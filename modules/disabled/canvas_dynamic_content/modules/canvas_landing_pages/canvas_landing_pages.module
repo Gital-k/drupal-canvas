@@ -1,0 +1,54 @@
+<?php
+/**
+ * @file
+ * Code for the canvas Landing Pages feature.
+ */
+
+include_once 'canvas_landing_pages.features.inc';
+
+/**
+ * Implements hook_preprocess_page().
+ *
+ * Implements logic for hiding page sidebars based on the field_hide_sidebars
+ * field.
+ */
+function canvas_landing_pages_preprocess_page(&$variables) {
+  $options = array(
+    'options' => array(
+      'min_range' => 1,
+    ),
+  );
+  $nid = filter_var(arg(1), FILTER_VALIDATE_INT, $options);
+  $state = arg(2);
+  $draft_or_empty = empty($state) || $state === 'draft';
+  if (arg(0) === 'node' && $nid !== FALSE && $draft_or_empty) {
+    // Get the current node, and revision if relevant.
+    $node = node_load($nid);
+    if (empty($node)) {
+      return;
+    }
+    if ($state === 'draft' && $node->type === 'landing_page') {
+      $node = workbench_moderation_node_current_load($node);
+    }
+
+    // If we are on the right kind of node and we have a field setting, 'hide'
+    // the sidebars using brute force.
+    if (!empty($node) && $node->type === 'landing_page' && isset($node->field_hide_sidebars[LANGUAGE_NONE][0]['value'])) {
+      $sidebar_setting = $node->field_hide_sidebars[LANGUAGE_NONE][0]['value'];
+      switch ($sidebar_setting) {
+        case 'first':
+          $variables['page']['sidebar_first'] = array();
+          break;
+
+        case 'second':
+          $variables['page']['sidebar_second'] = array();
+          break;
+
+        case 'all':
+          $variables['page']['sidebar_first'] = array();
+          $variables['page']['sidebar_second'] = array();
+          break;
+      }
+    }
+  }
+}

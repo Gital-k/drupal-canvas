@@ -1,0 +1,13 @@
+name = Styles
+description = Provides a Style entity
+core = 7.x
+package = Canvas Paragraphs
+dependencies[] = eck
+dependencies[] = features
+dependencies[] = text
+features[eck_bundle][] = paragraph_style_paragraph_style
+features[eck_entity_type][] = paragraph_style
+features[features_api][] = api:2
+features[field_base][] = field_style_classes
+features[field_instance][] = paragraph_style-paragraph_style-field_style_classes
+mtime = 1421706447

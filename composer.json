@@ -1,0 +1,72 @@
+{
+  "name": "xtfer/canvas",
+  "type": "drupal-profile",
+  "description" : "canvas is a free, open source Drupal 7 distribution",
+  "license": "GPL-2.0+",
+  "authors": [
+    {
+      "name": "Christopher Skene",
+      "email": "chris@xtfer.com",
+      "role": "Developer"
+    }
+  ],
+  "repositories": [
+    {
+      "type": "package",
+      "package": {
+        "name": "drupal/coder",
+        "version": "master",
+        "source": {
+          "url": "git://drupalcode.org/project/coder.git",
+          "type": "vcs",
+          "reference": "7.x-2.2"
+        }
+      }
+    },
+    {
+      "type": "package",
+      "package": {
+        "name": "nickschuch/phpcs-security-audit",
+        "version": "master",
+        "source": {
+          "url": "https://github.com/nickschuch/phpcs-security-audit.git",
+          "type": "vcs",
+          "reference": "master"
+        }
+      }
+    },
+    {
+      "type": "package",
+      "package": {
+        "name": "xtfer/drupal-phing",
+        "version": "master",
+        "source": {
+          "url": "https://github.com/xtfer/drupal-phing.git",
+          "type": "vcs",
+          "reference": "master"
+        }
+      }
+    }
+  ],
+  "require": {
+    "composer/installers": "~1.0"
+  },
+  "require-dev": {
+    "drupal/drupal-extension": "~1.0",
+    "squizlabs/php_codesniffer": "~1.5",
+    "nickschuch/phpcs-security-audit": "dev-master",
+    "drupal/coder": "master",
+    "phpmd/phpmd": "~2.0",
+    "xtfer/drupal-phing": "dev-master"
+  },
+  "minimum-stability": "dev",
+  "config": {
+    "bin-dir": "bin/"
+  },
+  "extra": {
+    "branch-alias": {
+      "dev-7.x-2.x": "7.2.x-dev",
+      "dev-7.x-1.x": "7.1.x-dev"
+    }
+  }
+}

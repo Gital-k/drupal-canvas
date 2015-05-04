@@ -1,0 +1,13 @@
+name = Canvas Sitemap Configuration
+description = Provides default xmlsitemap configuration.
+core = 7.x
+package = Canvas
+dependencies[] = ctools
+dependencies[] = strongarm
+dependencies[] = xmlsitemap
+features[ctools][] = strongarm:strongarm:1
+features[features_api][] = api:2
+features[variable][] = xmlsitemap_minimum_lifetime
+features[variable][] = xmlsitemap_settings_menu_link_main-menu
+features[variable][] = xmlsitemap_settings_menu_link_menu-footer-sub-menu
+mtime = 1420666867

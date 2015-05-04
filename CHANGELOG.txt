@@ -1,0 +1,6 @@
+
+canvas Changelog
+
+7.x-1.0-alpha1
+==============
+Initial release of Canvas

@@ -1,0 +1,57 @@
+<project name="canvas" default="build">
+
+
+  <property name="drupal-phing.dir"  value="${project.basedir}/vendor/xtfer/drupal-phing" />
+  <import file="vendor/xtfer/drupal-phing/drupal-phing.build.xml" />
+
+  <property name="project.name" value="canvas"/>
+  <property name="profile.name" value="${project.name}" />
+  <property name="app.uri" value="http://canvas.dev" />
+  <property name="codestyle.standard.drupal" value="vendor/drupal/coder/coder_sniffer/Drupal" />
+  <property name="codestyle.standard.security" value="vendor/nickschuch/phpcs-security-audit/Security" />
+  <property name="codestyle.standard.security.src" value="vendor/nickschuch/phpcs-security-audit/example_drupal7_ruleset.xml" />
+  <property name="codestyle.extensions" value="php,module,inc,install,test,profile,theme" />
+  <property name="src.profile.dir" value="profiles/canvas" />
+  <property name="src.custom.modules" value="modules/canvas" />
+  <property name="src.custom.themes" value="" />
+  <property name="build.dir" value="build" />
+  <property name="build.drupal.dir" value="${project.basedir}/../build" />
+  <property name="build.profile.dir" value="${build.drupal.dir}/profiles/canvas" />
+  <property name="build.symlink.source" value="${project.basedir}" />
+  <property name="db.username" value="canvas" />
+  <property name="db.password" value="canvas" />
+  <property name="db.name" value="canvas" />
+  <property name="db.host" value="canvas.dev" />
+
+  <property file="./build.properties" override="true"/>
+
+  <target name="build" depends="profile:clean:all, prepare:all, validate:all, drush:make, install, drush:login" description="Build the project" />
+
+  <!-- Mapped targets -->
+
+  <target name="profile:build:no-install"
+          depends="profile:clean:all, prepare:all, validate:all, drush:make"
+          description="Builds the project without running the installer. Good for manual installer testing." />
+
+  <!-- Overridden targets -->
+
+  <target name="codestyle:prepare">
+    <copy file="${codestyle.standard.security.src}" tofile="${codestyle.standard.security}/ruleset.xml" overwrite="true" />
+  </target>
+
+  <target name="codestyle:validate"
+          description="Find coding standard violations using PHP_CodeSniffer creating a log file for the continuous integration server.">
+    <if>
+      <istrue value="${src.custom.modules}"/>
+      <then>
+        <exec command="${project.basedir}/bin/phpcs --standard=${codestyle.standard.drupal} --ignore=*features* --extensions=${codestyle.extensions} ${src.custom.modules}"
+              logoutput="true" passthru="true" checkreturn="true" />
+      </then>
+    </if>
+  </target>
+
+  <target name="drush:prepare" description="Ensures Drush dependencies are up to date" >
+    <exec command="drush dl -n composer-8.x drupalorg_drush-7.x-1.x-dev --destination=${user.home}/.drush" />
+  </target>
+
+</project>

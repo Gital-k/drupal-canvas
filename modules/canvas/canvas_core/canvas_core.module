@@ -1,0 +1,112 @@
+<?php
+/**
+ * @file
+ * Common functionality used across canvas.
+ */
+
+/**
+ * Implements hook_permission().
+ */
+function canvas_core_permission() {
+  return array(
+    'administer theme settings' => array(
+      'title' => t('Administer theme settings'),
+      'description' => t('Perform administration on theme settings'),
+    ),
+  );
+}
+
+/**
+ * Returns a list of the themes that canvas supports.
+ *
+ * @todo Seems to be two functions
+ * @see canvas_utilities_supported_themes
+ */
+function canvas_core_theme_info() {
+  return array(
+    CANVAS_UTILITIES_DEFAULT_THEME,
+  );
+}
+
+/**
+ * Implements hook_entity_info_alter().
+ */
+function canvas_core_entity_info_alter(&$entity_info) {
+
+  // @todo Provide this in a Config setting.
+  $entity_info['node']['view modes']['compact'] = array(
+    'label' => t('Compact'),
+    'custom settings' => TRUE,
+  );
+}
+
+/**
+ * Implements hook_menu_alter().
+ */
+function canvas_core_menu_alter(&$items) {
+
+  // Add a new permission for theme settings.
+  $items['admin/appearance/settings']['access arguments'] = array('administer theme settings');
+
+  // Modify access check for theme settings.
+  foreach (list_themes() as $theme) {
+    $items['admin/appearance/settings/' . $theme->name]['access callback'] = '_canvas_appearance_themes_access';
+  }
+}
+
+/**
+ * Callback to check if user has access to administer theme settings.
+ *
+ * @param string $theme
+ *   Theme to check access for.
+ *
+ * @return bool
+ *   TRUE if user has access to theme settings.
+ */
+function _canvas_appearance_themes_access($theme) {
+  return user_access('administer theme settings') && drupal_theme_access($theme);
+}
+
+/**
+ * Implements hook_metatag_config_default_alter().
+ */
+function canvas_core_metatag_config_default_alter(&$configs) {
+
+  $lang = language_default('language').
+
+  // @todo Provide this in a Config setting.
+  $configs['global']->config['dcterms.creator'] = array('item' => array('value' => '[site:name]'));
+  $configs['global']->config['dcterms.date'] = array('item' => array('value' => '[current-date:custom:Y-m-d\TH:iP]'));
+  $configs['global']->config['dcterms.description'] = array('item' => array('value' => '[site:slogan]'));
+  $configs['global']->config['dcterms.language'] = array('item' => array('value' => $lang));
+  $configs['global']->config['dcterms.publisher'] = array('item' => array('value' => '[site:name]'));
+  $configs['global']->config['dcterms.subject'] = array('item' => array('value' => '[site:slogan]'));
+  $configs['global']->config['dcterms.type'] = array('item' => array('value' => 'other'));
+
+  $configs['global']->config['generator'] = array('value' => 'Drupal 7 (http://drupal.org) + canvas (http://drupal.org/project/canvas)');
+
+  $configs['node']->config['dcterms.language'] = array('item' => array('value' => $lang));
+}
+
+/**
+ * Implements hook_block_info_alter().
+ */
+function canvas_core_block_info_alter(&$blocks, $theme, $code_blocks) {
+  $blocks['system']['help']['region'] = 'content';
+  $blocks['system']['user-menu']['title'] = '<none>';
+}
+
+/**
+ * Implements hook_admin_paths().
+ */
+function canvas_core_admin_paths() {
+  $paths = array();
+
+  // Use the admin theme for user login and registration.
+  if (variable_get('canvas_login_admin_theme', TRUE) == TRUE) {
+    $paths['user/login'] = TRUE;
+    $paths['user/register'] = TRUE;
+  }
+
+  return $paths;
+}

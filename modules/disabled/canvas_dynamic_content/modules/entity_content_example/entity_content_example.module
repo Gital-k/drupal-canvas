@@ -1,0 +1,7 @@
+<?php
+/**
+ * @file
+ * Code for the Entity Content example feature.
+ */
+
+include_once 'entity_content_example.features.inc';

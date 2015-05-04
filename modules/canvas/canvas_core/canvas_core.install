@@ -1,0 +1,32 @@
+<?php
+
+/**
+ * @file
+ * Install file for Canvas Core.
+ *
+ * @license GPL v2 http://www.fsf.org/licensing/licenses/gpl.html
+ * @author Chris Skene chris at xtfer dot com
+ * @copyright Copyright(c) 2015 Christopher Skene
+ */
+
+use Drupal\ghost\Logger\Logger;
+
+/**
+ * Implements hook_install().
+ *
+ * Perform actions to set up the site for this profile.
+ */
+function canvas_core_install() {
+
+  Logger::init('canvas')
+    ->setMessage('Canvas install has started.')
+    ->useMessageArea()
+    ->logMessage();
+
+  \Drupal\canvas_core\Installer\Installer::init()->runInstall();
+
+  Logger::init('canvas')
+    ->setMessage('Canvas install has completed.')
+    ->useMessageArea()
+    ->logMessage();
+}

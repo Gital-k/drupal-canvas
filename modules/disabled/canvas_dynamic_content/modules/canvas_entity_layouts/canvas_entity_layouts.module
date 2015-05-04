@@ -1,0 +1,34 @@
+<?php
+/**
+ * @file
+ * Code for the Entity layouts feature.
+ */
+
+include_once 'canvas_entity_layouts.features.inc';
+
+/**
+ * Define the normal layout mode.
+ */
+const canvas_ENTITY_LAYOUTS_MODE_NORMAL = 'normal';
+
+/**
+ * Define the dynamic layout mode.
+ */
+const canvas_ENTITY_LAYOUTS_MODE_DYNAMIC = 'paragraphs';
+
+/**
+ * Implements hook_entity_view().
+ */
+function canvas_entity_layouts_entity_view($entity, $type, $view_mode, $langcode) {
+  \Drupal\canvas_entity_layouts\EntityContentizer::entityView($entity, $type, $view_mode, $langcode);
+}
+
+/**
+ * Callback to provide options for the layout_mode field.
+ */
+function canvas_entity_layouts_layout_mode_options() {
+  return array(
+    canvas_ENTITY_LAYOUTS_MODE_NORMAL => t('Normal (default)'),
+    canvas_ENTITY_LAYOUTS_MODE_DYNAMIC => t('Dynamic'),
+  );
+}

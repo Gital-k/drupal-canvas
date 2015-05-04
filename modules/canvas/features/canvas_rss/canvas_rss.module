@@ -1,0 +1,7 @@
+<?php
+/**
+ * @file
+ * Code for the RSS feature.
+ */
+
+include_once 'canvas_rss.features.inc';

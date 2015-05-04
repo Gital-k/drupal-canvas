@@ -1,0 +1,4 @@
+name = Canvas Environments
+package = Canvas
+description = Default environment indicator configurations for Canvas
+core = 7.x

@@ -1,0 +1,25 @@
+name = Canvas Core
+package = Canvas
+description = The main Canvas installer.
+core = 7.x
+
+registry_autoload[] = PSR-4
+
+dependencies[] = config
+dependencies[] = registry_autoload
+
+dependencies[] = canvas_utilities
+dependencies[] = canvas_inactive_account
+dependencies[] = canvas_editing
+dependencies[] = canvas_chosen
+dependencies[] = canvas_menu_block
+dependencies[] = canvas_mini_site
+dependencies[] = canvas_password_policy
+dependencies[] = canvas_rss
+dependencies[] = canvas_sitemap
+dependencies[] = canvas_social_links
+dependencies[] = canvas_share_links
+dependencies[] = canvas_menu
+dependencies[] = canvas_search_core
+
+

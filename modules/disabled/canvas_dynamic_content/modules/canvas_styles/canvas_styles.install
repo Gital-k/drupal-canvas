@@ -1,0 +1,46 @@
+<?php
+
+/**
+ * @file
+ * Install, update and uninstall functions for the canvas_styles module.
+ */
+
+/**
+ * Convert entity type style to paragraph_style.
+ */
+function canvas_styles_update_7100() {
+  db_transaction();
+  $id_mapping = array();
+  $result = db_select('eck_style', 'e')
+    ->fields('e', array('id', 'human_readable_name'))
+    ->execute();
+  while ($style = $result->fetchAssoc()) {
+    $paragraph_style = entity_create('paragraph_style', array(
+      'type' => 'paragraph_style',
+      'human_readable_name' => $style['human_readable_name'],
+    ));
+    $paragraph_style->save();
+    $id_mapping[$style['id']] = $paragraph_style->id;
+  }
+  foreach ($id_mapping as $old_id => $new_id) {
+    foreach (array('field_data_field_style_classes', 'field_revision_field_style_classes') as $table_name) {
+      db_update($table_name)
+        ->fields(array(
+          'entity_type' => 'paragraph_style',
+          'bundle' => 'paragraph_style',
+          'entity_id' => $new_id,
+          'revision_id' => $new_id,
+        ))
+        ->condition('entity_type', 'style')
+        ->condition('bundle', 'style')
+        ->condition('entity_id', $old_id)
+        ->condition('revision_id', $old_id)
+        ->execute();
+    }
+  }
+  db_delete('eck_bundle')
+    ->condition('machine_name', 'style_style')
+    ->execute();
+  db_drop_table('eck_style');
+  drupal_flush_all_caches();
+}

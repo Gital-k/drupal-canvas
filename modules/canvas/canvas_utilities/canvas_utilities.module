@@ -1,0 +1,36 @@
+<?php
+
+/**
+ * @file
+ * Utilities
+ *
+ * @license GPL v2 http://www.fsf.org/licensing/licenses/gpl.html
+ * @author Chris Skene chris at xtfer dot com
+ * @copyright Copyright(c) 2015 Christopher Skene
+ */
+
+/**
+ * Define a default theme constant
+ */
+define('CANVAS_UTILITIES_DEFAULT_THEME', 'bootstrap');
+
+/**
+ * Define the admin theme.
+ */
+define('CANVAS_UTILITIES_DEFAULT_ADMIN_THEME', 'shiny');
+
+/**
+ * Set the twitter widget ID.
+ * @todo
+ */
+define('CANVAS_UTILITIES_TWITTER_WIDGET_ID', '360632154172030979');
+
+/**
+ * Returns a list of the themes that canvas supports.
+ */
+function canvas_utilities_supported_themes() {
+  return array(
+    CANVAS_UTILITIES_DEFAULT_THEME,
+    CANVAS_INSTALL_DEFAULT_THEME,
+  );
+}

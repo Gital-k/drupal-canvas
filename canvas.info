@@ -1,0 +1,145 @@
+name = Canvas
+package = Canvas
+description = Quick start for Drupal sites
+core = 7.x
+
+php = 5.5
+
+; System Requirements.
+php_memory_limit = 128M
+
+; Core
+
+dependencies[] = block
+dependencies[] = contact
+dependencies[] = comment
+dependencies[] = contextual
+dependencies[] = filter
+dependencies[] = help
+dependencies[] = image
+dependencies[] = list
+dependencies[] = menu
+dependencies[] = number
+dependencies[] = options
+dependencies[] = path
+dependencies[] = taxonomy
+dependencies[] = search
+dependencies[] = syslog
+dependencies[] = shortcut
+dependencies[] = field
+dependencies[] = field_ui
+dependencies[] = text
+dependencies[] = file
+dependencies[] = image
+dependencies[] = list
+dependencies[] = rdf
+dependencies[] = update
+
+; Contrib
+
+dependencies[] = accessible_forms
+dependencies[] = admin_views
+dependencies[] = chosen
+dependencies[] = ctools
+dependencies[] = crumbs
+dependencies[] = date
+dependencies[] = defaultconfig
+dependencies[] = diff
+dependencies[] = draggableviews
+dependencies[] = ds
+dependencies[] = elements
+dependencies[] = entity
+dependencies[] = entitycache
+dependencies[] = entityreference
+dependencies[] = escape_admin
+dependencies[] = favicon
+dependencies[] = features
+dependencies[] = field_redirection
+dependencies[] = file_entity
+dependencies[] = file_lock
+dependencies[] = globalredirect
+dependencies[] = googleanalytics
+dependencies[] = google_analytics_reports
+dependencies[] = honeypot
+dependencies[] = libraries
+dependencies[] = link
+dependencies[] = linkchecker
+dependencies[] = linkit
+dependencies[] = login_destination
+dependencies[] = login_security
+dependencies[] = m4032404
+dependencies[] = maintenance_mode_permissions
+dependencies[] = media
+dependencies[] = media_internet
+dependencies[] = menu_block
+dependencies[] = menu_block_export
+dependencies[] = metatag
+dependencies[] = module_filter
+dependencies[] = mpac
+dependencies[] = navbar
+dependencies[] = options_flatten
+dependencies[] = panels
+dependencies[] = panels_ipe
+dependencies[] = password_policy
+dependencies[] = paranoia
+dependencies[] = pathauto
+dependencies[] = pathauto_persist
+dependencies[] = pci_update
+dependencies[] = phone
+dependencies[] = quicktabs
+dependencies[] = quicktabs_tabstyles
+dependencies[] = redirect
+dependencies[] = registry_autoload
+dependencies[] = strongarm
+dependencies[] = textformatter
+dependencies[] = textformatter_contrib
+dependencies[] = token
+dependencies[] = views_content
+dependencies[] = search404
+dependencies[] = search_api
+dependencies[] = search_api_db
+dependencies[] = search_api_page
+dependencies[] = scheduler
+dependencies[] = scheduler_workbench
+dependencies[] = session_cookie_lifetime
+dependencies[] = shield
+dependencies[] = seckit
+dependencies[] = simple_aggregation
+dependencies[] = site_map
+dependencies[] = text_summary_options
+dependencies[] = twitter_block
+dependencies[] = username_enumeration_prevention
+dependencies[] = userprotect
+dependencies[] = video_filter
+dependencies[] = views
+dependencies[] = views_rss
+dependencies[] = views_rss_core
+dependencies[] = views_ui
+dependencies[] = views_bulk_operations
+dependencies[] = view_unpublished
+dependencies[] = webform
+dependencies[] = webform_clear
+dependencies[] = webform_phone
+dependencies[] = workbench
+dependencies[] = workbench_moderation
+dependencies[] = wysiwyg
+dependencies[] = wysiwyg_filter
+dependencies[] = xmlsitemap
+dependencies[] = xmlsitemap_menu
+dependencies[] = xmlsitemap_node
+dependencies[] = ccl
+dependencies[] = ccl_actions
+dependencies[] = ccl_blocks
+dependencies[] = ccl_local_actions
+dependencies[] = ccl_views
+
+; Custom
+
+dependencies[] = iconomist
+dependencies[] = user_action_report
+
+; canvas
+
+;dependencies[] = canvas_core
+;
+

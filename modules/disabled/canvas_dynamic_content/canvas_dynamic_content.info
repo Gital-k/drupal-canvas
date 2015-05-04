@@ -1,0 +1,6 @@
+name = Canvas Dynamic Content
+description = Provides complex Paragraphs integration for dynamic and interesting content
+core = 7.x
+package = Canvas
+
+dependencies[] = canvas_landing_pages

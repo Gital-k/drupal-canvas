@@ -1,0 +1,4 @@
+name = Canvas Utilities
+package = Canvas
+description = Provides common functionality required by other canvas modules
+core = 7.x

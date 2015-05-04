@@ -1,0 +1,308 @@
+<?php
+/**
+ * @file
+ * Code for the Mini-site feature.
+ */
+
+include_once 'canvas_mini_site.features.inc';
+
+use Drupal\canvas_mini_site\Archive;
+use Drupal\canvas_mini_site\FileUtil;
+
+/**
+ * Get the directory path where mini-sites are stored.
+ *
+ * @return string
+ *   The directory path to extract to.
+ */
+function _canvas_mini_site_get_path() {
+  $public_path = variable_get('file_public_path', conf_path() . '/files');
+  $file_path = variable_get('canvas_mini_site_file_path', $public_path . '/minisites');
+  return $file_path;
+}
+
+/**
+ * Get the list of allowed file extensions for files in mini-site archive.
+ *
+ * @return array
+ *   Array of allowed extensions.
+ */
+function _canvas_mini_site_allowed_extensions() {
+  $default_allowed_extensions = 'html htm css js png gif jpg jpeg woff woff2 eot ttf svg pdf doc xls docx odt ppt pptx txt rtf flv fla DS_Store';
+  $allowed_extensions = variable_get('canvas_mini_site_allowed_extensions', $default_allowed_extensions);
+  return explode(' ', $allowed_extensions);
+}
+
+/**
+ * Validate a mini-site file.
+ *
+ * @param object $file
+ *   The mini site archive file.
+ * @param string $minisite_name
+ *   The existing minisite name if creating revision.
+ *
+ * @return array
+ *   An array. If the file is not a valid mini-site, it will contain an error
+ *   message.
+ */
+function canvas_mini_sites_file_validate($file, $minisite_name = NULL) {
+  $errors = array();
+  $archive = Archive::open($file);
+  if (!$archive) {
+    $errors[] = t('Unable to open mini-site archive.');
+    return $errors;
+  }
+  $files = $archive->listContents();
+  $tree = $archive->fileTree();
+  // Ignore __MACOSX folder.
+  unset($tree['__MACOSX']);
+  // Check mini-site is in folder.
+  $root_files = array_keys($tree);
+  if (count($root_files) !== 1 || !is_array($tree[$root_files[0]])) {
+    $errors[] = t('Mini-site must have a single top level directory.');
+    return $errors;
+  }
+  // Check mini-site has an index file.
+  $top_folder = $root_files[0];
+  $file->type = 'mini_site_archive';
+  $file->field_minisite_name = array(LANGUAGE_NONE => array(array('value' => $top_folder)));
+  $top_level = $tree[$top_folder];
+  if (!array_key_exists('index.html', $top_level)) {
+    $errors[] = t('Mini-site must contain a index.html file.');
+  }
+  // Check only allowed extensions are used.
+  $allowed_extensions = _canvas_mini_site_allowed_extensions();
+  $invalid_files = FileUtil::checkExtensions($files, $allowed_extensions);
+  if (!empty($invalid_files)) {
+    $errors[] = t('Mini-site contains files with invalid extensions: %files. Only files with the following extensions are allowed: %allowed-extensions', array(
+      '%allowed-extensions' => implode(' ', $allowed_extensions),
+      '%files' => implode(' ', $invalid_files),
+    ));
+  }
+  if ($minisite_name) {
+    // Check mini-site matches name of earlier revision.
+    if ($top_folder !== $minisite_name) {
+      $errors[] = t('Mini-site revision must have top level folder: %folder', array('%folder' => $minisite_name));
+    }
+  }
+  else {
+    // Check mini-site does not already exist.
+    $existing_names = db_select('field_data_field_minisite_name', 'f')->fields('f', array('field_minisite_name_value'))->execute()->fetchCol();
+    if (in_array($top_folder, $existing_names)) {
+      $errors[] = t('Mini-site named %folder already exists.', array('%folder' => $top_folder));
+    }
+  }
+  return $errors;
+}
+
+/**
+ * Implements hook_file_presave().
+ */
+function canvas_mini_site_file_presave($file) {
+  if ($file->status && $file->type === 'mini_site_archive') {
+    // Extract contents of mini-site.
+    $extract_path = _canvas_mini_site_get_path() . '/extract/' . $file->fid;
+    $archive = Archive::open($file);
+    if ($archive) {
+      FileUtil::rrmdir($extract_path);
+      $archive->extract($extract_path);
+    }
+  }
+}
+
+/**
+ * Implements hook_file_delete().
+ */
+function canvas_mini_site_file_delete($file) {
+  if ($file->type === 'mini_site_archive') {
+    $extract_path = _canvas_mini_site_get_path() . '/extract/' . $file->fid;
+    FileUtil::rrmdir($extract_path);
+  }
+}
+
+/**
+ * Perform actions for after mini-site node is saved.
+ *
+ * @param object $node
+ *   The mini-site node.
+ * @param int $vid
+ *   The version of the node.
+ * @param string $moderation_state
+ *   Moderation state of the node.
+ */
+function canvas_mini_site_node_postsave($node, $vid, $moderation_state) {
+  $fid = $node->field_minisite_archive_file[LANGUAGE_NONE][0]['fid'];
+  $file = file_load($fid);
+  $minisite_name = $file->field_minisite_name[LANGUAGE_NONE][0]['value'];
+  $node_path = _canvas_mini_site_get_path() . '/revisions/' . $node->nid;
+  $revision_path = $node_path . '/' . $vid;
+  $target = '../../extract/' . $fid;
+  if (!file_exists($node_path)) {
+    mkdir($node_path, 0777, TRUE);
+  }
+  if (is_link($revision_path)) {
+    drupal_unlink($revision_path);
+  }
+  symlink($target, $revision_path);
+  if ($moderation_state === workbench_moderation_state_published()) {
+    // Create a shorten symlink for published version.
+    $publish_path = _canvas_mini_site_get_path() . '/' . $minisite_name;
+    if (is_link($publish_path)) {
+      drupal_unlink($publish_path);
+    }
+    $target = 'extract/' . $fid . '/' . $minisite_name;
+    symlink($target, $publish_path);
+
+    // Use the short URL version for publish version.
+    $node->field_link_to[LANGUAGE_NONE][0]['url'] = $publish_path . '/index.html';
+
+    // Update previous publish revision to use its revision URL instead of
+    // the short URL.
+    $old_vid = db_select('workbench_moderation_node_history', 'h')
+      ->fields('h', array('vid'))
+      ->condition('nid', $node->nid)
+      ->condition('published', FALSE)
+      ->condition('state', workbench_moderation_state_published())
+      ->execute()
+      ->fetchField();
+    if ($old_vid) {
+      $old_node = node_load($node->nid, $old_vid);
+      $revision_path = $node_path . '/' . $old_node->vid;
+      $old_node->field_link_to[LANGUAGE_NONE][0]['url'] = $revision_path . '/' . $minisite_name . '/index.html';
+      field_attach_update('node', $old_node);
+    }
+  }
+  else {
+    $node->field_link_to[LANGUAGE_NONE][0]['url'] = $revision_path . '/' . $minisite_name . '/index.html';
+
+    // If no published revision, remove symlink.
+    if (isset($node->workbench_moderation) && empty($node->workbench_moderation['published'])) {
+      $publish_path = _canvas_mini_site_get_path() . '/' . $minisite_name;
+      if (is_link($publish_path)) {
+        drupal_unlink($publish_path);
+      }
+    }
+  }
+  field_attach_update('node', $node);
+}
+
+/**
+ * Implements hook_node_insert().
+ */
+function canvas_mini_site_node_insert($node) {
+  if ($node->type === 'mini_site') {
+    canvas_mini_site_node_postsave($node, $node->vid, $node->workbench_moderation_state_new);
+  }
+}
+
+/**
+ * Implements hook_node_update().
+ */
+function canvas_mini_site_node_update($node) {
+  if ($node->type === 'mini_site') {
+    if (isset($node->workbench_moderation_state_new)) {
+      canvas_mini_site_node_postsave($node, $node->vid, $node->workbench_moderation_state_new);
+    }
+    else {
+      $moderation = $node->workbench_moderation['my_revision'];
+      canvas_mini_site_node_postsave($node, $moderation->vid, $moderation->state);
+    }
+  }
+}
+
+/**
+ * Implements hook_node_delete().
+ */
+function canvas_mini_site_node_delete($node) {
+  if ($node->type === 'mini_site') {
+    // Remove revision symlinks.
+    $path = _canvas_mini_site_get_path();
+    $node_path = $path . '/revisions/' . $node->nid;
+    FileUtil::rrmdir($node_path);
+
+    // Delete publish link.
+    $fid = $node->field_minisite_archive_file[LANGUAGE_NONE][0]['fid'];
+    $file = file_load($fid);
+    $minisite_name = $file->field_minisite_name[LANGUAGE_NONE][0]['value'];
+    $publish_path = $path . '/' . $minisite_name;
+    if (is_link($publish_path)) {
+      drupal_unlink($publish_path);
+    }
+    // Force delete the associated managed files. The files should not be used
+    // by any other modules but due to what I believe is a bug the usage counts
+    // are incorrect, so this works around that problem.
+    $fids = db_select('field_revision_field_minisite_archive_file', 'f')
+      ->fields('f', array('field_minisite_archive_file_fid'))
+      ->condition('entity_type', 'node')
+      ->condition('bundle', 'mini_site')
+      ->condition('entity_id', $node->nid)
+      ->execute()
+      ->fetchCol();
+    $files = entity_load('file', $fids);
+    foreach ($files as $file) {
+      file_delete($file, TRUE);
+    }
+  }
+}
+
+/**
+ * Implements hook_node_revision_delete().
+ */
+function canvas_mini_site_node_revision_delete($node) {
+  if ($node->type === 'mini_site') {
+    $extract_path = _canvas_mini_site_get_path();
+    $node_path = $extract_path . '/revisions/' . $node->nid;
+    $revision_path = $node_path . '/' . $node->vid;
+    drupal_unlink($revision_path);
+  }
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function canvas_mini_site_form_mini_site_node_form_alter(&$form, &$form_state, $form_id) {
+  $node = $form['#node'];
+  $minisite_name = NULL;
+  if (isset($node->field_minisite_archive_file[LANGUAGE_NONE][0])) {
+    $file_field = $node->field_minisite_archive_file[LANGUAGE_NONE][0];
+    if (isset($file_field['field_minisite_name'][LANGUAGE_NONE][0])) {
+      $minisite_name = $file_field['field_minisite_name'][LANGUAGE_NONE][0]['value'];
+    }
+  }
+  $form['field_minisite_archive_file'][LANGUAGE_NONE][0]['#upload_validators']['canvas_mini_sites_file_validate'] = array($minisite_name);
+  unset($form['field_link_to']);
+  // Clear file upload field for new draft.
+  if (isset($node->workbench_moderation)) {
+    $state = $node->workbench_moderation;
+    if (!empty($state['published']) && $state['published']->vid == $state['current']->vid) {
+      unset($form['field_minisite_archive_file'][LANGUAGE_NONE][0]['#default_value']);
+    }
+  }
+}
+
+/**
+ * Implements hook_permission().
+ */
+function canvas_mini_site_permission() {
+  return array(
+    'administer minisite' => array(
+      'title' => t('Administer mini-site module'),
+      'description' => t('Perform administration tasks for mini-site module.'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_menu_alter().
+ */
+function canvas_mini_site_menu_alter(&$items) {
+  $items['admin/config/system/minisite'] = array(
+    'title' => 'canvas Mini-site',
+    'description' => 'Manage the settings of mini-sites module.',
+    'type' => MENU_NORMAL_ITEM,
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('minisite_admin_settings'),
+    'access arguments' => array('administer minisite'),
+    'file' => drupal_get_path('module', 'canvas_mini_site') . '/canvas_mini_site.admin.inc',
+  );
+}

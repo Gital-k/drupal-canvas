@@ -1,0 +1,37 @@
+<?php
+
+/**
+ * @file
+ * Dynamic Content module file
+ */
+
+
+/**
+ * Implements hook_defaultconfig_user_default_permissions().
+ */
+function canvas_dynamic_content_defaultconfig_user_default_permissions() {
+  $permissions = array();
+
+  $base_permissions = _canvas_dynamic_content_get_permissions();
+  foreach ($base_permissions as $module => $module_permissions) {
+    foreach ($module_permissions as $permission_key => $permission) {
+      $permissions[$permission_key] = array(
+        'name' => $permission_key,
+        'roles' => $permission['roles'],
+        'module' => $module,
+      );
+    }
+  }
+
+  return $permissions;
+}
+
+/**
+ * Get module permissions.
+ *
+ * @return array
+ *   An array of permissions.
+ */
+function _canvas_dynamic_content_get_permissions() {
+  return array();
+}

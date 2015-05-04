@@ -1,0 +1,30 @@
+<?php
+
+/**
+ * @file
+ * Install file for canvas_search_core
+ */
+
+/**
+ * Implements hook_install().
+ */
+function canvas_search_core_install() {
+  user_role_grant_permissions(
+    DRUPAL_ANONYMOUS_RID,
+    array(
+      'access search_api_page',
+    )
+  );
+  user_role_grant_permissions(
+    DRUPAL_AUTHENTICATED_RID,
+    array(
+      'access search_api_page',
+    )
+  );
+
+  $themes = canvas_utilities_supported_themes();
+
+  // @todo use Fabricator
+  module_load_include('inc', 'canvas_core', 'inc/block');
+  canvas_core_insert_block('search_api_page', 'default_search', $themes, 'header', 0, 0, '', '<none>');
+}

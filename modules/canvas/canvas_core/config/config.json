@@ -1,0 +1,12 @@
+{
+  "text_formats" : "\\Drupal\\canvas_core\\ConfigTasks\\Core\\TextFormats",
+  "user_roles" : "\\Drupal\\canvas_core\\ConfigTasks\\Core\\UserRoles",
+  "theme" : "\\Drupal\\canvas_core\\ConfigTasks\\Core\\Theme",
+  "date_formats" : "\\Drupal\\canvas_core\\ConfigTasks\\Core\\DateFormats",
+  "block" : "\\Drupal\\canvas_core\\ConfigTasks\\Core\\Block",
+  "image_styles" : "\\Drupal\\canvas_core\\ConfigTasks\\Core\\ImageStyles",
+  "variables" : "\\Drupal\\canvas_core\\ConfigTasks\\Variable",
+  "pathauto" : "\\Drupal\\canvas_core\\ConfigTasks\\Contrib\\Pathauto",
+  "login_destination": "\\Drupal\\canvas_core\\ConfigTasks\\Contrib\\LoginDestination",
+  "finalise" : "\\Drupal\\canvas_core\\ConfigTasks\\Core\\Finalise"
+}

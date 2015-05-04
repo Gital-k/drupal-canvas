@@ -1,0 +1,63 @@
+<?php
+
+/**
+ * @file
+ * Blank module file
+ */
+
+/**
+ * Implements hook_modules_enabled().
+ *
+ * Install default arrangements after the canvas_arrangements feature as
+ * completed setting up the entity type.
+ */
+function canvas_default_arrangements_modules_enabled($modules) {
+  if (in_array('canvas_default_arrangements', $modules)) {
+    _canvas_arrangements_default_arrangements();
+  }
+}
+
+/**
+ * Implements hook_module_implements_alter().
+ *
+ * canvas_default_arrangements_modules_enabled() needs to run after
+ * features_modules_enabled().
+ */
+function canvas_default_arrangements_module_implements_alter(&$implementations, $hook) {
+  if ($hook === 'modules_enabled') {
+    $module_name = 'canvas_default_arrangements';
+    $group = $implementations[$module_name];
+    unset($implementations[$module_name]);
+    $implementations[$module_name] = $group;
+  }
+}
+
+/**
+ * Callback to install some default arrangement types.
+ */
+function _canvas_arrangements_default_arrangements() {
+  $arrangements = array(
+    'full' => array(
+      'title' => 'Full width',
+    ),
+    'tiles_2' => array(
+      'title' => 'Tiled (2 across)',
+    ),
+    'tiles_3' => array(
+      'title' => 'Tiled (3 across)',
+    ),
+    'tiles_4' => array(
+      'title' => 'Tiled (4 across)',
+    ),
+    'tiles_5' => array(
+      'title' => 'Tiled (5 across)',
+    ),
+  );
+
+  foreach ($arrangements as $arr_key => $settings) {
+    $settings['field_machine_name'][LANGUAGE_NONE][0]['value'] = $arr_key;
+    $settings['type'] = 'arrangement';
+    $entity = entity_create('arrangement', $settings);
+    entity_save('arrangement', $entity);
+  }
+}

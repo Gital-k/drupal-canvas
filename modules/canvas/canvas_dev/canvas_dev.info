@@ -1,0 +1,9 @@
+name = Canvas Developer
+package = Canvas
+description = Enables developer tools and setting for Canvas
+core = 7.x
+
+
+
+
+dependencies[] = canvas_environment

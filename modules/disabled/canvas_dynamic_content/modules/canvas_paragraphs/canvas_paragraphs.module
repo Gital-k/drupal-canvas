@@ -1,0 +1,109 @@
+<?php
+/**
+ * @file
+ * Code for the canvas Paragraphs feature.
+ */
+
+include_once 'canvas_paragraphs.features.inc';
+
+/**
+ * Implements hook_entity_info_alter().
+ */
+function canvas_paragraphs_entity_info_alter(&$entity_info) {
+  $view_modes = canvas_paragraphs_widget_view_modes();
+  foreach ($view_modes as $view_mode_name => $view_mode) {
+    if (!empty($view_mode['entities'])) {
+      foreach ($view_mode['entities'] as $entity_type) {
+        $entity_info[$entity_type]['view modes'][$view_mode_name] = $view_mode;
+        unset($entity_info[$entity_type]['view modes'][$view_mode_name]['entities']);
+      }
+    }
+  }
+}
+
+/**
+ * Default view modes.
+ *
+ * @return array
+ *   An array of view modes.
+ */
+function canvas_paragraphs_widget_view_modes() {
+  $view_modes = array();
+
+  // Paragraphs Item view modes.
+  $view_modes['teaser'] = array(
+    'label' => t('Teaser'),
+    'custom settings' => TRUE,
+    'entities' => array('paragraphs_item'),
+  );
+  // Paragraphs Item view modes.
+  $view_modes['nested'] = array(
+    'label' => t('Nested'),
+    'custom settings' => TRUE,
+    'entities' => array('paragraphs_item'),
+  );
+  $view_modes['compact'] = array(
+    'label' => t('Compact'),
+    'custom settings' => TRUE,
+    'entities' => array('paragraphs_item'),
+  );
+
+  return $view_modes;
+}
+
+/**
+ * Implements hook_entity_view().
+ */
+function canvas_paragraphs_entity_view($entity, $type, $view_mode, $langcode) {
+  // We have a field which allows us to select a view mode for nodes.
+  // However the switching doesn't work like it does normally, so we have to
+  // manually apply the view here.
+  if ($type === 'paragraphs_item' && isset($entity->bundle) && $entity->bundle === 'node') {
+    if (isset($entity->field_pbundle_view_mode[$langcode][0]['entity_display']) && $entity->field_pbundle_view_mode[$langcode][0]['entity_display'] !== 'full') {
+      $entity->content['field_pbundle_node'] = node_view($entity->field_pbundle_node[$langcode][0]['entity'], $entity->field_pbundle_view_mode[$langcode][0]['entity_display'], $langcode);
+    }
+  }
+
+  // Class logic in the Class Controller.
+  \Drupal\canvas_paragraphs\ClassController::resolveClasses($entity, $type, $view_mode, $langcode);
+}
+
+/**
+ * Implements theme_preprocess_paragraphs_items().
+ */
+function canvas_paragraphs_preprocess_paragraphs_items(&$variables, $hook) {
+  $variables['classes_array'] = array();
+
+  // Add the view mode class.
+  $variables['classes_array'][] = 'paragraphs-items_view-mode_' . drupal_html_class($variables['view_mode']);
+
+  // Paragraphs doesn't properly add the element classes.
+  \Drupal\canvas_paragraphs\ClassController::setElementClasses($variables, 'element');
+}
+
+/**
+ * Implements theme_preprocess_entity().
+ */
+function canvas_paragraphs_preprocess_entity(&$variables) {
+  // Paragraphs never calls theme_paragraphs_item, so we do it in
+  // entity instead.
+  if ($variables['entity_type'] == 'paragraphs_item') {
+
+    // Add the view mode class.
+    $variables['classes_array'][] = 'paragraphs-item_view-mode_' . drupal_html_class($variables['view_mode']);
+
+    // Paragraphs doesn't properly add the element classes.
+    \Drupal\canvas_paragraphs\ClassController::setElementClasses($variables, 'elements');
+  }
+}
+
+/**
+ * Implements hook_preprocess_field().
+ */
+function canvas_paragraphs_preprocess_field(&$variables) {
+  if ($variables['element']['#field_name'] == 'field_pbundle_view') {
+    // Add the layout classes.
+    // Paragraphs doesn't properly add the element classes.
+    \Drupal\canvas_paragraphs\ClassController::setElementClasses($variables, 'element');
+  }
+}

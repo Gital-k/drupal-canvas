@@ -1,0 +1,5 @@
+name = canvas Default arrangements
+core = 7.x
+package = Canvas Paragraphs
+
+dependencies[] = canvas_arrangements

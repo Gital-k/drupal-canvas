@@ -1,0 +1,14 @@
+name = Entity layouts
+description = Allows the use of Paragraphs as an entity layout tool
+core = 7.x
+package = Canvas Paragraphs
+dependencies[] = canvas_paragraphs
+dependencies[] = features
+dependencies[] = list
+dependencies[] = paragraphs
+dependencies[] = registry_autoload
+features[features_api][] = api:2
+features[field_base][] = field_layout_mode
+features[field_base][] = field_paragraph_content
+features[paragraphs][] = entity_content
+registry_autoload[] = PSR-4

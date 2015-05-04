@@ -1,0 +1,13 @@
+name = canvas Arrangements
+core = 7.x
+package = Canvas Paragraphs
+dependencies[] = eck
+dependencies[] = features
+dependencies[] = machine_name
+features[eck_bundle][] = arrangement_arrangement
+features[eck_entity_type][] = arrangement
+features[features_api][] = api:2
+features[field_base][] = field_machine_name
+features[field_instance][] = arrangement-arrangement-field_machine_name
+mtime = 1417607898
+project path = profiles/canvas/modules/features
