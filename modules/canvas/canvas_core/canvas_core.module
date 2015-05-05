@@ -72,7 +72,7 @@ function _canvas_appearance_themes_access($theme) {
  */
 function canvas_core_metatag_config_default_alter(&$configs) {
 
-  $lang = language_default('language').
+  $lang = language_default('language');
 
   // @todo Provide this in a Config setting.
   $configs['global']->config['dcterms.creator'] = array('item' => array('value' => '[site:name]'));
