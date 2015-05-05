@@ -33,6 +33,8 @@
           depends="profile:clean:all, prepare:all, validate:all, drush:make"
           description="Builds the project without running the installer. Good for manual installer testing." />
 
+  <target name="install"/>
+
   <!-- Overridden targets -->
 
   <target name="codestyle:prepare">

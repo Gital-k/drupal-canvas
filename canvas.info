@@ -108,7 +108,8 @@ dependencies[] = simple_aggregation
 dependencies[] = site_map
 dependencies[] = text_summary_options
 dependencies[] = twitter_block
-dependencies[] = username_enumeration_prevention
+; Disabled till we fix https://www.drupal.org/node/2483015
+;dependencies[] = username_enumeration_prevention
 dependencies[] = userprotect
 dependencies[] = video_filter
 dependencies[] = views

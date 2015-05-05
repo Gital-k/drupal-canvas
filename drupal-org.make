@@ -134,7 +134,8 @@ projects[text_summary_options][version] = "1.0-beta1"
 projects[token][version] = "1.5"
 projects[token][version] = "1.6"
 projects[twitter_block][version] = "2.2"
-projects[username_enumeration_prevention][version] = "1.1"
+; Disabled till we fix https://www.drupal.org/node/2483015
+; projects[username_enumeration_prevention][version] = "1.1"
 projects[userprotect][version] = "1.1"
 projects[uuid][version] = "1.0-alpha6"
 projects[video_filter][patch][] = https://www.drupal.org/files/issues/video_filter-fix_modal-2335169-11.patch
