@@ -235,6 +235,16 @@ props:
           #  alt: 'The BEST cat!'
           #  width: 601
           #  height: 402
+    # The "video" predefined object format.
+    test_object_drupal_video:
+      title: 'Object, $ref=json-schema-definitions://experience_builder.module/video'
+      $ref: json-schema-definitions://experience_builder.module/video
+      type: object
+      examples:
+        - src: https://youtu.be/dQw4w9WgXcQ
+          poster: /sites/default/files/600x400.png
+          width: 600
+          height: 400
 
     # The "date-range" object format for this module.
     test_object_drupal_date_range:

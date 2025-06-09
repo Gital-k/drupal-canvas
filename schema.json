@@ -208,6 +208,30 @@
         }
       }
     },
+    "video": {
+      "title": "video",
+      "type":  "object",
+      "required": ["src"],
+      "properties": {
+        "src": {
+          "title": "Video URL",
+          "type": "string",
+          "format": "uri"
+        },
+        "poster": {
+          "title": "Poster image URL",
+          "$ref": "json-schema-definitions://experience_builder.module/image-uri"
+        },
+        "width": {
+          "title": "Image width",
+          "type": "integer"
+        },
+        "height": {
+          "title": "Image height",
+          "type": "integer"
+        }
+      }
+    },
     "config-entity-id": {
       "title": "config entity id",
       "type": "string",
