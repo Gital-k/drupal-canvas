@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupal\Tests\experience_builder\Kernel;
 
 use Drupal\experience_builder\PropExpressions\StructuredData\StructuredDataPropExpression;
+use Drupal\experience_builder\PropShape\PropShape;
 use Drupal\experience_builder\PropShape\StorablePropShape;
 
 /**
@@ -54,6 +55,13 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
     $this->installEntitySchema('filter_format');
   }
 
+  public static function getExpectedUnstorablePropShapes(): array {
+    $unstorable_prop_shapes = parent::getExpectedUnstorablePropShapes();
+    unset($unstorable_prop_shapes['type=object&$ref=json-schema-definitions://experience_builder.module/video']);
+
+    return $unstorable_prop_shapes;
+  }
+
   /**
    * @return \Drupal\experience_builder\PropShape\StorablePropShape[]
    */
@@ -61,7 +69,7 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
     $storable_prop_shapes = parent::getExpectedStorablePropShapes();
     $image_shapes = array_filter(
       $storable_prop_shapes,
-      fn ($k) => str_contains($k, 'json-schema-definitions://experience_builder.module/image'),
+      fn (string $k) => str_contains($k, 'json-schema-definitions://experience_builder.module/image'),
       ARRAY_FILTER_USE_KEY
     );
     foreach ($image_shapes as $k => $image_shape) {
@@ -84,6 +92,25 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
         ],
       );
     }
+
+    $storable_prop_shapes['type=object&$ref=json-schema-definitions://experience_builder.module/video'] = new StorablePropShape(
+      shape: new PropShape(['type' => 'object', '$ref' => 'json-schema-definitions://experience_builder.module/video']),
+      // @phpstan-ignore-next-line
+      fieldTypeProp: StructuredDataPropExpression::fromString('ℹ︎entity_reference␟{src↝entity␜␜entity:media:video␝field_media_video_file␞␟entity␜␜entity:file␝uri␞␟value,poster↝entity␜␜entity:media:video␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url,width↝entity␜␜entity:media:video␝thumbnail␞␟width,height↝entity␜␜entity:media:video␝thumbnail␞␟height}'),
+      fieldWidget: 'media_library_widget',
+      fieldStorageSettings: [
+        'target_type' => 'media',
+      ],
+      fieldInstanceSettings: [
+        'handler' => 'default:media',
+        'handler_settings' => [
+          'target_bundles' => [
+            'video' => 'video',
+          ],
+        ],
+      ],
+    );
+
     return $storable_prop_shapes;
   }
 

@@ -259,6 +259,52 @@ class ShapeMatchingHooks {
       ];
       $storable_prop_shape->fieldWidget = 'media_library_widget';
     }
+
+    if ($storable_prop_shape->shape->schema == [
+      'type' => 'object',
+      '$ref' => 'json-schema-definitions://experience_builder.module/video',
+    ]) {
+
+      $video_media_type = MediaType::load('video');
+      if (!$video_media_type) {
+        return;
+      }
+      $source_field_definition = $video_media_type->getSource()
+        ->getSourceFieldDefinition($video_media_type);
+      \assert($source_field_definition !== \NULL);
+      $source_field_name = $source_field_definition->getName();
+
+      $storable_prop_shape->fieldTypeProp = new FieldTypeObjectPropsExpression('entity_reference', [
+        'src' => new ReferenceFieldTypePropExpression(
+          new FieldTypePropExpression('entity_reference', 'entity'),
+          new ReferenceFieldPropExpression(
+            new FieldPropExpression(EntityDataDefinition::create('media', 'video'), $source_field_name, \NULL, 'entity'),
+            new FieldPropExpression(EntityDataDefinition::create('file'), 'uri', \NULL, 'value'),
+          ),
+        ),
+        'poster' => new ReferenceFieldTypePropExpression(
+          new FieldTypePropExpression('entity_reference', 'entity'),
+          new ReferenceFieldPropExpression(
+            new FieldPropExpression(EntityDataDefinition::create('media', 'video'), 'thumbnail', \NULL, 'entity'),
+            new FieldPropExpression(EntityDataDefinition::create('file'), 'uri', \NULL, 'url'),
+          ),
+        ),
+        'width' => new ReferenceFieldTypePropExpression(
+          new FieldTypePropExpression('entity_reference', 'entity'),
+          new FieldPropExpression(EntityDataDefinition::create('media', 'video'), 'thumbnail', NULL, 'width'),
+        ),
+        'height' => new ReferenceFieldTypePropExpression(
+          new FieldTypePropExpression('entity_reference', 'entity'),
+          new FieldPropExpression(EntityDataDefinition::create('media', 'video'), 'thumbnail', NULL, 'height'),
+        ),
+      ]);
+      $storable_prop_shape->fieldWidget = 'media_library_widget';
+      $storable_prop_shape->fieldStorageSettings = ['target_type' => 'media'];
+      $storable_prop_shape->fieldInstanceSettings = [
+        'handler' => 'default:media',
+        'handler_settings' => ['target_bundles' => ['video' => 'video']],
+      ];
+    }
   }
 
   /**
