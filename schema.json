@@ -253,7 +253,7 @@
         },
         "title": {
           "title": "Video title",
-          "$ref": "json-schema-definitions://experience_builder.module/image-uri"
+          "type": "string"
         }
       }
     },
