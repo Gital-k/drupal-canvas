@@ -35,6 +35,7 @@ use Drupal\experience_builder\PropExpressions\StructuredData\ReferenceFieldTypeP
 use Drupal\experience_builder\PropShape\CandidateStorablePropShape;
 use Drupal\filter\FilterFormatInterface;
 use Drupal\media\Entity\MediaType;
+use Drupal\media\MediaTypeInterface;
 use Symfony\Component\Validator\Constraints\Hostname;
 use Symfony\Component\Validator\Constraints\Ip;
 use Symfony\Component\Validator\Constraints\NotEqualTo;
@@ -47,6 +48,12 @@ use Symfony\Component\Validator\Constraints\NotEqualTo;
  * @see docs/shape-matching-into-field-types.md, section 3.1.2.a
  */
 class ShapeMatchingHooks {
+
+  const SCHEMA_TO_MEDIA_BUNDLE = [
+    'json-schema-definitions://experience_builder.module/image' => 'image',
+    'json-schema-definitions://experience_builder.module/video' => 'video',
+    'json-schema-definitions://experience_builder.module/oembed_video' => 'remote_video',
+  ];
 
   /**
    * Implements hook_validation_constraint_alter().
@@ -185,7 +192,8 @@ class ShapeMatchingHooks {
   /**
    * Implements hook_entity_operation_alter().
    *
-   * Removes all operations for Experience Builder's text formats and editors from list builders.
+   * Removes all operations for Experience Builder's text formats and editors
+   * from list builders.
    */
   #[Hook('entity_operation_alter')]
   public function entityOperationAlter(array &$operations, EntityInterface $entity): void {
@@ -221,8 +229,10 @@ class ShapeMatchingHooks {
    *
    * (On behalf of the Media Library module.)
    *
-   * Overrides the default: the "image" field type + widget. Note that this used
-   * to run only for sites that install the Media Library module, but to achieve
+   * Overrides the default: the "image" field type + widget. Note that this
+   * used
+   * to run only for sites that install the Media Library module, but to
+   * achieve
    * the intended authoring experience, XB depends on the Media Library module
    * since https://www.drupal.org/i/3474226.
    *
@@ -231,92 +241,25 @@ class ShapeMatchingHooks {
    */
   #[Hook('storage_prop_shape_alter', module: 'media_library')]
   public function mediaLibraryStoragePropShapeAlter(CandidateStorablePropShape $storable_prop_shape): void {
-    if ($storable_prop_shape->shape->schema == [
-      'type' => 'object',
-      '$ref' => 'json-schema-definitions://experience_builder.module/image',
-    ]) {
-      // @todo Allow configuring which media type, for now this assumes the
-      //   Standard 'image' media type.
-      // @see core/profiles/standard/config/optional/media.type.image.yml
-      $image_media_type = MediaType::load('image');
-      if (!$image_media_type) {
+    if ($storable_prop_shape->shape->schema['type'] === 'object' &&
+      in_array($storable_prop_shape->shape->schema['$ref'], array_keys(self::SCHEMA_TO_MEDIA_BUNDLE))
+      ) {
+
+      $bundle = self::SCHEMA_TO_MEDIA_BUNDLE[$storable_prop_shape->shape->schema['$ref']];
+      $media_type = MediaType::load($bundle);
+      if (!$media_type) {
         return;
       }
-      $source_field_definition = $image_media_type->getSource()
-        ->getSourceFieldDefinition($image_media_type);
-      \assert($source_field_definition !== \NULL);
-      $source_field_name = $source_field_definition->getName();
-      $storable_prop_shape->fieldTypeProp = new FieldTypeObjectPropsExpression('entity_reference', [
-        'src' => new ReferenceFieldTypePropExpression(new FieldTypePropExpression('entity_reference', 'entity'), new ReferenceFieldPropExpression(new FieldPropExpression(EntityDataDefinition::create('media', 'image'), $source_field_name, \NULL, 'entity'), new FieldPropExpression(EntityDataDefinition::create('file'), 'uri', \NULL, 'url'))),
-        'alt' => new ReferenceFieldTypePropExpression(new FieldTypePropExpression('entity_reference', 'entity'), new FieldPropExpression(EntityDataDefinition::create('media', 'image'), $source_field_name, \NULL, 'alt')),
-        'width' => new ReferenceFieldTypePropExpression(new FieldTypePropExpression('entity_reference', 'entity'), new FieldPropExpression(EntityDataDefinition::create('media', 'image'), $source_field_name, \NULL, 'width')),
-        'height' => new ReferenceFieldTypePropExpression(new FieldTypePropExpression('entity_reference', 'entity'), new FieldPropExpression(EntityDataDefinition::create('media', 'image'), $source_field_name, \NULL, 'height')),
-      ]);
+
+      $storable_prop_shape->fieldTypeProp = new FieldTypeObjectPropsExpression('entity_reference',
+        $this->getFieldTypeProps($media_type)
+      );
       $storable_prop_shape->fieldStorageSettings = ['target_type' => 'media'];
       $storable_prop_shape->fieldInstanceSettings = [
         'handler' => 'default:media',
-        'handler_settings' => ['target_bundles' => ['image' => 'image']],
+        'handler_settings' => ['target_bundles' => [$bundle => $bundle]],
       ];
       $storable_prop_shape->fieldWidget = 'media_library_widget';
-    }
-
-    if ($storable_prop_shape->shape->schema == [
-      'type' => 'object',
-      '$ref' => 'json-schema-definitions://experience_builder.module/video',
-    ]) {
-
-      $video_media_type = MediaType::load('video');
-      if (!$video_media_type) {
-        return;
-      }
-      $source_field_definition = $video_media_type->getSource()
-        ->getSourceFieldDefinition($video_media_type);
-      \assert($source_field_definition !== \NULL);
-      $source_field_name = $source_field_definition->getName();
-
-      $storable_prop_shape->fieldTypeProp = new FieldTypeObjectPropsExpression('entity_reference', [
-        'src' => new ReferenceFieldTypePropExpression(
-          new FieldTypePropExpression('entity_reference', 'entity'),
-          new ReferenceFieldPropExpression(
-            new FieldPropExpression(EntityDataDefinition::create('media', 'video'), $source_field_name, \NULL, 'entity'),
-            new FieldPropExpression(EntityDataDefinition::create('file'), 'uri', \NULL, 'value'),
-          ),
-        ),
-      ]);
-      $storable_prop_shape->fieldWidget = 'media_library_widget';
-      $storable_prop_shape->fieldStorageSettings = ['target_type' => 'media'];
-      $storable_prop_shape->fieldInstanceSettings = [
-        'handler' => 'default:media',
-        'handler_settings' => ['target_bundles' => ['video' => 'video']],
-      ];
-    }
-
-    if ($storable_prop_shape->shape->schema == [
-      'type' => 'object',
-      '$ref' => 'json-schema-definitions://experience_builder.module/oembed_video',
-    ]) {
-
-      $video_media_type = MediaType::load('remote_video');
-      if (!$video_media_type) {
-        return;
-      }
-      $source_field_definition = $video_media_type->getSource()
-        ->getSourceFieldDefinition($video_media_type);
-      \assert($source_field_definition !== \NULL);
-      $source_field_name = $source_field_definition->getName();
-
-      $storable_prop_shape->fieldTypeProp = new FieldTypeObjectPropsExpression('entity_reference', [
-        'url' => new ReferenceFieldTypePropExpression(
-          new FieldTypePropExpression('entity_reference', 'entity'),
-          new FieldPropExpression(EntityDataDefinition::create('media', 'remote_video'), $source_field_name, \NULL, 'value'),
-        ),
-      ]);
-      $storable_prop_shape->fieldWidget = 'media_library_widget';
-      $storable_prop_shape->fieldStorageSettings = ['target_type' => 'media'];
-      $storable_prop_shape->fieldInstanceSettings = [
-        'handler' => 'default:media',
-        'handler_settings' => ['target_bundles' => ['remote_video' => 'remote_video']],
-      ];
     }
   }
 
@@ -342,6 +285,57 @@ class ShapeMatchingHooks {
       // @todo Make this actually work in component instance forms in https://www.drupal.org/project/experience_builder/issues/3523379
       $storable_prop_shape->fieldWidget = 'daterange_default';
     }
+  }
+
+  /**
+   * Returns Field Type Props for specific MediaType.
+   *
+   * @param \Drupal\media\MediaTypeInterface $media_type
+   *
+   * @return array|\Drupal\experience_builder\PropExpressions\StructuredData\ReferenceFieldTypePropExpression[]
+   */
+  protected function getFieldTypeProps(MediaTypeInterface $media_type): array {
+    $source_field_name = $this->getMediaSourceFieldName($media_type);
+
+    return match ($media_type->id()) {
+      'image' => [
+        'src' => new ReferenceFieldTypePropExpression(new FieldTypePropExpression('entity_reference', 'entity'), new ReferenceFieldPropExpression(new FieldPropExpression(EntityDataDefinition::create('media', 'image'), $source_field_name, \NULL, 'entity'), new FieldPropExpression(EntityDataDefinition::create('file'), 'uri', \NULL, 'url'))),
+        'alt' => new ReferenceFieldTypePropExpression(new FieldTypePropExpression('entity_reference', 'entity'), new FieldPropExpression(EntityDataDefinition::create('media', 'image'), $source_field_name, \NULL, 'alt')),
+        'width' => new ReferenceFieldTypePropExpression(new FieldTypePropExpression('entity_reference', 'entity'), new FieldPropExpression(EntityDataDefinition::create('media', 'image'), $source_field_name, \NULL, 'width')),
+        'height' => new ReferenceFieldTypePropExpression(new FieldTypePropExpression('entity_reference', 'entity'), new FieldPropExpression(EntityDataDefinition::create('media', 'image'), $source_field_name, \NULL, 'height')),
+      ],
+      'video' => [
+        'src' => new ReferenceFieldTypePropExpression(
+          new FieldTypePropExpression('entity_reference', 'entity'),
+          new ReferenceFieldPropExpression(
+            new FieldPropExpression(EntityDataDefinition::create('media', 'video'), $source_field_name, \NULL, 'entity'),
+            new FieldPropExpression(EntityDataDefinition::create('file'), 'uri', \NULL, 'value'),
+          ),
+        ),
+      ],
+      'remote_video' => [
+        'url' => new ReferenceFieldTypePropExpression(
+          new FieldTypePropExpression('entity_reference', 'entity'),
+          new FieldPropExpression(EntityDataDefinition::create('media', 'remote_video'), $source_field_name, \NULL, 'value'),
+        ),
+      ],
+      default => [],
+    };
+  }
+
+  /**
+   * Returns MediaType Source Plugin field name.
+   *
+   * @param \Drupal\media\MediaTypeInterface $media_type
+   *
+   * @return string
+   */
+  protected function getMediaSourceFieldName(MediaTypeInterface $media_type): string {
+    $source_field_definition = $media_type->getSource()
+      ->getSourceFieldDefinition($media_type);
+    \assert($source_field_definition !== \NULL);
+
+    return $source_field_definition->getName();
   }
 
 }
