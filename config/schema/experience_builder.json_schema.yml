@@ -205,6 +205,7 @@ experience_builder.json_schema.prop.object:
         Choice:
           - 'json-schema-definitions://experience_builder.module/image'
           - 'json-schema-definitions://experience_builder.module/video'
+          - 'json-schema-definitions://experience_builder.module/oembed_video'
 
 experience_builder.json_schema.object:
   class: '\Drupal\experience_builder\Config\Schema\JsonSchemaObject'

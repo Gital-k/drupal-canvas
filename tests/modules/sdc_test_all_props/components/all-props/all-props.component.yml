@@ -241,10 +241,20 @@ props:
       $ref: json-schema-definitions://experience_builder.module/video
       type: object
       examples:
-        - src: https://youtu.be/dQw4w9WgXcQ
+        - src: public://file.mp4
           poster: /sites/default/files/600x400.png
           width: 600
           height: 400
+    # The "remote_video" (oembed:video) predefined object format.
+    test_object_drupal_oembed_video:
+      title: 'Object, $ref=json-schema-definitions://experience_builder.module/oembed_video'
+      $ref: json-schema-definitions://experience_builder.module/oembed_video
+      type: object
+      examples:
+        - url: https://youtu.be/dQw4w9WgXcQ
+          width: 600
+          height: 400
+          title: 'Example oEmbed video title'
 
     # The "date-range" object format for this module.
     test_object_drupal_date_range:

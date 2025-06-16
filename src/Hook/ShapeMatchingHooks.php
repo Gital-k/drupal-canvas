@@ -290,6 +290,34 @@ class ShapeMatchingHooks {
         'handler_settings' => ['target_bundles' => ['video' => 'video']],
       ];
     }
+
+    if ($storable_prop_shape->shape->schema == [
+      'type' => 'object',
+      '$ref' => 'json-schema-definitions://experience_builder.module/oembed_video',
+    ]) {
+
+      $video_media_type = MediaType::load('remote_video');
+      if (!$video_media_type) {
+        return;
+      }
+      $source_field_definition = $video_media_type->getSource()
+        ->getSourceFieldDefinition($video_media_type);
+      \assert($source_field_definition !== \NULL);
+      $source_field_name = $source_field_definition->getName();
+
+      $storable_prop_shape->fieldTypeProp = new FieldTypeObjectPropsExpression('entity_reference', [
+        'url' => new ReferenceFieldTypePropExpression(
+          new FieldTypePropExpression('entity_reference', 'entity'),
+          new FieldPropExpression(EntityDataDefinition::create('media', 'remote_video'), $source_field_name, \NULL, 'value'),
+        ),
+      ]);
+      $storable_prop_shape->fieldWidget = 'media_library_widget';
+      $storable_prop_shape->fieldStorageSettings = ['target_type' => 'media'];
+      $storable_prop_shape->fieldInstanceSettings = [
+        'handler' => 'default:media',
+        'handler_settings' => ['target_bundles' => ['remote_video' => 'remote_video']],
+      ];
+    }
   }
 
   /**

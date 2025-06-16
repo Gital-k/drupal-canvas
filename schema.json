@@ -232,6 +232,31 @@
         }
       }
     },
+    "oembed_video": {
+      "title": "oembed_video",
+      "type":  "object",
+      "required": ["url"],
+      "properties": {
+        "url": {
+          "title": "oEmbed URL",
+          "type": "string",
+          "contentMediaType": "application/oembed+json",
+          "x-oembed-type": "video"
+        },
+        "width": {
+          "title": "Image width",
+          "type": "integer"
+        },
+        "height": {
+          "title": "Image height",
+          "type": "integer"
+        },
+        "title": {
+          "title": "Video title",
+          "$ref": "json-schema-definitions://experience_builder.module/image-uri"
+        }
+      }
+    },
     "config-entity-id": {
       "title": "config entity id",
       "type": "string",

@@ -7,6 +7,7 @@ namespace Drupal\Tests\experience_builder\Kernel;
 use Drupal\experience_builder\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\experience_builder\PropShape\PropShape;
 use Drupal\experience_builder\PropShape\StorablePropShape;
+use Drupal\media\Entity\MediaType;
 
 /**
  * @covers media_library_storage_prop_shape_alter()
@@ -57,7 +58,10 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
 
   public static function getExpectedUnstorablePropShapes(): array {
     $unstorable_prop_shapes = parent::getExpectedUnstorablePropShapes();
-    unset($unstorable_prop_shapes['type=object&$ref=json-schema-definitions://experience_builder.module/video']);
+    unset(
+      $unstorable_prop_shapes['type=object&$ref=json-schema-definitions://experience_builder.module/video'],
+      $unstorable_prop_shapes['type=object&$ref=json-schema-definitions://experience_builder.module/oembed_video'],
+    );
 
     return $unstorable_prop_shapes;
   }
@@ -106,6 +110,24 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
         'handler_settings' => [
           'target_bundles' => [
             'video' => 'video',
+          ],
+        ],
+      ],
+    );
+
+    $storable_prop_shapes['type=object&$ref=json-schema-definitions://experience_builder.module/oembed_video'] = new StorablePropShape(
+      shape: new PropShape(['type' => 'object', '$ref' => 'json-schema-definitions://experience_builder.module/oembed_video']),
+      // @phpstan-ignore-next-line
+      fieldTypeProp: StructuredDataPropExpression::fromString('ℹ︎entity_reference␟{url↝entity␜␜entity:media:remote_video␝field_media_oembed_video␞␟value}'),
+      fieldWidget: 'media_library_widget',
+      fieldStorageSettings: [
+        'target_type' => 'media',
+      ],
+      fieldInstanceSettings: [
+        'handler' => 'default:media',
+        'handler_settings' => [
+          'target_bundles' => [
+            'remote_video' => 'remote_video',
           ],
         ],
       ],
