@@ -282,21 +282,6 @@ class ShapeMatchingHooks {
             new FieldPropExpression(EntityDataDefinition::create('file'), 'uri', \NULL, 'value'),
           ),
         ),
-        'poster' => new ReferenceFieldTypePropExpression(
-          new FieldTypePropExpression('entity_reference', 'entity'),
-          new ReferenceFieldPropExpression(
-            new FieldPropExpression(EntityDataDefinition::create('media', 'video'), 'thumbnail', \NULL, 'entity'),
-            new FieldPropExpression(EntityDataDefinition::create('file'), 'uri', \NULL, 'url'),
-          ),
-        ),
-        'width' => new ReferenceFieldTypePropExpression(
-          new FieldTypePropExpression('entity_reference', 'entity'),
-          new FieldPropExpression(EntityDataDefinition::create('media', 'video'), 'thumbnail', NULL, 'width'),
-        ),
-        'height' => new ReferenceFieldTypePropExpression(
-          new FieldTypePropExpression('entity_reference', 'entity'),
-          new FieldPropExpression(EntityDataDefinition::create('media', 'video'), 'thumbnail', NULL, 'height'),
-        ),
       ]);
       $storable_prop_shape->fieldWidget = 'media_library_widget';
       $storable_prop_shape->fieldStorageSettings = ['target_type' => 'media'];
