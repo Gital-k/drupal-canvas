@@ -7,7 +7,6 @@ namespace Drupal\Tests\experience_builder\Kernel;
 use Drupal\experience_builder\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\experience_builder\PropShape\PropShape;
 use Drupal\experience_builder\PropShape\StorablePropShape;
-use Drupal\media\Entity\MediaType;
 
 /**
  * @covers media_library_storage_prop_shape_alter()
