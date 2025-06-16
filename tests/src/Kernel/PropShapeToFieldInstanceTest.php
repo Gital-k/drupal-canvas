@@ -698,6 +698,18 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
             ],
           ],
         ],
+        'optional, type=object&$ref=json-schema-definitions://experience_builder.module/oembed_video' => [
+          'SDC props' => [
+            '⿲sdc_test_all_props:all-props␟test_object_drupal_oembed_video'
+          ],
+          'static prop source' => null,
+          'instances' => [
+            'ℹ︎␜entity:file␝uri␞␟{url↠url}',
+            'ℹ︎␜entity:node:foo␝field_silly_image␞␟{url↝entity␜␜entity:file␝uri␞␟value,width↠width,height↠height,title↠title}',
+          ],
+          'adapter_matches_field_type' => [],
+          'adapter_matches_instance' => [],
+        ],
         'optional, type=object&$ref=json-schema-definitions://experience_builder.module/shoe-icon' => [
           'SDC props' => [
             '⿲experience_builder:shoe_button␟icon',
@@ -715,6 +727,18 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
             'ℹ︎␜entity:xb_page␝image␞␟{label↝entity␜␜entity:media␝revision_log_message␞␟value,slot↝entity␜␜entity:media␝name␞␟value}',
             'ℹ︎␜entity:xb_page␝revision_log␞␟{label↠value}',
             'ℹ︎␜entity:xb_page␝title␞␟{label↠value}',
+          ],
+          'adapter_matches_field_type' => [],
+          'adapter_matches_instance' => [],
+        ],
+        'optional, type=object&$ref=json-schema-definitions://experience_builder.module/video' => [
+          'SDC props' => [
+            '⿲sdc_test_all_props:all-props␟test_object_drupal_video'
+          ],
+          'static prop source' => null,
+          'instances' => [
+            'ℹ︎␜entity:file␝uri␞␟{src↠value}',
+            'ℹ︎␜entity:node:foo␝field_silly_image␞␟{src↝entity␜␜entity:file␝uri␞␟value,poster↝entity␜␜entity:file␝uri␞␟url,width↠width,height↠height}',
           ],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],

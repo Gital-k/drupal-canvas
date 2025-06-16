@@ -311,6 +311,8 @@ class PropSourceEndpointTest extends FunctionalTestBase {
           ],
           'test_object_drupal_image' => [],
           'test_object_drupal_image_ARRAY' => [],
+          'test_object_drupal_video' => [],
+          'test_object_drupal_oembed_video' => [],
           'test_string_html_inline' => [],
           'test_string_html_block' => [
             "Subset of this Article's Body: processed (1 of 5 props — absent: value, format, summary, summary_processed)" => 'ℹ︎␜entity:node:article␝body␞␟processed',
