@@ -242,6 +242,7 @@ class ShapeMatchingHooks {
   #[Hook('storage_prop_shape_alter', module: 'media_library')]
   public function mediaLibraryStoragePropShapeAlter(CandidateStorablePropShape $storable_prop_shape): void {
     if ($storable_prop_shape->shape->schema['type'] === 'object' &&
+      isset($storable_prop_shape->shape->schema['$ref']) &&
       in_array($storable_prop_shape->shape->schema['$ref'], array_keys(self::SCHEMA_TO_MEDIA_BUNDLE))
       ) {
 
