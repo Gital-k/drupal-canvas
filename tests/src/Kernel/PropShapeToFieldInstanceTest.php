@@ -700,9 +700,9 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
         ],
         'optional, type=object&$ref=json-schema-definitions://experience_builder.module/oembed_video' => [
           'SDC props' => [
-            '⿲sdc_test_all_props:all-props␟test_object_drupal_oembed_video'
+            '⿲sdc_test_all_props:all-props␟test_object_drupal_oembed_video',
           ],
-          'static prop source' => null,
+          'static prop source' => NULL,
           'instances' => [
             'ℹ︎␜entity:file␝uri␞␟{url↠url}',
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟{url↝entity␜␜entity:file␝uri␞␟value,width↠width,height↠height,title↠title}',
@@ -733,9 +733,9 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
         ],
         'optional, type=object&$ref=json-schema-definitions://experience_builder.module/video' => [
           'SDC props' => [
-            '⿲sdc_test_all_props:all-props␟test_object_drupal_video'
+            '⿲sdc_test_all_props:all-props␟test_object_drupal_video',
           ],
-          'static prop source' => null,
+          'static prop source' => NULL,
           'instances' => [
             'ℹ︎␜entity:file␝uri␞␟{src↠value}',
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟{src↝entity␜␜entity:file␝uri␞␟value,poster↝entity␜␜entity:file␝uri␞␟url,width↠width,height↠height}',
