@@ -223,11 +223,11 @@
           "$ref": "json-schema-definitions://experience_builder.module/image-uri"
         },
         "width": {
-          "title": "Image width",
+          "title": "Video width",
           "type": "integer"
         },
         "height": {
-          "title": "Image height",
+          "title": "Video height",
           "type": "integer"
         }
       }
