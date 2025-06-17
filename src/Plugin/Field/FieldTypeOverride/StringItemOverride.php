@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\experience_builder\Plugin\Field\FieldTypeOverride;
 
+use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Field\Plugin\Field\FieldType\StringItem;
 use Drupal\experience_builder\Plugin\Validation\Constraint\StringSemanticsConstraint;
@@ -21,6 +22,15 @@ class StringItemOverride extends StringItem {
     $properties = parent::propertyDefinitions($field_definition);
     $properties['value']->addConstraint('StringSemantics', StringSemanticsConstraint::PROSE);
     return $properties;
+  }
+
+  public static function generateSampleValue(FieldDefinitionInterface $field_definition) {
+    // remote_video uses oembed:video resource and it's sample should be uri.
+    if ($field_definition->getTargetBundle() === 'remote_video') {
+      return UriItemOverride::generateSampleValue($field_definition);
+    }
+
+    return parent::generateSampleValue($field_definition);
   }
 
 }
