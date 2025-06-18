@@ -310,7 +310,7 @@ class ShapeMatchingHooks {
           new FieldTypePropExpression('entity_reference', 'entity'),
           new ReferenceFieldPropExpression(
             new FieldPropExpression(EntityDataDefinition::create('media', 'video'), $source_field_name, \NULL, 'entity'),
-            new FieldPropExpression(EntityDataDefinition::create('file'), 'uri', \NULL, 'value'),
+            new FieldPropExpression(EntityDataDefinition::create('file'), 'uri', \NULL, 'url'),
           ),
         ),
       ],
