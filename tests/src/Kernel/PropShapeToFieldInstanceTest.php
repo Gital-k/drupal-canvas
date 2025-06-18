@@ -274,6 +274,18 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
             ],
           ],
         ],
+        'REQUIRED, type=object&$ref=json-schema-definitions://experience_builder.module/oembed_video' => [
+          'SDC props' => [
+            '⿲experience_builder:oembed_video␟video',
+          ],
+          'static prop source' => NULL,
+          'instances' => [
+            'ℹ︎␜entity:file␝uri␞␟{url↠url}',
+            'ℹ︎␜entity:node:foo␝field_silly_image␞␟{url↝entity␜␜entity:file␝uri␞␟value,width↠width,height↠height,title↠title}',
+          ],
+          'adapter_matches_field_type' => [],
+          'adapter_matches_instance' => [],
+        ],
         'REQUIRED, type=object&$ref=json-schema-definitions://experience_builder.module/video' => [
           'SDC props' => [
             '⿲experience_builder:video␟video',
