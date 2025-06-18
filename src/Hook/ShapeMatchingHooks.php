@@ -259,7 +259,6 @@ class ShapeMatchingHooks {
         $media_types
       );
 
-
       $storable_prop_shape->fieldTypeProp = new FieldTypeObjectPropsExpression('entity_reference',
         $this->getFieldTypeProps($media_types, $media_type_ids, $media_source)
       );
@@ -267,7 +266,7 @@ class ShapeMatchingHooks {
       $storable_prop_shape->fieldInstanceSettings = [
         'handler' => 'default:media',
         'handler_settings' => [
-          'target_bundles' => array_combine($media_type_ids, $media_type_ids)
+          'target_bundles' => array_combine($media_type_ids, $media_type_ids),
         ],
       ];
       $storable_prop_shape->fieldWidget = 'media_library_widget';
@@ -301,7 +300,9 @@ class ShapeMatchingHooks {
   /**
    * Returns Field Type Props for specific MediaType.
    *
-   * @param \Drupal\media\MediaTypeInterface[] $media_type
+   * @param \Drupal\media\MediaTypeInterface[] $media_types
+   * @param array $media_type_ids
+   * @param string $media_source
    *
    * @return array|\Drupal\experience_builder\PropExpressions\StructuredData\ReferenceFieldTypePropExpression[]
    */

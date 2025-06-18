@@ -278,7 +278,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           'SDC props' => [
             '⿲experience_builder:video␟video',
           ],
-          'static prop source' => null,
+          'static prop source' => NULL,
           'instances' => [],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
