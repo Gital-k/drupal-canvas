@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\experience_builder\Kernel;
 
-use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Extension\ExtensionPathResolver;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Field\Plugin\Field\FieldWidget\BooleanCheckboxWidget;
@@ -12,6 +11,8 @@ use Drupal\Core\Field\Plugin\Field\FieldWidget\EntityReferenceAutocompleteWidget
 use Drupal\Core\Field\Plugin\Field\FieldWidget\NumberWidget;
 use Drupal\Core\Field\Plugin\Field\FieldWidget\StringTextfieldWidget;
 use Drupal\Core\Field\Plugin\Field\FieldWidget\UriWidget;
+use Drupal\Core\File\FileExists;
+use Drupal\Core\StreamWrapper\PublicStream;
 use Drupal\Core\Url;
 use Drupal\datetime\Plugin\Field\FieldType\DateTimeItem;
 use Drupal\datetime_range\Plugin\Field\FieldWidget\DateRangeDatelistWidget;
@@ -28,10 +29,13 @@ use Drupal\experience_builder\PropSource\DefaultRelativeUrlPropSource;
 use Drupal\experience_builder\PropSource\DynamicPropSource;
 use Drupal\experience_builder\PropSource\PropSource;
 use Drupal\experience_builder\PropSource\StaticPropSource;
+use Drupal\file\Entity\File;
 use Drupal\KernelTests\KernelTestBase;
-use Drupal\media\Entity\MediaType;
+use Drupal\media\Entity\Media;
+use Drupal\media_library\Plugin\Field\FieldWidget\MediaLibraryWidget;
 use Drupal\node\Entity\NodeType;
 use Drupal\Tests\experience_builder\Traits\ContribStrictConfigSchemaTestTrait;
+use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
 use Drupal\Tests\node\Traits\NodeCreationTrait;
 use Drupal\user\Entity\Role;
 use Drupal\user\Entity\User;
@@ -42,7 +46,11 @@ use Drupal\user\Entity\User;
  */
 class PropSourceTest extends KernelTestBase {
 
+  private const IMAGE_MEDIA_UUID1 = '83b145bb-d8c3-4410-bbd6-fdcd06e27c29';
+  private const IMAGE_MEDIA_UUID2 = '93b145bb-d8c3-4410-bbd6-fdcd06e27c29';
+
   use ContribStrictConfigSchemaTestTrait;
+  use MediaTypeCreationTrait;
   use NodeCreationTrait;
 
   /**
@@ -52,6 +60,7 @@ class PropSourceTest extends KernelTestBase {
     'experience_builder',
     'field',
     'file',
+    'image',
     'node',
     'user',
     'datetime',
@@ -70,24 +79,61 @@ class PropSourceTest extends KernelTestBase {
     parent::setUp();
     $this->installEntitySchema('field_storage_config');
     $this->installEntitySchema('field_config');
-    $media_type = MediaType::create([
-      'id' => 'image',
-      'label' => 'Image',
-      'source' => 'file',
-    ]);
-    $media_type->save();
-    // Create the source field.
-    $source_field = $media_type->getSource()->createSourceField($media_type);
-    $field_storage_definition = $source_field->getFieldStorageDefinition();
-    assert($field_storage_definition instanceof EntityInterface);
-    $field_storage_definition->save();
 
-    $source_field->save();
-    $media_type
-      ->set('source_configuration', [
-        'source_field' => $source_field->getName(),
-      ])
-      ->save();
+    $this->createMediaType('image', ['id' => 'image']);
+    $this->createMediaType('image', ['id' => 'anything_is_possible']);
+
+    /** @var \Drupal\Core\File\FileSystemInterface $file_system */
+    $file_system = \Drupal::service('file_system');
+    $this->installEntitySchema('file');
+    $this->installSchema('file', 'file_usage');
+    $this->installEntitySchema('user');
+    $this->installSchema('user', ['users_data']);
+    $file_uri = 'public://image-2.jpg';
+    if (!\file_exists($file_uri)) {
+      $file_system->copy(\Drupal::root() . '/core/tests/fixtures/files/image-2.jpg', PublicStream::basePath(), FileExists::Replace);
+    }
+    $file1 = File::create([
+      'uri' => $file_uri,
+      'status' => 1,
+    ]);
+    $file1->save();
+    $file_uri = 'public://image-3.jpg';
+    if (!\file_exists($file_uri)) {
+      $file_system->copy(\Drupal::root() . '/core/tests/fixtures/files/image-3.jpg', PublicStream::basePath(), FileExists::Replace);
+    }
+    $file2 = File::create([
+      'uri' => $file_uri,
+      'status' => 1,
+    ]);
+    $file2->save();
+    $this->installEntitySchema('media');
+    $image1 = Media::create([
+      'uuid' => self::IMAGE_MEDIA_UUID1,
+      'bundle' => 'image',
+      'name' => 'Amazing image',
+      'field_media_image' => [
+        [
+          'target_id' => $file1->id(),
+          'alt' => 'An image so amazing that to gaze upon it would melt your face',
+          'title' => 'This is an amazing image, just look at it and you will be amazed',
+        ],
+      ],
+    ]);
+    $image1->save();
+    $image2 = Media::create([
+      'uuid' => self::IMAGE_MEDIA_UUID2,
+      'bundle' => 'anything_is_possible',
+      'name' => 'amazing',
+      'field_media_image_1' => [
+        [
+          'target_id' => $file2->id(),
+          'alt' => 'amazing',
+          'title' => 'amazing',
+        ],
+      ],
+    ]);
+    $image2->save();
   }
 
   /**
@@ -150,6 +196,20 @@ class PropSourceTest extends KernelTestBase {
     $this->assertSame($value, $prop_source_example->getValue());
     // Test the functionality of a StaticPropSource:
     // - evaluate it to populate an SDC prop
+    if (isset($expected_user_value['src'])) {
+      // Make it easier to write expectations containing root-relative URLs
+      // pointing somewhere into the site-specific directory.
+      $expected_user_value['src'] = str_replace('::SITE_DIR_BASE_URL::', \base_path() . $this->siteDirectory, $expected_user_value['src']);
+    }
+    if (is_array($expected_user_value) && array_is_list($expected_user_value)) {
+      foreach (array_keys($expected_user_value) as $i) {
+        if (isset($expected_user_value[$i]['src'])) {
+          // Make it easier to write expectations containing root-relative URLs
+          // pointing somewhere into the site-specific directory.
+          $expected_user_value[$i]['src'] = str_replace('::SITE_DIR_BASE_URL::', \base_path() . $this->siteDirectory, $expected_user_value[$i]['src']);
+        }
+      }
+    }
     $this->assertSame($expected_user_value, $prop_source_example->evaluate(User::create([])));
     // - the field type's item's raw value is minimized if it is single-property
     $this->assertSame($value, $prop_source_example->getValue());
@@ -169,11 +229,7 @@ class PropSourceTest extends KernelTestBase {
       ],
       'expected_user_value' => 'Hello, world!',
       'expected_prop_expression' => FieldTypePropExpression::class,
-      'expected_dependencies' => [
-        'plugin' => [
-          'field_type:string',
-        ],
-      ],
+      'expected_dependencies' => [],
     ];
     yield "scalar shape, field type=uri, cardinality=1" => [
       'sourceType' => 'static:field_item:uri',
@@ -187,11 +243,7 @@ class PropSourceTest extends KernelTestBase {
       ],
       'expected_user_value' => 'https://drupal.org',
       'expected_prop_expression' => FieldTypePropExpression::class,
-      'expected_dependencies' => [
-        'plugin' => [
-          'field_type:uri',
-        ],
-      ],
+      'expected_dependencies' => [],
     ];
     yield "scalar shape, field type=boolean, cardinality=1" => [
       'sourceType' => 'static:field_item:boolean',
@@ -205,11 +257,7 @@ class PropSourceTest extends KernelTestBase {
       ],
       'expected_user_value' => TRUE,
       'expected_prop_expression' => FieldTypePropExpression::class,
-      'expected_dependencies' => [
-        'plugin' => [
-          'field_type:boolean',
-        ],
-      ],
+      'expected_dependencies' => [],
     ];
     // A simple (expression targeting a simple prop) array example (with
     // cardinality specified, rather than the default of `cardinality=1`).
@@ -239,11 +287,7 @@ class PropSourceTest extends KernelTestBase {
         92,
       ],
       'expected_prop_expression' => FieldTypePropExpression::class,
-      'expected_dependencies' => [
-        'plugin' => [
-          'field_type:integer',
-        ],
-      ],
+      'expected_dependencies' => [],
     ];
     yield "object shape, daterange field, cardinality=1" => [
       'sourceType' => 'static:field_item:daterange',
@@ -267,9 +311,6 @@ class PropSourceTest extends KernelTestBase {
       'expected_dependencies' => [
         'module' => [
           'datetime_range',
-        ],
-        'plugin' => [
-          'field_type:daterange',
         ],
       ],
     ];
@@ -312,9 +353,6 @@ class PropSourceTest extends KernelTestBase {
         'module' => [
           'datetime_range',
         ],
-        'plugin' => [
-          'field_type:daterange',
-        ],
       ],
     ];
     yield "complex empty example with entity_reference" => [
@@ -333,8 +371,7 @@ class PropSourceTest extends KernelTestBase {
       'expected_json_representation' => '{"sourceType":"static:field_item:entity_reference","value":null,"expression":"ℹ︎entity_reference␟{src↝entity␜␜entity:media:image␝field_media_image␞␟entity␜␜entity:file␝uri␞␟url,alt↝entity␜␜entity:media:image␝field_media_image␞␟alt,width↝entity␜␜entity:media:image␝field_media_image␞␟width,height↝entity␜␜entity:media:image␝field_media_image␞␟height}","sourceTypeSettings":{"storage":{"target_type":"media"},"instance":{"handler":"default:media","handler_settings":{"target_bundles":{"image":"image"}}}}}',
       'field_widgets' => [
         NULL => EntityReferenceAutocompleteWidget::class,
-        'entity_reference_autocomplete' => EntityReferenceAutocompleteWidget::class,
-        'daterange_datelist' => EntityReferenceAutocompleteWidget::class,
+        'media_library_widget' => MediaLibraryWidget::class,
       ],
       'expected_user_value' => NULL,
       'expected_prop_expression' => FieldTypeObjectPropsExpression::class,
@@ -346,8 +383,56 @@ class PropSourceTest extends KernelTestBase {
         'module' => [
           'media',
         ],
-        'plugin' => [
-          'field_type:entity_reference',
+      ],
+    ];
+    yield "complex non-empty example with entity_reference and multiple target bundles but same field name" => [
+      'sourceType' => 'static:field_item:entity_reference',
+      'sourceTypeSettings' => [
+        'cardinality' => 5,
+        'storage' => ['target_type' => 'media'],
+        'instance' => [
+          'handler' => 'default:media',
+          'handler_settings' => [
+            'target_bundles' => [
+              'image' => 'image',
+              'anything_is_possible' => 'anything_is_possible',
+            ],
+          ],
+        ],
+      ],
+      'value' => [['target_id' => 2], ['target_id' => 1]],
+      'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:anything_is_possible|image␝field_media_image_1|field_media_image␞␟entity␜␜entity:file␝uri␞␟url,alt↝entity␜␜entity:media:anything_is_possible|image␝field_media_image_1|field_media_image␞␟alt,width↝entity␜␜entity:media:anything_is_possible|image␝field_media_image_1|field_media_image␞␟width,height↝entity␜␜entity:media:anything_is_possible|image␝field_media_image_1|field_media_image␞␟height}',
+      'expected_json_representation' => '{"sourceType":"static:field_item:entity_reference","value":[{"target_id":2},{"target_id":1}],"expression":"ℹ︎entity_reference␟{src↝entity␜␜entity:media:anything_is_possible|image␝field_media_image_1|field_media_image␞␟entity␜␜entity:file␝uri␞␟url,alt↝entity␜␜entity:media:anything_is_possible|image␝field_media_image_1|field_media_image␞␟alt,width↝entity␜␜entity:media:anything_is_possible|image␝field_media_image_1|field_media_image␞␟width,height↝entity␜␜entity:media:anything_is_possible|image␝field_media_image_1|field_media_image␞␟height}","sourceTypeSettings":{"storage":{"target_type":"media"},"instance":{"handler":"default:media","handler_settings":{"target_bundles":{"image":"image","anything_is_possible":"anything_is_possible"}}},"cardinality":5}}',
+      'field_widgets' => [
+        NULL => EntityReferenceAutocompleteWidget::class,
+        'media_library_widget' => MediaLibraryWidget::class,
+      ],
+      'expected_user_value' => [
+        [
+          'src' => '::SITE_DIR_BASE_URL::/files/image-3.jpg',
+          'alt' => 'amazing',
+          'width' => 80,
+          'height' => 60,
+        ],
+        [
+          'src' => '::SITE_DIR_BASE_URL::/files/image-2.jpg',
+          'alt' => 'An image so amazing that to gaze upon it would melt your face',
+          'width' => 80,
+          'height' => 60,
+        ],
+      ],
+      'expected_prop_expression' => FieldTypeObjectPropsExpression::class,
+      'expected_dependencies' => [
+        'config' => [
+          'media.type.anything_is_possible',
+          'media.type.image',
+        ],
+        'content' => [
+          'media:anything_is_possible:' . self::IMAGE_MEDIA_UUID2,
+          'media:image:' . self::IMAGE_MEDIA_UUID1,
+        ],
+        'module' => [
+          'media',
         ],
       ],
     ];
@@ -383,9 +468,6 @@ class PropSourceTest extends KernelTestBase {
       'module' => [
         'user',
       ],
-      'plugin' => [
-        'entity_type:user',
-      ],
     ], $simple_example->calculateDependencies($user));
 
     // A reference example: ReferenceFieldPropExpression.
@@ -418,7 +500,6 @@ class PropSourceTest extends KernelTestBase {
     // - calculate its dependencies
     $this->assertSame([
       'module' => ['node'],
-      'plugin' => ['entity_type:node'],
       'config' => ['node.type.page'],
       'content' => ['user:user:' . $user->uuid()],
     ], $simple_example->calculateDependencies($node));
@@ -456,10 +537,6 @@ class PropSourceTest extends KernelTestBase {
       'module' => [
         'node',
         'node',
-      ],
-      'plugin' => [
-        'entity_type:node',
-        'entity_type:node',
       ],
       'config' => [
         'node.type.page',
@@ -548,11 +625,6 @@ class PropSourceTest extends KernelTestBase {
         'datetime_range',
         'datetime_range',
       ],
-      'plugin' => [
-        'adapter:day_count',
-        'field_type:daterange',
-        'field_type:daterange',
-      ],
     ], $simple_static_example->calculateDependencies());
 
     // A simple dynamic example.
@@ -599,13 +671,6 @@ class PropSourceTest extends KernelTestBase {
         'experience_builder',
         'user',
       ],
-      'plugin' => [
-        'adapter:day_count',
-        'adapter:unix_to_date',
-        'entity_type:user',
-        'adapter:unix_to_date',
-        'entity_type:user',
-      ],
     ], $simple_dynamic_example->calculateDependencies($user));
 
     // A complex example.
@@ -651,12 +716,6 @@ class PropSourceTest extends KernelTestBase {
         'experience_builder',
         'user',
       ],
-      'plugin' => [
-        'adapter:day_count',
-        'field_type:datetime',
-        'adapter:unix_to_date',
-        'entity_type:user',
-      ],
     ], $complex_example->calculateDependencies($user));
   }
 
@@ -685,7 +744,7 @@ class PropSourceTest extends KernelTestBase {
           'src' => [
             'type' => 'string',
             'format' => 'uri-reference',
-            'pattern' => '^(/|https?://)?.*\.(png|gif|jpg|jpeg|webp)(\?.*)?(#.*)?$',
+            'pattern' => '^(/|https?://)?.*\.([Pp][Nn][Gg]|[Gg][Ii][Ff]|[Jj][Pp][Gg]|[Jj][Pp][Ee][Gg]|[Ww][Ee][Bb][Pp])(\?.*)?(#.*)?$',
             'title' => 'Image URL',
           ],
           'alt' => [
@@ -708,7 +767,7 @@ class PropSourceTest extends KernelTestBase {
     // serialization and deserialization works.
     // Note: title of properties have been omitted; only essential data is kept.
     $json_representation = (string) $source;
-    self::assertSame('{"sourceType":"default-relative-url","value":{"src":"gracie.jpg","alt":"A good dog","width":601,"height":402},"jsonSchema":{"type":"object","properties":{"src":{"type":"string","format":"uri-reference","pattern":"^(\/|https?:\/\/)?.*\\\.(png|gif|jpg|jpeg|webp)(\\\?.*)?(#.*)?$"},"alt":{"type":"string"},"width":{"type":"integer"},"height":{"type":"integer"}},"required":["src"]},"componentId":"sdc.xb_test_sdc.image-optional-with-example-and-additional-prop"}', $json_representation);
+    self::assertSame('{"sourceType":"default-relative-url","value":{"src":"gracie.jpg","alt":"A good dog","width":601,"height":402},"jsonSchema":{"type":"object","properties":{"src":{"type":"string","format":"uri-reference","pattern":"^(\/|https?:\/\/)?.*\\\.([Pp][Nn][Gg]|[Gg][Ii][Ff]|[Jj][Pp][Gg]|[Jj][Pp][Ee][Gg]|[Ww][Ee][Bb][Pp])(\\\?.*)?(#.*)?$"},"alt":{"type":"string"},"width":{"type":"integer"},"height":{"type":"integer"}},"required":["src"]},"componentId":"sdc.xb_test_sdc.image-optional-with-example-and-additional-prop"}', $json_representation);
     $decoded = json_decode($json_representation, TRUE);
     // Ensure that DefaultRelativeUrlPropSource::parse() does not care about key
     // order for the JSON Schema definition it contains.

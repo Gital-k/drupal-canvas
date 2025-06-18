@@ -49,6 +49,13 @@ final class InvalidSlots extends ComponentSourceBase implements ComponentSourceW
   /**
    * {@inheritdoc}
    */
+  protected function getExplicitInputDefinitions(): array {
+    return [];
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   public function requiresExplicitInput(): bool {
     return FALSE;
   }
@@ -113,13 +120,6 @@ final class InvalidSlots extends ComponentSourceBase implements ComponentSourceW
    * {@inheritdoc}
    */
   public function checkRequirements(): void {
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function onDependencyRemoval(array $dependencies): bool {
-    return FALSE;
   }
 
   /**

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\experience_builder\Kernel;
 
-use Drupal\Core\Entity\TypedData\EntityDataDefinition;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Field\WidgetInterface;
 use Drupal\Core\Field\WidgetPluginManager;
@@ -19,6 +18,7 @@ use Drupal\experience_builder\PropShape\PropShape;
 use Drupal\experience_builder\PropShape\StorablePropShape;
 use Drupal\experience_builder\PropSource\StaticPropSource;
 use Drupal\experience_builder\ShapeMatcher\JsonSchemaFieldInstanceMatcher;
+use Drupal\experience_builder\TypedData\BetterEntityDataDefinition;
 use Drupal\KernelTests\KernelTestBase;
 use Drupal\Tests\experience_builder\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\user\Entity\User;
@@ -222,7 +222,7 @@ class PropShapeRepositoryTest extends KernelTestBase {
         fieldTypeProp: new FieldTypeObjectPropsExpression('image', [
           'src' => new ReferenceFieldTypePropExpression(
             new FieldTypePropExpression('image', 'entity'),
-            new FieldPropExpression(EntityDataDefinition::create('file'), 'uri', NULL, 'url'),
+            new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'uri', NULL, 'url'),
           ),
           'alt' => new FieldTypePropExpression('image', 'alt'),
           'width' => new FieldTypePropExpression('image', 'width'),
@@ -459,7 +459,7 @@ class PropShapeRepositoryTest extends KernelTestBase {
         fieldTypeProp: new FieldTypeObjectPropsExpression('image', [
           'src' => new ReferenceFieldTypePropExpression(
             new FieldTypePropExpression('image', 'entity'),
-            new FieldPropExpression(EntityDataDefinition::create('file'), 'uri', NULL, 'url'),
+            new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'uri', NULL, 'url'),
           ),
           'alt' => new FieldTypePropExpression('image', 'alt'),
           'width' => new FieldTypePropExpression('image', 'width'),

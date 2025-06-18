@@ -1,16 +1,19 @@
 import { useEffect } from 'react';
 import { useErrorBoundary } from 'react-error-boundary';
-import { useGetComponentsQuery } from '@/services/componentAndLayout';
 import List from '@/components/list/List';
 import { useAppSelector } from '@/app/hooks';
-import { selectUniqueListId } from '@/features/ui/primaryPanelSlice';
+import {
+  LayoutItemType,
+  selectUniqueListId,
+} from '@/features/ui/primaryPanelSlice';
+import { useGetFilteredComponentsQuery } from '@/hooks/useGetFilteredComponentsQuery';
 
 const ComponentList = () => {
   const {
-    data: components,
+    filteredComponents: components,
     error,
     isLoading,
-  } = useGetComponentsQuery({
+  } = useGetFilteredComponentsQuery({
     mode: 'exclude',
     libraries: ['dynamic_components'],
   });
@@ -27,7 +30,7 @@ const ComponentList = () => {
     <List
       items={components}
       isLoading={isLoading}
-      type="component"
+      type={LayoutItemType.COMPONENT}
       label="Components"
       key={id}
     />

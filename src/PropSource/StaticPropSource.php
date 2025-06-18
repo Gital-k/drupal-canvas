@@ -26,6 +26,7 @@ use Drupal\experience_builder\PropExpressions\StructuredData\FieldTypePropExpres
 use Drupal\experience_builder\PropExpressions\StructuredData\ReferenceFieldTypePropExpression;
 use Drupal\experience_builder\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\experience_builder\PropExpressions\StructuredData\StructuredDataPropExpressionInterface;
+use Drupal\media\MediaInterface;
 
 /**
  * Contains unstructured data for 1 explicit input of a component instance.
@@ -186,6 +187,14 @@ final class StaticPropSource extends PropSourceBase {
         assert($field_item instanceof EntityReferenceItem);
         if ($field_item->get('target_id')->getValue() === NULL && $field_item->get('entity')->getValue()->isNew()) {
           $entity = $field_item->get('entity')->getValue();
+          if ($entity instanceof MediaInterface && $entity->getSource()->getPluginId() === 'oembed:video') {
+            // Saving Media entity with `oembed:video` source fails during an
+            // attempt to fetch thumbnail uri from metadata. This prevents
+            // thumbnail uri fetching via metadata and forces Media entity to
+            // use Media::getDefaultThumbnailUri() for thumbnail uri.
+            // @see \Drupal\media\Entity\Media::getThumbnailUri()
+            $entity->bundle->entity->setQueueThumbnailDownloadsStatus(TRUE);
+          }
           $entity->save();
           $field_item->setValue(['entity' => $entity]);
         }

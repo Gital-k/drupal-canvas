@@ -10,17 +10,24 @@ use Drupal\Core\Block\BlockPluginInterface;
 use Drupal\Core\Block\MainContentBlockPluginInterface;
 use Drupal\Core\Block\MessagesBlockPluginInterface;
 use Drupal\Core\Block\TitleBlockPluginInterface;
+use Drupal\Core\Breadcrumb\Breadcrumb;
+use Drupal\Core\Breadcrumb\BreadcrumbBuilderInterface;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Config\TypedConfigManagerInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Link;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Drupal\Core\Plugin\Context\ContextDefinitionInterface;
 use Drupal\Core\Plugin\PluginDependencyTrait;
 use Drupal\Core\Render\Element;
+use Drupal\Core\Routing\RouteMatch;
+use Drupal\Core\Routing\RouteMatchInterface;
+use Drupal\Core\Routing\RouteProviderInterface;
 use Drupal\Core\Session\AccountInterface;
+use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\TypedData\ComplexDataInterface;
 use Drupal\Core\TypedData\Plugin\DataType\BooleanData;
@@ -34,6 +41,7 @@ use Drupal\experience_builder\Entity\JavaScriptComponent;
 use Drupal\experience_builder\MissingComponentInputsException;
 use Drupal\experience_builder\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\experience_builder\Validation\ConstraintPropertyPathTranslatorTrait;
+use Drupal\system\Plugin\Block\SystemBreadcrumbBlock;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Validator\ConstraintViolationList;
 use Symfony\Component\Validator\ConstraintViolationListInterface;
@@ -81,6 +89,7 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
     private readonly TypedConfigManagerInterface $typedConfigManager,
     private readonly EntityTypeManagerInterface $entityTypeManager,
   ) {
+    assert(array_key_exists('local_source_id', $configuration));
     parent::__construct($configuration, $plugin_id, $plugin_definition);
   }
 
@@ -152,6 +161,36 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
    */
   public function renderComponent(array $inputs, string $componentUuid, bool $isPreview = FALSE): array {
     $block = $this->getBlockPlugin();
+
+    // @todo Refine to reflect the edited entity route in https://www.drupal.org/i/3509500
+    if ($isPreview && $block instanceof SystemBreadcrumbBlock) {
+      $block = new SystemBreadcrumbBlock(
+        $block->getConfiguration(),
+        $block->getPluginId(),
+        $block->getPluginDefinition(),
+        new class() implements BreadcrumbBuilderInterface {
+          use StringTranslationTrait;
+
+          public function applies(RouteMatchInterface $route_match) {
+             return TRUE;
+          }
+
+          /**
+           * In the preview, the breadcrumbs always points to the frontpage.
+           */
+          public function build(RouteMatchInterface $route_match) {
+            $breadcrumb = new Breadcrumb();
+            $breadcrumb->addLink(Link::createFromRoute($this->t('Home'), '<front>'));
+            return $breadcrumb;
+          }
+
+        },
+        // @phpstan-ignore-next-line
+        new RouteMatch('<front>', \Drupal::service(RouteProviderInterface::class)->getRouteByName('<front>')),
+      );
+      assert($block instanceof SystemBreadcrumbBlock);
+    }
+
     foreach ($inputs[self::EXPLICIT_INPUT_NAME] ?? [] as $key => $value) {
       $block->setConfigurationValue($key, $value);
     }
@@ -222,6 +261,30 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
     }
 
     return $build;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function getExplicitInputDefinitions(): array {
+    $block_plugin = $this->getBlockPlugin();
+    $plugin_id = $block_plugin->getPluginId();
+    $config_schema_type_definition = $this->typedConfigManager->getDefinition('block.settings.' . $plugin_id);
+    return self::removeConfigSchemaLabels($config_schema_type_definition);
+  }
+
+  private static function removeConfigSchemaLabels(array $config_schema): array {
+    $normalized = [];
+    foreach ($config_schema as $key => $value) {
+      if ($key === 'label') {
+        continue;
+      }
+      if (is_array($value)) {
+        $value = self::removeConfigSchemaLabels($value);
+      }
+      $normalized[$key] = $value;
+    }
+    return $normalized;
   }
 
   /**
@@ -415,10 +478,6 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
     if ($reasons) {
       throw new ComponentDoesNotMeetRequirementsException($reasons);
     }
-  }
-
-  public function onDependencyRemoval(array $dependencies): bool {
-    return !empty($this->getPluginRemovedDependencies($this->getPluginDependencies($this), $dependencies));
   }
 
 }

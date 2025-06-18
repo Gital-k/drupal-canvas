@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource;
 
+use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Entity\TypedData\EntityDataDefinition;
-use Drupal\Core\Field\FieldTypePluginManagerInterface;
 use Drupal\Core\Field\WidgetPluginManager;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Plugin\Component as SdcPlugin;
@@ -31,9 +31,9 @@ use Drupal\experience_builder\PropExpressions\StructuredData\ReferenceFieldPropE
 use Drupal\experience_builder\PropExpressions\StructuredData\ReferenceFieldTypePropExpression;
 use Drupal\experience_builder\PropShape\PropShape;
 use Drupal\experience_builder\PropShape\StorablePropShape;
+use Drupal\experience_builder\PropSource\DefaultRelativeUrlPropSource;
 use Drupal\experience_builder\PropSource\PropSource;
 use Drupal\experience_builder\PropSource\StaticPropSource;
-use Drupal\experience_builder\PropSource\DefaultRelativeUrlPropSource;
 use Drupal\experience_builder\ShapeMatcher\FieldForComponentSuggester;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Validator\ConstraintViolation;
@@ -71,11 +71,11 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     string $plugin_id,
     array $plugin_definition,
     private readonly ComponentValidator $componentValidator,
-    private readonly FieldTypePluginManagerInterface $fieldTypePluginManager,
     private readonly WidgetPluginManager $fieldWidgetPluginManager,
     private readonly FieldForComponentSuggester $fieldForComponentSuggester,
     protected readonly EntityTypeManagerInterface $entityTypeManager,
   ) {
+    assert(array_key_exists('local_source_id', $configuration));
     parent::__construct($configuration, $plugin_id, $plugin_definition);
   }
 
@@ -89,7 +89,6 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       $plugin_id,
       $plugin_definition,
       $container->get(ComponentValidator::class),
-      $container->get(FieldTypePluginManagerInterface::class),
       $container->get('plugin.manager.field.widget'),
       $container->get(FieldForComponentSuggester::class),
       $container->get(EntityTypeManagerInterface::class),
@@ -113,16 +112,11 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     assert(array_key_exists('prop_field_definitions', $this->configuration));
     assert(is_array($this->configuration['prop_field_definitions']));
     $dependencies = [];
-    foreach ($this->configuration['prop_field_definitions'] as ['field_type' => $field_type, 'field_widget' => $field_widget]) {
-      // TRICKY: `field_type` (and `field_widget`) may not be set if no field
-      // types match this SDC prop shape.
-      if ($field_type === NULL) {
-        continue;
-      }
-      $field_type_definition = $this->fieldTypePluginManager->getDefinition($field_type);
-      $dependencies['module'][] = $field_type_definition['provider'];
+    foreach ($this->configuration['prop_field_definitions'] as $prop_name => ['field_type' => $field_type, 'field_widget' => $field_widget]) {
       $field_widget_definition = $this->fieldWidgetPluginManager->getDefinition($field_widget);
       $dependencies['module'][] = $field_widget_definition['provider'];
+      $prop_source = $this->getDefaultStaticPropSource($prop_name, FALSE);
+      $dependencies = NestedArray::mergeDeep($dependencies, \array_diff_key($prop_source->calculateDependencies(), \array_flip(['plugin'])));
     }
 
     ksort($dependencies);
@@ -138,15 +132,19 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
    *
    * @param string $prop_name
    *   The prop name.
+   * @param bool $validate_prop_name
+   *   TRUE to validate the prop name against the current version of the SDC
+   *   plugin. For past versions pass FALSE as a prop field definition may no
+   *   longer exist.
    *
    * @return \Drupal\experience_builder\PropSource\StaticPropSource
    *   The prop source object.
    */
-  private function getDefaultStaticPropSource(string $prop_name): StaticPropSource {
+  private function getDefaultStaticPropSource(string $prop_name, bool $validate_prop_name = TRUE): StaticPropSource {
     assert(isset($this->configuration['prop_field_definitions']));
     assert(is_array($this->configuration['prop_field_definitions']));
     $component_schema = $this->getSdcPlugin()->metadata->schema ?? [];
-    if (!array_key_exists($prop_name, $component_schema['properties'] ?? [])) {
+    if ($validate_prop_name && !array_key_exists($prop_name, $component_schema['properties'] ?? [])) {
       throw new \OutOfRangeException(sprintf("'%s' is not a prop on the component '%s'.", $prop_name, $this->getComponentDescription()));
     }
 
@@ -170,6 +168,21 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
 
   public function getSlotDefinitions(): array {
     return $this->getSdcPlugin()->metadata->slots;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function getExplicitInputDefinitions(): array {
+    $sdc_plugin = $this->getSdcPlugin();
+    $prop_shapes = PropShape::getComponentProps($this->getSdcPlugin());
+    return [
+      'required' => $sdc_plugin->metadata->schema['required'] ?? [],
+      'shapes' => array_combine(
+        array_map(fn (string $cpe) => ComponentPropExpression::fromString($cpe)->propName, array_keys($prop_shapes)),
+        array_map(fn (PropShape $shape) => $shape->schema, $prop_shapes),
+      ),
+    ];
   }
 
   /**
@@ -778,13 +791,13 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       // corresponding source but may not.
       $prop_value = $client_model['resolved'][$prop] ?? NULL;
       try {
+        // TRICKY: this is always set, *except* in the case of an auto-saved
+        // code component that just gained a new prop.
+        $default_source_value = $this->configuration['prop_field_definitions'][$prop]['default_value'] ?? NULL;
         // @see PropSourceComponent type-script definition.
         // @see EvaluatedComponentModel type-script definition.
         // Undo what ::inputToClientModel() did: restore the omitted `'value'`
         // in cases where it is the same as the source value.
-        // TRICKY: this is always set, *except* in the case of an auto-saved
-        // code component that just gained a new prop.
-        $default_source_value = $this->configuration['prop_field_definitions'][$prop]['default_value'] ?? NULL;
         if (!\array_key_exists('value', $prop_source)) {
           $prop_source['value'] = $prop_value;
         }
@@ -819,11 +832,6 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
         // subsequent validation to bubble up any errors.
         continue;
       }
-      catch (\LogicException) {
-        // Invalid client data has been passed - fallback to an empty default
-        // static prop source.
-        $source = $this->getDefaultStaticPropSource($prop)->withValue([]);
-      }
       $props[$prop] = $source->toArray();
       if ($source instanceof StaticPropSource &&
         \array_key_exists('expression', $props[$prop]) &&
@@ -847,19 +855,8 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
    * @phpstan-return PropSourceArray
    */
   private function rawInputValueToPropSourceArray(mixed $value, string $prop_name): array {
-    $static_defaults = $this->configuration['prop_field_definitions'];
     if (!\is_array($value) || !\array_key_exists('sourceType', $value)) {
-      $value = [
-        'value' => $value,
-        'expression' => $static_defaults[$prop_name]['expression'] ?? throw new \UnexpectedValueException(\sprintf('Missing expression for prop %s.', $prop_name)),
-        'sourceType' => \sprintf('static:field_item:%s', $static_defaults[$prop_name]['field_type'] ?? throw new \UnexpectedValueException(\sprintf('Missing field type for prop %s.', $prop_name))),
-      ];
-      $value += \array_filter([
-        'sourceTypeSettings' => \array_filter([
-          'storage' => $static_defaults[$prop_name]['field_storage_settings'] ?? [],
-          'instance' => $static_defaults[$prop_name]['field_instance_settings'] ?? [],
-        ]),
-      ]);
+      $value = $this->getDefaultStaticPropSource($prop_name)->withValue($value)->toArray();
     }
     // phpcs:ignore
     /** @var PropSourceArray */

@@ -4,9 +4,8 @@ declare(strict_types=1);
 
 namespace Drupal\experience_builder\Entity;
 
+use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Config\Entity\ConfigEntityBase;
-use Drupal\Core\Config\Schema\Mapping;
-use Drupal\Core\Config\TypedConfigManagerInterface;
 use Drupal\Core\Entity\EntityStorageException;
 use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Entity\EntityWithPluginCollectionInterface;
@@ -15,6 +14,7 @@ use Drupal\experience_builder\Plugin\VersionedConfigurationSubsetSingleLazyPlugi
 
 /**
  * @property ?\Drupal\experience_builder\Plugin\DataType\ConfigEntityVersionAdapter $typedData
+ * @phpstan-import-type ConfigDependenciesArray from \Drupal\experience_builder\Entity\VersionedConfigEntityInterface
  */
 abstract class VersionedConfigEntityBase extends ConfigEntityBase implements VersionedConfigEntityInterface {
 
@@ -50,9 +50,9 @@ abstract class VersionedConfigEntityBase extends ConfigEntityBase implements Ver
   }
 
   public function loadVersion(string $version): static {
-    if ($version !== $this->active_version) {
+    if ($version !== $this->loadedVersion) {
       assert($this->versioned_properties !== NULL);
-      if (!array_key_exists($version, $this->versioned_properties)) {
+      if ($version !== $this->active_version && !array_key_exists($version, $this->versioned_properties)) {
         throw new \OutOfRangeException(sprintf('The requested version `%s` is not available. Available versions: %s.',
           (string) $version,
           implode(', ', array_map(
@@ -64,23 +64,6 @@ abstract class VersionedConfigEntityBase extends ConfigEntityBase implements Ver
       $this->loadedVersion = $version;
     }
     return $this;
-  }
-
-  public static function generateVersionStringForData(array $data, string $config_schema_type): string {
-    $typed_data = \Drupal::service(TypedConfigManagerInterface::class)->createFromNameAndData($config_schema_type, $data);
-    assert($typed_data instanceof Mapping);
-    $normalized_data = $typed_data->toArray();
-    self::recursiveKsort($normalized_data);
-    return \hash('xxh64', \json_encode($normalized_data, JSON_THROW_ON_ERROR));
-  }
-
-  private static function recursiveKsort(array &$array): void {
-    ksort($array);
-    foreach ($array as &$value) {
-      if (is_array($value)) {
-        self::recursiveKsort($value);
-      }
-    }
   }
 
   public function createVersion(string $version): static {
@@ -207,6 +190,39 @@ abstract class VersionedConfigEntityBase extends ConfigEntityBase implements Ver
       $this->typedData = ConfigEntityVersionAdapter::createFromEntity($this);
     }
     return $this->typedData;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function calculateDependencies(): static {
+    $this->dependencies = [];
+    $dependencies = [];
+    foreach ($this->getVersions() as $version) {
+      // Load each version and compute its dependencies.
+      $dependencies = NestedArray::mergeDeep($dependencies, $this->getVersionSpecificDependencies($version));
+    }
+    $this->addDependencies($dependencies);
+    return $this;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getVersionSpecificDependencies(string $version): array {
+    $current_dependencies = $this->dependencies;
+    $current_version = $this->getLoadedVersion();
+
+    $this->loadVersion($version);
+    parent::calculateDependencies();
+    $dependencies = $this->dependencies;
+
+    // Restore original state.
+    $this->loadVersion($current_version);
+    $this->dependencies = $current_dependencies;
+
+    /** @var ConfigDependenciesArray */
+    return $dependencies;
   }
 
 }

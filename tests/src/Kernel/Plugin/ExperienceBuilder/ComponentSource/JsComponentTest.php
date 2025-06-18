@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\experience_builder\Kernel\Plugin\ExperienceBuilder\ComponentSource;
 
-// cspell:ignore Tilly Umso Dzyawdvr Mafgg
+// cspell:ignore Tilly anzut nhsy sxnz
 
 use Drupal\Component\Serialization\Json;
 use Drupal\Component\Utility\Crypt;
@@ -14,7 +14,6 @@ use Drupal\Core\Asset\AttachedAssets;
 use Drupal\Core\Cache\CacheableDependencyInterface;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\File\FileUrlGeneratorInterface;
-use Drupal\Core\Site\Settings;
 use Drupal\Core\StreamWrapper\StreamWrapperInterface;
 use Drupal\Core\StreamWrapper\StreamWrapperManagerInterface;
 use Drupal\experience_builder\AutoSave\AutoSaveManager;
@@ -234,6 +233,9 @@ final class JsComponentTest extends ComponentSourceTestBase {
         'tailwind-merge' => \sprintf('%s/ui/lib/astro-hydration/dist/tailwind-merge.js', $module_path),
         '@/lib/FormattedText' => \sprintf('%s/ui/lib/astro-hydration/dist/FormattedText.js', $module_path),
         '@/lib/utils' => \sprintf('%s/ui/lib/astro-hydration/dist/utils.js', $module_path),
+        '@drupal-api-client/json-api-client' => \sprintf('%s/ui/lib/astro-hydration/dist/json-api-client.js', $module_path),
+        'drupal-jsonapi-params' => \sprintf('%s/ui/lib/astro-hydration/dist/jsonapi-params.js', $module_path),
+        'swr' => \sprintf('%s/ui/lib/astro-hydration/dist/swr.js', $module_path),
       ],
     ];
 
@@ -256,16 +258,16 @@ final class JsComponentTest extends ComponentSourceTestBase {
               [
                 'rel' => 'modulepreload',
                 'fetchpriority' => 'high',
-                'href' => \sprintf('/%s/files/astro-island/CiwA6RtUpaykMTcpxFHhMnJFCGcbFW98vMZYXTqv9hY.js', $site_path),
+                'href' => \sprintf('/%s/files/astro-island/1Dq8BIqr4CMOA9RWhpbDNM4mjbvezQDq0mKKzO7iEmw.js', $site_path),
               ],
             ],
           ],
           'import_maps' => $default_imports + [
             ImportMapResponseAttachmentsProcessor::SCOPED_IMPORTS => [
-              \sprintf('/%s/files/astro-island/CiwA6RtUpaykMTcpxFHhMnJFCGcbFW98vMZYXTqv9hY.js', $site_path) => [
+              \sprintf('/%s/files/astro-island/1Dq8BIqr4CMOA9RWhpbDNM4mjbvezQDq0mKKzO7iEmw.js', $site_path) => [
 
-                '@/components/xb_test_code_components_with_no_props' => \sprintf('/%s/files/astro-island/DIVuf4g3b3u8n5-VUmsoKODzyawdvr_IN1g-mj0nshQ.js', $site_path),
-                '@/components/xb_test_code_components_with_props' => \sprintf('/%s/files/astro-island/2jV89MNP0iZ-LKQfZcMafgg380hSb1XsUhk6YAp_6nc.js', $site_path),
+                '@/components/xb_test_code_components_with_no_props' => \sprintf('/%s/files/astro-island/axL0zkV0Jlcf3zuQfhx8HWxySMYQVoAZLwgGK-dxXWU.js', $site_path),
+                '@/components/xb_test_code_components_with_props' => \sprintf('/%s/files/astro-island/AFWyiY79ad8_Hbz1qqKz97PSpKgNHSYCcwBWz8QRChU.js', $site_path),
               ],
             ],
           ],
@@ -282,7 +284,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
               [
                 'rel' => 'modulepreload',
                 'fetchpriority' => 'high',
-                'href' => \sprintf('/%s/files/astro-island/AWzvjuD0F9PeMDLpE7JOz6gNduz6leBzCpSxl1aSjBE.js', $site_path),
+                'href' => \sprintf('/%s/files/astro-island/Ej9H8EwYfANZUT_jL84bUAXkK8F_p9-yZyj4Sxnz7C8.js', $site_path),
               ],
             ],
           ],
@@ -300,7 +302,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
               [
                 'rel' => 'modulepreload',
                 'fetchpriority' => 'high',
-                'href' => \sprintf('/%s/files/astro-island/DIVuf4g3b3u8n5-VUmsoKODzyawdvr_IN1g-mj0nshQ.js', $site_path),
+                'href' => \sprintf('/%s/files/astro-island/axL0zkV0Jlcf3zuQfhx8HWxySMYQVoAZLwgGK-dxXWU.js', $site_path),
               ],
             ],
           ],
@@ -322,7 +324,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
               [
                 'rel' => 'modulepreload',
                 'fetchpriority' => 'high',
-                'href' => \sprintf('/%s/files/astro-island/2jV89MNP0iZ-LKQfZcMafgg380hSb1XsUhk6YAp_6nc.js', $site_path),
+                'href' => \sprintf('/%s/files/astro-island/AFWyiY79ad8_Hbz1qqKz97PSpKgNHSYCcwBWz8QRChU.js', $site_path),
               ],
             ],
           ],
@@ -425,7 +427,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
     \assert($asset_wrapper instanceof StreamWrapperInterface);
     \assert(\method_exists($asset_wrapper, 'getDirectoryPath'));
     $directory_path = $asset_wrapper->getDirectoryPath();
-    $js_hash = Crypt::hmacBase64($expected_component_compiled_js, Settings::getHashSalt());
+    $js_hash = Crypt::hmacBase64($expected_component_compiled_js, $js_component->uuid());
     // @phpstan-ignore-next-line
     $expected_js_filename = match ($expected_result) {
       'live' => \sprintf('/%s/astro-island/%s.js', $directory_path, $js_hash),
@@ -457,7 +459,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
       $css_filename = match ($expected_result) {
         'live' => \sprintf(
           'assets://astro-island/%s.css',
-          Crypt::hmacBase64($expected_component_compiled_css, Settings::getHashSalt()),
+          Crypt::hmacBase64($expected_component_compiled_css, $js_component->uuid()),
         ),
         'draft' => "xb/api/v0/auto-saves/css/js_component/$js_component_id",
       };
@@ -477,7 +479,9 @@ final class JsComponentTest extends ComponentSourceTestBase {
         ],
       ],
       'js.xb_test_code_components_vanilla_image' => [
+        'content' => [],
         'module' => [
+          'file',
           'image',
         ],
         'config' => [
@@ -783,7 +787,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
                   'title' => 'Image URL',
                   'type' => 'string',
                   'format' => 'uri-reference',
-                  'pattern' => '^(/|https?://)?.*\\.(png|gif|jpg|jpeg|webp)(\\?.*)?(#.*)?$',
+                  'pattern' => '^(/|https?://)?.*\\.([Pp][Nn][Gg]|[Gg][Ii][Ff]|[Jj][Pp][Gg]|[Jj][Pp][Ee][Gg]|[Ww][Ee][Bb][Pp])(\\?.*)?(#.*)?$',
                 ],
                 'alt' => [
                   'title' => 'Alternative text',
@@ -959,7 +963,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
     return Component::load($component_id);
   }
 
-  protected function forceComponentFallback(ComponentInterface $used_component, ComponentInterface $unused_component): void {
+  protected function deleteConfigAndTriggerComponentFallback(ComponentInterface $used_component, ComponentInterface $unused_component): void {
     $source = $used_component->getComponentSource();
     \assert($source instanceof JsComponent);
     $source->getJavaScriptComponent()->delete();
@@ -999,6 +1003,171 @@ final class JsComponentTest extends ComponentSourceTestBase {
       ],
     ]);
     $js_component->enable()->save();
+  }
+
+  public function testVersionDeterminability(): void {
+    $js_component = JavaScriptComponent::create([
+      'machineName' => 'joy_is_everything',
+      'name' => $this->getRandomGenerator()->sentences(5),
+      'status' => FALSE,
+      'props' => [],
+      'required' => [],
+      'slots' => [
+        'joy' => [
+          'title' => 'Joy',
+          'description' => "I see eyes like sunken ships, falling slowly in the waters.",
+          'examples' => [
+            'Even the deepest anchor in the middle of the ocean will yield to times of slaughter',
+          ],
+        ],
+      ],
+      'js' => [
+        'original' => 'console.log("hey");',
+        'compiled' => 'console.log("hey");',
+      ],
+      'css' => [
+        'original' => '.test { display: none; }',
+        'compiled' => '.test { display: none; }',
+      ],
+    ]);
+    $violations = $js_component->getTypedData()->validate();
+    self::assertCount(0, $violations);
+
+    // Save and enable to create a component.
+    $js_component->enable()->save();
+    $corresponding_component = Component::load(JsComponent::SOURCE_PLUGIN_ID . '.joy_is_everything');
+    assert($corresponding_component instanceof Component);
+
+    $original_version = $corresponding_component->getActiveVersion();
+    $versions = [$original_version];
+    self::assertCount(1, array_unique($versions));
+
+    // Change the slot example.
+    $js_component->set('slots', [
+      'joy' => [
+        'title' => 'Joy',
+        'description' => "I see eyes like sunken ships, falling slowly in the waters.",
+        'examples' => [
+          'A pilot light of hope spins around, it illuminates the strobe',
+        ],
+      ],
+    ])->save();
+    $second_version_component = Component::load(JsComponent::SOURCE_PLUGIN_ID . '.joy_is_everything');
+    assert($second_version_component instanceof Component);
+
+    $second_version = $second_version_component->getActiveVersion();
+    self::assertNotEquals($original_version, $second_version);
+    $versions[] = $second_version;
+    self::assertCount(2, array_unique($versions));
+
+    // Add a slot.
+    $js_component->set('slots', [
+      'joy' => [
+        'title' => 'Joy',
+        'description' => "I see eyes like sunken ships, falling slowly in the waters.",
+        'examples' => [
+          'A pilot light of hope spins around, it illuminates the strobe',
+        ],
+      ],
+      'road' => [
+        'title' => 'Road ahead',
+        'description' => "Somewhere in space and time when I'm looking ahead",
+        'examples' => [
+          "There's a road that could change everything",
+        ],
+      ],
+    ])->save();
+
+    $third_version_component = Component::load(JsComponent::SOURCE_PLUGIN_ID . '.joy_is_everything');
+    assert($third_version_component instanceof Component);
+
+    $third_version = $third_version_component->getActiveVersion();
+    $versions[] = $third_version;
+    self::assertCount(3, array_unique($versions));
+
+    // Changing the slot description should not trigger a new version.
+    $js_component->set('slots', [
+      'joy' => [
+        'title' => 'Joy',
+        'description' => "I see eyes like sunken ships, falling slowly in the waters.",
+        'examples' => [
+          'A pilot light of hope spins around, it illuminates the strobe',
+        ],
+      ],
+      'road' => [
+        'title' => 'Road ahead',
+        'description' => "A woven maze that can even catch the spider within",
+        'examples' => [
+          "There's a road that could change everything",
+        ],
+      ],
+    ])->save();
+
+    $fourth_version_component = Component::load(JsComponent::SOURCE_PLUGIN_ID . '.joy_is_everything');
+    assert($fourth_version_component instanceof Component);
+
+    $fourth_version = $fourth_version_component->getActiveVersion();
+    self::assertEquals($fourth_version, $third_version);
+    $versions[] = $fourth_version;
+    self::assertCount(3, array_unique($versions));
+
+    // Add a prop.
+    $js_component->setProps([
+      'title' => [
+        'type' => 'string',
+        'title' => 'Title',
+      ],
+    ])->save();
+
+    $fifth_version_component = Component::load(JsComponent::SOURCE_PLUGIN_ID . '.joy_is_everything');
+    assert($fifth_version_component instanceof Component);
+
+    $fifth_version = $fifth_version_component->getActiveVersion();
+    $versions[] = $fifth_version;
+    self::assertCount(4, array_unique($versions));
+  }
+
+  protected function createAndSaveInUseComponentForUninstallValidationTesting(): ComponentInterface {
+    $js_component_id = $this->randomMachineName();
+    $js_component = JavaScriptComponent::create([
+      'machineName' => $js_component_id,
+      'name' => $this->getRandomGenerator()->sentences(5),
+      'status' => FALSE,
+      'props' => [
+        'text' => [
+          'type' => 'string',
+          'title' => 'Text',
+          'enum' => ['hello', 'goodbye'],
+        ],
+      ],
+      'required' => [],
+      'slots' => [],
+      'js' => [
+        'original' => 'console.log("hey");',
+        'compiled' => 'console.log("hey");',
+      ],
+      'css' => [
+        'original' => '.test { display: none; }',
+        'compiled' => '.test { display: none; }',
+      ],
+    ]);
+    $js_component->enable()->save();
+    $component_id = JsComponent::componentIdFromJavascriptComponentId($js_component_id);
+    /** @var \Drupal\experience_builder\Entity\ComponentInterface */
+    return Component::load($component_id);
+  }
+
+  protected function createAndSaveUnusedComponentForUninstallValidationTesting(): ComponentInterface {
+    return $this->createAndSaveUnusedComponentForFallbackTesting();
+  }
+
+  protected function getNotAllowedModuleForUninstallValidatorTesting(): string {
+    // Provides the field type for the enum.
+    return 'options';
+  }
+
+  protected function getAllowedModuleForUninstallValidatorTesting(): string {
+    $this->markTestSkipped('Uninstall is not valid for JS Components as they only depend on config, not optional modules.');
   }
 
 }

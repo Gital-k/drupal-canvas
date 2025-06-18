@@ -7,13 +7,17 @@ namespace Drupal\Tests\experience_builder\Kernel;
 use Drupal\experience_builder\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\experience_builder\PropShape\PropShape;
 use Drupal\experience_builder\PropShape\StorablePropShape;
+use Drupal\media\Entity\MediaType;
+use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
 
 /**
- * @covers media_library_storage_prop_shape_alter()
- * @covers media_library_field_widget_info_alter()
+ * @covers \Drupal\experience_builder\Hook\ShapeMatchingHooks::mediaLibraryStoragePropShapeAlter()
+ * @covers \Drupal\experience_builder\Hook\ReduxIntegratedFieldWidgetsHooks::mediaLibraryFieldWidgetInfoAlter()
  * @group experience_builder
  */
 class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
+
+  use MediaTypeCreationTrait;
 
   /**
    * {@inheritdoc}
@@ -23,8 +27,8 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
     'media',
     // @see \Drupal\media_library\Plugin\Field\FieldWidget\MediaLibraryWidget
     'media_library',
-    // Without this module installed, the `field_media_image` field won't be
-    // created, because the FieldConfig entity type would not exist.
+    // Without this module installed, the media source fields can't be created,
+    // because the FieldConfig entity type would not exist.
     'field',
     // The Media Library widget uses Views.
     'views',
@@ -44,9 +48,16 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
     // @see \Drupal\media_library\Plugin\Field\FieldWidget\MediaLibraryWidget
     $this->installEntitySchema('user');
 
+    // Intentionally do NOT rely on the Standard install profile: the MediaTypes
+    // using the Image MediaSource should work.
     // @see core/profiles/standard/config/optional/media.type.image.yml
-    $this->setInstallProfile('standard');
-    $this->installConfig(['media']);
+    // @see \Drupal\media\Plugin\media\Source\Image
+    $this->createMediaType('image', ['id' => 'baby_photos']);
+    $this->createMediaType('image', ['id' => 'vacation_photos']);
+    $this->createMediaType('video_file', ['id' => 'baby_videos']);
+    $this->createMediaType('video_file', ['id' => 'vacation_videos']);
+    $this->createMediaType('oembed:video', ['id' => 'remote_baby_videos']);
+    $this->createMediaType('oembed:video', ['id' => 'remote_vacation_videos']);
 
     // A sample value is generated during the test, which needs this table.
     $this->installSchema('file', ['file_usage']);
@@ -81,7 +92,7 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
         cardinality: $image_shape->cardinality,
         fieldWidget: 'media_library_widget',
         // @phpstan-ignore-next-line
-        fieldTypeProp: StructuredDataPropExpression::fromString('ℹ︎entity_reference␟{src↝entity␜␜entity:media:image␝field_media_image␞␟entity␜␜entity:file␝uri␞␟url,alt↝entity␜␜entity:media:image␝field_media_image␞␟alt,width↝entity␜␜entity:media:image␝field_media_image␞␟width,height↝entity␜␜entity:media:image␝field_media_image␞␟height}'),
+        fieldTypeProp: StructuredDataPropExpression::fromString("ℹ︎entity_reference␟{src↝entity␜␜entity:media:baby_photos|vacation_photos␝field_media_image|field_media_image_1␞␟entity␜␜entity:file␝uri␞␟url,alt↝entity␜␜entity:media:baby_photos|vacation_photos␝field_media_image|field_media_image_1␞␟alt,width↝entity␜␜entity:media:baby_photos|vacation_photos␝field_media_image|field_media_image_1␞␟width,height↝entity␜␜entity:media:baby_photos|vacation_photos␝field_media_image|field_media_image_1␞␟height}"),
         fieldStorageSettings: [
           'target_type' => 'media',
         ],
@@ -89,7 +100,8 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
           'handler' => 'default:media',
           'handler_settings' => [
             'target_bundles' => [
-              'image' => 'image',
+              'baby_photos' => 'baby_photos',
+              'vacation_photos' => 'vacation_photos',
             ],
           ],
         ],
@@ -99,7 +111,7 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
     $storable_prop_shapes['type=object&$ref=json-schema-definitions://experience_builder.module/video'] = new StorablePropShape(
       shape: new PropShape(['type' => 'object', '$ref' => 'json-schema-definitions://experience_builder.module/video']),
       // @phpstan-ignore-next-line
-      fieldTypeProp: StructuredDataPropExpression::fromString('ℹ︎entity_reference␟{src↝entity␜␜entity:media:video␝field_media_video_file␞␟entity␜␜entity:file␝uri␞␟url}'),
+      fieldTypeProp: StructuredDataPropExpression::fromString('ℹ︎entity_reference␟{src↝entity␜␜entity:media:baby_videos|vacation_videos␝field_media_video_file|field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟url}'),
       fieldWidget: 'media_library_widget',
       fieldStorageSettings: [
         'target_type' => 'media',
@@ -108,7 +120,8 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
         'handler' => 'default:media',
         'handler_settings' => [
           'target_bundles' => [
-            'video' => 'video',
+            'baby_videos' => 'baby_videos',
+            'vacation_videos' => 'vacation_videos',
           ],
         ],
       ],
@@ -117,7 +130,7 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
     $storable_prop_shapes['type=object&$ref=json-schema-definitions://experience_builder.module/oembed_video'] = new StorablePropShape(
       shape: new PropShape(['type' => 'object', '$ref' => 'json-schema-definitions://experience_builder.module/oembed_video']),
       // @phpstan-ignore-next-line
-      fieldTypeProp: StructuredDataPropExpression::fromString('ℹ︎entity_reference␟{url↝entity␜␜entity:media:remote_video␝field_media_oembed_video␞␟value}'),
+      fieldTypeProp: StructuredDataPropExpression::fromString('ℹ︎entity_reference␟{url↝entity␜␜entity:media:remote_baby_videos|remote_vacation_videos␝field_media_oembed_video|field_media_oembed_video_1␞␟value}'),
       fieldWidget: 'media_library_widget',
       fieldStorageSettings: [
         'target_type' => 'media',
@@ -126,7 +139,8 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
         'handler' => 'default:media',
         'handler_settings' => [
           'target_bundles' => [
-            'remote_video' => 'remote_video',
+            'remote_baby_videos' => 'remote_baby_videos',
+            'remote_vacation_videos' => 'remote_vacation_videos',
           ],
         ],
       ],

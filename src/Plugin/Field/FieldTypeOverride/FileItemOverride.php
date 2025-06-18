@@ -11,6 +11,7 @@ use Drupal\Core\File\FileExists;
 use Drupal\Core\File\FileSystemInterface;
 use Drupal\experience_builder\Plugin\Validation\Constraint\StringSemanticsConstraint;
 use Drupal\file\Plugin\Field\FieldType\FileItem;
+use Drupal\media\Entity\MediaType;
 
 /**
  * @todo Fix upstream.
@@ -30,7 +31,7 @@ class FileItemOverride extends FileItem {
     // FileItem::generateSampleValue() creates File entity with hardcoded .txt
     // .extension, media:video requires .mp4 extension for video_file source.
     // @see \Drupal\file\Plugin\Field\FieldType\FileItem::generateSampleValue()
-    if ($field_definition->getTargetEntityTypeId() === 'media' && $field_definition->getTargetBundle() === 'video') {
+    if ($field_definition->getTargetEntityTypeId() === 'media' && !empty($field_definition->getTargetBundle()) && MediaType::load($field_definition->getTargetBundle())->getSource()->getPluginId() === 'video_file') {
       $random = new Random();
       $settings = $field_definition->getSettings();
 

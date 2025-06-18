@@ -6,7 +6,9 @@ namespace Drupal\Tests\experience_builder\Unit\EntityHandlers;
 
 use Drupal\Core\Access\AccessResultAllowed;
 use Drupal\Core\Access\AccessResultForbidden;
+use Drupal\Core\Access\AccessResultNeutral;
 use Drupal\Core\Access\AccessResultReasonInterface;
+use Drupal\Core\Cache\Cache;
 use Drupal\Core\Cache\Context\CacheContextsManager;
 use Drupal\Core\Config\ConfigManagerInterface;
 use Drupal\Core\Config\Entity\ConfigDependencyManager;
@@ -36,9 +38,10 @@ final class ContentCreatorVisibleXbConfigEntityAccessControlHandlerTest extends 
    * @covers ::checkAccess
    * @dataProvider viewPermissionProvider
    */
-  public function testCanViewWithoutCheckingPermissions(string $entityTypeId, string $entityTypeLabel, string $permission, string $expectedAccessResult): void {
+  public function testCanViewWithoutCheckingPermissions(string $entityTypeId, string $entityTypeLabel, bool $status, string $permission, string $expectedAccessResult): void {
     $cacheContextsManager = $this->prophesize(CacheContextsManager::class);
     $cacheContextsManager->assertValidTokens(['user.permissions'])->willReturn(TRUE);
+    $cacheContextsManager->assertValidTokens(['context:one', 'context:two'])->willReturn(TRUE);
     $container = new ContainerBuilder();
     $container->set('cache_contexts_manager', $cacheContextsManager->reveal());
     \Drupal::setContainer($container);
@@ -48,6 +51,19 @@ final class ContentCreatorVisibleXbConfigEntityAccessControlHandlerTest extends 
     $entityType = $this->createMock(EntityTypeInterface::class);
     $entityType->expects($this->never())->method('getAdminPermission')->willReturn($permission);
     $entity = $this->createMock(ConfigEntityInterface::class);
+
+    $entity->expects($this->once())
+      ->method('status')
+      ->willReturn($status);
+    $entity->expects($this->once())
+      ->method('getCacheContexts')
+      ->willReturn(['context:one', 'context:two']);
+    $entity->expects($this->once())
+      ->method('getCacheTags')
+      ->willReturn(['tag:one', 'tag:two']);
+    $entity->expects($this->once())
+      ->method('getCacheMaxAge')
+      ->willReturn(Cache::PERMANENT);
     $configManager = $this->createMock(ConfigManagerInterface::class);
     $account = $this->createMock(AccountInterface::class);
     $account->expects($this->never())->method('hasPermission')->willReturn(TRUE);
@@ -63,9 +79,12 @@ final class ContentCreatorVisibleXbConfigEntityAccessControlHandlerTest extends 
 
   public static function viewPermissionProvider(): array {
     return [
-      [Component::ENTITY_TYPE_ID, 'component', Component::ADMIN_PERMISSION, AccessResultAllowed::class],
-      [Pattern::ENTITY_TYPE_ID, 'pattern', Pattern::ADMIN_PERMISSION, AccessResultAllowed::class],
-      [PageRegion::ENTITY_TYPE_ID, 'page region', PageRegion::ADMIN_PERMISSION, AccessResultAllowed::class],
+      [Component::ENTITY_TYPE_ID, 'component', TRUE, Component::ADMIN_PERMISSION, AccessResultAllowed::class],
+      [Pattern::ENTITY_TYPE_ID, 'pattern', TRUE, Pattern::ADMIN_PERMISSION, AccessResultAllowed::class],
+      [PageRegion::ENTITY_TYPE_ID, 'page region', TRUE, PageRegion::ADMIN_PERMISSION, AccessResultAllowed::class],
+      [Component::ENTITY_TYPE_ID, 'component', FALSE, Component::ADMIN_PERMISSION, AccessResultNeutral::class],
+      [Pattern::ENTITY_TYPE_ID, 'pattern', FALSE, Pattern::ADMIN_PERMISSION, AccessResultNeutral::class],
+      [PageRegion::ENTITY_TYPE_ID, 'page region', FALSE, PageRegion::ADMIN_PERMISSION, AccessResultNeutral::class],
     ];
   }
 

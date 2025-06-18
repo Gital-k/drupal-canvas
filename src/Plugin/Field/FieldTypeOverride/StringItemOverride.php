@@ -8,6 +8,7 @@ use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Field\Plugin\Field\FieldType\StringItem;
 use Drupal\experience_builder\Plugin\Validation\Constraint\StringSemanticsConstraint;
+use Drupal\media\Entity\MediaType;
 
 /**
  * @todo Fix upstream.
@@ -25,8 +26,8 @@ class StringItemOverride extends StringItem {
   }
 
   public static function generateSampleValue(FieldDefinitionInterface $field_definition) {
-    // remote_video uses oembed:video resource and it's sample should be uri.
-    if ($field_definition->getTargetEntityTypeId() === 'media' && $field_definition->getTargetBundle() === 'remote_video') {
+    // Media using oembed:video source should generate URI as a sample.
+    if ($field_definition->getTargetEntityTypeId() === 'media' && !empty($field_definition->getTargetBundle()) && MediaType::load($field_definition->getTargetBundle())->getSource()->getPluginId() === 'oembed:video') {
       return UriItemOverride::generateSampleValue($field_definition);
     }
 

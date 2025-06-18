@@ -5,12 +5,10 @@ declare(strict_types=1);
 namespace Drupal\Tests\experience_builder\Kernel\Plugin\ExperienceBuilder\ComponentSource;
 
 use Drupal\Core\Cache\CacheableMetadata;
-use Drupal\Core\Extension\ModuleInstallerInterface;
+use Drupal\Core\Config\TypedConfigManagerInterface;
 use Drupal\experience_builder\Entity\Component;
 use Drupal\experience_builder\Entity\ComponentInterface;
-use Drupal\experience_builder\Entity\Pattern;
 use Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\BlockComponent;
-use Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\Fallback;
 use Drupal\experience_builder\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\node\Entity\Node;
 use Drupal\system\Entity\Menu;
@@ -20,6 +18,7 @@ use Drupal\Tests\experience_builder\Traits\CrawlerTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use Drupal\user\Entity\User;
 use Drupal\xb_test_block\Plugin\Block\XbTestBlockInputNone;
+use Drupal\xb_test_block\Plugin\Block\XbTestBlockInputSchemaChangePoc;
 use Drupal\xb_test_block\Plugin\Block\XbTestBlockInputValidatable;
 use Drupal\xb_test_block\Plugin\Block\XbTestBlockInputValidatableCrash;
 use Drupal\xb_test_block\Plugin\Block\XbTestBlockOptionalContexts;
@@ -80,6 +79,7 @@ final class BlockComponentTest extends ComponentSourceTestBase {
     $auto_created_components = $this->findCreatedComponentConfigEntities(BlockComponent::SOURCE_PLUGIN_ID, 'xb_test_block');
     self::assertSame([
       'block.xb_test_block_input_none',
+      'block.xb_test_block_input_schema_change_poc',
       'block.xb_test_block_input_validatable',
       'block.xb_test_block_input_validatable_crash',
       'block.xb_test_block_optional_contexts',
@@ -101,6 +101,15 @@ final class BlockComponentTest extends ComponentSourceTestBase {
           'label' => 'Test block with no settings.',
           'label_display' => '0',
           'provider' => 'xb_test_block',
+        ],
+      ],
+      'block.xb_test_block_input_schema_change_poc' => [
+        'default_settings' => [
+          'id' => 'xb_test_block_input_schema_change_poc',
+          'label' => 'Test block for Input Schema Change POC.',
+          'label_display' => '0',
+          'provider' => 'xb_test_block',
+          'foo' => 'bar',
         ],
       ],
       'block.xb_test_block_input_validatable' => [
@@ -143,6 +152,7 @@ final class BlockComponentTest extends ComponentSourceTestBase {
   public function testGetReferencedPluginClass(array $component_ids): void {
     self::assertSame([
       'block.xb_test_block_input_none' => XbTestBlockInputNone::class,
+      'block.xb_test_block_input_schema_change_poc' => XbTestBlockInputSchemaChangePoc::class,
       'block.xb_test_block_input_validatable' => XbTestBlockInputValidatable::class,
       'block.xb_test_block_input_validatable_crash' => XbTestBlockInputValidatableCrash::class,
       'block.xb_test_block_optional_contexts' => XbTestBlockOptionalContexts::class,
@@ -198,19 +208,19 @@ HTML,
           ]),
         'attachments' => [],
       ],
-      'block.xb_test_block_input_validatable' => [
+      'block.xb_test_block_input_schema_change_poc' => [
         'html' => <<<HTML
 <div id="block-some-uuid--2">
 
 
-      <div>Hello, XB!</div>
+      Current foo value: bar
   </div>
 
 HTML,
         'cacheability' => $default_cacheability,
         'attachments' => [],
       ],
-      'block.xb_test_block_input_validatable_crash' => [
+      'block.xb_test_block_input_validatable' => [
         'html' => <<<HTML
 <div id="block-some-uuid--3">
 
@@ -222,9 +232,21 @@ HTML,
         'cacheability' => $default_cacheability,
         'attachments' => [],
       ],
-      'block.xb_test_block_optional_contexts' => [
+      'block.xb_test_block_input_validatable_crash' => [
         'html' => <<<HTML
 <div id="block-some-uuid--4">
+
+
+      <div>Hello, XB!</div>
+  </div>
+
+HTML,
+        'cacheability' => $default_cacheability,
+        'attachments' => [],
+      ],
+      'block.xb_test_block_optional_contexts' => [
+        'html' => <<<HTML
+<div id="block-some-uuid--5">
 
 
       Test Block with optional context value: @todo in https://www.drupal.org/i/3485502
@@ -244,6 +266,9 @@ HTML,
     return [
       'block.xb_test_block_input_none' => [
         'expected_output_selectors' => ['div:contains("Hello bob, from XB!")'],
+      ],
+      'block.xb_test_block_input_schema_change_poc' => [
+        'expected_output_selectors' => ['div:contains("Current foo value: bar")'],
       ],
       'block.xb_test_block_input_validatable' => [
         'expected_output_selectors' => ['div:contains("Hello, XB!")'],
@@ -325,6 +350,7 @@ HTML,
     $dependencies = ['module' => ['xb_test_block']];
     self::assertSame([
       'block.xb_test_block_input_none' => $dependencies,
+      'block.xb_test_block_input_schema_change_poc' => $dependencies,
       'block.xb_test_block_input_validatable' => $dependencies,
       'block.xb_test_block_input_validatable_crash' => $dependencies,
       'block.xb_test_block_optional_contexts' => $dependencies,
@@ -332,121 +358,45 @@ HTML,
   }
 
   protected function createAndSaveInUseComponentForFallbackTesting(): ComponentInterface {
+    $this->installConfig(['system']);
     $this->generateComponentConfig();
     /** @var \Drupal\experience_builder\Entity\ComponentInterface */
-    return Component::load('block.xb_test_block_input_none');
+    return Component::load('block.system_menu_block.footer');
   }
 
   protected function createAndSaveUnusedComponentForFallbackTesting(): ComponentInterface {
     /** @var \Drupal\experience_builder\Entity\ComponentInterface */
-    return Component::load('block.xb_test_block_input_validatable');
+    return Component::load('block.system_menu_block.admin');
   }
 
-  protected function forceComponentFallback(ComponentInterface $used_component, ComponentInterface $unused_component): void {
-    \Drupal::service(ModuleInstallerInterface::class)->uninstall(['xb_test_block']);
+  protected static function getPropsForComponentFallbackTesting(): array {
+    return [
+      'label' => 'Main navigation',
+      'label_display' => '',
+      'level' => 1,
+      'depth' => 0,
+      'expand_all_items' => TRUE,
+    ];
+  }
+
+  protected function deleteConfigAndTriggerComponentFallback(ComponentInterface $used_component, ComponentInterface $unused_component): void {
+    $menu = Menu::load('footer');
+    \assert($menu instanceof Menu);
+    $menu->delete();
+
+    $menu = Menu::load('admin');
+    \assert($menu instanceof Menu);
+    $menu->delete();
   }
 
   protected function recoverComponentFallback(ComponentInterface $component): void {
-    \Drupal::service(ModuleInstallerInterface::class)->install(['xb_test_block']);
+    $menu = Menu::create([
+      'id' => 'footer',
+      'label' => 'Footer',
+      'description' => 'Site information links',
+    ]);
+    $menu->save();
     $this->generateComponentConfig();
-  }
-
-  /**
-   * @covers ::onDependencyRemoval()
-   */
-  public function testConfigDependencyDelete(): void {
-    // Install the default menus provided by system.module.
-    $this->installConfig(['system']);
-    $this->generateComponentConfig();
-
-    $this->assertContains('block.system_menu_block.footer', $this->findCreatedComponentConfigEntities(BlockComponent::SOURCE_PLUGIN_ID, 'system'));
-
-    $menu = $this->config('experience_builder.component.block.system_menu_block.footer');
-    $this->assertSame([
-      'config' => ['system.menu.footer'],
-      'module' => ['system'],
-    ], $menu->get('dependencies'));
-
-    $menu = Menu::load('footer');
-    assert($menu instanceof Menu);
-
-    // Deleting dependency of unused Component results in deletion of Component.
-    $menu->delete();
-    $this->assertNotContains('block.system_menu_block.footer', $this->findCreatedComponentConfigEntities(BlockComponent::SOURCE_PLUGIN_ID, 'system'));
-
-    $this->assertContains('block.system_menu_block.main', $this->findCreatedComponentConfigEntities(BlockComponent::SOURCE_PLUGIN_ID, 'system'));
-    $menu = $this->config('experience_builder.component.block.system_menu_block.main');
-    $this->assertSame([
-      'config' => ['system.menu.main'],
-      'module' => ['system'],
-    ], $menu->get('dependencies'));
-    Pattern::create([
-      'id' => 'test_pattern',
-      'label' => 'Test pattern',
-      'component_tree' => [
-        [
-          'uuid' => '75144f9b-1bfc-4874-b848-b5889f066217',
-          'component_id' => 'block.system_menu_block.main',
-          'component_version' => '1890264ee53dc1f4',
-          'inputs' => [
-            'label' => 'Main navigation',
-            'label_display' => '',
-            'level' => 1,
-            'depth' => 0,
-            'expand_all_items' => TRUE,
-          ],
-        ],
-      ],
-    ])->save();
-
-    $menu = Menu::load('main');
-    assert($menu instanceof Menu);
-
-    // Deleting dependency of used Component results in "fallback" Component.
-    $menu->delete();
-    $this->assertContains('block.system_menu_block.main', $this->findCreatedComponentConfigEntities(BlockComponent::SOURCE_PLUGIN_ID, 'system'));
-    $component = Component::load('block.system_menu_block.main');
-    assert($component instanceof Component);
-    $this->assertFalse($component->status());
-    $this->assertTrue($component->getComponentSource() instanceof Fallback);
-  }
-
-  /**
-   * @covers ::onDependencyRemoval()
-   */
-  public function testPluginDependencyUninstall(): void {
-    $this->generateComponentConfig();
-
-    // Component entity based on block, unused.
-    $this->assertContains('block.xb_test_block_input_none', $this->findCreatedComponentConfigEntities(BlockComponent::SOURCE_PLUGIN_ID, 'xb_test_block'));
-
-    // Component entity based on block, used in Pattern.
-    $this->assertContains('block.xb_test_block_input_validatable', $this->findCreatedComponentConfigEntities(BlockComponent::SOURCE_PLUGIN_ID, 'xb_test_block'));
-    Pattern::create([
-      'id' => 'test_pattern',
-      'label' => 'Test pattern',
-      'component_tree' => [
-        [
-          'uuid' => '4b26c295-c8cc-4b2d-a38a-235c6cfa1ffa',
-          'component_id' => 'block.xb_test_block_input_validatable',
-          'component_version' => '9bc2091e7da4816c',
-          'inputs' => [
-            'name' => 'test',
-            'label' => 'test',
-            'label_display' => '',
-          ],
-        ],
-      ],
-    ])->save();
-
-    $this->container->get('module_installer')->uninstall(['xb_test_block']);
-
-    $this->assertNotContains('block.xb_test_block_input_none', $this->findCreatedComponentConfigEntities(BlockComponent::SOURCE_PLUGIN_ID, 'xb_test_block'));
-    $this->assertContains('block.xb_test_block_input_validatable', $this->findCreatedComponentConfigEntities(BlockComponent::SOURCE_PLUGIN_ID, 'xb_test_block'));
-    $component = Component::load('block.xb_test_block_input_validatable');
-    assert($component instanceof Component);
-    $this->assertFalse($component->status());
-    $this->assertTrue($component->getComponentSource() instanceof Fallback);
   }
 
   /**
@@ -468,6 +418,46 @@ HTML,
     $this->generateComponentConfig();
 
     $this->assertSame($label, $this->config($config)->get('label'));
+  }
+
+  public function testVersionDeterminability(): void {
+    $this->generateComponentConfig();
+    $original_component = Component::load('block.xb_test_block_input_validatable');
+    assert($original_component instanceof Component);
+    $original_version = $original_component->getActiveVersion();
+
+    // Trigger an alter to the schema which should result in a new version as
+    // validation may make previous versions no longer valid.
+    // @see \Drupal\xb_test_block\Hook\XbTestBlockHooks::configSchemaInfoAlter
+    \Drupal::keyValue('xb_test_block')->set('i_can_haz_alter?', TRUE);
+    \Drupal::service(TypedConfigManagerInterface::class)->clearCachedDefinitions();
+    $this->generateComponentConfig();
+
+    $new_component = Component::load('block.xb_test_block_input_validatable');
+    assert($new_component instanceof Component);
+
+    $new_version = $new_component->getActiveVersion();
+    self::assertNotEquals($new_version, $original_version);
+  }
+
+  protected function createAndSaveInUseComponentForUninstallValidationTesting(): ComponentInterface {
+    $this->enableModules(['help']);
+    $this->generateComponentConfig();
+    /** @var \Drupal\experience_builder\Entity\ComponentInterface */
+    return Component::load('block.xb_test_block_input_none');
+  }
+
+  protected function createAndSaveUnusedComponentForUninstallValidationTesting(): ComponentInterface {
+    /** @var \Drupal\experience_builder\Entity\ComponentInterface */
+    return Component::load('block.help_block');
+  }
+
+  protected function getAllowedModuleForUninstallValidatorTesting(): string {
+    return 'help';
+  }
+
+  protected function getNotAllowedModuleForUninstallValidatorTesting(): string {
+    return 'xb_test_block';
   }
 
 }

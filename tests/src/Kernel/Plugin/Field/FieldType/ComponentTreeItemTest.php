@@ -187,8 +187,8 @@ class ComponentTreeItemTest extends KernelTestBase {
     $this->assertCount(2, $item_list);
     $violations = $item_list->validate();
     $this->assertSame([
-      '0.component_version' => "'lol' is not a version that exists on component config entity 'sdc.xb_test_sdc.props-slots'. Available versions: 'c8a016671696090c'.",
-      '1.component_version' => "'hah' is not a version that exists on component config entity 'sdc.xb_test_sdc.props-no-slots'. Available versions: 'c8a016671696090c'.",
+      '0.component_version' => "'lol' is not a version that exists on component config entity 'sdc.xb_test_sdc.props-slots'. Available versions: 'ab4d3ddce315cf64'.",
+      '1.component_version' => "'hah' is not a version that exists on component config entity 'sdc.xb_test_sdc.props-no-slots'. Available versions: '95f4f1d5ee47663b'.",
     ], self::violationsToArray($violations));
   }
 
@@ -341,6 +341,10 @@ class ComponentTreeItemTest extends KernelTestBase {
     self::assertNotEquals($old_version_item->getComponentVersion(), $new_version_item->getComponentVersion());
     self::assertNotEquals($old_version_item->getComponent(), $new_version_item->getComponent());
 
+    // Test that setting the version updates the component loaded.
+    $old_version_item->set('component_version', $active_version);
+    self::assertEquals($active_version, $old_version_item->getComponentVersion());
+    self::assertEquals($active_version, $old_version_item->getComponent()?->getLoadedVersion());
   }
 
   public function testCalculateDependencies(): void {

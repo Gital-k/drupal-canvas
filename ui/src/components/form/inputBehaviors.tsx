@@ -11,6 +11,7 @@ import {
 } from '@/components/form/formUtil';
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import type {
+  ComponentModels,
   ResolvedValues,
   Sources,
 } from '@/features/layout/layoutModelSlice';
@@ -355,6 +356,7 @@ const InputBehaviorsComponentPropsForm = (
     // with the structure.
     Object.keys(values).forEach((prop) => {
       if (flaggedForRemoval(values[prop]) && component?.propSources?.[prop]) {
+        // If the prop is optional, it can be removed.
         if (!component.propSources[prop]?.required) {
           if (isEvaluatedComponentModel(selectedModel)) {
             // The source value can also be updated to empty when permitted.
@@ -362,8 +364,11 @@ const InputBehaviorsComponentPropsForm = (
               selectedModel.source[prop].value = [];
             }
           }
+          resolved[prop] = [];
+        } else {
+          // If the prop is required, we need to set it back to the default.
+          resolved[prop] = component.propSources[prop].default_values.resolved;
         }
-        resolved[prop] = [];
       }
     });
 
@@ -393,9 +398,10 @@ const InputBehaviorsComponentPropsForm = (
   };
 
   const fieldName = attributes.name || attributes['data-xb-name'];
+  const propName = toPropName(fieldName, selectedComponent);
+  const propsOverrides: { options?: Object[] } = {};
   const parseNewValue = (e: React.ChangeEvent) => {
     const schemas = getPropSchemas(inputAndUiData);
-    const propName = toPropName(fieldName, selectedComponent);
     return parseValue(
       (e.target as HTMLInputElement | HTMLSelectElement).value,
       e.target as HTMLInputElement,
@@ -405,7 +411,9 @@ const InputBehaviorsComponentPropsForm = (
 
   const validateNewValue = (e: React.ChangeEvent, newValue: any) => {
     const target = e.target as HTMLInputElement;
-    if (!shouldSkipPropValidation(fieldName, target, inputAndUiData)) {
+    if (
+      !shouldSkipPropValidation(fieldName, target, inputAndUiData, newValue)
+    ) {
       const [valid, validate] = validateProp(
         toPropName(fieldName, selectedComponent),
         newValue,
@@ -419,10 +427,28 @@ const InputBehaviorsComponentPropsForm = (
     return { valid: true, errors: null };
   };
 
+  if (props.options && !props.attributes.required) {
+    // If an element has a `_none` value as one of the render array options,
+    // and there is no value stored for this prop, then we set that _none as the
+    // selected option. This logic is only necessary in the component instance
+    // form, hence it being located here.
+    if (
+      props.options.some((option: PropsValues) => option.value === '_none') &&
+      !inputAndUiData?.model?.[currentComponent as keyof ComponentModels]
+        .resolved[propName]
+    ) {
+      propsOverrides.options = props.options.map((option: PropsValues) =>
+        option.value === '_none'
+          ? { ...option, selected: true }
+          : { ...option, selected: false },
+      );
+    }
+  }
+
   return (
     <InputBehaviorsCommon
       OriginalInput={OriginalInput}
-      props={props}
+      props={{ ...props, ...propsOverrides }}
       callbacks={{
         commitFormState: formStateToStore,
         parseNewValue,
@@ -500,7 +526,11 @@ const InputBehaviorsEntityForm = (
     const target = e.target as HTMLInputElement;
     // If the target is an input element, return its value
     if (target.value !== undefined) {
-      return target.value;
+      // We have a special case for `_none`, which represents an empty value in a
+      // select element. It is converted to an empty string so it can leverage
+      // the logic for textfields where an empty string results in the prop
+      // being removed from the model.
+      return target.value === '_none' ? null : target.value;
     }
     // If the target is a checkbox or radio button, return its checked
     if ('checked' in target) {

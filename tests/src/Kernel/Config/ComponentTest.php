@@ -9,6 +9,7 @@ use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Theme\ComponentPluginManager as CoreComponentPluginManager;
 use Drupal\experience_builder\ComponentIncompatibilityReasonRepository;
 use Drupal\experience_builder\Entity\ComponentInterface;
+use Drupal\experience_builder\Entity\VersionedConfigEntityInterface;
 use Drupal\experience_builder\Plugin\ComponentPluginManager;
 use Drupal\experience_builder\Entity\Component;
 use Drupal\KernelTests\KernelTestBase;
@@ -100,13 +101,104 @@ class ComponentTest extends KernelTestBase {
     $this->componentPluginManager->getDefinitions();
     $initial_components = Component::loadMultiple();
     $this->assertNotEmpty($initial_components);
-    $this->assertArrayHasKey('sdc.experience_builder.image', $initial_components);
-    $this->assertSame('image', $initial_components['sdc.experience_builder.image']->getSettings()['prop_field_definitions']['image']['field_type']);
 
+    // Originally:
+    // - uses `image` field type
+    // - one version
+    // - depends on `image` module
+    $this->assertArrayHasKey('sdc.experience_builder.image', $initial_components);
+    $initial_component = $initial_components['sdc.experience_builder.image'];
+    $this->assertSame('image', $initial_component->getSettings()['prop_field_definitions']['image']['field_type']);
+    $initial_expected_version = 'a8c84fff36af8a5a';
+    self::assertSame($initial_expected_version, $initial_component->getActiveVersion());
+    self::assertSame([$initial_expected_version], $initial_component->getVersions());
+    self::assertSame(['module' => ['file', 'image']], $initial_component->getDependencies());
+    self::assertSame(['module' => ['file', 'image']], $initial_component->calculateDependencies()->getDependencies());
+    self::assertSame(['module' => ['file', 'image']], $initial_component->getVersionSpecificDependencies(VersionedConfigEntityInterface::ACTIVE_VERSION));
+
+    // Then:
+    // - uses `entity_reference` field type
+    // - two versions
+    // - depends on both the 'image' and `media_library` module, because there
+    //   are now two versions.
     $this->midTestSetUp();
     $updated_component = Component::load('sdc.experience_builder.image');
     assert($updated_component instanceof Component);
     $this->assertSame('entity_reference', $updated_component->getSettings()['prop_field_definitions']['image']['field_type']);
+    $updated_expected_version = '02ac4f958c84990f';
+    self::assertSame('02ac4f958c84990f', $updated_component->getActiveVersion());
+    self::assertSame(['02ac4f958c84990f', 'a8c84fff36af8a5a'], $updated_component->getVersions());
+    self::assertSame([
+      'config' => [
+        'media.type.image',
+      ],
+      'module' => [
+        'file',
+        'image',
+        'media',
+        'media_library',
+      ],
+    ], $updated_component->getDependencies());
+    self::assertSame(['module' => ['file', 'image']], $updated_component->getVersionSpecificDependencies($initial_expected_version));
+    self::assertSame([
+      'config' => [
+        'media.type.image',
+      ],
+      'module' => [
+        'media',
+        'media_library',
+      ],
+    ], $updated_component->getVersionSpecificDependencies(VersionedConfigEntityInterface::ACTIVE_VERSION));
+
+    // Now specifically load the old version, and check that calling
+    // ::calculateDependencies() again causes ::getDependencies() to return only
+    // the dependencies of THAT version. ⚠️
+    self::assertTrue($updated_component->isLoadedVersionActiveVersion());
+    $updated_component->loadVersion('a8c84fff36af8a5a');
+    self::assertFalse($updated_component->isLoadedVersionActiveVersion());
+    $this->assertSame('image', $updated_component->getSettings()['prop_field_definitions']['image']['field_type']);
+    self::assertSame([
+      'config' => [
+        'media.type.image',
+      ],
+      'module' => [
+        'file',
+        'image',
+        'media',
+        'media_library',
+      ],
+    ], $updated_component->getDependencies());
+    self::assertSame([
+      'config' => [
+        'media.type.image',
+      ],
+      'module' => [
+        'file',
+        'image',
+        'media',
+        'media_library',
+      ],
+    ], $updated_component->calculateDependencies()->getDependencies());
+    $updated_component->loadVersion('02ac4f958c84990f');
+    self::assertTrue($updated_component->isLoadedVersionActiveVersion());
+
+    // Finally, because no component instances exist that use the old version,
+    // the old version can be deleted, and then:
+    // - uses `entity_reference`
+    // - one version
+    // - depends on the `media_library` module
+    $updated_component->deleteVersion($initial_expected_version)->save();
+    $component_without_obsolete_versions = Component::load('sdc.experience_builder.image');
+    assert($component_without_obsolete_versions instanceof Component);
+    $this->assertSame('entity_reference', $updated_component->getSettings()['prop_field_definitions']['image']['field_type']);
+    self::assertSame($updated_expected_version, $updated_component->getActiveVersion());
+    self::assertSame([$updated_expected_version], $updated_component->getVersions());
+    self::assertSame([
+      'config' => [
+        'media.type.image',
+      ],
+      'module' => ['media', 'media_library'],
+    ], $updated_component->getDependencies());
   }
 
   public function testOperations(): void {
