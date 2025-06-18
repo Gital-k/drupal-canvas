@@ -99,7 +99,7 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
     $storable_prop_shapes['type=object&$ref=json-schema-definitions://experience_builder.module/video'] = new StorablePropShape(
       shape: new PropShape(['type' => 'object', '$ref' => 'json-schema-definitions://experience_builder.module/video']),
       // @phpstan-ignore-next-line
-      fieldTypeProp: StructuredDataPropExpression::fromString('ℹ︎entity_reference␟{src↝entity␜␜entity:media:video␝field_media_video_file␞␟entity␜␜entity:file␝uri␞␟value}'),
+      fieldTypeProp: StructuredDataPropExpression::fromString('ℹ︎entity_reference␟{src↝entity␜␜entity:media:video␝field_media_video_file␞␟entity␜␜entity:file␝uri␞␟url}'),
       fieldWidget: 'media_library_widget',
       fieldStorageSettings: [
         'target_type' => 'media',
