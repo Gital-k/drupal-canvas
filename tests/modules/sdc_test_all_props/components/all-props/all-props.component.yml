@@ -241,7 +241,7 @@ props:
       $ref: json-schema-definitions://experience_builder.module/video
       type: object
       examples:
-        - src: public://file.mp4
+        - src: https://example.com/file.mp4
           poster: /sites/default/files/600x400.png
           width: 600
           height: 400

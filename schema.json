@@ -216,7 +216,8 @@
         "src": {
           "title": "Video URL",
           "type": "string",
-          "format": "uri"
+          "format": "uri-reference",
+          "pattern": "^(/|https?://).*\\.([Mm][Pp][4])+(\\?.*)?(#.*)?$"
         },
         "poster": {
           "title": "Poster image URL",
