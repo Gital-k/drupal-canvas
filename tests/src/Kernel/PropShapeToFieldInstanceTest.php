@@ -274,6 +274,15 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
             ],
           ],
         ],
+        'REQUIRED, type=object&$ref=json-schema-definitions://experience_builder.module/video' => [
+          'SDC props' => [
+            '⿲experience_builder:video␟video',
+          ],
+          'static prop source' => null,
+          'instances' => [],
+          'adapter_matches_field_type' => [],
+          'adapter_matches_instance' => [],
+        ],
         'REQUIRED, type=string' => [
           'SDC props' => [
             '⿲experience_builder:heading␟text',
@@ -377,15 +386,6 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝uri␞␟value',
           ],
-          'adapter_matches_field_type' => [],
-          'adapter_matches_instance' => [],
-        ],
-        'REQUIRED, type=string&format=uri&pattern=\.(mp4|webm)(\?.*)?(#.*)?$' => [
-          'SDC props' => [
-            '⿲experience_builder:video␟src',
-          ],
-          'static prop source' => NULL,
-          'instances' => [],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
         ],
@@ -736,10 +736,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
             '⿲sdc_test_all_props:all-props␟test_object_drupal_video',
           ],
           'static prop source' => NULL,
-          'instances' => [
-            'ℹ︎␜entity:file␝uri␞␟{src↠value}',
-            'ℹ︎␜entity:node:foo␝field_silly_image␞␟{src↝entity␜␜entity:file␝uri␞␟value,poster↝entity␜␜entity:file␝uri␞␟url,width↠width,height↠height}',
-          ],
+          'instances' => [],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
         ],
