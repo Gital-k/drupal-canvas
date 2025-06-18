@@ -193,6 +193,7 @@ final class StaticPropSource extends PropSourceBase {
             // thumbnail uri fetching via metadata and forces Media entity to
             // use Media::getDefaultThumbnailUri() for thumbnail uri.
             // @see \Drupal\media\Entity\Media::getThumbnailUri()
+            // @phpstan-ignore-next-line
             $entity->bundle->entity->setQueueThumbnailDownloadsStatus(TRUE);
           }
           $entity->save();
