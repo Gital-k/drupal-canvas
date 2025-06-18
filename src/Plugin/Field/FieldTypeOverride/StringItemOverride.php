@@ -26,7 +26,7 @@ class StringItemOverride extends StringItem {
 
   public static function generateSampleValue(FieldDefinitionInterface $field_definition) {
     // remote_video uses oembed:video resource and it's sample should be uri.
-    if ($field_definition->getTargetBundle() === 'remote_video') {
+    if ($field_definition->getTargetEntityTypeId() === 'media' && $field_definition->getTargetBundle() === 'remote_video') {
       return UriItemOverride::generateSampleValue($field_definition);
     }
 
