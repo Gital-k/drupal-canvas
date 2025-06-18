@@ -2,7 +2,7 @@
 name: Video (oEmbed)
 status: stable
 group: Atom/Media
-description: A video element
+description: A video element using Youtube or Vimeo as providers
 props:
   type: object
   required:
