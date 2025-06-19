@@ -31,6 +31,7 @@ class FileItemOverride extends FileItem {
     // FileItem::generateSampleValue() creates File entity with hardcoded .txt
     // .extension, media:video requires .mp4 extension for video_file source.
     // @see \Drupal\file\Plugin\Field\FieldType\FileItem::generateSampleValue()
+    // @todo Remove once https://www.drupal.org/project/drupal/issues/2550977 is in
     if ($field_definition->getTargetEntityTypeId() === 'media' && !empty($field_definition->getTargetBundle()) && MediaType::load($field_definition->getTargetBundle())->getSource()->getPluginId() === 'video_file') {
       $random = new Random();
       $settings = $field_definition->getSettings();
