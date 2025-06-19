@@ -279,10 +279,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
             '⿲experience_builder:oembed_video␟video',
           ],
           'static prop source' => NULL,
-          'instances' => [
-            'ℹ︎␜entity:file␝uri␞␟{url↠url}',
-            'ℹ︎␜entity:node:foo␝field_silly_image␞␟{url↝entity␜␜entity:file␝uri␞␟value,width↠width,height↠height,title↠title}',
-          ],
+          'instances' => [],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
         ],
@@ -715,10 +712,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
             '⿲sdc_test_all_props:all-props␟test_object_drupal_oembed_video',
           ],
           'static prop source' => NULL,
-          'instances' => [
-            'ℹ︎␜entity:file␝uri␞␟{url↠url}',
-            'ℹ︎␜entity:node:foo␝field_silly_image␞␟{url↝entity␜␜entity:file␝uri␞␟value,width↠width,height↠height,title↠title}',
-          ],
+          'instances' => [],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
         ],

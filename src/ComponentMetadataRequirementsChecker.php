@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupal\experience_builder;
 
 use Drupal\Core\Theme\Component\ComponentMetadata;
+use Drupal\experience_builder\JsonSchemaInterpreter\JsonSchemaStringFormat;
 use Drupal\experience_builder\PropExpressions\Component\ComponentPropExpression;
 use Drupal\experience_builder\PropShape\PropShape;
 use Drupal\experience_builder\PropShape\StorablePropShape;
@@ -89,6 +90,12 @@ final class ComponentMetadataRequirementsChecker {
       if (array_key_exists('contentMediaType', $prop) && $prop['contentMediaType'] === 'text/html' && isset($prop['x-formatting-context'])) {
         if (!in_array($prop['x-formatting-context'], ['inline', 'block'], TRUE)) {
           $messages[] = \sprintf('Invalid value "%s" for "x-formatting-context". Valid values are "inline" and "block".', $prop['x-formatting-context']);
+          continue;
+        }
+      }
+      if (array_key_exists('format', $prop) && $prop['format'] === JsonSchemaStringFormat::URI && array_key_exists('contentMediaType', $prop) && $prop['contentMediaType'] === 'application/oembed+json' && isset($prop['x-oembed-type'])) {
+        if (!in_array($prop['x-oembed-type'], ['video'], TRUE)) {
+          $messages[] = \sprintf('Invalid value "%s" for "x-oembed-type". For now, only "video" is allowed.', $prop['x-oembed-type']);
           continue;
         }
       }
