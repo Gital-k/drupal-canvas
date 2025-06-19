@@ -50,8 +50,12 @@ use Symfony\Component\Validator\Constraints\NotEqualTo;
 class ShapeMatchingHooks {
 
   const SCHEMA_TO_MEDIA_SOURCE = [
-    'json-schema-definitions://experience_builder.module/image' => 'image',
+    // @see \Drupal\media\Plugin\media\Source\Image
+    'json-schema-definitions://experience_builder.module/image' => Image',
+    // @see \Drupal\media\Plugin\media\Source\VideoFile
     'json-schema-definitions://experience_builder.module/video' => 'video_file',
+    // @see \Drupal\media\Plugin\media\Source\OEmbed 
+    // @see \Drupal\media\Plugin\media\Source\OEmbedDeriver
     'json-schema-definitions://experience_builder.module/oembed_video' => 'oembed:video',
   ];
 
@@ -240,7 +244,7 @@ class ShapeMatchingHooks {
   public function mediaLibraryStoragePropShapeAlter(CandidateStorablePropShape $storable_prop_shape): void {
     if ($storable_prop_shape->shape->schema['type'] === 'object' &&
       isset($storable_prop_shape->shape->schema['$ref']) &&
-      in_array($storable_prop_shape->shape->schema['$ref'], array_keys(self::SCHEMA_TO_MEDIA_SOURCE))
+      array_key_exists($storable_prop_shape->shape->schema['$ref'], self::SCHEMA_TO_MEDIA_SOURCE)
     ) {
       $media_source = self::SCHEMA_TO_MEDIA_SOURCE[$storable_prop_shape->shape->schema['$ref']];
       // Allow all MediaTypes that use the "image" MediaSource.
@@ -298,22 +302,22 @@ class ShapeMatchingHooks {
   }
 
   /**
-   * Returns Field Type Props for specific MediaType.
+   * Returns Field Type Props for specific MediaSource.
    *
    * @param \Drupal\media\MediaTypeInterface[] $media_types
    * @param array $media_type_ids
-   * @param string $media_source
+   * @param string $media_source_id
    *
    * @return array|\Drupal\experience_builder\PropExpressions\StructuredData\ReferenceFieldTypePropExpression[]
    */
-  protected function getFieldTypeProps(array $media_types, array $media_type_ids, string $media_source): array {
+  protected function getFieldTypeProps(array $media_types, array $media_type_ids, string $media_source_id): array {
     $source_field_names = array_map(
     // @phpstan-ignore-next-line
       fn (MediaTypeInterface $type): string => $type->getSource()->getSourceFieldDefinition($type)->getName(),
       $media_types
     );
 
-    return match ($media_source) {
+    return match ($media_source_id) {
       'image' => [
         'src' => new ReferenceFieldTypePropExpression(
           new FieldTypePropExpression('entity_reference', 'entity'),
