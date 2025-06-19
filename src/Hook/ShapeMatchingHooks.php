@@ -51,12 +51,14 @@ class ShapeMatchingHooks {
 
   const SCHEMA_TO_MEDIA_SOURCE = [
     // @see \Drupal\media\Plugin\media\Source\Image
-    'json-schema-definitions://experience_builder.module/image' => Image',
+    'json-schema-definitions://experience_builder.module/image' => 'image',
     // @see \Drupal\media\Plugin\media\Source\VideoFile
     'json-schema-definitions://experience_builder.module/video' => 'video_file',
-    // @see \Drupal\media\Plugin\media\Source\OEmbed 
+    // @see \Drupal\media\Plugin\media\Source\OEmbed
     // @see \Drupal\media\Plugin\media\Source\OEmbedDeriver
     'json-schema-definitions://experience_builder.module/oembed_video' => 'oembed:video',
+    // @see \Drupal\media\Plugin\media\Source\File
+    'json-schema-definitions://experience_builder.module/document' => 'file',
   ];
 
   /**
@@ -343,6 +345,40 @@ class ShapeMatchingHooks {
         'url' => new ReferenceFieldTypePropExpression(
           new FieldTypePropExpression('entity_reference', 'entity'),
           new FieldPropExpression(BetterEntityDataDefinition::create('media', $media_type_ids), $source_field_names, \NULL, 'value'),
+        ),
+      ],
+      'file' => [
+        'src' => new ReferenceFieldTypePropExpression(
+          new FieldTypePropExpression('entity_reference', 'entity'),
+          new ReferenceFieldPropExpression(
+            new FieldPropExpression(BetterEntityDataDefinition::create('media', $media_type_ids), $source_field_names, \NULL, 'entity'),
+            new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'uri', \NULL, 'url')
+          )
+        ),
+        'title' => new ReferenceFieldTypePropExpression(
+          new FieldTypePropExpression('entity_reference', 'entity'),
+          new FieldPropExpression(BetterEntityDataDefinition::create('media', $media_type_ids), 'name', \NULL, 'value'),
+        ),
+        'filename' => new ReferenceFieldTypePropExpression(
+          new FieldTypePropExpression('entity_reference', 'entity'),
+          new ReferenceFieldPropExpression(
+            new FieldPropExpression(BetterEntityDataDefinition::create('media', $media_type_ids), $source_field_names, \NULL, 'entity'),
+            new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'filename', \NULL, 'value')
+          )
+        ),
+        'filesize' => new ReferenceFieldTypePropExpression(
+          new FieldTypePropExpression('entity_reference', 'entity'),
+          new ReferenceFieldPropExpression(
+            new FieldPropExpression(BetterEntityDataDefinition::create('media', $media_type_ids), $source_field_names, \NULL, 'entity'),
+            new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'filesize', \NULL, 'value')
+          )
+        ),
+        'mimetype' => new ReferenceFieldTypePropExpression(
+          new FieldTypePropExpression('entity_reference', 'entity'),
+          new ReferenceFieldPropExpression(
+            new FieldPropExpression(BetterEntityDataDefinition::create('media', $media_type_ids), $source_field_names, \NULL, 'entity'),
+            new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'filemime', \NULL, 'value')
+          )
         ),
       ],
       default => [],
