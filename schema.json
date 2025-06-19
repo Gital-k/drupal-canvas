@@ -259,6 +259,44 @@
         }
       }
     },
+    "document": {
+      "title": "document",
+      "type": "object",
+      "required": ["src"],
+      "properties": {
+        "src": {
+          "title": "Document URL",
+          "$ref": "json-schema-definitions://experience_builder.module/document-uri"
+        },
+        "title": {
+          "title": "Document title",
+          "type": "string"
+        },
+        "description": {
+          "title": "Document description",
+          "type": "string"
+        },
+        "filename": {
+          "title": "Filename",
+          "type": "string"
+        },
+        "filesize": {
+          "title": "File size",
+          "type": "integer",
+          "description": "File size in bytes"
+        },
+        "mimetype": {
+          "title": "MIME type",
+          "type": "string"
+        }
+      }
+    },
+    "document-uri": {
+      "title": "Document URL",
+      "type": "string",
+      "format": "uri-reference",
+      "pattern": "^(/|https?://).*\\.(txt|rtf|doc|docx|ppt|pptx|xls|xlsx|pdf|odf|odg|odp|ods|odt|fodt|fods|fodp|fodg|key|numbers|pages)(\\?.*)?(#.*)?$"
+    },
     "config-entity-id": {
       "title": "config entity id",
       "type": "string",
