@@ -436,6 +436,18 @@ class FieldForComponentSuggesterTest extends KernelTestBase {
           ],
           'adapters' => [],
         ],
+        '⿲sdc_test_all_props:all-props␟test_object_drupal_video' => [
+          'required' => FALSE,
+          'instances' => [],
+          'adapters' => [],
+        ],
+        '⿲sdc_test_all_props:all-props␟test_object_drupal_oembed_video' => [
+          'required' => FALSE,
+          'instances' => [
+            "Subset of this Foo's field_silly_image: entity, width, height, title (4 of 5 props — absent: alt)" => 'ℹ︎␜entity:node:foo␝field_silly_image␞␟{url↝entity␜␜entity:file␝uri␞␟value,width↠width,height↠height,title↠title}'
+          ],
+          'adapters' => [],
+        ],
         '⿲sdc_test_all_props:all-props␟test_object_drupal_date_range' => [
           'required' => FALSE,
           'instances' => [
