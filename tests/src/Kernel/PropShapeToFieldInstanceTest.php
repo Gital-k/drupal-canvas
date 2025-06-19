@@ -246,6 +246,15 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
         ],
+        'REQUIRED, type=object&$ref=json-schema-definitions://experience_builder.module/document' => [
+          'SDC props' => [
+            '⿲experience_builder:document␟document',
+          ],
+          'static prop source' => NULL,
+          'instances' => [],
+          'adapter_matches_field_type' => [],
+          'adapter_matches_instance' => [],
+        ],
         'REQUIRED, type=object&$ref=json-schema-definitions://experience_builder.module/image' => [
           'SDC props' => [
             '⿲experience_builder:image␟image',
@@ -677,6 +686,15 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
             'ℹ︎␜entity:xb_page␝revision_user␞␟entity␜␜entity:user␝created␞␟value',
             'ℹ︎␜entity:xb_page␝revision_user␞␟entity␜␜entity:user␝login␞␟value',
           ],
+          'adapter_matches_field_type' => [],
+          'adapter_matches_instance' => [],
+        ],
+        'optional, type=object&$ref=json-schema-definitions://experience_builder.module/document' => [
+          'SDC props' => [
+            '⿲sdc_test_all_props:all-props␟test_object_drupal_document',
+          ],
+          'static prop source' => NULL,
+          'instances' => [],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
         ],

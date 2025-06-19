@@ -255,6 +255,18 @@ props:
           width: 600
           height: 400
           title: 'Example oEmbed video title'
+    # The "document" predefined object format.
+    test_object_drupal_document:
+      title: 'Object, $ref=json-schema-definitions://experience_builder.module/document'
+      $ref: json-schema-definitions://experience_builder.module/document
+      type: object
+      examples:
+        - src: https://example.com/file.txt
+          title: 'Example document title'
+          description: 'Example document description'
+          filename: file.txt
+          filesize: 1048576
+          mimetype: text/plain
 
     # The "date-range" object format for this module.
     test_object_drupal_date_range:

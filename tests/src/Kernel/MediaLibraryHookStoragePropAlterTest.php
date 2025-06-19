@@ -55,8 +55,10 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
     $this->createMediaType('image', ['id' => 'vacation_photos']);
     $this->createMediaType('video_file', ['id' => 'baby_videos']);
     $this->createMediaType('video_file', ['id' => 'vacation_videos']);
-    $this->createMediaType('oembed:video', ['id' => 'remote_baby_videos']);
-    $this->createMediaType('oembed:video', ['id' => 'remote_vacation_videos']);
+    $this->createMediaType('oembed:video', ['id' => 'remote_vimeo_videos']);
+    $this->createMediaType('oembed:video', ['id' => 'remote_youtube_videos']);
+    $this->createMediaType('file', ['id' => 'important_documents']);
+    $this->createMediaType('file', ['id' => 'vacation_documents']);
 
     // A sample value is generated during the test, which needs this table.
     $this->installSchema('file', ['file_usage']);
@@ -70,6 +72,7 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
     unset(
       $unstorable_prop_shapes['type=object&$ref=json-schema-definitions://experience_builder.module/video'],
       $unstorable_prop_shapes['type=object&$ref=json-schema-definitions://experience_builder.module/oembed_video'],
+      $unstorable_prop_shapes['type=object&$ref=json-schema-definitions://experience_builder.module/document'],
     );
 
     return $unstorable_prop_shapes;
@@ -129,7 +132,7 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
     $storable_prop_shapes['type=object&$ref=json-schema-definitions://experience_builder.module/oembed_video'] = new StorablePropShape(
       shape: new PropShape(['type' => 'object', '$ref' => 'json-schema-definitions://experience_builder.module/oembed_video']),
       // @phpstan-ignore-next-line
-      fieldTypeProp: StructuredDataPropExpression::fromString('ℹ︎entity_reference␟{url↝entity␜␜entity:media:remote_baby_videos|remote_vacation_videos␝field_media_oembed_video|field_media_oembed_video_1␞␟value}'),
+      fieldTypeProp: StructuredDataPropExpression::fromString('ℹ︎entity_reference␟{url↝entity␜␜entity:media:remote_vimeo_videos|remote_youtube_videos␝field_media_oembed_video|field_media_oembed_video_1␞␟value}'),
       fieldWidget: 'media_library_widget',
       fieldStorageSettings: [
         'target_type' => 'media',
@@ -138,8 +141,27 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
         'handler' => 'default:media',
         'handler_settings' => [
           'target_bundles' => [
-            'remote_baby_videos' => 'remote_baby_videos',
-            'remote_vacation_videos' => 'remote_vacation_videos',
+            'remote_vimeo_videos' => 'remote_vimeo_videos',
+            'remote_youtube_videos' => 'remote_youtube_videos',
+          ],
+        ],
+      ],
+    );
+
+    $storable_prop_shapes['type=object&$ref=json-schema-definitions://experience_builder.module/document'] = new StorablePropShape(
+      shape: new PropShape(['type' => 'object', '$ref' => 'json-schema-definitions://experience_builder.module/document']),
+      // @phpstan-ignore-next-line
+      fieldTypeProp: StructuredDataPropExpression::fromString('ℹ︎entity_reference␟{src↝entity␜␜entity:media:important_documents|vacation_documents␝field_media_file|field_media_file_1␞␟entity␜␜entity:file␝uri␞␟url,title↝entity␜␜entity:media:important_documents|vacation_documents␝name␞␟value,filename↝entity␜␜entity:media:important_documents|vacation_documents␝field_media_file|field_media_file_1␞␟entity␜␜entity:file␝filename␞␟value,filesize↝entity␜␜entity:media:important_documents|vacation_documents␝field_media_file|field_media_file_1␞␟entity␜␜entity:file␝filesize␞␟value,mimetype↝entity␜␜entity:media:important_documents|vacation_documents␝field_media_file|field_media_file_1␞␟entity␜␜entity:file␝filemime␞␟value}'),
+      fieldWidget: 'media_library_widget',
+      fieldStorageSettings: [
+        'target_type' => 'media',
+      ],
+      fieldInstanceSettings: [
+        'handler' => 'default:media',
+        'handler_settings' => [
+          'target_bundles' => [
+            'important_documents' => 'important_documents',
+            'vacation_documents' => 'vacation_documents',
           ],
         ],
       ],
