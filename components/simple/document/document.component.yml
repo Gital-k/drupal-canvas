@@ -12,7 +12,7 @@ props:
       title: Document
       type: object
       $ref: json-schema-definitions://experience_builder.module/document
-      description: The video object.
+      description: The document object.
       examples:
         - src: https://example.com/file.txt
           title: 'Example document title'
