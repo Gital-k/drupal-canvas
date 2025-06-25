@@ -7,7 +7,9 @@ namespace Drupal\Tests\experience_builder\Kernel;
 use Drupal\experience_builder\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\experience_builder\PropShape\PropShape;
 use Drupal\experience_builder\PropShape\StorablePropShape;
+use Drupal\media\OEmbed\UrlResolverInterface;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
+use Prophecy\Argument;
 
 /**
  * @covers \Drupal\experience_builder\Hook\ShapeMatchingHooks::mediaLibraryStoragePropShapeAlter()
@@ -65,6 +67,14 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
 
     // @see \Drupal\media_library\MediaLibraryEditorOpener::__construct()
     $this->installEntitySchema('filter_format');
+
+    // Mock the resource fetcher so that it will return our fake resource url.
+    $resource_url_resolver = $this->prophesize(UrlResolverInterface::class);
+    // @phpstan-ignore-next-line
+    $resource_url_resolver->getResourceUrl(Argument::any())
+      ->willReturn('https://vimeo.com/api/oembed.json?url=https%3A//vimeo.com/7073899');
+    $this->container->set('media.oembed.url_resolver', $resource_url_resolver->reveal());
+
   }
 
   public static function getExpectedUnstorablePropShapes(): array {
