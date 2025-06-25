@@ -14,15 +14,15 @@ props:
       $ref: json-schema-definitions://experience_builder.module/oembed_video
       description: The video object.
       examples:
-        - url: https://www.youtube.com/oembed?url=https%3A//www.youtube.com/watch%3Fv%3DPWjcqE3QKBg
+        - url: https://www.youtube.com/watch?v=PWjcqE3QKBg
           title: Example oEmbed video title
     width:
       title: width
       type: integer
       examples:
-        - 1280
+        - 640
     height:
       title: width
       type: integer
       examples:
-        - 720
+        - 480
