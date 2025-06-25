@@ -245,14 +245,6 @@
           "contentMediaType": "application/oembed+json",
           "x-oembed-type": "video"
         },
-        "width": {
-          "title": "Image width",
-          "type": "integer"
-        },
-        "height": {
-          "title": "Image height",
-          "type": "integer"
-        },
         "title": {
           "title": "Video title",
           "type": "string"

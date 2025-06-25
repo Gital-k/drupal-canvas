@@ -1,1 +1,1 @@
-This should use a twig function to transform resource url "{{ video.url }}", width of {{ width }} and height of {{ height }} to Drupal oembed iframe.
+{{ transform_resource_url(video.url, width, height)|raw }}
