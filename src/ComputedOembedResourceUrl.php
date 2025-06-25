@@ -7,6 +7,8 @@ use Drupal\Core\TypedData\TypedData;
 
 class ComputedOembedResourceUrl extends TypedData {
 
+  protected $value;
+
   public function getValue() {
     assert($this->getParent() instanceof TraversableTypedDataInterface);
     return \Drupal::service('media.oembed.url_resolver')->getResourceUrl($this->getParent()->getValue()['value']);
