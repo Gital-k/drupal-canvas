@@ -25,9 +25,9 @@ final class XbTwigExtension extends AbstractExtension {
    */
   public function getFunctions() {
     return [
-      new TwigFunction('transform_resource_url', [
+      new TwigFunction('create_oembed_iframe_from_url', [
         $this,
-        'transformResourceUrl',
+        'createOembedIframeFromUrl',
       ]),
     ];
   }
@@ -42,7 +42,7 @@ final class XbTwigExtension extends AbstractExtension {
     ];
   }
 
-  public function transformResourceUrl(string $media_url, int $max_width, int $max_height): string {
+  public function createOembedIframeFromUrl(string $media_url, int $max_width, int $max_height): string {
     $resource_url = $this->urlResolver->getResourceUrl($media_url, $max_width, $max_height);
     $resource = $this->resourceFetcher->fetchResource($resource_url);
     return (string) IFrameMarkup::create($resource->getHtml());
