@@ -16,13 +16,13 @@ props:
       examples:
         - url: https://www.youtube.com/watch?v=PWjcqE3QKBg
           title: Example oEmbed video title
-    width:
-      title: width
+    max_width:
+      title: Max width
       type: integer
       examples:
         - 640
-    height:
-      title: width
+    max_height:
+      title: Max height
       type: integer
       examples:
         - 480

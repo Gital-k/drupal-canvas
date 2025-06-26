@@ -252,8 +252,6 @@ props:
       type: object
       examples:
         - url: https://youtu.be/dQw4w9WgXcQ
-          width: 600
-          height: 400
           title: 'Example oEmbed video title'
     # The "document" predefined object format.
     test_object_drupal_document:

@@ -533,6 +533,8 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
         ],
         'optional, type=integer' => [
           'SDC props' => [
+            '⿲experience_builder:oembed_video␟max_width',
+            '⿲experience_builder:oembed_video␟max_height',
             '⿲sdc_test_all_props:all-props␟test_integer',
           ],
           'static prop source' => 'ℹ︎integer␟value',
