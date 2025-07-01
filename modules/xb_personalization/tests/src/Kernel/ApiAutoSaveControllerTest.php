@@ -14,6 +14,7 @@ use Drupal\KernelTests\KernelTestBase;
 use Drupal\Tests\experience_builder\Kernel\Traits\RequestTrait;
 use Drupal\Tests\experience_builder\TestSite\XBTestSetup;
 use Drupal\Tests\experience_builder\Traits\AutoSaveManagerTestTrait;
+use Drupal\Tests\experience_builder\Traits\AutoSaveRequestTestTrait;
 use Drupal\Tests\experience_builder\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\experience_builder\Traits\OpenApiSpecTrait;
 use Drupal\Tests\experience_builder\Traits\XBFieldTrait;
@@ -21,6 +22,7 @@ use Drupal\Tests\user\Traits\UserCreationTrait;
 use Drupal\xb_personalization\Entity\Segment;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 /**
  * @see \Drupal\Tests\experience_builder\Kernel\ApiAutoSaveControllerTest
@@ -32,6 +34,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
 
   use ContribStrictConfigSchemaTestTrait;
   use AutoSaveManagerTestTrait;
+  use AutoSaveRequestTestTrait;
   use UserCreationTrait;
   use OpenApiSpecTrait;
   use RequestTrait;
@@ -63,7 +66,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     /** @var \Drupal\experience_builder\AutoSave\AutoSaveManager $autoSave */
     $autoSave = $this->container->get(AutoSaveManager::class);
 
-    list($account, $avatarUrl) = $this->setUserWithPictureField($permissions);
+    [$account, $avatarUrl] = $this->setUserWithPictureField($permissions);
 
     $segment_id = $this->getRandomGenerator()->machineName();
     $data = [
@@ -111,7 +114,8 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
         ],
       ],
     ];
-    $autoSave->save($segment, $data);
+    $segment->updateFromClientSide($data);
+    $autoSave->saveEntity($segment);
 
     $request = Request::create(Url::fromRoute('experience_builder.api.auto-save.get')->toString());
     $response = $this->request($request);
@@ -132,9 +136,11 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
 
     // Assert the content is marked as updated.
     self::assertArrayHasKey('updated', $content[$segmentIdentifier]);
+    // And that a hash exists.
+    self::assertArrayHasKey('data_hash', $content[$segmentIdentifier]);
 
     self::assertEquals([
-      'langcode' => NULL,
+      'langcode' => 'en',
       'entity_type' => $segment->getEntityTypeId(),
       'entity_id' => $segment->id(),
       'owner' => [
@@ -144,23 +150,34 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
         'uri' => $account->toUrl()->toString(),
       ],
       'label' => $new_title,
-      'data_hash' => self::generateAutoSaveHash($data),
-    ], \array_diff_key($content[$segmentIdentifier], \array_flip(['updated'])));
+    ], \array_diff_key($content[$segmentIdentifier], \array_flip(['updated', 'data_hash'])));
 
     $this->assertDataCompliesWithApiSpecification($content, 'AutoSaveCollection');
   }
 
-  public function testApiAutoSaveControllerPost(): void {
+  /**
+   * @testWith [false, "The 'publish auto-saves' permission is required."]
+   *           [true, null]
+   */
+  public function testPost(bool $authorized, ?string $expected_403_message): void {
     $this->setUpImages();
     $entity_type_manager = $this->container->get('entity_type.manager');
     $segment_storage = $entity_type_manager->getStorage(Segment::ENTITY_TYPE_ID);
     /** @var \Drupal\experience_builder\AutoSave\AutoSaveManager $autoSave */
     $autoSave = \Drupal::service(AutoSaveManager::class);
-    $this->setUpCurrentUser(permissions: [
+    $permissions = [
       'edit any article content',
-      Page::EDIT_PERMISSION,
       Segment::ADMIN_PERMISSION,
-    ]);
+      Page::EDIT_PERMISSION,
+    ];
+    if ($authorized) {
+      $permissions[] = AutoSaveManager::PUBLISH_PERMISSION;
+    }
+    $this->setUpCurrentUser(permissions: $permissions);
+    if ($expected_403_message) {
+      $this->expectException(AccessDeniedHttpException::class);
+      $this->expectExceptionMessage($expected_403_message);
+    }
     $this->assertNoAutoSaveData();
     $segment_id = 'new_segment';
     $data = [
@@ -207,8 +224,8 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
         ],
       ],
     ];
-
-    $autoSave->save($segment, $missing_auto_save_data);
+    $segment->updateFromClientSide($missing_auto_save_data);
+    $autoSave->saveEntity($segment);
 
     $response = $this->makePublishAllRequest();
     $json = json_decode($response->getContent() ?: '', TRUE);
@@ -251,7 +268,8 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     $updated_segment_data['label'] = $new_title;
     $updated_segment_data['description'] = $new_description;
     $updated_segment_data['rules'] = $data['rules'];
-    $autoSave->save($segment, $updated_segment_data);
+    $segment->updateFromClientSide($updated_segment_data);
+    $autoSave->saveEntity($segment);
 
     $auto_save_data = $this->getAutoSaveStatesFromServer();
     $segment_auto_save_key = 'segment:' . $segment_id;

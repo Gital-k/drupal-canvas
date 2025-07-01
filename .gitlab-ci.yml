@@ -132,6 +132,22 @@ cspell:
       - ui/tests/fixtures/**/*
     when: on_success
 
+.CLI-files-change-rule: &CLI-files-change-rule
+  - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    changes:
+      - cli/package.json
+      - cli/**/*.js
+      - cli/**/*.ts
+      - cli/**/*.tsx
+      - cli/tsconfig.json
+
+.CLI-HTTP-API-change-rule: &CLI-HTTP-API-change-rule
+  - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    changes:
+      - openapi.yml
+      - src/Entity/JavaScriptComponent.php
+      - src/Controller/ApiConfigControllers.php
+
 # Helper to setup a Drupal installation
 #
 # This should be quite fast with a warm cache, and is only used by one job
@@ -149,7 +165,7 @@ cspell:
   - find . -maxdepth 1 -type d -not -path "." -not -path "./tmp" -exec mv {} tmp/ \;
   - mv tmp $CI_PROJECT_NAME
   # Get Drupal
-  - composer create-project drupal/recommended-project _drupal
+  - composer create-project drupal/recommended-project:$DRUPAL_CORE _drupal
   - cd _drupal
   # Add core-dev, Experience Builder, and drush
   - |
@@ -181,10 +197,13 @@ cspell:
   # Set simpletest environment variables
   - !reference [ .simpletest-db ]
   - !reference [ .show-environment-variables ]
-  # Install Drupal, this is only needed due to a bug when applying recipes with
-  # drush (hash salt errors).
-  - cd $CI_PROJECT_DIR/_drupal/web
-  - php core/scripts/drupal install minimal --no-interaction --quiet
+  # Ensure that every test site will be able to discover and install test modules.
+  # Anything in settings.testing.php is automatically copied into the settings of
+  # individual test sites. See \Drupal\Core\Test\FunctionalTestSetupTrait::prepareSettings(),
+  # which is called (indirectly) by \Drupal\TestSite\Commands\TestSiteInstallCommand.
+  - cd $CI_PROJECT_DIR/_drupal/web/sites/default
+  - echo '<?php' >> settings.testing.php
+  - echo '$settings["extension_discovery_scan_tests"] = TRUE;' >> settings.testing.php
   # Change to the project directory
   - cd $CI_PROJECT_DIR/_drupal/web/modules/contrib/$CI_PARENT_PROJECT_NAME
   # Install the UI
@@ -323,7 +342,7 @@ eslint:
   # This module wants to strictly comply with eslint.
   allow_failure: false
   before_script:
-    # 🤷‍.eslintignore already instructs eslint to ignore this, but it does not seem to work. This is validated by the `UI - eslint` job below.
+    # 🤷‍.eslintignore already instructs eslint to ignore this, but it does not seem to work. This is validated by the `UI eslint` and `CLI eslint` jobs below.
     - rm -rf ui
     - rm -rf tests/src/Playwright playwright.config.ts eslint.config.mjs
   # @todo Remove when https://www.drupal.org/project/gitlab_templates/issues/3452183 lands.
@@ -388,15 +407,11 @@ UI eslint:
 CLI:
   stage: build
   image: node:20-alpine
+  needs: []
   rules:
     - *is-push-rule
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes:
-        - cli/package.json
-        - cli/**/*.js
-        - cli/**/*.ts
-        - cli/**/*.tsx
-        - cli/tsconfig.json
+    - *CLI-files-change-rule
+    - *CLI-HTTP-API-change-rule
     - *manual-rule
   script:
     - cd cli
@@ -414,13 +429,7 @@ CLI eslint:
     - CLI
   rules:
     - *is-push-rule
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes:
-        - cli/package.json
-        - cli/**/*.js
-        - cli/**/*.ts
-        - cli/**/*.tsx
-        - cli/tsconfig.json
+    - *CLI-files-change-rule
     - *manual-rule
   script:
     - cd cli
@@ -443,13 +452,8 @@ CLI vitest:
     - CLI
   rules:
     - *is-push-rule
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes:
-        - cli/package.json
-        - cli/**/*.js
-        - cli/**/*.ts
-        - cli/**/*.tsx
-        - cli/tsconfig.json
+    - *CLI-files-change-rule
+    - *CLI-HTTP-API-change-rule
     - *manual-rule
   script:
     - cd cli

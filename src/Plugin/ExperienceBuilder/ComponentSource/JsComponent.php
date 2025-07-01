@@ -13,7 +13,7 @@ use Drupal\Core\Render\Component\Exception\InvalidComponentException;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\experience_builder\Attribute\ComponentSource;
 use Drupal\experience_builder\AutoSave\AutoSaveManager;
-use Drupal\experience_builder\AutoSaveData;
+use Drupal\experience_builder\AutoSaveEntity;
 use Drupal\experience_builder\ComponentDoesNotMeetRequirementsException;
 use Drupal\experience_builder\ComponentMetadataRequirementsChecker;
 use Drupal\experience_builder\ComponentSource\ComponentSourceManager;
@@ -120,15 +120,12 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
   public function renderComponent(array $inputs, string $componentUuid, bool $isPreview = FALSE): array {
     $component = $this->getJavaScriptComponent();
 
-    $autoSave = $this->autoSaveManager->getAutoSaveData($component);
-    $component_url = $component->getComponentUrl($this->fileUrlGenerator, $autoSave, $isPreview);
+    $autoSave = $this->autoSaveManager->getAutoSaveEntity($component);
+    $component_url = $component->getComponentUrl($this->fileUrlGenerator, $isPreview);
 
     $build = [];
     $base_path = \base_path();
-    $css_library = $component->getCssLibrary($autoSave, $isPreview);
-    if ($css_library) {
-      $build['#attached']['library'][] = $css_library;
-    }
+    $build['#attached']['library'][] = $component->getAssetLibrary($isPreview);
 
     $xb_path = $this->extensionPathResolver->getPath('module', 'experience_builder');
     // Build base import map
@@ -153,7 +150,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
     if (count($scoped_map) > 0) {
       $import_maps[ImportMapResponseAttachmentsProcessor::SCOPED_IMPORTS] = $scoped_map;
     }
-    $build['#attached']['library'] = \array_merge($build['#attached']['library'] ?? [], $this->getDependencyLibraries($component, $autoSave, $isPreview));
+    $build['#attached']['library'] = \array_merge($build['#attached']['library'], $this->getDependencyLibraries($component, $autoSave, $isPreview));
 
     if (\count($build['#attached']['library']) === 0) {
       unset($build['#attached']['library']);
@@ -173,8 +170,8 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
       ];
     }
     if ($isPreview && !$autoSave->isEmpty()) {
-      \assert($autoSave->data !== NULL);
-      $component = $component->forAutoSavePreview($autoSave->data);
+      \assert($autoSave->entity instanceof JavaScriptComponent);
+      $component = $autoSave->entity;
     }
     if ($isPreview) {
       $build['#cache']['tags'][] = AutoSaveManager::CACHE_TAG;
@@ -368,9 +365,9 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
     throw new \InvalidArgumentException('Default images for Javascript Components must be a fully-qualified URL with both scheme and host.');
   }
 
-  private function getScopedDependencies(JavaScriptComponent $component, AutoSaveData $autoSave, bool $isPreview, array $seen = []): array {
+  private function getScopedDependencies(JavaScriptComponent $component, AutoSaveEntity $autoSave, bool $isPreview, array $seen = []): array {
     $scoped_dependencies = [];
-    $component_url = $component->getComponentUrl($this->fileUrlGenerator, $autoSave, $isPreview);
+    $component_url = $component->getComponentUrl($this->fileUrlGenerator, $isPreview);
     foreach ($component->getComponentDependencies($autoSave, $isPreview) as $js_component_dependency_name => $js_component_dependency) {
       if (\in_array($js_component_dependency_name, $seen, TRUE)) {
         // Recursion or already processed by another dependency.
@@ -378,9 +375,9 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
       }
       $seen[] = $js_component_dependency_name;
       assert($js_component_dependency instanceof JavaScriptComponent);
-      $dependencyAutoSave = $this->autoSaveManager->getAutoSaveData($js_component_dependency);
-      $dependency_component_url = $js_component_dependency->getComponentUrl($this->fileUrlGenerator, $dependencyAutoSave, $isPreview);
-      $scoped_dependencies[$component_url]["@/components/{$js_component_dependency_name}"] = $js_component_dependency->getComponentUrl($this->fileUrlGenerator, $dependencyAutoSave, $isPreview);
+      $dependencyAutoSave = $this->autoSaveManager->getAutoSaveEntity($js_component_dependency);
+      $dependency_component_url = $js_component_dependency->getComponentUrl($this->fileUrlGenerator, $isPreview);
+      $scoped_dependencies[$component_url]["@/components/{$js_component_dependency_name}"] = $js_component_dependency->getComponentUrl($this->fileUrlGenerator, $isPreview);
       $scoped_dependencies = array_merge($scoped_dependencies, $this->getScopedDependencies($js_component_dependency, $dependencyAutoSave, $isPreview, $seen));
       if (isset($scoped_dependencies[$dependency_component_url])) {
         // The dependencies of my dependencies are also my dependencies, so says the logic.
@@ -390,7 +387,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
     return $scoped_dependencies;
   }
 
-  private function getDependencyLibraries(JavaScriptComponent $component, AutoSaveData $autoSave, bool $isPreview, array $seen = []): array {
+  private function getDependencyLibraries(JavaScriptComponent $component, AutoSaveEntity $autoSave, bool $isPreview, array $seen = []): array {
     $libraries = [];
     foreach ($component->getComponentDependencies($autoSave, $isPreview) as $js_component_dependency_name => $js_component_dependency) {
       if (\in_array($js_component_dependency_name, $seen, TRUE)) {
@@ -399,11 +396,8 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
       }
       $seen[] = $js_component_dependency_name;
       assert($js_component_dependency instanceof JavaScriptComponent);
-      $dependencyAutoSave = $this->autoSaveManager->getAutoSaveData($js_component_dependency);
-      $dependency_library = $js_component_dependency->getCssLibrary($dependencyAutoSave, $isPreview);
-      if ($dependency_library) {
-        $libraries[] = $dependency_library;
-      }
+      $dependencyAutoSave = $this->autoSaveManager->getAutoSaveEntity($js_component_dependency);
+      $libraries[] = $js_component_dependency->getAssetLibrary($isPreview);
       $libraries = array_merge($libraries, $this->getDependencyLibraries($js_component_dependency, $dependencyAutoSave, $isPreview, $seen));
     }
     return $libraries;

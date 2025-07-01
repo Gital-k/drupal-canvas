@@ -55,7 +55,7 @@ abstract class ComponentSourceBase extends PluginBase implements ComponentSource
     return \hash('xxh64', \json_encode($normalized_data, JSON_THROW_ON_ERROR));
   }
 
-  private static function recursiveKsort(array &$array): void {
+  protected static function recursiveKsort(array &$array): void {
     ksort($array);
     foreach ($array as &$value) {
       if (is_array($value)) {
@@ -165,5 +165,13 @@ abstract class ComponentSourceBase extends PluginBase implements ComponentSource
    *   - …
    */
   abstract protected function getExplicitInputDefinitions(): array;
+
+  /**
+   * {@inheritdoc}
+   */
+  public function optimizeExplicitInput(array $values): array {
+    // Nil-op.
+    return $values;
+  }
 
 }

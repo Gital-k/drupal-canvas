@@ -5,12 +5,16 @@ declare(strict_types=1);
 namespace Drupal\Tests\experience_builder\Kernel\Controller;
 
 use Drupal\Core\Url;
+use Drupal\experience_builder\AutoSave\AutoSaveManager;
 use Drupal\experience_builder\Entity\ContentTemplate;
 use Drupal\experience_builder\Entity\JavaScriptComponent;
 use Drupal\experience_builder\Entity\Page;
 use Drupal\experience_builder\Entity\PageRegion;
 use Drupal\experience_builder\Entity\Pattern;
+use Drupal\field\Entity\FieldConfig;
+use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\KernelTests\KernelTestBase;
+use Drupal\node\Entity\NodeType;
 use Drupal\Tests\experience_builder\Kernel\Traits\PageTrait;
 use Drupal\Tests\experience_builder\Kernel\Traits\RequestTrait;
 use Drupal\Tests\experience_builder\Kernel\Traits\XbUiAssertionsTrait;
@@ -34,16 +38,46 @@ final class ExperienceBuilderControllerTest extends KernelTestBase {
    */
   protected static $modules = [
     'experience_builder',
-    'system',
     'entity_test',
     ...self::PAGE_TEST_MODULES,
+    'block',
+    'node',
+    // XB's dependencies (modules providing field types + widgets).
+    'text',
+    'datetime',
+    'file',
+    'image',
+    'media',
+    'options',
+    'path',
+    'link',
+    'system',
+    'user',
   ];
 
   protected function setUp(): void {
     parent::setUp();
     // Needed for date formats.
     $this->installConfig(['system']);
+    $this->installConfig(['node']);
     $this->installEntitySchema('path_alias');
+    $this->installEntitySchema('node_type');
+    $this->installEntitySchema('node');
+
+    NodeType::create([
+      'name' => 'Amazing article',
+      'type' => 'article',
+    ])->save();
+    $field_storage = FieldStorageConfig::create([
+      'type' => 'component_tree',
+      'entity_type' => 'node',
+      'field_name' => 'field_xb_tree',
+    ]);
+    $field_storage->save();
+    FieldConfig::create([
+      'field_storage' => $field_storage,
+      'bundle' => 'article',
+    ])->save();
   }
 
   /**
@@ -152,7 +186,7 @@ final class ExperienceBuilderControllerTest extends KernelTestBase {
     /** @var \Drupal\Core\Render\HtmlResponse $response */
     $response = $this->request(Request::create($add_url));
 
-    $this->assertEqualsCanonicalizing($expectedPermissionFlags, $this->drupalSettings['xb']['permissions']);
+    $this->assertSame($expectedPermissionFlags, $this->drupalSettings['xb']['permissions']);
     self::assertSame([
       'user.permissions',
       'languages:language_interface',
@@ -178,22 +212,25 @@ final class ExperienceBuilderControllerTest extends KernelTestBase {
           ...$page_permissions,
         ],
         [
-          'globalRegion' => FALSE,
+          'globalRegions' => FALSE,
           'sections' => FALSE,
           'codeComponents' => FALSE,
           'contentTemplates' => FALSE,
+          'publishChanges' => FALSE,
         ],
       ],
       [
         [
           ...$page_permissions,
           JavaScriptComponent::ADMIN_PERMISSION,
+          AutoSaveManager::PUBLISH_PERMISSION,
         ],
         [
-          'globalRegion' => FALSE,
+          'globalRegions' => FALSE,
           'sections' => FALSE,
           'codeComponents' => TRUE,
           'contentTemplates' => FALSE,
+          'publishChanges' => TRUE,
         ],
       ],
       [
@@ -203,10 +240,11 @@ final class ExperienceBuilderControllerTest extends KernelTestBase {
           PageRegion::ADMIN_PERMISSION,
         ],
         [
-          'globalRegion' => TRUE,
+          'globalRegions' => TRUE,
           'sections' => TRUE,
           'codeComponents' => FALSE,
           'contentTemplates' => FALSE,
+          'publishChanges' => FALSE,
         ],
       ],
       [
@@ -217,10 +255,11 @@ final class ExperienceBuilderControllerTest extends KernelTestBase {
           JavaScriptComponent::ADMIN_PERMISSION,
         ],
         [
-          'globalRegion' => TRUE,
+          'globalRegions' => TRUE,
           'sections' => TRUE,
           'codeComponents' => TRUE,
           'contentTemplates' => FALSE,
+          'publishChanges' => FALSE,
         ],
       ],
       [
@@ -230,12 +269,80 @@ final class ExperienceBuilderControllerTest extends KernelTestBase {
           PageRegion::ADMIN_PERMISSION,
           JavaScriptComponent::ADMIN_PERMISSION,
           ContentTemplate::ADMIN_PERMISSION,
+          AutoSaveManager::PUBLISH_PERMISSION,
         ],
         [
-          'globalRegion' => TRUE,
+          'globalRegions' => TRUE,
           'sections' => TRUE,
           'codeComponents' => TRUE,
           'contentTemplates' => TRUE,
+          'publishChanges' => TRUE,
+        ],
+      ],
+    ];
+  }
+
+  /**
+   * Tests controller exposed content entity create operations.
+   *
+   * @param array $permissions
+   *   The permissions.
+   * @param array $expectedCreateOperations
+   *   The expected create operations array.
+   *
+   * @dataProvider createOperationsData
+   */
+  public function testControllerExposedContentEntityCreateOperations(array $permissions, array $expectedCreateOperations): void {
+    $this->installEntitySchema(Page::ENTITY_TYPE_ID);
+
+    $this->setUpCurrentUser([], $permissions);
+
+    $add_url = Url::fromRoute('experience_builder.experience_builder', [
+      'entity_type' => Page::ENTITY_TYPE_ID,
+      'entity' => '',
+    ])->toString();
+    self::assertEquals("/xb/xb_page", $add_url);
+
+    /** @var \Drupal\Core\Render\HtmlResponse $response */
+    $response = $this->request(Request::create($add_url));
+
+    $this->assertSame($expectedCreateOperations, $this->drupalSettings['xb']['contentEntityCreateOperations']);
+    self::assertSame([
+      'user.permissions',
+      'languages:language_interface',
+      'theme',
+    ], $response->getCacheableMetadata()->getCacheContexts());
+    self::assertSame([
+      'http_response',
+    ], $response->getCacheableMetadata()->getCacheTags());
+  }
+
+  public static function createOperationsData(): array {
+    return [
+      [
+        [
+          'access content',
+          Page::CREATE_PERMISSION,
+        ],
+        [
+          'xb_page' => [
+            'xb_page' => 'Page',
+          ],
+        ],
+      ],
+      [
+        [
+          'access content',
+          Page::CREATE_PERMISSION,
+          'create article content',
+        ],
+        [
+          'xb_page' => [
+            'xb_page' => 'Page',
+          ],
+          'node' => [
+            'article' => 'Amazing article',
+          ],
         ],
       ],
     ];

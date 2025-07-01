@@ -98,17 +98,18 @@ final class ApiLayoutControllerTest extends HttpApiTestBase {
     /** @var \Drupal\experience_builder\AutoSave\AutoSaveManager $autoSave */
     $autoSave = $this->container->get(AutoSaveManager::class);
     // Auto-save entries should match the format sent by the client.
-    $saved_component_values['source_code_js'] = $saved_component_values['js']['original'];
-    $saved_component_values['compiled_js'] = $saved_component_values['js']['compiled'];
-    $saved_component_values['source_code_css'] = $saved_component_values['css']['original'];
-    $saved_component_values['compiled_css'] = $saved_component_values['css']['compiled'];
-    // 'imported_js_components' is a value sent by the client that is used to
+    $saved_component_values['sourceCodeJs'] = $saved_component_values['js']['original'];
+    $saved_component_values['compiledJs'] = $saved_component_values['js']['compiled'];
+    $saved_component_values['sourceCodeCss'] = $saved_component_values['css']['original'];
+    $saved_component_values['compiledCss'] = $saved_component_values['css']['compiled'];
+    // 'importedJsComponents' is a value sent by the client that is used to
     // determine Javascript Code component dependencies and is not saved
     // directly on the backend.
     // @see \Drupal\experience_builder\Entity\JavaScriptComponent::addJavaScriptComponentsDependencies().
-    $saved_component_values['imported_js_components'] = [];
+    $saved_component_values['importedJsComponents'] = [];
     unset($saved_component_values['js'], $saved_component_values['css']);
-    $autoSave->save($code_component, $saved_component_values);
+    $code_component->updateFromClientSide($saved_component_values);
+    $autoSave->saveEntity($code_component);
 
     // Load the test data from the layout controller.
     $content = $this->drupalGet('/xb/api/v0/layout/xb_page/1');
@@ -199,7 +200,8 @@ final class ApiLayoutControllerTest extends HttpApiTestBase {
     // Updating the auto-save should invalidate the config cache and cause the
     // new value to be used on a subsequent POST.
     $saved_component_values['name'] = 'Rodney';
-    $autoSave->save($code_component, $saved_component_values);
+    $code_component->updateFromClientSide($saved_component_values);
+    $autoSave->saveEntity($code_component);
 
     $original_request_json['autoSaves'] = $json['autoSaves'];
     $request_options[RequestOptions::BODY] = Json::encode($original_request_json);

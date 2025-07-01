@@ -8,7 +8,6 @@ use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
-use Drupal\Core\Entity\TypedData\EntityDataDefinition;
 use Drupal\Core\Field\WidgetPluginManager;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Plugin\Component as SdcPlugin;
@@ -24,17 +23,14 @@ use Drupal\experience_builder\Entity\Component as ComponentEntity;
 use Drupal\experience_builder\MissingHostEntityException;
 use Drupal\experience_builder\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\experience_builder\PropExpressions\Component\ComponentPropExpression;
-use Drupal\experience_builder\PropExpressions\StructuredData\FieldObjectPropsExpression;
-use Drupal\experience_builder\PropExpressions\StructuredData\FieldPropExpression;
 use Drupal\experience_builder\PropExpressions\StructuredData\FieldTypeObjectPropsExpression;
-use Drupal\experience_builder\PropExpressions\StructuredData\ReferenceFieldPropExpression;
 use Drupal\experience_builder\PropExpressions\StructuredData\ReferenceFieldTypePropExpression;
 use Drupal\experience_builder\PropShape\PropShape;
 use Drupal\experience_builder\PropShape\StorablePropShape;
 use Drupal\experience_builder\PropSource\DefaultRelativeUrlPropSource;
 use Drupal\experience_builder\PropSource\PropSource;
+use Drupal\experience_builder\PropSource\PropSourceBase;
 use Drupal\experience_builder\PropSource\StaticPropSource;
-use Drupal\experience_builder\ShapeMatcher\FieldForComponentSuggester;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Validator\ConstraintViolation;
 use Symfony\Component\Validator\ConstraintViolationList;
@@ -72,7 +68,6 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     array $plugin_definition,
     private readonly ComponentValidator $componentValidator,
     private readonly WidgetPluginManager $fieldWidgetPluginManager,
-    private readonly FieldForComponentSuggester $fieldForComponentSuggester,
     protected readonly EntityTypeManagerInterface $entityTypeManager,
   ) {
     assert(array_key_exists('local_source_id', $configuration));
@@ -90,7 +85,6 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       $plugin_definition,
       $container->get(ComponentValidator::class),
       $container->get('plugin.manager.field.widget'),
-      $container->get(FieldForComponentSuggester::class),
       $container->get(EntityTypeManagerInterface::class),
     );
   }
@@ -198,7 +192,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     $entity = $item->getRoot() === $item->getParent() ? NULL : $item->getEntity();
     $values = $item->getInputs() ?? [];
     foreach ($values as $prop => $input) {
-      $values[$prop] = $this->rawInputValueToPropSourceArray($input, $prop);
+      $values[$prop] = $this->uncollapse($input, $prop)->toArray();
     }
 
     return [
@@ -292,7 +286,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
   public function validateComponentInput(array $inputValues, string $component_instance_uuid, ?FieldableEntityInterface $entity): ConstraintViolationListInterface {
     $violations = new ConstraintViolationList();
     foreach ($inputValues as $component_prop_name => $raw_prop_source) {
-      $raw_prop_source = $this->rawInputValueToPropSourceArray($raw_prop_source, $component_prop_name);
+      $raw_prop_source = $this->uncollapse($raw_prop_source, $component_prop_name)->toArray();
       // Store the expanded prop source with all the values populated from the
       // composite field type.
       $inputValues[$component_prop_name] = $raw_prop_source;
@@ -430,15 +424,14 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
 
       $component_prop = ComponentPropExpression::fromString($component_prop_expression);
       $sdc_prop_name = $component_prop->propName;
-      $prop_source_array = $this->rawInputValueToPropSourceArray($client_model[$sdc_prop_name] ?? $default_prop_sources[$sdc_prop_name], $sdc_prop_name);
+      $source = $this->uncollapse($client_model[$sdc_prop_name] ?? $default_prop_sources[$sdc_prop_name], $sdc_prop_name);
       $disabled = FALSE;
-      $source = PropSource::parse($prop_source_array);
       if (!$source instanceof StaticPropSource) {
         // @todo Design is undefined for the DynamicPropSource UX. Related: https://www.drupal.org/project/experience_builder/issues/3459234
         // @todo Design is undefined for the AdaptedPropSource UX.
         // Fall back to the static version, disabled for now where the design is undefined.
         $disabled = !$source instanceof DefaultRelativeUrlPropSource;
-        $source = $this->getDefaultStaticPropSource($sdc_prop_name)->withValue($prop_source_array['value'] ?? NULL);
+        $source = $this->getDefaultStaticPropSource($sdc_prop_name)->withValue($source->toArray()['value'] ?? NULL);
       }
 
       // 1. If the given static prop source matches the *current* field type
@@ -494,16 +487,11 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
   public function getClientSideInfo(ComponentEntity $component): array {
     $component_plugin = $this->getSdcPlugin();
     assert($component_plugin instanceof SdcPlugin);
-    // @todo Refactor away this instanceof check in https://www.drupal.org/i/3503038
-    $suggestions = $this instanceof SingleDirectoryComponent
-      ? $this->fieldForComponentSuggester->suggest($component_plugin->getPluginId(), EntityDataDefinition::create('node', 'article'))
-      : [];
     $prop_field_definitions = $component->getSettings()['prop_field_definitions'];
 
     $field_data = [];
     $default_props_for_default_markup = [];
     $unpopulated_props_for_default_markup = [];
-    $dynamic_prop_source_candidates = [];
     $transforms = [];
     foreach (PropShape::getComponentProps($component_plugin) as $component_prop_expression => $prop_shape) {
       $storable_prop_shape = $prop_shape->getStorage();
@@ -515,12 +503,6 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
 
       $component_prop = ComponentPropExpression::fromString($component_prop_expression);
       $prop_name = $component_prop->propName;
-      if (isset($suggestions[$component_prop_expression])) {
-        $dynamic_prop_source_candidates[$prop_name] = array_map(
-          fn(FieldPropExpression|FieldObjectPropsExpression|ReferenceFieldPropExpression $expr) => (string) $expr,
-          $suggestions[$component_prop_expression]['instances']
-        );
-      }
 
       // Determine the default:
       // - resolved value (used for the preview of the component)
@@ -644,7 +626,6 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       // @todo UI does not use any other metadata - should `slots` move to top level?
       'metadata' => ['slots' => $this->getSlotDefinitions()],
       'propSources' => $field_data,
-      'dynamic_prop_source_candidates' => $dynamic_prop_source_candidates,
       'transforms' => $transforms,
     ];
   }
@@ -832,35 +813,97 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
         // subsequent validation to bubble up any errors.
         continue;
       }
-      $props[$prop] = $source->toArray();
-      if ($source instanceof StaticPropSource &&
-        \array_key_exists('expression', $props[$prop]) &&
-        \array_key_exists($prop, $this->configuration['prop_field_definitions']) &&
-        $props[$prop]['expression'] === $this->configuration['prop_field_definitions'][$prop]['expression'] &&
-        $props[$prop]['sourceType'] === \sprintf('static:field_item:%s', $this->configuration['prop_field_definitions'][$prop]['field_type'])
-      ) {
-        // The other keys are tracked in versioned properties of the component.
-        // We can collapse some of the values here if this is a static-prop as
-        // entity.
-        \assert(\array_key_exists('value', $props[$prop]));
-        $props[$prop] = $props[$prop]['value'];
-      }
-
+      $props[$prop] = $this->collapse($source, $prop);
     }
 
     return $props;
   }
 
+  public function optimizeExplicitInput(array $values): array {
+    foreach ($values as $prop => $input) {
+      // Every input for a component instance of this ComponentSource plugin
+      // base class MUST be a PropSourceBase, which all are stored as arrays.
+      // @see \Drupal\experience_builder\PropSource\PropSourceBase::toArray()
+      if (!\is_array($input) || !\array_key_exists('sourceType', $input)) {
+        // The inputs have already been stored collapsed. Prove using assertions
+        // (which does not have a production performance impact).
+        assert($this->uncollapse($input, $prop) instanceof StaticPropSource);
+        assert($this->uncollapse($input, $prop)->hasSameShapeAs($this->getDefaultStaticPropSource($prop)));
+        continue;
+      }
+      // phpcs:ignore
+      /** @var PropSourceArray $input */
+      $source = PropSource::parse($input);
+      $collapsed_input = $this->collapse($source, $prop);
+      if ($input !== $collapsed_input) {
+        $values[$prop] = $collapsed_input;
+      }
+    }
+    return $values;
+  }
+
   /**
-   * @phpstan-return PropSourceArray
+   * Collapse prop source for storage whenever possible.
+   *
+   * StaticPropSources are dangling field item lists, which require a lot of
+   * metadata to be known: field type, storage settings, instance settings and
+   * expression.
+   * When a StaticPropSource is being stored (to populate some component prop),
+   * check if it matches that metadata in the `prop_field_definitions` for this
+   * component instance's referenced version of the Component config entity. If
+   * it does match, all metadata can be omitted, which significantly reduces the
+   * amount of data stored.
+   *
+   * @param \Drupal\experience_builder\PropSource\PropSourceBase $source
+   *
+   * @return mixed|PropSourceArray
+   *   Either:
+   *   - the collapsed prop source storage representation, which means either a
+   *     scalar or an array without a `sourceType` key
+   *   - the uncollapsed prop source storage representation, which means this
+   *     will be an array with a `sourceType` key.
+   *
+   * @see ::uncollapse()
    */
-  private function rawInputValueToPropSourceArray(mixed $value, string $prop_name): array {
+  private function collapse(PropSourceBase $source, string $prop_name): mixed {
+    // @todo Simplify this to just `if ($source instanceof StaticPropSource && $source->hasSameShapeAs($this->getDefaultStaticPropSource($prop_name))) { return $source->getValue(); }` in https://www.drupal.org/project/experience_builder/issues/3532414
+    if ($source instanceof StaticPropSource) {
+      try {
+        $default_source = $this->getDefaultStaticPropSource($prop_name);
+        return $source->hasSameShapeAs($default_source)
+          ? $source->getValue()
+          : $source->toArray();
+      }
+      catch (\OutOfRangeException) {
+        // TRICKY: https://www.drupal.org/node/3500386 and its test coverage
+        // assume that even auto-saves of code components can have their props
+        // appear. This never really made sense, but especially no longer since
+        // we introduced component versions. It never made sense though, because
+        // no entry would exist in `prop_field_definitions` for the code
+        // component, meaning no widget would ever have appeared.
+        return $source->toArray();
+      }
+    }
+    return $source->toArray();
+  }
+
+  /**
+   * Uncollapses a (collapsed or not) prop source.
+   *
+   * @param mixed|PropSourceArray $value
+   * @param string $prop_name
+   *
+   * @return \Drupal\experience_builder\PropSource\PropSourceBase
+   *
+   * @see ::collapse()
+   */
+  private function uncollapse(mixed $value, string $prop_name): PropSourceBase {
     if (!\is_array($value) || !\array_key_exists('sourceType', $value)) {
-      $value = $this->getDefaultStaticPropSource($prop_name)->withValue($value)->toArray();
+      return $this->getDefaultStaticPropSource($prop_name)->withValue($value);
     }
     // phpcs:ignore
-    /** @var PropSourceArray */
-    return $value;
+    /** @var PropSourceArray $value */
+    return PropSource::parse($value);
   }
 
 }

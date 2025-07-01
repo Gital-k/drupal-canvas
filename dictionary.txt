@@ -1,4 +1,5 @@
 adrs
+aiwizard
 apikey
 astrojs
 atrule
@@ -78,6 +79,9 @@ toolset
 topbar
 tsconfigs
 ultrawide
+uncollapse
+uncollapsed
+uncollapses
 unstorable
 unstub
 unvalidatable
@@ -91,4 +95,5 @@ xbstark
 xbrc
 xbxb
 xmdi
+ymls
 Deepchat

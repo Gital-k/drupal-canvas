@@ -32,6 +32,7 @@ use Drupal\Tests\experience_builder\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\experience_builder\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\experience_builder\Traits\CrawlerTrait;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
+use Drupal\Tests\node\Traits\ContentTypeCreationTrait;
 use Drupal\Tests\TestFileCreationTrait;
 use Twig\Error\Error;
 use Twig\Error\RuntimeError;
@@ -53,6 +54,7 @@ final class SingleDirectoryComponentTest extends ComponentSourceTestBase {
   use CrawlerTrait;
   use MediaTypeCreationTrait;
   use TestFileCreationTrait;
+  use ContentTypeCreationTrait;
 
   /**
    * {@inheritdoc}
@@ -63,7 +65,18 @@ final class SingleDirectoryComponentTest extends ComponentSourceTestBase {
     'node',
     'path',
     'user',
+    'field',
+    'text',
   ];
+
+  /**
+   * @depends testDiscovery
+   */
+  public function testGetClientSideInfo(array $component_ids): void {
+    $this->installConfig('node');
+    $this->createContentType(['type' => 'article']);
+    parent::testGetClientSideInfo($component_ids);
+  }
 
   /**
    * All test module SDCs must either have a Component or a reason why not.
@@ -180,6 +193,8 @@ final class SingleDirectoryComponentTest extends ComponentSourceTestBase {
    * @depends testDiscovery
    */
   public function testRenderComponentLive(array $component_ids): void {
+    $this->installConfig('node');
+    $this->createContentType(['type' => 'article']);
     $this->assertNotEmpty($component_ids);
 
     $rendered = $this->renderComponentsLive(
@@ -920,9 +935,6 @@ HTML,
             ],
           ],
         ],
-        'dynamic_prop_source_candidates' => [
-          'crash' => [],
-        ],
         'transforms' => [],
       ],
       'sdc.xb_test_sdc.deprecated' => [
@@ -948,9 +960,6 @@ HTML,
             ],
           ],
         ],
-        'dynamic_prop_source_candidates' => [
-          'text' => [],
-        ],
         'transforms' => [],
       ],
       'sdc.xb_test_sdc.experimental' => [
@@ -975,9 +984,6 @@ HTML,
               'resolved' => 'A text field',
             ],
           ],
-        ],
-        'dynamic_prop_source_candidates' => [
-          'text' => [],
         ],
         'transforms' => [],
       ],
@@ -1030,9 +1036,6 @@ HTML,
               'resolved' => 'horizontal',
             ],
           ],
-        ],
-        'dynamic_prop_source_candidates' => [
-          'direction' => [],
         ],
         'transforms' => [],
       ],
@@ -1115,10 +1118,6 @@ HTML,
             ],
           ],
         ],
-        'dynamic_prop_source_candidates' => [
-          'caption' => [],
-          'images' => [],
-        ],
         'transforms' => [],
       ],
       'sdc.xb_test_sdc.image-optional-with-example' => [
@@ -1169,9 +1168,6 @@ HTML,
               ],
             ],
           ],
-        ],
-        'dynamic_prop_source_candidates' => [
-          'image' => [],
         ],
         'transforms' => [],
       ],
@@ -1232,10 +1228,6 @@ HTML,
             ],
           ],
         ],
-        'dynamic_prop_source_candidates' => [
-          'heading' => [],
-          'image' => [],
-        ],
         'transforms' => [],
       ],
       'sdc.xb_test_sdc.image-optional-without-example' => [
@@ -1275,9 +1267,6 @@ HTML,
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟{src↝entity␜␜entity:file␝uri␞␟url,alt↠alt,width↠width,height↠height}',
           ],
-        ],
-        'dynamic_prop_source_candidates' => [
-          'image' => [],
         ],
         'transforms' => [],
       ],
@@ -1329,9 +1318,6 @@ HTML,
               ],
             ],
           ],
-        ],
-        'dynamic_prop_source_candidates' => [
-          'image' => [],
         ],
         'transforms' => [],
       ],
@@ -1411,11 +1397,6 @@ HTML,
             ],
           ],
         ],
-        'dynamic_prop_source_candidates' => [
-          'text' => [],
-          'href' => [],
-          'target' => [],
-        ],
         'transforms' => [],
       ],
       'sdc.xb_test_sdc.props-no-slots' => [
@@ -1441,9 +1422,6 @@ HTML,
               'resolved' => 'There goes my hero',
             ],
           ],
-        ],
-        'dynamic_prop_source_candidates' => [
-          'heading' => [],
         ],
         'transforms' => [],
       ],
@@ -1496,9 +1474,6 @@ HTML,
             ],
           ],
         ],
-        'dynamic_prop_source_candidates' => [
-          'heading' => [],
-        ],
         'transforms' => [],
       ],
       'sdc.xb_test_sdc.sparkline' => [
@@ -1542,9 +1517,6 @@ HTML,
               ],
             ],
           ],
-        ],
-        'dynamic_prop_source_candidates' => [
-          'data' => [],
         ],
         'transforms' => [],
       ],

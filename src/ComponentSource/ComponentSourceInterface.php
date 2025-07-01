@@ -224,4 +224,18 @@ interface ComponentSourceInterface extends PluginInspectionInterface, Derivative
    */
   public function checkRequirements(): void;
 
+  /**
+   * Optimize component inputs prior to saving.
+   *
+   * For example a component source plugin may with to store a normalized
+   * representation of its data.
+   *
+   * @param array $values
+   *   Input values to optimize.
+   *
+   * @return array
+   *   Optimized values.
+   */
+  public function optimizeExplicitInput(array $values): array;
+
 }

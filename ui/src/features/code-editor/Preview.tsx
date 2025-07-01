@@ -25,7 +25,12 @@ import {
   getSlotNamesForPreview,
 } from '@/features/code-editor/utils';
 import { useGetCodeComponentsQuery } from '@/services/componentAndLayout';
-import { getDrupal, getXbSettings, getBaseUrl } from '@/utils/drupal-globals';
+import {
+  getBaseUrl,
+  getDrupal,
+  getDrupalSettings,
+  getXbSettings,
+} from '@/utils/drupal-globals';
 
 const Drupal = getDrupal();
 const XB_MODULE_UI_PATH =
@@ -38,14 +43,14 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
     selectCodeComponentProperty('machineName'),
   );
   const blockOverride = useAppSelector(
-    selectCodeComponentProperty('block_override'),
+    selectCodeComponentProperty('blockOverride'),
   );
   const sourceCodeJs = useAppSelector(
-    selectCodeComponentProperty('source_code_js'),
+    selectCodeComponentProperty('sourceCodeJs'),
   );
-  const compiledJs = useAppSelector(selectCodeComponentProperty('compiled_js'));
+  const compiledJs = useAppSelector(selectCodeComponentProperty('compiledJs'));
   const compiledCss = useAppSelector(
-    selectCodeComponentProperty('compiled_css'),
+    selectCodeComponentProperty('compiledCss'),
   );
   const compiledGlobalCss = useAppSelector(
     selectGlobalAssetLibraryProperty(['css', 'compiled']),
@@ -74,7 +79,6 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
       imports: {
         // Map to XB generated libraries.
         preact: `${XB_MODULE_UI_PATH}/lib/astro-hydration/dist/preact.module.js`,
-        'preact-ext/hooks': `${XB_MODULE_UI_PATH}/lib/astro-hydration/dist/hooks.module.js`,
         'preact/hooks': `${XB_MODULE_UI_PATH}/lib/astro-hydration/dist/hooks.module.js`,
         'react/jsx-runtime': `${XB_MODULE_UI_PATH}/lib/astro-hydration/dist/jsxRuntime.module.js`,
         react: `${XB_MODULE_UI_PATH}/lib/astro-hydration/dist/compat.module.js`,
@@ -136,6 +140,15 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
       </head>
       <body>
         <div id="xb-code-editor-preview-root"></div>
+        <script>
+          document.addEventListener('click', function (e) {
+            const anchor = e.target.closest('a');
+            if (anchor) {
+              e.preventDefault();
+              e.stopPropagation();
+            }
+          });
+        </script>
       </body>
     </html>`,
     [codeComponents, componentId, importMap],
@@ -165,7 +178,7 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
       const scope = '@/components/';
       const imports = getImportsFromAst(ast, scope);
       dispatch(clearDataFetches());
-      dispatch(setCodeComponentProperty(['imported_js_components', imports]));
+      dispatch(setCodeComponentProperty(['importedJsComponents', imports]));
       setIsJsImportError(false);
       if (imports.length > 0) {
         imports.map((importName) => {
@@ -218,6 +231,10 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
     const slotNames = !blockOverride
       ? getSlotNamesForPreview(slots)
       : getExampleSlotNamesForOverridePreview(blockOverride);
+    // Remove the `xb` and `xbExtension` properties from `drupalSettings`.
+    // They are only added for the XB UI, and are not available normally.
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { xb, xbExtension, ...drupalSettings } = getDrupalSettings();
     const previewJsData = JSON.stringify({
       compiledJsUrl: URL.createObjectURL(
         new Blob([compiledJs], { type: 'text/javascript' }),
@@ -227,6 +244,7 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
       ),
       propValues,
       slotNames,
+      drupalSettings,
     });
     setIframeSrcDoc(
       getIframeSrc({

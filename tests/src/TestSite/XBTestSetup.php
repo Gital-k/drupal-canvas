@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace Drupal\Tests\experience_builder\TestSite;
 
 use Drupal\Core\Extension\ModuleInstallerInterface;
+use Drupal\experience_builder\AutoSave\AutoSaveManager;
 use Drupal\experience_builder\Entity\JavaScriptComponent;
 use Drupal\experience_builder\Entity\Page;
 use Drupal\experience_builder\Entity\PageRegion;
 use Drupal\experience_builder\Entity\Pattern;
+use Drupal\experience_builder\PropSource\StaticPropSource;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\file\Entity\File;
@@ -150,6 +152,8 @@ class XBTestSetup implements TestSetupInterface {
 
     $field_definitions = \Drupal::service('entity_field.manager')->getFieldDefinitions('node', 'article');
     $image_field_sample_value = ImageItem::generateSampleValue($field_definitions['field_hero']);
+    // The field_hero field doesn't support 'title' in its field settings.
+    $image_field_sample_value['title'] = '';
     \assert(\is_array($image_field_sample_value) && \array_key_exists('target_id', $image_field_sample_value));
     $hero_reference = Media::create([
       'bundle' => 'image',
@@ -176,6 +180,9 @@ class XBTestSetup implements TestSetupInterface {
         ],
       ],
     ];
+    // Rely on `StaticPropSource::toArray()` (just like at runtime!) to ensure
+    // consistent key order, enabling deterministic auto-save hashing.
+    $static_image_prop_source = StaticPropSource::parse($static_image_prop_source)->toArray();
     $cta1href = [
       'sourceType' => 'static:field_item:uri',
       'value' => 'https://drupal.org',
@@ -352,10 +359,14 @@ class XBTestSetup implements TestSetupInterface {
           'image' => [
             'sourceType' => 'adapter:image_apply_style',
             'adapterInputs' => [
-              // This expression resolves `src` to the image's stream wrapper URI.
-              'image' => [
+              // This expression resolves `src` to the image's stream wrapper
+              // URI.
+              // Rely on `StaticPropSource::toArray()` (just like at runtime!)
+              // to ensure consistent key order, enabling deterministic
+              // auto-save hashing.
+              'image' => StaticPropSource::parse([
                 'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:image␝field_media_image␞␟entity␜␜entity:file␝uri␞␟value,alt↝entity␜␜entity:media:image␝field_media_image␞␟alt,width↝entity␜␜entity:media:image␝field_media_image␞␟width,height↝entity␜␜entity:media:image␝field_media_image␞␟height}',
-              ] + $static_image_prop_source,
+              ] + $static_image_prop_source)->toArray(),
               'imageStyle' => [
                 'sourceType' => 'static:field_item:string',
                 'value' => 'thumbnail',
@@ -500,6 +511,7 @@ class XBTestSetup implements TestSetupInterface {
         Page::CREATE_PERMISSION,
         Page::EDIT_PERMISSION,
         Page::DELETE_PERMISSION,
+        AutoSaveManager::PUBLISH_PERMISSION,
         'administer url aliases',
         'create url aliases',
         JavaScriptComponent::ADMIN_PERMISSION,

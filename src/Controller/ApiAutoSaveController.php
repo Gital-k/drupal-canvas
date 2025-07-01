@@ -7,23 +7,27 @@ namespace Drupal\experience_builder\Controller;
 use Drupal\Core\Cache\CacheableJsonResponse;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Config\ConfigFactoryInterface;
-use Drupal\Core\Config\TypedConfigManagerInterface;
+use Drupal\Core\Config\Entity\ConfigEntityInterface;
+use Drupal\Core\Database\Connection;
 use Drupal\Core\Entity\ContentEntityInterface;
+use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityPublishedInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\RevisionableInterface;
+use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\Core\File\FileUrlGeneratorInterface;
+use Drupal\Core\Http\Exception\CacheableAccessDeniedHttpException;
 use Drupal\Core\StringTranslation\PluralTranslatableMarkup;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\Core\Utility\Error;
 use Drupal\experience_builder\AutoSave\AutoSaveManager;
-use Drupal\experience_builder\ClientDataToEntityConverter;
 use Drupal\experience_builder\Entity\EntityConstraintViolationList;
-use Drupal\experience_builder\Entity\PageRegion;
-use Drupal\experience_builder\Entity\XbHttpApiEligibleConfigEntityInterface;
-use Drupal\experience_builder\Exception\ConstraintViolationException;
-use Drupal\experience_builder\Plugin\DisplayVariant\XbPageVariant;
+use Drupal\experience_builder\Plugin\Field\FieldType\ComponentTreeItem;
+use Drupal\experience_builder\Validation\ConstraintPropertyPathTranslatorTrait;
 use Drupal\image\Entity\ImageStyle;
 use Drupal\user\UserInterface;
+use Psr\Log\LoggerInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -33,16 +37,19 @@ use Symfony\Component\HttpFoundation\Response;
  */
 final class ApiAutoSaveController extends ApiControllerBase {
 
+  use ConstraintPropertyPathTranslatorTrait;
+
   public const AUTO_SAVE_KEY = 'api_auto_save_key';
   public const AVATAR_IMAGE_STYLE = 'xb_avatar';
 
   public function __construct(
+    private readonly Connection $database,
     private readonly EntityTypeManagerInterface $entityTypeManager,
     private readonly ConfigFactoryInterface $configFactory,
     private readonly FileUrlGeneratorInterface $fileUrlGenerator,
-    private readonly TypedConfigManagerInterface $typedConfigManager,
-    private readonly ClientDataToEntityConverter $clientDataToEntityConverter,
     private readonly AutoSaveManager $autoSaveManager,
+    #[Autowire(service: 'logger.channel.experience_builder')]
+    private readonly LoggerInterface $logger,
   ) {}
 
   private static function validateExpectedAutoSaves(array $expected_auto_saves, array $all_auto_saves): ?JsonResponse {
@@ -105,9 +112,9 @@ final class ApiAutoSaveController extends ApiControllerBase {
     // User display names depend on configuration.
     $cache->addCacheableDependency($this->configFactory->get('user.settings'));
 
-    // Remove 'data' key because this will reduce the amount of data sent to the
-    // client and back to the server.
-    $all = \array_map(fn(array $item) => \array_diff_key($item, ['data' => '']), $all);
+    // Remove 'data' and 'entity' key because this will reduce the amount of
+    // data sent to the client and back to the server.
+    $all = \array_map(fn(array $item) => \array_diff_key($item, \array_flip(['data', 'entity'])), $all);
 
     $withUserDetails = \array_map(fn(array $item) => [
       // @phpstan-ignore-next-line
@@ -132,7 +139,7 @@ final class ApiAutoSaveController extends ApiControllerBase {
   public function post(Request $request): JsonResponse {
     $client_auto_saves = \json_decode($request->getContent(), TRUE);
     \assert(\is_array($client_auto_saves));
-    $all_auto_saves = $this->autoSaveManager->getAllAutoSaveList();
+    $all_auto_saves = $this->autoSaveManager->getAllAutoSaveList(TRUE);
     if ($validation_response = self::validateExpectedAutoSaves($client_auto_saves, $all_auto_saves)) {
       return $validation_response;
     }
@@ -142,68 +149,122 @@ final class ApiAutoSaveController extends ApiControllerBase {
     }
 
     // We keep these in an array instead of making use of a collection like
-    // ConstraintViolationList so we can keep violations grouped by each entity.
+    // ConstraintViolationList, so we can keep violations grouped by each entity.
     $violationSets = [];
     $entities = [];
     // The client auto-saves do not contain the 'data' key, so we need to use
     // the versions from the auto-save manager.
     $publish_auto_saves = array_intersect_key($all_auto_saves, $client_auto_saves);
-    foreach ($publish_auto_saves as $auto_save) {
-      $entity = $this->entityTypeManager->getStorage($auto_save['entity_type'])
-        ->load($auto_save['entity_id']);
 
-      try {
-        if ($entity instanceof PageRegion) {
-          $entity = $entity->forAutoSaveData($auto_save['data']);
-          $entity->enforceIsNew(FALSE);
-          $this->validatePageRegion($entity);
-        }
-        elseif ($entity instanceof XbHttpApiEligibleConfigEntityInterface) {
-          $original_entity = clone $entity;
-          $entity->updateFromClientSide($auto_save['data']);
-          $violations = $entity->getTypedData()->validate();
-          if ($violations->count() > 0) {
-            throw new ConstraintViolationException(new EntityConstraintViolationList($original_entity, iterator_to_array($violations)));
-          }
-        }
-        else {
-          assert($entity instanceof ContentEntityInterface);
+    // We want to report all access errors at one, so keeping the labels.
+    $access_error_labels = [];
+    $access_error_cache = new CacheableMetadata();
+    $loadedEntities = [];
+    foreach ($publish_auto_saves as $autoSaveKey => ['entity' => $entity]) {
+      assert($entity instanceof EntityInterface);
+      // Auto-saves always are updates to existing entities. This just used
+      // EntityStorageInterface::create() to construct an entity object from
+      // just its values, which for some entities would result in it being
+      // considered new, when it is not. Ensure it is never considered new.
+      // @see \Drupal\Core\Entity\EntityBase::isNew()
+      // @see \Drupal\Core\Config\Entity\ConfigEntityBase::isNew()
+      $entity->enforceIsNew(FALSE);
+      $loadedEntities[$autoSaveKey] = $entity;
 
-          $is_new = AutoSaveManager::contentEntityIsConsideredNew($entity);
-
-          if ($entity instanceof EntityPublishedInterface) {
-            $entity->setPublished();
-          }
-          if ($entity instanceof RevisionableInterface) {
-            // If the entity is new, the autosaved data is considered to be part
-            // of the first revision. Therefore, do not create a new revision
-            // for new entities.
-            $entity->setNewRevision(!$is_new);
-          }
-
-          // Pluck out only the content region.
-          $content_region = \array_values(\array_filter($auto_save['data']['layout'], static fn(array $region) => $region['id'] === XbPageVariant::MAIN_CONTENT_REGION));
-          $this->clientDataToEntityConverter->convert([
-            'layout' => reset($content_region),
-            'model' => $auto_save['data']['model'],
-            'entity_form_fields' => $auto_save['data']['entity_form_fields'],
-          ], $entity);
-        }
-
-        $entities[] = $entity;
+      $access = $entity->access(operation: 'update', return_as_object: TRUE);
+      if (!$access->isAllowed()) {
+        $access_error_cache->addCacheableDependency($entity);
+        $access_error_cache->addCacheableDependency($access);
+        $access_error_cache->addCacheTags([AutoSaveManager::CACHE_TAG]);
+        $access_error_labels[] = $entity->label();
       }
-      catch (ConstraintViolationException $e) {
-        $violationSets[] = $e->getConstraintViolationList();
+    }
+    if (!empty($access_error_labels)) {
+      throw new CacheableAccessDeniedHttpException($access_error_cache, sprintf('Unable to update entities: %s.', implode(', ', array_map(fn(\Stringable|string|NULL $label) => $label ? "'$label'" : "''", $access_error_labels))));
+    }
+
+    foreach ($loadedEntities as $entity) {
+      if ($entity instanceof ConfigEntityInterface) {
+        $violations = $entity->getTypedData()->validate();
+        if ($violations->count() > 0) {
+          $violationSets[] = new EntityConstraintViolationList($entity, $violations);
+          continue;
+        }
       }
+      else {
+        assert($entity instanceof ContentEntityInterface);
+
+        $use_existing_revision_id = AutoSaveManager::contentEntityIsConsideredNew($entity);
+
+        if ($entity instanceof EntityPublishedInterface) {
+          $entity->setPublished();
+        }
+        if ($entity instanceof RevisionableInterface) {
+          // If the entity is new, the autosaved data is considered to be part
+          // of the first revision. Therefore, do not create a new revision
+          // for new entities.
+          if ($use_existing_revision_id) {
+            $entity->setNewRevision(FALSE);
+          }
+          else {
+            // Reset the revision ID.
+            $entity->setNewRevision();
+            $revision_id_key = $entity->getEntityType()->getKey('revision');
+            \assert(\is_string($revision_id_key));
+            $entity->set($revision_id_key, NULL);
+          }
+        }
+        $violations = $entity->validate();
+        $form_violations = $this->autoSaveManager->getEntityFormViolation($entity);
+        foreach ($form_violations as $form_violation) {
+          // Add any form violations at this point.
+          // @todo Remove this in https://drupal.org/i/3505018
+          $violations->add($form_violation);
+        }
+        if ($violations->count() > 0) {
+          // Violations for XB field inputs should show against the 'model'
+          // property.
+          $map = \array_reduce(
+            \array_keys(\array_filter($entity->getFields(), static fn(FieldItemListInterface $field): bool => $field->getItemDefinition()->getClass() === ComponentTreeItem::class)),
+            static fn (array $carry, string $field_name): array => [...$carry, ...[$field_name . '.0.inputs' => 'model']],
+            []
+          );
+          $violationSets[] = self::translateConstraintPropertyPathsAndRoot($map, EntityConstraintViolationList::fromCoreConstraintViolationList($violations));
+          continue;
+        }
+      }
+      $entity->enforceIsNew(FALSE);
+      $entities[] = $entity;
     }
     if ($validation_errors_response = self::createJsonResponseFromViolationSets(...$violationSets)) {
       return $validation_errors_response;
     }
-    foreach ($entities as $entity) {
-      $entity->save();
-      $this->autoSaveManager->delete($entity);
+
+    // Either everything must be published, or nothing at all.
+    try {
+      $transaction = $this->database->startTransaction();
+      foreach ($entities as $entity) {
+        $entity->save();
+        $this->autoSaveManager->delete($entity);
+      }
     }
+    catch (\Exception $e) {
+      if (isset($transaction)) {
+        $transaction->rollBack();
+      }
+      Error::logException($this->logger, $e);
+      throw $e;
+    }
+
     return new JsonResponse(data: ['message' => new PluralTranslatableMarkup(\count($publish_auto_saves), 'Successfully published 1 item.', 'Successfully published @count items.')], status: 200);
+  }
+
+  public function delete(EntityInterface $entity): JsonResponse {
+    if ($this->autoSaveManager->getAutoSaveEntity($entity)->isEmpty()) {
+      return new JsonResponse(data: ['error' => 'No auto-save data found for this entity.'], status: Response::HTTP_NOT_FOUND);
+    }
+    $this->autoSaveManager->delete($entity);
+    return new JsonResponse(data: ['message' => 'Auto-save data deleted successfully.'], status: Response::HTTP_NO_CONTENT);
   }
 
   /**
@@ -231,16 +292,6 @@ final class ApiAutoSaveController extends ApiControllerBase {
       return $this->fileUrlGenerator->generateString($uri);
     }
     return $imageStyle->buildUrl($uri);
-  }
-
-  private function validatePageRegion(PageRegion $entity): void {
-    // @todo Use a violation list that allows keeping track of the entity
-    // context.
-    // @see https://www.drupal.org/project/drupal/issues/3495599
-    $violations = $this->typedConfigManager->createFromNameAndData($entity->getConfigDependencyName(), $entity->toArray())->validate();
-    if ($violations->count() > 0) {
-      throw new ConstraintViolationException($violations);
-    }
   }
 
 }

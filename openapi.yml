@@ -177,6 +177,38 @@ paths:
                       - No items to publish
         '422':
           $ref: '#/components/responses/ClientErrorResponse'
+  /xb/api/v0/auto-saves/{entityTypeId}/{entityId}:
+    description:  Interact with an auto-save entry for a particular entity
+    parameters:
+      - $ref: '#/components/parameters/entityTypeId'
+      - $ref: '#/components/parameters/entityId'
+    delete:
+      description: Deletes an auto-save entry
+      responses:
+        '204':
+          description: Auto-save entry deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    title: Status message
+                    examples:
+                      - Auto-save data deleted successfully.
+        '404':
+          description: Auto-save entry not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    title: Error message
+                    examples:
+                      - No auto-save data found for this entity.
   /xb/api/v0/config/auto-save/{entityTypeId}/{configEntityId}:
     description: Auto-save endpoints
     get:
@@ -304,6 +336,18 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/NewCodeComponent'
+            examples:
+              a simple js component with no slots or props, and no imports:
+                machineName: test_component
+                name: Test Component
+                status: FALSE
+                props: []
+                slots: []
+                sourceCodeJs: 'console.log("Test");'
+                sourceCodeCss: '.test{ display:none; }'
+                compiledJs: 'console.log("Test");'
+                compiledCss: '.test{display:none;}'
+                importedJsComponents: []
       responses:
         '201':
           description: Successful creation of individual Code Component
@@ -390,6 +434,27 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/NewPattern'
+            examples:
+              example with one section:
+                name: Section
+                layout:
+                  -
+                    uuid: 0b755464-281c-4487-82a0-ece34a9b1121
+                    nodeType: component
+                    type: sdc.experience_builder.my-section@05bd00d2c481f924
+                    slots: [ ]
+                model:
+                  0b755464-281c-4487-82a0-ece34a9b1121:
+                    resolved:
+                      text:
+                        value: >-
+                          Our mission is to deliver the best products and
+                          services to our customers. We strive to exceed
+                          expectations and continuously improve our offerings.
+                    source:
+                      text:
+                        sourceType: static:field_item:string,
+                        expression: 'ℹ︎string␟value'
       responses:
         '201':
           description: Successful save of Section/Pattern
@@ -641,8 +706,11 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
+                type: object
+                minProperties: 0
+                # @todo Validate the property keys match the '^\\[a-zA-Z0-9_-]$'
+                #  pattern in https://drupal.org/i/3506543.
+                additionalProperties:
                   type: object
                   properties:
                     id:
@@ -693,16 +761,15 @@ paths:
             schema:
               $ref: '#/components/schemas/NewAssetLibrary'
             examples:
-              example:
-                value:
-                  id: "global"
-                  label: "Global Asset Library"
-                  css:
-                    original: "body { background-color: #fff; }"
-                    compiled: "body{background-color:#fff}"
-                  js:
-                    original: "console.log('Hello, world!');"
-                    compiled: "console.log('Hello, world!');"
+              example of a global library:
+                id: "global"
+                label: "Global Asset Library"
+                css:
+                  original: "body { background-color: #fff; }"
+                  compiled: "body{background-color:#fff}"
+                js:
+                  original: "console.log('Hello, world!');"
+                  compiled: "console.log('Hello, world!');"
       responses:
         '201':
           description: Created entity successfully
@@ -788,6 +855,18 @@ paths:
   '/xb/api/v0/content/{entity_type}':
     get:
       description: Provides api for page listing.
+      parameters:
+        - in: query
+          name: search
+          required: false
+          description: Search term to filter content by title
+          schema:
+            type: string
+          examples:
+            Find content with title 'My page':
+              value: 'My page'
+            Search for marketing update content:
+              value: 'Marketing update'
       responses:
         200:
           description: Page list generated successfully.
@@ -1462,7 +1541,7 @@ components:
           type: array
           items:
             type: string
-        block_override:
+        blockOverride:
           type: string
           description: The base ID of the block plugin to override
           nullable: true
@@ -1489,13 +1568,13 @@ components:
                   type: string
         status:
           type: boolean
-        source_code_js:
+        sourceCodeJs:
           type: string
-        source_code_css:
+        sourceCodeCss:
           type: string
-        compiled_js:
+        compiledJs:
           type: string
-        compiled_css:
+        compiledCss:
           type: string
     NewCodeComponent:
       type: object
@@ -1504,15 +1583,15 @@ components:
             - name
             - machineName
             - status
-            - imported_js_components
+            - importedJsComponents
         - $ref: '#/components/schemas/CodeComponent'
         - properties:
-            # `imported_js_components` will be required if `source_code_js` or
-            # `compiled_js` is provided.
+            # `importedJsComponents` will be required if `sourceCodeJs` or
+            # `compiledJs` is provided.
             # @see \Drupal\experience_builder\Entity\JavaScriptComponent::updateFromClientSide()
             # OpenAPI 3 does not support conditional requirements.
             # @see https://github.com/OAI/OpenAPI-Specification/issues/256#issuecomment-1908868607
-            imported_js_components:
+            importedJsComponents:
               type: array
               items:
                 type: string
