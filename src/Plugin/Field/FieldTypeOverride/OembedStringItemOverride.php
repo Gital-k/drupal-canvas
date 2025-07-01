@@ -10,9 +10,11 @@ use Drupal\media\Entity\MediaType;
 
 /**
  * @todo Fix upstream.
+ * @see \Drupal\media\Plugin\media\Source\OEmbedDeriver::getDerivativeDefinitions()
  * @see \Drupal\experience_builder\Hook\ShapeMatchingHooks::entityBaseFieldInfoAlter()
+ * @internal
  */
-class OembedStringItemOverride extends StringItem {
+final class OembedStringItemOverride extends StringItem {
 
   public static function generateSampleValue(FieldDefinitionInterface $field_definition) {
     // Media using oembed:video source should generate URI as a sample.
