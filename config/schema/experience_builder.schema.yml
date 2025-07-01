@@ -152,12 +152,15 @@ experience_builder.js_component.*:
         uuid:
           label: 'UUID based on file hash'
           type: string
+          requiredKey: false
         filename:
           label: 'Original filename of file upload'
           type: string
+          requiredKey: false
         base64:
           label: 'File content encoded in base64'
           type: string
+          requiredKey: false
     machineName:
       type: machine_name
       label: 'Machine Name'
