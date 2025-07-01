@@ -83,7 +83,6 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
       $unstorable_prop_shapes['type=object&$ref=json-schema-definitions://experience_builder.module/oembed_video'],
       $unstorable_prop_shapes['type=object&$ref=json-schema-definitions://experience_builder.module/document'],
     );
-
     return $unstorable_prop_shapes;
   }
 

@@ -7,6 +7,7 @@ namespace Drupal\experience_builder\Hook;
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
+use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Field\TypedData\FieldItemDataDefinition;
 use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\Core\Session\AccountInterface;
@@ -36,7 +37,6 @@ use Drupal\experience_builder\PropExpressions\StructuredData\ReferenceFieldPropE
 use Drupal\experience_builder\PropExpressions\StructuredData\ReferenceFieldTypePropExpression;
 use Drupal\experience_builder\PropShape\CandidateStorablePropShape;
 use Drupal\experience_builder\TypedData\BetterEntityDataDefinition;
-use Drupal\field\Entity\FieldConfig;
 use Drupal\filter\FilterFormatInterface;
 use Drupal\media\Entity\MediaType;
 use Drupal\media\MediaTypeInterface;
@@ -165,7 +165,7 @@ class ShapeMatchingHooks {
     assert($media_type instanceof MediaTypeInterface);
     if ($media_type->getSource()->getPluginId() === 'oembed:video') {
       foreach ($fields as $field) {
-        assert($field instanceof FieldConfig);
+        assert($field instanceof FieldDefinitionInterface);
         assert($field->getItemDefinition() instanceof FieldItemDataDefinition);
         $field->getItemDefinition()->setClass(OembedStringItemOverride::class);
       }

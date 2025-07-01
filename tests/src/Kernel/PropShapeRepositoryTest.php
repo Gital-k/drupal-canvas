@@ -483,6 +483,7 @@ class PropShapeRepositoryTest extends KernelTestBase {
       'type=object&$ref=json-schema-definitions://sdc_test_all_props.module/date-range' => new PropShape(['type' => 'object', '$ref' => 'json-schema-definitions://sdc_test_all_props.module/date-range']),
       'type=string&$ref=json-schema-definitions://experience_builder.module/image-uri' => new PropShape(['type' => 'string', '$ref' => 'json-schema-definitions://experience_builder.module/image-uri']),
       'type=object&$ref=json-schema-definitions://experience_builder.module/shoe-icon' => new PropShape(['type' => 'object', '$ref' => 'json-schema-definitions://experience_builder.module/shoe-icon']),
+      'type=object&$ref=json-schema-definitions://experience_builder.module/document' => new PropShape(['type' => 'object', '$ref' => 'json-schema-definitions://experience_builder.module/document']),
       'type=object&$ref=json-schema-definitions://experience_builder.module/video' => new PropShape(['type' => 'object', '$ref' => 'json-schema-definitions://experience_builder.module/video']),
       'type=object&$ref=json-schema-definitions://experience_builder.module/oembed_video' => new PropShape(['type' => 'object', '$ref' => 'json-schema-definitions://experience_builder.module/oembed_video']),
       'type=string&format=duration' => new PropShape(['type' => 'string', 'format' => JsonSchemaStringFormat::DURATION->value]),
@@ -499,7 +500,6 @@ class PropShapeRepositoryTest extends KernelTestBase {
       'type=string&enum[0]=&enum[1]=_blank' => new PropShape(['type' => 'string', 'enum' => ['', '_blank']]),
       'type=string&enum[0]=&enum[1]=base&enum[2]=l&enum[3]=s&enum[4]=xs&enum[5]=xxs' => new PropShape(['type' => 'string', 'enum' => ['', 'base', 'l', 's', 'xs', 'xxs']]),
       'type=string&enum[0]=&enum[1]=gray&enum[2]=primary&enum[3]=neutral-soft&enum[4]=neutral-medium&enum[5]=neutral-loud&enum[6]=primary-medium&enum[7]=primary-loud&enum[8]=black&enum[9]=white&enum[10]=red&enum[11]=gold&enum[12]=green' => new PropShape(['type' => 'string', 'enum' => ['', 'gray', 'primary', 'neutral-soft', 'neutral-medium', 'neutral-loud', 'primary-medium', 'primary-loud', 'black', 'white', 'red', 'gold', 'green']]),
-      'type=object&$ref=json-schema-definitions://experience_builder.module/document' => new PropShape(['type' => 'object', '$ref' => 'json-schema-definitions://experience_builder.module/document']),
     ];
   }
 
