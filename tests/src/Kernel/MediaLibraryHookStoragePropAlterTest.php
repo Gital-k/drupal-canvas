@@ -70,7 +70,6 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
 
     // Mock the resource fetcher so that it will return our fake resource url.
     $resource_url_resolver = $this->prophesize(UrlResolverInterface::class);
-    // @phpstan-ignore-next-line
     $resource_url_resolver->getResourceUrl(Argument::any())
       ->willReturn('https://vimeo.com/api/oembed.json?url=https%3A//vimeo.com/7073899');
     $this->container->set('media.oembed.url_resolver', $resource_url_resolver->reveal());

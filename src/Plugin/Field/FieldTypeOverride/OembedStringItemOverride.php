@@ -5,10 +5,7 @@ declare(strict_types=1);
 namespace Drupal\experience_builder\Plugin\Field\FieldTypeOverride;
 
 use Drupal\Core\Field\FieldDefinitionInterface;
-use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Field\Plugin\Field\FieldType\StringItem;
-use Drupal\Core\TypedData\DataDefinition;
-use Drupal\experience_builder\ComputedOembedResourceUrl;
 use Drupal\media\Entity\MediaType;
 
 /**

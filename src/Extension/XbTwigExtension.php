@@ -17,7 +17,7 @@ final class XbTwigExtension extends AbstractExtension {
 
   public function __construct(
     protected readonly UrlResolverInterface $urlResolver,
-    protected readonly ResourceFetcherInterface $resourceFetcher
+    protected readonly ResourceFetcherInterface $resourceFetcher,
   ) {}
 
   /**
@@ -31,7 +31,6 @@ final class XbTwigExtension extends AbstractExtension {
       ]),
     ];
   }
-
 
   /**
    * {@inheritdoc}
