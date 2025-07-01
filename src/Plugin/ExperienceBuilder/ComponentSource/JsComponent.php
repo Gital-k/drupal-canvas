@@ -24,6 +24,7 @@ use Drupal\experience_builder\Entity\JavaScriptComponent;
 use Drupal\experience_builder\ComponentSource\UrlRewriteInterface;
 use Drupal\experience_builder\Entity\VersionedConfigEntityBase;
 use Drupal\experience_builder\Render\ImportMapResponseAttachmentsProcessor;
+use Drupal\file\Entity\File;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -366,7 +367,10 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
     if (array_intersect_key($parsed_url, array_flip(['scheme', 'host']))) {
       return $url;
     }
-    throw new \InvalidArgumentException('Default images for Javascript Components must be a fully-qualified URL with both scheme and host.');
+
+    $this->checkDefaultImageFileUrl($url);
+
+    return $url;
   }
 
   private function getScopedDependencies(JavaScriptComponent $component, AutoSaveEntity $autoSave, bool $isPreview, array $seen = []): array {
@@ -410,6 +414,25 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
   public function setJavaScriptComponent(?JavaScriptComponent $jsComponent): static {
     $this->jsComponent = $jsComponent;
     return $this;
+  }
+
+  protected function checkDefaultImageFileUrl(string &$url): string {
+    $encoded_files = $this->getJavaScriptComponent()->get('encoded_files');
+    foreach ($encoded_files as $encoded_file) {
+      if ($encoded_file['filename'] === $url) {
+        $uuid = $encoded_file['uuid'];
+      }
+    }
+    if (empty($uuid)) {
+      return $url;
+    }
+
+    $files = $this->entityTypeManager->getStorage('file')->loadByProperties(['uuid' => $uuid]);
+    $file = reset($files);
+    assert($file instanceof File);
+    $url = $file->createFileUrl(TRUE);
+
+    return $url;
   }
 
 }

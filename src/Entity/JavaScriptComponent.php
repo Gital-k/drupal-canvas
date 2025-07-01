@@ -11,6 +11,8 @@ use Drupal\Core\Config\Entity\ConfigEntityBase;
 use Drupal\Core\Config\Entity\ConfigEntityTypeInterface;
 use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Entity\Query\QueryInterface;
+use Drupal\Core\File\FileExists;
+use Drupal\Core\File\FileSystemInterface;
 use Drupal\Core\File\FileUrlGeneratorInterface;
 use Drupal\Core\Url;
 use Drupal\experience_builder\AutoSaveEntity;
@@ -20,6 +22,8 @@ use Drupal\experience_builder\CodeComponentDataProvider;
 use Drupal\experience_builder\EntityHandlers\JavascriptComponentStorage;
 use Drupal\experience_builder\EntityHandlers\VisibleWhenDisabledXbConfigEntityAccessControlHandler;
 use Drupal\experience_builder\Exception\ConstraintViolationException;
+use Drupal\file\Entity\File;
+use Drupal\file\FileInterface;
 use Symfony\Component\Validator\ConstraintViolation;
 
 #[ConfigEntityType(
@@ -39,6 +43,7 @@ use Symfony\Component\Validator\ConstraintViolation;
     'status' => 'status',
   ],
   config_export: [
+    'encoded_files',
     'machineName',
     'name',
     'props',
@@ -57,6 +62,8 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
 
   public const string ENTITY_TYPE_ID = 'js_component';
   public const string ADMIN_PERMISSION = 'administer code components';
+  public const string PUBLIC_IMAGE_DIRECTORY = 'public://js_component/defaults';
+  public const string TEMPORARY_IMAGE_DIRECTORY = 'temporary://js_component/defaults';
   private const string ASSETS_DIRECTORY = 'assets://astro-island/';
 
   /**
@@ -68,6 +75,8 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
    * The human-readable label of the component.
    */
   protected ?string $name;
+
+  protected ?array $encoded_files = [];
 
   /**
    * The props of the component.
@@ -291,10 +300,55 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
   }
 
   /**
+   * Check for referenced files, if any available - convert them into static files managed by Experience Builder.
+   *
+   * {@inheritdoc}
+   */
+  public function preSave(EntityStorageInterface $storage): void {
+    parent::preSave($storage);
+    if ($this->isSyncing()) {
+      return;
+    }
+    $update = FALSE;
+    $encoded_files = $this->get('encoded_files') ?? [];
+    foreach ($encoded_files as $key => $encoded_file) {
+      $this->processEncodedFile($encoded_file);
+      $update = TRUE;
+      $this->addDependency('content', 'file:file:' . $encoded_file['uuid']);
+      $encoded_files[$key] = $encoded_file;
+    }
+    if ($update && !empty($encoded_files)) {
+      $this->set('encoded_files', $encoded_files);
+    }
+  }
+
+  /**
    * {@inheritdoc}
    */
   public function postSave(EntityStorageInterface $storage, $update = TRUE): void {
     parent::postSave($storage, $update);
+    if (isset($this->dependencies['content'])) {
+      foreach ($this->dependencies['content'] as $dependency) {
+        if (str_starts_with($dependency, 'file:file:')) {
+          $file_reference = substr($dependency, 10);
+
+          $files = $this->entityTypeManager()->getStorage('file')->loadByProperties(['uuid' => $file_reference]);
+          $file = reset($files);
+          if ($file instanceof FileInterface) {
+            if ($file->isTemporary()) {
+              /** @var \Drupal\Core\File\FileSystemInterface $file_system */
+              $file_system = \Drupal::service('file_system');
+              $default_image_directory = self::PUBLIC_IMAGE_DIRECTORY;
+              $file_system->prepareDirectory($default_image_directory, FileSystemInterface:: CREATE_DIRECTORY | FileSystemInterface::MODIFY_PERMISSIONS);
+              $fileRepository = \Drupal::service('file.repository');
+              $newFileUri = str_replace('temporary://', 'public://', (string) $file->getFileUri());
+              $movedFile = $fileRepository->move($file, $newFileUri, FileExists::Replace);
+              \Drupal::service('file.usage')->add($movedFile, 'experience_builder', 'js_component', (string) $this->id(), 1);
+            }
+          }
+        }
+      }
+    }
     // The files generated in XbAssetStorage::doSave() have a content-dependent
     // hash in their name. This has 2 consequences:
     // 1. Cached responses that referred to an older version, continue to work.
@@ -303,6 +357,43 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
     //    be recalculated.
     // @see \experience_builder_library_info_build()
     Cache::invalidateTags(['library_info']);
+  }
+
+  protected function processEncodedFile(array &$encoded_file): void {
+    $results = $this->entityTypeManager()->getStorage('file')->loadByProperties([
+      'uuid' => $encoded_file['uuid'],
+    ]);
+    $entity = reset($results);
+    // Uuid is hash based, so updated image won't be even loaded.
+    if ($entity instanceof File) {
+      unset($encoded_file['base64']);
+      return;
+    }
+    if (!isset($encoded_file['base64'])) {
+      return;
+    }
+
+    /** @var \Drupal\Core\File\FileSystemInterface $file_system */
+    $file_system = \Drupal::service('file_system');
+    assert($file_system instanceof FileSystemInterface);
+    $temporary_image_directory = self::TEMPORARY_IMAGE_DIRECTORY;
+    $file_system->prepareDirectory($temporary_image_directory, FileSystemInterface:: CREATE_DIRECTORY | FileSystemInterface::MODIFY_PERMISSIONS);
+    $filename = $file_system->createFilename($encoded_file['filename'], $temporary_image_directory);
+
+    $file = File::create([
+      'uuid' => $encoded_file['uuid'],
+      'uri' => $filename,
+      'name' => $encoded_file['filename'],
+    ]);
+    $temp_filename = $file_system->saveData(base64_decode($encoded_file['base64']), (string) $file->getFileUri(), FileExists::Rename);
+    if (is_string($temp_filename) && $temp_filename !== $filename) {
+      $file->setFileUri($temporary_image_directory . '/' . $temp_filename);
+    }
+
+    $file->setTemporary();
+    $file->save();
+
+    unset($encoded_file['base64']);
   }
 
   /**

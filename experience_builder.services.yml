@@ -104,7 +104,7 @@ services:
   Drupal\experience_builder\EventSubscriber\RecipeSubscriber:
     tags:
       - { name: service_collector, call: addComponentSource, tag: experience_builder.component_source }
-
+  Drupal\experience_builder\EventSubscriber\FileDependencyHandler: ~
   # Routing.
   Drupal\experience_builder\Entity\Routing\XbHtmlRouteEnhancer:
     tags:

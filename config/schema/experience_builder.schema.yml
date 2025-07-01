@@ -146,6 +146,18 @@ experience_builder.js_component.*:
     status:
       label: "Available in Experience Builder's component library"
     # See core/assets/schemas/v1/metadata-full.schema.json#properties.machineName
+    encoded_files:
+      type: mapping
+      mapping:
+        uuid:
+          label: 'UUID based on file hash'
+          type: string
+        filename:
+          label: 'Original filename of file upload'
+          type: string
+        base64:
+          label: 'File content encoded in base64'
+          type: string
     machineName:
       type: machine_name
       label: 'Machine Name'
