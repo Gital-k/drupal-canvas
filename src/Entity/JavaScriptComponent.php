@@ -334,8 +334,7 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
 
           $files = $this->entityTypeManager()->getStorage('file')->loadByProperties(['uuid' => $file_reference]);
           $file = reset($files);
-          if ($file instanceof FileInterface) {
-            if ($file->isTemporary()) {
+          if ($file instanceof FileInterface && $file->isTemporary()) {
               /** @var \Drupal\Core\File\FileSystemInterface $file_system */
               $file_system = \Drupal::service('file_system');
               $default_image_directory = self::PUBLIC_IMAGE_DIRECTORY;
