@@ -55,10 +55,15 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
     // @see \Drupal\media\Plugin\media\Source\Image
     $this->createMediaType('image', ['id' => 'baby_photos']);
     $this->createMediaType('image', ['id' => 'vacation_photos']);
+    // Same for the VideoFile, oEmbed and File MediaSources.
+    // @see \Drupal\media\Plugin\media\Source\VideoFile
     $this->createMediaType('video_file', ['id' => 'baby_videos']);
     $this->createMediaType('video_file', ['id' => 'vacation_videos']);
+    // @see \Drupal\media\Plugin\media\Source\OEmbed
+    // @see \Drupal\media\Plugin\media\Source\OEmbedDeriver::getDerivativeDefinitions()
     $this->createMediaType('oembed:video', ['id' => 'remote_vimeo_videos']);
     $this->createMediaType('oembed:video', ['id' => 'remote_youtube_videos']);
+    // @see \Drupal\media\Plugin\media\Source\File
     $this->createMediaType('file', ['id' => 'important_documents']);
     $this->createMediaType('file', ['id' => 'vacation_documents']);
 
