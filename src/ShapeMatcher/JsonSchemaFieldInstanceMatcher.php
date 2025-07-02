@@ -426,8 +426,11 @@ final class JsonSchemaFieldInstanceMatcher {
                 // Ignore base field matches; those are already handled by the
                 // logic just before this ">1 target bundles" conditional.
                 foreach ($referenced_matches as $referenced_match) {
-                  if (!in_array($referenced_match->fieldName, $base_field_names, TRUE)) {
-                    $matches[] = new ReferenceFieldPropExpression($current_entity_field_prop, $referenced_match);;
+                  $field_name = $referenced_match instanceof ReferenceFieldPropExpression
+                    ? $referenced_match->referencer->fieldName
+                    : $referenced_match->fieldName;
+                  if (!in_array($field_name, $base_field_names, TRUE)) {
+                    $matches[] = new ReferenceFieldPropExpression($current_entity_field_prop, $referenced_match);
                   }
                 }
               }
@@ -521,6 +524,7 @@ final class JsonSchemaFieldInstanceMatcher {
       return implode('', array_map(fn ($char) => match (TRUE) {
         ctype_digit($char) => $char,
         ctype_alpha($char) => '[' . strtoupper($char) . strtolower($char) . ']',
+        default => throw new \LogicException(),
       }, str_split($ext)));
     }, $ext_list);
 
