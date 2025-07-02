@@ -9,6 +9,7 @@ use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
 use Drupal\Core\Entity\Attribute\ConfigEntityType;
 use Drupal\Core\Config\Entity\ConfigEntityBase;
 use Drupal\Core\Config\Entity\ConfigEntityTypeInterface;
+use Drupal\Core\Entity\EntityRepositoryInterface;
 use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Entity\Query\QueryInterface;
 use Drupal\Core\File\FileExists;
@@ -328,22 +329,20 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
   public function postSave(EntityStorageInterface $storage, $update = TRUE): void {
     parent::postSave($storage, $update);
     if (isset($this->dependencies['content'])) {
+      $repository = \Drupal::service(EntityRepositoryInterface::class);
       foreach ($this->dependencies['content'] as $dependency) {
         if (str_starts_with($dependency, 'file:file:')) {
-          $file_reference = substr($dependency, 10);
-
-          $files = $this->entityTypeManager()->getStorage('file')->loadByProperties(['uuid' => $file_reference]);
-          $file = reset($files);
+          $file_uuid = substr($dependency, 10);
+          $file = $repository->loadEntityByUuid('file', $file_uuid);
           if ($file instanceof FileInterface && $file->isTemporary()) {
-              /** @var \Drupal\Core\File\FileSystemInterface $file_system */
-              $file_system = \Drupal::service('file_system');
-              $default_image_directory = self::PUBLIC_IMAGE_DIRECTORY;
-              $file_system->prepareDirectory($default_image_directory, FileSystemInterface:: CREATE_DIRECTORY | FileSystemInterface::MODIFY_PERMISSIONS);
-              $fileRepository = \Drupal::service('file.repository');
-              $newFileUri = str_replace('temporary://', 'public://', (string) $file->getFileUri());
-              $movedFile = $fileRepository->move($file, $newFileUri, FileExists::Replace);
-              \Drupal::service('file.usage')->add($movedFile, 'experience_builder', 'js_component', (string) $this->id(), 1);
-            }
+            /** @var \Drupal\Core\File\FileSystemInterface $file_system */
+            $file_system = \Drupal::service('file_system');
+            $default_image_directory = self::PUBLIC_IMAGE_DIRECTORY;
+            $file_system->prepareDirectory($default_image_directory, FileSystemInterface:: CREATE_DIRECTORY | FileSystemInterface::MODIFY_PERMISSIONS);
+            $fileRepository = \Drupal::service('file.repository');
+            $newFileUri = str_replace('temporary://', 'public://', (string) $file->getFileUri());
+            $movedFile = $fileRepository->move($file, $newFileUri, FileExists::Replace);
+            \Drupal::service('file.usage')->add($movedFile, 'experience_builder', 'js_component', (string) $this->id(), 1);
           }
         }
       }
