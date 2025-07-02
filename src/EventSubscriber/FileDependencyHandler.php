@@ -4,6 +4,7 @@ namespace Drupal\experience_builder\EventSubscriber;
 
 use Drupal\Core\Config\ConfigEvents;
 use Drupal\Core\Config\StorageTransformEvent;
+use Drupal\Core\Entity\EntityRepositoryInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\File\FileExists;
 use Drupal\Core\File\FileSystemInterface;
@@ -16,7 +17,7 @@ class FileDependencyHandler implements EventSubscriberInterface {
   const FILE_REFERENCE = 'file:file:';
 
   public function __construct(
-    protected readonly EntityTypeManagerInterface $entityTypeManager,
+    protected readonly EntityRepositoryInterface $entityRepository,
     protected readonly FileSystemInterface $fileSystem,
   ) {}
 
@@ -31,8 +32,7 @@ class FileDependencyHandler implements EventSubscriberInterface {
       if (!empty($config['encoded_files'])) {
         $changed = FALSE;
         foreach ($config['encoded_files'] as $key => $encoded_file) {
-          $files = $this->entityTypeManager->getStorage('file')->loadByProperties(['uuid' => $encoded_file['uuid']]);
-          $file = reset($files);
+          $file = $this->entityRepository->loadEntityByUuid('file', $encoded_file['uuid']);
           if ($file instanceof FileInterface) {
             $content = file_get_contents((string) $file->getFileUri());
             if (!empty($content)) {
@@ -50,6 +50,7 @@ class FileDependencyHandler implements EventSubscriberInterface {
 
   public function onImportTransform(StorageTransformEvent $event): void {
     $storage = $event->getStorage();
+    $this->fileSystem->prepareDirectory($temporary_image_directory, FileSystemInterface:: CREATE_DIRECTORY | FileSystemInterface::MODIFY_PERMISSIONS);
 
     foreach ($storage->listAll() as $name) {
       if (!str_starts_with($name, 'experience_builder.js_component.')) {
@@ -59,12 +60,10 @@ class FileDependencyHandler implements EventSubscriberInterface {
       $changed = FALSE;
       if (isset($config['encoded_files'])) {
         foreach ($config['encoded_files'] as $key => $encoded_file) {
-          $files = $this->entityTypeManager->getStorage('file')->loadByProperties(['uuid' => $encoded_file['uuid']]);
-          $file = reset($files);
+          $file = $this->entityRepository->loadEntityByUuid('file', $encoded_file['uuid']);
           // UUID is based on hash, so if the file exists there's nothing to do.
           if (!$file instanceof FileInterface) {
             $temporary_image_directory = JavaScriptComponent::TEMPORARY_IMAGE_DIRECTORY;
-            $this->fileSystem->prepareDirectory($temporary_image_directory, FileSystemInterface:: CREATE_DIRECTORY | FileSystemInterface::MODIFY_PERMISSIONS);
             $filename = $this->fileSystem->createFilename($encoded_file['filename'], $temporary_image_directory);
 
             $file = File::create([
