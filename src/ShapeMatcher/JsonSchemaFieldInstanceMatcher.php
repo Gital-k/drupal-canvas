@@ -400,9 +400,37 @@ final class JsonSchemaFieldInstanceMatcher {
               assert($field_item instanceof FileItem);
               $target->addConstraint('FileExtension', $field_item->getUploadValidators()['FileExtension']);
             }
+
+            // Matches in $target:
+            // - both base + bundle fields if <=1 bundle is specified
+            // - only base fields if >1 bundle is specified
+            // @see \Drupal\Core\Entity\TypedData\EntityDataDefinition::getPropertyDefinitions()
             $referenced_matches = $this->matchEntityProps($target, $levels_to_recurse - 1, $primitive_type, $is_required_in_json_schema, $schema);
             foreach ($referenced_matches as $referenced_match) {
               $matches[] = new ReferenceFieldPropExpression($current_entity_field_prop, $referenced_match);
+            }
+
+            // When >1 bundle is specified, the above only matched base fields.
+            // Iterate over all possible target bundles, set each on a clone of
+            // $target, and hence repeat the same process as above — but exclude
+            // base fields that are re-matched.
+            // @see \Drupal\Core\Entity\TypedData\EntityDataDefinition::getPropertyDefinitions()
+            $target_bundles = $field_definition->getItemDefinition()->getSettings()['handler_settings']['target_bundles'] ?? [];
+            if (count($target_bundles) > 1) {
+              $base_field_names = array_keys($target->getPropertyDefinitions());
+              foreach ($target_bundles as $target_bundle) {
+                assert($target->getBundles() === NULL);
+                $bundle_specific_target = clone $target;
+                $bundle_specific_target->setBundles([$target_bundle]);
+                $referenced_matches = $this->matchEntityProps($bundle_specific_target, $levels_to_recurse - 1, $primitive_type, $is_required_in_json_schema, $schema);
+                // Ignore base field matches; those are already handled by the
+                // logic just before this ">1 target bundles" conditional.
+                foreach ($referenced_matches as $referenced_match) {
+                  if (!in_array($referenced_match->fieldName, $base_field_names, TRUE)) {
+                    $matches[] = new ReferenceFieldPropExpression($current_entity_field_prop, $referenced_match);;
+                  }
+                }
+              }
             }
           }
         }
