@@ -6,6 +6,7 @@ namespace Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource;
 
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Config\Entity\ConfigEntityStorageInterface;
+use Drupal\Core\Entity\EntityRepositoryInterface;
 use Drupal\Core\Extension\ExtensionPathResolver;
 use Drupal\Core\File\FileUrlGeneratorInterface;
 use Drupal\Core\Plugin\Component as SdcPlugin;
@@ -42,6 +43,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
   protected ExtensionPathResolver $extensionPathResolver;
   protected AutoSaveManager $autoSaveManager;
   protected FileUrlGeneratorInterface $fileUrlGenerator;
+  protected EntityRepositoryInterface $entityRepository;
   protected ?JavaScriptComponent $jsComponent = NULL;
 
   public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
@@ -49,6 +51,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
     $instance->extensionPathResolver = $container->get(ExtensionPathResolver::class);
     $instance->autoSaveManager = $container->get(AutoSaveManager::class);
     $instance->fileUrlGenerator = $container->get(FileUrlGeneratorInterface::class);
+    $instance->entityRepository = $container->get(EntityRepositoryInterface::class);
     return $instance;
   }
 
@@ -368,9 +371,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
       return $url;
     }
 
-    $this->checkDefaultImageFileUrl($url);
-
-    return $url;
+    return $this->checkDefaultImageFileUrl($url);
   }
 
   private function getScopedDependencies(JavaScriptComponent $component, AutoSaveEntity $autoSave, bool $isPreview, array $seen = []): array {
@@ -416,7 +417,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
     return $this;
   }
 
-  protected function checkDefaultImageFileUrl(string &$url): string {
+  protected function checkDefaultImageFileUrl(string $url): string {
     $encoded_files = $this->getJavaScriptComponent()->get('encoded_files');
     foreach ($encoded_files as $encoded_file) {
       if ($encoded_file['filename'] === $url) {
@@ -427,8 +428,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
       return $url;
     }
 
-    $files = $this->entityTypeManager->getStorage('file')->loadByProperties(['uuid' => $uuid]);
-    $file = reset($files);
+    $file = $this->entityRepository->loadEntityByUuid('file', $uuid);
     assert($file instanceof File);
     $url = $file->createFileUrl(TRUE);
 
