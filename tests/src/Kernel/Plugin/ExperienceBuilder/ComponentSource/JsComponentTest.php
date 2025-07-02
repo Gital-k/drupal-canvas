@@ -53,7 +53,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
    */
   protected static $modules = [
     'xb_test_code_components',
-    'file'
+    'file',
   ];
 
   /**

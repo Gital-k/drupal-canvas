@@ -5,7 +5,6 @@ namespace Drupal\experience_builder\EventSubscriber;
 use Drupal\Core\Config\ConfigEvents;
 use Drupal\Core\Config\StorageTransformEvent;
 use Drupal\Core\Entity\EntityRepositoryInterface;
-use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\File\FileExists;
 use Drupal\Core\File\FileSystemInterface;
 use Drupal\experience_builder\Entity\JavaScriptComponent;
@@ -14,7 +13,6 @@ use Drupal\file\FileInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 class FileDependencyHandler implements EventSubscriberInterface {
-  const FILE_REFERENCE = 'file:file:';
 
   public function __construct(
     protected readonly EntityRepositoryInterface $entityRepository,

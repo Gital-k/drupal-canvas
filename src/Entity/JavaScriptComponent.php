@@ -25,7 +25,6 @@ use Drupal\experience_builder\EntityHandlers\VisibleWhenDisabledXbConfigEntityAc
 use Drupal\experience_builder\Exception\ConstraintViolationException;
 use Drupal\file\Entity\File;
 use Drupal\file\FileInterface;
-use Drupal\file\FileRepositoryInterface;
 use Symfony\Component\Validator\ConstraintViolation;
 
 #[ConfigEntityType(
