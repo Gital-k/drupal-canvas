@@ -501,13 +501,15 @@ final class JsonSchemaFieldInstanceMatcher {
   }
 
   /**
-   * It converts the extensions in to a case-insensitive regexp without modifiers.
+   * Converts file extensions into a case-insensitive regexp without modifiers.
    *
    * @param string $extensions
-   *   The extensions as drupal store it (e.g. "png gif jpeg jpg webp").
+   *   The extensions as Drupal stores it (e.g. "png gif" or "mp4").
    *
    * @return string
-   *   The regexp (e.g. [Pp][Nn][Gg]|[Gg][Ii][Ff]|...).
+   *   The corresponding case-insensitive regexp. For example:
+   *   - `png` becomes `[Pp][Nn][Gg]`
+   *   - `mp4` becomes `[Mm][Pp]4`
    */
   private function buildCaseInsensitiveExtensionRegex(string $extensions): string {
     $ext_list = preg_split('/\s+/', trim($extensions));
@@ -516,8 +518,9 @@ final class JsonSchemaFieldInstanceMatcher {
     }
 
     $patterns = array_map(function ($ext) {
-      return implode('', array_map(function ($char) {
-        return '[' . strtoupper($char) . strtolower($char) . ']';
+      return implode('', array_map(fn ($char) => match (TRUE) {
+        ctype_digit($char) => $char,
+        ctype_alpha($char) => '[' . strtoupper($char) . strtolower($char) . ']',
       }, str_split($ext)));
     }, $ext_list);
 
