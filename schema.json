@@ -217,7 +217,7 @@
           "title": "Video URL",
           "type": "string",
           "format": "uri-reference",
-          "pattern": "^(/|https?://).*\\.([Mm][Pp][4])+(\\?.*)?(#.*)?$"
+          "pattern": "^(/|https?://)?.*\\.([Mm][Pp][44])(\\?.*)?(#.*)?$"
         },
         "poster": {
           "title": "Poster image URL",
