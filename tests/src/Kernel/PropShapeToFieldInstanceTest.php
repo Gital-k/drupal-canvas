@@ -217,7 +217,8 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
    */
   public static function provider(): array {
     $cases = [];
-    $cases['XB example SDCs + all-props SDC, using ALL core-provided field types'] = [
+
+    $cases['XB example SDCs + all-props SDC, using ALL core-provided field types + media library without Image-powered media types'] = [
       'modules' => [
         // The module providing the sample SDC to test all JSON schema types.
         'sdc_test_all_props',
@@ -235,6 +236,16 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
         // Create sample configurable fields on the `node` entity type.
         'node',
         'field',
+        // The Media Library module being installed does not affect the results
+        // of the JsonSchemaFieldInstanceMatcher; it only affects
+        // PropShape::getStorage(). Note that zero Image MediaSource-powered
+        // Media Types are installed, hence the matching field instances for
+        // `$ref: json-schema-definitions://experience_builder.module/image` are
+        // image fields, not media reference fields!
+        // @see media_library_storage_prop_shape_alter()
+        // @see \Drupal\experience_builder\PropShape\PropShape::getStorage()
+        // @see \Drupal\experience_builder\ShapeMatcher\JsonSchemaFieldInstanceMatcher
+        'media_library',
       ],
       'expected' => [
         'REQUIRED, type=integer&$ref=json-schema-definitions://experience_builder.module/column-width' => [
@@ -1204,15 +1215,6 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
         ],
       ],
     ];
-
-    // The Media Library module being installed does not affect the results of
-    // the JsonSchemaFieldInstanceMatcher; it only affects
-    // PropShape::getStorage().
-    // @see media_library_storage_prop_shape_alter()
-    // @see \Drupal\experience_builder\PropShape\PropShape::getStorage()
-    // @see \Drupal\experience_builder\ShapeMatcher\JsonSchemaFieldInstanceMatcher
-    $cases['XB example SDCs + all-props SDC, using ALL core-provided field types + media library'] = $cases['XB example SDCs + all-props SDC, using ALL core-provided field types'];
-    $cases['XB example SDCs + all-props SDC, using ALL core-provided field types + media library']['modules'][] = 'media_library';
 
     return $cases;
   }
