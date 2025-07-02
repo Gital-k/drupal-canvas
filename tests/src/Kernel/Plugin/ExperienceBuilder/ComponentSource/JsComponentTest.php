@@ -53,6 +53,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
    */
   protected static $modules = [
     'xb_test_code_components',
+    'file'
   ];
 
   /**
@@ -60,6 +61,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
    */
   public function setUp(): void {
     parent::setUp();
+    $this->installEntitySchema('file');
     $this->assetResolver = $this->container->get(AssetResolverInterface::class);
     $this->codeComponentDataProvider = $this->container->get(CodeComponentDataProvider::class);
   }
