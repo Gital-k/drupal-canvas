@@ -270,7 +270,6 @@ props:
           filename: file.txt
           filesize: 1048576
           mimetype: text/plain
-
     # The "date-range" object format for this module.
     test_object_drupal_date_range:
       title: 'Object, $ref=json-schema-definitions://sdc_test_all_props.module/date-range'

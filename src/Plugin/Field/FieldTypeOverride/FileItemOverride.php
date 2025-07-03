@@ -40,7 +40,7 @@ class FileItemOverride extends FileItem {
       $dirname = static::doGetUploadLocation($settings);
       \Drupal::service('file_system')->prepareDirectory($dirname, FileSystemInterface::CREATE_DIRECTORY);
 
-      // Generate a file entity.
+      // Generate a File entity.
       $destination = $dirname . '/' . $random->name(10, TRUE) . '.mp4';
       $data = $random->paragraphs(3);
       /** @var \Drupal\file\FileRepositoryInterface $file_repository */

@@ -101,15 +101,15 @@ describe('Form validation ✅', { retries: { openMode: 0, runMode: 3 } }, () => 
 
   it('Form validation errors prevent publishing', () => {
     cy.loadURLandWaitForXBLoaded({ url: 'xb/node/2' });
-    cy.findByText('Authoring information').click();
+    cy.findByText('Authoring information').click({ force: true });
     cy.findByText('Authoring information')
       .parents('[data-state="open"][data-drupal-selector]')
       .as('authoringInformation');
     cy.get('@authoringInformation')
       .findByLabelText('Authored by', { exact: false })
       .as('author');
-    cy.get('@author').clear();
-    cy.get('@author').type('El Duderino');
+    cy.get('@author').clear({ force: true });
+    cy.get('@author').type('El Duderino', { force: true });
     // Blur the autocomplete input to trigger an update.
     cy.findByLabelText('Title').focus();
 

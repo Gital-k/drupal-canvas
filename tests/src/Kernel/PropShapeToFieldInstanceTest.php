@@ -338,8 +338,8 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           ],
           'static prop source' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:baby_videos|vacation_videos␝field_media_video_file|field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟url}',
           'instances' => [
-            'ℹ︎␜entity:media:baby_videos␝field_media_video_file␞␟{src↝entity␜␜entity:file␝uri␞␟url,width↝entity␜␜entity:file␝filesize␞␟value,height↝entity␜␜entity:file␝created␞␟value}',
-            'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟{src↝entity␜␜entity:file␝uri␞␟url,width↝entity␜␜entity:file␝filesize␞␟value,height↝entity␜␜entity:file␝created␞␟value}',
+            'ℹ︎␜entity:media:baby_videos␝field_media_video_file␞␟{src↝entity␜␜entity:file␝uri␞␟url}',
+            'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟{src↝entity␜␜entity:file␝uri␞␟url}',
           ],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
@@ -443,7 +443,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           'SDC props' => [
             '⿲experience_builder:my-hero␟cta1href',
           ],
-          'static prop source' => 'ℹ︎link␟uri',
+          'static prop source' => 'ℹ︎link␟url',
           'instances' => [
             'ℹ︎␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:file␝uri␞␟value',
@@ -764,6 +764,15 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
         ],
+        'optional, type=integer&minimum=1' => [
+          'SDC props' => [
+            '⿲experience_builder:video␟display_width',
+          ],
+          'static prop source' => 'ℹ︎integer␟value',
+          'instances' => [],
+          'adapter_matches_field_type' => [],
+          'adapter_matches_instance' => [],
+        ],
         'optional, type=number' => [
           'SDC props' => [
             '⿲sdc_test_all_props:all-props␟test_number',
@@ -931,8 +940,8 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           ],
           'static prop source' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:baby_videos|vacation_videos␝field_media_video_file|field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟url}',
           'instances' => [
-            'ℹ︎␜entity:media:baby_videos␝field_media_video_file␞␟{src↝entity␜␜entity:file␝uri␞␟url,width↝entity␜␜entity:file␝filesize␞␟value,height↝entity␜␜entity:file␝created␞␟value}',
-            'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟{src↝entity␜␜entity:file␝uri␞␟url,width↝entity␜␜entity:file␝filesize␞␟value,height↝entity␜␜entity:file␝created␞␟value}',
+            'ℹ︎␜entity:media:baby_videos␝field_media_video_file␞␟{src↝entity␜␜entity:file␝uri␞␟url}',
+            'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟{src↝entity␜␜entity:file␝uri␞␟url}',
           ],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
@@ -1272,7 +1281,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           'SDC props' => [
             '⿲sdc_test_all_props:all-props␟test_string_format_' . JsonSchemaStringFormat::IRI->value,
           ],
-          'static prop source' => 'ℹ︎link␟uri',
+          'static prop source' => 'ℹ︎link␟url',
           'instances' => [
             'ℹ︎␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:file␝uri␞␟value',
@@ -1294,7 +1303,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           'SDC props' => [
             '⿲sdc_test_all_props:all-props␟test_string_format_' . str_replace('-', '_', JsonSchemaStringFormat::IRI_REFERENCE->value),
           ],
-          'static prop source' => 'ℹ︎link␟uri',
+          'static prop source' => 'ℹ︎link␟url',
           'instances' => [
             'ℹ︎␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:file␝uri␞␟value',
@@ -1356,7 +1365,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           'SDC props' => [
             '⿲sdc_test_all_props:all-props␟test_string_format_' . JsonSchemaStringFormat::URI->value,
           ],
-          'static prop source' => 'ℹ︎link␟uri',
+          'static prop source' => 'ℹ︎link␟url',
           'instances' => [
             'ℹ︎␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:file␝uri␞␟value',
@@ -1378,7 +1387,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           'SDC props' => [
             '⿲sdc_test_all_props:all-props␟test_string_format_' . str_replace('-', '_', JsonSchemaStringFormat::URI_REFERENCE->value),
           ],
-          'static prop source' => 'ℹ︎link␟uri',
+          'static prop source' => 'ℹ︎link␟url',
           'instances' => [
             'ℹ︎␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:file␝uri␞␟value',

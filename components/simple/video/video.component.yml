@@ -18,3 +18,7 @@ props:
           poster: https://example.com/600x400.png
           width: 600
           height: 400
+    display_width:
+      title: Display width
+      type: integer
+      minimum: 1

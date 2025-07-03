@@ -40,6 +40,10 @@ use Drupal\experience_builder\TypedData\BetterEntityDataDefinition;
 use Drupal\filter\FilterFormatInterface;
 use Drupal\media\Entity\MediaType;
 use Drupal\media\MediaTypeInterface;
+use Drupal\media\Plugin\media\Source\File;
+use Drupal\media\Plugin\media\Source\Image;
+use Drupal\media\Plugin\media\Source\OEmbed;
+use Drupal\media\Plugin\media\Source\VideoFile;
 use Symfony\Component\Validator\Constraints\Hostname;
 use Symfony\Component\Validator\Constraints\Ip;
 use Symfony\Component\Validator\Constraints\NotEqualTo;
@@ -55,14 +59,15 @@ class ShapeMatchingHooks {
 
   const SCHEMA_TO_MEDIA_SOURCE = [
     // @see \Drupal\media\Plugin\media\Source\Image
-    'json-schema-definitions://experience_builder.module/image' => 'image',
+    'json-schema-definitions://experience_builder.module/image' => Image::class,
     // @see \Drupal\media\Plugin\media\Source\VideoFile
-    'json-schema-definitions://experience_builder.module/video' => 'video_file',
+    'json-schema-definitions://experience_builder.module/video' => VideoFile::class,
     // @see \Drupal\media\Plugin\media\Source\OEmbed
     // @see \Drupal\media\Plugin\media\Source\OEmbedDeriver
-    'json-schema-definitions://experience_builder.module/oembed_video' => 'oembed:video',
+    // @todo Restrict to just the `oembed:video` derivative
+    'json-schema-definitions://experience_builder.module/oembed_video' => OEmbed::class,
     // @see \Drupal\media\Plugin\media\Source\File
-    'json-schema-definitions://experience_builder.module/document' => 'file',
+    'json-schema-definitions://experience_builder.module/document' => File::class,
   ];
 
   /**
@@ -272,12 +277,12 @@ class ShapeMatchingHooks {
       isset($storable_prop_shape->shape->schema['$ref']) &&
       array_key_exists($storable_prop_shape->shape->schema['$ref'], self::SCHEMA_TO_MEDIA_SOURCE)
     ) {
-      $media_source = self::SCHEMA_TO_MEDIA_SOURCE[$storable_prop_shape->shape->schema['$ref']];
+      $media_source_class = self::SCHEMA_TO_MEDIA_SOURCE[$storable_prop_shape->shape->schema['$ref']];
       // Allow all MediaTypes that use the "image" MediaSource.
       // @see \Drupal\media\Plugin\media\Source\Image
       $media_types = array_filter(
         MediaType::loadMultiple(),
-        fn (MediaTypeInterface $type): bool => $type->getSource()->getPluginId() === $media_source
+        fn (MediaTypeInterface $type): bool => is_a($type->getSource(), $media_source_class)
       );
       if (empty($media_types)) {
         return;
@@ -290,7 +295,7 @@ class ShapeMatchingHooks {
       );
 
       $storable_prop_shape->fieldTypeProp = new FieldTypeObjectPropsExpression('entity_reference',
-        $this->getFieldTypeProps($media_types, $media_type_ids, $media_source)
+        $this->getFieldTypeProps($media_types, $media_type_ids, $media_source_class)
       );
       $storable_prop_shape->fieldStorageSettings = ['target_type' => 'media'];
       $storable_prop_shape->fieldInstanceSettings = [
@@ -332,19 +337,19 @@ class ShapeMatchingHooks {
    *
    * @param \Drupal\media\MediaTypeInterface[] $media_types
    * @param array $media_type_ids
-   * @param string $media_source_id
+   * @param string $media_source_class
    *
    * @return array|\Drupal\experience_builder\PropExpressions\StructuredData\ReferenceFieldTypePropExpression[]
    */
-  protected function getFieldTypeProps(array $media_types, array $media_type_ids, string $media_source_id): array {
+  protected function getFieldTypeProps(array $media_types, array $media_type_ids, string $media_source_class): array {
     $source_field_names = array_map(
     // @phpstan-ignore-next-line
       fn (MediaTypeInterface $type): string => $type->getSource()->getSourceFieldDefinition($type)->getName(),
       $media_types
     );
 
-    return match ($media_source_id) {
-      'image' => [
+    return match ($media_source_class) {
+      Image::class => [
         'src' => new ReferenceFieldTypePropExpression(
           new FieldTypePropExpression('entity_reference', 'entity'),
           new ReferenceFieldPropExpression(
@@ -356,7 +361,7 @@ class ShapeMatchingHooks {
         'width' => new ReferenceFieldTypePropExpression(new FieldTypePropExpression('entity_reference', 'entity'), new FieldPropExpression(BetterEntityDataDefinition::create('media', $media_type_ids), $source_field_names, \NULL, 'width')),
         'height' => new ReferenceFieldTypePropExpression(new FieldTypePropExpression('entity_reference', 'entity'), new FieldPropExpression(BetterEntityDataDefinition::create('media', $media_type_ids), $source_field_names, \NULL, 'height')),
       ],
-      'video_file' => [
+      VideoFile::class => [
         'src' => new ReferenceFieldTypePropExpression(
           new FieldTypePropExpression('entity_reference', 'entity'),
           new ReferenceFieldPropExpression(
@@ -365,13 +370,13 @@ class ShapeMatchingHooks {
           )
         ),
       ],
-      'oembed:video' => [
+      OEmbed::class => [
         'url' => new ReferenceFieldTypePropExpression(
           new FieldTypePropExpression('entity_reference', 'entity'),
           new FieldPropExpression(BetterEntityDataDefinition::create('media', $media_type_ids), $source_field_names, \NULL, 'value'),
         ),
       ],
-      'file' => [
+      File::class => [
         'src' => new ReferenceFieldTypePropExpression(
           new FieldTypePropExpression('entity_reference', 'entity'),
           new ReferenceFieldPropExpression(

@@ -224,12 +224,14 @@
           "$ref": "json-schema-definitions://experience_builder.module/image-uri"
         },
         "width": {
-          "title": "Video width",
-          "type": "integer"
+          "title": "Intrinsic video width",
+          "type": "integer",
+          "minimum": 1
         },
         "height": {
-          "title": "Video height",
-          "type": "integer"
+          "title": "Intrinsic video height",
+          "type": "integer",
+          "minimum": 1
         }
       }
     },
