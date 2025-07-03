@@ -91,14 +91,6 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
     return $unstorable_prop_shapes;
   }
 
-  public static function getExpectedUnstorablePropShapes(): array {
-    $unstorable_prop_shapes = parent::getExpectedUnstorablePropShapes();
-    unset(
-      $unstorable_prop_shapes['type=object&$ref=json-schema-definitions://experience_builder.module/video'],
-    );
-    return $unstorable_prop_shapes;
-  }
-
   /**
    * @return \Drupal\experience_builder\PropShape\StorablePropShape[]
    */
