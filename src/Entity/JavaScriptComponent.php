@@ -347,13 +347,19 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
         if (str_starts_with($dependency, 'file:file:')) {
           $file_uuid = substr($dependency, 10);
           $file = $repository->loadEntityByUuid('file', $file_uuid);
-          if ($file instanceof FileInterface && $file->isTemporary()) {
+          if (!$file instanceof FileInterface) {
+            continue;
+          }
+          if ($file->isTemporary()) {
             /** @var \Drupal\Core\File\FileSystemInterface $file_system */
             $default_image_directory = self::PUBLIC_IMAGE_DIRECTORY;
             $file_system->prepareDirectory($default_image_directory, FileSystemInterface:: CREATE_DIRECTORY | FileSystemInterface::MODIFY_PERMISSIONS);
             $newFileUri = str_replace('temporary://', 'public://', (string) $file->getFileUri());
             $movedFile = $file_repository->move($file, $newFileUri, FileExists::Replace);
             $file_usage->add($movedFile, 'experience_builder', 'js_component', (string) $this->id(), 1);
+          }
+          elseif ($usage = $file_usage->listUsage($file) && !isset($usage[$this->getEntityType()->getProvider()][$this->getEntityTypeId()][$this->id()])) {
+            $file_usage->add($file, $this->getEntityType()->getProvider(), $this->getEntityTypeId(), $this->id());
           }
         }
       }
