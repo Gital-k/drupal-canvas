@@ -147,20 +147,10 @@ experience_builder.js_component.*:
       label: "Available in Experience Builder's component library"
     # See core/assets/schemas/v1/metadata-full.schema.json#properties.machineName
     encoded_files:
-      type: mapping
-      mapping:
-        uuid:
-          label: 'UUID based on file hash'
-          type: string
-          requiredKey: false
-        filename:
-          label: 'Original filename of file upload'
-          type: string
-          requiredKey: false
-        base64:
-          label: 'File content encoded in base64'
-          type: string
-          requiredKey: false
+      type: sequence
+      sequence:
+        type: experience_builder.encoded_entity
+      constraints: {}
     machineName:
       type: machine_name
       label: 'Machine Name'
@@ -781,3 +771,19 @@ experience_builder.content_template.*.*.*:
           # @see \Drupal\experience_builder\Plugin\Validation\Constraint\ValidSlotNameConstraint::VALID_NAME
           pattern: '/^[a-z0-9]+([a-z0-9_-]+)[a-z0-9]+$/'
           message: "%value is not a valid exposed slot name."
+experience_builder.encoded_entity:
+  label: 'Encoded file with UUID based on hash of file contents'
+  type: mapping
+  mapping:
+    uuid:
+      label: 'UUID based on file hash'
+      type: string
+      requiredKey: false
+    filename:
+      label: 'Original filename of file upload'
+      type: string
+      requiredKey: false
+    base64:
+      label: 'File content encoded in base64'
+      type: string
+      requiredKey: false
