@@ -180,8 +180,10 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
    */
   protected function callSourceMethodForEach(string $method_name, array $component_ids): array {
     $this->assertNotEmpty($component_ids);
-    $this->assertCount(0, $this->componentStorage->loadMultiple());
-    $this->generateComponentConfig();
+    if (empty($this->componentStorage->loadMultiple())) {
+      $this->generateComponentConfig();
+    }
+    $this->assertNotCount(0, $this->componentStorage->loadMultiple());
     $components = $this->componentStorage->loadMultiple($component_ids);
 
     $return_values = [];

@@ -13,6 +13,7 @@ use Drupal\Core\Asset\AssetResolverInterface;
 use Drupal\Core\Asset\AttachedAssets;
 use Drupal\Core\Cache\CacheableDependencyInterface;
 use Drupal\Core\Cache\CacheableMetadata;
+use Drupal\Core\Entity\EntityRepositoryInterface;
 use Drupal\Core\File\FileUrlGeneratorInterface;
 use Drupal\Core\StreamWrapper\StreamWrapperInterface;
 use Drupal\Core\StreamWrapper\StreamWrapperManagerInterface;
@@ -26,6 +27,7 @@ use Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\JsCompone
 use Drupal\experience_builder\PropExpressions\StructuredData\FieldTypePropExpression;
 use Drupal\experience_builder\PropSource\StaticPropSource;
 use Drupal\experience_builder\Render\ImportMapResponseAttachmentsProcessor;
+use Drupal\file\Entity\File;
 use Drupal\Tests\experience_builder\Kernel\Traits\CiModulePathTrait;
 use Drupal\Tests\experience_builder\Traits\CrawlerTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
@@ -62,6 +64,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
   public function setUp(): void {
     parent::setUp();
     $this->installEntitySchema('file');
+    $this->installSchema('file', 'file_usage');
     $this->assetResolver = $this->container->get(AssetResolverInterface::class);
     $this->codeComponentDataProvider = $this->container->get(CodeComponentDataProvider::class);
   }
@@ -829,6 +832,8 @@ final class JsComponentTest extends ComponentSourceTestBase {
    * {@inheritdoc}
    */
   public static function getExpectedClientSideInfo(): array {
+    $default_image = \Drupal::service(EntityRepositoryInterface::class)->loadEntityByUuid('file', 'f8133ff8-3276-5d4d-b3f9-8fb6b363fb70');
+    assert($default_image instanceof File);
     return [
       'js.xb_test_code_components_using_drupalsettings' => [
         'expected_output_selectors' => [
@@ -852,7 +857,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
       ],
       'js.xb_test_code_components_vanilla_image' => [
         'expected_output_selectors' => [
-          'astro-island[opts*="Vanilla Image"][props*="placehold.co"]',
+          'astro-island[opts*="Vanilla Image"][props*="' . $default_image->getFilename() . '"]',
           'script[blocking="render"][src*="/ui/lib/astro-hydration/dist/client.js"]',
         ],
         'source' => 'Code component',
@@ -898,7 +903,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
             'default_values' => [
               'source' => [],
               'resolved' => [
-                'src' => 'https://placehold.co/1200x900@2x.png',
+                'src' => $default_image->createFileUrl(TRUE),
                 'width' => 1200,
                 'height' => 900,
                 'alt' => 'Example image placeholder',
@@ -968,6 +973,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
    * @depends testDiscovery
    */
   public function testGetClientSideInfo(array $component_ids): void {
+    $this->container->get('config.installer')->installDefaultConfig('module', 'xb_test_code_components');
     parent::testGetClientSideInfo($component_ids);
 
     // Grab one of the test components.
