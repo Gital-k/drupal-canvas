@@ -207,6 +207,8 @@ class ComponentTreeItemTest extends KernelTestBase {
     $root_uuid = '947c196f-f108-43fd-a446-03a08100d579';
     $child_uuid = '8b6b47ec-1167-433b-975d-e2d97739f5a6';
     $js_uuid = '0aaa0f58-287c-453d-be65-81ba0f4e6f1c';
+    $this->installEntitySchema('file');
+    $this->installSchema('file', 'file_usage');
 
     $this->generateComponentConfig();
     $this->installConfig('xb_test_code_components');
