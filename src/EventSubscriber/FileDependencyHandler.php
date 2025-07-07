@@ -29,12 +29,12 @@ class FileDependencyHandler implements EventSubscriberInterface {
       $config = $storage->read($name);
       if (!empty($config['encoded_files'])) {
         $changed = FALSE;
-        foreach ($config['encoded_files'] as $key => $encoded_file) {
-          $file = $this->entityRepository->loadEntityByUuid('file', $encoded_file['uuid']);
+        foreach ($config['encoded_files'] as $uuid => $encoded_file) {
+          $file = $this->entityRepository->loadEntityByUuid('file', $uuid);
           if ($file instanceof FileInterface) {
             $content = file_get_contents((string) $file->getFileUri());
             if (!empty($content)) {
-              $config['encoded_files'][$key]['base64'] = base64_encode($content);
+              $config['encoded_files'][$uuid]['base64'] = base64_encode($content);
             }
             $changed = TRUE;
           }
@@ -58,14 +58,14 @@ class FileDependencyHandler implements EventSubscriberInterface {
       $config = $storage->read($name);
       $changed = FALSE;
       if (isset($config['encoded_files'])) {
-        foreach ($config['encoded_files'] as $key => $encoded_file) {
-          $file = $this->entityRepository->loadEntityByUuid('file', $encoded_file['uuid']);
+        foreach ($config['encoded_files'] as $uuid => $encoded_file) {
+          $file = $this->entityRepository->loadEntityByUuid('file', $uuid);
           // UUID is based on hash, so if the file exists there's nothing to do.
           if (!$file instanceof FileInterface) {
             $filename = $this->fileSystem->createFilename($encoded_file['filename'], $temporary_image_directory);
 
             $file = File::create([
-              'uuid' => $encoded_file['uuid'],
+              'uuid' => $uuid,
               'uri' => $filename,
             ]);
             $this->fileSystem->saveData(base64_decode($encoded_file['base64']), (string) $file->getFileUri(), FileExists::Rename);
@@ -74,7 +74,7 @@ class FileDependencyHandler implements EventSubscriberInterface {
             $file->save();
           }
           unset($encoded_file['base64']);
-          $config['encoded_files'][$key] = $encoded_file;
+          $config['encoded_files'][$uuid] = $encoded_file;
           $changed = TRUE;
         }
       }

@@ -419,18 +419,15 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
 
   protected function checkDefaultImageFileUrl(string $url): string {
     $encoded_files = $this->getJavaScriptComponent()->get('encoded_files');
-    foreach ($encoded_files as $encoded_file) {
+    foreach ($encoded_files as $uuid => $encoded_file) {
       if ($encoded_file['filename'] === $url) {
-        $uuid = $encoded_file['uuid'];
+        $file = $this->entityRepository->loadEntityByUuid('file', $uuid);
+        assert($file instanceof File);
+        $url = $file->createFileUrl(TRUE);
+
+        return $url;
       }
     }
-    if (empty($uuid)) {
-      return $url;
-    }
-
-    $file = $this->entityRepository->loadEntityByUuid('file', $uuid);
-    assert($file instanceof File);
-    $url = $file->createFileUrl(TRUE);
 
     return $url;
   }

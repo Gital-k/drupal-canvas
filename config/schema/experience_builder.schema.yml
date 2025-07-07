@@ -150,7 +150,12 @@ experience_builder.js_component.*:
       type: sequence
       sequence:
         type: experience_builder.encoded_entity
-      constraints: {}
+      constraints:
+        SequenceKeysMatchRegex:
+          # Sequence keys must be valid UUID.
+          # @see \Drupal\Component\Uuid\Uuid::VALID_PATTERN
+          pattern: '/^[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}$/'
+          message: "%value is not a valid UUID."
     machineName:
       type: machine_name
       label: 'Machine Name'
@@ -775,10 +780,6 @@ experience_builder.encoded_entity:
   label: 'Encoded file with UUID based on hash of file contents'
   type: mapping
   mapping:
-    uuid:
-      label: 'UUID based on file hash'
-      type: string
-      requiredKey: false
     filename:
       label: 'Original filename of file upload'
       type: string

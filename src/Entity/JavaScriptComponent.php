@@ -322,11 +322,11 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
     $temporary_image_directory = self::TEMPORARY_IMAGE_DIRECTORY;
     $file_system->prepareDirectory($temporary_image_directory, FileSystemInterface:: CREATE_DIRECTORY | FileSystemInterface::MODIFY_PERMISSIONS);
 
-    foreach ($encoded_files as $key => $encoded_file) {
-      $this->processEncodedFile($encoded_file, $file_system);
+    foreach ($encoded_files as $uuid => $encoded_file) {
+      $this->processEncodedFile($uuid, $encoded_file, $file_system);
       $update = TRUE;
-      $this->addDependency('content', 'file:file:' . $encoded_file['uuid']);
-      $encoded_files[$key] = $encoded_file;
+      $this->addDependency('content', 'file:file:' . $uuid);
+      $encoded_files[$uuid] = $encoded_file;
     }
     if ($update && !empty($encoded_files)) {
       $this->set('encoded_files', $encoded_files);
@@ -343,24 +343,22 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
       $file_repository = \Drupal::service('file.repository');
       $file_system = \Drupal::service('file_system');
       $file_usage = \Drupal::service('file.usage');
-      foreach ($this->dependencies['content'] as $dependency) {
-        if (str_starts_with($dependency, 'file:file:')) {
-          $file_uuid = substr($dependency, 10);
-          $file = $repository->loadEntityByUuid('file', $file_uuid);
-          if (!$file instanceof FileInterface) {
-            continue;
-          }
-          if ($file->isTemporary()) {
-            /** @var \Drupal\Core\File\FileSystemInterface $file_system */
-            $default_image_directory = self::PUBLIC_IMAGE_DIRECTORY;
-            $file_system->prepareDirectory($default_image_directory, FileSystemInterface:: CREATE_DIRECTORY | FileSystemInterface::MODIFY_PERMISSIONS);
-            $newFileUri = str_replace('temporary://', 'public://', (string) $file->getFileUri());
-            $movedFile = $file_repository->move($file, $newFileUri, FileExists::Replace);
-            $file_usage->add($movedFile, 'experience_builder', 'js_component', (string) $this->id(), 1);
-          }
-          elseif ($usage = $file_usage->listUsage($file) && !isset($usage[$this->getEntityType()->getProvider()][$this->getEntityTypeId()][$this->id()])) {
-            $file_usage->add($file, $this->getEntityType()->getProvider(), $this->getEntityTypeId(), (string) $this->id());
-          }
+      assert(is_array($this->encoded_files));
+      foreach ($this->encoded_files as $uuid => $encoded_file) {
+        $file = $repository->loadEntityByUuid('file', $uuid);
+        if (!$file instanceof FileInterface) {
+          continue;
+        }
+        if ($file->isTemporary()) {
+          /** @var \Drupal\Core\File\FileSystemInterface $file_system */
+          $default_image_directory = self::PUBLIC_IMAGE_DIRECTORY;
+          $file_system->prepareDirectory($default_image_directory, FileSystemInterface:: CREATE_DIRECTORY | FileSystemInterface::MODIFY_PERMISSIONS);
+          $new_file_uri = str_replace('temporary://', 'public://', (string) $file->getFileUri());
+          $moved_file = $file_repository->move($file, $new_file_uri, FileExists::Replace);
+          $file_usage->add($moved_file, 'experience_builder', 'js_component', (string) $this->id(), 1);
+        }
+        elseif ($usage = $file_usage->listUsage($file) && !isset($usage[$this->getEntityType()->getProvider()][$this->getEntityTypeId()][$this->id()])) {
+          $file_usage->add($file, $this->getEntityType()->getProvider(), $this->getEntityTypeId(), (string) $this->id());
         }
       }
     }
@@ -375,8 +373,8 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
     Cache::invalidateTags(['library_info']);
   }
 
-  protected function processEncodedFile(array &$encoded_file, FileSystemInterface $file_system): void {
-    $entity = \Drupal::service(EntityRepositoryInterface::class)->loadEntityByUuid('file', $encoded_file['uuid']);
+  protected function processEncodedFile(string $uuid, array &$encoded_file, FileSystemInterface $file_system): void {
+    $entity = \Drupal::service(EntityRepositoryInterface::class)->loadEntityByUuid('file', $uuid);
     // Uuid is hash based, so updated image won't be even loaded.
     if ($entity instanceof File) {
       unset($encoded_file['base64']);
@@ -388,7 +386,7 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
 
     $filename = $file_system->createFilename($encoded_file['filename'], self::TEMPORARY_IMAGE_DIRECTORY);
     $file = File::create([
-      'uuid' => $encoded_file['uuid'],
+      'uuid' => $uuid,
       'uri' => $filename,
     ]);
     $file_system->saveData(base64_decode($encoded_file['base64']), (string) $file->getFileUri(), FileExists::Rename);

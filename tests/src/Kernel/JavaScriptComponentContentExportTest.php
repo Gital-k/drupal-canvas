@@ -69,9 +69,10 @@ class JavaScriptComponentContentExportTest extends KernelTestBase {
     // After that work is complete and merged, UUID generation based on hash
     // can be refactored and moved into form submission, somewhere in
     // JavascriptComponent or into some utility class.
-    foreach ($this->encodedFiles as $key => $encoded_file) {
+    $encoded_files_with_hash_uuid = [];
+    foreach ($this->encodedFiles as $encoded_file) {
       $hashing = hash('sha1', base64_decode($encoded_file['base64']));
-      $this->encodedFiles[$key]['uuid'] = sprintf('%08s-%04s-%04x-%04x-%12s',
+      $uuid = sprintf('%08s-%04s-%04x-%04x-%12s',
         // 32 bits for the time_low
         substr($hashing, 0, 8),
         // 16 bits for the time_mid
@@ -84,7 +85,9 @@ class JavaScriptComponentContentExportTest extends KernelTestBase {
         // 48 bits for the node
         substr($hashing, 20, 12)
       );
+      $encoded_files_with_hash_uuid[$uuid] = ['uuid' => $uuid] + $encoded_file;
     }
+    $this->encodedFiles = $encoded_files_with_hash_uuid;
   }
 
   public function testDefaultImages(): void {
@@ -100,7 +103,7 @@ class JavaScriptComponentContentExportTest extends KernelTestBase {
     // 2. Create new JavascriptComponent using default image.
     $code_component = JavaScriptComponent::create([
       'encoded_files' => [
-        $this->encodedFiles[0],
+        $this->encodedFiles['6d382ad1-4af3-5702-800c-30b5ea45b494'],
       ],
       'machineName' => $this->randomMachineName(),
       'name' => $this->getRandomGenerator()->sentences(5),
@@ -123,7 +126,7 @@ class JavaScriptComponentContentExportTest extends KernelTestBase {
     // 3. Create new JavascriptComponent using same default image.
     $code_component = JavaScriptComponent::create([
       'encoded_files' => [
-        $this->encodedFiles[0],
+        $this->encodedFiles['6d382ad1-4af3-5702-800c-30b5ea45b494'],
       ],
       'machineName' => $this->randomMachineName(),
       'name' => $this->getRandomGenerator()->sentences(5),
@@ -147,7 +150,7 @@ class JavaScriptComponentContentExportTest extends KernelTestBase {
     // 4. Create new JavascriptComponent using same different default image.
     $code_component = JavaScriptComponent::create([
       'encoded_files' => [
-        $this->encodedFiles[1],
+        $this->encodedFiles['fa21a33f-23cb-5dcf-a861-30967f06999b'],
       ],
       'machineName' => $this->randomMachineName(),
       'name' => $this->getRandomGenerator()->sentences(5),
@@ -188,7 +191,7 @@ class JavaScriptComponentContentExportTest extends KernelTestBase {
     assert($count_query instanceof StatementInterface);
     $this->assertSame(2, (int) $count_query->fetchField());
 
-    $file = \Drupal::service(EntityRepositoryInterface::class)->loadEntityByUuid('file', $this->encodedFiles[0]['uuid']);
+    $file = \Drupal::service(EntityRepositoryInterface::class)->loadEntityByUuid('file', $this->encodedFiles['6d382ad1-4af3-5702-800c-30b5ea45b494']['uuid']);
     assert($file instanceof FileInterface);
     $this->assertStringStartsWith('public://js_component/defaults', (string) $file->getFileUri());
 
