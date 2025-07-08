@@ -145,7 +145,6 @@ experience_builder.js_component.*:
     # component should be exposed in Experience Builder's component library or not. (See its ComponentSource plugin.)
     status:
       label: "Available in Experience Builder's component library"
-    # See core/assets/schemas/v1/metadata-full.schema.json#properties.machineName
     encoded_files:
       requiredKey: false
       type: sequence
@@ -158,6 +157,7 @@ experience_builder.js_component.*:
           # @see \Drupal\Component\Uuid\Uuid::VALID_PATTERN
           pattern: '/^[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}$/'
           message: "%value is not a valid UUID."
+    # See core/assets/schemas/v1/metadata-full.schema.json#properties.machineName
     machineName:
       type: machine_name
       label: 'Machine Name'
