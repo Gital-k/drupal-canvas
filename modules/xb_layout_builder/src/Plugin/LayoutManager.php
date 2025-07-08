@@ -15,7 +15,6 @@ use Drupal\experience_builder\ComponentIncompatibilityReasonRepository;
 use Drupal\experience_builder\ComponentSource\ComponentSourceManager;
 use Drupal\experience_builder\Entity\Component;
 use Drupal\experience_builder\Entity\VersionedConfigEntityBase;
-use Drupal\experience_builder\Entity\VersionedConfigEntityInterface;
 use Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\BlockComponent;
 use Drupal\xb_layout_builder\Plugin\ExperienceBuilder\ComponentSource\LayoutComponent;
 
@@ -39,6 +38,7 @@ final class LayoutManager extends LayoutPluginManager {
     ModuleHandlerInterface $module_handler,
     ThemeHandlerInterface $theme_handler,
     protected ComponentIncompatibilityReasonRepository $reasonRepository,
+    protected ComponentSourceManager $componentSourceManager,
   ) {
     parent::__construct($namespaces, $cache_backend, $module_handler, $theme_handler);
   }
@@ -73,7 +73,7 @@ final class LayoutManager extends LayoutPluginManager {
         // @todo Refactor this to a proper update as per BlockManager.
         // @todo remove the duplication that we have here and below.
         $component
-          ->setSource(LayoutComponent::SOURCE_PLUGIN_ID)
+          ->set('source', LayoutComponent::SOURCE_PLUGIN_ID)
           ->setSettings([
             'plugin_id' => $id,
             'local_source_id' => \sprintf('layout_builder:%s', $id),
@@ -93,7 +93,7 @@ final class LayoutManager extends LayoutPluginManager {
         continue;
       }
       $settings = $layout->defaultConfiguration();
-      $source = \Drupal::service(ComponentSourceManager::class)
+      $source = $this->componentSourceManager
         ->createInstance(LayoutComponent::SOURCE_PLUGIN_ID, [
           'local_source_id' => \sprintf('layout_builder:%s', $id),
           'plugin_id' => $id,

@@ -5,4 +5,4 @@ services:
   Drupal\xb_layout_builder\Plugin\LayoutManager:
     decorates: plugin.manager.core.layout
     parent: Drupal\Core\Layout\LayoutPluginManagerInterface
-    arguments: ['@Drupal\experience_builder\ComponentIncompatibilityReasonRepository']
+    arguments: ['@Drupal\experience_builder\ComponentIncompatibilityReasonRepository', '@Drupal\experience_builder\ComponentSource\ComponentSourceManager']

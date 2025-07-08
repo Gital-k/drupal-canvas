@@ -132,9 +132,14 @@ final class LayoutComponent extends ComponentSourceBase implements ContainerFact
     ];
     if ($isPreview) {
       foreach (Element::children($content) as $child) {
+        $startString = '<!-- xb-slot-start-%s/%s -->';
+        if ($content[$child] === []) {
+          // If the region is empty, add text after the comment to render
+          // the region in the preview.
+          $startString .= 'The content of the region';
+        }
         array_unshift($content[$child], [
-          '#markup' => Markup::create(\sprintf('<!-- xb-slot-start-%s/%s -->The content of the region', $componentUuid, $child)),
-          //'#markup' => Markup::create(\sprintf('<!-- xb-prop-start-%s/%s -->', $componentUuid, $child)),
+          '#markup' => Markup::create(\sprintf($startString, $componentUuid, $child)),
         ]);
         array_push($content[$child], [
           '#markup' => Markup::create(\sprintf('<!-- xb-slot-end-%s/%s -->', $componentUuid, $child)),
@@ -235,4 +240,5 @@ final class LayoutComponent extends ComponentSourceBase implements ContainerFact
     // @todo Implement.
     return [];
   }
+
 }

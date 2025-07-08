@@ -206,11 +206,32 @@ HTML,
     $componentPluginManager->getDefinitions();
   }
 
-  protected function generateCrashTestDummyComponentTree(string $component_id, array $inputs): ComponentTreeItemList {
+  protected function generateCrashTestDummyComponentTree(string $component_id, array $inputs, bool $assertCount = TRUE): ComponentTreeItemList {
     return parent::generateCrashTestDummyComponentTree(
       $component_id,
       $inputs,
     );
   }
 
+  protected function deleteConfigAndTriggerComponentFallback(ComponentInterface $used_component, ComponentInterface $unused_component): void {
+    return;
+  }
+
+  protected function createAndSaveInUseComponentForUninstallValidationTesting(): ComponentInterface {
+    /** @var \Drupal\experience_builder\Entity\ComponentInterface */
+    return Component::load('layout.layout_builder.xb_layout_builder_test_layout');
+  }
+
+  protected function createAndSaveUnusedComponentForUninstallValidationTesting(): ComponentInterface {
+    /** @var \Drupal\experience_builder\Entity\ComponentInterface */
+    return Component::load('layout.layout_builder.xb_layout_builder_test_layout');
+  }
+
+  protected function getNotAllowedModuleForUninstallValidatorTesting(): string {
+    return 'layout_builder';
+  }
+
+  protected function getAllowedModuleForUninstallValidatorTesting(): string {
+    return 'xb_layout_builder_test';
+  }
 }
