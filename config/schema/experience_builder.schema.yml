@@ -147,10 +147,12 @@ experience_builder.js_component.*:
       label: "Available in Experience Builder's component library"
     # See core/assets/schemas/v1/metadata-full.schema.json#properties.machineName
     encoded_files:
+      requiredKey: false
       type: sequence
       sequence:
         type: experience_builder.encoded_entity
       constraints:
+        NotBlank: ~
         SequenceKeysMatchRegex:
           # Sequence keys must be valid UUID.
           # @see \Drupal\Component\Uuid\Uuid::VALID_PATTERN
@@ -783,8 +785,6 @@ experience_builder.encoded_entity:
     filename:
       label: 'Original filename of file upload'
       type: string
-      requiredKey: false
     base64:
       label: 'File content encoded in base64'
       type: string
-      requiredKey: false
