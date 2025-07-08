@@ -787,6 +787,9 @@ experience_builder.encoded_entity:
     filename:
       label: 'Original filename of file upload'
       type: string
-    base64:
-      label: 'File content encoded in base64'
-      type: string
+    data:
+      label: 'File content encoded as a `data:` URI'
+      type: uri
+      constraints:
+        Regex:
+          pattern: '/^data\:.*$/'
