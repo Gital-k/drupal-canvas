@@ -60,10 +60,8 @@ export interface JSComponent extends BaseComponent {
   transforms: any[];
 }
 
-// PropSourceComponent Interface
-export interface PropSourceComponent extends BaseComponent {
+export interface SlottedComponent extends BaseComponent {
   library: 'elements' | 'extension_components';
-  propSources: FieldData;
   metadata: {
     slots?: {
       [key: string]: {
@@ -73,13 +71,20 @@ export interface PropSourceComponent extends BaseComponent {
     };
     [key: string]: any;
   };
+}
+
+// PropSourceComponent Interface
+export interface PropSourceComponent extends SlottedComponent {
+  propSources: FieldData;
+  dynamic_prop_source_candidates: Record<string, any>;
   transforms: TransformConfig;
 }
 // Union type for any component
 export type CanvasComponent =
   | DynamicComponent
   | JSComponent
-  | PropSourceComponent;
+  | PropSourceComponent
+  | SlottedComponent;
 
 // ComponentsList representing the API response
 export interface ComponentsList {
@@ -124,4 +129,10 @@ export const componentHasFieldData = (
   component: CanvasComponent | undefined,
 ): component is PropSourceComponent => {
   return component !== undefined && 'propSources' in component;
+};
+
+export const componentHasSlots = (
+  component: CanvasComponent | undefined,
+): component is SlottedComponent => {
+  return component !== undefined && 'metadata' in component && 'slots' in component.metadata;
 };
