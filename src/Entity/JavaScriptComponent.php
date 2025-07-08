@@ -77,7 +77,7 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
    */
   protected ?string $name;
 
-  protected ?array $encoded_files = [];
+  protected ?array $encoded_files;
 
   /**
    * The props of the component.

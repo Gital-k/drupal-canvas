@@ -148,10 +148,12 @@ experience_builder.js_component.*:
     encoded_files:
       requiredKey: false
       type: sequence
+      nullable: true
       sequence:
         type: experience_builder.encoded_entity
       constraints:
-        NotBlank: ~
+        NotBlank:
+          allowNull: true
         SequenceKeysMatchRegex:
           # Sequence keys must be valid UUID.
           # @see \Drupal\Component\Uuid\Uuid::VALID_PATTERN
