@@ -310,7 +310,6 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
     if ($this->isSyncing()) {
       return;
     }
-    $update = FALSE;
     $encoded_files = $this->get('encoded_files');
     if (!is_array($encoded_files)) {
       return;
@@ -325,13 +324,10 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
 
     foreach ($encoded_files as $uuid => $encoded_file) {
       $this->processEncodedFile($uuid, $encoded_file, $file_system);
-      $update = TRUE;
       $this->addDependency('content', 'file:file:' . $uuid);
       $encoded_files[$uuid] = $encoded_file;
     }
-    if ($update && !empty($encoded_files)) {
-      $this->set('encoded_files', $encoded_files);
-    }
+    $this->set('encoded_files', $encoded_files);
   }
 
   /**
