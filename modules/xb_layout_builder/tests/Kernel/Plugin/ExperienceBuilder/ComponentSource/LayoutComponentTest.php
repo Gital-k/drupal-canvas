@@ -213,9 +213,7 @@ HTML,
     );
   }
 
-  protected function deleteConfigAndTriggerComponentFallback(ComponentInterface $used_component, ComponentInterface $unused_component): void {
-    return;
-  }
+  protected function deleteConfigAndTriggerComponentFallback(ComponentInterface $used_component, ComponentInterface $unused_component): void {}
 
   protected function createAndSaveInUseComponentForUninstallValidationTesting(): ComponentInterface {
     /** @var \Drupal\experience_builder\Entity\ComponentInterface */
@@ -234,4 +232,5 @@ HTML,
   protected function getAllowedModuleForUninstallValidatorTesting(): string {
     return 'xb_layout_builder_test';
   }
+
 }

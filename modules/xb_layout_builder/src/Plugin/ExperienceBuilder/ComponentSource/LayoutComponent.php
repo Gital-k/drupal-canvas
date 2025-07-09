@@ -10,6 +10,7 @@ use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Layout\LayoutInterface;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Drupal\Core\Plugin\PluginDependencyTrait;
+use Drupal\Core\Plugin\PluginFormInterface;
 use Drupal\Core\Render\Element;
 use Drupal\Core\Render\Markup;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
@@ -18,7 +19,9 @@ use Drupal\experience_builder\ComponentSource\ComponentSourceBase;
 use Drupal\experience_builder\ComponentSource\ComponentSourceWithSlotsInterface;
 use Drupal\experience_builder\Entity\Component;
 use Drupal\experience_builder\Entity\Component as ComponentEntity;
+use Drupal\experience_builder\MissingComponentInputsException;
 use Drupal\experience_builder\Plugin\Field\FieldType\ComponentTreeItem;
+use Drupal\layout_builder\Plugin\Layout\MultiWidthLayoutBase;
 use Drupal\xb_layout_builder\Plugin\LayoutManager;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Validator\ConstraintViolationList;
@@ -73,7 +76,14 @@ final class LayoutComponent extends ComponentSourceBase implements ContainerFact
   }
 
   public function buildConfigurationForm(array $form, FormStateInterface $form_state, string $component_instance_uuid = '', array $client_model = [], ?EntityInterface $entity = NULL, array $settings = []): array {
-    // @todo Implement.
+    $layoutPlugin = $this->getLayoutPlugin();
+    if (!$layoutPlugin instanceof PluginFormInterface) {
+      return $form;
+    }
+    if ($client_model) {
+      $layoutPlugin->setConfiguration($client_model);
+    }
+    $form += $layoutPlugin->buildConfigurationForm($form, $form_state);
     return $form;
   }
 
@@ -108,6 +118,7 @@ final class LayoutComponent extends ComponentSourceBase implements ContainerFact
     foreach ($layoutRegions as $key => $region) {
       $regions[$key] = [];
     }
+    $layout->setConfiguration($inputs['settings'] ?? [] + $layout->getConfiguration());
     $content = $layout->build($regions);
     foreach ($inputs['slots'] as $key => $slot) {
       if (is_array($slot)) {
@@ -146,19 +157,29 @@ final class LayoutComponent extends ComponentSourceBase implements ContainerFact
         ]);
       }
     }
+    if ($layout instanceof MultiWidthLayoutBase) {
 
+    }
+    $content['#settings'] = $inputs['settings'] ?? [];
     $content['#slots'] = $layout->getPluginDefinition()->getRegionNames();
     return $content;
   }
 
   public function requiresExplicitInput(): bool {
     // @todo Implement.
-    return FALSE;
+    return !empty($this->getDefaultExplicitInput());
   }
 
   public function getExplicitInput(string $uuid, ComponentTreeItem $item): array {
-    // @todo Implement.
-    return [];
+    try {
+      return $item->getInputs() ?? [];
+    }
+    catch (MissingComponentInputsException) {
+      // There is no input for this component. That should only be the case for
+      // block plugins without any settings.
+      assert(!$this->requiresExplicitInput());
+      return [];
+    }
   }
 
   public function hydrateComponent(array $explicit_input): array {
@@ -166,7 +187,7 @@ final class LayoutComponent extends ComponentSourceBase implements ContainerFact
     if ($slots = $this->getSlotDefinitions()) {
       $hydrated['slots'] = array_map(fn($slot) => $slot['examples'][0] ?? '', $slots);
     }
-
+    $hydrated['settings'] = $explicit_input;
     return $hydrated;
   }
 
@@ -191,7 +212,13 @@ final class LayoutComponent extends ComponentSourceBase implements ContainerFact
 
   public function clientModelToInput(string $component_instance_uuid, ComponentEntity $component, array $client_model, ?ConstraintViolationListInterface $violations = NULL): array {
     // @todo Implement.
-    return [];
+    $defaults = $component->get('settings')['default_settings'];
+    $input = $client_model['resolved'] ?? [];
+    // We don't need to store these as they can be recalculated based on the
+    // plugin ID.
+    $input += $defaults;
+    unset($input['provider'], $input['id']);
+    return $input;
   }
 
   public function checkRequirements(): void {
@@ -229,7 +256,7 @@ final class LayoutComponent extends ComponentSourceBase implements ContainerFact
 
   public function getDefaultExplicitInput(): array {
     // @todo Implement.
-    return [];
+    return $this->getLayoutPlugin()->defaultConfiguration();
   }
 
   public function onDependencyRemoval(array $dependencies): bool {
