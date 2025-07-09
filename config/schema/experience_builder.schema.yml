@@ -790,6 +790,7 @@ experience_builder.encoded_entity:
     data:
       label: 'File content encoded as a `data:` URI'
       type: uri
+      requiredKey: false
       constraints:
         Regex:
           pattern: '/^data\:.*$/'
