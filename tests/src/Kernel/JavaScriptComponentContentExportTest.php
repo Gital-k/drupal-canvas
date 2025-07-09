@@ -80,10 +80,9 @@ class JavaScriptComponentContentExportTest extends KernelTestBase {
       );
       $this->encodedFiles[$uuid] = [
         'filename' => basename($image_path),
-        'data' => base64_encode(\file_get_contents($path)),
+        'data' => \base64_encode($contents),
       ];
     }
-
 
     $file_system = \Drupal::service('file_system');
     $directory = 'public://js_component/defaults';

@@ -13,6 +13,9 @@ use Drupal\Core\Asset\AssetResolverInterface;
 use Drupal\Core\Asset\AttachedAssets;
 use Drupal\Core\Cache\CacheableDependencyInterface;
 use Drupal\Core\Cache\CacheableMetadata;
+use Drupal\Core\Entity\EntityRepositoryInterface;
+use Drupal\Core\File\FileExists;
+use Drupal\Core\File\FileSystemInterface;
 use Drupal\Core\File\FileUrlGeneratorInterface;
 use Drupal\Core\StreamWrapper\StreamWrapperInterface;
 use Drupal\Core\StreamWrapper\StreamWrapperManagerInterface;
@@ -26,6 +29,8 @@ use Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\JsCompone
 use Drupal\experience_builder\PropExpressions\StructuredData\FieldTypePropExpression;
 use Drupal\experience_builder\PropSource\StaticPropSource;
 use Drupal\experience_builder\Render\ImportMapResponseAttachmentsProcessor;
+use Drupal\file\Entity\File;
+use Drupal\file\FileInterface;
 use Drupal\Tests\experience_builder\Kernel\Traits\CiModulePathTrait;
 use Drupal\Tests\experience_builder\Traits\CrawlerTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
@@ -830,6 +835,25 @@ final class JsComponentTest extends ComponentSourceTestBase {
    * {@inheritdoc}
    */
   public static function getExpectedClientSideInfo(): array {
+    $default_image = \Drupal::service(EntityRepositoryInterface::class)->loadEntityByUuid('file', 'f8133ff8-3276-5d4d-b3f9-8fb6b363fb70');
+    if (!$default_image instanceof FileInterface) {
+      $directory = JavaScriptComponent::PUBLIC_IMAGE_DIRECTORY;
+      $fixture_image_path = \dirname(__DIR__, 5) . '/fixtures/images/cosmo.jpg';
+      $contents = \file_get_contents($fixture_image_path);
+      \assert(\is_string($contents));
+      $file_system = \Drupal::service(FileSystemInterface::class);
+      $file_system->prepareDirectory($directory, FileSystemInterface:: CREATE_DIRECTORY | FileSystemInterface::MODIFY_PERMISSIONS);
+      $filename = $file_system->createFilename(\basename($fixture_image_path), $directory);
+      $filename = $file_system->saveData($contents, $filename, FileExists::Replace);
+      $default_image = File::create([
+        'uuid' => 'f8133ff8-3276-5d4d-b3f9-8fb6b363fb70',
+        'uri' => $filename,
+      ]);
+      $default_image->setPermanent();
+      $default_image->save();
+    }
+
+    assert($default_image instanceof File);
     return [
       'js.xb_test_code_components_using_drupalsettings' => [
         'expected_output_selectors' => [
@@ -853,7 +877,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
       ],
       'js.xb_test_code_components_vanilla_image' => [
         'expected_output_selectors' => [
-          'astro-island[opts*="Vanilla Image"][props*="cosmo.jpg"]',
+          'astro-island[opts*="Vanilla Image"][props*="' . $default_image->getFilename() . '"]',
           'script[blocking="render"][src*="/ui/lib/astro-hydration/dist/client.js"]',
         ],
         'source' => 'Code component',
@@ -899,7 +923,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
             'default_values' => [
               'source' => [],
               'resolved' => [
-                'src' => 'cosmo.jpg',
+                'src' => $default_image->createFileUrl(TRUE),
                 'width' => 1200,
                 'height' => 900,
                 'alt' => 'Example image placeholder',
@@ -969,7 +993,6 @@ final class JsComponentTest extends ComponentSourceTestBase {
    * @depends testDiscovery
    */
   public function testGetClientSideInfo(array $component_ids): void {
-    $this->container->get('config.installer')->installDefaultConfig('module', 'xb_test_code_components');
     parent::testGetClientSideInfo($component_ids);
 
     // Grab one of the test components.
