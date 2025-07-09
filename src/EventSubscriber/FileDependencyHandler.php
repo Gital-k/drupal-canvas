@@ -34,7 +34,7 @@ class FileDependencyHandler implements EventSubscriberInterface {
           if ($file instanceof FileInterface) {
             $content = file_get_contents((string) $file->getFileUri());
             if (!empty($content)) {
-              $config['encoded_files'][$uuid]['base64'] = base64_encode($content);
+              $config['encoded_files'][$uuid]['data'] = base64_encode($content);
             }
             $changed = TRUE;
           }
@@ -68,12 +68,12 @@ class FileDependencyHandler implements EventSubscriberInterface {
               'uuid' => $uuid,
               'uri' => $filename,
             ]);
-            $this->fileSystem->saveData(base64_decode($encoded_file['base64']), (string) $file->getFileUri(), FileExists::Rename);
+            $this->fileSystem->saveData(base64_decode($encoded_file['data']), (string) $file->getFileUri(), FileExists::Rename);
 
             $file->setTemporary();
             $file->save();
           }
-          unset($encoded_file['base64']);
+          unset($encoded_file['data']);
           $config['encoded_files'][$uuid] = $encoded_file;
           $changed = TRUE;
         }

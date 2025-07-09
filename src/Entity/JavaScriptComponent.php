@@ -312,9 +312,10 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
     }
     $update = FALSE;
     $encoded_files = $this->get('encoded_files');
-    if (empty($encoded_files)) {
+    if (!is_array($encoded_files)) {
       return;
     }
+    assert(!empty($encoded_files));
 
     /** @var \Drupal\Core\File\FileSystemInterface $file_system */
     $file_system = \Drupal::service('file_system');
@@ -377,10 +378,10 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
     $entity = \Drupal::service(EntityRepositoryInterface::class)->loadEntityByUuid('file', $uuid);
     // Uuid is hash based, so updated image won't be even loaded.
     if ($entity instanceof File) {
-      unset($encoded_file['base64']);
+      unset($encoded_file['data']);
       return;
     }
-    if (!isset($encoded_file['base64'])) {
+    if (!isset($encoded_file['data'])) {
       return;
     }
 
@@ -389,12 +390,12 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
       'uuid' => $uuid,
       'uri' => $filename,
     ]);
-    $file_system->saveData(base64_decode($encoded_file['base64']), (string) $file->getFileUri(), FileExists::Rename);
+    $file_system->saveData(base64_decode($encoded_file['data']), (string) $file->getFileUri(), FileExists::Rename);
 
     $file->setTemporary();
     $file->save();
 
-    unset($encoded_file['base64']);
+    unset($encoded_file['data']);
   }
 
   /**
