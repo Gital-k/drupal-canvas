@@ -82,6 +82,7 @@ class JavaScriptComponentContentExportTest extends KernelTestBase {
         'filename' => basename($image_path),
         'data' => \base64_encode($contents),
       ];
+
     }
 
     $file_system = \Drupal::service('file_system');
@@ -165,7 +166,15 @@ class JavaScriptComponentContentExportTest extends KernelTestBase {
     ]);
     $code_component->save();
 
-    $this->assertCount(3, JavaScriptComponent::loadMultiple());
+    $code_components = JavaScriptComponent::loadMultiple();
+    $this->assertCount(3, $code_components);
+    foreach ($code_components as $code_component) {
+      $encoded_files = $code_component->get('encoded_files');
+      foreach ($encoded_files as $encoded_file) {
+        self::assertArrayNotHasKey('data', $encoded_file);
+      }
+      $this->assertEquals(SAVED_UPDATED, $code_component->save());
+    }
 
     // Assert that additional File entity was created.
     $this->assertSame(2, \Drupal::entityTypeManager()->getStorage('file')->getQuery()->count()->accessCheck(FALSE)->execute());
