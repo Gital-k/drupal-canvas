@@ -19,7 +19,8 @@ use Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\BlockComp
 use Drupal\xb_layout_builder\Plugin\ExperienceBuilder\ComponentSource\LayoutComponent;
 
 /**
- * Decorator that auto-creates/updates an Experience Builder Component entity per Block plugin.
+ * Decorator that auto-creates/updates an Experience Builder Component entity
+ * per Layout plugin.
  *
  * @see \Drupal\experience_builder\Entity\Component
  * @see docs/components.md#3.2
@@ -55,9 +56,6 @@ final class LayoutManager extends LayoutPluginManager {
 
     foreach ($definitions as $id => $definition) {
       \assert($definition instanceof LayoutDefinition);
-      if ($id === 'broken') {
-        continue;
-      }
 
       $componentId = \sprintf('layout.layout_builder.%s', $definition->id());
 
@@ -65,8 +63,8 @@ final class LayoutManager extends LayoutPluginManager {
       if ($component instanceof Component) {
         $layout = $this->createInstance($id);
         if (!$layout instanceof LayoutInterface) {
-          // If the layout plugin cannot bhe created, we cannot create a
-          // Component entity for it.
+          // If the layout plugin instance cannot be created, we cannot
+          // create a Component entity for it.
           continue;
         }
         $settings = $layout->defaultConfiguration();
@@ -88,8 +86,8 @@ final class LayoutManager extends LayoutPluginManager {
 
       $layout = $this->createInstance($id);
       if (!$layout instanceof LayoutInterface) {
-        // If the layout plugin cannot bhe created, we cannot create a
-        // Component entity for it.
+        // If the layout plugin instance cannot be created, we cannot
+        // create a Component entity for it.
         continue;
       }
       $settings = $layout->defaultConfiguration();

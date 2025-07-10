@@ -9,11 +9,11 @@ use Drupal\Core\Layout\LayoutDefault;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 
 /**
- * Layout Builder Test Layout.
+ * Layout Builder Test Layout for testing an unused layout plugin.
  */
 #[Layout(
   id: self::PLUGIN_ID,
-  label: new TranslatableMarkup('Layout Builder unsed test plugin'),
+  label: new TranslatableMarkup('Layout Builder unused test plugin'),
   regions: [
     self::MAIN_REGION => [
       "label" => new TranslatableMarkup("Main Region"),

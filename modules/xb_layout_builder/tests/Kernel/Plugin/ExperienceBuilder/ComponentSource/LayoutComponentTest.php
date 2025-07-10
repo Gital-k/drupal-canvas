@@ -44,7 +44,6 @@ final class LayoutComponentTest extends ComponentSourceTestBase {
     // LayoutManager class, which will auto-create the Component entities.
     $layoutManager->clearCachedDefinitions();
     $layoutManager->getDefinitions();
-    // @todo add a test for ineligible components
     $createdComponents = \array_map(static fn(ComponentInterface $component) => $component->id(), Component::loadMultiple());
     $testPlugins = \array_filter($createdComponents, static fn(string $id) => \str_starts_with($id, 'layout.layout_builder.xb_layout_builder_test'));
     self::assertSame([

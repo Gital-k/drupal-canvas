@@ -28,7 +28,7 @@ use Symfony\Component\Validator\ConstraintViolationList;
 use Symfony\Component\Validator\ConstraintViolationListInterface;
 
 /**
- * Defines a component source based on block plugins.
+ * Defines a component source based on layout plugins.
  *
  * @todo Context mappings.
  */
@@ -101,7 +101,6 @@ final class LayoutComponent extends ComponentSourceBase implements ContainerFact
   }
 
   public function getReferencedPluginClass(): ?string {
-    // @todo Implement.
     return $this->layoutManager->getDefinition($this->configuration['plugin_id'] ?? $this->configuration['local_source_id'])?->getClass();
   }
 
@@ -109,7 +108,6 @@ final class LayoutComponent extends ComponentSourceBase implements ContainerFact
     $layout = $this->getLayoutPlugin();
     // @todo access.
     // @todo cache.
-    // @todo config.
     $regions = [];
     $layoutRegions = $this->getSlotDefinitions();
     if (\array_key_exists('slots', $inputs)) {
@@ -157,16 +155,12 @@ final class LayoutComponent extends ComponentSourceBase implements ContainerFact
         ]);
       }
     }
-    if ($layout instanceof MultiWidthLayoutBase) {
-
-    }
     $content['#settings'] = $inputs['settings'] ?? [];
     $content['#slots'] = $layout->getPluginDefinition()->getRegionNames();
     return $content;
   }
 
   public function requiresExplicitInput(): bool {
-    // @todo Implement.
     return !empty($this->getDefaultExplicitInput());
   }
 
@@ -176,7 +170,7 @@ final class LayoutComponent extends ComponentSourceBase implements ContainerFact
     }
     catch (MissingComponentInputsException) {
       // There is no input for this component. That should only be the case for
-      // block plugins without any settings.
+      // layout plugins without any settings.
       assert(!$this->requiresExplicitInput());
       return [];
     }
@@ -211,7 +205,6 @@ final class LayoutComponent extends ComponentSourceBase implements ContainerFact
   }
 
   public function clientModelToInput(string $component_instance_uuid, ComponentEntity $component, array $client_model, ?ConstraintViolationListInterface $violations = NULL): array {
-    // @todo Implement.
     $defaults = $component->get('settings')['default_settings'];
     $input = $client_model['resolved'] ?? [];
     // We don't need to store these as they can be recalculated based on the
@@ -255,7 +248,6 @@ final class LayoutComponent extends ComponentSourceBase implements ContainerFact
   }
 
   public function getDefaultExplicitInput(): array {
-    // @todo Implement.
     return $this->getLayoutPlugin()->defaultConfiguration();
   }
 
