@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+// cspell:ignore kiki
+
 namespace Drupal\Tests\experience_builder\Traits;
 
 trait DefaultImagesTrait {

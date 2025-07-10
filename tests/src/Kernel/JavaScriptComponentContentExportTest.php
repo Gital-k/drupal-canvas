@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\experience_builder\Kernel;
 
-// cspell:ignore kiki
-
 use Drupal\Core\Config\ConfigImporter;
 use Drupal\Core\Config\ExportStorageManager;
 use Drupal\Core\Config\MemoryStorage;
