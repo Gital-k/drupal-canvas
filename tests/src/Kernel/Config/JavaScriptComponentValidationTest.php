@@ -50,6 +50,13 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
   /**
    * {@inheritdoc}
    */
+  protected static array $propertiesWithOptionalValues = [
+    'encoded_files',
+  ];
+
+  /**
+   * {@inheritdoc}
+   */
   protected function setUp(): void {
     parent::setUp();
     $javascript_component_base = [
