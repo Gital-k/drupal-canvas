@@ -19,13 +19,11 @@ use Drupal\experience_builder\Entity\JavaScriptComponent;
 use Drupal\file\Entity\File;
 use Drupal\file\FileInterface;
 use Drupal\KernelTests\KernelTestBase;
+use Drupal\Tests\experience_builder\Traits\DefaultImagesTrait;
 
 class JavaScriptComponentContentExportTest extends KernelTestBase {
 
-  const FIXTURE_IMAGES = [
-    '/fixtures/images/cosmo.jpg',
-    '/fixtures/images/kiki.jpeg',
-  ];
+  use DefaultImagesTrait;
 
   /**
    * {@inheritdoc}
@@ -55,34 +53,9 @@ class JavaScriptComponentContentExportTest extends KernelTestBase {
     $this->installEntitySchema('user');
     $this->installSchema('file', ['file_usage']);
 
-    foreach (self::FIXTURE_IMAGES as $image_path) {
-      $path = \dirname(__DIR__, 2) . $image_path;
-      $contents = \file_get_contents($path);
-      \assert(\is_string($contents));
-
-      // This is intentionally here until FE counterpart of this work is in.
-      // After that work is complete and merged, UUID generation based on hash
-      // can be refactored and moved into form submission, somewhere in
-      // JavascriptComponent or into some utility class.
-      $hashing = hash('sha1', $contents);
-      $uuid = sprintf('%08s-%04s-%04x-%04x-%12s',
-        // 32 bits for the time_low
-        substr($hashing, 0, 8),
-        // 16 bits for the time_mid
-        substr($hashing, 8, 4),
-        // 16 bits for the time_hi,
-        (hexdec(substr($hashing, 12, 4)) & 0x0fff) | 0x5000,
-        // 8 bits and 16 bits for the clk_seq_hi_res,
-        // 8 bits for the clk_seq_low,
-        (hexdec(substr($hashing, 16, 4)) & 0x3fff) | 0x8000,
-        // 48 bits for the node
-        substr($hashing, 20, 12)
-      );
-      $this->encodedFiles[$uuid] = [
-        'filename' => basename($image_path),
-        'data' => \base64_encode($contents),
-      ];
-
+    foreach (self::getEncodedImages() as $encoded_image) {
+      $uuid = JavaScriptComponent::generateImageUuid(\base64_decode($encoded_image['data']));
+      $this->encodedFiles[$uuid] = $encoded_image;
     }
 
     $file_system = \Drupal::service('file_system');

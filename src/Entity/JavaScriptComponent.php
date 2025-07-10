@@ -205,6 +205,46 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
         'compiled' => $data['compiledJs'] ?? '',
       ]);
     }
+
+    // ⚠️ This is likely to be refactored once FE part of this is complete.
+    if (array_key_exists('defaultImages', $data)) {
+      $encoded_files = NULL;
+      foreach ($data['defaultImages'] as $default_image) {
+        /** @var array{data: string, filename: string} $default_image */
+        $uuid = self::generateImageUuid(\base64_decode($default_image['data']));
+        $encoded_files[$uuid] = $default_image;
+      }
+      $this->set('encoded_files', $encoded_files);
+    }
+  }
+
+  /**
+   * Generates UUID based on image file content.
+   *
+   * This is intentionally here until FE counterpart of this work is in.
+   * After that work is complete and merged, UUID generation based on hash
+   * can be refactored and moved into form submission, somewhere in
+   * JavascriptComponent or into some utility class.
+   *
+   * @param string $data
+   *
+   * @return string
+   */
+  public static function generateImageUuid(string $data): string {
+    $hashing = hash('sha1', $data);
+    return sprintf('%08s-%04s-%04x-%04x-%12s',
+      // 32 bits for the time_low
+      substr($hashing, 0, 8),
+      // 16 bits for the time_mid
+      substr($hashing, 8, 4),
+      // 16 bits for the time_hi,
+      (hexdec(substr($hashing, 12, 4)) & 0x0fff) | 0x5000,
+      // 8 bits and 16 bits for the clk_seq_hi_res,
+      // 8 bits for the clk_seq_low,
+      (hexdec(substr($hashing, 16, 4)) & 0x3fff) | 0x8000,
+      // 48 bits for the node
+      substr($hashing, 20, 12)
+    );
   }
 
   /**
