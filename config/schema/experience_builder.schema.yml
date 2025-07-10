@@ -150,7 +150,7 @@ experience_builder.js_component.*:
       type: sequence
       nullable: true
       sequence:
-        type: experience_builder.encoded_entity
+        type: experience_builder.encoded_file
       constraints:
         NotBlank:
           allowNull: true
@@ -780,7 +780,7 @@ experience_builder.content_template.*.*.*:
           # @see \Drupal\experience_builder\Plugin\Validation\Constraint\ValidSlotNameConstraint::VALID_NAME
           pattern: '/^[a-z0-9]+([a-z0-9_-]+)[a-z0-9]+$/'
           message: "%value is not a valid exposed slot name."
-experience_builder.encoded_entity:
+experience_builder.encoded_file:
   label: 'Encoded file with UUID based on hash of file contents'
   type: mapping
   mapping:
