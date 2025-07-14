@@ -21,7 +21,6 @@ use Drupal\experience_builder\Entity\Component;
 use Drupal\experience_builder\Entity\Component as ComponentEntity;
 use Drupal\experience_builder\MissingComponentInputsException;
 use Drupal\experience_builder\Plugin\Field\FieldType\ComponentTreeItem;
-use Drupal\layout_builder\Plugin\Layout\MultiWidthLayoutBase;
 use Drupal\xb_layout_builder\Plugin\LayoutManager;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Validator\ConstraintViolationList;
@@ -118,7 +117,7 @@ final class LayoutComponent extends ComponentSourceBase implements ContainerFact
     }
     $layout->setConfiguration($inputs['settings'] ?? [] + $layout->getConfiguration());
     $content = $layout->build($regions);
-    foreach ($inputs['slots'] as $key => $slot) {
+    foreach ($inputs['slots'] ?? [] as $key => $slot) {
       if (is_array($slot)) {
         foreach ($slot as $subkey => $component) {
           if (!is_array($component) || !\array_key_exists('component', $component)) {

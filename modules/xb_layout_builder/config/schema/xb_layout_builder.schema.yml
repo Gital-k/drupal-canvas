@@ -1,18 +1,16 @@
 experience_builder.component_source_settings.layout:
-#  constraints:
-#    FullyValidatable: ~
+  label: 'Layout settings'
   type: experience_builder.component_source_settings.*
-  label: 'Block component settings'
   mapping:
-    local_source_id:
-      label: 'Layout plugin ID'
+    default_settings:
+      type: layout_plugin.settings.[%parent.%parent.%parent.%parent.source_local_id]
+    label:
+      type: string
+      label: 'Label'
+      description: 'The label of the layout.'
+    column_widths:
+      type: ignore
     slots:
       type: ignore
-    plugin_id:
-      type: ignore
-    default_settings:
-      type: ignore
-    fallback_metadata:
-      type: ignore
-#    default_settings:
-#      type: block.settings.[%parent.local_source_id]
+
+

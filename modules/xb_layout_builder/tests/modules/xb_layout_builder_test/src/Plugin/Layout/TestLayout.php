@@ -7,6 +7,7 @@ namespace Drupal\xb_layout_builder_test\Plugin\Layout;
 use Drupal\Core\Layout\Attribute\Layout;
 use Drupal\Core\Layout\LayoutDefault;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\system\Entity\Menu;
 
 /**
  * Layout Builder Test Layout.
@@ -45,6 +46,21 @@ class TestLayout extends LayoutDefault {
       $build[self::SIDEBAR_REGION]['#attributes']['class'][] = 'xb-sidebar-test-preview';
     }
     return $build;
+  }
+
+  public function calculateDependencies() {
+    $dependencies = parent::calculateDependencies();
+    $menu = Menu::load('menu');
+    if (!$menu) {
+      // Create a menu if it does not exist.
+      $menu = Menu::create([
+        'id' => 'menu',
+        'label' => 'Menu',
+      ]);
+      $menu->save();
+    }
+    $dependencies['config']['system.menu.menu'] = $menu->getConfigDependencyName();
+    return $dependencies;
   }
 
 }
