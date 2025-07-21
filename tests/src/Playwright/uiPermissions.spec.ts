@@ -44,8 +44,7 @@ test.describe('XB UI Permissions', () => {
     });
     await expect(contextMenu).toBeVisible();
 
-    // Ensure "Rename page" and "Duplicate page" options appear in the context menu
-    await expect(contextMenu.getByText('Rename page')).toBeVisible();
+    // Ensure "Duplicate page" and "Delete page" options appear in the context menu
     await expect(contextMenu.getByText('Duplicate page')).toBeVisible();
     await expect(contextMenu.getByText('Delete page')).toBeVisible();
 
@@ -68,7 +67,8 @@ test.describe('XB UI Permissions', () => {
     await expect(page.getByLabel('Sub-heading')).toBeAttached();
     await page.getByLabel('Sub-heading').fill('New Heading');
     await page.getByText('Review 1 change').click();
-    await expect(page.getByText('Publish all changes')).toBeAttached();
+    await page.getByTestId('xb-publish-review-select-all').click();
+    await expect(page.getByText('Publish 1 selected')).toBeAttached();
   });
   test('User with no XB permissions can load XB UI', async ({
     page,
@@ -131,10 +131,6 @@ test.describe('XB UI Permissions', () => {
     // Ensure the "Delete page" option does not appear in the context menu
     await expect(contextMenu.getByText('Delete page')).not.toBeAttached();
 
-    // I don't think it's possible to get to the page if you don't have edit permissions, and if you
-    // can edit the page, you can rename it, but I'm leaving this here but commented case that assumption changes.
-    // await expect(contextMenu.getByText('Rename page')).not.toBeAttached();
-
     // @todo https://drupal.org/i/3533728 Update this test when the "Duplicate page" option is hidden by permissions.
     // await expect(contextMenu.getByText('Duplicate page')).not.toBeAttached();
 
@@ -160,8 +156,9 @@ test.describe('XB UI Permissions', () => {
 
     // A change to the page was made in the previous test, so it should be visible.
     await page.getByText('Review 1 change').click();
+    await page.getByTestId('xb-publish-review-select-all').click();
     // but the user should not be able to publish changes.
-    await expect(page.getByText('Publish all changes')).not.toBeAttached();
+    await expect(page.getByText('Publish 1 selected')).not.toBeAttached();
 
     // User without "administer components" should not be able to access the code editor.
     await page.goto('/xb/node/1/code-editor/code/foobar');

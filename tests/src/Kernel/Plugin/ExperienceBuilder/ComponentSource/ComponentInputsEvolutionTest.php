@@ -70,6 +70,7 @@ final class ComponentInputsEvolutionTest extends KernelTestBase {
     'filter',
     'ckeditor5',
     'editor',
+    'xb_test_sdc',
   ];
 
   /**
@@ -92,7 +93,7 @@ final class ComponentInputsEvolutionTest extends KernelTestBase {
    * @covers \Drupal\experience_builder\ComponentSource\ComponentSourceBase::generateVersionHash()
    */
   public function testStorablePropShapeChanges(): void {
-    $component = Component::load('sdc.experience_builder.my-hero');
+    $component = Component::load('sdc.xb_test_sdc.my-hero');
     \assert($component instanceof ComponentInterface);
     self::assertEquals([
       'heading' => 'string',
@@ -104,7 +105,7 @@ final class ComponentInputsEvolutionTest extends KernelTestBase {
 
     $uuid = \Drupal::service(UuidInterface::class);
 
-    // Create an item for the component in it's current form.
+    // Create an item for the component in its current form.
     $items = self::staticallyCreateDanglingComponentTreeItemList(\Drupal::typedDataManager());
     $first_uuid = $uuid->generate();
     $original_version = $component->getActiveVersion();
@@ -117,10 +118,7 @@ final class ComponentInputsEvolutionTest extends KernelTestBase {
         // version.
         'inputs' => [
           'heading' => 'mirror my melody',
-          'subheading' => '',
-          'cta1' => '',
           'cta1href' => ['uri' => 'http://arachnophobia.com/', 'options' => []],
-          'cta2' => '',
         ],
       ],
     ]);
@@ -141,7 +139,7 @@ final class ComponentInputsEvolutionTest extends KernelTestBase {
         [
           'uuid' => $first_uuid,
           'nodeType' => 'component',
-          'type' => 'sdc.experience_builder.my-hero@' . $original_version,
+          'type' => 'sdc.xb_test_sdc.my-hero@' . $original_version,
           'slots' => [],
           'name' => NULL,
         ],
@@ -182,7 +180,7 @@ final class ComponentInputsEvolutionTest extends KernelTestBase {
     \Drupal::service(ModuleInstallerInterface::class)
       ->install(['xb_test_storage_prop_shape_alter']);
     $this->generateComponentConfig();
-    $component = Component::load('sdc.experience_builder.my-hero');
+    $component = Component::load('sdc.xb_test_sdc.my-hero');
     \assert($component instanceof ComponentInterface);
     $new_version = $component->getActiveVersion();
     self::assertNotEquals($original_version, $new_version);
@@ -203,10 +201,7 @@ final class ComponentInputsEvolutionTest extends KernelTestBase {
         'component_id' => $component->id(),
         'inputs' => [
           'heading' => 'mirror my melody',
-          'subheading' => '',
-          'cta1' => '',
           'cta1href' => 'http://arachnophobia.com/',
-          'cta2' => '',
         ],
       ],
     ]);
@@ -224,7 +219,7 @@ final class ComponentInputsEvolutionTest extends KernelTestBase {
         [
           'uuid' => $second_uuid,
           'nodeType' => 'component',
-          'type' => 'sdc.experience_builder.my-hero@' . $new_version,
+          'type' => 'sdc.xb_test_sdc.my-hero@' . $new_version,
           'slots' => [],
           'name' => NULL,
         ],
@@ -268,7 +263,7 @@ final class ComponentInputsEvolutionTest extends KernelTestBase {
     // original field type.
     \Drupal::service(ModuleInstallerInterface::class)->uninstall(['xb_test_storage_prop_shape_alter']);
     $this->generateComponentConfig();
-    $component = Component::load('sdc.experience_builder.my-hero');
+    $component = Component::load('sdc.xb_test_sdc.my-hero');
     \assert($component instanceof ComponentInterface);
     $newest_version = $component->getActiveVersion();
     self::assertEquals($original_version, $newest_version);
@@ -288,10 +283,7 @@ final class ComponentInputsEvolutionTest extends KernelTestBase {
         'component_id' => $component->id(),
         'inputs' => [
           'heading' => 'mirror my melody',
-          'subheading' => '',
-          'cta1' => '',
           'cta1href' => ['uri' => 'http://arachnophobia.com/', 'options' => []],
-          'cta2' => '',
         ],
       ],
     ]);

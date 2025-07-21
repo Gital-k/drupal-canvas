@@ -1,5 +1,6 @@
 adrs
 aiwizard
+alternatewidths
 apikey
 astrojs
 atrule
@@ -22,6 +23,7 @@ diaclone
 drupalcode
 drupaldev
 drupalsettings
+druplicon
 endapply
 entityviewdisplay
 extralight
@@ -37,6 +39,7 @@ inwidget
 jangregor
 JSONified
 jsxs
+langcode
 leftbar
 lightningcss
 Linkit
@@ -103,3 +106,4 @@ Deepchat
 interactable
 nodepath
 nodepaths
+proptypes

@@ -8,7 +8,10 @@ use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Field\WidgetPluginManager;
 use Drupal\Core\Form\FormState;
 use Drupal\datetime\Plugin\Field\FieldType\DateTimeItem;
+use Drupal\experience_builder\Entity\Component;
 use Drupal\experience_builder\JsonSchemaInterpreter\JsonSchemaStringFormat;
+use Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\SingleDirectoryComponent;
+use Drupal\experience_builder\PropExpressions\Component\ComponentPropExpression;
 use Drupal\experience_builder\PropExpressions\StructuredData\FieldPropExpression;
 use Drupal\experience_builder\PropExpressions\StructuredData\FieldTypeObjectPropsExpression;
 use Drupal\experience_builder\PropExpressions\StructuredData\FieldTypePropExpression;
@@ -45,6 +48,7 @@ class PropShapeRepositoryTest extends KernelTestBase {
     // Modules providing additional SDCs.
     'sdc_test',
     'sdc_test_all_props',
+    'xb_test_sdc',
     // Modules providing field types and widgets that the PropShapes are using.
     'ckeditor5',
     'datetime',
@@ -90,7 +94,8 @@ class PropShapeRepositoryTest extends KernelTestBase {
         // make sense.
         if ($prop_shape->schema['type'] === 'object' && !array_key_exists('$ref', $prop_shape->schema) && empty($prop_shape->schema['properties'] ?? [])) {
           // @see core/modules/system/tests/modules/sdc_test/components/array-to-object/array-to-object.component.yml
-          assert($component->getPluginId() === 'sdc_test:array-to-object');
+          // @see tests/modules/xb_test_sdc/components/props-invalid-shapes/props-invalid-shapes.component.yml
+          assert($component->getPluginId() === 'sdc_test:array-to-object' || $component->getPluginId() === 'xb_test_sdc:props-invalid-shapes');
           continue;
         }
 
@@ -100,8 +105,11 @@ class PropShapeRepositoryTest extends KernelTestBase {
     ksort($unique_prop_shapes);
     $unique_prop_shapes = array_values($unique_prop_shapes);
     $this->assertEquals([
+      new PropShape(['type' => 'array', 'items' => ['type' => 'object', '$ref' => 'json-schema-definitions://experience_builder.module/image']]),
       new PropShape(['type' => 'array', 'items' => ['type' => 'object', '$ref' => 'json-schema-definitions://experience_builder.module/image'], 'maxItems' => 2]),
       new PropShape(['type' => 'array', 'items' => ['type' => 'integer']]),
+      new PropShape(['type' => 'array', 'items' => ['type' => 'integer', 'maximum' => 100, 'minimum' => -100], 'maxItems' => 100]),
+      new PropShape(['type' => 'array', 'items' => ['type' => 'integer', 'maximum' => 100, 'minimum' => -100], 'maxItems' => 100, 'minItems' => 2]),
       new PropShape(['type' => 'array', 'items' => ['type' => 'integer'], 'maxItems' => 2]),
       new PropShape(['type' => 'array', 'items' => ['type' => 'integer'], 'maxItems' => 20, 'minItems' => 1]),
       new PropShape(['type' => 'array', 'items' => ['type' => 'integer'], 'minItems' => 1]),
@@ -125,19 +133,27 @@ class PropShapeRepositoryTest extends KernelTestBase {
       new PropShape(['type' => 'string', 'contentMediaType' => 'text/html']),
       new PropShape(['type' => 'string', 'contentMediaType' => 'text/html', 'x-formatting-context' => 'block']),
       new PropShape(['type' => 'string', 'contentMediaType' => 'text/html', 'x-formatting-context' => 'inline']),
+      new PropShape(['type' => 'string', 'contentMediaType' => 'text/html', 'x-formatting-context' => 'invalid']),
       new PropShape(['type' => 'string', 'enum' => ['', '_blank']]),
       new PropShape(['type' => 'string', 'enum' => ['', 'base', 'l', 's', 'xs', 'xxs']]),
+      new PropShape(['type' => 'string', 'enum' => ['', 'dog', 'cat', 'fish', 'rabbit']]),
       new PropShape(['type' => 'string', 'enum' => ['', 'gray', 'primary', 'neutral-soft', 'neutral-medium', 'neutral-loud', 'primary-medium', 'primary-loud', 'black', 'white', 'red', 'gold', 'green']]),
+      new PropShape(['type' => 'string', 'enum' => ['7', '3.14']]),
       new PropShape(['type' => 'string', 'enum' => ['_blank', '_parent', '_self', '_top']]),
+      new PropShape(['type' => 'string', 'enum' => ['_self', '_blank']]),
+      new PropShape(['type' => 'string', 'enum' => ['auto', 'manual']]),
       new PropShape(['type' => 'string', 'enum' => ['default', 'primary', 'success', 'neutral', 'warning', 'danger', 'text']]),
       new PropShape(['type' => 'string', 'enum' => ['foo', 'bar']]),
       new PropShape(['type' => 'string', 'enum' => ['full', 'wide', 'normal', 'narrow']]),
+      new PropShape(['type' => 'string', 'enum' => ['horizontal', 'vertical']]),
       new PropShape(['type' => 'string', 'enum' => ['moon-stars-fill', 'moon-stars', 'star-fill', 'star', 'stars', 'rocket-fill', 'rocket-takeoff-fill', 'rocket-takeoff', 'rocket']]),
       new PropShape(['type' => 'string', 'enum' => ['power', 'like', 'external']]),
       new PropShape(['type' => 'string', 'enum' => ['prefix', 'suffix']]),
       new PropShape(['type' => 'string', 'enum' => ['primary', 'secondary']]),
       new PropShape(['type' => 'string', 'enum' => ['primary', 'secondary', 'tertiary']]),
       new PropShape(['type' => 'string', 'enum' => ['primary', 'success', 'neutral', 'warning', 'danger']]),
+      new PropShape(['type' => 'string', 'enum' => ['small', 'big', 'huge']]),
+      new PropShape(['type' => 'string', 'enum' => ['small', 'big', 'huge', 'contains.dots']]),
       new PropShape(['type' => 'string', 'enum' => ['small', 'medium', 'large']]),
       new PropShape(['type' => 'string', 'enum' => ['top', 'bottom', 'start', 'end']]),
       new PropShape(['type' => 'string', 'format' => JsonSchemaStringFormat::DATE->value]),
@@ -158,6 +174,7 @@ class PropShapeRepositoryTest extends KernelTestBase {
       new PropShape(['type' => 'string', 'format' => JsonSchemaStringFormat::URI->value]),
       new PropShape(['type' => 'string', 'format' => JsonSchemaStringFormat::URI_REFERENCE->value]),
       new PropShape(['type' => 'string', 'format' => JsonSchemaStringFormat::URI_TEMPLATE->value]),
+      new PropShape(['type' => 'string', 'format' => JsonSchemaStringFormat::URI_TEMPLATE->value, 'x-required-variables' => ['width']]),
       new PropShape(['type' => 'string', 'format' => JsonSchemaStringFormat::UUID->value]),
       new PropShape(['type' => 'string', 'minLength' => 2]),
     ], $unique_prop_shapes);
@@ -169,12 +186,6 @@ class PropShapeRepositoryTest extends KernelTestBase {
    * @return \Drupal\experience_builder\PropShape\StorablePropShape[]
    */
   public static function getExpectedStorablePropShapes(): array {
-    $generate_allowed_values_setting = function (array $allowed_values): array {
-      return array_map(
-        fn ($allowed_value) => ['value' => $allowed_value, 'label' => (string) $allowed_value],
-        $allowed_values,
-      );
-    };
     return [
       'type=boolean' => new StorablePropShape(
         shape: new PropShape(['type' => 'boolean']),
@@ -191,13 +202,7 @@ class PropShapeRepositoryTest extends KernelTestBase {
         fieldTypeProp: new FieldTypePropExpression('list_integer', 'value'),
         fieldWidget: 'options_select',
         fieldStorageSettings: [
-          'allowed_values' => [
-            ['value' => 25, 'label' => '25'],
-            ['value' => 33, 'label' => '33'],
-            ['value' => 50, 'label' => '50'],
-            ['value' => 66, 'label' => '66'],
-            ['value' => 75, 'label' => '75'],
-          ],
+          'allowed_values_function' => 'experience_builder_load_allowed_values_for_component_prop',
         ],
       ),
       'type=integer&maximum=2147483648&minimum=-2147483648' => new StorablePropShape(
@@ -231,31 +236,30 @@ class PropShapeRepositoryTest extends KernelTestBase {
       'type=object&$ref=json-schema-definitions://experience_builder.module/image' => new StorablePropShape(
         shape: new PropShape(['type' => 'object', '$ref' => 'json-schema-definitions://experience_builder.module/image']),
         fieldTypeProp: new FieldTypeObjectPropsExpression('image', [
-          'src' => new ReferenceFieldTypePropExpression(
-            new FieldTypePropExpression('image', 'entity'),
-            new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'uri', NULL, 'url'),
-          ),
+          'src' => new FieldTypePropExpression('image', 'src_with_alternate_widths'),
           'alt' => new FieldTypePropExpression('image', 'alt'),
           'width' => new FieldTypePropExpression('image', 'width'),
           'height' => new FieldTypePropExpression('image', 'height'),
-          'srcSetCandidateTemplate' => new FieldTypePropExpression('image', 'srcset_candidate_uri_template'),
         ]),
         fieldWidget: 'image_image',
+      ),
+      'type=object&$ref=json-schema-definitions://experience_builder.module/video' => new StorablePropShape(
+        new PropShape(['type' => 'object', '$ref' => 'json-schema-definitions://experience_builder.module/video']),
+        fieldTypeProp: new FieldTypeObjectPropsExpression('file', [
+          'src' => new ReferenceFieldTypePropExpression(
+            new FieldTypePropExpression('file', 'entity'),
+            new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'uri', NULL, 'url'),
+          ),
+        ]),
+        fieldInstanceSettings: ['file_extensions' => 'mp4'],
+        fieldWidget: 'file_generic',
       ),
       'type=string&$ref=json-schema-definitions://experience_builder.module/heading-element' => new StorablePropShape(
         shape: new PropShape(['type' => 'string', 'enum' => ['div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']]),
         fieldTypeProp: new FieldTypePropExpression('list_string', 'value'),
         fieldWidget: 'options_select',
         fieldStorageSettings: [
-          'allowed_values' => [
-            ['value' => 'div', 'label' => 'div'],
-            ['value' => 'h1', 'label' => 'h1'],
-            ['value' => 'h2', 'label' => 'h2'],
-            ['value' => 'h3', 'label' => 'h3'],
-            ['value' => 'h4', 'label' => 'h4'],
-            ['value' => 'h5', 'label' => 'h5'],
-            ['value' => 'h6', 'label' => 'h6'],
-          ],
+          'allowed_values_function' => 'experience_builder_load_allowed_values_for_component_prop',
         ],
       ),
       'type=string&enum[0]=foo&enum[1]=bar' => new StorablePropShape(
@@ -266,10 +270,7 @@ class PropShapeRepositoryTest extends KernelTestBase {
         fieldTypeProp: new FieldTypePropExpression('list_string', 'value'),
         fieldWidget: 'options_select',
         fieldStorageSettings: [
-          'allowed_values' => [
-            ['value' => 'foo', 'label' => 'foo'],
-            ['value' => 'bar', 'label' => 'bar'],
-          ],
+          'allowed_values_function' => 'experience_builder_load_allowed_values_for_component_prop',
         ],
       ),
       'type=string&enum[0]=_blank&enum[1]=_parent&enum[2]=_self&enum[3]=_top' => new StorablePropShape(
@@ -280,7 +281,18 @@ class PropShapeRepositoryTest extends KernelTestBase {
         fieldTypeProp: new FieldTypePropExpression('list_string', 'value'),
         fieldWidget: 'options_select',
         fieldStorageSettings: [
-          'allowed_values' => $generate_allowed_values_setting(['_blank', '_parent', '_self', '_top']),
+          'allowed_values_function' => 'experience_builder_load_allowed_values_for_component_prop',
+        ],
+      ),
+      'type=string&enum[0]=auto&enum[1]=manual' => new StorablePropShape(
+        shape: new PropShape([
+          'type' => 'string',
+          'enum' => ['auto', 'manual'],
+        ]),
+        fieldTypeProp: new FieldTypePropExpression('list_string', 'value'),
+        fieldWidget: 'options_select',
+        fieldStorageSettings: [
+          'allowed_values_function' => 'experience_builder_load_allowed_values_for_component_prop',
         ],
       ),
       'type=string&enum[0]=default&enum[1]=primary&enum[2]=success&enum[3]=neutral&enum[4]=warning&enum[5]=danger&enum[6]=text' => new StorablePropShape(
@@ -291,7 +303,7 @@ class PropShapeRepositoryTest extends KernelTestBase {
         fieldTypeProp: new FieldTypePropExpression('list_string', 'value'),
         fieldWidget: 'options_select',
         fieldStorageSettings: [
-          'allowed_values' => $generate_allowed_values_setting(['default', 'primary', 'success', 'neutral', 'warning', 'danger', 'text']),
+          'allowed_values_function' => 'experience_builder_load_allowed_values_for_component_prop',
         ],
       ),
       'type=string&enum[0]=full&enum[1]=wide&enum[2]=normal&enum[3]=narrow' => new StorablePropShape(
@@ -302,7 +314,7 @@ class PropShapeRepositoryTest extends KernelTestBase {
         fieldTypeProp: new FieldTypePropExpression('list_string', 'value'),
         fieldWidget: 'options_select',
         fieldStorageSettings: [
-          'allowed_values' => $generate_allowed_values_setting(['full', 'wide', 'normal', 'narrow']),
+          'allowed_values_function' => 'experience_builder_load_allowed_values_for_component_prop',
         ],
       ),
       'type=string&enum[0]=moon-stars-fill&enum[1]=moon-stars&enum[2]=star-fill&enum[3]=star&enum[4]=stars&enum[5]=rocket-fill&enum[6]=rocket-takeoff-fill&enum[7]=rocket-takeoff&enum[8]=rocket' => new StorablePropShape(
@@ -313,7 +325,7 @@ class PropShapeRepositoryTest extends KernelTestBase {
         fieldTypeProp: new FieldTypePropExpression('list_string', 'value'),
         fieldWidget: 'options_select',
         fieldStorageSettings: [
-          'allowed_values' => $generate_allowed_values_setting(['moon-stars-fill', 'moon-stars', 'star-fill', 'star', 'stars', 'rocket-fill', 'rocket-takeoff-fill', 'rocket-takeoff', 'rocket']),
+          'allowed_values_function' => 'experience_builder_load_allowed_values_for_component_prop',
         ],
       ),
       'type=string&enum[0]=prefix&enum[1]=suffix' => new StorablePropShape(
@@ -324,7 +336,7 @@ class PropShapeRepositoryTest extends KernelTestBase {
         fieldTypeProp: new FieldTypePropExpression('list_string', 'value'),
         fieldWidget: 'options_select',
         fieldStorageSettings: [
-          'allowed_values' => $generate_allowed_values_setting(['prefix', 'suffix']),
+          'allowed_values_function' => 'experience_builder_load_allowed_values_for_component_prop',
         ],
       ),
       'type=string&enum[0]=primary&enum[1]=secondary' => new StorablePropShape(
@@ -335,7 +347,7 @@ class PropShapeRepositoryTest extends KernelTestBase {
         fieldTypeProp: new FieldTypePropExpression('list_string', 'value'),
         fieldWidget: 'options_select',
         fieldStorageSettings: [
-          'allowed_values' => $generate_allowed_values_setting(['primary', 'secondary']),
+          'allowed_values_function' => 'experience_builder_load_allowed_values_for_component_prop',
         ],
       ),
       'type=string&enum[0]=primary&enum[1]=success&enum[2]=neutral&enum[3]=warning&enum[4]=danger' => new StorablePropShape(
@@ -346,7 +358,7 @@ class PropShapeRepositoryTest extends KernelTestBase {
         fieldTypeProp: new FieldTypePropExpression('list_string', 'value'),
         fieldWidget: 'options_select',
         fieldStorageSettings: [
-          'allowed_values' => $generate_allowed_values_setting(['primary', 'success', 'neutral', 'warning', 'danger']),
+          'allowed_values_function' => 'experience_builder_load_allowed_values_for_component_prop',
         ],
       ),
       'type=string&enum[0]=primary&enum[1]=secondary&enum[2]=tertiary' => new StorablePropShape(
@@ -357,7 +369,7 @@ class PropShapeRepositoryTest extends KernelTestBase {
         fieldTypeProp: new FieldTypePropExpression('list_string', 'value'),
         fieldWidget: 'options_select',
         fieldStorageSettings: [
-          'allowed_values' => $generate_allowed_values_setting(['primary', 'secondary', 'tertiary']),
+          'allowed_values_function' => 'experience_builder_load_allowed_values_for_component_prop',
         ],
       ),
       'type=string&enum[0]=small&enum[1]=medium&enum[2]=large' => new StorablePropShape(
@@ -368,7 +380,7 @@ class PropShapeRepositoryTest extends KernelTestBase {
         fieldTypeProp: new FieldTypePropExpression('list_string', 'value'),
         fieldWidget: 'options_select',
         fieldStorageSettings: [
-          'allowed_values' => $generate_allowed_values_setting(['small', 'medium', 'large']),
+          'allowed_values_function' => 'experience_builder_load_allowed_values_for_component_prop',
         ],
       ),
       'type=string&enum[0]=top&enum[1]=bottom&enum[2]=start&enum[3]=end' => new StorablePropShape(
@@ -379,7 +391,7 @@ class PropShapeRepositoryTest extends KernelTestBase {
         fieldTypeProp: new FieldTypePropExpression('list_string', 'value'),
         fieldWidget: 'options_select',
         fieldStorageSettings: [
-          'allowed_values' => $generate_allowed_values_setting(['top', 'bottom', 'start', 'end']),
+          'allowed_values_function' => 'experience_builder_load_allowed_values_for_component_prop',
         ],
       ),
       'type=string&enum[0]=power&enum[1]=like&enum[2]=external' => new StorablePropShape(
@@ -390,11 +402,7 @@ class PropShapeRepositoryTest extends KernelTestBase {
         fieldTypeProp: new FieldTypePropExpression('list_string', 'value'),
         fieldWidget: 'options_select',
         fieldStorageSettings: [
-          'allowed_values' => [
-            ['value' => 'power', 'label' => 'power'],
-            ['value' => 'like', 'label' => 'like'],
-            ['value' => 'external', 'label' => 'external'],
-          ],
+          'allowed_values_function' => 'experience_builder_load_allowed_values_for_component_prop',
         ],
       ),
       'type=string&format=uri' => new StorablePropShape(
@@ -495,10 +503,7 @@ class PropShapeRepositoryTest extends KernelTestBase {
         fieldTypeProp: new FieldTypePropExpression('list_integer', 'value'),
         fieldWidget: 'options_select',
         fieldStorageSettings: [
-          'allowed_values' => [
-            ['value' => 1, 'label' => '1'],
-            ['value' => 2, 'label' => '2'],
-          ],
+          'allowed_values_function' => 'experience_builder_load_allowed_values_for_component_prop',
         ],
       ),
       'type=array&items[type]=integer' => new StorablePropShape(
@@ -516,17 +521,75 @@ class PropShapeRepositoryTest extends KernelTestBase {
       'type=array&items[$ref]=json-schema-definitions://experience_builder.module/image&items[type]=object&maxItems=2' => new StorablePropShape(
         shape: new PropShape(['type' => 'array', 'items' => ['type' => 'object', '$ref' => 'json-schema-definitions://experience_builder.module/image'], 'maxItems' => 2]),
         fieldTypeProp: new FieldTypeObjectPropsExpression('image', [
-          'src' => new ReferenceFieldTypePropExpression(
-            new FieldTypePropExpression('image', 'entity'),
-            new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'uri', NULL, 'url'),
-          ),
+          'src' => new FieldTypePropExpression('image', 'src_with_alternate_widths'),
           'alt' => new FieldTypePropExpression('image', 'alt'),
           'width' => new FieldTypePropExpression('image', 'width'),
           'height' => new FieldTypePropExpression('image', 'height'),
-          'srcSetCandidateTemplate' => new FieldTypePropExpression('image', 'srcset_candidate_uri_template'),
         ]),
         cardinality: 2,
         fieldWidget: 'image_image',
+      ),
+      'type=array&items[$ref]=json-schema-definitions://experience_builder.module/image&items[type]=object' => new StorablePropShape(
+        shape: new PropShape(['type' => 'array', 'items' => ['type' => 'object', '$ref' => 'json-schema-definitions://experience_builder.module/image']]),
+        fieldTypeProp: new FieldTypeObjectPropsExpression('image', [
+          'src' => new FieldTypePropExpression('image', 'src_with_alternate_widths'),
+          'alt' => new FieldTypePropExpression('image', 'alt'),
+          'width' => new FieldTypePropExpression('image', 'width'),
+          'height' => new FieldTypePropExpression('image', 'height'),
+        ]),
+        cardinality: FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
+        fieldWidget: 'image_image',
+      ),
+      'type=array&items[type]=integer&items[minimum]=-100&items[maximum]=100&maxItems=100' => new StorablePropShape(
+        shape: new PropShape(['type' => 'array', 'items' => ['type' => 'integer', 'maximum' => 100, 'minimum' => -100], 'maxItems' => 100]),
+        fieldTypeProp: new FieldTypePropExpression('integer', 'value'),
+        cardinality: 100,
+        fieldWidget: 'number',
+        fieldStorageSettings: NULL,
+        fieldInstanceSettings: [
+          'min' => -100,
+          'max' => 100,
+        ],
+      ),
+      'type=string&enum[0]=7&enum[1]=3.14' => new StorablePropShape(
+        shape: new PropShape(['type' => 'string', 'enum' => ['7', '3.14']]),
+        fieldTypeProp: new FieldTypePropExpression('list_string', 'value'),
+        fieldWidget: 'options_select',
+        fieldStorageSettings: [
+          'allowed_values_function' => 'experience_builder_load_allowed_values_for_component_prop',
+        ],
+      ),
+      'type=string&enum[0]=_self&enum[1]=_blank' => new StorablePropShape(
+        shape: new PropShape(['type' => 'string', 'enum' => ['_self', '_blank']]),
+        fieldTypeProp: new FieldTypePropExpression('list_string', 'value'),
+        fieldWidget: 'options_select',
+        fieldStorageSettings: [
+          'allowed_values_function' => 'experience_builder_load_allowed_values_for_component_prop',
+        ],
+      ),
+      'type=string&enum[0]=horizontal&enum[1]=vertical' => new StorablePropShape(
+        shape: new PropShape(['type' => 'string', 'enum' => ['horizontal', 'vertical']]),
+        fieldTypeProp: new FieldTypePropExpression('list_string', 'value'),
+        fieldWidget: 'options_select',
+        fieldStorageSettings: [
+          'allowed_values_function' => 'experience_builder_load_allowed_values_for_component_prop',
+        ],
+      ),
+      'type=string&enum[0]=small&enum[1]=big&enum[2]=huge' => new StorablePropShape(
+        shape: new PropShape(['type' => 'string', 'enum' => ['small', 'big', 'huge']]),
+        fieldTypeProp: new FieldTypePropExpression('list_string', 'value'),
+        fieldWidget: 'options_select',
+        fieldStorageSettings: [
+          'allowed_values_function' => 'experience_builder_load_allowed_values_for_component_prop',
+        ],
+      ),
+      'type=string&enum[0]=small&enum[1]=big&enum[2]=huge&enum[3]=contains.dots' => new StorablePropShape(
+        shape: new PropShape(['type' => 'string', 'enum' => ['small', 'big', 'huge', 'contains.dots']]),
+        fieldTypeProp: new FieldTypePropExpression('list_string', 'value'),
+        fieldWidget: 'options_select',
+        fieldStorageSettings: [
+          'allowed_values_function' => 'experience_builder_load_allowed_values_for_component_prop',
+        ],
       ),
     ];
   }
@@ -542,7 +605,6 @@ class PropShapeRepositoryTest extends KernelTestBase {
       'type=object&$ref=json-schema-definitions://sdc_test_all_props.module/date-range' => new PropShape(['type' => 'object', '$ref' => 'json-schema-definitions://sdc_test_all_props.module/date-range']),
       'type=string&$ref=json-schema-definitions://experience_builder.module/image-uri' => new PropShape(['type' => 'string', '$ref' => 'json-schema-definitions://experience_builder.module/image-uri']),
       'type=object&$ref=json-schema-definitions://experience_builder.module/shoe-icon' => new PropShape(['type' => 'object', '$ref' => 'json-schema-definitions://experience_builder.module/shoe-icon']),
-      'type=object&$ref=json-schema-definitions://experience_builder.module/video' => new PropShape(['type' => 'object', '$ref' => 'json-schema-definitions://experience_builder.module/video']),
       'type=string&format=duration' => new PropShape(['type' => 'string', 'format' => JsonSchemaStringFormat::DURATION->value]),
       'type=string&format=hostname' => new PropShape(['type' => 'string', 'format' => JsonSchemaStringFormat::HOSTNAME->value]),
       'type=string&format=idn-hostname' => new PropShape(['type' => 'string', 'format' => JsonSchemaStringFormat::IDN_HOSTNAME->value]),
@@ -555,7 +617,10 @@ class PropShapeRepositoryTest extends KernelTestBase {
       'type=string&format=uri-template' => new PropShape(['type' => 'string', 'format' => JsonSchemaStringFormat::URI_TEMPLATE->value]),
       'type=string&format=uuid' => new PropShape(['type' => 'string', 'format' => JsonSchemaStringFormat::UUID->value]),
       // These can't be stored as they have empty values as enum values.
-      'type=string&enum[0]=&enum[1]=_blank' => new PropShape(['type' => 'string', 'enum' => ['', '_blank']]),
+      'type=string&enum[0]=&enum[1]=_blank' => new PropShape([
+        'type' => 'string',
+        'enum' => ['', '_blank'],
+      ]),
       'type=string&enum[0]=&enum[1]=base&enum[2]=l&enum[3]=s&enum[4]=xs&enum[5]=xxs' => new PropShape([
         'type' => 'string',
         'enum' => ['', 'base', 'l', 's', 'xs', 'xxs'],
@@ -577,6 +642,26 @@ class PropShapeRepositoryTest extends KernelTestBase {
           'gold',
           'green',
         ],
+      ]),
+      'type=array&items[type]=integer&items[minimum]=-100&items[maximum]=100&maxItems=100&minItems=2' => new PropShape([
+        'type' => 'array',
+        'items' => ['type' => 'integer', 'maximum' => 100, 'minimum' => -100],
+        'maxItems' => 100,
+        'minItems' => 2,
+      ]),
+      'type=string&contentMediaType=text/html&x-formatting-context=invalid' => new PropShape([
+        'type' => 'string',
+        'contentMediaType' => 'text/html',
+        'x-formatting-context' => 'invalid',
+      ]),
+      'type=string&enum[0]=&enum[1]=dog&enum[2]=cat&enum[3]=fish&enum[4]=rabbit' => new PropShape([
+        'type' => 'string',
+        'enum' => ['', 'dog', 'cat', 'fish', 'rabbit'],
+      ]),
+      'type=string&format=uri-template&x-required-variables[0]=width' => new PropShape([
+        'type' => 'string',
+        'format' => JsonSchemaStringFormat::URI_TEMPLATE->value,
+        'x-required-variables' => ['width'],
       ]),
     ];
   }
@@ -612,12 +697,40 @@ class PropShapeRepositoryTest extends KernelTestBase {
    */
   public function testPropShapesYieldWorkingStaticPropSources(array $storable_prop_shapes): void {
     $this->assertNotEmpty($storable_prop_shapes);
-    foreach ($storable_prop_shapes as $storable_prop_shape) {
+
+    // A StaticPropSource is never rendered in an abstract context; it's always
+    // rendered for a concrete component's prop. So, this test should do the
+    // same.
+    // @see \Drupal\experience_builder\Form\ComponentInputsForm
+    $sdc_manager = \Drupal::service('plugin.manager.sdc');
+    $components = $sdc_manager->getAllComponents();
+    $some_sdc_prop_for_unique_prop_shape = [];
+    foreach ($components as $component) {
+      foreach (PropShape::getComponentProps($component) as $component_prop_expression => $prop_shape) {
+        // First SDC prop with this unique shape wins — doesn't really matter.
+        if (!array_key_exists($prop_shape->uniquePropSchemaKey(), $some_sdc_prop_for_unique_prop_shape)) {
+          $sdc_prop = ComponentPropExpression::fromString($component_prop_expression);
+          $component_id = SingleDirectoryComponent::convertMachineNameToId($sdc_prop->componentName);
+          $some_sdc_prop_for_unique_prop_shape[$prop_shape->uniquePropSchemaKey()] = [
+            $component_id,
+            // Note: on the live site, an older version than the active version
+            // may be used in the ComponentInputsForm, because the Content
+            // Author may be editing an ancient component instance. For the
+            // purpose of this test, the active version is fine.
+            Component::load($component_id)?->getActiveVersion(),
+            $sdc_prop->propName,
+          ];
+        }
+      }
+    }
+
+    foreach ($storable_prop_shapes as $key => $storable_prop_shape) {
       // A static prop source can be generated.
       $prop_source = $storable_prop_shape->toStaticPropSource();
 
       // A widget can be generated.
-      $widget = $prop_source->getWidget('irrelevant-in-this-test', $this->randomString(), $storable_prop_shape->fieldWidget);
+      [$component_id, $component_version, $prop_name] = $some_sdc_prop_for_unique_prop_shape[$key];
+      $widget = $prop_source->getWidget($component_id, $component_version, $prop_name, $this->randomString(), $storable_prop_shape->fieldWidget);
       $this->assertSame($storable_prop_shape->fieldWidget, $widget->getPluginId());
 
       // A widget form can be generated.
@@ -637,6 +750,16 @@ class PropShapeRepositoryTest extends KernelTestBase {
       //   parts of the generated value using the stored expression in such a
       //   way that the SDC component validator reports no errors.
       $randomized_prop_source = $prop_source->randomizeValue();
+
+      // Some core SDCs have enums without meta:enums, which we aren't
+      // supporting. So instead of option_list we are getting a textfield.
+      // So we would need to ignore those or just use one of the
+      // valid values for now. This should not be needed after requiring 11.2.x
+      // which will include https://drupal.org/i/3493070.
+      if (isset($storable_prop_shape->shape->schema['enum'])) {
+        $randomized_prop_source = $prop_source->withValue($storable_prop_shape->shape->schema['enum'][0]);
+      }
+
       $random_value = $randomized_prop_source->getValue();
       $stored_randomized_prop_source = (string) $randomized_prop_source;
       $reloaded_randomized_prop_source = StaticPropSource::parse(json_decode($stored_randomized_prop_source, TRUE));
@@ -661,9 +784,6 @@ class PropShapeRepositoryTest extends KernelTestBase {
           $storable_prop_shape->shape->uniquePropSchemaKey()
         )
       );
-
-      // @todo Remove this, find better solution.
-      drupal_static_reset('options_allowed_values');
     }
   }
 

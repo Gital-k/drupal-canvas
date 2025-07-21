@@ -27,7 +27,6 @@ use Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\Generated
 use Drupal\experience_builder\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
 use Drupal\experience_builder\Plugin\Field\FieldType\ComponentTreeItemList;
 use Drupal\experience_builder\PropExpressions\StructuredData\FieldTypePropExpression;
-use Drupal\experience_builder\PropSource\DefaultRelativeUrlPropSource;
 use Drupal\experience_builder\PropSource\StaticPropSource;
 use Drupal\experience_builder\Storage\ComponentTreeLoader;
 use Drupal\KernelTests\KernelTestBase;
@@ -308,12 +307,7 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
           continue;
         }
 
-        $explicit_inputs[$sdc_prop_name] = (new DefaultRelativeUrlPropSource(
-          value: $client_side_info_for_prop['default_values']['resolved'],
-          jsonSchema: $client_side_info_for_prop['jsonSchema'],
-          componentId: $component->id(),
-        ))->evaluate(NULL, is_required: TRUE);
-
+        $explicit_inputs[$sdc_prop_name] = $client_side_info_for_prop['default_values']['resolved'];
         continue;
       }
 
@@ -362,7 +356,7 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
     $field_item->setValue([
       [
         'uuid' => '38b79bf8-53d0-4307-b9ef-221c6a63023a',
-        'component_id' => 'sdc.experience_builder.two_column',
+        'component_id' => 'sdc.xb_test_sdc.two_column',
         'inputs' => [
           'width' => StaticPropSource::generate(
             expression: new FieldTypePropExpression('integer', 'value'),
@@ -373,7 +367,7 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
       [
         // Before crash component.
         'uuid' => 'ab72924b-a1f6-4b07-a0e7-6a3d3b03d8f7',
-        'component_id' => 'sdc.experience_builder.druplicon',
+        'component_id' => 'sdc.xb_test_sdc.druplicon',
         'inputs' => [],
         'parent_uuid' => '38b79bf8-53d0-4307-b9ef-221c6a63023a',
         'slot' => 'column_one',
@@ -388,14 +382,14 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
       ],
       [
         'uuid' => 'c3a4f459-7a8d-4dcd-88f7-ea353c9ec99a',
-        'component_id' => 'sdc.experience_builder.druplicon',
+        'component_id' => 'sdc.xb_test_sdc.druplicon',
         'inputs' => [],
         'parent_uuid' => '38b79bf8-53d0-4307-b9ef-221c6a63023a',
         'slot' => 'column_one',
       ],
       [
         'uuid' => 'c16945de-c27b-463c-89a9-0b79af684c0a',
-        'component_id' => 'sdc.experience_builder.druplicon',
+        'component_id' => 'sdc.xb_test_sdc.druplicon',
         'inputs' => [],
         'parent_uuid' => '38b79bf8-53d0-4307-b9ef-221c6a63023a',
         'slot' => 'column_two',
@@ -660,7 +654,7 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
         'parent_uuid' => self::UUID_FALLBACK_ROOT,
         'uuid' => $uuid,
         'slot' => $slot,
-        'component' => 'sdc.experience_builder.heading',
+        'component' => 'sdc.xb_test_sdc.heading',
         'inputs' => [
           // Give it some inputs we can assert still exist when the fallback
           // conditions are triggered.

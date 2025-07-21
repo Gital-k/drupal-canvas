@@ -11,7 +11,7 @@ describe('Multi-select components', () => {
 
     // Make sure we have multiple components visible for testing
     cy.testInIframe(
-      '[data-component-id="experience_builder:my-hero"]',
+      '[data-component-id="xb_test_sdc:my-hero"]',
       (myHeroComponent) => {
         expect(myHeroComponent.length).to.be.at.least(
           2,
@@ -116,8 +116,6 @@ describe('Multi-select components', () => {
   });
 
   it('should select components from Layers panel and support multi-selection', () => {
-    // Open the layers panel
-    cy.openLayersPanel();
     cy.previewReady();
 
     // Find and click Hero components in layers view
@@ -151,8 +149,6 @@ describe('Multi-select components', () => {
   });
 
   it('should sync selection between preview and layers panel', () => {
-    // Open the layers panel
-    cy.openLayersPanel();
     cy.previewReady();
 
     // Now select in preview
@@ -177,8 +173,6 @@ describe('Multi-select components', () => {
   });
 
   it('should prevent selecting parent and child components simultaneously', () => {
-    // Open the layers panel
-    cy.openLayersPanel();
     cy.previewReady();
 
     cy.log('Select the parent');

@@ -58,6 +58,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
     'filter',
     'ckeditor5',
     'editor',
+    'xb_test_sdc',
   ];
 
   /**
@@ -167,8 +168,14 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
       $components
     );
     ksort($components);
-    // @todo Support matching `type: array` prop shapes in https://www.drupal.org/project/experience_builder/issues/3467870
-    unset($components['experience_builder:shoe_tab_group']);
+
+    // Removing some test components that have been enabled due to all SDCs now
+    // in xb_test_sdc module.
+    $components_to_remove = ['crash', 'component-no-meta-enum', 'component-mismatch-meta-enum', 'empty-enum', 'deprecated', 'experimental', 'image-gallery', 'image-optional-with-example-and-additional-prop', 'obsolete', 'grid-container', 'html-invalid-format', 'my-cta', 'sparkline', 'sparkline_min_2', 'props-invalid-shapes', 'props-no-examples', 'props-no-slots', 'props-no-title', 'props-slots', 'image-optional-with-example', 'image-optional-without-example', 'image-required-with-example', 'image-required-with-invalid-example', 'image-required-without-example'];
+    foreach ($components_to_remove as $key) {
+      unset($components['xb_test_sdc:' . $key]);
+    }
+
     foreach ($components as $component) {
       // Do not find a match for every unique SDC prop, but only for unique prop
       // shapes. This avoids a lot of meaningless test expectations.
@@ -255,6 +262,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
       'modules' => [
         // The module providing the sample SDC to test all JSON schema types.
         'sdc_test_all_props',
+        'xb_test_sdc',
         // All other core modules providing field types.
         'comment',
         'datetime',
@@ -283,7 +291,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
       'expected' => [
         'REQUIRED, type=integer&$ref=json-schema-definitions://experience_builder.module/column-width' => [
           'SDC props' => [
-            '⿲experience_builder:two_column␟width',
+            '⿲xb_test_sdc:two_column␟width',
           ],
           'static prop source' => 'ℹ︎list_integer␟value',
           'instances' => [],
@@ -292,11 +300,12 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
         ],
         'REQUIRED, type=object&$ref=json-schema-definitions://experience_builder.module/image' => [
           'SDC props' => [
-            '⿲experience_builder:image␟image',
+            '⿲xb_test_sdc:image␟image',
+            '⿲xb_test_sdc:image-srcset-candidate-template-uri␟image',
           ],
-          'static prop source' => 'ℹ︎image␟{src↝entity␜␜entity:file␝uri␞␟url,alt↠alt,width↠width,height↠height,srcSetCandidateTemplate↠srcset_candidate_uri_template}',
+          'static prop source' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
           'instances' => [
-            'ℹ︎␜entity:node:foo␝field_silly_image␞␟{src↝entity␜␜entity:file␝uri␞␟url,alt↠alt,width↠width,height↠height,srcSetCandidateTemplate↠srcset_candidate_uri_template}',
+            'ℹ︎␜entity:node:foo␝field_silly_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
           ],
           'adapter_matches_field_type' => [
             'image_apply_style' => [
@@ -305,7 +314,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
               'imageStyle' => NULL,
             ],
             'image_url_rel_to_abs' => [
-              'image' => 'ℹ︎image␟{src↝entity␜␜entity:file␝uri␞␟url,alt↠alt,width↠width,height↠height,srcSetCandidateTemplate↠srcset_candidate_uri_template}',
+              'image' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
             ],
           ],
           'adapter_matches_instance' => [
@@ -314,13 +323,13 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
               'imageStyle' => [],
             ],
             'image_url_rel_to_abs' => [
-              'image' => ['ℹ︎␜entity:node:foo␝field_silly_image␞␟{src↝entity␜␜entity:file␝uri␞␟url,alt↠alt,width↠width,height↠height,srcSetCandidateTemplate↠srcset_candidate_uri_template}'],
+              'image' => ['ℹ︎␜entity:node:foo␝field_silly_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}'],
             ],
           ],
         ],
         'REQUIRED, type=object&$ref=json-schema-definitions://experience_builder.module/video' => [
           'SDC props' => [
-            '⿲experience_builder:video␟video',
+            '⿲xb_test_sdc:video␟video',
           ],
           'static prop source' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:baby_videos|vacation_videos␝field_media_video_file|field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟url}',
           'instances' => [
@@ -332,13 +341,13 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
         ],
         'REQUIRED, type=string' => [
           'SDC props' => [
-            '⿲experience_builder:heading␟text',
-            '⿲experience_builder:my-hero␟heading',
-            '⿲experience_builder:shoe_details␟summary',
-            '⿲experience_builder:shoe_tab␟label',
-            '⿲experience_builder:shoe_tab␟panel',
-            '⿲experience_builder:shoe_tab_panel␟name',
             '⿲sdc_test_all_props:all-props␟test_REQUIRED_string',
+            '⿲xb_test_sdc:heading␟text',
+            '⿲xb_test_sdc:my-hero␟heading',
+            '⿲xb_test_sdc:shoe_details␟summary',
+            '⿲xb_test_sdc:shoe_tab␟label',
+            '⿲xb_test_sdc:shoe_tab␟panel',
+            '⿲xb_test_sdc:shoe_tab_panel␟name',
           ],
           'static prop source' => 'ℹ︎string␟value',
           'instances' => [
@@ -355,7 +364,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
         ],
         'REQUIRED, type=string&$ref=json-schema-definitions://experience_builder.module/heading-element' => [
           'SDC props' => [
-            '⿲experience_builder:heading␟element',
+            '⿲xb_test_sdc:heading␟element',
           ],
           'static prop source' => 'ℹ︎list_string␟value',
           'instances' => [],
@@ -391,7 +400,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
         ],
         'REQUIRED, type=string&enum[0]=default&enum[1]=primary&enum[2]=success&enum[3]=neutral&enum[4]=warning&enum[5]=danger&enum[6]=text' => [
           'SDC props' => [
-            '⿲experience_builder:shoe_button␟variant',
+            '⿲xb_test_sdc:shoe_button␟variant',
           ],
           'static prop source' => 'ℹ︎list_string␟value',
           'instances' => [],
@@ -400,7 +409,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
         ],
         'REQUIRED, type=string&enum[0]=full&enum[1]=wide&enum[2]=normal&enum[3]=narrow' => [
           'SDC props' => [
-            '⿲experience_builder:one_column␟width',
+            '⿲xb_test_sdc:one_column␟width',
           ],
           'static prop source' => 'ℹ︎list_string␟value',
           'instances' => [],
@@ -409,7 +418,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
         ],
         'REQUIRED, type=string&enum[0]=moon-stars-fill&enum[1]=moon-stars&enum[2]=star-fill&enum[3]=star&enum[4]=stars&enum[5]=rocket-fill&enum[6]=rocket-takeoff-fill&enum[7]=rocket-takeoff&enum[8]=rocket' => [
           'SDC props' => [
-            '⿲experience_builder:shoe_icon␟name',
+            '⿲xb_test_sdc:shoe_icon␟name',
           ],
           'static prop source' => 'ℹ︎list_string␟value',
           'instances' => [],
@@ -418,7 +427,16 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
         ],
         'REQUIRED, type=string&enum[0]=primary&enum[1]=success&enum[2]=neutral&enum[3]=warning&enum[4]=danger' => [
           'SDC props' => [
-            '⿲experience_builder:shoe_badge␟variant',
+            '⿲xb_test_sdc:shoe_badge␟variant',
+          ],
+          'static prop source' => 'ℹ︎list_string␟value',
+          'instances' => [],
+          'adapter_matches_field_type' => [],
+          'adapter_matches_instance' => [],
+        ],
+        'REQUIRED, type=string&enum[0]=top&enum[1]=bottom&enum[2]=start&enum[3]=end' => [
+          'SDC props' => [
+            '⿲xb_test_sdc:shoe_tab_group␟placement',
           ],
           'static prop source' => 'ℹ︎list_string␟value',
           'instances' => [],
@@ -427,7 +445,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
         ],
         'REQUIRED, type=string&format=uri' => [
           'SDC props' => [
-            '⿲experience_builder:my-hero␟cta1href',
+            '⿲xb_test_sdc:my-hero␟cta1href',
           ],
           'static prop source' => 'ℹ︎link␟url',
           'instances' => [
@@ -439,13 +457,14 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
             'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟value',
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:node:foo␝field_silly_image␞␟src_with_alternate_widths',
           ],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
         ],
         'REQUIRED, type=string&minLength=2' => [
           'SDC props' => [
-            '⿲experience_builder:my-section␟text',
+            '⿲xb_test_sdc:my-section␟text',
           ],
           'static prop source' => 'ℹ︎string␟value',
           'instances' => [
@@ -464,7 +483,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           'SDC props' => [
             '⿲sdc_test_all_props:all-props␟test_object_drupal_image_ARRAY',
           ],
-          'static prop source' => 'ℹ︎image␟{src↝entity␜␜entity:file␝uri␞␟url,alt↠alt,width↠width,height↠height,srcSetCandidateTemplate↠srcset_candidate_uri_template}',
+          'static prop source' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
           'instances' => [],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
@@ -522,21 +541,22 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
         ],
         'optional, type=boolean' => [
           'SDC props' => [
-            '⿲experience_builder:shoe_badge␟pill',
-            '⿲experience_builder:shoe_badge␟pulse',
-            '⿲experience_builder:shoe_button␟disabled',
-            '⿲experience_builder:shoe_button␟loading',
-            '⿲experience_builder:shoe_button␟outline',
-            '⿲experience_builder:shoe_button␟pill',
-            '⿲experience_builder:shoe_button␟circle',
-            '⿲experience_builder:shoe_details␟open',
-            '⿲experience_builder:shoe_details␟disabled',
-            '⿲experience_builder:shoe_tab␟active',
-            '⿲experience_builder:shoe_tab␟closable',
-            '⿲experience_builder:shoe_tab␟disabled',
-            '⿲experience_builder:shoe_tab_panel␟active',
             '⿲sdc_test_all_props:all-props␟test_bool_default_false',
             '⿲sdc_test_all_props:all-props␟test_bool_default_true',
+            '⿲xb_test_sdc:shoe_badge␟pill',
+            '⿲xb_test_sdc:shoe_badge␟pulse',
+            '⿲xb_test_sdc:shoe_button␟disabled',
+            '⿲xb_test_sdc:shoe_button␟loading',
+            '⿲xb_test_sdc:shoe_button␟outline',
+            '⿲xb_test_sdc:shoe_button␟pill',
+            '⿲xb_test_sdc:shoe_button␟circle',
+            '⿲xb_test_sdc:shoe_details␟open',
+            '⿲xb_test_sdc:shoe_details␟disabled',
+            '⿲xb_test_sdc:shoe_tab␟active',
+            '⿲xb_test_sdc:shoe_tab␟closable',
+            '⿲xb_test_sdc:shoe_tab␟disabled',
+            '⿲xb_test_sdc:shoe_tab_group␟no_scroll',
+            '⿲xb_test_sdc:shoe_tab_panel␟active',
           ],
           'static prop source' => 'ℹ︎boolean␟value',
           'instances' => [
@@ -750,7 +770,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
         ],
         'optional, type=integer&minimum=1' => [
           'SDC props' => [
-            '⿲experience_builder:video␟display_width',
+            '⿲xb_test_sdc:video␟display_width',
           ],
           'static prop source' => 'ℹ︎integer␟value',
           'instances' => [],
@@ -849,9 +869,9 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           'SDC props' => [
             '⿲sdc_test_all_props:all-props␟test_object_drupal_image',
           ],
-          'static prop source' => 'ℹ︎image␟{src↝entity␜␜entity:file␝uri␞␟url,alt↠alt,width↠width,height↠height,srcSetCandidateTemplate↠srcset_candidate_uri_template}',
+          'static prop source' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
           'instances' => [
-            'ℹ︎␜entity:node:foo␝field_silly_image␞␟{src↝entity␜␜entity:file␝uri␞␟url,alt↠alt,width↠width,height↠height,srcSetCandidateTemplate↠srcset_candidate_uri_template}',
+            'ℹ︎␜entity:node:foo␝field_silly_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
           ],
           'adapter_matches_field_type' => [
             'image_apply_style' => [
@@ -859,7 +879,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
               'imageStyle' => NULL,
             ],
             'image_url_rel_to_abs' => [
-              'image' => 'ℹ︎image␟{src↝entity␜␜entity:file␝uri␞␟url,alt↠alt,width↠width,height↠height,srcSetCandidateTemplate↠srcset_candidate_uri_template}',
+              'image' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
             ],
           ],
           'adapter_matches_instance' => [
@@ -868,16 +888,18 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
               'imageStyle' => [],
             ],
             'image_url_rel_to_abs' => [
-              'image' => ['ℹ︎␜entity:node:foo␝field_silly_image␞␟{src↝entity␜␜entity:file␝uri␞␟url,alt↠alt,width↠width,height↠height,srcSetCandidateTemplate↠srcset_candidate_uri_template}'],
+              'image' => ['ℹ︎␜entity:node:foo␝field_silly_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}'],
             ],
           ],
         ],
         'optional, type=object&$ref=json-schema-definitions://experience_builder.module/shoe-icon' => [
           'SDC props' => [
-            '⿲experience_builder:shoe_button␟icon',
-            '⿲experience_builder:shoe_details␟expand_icon',
-            '⿲experience_builder:shoe_details␟collapse_icon',
+            '⿲xb_test_sdc:shoe_button␟icon',
+            '⿲xb_test_sdc:shoe_details␟expand_icon',
+            '⿲xb_test_sdc:shoe_details␟collapse_icon',
           ],
+          // As shoe-icon has a enum with an empty value, this won't be a valid
+          // source.
           'static prop source' => NULL,
           'instances' => [
             'ℹ︎␜entity:media:baby_videos␝field_media_video_file␞␟{label↠description}',
@@ -925,16 +947,16 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
         ],
         'optional, type=string' => [
           'SDC props' => [
-            '⿲experience_builder:my-hero␟subheading',
-            '⿲experience_builder:my-hero␟cta1',
-            '⿲experience_builder:my-hero␟cta2',
-            '⿲experience_builder:shoe_button␟label',
-            '⿲experience_builder:shoe_button␟href',
-            '⿲experience_builder:shoe_button␟rel',
-            '⿲experience_builder:shoe_button␟download',
-            '⿲experience_builder:shoe_icon␟label',
-            '⿲experience_builder:shoe_icon␟slot',
             '⿲sdc_test_all_props:all-props␟test_string',
+            '⿲xb_test_sdc:my-hero␟subheading',
+            '⿲xb_test_sdc:my-hero␟cta1',
+            '⿲xb_test_sdc:my-hero␟cta2',
+            '⿲xb_test_sdc:shoe_button␟label',
+            '⿲xb_test_sdc:shoe_button␟href',
+            '⿲xb_test_sdc:shoe_button␟rel',
+            '⿲xb_test_sdc:shoe_button␟download',
+            '⿲xb_test_sdc:shoe_icon␟label',
+            '⿲xb_test_sdc:shoe_icon␟slot',
           ],
           'static prop source' => 'ℹ︎string␟value',
           'instances' => [
@@ -970,8 +992,13 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           'static prop source' => NULL,
           'instances' => [
             'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url',
+            'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟src_with_alternate_widths',
             'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url',
+            'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟src_with_alternate_widths',
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝uri␞␟url',
+            'ℹ︎␜entity:node:foo␝field_silly_image␞␟src_with_alternate_widths',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝thumbnail␞␟src_with_alternate_widths',
+            'ℹ︎␜entity:xb_page␝image␞␟entity␜␜entity:media␝thumbnail␞␟src_with_alternate_widths',
           ],
           'adapter_matches_field_type' => [
             'image_extract_url' => [
@@ -1034,8 +1061,10 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
         ],
         'optional, type=string&enum[0]=&enum[1]=base&enum[2]=l&enum[3]=s&enum[4]=xs&enum[5]=xxs' => [
           'SDC props' => [
-            '⿲experience_builder:shoe_icon␟size',
+            '⿲xb_test_sdc:shoe_icon␟size',
           ],
+          // As shoe-icon has a enum with an empty value, this won't be a valid
+          // source.
           'static prop source' => NULL,
           'instances' => [],
           'adapter_matches_field_type' => [],
@@ -1043,8 +1072,10 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
         ],
         'optional, type=string&enum[0]=&enum[1]=gray&enum[2]=primary&enum[3]=neutral-soft&enum[4]=neutral-medium&enum[5]=neutral-loud&enum[6]=primary-medium&enum[7]=primary-loud&enum[8]=black&enum[9]=white&enum[10]=red&enum[11]=gold&enum[12]=green' => [
           'SDC props' => [
-            '⿲experience_builder:shoe_icon␟color',
+            '⿲xb_test_sdc:shoe_icon␟color',
           ],
+          // As shoe-icon has a enum with an empty value, this won't be a valid
+          // source.
           'static prop source' => NULL,
           'instances' => [],
           'adapter_matches_field_type' => [],
@@ -1052,7 +1083,16 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
         ],
         'optional, type=string&enum[0]=_blank&enum[1]=_parent&enum[2]=_self&enum[3]=_top' => [
           'SDC props' => [
-            '⿲experience_builder:shoe_button␟target',
+            '⿲xb_test_sdc:shoe_button␟target',
+          ],
+          'static prop source' => 'ℹ︎list_string␟value',
+          'instances' => [],
+          'adapter_matches_field_type' => [],
+          'adapter_matches_instance' => [],
+        ],
+        'optional, type=string&enum[0]=auto&enum[1]=manual' => [
+          'SDC props' => [
+            '⿲xb_test_sdc:shoe_tab_group␟activation',
           ],
           'static prop source' => 'ℹ︎list_string␟value',
           'instances' => [],
@@ -1070,7 +1110,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
         ],
         'optional, type=string&enum[0]=prefix&enum[1]=suffix' => [
           'SDC props' => [
-            '⿲experience_builder:shoe_button␟icon_position',
+            '⿲xb_test_sdc:shoe_button␟icon_position',
           ],
           'static prop source' => 'ℹ︎list_string␟value',
           'instances' => [],
@@ -1079,7 +1119,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
         ],
         'optional, type=string&enum[0]=primary&enum[1]=secondary' => [
           'SDC props' => [
-            '⿲experience_builder:heading␟style',
+            '⿲xb_test_sdc:heading␟style',
           ],
           'static prop source' => 'ℹ︎list_string␟value',
           'instances' => [],
@@ -1088,7 +1128,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
         ],
         'optional, type=string&enum[0]=small&enum[1]=medium&enum[2]=large' => [
           'SDC props' => [
-            '⿲experience_builder:shoe_button␟size',
+            '⿲xb_test_sdc:shoe_button␟size',
           ],
           'static prop source' => 'ℹ︎list_string␟value',
           'instances' => [],
@@ -1255,12 +1295,17 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
             'ℹ︎␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝uri␞␟value',
             'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟src_with_alternate_widths',
             'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟value',
             'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟src_with_alternate_widths',
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:node:foo␝field_silly_image␞␟src_with_alternate_widths',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝thumbnail␞␟src_with_alternate_widths',
+            'ℹ︎␜entity:xb_page␝image␞␟entity␜␜entity:media␝thumbnail␞␟src_with_alternate_widths',
           ],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
@@ -1277,12 +1322,17 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
             'ℹ︎␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝uri␞␟value',
             'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟src_with_alternate_widths',
             'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟value',
             'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟src_with_alternate_widths',
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:node:foo␝field_silly_image␞␟src_with_alternate_widths',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝thumbnail␞␟src_with_alternate_widths',
+            'ℹ︎␜entity:xb_page␝image␞␟entity␜␜entity:media␝thumbnail␞␟src_with_alternate_widths',
           ],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
@@ -1339,12 +1389,17 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
             'ℹ︎␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝uri␞␟value',
             'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟src_with_alternate_widths',
             'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟value',
             'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟src_with_alternate_widths',
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:node:foo␝field_silly_image␞␟src_with_alternate_widths',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝thumbnail␞␟src_with_alternate_widths',
+            'ℹ︎␜entity:xb_page␝image␞␟entity␜␜entity:media␝thumbnail␞␟src_with_alternate_widths',
           ],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
@@ -1361,12 +1416,17 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
             'ℹ︎␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝uri␞␟value',
             'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟src_with_alternate_widths',
             'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟value',
             'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟src_with_alternate_widths',
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:node:foo␝field_silly_image␞␟src_with_alternate_widths',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝thumbnail␞␟src_with_alternate_widths',
+            'ℹ︎␜entity:xb_page␝image␞␟entity␜␜entity:media␝thumbnail␞␟src_with_alternate_widths',
           ],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
@@ -1378,6 +1438,21 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           ],
           'static prop source' => NULL,
           'instances' => [],
+          'adapter_matches_field_type' => [],
+          'adapter_matches_instance' => [],
+        ],
+        'optional, type=string&format=uri-template&x-required-variables[0]=width' => [
+          'SDC props' => [
+            0 => '⿲xb_test_sdc:image-srcset-candidate-template-uri␟srcSetCandidateTemplate',
+          ],
+          'static prop source' => NULL,
+          'instances' => [
+            0 => 'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟srcset_candidate_uri_template',
+            1 => 'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟srcset_candidate_uri_template',
+            2 => 'ℹ︎␜entity:node:foo␝field_silly_image␞␟srcset_candidate_uri_template',
+            3 => 'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝thumbnail␞␟srcset_candidate_uri_template',
+            4 => 'ℹ︎␜entity:xb_page␝image␞␟entity␜␜entity:media␝thumbnail␞␟srcset_candidate_uri_template',
+          ],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
         ],

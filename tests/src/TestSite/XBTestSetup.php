@@ -68,7 +68,15 @@ class XBTestSetup implements TestSetupInterface {
   use BlockCreationTrait;
   use CreateTestJsComponentTrait;
 
+  protected string $root;
+
   public function setup(): void {
+    // CreateTestJsComponentTrait requires having the $root set.
+    $container = \Drupal::getContainer();
+    $root = $container && $container->hasParameter('app.root') ? $container->getParameter('app.root') : DRUPAL_ROOT;
+    assert(is_string($root));
+    $this->root = $root;
+
     $module_installer = \Drupal::service('module_installer');
     $module_installer->install(['system', 'user']);
     $config_factory = \Drupal::configFactory();
@@ -187,7 +195,7 @@ class XBTestSetup implements TestSetupInterface {
       'sourceType' => 'static:field_item:entity_reference',
       'value' => ['target_id' => 3],
       // This expression resolves `src` to the image's public URL.
-      'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:image␝field_media_image␞␟entity␜␜entity:file␝uri␞␟url,alt↝entity␜␜entity:media:image␝field_media_image␞␟alt,width↝entity␜␜entity:media:image␝field_media_image␞␟width,height↝entity␜␜entity:media:image␝field_media_image␞␟height}',
+      'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:image␝field_media_image␞␟src_with_alternate_widths,alt↝entity␜␜entity:media:image␝field_media_image␞␟alt,width↝entity␜␜entity:media:image␝field_media_image␞␟width,height↝entity␜␜entity:media:image␝field_media_image␞␟height}',
       'sourceTypeSettings' => [
         'storage' => ['target_type' => 'media'],
         'instance' => [
@@ -221,7 +229,7 @@ class XBTestSetup implements TestSetupInterface {
     }
     $items = [
       [
-        'component_id' => 'sdc.experience_builder.two_column',
+        'component_id' => 'sdc.xb_test_sdc.two_column',
         'uuid' => self::UUID_TWO_COLUMN_UUID,
         'inputs' => [
           'width' => [
@@ -230,28 +238,7 @@ class XBTestSetup implements TestSetupInterface {
             'expression' => 'ℹ︎list_integer␟value',
             'sourceTypeSettings' => [
               'storage' => [
-                'allowed_values' => [
-                  [
-                    'value' => 25,
-                    'label' => '25',
-                  ],
-                  [
-                    'value' => 33,
-                    'label' => '33',
-                  ],
-                  [
-                    'value' => 50,
-                    'label' => '50',
-                  ],
-                  [
-                    'value' => 66,
-                    'label' => '66',
-                  ],
-                  [
-                    'value' => 75,
-                    'label' => '75',
-                  ],
-                ],
+                'allowed_values_function' => 'experience_builder_load_allowed_values_for_component_prop',
               ],
             ],
           ],
@@ -260,7 +247,7 @@ class XBTestSetup implements TestSetupInterface {
       [
         'parent_uuid' => self::UUID_TWO_COLUMN_UUID,
         'slot' => 'column_one',
-        'component_id' => 'sdc.experience_builder.image',
+        'component_id' => 'sdc.xb_test_sdc.image',
         'uuid' => self::UUID_STATIC_IMAGE,
         'inputs' => [
           'image' => $static_image_prop_source,
@@ -269,7 +256,7 @@ class XBTestSetup implements TestSetupInterface {
       [
         'parent_uuid' => self::UUID_TWO_COLUMN_UUID,
         'slot' => 'column_one',
-        'component_id' => 'sdc.experience_builder.my-hero',
+        'component_id' => 'sdc.xb_test_sdc.my-hero',
         'uuid' => self::UUID_STATIC_CARD1,
         'inputs' => [
           'heading' => [
@@ -307,7 +294,7 @@ class XBTestSetup implements TestSetupInterface {
         'parent_uuid' => self::UUID_TWO_COLUMN_UUID,
         'slot' => 'column_one',
         'uuid' => self::UUID_ALL_SLOTS_EMPTY,
-        'component_id' => 'sdc.experience_builder.one_column',
+        'component_id' => 'sdc.xb_test_sdc.one_column',
         'inputs' => [
           'width' => [
             'sourceType' => 'static:field_item:list_string',
@@ -315,24 +302,7 @@ class XBTestSetup implements TestSetupInterface {
             'expression' => 'ℹ︎list_string␟value',
             'sourceTypeSettings' => [
               'storage' => [
-                'allowed_values' => [
-                  [
-                    'value' => 'full',
-                    'label' => 'full',
-                  ],
-                  [
-                    'value' => 'wide',
-                    'label' => 'wide',
-                  ],
-                  [
-                    'value' => 'normal',
-                    'label' => 'normal',
-                  ],
-                  [
-                    'value' => 'narrow',
-                    'label' => 'narrow',
-                  ],
-                ],
+                'allowed_values_function' => 'experience_builder_load_allowed_values_for_component_prop',
               ],
             ],
           ],
@@ -342,7 +312,7 @@ class XBTestSetup implements TestSetupInterface {
         'parent_uuid' => self::UUID_TWO_COLUMN_UUID,
         'slot' => 'column_two',
         'uuid' => self::UUID_STATIC_CARD2,
-        'component_id' => 'sdc.experience_builder.my-hero',
+        'component_id' => 'sdc.xb_test_sdc.my-hero',
         'inputs' => [
           'heading' => [
             'sourceType' => 'static:field_item:string',
@@ -356,7 +326,7 @@ class XBTestSetup implements TestSetupInterface {
         'parent_uuid' => self::UUID_TWO_COLUMN_UUID,
         'slot' => 'column_two',
         'uuid' => self::UUID_STATIC_CARD3,
-        'component_id' => 'sdc.experience_builder.my-hero',
+        'component_id' => 'sdc.xb_test_sdc.my-hero',
         'inputs' => [
           'heading' => [
             'sourceType' => 'static:field_item:string',
@@ -372,7 +342,7 @@ class XBTestSetup implements TestSetupInterface {
         'parent_uuid' => self::UUID_TWO_COLUMN_UUID,
         'slot' => 'column_two',
         'uuid' => self::UUID_ADAPTED_IMAGE,
-        'component_id' => 'sdc.experience_builder.image',
+        'component_id' => 'sdc.xb_test_sdc.image',
         'inputs' => [
           'image' => [
             'sourceType' => 'adapter:image_apply_style',
@@ -538,6 +508,7 @@ class XBTestSetup implements TestSetupInterface {
         'post comments',
         'administer permissions',
         PageRegion::ADMIN_PERMISSION,
+        'administer site configuration',
       ],
     ]);
     $xb_role->save();

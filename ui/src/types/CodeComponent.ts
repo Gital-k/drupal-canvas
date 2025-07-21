@@ -26,7 +26,11 @@ export interface CodeComponentProp {
   name: string;
   type: 'string' | 'integer' | 'number' | 'boolean' | 'object';
   enum?: string[];
-  example?: string | boolean | CodeComponentPropImageExample;
+  example?:
+    | string
+    | boolean
+    | CodeComponentPropImageExample
+    | CodeComponentPropVideoExample;
   $ref?: string;
   format?: string;
   derivedType: (typeof derivedPropTypes)[number]['type'] | null;
@@ -36,8 +40,6 @@ export interface CodeComponentProp {
 
 export interface CodeComponentPropImageExample {
   src: string;
-  // @todo Delete the following line in https://drupal.org/i/3532718.
-  srcSetCandidateTemplate: string;
   width: number;
   height: number;
   alt: string;
@@ -47,7 +49,13 @@ export interface CodeComponentPropSerialized {
   title: string;
   type: 'string' | 'integer' | 'number' | 'boolean' | 'object';
   enum?: (string | number)[];
-  examples?: (string | number | boolean | CodeComponentPropImageExample)[];
+  examples?: (
+    | string
+    | number
+    | boolean
+    | CodeComponentPropImageExample
+    | CodeComponentPropVideoExample
+  )[];
   $ref?: string;
   format?: string;
   contentMediaType?: string;
@@ -78,4 +86,9 @@ export interface AssetLibrary {
     original: string;
     compiled: string;
   };
+}
+
+export interface CodeComponentPropVideoExample {
+  src: string;
+  poster: string;
 }

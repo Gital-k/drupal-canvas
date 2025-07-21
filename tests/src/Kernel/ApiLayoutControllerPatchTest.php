@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\experience_builder\Kernel;
 
-use Drupal\Core\File\FileUrlGeneratorInterface;
 use Drupal\experience_builder\AutoSave\AutoSaveManager;
 use Drupal\experience_builder\Entity\PageRegion;
+use Drupal\experience_builder\Plugin\Field\FieldType\ComponentTreeItem;
+use Drupal\experience_builder\Plugin\Field\FieldType\ComponentTreeItemList;
+use Drupal\experience_builder\Plugin\Field\FieldTypeOverride\ImageItemOverride;
 use Drupal\file\FileInterface;
 use Drupal\image\Entity\ImageStyle;
 use Drupal\image\ImageStyleInterface;
@@ -14,6 +16,7 @@ use Drupal\media\MediaInterface;
 use Drupal\node\Entity\Node;
 use Drupal\node\NodeInterface;
 use Drupal\Tests\experience_builder\TestSite\XBTestSetup;
+use Drupal\Tests\experience_builder\Traits\AutoSaveRequestTestTrait;
 use Drupal\Tests\experience_builder\Traits\XBFieldTrait;
 use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\HttpFoundation\Request;
@@ -30,6 +33,7 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
 
   use XBFieldTrait;
+  use AutoSaveRequestTestTrait;
 
   /**
    * {@inheritdoc}
@@ -103,7 +107,7 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
       BadRequestHttpException::class,
       [
         'componentInstanceUuid' => 'e8c95423-4f22-4210-8707-08bade75ff22',
-        'componentType' => 'sdc.experience_builder.image@caab32397e0f3172',
+        'componentType' => 'sdc.xb_test_sdc.image@c06e0be7dd131740',
       ],
     ];
     yield 'No such component in model' => [
@@ -111,7 +115,7 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
       NotFoundHttpException::class,
       [
         'componentInstanceUuid' => 'e8c95423-4f22-4210-8707-08bade75ff22',
-        'componentType' => 'sdc.experience_builder.image@caab32397e0f3172',
+        'componentType' => 'sdc.xb_test_sdc.image@c06e0be7dd131740',
         'model' => [],
         'autoSaves' => [],
         'clientInstanceId' => 'sample-client-id',
@@ -129,22 +133,22 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
       ],
     ];
     yield 'No version provided' => [
-      'Missing version for component sdc.experience_builder.image',
+      'Missing version for component sdc.xb_test_sdc.image',
       NotFoundHttpException::class,
       [
         'componentInstanceUuid' => XbTestSetup::UUID_STATIC_IMAGE,
-        'componentType' => 'sdc.experience_builder.image',
+        'componentType' => 'sdc.xb_test_sdc.image',
         'model' => [],
         'autoSaves' => [],
         'clientInstanceId' => 'sample-client-id',
       ],
     ];
     yield 'Invalid version provided' => [
-      'No such version hamster for component sdc.experience_builder.image',
+      'No such version hamster for component sdc.xb_test_sdc.image',
       NotFoundHttpException::class,
       [
         'componentInstanceUuid' => XbTestSetup::UUID_STATIC_IMAGE,
-        'componentType' => 'sdc.experience_builder.image@hamster',
+        'componentType' => 'sdc.xb_test_sdc.image@hamster',
         'model' => [],
         'autoSaves' => [],
         'clientInstanceId' => 'sample-client-id',
@@ -170,6 +174,33 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
         $region->save();
       }
     }
+
+    // Setup additional nesting of components.
+    $node = Node::load(1);
+    \assert($node instanceof NodeInterface);
+    $tree = $node->get('field_xb_demo');
+    \assert($tree instanceof ComponentTreeItemList);
+    $static_image = $tree->getComponentTreeItemByUuid(XbTestSetup::UUID_STATIC_IMAGE);
+    \assert($static_image instanceof ComponentTreeItem);
+    $static_image->set('parent_uuid', XbTestSetup::UUID_ALL_SLOTS_EMPTY);
+    $static_image->set('slot', 'content');
+    // We need to make sure the delta order reflects that parents come before
+    // children otherwise this will happen on POST and create an auto-save entry.
+    $image_delta = $tree->getComponentTreeDeltaByUuid(XBTestSetup::UUID_STATIC_IMAGE);
+    $parent_delta = $tree->getComponentTreeDeltaByUuid(XBTestSetup::UUID_ALL_SLOTS_EMPTY);
+    \assert($image_delta !== NULL);
+    \assert($parent_delta !== NULL);
+    $values = $tree->getValue();
+    $values = [
+      ...\array_slice($values, 0, $image_delta),
+      ...\array_slice($values, $image_delta + 1, $parent_delta - $image_delta),
+      ...\array_slice($values, $image_delta, 1),
+      ...\array_slice($values, $parent_delta + 1),
+    ];
+    $node->set('field_xb_demo', $values);
+
+    $node->save();
+
     // Load the test data from the layout controller.
     $response = $this->parentRequest(Request::create('/xb/api/v0/layout/node/1'));
     $this->assertResponseAutoSaves($response, [Node::load(1)], $withGlobal);
@@ -221,6 +252,7 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
     \assert($media instanceof MediaInterface);
 
     // Make sure the current value isn't the same media ID.
+    self::assertNotEmpty($model[XbTestSetup::UUID_STATIC_IMAGE]['resolved']['image']);
     self::assertNotEquals($media->id(), $model[XbTestSetup::UUID_STATIC_IMAGE]['resolved']['image']);
 
     // Now patch the layout.
@@ -229,7 +261,7 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
     $new_model['source']['image']['value'] = $media->id();
     $updateImageClientData = [
       'model' => $new_model,
-      'componentType' => 'sdc.experience_builder.image@caab32397e0f3172',
+      'componentType' => 'sdc.xb_test_sdc.image@c06e0be7dd131740',
       'componentInstanceUuid' => XbTestSetup::UUID_STATIC_IMAGE,
     ] + $this->getPatchContentsDefaults([$node]);
     $response = $this->request(Request::create('/xb/api/v0/layout/node/1', method: 'PATCH', content: \json_encode($updateImageClientData, JSON_THROW_ON_ERROR)));
@@ -242,7 +274,9 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
     \assert($file instanceof FileInterface);
     $fileUri = $file->getFileUri();
     \assert(is_string($fileUri));
-    $image_url = $this->container->get(FileUrlGeneratorInterface::class)->generateString($fileUri);
+    $image = $media->get('field_media_image')->get(0);
+    \assert($image instanceof ImageItemOverride);
+    $image_url = $image->get('src_with_alternate_widths')->getValue();
     self::assertEquals($image_url, $data['model'][XbTestSetup::UUID_STATIC_IMAGE]['resolved']['image']['src']);
 
     self::assertFalse($autoSave->getAutoSaveEntity($node)->isEmpty());

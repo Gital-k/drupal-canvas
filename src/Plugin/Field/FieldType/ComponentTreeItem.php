@@ -63,6 +63,7 @@ use Symfony\Component\Validator\ConstraintViolationList;
       'inputs' => [
         'absence' => [
           'dynamic',
+          // @todo Allow adapters that consume a single shape and output that same single shape in https://www.drupal.org/project/experience_builder/issues/3536115
           'adapter',
         ],
         'presence' => NULL,
@@ -405,7 +406,7 @@ class ComponentTreeItem extends FieldItemBase {
     // TRICKY: do this *only* when no version is specified, otherwise this would
     // unintentionally "upgrade" instances of older component versions to newer
     // ones!
-    if (!array_key_exists('component_version', $this->values) && ($property_name === 'component_id' || $property_name === 'component')) {
+    if ($this->get('component_version')->getValue() === NULL && ($property_name === 'component_id' || $property_name === 'component')) {
       // Set the version ID based on the loaded component.
       $this->writePropertyValue('component_version', $this->getComponent()?->getLoadedVersion());
     }

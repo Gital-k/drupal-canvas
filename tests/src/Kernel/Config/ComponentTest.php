@@ -38,6 +38,7 @@ class ComponentTest extends KernelTestBase {
     'experience_builder',
     'sdc',
     'sdc_test',
+    'xb_test_sdc',
     // XB's dependencies (modules providing field types + widgets).
     'datetime',
     'file',
@@ -110,29 +111,29 @@ class ComponentTest extends KernelTestBase {
     // - uses `image` field type
     // - one version
     // - depends on `image` module
-    $this->assertArrayHasKey('sdc.experience_builder.image', $initial_components);
-    $initial_component = $initial_components['sdc.experience_builder.image'];
+    $this->assertArrayHasKey('sdc.xb_test_sdc.image', $initial_components);
+    $initial_component = $initial_components['sdc.xb_test_sdc.image'];
     $this->assertSame('image', $initial_component->getSettings()['prop_field_definitions']['image']['field_type']);
-    $initial_expected_version = '3a3d5862c2731770';
+    $initial_expected_version = 'd3a3df7d7e68efc0';
     self::assertSame($initial_expected_version, $initial_component->getActiveVersion());
     self::assertSame([$initial_expected_version], $initial_component->getVersions());
     self::assertSame([
       'config' => [
         'image.style.xb_parametrized_width',
       ],
-      'module' => ['file', 'image'],
+      'module' => ['file', 'image', 'xb_test_sdc'],
     ], $initial_component->getDependencies());
     self::assertSame([
       'config' => [
         'image.style.xb_parametrized_width',
       ],
-      'module' => ['file', 'image'],
+      'module' => ['file', 'image', 'xb_test_sdc'],
     ], $initial_component->calculateDependencies()->getDependencies());
     self::assertSame([
       'config' => [
         'image.style.xb_parametrized_width',
       ],
-      'module' => ['file', 'image'],
+      'module' => ['file', 'image', 'xb_test_sdc'],
     ], $initial_component->getVersionSpecificDependencies(VersionedConfigEntityInterface::ACTIVE_VERSION));
 
     // Then:
@@ -141,12 +142,12 @@ class ComponentTest extends KernelTestBase {
     // - depends on both the 'image' and `media_library` module, because there
     //   are now two versions.
     $this->midTestSetUp();
-    $updated_component = Component::load('sdc.experience_builder.image');
+    $updated_component = Component::load('sdc.xb_test_sdc.image');
     assert($updated_component instanceof Component);
     $this->assertSame('entity_reference', $updated_component->getSettings()['prop_field_definitions']['image']['field_type']);
-    $updated_expected_version = 'caab32397e0f3172';
-    self::assertSame('caab32397e0f3172', $updated_component->getActiveVersion());
-    self::assertSame(['caab32397e0f3172', '3a3d5862c2731770'], $updated_component->getVersions());
+    $updated_expected_version = 'c06e0be7dd131740';
+    self::assertSame('c06e0be7dd131740', $updated_component->getActiveVersion());
+    self::assertSame(['c06e0be7dd131740', 'd3a3df7d7e68efc0'], $updated_component->getVersions());
     self::assertSame([
       'config' => [
         'field.field.media.image.field_media_image',
@@ -158,13 +159,14 @@ class ComponentTest extends KernelTestBase {
         'image',
         'media',
         'media_library',
+        'xb_test_sdc',
       ],
     ], $updated_component->getDependencies());
     self::assertSame([
       'config' => [
         'image.style.xb_parametrized_width',
       ],
-      'module' => ['file', 'image'],
+      'module' => ['file', 'image', 'xb_test_sdc'],
     ], $updated_component->getVersionSpecificDependencies($initial_expected_version));
     self::assertSame([
       'config' => [
@@ -176,6 +178,7 @@ class ComponentTest extends KernelTestBase {
         'file',
         'media',
         'media_library',
+        'xb_test_sdc',
       ],
     ], $updated_component->getVersionSpecificDependencies(VersionedConfigEntityInterface::ACTIVE_VERSION));
 
@@ -183,7 +186,7 @@ class ComponentTest extends KernelTestBase {
     // ::calculateDependencies() again causes ::getDependencies() to return only
     // the dependencies of THAT version. ⚠️
     self::assertTrue($updated_component->isLoadedVersionActiveVersion());
-    $updated_component->loadVersion('3a3d5862c2731770');
+    $updated_component->loadVersion('d3a3df7d7e68efc0');
     self::assertFalse($updated_component->isLoadedVersionActiveVersion());
     $this->assertSame('image', $updated_component->getSettings()['prop_field_definitions']['image']['field_type']);
     self::assertSame([
@@ -197,6 +200,7 @@ class ComponentTest extends KernelTestBase {
         'image',
         'media',
         'media_library',
+        'xb_test_sdc',
       ],
     ], $updated_component->getDependencies());
     self::assertSame([
@@ -210,9 +214,10 @@ class ComponentTest extends KernelTestBase {
         'image',
         'media',
         'media_library',
+        'xb_test_sdc',
       ],
     ], $updated_component->calculateDependencies()->getDependencies());
-    $updated_component->loadVersion('caab32397e0f3172');
+    $updated_component->loadVersion('c06e0be7dd131740');
     self::assertTrue($updated_component->isLoadedVersionActiveVersion());
 
     // Finally, because no component instances exist that use the old version,
@@ -221,7 +226,7 @@ class ComponentTest extends KernelTestBase {
     // - one version
     // - depends on the `media_library` module
     $updated_component->deleteVersion($initial_expected_version)->save();
-    $component_without_obsolete_versions = Component::load('sdc.experience_builder.image');
+    $component_without_obsolete_versions = Component::load('sdc.xb_test_sdc.image');
     assert($component_without_obsolete_versions instanceof Component);
     $this->assertSame('entity_reference', $updated_component->getSettings()['prop_field_definitions']['image']['field_type']);
     self::assertSame($updated_expected_version, $updated_component->getActiveVersion());
@@ -232,7 +237,7 @@ class ComponentTest extends KernelTestBase {
         'image.style.xb_parametrized_width',
         'media.type.image',
       ],
-      'module' => ['file', 'media', 'media_library'],
+      'module' => ['file', 'media', 'media_library', 'xb_test_sdc'],
     ], $updated_component->getDependencies());
   }
 
@@ -241,7 +246,7 @@ class ComponentTest extends KernelTestBase {
     $list_builder = $this->container->get(EntityTypeManagerInterface::class)->getListBuilder(Component::ENTITY_TYPE_ID);
     \assert($list_builder instanceof EntityListBuilderInterface);
     $this->componentPluginManager->getDefinitions();
-    $component = Component::load('sdc.experience_builder.image');
+    $component = Component::load('sdc.xb_test_sdc.image');
     \assert($component instanceof ComponentInterface);
     $operations = $list_builder->getOperations($component);
     self::assertArrayHasKey('disable', $operations);

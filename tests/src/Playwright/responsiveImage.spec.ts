@@ -15,7 +15,7 @@ test.describe('Responsive Image', () => {
     await drupal.loginAsAdmin();
     await page.goto('/homepage');
     await xBEditor.goToEditor();
-    await xBEditor.addComponent('sdc.experience_builder.image');
+    await xBEditor.addComponent('sdc.xb_test_sdc.image');
 
     const frame = page
       .locator('[data-testid="xb-canvas-scaling"] [data-xb-swap-active="true"]')
@@ -44,9 +44,11 @@ test.describe('Responsive Image', () => {
     expect(previewSrc).toContain('gracie');
 
     const previewSrcset = await previewImg.getAttribute('srcset');
-    const defaultWidths = [640, 750, 828, 1080, 1200, 1920, 2048];
+    const defaultWidths = [
+      16, 32, 48, 64, 96, 128, 256, 384, 640, 750, 828, 1080, 1200, 1920, 2048,
+    ];
     const matches = previewSrcset.match(/itok=[^&\s]+/g);
-    expect(matches).toHaveLength(7);
+    expect(matches).toHaveLength(defaultWidths.length);
     defaultWidths.forEach((width) => {
       expect(previewSrcset).toContain(
         `/styles/xb_parametrized_width--${width}`,

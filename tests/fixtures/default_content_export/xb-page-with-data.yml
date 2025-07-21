@@ -15,7 +15,7 @@ default:
       value: Homepage
   components:
     - uuid: 16176e0b-8197-40e3-ad49-48f1b6e9a7f9
-      component_id: sdc.experience_builder.two_column
+      component_id: sdc.xb_test_sdc.two_column
       inputs:
         width:
           sourceType: 'static:field_item:list_integer'
@@ -23,17 +23,7 @@ default:
           expression: ℹ︎list_integer␟value
           sourceTypeSettings:
             storage:
-              allowed_values:
-                - value: 25
-                  label: '25'
-                - value: 33
-                  label: '33'
-                - value: 50
-                  label: '50'
-                - value: 66
-                  label: '66'
-                - value: 75
-                  label: '75'
+              allowed_values_function: experience_builder_load_allowed_values_for_component_prop
   created:
     -
       value: 1735191284

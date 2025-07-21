@@ -269,10 +269,10 @@ enum JsonSchemaType: string {
           TRUE => NULL,
           FALSE => new StorablePropShape(
             shape: $shape,
-            fieldWidget: 'options_select',
             fieldTypeProp: new FieldTypePropExpression('list_string', 'value'),
+            fieldWidget: 'options_select',
             fieldStorageSettings: [
-              'allowed_values' => array_map(fn ($v) => ['value' => $v, 'label' => (string) $v], $schema['enum']),
+              'allowed_values_function' => 'experience_builder_load_allowed_values_for_component_prop',
             ],
           ),
         },
@@ -293,8 +293,8 @@ enum JsonSchemaType: string {
       // - `minimum`, `exclusiveMinimum`, `maximum` and `exclusiveMaximum`: https://json-schema.org/understanding-json-schema/reference/numeric#range
       JsonSchemaType::INTEGER => match (TRUE) {
         array_key_exists('$ref', $schema) => NULL,
-        array_key_exists('enum', $schema) => new StorablePropShape(shape: $shape, fieldWidget: 'options_select', fieldTypeProp: new FieldTypePropExpression('list_integer', 'value'), fieldStorageSettings: [
-          'allowed_values' => array_map(fn ($v) => ['value' => $v, 'label' => (string) $v], $schema['enum']),
+        array_key_exists('enum', $schema)=> new StorablePropShape(shape: $shape, fieldTypeProp: new FieldTypePropExpression('list_integer', 'value'), fieldWidget: 'options_select', fieldStorageSettings: [
+          'allowed_values_function' => 'experience_builder_load_allowed_values_for_component_prop',
         ]),
         // `min` and/or `max`
         array_key_exists('minimum', $schema) || array_key_exists('maximum', $schema) => new StorablePropShape(shape: $shape, fieldTypeProp: new FieldTypePropExpression('integer', 'value'), fieldWidget: 'number', fieldInstanceSettings: [
@@ -312,8 +312,8 @@ enum JsonSchemaType: string {
       // - `minimum`, `exclusiveMinimum`, `maximum` and `exclusiveMaximum`: https://json-schema.org/understanding-json-schema/reference/numeric#range
       JsonSchemaType::NUMBER => match (TRUE) {
         array_key_exists('$ref', $schema) => NULL,
-        array_key_exists('enum', $schema) => new StorablePropShape(shape: $shape, fieldWidget: 'options_select', fieldTypeProp: new FieldTypePropExpression('list_float', 'value'), fieldStorageSettings: [
-          'allowed_values' => array_map(fn ($v) => ['value' => $v, 'label' => (string) $v], $schema['enum']),
+        array_key_exists('enum', $schema) => new StorablePropShape(shape: $shape, fieldTypeProp: new FieldTypePropExpression('list_float', 'value'), fieldWidget: 'options_select', fieldStorageSettings: [
+          'allowed_values_function' => 'experience_builder_load_allowed_values_for_component_prop',
         ]),
         // `min` and/or `max`
         array_key_exists('minimum', $schema) || array_key_exists('maximum', $schema) => new StorablePropShape(shape: $shape, fieldTypeProp: new FieldTypePropExpression('float', 'value'), fieldWidget: 'number', fieldStorageSettings: [
@@ -328,19 +328,38 @@ enum JsonSchemaType: string {
       JsonSchemaType::OBJECT => match (TRUE) {
         array_key_exists('$ref', $schema) => match ($schema['$ref']) {
           // @see \Drupal\image\Plugin\Field\FieldType\ImageItem
-          // @see media_library_storage_prop_shape_alter()
+          // @see \Drupal\experience_builder\Hook\ShapeMatchingHooks::mediaLibraryStoragePropShapeAlter()
+          // @todo Try decorating with adapter in https://www.drupal.org/project/experience_builder/issues/3536115.
           'json-schema-definitions://experience_builder.module/image' => new StorablePropShape(shape: $shape, fieldWidget: 'image_image', fieldTypeProp: new FieldTypeObjectPropsExpression('image', [
+            // TRICKY: Additional computed property on image fields added by Experience Builder.
+            // @see \Drupal\experience_builder\Plugin\Field\FieldTypeOverride\ImageItemOverride
+            // @todo Remove the next line in favor of the commented out lines in https://www.drupal.org/project/experience_builder/issues/3536115.
+            'src' => new FieldTypePropExpression('image', 'src_with_alternate_widths'),
+            // @phpcs:disable
+            /*
             'src' => new ReferenceFieldTypePropExpression(
               new FieldTypePropExpression('image', 'entity'),
               new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'uri', NULL, 'url'),
             ),
+            */
+            // @phpcs:enable
             'alt' => new FieldTypePropExpression('image', 'alt'),
             'width' => new FieldTypePropExpression('image', 'width'),
             'height' => new FieldTypePropExpression('image', 'height'),
-            // TRICKY: Additional computed property on image fields added by Experience Builder.
-            // @see \Drupal\experience_builder\Plugin\Field\FieldTypeOverride\ImageItemOverride
-            'srcSetCandidateTemplate' => new FieldTypePropExpression('image', 'srcset_candidate_uri_template'),
           ])),
+          // @see \Drupal\file\Plugin\Field\FieldType\FileItem
+          // @see \Drupal\experience_builder\Hook\ShapeMatchingHooks::mediaLibraryStoragePropShapeAlter()
+          'json-schema-definitions://experience_builder.module/video' => new StorablePropShape(
+            shape: $shape,
+            fieldWidget: 'file_generic',
+            fieldTypeProp: new FieldTypeObjectPropsExpression('file', [
+              'src' => new ReferenceFieldTypePropExpression(
+                new FieldTypePropExpression('file', 'entity'),
+                new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'uri', NULL, 'url'),
+              ),
+            ]),
+            fieldInstanceSettings: ['file_extensions' => 'mp4'],
+          ),
           default => NULL,
         },
         default => NULL,

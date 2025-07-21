@@ -13,7 +13,6 @@ use Drupal\experience_builder\AutoSave\AutoSaveManager;
 use Drupal\experience_builder\Entity\Component;
 use Drupal\experience_builder\Entity\ComponentInterface;
 use Drupal\experience_builder\Entity\JavaScriptComponent;
-use Drupal\experience_builder\Entity\Page;
 use Drupal\experience_builder\Entity\PageRegion;
 use Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\JsComponent;
 use Drupal\file\FileInterface;
@@ -166,7 +165,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
                   'nodeType' => 'slot',
                 ],
               ],
-              'type' => 'sdc.experience_builder.one_column@f6a3a392e98e8342',
+              'type' => 'sdc.xb_test_sdc.one_column@836c8835c850cdc5',
               'uuid' => 'c4074d1f-149a-4662-aaf3-615151531cf6',
             ],
           ],
@@ -184,24 +183,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
               'expression' => 'ℹ︎list_string␟value',
               'sourceTypeSettings' => [
                 'storage' => [
-                  'allowed_values' => [
-                    [
-                      'value' => 'full',
-                      'label' => 'full',
-                    ],
-                    [
-                      'value' => 'wide',
-                      'label' => 'wide',
-                    ],
-                    [
-                      'value' => 'normal',
-                      'label' => 'normal',
-                    ],
-                    [
-                      'value' => 'narrow',
-                      'label' => 'narrow',
-                    ],
-                  ],
+                  'allowed_values_function' => 'experience_builder_load_allowed_values_for_component_prop',
                 ],
               ],
             ],
@@ -215,163 +197,6 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
     $this->assertNotNull($root);
     $slot_and_component_comments = $this->getComponentInstances($root);
     $this->assertSame(['c4074d1f-149a-4662-aaf3-615151531cf6'], $slot_and_component_comments);
-  }
-
-  /**
-   * @testWith [false]
-   *         [true]
-   */
-  public function testOutdatedAutoSave(bool $testRegion): void {
-    $page = Page::create([
-      'title' => 'Test page',
-      'status' => FALSE,
-      'components' => [],
-    ]);
-    $page->save();
-    $permissions = [Page::CREATE_PERMISSION, Page::EDIT_PERMISSION, AutoSaveManager::PUBLISH_PERMISSION];
-    if ($testRegion) {
-      $permissions[] = PageRegion::ADMIN_PERMISSION;
-      $regions = PageRegion::createFromBlockLayout('stark');
-      foreach ($regions as $region) {
-        $region->save();
-      }
-      $sideBarRegion = PageRegion::load('stark.sidebar_first');
-      assert($sideBarRegion instanceof PageRegion);
-      $autoSaveKey = AutoSaveManager::getAutoSaveKey($sideBarRegion);
-      $entity = $sideBarRegion;
-      $updateJson = function (&$json, $text) {
-        $regions = array_filter($json['layout'], fn ($region) =>
-          $region['nodeType'] === 'region'
-          && $region['id'] === 'sidebar_first'
-          && str_starts_with($region['components'][0]['type'], 'block.system_messages_block@')
-        );
-        self::assertCount(1, $regions);
-        $region = reset($regions);
-        $uuid = $region['components'][0]['uuid'];
-        \assert(isset($json['model'][$uuid]['resolved']['label']));
-        $json['model'][$uuid]['resolved']['label'] = $text;
-      };
-      $assertUpdate = function (string $text) use ($entity) {
-        $autoSaveManager = $this->container->get(AutoSaveManager::class);
-        \assert($autoSaveManager instanceof AutoSaveManager);
-        $region = $autoSaveManager->getAutoSaveEntity($entity)->entity;
-        \assert($region instanceof PageRegion);
-        self::assertSame($text, $region->getComponentTree()->getValue()[0]['inputs']['label']);
-      };
-    }
-    else {
-      $entity = $page;
-      $autoSaveKey = AutoSaveManager::getAutoSaveKey($page);
-      $updateJson = fn (&$json, $text) => $json['entity_form_fields']['title[0][value]'] = $text;
-      $assertUpdate = function (string $text) use ($entity) {
-        $autoSaveManager = $this->container->get(AutoSaveManager::class);
-        \assert($autoSaveManager instanceof AutoSaveManager);
-        $page = $autoSaveManager->getAutoSaveEntity($entity)->entity;
-        self::assertInstanceOf(Page::class, $page);
-        self::assertSame($text, $page->label());
-      };
-    }
-    $this->setUpCurrentUser(permissions: $permissions);
-
-    $autoSaveManager = $this->container->get(AutoSaveManager::class);
-    assert($autoSaveManager instanceof AutoSaveManager);
-    $url = Url::fromRoute('experience_builder.api.layout.get', [
-      'entity' => $page->id(),
-      'entity_type' => 'xb_page',
-    ])->toString();
-
-    $response = $this->request(Request::create($url));
-    self::assertSame(Response::HTTP_OK, $response->getStatusCode());
-    $getJson = self::decodeResponse($response);
-    // Even without an auto-save entry, the `autoSaves` value will not be empty.
-    // We always need the `autoSaveRevision` set to determine if the client data
-    // is outdated because the `hash` being empty only indicates
-    // that there was no auto-save entry at the time of the GET request. It does
-    // not tell us if it was created from the current version of the entity. The
-    // last request of the client could have been made a long time ago.
-    $this->assertNull($getJson['autoSaves'][$autoSaveKey]['hash']);
-    $this->assertNotEmpty($getJson['autoSaves'][$autoSaveKey]['autoSaveRevision']);
-
-    $originalGetJson = $getJson;
-    $updateJson($getJson, 'Updated text');
-    $originalClientId = 'known-client-id';
-    $getJson['clientInstanceId'] = $originalClientId;
-
-    $updateTitleRequest = Request::create($url, method: 'POST', content: $this->filterLayoutForPost(json_encode($getJson, JSON_THROW_ON_ERROR)));
-    if ($testRegion) {
-      // If we try to post back the same `autoSaves` including the regions
-      // when the user does not access to 'update' regions, we should get a
-      // conflict.
-      $permissions = array_diff($permissions, [PageRegion::ADMIN_PERMISSION]);
-      $this->setUpCurrentUser(permissions: $permissions);
-      $this->assertRequestAutoSaveConflict($updateTitleRequest);
-
-      $permissions[] = PageRegion::ADMIN_PERMISSION;
-      $this->setUpCurrentUser(permissions: $permissions);
-
-      $getJsonMissingRegion = $getJson;
-      unset($getJsonMissingRegion['autoSaves']['page_region:stark.sidebar_second']);
-      $this->assertRequestAutoSaveConflict(Request::create($url, method: 'POST', content: $this->filterLayoutForPost(json_encode($getJsonMissingRegion, JSON_THROW_ON_ERROR))));
-    }
-
-    $response = $this->request($updateTitleRequest);
-    $assertUpdate('Updated text');
-    self::assertSame(Response::HTTP_OK, $response->getStatusCode());
-    $postJson = self::decodeResponse($response);
-    // The auto-save hash should be set after the first post but the
-    // `autoSaveRevision` should be the same as the one from the GET request.
-    $this->assertNotNull($postJson['autoSaves'][$autoSaveKey]['hash']);
-    $this->assertSame($getJson['autoSaves'][$autoSaveKey]['autoSaveRevision'], $postJson['autoSaves'][$autoSaveKey]['autoSaveRevision']);
-    // A post with an outdated auto-save hash should cause a conflict exception.
-    $this->assertRequestAutoSaveConflict(Request::create($url, method: 'POST', content: $this->filterLayoutForPost(json_encode($originalGetJson, JSON_THROW_ON_ERROR))));
-
-    // A post with outdated auto-save hashes but from the same client should
-    // be accepted because in some cases the client may send a request before
-    // the previous on returns with the latest auto-save hash.
-    $originalGetJsonWithMatchingClientId = $originalGetJson;
-    $originalGetJsonWithMatchingClientId['clientInstanceId'] = $originalClientId;
-    $updateJson($originalGetJsonWithMatchingClientId, 'Updated title-finalV2');
-    $response = $this->request(Request::create($url, method: 'POST', content: $this->filterLayoutForPost(json_encode($originalGetJsonWithMatchingClientId, JSON_THROW_ON_ERROR))));
-    self::assertSame(Response::HTTP_OK, $response->getStatusCode());
-    $assertUpdate('Updated title-finalV2');
-
-    $this->makePublishAllRequest();
-
-    // After publishing the auto-save hash should be empty and the
-    // `autoSaveRevision` should be different.
-    $response = $this->request(Request::create($url));
-    self::assertSame(Response::HTTP_OK, $response->getStatusCode());
-    $getJson = self::decodeResponse($response);
-    $this->assertNull($getJson['autoSaves'][$autoSaveKey]['hash']);
-    $this->assertNotEmpty($getJson['autoSaves'][$autoSaveKey]['autoSaveRevision']);
-    $this->assertNotEquals($getJson['autoSaves'][$autoSaveKey]['autoSaveRevision'], $originalGetJson['autoSaves'][$autoSaveKey]['autoSaveRevision']);
-
-    // The outdated `autoSaveRevision` should cause a conflict exception.
-    $this->assertRequestAutoSaveConflict(Request::create($url, method: 'POST', content: $this->filterLayoutForPost(json_encode($originalGetJson, JSON_THROW_ON_ERROR))));
-
-    // After publishing, we no longer have an auto-save entry with a client Id.
-    // Therefore, we can no longer post with an outdated auto-save hash with a
-    // matching client id.
-    self::assertTrue($autoSaveManager->getAutoSaveEntity($entity)->isEmpty());
-    $originalGetJsonWithMatchingClientId = $originalGetJson;
-    $originalGetJsonWithMatchingClientId['clientInstanceId'] = $originalClientId;
-    $updateJson($originalGetJsonWithMatchingClientId, 'Updated text-finalV2');
-    $this->assertRequestAutoSaveConflict(Request::create($url, method: 'POST', content: $this->filterLayoutForPost(json_encode($originalGetJsonWithMatchingClientId, JSON_THROW_ON_ERROR))));
-
-    // A post with the auto-save information from the GET request after
-    // publishing should not get a conflict exception.
-    $getJson['clientInstanceId'] = $originalClientId;
-    $updateJson($getJson, 'Updated text-finalV3');
-    $response = $this->request(Request::create($url, method: 'POST', content: $this->filterLayoutForPost(json_encode($getJson, JSON_THROW_ON_ERROR))));
-    self::assertSame(Response::HTTP_OK, $response->getStatusCode());
-
-    // Even if the auto-save hash and the client ID match there would be still
-    // be a conflict exception because the `autoSaveRevision` does not match.
-    $autoSaveEntity = $autoSaveManager->getAutoSaveEntity($entity);
-    self::assertFalse($autoSaveEntity->isEmpty());
-    self::assertSame($originalClientId, $autoSaveEntity->clientId);
-    $originalGetJsonWithMatchingClientId['autoSaves'][$autoSaveKey]['hash'] = $autoSaveEntity->hash;
-    $this->assertRequestAutoSaveConflict(Request::create($url, method: 'POST', content: $this->filterLayoutForPost(json_encode($originalGetJsonWithMatchingClientId, JSON_THROW_ON_ERROR))));
   }
 
   public function test(): void {
@@ -416,7 +241,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
     $json['layout'][0]['components'][] = [
       'nodeType' => 'component',
       'uuid' => $uuid,
-      'type' => 'sdc.experience_builder.heading@1b4f8df7c94d7e3c',
+      'type' => 'sdc.xb_test_sdc.heading@9616e3c4ab9b4fce',
       'slots' => [],
     ];
     // And update the card model to use a URI reference.
@@ -478,7 +303,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
     $json['layout'][\key($highlightedRegion)]['components'][] = [
       'nodeType' => 'component',
       'uuid' => $uuid,
-      'type' => 'sdc.experience_builder.heading@1b4f8df7c94d7e3c',
+      'type' => 'sdc.xb_test_sdc.heading@9616e3c4ab9b4fce',
       'slots' => [],
     ];
     $json += $this->getPostContentsDefaults($node);
@@ -538,7 +363,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
     $json['layout'][1]['components'][] = [
       'nodeType' => 'component',
       'uuid' => $uuid,
-      'type' => 'sdc.experience_builder.heading',
+      'type' => 'sdc.xb_test_sdc.heading',
       'slots' => [],
     ];
     $json += $this->getPostContentsDefaults($node);
@@ -628,11 +453,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
           'expression' => 'ℹ︎list_string␟value',
           'sourceTypeSettings' => [
             'storage' => [
-              'allowed_values' => [
-                ['value' => 'polite', 'label' => 'polite'],
-                ['value' => 'shouting', 'label' => 'shouting'],
-                ['value' => 'toddler on a sugar high', 'label' => 'toddler on a sugar high'],
-              ],
+              'allowed_values_function' => 'experience_builder_load_allowed_values_for_component_prop',
             ],
           ],
         ],
@@ -693,16 +514,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
           'expression' => 'ℹ︎list_string␟value',
           'sourceTypeSettings' => [
             'storage' => [
-              'allowed_values' => [
-                [
-                  'value' => 'primary',
-                  'label' => 'primary',
-                ],
-                [
-                  'value' => 'secondary',
-                  'label' => 'secondary',
-                ],
-              ],
+              'allowed_values_function' => 'experience_builder_load_allowed_values_for_component_prop',
             ],
           ],
         ],
@@ -711,36 +523,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
           'expression' => 'ℹ︎list_string␟value',
           'sourceTypeSettings' => [
             'storage' => [
-              'allowed_values' => [
-                [
-                  'value' => 'div',
-                  'label' => 'div',
-                ],
-                [
-                  'value' => 'h1',
-                  'label' => 'h1',
-                ],
-                [
-                  'value' => 'h2',
-                  'label' => 'h2',
-                ],
-                [
-                  'value' => 'h3',
-                  'label' => 'h3',
-                ],
-                [
-                  'value' => 'h4',
-                  'label' => 'h4',
-                ],
-                [
-                  'value' => 'h5',
-                  'label' => 'h5',
-                ],
-                [
-                  'value' => 'h6',
-                  'label' => 'h6',
-                ],
-              ],
+              'allowed_values_function' => 'experience_builder_load_allowed_values_for_component_prop',
             ],
           ],
         ],
@@ -792,7 +575,9 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
         'heading' => 'Heading the right direction?',
         // Resolved will default to the default resolved values.
         // @see addNewComponentToLayout reducer in typescript code.
-        'image' => $client_side['propSources']['image']['default_values']['resolved'] ?? NULL,
+        'image' => \str_contains($sdc, 'required')
+          ? $reference_media->id()
+          : ($client_side['propSources']['image']['default_values']['resolved'] ?? NULL),
       ],
       'source' => [
         'heading' => [
@@ -801,7 +586,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
         ],
         'image' => [
           'sourceType' => 'static:field_item:entity_reference',
-          'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:image␝field_media_image␞␟entity␜␜entity:file␝uri␞␟url,alt↝entity␜␜entity:media:image␝field_media_image␞␟alt,width↝entity␜␜entity:media:image␝field_media_image␞␟width,height↝entity␜␜entity:media:image␝field_media_image␞␟height}',
+          'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:image␝field_media_image␞␟src_with_alternate_widths,alt↝entity␜␜entity:media:image␝field_media_image␞␟alt,width↝entity␜␜entity:media:image␝field_media_image␞␟width,height↝entity␜␜entity:media:image␝field_media_image␞␟height}',
           'sourceTypeSettings' => [
             'storage' => ['target_type' => 'media'],
             'instance' => [
@@ -827,7 +612,8 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
     $module_path = \Drupal::service('extension.list.module')->getPath('experience_builder');
     $expected_preview_html = str_replace('XB/MODULE/PATH', $module_path, $expected_preview_html);
     \assert($reference_media->field_media_image->entity instanceof FileInterface);
-    $expected_preview_html = str_replace('!!REFERENCED_MEDIA!!', $reference_media->field_media_image->entity->createFileUrl(), $expected_preview_html);
+    // @phpstan-ignore-next-line
+    $expected_preview_html = str_replace('!!REFERENCED_MEDIA!!', $reference_media->field_media_image->src_with_alternate_widths, $expected_preview_html);
 
     unset($json['html'], $json['isPublished'], $json['isNew']);
     $this->request(Request::create('/xb/api/v0/layout/node/1', method: 'POST', content: json_encode($json, JSON_THROW_ON_ERROR)));

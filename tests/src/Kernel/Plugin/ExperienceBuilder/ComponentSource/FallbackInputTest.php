@@ -109,9 +109,9 @@ final class FallbackInputTest extends ApiLayoutControllerTestBase {
    *           [false]
    */
   public function testFallbackInputCanBeRecovered(bool $publish = FALSE): void {
-    $component_to_recover = Component::load('sdc.experience_builder.image');
+    $component_to_recover = Component::load('sdc.xb_test_sdc.image');
     \assert($component_to_recover instanceof ComponentInterface);
-    $component_to_edit = Component::load('sdc.experience_builder.heading');
+    $component_to_edit = Component::load('sdc.xb_test_sdc.heading');
     \assert($component_to_edit instanceof ComponentInterface);
     // Create a tree containing two components, one that will be forced to a
     // fallback and then be recovered. One that we will edit.
@@ -149,7 +149,7 @@ final class FallbackInputTest extends ApiLayoutControllerTestBase {
             'sourceType' => 'static:field_item:entity_reference',
             'value' => ['target_id' => $image->id()],
             // This expression resolves `src` to the image's public URL.
-            'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:image␝field_media_image␞␟entity␜␜entity:file␝uri␞␟url,alt↝entity␜␜entity:media:image␝field_media_image␞␟alt,width↝entity␜␜entity:media:image␝field_media_image␞␟width,height↝entity␜␜entity:media:image␝field_media_image␞␟height}',
+            'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:image␝field_media_image␞␟src_with_alternate_widths,alt↝entity␜␜entity:media:image␝field_media_image␞␟alt,width↝entity␜␜entity:media:image␝field_media_image␞␟width,height↝entity␜␜entity:media:image␝field_media_image␞␟height}',
             'sourceTypeSettings' => [
               'storage' => ['target_type' => 'media'],
               'instance' => [
@@ -177,16 +177,7 @@ final class FallbackInputTest extends ApiLayoutControllerTestBase {
             'expression' => 'ℹ︎list_string␟value',
             'sourceTypeSettings' => [
               'storage' => [
-                'allowed_values' => [
-                  [
-                    'value' => 'primary',
-                    'label' => 'primary',
-                  ],
-                  [
-                    'value' => 'secondary',
-                    'label' => 'secondary',
-                  ],
-                ],
+                'allowed_values_function' => 'experience_builder_load_allowed_values_for_component_prop',
               ],
             ],
           ],
@@ -196,36 +187,7 @@ final class FallbackInputTest extends ApiLayoutControllerTestBase {
             'expression' => 'ℹ︎list_string␟value',
             'sourceTypeSettings' => [
               'storage' => [
-                'allowed_values' => [
-                  [
-                    'value' => 'div',
-                    'label' => 'div',
-                  ],
-                  [
-                    'value' => 'h1',
-                    'label' => 'h1',
-                  ],
-                  [
-                    'value' => 'h2',
-                    'label' => 'h2',
-                  ],
-                  [
-                    'value' => 'h3',
-                    'label' => 'h3',
-                  ],
-                  [
-                    'value' => 'h4',
-                    'label' => 'h4',
-                  ],
-                  [
-                    'value' => 'h5',
-                    'label' => 'h5',
-                  ],
-                  [
-                    'value' => 'h6',
-                    'label' => 'h6',
-                  ],
-                ],
+                'allowed_values_function' => 'experience_builder_load_allowed_values_for_component_prop',
               ],
             ],
           ],
@@ -277,7 +239,7 @@ final class FallbackInputTest extends ApiLayoutControllerTestBase {
     $new_model['source']['text']['value'] = 'New heading text';
     $response = $this->request(Request::create($api_endpoint_uri, method: 'PATCH', content: \json_encode([
       'model' => $new_model,
-      'componentType' => 'sdc.experience_builder.heading@1b4f8df7c94d7e3c',
+      'componentType' => 'sdc.xb_test_sdc.heading@9616e3c4ab9b4fce',
       'componentInstanceUuid' => $component_to_edit_uuid,
     ] + $this->getPatchContentsDefaults([$page]), JSON_THROW_ON_ERROR)));
     self::assertEquals(Response::HTTP_OK, $response->getStatusCode());

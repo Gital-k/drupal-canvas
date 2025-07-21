@@ -114,7 +114,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
         [
           'uuid' => '435d1d20-a697-4d36-9892-9d61c825c99c',
           'component_id' => 'sdc.xb_test_sdc.my-cta',
-          'component_version' => 'fa533ff8be5a1402',
+          'component_version' => '9454c3bca9bbbf4b',
           'inputs' => [
             'text' => [
               'sourceType' => 'static:field_item:string',
@@ -133,7 +133,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
         [
           'uuid' => '57afe4ed-c593-4457-a741-2ac5053be928',
           'component_id' => 'js.my-cta',
-          'component_version' => 'dd3127c82cca2600',
+          'component_version' => '9454c3bca9bbbf4b',
           'inputs' => [
             'text' => [
               'sourceType' => 'dynamic',
@@ -258,7 +258,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
       'component_tree' => [
         [
           'uuid' => '19ff9a18-54a2-422a-bf68-49d65a5d53ac',
-          'component_id' => 'sdc.experience_builder.druplicon',
+          'component_id' => 'sdc.xb_test_sdc.druplicon',
           'component_version' => '8fe3be948e0194e1',
           'inputs' => [],
         ],
@@ -335,15 +335,15 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
         ],
         [
           'uuid' => '7240f848-ea70-4ad2-a9d6-3ab60cba4d78',
-          'component_id' => 'sdc.experience_builder.image',
-          'component_version' => '3a3d5862c2731770',
+          'component_id' => 'sdc.xb_test_sdc.image',
+          'component_version' => 'd3a3df7d7e68efc0',
           'inputs' => [
             'image' => [
               'sourceType' => 'adapter:image_apply_style',
               'adapterInputs' => [
                 'image' => [
                   'sourceType' => 'dynamic',
-                  'expression' => 'ℹ︎␜entity:node:article␝field_hero␞␟{src↝entity␜␜entity:file␝uri␞0␟value,alt↠alt,width↠width,height↠height,srcSetCandidateTemplate↠srcset_candidate_uri_template}',
+                  'expression' => 'ℹ︎␜entity:node:article␝field_hero␞␟{src↝entity␜␜entity:file␝uri␞0␟value,alt↠alt,width↠width,height↠height}',
                 ],
                 'imageStyle' => [
                   'sourceType' => 'static:field_item:string',

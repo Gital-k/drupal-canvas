@@ -61,6 +61,7 @@ services:
     parent: tempstore.shared
   Drupal\experience_builder\Storage\ComponentTreeLoader: {}
   Drupal\experience_builder\CodeComponentDataProvider: {}
+  Drupal\experience_builder\Version: {}
 
   # Event subscribers.
   experience_builder.openapi.http_request_validator.subscriber:
@@ -139,6 +140,7 @@ services:
   Drupal\experience_builder\Controller\ApiLogController: {}
   Drupal\experience_builder\Controller\ApiContentUpdateForDemoController: {}
   Drupal\experience_builder\Controller\ApiContentControllers: {}
+  Drupal\experience_builder\Controller\ApiStagedConfigUpdateAutoSaveController: {}
   Drupal\experience_builder\Controller\ComponentStatusController: {}
   Drupal\experience_builder\Controller\ComponentAuditController: {}
   Drupal\experience_builder\Controller\ExperienceBuilderController: {}

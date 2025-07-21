@@ -5,6 +5,7 @@ import {
   FileIcon,
   SectionIcon,
   StackIcon,
+  HomeIcon,
 } from '@radix-ui/react-icons';
 import {
   Badge,
@@ -13,21 +14,22 @@ import {
   Flex,
   Popover,
 } from '@radix-ui/themes';
-import { useAppSelector } from '@/app/hooks';
+import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import { selectPageData } from '@/features/pageData/pageDataSlice';
 import type { ReactElement } from 'react';
 import { useEffect } from 'react';
 import useDebounce from '@/hooks/useDebounce';
 import { DEFAULT_REGION } from '@/features/ui/uiSlice';
-import { Link, useParams } from 'react-router-dom';
+import { NavLink, useParams } from 'react-router-dom';
 import { selectLayout } from '@/features/layout/layoutModelSlice';
 import { selectCodeComponentProperty } from '@/features/code-editor/codeEditorSlice';
 import Navigation from '@/components/navigation/Navigation';
-import { handleNonWorkingBtn } from '@/utils/function-utils';
 import {
   useDeleteContentMutation,
   useGetContentListQuery,
   useCreateContentMutation,
+  useSetStagedConfigMutation,
+  useGetStagedConfigQuery,
 } from '@/services/content';
 import useEditorNavigation from '@/hooks/useEditorNavigation';
 import { useErrorBoundary } from 'react-error-boundary';
@@ -39,9 +41,12 @@ import Panel from '@/components/Panel';
 import {
   selectEntityId,
   selectEntityType,
+  selectHomepagePath,
+  setHomepagePath,
 } from '@/features/configuration/configurationSlice';
 import { getBaseUrl, getXbSettings } from '@/utils/drupal-globals';
 import { getQueryErrorMessage } from '@/utils/error-handling';
+import { pageDataFormApi } from '@/services/pageDataForm';
 
 interface PageType {
   [key: string]: ReactElement;
@@ -52,9 +57,12 @@ const iconMap: PageType = {
   ContentType: <StackIcon />,
   ComponentName: <CodeIcon />,
   GlobalPatternName: <SectionIcon />,
+  Homepage: <HomeIcon />,
 };
 
 const xbSettings = getXbSettings();
+
+export const HOMEPAGE_CONFIG_ID = 'xb_set_homepage';
 
 const PageInfo = () => {
   const { showBoundary } = useErrorBoundary();
@@ -63,6 +71,7 @@ const PageInfo = () => {
   const codeComponentName = useAppSelector(selectCodeComponentProperty('name'));
   const isCodeEditor = codeComponentName !== '';
   const layout = useAppSelector(selectLayout);
+  const dispatch = useAppDispatch();
   const focusedRegionName = layout.find(
     (region) => region.id === focusedRegion,
   )?.name;
@@ -94,6 +103,17 @@ const PageInfo = () => {
       isSuccess: isCreateContentSuccess,
     },
   ] = useCreateContentMutation();
+  const { data: homepageConfig, isSuccess } =
+    useGetStagedConfigQuery(HOMEPAGE_CONFIG_ID);
+  const homepagePath = useAppSelector(selectHomepagePath);
+
+  useEffect(() => {
+    if (isSuccess) {
+      dispatch(
+        setHomepagePath(homepageConfig.data.actions[0].input['page.front']),
+      );
+    }
+  }, [dispatch, homepageConfig?.data, isSuccess]);
 
   function handleNewPage() {
     createContent({
@@ -103,6 +123,8 @@ const PageInfo = () => {
 
   const [deleteContent, { error: deleteContentError }] =
     useDeleteContentMutation();
+  const [setHomepage, { error: setHomepageError }] =
+    useSetStagedConfigMutation();
 
   async function handleDeletePage(item: ContentStub) {
     // Find another page to redirect to (filtering out the page being deleted)
@@ -113,10 +135,15 @@ const PageInfo = () => {
       entityType: 'xb_page',
       entityId: pageToDeleteId,
     });
-    // If the current page is the one being deleted, redirect to first available page.
-    // @todo: Change this to redirect to the homepage in XB in https://www.drupal.org/i/3503412.
+    const homepage = pageItems?.find(
+      (page) => page.internalPath === homepagePath,
+    );
+    // If the current page is the one being deleted, redirect to the homepage.
     if (entityType === 'xb_page' && entityId === pageToDeleteId) {
-      if (remainingPages.length > 0) {
+      if (homepage) {
+        setEditorEntity('xb_page', String(homepage.id));
+      } else if (remainingPages.length > 0) {
+        // It's possible there is no homepage set yet right now, so we redirect to the first remaining page.
         setEditorEntity('xb_page', String(remainingPages[0].id));
       } else {
         // If there are no more pages, redirect out of XB.
@@ -145,6 +172,27 @@ const PageInfo = () => {
     setEditorEntity('xb_page', String(item.id));
   }
 
+  function handleSetHomepage(item: ContentStub) {
+    const { internalPath } = item;
+    dispatch(setHomepagePath(internalPath));
+    setHomepage({
+      data: {
+        id: HOMEPAGE_CONFIG_ID,
+        label: 'Update homepage',
+        target: 'system.site',
+        actions: [
+          {
+            name: 'simpleConfigUpdate',
+            input: {
+              'page.front': internalPath,
+            },
+          },
+        ],
+      },
+      autoSaves: '',
+    });
+  }
+
   useEffect(() => {
     if (isCreateContentSuccess) {
       setEditorEntity(
@@ -165,6 +213,12 @@ const PageInfo = () => {
       showBoundary(deleteContentError);
     }
   }, [deleteContentError, showBoundary]);
+
+  useEffect(() => {
+    if (setHomepageError) {
+      showBoundary(setHomepageError);
+    }
+  }, [setHomepageError, showBoundary]);
 
   return (
     <Flex gap="2" align="center">
@@ -200,9 +254,8 @@ const PageInfo = () => {
                   onNewPage={handleNewPage}
                   onSearch={setSearchTerm}
                   onSelect={handleOnSelect}
-                  onRename={handleNonWorkingBtn}
                   onDuplicate={handleDuplication}
-                  onSetHomepage={handleNonWorkingBtn}
+                  onSetHomepage={handleSetHomepage}
                   onDelete={handleDeletePage}
                 />
               )}
@@ -216,18 +269,28 @@ const PageInfo = () => {
           </Popover.Content>
         </Popover.Root>
       ) : (
-        <Link
+        <NavLink
           to={{
             pathname: '/editor',
           }}
           aria-label="Back to Content region"
+          onClick={() => {
+            // Fetch a new version of the page data form as it has been
+            // unmounted and the cached versions won't reflect any AJAX updates
+            // to the form.
+            dispatch(
+              pageDataFormApi.util.invalidateTags([
+                { type: 'PageDataForm', id: 'FORM' },
+              ]),
+            );
+          }}
         >
           <Badge color={isCodeEditor ? 'sky' : 'grass'} size="2">
             <ChevronLeftIcon />
             {isCodeEditor ? <CodeIcon /> : <CubeIcon />}
             {isCodeEditor ? codeComponentName : focusedRegionName}
           </Badge>
-        </Link>
+        </NavLink>
       )}
 
       <PageStatus />

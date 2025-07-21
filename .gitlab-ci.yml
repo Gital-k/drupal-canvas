@@ -427,9 +427,6 @@ CLI:
     - cd cli
     - npm ci
     - npm run build
-  artifacts:
-    paths:
-      - cli/node_modules
 
 CLI eslint:
   stage: validate
@@ -443,7 +440,8 @@ CLI eslint:
     - *manual-rule
   script:
     - cd cli
-    - node_modules/.bin/eslint . --format=junit --output-file=$CI_PROJECT_DIR/cli-eslint-junit.xml --max-warnings=0
+    - npm ci
+    - npx eslint --format=junit --output-file=$CI_PROJECT_DIR/cli-eslint-junit.xml --max-warnings=0
   artifacts:
     expose_as: junit
     expire_in: 6 mos
@@ -467,6 +465,7 @@ CLI vitest:
     - *manual-rule
   script:
     - cd cli
+    - npm ci
     - npm test -- --reporter=junit --outputFile=$CI_PROJECT_DIR/cli-vitest-junit.xml
   artifacts:
     expose_as: junit
@@ -636,9 +635,7 @@ playwright:
     - !reference [ .drupal ]
   script:
     - npm install
-    ## This is also running eslint and prettier, but it currently only applies
-    ## to the Playwright tests so we might as well run it here.
-    - npx npm-run-all --continue-on-error --parallel test:*
+    - npx npm-run-all --continue-on-error --parallel test:playwright
   after_script:
     - mkdir -p $CI_PROJECT_DIR/logs
     - cp -R /var/log/apache2 $CI_PROJECT_DIR/logs/apache2
@@ -656,3 +653,79 @@ playwright:
     reports:
       junit:
         - test-results/playwright.xml
+
+playwright code style:
+  stage: validate
+  image: node:20-alpine
+  allow_failure: false
+  needs: []
+  rules:
+    - *is-push-rule
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - tests/src/Playwright/*
+        - tests/src/Playwright/**/*
+    - *manual-rule
+  script:
+    - npm ci
+    - npm run test:eslint
+    - npm run test:prettier
+
+# User facing documentation.
+pages-mr:
+  image: node:22
+  stage: publish
+  needs: []
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - "docs/user/**/*"
+  variables:
+    ASTRO_SITE: https://$CI_PAGES_HOSTNAME
+    ASTRO_BASE: /$CI_PROJECT_NAME/mr-$CI_MERGE_REQUEST_IID/
+  script:
+    - npm ci
+    - npm run build --workspace=docs
+  pages:
+    publish: docs/user/dist
+    path_prefix: "mr-$CI_MERGE_REQUEST_IID"
+    expire_in: 1 month
+  environment:
+    name: pages/mr-$CI_MERGE_REQUEST_IID
+    url: $CI_PAGES_URL
+    on_stop: stop-pages-mr
+
+stop-pages-mr:
+  stage: publish
+  needs: []
+  rules:
+    # Branch merge.
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_MERGE_REQUEST_IID
+      changes:
+        - "docs/user/**/*"
+    # Branch deletion.
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BEFORE_SHA != "0000000000000000000000000000000000000000" && $CI_COMMIT_SHA == "0000000000000000000000000000000000000000"
+      changes:
+        - "docs/user/**/*"
+  script:
+    - echo "Stopping pages deployment for MR $CI_MERGE_REQUEST_IID"
+  environment:
+    name: pages/mr-$CI_MERGE_REQUEST_IID
+    action: stop
+
+pages-publish:
+  image: node:22
+  stage: publish
+  needs: []
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes:
+        - "docs/user/**/*"
+  variables:
+    ASTRO_SITE: https://$CI_PAGES_HOSTNAME
+    ASTRO_BASE: /$CI_PROJECT_NAME/
+  script:
+    - npm ci
+    - npm run build --workspace=docs
+  pages:
+    publish: docs/user/dist

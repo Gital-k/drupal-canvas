@@ -20,7 +20,7 @@ describe('Experience Builder canvas controls/navigation', () => {
 
     // Hover over a component to trigger the outline and get its bounding rect.
     cy.getIframeBody()
-      .find('[data-component-id="experience_builder:my-hero"] h1')
+      .find('[data-component-id="xb_test_sdc:my-hero"] h1')
       .first()
       .then(($h1) => {
         const element = $h1;
@@ -51,11 +51,11 @@ describe('Experience Builder canvas controls/navigation', () => {
       'transform',
       'matrix(1.1, 0, 0, 1.1, 0, 0)',
     );
-    cy.findByText('110%');
+    cy.findByTestId('xb-canvas-controls').findByText('110%');
 
     // Re-hover over the component after zoom change and get its new bounding rect.
     cy.getIframeBody()
-      .find('[data-component-id="experience_builder:my-hero"] h1')
+      .find('[data-component-id="xb_test_sdc:my-hero"] h1')
       .first()
       .then(($h1) => {
         cy.wrap($h1).trigger('mouseover');
@@ -93,12 +93,12 @@ describe('Experience Builder canvas controls/navigation', () => {
       'transform',
       'matrix(1.25, 0, 0, 1.25, 0, 0)',
     );
-    cy.findByText('125%');
+    cy.findByTestId('xb-canvas-controls').findByText('125%');
     cy.get('html').realType('-');
 
     // Re-hover over the component again after zoom-out.
     cy.getIframeBody()
-      .find('[data-component-id="experience_builder:my-hero"] h1')
+      .find('[data-component-id="xb_test_sdc:my-hero"] h1')
       .first()
       .then(($h1) => {
         cy.wrap($h1).trigger('mouseover', { force: true });
@@ -132,7 +132,7 @@ describe('Experience Builder canvas controls/navigation', () => {
       'transform',
       'matrix(1.1, 0, 0, 1.1, 0, 0)',
     );
-    cy.findByText('110%');
+    cy.findByTestId('xb-canvas-controls').findByText('110%');
 
     cy.log(
       "The selected value in the drop down should match the zoom level if it's one of the available steps",
@@ -153,7 +153,7 @@ describe('Experience Builder canvas controls/navigation', () => {
       'transform',
       'matrix(0.75, 0, 0, 0.75, 0, 0)',
     );
-    cy.findByText('75%');
+    cy.findByTestId('xb-canvas-controls').findByText('75%');
   });
 
   it('Can zoom the canvas with the mouse', () => {
@@ -171,7 +171,7 @@ describe('Experience Builder canvas controls/navigation', () => {
       'transform',
       'matrix(1.1, 0, 0, 1.1, 0, 0)',
     );
-    cy.findByText('110%');
+    cy.findByTestId('xb-canvas-controls').findByText('110%');
 
     cy.log(
       'Zoom out (twice) by holding ctrl and using the mousewheel (or pinch on track pad)',
@@ -194,6 +194,6 @@ describe('Experience Builder canvas controls/navigation', () => {
       'transform',
       'matrix(0.9, 0, 0, 0.9, 0, 0)',
     );
-    cy.findByText('90%');
+    cy.findByTestId('xb-canvas-controls').findByText('90%');
   });
 });

@@ -14,6 +14,7 @@ use Drupal\experience_builder\Entity\AssetLibrary;
 use Drupal\experience_builder\Entity\JavaScriptComponent;
 use Drupal\experience_builder\Entity\Page;
 use Drupal\experience_builder\Entity\PageRegion;
+use Drupal\experience_builder\Entity\StagedConfigUpdate;
 use Drupal\experience_builder\Entity\XbHttpApiEligibleConfigEntityInterface;
 use Drupal\experience_builder\Plugin\DisplayVariant\XbPageVariant;
 use Drupal\experience_builder\Render\PreviewEnvelope;
@@ -198,7 +199,7 @@ class AutoSaveManagerTest extends KernelTestBase {
       'uuid' => 'static-image-udf7d',
       // This is intentionally missing a version AND a non-existent component to
       // confirm that auto-saves do not perform validation.
-      'type' => 'sdc.experience_builder.static_image',
+      'type' => 'sdc.xb_test_sdc.static_image',
       'slots' => [],
     ];
     $this->assertAutoSaveCreated($xb_page, $matching_client_data, $new_component_client_data);
@@ -316,10 +317,87 @@ class AutoSaveManagerTest extends KernelTestBase {
     $new_component_client_data['layout'][0]['components'][] = [
       'nodeType' => 'component',
       'uuid' => 'static-image-udf7d',
-      'type' => 'sdc.experience_builder.static_image',
+      'type' => 'sdc.xb_test_sdc.static_image',
       'slots' => [],
     ];
     $this->assertAutoSaveCreated($node, $matching_client_data, $new_component_client_data);
+  }
+
+  public function testStagedConfigUpdate(): void {
+    $this->installConfig(['system']);
+
+    $sut = $this->container->get(AutoSaveManager::class);
+    self::assertInstanceOf(AutoSaveManager::class, $sut);
+    StagedConfigUpdate::createFromClientSide([
+      'id' => 'xb_change_site_name',
+      'label' => 'Change the site name',
+      'target' => 'system.site',
+      'actions' => [
+        [
+          'name' => 'simpleConfigUpdate',
+          'input' => ['name' => 'My awesome site'],
+        ],
+      ],
+    ])->save();
+
+    $list = $sut->getAllAutoSaveList();
+    self::assertCount(1, $list);
+    self::assertArrayHasKey('staged_config_update:xb_change_site_name', $list);
+    self::assertEquals([
+      [
+        'name' => 'simpleConfigUpdate',
+        'input' => ['name' => 'My awesome site'],
+      ],
+    ], $list['staged_config_update:xb_change_site_name']['data']['actions']);
+
+    // Prove duplicated saves overwrite the previous one.
+    StagedConfigUpdate::createFromClientSide([
+      'id' => 'xb_change_site_name',
+      'label' => 'Change the site name',
+      'target' => 'system.site',
+      'actions' => [
+        [
+          'name' => 'simpleConfigUpdate',
+          'input' => ['name' => 'My SUPER AWESOME site'],
+        ],
+      ],
+    ])->save();
+    $list = $sut->getAllAutoSaveList();
+    self::assertCount(1, $list);
+    self::assertArrayHasKey('staged_config_update:xb_change_site_name', $list);
+    self::assertEquals([
+      [
+        'name' => 'simpleConfigUpdate',
+        'input' => ['name' => 'My SUPER AWESOME site'],
+      ],
+    ], $list['staged_config_update:xb_change_site_name']['data']['actions']);
+
+    StagedConfigUpdate::createFromClientSide([
+      'id' => 'xb_set_homepage',
+      'label' => 'Update the front page',
+      'target' => 'system.site',
+      'actions' => [
+        [
+          'name' => 'simpleConfigUpdate',
+          'input' => ['page.front' => '/home'],
+        ],
+      ],
+    ])->save();
+    $list = $sut->getAllAutoSaveList();
+    self::assertCount(2, $list);
+    self::assertArrayHasKey('staged_config_update:xb_set_homepage', $list);
+    self::assertEquals([
+      [
+        'name' => 'simpleConfigUpdate',
+        'input' => ['name' => 'My SUPER AWESOME site'],
+      ],
+    ], $list['staged_config_update:xb_change_site_name']['data']['actions']);
+    self::assertEquals([
+      [
+        'name' => 'simpleConfigUpdate',
+        'input' => ['page.front' => '/home'],
+      ],
+    ], $list['staged_config_update:xb_set_homepage']['data']['actions']);
   }
 
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource;
 
+use Drupal\Component\Plugin\DependentPluginInterface;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
@@ -19,11 +20,14 @@ use Drupal\Core\Theme\Component\ComponentMetadata;
 use Drupal\Core\Theme\Component\ComponentValidator;
 use Drupal\experience_builder\ComponentSource\ComponentSourceBase;
 use Drupal\experience_builder\ComponentSource\ComponentSourceWithSlotsInterface;
+use Drupal\experience_builder\Entity\Component;
 use Drupal\experience_builder\Entity\Component as ComponentEntity;
+use Drupal\experience_builder\JsonSchemaInterpreter\JsonSchemaType;
 use Drupal\experience_builder\MissingHostEntityException;
 use Drupal\experience_builder\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\experience_builder\PropExpressions\Component\ComponentPropExpression;
 use Drupal\experience_builder\PropExpressions\StructuredData\FieldTypeObjectPropsExpression;
+use Drupal\experience_builder\PropExpressions\StructuredData\FieldTypePropExpression;
 use Drupal\experience_builder\PropExpressions\StructuredData\ReferenceFieldTypePropExpression;
 use Drupal\experience_builder\PropShape\PropShape;
 use Drupal\experience_builder\PropShape\StorablePropShape;
@@ -31,6 +35,8 @@ use Drupal\experience_builder\PropSource\DefaultRelativeUrlPropSource;
 use Drupal\experience_builder\PropSource\PropSource;
 use Drupal\experience_builder\PropSource\PropSourceBase;
 use Drupal\experience_builder\PropSource\StaticPropSource;
+use Drupal\experience_builder\ShapeMatcher\JsonSchemaFieldInstanceMatcher;
+use Drupal\experience_builder\Utility\TypedDataHelper;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Validator\ConstraintViolation;
 use Symfony\Component\Validator\ConstraintViolationList;
@@ -160,6 +166,18 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     return StaticPropSource::parse($sdc_prop_source);
   }
 
+  private function getDefaultRelativeUrlPropSource(string $component_id, string $prop_name): DefaultRelativeUrlPropSource {
+    $component_plugin = $this->getSdcPlugin();
+    assert(array_key_exists(0, $component_plugin->metadata->schema['properties'][$prop_name]['examples'] ?? []));
+    return new DefaultRelativeUrlPropSource(
+      // @phpstan-ignore-next-line offsetAccess.notFound
+      value: $component_plugin->metadata->schema['properties'][$prop_name]['examples'][0],
+      // @phpstan-ignore-next-line offsetAccess.notFound
+      jsonSchema: PropShape::normalize($component_plugin->metadata->schema['properties'][$prop_name])->resolvedSchema,
+      componentId: $component_id,
+    );
+  }
+
   public function getSlotDefinitions(): array {
     return $this->getSdcPlugin()->metadata->slots;
   }
@@ -177,6 +195,37 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
         array_map(fn (PropShape $shape) => $shape->schema, $prop_shapes),
       ),
     ];
+  }
+
+  /**
+   * @return array<int, array{'value': mixed, 'label': 'string'}>
+   *
+   * @see \experience_builder_load_allowed_values_for_component_prop()
+   * @todo Ensure that when XB adds translation support, that SDC `meta:enum`s are loaded from interface translation, and those for code components from config translation.
+   */
+  public function getOptionsForExplicitInputEnumProp(string $prop_name): array {
+    $explicit_input_definitions = $this->getExplicitInputDefinitions();
+    if (!array_key_exists($prop_name, $explicit_input_definitions['shapes'])) {
+      throw new \LogicException("`$prop_name` is not an explicit input prop on `{$this->getPluginId()}.{$this->getSdcPlugin()->getPluginId()}`.");
+    }
+
+    // Retrieve the JSON schema for this explicit input prop.
+    $schema = (new PropShape($explicit_input_definitions['shapes'][$prop_name]))->resolvedSchema;
+    if (!array_key_exists('enum', $schema)) {
+      throw new \LogicException("`enum` is missing for schema of `$prop_name` explicit input prop of `{$this->getPluginId()}.{$this->getSdcPlugin()->getPluginId()}`.");
+    }
+    // @todo Simplify in https://www.drupal.org/project/experience_builder/issues/3518247
+    $raw_schema = $this->getSdcPlugin()->metadata->schema['properties'][$prop_name] ?? [];
+    if (!array_key_exists('meta:enum', $schema)) {
+      if (!array_key_exists('meta:enum', $raw_schema)) {
+        throw new \LogicException("`meta:enum` is missing for schema of `$prop_name` explicit input prop of `{$this->getPluginId()}.{$this->getSdcPlugin()->getPluginId()}`.");
+      }
+      else {
+        $schema['meta:enum'] = $raw_schema['meta:enum'];
+      }
+    }
+
+    return $schema['meta:enum'];
   }
 
   /**
@@ -233,19 +282,24 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     $model = $explicit_input;
 
     foreach ($explicit_input['resolved'] as $prop_name => $value) {
-      // @see getPropsValues() in formUtil.ts for the equivalent empty string
-      // comparison.
-      if ((\is_scalar($value) && (string) $value === '')) {
-        // Don't send empty values. This is consistent with
-        // syncPropSourcesToResolvedValues in the type-script code.
-        unset($model['source'][$prop_name], $model['resolved'][$prop_name]);
-        continue;
-      }
-      // Undo what ::clientModelToInput() did: restore the prop source of
-      // valueless props.
+      // Undo what ::clientModelToInput() and ::getExplicitInput() did: restore
+      // the `source` to pass the necessary information to the client that
+      // \Drupal\experience_builder\Form\ComponentInputsForm expects (and hence
+      // also ::buildConfigurationForm()).
+      // Note this only changes `source`, not `resolved`, because the `resolved`
+      // value must still be what the `DefaultRelativeUrlPropSource` evaluated
+      // to in order to correctly render the component instance.
+      // Also note that this will NOT run anymore for a given prop once the
+      // Content Creator has specified a value in the generated field widget.
       if ($model['source'][$prop_name]['sourceType'] === DefaultRelativeUrlPropSource::getSourceTypePrefix()) {
+        // TRICKY: use the default static prop source as-is, with its default
+        // value, because:
+        // - the server side can ONLY store a `StaticPropSource` if it actually
+        //   contains a valid storable value (that also means not considered
+        //   empty by the field type)
+        // - the server side MUST fall back to a `DefaultRelativeUrlPropSource`
+        //   to be able to render the component at all
         $model['source'][$prop_name] = $this->getDefaultStaticPropSource($prop_name)
-          ->withValue($model['source'][$prop_name]['value'])
           ->toArray();
       }
       // Don't duplicate value if the resolved value matches the static value.
@@ -394,6 +448,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
   public function buildConfigurationForm(
     array $form,
     FormStateInterface $form_state,
+    ?Component $component = NULL,
     string $component_instance_uuid = '',
     array $client_model = [],
     ?EntityInterface $entity = NULL,
@@ -431,7 +486,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
         // @todo Design is undefined for the AdaptedPropSource UX.
         // Fall back to the static version, disabled for now where the design is undefined.
         $disabled = !$source instanceof DefaultRelativeUrlPropSource;
-        $source = $this->getDefaultStaticPropSource($sdc_prop_name)->withValue($source->toArray()['value'] ?? NULL);
+        $source = $this->getDefaultStaticPropSource($sdc_prop_name);
       }
 
       // 1. If the given static prop source matches the *current* field type
@@ -444,7 +499,8 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       }
       assert(isset($component_schema['properties'][$sdc_prop_name]['title']));
       $label = $component_schema['properties'][$sdc_prop_name]['title'];
-      $widget = $source->getWidget($sdc_prop_name, $label, $field_widget_plugin_id);
+      assert($component instanceof Component);
+      $widget = $source->getWidget($component->id(), $component->getLoadedVersion(), $sdc_prop_name, $label, $field_widget_plugin_id);
       $is_required = isset($component_schema['required']) && in_array($sdc_prop_name, $component_schema['required'], TRUE);
       $form[$sdc_prop_name] = $source->formTemporaryRemoveThisExclamationExclamationExclamation($widget, $sdc_prop_name, $is_required, $entity, $form, $form_state);
       $form[$sdc_prop_name]['#disabled'] = $disabled;
@@ -579,7 +635,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       // @see \Drupal\experience_builder\Form\ComponentInputsForm
       $field_data[$prop_name] = [
         'required' => in_array($prop_name, $component_plugin->metadata->schema['required'] ?? [], TRUE),
-        'jsonSchema' => $prop_shape->resolvedSchema,
+        'jsonSchema' => array_diff_key($prop_shape->resolvedSchema, array_flip(['meta:enum', 'x-translation-context'])),
       ] + \array_diff_key($default_static_prop_source->toArray(), \array_flip(['value']));
       if ($default_resolved_value !== NULL) {
         $field_data[$prop_name]['default_values']['source'] = $default_source_value;
@@ -754,6 +810,21 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
           if ($field_type_prop instanceof ReferenceFieldTypePropExpression) {
             return TRUE;
           }
+
+          // If this is a field property that computes the combination of
+          // multiple other field properties, then this property may actually
+          // also be relying on a (referenced) entity.
+          // @see \Drupal\experience_builder\Plugin\DataType\ComputedUrlWithQueryString
+          // @todo Consider dropping this in favor of adding adapter support in https://www.drupal.org/project/experience_builder/issues/3464003
+          if ($field_type_prop instanceof FieldTypePropExpression) {
+            $property = TypedDataHelper::conjureFieldItemObject($field_type_prop->fieldType)->getProperties(TRUE)[$field_type_prop->propName] ?? NULL;
+            assert($property !== NULL);
+            // Detect if this is a field property relying on other properties.
+            if (!$property instanceof DependentPluginInterface) {
+              continue;
+            }
+            return JsonSchemaFieldInstanceMatcher::propertyDependsOnReferencedEntity($property->getDataDefinition());
+          }
         }
       }
     }
@@ -776,6 +847,52 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
         // TRICKY: this is always set, *except* in the case of an auto-saved
         // code component that just gained a new prop.
         $default_source_value = $this->configuration['prop_field_definitions'][$prop]['default_value'] ?? NULL;
+
+        // Valueless prop, for the case where an example is provided that cannot
+        // be be expressed as/stored in the field type in the matched
+        // `StaticPropSource`. This is true for any example values that must be
+        // transformed into browser-resolvable URLs, rather than component
+        // -relative URLs: links, image URLs, video URLs, etc.
+        // These example values are used both in XB's preview and when rendering
+        // the live site. The Content Author must be given the opportunity to
+        // specify a value different from the example. But both are powered by
+        // different prop sources:
+        // - actual values specified by the Content Creator are represented in
+        //   `StaticPropSource`s
+        // - example values (of this very specific nature that a URL rewrite is
+        //   needed) specified by the Component Developer are represented in
+        //   `DefaultRelativeUrlPropSource`s
+        // Note: example values that *can* be stored in the field type powering
+        // the `StaticPropSource`, are and must be stored in there — those would
+        // never hit this edge case.
+        // This happens when the Content Creator instantiates a component with a
+        // video/image prop (required or optional) that has a default value, and
+        // no value is specified in the generated field widget, when either:
+        // - the component is freshly instantiated; no value was specified yet
+        // - the prop's field widget has had its value erased by the Content
+        //   Creator (e.g. removed the image picked from the media library)
+        // In these cases, fall back to `DefaultRelativeUrlPropSource`.
+        // @see \Drupal\experience_builder\PropSource\DefaultRelativeUrlPropSource
+        // @see ::exampleValueRequiresEntity()
+        if ($default_source_value === []) {
+          assert($this->configuration['prop_field_definitions'][$prop]['default_value'] === []);
+          $component_plugin = $this->getSdcPlugin();
+          if (array_key_exists(0, $component_plugin->metadata->schema['properties'][$prop]['examples'] ?? [])) {
+            // Detect 2 possible `resolved` values from the client model:
+            // 1. the empty array
+            // 2. an exact match for what's in the client-side info
+            // Ignore these and fall back fall back to the example value stored
+            // in the component itself,
+            // @see ::getClientSideInfo()
+            $client_side_info = $this->getClientSideInfo($component);
+            \assert(isset($client_side_info['propSources'][$prop]['jsonSchema']));
+            if (empty($prop_value) || $prop_value == $client_side_info['propSources'][$prop]['default_values']['resolved']) {
+              $props[$prop] = $this->getDefaultRelativeUrlPropSource($component->id(), $prop)->toArray();
+              continue;
+            }
+          }
+        }
+
         // @see PropSourceComponent type-script definition.
         // @see EvaluatedComponentModel type-script definition.
         // Undo what ::inputToClientModel() did: restore the omitted `'value'`
@@ -790,64 +907,42 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
 
         // Optional component props that evaluate to NULL can be omitted:
         // storing these would be a waste of storage space.
-        // ⚠️ Exception: a prop source that evaluates to `NULL` when an example
-        // value is present that cannot be stored as a value of the
-        // `StaticPropSource`.
-        // Note: such unstorable example values can also be for required props,
-        // in that case the ::evaluate() call above would've thrown an
-        // \OutOfRangeException.
         if (!$is_required && $evaluated === NULL) {
-          // The component's own rendering would fall back to the default value,
-          // except that certain example values need pre-processing.
-          // @see \Drupal\experience_builder\PropSource\DefaultRelativeUrlPropSource
-          // @see ::exampleValueRequiresEntity()
-          $example_value_requires_entity = $this->configuration['prop_field_definitions'][$prop]['default_value'] === [];
-          $component_plugin = $this->getSdcPlugin();
-          if ($example_value_requires_entity && array_key_exists(0, $component_plugin->metadata->schema['properties'][$prop]['examples'] ?? [])) {
-            // This will trigger the fallback to DefaultRelativeUrlPropSource in
-            // the catch below.
-            // @todo Make the flow clearer still.
-            throw new \OutOfRangeException();
-          }
           continue;
         }
 
+        // Required string component props that evaluate to '' must be retained:
+        // while the empty string is NOT considered a valid value, this is the
+        // fallback behavior XB opts for to enhance the user experience: it
+        // allows a component to render even at the point in time where a
+        // Content Author has *emptied* the string input, as they're thinking
+        // about what string they do want.
+        // ⚠️ This won't work for components whose logic specifically checks for
+        // an empty string and refuses to render then.
+        // @todo Expand to support multiple-cardinality.
+        if ($required && $evaluated === '' && $this->getExplicitInputDefinitions()['shapes'][$prop]['type'] === JsonSchemaType::STRING->value) {
+          // Confirm that *if* this weren't special-cased, that this would
+          // indeed enter the next branch, which would cause it to be skipped.
+          // @todo Consider adding a new `GracefulDegradationPropSource` to
+          // encapsulate this similarly to `DefaultRelativeUrlPropSource`.
+          assert(!$source instanceof StaticPropSource || ($source->fieldItemList->count() > 0 && $source->fieldItemList->isEmpty()));
+        }
         // 💡 Automatically inform developers of missing client-side transforms,
         // which is the most likely explanation for a value sent by the XB UI
         // not being accepted by the field type. However, gracefully degrade and
         // log a deprecation error.
         // @see https://en.wikipedia.org/wiki/Robustness_principle
-        if ($source instanceof StaticPropSource && $source->fieldItemList->count() > 0 && $source->fieldItemList->isEmpty()) {
+        elseif ($source instanceof StaticPropSource && $source->fieldItemList->count() > 0 && $source->fieldItemList->isEmpty()) {
           // @todo Investigate in https://www.drupal.org/project/experience_builder/issues/3535024, and preferably add extra guardrails and convert this to an exception
           // @phpcs:ignore Drupal.Semantics.FunctionTriggerError.TriggerErrorTextLayoutRelaxed
           @trigger_error(sprintf('Client-side transformation for the `%s` prop failed: `%s` provided, but the %s data type logic considers it to be empty, hence indicating a mismatch.', $prop, json_encode($prop_value), $source->getSourceType()), E_USER_DEPRECATED);
           continue;
         }
       }
-      catch (\OutOfRangeException | \OutOfBoundsException) {
-        if (($violations === NULL ||
-          (\array_key_exists('value', $prop_source) && $prop_source['value'] === $default_source_value)) &&
-          !empty($prop_value)) {
-          // Valueless prop, for the case where only a default is provided for
-          // the preview or the initial state of the component inputs form, and
-          // the content creator has not populated the StaticPropSource.
-          // This typically happens when the Content Creator instantiates a
-          // component with an optional image prop that has a default value, and
-          // they then immediately save the result.
-          // @see ::exampleValueRequiresEntity()
-          // @see ::getClientSideInfo()
-          $client_side_info = $this->getClientSideInfo($component);
-          \assert(isset($client_side_info['propSources'][$prop]['jsonSchema']));
-          $source = new DefaultRelativeUrlPropSource(
-            value: $prop_value,
-            jsonSchema: $client_side_info['propSources'][$prop]['jsonSchema'],
-            componentId: $component->id(),
-          );
-          $props[$prop] = $source->toArray();
-          continue;
-        }
+      catch (\OutOfRangeException) {
         // If this is a required property without a value, we can leave
         // subsequent validation to bubble up any errors.
+        // @see \Drupal\experience_builder\PropExpressions\StructuredData\Evaluator::doEvaluate()
         continue;
       }
       $props[$prop] = $this->collapse($source, $prop);
@@ -936,7 +1031,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
    */
   private function uncollapse(mixed $value, string $prop_name): PropSourceBase {
     if (!\is_array($value) || !\array_key_exists('sourceType', $value)) {
-      return $this->getDefaultStaticPropSource($prop_name)->withValue($value);
+      return $this->getDefaultStaticPropSource($prop_name)->withValue($value, allow_empty: TRUE);
     }
     // phpcs:ignore
     /** @var PropSourceArray $value */

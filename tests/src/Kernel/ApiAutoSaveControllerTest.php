@@ -19,6 +19,7 @@ use Drupal\experience_builder\Entity\AssetLibrary;
 use Drupal\experience_builder\Entity\JavaScriptComponent;
 use Drupal\experience_builder\Entity\Page;
 use Drupal\experience_builder\Entity\PageRegion;
+use Drupal\experience_builder\Entity\StagedConfigUpdate;
 use Drupal\image\ImageStyleInterface;
 use Drupal\KernelTests\KernelTestBase;
 use Drupal\node\Entity\Node;
@@ -76,7 +77,11 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
 
   public function testApiAutoSaveControllerGet(): void {
     $this->installConfig(['test_user_config']);
-    $permissions = [Page::EDIT_PERMISSION];
+    $permissions = [
+      Page::EDIT_PERMISSION,
+      // We need access to page regions even for seeing there are changes.
+      PageRegion::ADMIN_PERMISSION,
+    ];
     $anonAccountContent = Node::create([
       'type' => 'article',
       'title' => 'Anon, empty',
@@ -170,6 +175,20 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     \assert($library instanceof AssetLibrary);
     $library->set('css', $library->get('css') + ['yeah' => 'this is not validated either']);
     $autoSave->saveEntity($library);
+
+    $staged_set_homepage = StagedConfigUpdate::create([
+      'id' => 'xb_set_homepage',
+      'label' => 'Update the front page',
+      'target' => 'system.site',
+      'actions' => [
+        [
+          'name' => 'simpleConfigUpdate',
+          'input' => ['page.front' => '/home'],
+        ],
+      ],
+    ]);
+    $staged_set_homepage->save();
+
     $request = Request::create(Url::fromRoute('experience_builder.api.auto-save.get')->toString());
     $response = $this->request($request);
     self::assertInstanceOf(CacheableJsonResponse::class, $response);
@@ -186,6 +205,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
       'node:2:en',
       $anonContentIdentifier,
       'page_region:stark.highlighted',
+      'staged_config_update:xb_set_homepage',
       'xb_asset_library:global',
     ], \array_keys($content));
     // We don't assert the exact value of these because of clock-drift during
@@ -195,12 +215,14 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     \assert(\is_array($content['page_region:stark.highlighted']));
     \assert(\is_array($content[$anonContentIdentifier]));
     \assert(\is_array($content['js_component:test_code']));
+    \assert(\is_array($content['staged_config_update:xb_set_homepage']));
     \assert(\is_array($content['xb_asset_library:global']));
     self::assertArrayHasKey('updated', $content['node:1:en']);
     self::assertArrayHasKey('updated', $content['node:2:en']);
     self::assertArrayHasKey('updated', $content[$anonContentIdentifier]);
     self::assertArrayHasKey('updated', $content['page_region:stark.highlighted']);
     self::assertArrayHasKey('updated', $content['js_component:test_code']);
+    self::assertArrayHasKey('updated', $content['staged_config_update:xb_set_homepage']);
     self::assertArrayHasKey('updated', $content['xb_asset_library:global']);
     $imageStyle = \Drupal::entityTypeManager()->getStorage('image_style')->load(ApiAutoSaveController::AVATAR_IMAGE_STYLE);
     self::assertInstanceOf(ImageStyleInterface::class, $imageStyle);
@@ -274,6 +296,18 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     ], \array_diff_key($content['js_component:test_code'], \array_flip(['updated', 'data_hash'])));
     self::assertEquals([
       'langcode' => 'en',
+      'entity_type' => $staged_set_homepage->getEntityTypeId(),
+      'entity_id' => $staged_set_homepage->id(),
+      'owner' => [
+        'id' => $account2->id(),
+        'name' => $account2->getDisplayName(),
+        'avatar' => NULL,
+        'uri' => $account2->toUrl()->toString(),
+      ],
+      'label' => $staged_set_homepage->label(),
+    ], \array_diff_key($content['staged_config_update:xb_set_homepage'], \array_flip(['updated', 'data_hash'])));
+    self::assertEquals([
+      'langcode' => 'en',
       'entity_type' => $library->getEntityTypeId(),
       'entity_id' => $library->id(),
       'owner' => [
@@ -285,6 +319,135 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
       'label' => $library->label(),
     ], \array_diff_key($content['xb_asset_library:global'], \array_flip(['updated', 'data_hash'])));
     $this->assertDataCompliesWithApiSpecification($content, 'AutoSaveCollection');
+  }
+
+  public function testGetOmitsNotAccessibleEntities(): void {
+    $permissions = [
+      'create article content',
+      Page::EDIT_PERMISSION,
+    ];
+    $article = Node::create([
+      'type' => 'article',
+      'title' => 'Anon, empty',
+    ]);
+    $article->save();
+    \assert($article instanceof NodeInterface);
+    // Trigger a new hash.
+    $article->setRevisionUserId(2);
+    /** @var \Drupal\experience_builder\AutoSave\AutoSaveManager $autoSave */
+    $autoSave = $this->container->get(AutoSaveManager::class);
+    $autoSave->saveEntity($article);
+
+    $page = Page::load(2);
+    \assert($page instanceof Page);
+    // Trigger a new hash.
+    $page->set('title', 'New title');
+    /** @var \Drupal\experience_builder\AutoSave\AutoSaveManager $autoSave */
+    $autoSave = $this->container->get(AutoSaveManager::class);
+    $autoSave->saveEntity($page);
+
+    $code_component = JavaScriptComponent::create(
+      [
+        'machineName' => 'test_code',
+        'name' => 'Test',
+        'status' => TRUE,
+        'props' => [
+          'text' => [
+            'type' => 'string',
+            'title' => 'Title',
+            'examples' => ['Press', 'Submit now'],
+          ],
+        ],
+        'slots' => [
+          'test-slot' => [
+            'title' => 'test',
+            'description' => 'Title',
+            'examples' => [
+              'Test 1',
+              'Test 2',
+            ],
+          ],
+        ],
+        'js' => [
+          'original' => 'console.log("Test")',
+          'compiled' => 'console.log("Test")',
+        ],
+        'css' => [
+          'original' => '.test { display: none; }',
+          'compiled' => '.test{display:none;}',
+        ],
+      ]
+    );
+    $this->assertSame(SAVED_NEW, $code_component->save());
+    $code_component->set('props', $code_component->get('props') + ['yeah' => 'this is not valid, but not validated either']);
+    $autoSave->saveEntity($code_component);
+
+    // Save a draft of the page region.
+    $region = PageRegion::createFromBlockLayout('stark')['stark.highlighted']->enable();
+    $region->save();
+    $regionData = [
+      'layout' => [
+        [
+          "nodeType" => "component",
+          "slots" => [],
+          "type" => "block.page_title_block@62af221149ae4887",
+          "uuid" => "c3f3c22c-c22e-4bb6-ad16-635f069148e4",
+        ],
+      ],
+      'model' => [
+        "c3f3c22c-c22e-4bb6-ad16-635f069148e4" => [
+          "label" => "Page title",
+          "label_display" => "0",
+          "provider" => "core",
+        ],
+      ],
+    ];
+    $region = $region->forAutoSaveData($regionData, validate: TRUE);
+    $autoSave->saveEntity($region);
+
+    $staged_set_homepage = StagedConfigUpdate::create([
+      'id' => 'xb_set_homepage',
+      'label' => 'Update the front page',
+      'target' => 'system.site',
+      'actions' => [
+        [
+          'name' => 'simpleConfigUpdate',
+          'input' => ['page.front' => '/home'],
+        ],
+      ],
+    ]);
+    $staged_set_homepage->save();
+
+    $user = $this->createUser($permissions);
+    assert($user instanceof AccountInterface);
+    $this->setCurrentUser($user);
+
+    $request = Request::create(Url::fromRoute('experience_builder.api.auto-save.get')->toString());
+    $response = $this->request($request);
+    self::assertInstanceOf(CacheableJsonResponse::class, $response);
+    self::assertEquals(Response::HTTP_OK, $response->getStatusCode());
+    self::assertSame([
+      'config:experience_builder.js_component.test_code',
+      'config:experience_builder.page_region.stark.highlighted',
+      'config:system.site',
+      'user:0',
+      'config:user.settings',
+      AutoSaveManager::CACHE_TAG,
+      'http_response',
+    ], $response->getCacheableMetadata()->getCacheTags());
+    self::assertSame(['user.permissions'], $response->getCacheableMetadata()->getCacheContexts());
+    $content = \json_decode($response->getContent() ?: '{}', TRUE);
+    $anonContentIdentifier = \sprintf('node:%d:en', $article->id());
+    // Assert we get the keys of auto-save data that we can view (even if maybe
+    // we aren't allowed to update).
+    // We can view code components, contents and staged config updates
+    // but not the page region entity.
+    self::assertEquals([
+      'js_component:test_code',
+      $anonContentIdentifier,
+      'staged_config_update:xb_set_homepage',
+      'xb_page:2:en',
+    ], \array_keys($content));
   }
 
   public static function providerCases(): iterable {
@@ -300,6 +463,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
    */
   public function testPost(bool $authorized, bool $withGlobal, ?string $expected_403_message): void {
     $this->setUpImages();
+    $this->assertSiteHomepage('/user/login');
     $entity_type_manager = $this->container->get('entity_type.manager');
     $code_component_storage = $entity_type_manager->getStorage(JavaScriptComponent::ENTITY_TYPE_ID);
     $library_storage = $entity_type_manager->getStorage(AssetLibrary::ENTITY_TYPE_ID);
@@ -308,7 +472,10 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     $autoSave = \Drupal::service(AutoSaveManager::class);
     $permissions = [
       PageRegion::ADMIN_PERMISSION,
-      'edit any article content',
+      // @todo 'bypass node access' is a very powerful permission and could have
+      //   side effects. Determine a way to give the user just the access they
+      //   need in https://drupal.org/i/3535354.
+      'bypass node access',
       Page::EDIT_PERMISSION,
     ];
     if ($authorized) {
@@ -383,6 +550,19 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     $page->set('title', 'The updated title.');
     $autoSave->saveEntity($page);
 
+    $staged_set_homepage = StagedConfigUpdate::create([
+      'id' => 'xb_set_homepage',
+      'label' => 'Update the front page',
+      'target' => 'system.site',
+      'actions' => [
+        [
+          'name' => 'simpleConfigUpdate',
+          'input' => ['page.front' => '/home'],
+        ],
+      ],
+    ]);
+    $staged_set_homepage->save();
+
     // Add some global elements.
     if ($withGlobal) {
       $page_region = PageRegion::createFromBlockLayout('stark')['stark.header'];
@@ -423,8 +603,8 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     $node2->set('field_xb_demo', [
       [
         'uuid' => self::TEST_HEADING_UUID,
-        'component_id' => 'sdc.experience_builder.heading',
-        'component_version' => '1b4f8df7c94d7e3c',
+        'component_id' => 'sdc.xb_test_sdc.heading',
+        'component_version' => '9616e3c4ab9b4fce',
         'inputs' => [
           'style' => 'flared',
           'element' => 'h3',
@@ -457,28 +637,49 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     $autoSave->saveEntity($library);
 
     // Try to publish all the changes. We are not allowed, as we are missing
-    // permissions for the code components and library assets.
+    // permissions for the code components and library assets and staged config
+    // updates.
     try {
       $this->makePublishAllRequest();
       $this->fail('Expected access denied error after field check on publishing auto-saved changes.');
     }
     catch (CacheableAccessDeniedHttpException $exception) {
       // Get access denied as expected. The label is the new one that we set.
-      $this->assertSame("Unable to update entities: 'New name', 'New label'.", $exception->getMessage());
+      $this->assertSame("Unable to update entities: 'New name', 'Update the front page', 'New label'.", $exception->getMessage());
       $this->assertSame([
         'config:experience_builder.js_component.test-component',
         AutoSaveManager::CACHE_TAG,
+        'config:system.site',
         'config:experience_builder.xb_asset_library.global',
       ], $exception->getCacheTags());
       $this->assertSame(['user.permissions'], $exception->getCacheContexts());
     }
     // Grant that permission.
     $this->setUpCurrentUser(permissions: [
-      PageRegion::ADMIN_PERMISSION,
-      'edit any article content',
+      ...$permissions,
       JavaScriptComponent::ADMIN_PERMISSION,
-      Page::EDIT_PERMISSION,
-      AutoSaveManager::PUBLISH_PERMISSION,
+    ]);
+
+    // Verify that the user must have `administer site configuration` permission
+    // to change the homepage.
+    try {
+      $this->makePublishAllRequest();
+      $this->fail('Expected access denied error after field check on publishing auto-saved changes.');
+    }
+    catch (CacheableAccessDeniedHttpException $exception) {
+      // Get access denied as expected. The label is the new one that we set.
+      $this->assertSame("Unable to update entities: 'Update the front page'.", $exception->getMessage());
+      $this->assertSame([
+        'config:system.site',
+        AutoSaveManager::CACHE_TAG,
+      ], $exception->getCacheTags());
+      $this->assertSame(['user.permissions'], $exception->getCacheContexts());
+    }
+    // Grant that permission.
+    $user = $this->setUpCurrentUser(permissions: [
+      ...$permissions,
+      JavaScriptComponent::ADMIN_PERMISSION,
+      'administer site configuration',
     ]);
 
     $response = $this->makePublishAllRequest();
@@ -560,6 +761,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     $this->assertEquals($originalGlobalLibraryName, $library_storage->loadUnchanged($library->id())?->label());
     $this->assertNotNull($page->id());
     $this->assertSame('Test page', $page_storage->loadUnchanged($page->id())?->label());
+    $this->assertSiteHomepage('/user/login');
 
     if ($withGlobal) {
       // Note: no additional error appears for the invalid auto-saved layout for
@@ -664,6 +866,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     $this->assertEquals($originalGlobalLibraryName, $library_storage->loadUnchanged($library->id())?->label());
     $this->assertNotNull($page->id());
     $this->assertSame('Test page', $page_storage->loadUnchanged($page->id())->label());
+    $this->assertSiteHomepage('/user/login');
 
     // Try publishing something with a field change that we don't have access to.
     $this->container->get('module_installer')->install(['xb_test_field_access']);
@@ -682,10 +885,12 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     self::assertEquals(Response::HTTP_OK, $response->getStatusCode());
     self::assertEquals(['message' => \sprintf('Successfully published %d items.', $auto_save_count - 1)], $json);
 
+    $this->assertSiteHomepage('/home');
+
     $this->assertNodeValues(
       $node2,
       [
-        'sdc.experience_builder.heading',
+        'sdc.xb_test_sdc.heading',
         'block.system_branding_block',
       ],
       \array_intersect_key($this->getValidConvertedInputs(), \array_flip([self::TEST_HEADING_UUID, self::TEST_BLOCK])),
@@ -708,6 +913,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     assert($page instanceof Page);
     $this->assertTrue($page->isPublished());
     $this->assertSame('The updated title.', $page->label());
+    $this->assertSame($page->getRevisionUserId(), $user->id());
 
     $this->assertNotNull($code_component->id());
     $this->assertSame('New new JavaScriptComponent name', $code_component_storage->loadUnchanged($code_component->id())?->label());
@@ -746,10 +952,21 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     $node->setTitle('Updated Title');
     $autoSave->saveEntity($node);
 
+    $global = AssetLibrary::load('global');
+    \assert($global instanceof AssetLibrary);
+    $global->set('label', $this->randomMachineName());
+    $autoSave->saveEntity($global);
+
     // Verify auto-save data exists.
+    // Set up a user that can access the XB UI, and has 'view label' access to
+    // both entities.
+    $this->setUpCurrentUser(permissions: [
+      Page::EDIT_PERMISSION,
+    ]);
     $auto_save_data = $this->getAutoSaveStatesFromServer();
-    self::assertCount(1, $auto_save_data);
+    self::assertCount(2, $auto_save_data);
     self::assertArrayHasKey("node:{$node->id()}:en", $auto_save_data);
+    self::assertArrayHasKey(\sprintf('%s:global', AssetLibrary::ENTITY_TYPE_ID), $auto_save_data);
 
     $account = $this->createUser([]);
     \assert($account instanceof AccountInterface);
@@ -809,6 +1026,20 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     // Valid DELETE request.
     $token_generator = $this->container->get(CsrfTokenGenerator::class);
     $request = Request::create($url->toString(), 'DELETE', server: ['CONTENT_TYPE' => 'application/json']);
+    $request->cookies->set($session_configuration['name'], 'ABCD');
+    $request->headers->set('X-CSRF-Token', $token_generator->get(CsrfRequestHeaderAccessCheck::TOKEN_KEY));
+    $response = $this->request($request);
+    self::assertSame(Response::HTTP_NO_CONTENT, $response->getStatusCode());
+    self::assertSame(
+      ['message' => 'Auto-save data deleted successfully.'],
+      json_decode((string) $response->getContent(), TRUE)
+    );
+
+    $asset_library_url = Url::fromRoute('experience_builder.api.auto-save.delete', [
+      'entity_type' => AssetLibrary::ENTITY_TYPE_ID,
+      'entity' => $global->id(),
+    ]);
+    $request = Request::create($asset_library_url->toString(), 'DELETE', server: ['CONTENT_TYPE' => 'application/json']);
     $request->cookies->set($session_configuration['name'], 'ABCD');
     $request->headers->set('X-CSRF-Token', $token_generator->get(CsrfRequestHeaderAccessCheck::TOKEN_KEY));
     $response = $this->request($request);
@@ -924,6 +1155,10 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
         ],
       ], $json);
     }
+  }
+
+  private function assertSiteHomepage(string $path): void {
+    self::assertEquals($path, $this->config('system.site')->get('page.front'));
   }
 
 }

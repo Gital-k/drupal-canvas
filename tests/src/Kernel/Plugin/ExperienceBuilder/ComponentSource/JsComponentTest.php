@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\experience_builder\Kernel\Plugin\ExperienceBuilder\ComponentSource;
 
-// cspell:ignore Tilly anzut nhsy sxnz lffq
+// cspell:ignore Tilly anzut nhsy sxnz Umso Dzyawdvr Mafgg Royu Cmsy Pmsg Lgfkq
 
 use Drupal\Component\Serialization\Json;
 use Drupal\Component\Utility\Crypt;
@@ -13,12 +13,17 @@ use Drupal\Core\Asset\AssetResolverInterface;
 use Drupal\Core\Asset\AttachedAssets;
 use Drupal\Core\Cache\CacheableDependencyInterface;
 use Drupal\Core\Cache\CacheableMetadata;
+use Drupal\Core\Extension\ModuleExtensionList;
 use Drupal\Core\Entity\EntityRepositoryInterface;
 use Drupal\Core\File\FileExists;
 use Drupal\Core\File\FileSystemInterface;
 use Drupal\Core\File\FileUrlGeneratorInterface;
 use Drupal\Core\StreamWrapper\StreamWrapperInterface;
 use Drupal\Core\StreamWrapper\StreamWrapperManagerInterface;
+use Drupal\Tests\experience_builder\Kernel\Traits\CacheBustingTrait;
+use Drupal\Tests\experience_builder\Kernel\Traits\CiModulePathTrait;
+use Drupal\Tests\experience_builder\Traits\CrawlerTrait;
+use Drupal\Tests\user\Traits\UserCreationTrait;
 use Drupal\experience_builder\AutoSave\AutoSaveManager;
 use Drupal\experience_builder\CodeComponentDataProvider;
 use Drupal\experience_builder\Entity\AssetLibrary;
@@ -31,9 +36,7 @@ use Drupal\experience_builder\PropSource\StaticPropSource;
 use Drupal\experience_builder\Render\ImportMapResponseAttachmentsProcessor;
 use Drupal\file\Entity\File;
 use Drupal\file\FileInterface;
-use Drupal\Tests\experience_builder\Kernel\Traits\CiModulePathTrait;
-use Drupal\Tests\experience_builder\Traits\CrawlerTrait;
-use Drupal\Tests\user\Traits\UserCreationTrait;
+use Drupal\media\Entity\MediaType;
 use Drupal\xb_test_code_components\Hook\IslandCastaway;
 
 /**
@@ -50,6 +53,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
   use CiModulePathTrait;
   use UserCreationTrait;
   use CrawlerTrait;
+  use CacheBustingTrait;
 
   protected readonly AssetResolverInterface $assetResolver;
   protected readonly CodeComponentDataProvider $codeComponentDataProvider;
@@ -58,6 +62,11 @@ final class JsComponentTest extends ComponentSourceTestBase {
    */
   protected static $modules = [
     'xb_test_code_components',
+    // For testing a code component using the "video" prop shape.
+    'field',
+    'media_library',
+    'views',
+    'xb_test_video_fixture',
     'file',
   ];
 
@@ -70,6 +79,26 @@ final class JsComponentTest extends ComponentSourceTestBase {
     $this->installSchema('file', 'file_usage');
     $this->assetResolver = $this->container->get(AssetResolverInterface::class);
     $this->codeComponentDataProvider = $this->container->get(CodeComponentDataProvider::class);
+
+    // For testing a code component using the "video" prop shape.
+    $this->installEntitySchema('media');
+    $this->installEntitySchema('field_storage_config');
+    $this->installEntitySchema('field_config');
+    $media_type = MediaType::create([
+      'id' => 'video',
+      'label' => 'Video',
+      'source' => 'video_file',
+    ]);
+    $media_type->save();
+    $source_field = $media_type->getSource()->createSourceField($media_type);
+    // @phpstan-ignore-next-line
+    $source_field->getFieldStorageDefinition()->save();
+    $source_field->save();
+    $media_type
+      ->set('source_configuration', [
+        'source_field' => $source_field->getName(),
+      ])
+      ->save();
   }
 
   protected function generateComponentConfig(): void {
@@ -136,7 +165,52 @@ final class JsComponentTest extends ComponentSourceTestBase {
 
   public static function getExpectedSettings(): array {
     return [
-      'js.xb_test_code_components_using_drupalsettings' => [
+      'js.xb_test_code_components_captioned_video' => [
+        'prop_field_definitions' => [
+          'caption' => [
+            'field_type' => 'string',
+            'field_storage_settings' => [],
+            'field_instance_settings' => [],
+            'field_widget' => 'string_textfield',
+            'default_value' => [
+              ['value' => 'A video'],
+            ],
+            'expression' => 'ℹ︎string␟value',
+          ],
+          'displayWidth' => [
+            'field_type' => 'list_integer',
+            'field_storage_settings' => [
+              'allowed_values_function' => 'experience_builder_load_allowed_values_for_component_prop',
+            ],
+            'field_instance_settings' => [],
+            'field_widget' => 'options_select',
+            'default_value' => [
+              ['value' => 400],
+            ],
+            'expression' => 'ℹ︎list_integer␟value',
+          ],
+          'video' => [
+            'field_type' => 'entity_reference',
+            'field_storage_settings' => [
+              'target_type' => 'media',
+            ],
+            'field_instance_settings' => [
+              'handler' => 'default:media',
+              'handler_settings' => [
+                'target_bundles' => [
+                  'video' => 'video',
+                ],
+              ],
+            ],
+            'field_widget' => 'media_library_widget',
+            // ⚠️ Empty default value.
+            // @see \Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::exampleValueRequiresEntity()
+            'default_value' => [],
+            'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:video␝field_media_video_file␞␟entity␜␜entity:file␝uri␞␟url}',
+          ],
+        ],
+      ],
+      'js.xb_test_code_components_using_drupalsettings_get_site_data' => [
         'prop_field_definitions' => [],
       ],
       'js.xb_test_code_components_using_imports' => [
@@ -152,7 +226,39 @@ final class JsComponentTest extends ComponentSourceTestBase {
             // ⚠️ Empty default value.
             // @see \Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::exampleValueRequiresEntity()
             'default_value' => [],
-            'expression' => 'ℹ︎image␟{src↝entity␜␜entity:file␝uri␞␟url,alt↠alt,width↠width,height↠height,srcSetCandidateTemplate↠srcset_candidate_uri_template}',
+            'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
+          ],
+        ],
+      ],
+      'js.xb_test_code_components_with_enums' => [
+        'prop_field_definitions' => [
+          'favorite_color' => [
+            'field_type' => 'list_string',
+            'field_storage_settings' => [
+              'allowed_values_function' => 'experience_builder_load_allowed_values_for_component_prop',
+            ],
+            'field_instance_settings' => [],
+            'field_widget' => 'options_select',
+            'default_value' => [
+              [
+                'value' => 'red',
+              ],
+            ],
+            'expression' => 'ℹ︎list_string␟value',
+          ],
+          'size' => [
+            'field_type' => 'list_string',
+            'field_storage_settings' => [
+              'allowed_values_function' => 'experience_builder_load_allowed_values_for_component_prop',
+            ],
+            'field_instance_settings' => [],
+            'field_widget' => 'options_select',
+            'default_value' => [
+              [
+                'value' => 'small',
+              ],
+            ],
+            'expression' => 'ℹ︎list_string␟value',
           ],
         ],
       ],
@@ -190,6 +296,9 @@ final class JsComponentTest extends ComponentSourceTestBase {
   public function testRenderComponentLive(array $component_ids): void {
     $this->assertNotEmpty($component_ids);
 
+    // We need to force the cache busting query to ensure we use it correctly.
+    $this->setCacheBustingQueryString($this->container, '2.1.0-alpha3');
+
     $rendered = $this->renderComponentsLive(
       $component_ids,
       get_default_input: [__CLASS__, 'getDefaultInputForGeneratedInputUx'],
@@ -222,41 +331,63 @@ final class JsComponentTest extends ComponentSourceTestBase {
         [
           'rel' => 'modulepreload',
           'fetchpriority' => 'high',
-          'href' => \sprintf('%s/ui/lib/astro-hydration/dist/signals.module.js', $module_path),
+          'href' => \sprintf('%s/ui/lib/astro-hydration/dist/signals.module.js?2.1.0-alpha3', $module_path),
         ],
       ],
       [
         [
           'rel' => 'modulepreload',
           'fetchpriority' => 'high',
-          'href' => \sprintf('%s/ui/lib/astro-hydration/dist/preload-helper.js', $module_path),
+          'href' => \sprintf('%s/ui/lib/astro-hydration/dist/preload-helper.js?2.1.0-alpha3', $module_path),
         ],
       ],
     ];
     $default_imports = [
       ImportMapResponseAttachmentsProcessor::GLOBAL_IMPORTS => [
-        'preact' => \sprintf('%s/ui/lib/astro-hydration/dist/preact.module.js', $module_path),
-        'preact/hooks' => \sprintf('%s/ui/lib/astro-hydration/dist/hooks.module.js', $module_path),
-        'react/jsx-runtime' => \sprintf('%s/ui/lib/astro-hydration/dist/jsx-runtime-default.js', $module_path),
-        'react' => \sprintf('%s/ui/lib/astro-hydration/dist/compat.module.js', $module_path),
-        'react-dom' => \sprintf('%s/ui/lib/astro-hydration/dist/compat.module.js', $module_path),
-        'react-dom/client' => \sprintf('%s/ui/lib/astro-hydration/dist/compat.module.js', $module_path),
-        'clsx' => \sprintf('%s/ui/lib/astro-hydration/dist/clsx.js', $module_path),
-        'class-variance-authority' => \sprintf('%s/ui/lib/astro-hydration/dist/class-variance-authority.js', $module_path),
-        'tailwind-merge' => \sprintf('%s/ui/lib/astro-hydration/dist/tailwind-merge.js', $module_path),
-        '@/lib/FormattedText' => \sprintf('%s/ui/lib/astro-hydration/dist/FormattedText.js', $module_path),
-        'next-image-standalone' => \sprintf('%s/ui/lib/astro-hydration/dist/next-image-standalone.js', $module_path),
-        '@/lib/use-image-loader' => \sprintf('%s/ui/lib/astro-hydration/dist/use-image-loader.js', $module_path),
-        '@/lib/utils' => \sprintf('%s/ui/lib/astro-hydration/dist/utils.js', $module_path),
-        '@drupal-api-client/json-api-client' => \sprintf('%s/ui/lib/astro-hydration/dist/jsonapi-client.js', $module_path),
-        'drupal-jsonapi-params' => \sprintf('%s/ui/lib/astro-hydration/dist/jsonapi-params.js', $module_path),
-        '@/lib/jsonapi-utils' => \sprintf('%s/ui/lib/astro-hydration/dist/jsonapi-utils.js', $module_path),
-        '@/lib/drupal-utils' => \sprintf('%s/ui/lib/astro-hydration/dist/drupal-utils.js', $module_path),
-        'swr' => \sprintf('%s/ui/lib/astro-hydration/dist/swr.js', $module_path),
+        'preact' => \sprintf('%s/ui/lib/astro-hydration/dist/preact.module.js?2.1.0-alpha3', $module_path),
+        'preact/hooks' => \sprintf('%s/ui/lib/astro-hydration/dist/hooks.module.js?2.1.0-alpha3', $module_path),
+        'react/jsx-runtime' => \sprintf('%s/ui/lib/astro-hydration/dist/jsx-runtime-default.js?2.1.0-alpha3', $module_path),
+        'react' => \sprintf('%s/ui/lib/astro-hydration/dist/compat.module.js?2.1.0-alpha3', $module_path),
+        'react-dom' => \sprintf('%s/ui/lib/astro-hydration/dist/compat.module.js?2.1.0-alpha3', $module_path),
+        'react-dom/client' => \sprintf('%s/ui/lib/astro-hydration/dist/compat.module.js?2.1.0-alpha3', $module_path),
+        'clsx' => \sprintf('%s/ui/lib/astro-hydration/dist/clsx.js?2.1.0-alpha3', $module_path),
+        'class-variance-authority' => \sprintf('%s/ui/lib/astro-hydration/dist/class-variance-authority.js?2.1.0-alpha3', $module_path),
+        'tailwind-merge' => \sprintf('%s/ui/lib/astro-hydration/dist/tailwind-merge.js?2.1.0-alpha3', $module_path),
+        '@/lib/FormattedText' => \sprintf('%s/ui/lib/astro-hydration/dist/FormattedText.js?2.1.0-alpha3', $module_path),
+        'next-image-standalone' => \sprintf('%s/ui/lib/astro-hydration/dist/next-image-standalone.js?2.1.0-alpha3', $module_path),
+        '@/lib/utils' => \sprintf('%s/ui/lib/astro-hydration/dist/utils.js?2.1.0-alpha3', $module_path),
+        '@drupal-api-client/json-api-client' => \sprintf('%s/ui/lib/astro-hydration/dist/jsonapi-client.js?2.1.0-alpha3', $module_path),
+        'drupal-jsonapi-params' => \sprintf('%s/ui/lib/astro-hydration/dist/jsonapi-params.js?2.1.0-alpha3', $module_path),
+        '@/lib/jsonapi-utils' => \sprintf('%s/ui/lib/astro-hydration/dist/jsonapi-utils.js?2.1.0-alpha3', $module_path),
+        '@/lib/drupal-utils' => \sprintf('%s/ui/lib/astro-hydration/dist/drupal-utils.js?2.1.0-alpha3', $module_path),
+        'swr' => \sprintf('%s/ui/lib/astro-hydration/dist/swr.js?2.1.0-alpha3', $module_path),
       ],
     ];
 
     $this->assertEquals([
+      'js.xb_test_code_components_captioned_video' => [
+        'cacheability' => (clone $default_cacheability)
+          ->setCacheTags([
+            'config:experience_builder.js_component.xb_test_code_components_captioned_video',
+          ]),
+        'attachments' => [
+          'library' => [
+            'experience_builder/astro_island.xb_test_code_components_captioned_video',
+            ...$default_libraries,
+          ],
+          'html_head_link' => [
+            ...$default_html_head_links,
+            [
+              [
+                'rel' => 'modulepreload',
+                'fetchpriority' => 'high',
+                'href' => \sprintf('/%s/files/astro-island/1PcAZQSkckmMSZ3XOvm8e4GTnc7DaSei5KVZ6t-eKG8.js', $site_path),
+              ],
+            ],
+          ],
+          'import_maps' => $default_imports,
+        ],
+      ],
       'js.xb_test_code_components_using_imports' => [
         'cacheability' => (clone $default_cacheability)
           ->setCacheTags([
@@ -284,7 +415,6 @@ final class JsComponentTest extends ComponentSourceTestBase {
           'import_maps' => $default_imports + [
             ImportMapResponseAttachmentsProcessor::SCOPED_IMPORTS => [
               \sprintf('/%s/files/astro-island/1Dq8BIqr4CMOA9RWhpbDNM4mjbvezQDq0mKKzO7iEmw.js', $site_path) => [
-
                 '@/components/xb_test_code_components_with_no_props' => \sprintf('/%s/files/astro-island/axL0zkV0Jlcf3zuQfhx8HWxySMYQVoAZLwgGK-dxXWU.js', $site_path),
                 '@/components/xb_test_code_components_with_props' => \sprintf('/%s/files/astro-island/AFWyiY79ad8_Hbz1qqKz97PSpKgNHSYCcwBWz8QRChU.js', $site_path),
               ],
@@ -309,6 +439,27 @@ final class JsComponentTest extends ComponentSourceTestBase {
                 'rel' => 'modulepreload',
                 'fetchpriority' => 'high',
                 'href' => \sprintf('/%s/files/astro-island/Ej9H8EwYfANZUT_jL84bUAXkK8F_p9-yZyj4Sxnz7C8.js', $site_path),
+              ],
+            ],
+          ],
+          'import_maps' => $default_imports,
+        ],
+      ],
+      'js.xb_test_code_components_with_enums' => [
+        'cacheability' => (clone $default_cacheability)
+          ->setCacheTags(['config:experience_builder.js_component.xb_test_code_components_with_enums']),
+        'attachments' => [
+          'library' => [
+            'experience_builder/astro_island.xb_test_code_components_with_enums',
+            ...$default_libraries,
+          ],
+          'html_head_link' => [
+            ...$default_html_head_links,
+            [
+              [
+                'rel' => 'modulepreload',
+                'fetchpriority' => 'high',
+                'href' => \sprintf('/%s/files/astro-island/S_GMOfXPnSsDMzuP0bw4pnXmP2SWPmsg4LgfkqNMzsI.js', $site_path),
               ],
             ],
           ],
@@ -357,12 +508,12 @@ final class JsComponentTest extends ComponentSourceTestBase {
           'import_maps' => $default_imports,
         ],
       ],
-      'js.xb_test_code_components_using_drupalsettings' => [
+      'js.xb_test_code_components_using_drupalsettings_get_site_data' => [
         'cacheability' => (clone $default_cacheability)
-          ->setCacheTags(['config:experience_builder.js_component.xb_test_code_components_using_drupalsettings']),
+          ->setCacheTags(['config:experience_builder.js_component.xb_test_code_components_using_drupalsettings_get_site_data']),
         'attachments' => [
           'library' => [
-            'experience_builder/astro_island.xb_test_code_components_using_drupalsettings',
+            'experience_builder/astro_island.xb_test_code_components_using_drupalsettings_get_site_data',
             ...$default_libraries,
           ],
           'html_head_link' => [
@@ -371,7 +522,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
               [
                 'rel' => 'modulepreload',
                 'fetchpriority' => 'high',
-                'href' => \sprintf('/%s/files/astro-island/4mmrh6rA0pHwhUlnqPevMaX0bGKNcokjoLC3VLBVXDY.js', $site_path),
+                'href' => \sprintf('/%s/files/astro-island/Bqd05shWDg_CVBJn_oQu0IFbb8Cz27jiqEZcqqAPfr8.js', $site_path),
               ],
             ],
           ],
@@ -391,6 +542,9 @@ final class JsComponentTest extends ComponentSourceTestBase {
    *           [true, true, "draft", ["experience_builder__auto_save"]]
    */
   public function testRenderJsComponent(bool $preview_requested, bool $auto_save_exists, string $expected_result, array $additional_expected_cache_tags, array $component_ids): void {
+    // We need to force the cache busting query to ensure we use it correctly.
+    $this->setCacheBustingQueryString($this->container, '2.1.0-alpha3');
+
     $this->generateComponentConfig();
     foreach ($this->componentStorage->loadMultiple($component_ids) as $component) {
       assert($component instanceof Component);
@@ -516,15 +670,83 @@ final class JsComponentTest extends ComponentSourceTestBase {
     }
   }
 
+  public function testRewriteExampleUrl(): void {
+    self::assertNull(Component::load('js.xb_test_code_components_captioned_video'));
+    $this->generateComponentConfig();
+    $video_component = Component::load('js.xb_test_code_components_captioned_video');
+    // @phpstan-ignore-next-line staticMethod.impossibleType
+    self::assertInstanceOf(ComponentInterface::class, $video_component);
+
+    $source = $video_component->getComponentSource();
+    self::assertInstanceOf(JsComponent::class, $source);
+
+    // Assert that the two example videos XB ships with are rewritten to include
+    // the relative path on the current site.
+    $module_path = \Drupal::service(ModuleExtensionList::class)->getPath('experience_builder');
+    self::assertSame(\base_path() . $module_path . JsComponent::EXAMPLE_VIDEO_HORIZONTAL, $source->rewriteExampleUrl(JsComponent::EXAMPLE_VIDEO_HORIZONTAL));
+    self::assertSame(\base_path() . $module_path . JsComponent::EXAMPLE_VIDEO_VERTICAL, $source->rewriteExampleUrl(JsComponent::EXAMPLE_VIDEO_VERTICAL));
+
+    // Assert that full URLs are left alone.
+    self::assertSame('https://www.example.com/', $source->rewriteExampleUrl('https://www.example.com/'));
+
+    // Assert that any other `/ui/assets/…` URL is disallowed, not even one to
+    // the containing directory.
+    // Rationale: avoid security concerns by not relying on file_exists(),
+    // potential bypasses of that, and instead only have 2 allowed examples.
+    try {
+      self::assertSame('/ui/assets/videos', dirname(JsComponent::EXAMPLE_VIDEO_VERTICAL));
+      $source->rewriteExampleUrl('/ui/assets/videos');
+      $this->fail();
+    }
+    catch (\InvalidArgumentException $e) {
+      self::assertSame('Default images for Javascript Components must be a fully-qualified URL with both scheme and host.', $e->getMessage());
+    }
+
+    // Assert that neither a prefix nor a suffix is tolerated: only these exact
+    // 2 strings are allowed.
+    // Rationale: configuration management DX is degraded if the example is
+    // environment-dependent (Drupal served from root vs subdir, XB module
+    // installation location).
+    try {
+      $source->rewriteExampleUrl('/subdir' . JsComponent::EXAMPLE_VIDEO_VERTICAL);
+      $this->fail();
+    }
+    catch (\InvalidArgumentException $e) {
+      self::assertSame('Default images for Javascript Components must be a fully-qualified URL with both scheme and host.', $e->getMessage());
+    }
+    try {
+      $source->rewriteExampleUrl(JsComponent::EXAMPLE_VIDEO_VERTICAL . '?foo=bar');
+      $this->fail();
+    }
+    catch (\InvalidArgumentException $e) {
+      self::assertSame('Default images for Javascript Components must be a fully-qualified URL with both scheme and host.', $e->getMessage());
+    }
+  }
+
   /**
    * @covers ::calculateDependencies()
    * @depends testDiscovery
    */
   public function testCalculateDependencies(array $component_ids): void {
     self::assertSame([
-      'js.xb_test_code_components_using_drupalsettings' => [
+      'js.xb_test_code_components_captioned_video' => [
         'config' => [
-          'experience_builder.js_component.xb_test_code_components_using_drupalsettings',
+          'field.field.media.video.field_media_video_file',
+          'media.type.video',
+          'experience_builder.js_component.xb_test_code_components_captioned_video',
+        ],
+        'content' => [],
+        'module' => [
+          'core',
+          'file',
+          'media',
+          'media_library',
+          'options',
+        ],
+      ],
+      'js.xb_test_code_components_using_drupalsettings_get_site_data' => [
+        'config' => [
+          'experience_builder.js_component.xb_test_code_components_using_drupalsettings_get_site_data',
         ],
       ],
       'js.xb_test_code_components_using_imports' => [
@@ -537,10 +759,18 @@ final class JsComponentTest extends ComponentSourceTestBase {
           'image.style.xb_parametrized_width',
           'experience_builder.js_component.xb_test_code_components_vanilla_image',
         ],
-        'content' => [],
         'module' => [
           'file',
           'image',
+        ],
+      ],
+      'js.xb_test_code_components_with_enums' => [
+        'module' => [
+          'core',
+          'options',
+        ],
+        'config' => [
+          'experience_builder.js_component.xb_test_code_components_with_enums',
         ],
       ],
       'js.xb_test_code_components_with_no_props' => [
@@ -855,9 +1085,98 @@ final class JsComponentTest extends ComponentSourceTestBase {
 
     assert($default_image instanceof File);
     return [
-      'js.xb_test_code_components_using_drupalsettings' => [
+      'js.xb_test_code_components_captioned_video' => [
         'expected_output_selectors' => [
-          'astro-island[opts*="Using drupalSettings"][props="{}"]',
+          'astro-island[opts*="Captioned video"][props*="bird_vertical"]',
+          'script[blocking="render"][src*="/ui/lib/astro-hydration/dist/client.js"]',
+        ],
+        'source' => 'Code component',
+        'metadata' => ['slots' => []],
+        'propSources' => [
+          'video' => [
+            'required' => TRUE,
+            'jsonSchema' => [
+              'title' => 'video',
+              'type' => 'object',
+              'required' => ['src'],
+              'properties' => [
+                'src' => [
+                  'title' => 'Video URL',
+                  'type' => 'string',
+                  'format' => 'uri-reference',
+                  'pattern' => '^(/|https?://)?.*\.([Mm][Pp]4)(\?.*)?(#.*)?$',
+                ],
+                'poster' => [
+                  'title' => 'Image URL',
+                  'type' => 'string',
+                  'format' => 'uri-reference',
+                  'pattern' => '^(/|https?://)?.*\.([Pp][Nn][Gg]|[Gg][Ii][Ff]|[Jj][Pp][Gg]|[Jj][Pp][Ee][Gg]|[Ww][Ee][Bb][Pp]|[Aa][Vv][Ii][Ff])(\?.*)?(#.*)?$',
+                ],
+              ],
+            ],
+            'sourceType' => 'static:field_item:entity_reference',
+            'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:video␝field_media_video_file␞␟entity␜␜entity:file␝uri␞␟url}',
+            'sourceTypeSettings' => [
+              'storage' => [
+                'target_type' => 'media',
+              ],
+              'instance' => [
+                'handler' => 'default:media',
+                'handler_settings' => [
+                  'target_bundles' => [
+                    'video' => 'video',
+                  ],
+                ],
+              ],
+            ],
+            'default_values' => [
+              'source' => [],
+              'resolved' => [
+                'src' => rtrim(\base_path(), '/') . self::getCiModulePath() . '/ui/assets/videos/bird_vertical.mp4',
+                'poster' => 'https://placehold.co/1080x1920.png?text=Vertical',
+              ],
+            ],
+          ],
+          'displayWidth' => [
+            'required' => FALSE,
+            'jsonSchema' => [
+              'type' => 'integer',
+              'enum' => [200, 300, 400, 500],
+            ],
+            'sourceType' => 'static:field_item:list_integer',
+            'expression' => 'ℹ︎list_integer␟value',
+            'sourceTypeSettings' => [
+              'storage' => [
+                'allowed_values_function' => 'experience_builder_load_allowed_values_for_component_prop',
+              ],
+            ],
+            'default_values' => [
+              'source' => [
+                0 => ['value' => 400],
+              ],
+              'resolved' => 400,
+            ],
+          ],
+          'caption' => [
+            'required' => TRUE,
+            'jsonSchema' => [
+              'type' => 'string',
+            ],
+            'sourceType' => 'static:field_item:string',
+            'expression' => 'ℹ︎string␟value',
+            'default_values' => [
+              'source' => [
+                0 => ['value' => 'A video'],
+              ],
+              'resolved' => 'A video',
+            ],
+          ],
+        ],
+        'transforms' => [],
+      ],
+      'js.xb_test_code_components_using_drupalsettings_get_site_data' => [
+        'expected_output_selectors' => [
+          'astro-island[opts*="Using drupalSettings getSiteData"][props="{}"]',
           'script[blocking="render"][src*="/ui/lib/astro-hydration/dist/client.js"]',
         ],
         'source' => 'Code component',
@@ -910,16 +1229,10 @@ final class JsComponentTest extends ComponentSourceTestBase {
                   'title' => 'Image height',
                   'type' => 'integer',
                 ],
-                'srcSetCandidateTemplate' => [
-                  'type' => 'string',
-                  'title' => 'Image candidate string URL template for <img srcset>',
-                  'format' => 'uri-template',
-                  'x-required-variables' => ['width'],
-                ],
               ],
             ],
             'sourceType' => 'static:field_item:image',
-            'expression' => 'ℹ︎image␟{src↝entity␜␜entity:file␝uri␞␟url,alt↠alt,width↠width,height↠height,srcSetCandidateTemplate↠srcset_candidate_uri_template}',
+            'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
             'default_values' => [
               'source' => [],
               'resolved' => [
@@ -928,6 +1241,71 @@ final class JsComponentTest extends ComponentSourceTestBase {
                 'height' => 900,
                 'alt' => 'Example image placeholder',
               ],
+            ],
+          ],
+        ],
+        'transforms' => [],
+      ],
+      'js.xb_test_code_components_with_enums' => [
+        'expected_output_selectors' => [
+          'astro-island[opts*="With enums"][props*="red"]',
+          'script[blocking="render"][src*="/ui/lib/astro-hydration/dist/client.js"]',
+        ],
+        'source' => 'Code component',
+        'metadata' => [
+          'slots' => [],
+        ],
+        'propSources' => [
+          'favorite_color' => [
+            'required' => FALSE,
+            'jsonSchema' => [
+              'type' => 'string',
+              'enum' => [
+                'red',
+                'green',
+                'blue',
+              ],
+            ],
+            'sourceType' => 'static:field_item:list_string',
+            'expression' => 'ℹ︎list_string␟value',
+            'sourceTypeSettings' => [
+              'storage' => [
+                'allowed_values_function' => 'experience_builder_load_allowed_values_for_component_prop',
+              ],
+            ],
+            'default_values' => [
+              'source' => [
+                [
+                  'value' => 'red',
+                ],
+              ],
+              'resolved' => 'red',
+            ],
+          ],
+          'size' => [
+            'required' => FALSE,
+            'jsonSchema' => [
+              'type' => 'string',
+              'enum' => [
+                'small',
+                'regular',
+                'large',
+              ],
+            ],
+            'sourceType' => 'static:field_item:list_string',
+            'expression' => 'ℹ︎list_string␟value',
+            'sourceTypeSettings' => [
+              'storage' => [
+                'allowed_values_function' => 'experience_builder_load_allowed_values_for_component_prop',
+              ],
+            ],
+            'default_values' => [
+              'source' => [
+                [
+                  'value' => 'small',
+                ],
+              ],
+              'resolved' => 'small',
             ],
           ],
         ],
@@ -1242,6 +1620,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
           'type' => 'string',
           'title' => 'Text',
           'enum' => ['hello', 'goodbye'],
+          'meta:enum' => ['hello' => 'Hello!', 'goodbye' => 'Good bye!'],
         ],
       ],
       'required' => [],

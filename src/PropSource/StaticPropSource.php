@@ -18,7 +18,6 @@ use Drupal\Core\Field\WidgetInterface;
 use Drupal\Core\Field\WidgetPluginManager;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\TypedData\DataDefinition;
-use Drupal\Core\TypedData\DataDefinitionInterface;
 use Drupal\Core\TypedData\TypedDataManagerInterface;
 use Drupal\experience_builder\PropExpressions\StructuredData\Evaluator;
 use Drupal\experience_builder\PropExpressions\StructuredData\FieldTypeObjectPropsExpression;
@@ -230,9 +229,37 @@ final class StaticPropSource extends PropSourceBase {
     );
   }
 
-  public function withValue(mixed $value): static {
+  /**
+   * @param mixed $value
+   *   The value to initialize the field item list with.
+   * @param bool $allow_empty
+   *   By default, no empty values are allowed, because they're pointless to
+   *   store in a StaticPropSource.
+   *   In very specific circumstances, this may be acceptable and even necessary
+   *   though:
+   *   - when validating
+   *   - when loading stored data (a field type might change its logic for what
+   *     it considers empty)
+   *   - when *previewing* the user input, which may be "mid-input" and hence in
+   *     a temporarily empty state.
+   *   Validation will prevent empty values from being stored.
+   *
+   * @see \Drupal\experience_builder\PropSource\StaticPropSource::isMinimalRepresentation()
+   */
+  public function withValue(mixed $value, bool $allow_empty = FALSE): static {
     $field_item_list = clone $this->fieldItemList;
     $field_item_list->setValue($value);
+
+    if (!$allow_empty) {
+      // Detect values considered empty by the field type, and abort early.
+      $before = $field_item_list->count();
+      $field_item_list->filterEmptyItems();
+      $after = $field_item_list->count();
+      if ($before !== $after) {
+        throw new \LogicException(sprintf('%s called with invalid value for field type %s.', __METHOD__, $this->fieldItemList->getFieldDefinition()->getItemDefinition()->getDataType()));
+      }
+    }
+
     return new StaticPropSource(
       $field_item_list,
       $this->expression,
@@ -409,7 +436,7 @@ final class StaticPropSource extends PropSourceBase {
     };
   }
 
-  public function getWidget(string $sdc_prop_name, string $sdc_prop_label, ?string $field_widget_plugin_id): WidgetInterface {
+  public function getWidget(string $component_config_entity_id, ?string $component_config_entity_version, string $prop_name, string $sdc_prop_label, ?string $field_widget_plugin_id): WidgetInterface {
     // @phpstan-ignore-next-line
     $field_widget_plugin_manager = \Drupal::service('plugin.manager.field.widget');
     assert($field_widget_plugin_manager instanceof WidgetPluginManager);
@@ -421,7 +448,24 @@ final class StaticPropSource extends PropSourceBase {
     assert($field_storage_definition instanceof FieldStorageDefinition);
     $widget = $field_widget_plugin_manager->getInstance([
       'field_definition' => $field_storage_definition
-        ->setName($sdc_prop_name)
+        // TRICKY: we would need to set a name that uniquely identifies this SDC
+        // prop, to avoid the static caching in `options_allowed_values()`
+        // interfering. As this name is used in the client UI and can have
+        // consequences, `experience_builder_load_allowed_values_for_component_prop`
+        // won't allow  caching.
+        ->setName($prop_name)
+        // This is a conjured field storage definition; the widget needs precise
+        // context. (For example to load the correct allowed values.)
+        // @see \Drupal\Core\Field\FieldDefinitionInterface::getDisplayOptions
+        ->setDisplayOptions('form', [
+          'third_party_settings' => [
+            'experience_builder' => [
+              'component_id' => $component_config_entity_id,
+              'component_version' => $component_config_entity_version,
+              'explicit_input_prop_name' => $prop_name,
+            ],
+          ],
+        ])
         ->setLabel($sdc_prop_label),
       'configuration' => $configuration,
       'prepare' => TRUE,
@@ -439,8 +483,12 @@ final class StaticPropSource extends PropSourceBase {
     // prevent the field widget plugin from being able to modify this
     // StaticPropSource's field item list by reference.
     $field = clone $this->fieldItemList;
+    // Remove empty or invalid items.
+    $field->filterEmptyItems();
     // Widgets assume there is at least one field item present for editing.
-    $field->appendItem();
+    if ($field->count() === 0) {
+      $field->appendItem();
+    }
     // Most widgets do not need an entity context, but some do:
     // @see \Drupal\file\Plugin\Field\FieldWidget\FileWidget
     // @see \Drupal\image\Plugin\Field\FieldWidget\ImageWidget
@@ -459,43 +507,6 @@ final class StaticPropSource extends PropSourceBase {
     }
 
     return $widget_form;
-  }
-
-  /**
-   * @param array<int, array<string, mixed>> $values
-   * @param array<mixed> $form
-   *
-   * @return mixed|array<string, mixed>
-   */
-  public function massageFormValuesTemporaryRemoveThisExclamationExclamationExclamation(?string $field_widget_plugin_id, string $sdc_prop_name, string $sdc_prop_label, array $values, array &$form, FormStateInterface $form_state): mixed {
-    // 1. Apply the field widget's transformation.
-    $massaged_values = $this->getWidget($sdc_prop_name, $sdc_prop_label, $field_widget_plugin_id)
-      ->massageFormValues($values, $form, $form_state);
-
-    // Work on a clone of the stored field item list to avoid side effects.
-    $field_item_list = clone $this->fieldItemList;
-
-    // 2. Apply the field type's transformation.
-    // @see \Drupal\link\Plugin\Field\FieldType\LinkItem::setValue()
-    $field_item_list->setValue($massaged_values);
-    // @see \Drupal\image\Plugin\Field\FieldType\ImageItem::preSave()
-    // @see \Drupal\experience_builder\Plugin\Field\FieldTypeOverride\ListIntegerItemOverride::preSave()
-    $field_item_list->preSave();
-    $actual_values = $field_item_list->getValue();
-
-    // 3. XB only needs to store non-computed values.
-    $item_definition = $this->fieldItemList->getItemDefinition();
-    assert($item_definition instanceof FieldItemDataDefinitionInterface);
-    $non_computed_properties = array_filter(
-      $item_definition->getPropertyDefinitions(),
-      fn (DataDefinitionInterface $def): bool => !$def->isComputed(),
-    );
-    $stored_values = array_map(
-      fn (mixed $field_item_value): mixed => array_intersect_key($actual_values, $non_computed_properties),
-      $actual_values
-    );
-
-    return $stored_values;
   }
 
   private function getFieldItemDefinition(): FieldItemDataDefinitionInterface {

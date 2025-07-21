@@ -163,14 +163,23 @@ describe('Prop types editing', () => {
       .as('select')
       .should('have.value', 'foo');
     cy.waitForElementContentInIframe('#test-string-enum', 'foo');
+    cy.get('@select').within(() => {
+      cy.get('option:selected').should('have.text', 'Foo');
+    });
     cy.get('@select').select(0, { force: true });
     cy.get('@select').should('have.value', '_none');
+    cy.get('@select').within(() => {
+      cy.get('option:selected').should('have.text', '- None -');
+    });
     cy.waitForElementContentNotInIframe('#test-string-enum', 'foo');
     cy.testInIframe('#test-string-enum code', (enumPreview) => {
       expect(enumPreview.textContent).to.eq('');
     });
     cy.get('@select').select(2, { force: true });
     cy.get('@select').should('have.value', 'bar');
+    cy.get('@select').within(() => {
+      cy.get('option:selected').should('have.text', 'Bar');
+    });
     cy.waitForElementContentInIframe('#test-string-enum', 'bar');
 
     // See if an empty value is maintained on reload.
@@ -178,7 +187,6 @@ describe('Prop types editing', () => {
     cy.get('@select').should('have.value', '_none');
     cy.waitForElementContentNotInIframe('#test-string-enum', 'bar');
     cy.loadURLandWaitForXBLoaded({ clearAutoSave: false });
-    cy.openLayersPanel();
     cy.clickComponentInLayersView('All props');
     cy.findByLabelText('String — single line').should('exist');
     cy.findByLabelText('String - Enum').should('have.value', '_none');
@@ -200,14 +208,23 @@ describe('Prop types editing', () => {
         .as('select')
         .should('have.value', '1');
       cy.waitForElementContentInIframe('#test-integer-enum', '1');
+      cy.get('@select').within(() => {
+        cy.get('option:selected').should('have.text', '1');
+      });
       cy.get('@select').select(0, { force: true });
       cy.get('@select').should('have.value', '_none');
+      cy.get('@select').within(() => {
+        cy.get('option:selected').should('have.text', '- None -');
+      });
       cy.waitForElementContentNotInIframe('#test-integer-enum', '1');
       cy.testInIframe('#test-integer-enum code', (enumPreview) => {
         expect(enumPreview.textContent).to.eq('');
       });
       cy.get('@select').select(2, { force: true });
       cy.get('@select').should('have.value', '2');
+      cy.get('@select').within(() => {
+        cy.get('option:selected').should('have.text', '2');
+      });
       cy.waitForElementContentInIframe('#test-integer-enum', '2');
     },
   );
@@ -588,7 +605,6 @@ describe('Prop types editing', () => {
     cy.findByLabelText(labelText).clear({ force: true });
     cy.waitForElementContentNotInIframe(iframeSelector, valuePre);
     cy.loadURLandWaitForXBLoaded({ clearAutoSave: false });
-    cy.openLayersPanel();
     cy.clickComponentInLayersView('All props');
     cy.findByLabelText('String — single line').should('exist');
     cy.waitForElementContentInIframe(
@@ -687,7 +703,7 @@ describe('Prop types editing', () => {
     cy.get('.primaryPanelContent').findByText('Heading').click();
     cy.findByLabelText('Style').should('have.value', 'primary');
     cy.findByLabelText('Style').within(() => {
-      cy.get('option:selected').should('have.text', 'primary');
+      cy.get('option:selected').should('have.text', 'Primary');
     });
     cy.findByLabelText('Style').select('_none');
     cy.findByLabelText('Style').should('have.value', '_none');

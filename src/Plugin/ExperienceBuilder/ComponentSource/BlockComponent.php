@@ -307,6 +307,7 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
   public function buildConfigurationForm(
     array $form,
     FormStateInterface $form_state,
+    ?ComponentEntity $component = NULL,
     string $component_instance_uuid = '',
     array $client_model = [],
     ?EntityInterface $entity = NULL,
@@ -430,7 +431,7 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
 
     $reasons = [];
     if (!empty($settings) && !$fullyValidatable) {
-      $reasons[] = 'Block plugin settings must be fully validatable';
+      $reasons[] = 'Block plugin settings must opt into strict validation. Use the FullyValidatable constraint. See https://www.drupal.org/node/3404425';
     }
 
     $plugin_definition = $block->getPluginDefinition();

@@ -909,8 +909,6 @@ describe('Component data / props in code editor', () => {
         selectCodeComponentProperty('props')(store.getState())[0].example,
       ).to.deep.equal({
         src: 'https://placehold.co/800x600@2x.png?alternateWidths=https%3A%2F%2Fplacehold.co%2F%7Bwidth%7Dx%7Bheight%7D%402x.png',
-        // @todo Delete the following line in https://drupal.org/i/3532718.
-        srcSetCandidateTemplate: 'https://placehold.co/{width}x{height}@2x.png',
         width: 800,
         height: 600,
         alt: 'Example image placeholder',
@@ -985,9 +983,6 @@ describe('Component data / props in code editor', () => {
           type: 'object',
           example: {
             src: 'https://placehold.co/800x600@2x.png?alternateWidths=https%3A%2F%2Fplacehold.co%2F%7Bwidth%7Dx%7Bheight%7D%402x.png',
-            // @todo Delete the following line in https://drupal.org/i/3532718.
-            srcSetCandidateTemplate:
-              'https://placehold.co/{width}x{height}@2x.png',
             width: 800,
             height: 600,
             alt: 'Example image placeholder',
@@ -1037,9 +1032,6 @@ describe('Component data / props in code editor', () => {
           type: 'object',
           example: {
             src: 'https://placehold.co/800x600@2x.png?alternateWidths=https%3A%2F%2Fplacehold.co%2F%7Bwidth%7Dx%7Bheight%7D%402x.png',
-            // @todo Delete the following line in https://drupal.org/i/3532718.
-            srcSetCandidateTemplate:
-              'https://placehold.co/{width}x{height}@2x.png',
             width: 800,
             height: 600,
             alt: 'Example image placeholder',
@@ -1073,9 +1065,6 @@ describe('Component data / props in code editor', () => {
           type: 'object',
           example: {
             src: 'https://placehold.co/1280x720@3x.png?alternateWidths=https%3A%2F%2Fplacehold.co%2F%7Bwidth%7Dx%7Bheight%7D%403x.png',
-            // @todo Delete the following line in https://drupal.org/i/3532718.
-            srcSetCandidateTemplate:
-              'https://placehold.co/{width}x{height}@3x.png',
             width: 1280,
             height: 720,
             alt: 'Example image placeholder',
@@ -1107,15 +1096,132 @@ describe('Component data / props in code editor', () => {
           type: 'object',
           example: {
             src: 'https://placehold.co/1280x720@3x.png?alternateWidths=https%3A%2F%2Fplacehold.co%2F%7Bwidth%7Dx%7Bheight%7D%403x.png',
-            // @todo Delete the following line in https://drupal.org/i/3532718.
-            srcSetCandidateTemplate:
-              'https://placehold.co/{width}x{height}@3x.png',
             width: 1280,
             height: 720,
             alt: 'Example image placeholder',
           },
           format: undefined,
           $ref: 'json-schema-definitions://experience_builder.module/image',
+        },
+        'Should have the appropriate type, example value, and $ref',
+      );
+    });
+  });
+
+  it('creates a new video prop', () => {
+    cy.findByText('Add').click();
+
+    cy.findByLabelText('Prop name').type('Video');
+    cy.findByLabelText('Type').click();
+    cy.findByText('Video').click();
+    // Verify the default example value.
+    cy.findByLabelText('Example aspect ratio').should(
+      'have.text',
+      '16:9 (Widescreen)',
+    );
+
+    cy.wrap(store).then((store) => {
+      expect(
+        selectCodeComponentProperty('props')(store.getState())[0],
+      ).to.deep.include(
+        {
+          type: 'object',
+          example: {
+            src: `/ui/assets/videos/mountain_wide.mp4`,
+            poster: 'https://placehold.co/1920x1080.png?text=Widescreen',
+          },
+          format: undefined,
+          $ref: 'json-schema-definitions://experience_builder.module/video',
+        },
+        'Should have the appropriate type, example value, and $ref',
+      );
+    });
+
+    // Select the "None" option for the example aspect ratio.
+    cy.findByLabelText('Example aspect ratio').click();
+    cy.findByText('- None -').click();
+    cy.wrap(store).then((store) => {
+      expect(
+        selectCodeComponentProperty('props')(store.getState())[0],
+      ).to.deep.include(
+        {
+          type: 'object',
+          example: '',
+          format: undefined,
+          $ref: 'json-schema-definitions://experience_builder.module/video',
+        },
+        'Should have the appropriate type, example value, and $ref',
+      );
+    });
+
+    // Set the prop as required.
+    cy.findByLabelText('Required').toggleToggle();
+    // The example aspect ratio should now be the default values.
+    cy.findByLabelText('Example aspect ratio').should(
+      'have.text',
+      '16:9 (Widescreen)',
+    );
+    cy.wrap(store).then((store) => {
+      expect(
+        selectCodeComponentProperty('props')(store.getState())[0],
+      ).to.deep.include(
+        {
+          type: 'object',
+          example: {
+            src: `/ui/assets/videos/mountain_wide.mp4`,
+            poster: 'https://placehold.co/1920x1080.png?text=Widescreen',
+          },
+          format: undefined,
+          $ref: 'json-schema-definitions://experience_builder.module/video',
+        },
+        'Should have the appropriate type, example value, and $ref',
+      );
+    });
+
+    // Update the aspect ratio.
+    cy.findByLabelText('Example aspect ratio').click();
+    cy.findByText('9:16 (Vertical)').click();
+    cy.findByLabelText('Example aspect ratio').should(
+      'have.text',
+      '9:16 (Vertical)',
+    );
+    cy.wrap(store).then((store) => {
+      expect(
+        selectCodeComponentProperty('props')(store.getState())[0],
+      ).to.deep.include(
+        {
+          type: 'object',
+          example: {
+            src: `/ui/assets/videos/bird_vertical.mp4`,
+            poster: 'https://placehold.co/1080x1920.png?text=Vertical',
+          },
+          format: undefined,
+          $ref: 'json-schema-definitions://experience_builder.module/video',
+        },
+        'Should have the appropriate type, example value, and $ref',
+      );
+    });
+
+    // Set the prop as not required, then back to required. The example aspect
+    // ratio should be the previous values.
+    cy.findByLabelText('Required').toggleToggle();
+    cy.findByLabelText('Required').toggleToggle();
+    cy.findByLabelText('Example aspect ratio').should(
+      'have.text',
+      '9:16 (Vertical)',
+    );
+    cy.wrap(store).then((store) => {
+      expect(
+        selectCodeComponentProperty('props')(store.getState())[0],
+      ).to.deep.include(
+        {
+          type: 'object',
+          example: {
+            src: `/ui/assets/videos/bird_vertical.mp4`,
+            poster: 'https://placehold.co/1080x1920.png?text=Vertical',
+          },
+          format: undefined,
+          $ref: 'json-schema-definitions://experience_builder.module/video',
         },
         'Should have the appropriate type, example value, and $ref',
       );

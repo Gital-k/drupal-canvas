@@ -126,13 +126,13 @@ class ClientServerConversionTraitTest extends KernelTestBase {
     $this->assertSame([
       [
         'uuid' => self::TEST_HEADING_UUID,
-        'component_id' => 'sdc.experience_builder.heading',
-        'component_version' => '1b4f8df7c94d7e3c',
+        'component_id' => 'sdc.xb_test_sdc.heading',
+        'component_version' => '9616e3c4ab9b4fce',
       ],
       [
         'uuid' => self::TEST_IMAGE_UUID,
-        'component_id' => 'sdc.experience_builder.image',
-        'component_version' => 'caab32397e0f3172',
+        'component_id' => 'sdc.xb_test_sdc.image',
+        'component_version' => 'c06e0be7dd131740',
       ],
       [
         'uuid' => self::TEST_BLOCK,
@@ -164,8 +164,8 @@ class ClientServerConversionTraitTest extends KernelTestBase {
     $this->assertNodeValues(
       $node1,
       [
-        'sdc.experience_builder.heading',
-        'sdc.experience_builder.image',
+        'sdc.xb_test_sdc.heading',
+        'sdc.xb_test_sdc.image',
         'block.system_branding_block',
         'sdc.xb_test_sdc.props-slots',
       ],
@@ -179,13 +179,13 @@ class ClientServerConversionTraitTest extends KernelTestBase {
     $this->assertSame([
       [
         'uuid' => self::TEST_HEADING_UUID,
-        'component_id' => 'sdc.experience_builder.heading',
-        'component_version' => '1b4f8df7c94d7e3c',
+        'component_id' => 'sdc.xb_test_sdc.heading',
+        'component_version' => '9616e3c4ab9b4fce',
       ],
       [
         'uuid' => self::TEST_IMAGE_UUID,
-        'component_id' => 'sdc.experience_builder.image',
-        'component_version' => 'caab32397e0f3172',
+        'component_id' => 'sdc.xb_test_sdc.image',
+        'component_version' => 'c06e0be7dd131740',
       ],
       [
         'uuid' => self::TEST_BLOCK,
@@ -249,13 +249,13 @@ class ClientServerConversionTraitTest extends KernelTestBase {
         [
           'nodeType' => 'component',
           'uuid' => self::TEST_HEADING_UUID,
-          'type' => 'sdc.experience_builder.heading@1b4f8df7c94d7e3c',
+          'type' => 'sdc.xb_test_sdc.heading@9616e3c4ab9b4fce',
           'slots' => [],
         ],
         [
           'nodeType' => 'component',
           'uuid' => self::TEST_IMAGE_UUID,
-          'type' => 'sdc.experience_builder.image@caab32397e0f3172',
+          'type' => 'sdc.xb_test_sdc.image@c06e0be7dd131740',
           'slots' => [],
         ],
         [
@@ -282,16 +282,7 @@ class ClientServerConversionTraitTest extends KernelTestBase {
               'expression' => 'ℹ︎list_string␟value',
               'sourceTypeSettings' => [
                 'storage' => [
-                  'allowed_values' => [
-                    [
-                      'value' => 'primary',
-                      'label' => 'primary',
-                    ],
-                    [
-                      'value' => 'secondary',
-                      'label' => 'secondary',
-                    ],
-                  ],
+                  'allowed_values_function' => 'experience_builder_load_allowed_values_for_component_prop',
                 ],
               ],
             ],
@@ -300,36 +291,7 @@ class ClientServerConversionTraitTest extends KernelTestBase {
               'expression' => 'ℹ︎list_string␟value',
               'sourceTypeSettings' => [
                 'storage' => [
-                  'allowed_values' => [
-                    [
-                      'value' => 'div',
-                      'label' => 'div',
-                    ],
-                    [
-                      'value' => 'h1',
-                      'label' => 'h1',
-                    ],
-                    [
-                      'value' => 'h2',
-                      'label' => 'h2',
-                    ],
-                    [
-                      'value' => 'h3',
-                      'label' => 'h3',
-                    ],
-                    [
-                      'value' => 'h4',
-                      'label' => 'h4',
-                    ],
-                    [
-                      'value' => 'h5',
-                      'label' => 'h5',
-                    ],
-                    [
-                      'value' => 'h6',
-                      'label' => 'h6',
-                    ],
-                  ],
+                  'allowed_values_function' => 'experience_builder_load_allowed_values_for_component_prop',
                 ],
               ],
             ],
@@ -348,7 +310,7 @@ class ClientServerConversionTraitTest extends KernelTestBase {
             'image' => [
               'value' => $this->mediaEntity->id(),
               'sourceType' => 'static:field_item:entity_reference',
-              'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:image␝field_media_image␞␟entity␜␜entity:file␝uri␞␟url,alt↝entity␜␜entity:media:image␝field_media_image␞␟alt,width↝entity␜␜entity:media:image␝field_media_image␞␟width,height↝entity␜␜entity:media:image␝field_media_image␞␟height,srcSetCandidateTemplate↝entity␜␜entity:media:image␝field_media_image␞␟srcset_candidate_uri_template}',
+              'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:image␝field_media_image␞␟src_with_alternate_widths,alt↝entity␜␜entity:media:image␝field_media_image␞␟alt,width↝entity␜␜entity:media:image␝field_media_image␞␟width,height↝entity␜␜entity:media:image␝field_media_image␞␟height}',
               'sourceTypeSettings' => [
                 'storage' => ['target_type' => 'media'],
                 'instance' => [

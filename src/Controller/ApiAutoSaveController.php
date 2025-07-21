@@ -18,6 +18,7 @@ use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\Core\File\FileUrlGeneratorInterface;
 use Drupal\Core\Http\Exception\CacheableAccessDeniedHttpException;
+use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\StringTranslation\PluralTranslatableMarkup;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\Utility\Error;
@@ -25,6 +26,7 @@ use Drupal\experience_builder\AutoSave\AutoSaveManager;
 use Drupal\experience_builder\Entity\AssetLibrary;
 use Drupal\experience_builder\Entity\EntityConstraintViolationList;
 use Drupal\experience_builder\Entity\JavaScriptComponent;
+use Drupal\experience_builder\Entity\StagedConfigUpdate;
 use Drupal\experience_builder\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\experience_builder\Validation\ConstraintPropertyPathTranslatorTrait;
 use Drupal\image\Entity\ImageStyle;
@@ -53,6 +55,7 @@ final class ApiAutoSaveController extends ApiControllerBase {
     private readonly AutoSaveManager $autoSaveManager,
     #[Autowire(service: 'logger.channel.experience_builder')]
     private readonly LoggerInterface $logger,
+    private readonly AccountInterface $currentUser,
   ) {}
 
   private static function validateExpectedAutoSaves(array $expected_auto_saves, array $all_auto_saves): ?JsonResponse {
@@ -134,9 +137,23 @@ final class ApiAutoSaveController extends ApiControllerBase {
    * Gets the auto-saved changes.
    */
   public function get(): CacheableJsonResponse {
-    $all = $this->autoSaveManager->getAllAutoSaveList();
-    $userIds = \array_column($all, 'owner');
     $cache = new CacheableMetadata();
+
+    // Filter those the user has access to.
+    $filtered = \array_filter($this->autoSaveManager->getAllAutoSaveList(TRUE), function (array $item) use ($cache) {
+      assert($item['entity'] instanceof EntityInterface);
+      $access = $item['entity']->access('view label', return_as_object: TRUE);
+      // @todo This will result in the cache tag for this entity being returned
+      //   in the response even though the user does not have access to view the
+      //   entity. A less privileged user could still be able to determine that
+      //   the entity exists and has pending changes. Determine if we should
+      //   prevent this in https://drupal.org/i/3535355.
+      $cache->addCacheableDependency($item['entity']);
+      $cache->addCacheableDependency($access);
+      return $access->isAllowed();
+    });
+
+    $userIds = \array_column($filtered, 'owner');
     /** @var \Drupal\user\UserInterface[] $users */
     $users = $this->entityTypeManager->getStorage('user')->loadMultiple($userIds);
     foreach ($users as $uid => $user) {
@@ -154,7 +171,7 @@ final class ApiAutoSaveController extends ApiControllerBase {
     // data sent to the client and back to the server. Also, 'client_id' is only
     // used to determine if the client has the latest changes when editing an
     // entity in Experience Builder and not needed for the publishing process.
-    $all = \array_map(fn(array $item) => \array_diff_key($item, \array_flip(['data', 'client_id', 'entity'])), $all);
+    $filtered = \array_map(fn(array $item) => \array_diff_key($item, \array_flip(['data', 'client_id', 'entity'])), $filtered);
 
     $withUserDetails = \array_map(fn(array $item) => [
       // @phpstan-ignore-next-line
@@ -169,7 +186,7 @@ final class ApiAutoSaveController extends ApiControllerBase {
         'uri' => NULL,
         'id' => $item['owner'],
       ],
-    ] + $item, $all);
+    ] + $item, $filtered);
     return (new CacheableJsonResponse($withUserDetails))->addCacheableDependency($cache->addCacheTags([AutoSaveManager::CACHE_TAG]));
   }
 
@@ -230,6 +247,9 @@ final class ApiAutoSaveController extends ApiControllerBase {
           $violationSets[] = new EntityConstraintViolationList($entity, $violations);
           continue;
         }
+        if ($entity instanceof StagedConfigUpdate) {
+          $entity->applyUpdateOnSave();
+        }
       }
       else {
         assert($entity instanceof ContentEntityInterface);
@@ -266,7 +286,6 @@ final class ApiAutoSaveController extends ApiControllerBase {
             );
           }
         }
-
         $use_existing_revision_id = AutoSaveManager::contentEntityIsConsideredNew($entity);
 
         if ($entity instanceof EntityPublishedInterface) {
@@ -284,6 +303,15 @@ final class ApiAutoSaveController extends ApiControllerBase {
           $revision_id_key = $entity_definition->getKey('revision');
           \assert(\is_string($revision_id_key));
           $entity->set($revision_id_key, NULL);
+        }
+        // Always set the revision user to the current user. Even though we
+        // might not be creating a new revision, this would only be in the case
+        // where this entity should be considered new, which means it has never
+        // published before in Experience Builder.
+        // @see \Drupal\experience_builder\AutoSave\AutoSaveManager::contentEntityIsConsideredNew()
+        if ($revision_user = $entity_definition->getRevisionMetadataKey('revision_user')) {
+          assert(is_string($revision_user));
+          $entity->set($revision_user, $this->currentUser->id());
         }
         $violations = $entity->validate();
         $form_violations = $this->autoSaveManager->getEntityFormViolations($entity);

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource;
 
+use Drupal\Core\Asset\AssetQueryStringInterface;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Config\Entity\ConfigEntityStorageInterface;
 use Drupal\Core\Entity\EntityRepositoryInterface;
@@ -12,6 +13,7 @@ use Drupal\Core\File\FileUrlGeneratorInterface;
 use Drupal\Core\Plugin\Component as SdcPlugin;
 use Drupal\Core\Render\Component\Exception\InvalidComponentException;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\Core\Url;
 use Drupal\experience_builder\Attribute\ComponentSource;
 use Drupal\experience_builder\AutoSave\AutoSaveManager;
 use Drupal\experience_builder\AutoSaveEntity;
@@ -26,6 +28,7 @@ use Drupal\experience_builder\ComponentSource\UrlRewriteInterface;
 use Drupal\experience_builder\Entity\VersionedConfigEntityBase;
 use Drupal\experience_builder\Render\ImportMapResponseAttachmentsProcessor;
 use Drupal\file\Entity\File;
+use Drupal\experience_builder\Version;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -40,9 +43,14 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
 
   public const SOURCE_PLUGIN_ID = 'js';
 
+  public const EXAMPLE_VIDEO_HORIZONTAL = '/ui/assets/videos/mountain_wide.mp4';
+  public const EXAMPLE_VIDEO_VERTICAL = '/ui/assets/videos/bird_vertical.mp4';
+
   protected ExtensionPathResolver $extensionPathResolver;
   protected AutoSaveManager $autoSaveManager;
   protected FileUrlGeneratorInterface $fileUrlGenerator;
+  protected Version $version;
+  protected AssetQueryStringInterface $assetQueryString;
   protected EntityRepositoryInterface $entityRepository;
   protected ?JavaScriptComponent $jsComponent = NULL;
 
@@ -51,6 +59,8 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
     $instance->extensionPathResolver = $container->get(ExtensionPathResolver::class);
     $instance->autoSaveManager = $container->get(AutoSaveManager::class);
     $instance->fileUrlGenerator = $container->get(FileUrlGeneratorInterface::class);
+    $instance->version = $container->get(Version::class);
+    $instance->assetQueryString = $container->get(AssetQueryStringInterface::class);
     $instance->entityRepository = $container->get(EntityRepositoryInterface::class);
     return $instance;
   }
@@ -145,7 +155,6 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
       'tailwind-merge' => \sprintf('%s%s/ui/lib/astro-hydration/dist/tailwind-merge.js', $base_path, $xb_path),
       '@/lib/FormattedText' => \sprintf('%s%s/ui/lib/astro-hydration/dist/FormattedText.js', $base_path, $xb_path),
       'next-image-standalone' => \sprintf('%s%s/ui/lib/astro-hydration/dist/next-image-standalone.js', $base_path, $xb_path),
-      '@/lib/use-image-loader' => \sprintf('%s%s/ui/lib/astro-hydration/dist/use-image-loader.js', $base_path, $xb_path),
       '@/lib/utils' => \sprintf('%s%s/ui/lib/astro-hydration/dist/utils.js', $base_path, $xb_path),
       '@drupal-api-client/json-api-client' => \sprintf('%s%s/ui/lib/astro-hydration/dist/jsonapi-client.js', $base_path, $xb_path),
       'drupal-jsonapi-params' => \sprintf('%s%s/ui/lib/astro-hydration/dist/jsonapi-params.js', $base_path, $xb_path),
@@ -153,11 +162,25 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
       '@/lib/drupal-utils' => \sprintf('%s%s/ui/lib/astro-hydration/dist/drupal-utils.js', $base_path, $xb_path),
       'swr' => \sprintf('%s%s/ui/lib/astro-hydration/dist/swr.js', $base_path, $xb_path),
     ];
+    // We need a cache-busting query string for the browser to not use cached
+    // files after installing an update.
+    $version = $this->version->getVersion();
+    // If version is 0.0.0, use the AssetQueryStringInterface service to improve
+    // DX: avoid the need to do a hard refresh or wipe the browser cache.
+    $query_string = $version === '0.0.0' ? $this->assetQueryString->get() : $version;
+    foreach ($import_maps[ImportMapResponseAttachmentsProcessor::GLOBAL_IMPORTS] as &$asset) {
+      $asset .= '?' . $query_string;
+    }
 
+    // For scoped dependencies we don't need cache-busting query strings, as
+    // those are already busted by its content-dependent filename: when the
+    // code component changes, so does the filename.
+    // @see \Drupal\experience_builder\Entity\XbAssetLibraryTrait::getJsPath()
     $scoped_map = $this->getScopedDependencies($component, $autoSave, $isPreview);
     if (count($scoped_map) > 0) {
       $import_maps[ImportMapResponseAttachmentsProcessor::SCOPED_IMPORTS] = $scoped_map;
     }
+
     $build['#attached']['library'] = \array_merge($build['#attached']['library'], $this->getDependencyLibraries($component, $autoSave, $isPreview));
 
     if (\count($build['#attached']['library']) === 0) {
@@ -173,7 +196,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
         [
           'rel' => 'modulepreload',
           'fetchpriority' => 'high',
-          'href' => $url,
+          'href' => $url . '?' . $query_string,
         ],
       ];
     }
@@ -365,10 +388,23 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
    * {@inheritdoc}
    */
   public function rewriteExampleUrl(string $url): string {
+    // Allow any fully qualified URL.
     $parsed_url = parse_url($url);
     \assert(\is_array($parsed_url));
     if (array_intersect_key($parsed_url, array_flip(['scheme', 'host']))) {
       return $url;
+    }
+
+    // Allow the example URL to be one of the hardcoded relative URLs, and
+    // rewrite them to operational root-relative URLs.
+    // Only allow precise matches for both DX and security reasons.
+    $example_videos = [
+      self::EXAMPLE_VIDEO_HORIZONTAL,
+      self::EXAMPLE_VIDEO_VERTICAL,
+    ];
+    if (in_array($url, $example_videos, TRUE)) {
+      $file_path = $this->extensionPathResolver->getPath('module', 'experience_builder') . $url;
+      return Url::fromUri('base:/' . $file_path)->toString();
     }
 
     return $this->checkDefaultImageFileUrl($url);
