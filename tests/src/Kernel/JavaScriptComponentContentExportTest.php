@@ -65,15 +65,11 @@ class JavaScriptComponentContentExportTest extends KernelTestBase {
 
   public function testDefaultImages(): void {
 
-    // No js_component, no file entities exist and no files in-use.
+    // No js_component, no file entities exist.
     $this->assertSame(0, \Drupal::entityTypeManager()->getStorage('file')->getQuery()->count()->accessCheck(FALSE)->execute());
-    $file_usage_count_query = \Drupal::database()->select('file_usage')->countQuery();
-    $usage_count = $file_usage_count_query->execute();
-    assert($usage_count instanceof StatementInterface);
-    $this->assertSame(0, (int) $usage_count->fetchField());
     $this->assertSame([], JavaScriptComponent::loadMultiple());
 
-    $first_image_uuid = \array_key_first($this->encodedFiles);
+    $first_image_uuid = (string) \array_key_first($this->encodedFiles);
     // 2. Create new JavascriptComponent using default image.
     $code_component = JavaScriptComponent::create([
       'encoded_files' => [
@@ -93,9 +89,8 @@ class JavaScriptComponentContentExportTest extends KernelTestBase {
     // Assert that new File entity was created.
     $this->assertSame(1, \Drupal::entityTypeManager()->getStorage('file')->getQuery()->count()->accessCheck(FALSE)->execute());
     // Assert that the file is used.
-    $usage_count = $file_usage_count_query->execute();
-    assert($usage_count instanceof StatementInterface);
-    $this->assertSame(1, (int) $usage_count->fetchField());
+    $this->assertFileUsageCount($first_image_uuid, 1);
+    $this->assertComponentUsesFile($first_image_uuid, $code_component->id());
 
     // 3. Create new JavascriptComponent using same default image.
     $code_component = JavaScriptComponent::create([
@@ -112,16 +107,13 @@ class JavaScriptComponentContentExportTest extends KernelTestBase {
     ]);
     $code_component->save();
 
-    $this->assertCount(2, JavaScriptComponent::loadMultiple());
-
     // Assert that no new File entities were created.
     $this->assertSame(1, \Drupal::entityTypeManager()->getStorage('file')->getQuery()->count()->accessCheck(FALSE)->execute());
     // Assert that the file is used by two js_components.
-    $usage_count = $file_usage_count_query->execute();
-    assert($usage_count instanceof StatementInterface);
-    $this->assertSame(2, (int) $usage_count->fetchField());
+    $this->assertFileUsageCount($first_image_uuid, 2);
+    $this->assertComponentUsesFile($first_image_uuid, $code_component->id());
 
-    $last_image_uuid = \array_key_last($this->encodedFiles);
+    $last_image_uuid = (string) \array_key_last($this->encodedFiles);
     // 4. Create new JavascriptComponent using different default image.
     $code_component = JavaScriptComponent::create([
       'encoded_files' => [
@@ -150,9 +142,8 @@ class JavaScriptComponentContentExportTest extends KernelTestBase {
     // Assert that additional File entity was created.
     $this->assertSame(2, \Drupal::entityTypeManager()->getStorage('file')->getQuery()->count()->accessCheck(FALSE)->execute());
     // Assert that new file is used by js_component.
-    $usage_count = $file_usage_count_query->execute();
-    assert($usage_count instanceof StatementInterface);
-    $this->assertSame(3, (int) $usage_count->fetchField());
+    $this->assertFileUsageCount($last_image_uuid, 1);
+    $this->assertComponentUsesFile($last_image_uuid, $code_component->id());
   }
 
   public function testDefaultImageExport(): void {

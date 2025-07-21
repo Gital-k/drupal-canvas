@@ -6,6 +6,12 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\experience_builder\Traits;
 
+use Drupal\Core\Database\StatementInterface;
+use Drupal\Core\Entity\EntityRepositoryInterface;
+use Drupal\experience_builder\Entity\JavaScriptComponent;
+use Drupal\file\FileInterface;
+use Drupal\file\FileRepositoryInterface;
+
 trait DefaultImagesTrait {
   const FIXTURE_IMAGES = [
     '/fixtures/images/cosmo.jpg',
@@ -27,6 +33,33 @@ trait DefaultImagesTrait {
     }
 
     return $encoded_images;
+  }
+
+  public function assertFileUsageCount(string $fileUuid, int $count): void {
+    $file = \Drupal::service(EntityRepositoryInterface::class)->loadEntityByUuid('file', $fileUuid);
+    assert($file instanceof FileInterface);
+    $file_usage_count_query = \Drupal::database()->select('file_usage', 'f')
+      ->where('[f].[fid] = :fid', [
+        ':fid' => $file->id(),
+      ])
+      ->countQuery();
+    $usage_count = $file_usage_count_query->execute();
+    assert($usage_count instanceof StatementInterface);
+    $this->assertSame($count, (int) $usage_count->fetchField());
+  }
+
+  public function assertComponentUsesFile(string $fileUuid, string $componentId): void{
+    $file = \Drupal::service(EntityRepositoryInterface::class)->loadEntityByUuid('file', $fileUuid);
+    assert($file instanceof FileInterface);
+    $file_usage_count_query = \Drupal::database()->select('file_usage', 'f')
+      ->where('[f].[fid] = :fid AND [f].[id] = :id', [
+        ':fid' => $file->id(),
+        ':id' => $componentId,
+      ])
+      ->countQuery();
+    $usage_count = $file_usage_count_query->execute();
+    assert($usage_count instanceof StatementInterface);
+    $this->assertSame(1, (int) $usage_count->fetchField());
   }
 
 }
