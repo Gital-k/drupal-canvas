@@ -388,6 +388,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
    * {@inheritdoc}
    */
   public function rewriteExampleUrl(string $url): string {
+    $url = $this->convertDefaultImageFileUrl($url);
     // Allow any fully qualified URL.
     $parsed_url = parse_url($url);
     \assert(\is_array($parsed_url));
@@ -407,7 +408,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
       return Url::fromUri('base:/' . $file_path)->toString();
     }
 
-    return $this->checkDefaultImageFileUrl($url);
+    throw new \InvalidArgumentException('Default images for Javascript Components must be a fully-qualified URL with both scheme and host.');
   }
 
   private function getScopedDependencies(JavaScriptComponent $component, AutoSaveEntity $autoSave, bool $isPreview, array $seen = []): array {
@@ -453,16 +454,15 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
     return $this;
   }
 
-  protected function checkDefaultImageFileUrl(string $url): string {
+  protected function convertDefaultImageFileUrl(string $url): string {
     $encoded_files = $this->getJavaScriptComponent()->get('encoded_files');
     if (is_array($encoded_files)) {
       foreach ($encoded_files as $uuid => $encoded_file) {
         if ($encoded_file['filename'] === $url) {
           $file = $this->entityRepository->loadEntityByUuid('file', $uuid);
           assert($file instanceof File);
-          $url = $file->createFileUrl(TRUE);
 
-          return $url;
+          return $file->createFileUrl(FALSE);
         }
       }
     }
