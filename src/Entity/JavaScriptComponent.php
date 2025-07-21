@@ -393,8 +393,10 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
           $new_file_uri = str_replace('temporary://', 'public://', (string) $file->getFileUri());
           $moved_file = $file_repository->move($file, $new_file_uri, FileExists::Replace);
           $file_usage->add($moved_file, 'experience_builder', 'js_component', (string) $this->id(), 1);
+          continue;
         }
-        elseif ($usage = $file_usage->listUsage($file) && !isset($usage[$this->getEntityType()->getProvider()][$this->getEntityTypeId()][$this->id()])) {
+        $usage = $file_usage->listUsage($file) 
+        if (!isset($usage[$this->getEntityType()->getProvider()][$this->getEntityTypeId()][$this->id()])) {
           $file_usage->add($file, $this->getEntityType()->getProvider(), $this->getEntityTypeId(), (string) $this->id());
         }
       }
