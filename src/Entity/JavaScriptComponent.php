@@ -395,7 +395,7 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
           $file_usage->add($moved_file, 'experience_builder', 'js_component', (string) $this->id(), 1);
           continue;
         }
-        $usage = $file_usage->listUsage($file) 
+        $usage = $file_usage->listUsage($file);
         if (!isset($usage[$this->getEntityType()->getProvider()][$this->getEntityTypeId()][$this->id()])) {
           $file_usage->add($file, $this->getEntityType()->getProvider(), $this->getEntityTypeId(), (string) $this->id());
         }
