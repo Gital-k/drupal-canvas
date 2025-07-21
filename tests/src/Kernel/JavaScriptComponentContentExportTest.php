@@ -122,7 +122,7 @@ class JavaScriptComponentContentExportTest extends KernelTestBase {
     $this->assertSame(2, (int) $usage_count->fetchField());
 
     $last_image_uuid = \array_key_last($this->encodedFiles);
-    // 4. Create new JavascriptComponent using same different default image.
+    // 4. Create new JavascriptComponent using different default image.
     $code_component = JavaScriptComponent::create([
       'encoded_files' => [
         $last_image_uuid => $this->encodedFiles[$last_image_uuid],
