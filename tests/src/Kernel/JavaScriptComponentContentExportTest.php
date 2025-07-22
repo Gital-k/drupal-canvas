@@ -128,22 +128,23 @@ class JavaScriptComponentContentExportTest extends KernelTestBase {
       'css' => ['original' => '', 'compiled' => ''],
     ]);
     $code_component->save();
+    $last_code_component_id = $code_component->id();
 
     $code_components = JavaScriptComponent::loadMultiple();
     $this->assertCount(3, $code_components);
-    foreach ($code_components as $code_component) {
-      $encoded_files = $code_component->get('encoded_files');
+    foreach ($code_components as $component) {
+      $encoded_files = $component->get('encoded_files');
       foreach ($encoded_files as $encoded_file) {
         self::assertArrayNotHasKey('data', $encoded_file);
       }
-      $this->assertEquals(SAVED_UPDATED, $code_component->save());
+      $this->assertEquals(SAVED_UPDATED, $component->save());
     }
 
     // Assert that additional File entity was created.
     $this->assertSame(2, \Drupal::entityTypeManager()->getStorage('file')->getQuery()->count()->accessCheck(FALSE)->execute());
     // Assert that new file is used by js_component.
     $this->assertFileUsageCount($last_image_uuid, 1);
-    $this->assertComponentUsesFile($last_image_uuid, $code_component->id());
+    $this->assertComponentUsesFile($last_image_uuid, $last_code_component_id);
   }
 
   public function testDefaultImageExport(): void {
@@ -230,7 +231,7 @@ class JavaScriptComponentContentExportTest extends KernelTestBase {
     $this->assertEquals($code_component->toArray(), $import->read($code_component->getConfigDependencyName()));
 
     $files = File::loadMultiple();
-    self::assertEquals(\array_keys($this->encodedFiles), \array_map(static fn (FileInterface $file) => $file->uuid(), $files));
+    self::assertEquals(\array_keys($this->encodedFiles), \array_map(static fn (FileInterface $file) => $file->uuid(), \array_values($files)));
   }
 
 }

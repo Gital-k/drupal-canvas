@@ -381,6 +381,8 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
       $file_system = \Drupal::service('file_system');
       $file_usage = \Drupal::service('file.usage');
       assert(is_array($this->encoded_files));
+      $default_image_directory = self::PUBLIC_IMAGE_DIRECTORY;
+      $file_system->prepareDirectory($default_image_directory, FileSystemInterface:: CREATE_DIRECTORY | FileSystemInterface::MODIFY_PERMISSIONS);
       foreach ($this->encoded_files as $uuid => $encoded_file) {
         $file = $repository->loadEntityByUuid('file', $uuid);
         if (!$file instanceof FileInterface) {
@@ -388,12 +390,9 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
         }
         if ($file->isTemporary()) {
           /** @var \Drupal\Core\File\FileSystemInterface $file_system */
-          $default_image_directory = self::PUBLIC_IMAGE_DIRECTORY;
-          $file_system->prepareDirectory($default_image_directory, FileSystemInterface:: CREATE_DIRECTORY | FileSystemInterface::MODIFY_PERMISSIONS);
           $new_file_uri = str_replace('temporary://', 'public://', (string) $file->getFileUri());
           $moved_file = $file_repository->move($file, $new_file_uri, FileExists::Replace);
           $file_usage->add($moved_file, 'experience_builder', 'js_component', (string) $this->id(), 1);
-          continue;
         }
         $usage = $file_usage->listUsage($file);
         if (!isset($usage[$this->getEntityType()->getProvider()][$this->getEntityTypeId()][$this->id()])) {

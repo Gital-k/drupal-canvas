@@ -49,15 +49,11 @@ trait DefaultImagesTrait {
   public function assertComponentUsesFile(string $fileUuid, string $componentId): void {
     $file = \Drupal::service(EntityRepositoryInterface::class)->loadEntityByUuid('file', $fileUuid);
     assert($file instanceof FileInterface);
-    $file_usage_count_query = \Drupal::database()->select('file_usage', 'f')
-      ->where('[f].[fid] = :fid AND [f].[id] = :id', [
-        ':fid' => $file->id(),
-        ':id' => $componentId,
-      ])
-      ->countQuery();
-    $usage_count = $file_usage_count_query->execute();
-    assert($usage_count instanceof StatementInterface);
-    $this->assertSame(1, (int) $usage_count->fetchField());
+    $usage = \Drupal::service('file.usage')->listUsage($file);
+    assert(is_array($usage));
+    assert(isset($usage['experience_builder']['js_component']));
+    $this->assertArrayHasKey($componentId, $usage['experience_builder']['js_component']);
+    $this->assertSame("1", $usage['experience_builder']['js_component'][$componentId]);
   }
 
 }
