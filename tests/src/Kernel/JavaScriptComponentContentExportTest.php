@@ -230,8 +230,7 @@ class JavaScriptComponentContentExportTest extends KernelTestBase {
     $this->assertEquals($code_component->toArray(), $import->read($code_component->getConfigDependencyName()));
 
     $files = File::loadMultiple();
-    $matches = [];
-self::assertEquals(\array_keys($this->encodedFiles), \array_map(static fn (FileInterface $file) => $file->uuid(), $files));
+    self::assertEquals(\array_keys($this->encodedFiles), \array_map(static fn (FileInterface $file) => $file->uuid(), $files));
   }
 
 }
