@@ -231,14 +231,7 @@ class JavaScriptComponentContentExportTest extends KernelTestBase {
 
     $files = File::loadMultiple();
     $matches = [];
-    foreach ($files as $file) {
-      foreach ($this->encodedFiles as $uuid => $encoded_file) {
-        if ($file->uuid() === $uuid) {
-          $matches[] = TRUE;
-        }
-      }
-    }
-    $this->assertNotEmpty($matches);
+self::assertEquals(\array_keys($this->encodedFiles), \array_map(static fn (FileInterface $file) => $file->uuid(), $files));
   }
 
 }
