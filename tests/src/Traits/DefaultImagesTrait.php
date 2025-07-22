@@ -8,9 +8,7 @@ namespace Drupal\Tests\experience_builder\Traits;
 
 use Drupal\Core\Database\StatementInterface;
 use Drupal\Core\Entity\EntityRepositoryInterface;
-use Drupal\experience_builder\Entity\JavaScriptComponent;
 use Drupal\file\FileInterface;
-use Drupal\file\FileRepositoryInterface;
 
 trait DefaultImagesTrait {
   const FIXTURE_IMAGES = [
@@ -48,7 +46,7 @@ trait DefaultImagesTrait {
     $this->assertSame($count, (int) $usage_count->fetchField());
   }
 
-  public function assertComponentUsesFile(string $fileUuid, string $componentId): void{
+  public function assertComponentUsesFile(string $fileUuid, string $componentId): void {
     $file = \Drupal::service(EntityRepositoryInterface::class)->loadEntityByUuid('file', $fileUuid);
     assert($file instanceof FileInterface);
     $file_usage_count_query = \Drupal::database()->select('file_usage', 'f')
