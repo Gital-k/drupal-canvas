@@ -137,6 +137,7 @@ class JavaScriptComponentContentExportTest extends KernelTestBase {
       foreach ($encoded_files as $encoded_file) {
         self::assertArrayNotHasKey('data', $encoded_file);
       }
+      // Validates `js_components` can be saved without `data` property in their `encoded_files`.
       $this->assertEquals(SAVED_UPDATED, $component->save());
     }
 
