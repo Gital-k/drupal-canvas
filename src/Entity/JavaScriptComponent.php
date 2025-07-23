@@ -368,7 +368,7 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
       $encoded_files[$uuid] = $encoded_file;
     }
     $this->set('encoded_files', $encoded_files);
-    self::validateEndocedFiles($this);
+    self::validateEncodedFiles($this);
   }
 
   /**
@@ -421,7 +421,8 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
   public static function postLoad(EntityStorageInterface $storage, array &$entities) {
     parent::postLoad($storage, $entities);
     foreach ($entities as $entity) {
-      self::validateEndocedFiles($entity);
+      assert($entity instanceof JavaScriptComponent);
+      self::validateEncodedFiles($entity);
     }
   }
 
@@ -577,7 +578,7 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
    *
    * @throws \LogicException
    */
-  protected static function validateEndocedFiles(JavaScriptComponent $entity): void {
+  protected static function validateEncodedFiles(JavaScriptComponent $entity): void {
     if (!is_array($entity->encoded_files)) {
       return;
     }
