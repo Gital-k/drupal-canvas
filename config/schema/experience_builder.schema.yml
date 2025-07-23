@@ -787,13 +787,11 @@ experience_builder.encoded_file:
     filename:
       label: 'Original filename of file upload'
       type: string
+    # Note: this property is not and should not be stored in Drupal database. It should only exist in exported config entity. The purpose of this schema is not to validate property, but to document it's shape when config entity using `experience_builder.encoded_file` is exported.
     data:
-      label: 'File content encoded as a `data:` URI'
-      type: uri
+      label: 'File content encoded as base64 string'
+      type: string
       requiredKey: false
-      constraints:
-        Regex:
-          pattern: '/^data\:.*$/'
 
 experience_builder.staged_config_update.*:
   type: config_entity
