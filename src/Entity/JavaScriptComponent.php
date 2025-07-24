@@ -392,8 +392,7 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
         if ($file->isTemporary()) {
           /** @var \Drupal\Core\File\FileSystemInterface $file_system */
           $new_file_uri = str_replace('temporary://', 'public://', (string) $file->getFileUri());
-          $moved_file = $file_repository->move($file, $new_file_uri, FileExists::Rename);
-          $file_usage->add($moved_file, 'experience_builder', 'js_component', (string) $this->id(), 1);
+          $file = $file_repository->move($file, $new_file_uri, FileExists::Rename);
         }
         $usage = $file_usage->listUsage($file);
         if (!isset($usage[$this->getEntityType()->getProvider()][$this->getEntityTypeId()][$this->id()])) {
