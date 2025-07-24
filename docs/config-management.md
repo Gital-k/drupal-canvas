@@ -185,6 +185,35 @@ To the Content Creator, then, the input UX of an `SDC`-sourced `component` and a
 "props" (the name used for the `explicit component input` of both of those `Component Source Plugin`s) must be
 _indistinguishable_ from each other — despite one relying on Twig and the other only on JS.
 
+Code components can have default values assigned to their props, including default images. When creating File entity
+used for default image prop value, it's UUID is based on file content hash. If a default image is assigned to a
+_code component_ prop, the following happens:
+- File entity usage by `js_component` is added to `file_usage` database table
+- `js_component` config entity gets relevant `content dependency` declared
+- Original File entity filename is stored in `encoded_files` using File entity
+UUID as sequence key
+
+Upon exporting `js_component` config entity containing `encoded_files`, the following happens:
+- File entities used for default props are loaded
+- Contents of each File entity is encoded with base64
+- Encoded file contents are appended as `data` property to the relevant `encoded_files`sequence item.
+
+Upon importing `js_component` config entity, the following happens:
+- All `js_component` entities are checked for `encoded_files` properties
+- If `encoded_files` is not empty, an attempt to load File entity with relevant UUID is made
+- If the file is found, no further actions are required
+- If file is not found, a temporary File entity is created
+- All `js_component` entities have their `encoded_files` properties modified by unsetting `data` property
+- Config is imported
+- `JavaScript::postSave()` method checks if it's dependencies are stored as temporary files
+   - If no, no further action is required
+- If yes, files are moved to permanent storage and their usage tracking is updated
+
+This allows easy transfer of default images between environments, without having to worry about duplicate File entities,
+changing Image paths and without having to store amounts of base64 data in the database.
+
+⚠️ The exact approach might change in the future, but we expect functionality to remain very close to current
+implementation.
 
 #### 3.2.1 _Code components_ can be either _internal_ or _exposed_, and can have a _working copy_
 

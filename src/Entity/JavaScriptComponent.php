@@ -368,7 +368,6 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
       $encoded_files[$uuid] = $encoded_file;
     }
     $this->set('encoded_files', $encoded_files);
-    self::validateEncodedFiles($this);
   }
 
   /**
@@ -409,20 +408,6 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
     //    be recalculated.
     // @see \experience_builder_library_info_build()
     Cache::invalidateTags(['library_info']);
-  }
-
-  /**
-   * @param \Drupal\Core\Entity\EntityStorageInterface $storage
-   * @param array $entities
-   *
-   * @return void
-   */
-  public static function postLoad(EntityStorageInterface $storage, array &$entities) {
-    parent::postLoad($storage, $entities);
-    foreach ($entities as $entity) {
-      assert($entity instanceof JavaScriptComponent);
-      self::validateEncodedFiles($entity);
-    }
   }
 
   protected function processEncodedFile(string $uuid, array &$encoded_file, FileSystemInterface $file_system): void {
@@ -566,26 +551,6 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
    */
   public function getAssetLibraryDependencies(): array {
     return CodeComponentDataProvider::getRequiredXbDataLibraries($this->getJs());
-  }
-
-  /**
-   * The "data" element of "encoded_files" should never be saved or loaded.
-   *
-   * @param \Drupal\experience_builder\Entity\JavaScriptComponent $entity
-   *
-   * @return void
-   *
-   * @throws \LogicException
-   */
-  protected static function validateEncodedFiles(JavaScriptComponent $entity): void {
-    if (!is_array($entity->encoded_files)) {
-      return;
-    }
-    foreach ($entity->encoded_files as $uuid => $encoded_file) {
-      if (isset($encoded_file['data']) && !is_null($encoded_file['data'])) {
-        throw new \LogicException(sprintf('Array element "%s" of "encoded_files" contains disallowed "data" element.', $uuid));
-      }
-    }
   }
 
 }
