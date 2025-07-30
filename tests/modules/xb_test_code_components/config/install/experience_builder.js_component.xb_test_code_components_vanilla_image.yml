@@ -4,7 +4,6 @@ status: true
 dependencies:
   content:
     file:file:f8133ff8-3276-5d4d-b3f9-8fb6b363fb70
-# @see https://git.drupalcode.org/project/experience_builder/-/commit/8ecc46f9141b0e563605b33ebdae7baf1d7730fc
 encoded_files:
   f8133ff8-3276-5d4d-b3f9-8fb6b363fb70:
     filename: 'cosmo.jpg'

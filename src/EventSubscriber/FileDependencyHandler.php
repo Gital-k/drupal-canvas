@@ -12,7 +12,10 @@ use Drupal\file\Entity\File;
 use Drupal\file\FileInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
-class FileDependencyHandler implements EventSubscriberInterface {
+/**
+ * @internal
+ */
+final class FileDependencyHandler implements EventSubscriberInterface {
 
   public function __construct(
     protected readonly EntityRepositoryInterface $entityRepository,
