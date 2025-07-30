@@ -221,7 +221,7 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
       ]);
     }
 
-    // ⚠️ This is likely to be refactored once FE part of this is complete.
+    // @todo Refactor in https://www.drupal.org/project/experience_builder/issues/3538711
     if (array_key_exists('defaultImages', $data)) {
       $encoded_files = NULL;
       foreach ($data['defaultImages'] as $default_image) {
@@ -244,6 +244,8 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
    * @param string $data
    *
    * @return string
+   *
+   * @todo Refactor in https://www.drupal.org/project/experience_builder/issues/3537728
    */
   public static function generateImageUuid(string $data): string {
     $hashing = hash('sha1', $data);
@@ -360,8 +362,6 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
   }
 
   /**
-   * Check for referenced files, if any available - convert them into static files managed by Experience Builder.
-   *
    * {@inheritdoc}
    */
   public function preSave(EntityStorageInterface $storage): void {
@@ -370,6 +370,8 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
     if ($this->isSyncing()) {
       return;
     }
+    // Check for referenced files, if any. Convert them into File entities
+    // managed by Experience Builder.
     $encoded_files = $this->get('encoded_files');
     if (!is_array($encoded_files)) {
       return;

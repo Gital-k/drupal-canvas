@@ -185,6 +185,7 @@ To the Content Creator, then, the input UX of an `SDC`-sourced `component` and a
 "props" (the name used for the `explicit component input` of both of those `Component Source Plugin`s) must be
 _indistinguishable_ from each other — despite one relying on Twig and the other only on JS.
 
+
 #### 3.2.1 _Code components_ can be either _internal_ or _exposed_, and can have a _working copy_
 
 Every `JavaScriptComponent config entity` has a `status` key-value pair, just like every config entity. This determines
