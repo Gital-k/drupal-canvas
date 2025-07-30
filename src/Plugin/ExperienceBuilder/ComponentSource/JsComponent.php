@@ -478,20 +478,4 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
     return $this;
   }
 
-  protected function convertExampleImageFileUrl(string $url): string {
-    $encoded_files = $this->getJavaScriptComponent()->get('encoded_files');
-    if (is_array($encoded_files)) {
-      foreach ($encoded_files as $uuid => $encoded_file) {
-        if ($encoded_file['filename'] === $url) {
-          $file = $this->entityRepository->loadEntityByUuid('file', $uuid);
-          assert($file instanceof File);
-
-          return $file->createFileUrl(FALSE);
-        }
-      }
-    }
-
-    return $url;
-  }
-
 }
