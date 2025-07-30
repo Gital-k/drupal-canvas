@@ -157,16 +157,22 @@ const operationsHandler = {
                     if (!propSource.default_values) {
                       propSource.default_values = {};
                     }
-                    // Ensure source exists and is an array
-                    if (!Array.isArray(propSource.default_values.source)) {
-                      propSource.default_values.source = [{}];
+                    if (propSource.jsonSchema.format === 'uri-reference') {
+                      propSource.default_values.source = [value];
+                    } else {
+                      // Ensure source exists and is an array
+                      if (!Array.isArray(propSource.default_values.source)) {
+                        propSource.default_values.source = [{}];
+                      }
+                      // Ensure the first element exists
+                      if (!propSource.default_values.source[0]) {
+                        propSource.default_values.source[0] = {};
+                      }
+                      // Now set the value
+                      propSource.default_values.source[0].value = value;
+                      // @todo Revisit once https://www.drupal.org/node/3538576 is in.
+                      propSource.default_values.resolved = value;
                     }
-                    // Ensure the first element exists
-                    if (!propSource.default_values.source[0]) {
-                      propSource.default_values.source[0] = {};
-                    }
-                    // Now set the value
-                    propSource.default_values.source[0].value = value;
                   }
                 },
               );
@@ -488,8 +494,9 @@ const AiWizard = () => {
               },
             },
           }}
+          // @todo Revisit once https://www.drupal.org/node/3528730 is in.
           requestBodyLimits={{
-            maxMessages: 5,
+            maxMessages: 3,
           }}
           connect={{
             // Defining a handler instead of an object to ensure we can work with

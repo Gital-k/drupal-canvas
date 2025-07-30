@@ -50,6 +50,7 @@ class JavascriptComponentTest extends KernelTestBase {
       'compiledJs' => '',
       'compiledCss' => '',
       'importedJsComponents' => [],
+      'dataDependencies' => [],
     ];
     $js_component = JavaScriptComponent::createFromClientSide($client_data);
     $this->assertSame(SAVED_NEW, $js_component->save());

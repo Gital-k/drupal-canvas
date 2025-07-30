@@ -262,6 +262,33 @@ final class JsComponentTest extends ComponentSourceTestBase {
           ],
         ],
       ],
+      'js.xb_test_code_components_with_link_prop' => [
+        'prop_field_definitions' => [
+          'link' => [
+            'field_type' => 'link',
+            'field_storage_settings' => [],
+            'field_instance_settings' => [
+              'title' => 0,
+            ],
+            'field_widget' => 'link_default',
+            'default_value' => [
+              [
+                'uri' => '/llamas',
+                'options' => [],
+              ],
+            ],
+            'expression' => 'ℹ︎link␟url',
+          ],
+          'text' => [
+            'field_type' => 'string',
+            'field_storage_settings' => [],
+            'field_instance_settings' => [],
+            'field_widget' => 'string_textfield',
+            'default_value' => [0 => ['value' => 'This is my link']],
+            'expression' => 'ℹ︎string␟value',
+          ],
+        ],
+      ],
       'js.xb_test_code_components_with_no_props' => [
         'prop_field_definitions' => [],
       ],
@@ -460,6 +487,27 @@ final class JsComponentTest extends ComponentSourceTestBase {
                 'rel' => 'modulepreload',
                 'fetchpriority' => 'high',
                 'href' => \sprintf('/%s/files/astro-island/S_GMOfXPnSsDMzuP0bw4pnXmP2SWPmsg4LgfkqNMzsI.js', $site_path),
+              ],
+            ],
+          ],
+          'import_maps' => $default_imports,
+        ],
+      ],
+      'js.xb_test_code_components_with_link_prop' => [
+        'cacheability' => (clone $default_cacheability)
+          ->setCacheTags(['config:experience_builder.js_component.xb_test_code_components_with_link_prop']),
+        'attachments' => [
+          'library' => [
+            'experience_builder/astro_island.xb_test_code_components_with_link_prop',
+            ...$default_libraries,
+          ],
+          'html_head_link' => [
+            ...$default_html_head_links,
+            [
+              [
+                'rel' => 'modulepreload',
+                'fetchpriority' => 'high',
+                'href' => \sprintf('/%s/files/astro-island/fvdcbYvgbnFGHremAlwsfbIcqUtlrp6B1uNETJtRsbo.js', $site_path),
               ],
             ],
           ],
@@ -773,6 +821,15 @@ final class JsComponentTest extends ComponentSourceTestBase {
           'experience_builder.js_component.xb_test_code_components_with_enums',
         ],
       ],
+      'js.xb_test_code_components_with_link_prop' => [
+        'module' => [
+          'core',
+          'link',
+        ],
+        'config' => [
+          'experience_builder.js_component.xb_test_code_components_with_link_prop',
+        ],
+      ],
       'js.xb_test_code_components_with_no_props' => [
         'config' => [
           'experience_builder.js_component.xb_test_code_components_with_no_props',
@@ -884,6 +941,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
         'original' => 'console.log("nested dependency loaded");',
         'compiled' => 'console.log("nested dependency loaded");',
       ],
+      'dataDependencies' => [],
     ]);
     $nested_dependency_js_component->save();
     // Create a dependency component first
@@ -901,6 +959,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
         'original' => 'console.log("dependency loaded");',
         'compiled' => 'console.log("dependency loaded");',
       ],
+      'dataDependencies' => [],
     ]);
     $dependency_js_component->save();
     $js_component_data = $dependency_js_component->normalizeForClientSide()->values;
@@ -922,6 +981,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
         'original' => 'console.log("dependency with no css loaded");',
         'compiled' => 'console.log("dependency with no css loaded");',
       ],
+      'dataDependencies' => [],
     ]);
     $dependency_js_component_without_css->save();
 
@@ -947,6 +1007,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
         'original' => 'console.log( "hey" );',
         'compiled' => 'console.log("hey");',
       ],
+      'dataDependencies' => [],
     ]);
     // Add the dependency through client API.
     $js_component_data = $js_component->normalizeForClientSide()->values;
@@ -1311,6 +1372,54 @@ final class JsComponentTest extends ComponentSourceTestBase {
         ],
         'transforms' => [],
       ],
+      'js.xb_test_code_components_with_link_prop' => [
+        'expected_output_selectors' => [
+          'astro-island[opts*="My Code Component Link"]',
+          'script[blocking="render"][src*="/ui/lib/astro-hydration/dist/client.js"]',
+        ],
+        'source' => 'Code component',
+        'metadata' => ['slots' => []],
+        'propSources' => [
+          'text' => [
+            'required' => FALSE,
+            'jsonSchema' => [
+              'type' => 'string',
+            ],
+            'sourceType' => 'static:field_item:string',
+            'expression' => 'ℹ︎string␟value',
+            'default_values' => [
+              'source' => [
+                0 => ['value' => 'This is my link'],
+              ],
+              'resolved' => 'This is my link',
+            ],
+          ],
+          'link' => [
+            'required' => FALSE,
+            'jsonSchema' => [
+              'type' => 'string',
+              'format' => 'uri-reference',
+            ],
+            'sourceType' => 'static:field_item:link',
+            'expression' => 'ℹ︎link␟url',
+            'sourceTypeSettings' => [
+              'instance' => [
+                'title' => 0,
+              ],
+            ],
+            'default_values' => [
+              'source' => [
+                0 => [
+                  'uri' => '/llamas',
+                  'options' => [],
+                ],
+              ],
+              'resolved' => '/llamas',
+            ],
+          ],
+        ],
+        'transforms' => [],
+      ],
       'js.xb_test_code_components_with_no_props' => [
         'expected_output_selectors' => [
           'astro-island[opts*="With no props"][props="{}"]',
@@ -1414,6 +1523,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
         'original' => '.test { display: none; }',
         'compiled' => '.test { display: none; }',
       ],
+      'dataDependencies' => [],
     ]);
     $js_component->enable()->save();
     $component_id = JsComponent::componentIdFromJavascriptComponentId($js_component_id);
@@ -1438,6 +1548,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
         'original' => '.test { display: none; }',
         'compiled' => '.test { display: none; }',
       ],
+      'dataDependencies' => [],
     ]);
     $js_component->enable()->save();
     $component_id = JsComponent::componentIdFromJavascriptComponentId($js_component_id);
@@ -1483,6 +1594,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
         'original' => '.test { display: none; }',
         'compiled' => '.test { display: none; }',
       ],
+      'dataDependencies' => [],
     ]);
     $js_component->enable()->save();
   }
@@ -1511,6 +1623,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
         'original' => '.test { display: none; }',
         'compiled' => '.test { display: none; }',
       ],
+      'dataDependencies' => [],
     ]);
     $violations = $js_component->getTypedData()->validate();
     self::assertCount(0, $violations);
@@ -1633,6 +1746,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
         'original' => '.test { display: none; }',
         'compiled' => '.test { display: none; }',
       ],
+      'dataDependencies' => [],
     ]);
     $js_component->enable()->save();
     $component_id = JsComponent::componentIdFromJavascriptComponentId($js_component_id);

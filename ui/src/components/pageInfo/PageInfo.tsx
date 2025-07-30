@@ -43,6 +43,8 @@ import {
   selectEntityType,
   selectHomepagePath,
   setHomepagePath,
+  extractHomepagePathFromStagedConfig,
+  selectHomepageStagedConfigExists,
 } from '@/features/configuration/configurationSlice';
 import { getBaseUrl, getXbSettings } from '@/utils/drupal-globals';
 import { getQueryErrorMessage } from '@/utils/error-handling';
@@ -87,6 +89,7 @@ const PageInfo = () => {
     data: pageItems,
     isLoading: isPageItemsLoading,
     error: pageItemsError,
+    isSuccess: isGetPageItemsSuccess,
   } = useGetContentListQuery({
     // @todo Generalize in https://www.drupal.org/i/3498525
     entityType: 'xb_page',
@@ -103,17 +106,38 @@ const PageInfo = () => {
       isSuccess: isCreateContentSuccess,
     },
   ] = useCreateContentMutation();
-  const { data: homepageConfig, isSuccess } =
-    useGetStagedConfigQuery(HOMEPAGE_CONFIG_ID);
   const homepagePath = useAppSelector(selectHomepagePath);
+  const homepageStagedConfigExists = useAppSelector(
+    selectHomepageStagedConfigExists,
+  );
+  const { data: homepageConfig, isSuccess: isGetStagedUpdateSuccess } =
+    useGetStagedConfigQuery(HOMEPAGE_CONFIG_ID, {
+      // Only fetch the homepage staged config if it exists to avoid
+      // unnecessary API calls that return 404s.
+      skip: !homepageStagedConfigExists,
+    });
+  const [isCurrentPageHomepage, setIsCurrentPageHomepage] =
+    useState<boolean>(false);
 
   useEffect(() => {
-    if (isSuccess) {
-      dispatch(
-        setHomepagePath(homepageConfig.data.actions[0].input['page.front']),
+    if (isGetPageItemsSuccess) {
+      // Check if the current page is the homepage.
+      const homepage = pageItems.find(
+        (page) => page.internalPath === homepagePath,
+      );
+      setIsCurrentPageHomepage(
+        entityType === 'xb_page' && entityId === String(homepage?.id),
       );
     }
-  }, [dispatch, homepageConfig?.data, isSuccess]);
+  }, [entityId, entityType, homepagePath, isGetPageItemsSuccess, pageItems]);
+
+  useEffect(() => {
+    if (isGetStagedUpdateSuccess) {
+      dispatch(
+        setHomepagePath(extractHomepagePathFromStagedConfig(homepageConfig)),
+      );
+    }
+  }, [dispatch, homepageConfig, isGetStagedUpdateSuccess]);
 
   function handleNewPage() {
     createContent({
@@ -232,7 +256,7 @@ const PageInfo = () => {
               data-testid="xb-navigation-button"
             >
               <Flex gap="2" align="center">
-                {iconMap['Page']}
+                {isCurrentPageHomepage ? iconMap['Homepage'] : iconMap['Page']}
                 {title}
                 <ChevronDownIcon />
               </Flex>

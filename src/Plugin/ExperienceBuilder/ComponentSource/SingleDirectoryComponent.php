@@ -122,7 +122,11 @@ final class SingleDirectoryComponent extends GeneratedFieldExplicitInputUxCompon
     if (is_null($this->configuration['local_source_id'])) {
       throw new ComponentDoesNotMeetRequirementsException(['Component has no valid source plugin_id value.']);
     }
-    return $this->componentPluginManager->find($this->configuration['local_source_id']);
+    if ($this->componentPlugin === NULL) {
+      // Statically cache the loaded plugin.
+      $this->componentPlugin = $this->componentPluginManager->find($this->configuration['local_source_id']);
+    }
+    return $this->componentPlugin;
   }
 
   /**
@@ -215,7 +219,8 @@ final class SingleDirectoryComponent extends GeneratedFieldExplicitInputUxCompon
     assert(is_array($component_plugin->metadata->schema));
     $props = self::getPropsForComponentPlugin($component_plugin);
     assert(is_array($component_plugin->getPluginDefinition()));
-    $status = !(isset($component_plugin->metadata->status) && $component_plugin->metadata->status === 'obsolete');
+    // Disabled if obsolete or flagged with noUi.
+    $status = !((isset($component_plugin->metadata->noUi) && $component_plugin->metadata->noUi === TRUE) || (isset($component_plugin->metadata->status) && $component_plugin->metadata->status === 'obsolete'));
     $settings = [
       'prop_field_definitions' => $props,
     ];

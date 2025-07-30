@@ -25,6 +25,7 @@ import styles from './Navigation.module.css';
 import type { FormEvent } from 'react';
 import { selectHomepagePath } from '@/features/configuration/configurationSlice';
 import { useAppSelector } from '@/app/hooks';
+import { useEffect } from 'react';
 
 const hasPermission = (
   permission: 'edit' | 'duplicate' | 'homepage' | 'delete',
@@ -187,7 +188,7 @@ const ContentGroup = ({
                 flexGrow="1"
                 onClick={onSelect ? () => onSelect(item) : undefined}
               >
-                <Box px="3">
+                <Box px="3" pt="1">
                   {item.internalPath === homepagePath ? (
                     <HomeIcon />
                   ) : (
@@ -255,6 +256,13 @@ const Navigation = ({
   onSetHomepage?: (page: ContentStub) => void;
   onDelete?: (page: ContentStub) => void;
 }) => {
+  // Reset search when the component mounts
+  useEffect(() => {
+    if (onSearch) {
+      onSearch('');
+    }
+  }, [onSearch]);
+
   return (
     <div data-testid="xb-navigation-content">
       <Flex direction="row" gap="2" mb="4">
@@ -267,6 +275,9 @@ const Navigation = ({
               'xb-navigation-search': HTMLInputElement;
             };
             onSearch?.(formElements['xb-navigation-search'].value);
+          }}
+          onSubmit={(event: FormEvent<HTMLFormElement>) => {
+            event.preventDefault();
           }}
         >
           <TextField.Root

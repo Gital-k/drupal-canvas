@@ -156,6 +156,7 @@ final class SingleDirectoryComponentTest extends ComponentSourceTestBase {
     ], $this->findIneligibleComponents(SingleDirectoryComponent::SOURCE_PLUGIN_ID, 'xb_test_sdc'));
     $auto_created_components = $this->findCreatedComponentConfigEntities(SingleDirectoryComponent::SOURCE_PLUGIN_ID, 'xb_test_sdc');
     self::assertSame([
+      'sdc.xb_test_sdc.attributes',
       'sdc.xb_test_sdc.component-no-meta-enum',
       'sdc.xb_test_sdc.crash',
       'sdc.xb_test_sdc.deprecated',
@@ -172,6 +173,7 @@ final class SingleDirectoryComponentTest extends ComponentSourceTestBase {
       'sdc.xb_test_sdc.my-cta',
       'sdc.xb_test_sdc.my-hero',
       'sdc.xb_test_sdc.my-section',
+      'sdc.xb_test_sdc.no-ui-sdc',
       'sdc.xb_test_sdc.one_column',
       'sdc.xb_test_sdc.props-no-slots',
       'sdc.xb_test_sdc.props-slots',
@@ -252,6 +254,23 @@ final class SingleDirectoryComponentTest extends ComponentSourceTestBase {
     $default_cacheability = (new CacheableMetadata())
       ->setCacheContexts($default_render_cache_contexts);
     $this->assertEquals([
+      'sdc.xb_test_sdc.attributes' => [
+        'html' => <<<HTML
+<div data-component-id="xb_test_sdc:attributes" class="sdc-standardized-attributes">
+  <div class="additional-attributes-for-this-sdc">
+    The not-attributes SDC prop!
+  </div>
+</div>
+
+HTML,
+        'cacheability' => $default_cacheability,
+        'attachments' => [
+          'library' => [
+            'core/components.xb_test_sdc--attributes',
+            'core/components.xb_test_sdc--attributes',
+          ],
+        ],
+      ],
       'sdc.xb_test_sdc.deprecated' => [
         'html' => <<<HTML
 <div  data-component-id="xb_test_sdc:deprecated">
@@ -532,6 +551,19 @@ HTML,
           'library' => [
             'core/components.xb_test_sdc--my-section',
             'core/components.xb_test_sdc--my-section',
+          ],
+        ],
+      ],
+      'sdc.xb_test_sdc.no-ui-sdc' => [
+        'cacheability' => $default_cacheability,
+        'html' => '<div  data-component-id="xb_test_sdc:no-ui-sdc">
+  Playing hide and seek
+</div>
+',
+        'attachments' => [
+          'library' => [
+            'core/components.xb_test_sdc--no-ui-sdc',
+            'core/components.xb_test_sdc--no-ui-sdc',
           ],
         ],
       ],
@@ -820,6 +852,18 @@ activation="auto">
 
   public static function getExpectedSettings(): array {
     return [
+      'sdc.xb_test_sdc.attributes' => [
+        'prop_field_definitions' => [
+          'not_attributes' => [
+            'field_type' => 'string',
+            'field_storage_settings' => [],
+            'field_instance_settings' => [],
+            'field_widget' => 'string_textfield',
+            'default_value' => [0 => ['value' => 'The not-attributes SDC prop!']],
+            'expression' => 'ℹ︎string␟value',
+          ],
+        ],
+      ],
       'sdc.xb_test_sdc.component-no-meta-enum' => [
         'prop_field_definitions' => [
           'style' => [
@@ -1154,6 +1198,22 @@ activation="auto">
           ],
         ],
       ],
+      'sdc.xb_test_sdc.no-ui-sdc' => [
+        'prop_field_definitions' => [
+          'text' => [
+            'field_type' => 'string',
+            'field_storage_settings' => [],
+            'field_instance_settings' => [],
+            'field_widget' => 'string_textfield',
+            'default_value' => [
+              0 => [
+                'value' => 'Playing hide and seek',
+              ],
+            ],
+            'expression' => 'ℹ︎string␟value',
+          ],
+        ],
+      ],
       'sdc.xb_test_sdc.one_column' => [
         'prop_field_definitions' => [
           'width' => [
@@ -1436,6 +1496,12 @@ activation="auto">
    */
   public function testCalculateDependencies(array $component_ids): void {
     self::assertSame([
+      'sdc.xb_test_sdc.attributes' => [
+        'module' => [
+          'core',
+          'xb_test_sdc',
+        ],
+      ],
       'sdc.xb_test_sdc.component-no-meta-enum' => [
         'module' => [
           'core',
@@ -1563,6 +1629,12 @@ activation="auto">
           'xb_test_sdc',
         ],
       ],
+      'sdc.xb_test_sdc.no-ui-sdc' => [
+        'module' => [
+          'core',
+          'xb_test_sdc',
+        ],
+      ],
       'sdc.xb_test_sdc.one_column' => [
         'module' => [
           'core',
@@ -1637,6 +1709,30 @@ activation="auto">
    */
   public static function getExpectedClientSideInfo(): array {
     return [
+      'sdc.xb_test_sdc.attributes' => [
+        'expected_output_selectors' => [
+          'div>div:contains("The not-attributes SDC prop!")',
+        ],
+        'source' => 'Module component',
+        'metadata' => ['slots' => []],
+        'propSources' => [
+          'not_attributes' => [
+            'required' => TRUE,
+            'jsonSchema' => [
+              'type' => 'string',
+            ],
+            'sourceType' => 'static:field_item:string',
+            'expression' => 'ℹ︎string␟value',
+            'default_values' => [
+              'source' => [
+                0 => ['value' => 'The not-attributes SDC prop!'],
+              ],
+              'resolved' => 'The not-attributes SDC prop!',
+            ],
+          ],
+        ],
+        'transforms' => [],
+      ],
       'sdc.xb_test_sdc.component-no-meta-enum' => [
         'expected_output_selectors' => [
           'span:contains("me")',
@@ -2410,6 +2506,34 @@ activation="auto">
                 ],
               ],
               'resolved' => 'Our mission is to deliver the best products and services to our customers. We strive to exceed expectations and continuously improve our offerings.',
+            ],
+          ],
+        ],
+        'transforms' => [],
+      ],
+      'sdc.xb_test_sdc.no-ui-sdc' => [
+        'expected_output_selectors' => [
+          'div[data-component-id="xb_test_sdc:no-ui-sdc"]',
+        ],
+        'source' => 'Module component',
+        'metadata' => [
+          'slots' => [],
+        ],
+        'propSources' => [
+          'text' => [
+            'required' => TRUE,
+            'jsonSchema' => [
+              'type' => 'string',
+            ],
+            'sourceType' => 'static:field_item:string',
+            'expression' => 'ℹ︎string␟value',
+            'default_values' => [
+              'source' => [
+                0 => [
+                  'value' => 'Playing hide and seek',
+                ],
+              ],
+              'resolved' => 'Playing hide and seek',
             ],
           ],
         ],
