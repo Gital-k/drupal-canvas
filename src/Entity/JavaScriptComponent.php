@@ -360,20 +360,13 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
   }
 
   /**
-   * {@inheritdoc}
-   */
-  public function preSave(EntityStorageInterface $storage): void {
-    parent::preSave($storage);
-    static::getConfigUpdater()->updateJavaScriptComponent($this);
-  }
-
-  /**
    * Check for referenced files, if any available - convert them into static files managed by Experience Builder.
    *
    * {@inheritdoc}
    */
   public function preSave(EntityStorageInterface $storage): void {
     parent::preSave($storage);
+    static::getConfigUpdater()->updateJavaScriptComponent($this);
     if ($this->isSyncing()) {
       return;
     }
