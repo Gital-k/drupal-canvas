@@ -402,7 +402,17 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
    * {@inheritdoc}
    */
   public function rewriteExampleUrl(string $url): string {
-    $url = $this->convertDefaultImageFileUrl($url);
+    $encoded_files = $this->getJavaScriptComponent()->get('encoded_files');
+    if (is_array($encoded_files)) {
+      foreach ($encoded_files as $uuid => $encoded_file) {
+        if ($encoded_file['filename'] === $url) {
+          $file = $this->entityRepository->loadEntityByUuid('file', $uuid);
+          assert($file instanceof File);
+          return $file->createFileUrl(TRUE);
+        }
+      }
+    }
+
     // Allow any fully qualified URL.
     $parsed_url = parse_url($url);
     \assert(\is_array($parsed_url));
@@ -468,7 +478,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
     return $this;
   }
 
-  protected function convertDefaultImageFileUrl(string $url): string {
+  protected function convertExampleImageFileUrl(string $url): string {
     $encoded_files = $this->getJavaScriptComponent()->get('encoded_files');
     if (is_array($encoded_files)) {
       foreach ($encoded_files as $uuid => $encoded_file) {

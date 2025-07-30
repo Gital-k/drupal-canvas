@@ -1297,7 +1297,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
             'default_values' => [
               'source' => [],
               'resolved' => [
-                'src' => $default_image->createFileUrl(FALSE),
+                'src' => $default_image->createFileUrl(TRUE),
                 'width' => 1200,
                 'height' => 900,
                 'alt' => 'Example image placeholder',
