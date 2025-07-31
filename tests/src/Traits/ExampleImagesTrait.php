@@ -10,7 +10,7 @@ use Drupal\Core\Database\StatementInterface;
 use Drupal\Core\Entity\EntityRepositoryInterface;
 use Drupal\file\FileInterface;
 
-trait DefaultImagesTrait {
+trait ExampleImagesTrait {
   const FIXTURE_IMAGES = [
     '/fixtures/images/cosmo.jpg',
     '/fixtures/images/kiki.jpeg',

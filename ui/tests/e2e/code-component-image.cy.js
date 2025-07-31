@@ -19,9 +19,9 @@ describe('Image code component', () => {
       cy.loadURLandWaitForXBLoaded({ url: 'xb/node/2' });
       cy.openLibraryPanel();
       cy.get('.primaryPanelContent').findByText('Vanilla Image').click();
-      // Check the default image src is set.
+      // Check the example image src is set.
       cy.waitForElementInIframe(
-        'img[src*="files/js_component/defaults/cosmo.jpg"]',
+        'img[src*="files/js_component/examples/cosmo.jpg"]',
         '[data-test-xb-content-initialized="true"][data-xb-swap-active="true"]',
         10000,
       );

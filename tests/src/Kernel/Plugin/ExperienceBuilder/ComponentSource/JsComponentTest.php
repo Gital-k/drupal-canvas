@@ -1126,8 +1126,8 @@ final class JsComponentTest extends ComponentSourceTestBase {
    * {@inheritdoc}
    */
   public static function getExpectedClientSideInfo(): array {
-    $default_image = \Drupal::service(EntityRepositoryInterface::class)->loadEntityByUuid('file', 'f8133ff8-3276-5d4d-b3f9-8fb6b363fb70');
-    if (!$default_image instanceof FileInterface) {
+    $example_image = \Drupal::service(EntityRepositoryInterface::class)->loadEntityByUuid('file', 'f8133ff8-3276-5d4d-b3f9-8fb6b363fb70');
+    if (!$example_image instanceof FileInterface) {
       $directory = JavaScriptComponent::PUBLIC_IMAGE_DIRECTORY;
       $fixture_image_path = \dirname(__DIR__, 5) . '/fixtures/images/cosmo.jpg';
       $contents = \file_get_contents($fixture_image_path);
@@ -1136,15 +1136,15 @@ final class JsComponentTest extends ComponentSourceTestBase {
       $file_system->prepareDirectory($directory, FileSystemInterface:: CREATE_DIRECTORY | FileSystemInterface::MODIFY_PERMISSIONS);
       $filename = $file_system->createFilename(\basename($fixture_image_path), $directory);
       $filename = $file_system->saveData($contents, $filename, FileExists::Replace);
-      $default_image = File::create([
+      $example_image = File::create([
         'uuid' => 'f8133ff8-3276-5d4d-b3f9-8fb6b363fb70',
         'uri' => $filename,
       ]);
-      $default_image->setPermanent();
-      $default_image->save();
+      $example_image->setPermanent();
+      $example_image->save();
     }
 
-    assert($default_image instanceof File);
+    assert($example_image instanceof File);
     return [
       'js.xb_test_code_components_captioned_video' => [
         'expected_output_selectors' => [
@@ -1257,7 +1257,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
       ],
       'js.xb_test_code_components_vanilla_image' => [
         'expected_output_selectors' => [
-          'astro-island[opts*="Vanilla Image"][props*="' . $default_image->getFilename() . '"]',
+          'astro-island[opts*="Vanilla Image"][props*="' . $example_image->getFilename() . '"]',
           'script[blocking="render"][src*="/ui/lib/astro-hydration/dist/client.js"]',
         ],
         'source' => 'Code component',
@@ -1297,7 +1297,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
             'default_values' => [
               'source' => [],
               'resolved' => [
-                'src' => $default_image->createFileUrl(TRUE),
+                'src' => $example_image->createFileUrl(TRUE),
                 'width' => 1200,
                 'height' => 900,
                 'alt' => 'Example image placeholder',

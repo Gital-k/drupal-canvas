@@ -64,8 +64,8 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
 
   public const string ENTITY_TYPE_ID = 'js_component';
   public const string ADMIN_PERMISSION = 'administer code components';
-  public const string PUBLIC_IMAGE_DIRECTORY = 'public://js_component/defaults';
-  public const string TEMPORARY_IMAGE_DIRECTORY = 'temporary://js_component/defaults';
+  public const string PUBLIC_IMAGE_DIRECTORY = 'public://js_component/examples';
+  public const string TEMPORARY_IMAGE_DIRECTORY = 'temporary://js_component/examples';
   private const string ASSETS_DIRECTORY = 'assets://astro-island/';
 
   /**
@@ -222,12 +222,12 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
     }
 
     // @todo Refactor in https://www.drupal.org/project/experience_builder/issues/3538711
-    if (array_key_exists('defaultImages', $data)) {
+    if (array_key_exists('exampleImages', $data)) {
       $encoded_files = NULL;
-      foreach ($data['defaultImages'] as $default_image) {
-        /** @var array{data: string, filename: string} $default_image */
-        $uuid = self::generateImageUuid(\base64_decode($default_image['data']));
-        $encoded_files[$uuid] = $default_image;
+      foreach ($data['exampleImages'] as $example_image) {
+        /** @var array{data: string, filename: string} $example_image */
+        $uuid = self::generateImageUuid(\base64_decode($example_image['data']));
+        $encoded_files[$uuid] = $example_image;
       }
       $this->set('encoded_files', $encoded_files);
     }
@@ -403,8 +403,8 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
       $file_system = \Drupal::service('file_system');
       $file_usage = \Drupal::service('file.usage');
       assert(is_array($this->encoded_files));
-      $default_image_directory = self::PUBLIC_IMAGE_DIRECTORY;
-      $file_system->prepareDirectory($default_image_directory, FileSystemInterface:: CREATE_DIRECTORY | FileSystemInterface::MODIFY_PERMISSIONS);
+      $example_image_directory = self::PUBLIC_IMAGE_DIRECTORY;
+      $file_system->prepareDirectory($example_image_directory, FileSystemInterface:: CREATE_DIRECTORY | FileSystemInterface::MODIFY_PERMISSIONS);
       foreach ($this->encoded_files as $uuid => $encoded_file) {
         $file = $repository->loadEntityByUuid('file', $uuid);
         if (!$file instanceof FileInterface) {

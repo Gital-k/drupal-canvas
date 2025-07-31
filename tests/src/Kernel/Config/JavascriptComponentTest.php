@@ -10,7 +10,7 @@ use Drupal\experience_builder\Entity\JavaScriptComponent;
 use Drupal\experience_builder\Exception\ConstraintViolationException;
 use Drupal\file\Entity\File;
 use Drupal\KernelTests\KernelTestBase;
-use Drupal\Tests\experience_builder\Traits\DefaultImagesTrait;
+use Drupal\Tests\experience_builder\Traits\ExampleImagesTrait;
 
 /**
  * @coversDefaultClass \Drupal\experience_builder\Entity\JavaScriptComponent
@@ -18,7 +18,7 @@ use Drupal\Tests\experience_builder\Traits\DefaultImagesTrait;
  */
 class JavascriptComponentTest extends KernelTestBase {
 
-  use DefaultImagesTrait;
+  use ExampleImagesTrait;
 
   protected static $modules = [
     'experience_builder',
@@ -129,7 +129,7 @@ class JavascriptComponentTest extends KernelTestBase {
     ], $js_component->getCacheTags());
   }
 
-  public function testDefaultImages(): void {
+  public function testExampleImages(): void {
     $client_data = [
       'machineName' => 'test',
       'name' => 'Test Code Component',
@@ -145,7 +145,7 @@ class JavascriptComponentTest extends KernelTestBase {
     ];
     $js_component = JavaScriptComponent::createFromClientSide($client_data);
     $this->assertSame(SAVED_NEW, $js_component->save());
-    $client_data['defaultImages'] = self::getEncodedImages();
+    $client_data['exampleImages'] = self::getEncodedImages();
     $js_component->updateFromClientSide($client_data);
     $this->assertIsArray($js_component->get('encoded_files'));
     $this->assertSame(SAVED_UPDATED, $js_component->save());

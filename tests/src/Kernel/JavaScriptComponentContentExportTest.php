@@ -17,11 +17,11 @@ use Drupal\experience_builder\Entity\JavaScriptComponent;
 use Drupal\file\Entity\File;
 use Drupal\file\FileInterface;
 use Drupal\KernelTests\KernelTestBase;
-use Drupal\Tests\experience_builder\Traits\DefaultImagesTrait;
+use Drupal\Tests\experience_builder\Traits\ExampleImagesTrait;
 
 class JavaScriptComponentContentExportTest extends KernelTestBase {
 
-  use DefaultImagesTrait;
+  use ExampleImagesTrait;
 
   /**
    * {@inheritdoc}
@@ -57,20 +57,20 @@ class JavaScriptComponentContentExportTest extends KernelTestBase {
     }
 
     $file_system = \Drupal::service('file_system');
-    $directory = 'public://js_component/defaults';
+    $directory = 'public://js_component/examples';
     $file_system->prepareDirectory($directory, FileSystemInterface:: CREATE_DIRECTORY | FileSystemInterface::MODIFY_PERMISSIONS);
-    $directory = 'temporary://js_component/defaults';
+    $directory = 'temporary://js_component/examples';
     $file_system->prepareDirectory($directory, FileSystemInterface:: CREATE_DIRECTORY | FileSystemInterface::MODIFY_PERMISSIONS);
   }
 
-  public function testDefaultImages(): void {
+  public function testExampleImages(): void {
 
     // No js_component, no file entities exist.
     $this->assertSame(0, \Drupal::entityTypeManager()->getStorage('file')->getQuery()->count()->accessCheck(FALSE)->execute());
     $this->assertSame([], JavaScriptComponent::loadMultiple());
 
     $first_image_uuid = (string) \array_key_first($this->encodedFiles);
-    // 2. Create new JavascriptComponent using default image.
+    // 2. Create new JavascriptComponent using example image.
     $code_component = JavaScriptComponent::create([
       'encoded_files' => [
         $first_image_uuid => $this->encodedFiles[$first_image_uuid],
@@ -92,7 +92,7 @@ class JavaScriptComponentContentExportTest extends KernelTestBase {
     $this->assertFileUsageCount($first_image_uuid, 1);
     $this->assertComponentUsesFile($first_image_uuid, $code_component->id());
 
-    // 3. Create new JavascriptComponent using same default image.
+    // 3. Create new JavascriptComponent using same example image.
     $code_component = JavaScriptComponent::create([
       'encoded_files' => [
         $first_image_uuid => $this->encodedFiles[$first_image_uuid],
@@ -114,7 +114,7 @@ class JavaScriptComponentContentExportTest extends KernelTestBase {
     $this->assertComponentUsesFile($first_image_uuid, $code_component->id());
 
     $last_image_uuid = (string) \array_key_last($this->encodedFiles);
-    // 4. Create new JavascriptComponent using different default image.
+    // 4. Create new JavascriptComponent using different example image.
     $code_component = JavaScriptComponent::create([
       'encoded_files' => [
         $last_image_uuid => $this->encodedFiles[$last_image_uuid],
@@ -148,8 +148,8 @@ class JavaScriptComponentContentExportTest extends KernelTestBase {
     $this->assertComponentUsesFile($last_image_uuid, $last_code_component_id);
   }
 
-  public function testDefaultImageExport(): void {
-    // 1. Create new JavascriptComponent using default image.
+  public function testExampleImageExport(): void {
+    // 1. Create new JavascriptComponent using example image.
     $code_component = JavaScriptComponent::create([
       'encoded_files' => $this->encodedFiles,
       'machineName' => $this->randomMachineName(),
@@ -169,7 +169,7 @@ class JavaScriptComponentContentExportTest extends KernelTestBase {
 
     $file = \Drupal::service(EntityRepositoryInterface::class)->loadEntityByUuid('file', 'f8133ff8-3276-5d4d-b3f9-8fb6b363fb70');
     assert($file instanceof FileInterface);
-    $this->assertStringStartsWith('public://js_component/defaults', (string) $file->getFileUri());
+    $this->assertStringStartsWith('public://js_component/examples', (string) $file->getFileUri());
 
     // The export storage manager under test.
     $export_manager = new ExportStorageManager(
