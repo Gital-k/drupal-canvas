@@ -72,6 +72,7 @@ class JavaScriptComponentContentExportTest extends KernelTestBase {
     $this->assertSame([], JavaScriptComponent::loadMultiple());
 
     $first_image_uuid = (string) \array_key_first($this->encodedFiles);
+
     // 2. Create new JavascriptComponent using example image.
     $code_component = JavaScriptComponent::create([
       'encoded_files' => [
