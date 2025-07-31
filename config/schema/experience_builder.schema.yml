@@ -816,6 +816,10 @@ experience_builder.encoded_file:
   label: 'Encoded file with UUID based on hash of file contents'
   type: mapping
   mapping:
+    # ⚠️ Note the absence of `data` in this mapping! The `data` key-value pair is not part of the config schema, because
+    # `data` is dynamically added/removed to synchronize the contents of the file during config export/import.
+    # @see \Drupal\experience_builder\EventSubscriber\FileDependencyHandler::onExportTransform()
+    # @see \Drupal\experience_builder\EventSubscriber\FileDependencyHandler::onImportTransform()
     filename:
       label: 'Original filename of file upload'
       type: string
