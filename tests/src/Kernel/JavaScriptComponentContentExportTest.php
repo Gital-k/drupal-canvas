@@ -17,11 +17,13 @@ use Drupal\experience_builder\Entity\JavaScriptComponent;
 use Drupal\file\Entity\File;
 use Drupal\file\FileInterface;
 use Drupal\KernelTests\KernelTestBase;
+use Drupal\Tests\experience_builder\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\experience_builder\Traits\ExampleImagesTrait;
 
 class JavaScriptComponentContentExportTest extends KernelTestBase {
 
   use ExampleImagesTrait;
+  use ContribStrictConfigSchemaTestTrait;
 
   /**
    * {@inheritdoc}
