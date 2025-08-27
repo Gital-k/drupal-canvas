@@ -3,7 +3,9 @@
 
 declare(strict_types = 1);
 
-namespace Drupal\experience_builder\Rename;
+// Do not use `experience_builder` namespace so this script won't change it
+// in composer.json.
+namespace Drupal\renamer\Rename;
 
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -32,7 +34,9 @@ class ConverterCommand extends Command {
     $previous_dir = NULL;
     $current_dir = getcwd();
     while ($previous_dir !== $current_dir) {
-      if (file_exists($current_dir . '/experience_builder.info.yml')) {
+      // Allow the script to also be run after it has run once.
+      // @todo Is this a good idea?
+      if (file_exists($current_dir . '/experience_builder.info.yml') || file_exists($current_dir . '/canvas.info.yml')) {
         $this->projectRoot = $current_dir;
         break;
       }
@@ -92,7 +96,7 @@ class ConverterCommand extends Command {
       'XB' => 'CV',
       'ExperienceBuilder' => 'Canvas',
     ];
-    $debug_path = '/Users/ted.bowman/sites/debug-renam.txt';
+    /*$debug_path = '/Users/ted.bowman/sites/debug-renam.txt';
     // Delete the debug file if it exists.
     if (file_exists($debug_path)) {
       unlink($debug_path);
@@ -100,7 +104,7 @@ class ConverterCommand extends Command {
     foreach (static::getDirContents($this->projectRoot) as $file) {
       // Add full path of $file to debug file.
       file_put_contents($debug_path, $file->getRealPath() . "\n", FILE_APPEND);
-    }
+    }*/
     foreach ($replacements as $search => $replace) {
       static::renameFiles(static::getDirContents($this->projectRoot), $search, $replace);
       static::replaceContents(static::getDirContents($this->projectRoot, TRUE), $search, $replace);
