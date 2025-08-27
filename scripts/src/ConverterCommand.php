@@ -89,6 +89,7 @@ class ConverterCommand extends Command {
       'experience builder' => 'canvas',
       'Experience builder' => 'Canvas',
       'xb' => 'cv',
+      'XB' => 'CV',
       'ExperienceBuilder' => 'Canvas',
     ];
     $debug_path = '/Users/ted.bowman/sites/debug-renam.txt';
