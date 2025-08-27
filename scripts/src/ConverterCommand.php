@@ -1,4 +1,5 @@
 <?php
+// @codingStandardsIgnoreFile
 
 declare(strict_types = 1);
 
@@ -227,14 +228,5 @@ class ConverterCommand extends Command {
     return TRUE;
   }
 
-  /**
-   * Gets the current git branch.
-   *
-   * @return string
-   *   The current git branch.
-   */
-  private static function getCurrentBranch(): string {
-    return trim(shell_exec('git rev-parse --abbrev-ref HEAD'));
-  }
 
 }
