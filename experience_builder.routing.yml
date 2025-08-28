@@ -1,37 +1,3 @@
-entity.component.audit:
-  path: '/admin/appearance/component/{component}/audit'
-  defaults:
-    _controller: 'Drupal\experience_builder\Controller\ComponentAuditController::audit'
-    _title_callback: 'Drupal\experience_builder\Controller\ComponentAuditController::auditTitle'
-  requirements:
-    _xb_authentication_required: TRUE
-    _entity_access: 'component.audit'
-entity.component.delete_form:
-  path: '/admin/appearance/component/delete/{component}'
-  defaults:
-    _entity_form: 'component.delete'
-    _title: 'Delete component'
-  requirements:
-    _entity_access: 'component.delete'
-entity.component.disable:
-  path: '/admin/appearance/component/{component}/disable'
-  defaults:
-    _controller: 'Drupal\experience_builder\Controller\ComponentStatusController::performOperation'
-    op: disable
-  requirements:
-    _xb_authentication_required: TRUE
-    _entity_access: 'component.disable'
-    _csrf_token: 'TRUE'
-entity.component.enable:
-  path: '/admin/appearance/component/{component}/enable'
-  defaults:
-    _controller: 'Drupal\experience_builder\Controller\ComponentStatusController::performOperation'
-    op: enable
-  requirements:
-    _xb_authentication_required: TRUE
-    _entity_access: 'component.enable'
-    _csrf_token: 'TRUE'
-
 experience_builder.api.auto-save.delete:
   path: '/xb/api/v0/auto-saves/{entity_type}/{entity}'
   defaults:
@@ -453,3 +419,37 @@ experience_builder.component.status:
     _title: 'Components status'
   requirements:
     _permission: 'administer themes'
+
+entity.component.audit:
+  path: '/admin/appearance/component/{component}/audit'
+  defaults:
+    _controller: 'Drupal\experience_builder\Controller\ComponentAuditController::audit'
+    _title_callback: 'Drupal\experience_builder\Controller\ComponentAuditController::auditTitle'
+  requirements:
+    _xb_authentication_required: TRUE
+    _entity_access: 'component.audit'
+entity.component.delete_form:
+  path: '/admin/appearance/component/delete/{component}'
+  defaults:
+    _entity_form: 'component.delete'
+    _title: 'Delete component'
+  requirements:
+    _entity_access: 'component.delete'
+entity.component.disable:
+  path: '/admin/appearance/component/{component}/disable'
+  defaults:
+    _controller: 'Drupal\experience_builder\Controller\ComponentStatusController::performOperation'
+    op: disable
+  requirements:
+    _xb_authentication_required: TRUE
+    _entity_access: 'component.disable'
+    _csrf_token: 'TRUE'
+entity.component.enable:
+  path: '/admin/appearance/component/{component}/enable'
+  defaults:
+    _controller: 'Drupal\experience_builder\Controller\ComponentStatusController::performOperation'
+    op: enable
+  requirements:
+    _xb_authentication_required: TRUE
+    _entity_access: 'component.enable'
+    _csrf_token: 'TRUE'
