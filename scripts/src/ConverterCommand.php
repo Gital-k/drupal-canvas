@@ -127,7 +127,13 @@ class ConverterCommand extends Command {
       // js.cv_test_code_components_with_props
       '4e53ca9f3f06b418' => '3dd6c4590639cda8',
       // sdc.cv_test_sdc.image, because of $ref: json-schema-definitions://canvas.module/image
+      'c06e0be7dd131740' => 'cc9b97c9370aabdf',
       'd3a3df7d7e68efc0' => '5eabbfdb96b39a59',
+      // dc.cv_test_sdc.image-optional-with-example-and-additional-prop, because of $ref: json-schema-definitions://canvas.module/image
+      '602623740c98a6cf' => '43b51c7233d50b97',
+      // block.cv_test_block_input_schema_change_poc
+      // block.cv_test_block_input_none
+      '86af6a7a4e4644d5' => 'ea2d88e625ba1e74',
       // @todo Should we just ignore `ComponentInputsEvolutionTest` that requires updating the fixture dump?
     ];
     // Handle generated `itok` in images in tests.
