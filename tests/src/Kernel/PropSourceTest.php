@@ -451,13 +451,13 @@ class PropSourceTest extends KernelTestBase {
       ],
       'expected_user_value' => [
         [
-          'src' => '::SITE_DIR_BASE_URL::/files/image-3.jpg?alternateWidths=' . UrlHelper::encodePath('::SITE_DIR_BASE_URL::/files/styles/xb_parametrized_width--{width}/public/image-3.jpg.webp?itok=6Jb0oZWl'),
+          'src' => '::SITE_DIR_BASE_URL::/files/image-3.jpg?alternateWidths=' . UrlHelper::encodePath('::SITE_DIR_BASE_URL::/files/styles/xb_parametrized_width--{width}/public/image-3.jpg.webp?itok=spSF5vvd'),
           'alt' => 'amazing',
           'width' => 80,
           'height' => 60,
         ],
         [
-          'src' => '::SITE_DIR_BASE_URL::/files/image-2.jpg?alternateWidths=' . UrlHelper::encodePath('::SITE_DIR_BASE_URL::/files/styles/xb_parametrized_width--{width}/public/image-2.jpg.webp?itok=dQpNrzPR'),
+          'src' => '::SITE_DIR_BASE_URL::/files/image-2.jpg?alternateWidths=' . UrlHelper::encodePath('::SITE_DIR_BASE_URL::/files/styles/xb_parametrized_width--{width}/public/image-2.jpg.webp?itok=SnSVAYVj'),
           'alt' => 'An image so amazing that to gaze upon it would melt your face',
           'width' => 80,
           'height' => 60,
