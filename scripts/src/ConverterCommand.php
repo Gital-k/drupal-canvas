@@ -129,6 +129,8 @@ class ConverterCommand extends Command {
       'b4cd62533ff9bd99' => '6f8647435386329e',
       // js.cv_test_code_components_with_props
       '4e53ca9f3f06b418' => '3dd6c4590639cda8',
+      // js.cv_test_code_components_vanilla_image
+      'c69815f5c7412502' => 'b5e039b71b27fef6',
       // sdc.cv_test_sdc.image, because of $ref: json-schema-definitions://canvas.module/image
       'c06e0be7dd131740' => 'cc9b97c9370aabdf',
       'd3a3df7d7e68efc0' => '5eabbfdb96b39a59',
