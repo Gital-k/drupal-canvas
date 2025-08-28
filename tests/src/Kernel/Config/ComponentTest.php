@@ -121,19 +121,19 @@ class ComponentTest extends KernelTestBase {
       'config' => [
         'image.style.xb_parametrized_width',
       ],
-      'module' => ['file', 'image', 'xb_test_sdc'],
+      'module' => ['xb_test_sdc', 'file', 'image'],
     ], $initial_component->getDependencies());
     self::assertSame([
       'config' => [
         'image.style.xb_parametrized_width',
       ],
-      'module' => ['file', 'image', 'xb_test_sdc'],
+      'module' => ['xb_test_sdc', 'file', 'image'],
     ], $initial_component->calculateDependencies()->getDependencies());
     self::assertSame([
       'config' => [
         'image.style.xb_parametrized_width',
       ],
-      'module' => ['file', 'image', 'xb_test_sdc'],
+      'module' => ['xb_test_sdc', 'file', 'image'],
     ], $initial_component->getVersionSpecificDependencies(VersionedConfigEntityInterface::ACTIVE_VERSION));
 
     // Then:
@@ -166,7 +166,7 @@ class ComponentTest extends KernelTestBase {
       'config' => [
         'image.style.xb_parametrized_width',
       ],
-      'module' => ['file', 'image', 'xb_test_sdc'],
+      'module' => ['xb_test_sdc', 'file', 'image'],
     ], $updated_component->getVersionSpecificDependencies($initial_expected_version));
     self::assertSame([
       'config' => [
@@ -175,10 +175,10 @@ class ComponentTest extends KernelTestBase {
         'media.type.image',
       ],
       'module' => [
+        'xb_test_sdc',
         'file',
         'media',
         'media_library',
-        'xb_test_sdc',
       ],
     ], $updated_component->getVersionSpecificDependencies(VersionedConfigEntityInterface::ACTIVE_VERSION));
 
@@ -196,11 +196,11 @@ class ComponentTest extends KernelTestBase {
         'media.type.image',
       ],
       'module' => [
+        'xb_test_sdc',
         'file',
         'image',
         'media',
         'media_library',
-        'xb_test_sdc',
       ],
     ], $updated_component->getDependencies());
     self::assertSame([
@@ -210,11 +210,11 @@ class ComponentTest extends KernelTestBase {
         'media.type.image',
       ],
       'module' => [
+        'xb_test_sdc',
         'file',
         'image',
         'media',
         'media_library',
-        'xb_test_sdc',
       ],
     ], $updated_component->calculateDependencies()->getDependencies());
     $updated_component->loadVersion('c06e0be7dd131740');
@@ -237,7 +237,7 @@ class ComponentTest extends KernelTestBase {
         'image.style.xb_parametrized_width',
         'media.type.image',
       ],
-      'module' => ['file', 'media', 'media_library', 'xb_test_sdc'],
+      'module' => ['xb_test_sdc', 'file', 'media', 'media_library'],
     ], $updated_component->getDependencies());
   }
 
