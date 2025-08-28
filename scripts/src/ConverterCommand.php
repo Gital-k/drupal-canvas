@@ -161,7 +161,7 @@ class ConverterCommand extends Command {
       // @todo Should we just ignore `ComponentInputsEvolutionTest` that requires updating the fixture dump?
       '64ca25db5092fad7' => 'f91f8d4aff4aba7c',
       'ea2d88e625ba1e74' => '7cc894b85e93a7d8',
-
+      '0b69de6df4584ecc' => '88c370526c14d185',
     ];
     // Handle generated `itok` in images in tests.
     $replacements += [
