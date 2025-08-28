@@ -156,17 +156,17 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
     $this->assertSame(
       [
         'module' => [
-          'options',
           'xb_test_sdc',
+          'options',
         ],
       ],
       $this->entity->getDependencies()
     );
     $this->assertSame([
       'module' => [
-        'options',
-        'xb_test_sdc',
         'experience_builder',
+        'xb_test_sdc',
+        'options',
       ],
     ], $this->getAllDependencies($this->entity));
   }
