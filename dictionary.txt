@@ -16,6 +16,7 @@ biscoff
 Carden
 cebe
 cnvs
+cnvst # Used for "canvas tests"
 CODEOWNERS
 codespaces
 cqmr
