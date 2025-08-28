@@ -49,6 +49,23 @@ class ConverterCommand extends Command {
     }
 
     $this->doConvert();
+
+    // @todo Run prettier on ui because of line lengths.
+
+    // @todo Formerly XbPage becomes Page class, with `canvas` as plugin id
+    //   1. Do changes manually or with rector?
+    //   2. recipes' `xb_page` folder should become `canvas` folder.
+    //   3. Ideally we are using constants everywhere, but search for any remaining instances
+    //      of xb_page or cv_page.
+
+    // @todo Fix tests (manually or rector?) that depend on order:
+    //   1. Those arrays listing a bunch of components
+    //   2. Those arrays listing a bunch of cache tags or cache contexts.
+    //   2. The DX routing tests depending on routing.yml sorted alphabetically.
+    //   3. The routing.yml file itself should still be sorted alphabetically.
+
+    // @todo Verify openapi.yml
+
     return Command::SUCCESS;
   }
 
