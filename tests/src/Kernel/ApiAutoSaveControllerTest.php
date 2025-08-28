@@ -206,13 +206,13 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     $content = \json_decode($response->getContent() ?: '{}', TRUE);
     $anonContentIdentifier = \sprintf('node:%d:en', $anonAccountContent->id());
     self::assertEquals([
+      'xb_asset_library:global',
       'js_component:test_code',
       'node:1:en',
       'node:2:en',
       $anonContentIdentifier,
       'page_region:stark.highlighted',
       'staged_config_update:xb_set_homepage',
-      'xb_asset_library:global',
     ], \array_keys($content));
     // We don't assert the exact value of these because of clock-drift during
     // the test, asserting their presence is enough.
@@ -450,10 +450,10 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     // We can view code components, contents and staged config updates
     // but not the page region entity.
     self::assertEquals([
+      'xb_page:2:en',
       'js_component:test_code',
       $anonContentIdentifier,
       'staged_config_update:xb_set_homepage',
-      'xb_page:2:en',
     ], \array_keys($content));
   }
 
@@ -709,7 +709,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     }
     catch (CacheableAccessDeniedHttpException $exception) {
       // Get access denied as expected. The label is the new one that we set.
-      $this->assertSame("Unable to update entities: 'New name', 'Update the front page', 'New label'.", $exception->getMessage());
+      $this->assertSame("Unable to update entities: 'New label', 'New name', 'Update the front page'.", $exception->getMessage());
       $this->assertSame([
         'config:experience_builder.js_component.test-component',
         AutoSaveManager::CACHE_TAG,
