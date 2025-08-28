@@ -149,6 +149,8 @@ class ConverterCommand extends Command {
       // dc.cv_test_sdc.image-optional-with-example-and-additional-prop, because of $ref: json-schema-definitions://canvas.module/image
       '602623740c98a6cf' => '43b51c7233d50b97',
       // block.cv_test_block_input_schema_change_poc
+      '731594cf105d2a9f' => '6388b43679123f84',
+      '739aaf363770b8b9' => '45c41f776f70991e',
       // block.cv_test_block_input_none
       '86af6a7a4e4644d5' => 'ea2d88e625ba1e74',
       // @todo Should we just ignore `ComponentInputsEvolutionTest` that requires updating the fixture dump?
@@ -157,6 +159,9 @@ class ConverterCommand extends Command {
     $replacements += [
       'uFWMj39h' => 'ki8UAYrb',
       'ebZalNOg' => 'FUac6e2b',
+      '3D6Jb0oZWl' => '3D801KACCy',
+      '3DdQpNrzPR' => '3DYLIQc4vO',
+      'ki8UAYrb' => 'xc2YKzZE',
     ];
 
     /*$debug_path = '/Users/ted.bowman/sites/debug-renam.txt';
