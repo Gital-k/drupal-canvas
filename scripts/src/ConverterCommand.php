@@ -105,6 +105,8 @@ class ConverterCommand extends Command {
 
     $replacements = [
       $old_machine_name => $new_machine_name,
+      'xb_asset_library' => 'asset_library',
+      'xb_page' => 'canvas_page',
       'xbt' => 'cnvst',
       'EXPERIENCE_BUILDER' => 'CANVAS',
       'Experience Builder' => 'Drupal Canvas',
