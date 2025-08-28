@@ -200,6 +200,13 @@ class ConverterCommand extends Command {
    */
   private static function replaceContents(array $files, string $search, string $replace): void {
     foreach ($files as $file) {
+      // @todo 🔥🔥🔥🔥 - do we need exclude .php.gz or .gz files?
+      //   CollapseComponentInputsUpdateTest fails trying to opena php.gz file.
+      //   We need to remake that file anyways but probably not safe to search/replace in gz
+      //   as we don't know "xb" doesn't occur.
+      if ($file->getExtension() === 'gz') {
+        continue;
+      }
       $filePath = $file->getRealPath();
       file_put_contents($filePath, str_replace($search, $replace, file_get_contents($filePath)));
     }
@@ -292,13 +299,6 @@ class ConverterCommand extends Command {
       // Exclude package.json and package-lock.json for now, as this might cause changes in the integrity validation
       // hashes for packages.
       if (in_array($file->getFilename(), ['package.json', 'package-lock.json'])) {
-        continue;
-      }
-      // @todo 🔥🔥🔥🔥 - do we need exclude .php.gz or .gz files?
-      //   CollapseComponentInputsUpdateTest fails trying to opena php.gz file.
-      //   We need to remake that file anyways but probably not safe to search/replace in gz
-      //   as we don't know "xb" doesn't occur.
-      if ($file->getExtension() === 'gz') {
         continue;
       }
 
