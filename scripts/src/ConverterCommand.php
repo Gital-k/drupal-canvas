@@ -107,22 +107,18 @@ class ConverterCommand extends Command {
       $old_machine_name => $new_machine_name,
       'xb_asset_library' => 'asset_library',
       'xb_page' => 'canvas_page',
-      'xbt' => 'cnvst',
+      'xbt' => 'canvas_test',
       'EXPERIENCE_BUILDER' => 'CANVAS',
       'Experience Builder' => 'Drupal Canvas',
       'Experience-Builder' => 'Canvas',
       'experience-builder' => 'canvas',
       'experience builder' => 'Drupal Canvas',
       'Experience builder' => 'Drupal Canvas',
-      'xb' => 'cnvs',
-      'XB' => 'CNVS',
-      'Xb' => 'Cnvs',
+      'xb' => 'canvas',
+      'XB' => 'Canvas',
+      'Xb' => 'Canvas',
       'ExperienceBuilder' => 'Canvas',
       'Drupal Drupal Canvas' => 'Drupal Canvas',
-      // Use canvas word in paths (e.g. /canvas/api, but also /canvas/2 for our former XbPages)
-      'cnvs/' => 'canvas/',
-      // Also when is escaped for whatever reason, like playwright tests.
-      'cnvs\/' => 'canvas\/',
       // We cannot replace xB because that would match things like ajaxBehaviors.
       // If we need for some reason, we need to revert that here.
     ];
