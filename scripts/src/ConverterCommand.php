@@ -114,6 +114,7 @@ class ConverterCommand extends Command {
       'XB' => 'CNVS',
       'Xb' => 'Cnvs',
       'ExperienceBuilder' => 'Canvas',
+      'Drupal Drupal Canvas' => 'Drupal Canvas',
     ];
 
     // Those components that include an enum prop will change its version,
