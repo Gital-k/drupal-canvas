@@ -113,7 +113,8 @@ class ConverterCommand extends Command {
       'oauth2_scope.asset_library' => 'oauth2_scope.canvas_asset_library',
       'id: asset_library' => 'id: canvas_asset_library',
       'xb_page' => 'canvas_page',
-      'xbt' => 'canvas_test',
+      // canvas_test will make fields names that are too long.
+      'xbt' => 'cvt',
       'EXPERIENCE_BUILDER' => 'CANVAS',
       'Experience Builder' => 'Drupal Canvas',
       'Experience-Builder' => 'Canvas',
