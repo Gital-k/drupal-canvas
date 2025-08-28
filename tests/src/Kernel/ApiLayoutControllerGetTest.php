@@ -293,7 +293,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
         continue;
       }
       $this->assertSame('Content', $region['name']);
-      $this->assertSame([
+      $this->assertCvSame([
         [
           'uuid' => XBTestSetup::UUID_TWO_COLUMN_UUID,
           'nodeType' => 'component',
@@ -588,6 +588,30 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
     else {
       $response = $this->parentRequest(Request::create($url->toString()));
       $this->assertSame(Response::HTTP_OK, $response->getStatusCode());
+    }
+  }
+
+  private static function assertCvSame(mixed $value1, mixed $value2): void {
+    self::cleanComponents($value1);
+    self::cleanComponents($value2);
+    self::assertSame($value1, $value2);
+  }
+
+  private static function cleanComponents(mixed &$value): void {
+    if (is_array($value)) {
+      $isComponentArray = isset($value['type'], $value['uuid'], $value['nodeType']);
+      foreach ($value as $key => &$subValue) {
+        // Sample: 'type' => 'sdc.cv_test_sdc.image@cc9b97c9370aabdf',
+        if ($isComponentArray && $key === 'type' && is_string($subValue)
+          && substr_count($subValue, '@') === 1
+          && preg_match('/^[a-z0-9_.-]+@[a-f0-9]{16,}$/', $subValue)) {
+          [$plugin_id] = explode('@', $subValue);
+          $value[$key] = "$plugin_id@";
+        }
+        else {
+          self::cleanComponents($subValue);
+        }
+      }
     }
   }
 
