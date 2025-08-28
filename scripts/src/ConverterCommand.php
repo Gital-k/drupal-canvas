@@ -214,6 +214,12 @@ class ConverterCommand extends Command {
       if ($excludeDirs && $file->isDir()) {
         continue;
       }
+      // Exclude package.json and package-lock.json for now, as this might cause changes in the integrity validation
+      // hashes for packages.
+      if (in_array($file->getFilename(), ['package.json', 'package-lock.json'])) {
+        continue;
+      }
+
       $files[] = $file;
     }
 
