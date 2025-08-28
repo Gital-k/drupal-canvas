@@ -30,18 +30,6 @@ info:
 # @see https://spec.openapis.org/oas/v3.1.0.html#paths-object
 # @see https://spec.openapis.org/oas/v3.1.0.html#path-item-object
 paths:
-  /xb/api/v0/auto-saves/css/js_component/{configEntityId}:
-    description: Get draft CSS for a given component
-    get:
-      description: Get draft CSS for a given component
-      parameters:
-        - $ref: '#/components/parameters/configEntityId'
-      responses:
-        '200':
-          description: Draft CSS for the component
-          content:
-            text/css:
-              example: '.large {font-size: 3rem;}'
   /xb/api/v0/auto-saves/css/xb_asset_library/{configEntityId}:
     description: Get draft CSS for given asset library
     get:
@@ -54,18 +42,18 @@ paths:
           content:
             text/css:
               example: '.large {font-size: 3rem;}'
-  /xb/api/v0/auto-saves/js/js_component/{configEntityId}:
-    description: Get draft JS for a given component
+  /xb/api/v0/auto-saves/css/js_component/{configEntityId}:
+    description: Get draft CSS for a given component
     get:
-      description: Get draft JS for a given component
+      description: Get draft CSS for a given component
       parameters:
         - $ref: '#/components/parameters/configEntityId'
       responses:
         '200':
-          description: Draft JS for the component
+          description: Draft CSS for the component
           content:
-            text/javascript:
-              example: 'console.log("hey");'
+            text/css:
+              example: '.large {font-size: 3rem;}'
   /xb/api/v0/auto-saves/js/xb_asset_library/{configEntityId}:
     description: Get draft JS for given asset library
     get:
@@ -75,6 +63,18 @@ paths:
       responses:
         '200':
           description: Draft JS for the library
+          content:
+            text/javascript:
+              example: 'console.log("hey");'
+  /xb/api/v0/auto-saves/js/js_component/{configEntityId}:
+    description: Get draft JS for a given component
+    get:
+      description: Get draft JS for a given component
+      parameters:
+        - $ref: '#/components/parameters/configEntityId'
+      responses:
+        '200':
+          description: Draft JS for the component
           content:
             text/javascript:
               example: 'console.log("hey");'
@@ -223,6 +223,153 @@ paths:
                     title: Error message
                     examples:
                       - No auto-save data found for this entity.
+  /xb/api/v0/config/xb_asset_library:
+    description: Endpoint for managing asset libraries.
+    get:
+      description: Retrieves all available asset libraries.
+      responses:
+        '200':
+          description: All available asset libraries
+          content:
+            application/json:
+              schema:
+                type: object
+                minProperties: 0
+                # @todo Validate the property keys match the '^\\[a-zA-Z0-9_-]$'
+                #  pattern in https://drupal.org/i/3506543.
+                additionalProperties:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      description: Asset library ID
+                    label:
+                      type: string
+                      description: Human-readable label
+                    css:
+                      type: object
+                      description: CSS
+                      nullable: true
+                      properties:
+                        original:
+                          type: string
+                          description: Original CSS as entered by the human author
+                        compiled:
+                          type: string
+                          description: Compiled CSS code, compiled from the original
+                    js:
+                      type: object
+                      description: JS
+                      nullable: true
+                      properties:
+                        original:
+                          type: string
+                          description: Original JS as entered by the human author
+                        compiled:
+                          type: string
+                          description: Compiled JS code, compiled from the original
+              examples:
+                global_asset_library:
+                  value:
+                    - id: "global"
+                      label: "Global Asset Library"
+                      css:
+                        original: "body { background-color: #fff; }"
+                        compiled: "body{background-color:#fff}"
+                      js:
+                        original: "console.log('Hello, world!');"
+                        compiled: "console.log('Hello, world!');"
+    post:
+      description: Creates a new Asset Library.
+      requestBody:
+        description: Creates a new Asset Library.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewAssetLibrary'
+            examples:
+              example of a global library:
+                id: "global"
+                label: "Global Asset Library"
+                css:
+                  original: "body { background-color: #fff; }"
+                  compiled: "body{background-color:#fff}"
+                js:
+                  original: "console.log('Hello, world!');"
+                  compiled: "console.log('Hello, world!');"
+      responses:
+        '201':
+          description: Created entity successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetLibrary'
+              examples:
+                singleAssetLibrary:
+                  value:
+                    id: "global"
+                    label: "Global Asset Library"
+                    css:
+                      original: "body { background-color: #fff; }"
+                      compiled: "body{background-color:#fff}"
+                    js:
+                      original: "console.log('Hello, world!');"
+                      compiled: "console.log('Hello, world!');"
+        '409':
+          description: Asset Library with same ID already exists.
+          $ref: '#/components/responses/ClientErrorResponse'
+        '422':
+          description: Validation errors exist
+          $ref: '#/components/responses/ClientErrorResponse'
+  '/xb/api/v0/config/xb_asset_library/{configEntityId}':
+    description: Endpoint for managing a specific asset library.
+    get:
+      description: Retrieves details of a specific asset library.
+      parameters:
+        - $ref: '#/components/parameters/configEntityId'
+      responses:
+        '200':
+          description: Individual Asset Library
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetLibrary'
+              examples:
+                singleAssetLibrary:
+                  value:
+                    id: "global"
+                    label: "Global Asset Library"
+                    css:
+                      original: "body { background-color: #fff; }"
+                      compiled: "body{background-color:#fff}"
+                    js:
+                      original: "console.log('Hello, world!');"
+                      compiled: "console.log('Hello, world!');"
+    patch:
+      description: Updates a specific Asset Library.
+      requestBody:
+        description: Update specific Asset Library.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetLibrary'
+      parameters:
+        - $ref: '#/components/parameters/configEntityId'
+      responses:
+        '200':
+          description: Individual Asset Library
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetLibrary'
+    delete:
+      description: Deletes an Asset Library.
+      parameters:
+        - $ref: '#/components/parameters/configEntityId'
+      responses:
+        '204':
+          description: Deleted individual Asset Library
   /xb/api/v0/config/auto-save/{entityTypeId}/{configEntityId}:
     description: Auto-save endpoints
     get:
@@ -832,153 +979,6 @@ paths:
       responses:
         '204':
           description: Deleted individual Personalization Segment
-  /xb/api/v0/config/xb_asset_library:
-    description: Endpoint for managing asset libraries.
-    get:
-      description: Retrieves all available asset libraries.
-      responses:
-        '200':
-          description: All available asset libraries
-          content:
-            application/json:
-              schema:
-                type: object
-                minProperties: 0
-                # @todo Validate the property keys match the '^\\[a-zA-Z0-9_-]$'
-                #  pattern in https://drupal.org/i/3506543.
-                additionalProperties:
-                  type: object
-                  properties:
-                    id:
-                      type: string
-                      description: Asset library ID
-                    label:
-                      type: string
-                      description: Human-readable label
-                    css:
-                      type: object
-                      description: CSS
-                      nullable: true
-                      properties:
-                        original:
-                          type: string
-                          description: Original CSS as entered by the human author
-                        compiled:
-                          type: string
-                          description: Compiled CSS code, compiled from the original
-                    js:
-                      type: object
-                      description: JS
-                      nullable: true
-                      properties:
-                        original:
-                          type: string
-                          description: Original JS as entered by the human author
-                        compiled:
-                          type: string
-                          description: Compiled JS code, compiled from the original
-              examples:
-                global_asset_library:
-                  value:
-                    - id: "global"
-                      label: "Global Asset Library"
-                      css:
-                        original: "body { background-color: #fff; }"
-                        compiled: "body{background-color:#fff}"
-                      js:
-                        original: "console.log('Hello, world!');"
-                        compiled: "console.log('Hello, world!');"
-    post:
-      description: Creates a new Asset Library.
-      requestBody:
-        description: Creates a new Asset Library.
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/NewAssetLibrary'
-            examples:
-              example of a global library:
-                id: "global"
-                label: "Global Asset Library"
-                css:
-                  original: "body { background-color: #fff; }"
-                  compiled: "body{background-color:#fff}"
-                js:
-                  original: "console.log('Hello, world!');"
-                  compiled: "console.log('Hello, world!');"
-      responses:
-        '201':
-          description: Created entity successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AssetLibrary'
-              examples:
-                singleAssetLibrary:
-                  value:
-                    id: "global"
-                    label: "Global Asset Library"
-                    css:
-                      original: "body { background-color: #fff; }"
-                      compiled: "body{background-color:#fff}"
-                    js:
-                      original: "console.log('Hello, world!');"
-                      compiled: "console.log('Hello, world!');"
-        '409':
-          description: Asset Library with same ID already exists.
-          $ref: '#/components/responses/ClientErrorResponse'
-        '422':
-          description: Validation errors exist
-          $ref: '#/components/responses/ClientErrorResponse'
-  '/xb/api/v0/config/xb_asset_library/{configEntityId}':
-    description: Endpoint for managing a specific asset library.
-    get:
-      description: Retrieves details of a specific asset library.
-      parameters:
-        - $ref: '#/components/parameters/configEntityId'
-      responses:
-        '200':
-          description: Individual Asset Library
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AssetLibrary'
-              examples:
-                singleAssetLibrary:
-                  value:
-                    id: "global"
-                    label: "Global Asset Library"
-                    css:
-                      original: "body { background-color: #fff; }"
-                      compiled: "body{background-color:#fff}"
-                    js:
-                      original: "console.log('Hello, world!');"
-                      compiled: "console.log('Hello, world!');"
-    patch:
-      description: Updates a specific Asset Library.
-      requestBody:
-        description: Update specific Asset Library.
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AssetLibrary'
-      parameters:
-        - $ref: '#/components/parameters/configEntityId'
-      responses:
-        '200':
-          description: Individual Asset Library
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AssetLibrary'
-    delete:
-      description: Deletes an Asset Library.
-      parameters:
-        - $ref: '#/components/parameters/configEntityId'
-      responses:
-        '204':
-          description: Deleted individual Asset Library
   '/xb/api/v0/content/xb_page/{entityId}':
     description: Endpoint for deleting content entities.
     delete:
