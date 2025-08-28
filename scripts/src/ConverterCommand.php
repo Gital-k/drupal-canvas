@@ -118,6 +118,8 @@ class ConverterCommand extends Command {
       'experience builder' => 'Drupal Canvas',
       'Experience builder' => 'Drupal Canvas',
       'xb' => 'canvas',
+      // Class constants must be uppercase!
+      'XB_' => 'CANVAS_',
       'XB' => 'Canvas',
       'Xb' => 'Canvas',
       'ExperienceBuilder' => 'Canvas',
