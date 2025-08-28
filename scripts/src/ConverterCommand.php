@@ -110,9 +110,9 @@ class ConverterCommand extends Command {
       'experience-builder' => 'canvas',
       'experience builder' => 'canvas',
       'Experience builder' => 'Canvas',
-      'xb' => 'cv',
-      'XB' => 'CV',
-      'Xb' => 'Cv',
+      'xb' => 'cnvs',
+      'XB' => 'CNVS',
+      'Xb' => 'Cnvs',
       'ExperienceBuilder' => 'Canvas',
     ];
 
