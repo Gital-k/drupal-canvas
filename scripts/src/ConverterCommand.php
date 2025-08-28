@@ -27,10 +27,13 @@ class ConverterCommand extends Command {
 
   private string $projectRoot;
 
+  private Filesystem $fs;
+
   /**
    * {@inheritdoc}
    */
   protected function execute(InputInterface $input, OutputInterface $output): int {
+    $this->fs = new Filesystem();
     // Traverse upwards until we find `composer.json`.
     $previous_dir = NULL;
     $current_dir = getcwd();
@@ -178,7 +181,7 @@ class ConverterCommand extends Command {
       file_put_contents($debug_path, $file->getRealPath() . "\n", FILE_APPEND);
     }*/
     foreach ($replacements as $search => $replace) {
-      static::renameFiles(static::getDirContents($this->projectRoot), $search, $replace);
+      $this->renameFiles(static::getDirContents($this->projectRoot), $search, $replace);
       static::replaceContents(static::getDirContents($this->projectRoot, TRUE), $search, $replace);
     }
     self::info('Replacements done.');
@@ -211,7 +214,7 @@ class ConverterCommand extends Command {
    * @param string $new_pattern
    *   The new file name.
    */
-  private static function renameFiles(array $files, string $old_pattern, string $new_pattern): void {
+  private function renameFiles(array $files, string $old_pattern, string $new_pattern): void {
     // Keep a record of the files and directories to change.
     // We will change all the files first, so we don't change the location of
     // any files in the middle. This probably won't work if we had nested
@@ -243,14 +246,14 @@ class ConverterCommand extends Command {
       }
     }
     foreach ($filesToChange as $old => $new) {
-      (new Filesystem())->rename($old, $new);
+      $this->fs->rename($old, $new);
     }
     // Rename directories starting with the most nested to avoid renaming
     // parents directories first.
     krsort($dirsToChange);
     foreach ($dirsToChange as $dirs) {
       foreach ($dirs as $old => $new) {
-        (new Filesystem())->rename($old, $new);
+        $this->fs->rename($old, $new);
       }
     }
   }
