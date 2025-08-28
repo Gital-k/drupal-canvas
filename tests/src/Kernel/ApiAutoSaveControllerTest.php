@@ -711,10 +711,10 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
       // Get access denied as expected. The label is the new one that we set.
       $this->assertSame("Unable to update entities: 'New label', 'New name', 'Update the front page'.", $exception->getMessage());
       $this->assertSame([
-        'config:experience_builder.js_component.test-component',
-        AutoSaveManager::CACHE_TAG,
-        'config:system.site',
         'config:experience_builder.xb_asset_library.global',
+        AutoSaveManager::CACHE_TAG,
+        'config:experience_builder.js_component.test-component',
+        'config:system.site',
       ], $exception->getCacheTags());
       $this->assertSame(['user.permissions'], $exception->getCacheContexts());
     }
@@ -749,6 +749,19 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     $response = $this->makePublishAllRequest();
     $json = json_decode($response->getContent() ?: '', TRUE);
     self::assertEquals(Response::HTTP_UNPROCESSABLE_ENTITY, $response->getStatusCode());
+    $errors[] = [
+      'detail' => 'This value should not be null.',
+      'source' => [
+        'pointer' => 'css.original',
+      ],
+      'meta' => [
+        'entity_type' => AssetLibrary::ENTITY_TYPE_ID,
+        'entity_id' => $library->id(),
+        // The label should not be updated if model validation failed.
+        'label' => $library->label(),
+        ApiAutoSaveController::AUTO_SAVE_KEY => $autoSave->getAutoSaveKey($library),
+      ],
+    ];
     $errors[] = [
       'detail' => 'Unable to find class/interface "unknown" specified in the prop "mixed_up_prop" for the component "experience_builder:test-component".',
       'source' => [
@@ -828,19 +841,6 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
         // The label should not be updated if model validation failed.
         'label' => $node2_original_title,
         ApiAutoSaveController::AUTO_SAVE_KEY => $autoSave->getAutoSaveKey($node2),
-      ],
-    ];
-    $errors[] = [
-      'detail' => 'This value should not be null.',
-      'source' => [
-        'pointer' => 'css.original',
-      ],
-      'meta' => [
-        'entity_type' => AssetLibrary::ENTITY_TYPE_ID,
-        'entity_id' => $library->id(),
-        // The label should not be updated if model validation failed.
-        'label' => $library->label(),
-        ApiAutoSaveController::AUTO_SAVE_KEY => $autoSave->getAutoSaveKey($library),
       ],
     ];
 
