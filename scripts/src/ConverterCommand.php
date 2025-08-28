@@ -117,7 +117,8 @@ class ConverterCommand extends Command {
       'Xb' => 'Cnvs',
       'ExperienceBuilder' => 'Canvas',
       'Drupal Drupal Canvas' => 'Drupal Canvas',
-      '/cnvs/api/' => '/canvas/api/'
+      // Use canvas word in paths (e.g. /canvas/api, but also /canvas/2 for our former XbPages)
+      'cnvs/' => 'canvas/'
       // We cannot replace xB because that would match things like ajaxBehaviors.
       // If we need for some reason, we need to revert that here.
     ];
