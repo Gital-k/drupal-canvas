@@ -8,7 +8,6 @@ declare(strict_types = 1);
 // in composer.json.
 namespace Drupal\renamer\Rename;
 
-use Composer\Console\Input\InputArgument;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -29,21 +28,11 @@ class ConverterCommand extends Command {
   private string $projectRoot;
 
   private Filesystem $fs;
-  private string $onlyPath;
-
-  protected function configure()
-  {
-    parent::configure();
-    $this->addArgument('only-path', InputArgument::OPTIONAL, 'Only change this path.');
-
-  }
-
 
   /**
    * {@inheritdoc}
    */
   protected function execute(InputInterface $input, OutputInterface $output): int {
-    $this->onlyPath = $input->getArgument('only-path');
     $this->fs = new Filesystem();
     // Traverse upwards until we find `composer.json`.
     $previous_dir = NULL;
@@ -193,8 +182,8 @@ class ConverterCommand extends Command {
       file_put_contents($debug_path, $file->getRealPath() . "\n", FILE_APPEND);
     }*/
     foreach ($replacements as $search => $replace) {
-      $this->renameFiles($this->getDirContents($this->projectRoot), $search, $replace);
-      static::replaceContents($this->getDirContents($this->projectRoot, TRUE), $search, $replace);
+      $this->renameFiles(static::getDirContents($this->projectRoot), $search, $replace);
+      static::replaceContents(static::getDirContents($this->projectRoot, TRUE), $search, $replace);
     }
     self::info('Replacements done.');
   }
@@ -281,17 +270,12 @@ class ConverterCommand extends Command {
    * @return \SplFileInfo[]
    *   Array of objects containing file information.
    */
-  private function getDirContents(string $path, bool $excludeDirs = FALSE): array {
+  private static function getDirContents(string $path, bool $excludeDirs = FALSE): array {
     $rii = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($path));
 
     $files = [];
     /** @var \SplFileInfo $file */
     foreach ($rii as $file) {
-      if ($this->onlyPath) {
-        if (!str_starts_with($file->getRealPath(), $this->onlyPath)) {
-          continue;
-        }
-      }
       if ($file->isLink()) {
         continue;
       }
