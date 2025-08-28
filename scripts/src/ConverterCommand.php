@@ -52,6 +52,7 @@ class ConverterCommand extends Command {
 
     // Run prettier on ui because of line lengths.
     $this->executeCommand("cd ui && npm run lint:fix");
+    $this->executeCommand("npm run lint:prettier-fix");
 
     // @todo Formerly XbPage becomes Page class, with `canvas` as plugin id
     //   1. Do changes manually or with rector?
