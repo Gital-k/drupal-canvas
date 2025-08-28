@@ -118,6 +118,8 @@ class ConverterCommand extends Command {
       'Xb' => 'Cnvs',
       'ExperienceBuilder' => 'Canvas',
       'Drupal Drupal Canvas' => 'Drupal Canvas',
+      // We cannot replace xB because that would match things like ajaxBehaviors.
+      // If we need for some reason, we need to revert that here.
     ];
 
     // Those components that include an enum prop will change its version,
