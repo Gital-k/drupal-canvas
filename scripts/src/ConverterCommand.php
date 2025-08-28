@@ -105,8 +105,7 @@ class ConverterCommand extends Command {
 
     $replacements = [
       $old_machine_name => $new_machine_name,
-      // @todo What should this be?
-      'xbt' => 'cvt',
+      'xbt' => 'cnvst',
       'EXPERIENCE_BUILDER' => 'CANVAS',
       'Experience Builder' => 'Drupal Canvas',
       'Experience-Builder' => 'Canvas',
