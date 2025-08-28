@@ -298,6 +298,9 @@ class ConverterCommand extends Command {
       //   CollapseComponentInputsUpdateTest fails trying to opena php.gz file.
       //   We need to remake that file anyways but probably not safe to search/replace in gz
       //   as we don't know "xb" doesn't occur.
+      if ($file->getExtension() === 'gz') {
+        continue;
+      }
 
       $files[] = $file;
     }
