@@ -155,11 +155,11 @@ class ComponentTest extends KernelTestBase {
         'media.type.image',
       ],
       'module' => [
+        'xb_test_sdc',
         'file',
         'image',
         'media',
         'media_library',
-        'xb_test_sdc',
       ],
     ], $updated_component->getDependencies());
     self::assertSame([
