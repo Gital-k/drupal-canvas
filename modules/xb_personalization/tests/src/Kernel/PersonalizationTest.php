@@ -79,6 +79,8 @@ final class PersonalizationTest extends KernelTestBase {
     $cache_tags = $response->getCacheableMetadata()->getCacheTags();
     sort($cache_tags);
     self::assertSame([
+      'xb_page:1',
+      'xb_page_view',
       'config:block_list',
       'config:experience_builder.component.p13n.case',
       'config:experience_builder.component.p13n.switch',
@@ -87,8 +89,6 @@ final class PersonalizationTest extends KernelTestBase {
       'config:experience_builder.component.sdc.xb_test_sdc.two_column',
       'http_response',
       'rendered',
-      'xb_page:1',
-      'xb_page_view',
     ], $cache_tags);
     $cache_contexts = $response->getCacheableMetadata()->getCacheContexts();
     sort($cache_contexts);
