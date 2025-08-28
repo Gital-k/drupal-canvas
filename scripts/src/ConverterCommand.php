@@ -1,5 +1,6 @@
 <?php
 // @codingStandardsIgnoreFile
+// cspell:ignore renamer
 
 declare(strict_types = 1);
 
