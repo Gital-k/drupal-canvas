@@ -98,6 +98,25 @@ class ConverterCommand extends Command {
       'Xb' => 'Cv',
       'ExperienceBuilder' => 'Canvas',
     ];
+
+    // Those components that include an enum prop will change its version,
+    // because their settings reference the now renamed
+    // `canvas_load_allowed_values_for_component_prop` function.
+    $replacements += [
+      // sdc.cv_test_sdc.two_column
+      'd99140cbd47c0b51' => 'b1ae1e286c75438e',
+      // sdc.cv_test_sdc.heading
+      '9616e3c4ab9b4fce' => '8dd7b865998f53b0',
+      // sdc.cv_test_sdc.image, because of $ref: json-schema-definitions://canvas.module/image
+      'd3a3df7d7e68efc0' => '5eabbfdb96b39a59'
+      // @todo Should we just ignore `ComponentInputsEvolutionTest` that requires updating the fixture dump?
+    ];
+    // Handle generated `itok` in images in tests.
+    $replacements += [
+      'uFWMj39h' => 'ki8UAYrb',
+      'ebZalNOg' => 'FUac6e2b',
+    ];
+
     /*$debug_path = '/Users/ted.bowman/sites/debug-renam.txt';
     // Delete the debug file if it exists.
     if (file_exists($debug_path)) {
