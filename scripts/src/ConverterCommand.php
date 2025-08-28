@@ -127,6 +127,8 @@ class ConverterCommand extends Command {
     // because their settings reference the now renamed
     // `canvas_load_allowed_values_for_component_prop` function.
     $replacements += [
+      // sdc.cv_test_sdc.one_column
+      '836c8835c850cdc5' => '0555ab081a3c8721',
       // sdc.cv_test_sdc.two_column
       'd99140cbd47c0b51' => 'b1ae1e286c75438e',
       // sdc.cv_test_sdc.heading
