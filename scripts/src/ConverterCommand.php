@@ -294,6 +294,10 @@ class ConverterCommand extends Command {
       if (in_array($file->getFilename(), ['package.json', 'package-lock.json'])) {
         continue;
       }
+      // @todo 🔥🔥🔥🔥 - do we need exclude .php.gz or .gz files?
+      //   CollapseComponentInputsUpdateTest fails trying to opena php.gz file.
+      //   We need to remake that file anyways but probably not safe to search/replace in gz
+      //   as we don't know "xb" doesn't occur.
 
       $files[] = $file;
     }
