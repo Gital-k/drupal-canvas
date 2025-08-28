@@ -68,6 +68,8 @@ final class SegmentFormTest extends BrowserTestBase {
     $this->clickLink('New segment rule');
     $edit = [
       'plugin_id' => 'current_theme',
+      // @todo ⁉ Test fails because "settings[theme]" is not found in the form.
+      //   why?
       'settings[theme]' => 'stark',
       'settings[negate]' => FALSE,
     ];
