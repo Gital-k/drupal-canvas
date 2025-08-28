@@ -50,7 +50,8 @@ class ConverterCommand extends Command {
 
     $this->doConvert();
 
-    // @todo Run prettier on ui because of line lengths.
+    // Run prettier on ui because of line lengths.
+    $this->executeCommand("cd ui && npm run lint:fix");
 
     // @todo Formerly XbPage becomes Page class, with `canvas` as plugin id
     //   1. Do changes manually or with rector?
@@ -77,6 +78,7 @@ class ConverterCommand extends Command {
    */
   private static function executeCommand(string $cmd): void {
     $result = NULL;
+    static::info("Running $cmd");
     system($cmd, $result);
     if ($result !== 0) {
       throw new \Exception("Command failed: $cmd");
