@@ -50,8 +50,10 @@ test.describe('Folder Management', () => {
       - tabpanel "Components":
         - button "Add new folder":
           - img
+          - text: Add new folder
         - button "Atom/Media 1" [expanded]:
           - img
+          - text: Atom/Media 1
           - img
         - list:
           - listitem:
@@ -59,6 +61,7 @@ test.describe('Folder Management', () => {
             - text: Video
         - button "Atom/Tabs 2" [expanded]:
           - img
+          - text: Atom/Tabs 2
           - img
         - list:
           - listitem:
@@ -69,6 +72,7 @@ test.describe('Folder Management', () => {
             - text: Shoe Tab Panel
         - button "Atom/Text 2" [expanded]:
           - img
+          - text: Atom/Text 2
           - img
         - list:
           - listitem:
@@ -79,6 +83,7 @@ test.describe('Folder Management', () => {
             - text: Shoe Badge
         - button "Container 3" [expanded]:
           - img
+          - text: Container 3
           - img
         - list:
           - listitem:
@@ -92,6 +97,7 @@ test.describe('Folder Management', () => {
             - text: Two Column
         - button "Container/Special 1" [expanded]:
           - img
+          - text: Container/Special 1
           - img
         - list:
           - listitem:
@@ -99,6 +105,7 @@ test.describe('Folder Management', () => {
             - text: Shoe Tab Group
         - button "core 3" [expanded]:
           - img
+          - text: core 3
           - img
         - list:
           - listitem:
@@ -112,10 +119,12 @@ test.describe('Folder Management', () => {
             - text: Tabs
         - button "Empty Components 0" [expanded]:
           - img
+          - text: Empty Components 0
           - img
         - list
         - button "Forms 1" [expanded]:
           - img
+          - text: Forms 1
           - img
         - list:
           - listitem:
@@ -123,6 +132,7 @@ test.describe('Folder Management', () => {
             - text: User login
         - button "Lists (Views) 2" [expanded]:
           - img
+          - text: Lists (Views) 2
           - img
         - list:
           - listitem:
@@ -133,6 +143,7 @@ test.describe('Folder Management', () => {
             - text: Who's online
         - button "Menus 5" [expanded]:
           - img
+          - text: Menus 5
           - img
         - list:
           - listitem:
@@ -152,6 +163,7 @@ test.describe('Folder Management', () => {
             - text: User account menu
         - button /Other \\d+/ [expanded]:
           - img
+          - text: /Other \\d+/
           - img
         - list:
           - listitem:
@@ -216,6 +228,7 @@ test.describe('Folder Management', () => {
             - text: XB test SDC with required image, with example
         - button "Status 2" [expanded]:
           - img
+          - text: Status 2
           - img
         - list:
           - listitem:
@@ -226,6 +239,7 @@ test.describe('Folder Management', () => {
             - text: Experimental SDC
         - button "System 5" [expanded]:
           - img
+          - text: System 5
           - img
         - list:
           - listitem:
@@ -245,6 +259,7 @@ test.describe('Folder Management', () => {
             - text: Site branding
         - button "User 1" [expanded]:
           - img
+          - text: User 1
           - img
         - list:
           - listitem:
@@ -272,8 +287,10 @@ test.describe('Folder Management', () => {
       - tabpanel "Patterns":
         - button "Add new folder":
           - img
+          - text: Add new folder
         - button "Animal Pats 2" [expanded]:
           - img
+          - text: Animal Pats 2
           - img
         - list:
           - listitem:
@@ -284,6 +301,7 @@ test.describe('Folder Management', () => {
             - text: Dog pattern
         - button "Color Patterns 2" [expanded]:
           - img
+          - text: Color Patterns 2
           - img
         - list:
           - listitem:
@@ -294,6 +312,7 @@ test.describe('Folder Management', () => {
             - text: Yellow pattern
         - button "Empty Patterns 0" [expanded]:
           - img
+          - text: Empty Patterns 0
           - img
         - list
         - list:
@@ -322,8 +341,10 @@ test.describe('Folder Management', () => {
         - tabpanel "Code":
           - button "Add new folder":
             - img
+            - text: Add new folder
           - button "Active Users of Using 2" [expanded]:
             - img
+            - text: Active Users of Using 2
             - img
           - img
           - text: Using drupalSettings getSiteData (Internal)
@@ -333,9 +354,11 @@ test.describe('Folder Management', () => {
           - button "Open contextual menu"
           - button "Empty Code 0" [expanded]:
             - img
+            - text: Empty Code 0
             - img
           - button "Proclaimers of With 2" [expanded]:
             - img
+            - text: Proclaimers of With 2
             - img
           - img
           - text: My Code Component Link (Internal)
