@@ -206,33 +206,6 @@ test.describe('Perform CRUD operations on components', () => {
             - button "Call to Absolute Action":
               - img
               - text: Call to Absolute Action
-            - button "Card":
-              - img
-              - text: Card
-            - button "Card with local image":
-              - img
-              - text: Card with local image
-            - button "Card with remote image":
-              - img
-              - text: Card with remote image
-            - button "Card with stream wrapper image":
-              - img
-              - text: Card with stream wrapper image
-            - button "Component no meta:enum":
-              - img
-              - text: Component no meta:enum
-            - button "Druplicon":
-              - img
-              - text: Druplicon
-            - button "Hero":
-              - img
-              - text: Hero
-            - button "Section":
-              - img
-              - text: Section
-            - button "Test SDC Image":
-              - img
-              - text: Test SDC Image
             - button "XB test SDC for image gallery (>1 image)":
               - img
               - text: XB test SDC for image gallery (>1 image)
@@ -263,6 +236,33 @@ test.describe('Perform CRUD operations on components', () => {
             - button "XB test SDC with required image, with example":
               - img
               - text: XB test SDC with required image, with example
+            - button "Card":
+              - img
+              - text: Card
+            - button "Card with local image":
+              - img
+              - text: Card with local image
+            - button "Card with remote image":
+              - img
+              - text: Card with remote image
+            - button "Card with stream wrapper image":
+              - img
+              - text: Card with stream wrapper image
+            - button "Component no meta:enum":
+              - img
+              - text: Component no meta:enum
+            - button "Druplicon":
+              - img
+              - text: Druplicon
+            - button "Hero":
+              - img
+              - text: Hero
+            - button "Section":
+              - img
+              - text: Section
+            - button "Test SDC Image":
+              - img
+              - text: Test SDC Image
           - button "Status" [expanded]:
             - img
             - text: Status
