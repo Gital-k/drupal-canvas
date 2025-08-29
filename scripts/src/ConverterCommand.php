@@ -175,6 +175,12 @@ class ConverterCommand extends Command {
       'dQpNrzPR' => 'SnSVAYVj',
     ];
 
+    // JS Components astro-islands asset filenames also depend on their normalized settings.
+    $replacements += [
+      '1Dq8BIqr4CMOA9RWhpbDNM4mjbvezQDq0mKKzO7iEmw' => 'OXEtkRiIQlg16fvA1lWA_1ggYYS5VOUJpRZ5r3ow2N8',
+      'fvdcbYvgbnFGHremAlwsfbIcqUtlrp6B1uNETJtRsbo' => '9R7mSubaIqZ03U019LY2_xnqOKyDzLzQ0y11jg724VY',
+    ];
+
     /*$debug_path = '/Users/ted.bowman/sites/debug-renam.txt';
     // Delete the debug file if it exists.
     if (file_exists($debug_path)) {
