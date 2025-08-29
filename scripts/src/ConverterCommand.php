@@ -211,10 +211,14 @@ class ConverterCommand extends Command {
 
     system("gzip -d $gzipped");
     $replacements = $this->getReplacements();
+    $contents = file_get_contents($file);
     foreach ($replacements as $search => $replace) {
-      file_put_contents($file, str_replace($search, $replace, file_get_contents($file)));
+      $contents = str_replace($search, $replace, $contents);
     }
+    file_put_contents($file, $contents);
+
     system("gzip $file");
+
     self::info('Gzip processed');
   }
 
