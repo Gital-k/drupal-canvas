@@ -108,10 +108,10 @@ test.describe('Perform CRUD operations on components', () => {
           - list:
             - button "Shoe Tab":
               - img
-              - text: Show Tab
+              - text: Shoe Tab
             - button "Shoe Tab Panel":
               - img
-              - text: Show Tab Panel
+              - text: Shoe Tab Panel
           - button "Atom/Text" [expanded]:
             - img
             - text: Atom/Text
@@ -139,7 +139,7 @@ test.describe('Perform CRUD operations on components', () => {
               - text: Two Column
           - button "Container/Special" [expanded]:
             - img
-            - text: One Column
+            - text: Container/Special
             - img
           - list:
             - button "Shoe Tab Group":
@@ -211,7 +211,7 @@ test.describe('Perform CRUD operations on components', () => {
               - text: XB test SDC for image gallery (>1 image)
             - button /XB test SDC for sparkline \\(>1 integers between -\\d+ and \\d+\\)/:
               - img
-              - text: /XB test SDC for sparkline \\(>1 integers between -\\d+ and \\d+\\)/
+              - text: XB test SDC for sparkline (>1 integers between -100 and 100)
             - 'button "XB test SDC for testing type: \`Drupal\\\\Core\\\\Template\\\\Attribute\` special casing"':
               - img
               - text: "XB test SDC for testing type: \`Drupal\\\\Core\\\\Template\\\\Attribute\` special casing"
