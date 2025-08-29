@@ -137,27 +137,29 @@ class ConverterCommand extends Command {
     // because their settings reference the now renamed
     // `canvas_load_allowed_values_for_component_prop` function.
     $replacements += [
-      // sdc.cv_test_sdc.one_column
+      // sdc.canvas_test_sdc.one_column
       '836c8835c850cdc5' => '0555ab081a3c8721',
-      // sdc.cv_test_sdc.two_column
+      // sdc.canvas_test_sdc.two_column
       'd99140cbd47c0b51' => 'b1ae1e286c75438e',
-      // sdc.cv_test_sdc.heading
+      // sdc.canvas_test_sdc.heading
       '9616e3c4ab9b4fce' => '8dd7b865998f53b0',
-      // sdc.cv_test_sdc.my-cta
+      // sdc.canvas_test_sdc.my-cta
       'b4cd62533ff9bd99' => '6f8647435386329e',
-      // js.cv_test_code_components_with_props
+      // js.my-cta
+      '9454c3bca9bbbf4b' => '53ed322c96bee384',
+      // js.canvas_test_code_components_with_props
       '4e53ca9f3f06b418' => 'cd8b163a8d299fea',
-      // js.cv_test_code_components_vanilla_image
+      // js.canvas_test_code_components_vanilla_image
       'c69815f5c7412502' => 'b5e039b71b27fef6',
-      // sdc.cv_test_sdc.image, because of $ref: json-schema-definitions://canvas.module/image
+      // sdc.canvas_test_sdc.image, because of $ref: json-schema-definitions://canvas.module/image
       'c06e0be7dd131740' => 'cc9b97c9370aabdf',
       'd3a3df7d7e68efc0' => '5eabbfdb96b39a59',
-      // dc.cv_test_sdc.image-optional-with-example-and-additional-prop, because of $ref: json-schema-definitions://canvas.module/image
+      // sdc.canvas_test_sdc.image-optional-with-example-and-additional-prop, because of $ref: json-schema-definitions://canvas.module/image
       '602623740c98a6cf' => '43b51c7233d50b97',
-      // block.cv_test_block_input_schema_change_poc
+      // block.canvas_test_block_input_schema_change_poc
       '731594cf105d2a9f' => '6388b43679123f84',
       '739aaf363770b8b9' => '45c41f776f70991e',
-      // block.cv_test_block_input_none
+      // block.canvas_test_block_input_none
       '86af6a7a4e4644d5' => 'ea2d88e625ba1e74',
       // @todo Should we just ignore `ComponentInputsEvolutionTest` that requires updating the fixture dump?
       '64ca25db5092fad7' => 'f91f8d4aff4aba7c',
