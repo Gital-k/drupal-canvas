@@ -171,33 +171,6 @@ test.describe('Folder Management', () => {
             - text: Call to Absolute Action
           - listitem:
             - img
-            - text: Card
-          - listitem:
-            - img
-            - text: Card with local image
-          - listitem:
-            - img
-            - text: Card with remote image
-          - listitem:
-            - img
-            - text: Card with stream wrapper image
-          - listitem:
-            - img
-            - text: Component no meta:enum
-          - listitem:
-            - img
-            - text: Druplicon
-          - listitem:
-            - img
-            - text: Hero
-          - listitem:
-            - img
-            - text: Section
-          - listitem:
-            - img
-            - text: Test SDC Image
-          - listitem:
-            - img
             - text: XB test SDC for image gallery (>1 image)
           - listitem:
             - img
@@ -226,6 +199,33 @@ test.describe('Folder Management', () => {
           - listitem:
             - img
             - text: XB test SDC with required image, with example
+          - listitem:
+            - img
+            - text: Card
+          - listitem:
+            - img
+            - text: Card with local image
+          - listitem:
+            - img
+            - text: Card with remote image
+          - listitem:
+            - img
+            - text: Card with stream wrapper image
+          - listitem:
+            - img
+            - text: Component no meta:enum
+          - listitem:
+            - img
+            - text: Druplicon
+          - listitem:
+            - img
+            - text: Hero
+          - listitem:
+            - img
+            - text: Section
+          - listitem:
+            - img
+            - text: Test SDC Image
         - button "Status 2" [expanded]:
           - img
           - text: Status 2
