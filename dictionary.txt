@@ -87,6 +87,7 @@ subcontent
 subroute
 subtrigger
 superstrongpassword
+SVAY
 tseslint
 testid
 toolset

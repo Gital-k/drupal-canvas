@@ -170,6 +170,8 @@ class ConverterCommand extends Command {
       '3D6Jb0oZWl' => '3D801KACCy',
       '3DdQpNrzPR' => '3DYLIQc4vO',
       'ki8UAYrb' => 'xc2YKzZE',
+      '6Jb0oZWl' => 'spSF5vvd',
+      'dQpNrzPR' => 'SnSVAYVj',
     ];
 
     /*$debug_path = '/Users/ted.bowman/sites/debug-renam.txt';
