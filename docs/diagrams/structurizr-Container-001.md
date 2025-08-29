@@ -27,7 +27,7 @@ graph LR
       22("<div style='font-weight: bold'>XB 'Element' Component Type</div><div style='font-size: 70%; margin-top: 0px'>[Container]</div><div style='font-size: 80%; margin-top:10px'>N visible in UI — exposes 1<br />SDC 'directly', in principle<br />only 'simple' SDCs, BUT FOR<br />EARLY MILESTONES THIS COULD<br />BE ANY SDC!</div>")
       click 22 https://www.drupal.org/project/experience_builder/issues/3444417 "https://www.drupal.org/project/experience_builder/issues/3444417"
       style 22 fill:#808080,stroke:#595959,color:#ffffff
-      26("<div style='font-weight: bold'>XB 'Component' Component Type</div><div style='font-size: 70%; margin-top: 0px'>[Container]</div><div style='font-size: 80%; margin-top:10px'>N visible in UI — a<br />composition of SDCs built in<br />XB's 'Theme Builder', NOT FOR<br />EARLY MILESTONES!</div>")
+      26("<div style='font-weight: bold'>XB 'Component' Component Type</div><div style='font-size: 70%; margin-top: 0px'>[Container]</div><div style='font-size: 80%; margin-top:10px'>N visible in UI — a<br />composition of SDCs built in<br />XB's 'Theme Builder', NOT<br />FOR EARLY MILESTONES!</div>")
       click 26 https://www.drupal.org/project/experience_builder/issues/3444417 "https://www.drupal.org/project/experience_builder/issues/3444417"
       style 26 fill:#808080,stroke:#595959,color:#ffffff
       30("<div style='font-weight: bold'>XB 'Block' Component Type</div><div style='font-size: 70%; margin-top: 0px'>[Container]</div><div style='font-size: 80%; margin-top:10px'>Only 1 visible in UI — allows<br />1) selecting any block<br />plugin, 2) configuring its<br />settings</div>")
