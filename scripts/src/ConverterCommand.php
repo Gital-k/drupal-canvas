@@ -201,37 +201,12 @@ class ConverterCommand extends Command {
     foreach ($replacements as $search => $replace) {
       $this->renameFiles(static::getDirContents($this->projectRoot), $search, $replace);
     }
-
-    // We renamed everything, including gzipped.
-    $gzipped = 'tests/fixtures/update/drupal-11.2.2-with-canvas-0.7.2-alpha1.filled.php';
-    system("gzip -d $gzipped.gz");
-
     $renamed_files = static::getDirContents($this->projectRoot, TRUE);
     foreach ($renamed_files as $file) {
       static::replaceContents($file->getRealPath(), $replacements);
     }
 
-    // We need to re-gzip the file
-    system("gzip $gzipped");
-
     self::info('Replacements done.');
-  }
-
-  private function doConvertGzipDump(string $file): void {
-    $gzipped = $file . '.gz';
-    assert($this->fs->exists($gzipped));
-
-    system("gzip -d $gzipped");
-    $replacements = $this->getReplacements();
-    $contents = file_get_contents($file);
-    foreach ($replacements as $search => $replace) {
-      $contents = str_replace($search, $replace, $contents);
-    }
-    file_put_contents($file, $contents);
-
-    system("gzip $file");
-
-    self::info('Gzip processed');
   }
 
   /**
