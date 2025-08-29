@@ -83,7 +83,7 @@ class ConverterCommand extends Command {
       '602623740c98a6cf' => '43b51c7233d50b97',
       // block.canvas_test_block_input_schema_change_poc
       '731594cf105d2a9f' => '6388b43679123f84',
-      '739aaf363770b8b9' => '45c41f776f70991e',
+      '739aaf363770b8b9' => 'af78995aa8d4160e',
       // block.canvas_test_block_input_none
       '86af6a7a4e4644d5' => 'ea2d88e625ba1e74',
       // @todo Should we just ignore `ComponentInputsEvolutionTest` that requires updating the fixture dump?
