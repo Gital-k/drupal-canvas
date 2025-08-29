@@ -23,91 +23,16 @@ use Symfony\Component\Filesystem\Filesystem;
  */
 class ConverterCommand extends Command {
 
-  private bool $gitlabci;
-
   private string $projectRoot;
 
   private Filesystem $fs;
 
   /**
-   * {@inheritdoc}
+   * @return array<string, string>
    */
-  protected function execute(InputInterface $input, OutputInterface $output): int {
-    $this->fs = new Filesystem();
-    // Traverse upwards until we find `composer.json`.
-    $previous_dir = NULL;
-    $current_dir = getcwd();
-    while ($previous_dir !== $current_dir) {
-      // Allow the script to also be run after it has run once.
-      // @todo Is this a good idea?
-      if (file_exists($current_dir . '/experience_builder.info.yml') || file_exists($current_dir . '/canvas.info.yml')) {
-        $this->projectRoot = $current_dir;
-        break;
-      }
-      $previous_dir = $current_dir;
-      $current_dir = dirname($current_dir);
-    }
-    if (empty($this->projectRoot)) {
-      throw new \Exception("Could not find the project root.");
-    }
-
-    $this->doConvert();
-
-    // Run prettier on ui because of line lengths.
-    $this->executeCommand("cd ui && npm run lint:fix");
-    $this->executeCommand("npm run lint:prettier-fix");
-
-    // @todo Formerly XbPage becomes Page class, with `canvas` as plugin id
-    //   1. Do changes manually or with rector?
-    //   2. recipes' `xb_page` folder should become `canvas` folder.
-    //   3. Ideally we are using constants everywhere, but search for any remaining instances
-    //      of xb_page or cv_page.
-
-    // @todo Fix tests (manually or rector?) that depend on order:
-    //   1. Those arrays listing a bunch of components
-    //   2. Those arrays listing a bunch of cache tags or cache contexts.
-    //   2. The DX routing tests depending on routing.yml sorted alphabetically.
-    //   3. The routing.yml file itself should still be sorted alphabetically.
-
-    // @todo Verify openapi.yml
-
-    return Command::SUCCESS;
-  }
-
-  /**
-   * Executes a command and throws an exception if it fails.
-   *
-   * @param string $cmd
-   *   The command to execute.
-   */
-  private static function executeCommand(string $cmd): void {
-    $result = NULL;
-    static::info("Running $cmd");
-    system($cmd, $result);
-    if ($result !== 0) {
-      throw new \Exception("Command failed: $cmd");
-    }
-  }
-
-  /**
-   * Prints message.
-   *
-   * @param string $msg
-   *   The message to print.
-   */
-  private static function info(string $msg): void {
-    print "\n$msg";
-  }
-
-  /**
-   * Converts the contrib module to core merge request.
-   */
-  private function doConvert(): void {
-    $old_machine_name = 'experience_builder';
-    $new_machine_name = 'canvas';
-
+  public function getReplacements(): array {
     $replacements = [
-      $old_machine_name => $new_machine_name,
+      'experience_builder' => 'canvas',
       'xb-canvas' => 'editor-frame',
       'xb_asset_library' => 'asset_library',
       // Next two are just oauth2 scopes weird requirements.
@@ -183,6 +108,84 @@ class ConverterCommand extends Command {
       '1Dq8BIqr4CMOA9RWhpbDNM4mjbvezQDq0mKKzO7iEmw' => 'OXEtkRiIQlg16fvA1lWA_1ggYYS5VOUJpRZ5r3ow2N8',
       'fvdcbYvgbnFGHremAlwsfbIcqUtlrp6B1uNETJtRsbo' => '9R7mSubaIqZ03U019LY2_xnqOKyDzLzQ0y11jg724VY',
     ];
+    return $replacements;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function execute(InputInterface $input, OutputInterface $output): int {
+    $this->fs = new Filesystem();
+    // Traverse upwards until we find `composer.json`.
+    $previous_dir = NULL;
+    $current_dir = getcwd();
+    while ($previous_dir !== $current_dir) {
+      // Allow the script to also be run after it has run once.
+      // @todo Is this a good idea?
+      if (file_exists($current_dir . '/experience_builder.info.yml') || file_exists($current_dir . '/canvas.info.yml')) {
+        $this->projectRoot = $current_dir;
+        break;
+      }
+      $previous_dir = $current_dir;
+      $current_dir = dirname($current_dir);
+    }
+    if (empty($this->projectRoot)) {
+      throw new \Exception("Could not find the project root.");
+    }
+
+    $this->doConvert();
+
+    // Run prettier on ui because of line lengths.
+    $this->executeCommand("cd ui && npm run lint:fix");
+    $this->executeCommand("npm run lint:prettier-fix");
+
+    // @todo Formerly XbPage becomes Page class, with `canvas` as plugin id
+    //   1. Do changes manually or with rector?
+    //   2. recipes' `xb_page` folder should become `canvas` folder.
+    //   3. Ideally we are using constants everywhere, but search for any remaining instances
+    //      of xb_page or cv_page.
+
+    // @todo Fix tests (manually or rector?) that depend on order:
+    //   1. Those arrays listing a bunch of components
+    //   2. Those arrays listing a bunch of cache tags or cache contexts.
+    //   2. The DX routing tests depending on routing.yml sorted alphabetically.
+    //   3. The routing.yml file itself should still be sorted alphabetically.
+
+    // @todo Verify openapi.yml
+
+    return Command::SUCCESS;
+  }
+
+  /**
+   * Executes a command and throws an exception if it fails.
+   *
+   * @param string $cmd
+   *   The command to execute.
+   */
+  private static function executeCommand(string $cmd): void {
+    $result = NULL;
+    static::info("Running $cmd");
+    system($cmd, $result);
+    if ($result !== 0) {
+      throw new \Exception("Command failed: $cmd");
+    }
+  }
+
+  /**
+   * Prints message.
+   *
+   * @param string $msg
+   *   The message to print.
+   */
+  private static function info(string $msg): void {
+    print "\n$msg";
+  }
+
+  /**
+   * Converts the contrib module to core merge request.
+   */
+  private function doConvert(): void {
+    $replacements = $this->getReplacements();
 
     /*$debug_path = '/Users/ted.bowman/sites/debug-renam.txt';
     // Delete the debug file if it exists.
