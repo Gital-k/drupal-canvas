@@ -92,6 +92,7 @@ class ConverterCommand extends Command {
       '0b69de6df4584ecc' => '88c370526c14d185',
       '9704fc9dd83ff450' => '5ddd92c66000b6d0',
       '922675dd0e16c16e' => '7683487645918f28',
+      'af78995aa8d4160e' => 'ec03b64ff4f992b9',
     ];
     // Handle generated `itok` in images in tests.
     $replacements += [
