@@ -166,11 +166,10 @@ class ConverterCommand extends Command {
     ];
     // Handle generated `itok` in images in tests.
     $replacements += [
-      'uFWMj39h' => 'ki8UAYrb',
-      'ebZalNOg' => 'FUac6e2b',
+      'uFWMj39h' => 'uQqtnjV1',
+      'ebZalNOg' => 'DnW_VIs-',
       '3D6Jb0oZWl' => '3D801KACCy',
       '3DdQpNrzPR' => '3DYLIQc4vO',
-      'ki8UAYrb' => 'xc2YKzZE',
       '6Jb0oZWl' => 'spSF5vvd',
       'dQpNrzPR' => 'SnSVAYVj',
     ];
