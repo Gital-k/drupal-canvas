@@ -69,8 +69,8 @@ graph LR
     5-. "<div>Creates</div><div style='font-size: 70%'></div>" .->40
     33-. "<div>Proxies</div><div style='font-size: 70%'></div>" .->43
     5-. "<div>Creates</div><div style='font-size: 70%'></div>" .->43
-    2-. "<div>Creates content within<br />guardrails: places XB<br />Components in open slots,<br />defines SDC prop values for<br />XB components in default<br />layout and XB components in<br />open slots, maybe overrides<br />default layout</div><div style='font-size: 70%'></div>" .->46
-    3-. "<div>Uses this UI to review<br />changes to XB Content created<br />by Content Creators prior to<br />publishing</div><div style='font-size: 70%'></div>" .->46
+    2-. "<div>Creates content within<br />guardrails: places XB<br />Components in open slots,<br />defines SDC prop values for<br />XB components in default<br />layout and XB components<br />in open slots, maybe<br />overrides default layout</div><div style='font-size: 70%'></div>" .->46
+    3-. "<div>Uses this UI to review<br />changes to XB Content<br />created by Content Creators<br />prior to publishing</div><div style='font-size: 70%'></div>" .->46
     14-. "<div>Steers</div><div style='font-size: 70%'></div>" .->46
     22-. "<div>Is available in left sidebar<br />(assuming open slots and/or<br />unlocked component subtrees)<br />of</div><div style='font-size: 70%'></div>" .->46
     26-. "<div>Is available in left sidebar<br />(assuming open slots and/or<br />unlocked component subtrees)<br />of</div><div style='font-size: 70%'></div>" .->46
