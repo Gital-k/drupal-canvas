@@ -133,8 +133,6 @@ class ConverterCommand extends Command {
       throw new \Exception("Could not find the project root.");
     }
 
-    $this->doConvertGzipDump('tests/fixtures/update/drupal-11.2.2-with-xb-0.7.2-alpha1.filled.php');
-
     $this->doConvert();
 
     // Run prettier on ui because of line lengths.
@@ -200,8 +198,20 @@ class ConverterCommand extends Command {
     }*/
     foreach ($replacements as $search => $replace) {
       $this->renameFiles(static::getDirContents($this->projectRoot), $search, $replace);
-      static::replaceContents(static::getDirContents($this->projectRoot, TRUE), $search, $replace);
     }
+
+    // We renamed everything, including gzipped.
+    $gzipped = 'tests/fixtures/update/drupal-11.2.2-with-canvas-0.7.2-alpha1.filled.php';
+    system("gzip -d $gzipped.gz");
+
+    $renamed_files = static::getDirContents($this->projectRoot, TRUE);
+    foreach ($renamed_files as $file) {
+      static::replaceContents($file->getRealPath(), $replacements);
+    }
+
+    // We need to re-gzip the file
+    system("gzip $gzipped");
+
     self::info('Replacements done.');
   }
 
@@ -225,25 +235,15 @@ class ConverterCommand extends Command {
   /**
    * Replaces a string in the contents of the module files.
    *
-   * @param array $files
-   *   Files to replace.
-   * @param string $search
-   *   The string to be replaced.
-   * @param string $replace
-   *   The string to replace.
+   * @param string $file
+   * @param array<string, string> $replacements
    */
-  private static function replaceContents(array $files, string $search, string $replace): void {
-    foreach ($files as $file) {
-      // @todo 🔥🔥🔥🔥 - do we need exclude .php.gz or .gz files?
-      //   CollapseComponentInputsUpdateTest fails trying to opena php.gz file.
-      //   We need to remake that file anyways but probably not safe to search/replace in gz
-      //   as we don't know "xb" doesn't occur.
-      if ($file->getExtension() === 'gz') {
-        continue;
-      }
-      $filePath = $file->getRealPath();
-      file_put_contents($filePath, str_replace($search, $replace, file_get_contents($filePath)));
+  private static function replaceContents(string $file, array $replacements): void {
+    $contents = file_get_contents($file);
+    foreach ($replacements as $search => $replace) {
+      $contents = str_replace($search, $replace, $contents);
     }
+    file_put_contents($file, $contents);
   }
 
   /**
