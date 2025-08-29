@@ -196,12 +196,12 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
     $this->assertSame(
       [
         'config' => [
-          'core.entity_view_mode.node.full',
           'experience_builder.component.block.system_branding_block',
           'experience_builder.component.js.my-cta',
           'experience_builder.component.sdc.xb_test_sdc.my-cta',
           'experience_builder.component.sdc.xb_test_sdc.props-no-slots',
           'experience_builder.component.sdc.xb_test_sdc.props-slots',
+          'core.entity_view_mode.node.full',
           'field.field.node.alpha.field_test',
           'node.type.alpha',
         ],
@@ -213,12 +213,12 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
     );
     $this->assertSame([
       'config' => [
-        'core.entity_view_mode.node.full',
         'experience_builder.component.block.system_branding_block',
         'experience_builder.component.js.my-cta',
         'experience_builder.component.sdc.xb_test_sdc.my-cta',
         'experience_builder.component.sdc.xb_test_sdc.props-no-slots',
         'experience_builder.component.sdc.xb_test_sdc.props-slots',
+        'core.entity_view_mode.node.full',
         'field.field.node.alpha.field_test',
         'node.type.alpha',
         'experience_builder.js_component.my-cta',
@@ -227,11 +227,11 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
       'module' => [
         'node',
         'experience_builder',
-        'core',
         'system',
         'link',
         'options',
         'xb_test_sdc',
+        'core',
         'text',
         'field',
       ],
