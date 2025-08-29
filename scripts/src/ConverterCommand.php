@@ -133,6 +133,8 @@ class ConverterCommand extends Command {
       throw new \Exception("Could not find the project root.");
     }
 
+    $this->doConvertGzipDump('tests/fixtures/update/drupal-11.2.2-with-xb-0.7.2-alpha1.filled.php');
+
     $this->doConvert();
 
     // Run prettier on ui because of line lengths.
@@ -201,6 +203,19 @@ class ConverterCommand extends Command {
       static::replaceContents(static::getDirContents($this->projectRoot, TRUE), $search, $replace);
     }
     self::info('Replacements done.');
+  }
+
+  private function doConvertGzipDump(string $file): void {
+    $gzipped = $file . '.gz';
+    assert($this->fs->exists($gzipped));
+
+    system("gzip -d $gzipped");
+    $replacements = $this->getReplacements();
+    foreach ($replacements as $search => $replace) {
+      file_put_contents($file, str_replace($search, $replace, file_get_contents($file)));
+    }
+    system("gzip $file");
+    self::info('Gzip processed');
   }
 
   /**
