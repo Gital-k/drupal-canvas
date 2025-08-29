@@ -88,158 +88,220 @@ test.describe('Perform CRUD operations on components', () => {
           - img
         - button "Add new":
           - img
+          - text: Add new
         - button "Patterns" [expanded]
         - region "Patterns"
         - button "Components" [expanded]
         - region "Components":
           - button "Atom/Media" [expanded]:
             - img
+            - text: Atom/Media
             - img
           - list:
             - button "Video":
               - img
+              - text: Video
           - button "Atom/Tabs" [expanded]:
             - img
+            - text: Atom/Tabs
             - img
           - list:
             - button "Shoe Tab":
               - img
+              - text: Show Tab
             - button "Shoe Tab Panel":
               - img
+              - text: Show Tab Panel
           - button "Atom/Text" [expanded]:
             - img
+            - text: Atom/Text
             - img
           - list:
             - button "Heading":
               - img
+              - text: Heading
             - button "Shoe Badge":
               - img
+              - text: Shoe Badge
           - button "Container" [expanded]:
             - img
+            - text: Container
             - img
           - list:
             - button "Grid Container":
               - img
+              - text: Grid Container
             - button "One Column":
               - img
+              - text: One Column
             - button "Two Column":
               - img
+              - text: Two Column
           - button "Container/Special" [expanded]:
             - img
+            - text: One Column
             - img
           - list:
             - button "Shoe Tab Group":
               - img
+              - text: Shoe Tab Group
           - button "core" [expanded]:
             - img
+            - text: core
             - img
           - list:
             - button "Page title":
               - img
+              - text: Page title
             - button "Primary admin actions":
               - img
+              - text: Primary admin actions
             - button "Tabs":
               - img
+              - text: Tabs
           - button "Forms" [expanded]:
             - img
+            - text: Forms
             - img
           - list:
             - button "User login":
               - img
+              - text: User login
           - button "Lists (Views)" [expanded]:
             - img
+            - text: Lists (Views)
             - img
           - list:
             - button "Recent content":
               - img
+              - text: Recent content
             - button "Who's online":
               - img
+              - text: Who's online
           - button "Menus" [expanded]:
             - img
+            - text: Menus
             - img
           - list:
             - button "Administration":
               - img
+              - text: Administration
             - button "Footer":
               - img
+              - text: Footer
             - button "Main navigation":
               - img
+              - text: Main navigation
             - button "Tools":
               - img
+              - text: Tools
             - button "User account menu":
               - img
+              - text: User account menu
           - button "Other" [expanded]:
             - img
+            - text: Other
             - img
           - list:
             - button "Call to Absolute Action":
               - img
+              - text: Call to Absolute Action
             - button "Card":
               - img
+              - text: Card
             - button "Card with local image":
               - img
+              - text: Card with local image
             - button "Card with remote image":
               - img
+              - text: Card with remote image
             - button "Card with stream wrapper image":
               - img
+              - text: Card with stream wrapper image
             - button "Component no meta:enum":
               - img
+              - text: Component no meta:enum
             - button "Druplicon":
               - img
+              - text: Druplicon
             - button "Hero":
               - img
+              - text: Hero
             - button "Section":
               - img
+              - text: Section
             - button "Test SDC Image":
               - img
+              - text: Test SDC Image
             - button "XB test SDC for image gallery (>1 image)":
               - img
+              - text: XB test SDC for image gallery (>1 image)
             - button /XB test SDC for sparkline \\(>1 integers between -\\d+ and \\d+\\)/:
               - img
+              - text: /XB test SDC for sparkline \\(>1 integers between -\\d+ and \\d+\\)/
             - 'button "XB test SDC for testing type: \`Drupal\\\\Core\\\\Template\\\\Attribute\` special casing"':
               - img
+              - text: XB test SDC for testing type: \`Drupal\\\\Core\\\\Template\\\\Attribute\` special casing"
             - button "XB test SDC that crashes when 'crash' prop is TRUE":
               - img
+              - text: XB test SDC that crashes when 'crash' prop is TRUE
             - button "XB test SDC with optional image and heading":
               - img
+              - text: XB test SDC with optional image and heading
             - button "XB test SDC with optional image, with example":
               - img
+              - text: XB test SDC with optional image, with example
             - button "XB test SDC with optional image, without example":
               - img
+              - text: XB test SDC with optional image, without example
             - button "XB test SDC with props and slots":
               - img
+              - text: XB test SDC with props and slots
             - button "XB test SDC with props but no slots":
               - img
+              - text: XB test SDC with props but no slots
             - button "XB test SDC with required image, with example":
               - img
+              - text: XB test SDC with required image, with example
           - button "Status" [expanded]:
             - img
+            - text: Status
             - img
           - list:
             - button "Deprecated SDC":
               - img
+              - text: Deprecated SDC
             - button "Experimental SDC":
               - img
+              - text: Experimental SDC
           - button "System" [expanded]:
             - img
+            - text: System
             - img
           - list:
             - button "Breadcrumbs":
               - img
+              - text: Breadcrumbs
             - button "Clear cache":
               - img
+              - text: Clear cache
             - button "Messages":
               - img
+              - text: Messages
             - button "Powered by Drupal":
               - img
+              - text: Powered by Drupal
             - button "Site branding":
               - img
+              - text: Site branding
           - button "User" [expanded]:
             - img
+            - text: User
             - img
           - list:
             - button "Who's new":
               - img
+              - text: Who's new
          `);
   });
 
