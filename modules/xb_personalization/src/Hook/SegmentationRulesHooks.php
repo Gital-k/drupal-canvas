@@ -33,6 +33,9 @@ final class SegmentationRulesHooks {
         unset($definitions[$key]);
       }
     }
+    // Re-order them, as we depend on their sorting (by provider) in our Drupal UI.
+    // @todo Revisit in https://www.drupal.org/i/3527086, probably removing this sorting.
+    ksort($definitions);
   }
 
   /**
