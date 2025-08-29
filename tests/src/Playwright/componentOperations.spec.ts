@@ -212,9 +212,9 @@ test.describe('Perform CRUD operations on components', () => {
             - button /XB test SDC for sparkline \\(>1 integers between -\\d+ and \\d+\\)/:
               - img
               - text: /XB test SDC for sparkline \\(>1 integers between -\\d+ and \\d+\\)/
-            - 'button "XB test SDC for testing type: \`Drupal\\\\Core\\\\Template\\\\Attribute\` special casing"':
+            - 'button "XB test SDC for testing type: \`Drupal\\Core\\Template\\Attribute\` special casing"':
               - img
-              - text: XB test SDC for testing type: \`Drupal\\\\Core\\\\Template\\\\Attribute\` special casing"
+              - text: XB test SDC for testing type: \`Drupal\\Core\\Template\\Attribute\` special casing"
             - button "XB test SDC that crashes when 'crash' prop is TRUE":
               - img
               - text: XB test SDC that crashes when 'crash' prop is TRUE
