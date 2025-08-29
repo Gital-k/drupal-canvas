@@ -1054,7 +1054,6 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
         ],
         'optional, type=string' => [
           'SDC props' => [
-            '⿲sdc_test_all_props:all-props␟test_string',
             '⿲xb_test_sdc:card␟heading',
             '⿲xb_test_sdc:card␟content',
             '⿲xb_test_sdc:card␟footer',
@@ -1077,6 +1076,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
             '⿲xb_test_sdc:shoe_button␟download',
             '⿲xb_test_sdc:shoe_icon␟label',
             '⿲xb_test_sdc:shoe_icon␟slot',
+            '⿲sdc_test_all_props:all-props␟test_string',
           ],
           'static prop source' => 'ℹ︎string␟value',
           'instances' => [
