@@ -108,6 +108,7 @@ class ConverterCommand extends Command {
 
     $replacements = [
       $old_machine_name => $new_machine_name,
+      'xb-canvas' => 'editor-frame',
       'xb_asset_library' => 'asset_library',
       // Next two are just oauth2 scopes weird requirements.
       'oauth2_scope.asset_library' => 'oauth2_scope.canvas_asset_library',
