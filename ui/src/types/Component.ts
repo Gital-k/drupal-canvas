@@ -134,5 +134,9 @@ export const componentHasFieldData = (
 export const componentHasSlots = (
   component: CanvasComponent | undefined,
 ): component is SlottedComponent => {
-  return component !== undefined && 'metadata' in component && 'slots' in component.metadata;
+  return (
+    component !== undefined &&
+    'metadata' in component &&
+    'slots' in component.metadata
+  );
 };

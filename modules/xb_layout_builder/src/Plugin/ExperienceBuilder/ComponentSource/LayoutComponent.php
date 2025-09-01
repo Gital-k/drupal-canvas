@@ -74,7 +74,15 @@ final class LayoutComponent extends ComponentSourceBase implements ContainerFact
     ]);
   }
 
-  public function buildConfigurationForm(array $form, FormStateInterface $form_state, string $component_instance_uuid = '', array $client_model = [], ?EntityInterface $entity = NULL, array $settings = []): array {
+  public function buildComponentInstanceForm(
+    array $form,
+    FormStateInterface $form_state,
+    ?Component $component = NULL,
+    string $component_instance_uuid = '',
+    array $client_model = [],
+    ?EntityInterface $entity = NULL,
+    array $settings = [],
+  ): array {
     $layoutPlugin = $this->getLayoutPlugin();
     if (!$layoutPlugin instanceof PluginFormInterface) {
       return $form;
