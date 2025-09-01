@@ -44,6 +44,7 @@ final class CanvasBuilder extends ControllerBase {
     protected CanvasAiPageBuilderHelper $canvasAiPageBuilderHelper,
     protected CanvasAiTempStore $canvasAiTempStore,
     protected FileSystemInterface $fileSystem,
+    protected readonly XbAiPageBuilderHelper $pageBuilderHelper,
   ) {}
 
   /**
@@ -57,6 +58,7 @@ final class CanvasBuilder extends ControllerBase {
       $container->get('canvas_ai.page_builder_helper'),
       $container->get('canvas_ai.tempstore'),
       $container->get('file_system'),
+      $container->get('xb_ai.page_builder_helper'),
     );
   }
 
@@ -109,6 +111,7 @@ final class CanvasBuilder extends ControllerBase {
       }
     }
     $image_files = [];
+    $available_components = $this->pageBuilderHelper->getAllComponentsKeyedBySource();
     foreach ($files as $file) {
       $allowed_image_types = ['image/jpeg', 'image/png'];
       $mime_type = $file->getClientMimeType();
@@ -206,7 +209,7 @@ final class CanvasBuilder extends ControllerBase {
     $agent->setModelName($default['model_id']);
     $agent->setAiConfiguration([]);
     $agent->setCreateDirectly(TRUE);
-    $agent->setTokenContexts(['entity_type' => $prompt['entity_type'], 'entity_id' => $prompt['entity_id'], 'selected_component' => $prompt['selected_component'] ?? NULL, 'layout' => $prompt['layout'] ?? NULL, 'derived_proptypes' => JSON::encode($prompt['derived_proptypes']) ?? NULL, 'page_title' => $prompt['page_title'], 'page_description' => $prompt['page_description'] ?? NULL, 'active_component_uuid' => $prompt['active_component_uuid'] ?? 'None']);
+    $agent->setTokenContexts(['entity_type' => $prompt['entity_type'], 'entity_id' => $prompt['entity_id'], 'selected_component' => $prompt['selected_component'] ?? NULL, 'layout' => $prompt['layout'] ?? NULL, 'derived_proptypes' => JSON::encode($prompt['derived_proptypes']) ?? NULL, 'page_title' => $prompt['page_title'], 'page_description' => $prompt['page_description'] ?? NULL, 'active_component_uuid' => $prompt['active_component_uuid'] ?? 'None', 'global_css' => $prompt['global_css'] ?? NULL]);
     $solvability = $agent->determineSolvability();
     $status = FALSE;
     $message = '';

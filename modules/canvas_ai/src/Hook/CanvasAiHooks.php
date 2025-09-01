@@ -59,6 +59,10 @@ class CanvasAiHooks {
             'name' => $this->t('Active Component UUID'),
             'description' => $this->t('Returns the UUID of the active component in the page.'),
           ],
+          'global_css' => [
+            'name' => $this->t('Global CSS'),
+            'description' => $this->t('Returns the global CSS used by the site.'),
+          ],
         ],
       ],
     ];
@@ -104,6 +108,10 @@ class CanvasAiHooks {
 
           case 'active_component_uuid':
             $replacements[$original] = !empty($data['active_component_uuid']) ? $data['active_component_uuid'] : 'None';
+            break;
+
+          case 'global_css':
+            $replacements[$original] = !empty($data['global_css']) ? $data['global_css'] : 'None';
             break;
         }
       }
