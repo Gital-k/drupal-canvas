@@ -309,7 +309,7 @@ class ConverterCommand extends Command {
       }
       // Exclude package.json and package-lock.json for now, as this might cause changes in the integrity validation
       // hashes for packages.
-      if (in_array($file->getFilename(), ['package.json', 'package-lock.json'])) {
+      if (in_array($file->getFilename(), ['package.json', 'package-lock.json']) || in_array($file->getExtension(), ['webp', 'png', 'avi', 'jpeg', 'jpg', 'gif'])) {
         continue;
       }
 
