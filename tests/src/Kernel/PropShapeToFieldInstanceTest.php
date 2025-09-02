@@ -1160,6 +1160,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           ],
           'static prop source' => 'ℹ︎image␟src_with_alternate_widths',
           'instances' => [
+            'ℹ︎␜entity:xb_page␝image␞␟entity␜␜entity:media␝thumbnail␞␟src_with_alternate_widths',
             'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟src_with_alternate_widths',
             'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url',
@@ -1167,7 +1168,6 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟src_with_alternate_widths',
             'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝thumbnail␞␟src_with_alternate_widths',
-            'ℹ︎␜entity:xb_page␝image␞␟entity␜␜entity:media␝thumbnail␞␟src_with_alternate_widths',
           ],
           'adapter_matches_field_type' => [
             'image_extract_url' => [
