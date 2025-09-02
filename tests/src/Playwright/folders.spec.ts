@@ -3,17 +3,17 @@ import { test } from './fixtures/DrupalSite';
 import { Drupal } from './objects/Drupal';
 
 /**
- * Tests folder management in Experience Builder.
+ * Tests folder management in Drupal Canvas.
  */
 test.describe('Folder Management', () => {
   test.beforeAll(
-    'Setup test site with Experience Builder',
+    'Setup test site with Drupal Canvas',
     async ({ browser, drupalSite }) => {
       const page = await browser.newPage();
       const drupal: Drupal = new Drupal({ page, drupalSite });
       await drupal.drush('cr');
 
-      await drupal.installModules(['experience_builder', 'xb_test_folders']);
+      await drupal.installModules(['canvas', 'canvas_test_folders']);
 
       // @todo remove the cache clear once https://www.drupal.org/project/drupal/issues/3534825
       // is fixed.
@@ -24,7 +24,7 @@ test.describe('Folder Management', () => {
 
   test('Folder display and creation', async ({ page, drupal, xBEditor }) => {
     await drupal.loginAsAdmin();
-    await drupal.createXbPage('Test Page', '/test-page');
+    await drupal.createCanvasPage('Test Page', '/test-page');
     await page.goto('/test-page');
     await xBEditor.goToEditor();
 
@@ -36,16 +36,20 @@ test.describe('Folder Management', () => {
     // We begin on the Components tab.
     await expect(
       page.locator(
-        '[data-testid="xb-manage-library-components-tab-select"][aria-selected="true"]',
+        '[data-testid="canvas-manage-library-components-tab-select"][aria-selected="true"]',
       ),
     ).toBeVisible();
     await expect(
-      page.locator('[data-testid="xb-manage-library-components-tab-content"]'),
+      page.locator(
+        '[data-testid="canvas-manage-library-components-tab-content"]',
+      ),
     ).toBeVisible();
 
     // Confirm the Components tab contents.
     await expect(
-      page.locator('[data-testid="xb-manage-library-components-tab-content"]'),
+      page.locator(
+        '[data-testid="canvas-manage-library-components-tab-content"]',
+      ),
     ).toMatchAriaSnapshot(`
       - tabpanel "Components":
         - button "Add new folder":
@@ -171,34 +175,34 @@ test.describe('Folder Management', () => {
             - text: Call to Absolute Action
           - listitem:
             - img
-            - text: XB test SDC for image gallery (>1 image)
+            - text: Canvas test SDC for image gallery (>1 image)
           - listitem:
             - img
-            - text: /XB test SDC for sparkline \\(>1 integers between -\\d+ and \\d+\\)/
+            - text: /Canvas test SDC for sparkline \\(>1 integers between -\\d+ and \\d+\\)/
           - listitem:
             - img
-            - text: "XB test SDC for testing type: \`Drupal\\\\Core\\\\Template\\\\Attribute\` special casing"
+            - text: "Canvas test SDC for testing type: \`Drupal\\\\Core\\\\Template\\\\Attribute\` special casing"
           - listitem:
             - img
-            - text: XB test SDC that crashes when 'crash' prop is TRUE
+            - text: Canvas test SDC that crashes when 'crash' prop is TRUE
           - listitem:
             - img
-            - text: XB test SDC with optional image and heading
+            - text: Canvas test SDC with optional image and heading
           - listitem:
             - img
-            - text: XB test SDC with optional image, with example
+            - text: Canvas test SDC with optional image, with example
           - listitem:
             - img
-            - text: XB test SDC with optional image, without example
+            - text: Canvas test SDC with optional image, without example
           - listitem:
             - img
-            - text: XB test SDC with props and slots
+            - text: Canvas test SDC with props and slots
           - listitem:
             - img
-            - text: XB test SDC with props but no slots
+            - text: Canvas test SDC with props but no slots
           - listitem:
             - img
-            - text: XB test SDC with required image, with example
+            - text: Canvas test SDC with required image, with example
           - listitem:
             - img
             - text: Card
@@ -267,22 +271,26 @@ test.describe('Folder Management', () => {
             - text: Who's new
     `);
     await page
-      .locator('[data-testid="xb-manage-library-patterns-tab-select"]')
+      .locator('[data-testid="canvas-manage-library-patterns-tab-select"]')
       .click();
 
     // Move to the Patterns tab.
     await expect(
       page.locator(
-        '[data-testid="xb-manage-library-patterns-tab-select"][aria-selected="true"]',
+        '[data-testid="canvas-manage-library-patterns-tab-select"][aria-selected="true"]',
       ),
     ).toBeVisible();
     await expect(
-      page.locator('[data-testid="xb-manage-library-patterns-tab-content"]'),
+      page.locator(
+        '[data-testid="canvas-manage-library-patterns-tab-content"]',
+      ),
     ).toBeVisible();
 
     // Confirm the Patterns tab contents.
     await expect(
-      page.locator('[data-testid="xb-manage-library-patterns-tab-content"]'),
+      page.locator(
+        '[data-testid="canvas-manage-library-patterns-tab-content"]',
+      ),
     ).toMatchAriaSnapshot(`
       - tabpanel "Patterns":
         - button "Add new folder":
@@ -323,20 +331,20 @@ test.describe('Folder Management', () => {
 
     // Move to the Code tab.
     await page
-      .locator('[data-testid="xb-manage-library-code-tab-select"]')
+      .locator('[data-testid="canvas-manage-library-code-tab-select"]')
       .click();
     await expect(
       page.locator(
-        '[data-testid="xb-manage-library-code-tab-select"][aria-selected="true"]',
+        '[data-testid="canvas-manage-library-code-tab-select"][aria-selected="true"]',
       ),
     ).toBeVisible();
     await expect(
-      page.locator('[data-testid="xb-manage-library-code-tab-content"]'),
+      page.locator('[data-testid="canvas-manage-library-code-tab-content"]'),
     ).toBeVisible();
 
     // Confirm the Code tab contents.
     await expect(
-      page.locator('[data-testid="xb-manage-library-code-tab-content"]'),
+      page.locator('[data-testid="canvas-manage-library-code-tab-content"]'),
     ).toMatchAriaSnapshot(`
         - tabpanel "Code":
           - button "Add new folder":
@@ -387,40 +395,44 @@ test.describe('Folder Management', () => {
     ) => {
       for (const folderName of foldersToAdd) {
         await expect(
-          page.locator('[data-testid="xb-manage-library-add-folder-content"]'),
+          page.locator(
+            '[data-testid="canvas-manage-library-add-folder-content"]',
+          ),
         ).not.toBeAttached();
         await page.click('[data-testid="add-new-folder-button"]');
         page
-          .locator('[data-testid="xb-manage-library-add-folder-content"]')
+          .locator('[data-testid="canvas-manage-library-add-folder-content"]')
           .waitFor({ state: 'visible' });
         await expect(
           page.locator('#add-new-folder-in-tab-form'),
         ).toBeAttached();
         await expect(
           page.locator(
-            '[data-testid="xb-manage-library-new-folder-name-submit"]',
+            '[data-testid="canvas-manage-library-new-folder-name-submit"]',
           ),
         ).not.toBeEnabled();
         await page
-          .locator('[data-testid="xb-manage-library-new-folder-name"]')
+          .locator('[data-testid="canvas-manage-library-new-folder-name"]')
           .fill(folderName);
         await expect(
           page.locator(
-            '[data-testid="xb-manage-library-new-folder-name-submit"]',
+            '[data-testid="canvas-manage-library-new-folder-name-submit"]',
           ),
         ).toBeEnabled({ timeout: 5000 });
         await page.click(
-          '[data-testid="xb-manage-library-new-folder-name-submit"]',
+          '[data-testid="canvas-manage-library-new-folder-name-submit"]',
         );
         await page
-          .locator(`[data-xb-folder-name="${folderName}"]`)
+          .locator(`[data-canvas-folder-name="${folderName}"]`)
           .waitFor({ state: 'attached' });
       }
 
-      const folderElements = await page.locator('[data-xb-folder-name]').all();
+      const folderElements = await page
+        .locator('[data-canvas-folder-name]')
+        .all();
       const actualFolderNames = await Promise.all(
         folderElements.map(async (element) => {
-          return await element.getAttribute('data-xb-folder-name');
+          return await element.getAttribute('data-canvas-folder-name');
         }),
       );
       expect(actualFolderNames).toEqual(allExpectedFolders);
@@ -441,11 +453,11 @@ test.describe('Folder Management', () => {
 
     // Test adding a folder to the Patterns tab.
     await page
-      .locator('[data-testid="xb-manage-library-patterns-tab-select"]')
+      .locator('[data-testid="canvas-manage-library-patterns-tab-select"]')
       .click();
     await expect(
       page.locator(
-        '[data-testid="xb-manage-library-patterns-tab-select"][aria-selected="true"]',
+        '[data-testid="canvas-manage-library-patterns-tab-select"][aria-selected="true"]',
       ),
     ).toBeVisible();
     await testAddFolder(
@@ -463,18 +475,18 @@ test.describe('Folder Management', () => {
     // Test adding a folder to the Components tab.
 
     await page
-      .locator('[data-testid="xb-manage-library-components-tab-select"]')
+      .locator('[data-testid="canvas-manage-library-components-tab-select"]')
       .click();
     await expect(
       page.locator(
-        '[data-testid="xb-manage-library-components-tab-select"][aria-selected="true"]',
+        '[data-testid="canvas-manage-library-components-tab-select"][aria-selected="true"]',
       ),
     ).toBeVisible();
     await testAddFolder(
       ['Awesome New Folder', 'Is a Component Folder', 'Very Nice New Folder'],
       [
-        // @see \Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\JsComponent::createConfigEntity()
-        // @todo Remove next line in https://www.drupal.org/project/experience_builder/issues/3541364
+        // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::createConfigEntity()
+        // @todo Remove next line in https://www.drupal.org/project/canvas/issues/3541364
         '@todo',
         'Atom/Media',
         'Atom/Tabs',

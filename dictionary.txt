@@ -107,9 +107,9 @@ upserts
 useswr
 Validatable
 vaul
-xbstark
-xbrc
-xbxb
+canvasstark
+canvasrc
+canvascanvas
 xmdi
 ymls
 Deepchat

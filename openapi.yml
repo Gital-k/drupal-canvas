@@ -23,14 +23,14 @@
 openapi: 3.1.0
 
 info:
-  title: Experience Builder
-  description: API Spec for Experience Builder
+  title: Drupal Canvas
+  description: API Spec for Drupal Canvas
   version: 0.x
 
 # @see https://spec.openapis.org/oas/v3.1.0.html#paths-object
 # @see https://spec.openapis.org/oas/v3.1.0.html#path-item-object
 paths:
-  /xb/api/v0/auto-saves/css/xb_asset_library/{configEntityId}:
+  /canvas/api/v0/auto-saves/css/asset_library/{configEntityId}:
     description: Get draft CSS for given asset library
     get:
       description: Get draft CSS for given asset library
@@ -42,7 +42,7 @@ paths:
           content:
             text/css:
               example: '.large {font-size: 3rem;}'
-  /xb/api/v0/auto-saves/css/js_component/{configEntityId}:
+  /canvas/api/v0/auto-saves/css/js_component/{configEntityId}:
     description: Get draft CSS for a given component
     get:
       description: Get draft CSS for a given component
@@ -54,7 +54,7 @@ paths:
           content:
             text/css:
               example: '.large {font-size: 3rem;}'
-  /xb/api/v0/auto-saves/js/xb_asset_library/{configEntityId}:
+  /canvas/api/v0/auto-saves/js/asset_library/{configEntityId}:
     description: Get draft JS for given asset library
     get:
       description: Get draft JS for given asset library
@@ -66,7 +66,7 @@ paths:
           content:
             text/javascript:
               example: 'console.log("hey");'
-  /xb/api/v0/auto-saves/js/js_component/{configEntityId}:
+  /canvas/api/v0/auto-saves/js/js_component/{configEntityId}:
     description: Get draft JS for a given component
     get:
       description: Get draft JS for a given component
@@ -78,7 +78,7 @@ paths:
           content:
             text/javascript:
               example: 'console.log("hey");'
-  /xb/api/v0/auto-saves/pending:
+  /canvas/api/v0/auto-saves/pending:
     description: TODO
     get:
       description: TODO
@@ -102,14 +102,14 @@ paths:
                       data_hash: 4711efecf75d2d1a
                       entity_id: 1
                       label: Home page
-                    xb_asset_library:global:
+                    asset_library:global:
                       owner:
                         name: Gracie Dog
                         avatar: /sites/default/files/user-pictures/good-dog.jpg
                         uri: /user/13
                         id: 13
                       updated: 1732763680
-                      entity_type: xb_asset_library
+                      entity_type: asset_library
                       langcode: NULL
                       data_hash: 4711efecf75d2d1b
                       entity_id: global
@@ -141,7 +141,7 @@ paths:
 
               schema:
                 $ref: '#/components/schemas/AutoSaveCollection'
-  /xb/api/v0/auto-saves/publish:
+  /canvas/api/v0/auto-saves/publish:
     description: TODO
     post:
       description: TODO
@@ -179,7 +179,7 @@ paths:
           $ref: '#/components/responses/ClientErrorResponse'
         '500':
           $ref: '#/components/responses/ClientErrorResponse'
-  /xb/api/v0/auto-saves/{entityTypeId}/{entityId}:
+  /canvas/api/v0/auto-saves/{entityTypeId}/{entityId}:
     description:  Interact with an auto-save entry for a particular entity
     parameters:
       - $ref: '#/components/parameters/entityTypeId'
@@ -223,7 +223,7 @@ paths:
                     title: Error message
                     examples:
                       - No auto-save data found for this entity.
-  /xb/api/v0/config/xb_asset_library:
+  /canvas/api/v0/config/asset_library:
     description: Endpoint for managing asset libraries.
     get:
       description: Retrieves all available asset libraries.
@@ -321,7 +321,7 @@ paths:
         '422':
           description: Validation errors exist
           $ref: '#/components/responses/ClientErrorResponse'
-  '/xb/api/v0/config/xb_asset_library/{configEntityId}':
+  '/canvas/api/v0/config/asset_library/{configEntityId}':
     description: Endpoint for managing a specific asset library.
     get:
       description: Retrieves details of a specific asset library.
@@ -370,7 +370,7 @@ paths:
       responses:
         '204':
           description: Deleted individual Asset Library
-  /xb/api/v0/config/auto-save/{entityTypeId}/{configEntityId}:
+  /canvas/api/v0/config/auto-save/{entityTypeId}/{configEntityId}:
     description: Auto-save endpoints
     get:
       description: Gets an auto-save state
@@ -413,7 +413,7 @@ paths:
                   error:
                     type: string
                     description: Error message indicating the conflict.
-  /xb/api/v0/config/component:
+  /canvas/api/v0/config/component:
     description: TODO
     get:
       description: TODO
@@ -487,7 +487,7 @@ paths:
                 # @see \Drupal\Core\Plugin\Component::$machineName
                 additionalProperties:
                   $ref: '#/components/schemas/Component'
-  /xb/api/v0/config/folder:
+  /canvas/api/v0/config/folder:
     description: TODO
     get:
       description: TODO
@@ -535,7 +535,7 @@ paths:
         '422':
           description: Validation errors exist
           $ref: '#/components/responses/ClientErrorResponse'
-  '/xb/api/v0/config/folder/{configEntityId}':
+  '/canvas/api/v0/config/folder/{configEntityId}':
     description: TODO
     get:
       description: TODO
@@ -579,7 +579,7 @@ paths:
       responses:
         '204':
           description: Deleted individual Folder.
-  /xb/api/v0/config/js_component:
+  /canvas/api/v0/config/js_component:
     get:
       description: Collection of Code Components
       responses:
@@ -634,7 +634,7 @@ paths:
         '422':
           description: Validation errors exist
           $ref: '#/components/responses/ClientErrorResponse'
-  /xb/api/v0/config/js_component/{configEntityId}:
+  /canvas/api/v0/config/js_component/{configEntityId}:
     description: Code Component endpoints
     delete:
       description: Deletes Code Component
@@ -689,7 +689,7 @@ paths:
         '403':
           description: Access denied response.
           $ref: '#/components/responses/AuthenticationErrorResponse'
-  /xb/api/v0/config/pattern:
+  /canvas/api/v0/config/pattern:
     description: TODO
     get:
       description: TODO
@@ -720,7 +720,7 @@ paths:
                   -
                     uuid: 0b755464-281c-4487-82a0-ece34a9b1121
                     nodeType: component
-                    type: sdc.xb_test_sdc.my-section@05bd00d2c481f924
+                    type: sdc.canvas_test_sdc.my-section@05bd00d2c481f924
                     slots: [ ]
                 model:
                   0b755464-281c-4487-82a0-ece34a9b1121:
@@ -746,7 +746,7 @@ paths:
                       layout:
                         - uuid: 0b755464-281c-4487-82a0-ece34a9b1121
                           nodeType: component
-                          type: sdc.xb_test_sdc.my-section
+                          type: sdc.canvas_test_sdc.my-section
                           slots: []
                       model:
                         0b755464-281c-4487-82a0-ece34a9b1121:
@@ -757,12 +757,12 @@ paths:
                     name: Pattern
                     id: pattern
                     default_markup: >-
-                      <!-- xb-start-0b755464-281c-4487-82a0-ece34a9b1121 --><div
+                      <!-- canvas-start-0b755464-281c-4487-82a0-ece34a9b1121 --><div
                       class="my-section__wrapper">
                         <div class="my-section__content-wrapper">
                           <h2 class="my-section__h2">Our Mission</h2>
                           <p class="my-section__paragraph">
-                            <!-- xb-prop-start-text -->Our mission is to deliver the best products and services to our customers. We strive to exceed expectations and continuously improve our offerings.<!-- xb-prop-end-text -->
+                            <!-- canvas-prop-start-text -->Our mission is to deliver the best products and services to our customers. We strive to exceed expectations and continuously improve our offerings.<!-- canvas-prop-end-text -->
                           </p>
                           <p class="my-section__paragraph">
                             Join us on our journey to innovation and excellence. Your satisfaction is our priority.
@@ -771,7 +771,7 @@ paths:
                         <div class="my-section__image-wrapper">
                           <img alt="Placeholder Image" class="my-section__img" width="500" height="500">
                         </div>
-                      </div> <!-- xb-end-0b755464-281c-4487-82a0-ece34a9b1121
+                      </div> <!-- canvas-end-0b755464-281c-4487-82a0-ece34a9b1121
                       -->
                     css: >
                       <link rel="stylesheet" media="all"
@@ -786,7 +786,7 @@ paths:
         '422':
           description: Validation errors exist
           $ref: '#/components/responses/ClientErrorResponse'
-  '/xb/api/v0/config/pattern/{configEntityId}':
+  '/canvas/api/v0/config/pattern/{configEntityId}':
     description: TODO
     get:
       description: TODO
@@ -824,7 +824,7 @@ paths:
       responses:
         '204':
           description: Deleted individual Pattern.
-  /xb/api/v0/config/segment:
+  /canvas/api/v0/config/segment:
     description: Endpoint for managing Personalization Segments.
     get:
       description: Retrieves all available Personalization Segments.
@@ -922,7 +922,7 @@ paths:
         '422':
           description: Validation errors exist
           $ref: '#/components/responses/ClientErrorResponse'
-  '/xb/api/v0/config/segment/{configEntityId}':
+  '/canvas/api/v0/config/segment/{configEntityId}':
     description: Endpoint for managing a specific Personalization Segment.
     get:
       description: Retrieves details of a specific Personalization Segment.
@@ -979,7 +979,7 @@ paths:
       responses:
         '204':
           description: Deleted individual Personalization Segment
-  '/xb/api/v0/content/xb_page/{entityId}':
+  '/canvas/api/v0/content/canvas_page/{entityId}':
     description: Endpoint for deleting content entities.
     delete:
       description: Deletes a content entity.
@@ -988,7 +988,7 @@ paths:
       responses:
         '204':
           description: Content deleted successfully
-  '/xb/api/v0/content/{entity_type}':
+  '/canvas/api/v0/content/{entity_type}':
     get:
       description: Provides api for page listing.
       parameters:
@@ -1051,7 +1051,7 @@ paths:
                       additionalProperties:
                         type: string
                       examples:
-                        edit-form: /xb/xb_page/3
+                        edit-form: /canvas/canvas_page/3
               examples:
                 pageList:
                   value:
@@ -1063,7 +1063,7 @@ paths:
                       autoSaveLabel: Homer
                       autoSavePath: /updated-path
                       links:
-                        edit-form: /xb/xb_page/1
+                        edit-form: /canvas/canvas_page/1
                     '2':
                       id: 2
                       title: About
@@ -1072,7 +1072,7 @@ paths:
                       autoSaveLabel: About who?
                       autoSavePath: /page/1
                       links:
-                        edit-form: /xb/xb_page/2
+                        edit-form: /canvas/canvas_page/2
     post:
       description: Create content for a specific entity type
       parameters:
@@ -1100,7 +1100,7 @@ paths:
               examples:
                 newContentEntity:
                   value:
-                    entity_type: xb_page
+                    entity_type: canvas_page
                     id: 123
               schema:
                 type: object
@@ -1112,7 +1112,7 @@ paths:
                     type: string
                     description: The entity type ID
                     examples:
-                      - xb_page
+                      - canvas_page
                   entity_id:
                     type: string
                     description: The id of created content entity
@@ -1128,7 +1128,7 @@ paths:
                   error:
                     type: string
                     example: Cannot find entity to duplicate.
-  '/xb/api/v0/form/component-instance/{entityTypeId}/{entityId}':
+  '/canvas/api/v0/form/component-instance/{entityTypeId}/{entityId}':
     description: TODO
     parameters:
       - $ref: '#/components/parameters/entityTypeId'
@@ -1189,14 +1189,14 @@ paths:
             type: integer
             enum:
               - 1
-        # @see \Drupal\experience_builder\Render\MainContent\XBTemplateRenderer
+        # @see \Drupal\canvas\Render\MainContent\CanvasTemplateRenderer
         - in: query
           name: _wrapper_format
           required: true
           schema:
             type: string
             enum:
-              - xb_template
+              - canvas_template
               - drupal_ajax
       responses:
         '200':
@@ -1206,7 +1206,7 @@ paths:
               schema:
                 type: object
                 description: A Drupal AJAX response.
-  '/xb/api/v0/form/content-entity/{entityTypeId}/{entityId}':
+  '/canvas/api/v0/form/content-entity/{entityTypeId}/{entityId}':
     description: TODO
     get:
       description: Fetches the entity form with the "default" form mode
@@ -1229,14 +1229,14 @@ paths:
             type: integer
             enum:
               - 1
-        # @see \Drupal\experience_builder\Render\MainContent\XBTemplateRenderer
+        # @see \Drupal\canvas\Render\MainContent\CanvasTemplateRenderer
         - in: query
           name: _wrapper_format
           required: true
           schema:
             type: string
             enum:
-              - xb_template
+              - canvas_template
               - drupal_ajax
       responses:
         '200':
@@ -1246,7 +1246,7 @@ paths:
               schema:
                 type: object
                 description: A Drupal AJAX response.
-  '/xb/api/v0/form/content-entity/{entityTypeId}/{entityId}/{entityFormMode}':
+  '/canvas/api/v0/form/content-entity/{entityTypeId}/{entityId}/{entityFormMode}':
     description: Fetches the entity form with the specified form mode
     get:
       parameters:
@@ -1275,14 +1275,14 @@ paths:
             type: integer
             enum:
               - 1
-        # @see \Drupal\experience_builder\Render\MainContent\XBTemplateRenderer
+        # @see \Drupal\canvas\Render\MainContent\CanvasTemplateRenderer
         - in: query
           name: _wrapper_format
           required: true
           schema:
             type: string
             enum:
-              - xb_template
+              - canvas_template
               - drupal_ajax
       responses:
         '200':
@@ -1292,7 +1292,7 @@ paths:
               schema:
                 type: object
                 description: A Drupal AJAX response.
-  '/xb/api/v0/layout/{entityTypeId}/{entityId}':
+  '/canvas/api/v0/layout/{entityTypeId}/{entityId}':
     description: TODO
     get:
       description: TODO
@@ -1328,7 +1328,7 @@ paths:
                         components:
                           - nodeType: component
                             uuid: f0f03e3b-08e6-4f57-9f06-8f68d347d98f
-                            type: 'experience_builder:druplicon'
+                            type: 'canvas:druplicon'
                             name: null
                           - nodeType: component
                             uuid: bce8d97e-8d44-4609-adc3-5e1015342b49
@@ -1375,7 +1375,7 @@ paths:
                       'promote[value]': '1'
                       'status[value]': '1'
                       'sticky[value]': '0'
-                      'title[0][value]': XB Needs This For The Time Being
+                      'title[0][value]': Canvas Needs This For The Time Being
                       'uid[0][target_id]': Anonymous (0)
                       'langcode[0][value]': en
                       'revision_log[0][value]': ''
@@ -1408,13 +1408,13 @@ paths:
                     description: Entity field values that the user has edit access to.
                   isNew:
                     type: boolean
-                    # @see \Drupal\experience_builder\Controller\ApiLayoutController::contentEntityIsConsideredNew()
-                    # @see https://www.drupal.org/project/experience_builder/issues/3505118#comment-15982801
+                    # @see \Drupal\canvas\Controller\ApiLayoutController::contentEntityIsConsideredNew()
+                    # @see https://www.drupal.org/project/canvas/issues/3505118#comment-15982801
                     description: Whether the edited content entity is considered new.
                   isPublished:
                     type: boolean
                     # @see \Drupal\Core\Entity\EntityPublishedInterface
-                    # @see https://www.drupal.org/project/experience_builder/issues/3505118#comment-15982801
+                    # @see https://www.drupal.org/project/canvas/issues/3505118#comment-15982801
                     description: Whether the edited content entity is marked as published.
         '401':
           description: Unauthorized (unauthenticated) response.
@@ -1531,7 +1531,7 @@ paths:
                   error:
                     type: string
                     description: Error message indicating the conflict.
-  /xb/api/v0/log-error:
+  /canvas/api/v0/log-error:
     description: TODO
     post:
       description: TODO
@@ -1583,7 +1583,7 @@ paths:
                   error:
                     type: string
                     description: Error description
-  /xb/api/v0/staged-update/auto-save:
+  /canvas/api/v0/staged-update/auto-save:
     description: Auto-save endpoints for staged config updates.
     post:
       description: Creates an auto-save entry for a staged config update.
@@ -1606,7 +1606,7 @@ paths:
               stagedConfigUpdate:
                 value:
                   data:
-                    id: "xb_set_homepage"
+                    id: "canvas_set_homepage"
                     label: "Change the site name"
                     target: "system.site"
                     actions:
@@ -1632,7 +1632,7 @@ paths:
                     examples:
                       - Missing data
                       - Missing clientInstanceId
-  /xb/api/v0/ui/content_template/suggestions/structured-data-for-prop_shapes/{entityTypeId}/{bundle}/{configEntityId}:
+  /canvas/api/v0/ui/content_template/suggestions/structured-data-for-prop_shapes/{entityTypeId}/{bundle}/{configEntityId}:
     description: Provides suggestions for populating the props of a given component using structured data of the specified entity type and bundle.
     get:
       description: Get suggestions for populating the props of a given component using structured data of the specified entity type and bundle.
@@ -1656,7 +1656,7 @@ paths:
                   additionalProperties:
                     $ref: '#/components/schemas/StructuredDataForPropShapeSuggestion'
               examples:
-                Suggestions for a 'xb_test_sdc.heading' SDC component instance in the context of an article node:
+                Suggestions for a 'canvas_test_sdc.heading' SDC component instance in the context of an article node:
                   value:
                     text:
                       256dc2b8dcec7355:
@@ -1666,22 +1666,22 @@ paths:
                           expression: "ℹ︎␜entity:node:article␝title␞␟value"
                     style: []
                     element: []
-                Suggestions for a 'xb_test_sdc.video' SDC component instance in the context of an article node:
+                Suggestions for a 'canvas_test_sdc.video' SDC component instance in the context of an article node:
                   value:
                     video: []
                     display_width: []
-        # @todo fix in https://www.drupal.org/project/experience_builder/issues/3541366
+        # @todo fix in https://www.drupal.org/project/canvas/issues/3541366
         '401':
           description: Unauthorized (unauthenticated) response.
           $ref: '#/components/responses/UnauthorizedErrorResponse'
         '403':
           description: Access denied response.
           $ref: '#/components/responses/AuthenticationErrorResponse'
-        # @todo fix in https://www.drupal.org/project/experience_builder/issues/3541366
+        # @todo fix in https://www.drupal.org/project/canvas/issues/3541366
         '400':
           description: Invalid request from the UI.
           $ref: '#/components/responses/ClientErrorResponse'
-        # @todo fix in https://www.drupal.org/project/experience_builder/issues/3541366
+        # @todo fix in https://www.drupal.org/project/canvas/issues/3541366
         '404':
           description: Non-existent content entity type, bundle or Component.
           $ref: '#/components/responses/ClientErrorResponse'
@@ -1718,7 +1718,7 @@ components:
           type: string
           description: Library ID
           enum:
-            # Provided by Experience Builder
+            # Provided by Drupal Canvas
             - elements
             # Provided by Modules
             - extension_components
@@ -1847,7 +1847,7 @@ components:
         - properties:
             # `importedJsComponents` will be required if `sourceCodeJs` or
             # `compiledJs` is provided.
-            # @see \Drupal\experience_builder\Entity\JavaScriptComponent::updateFromClientSide()
+            # @see \Drupal\canvas\Entity\JavaScriptComponent::updateFromClientSide()
             # OpenAPI 3 does not support conditional requirements.
             # @see https://github.com/OAI/OpenAPI-Specification/issues/256#issuecomment-1908868607
             importedJsComponents:
@@ -2210,7 +2210,7 @@ components:
       type: object
     PatternPreview:
       title: 'Pattern with generated ID and preview metadata (default markup + CSS + JS)'
-      description: '@see \Drupal\experience_builder\Controller\ApiConfigControllers::normalizePattern()'
+      description: '@see \Drupal\canvas\Controller\ApiConfigControllers::normalizePattern()'
       type: object
       required:
         - layoutModel
@@ -2249,7 +2249,7 @@ components:
           type: string
     Pattern:
       title: Pattern
-      description: '@see \Drupal\experience_builder\Controller\ApiConfigControllers::denormalizePattern()'
+      description: '@see \Drupal\canvas\Controller\ApiConfigControllers::denormalizePattern()'
       type: object
       properties:
         id:
@@ -2334,7 +2334,7 @@ components:
         id:
           type: string
           description: The staged config update ID.
-          example: 'xb_set_homepage'
+          example: 'canvas_set_homepage'
         label:
           type: string
           description: Human-readable label for the staged config update.
@@ -2458,7 +2458,7 @@ components:
         arbitraryEntityId:
           value:
             - hopefully_meaningful_name
-            - sdc.xb_test_sdc.my-cta
+            - sdc.canvas_test_sdc.my-cta
   # @see https://spec.openapis.org/oas/v3.1.0.html#header-object
   requestBodies:
     Layout:
