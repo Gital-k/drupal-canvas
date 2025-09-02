@@ -203,6 +203,11 @@ class ConverterCommand extends Command {
     }
     $renamed_files = static::getDirContents($this->projectRoot, TRUE);
     foreach ($renamed_files as $file) {
+      // Exclude package.json and package-lock.json for now, as this might cause changes in the integrity validation
+      // hashes for packages.
+      if (in_array($file->getFilename(), ['package.json', 'package-lock.json']) || in_array($file->getExtension(), ['webp', 'png', 'avi', 'mkv', 'JPEG', 'JPG', 'jpeg', 'jpg', 'gif', 'png', 'mp4', 'gz'])) {
+        continue;
+      }
       static::replaceContents($file->getRealPath(), $replacements);
     }
 
@@ -305,11 +310,6 @@ class ConverterCommand extends Command {
         continue;
       }
       if ($excludeDirs && $file->isDir()) {
-        continue;
-      }
-      // Exclude package.json and package-lock.json for now, as this might cause changes in the integrity validation
-      // hashes for packages.
-      if (in_array($file->getFilename(), ['package.json', 'package-lock.json']) || in_array($file->getExtension(), ['webp', 'png', 'avi', 'mkv', 'JPEG', 'JPG', 'jpeg', 'jpg', 'gif', 'png', 'mp4', 'gz'])) {
         continue;
       }
 
