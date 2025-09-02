@@ -241,7 +241,6 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
     // and hence also in Canvas. Omit SDCs with `noUi: true`.
     $components = array_filter(
       $components,
-      // @phpstan-ignore-next-line function.alreadyNarrowedType
       fn (Component $c) => (property_exists($c->metadata, 'noUi') && $c->metadata->noUi === FALSE)
         // The above only works on Drupal core >=11.3.
         // @todo Remove in https://www.drupal.org/i/3537695
