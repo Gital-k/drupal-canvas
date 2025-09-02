@@ -9,7 +9,7 @@ of that UI environment.
 ## Installation
 
 ```bash
-npm install @drupal/xb-cli
+npm install @drupal-canvas/cli
 ```
 
 ## Setup

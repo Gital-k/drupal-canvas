@@ -1,7 +1,7 @@
 import { compileCss, extractClassNameCandidates } from 'tailwindcss-in-browser';
 import { promises as fs } from 'fs';
 import path from 'path';
-import { upsertClassNameCandidatesInComment } from '@drupal/experience_builder/features/code-editor/utils/classNameCandidates';
+import { upsertClassNameCandidatesInComment } from '@drupal-canvas/ui/features/code-editor/utils/classNameCandidates';
 import { getConfig } from '../config';
 import {
   cleanUpCacheDirectory,
