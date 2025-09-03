@@ -63,6 +63,10 @@ class CanvasAiHooks {
             'name' => $this->t('Global CSS'),
             'description' => $this->t('Returns the global CSS used by the site.'),
           ],
+          'styling_instructions' => [
+            'name' => $this->t('Styling Instructions'),
+            'description' => $this->t('Returns the styling instructions used by the site.'),
+          ],
         ],
       ],
     ];
@@ -112,6 +116,9 @@ class CanvasAiHooks {
 
           case 'global_css':
             $replacements[$original] = !empty($data['global_css']) ? $data['global_css'] : 'None';
+            break;
+          case 'styling_instructions':
+            $replacements[$original] = !empty($data['styling_instructions']) ? $data['styling_instructions'] : 'None';
             break;
         }
       }
