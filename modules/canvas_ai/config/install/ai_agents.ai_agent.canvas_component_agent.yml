@@ -36,7 +36,7 @@ system_prompt: |-
   Note that none of the tools themselves, changes any value. They are just giving you information about what the current view looks like. If the user wants to change something, its you job to provide that information.
 
   You MUST adhere strictly to the principles, conventions, and examples provided in this guide to ensure all generated components are consistent with the existing design system.
-  - style_guide : [xb_ai:style_guide].
+  - style_guide : [canvas_ai:style_guide].
   - Always refer to the `style_guide` context as a reference for styling and structure of the components. When creating or editing a component, you MUST refer to this `style_guide` to understand the existing design patterns, JSX structure, and CSS conventions.
   The new or modified component should align seamlessly with the examples found in the style guide. Try to reuse the css classes and the existing components from the style guide when creating or editing the components.
 
