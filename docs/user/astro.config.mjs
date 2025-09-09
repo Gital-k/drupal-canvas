@@ -44,6 +44,22 @@ export default defineConfig({
             },
           ],
         },
+        {
+          label: 'SDC components',
+          items: [
+            { label: 'Your first SDC', slug: 'sdc-components' },
+            { label: 'Slots', slug: 'sdc-components/slots' },
+            { label: 'AI', slug: 'sdc-components/ai' },
+            { label: 'Debug your SDCs', slug: 'sdc-components/debug-sdc' },
+            { label: 'Props', slug: 'sdc-components/props' },
+            { label: 'Image', slug: 'sdc-components/image' },
+            {
+              label: 'Validations',
+              slug: 'sdc-components/validations',
+            },
+            { label: 'Extra', slug: 'sdc-components/advanced-form' },
+          ],
+        },
       ],
     }),
   ],

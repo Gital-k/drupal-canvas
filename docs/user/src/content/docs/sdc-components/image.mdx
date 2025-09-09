@@ -1,0 +1,41 @@
+---
+title: Image in Canvas
+---
+
+Drupal Canvas provides a specific prop type object for image.
+That supports out of the box, width, height, src, alt.
+
+You can add a default image in your component folder:
+
+```
+components/
+  └── my-image/
+      ├── my-image.component.yml
+      ├── my-image.html.twig
+      ├── my-image.css
+      └── default-image.jpg
+```
+
+
+```yaml
+$schema: https://git.drupalcode.org/project/drupal/-/raw/HEAD/core/assets/schemas/v1/metadata.schema.json
+name: Image
+props:
+  type: object
+  required:
+    - image
+  properties:
+    image:
+      title: 'Image'
+       $ref: json-schema-definitions://canvas.module/image
+      type: object
+      examples:
+        - src: default-image.jpg
+          alt: 'Awesome default image'
+          width: 600
+          height: 400
+```
+
+TODO explain how to use responsive image, HTML loading property...
+See https://www.drupal.org/project/experience_builder/issues/3535453
+
