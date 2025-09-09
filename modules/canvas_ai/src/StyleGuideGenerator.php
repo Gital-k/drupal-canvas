@@ -84,6 +84,13 @@ class StyleGuideGenerator
     // Clean the source code for better LLM parsing (remove trailing commas, etc.)
     $cleanedSourceCode = rtrim(trim($sourceCode), ',');
 
+    $declarationPattern = '/^\s*const\s+defaultImage\s*=\s*[\'"`]data:.*?[\'"`];?\s*\n/m';
+    // Removing the data urls stored in default image variable.
+    if (preg_match($declarationPattern, $cleanedSourceCode)) {
+      $cleanedSourceCode = preg_replace($declarationPattern, '', $cleanedSourceCode);
+      $usagePattern = '/\s+\w+\s*=\s*\{defaultImage\}/';
+      $cleanedSourceCode = preg_replace($usagePattern, '', $cleanedSourceCode);
+    }
     $details = [
       'name' => $component['name'] ?? $id,
       'props_table' => 'This component has no configurable properties.',
@@ -91,72 +98,6 @@ class StyleGuideGenerator
       'composition' => 'This component is self-contained and does not use other library components.',
       'sourceCodeJs' => $cleanedSourceCode ?: '// No source code available.',
     ];
-
-    // Analyze Props with more detail
-    if (!empty($component['props'])) {
-      $propsTable = "| Prop Name    | Type   | Required | Default | Description & Examples |\n";
-      $propsTable .= "|:-------------|:-------|:---------|:--------|:-----------------------|\n";
-      $requiredProps = $component['required'] ?? [];
-
-      foreach ($component['props'] as $propName => $propDetails) {
-        $type = $propDetails['type'] ?? 'N/A';
-        if (!empty($propDetails['enum'])) {
-          $type = 'enum';
-        }
-        $required = in_array($propName, $requiredProps) ? 'Yes' : 'No';
-        $description = $propDetails['title'] ?? 'No description.';
-
-        // Extract default value from source code if possible
-        $default = '`N/A`';
-        if (preg_match("/{$propName}\s*=\s*['\"]([^'\"]+)['\"]/", $sourceCode, $matches)) {
-          $default = "`\"{$matches[1]}\"`";
-        } elseif (preg_match("/{$propName}\s*=\s*(\w+)/", $sourceCode, $matches) && !in_array($matches[1], ['true', 'false', 'null'])) {
-          // handles cases like height = "Small"
-        }  elseif (preg_match("/{$propName}\s*=\s*([true|false|null|\d]+)/", $sourceCode, $matches)) {
-          $default = "`{$matches[1]}`";
-        }
-
-
-        $examples = '';
-        if (!empty($propDetails['examples'])) {
-          $exampleValues = array_map(fn($ex) => is_array($ex) ? json_encode($ex) : $ex, $propDetails['examples']);
-          $examples = ' Example: `' . implode('`, `', $exampleValues) . '`';
-        }
-
-        if ($type === 'enum') {
-          $description .= ' (Options: `' . implode('`, `', $propDetails['enum']) . '`)';
-        }
-
-        $propsTable .= "| `{$propName}` | `{$type}` | {$required} | {$default} | {$description}{$examples} |\n";
-      }
-      $details['props_table'] = $propsTable;
-    }
-
-    // Analyze Slots
-    if (!empty($component['slots'])) {
-      $slotsList = "This component accepts content in the following slots:\n";
-      foreach ($component['slots'] as $slotName => $slotDetails) {
-        $title = $slotDetails['title'] ?? $slotName;
-        $slotsList .= "- **`{$slotName}`**: {$title}\n";
-      }
-      $details['slots'] = $slotsList;
-    }
-
-    // Analyze Composition
-    $usedComponents = [];
-    foreach ($allComponentIds as $componentId) {
-      // Look for usage like: <Component... or import Component from '@/components/component_name'
-      $pascalCaseComponent = str_replace('_', '', ucwords($componentId, '_'));
-      if (preg_match("/<{$pascalCaseComponent}|from\s*['\"]@[^'\"]+\/{$componentId}['\"]/", $sourceCode)) {
-        if ($id !== $componentId) {
-          $usedComponents[] = "`{$componentId}`";
-        }
-      }
-    }
-
-    if (!empty($usedComponents)) {
-      $details['composition'] = 'This component uses the following library components: ' . implode(', ', $usedComponents) . '.';
-    }
 
     $this->styleGuideRules['component_library'][$id] = $details;
   }
@@ -198,20 +139,11 @@ class StyleGuideGenerator
     $markdown .= "## 5. Component Reference Library\n\n";
     $markdown .= "The following components serve as the ground truth for our design system. Study their props, structure, composition, and source code carefully before generating new components.\n\n";
 
-    ksort($this->styleGuideRules['component_library']); // Sort components alphabetically
+    ksort($this->styleGuideRules['component_library']);
 
     foreach ($this->styleGuideRules['component_library'] as $id => $details) {
       $markdown .= "---\n\n";
-      $markdown .= "### Component: `{$id}` (\"{$details['name']}\")\n\n";
-
-      $markdown .= "**Props Definition**\n";
-      $markdown .= $details['props_table'] . "\n";
-
-      $markdown .= "**Slots**\n";
-      $markdown .= $details['slots'] . "\n\n";
-
-      $markdown .= "**Composition**\n";
-      $markdown .= $details['composition'] . "\n\n";
+      $markdown .= "### Component: `{$details['name']}` \n\n";
 
       $markdown .= "**Source Code (`{$id}.jsx`)**\n";
       $markdown .= "```jsx\n";
