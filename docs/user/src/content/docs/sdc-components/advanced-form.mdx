@@ -8,7 +8,7 @@ to support additional input types such as `<input type="color">` and
 `<input type="range">`.
 
 However, if you need more control, you can customize these forms using the
-`hook__form_component_inputs_form_alter` hook. This hook allows you to
+`hook__form_component_instance_form_alter` hook. This hook allows you to
 significantly enhance the user experience.
 
 For example, you can:
@@ -26,7 +26,7 @@ The `canvas_test_autocomplete` test module provides a practical example of these
 capabilities.
 
 ```php
-function canvas_test_autocomplete_form_component_inputs_form_alter(array &$form, FormStateInterface $form_state): void {
+function canvas_test_autocomplete_form_component_instance_form_alter(array &$form, FormStateInterface $form_state): void {
   $form['test_autocomplete'] = [
     '#type' => 'textfield',
     '#title' => 'Autocomplete Field',
