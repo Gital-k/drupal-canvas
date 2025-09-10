@@ -76,8 +76,8 @@ class CanvasAiHooks {
             'description' => $this->t('Returns the status of JSON API module.'),
           ],
           'style_guide' => [
-            'name' => $this->t('Style Guide'),
-            'description' => $this->t('Style guide for the site.'),
+            'name' => $this->t('Available components'),
+            'description' => $this->t('Available components for the site.'),
           ],
         ],
       ],
@@ -133,8 +133,8 @@ class CanvasAiHooks {
             $replacements[$original] = $data['json_api_module_status'];
             break;
 
-          case 'style_guide':
-            $replacements[$original] = !empty($data['style_guide']) ? $data['style_guide'] : '';
+          case 'available_components':
+            $replacements[$original] = !empty($data['available_components']) ? $data['available_components'] : '';
             break;
         }
       }

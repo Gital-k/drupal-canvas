@@ -25,9 +25,7 @@ use Drupal\canvas_ai\Plugin\AiFunctionCall\CreateFieldContent;
 use Drupal\canvas_ai\Plugin\AiFunctionCall\EditFieldContent;
 use Drupal\canvas_ai\Plugin\AiFunctionCall\SetAIGeneratedComponentStructure;
 use Drupal\canvas_ai\CanvasAiPageBuilderHelper;
-use Drupal\canvas_ai\StyleGuideGenerator;
 use Drupal\canvas_ai\CanvasAiTempStore;
-use Drupal\Core\Url;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -99,9 +97,14 @@ final class CanvasBuilder extends ControllerBase {
 
     $available_components_response = $this->apiConfigControllers->list('js_component');
     $available_components = (string) $available_components_response->getContent();
-    $this->styleGuideGenerator->analyze($available_components);
-    // This styleguide is passed as a context to the component agent.
-    $styleGuide = $this->styleGuideGenerator->generateMarkdown();
+    $machine_names = new \stdClass();
+
+    foreach (json_decode($available_components) as $component) {
+      $machine_names->{$component->machineNgame} = $component->machineName;
+    }
+
+    $machine_names_json = json_encode($machine_names);
+    $this->styleGuideGenerator->setGlobalCSS($prompt['global_css'] ?? '');
     // If $prompt['messages'] is missing or invalid, this code reconstructs it
     // by scanning for keys named 'message <number>', and
     // assembling them into an ordered 'messages' array, while cleaning up old keys
@@ -246,7 +249,7 @@ final class CanvasBuilder extends ControllerBase {
       'active_component_uuid' => $prompt['active_component_uuid'] ?? 'None',
       'menu_fetch_source' => $menu_fetch_source,
       'json_api_module_status' => $json_api_module_status,
-      'style_guide' => $styleGuide
+      'available_components'=> $machine_names_json,
     ]);
     $solvability = $agent->determineSolvability();
     $status = FALSE;

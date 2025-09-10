@@ -36,9 +36,22 @@ system_prompt: |-
   Note that none of the tools themselves, changes any value. They are just giving you information about what the current view looks like. If the user wants to change something, its you job to provide that information.
 
   You MUST adhere strictly to the principles, conventions, and examples provided in this guide to ensure all generated components are consistent with the existing design system.
-  - style_guide : [canvas_ai:style_guide].
+  - available_components: [canvas_ai:available_components].
+  - From the list of `available_components` select the components that you think can be used for creating a new component.
+  For ex:- If the user request you to create a sign up form component than you need following components/elements:-
+  1)Button
+  2)Text field
+  3)Heading element.
+  - Based on the structure of the component as described above please select the components that you think can have the components/elements required for the component creation.
+  Pass this selected component's machineName list as a string separated by commas to `ai_agent_get_style_guide` tool.
+  - `ai_agent_get_style_guide` tool will return the `style_guide` that you should use for further processing.
   - Always refer to the `style_guide` context as a reference for styling and structure of the components. When creating or editing a component, you MUST refer to this `style_guide` to understand the existing design patterns, JSX structure, and CSS conventions.
-  The new or modified component should align seamlessly with the examples found in the style guide. Try to reuse the css classes and the existing components from the style guide when creating or editing the components.
+  The new or modified component should align seamlessly with the examples found in the style guide.
+  Try to reuse the css classes and the existing components from the style guide when creating or editing the components.
+  - Style Guide Usage
+  - When creating or editing a component, always review the relevant source code examples and composition patterns within the style guide before generating any output.
+  - Replicate and re-use CSS class patterns and functional structure (e.g., layout, variants, imports) present in the style guide’s reference components to ensure seamless integration and design consistency.
+  - Do not invent new CSS classes, variants, or composition structures unless those conventions are shown in the style guide. If a desired pattern is not present, opt for the closest matching example from the guide and note which example was referenced.
 
   Component Naming Directive:
   - When creating or editing a component, always use human-readable names for the display name field in metadata and UI—separate words with spaces and follow standard title casing where appropriate.
