@@ -30,12 +30,12 @@ intent. It then redirects the prompt to the appropriate AI agent.
 
 - If you use words like `Place` or `Use`, the orchestrator understands that you
 want to use an existing component and directs the prompt to the
-`experience_builder_page_builder_agent`. This agent retrieves all
+`canvas_page_builder_agent`. This agent retrieves all
 [enabled components](debug-sdc#sdc-status) and uses them as context to build
 your page.
 
 - ❗ If you use ambiguous words like `Create` or `Add`, the orchestrator may
-direct the prompt to another agent `experience_builder_component_agent` to
+direct the prompt to another agent `canvas_component_agent` to
 create a new code component.
 
 ---
@@ -83,7 +83,7 @@ the canvas and use words like **into**, **inside** in your prompt.
 
 ## Generating a Full Page
 
-The `experience_builder_template_builder_agent` is designed to build entire
+The `canvas_template_builder_agent` is designed to build entire
 pages, headers, and footers. A succession of clear, focused prompts often gives
 better results than a single, complex one.
 
@@ -202,4 +202,4 @@ potential of this feature.
 🛠️ Ongoing improvements are being made
 
 - Stay tuned on the radio Canvas (﹙˓ ‍🎧 ˒﹚) !
-- Join the team on Slack: [`#experience-builder`](https://drupal.slack.com/archives/C072JMEPUS1)
+- Join the team on Slack: [`#experience-builder-is-now-drupal-canvas`](https://drupal.slack.com/archives/C072JMEPUS1)
