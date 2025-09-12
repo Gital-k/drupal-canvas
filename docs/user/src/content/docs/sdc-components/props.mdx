@@ -2,6 +2,12 @@
 title: SDC components - Props
 ---
 
+<style>{`
+.sl-markdown-content table td {
+  vertical-align: top;
+}
+`}</style>
+
 Props allow SDC components to define configurable inputs that users can configure
 in the Canvas interface. Each prop specifies its type, validation rules, and
 provides example values.
@@ -208,5 +214,8 @@ For a comprehensive overview of all available prop types and their widgets,
 refer to the **"All-Props" Test SDC** module which demonstrates every supported
 prop type with examples.
 
-![All props part 1](../../../assets/images/all-props.webp)
-![All props part 2](../../../assets/images/all-props-2.webp)
+| Boolean, strings with different formats | Integer, image, video, array of integers | Enriched HTML |
+|-----------------------------------------|------------------------------------------|---------------|
+| ![Boolean and string](../../../assets/images/boolean-string.webp) | ![Integer, image, video](../../../assets/images/integer-image-video.webp) ![Array of integers](../../../assets/images/array-integers.webp) | ![String, text with HTML](../../../assets/images/string-text-ckeditor.webp) |
+
+
