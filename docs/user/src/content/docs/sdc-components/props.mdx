@@ -2,8 +2,9 @@
 title: SDC components - Props
 ---
 
-Props allow SDC components to define configurable inputs. Each prop can specify
-its type, whether it's required, and provide example values.
+Props allow SDC components to define configurable inputs that users can configure
+in the Canvas interface. Each prop specifies its type, validation rules, and
+provides example values.
 
 Props can be used to:
 
@@ -11,52 +12,201 @@ Props can be used to:
 - Configure component appearance (colors, alignment, state)
 - Control component behavior (animations, interactions)
 
+Canvas automatically generates a form based on the props.
 
-Each prop can specify its type and the widget used when editing this prop.
+## Prop types and examples
 
-## Prop types
+### String
 
-1. **string**: A simple text input.
-2. **number**: A numeric input.
-3. **boolean**: A checkbox input.
-4. **object**: A complex input that can contain multiple properties.
-5. **array**: A list of items, each of which can be a string, number, or object.
+Basic text input for short text content.
 
-## Widgets and formats
-
-Canvas automatically selects appropriate input widgets based on prop configuration:
-
-- **Boolean**: Rendered as checkboxes
-- **String**: Multiple widget options available by specifying `format`, `$ref`, and other properties:
-  - Text input
-  - Textarea (with or without CKEditor)
-  - Dropdown (using `enum` and `meta:enum` properties)
-  - Date, time, duration pickers
-  - Link picker with auto-completion
-- **Number**: numeric input widgets:
-  - Number input field
-  - Dropdown with predefined values
-- **Array**: Rendered as lists where users can add or remove items (not fully supported yet)
-
-### Dropdown example
-
-Using `enum` to create dropdown options. The optional `meta:enum` allows you to
-customize display labels and enable translation capabilities:
-
+**Schema Definition:**
 ```yaml
-    test_string_enum:
-      title: 'String - Enum'
-      type: string
-      enum:
-        - foo
-        - bar
-      meta:enum:
-        foo: Foo
-        bar: Bar
+title:
+  type: string
+  title: 'Component title'
+  examples: ['Hello World']
 ```
 
-For a comprehensive overview of available prop types and their corresponding widgets,
-refer to the **"All-Props" Test SDC** module.
+**Twig Usage:**
+```twig
+<h2>{{ title }}</h2>
+```
+
+### String with HTML
+
+Rich text editor for formatted content with HTML markup.
+
+**Schema Definition:**
+```yaml
+content:
+  type: string
+  title: 'Rich text content'
+  contentMediaType: text/html
+  x-formatting-context: block
+  examples: ['<p>This is <strong>formatted</strong> text</p>']
+```
+
+**Twig Usage:**
+```twig
+<div class="content">
+  {{ formatted_content }}
+</div>
+```
+
+
+### Textarea
+
+Textarea input for longer text content that spans multiple lines.
+
+**Schema Definition:**
+```yaml
+description:
+  type: string
+  title: 'Description'
+  $ref: json-schema-definitions://canvas.module/textarea
+  examples: ['A longer description\nthat spans multiple lines']
+```
+
+**Twig Usage:**
+```twig
+<div class="description">
+  {{ description|nl2br }}
+</div>
+```
+
+
+### Boolean
+
+Checkbox input for true/false values.
+
+**Schema Definition:**
+```yaml
+show_image:
+  type: boolean
+  title: 'Show image'
+  examples: [true]
+```
+
+**Twig Usage:**
+```twig
+{% if show_image %}
+  <div class="image-section">...</div>
+{% endif %}
+```
+
+### Integer
+
+Numeric input with optional validation constraints.
+
+**Schema Definition:**
+```yaml
+spacing:
+  type: integer
+  title: 'Spacing in pixels'
+  minimum: 0
+  examples: [20]
+```
+
+**Twig Usage:**
+```twig
+<div style="padding-top: {{ spacing }}px">
+  Content with spacing
+</div>
+```
+
+### Enum (Dropdown)
+
+Renders as a dropdown with predefined options. Use `meta:enum` to customize display labels:
+
+**Schema Definition:**
+```yaml
+alignment:
+  type: string
+  title: 'Text alignment'
+  enum: ['left', 'center', 'right']
+  meta:enum:
+    left: Left aligned
+    center: Center aligned
+    right: Right aligned
+  examples: ['center']
+```
+
+**Twig Usage:**
+```twig
+<h2 class="heading heading--{{ alignment }}">
+</h2>
+```
+
+### Image Object
+
+Image selection from media library or image upload.
+
+**Schema Definition:**
+```yaml
+image:
+  title: 'Component image'
+  $ref: json-schema-definitions://canvas.module/image
+  type: object
+  examples:
+    - src: '/path/to/image.jpg'
+      alt: 'Component image'
+      width: 800
+      height: 600
+```
+
+**Twig Usage:**
+```twig
+{% include 'experience_builder:image' with image only %}
+```
+
+### Date
+
+Date picker input for selecting dates.
+
+**Schema Definition:**
+```yaml
+event_date:
+  type: string
+  format: date
+  title: 'Event date'
+  examples: ['2024-12-25']
+```
+
+**Twig Usage:**
+```twig
+<time datetime="{{ event_date }}">
+  {{ event_date|date('F j, Y') }}
+</time>
+```
+
+### Array
+
+List input allowing multiple values.
+
+**Schema Definition:**
+```yaml
+numbers:
+  type: array
+  title: 'List of numbers'
+  items:
+    type: string
+  maxItems: 10
+  examples: [['One', 'Two', 'Three']]
+```
+
+**Twig Usage:**
+```twig
+{% for number in numbers %}
+  <span class="number">{{ number }}</span>
+{% endfor %}
+```
+
+## Additional resources
+
+For a comprehensive overview of all available prop types and their widgets,
+refer to the **"All-Props" Test SDC** module which demonstrates every supported
+prop type with examples.
 
 ![All props part 1](../../../assets/images/all-props.webp)
 ![All props part 2](../../../assets/images/all-props-2.webp)
