@@ -10,7 +10,7 @@ use Drupal\ai\Service\FunctionCalling\ExecutableFunctionCallInterface;
 use Drupal\ai_agents\PluginInterfaces\AiAgentContextInterface;
 
 /**
- * Plugin implementation of the get props types function.
+ * Plugin implementation of the get style guide function.
  */
 #[FunctionCall(
   id: 'ai_agent:get_style_guide',
