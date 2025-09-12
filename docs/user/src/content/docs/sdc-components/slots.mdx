@@ -2,6 +2,8 @@
 title: SDC components - Slots
 ---
 
+import { FileTree } from '@astrojs/starlight/components';
+
 Slots allow you to place other SDC components, or any other Canvas
 component, inside your component. They define regions where content can be
 dynamically inserted.
@@ -14,14 +16,14 @@ any other SDC component to display as list items.
 Let's create a list component to display multiple artists. This component will
 act as a container where you can add multiple `Singer` components.
 
-```
-my_theme/
-└── components/
-    └── list/
-        ├── list.component.yml
-        ├── list.twig
-        └── list.css
-```
+<FileTree>
+- my_theme
+  - components
+    - list
+      - list.component.yml
+      - list.twig
+      - list.css
+</FileTree>
 
 ### Component structure
 
