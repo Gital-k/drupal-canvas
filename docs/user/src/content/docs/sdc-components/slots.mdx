@@ -1,17 +1,18 @@
 ---
-title: Slots
+title: SDC components - Slots
 ---
 
-A slot is a region which allows to place other components.
+Slots allow you to place other SDC components, or any other Canvas
+component, inside your component. They define regions where content can be 
+dynamically inserted.
 
-For example a SDC `List` define a slot called `Items`, that will accepts
-any other SDC, and each of them will be displayed as a list item.
+For example, a `List` component can define a slot called `Items` that accepts
+any other SDC component to display as list items.
 
-## SDC with slot
+## Creating components with slots
 
-What about making a **list of your favorite artists** !
-So you need a new SDC that will play the role of a container, where you will be
-able to add all your favorite `Singers`.
+Let's create a list component to display multiple artists. This component will
+act as a container where you can add multiple `Singer` components.
 
 ```
 my_theme/
@@ -22,17 +23,18 @@ my_theme/
         └── list.css
 ```
 
-### Structure
-- A **prop** `title` to show the name of the list
-- A **slot** `content` to list your singers
+### Component structure
 
-To define a slot, add it under the `slots` key. You can add multiple.
+- A **prop** `title` to show the name of the list  
+- A **slot** `content` to contain the list items
 
-ℹ️ This SDC `List` is generic, so could list anything, not only Singers !
+To define a slot, add it under the `slots` key in your component metadata. You can define multiple slots.
 
-### Metadata
+This `List` component is generic and can contain any type of component, not just Singers.
 
-`SDC List` contains one prop and one slot.
+### Component metadata
+
+The `List` component defines one prop and one slot:
 
 ```yaml
 # list.component.yml
@@ -57,16 +59,14 @@ slots:
       Place any SDC in this slot, to add them to the list.
 ```
 
-ℹ️ The `title` key of each slot will be used as the **placeholder** in the Canvas.
+The `title` key of each slot is used as the placeholder text in Canvas.
 
 !["SDC List with slot list items"](../../../assets/images/slot-list-items.webp)
 
-### Markup
+### Twig template
 
-Let's add some markup in the **TWIG**,
-
-- ℹ️ use unique class for each section to ease the styling.
-- ℹ️ It's recommended to use BEM methodology to avoid css collision
+The template should use unique classes for each section to facilitate styling.
+Using BEM methodology is recommended to avoid CSS collisions:
 
 ```twig
 {# list.twig #}
@@ -106,13 +106,9 @@ Let's add some CSS:
 }
 ```
 
-## Horizontal List
+## Enhanced list component
 
-Our list component is pretty nice, but what about making it awesome ?
-**Challenge accepted !**
-
-Let's add some props, not to add more content, but to change the SDC appearance
-this time:
+Let's enhance the list component by adding props to control its appearance:
 
 - Display the list horizontally or vertically
 - Display an optional Counter
@@ -179,25 +175,17 @@ And let's add more CSS for our new props
 }
 ```
 
-## Let's create Our top 5
+## Using the enhanced list
 
-Congratulation, your new SDC `List` has super powers and is ready to received as
-many singers that you like !
-
-5 wasn't enough, I added 10.
+Your enhanced `List` component is now ready to display multiple items in various layouts:
 
 !["SDC List with slot list items"](../../../assets/images/top-10-singers.webp)
 
-Some horizontal variations with and without counter
+The component supports horizontal and vertical layouts, with optional counters:
 
 !["SDC List horizontal with and without counter"](../../../assets/images/horizontal-lists.webp)
 
-Hum, in fact I lied, it's not my top 10, but the 10 most famous singers
-according AI.
-
-**What ???** How did you do that ?
-
-See you in next chapter to learn how to use [Canvas with AI](ai)
+To learn about integrating AI capabilities with Canvas, see [Canvas with AI](ai).
 
 
 

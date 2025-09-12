@@ -1,29 +1,31 @@
 ---
-title: Create your first SDC
+title: SDC components
 ---
 
-Because Drupal Canvas is ambitious, what about building your own Spotify
-interface ?
+[Single Directory Components (SDC)](https://www.drupal.org/docs/develop/theming-drupal/using-single-directory-components/quickstart)
+contain your own Twig, JavaScript, and CSS. They can be provided as part of a
+Drupal module or theme and can be reused across your Canvas projects.
 
-## Let's start with a singer SDC
----
+Components are built using Drupal's native Twig templating system with optional
+JavaScript and CSS files for enhanced functionality and styling.
+
+## Creating a new SDC component
 
 Inside your custom theme, create a folder for your new SDC.
-- Inside a `components/` folder, create a `singer/` folder, your new **Single
-Directory Component!**
+- Inside a `components/` folder, create a `singer/` folder for your new Single
+Directory Component.
 
 This directory should contain at least:
-- `singer.component.yml` that defines the SDC's **metadata**:
-  optional props and slots.
-- `singer.twig` that defines the markup.
+- `singer.component.yml` that defines the component metadata (props and slots)
+- `singer.twig` that defines the markup
 
 Optionally in the same folder add:
-- `singer.css` for **styling**
-- `singer.js` for any **behaviors**.
-- Extra **assets**: images, svg icons, fonts, etc.
-- `README.md` file for documentation.
+- `singer.css` for styling
+- `singer.js` for behaviors
+- Extra assets: images, SVG icons, fonts, etc.
+- `README.md` file for documentation
 
-ℹ️ Required **Drupal libraries**, should be defined in the `libraryOverrides`
+Required Drupal libraries should be defined in the `libraryOverrides`
 section of the `singer.component.yml` file.
 
 ### Structure
@@ -40,16 +42,16 @@ my_theme/
 
 ### Props
 
-Our SDC defines 3 content props or inputs:
-- `name` of the singer, simple **string**,
-- `image` of the artist, **image object**
-- `genre` of music, picked among list of predefined strings
+Our SDC defines 3 content props:
+- `name` of the singer (string)
+- `image` of the artist (image object)
+- `genre` of music (predefined string values)
 
 [Further details about props.](sdc-components/props)
 
-### Metadata
+### Component metadata
 
-Here how the metadata could be defined:
+The component metadata is defined in the `.component.yml` file:
 
 ```yaml
 # singer.component.yml
@@ -96,7 +98,7 @@ props:
 You can use this image for the default image of a new Singer
 ![Microphone](../../../assets/images/micro.webp)
 
-### TWIG: Let's add some markup
+### Twig template
 
 ```twig
 {# singer.twig #}
@@ -109,7 +111,7 @@ You can use this image for the default image of a new Singer
 </div>
 ```
 
-### CSS: Let's add some styling.
+### Styling
 
 ```css
 /* singer.css */
@@ -127,18 +129,16 @@ You can use this image for the default image of a new Singer
 .singer-genre { font-weight: normal; }
 ```
 
-## Ready to drag !
----
-1. Our component `Singer` is ready to be used, just drag it to the Canvas.
-- ℹ️ Oh ! Hovering your new SDC in the sidebar,
-displays a nice preview with [default values of your props](sdc-components/validations#default-values).
-- ℹ️ Pay attention, your new singer SDC is under the "Music" group. (`group: Music` in the metadata)
-2. You can insert your favorite singer, with a nice picture.
+## Using the component
+
+Once created, your `Singer` component is ready to be used in Canvas:
+
+1. The component appears in the sidebar under the "Music" group (as defined in metadata)
+2. Hovering over the component shows a preview with [default prop values](sdc-components/validations#default-values)
+3. Drag the component to the Canvas and configure its properties
 
 !["Dragging a Singer component, and set your props](../../../assets/images/singer.webp)
 
-## Many favorite singers
----
-But I have more than one favorite singer !
+## Creating collections
 
->💡 [Slots](sdc-components/slots) are here to help !
+To display multiple singers, you can use [Slots](sdc-components/slots) to create container components that accept multiple child components.

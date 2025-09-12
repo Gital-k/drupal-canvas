@@ -1,20 +1,15 @@
 ---
-title: Props
+title: SDC components - Props
 ---
 
-Props allow the component to define inputs.
+Props allow SDC components to define configurable inputs. Each prop can specify
+its type, whether it's required, and provide example values.
 
-Those inputs could be used by editor to:
+Props can be used to:
 
-- Insert content
-  - Set the text of a badge,
-  - Set the image of a card...
-
-- Configure the appearance of a SDC
-  - Change the color of a badge,
-  - Set text alignment,
-  - Set state of a tab to active,
-  - Apply animations...
+- Insert content (text, images, etc.)
+- Configure component appearance (colors, alignment, state)
+- Control component behavior (animations, interactions)
 
 
 Each prop can specify its type and the widget used when editing this prop.
@@ -27,32 +22,26 @@ Each prop can specify its type and the widget used when editing this prop.
 4. **object**: A complex input that can contain multiple properties.
 5. **array**: A list of items, each of which can be a string, number, or object.
 
-## Formats & Widgets
+## Widgets and formats
 
-According to the prop options, Drupal Canvas will use a different widgets
-to render the prop input in the sidebar:
+Canvas automatically selects appropriate input widgets based on prop configuration:
 
-- **Boolean** props will be rendered as a `HTML checkbox`,
-- **string** prop has several widgets, by specifying `format`, `$ref` and other
-  additional properties (like `contentMediaType` for text/html)
-  - Simple text input,
-  - `Textarea` with or without `CKEditor`
-  - `Dropdown` with a predefined list of options, using `enum` and `meta:enum`
-    properties,
-  - `Date`, `time`, `duration` picker,
-  - `Link` picker with auto-completion...
-- **number** has several widgets
-  - Simple input with type="number",
-  - `Dropdown` with a predefined list of numbers...
-- **object** props can be rendered as a form with multiple fields, each field
-  corresponding to a property of the object. Ex: image with alt text, title,
-  caption, etc.
-- **array** props can be rendered as a list of items, each item can be a string,
-  number, or object. The user can add or remove items from the list.
+- **Boolean**: Rendered as checkboxes
+- **String**: Multiple widget options available by specifying `format`, `$ref`, and other properties:
+  - Text input
+  - Textarea (with or without CKEditor)
+  - Dropdown (using `enum` and `meta:enum` properties)
+  - Date, time, duration pickers
+  - Link picker with auto-completion
+- **Number**: numeric input widgets:
+  - Number input field
+  - Dropdown with predefined values
+- **Array**: Rendered as lists where users can add or remove items (not fully supported yet)
 
-Example of dropdown, using `enum`.
-- ℹ️ `meta:enum` is optional, it allows you to rewrite the values shown in the
-dropdown. It also allows you to have translation capability on those strings.
+### Dropdown example
+
+Using `enum` to create dropdown options. The optional `meta:enum` allows you to
+customize display labels and enable translation capabilities:
 
 ```yaml
     test_string_enum:
@@ -66,8 +55,8 @@ dropdown. It also allows you to have translation capability on those strings.
         bar: Bar
 ```
 
-To get an overview of most available types and corresponding widgets,
-see the sub test module: **"All-Props" Test SDC**.
+For a comprehensive overview of available prop types and their corresponding widgets,
+refer to the **"All-Props" Test SDC** module.
 
 ![All props part 1](../../../assets/images/all-props.webp)
 ![All props part 2](../../../assets/images/all-props-2.webp)
