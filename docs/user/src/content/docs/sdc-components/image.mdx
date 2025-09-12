@@ -2,43 +2,43 @@
 title: SDC components - Images
 ---
 
-Canvas provides the `experience_builder:image` component for consistent image handling
+Canvas provides the `canvas:image` component for consistent image handling
 across SDC components. This component is designed for developers creating SDCs and
 handles responsive images, lazy loading, and modern image optimization automatically.
 
 ## Using the image component
 
-The `experience_builder:image` component is included in other SDC components using
+The `canvas:image` component is included in other SDC components using
 Twig's `include` function. It provides a standardized way to render images with
 proper attributes and performance optimizations.
 
 ### Basic usage
 
 ```twig
-{% include 'experience_builder:image' with {
+{% include 'canvas:image' with {
   src: 'https://example.com/image.jpg',
   alt: 'Example image',
   width: 600,
-  height: 400
+  height: 400,
 } only %}
 ```
 
 ### Usage with prop values
 
 ```twig
-{% include 'experience_builder:image' with image|merge({
+{% include 'canvas:image' with image|merge({
   loading: 'lazy',
   sizes: '(max-width: 768px) 100vw, 50vw',
   class: 'card--image',
   attributes: create_attribute({
     'data-testid': 'card-component-image',
-  })
+  }),
 } only %}
 ```
 
 ## Component properties
 
-The `experience_builder:image` component accepts the following properties:
+The `canvas:image` component accepts the following properties:
 
 ### Required properties
 
@@ -77,30 +77,9 @@ props:
           height: 300
 ```
 
-### Using image props in your template
+## Responsive image settings
 
-```twig
-{# card.twig #}
-<div class="card">
-  {% if image %}
-    {% include 'experience_builder:image' with image|merge({
-      loading: 'lazy',
-      class: 'card__image',
-      attributes: create_attribute({
-        'data-component': 'card-image'
-      })
-    }) only %}
-  {% endif %}
-
-  <div class="card__content">
-    <!-- Card content -->
-  </div>
-</div>
-```
-
-## Responsive images and performance
-
-The `experience_builder:image` component automatically handles responsive behavior
+The `canvas:image` component automatically handles responsive behavior
 and performance optimizations. You can enhance this with additional properties:
 
 ### Lazy loading
@@ -108,8 +87,8 @@ and performance optimizations. You can enhance this with additional properties:
 The component defaults to lazy loading. For above-the-fold images, use eager loading:
 
 ```twig
-{% include 'experience_builder:image' with image|merge({
-  loading: 'eager'  {# For hero images or critical content #}
+{% include 'canvas:image' with image|merge({
+  loading: 'eager',  {# For hero images or critical content #}
 }) only %}
 ```
 
@@ -118,9 +97,9 @@ The component defaults to lazy loading. For above-the-fold images, use eager loa
 Use the `sizes` attribute to optimize image loading for different viewport sizes:
 
 ```twig
-{% include 'experience_builder:image' with image|merge({
+{% include 'canvas:image' with image|merge({
   sizes: '(max-width: 480px) 100vw, (max-width: 768px) 50vw, 33vw',
-  loading: 'lazy'
+  loading: 'lazy',
 }) only %}
 ```
 
