@@ -5,10 +5,9 @@ namespace Drupal\canvas_ai;
 /**
  * A style guide generator.
  */
-class StyleGuideGenerator
-{
+class StyleGuideGenerator {
   /**
-   * @var array An array holding the parsed component definitions.
+   * @var array An array to store the extracted style guide rules.
    */
   private array $components;
 
@@ -16,90 +15,135 @@ class StyleGuideGenerator
    * @var array An array to store the extracted style guide rules.
    */
   private array $styleGuideRules = [
-    'preamble' => [
-      'title' => '#Component Generation Guide',
-      'introduction' => "You are an expert React component generator. Your task is to create new components based on a user's request. You MUST adhere strictly to the principles, conventions, and examples provided in this guide to ensure all generated components are consistent with the existing design system.",
-    ],
-    'principles' => [
-      'Component-Based Architecture: The UI is built from self-contained, reusable components defined in JSX.',
-      'Utility-First CSS: Styling is primarily achieved using Tailwind CSS utility classes directly within the JSX. This is the preferred method for layout, spacing, and styling.',
-      'Semantic & Accessible HTML: Markup must be meaningful and adhere to accessibility standards (e.g., `alt` text for images, `<label>` for forms, correct use of `<nav>`, `<button>`, etc.).',
-      'Structured Component API: Component properties (`props`) must be clearly defined with types, defaults, examples, and JSON schemas. Variants and states are managed via props.',
-    ],
-    'tooling' => [
-      '**React/JSX:** All components are written in JSX.',
-      '**Tailwind CSS:** A utility-first CSS framework used for all styling. Do not write separate CSS files.',
-      '**`class-variance-authority` (`cva`):** Used to manage component variants and styles based on props (e.g., button variants, heading sizes).',
-      '**`@/lib/utils/cn`:** A utility function to conditionally combine CSS classes. Always use `cn()` when applying classes that might be combined with external class names or variants from `cva`.',
-    ],
-    'html' => [
-      'rules' => [
-        'Use semantic tags (`<nav>`, `<footer>`, `<button>`) over generic `<div>`s where appropriate.',
-        'All form inputs MUST have a corresponding `<label>` or an `aria-label`.',
+    'css' => [
+      'utility_classes' => [
+        'prefix' => null,
+        'description' => 'Used for applying design tokens directly in HTML for layout, spacing, sizing, and colors.',
+        'examples' => [],
+      ],
+      'component_classes' => [
+        'description' => 'Define the core, non-negotiable styles of a specific component. Follow a BEM-like or kebab-case convention.',
+        'examples' => [],
+      ],
+      'state_classes' => [
+        'description' => 'Reflect a component\'s state or variant, often based on a prop. Typically uses a `--` modifier.',
+        'examples' => [],
+      ],
+      'categories' => [
+        'colors' => [
+          'description' => 'Classes related to colors including text, background, borders.',
+          'examples' => [],
+        ],
+        'typography' => [
+          'description' => 'Classes controlling font size, weight, line height, and text styles.',
+          'examples' => [],
+        ],
+        'spacing' => [
+          'description' => 'Classes controlling margin and padding.',
+          'examples' => [],
+        ],
+        'layouts' => [
+          'description' => 'Classes related to layout including grid, flex, block behaviors.',
+          'examples' => [],
+        ],
+        'iconography' => [
+          'description' => 'Classes related to icon sizing, positioning, and styling.',
+          'examples' => [],
+        ],
+        'states' => [
+          'description' => 'Classes used for UI states like hover, focus, disabled, active.',
+          'examples' => [],
+        ],
       ],
     ],
-    'javascript' => [
-      'rules' => [
-        'Decouple logic from styling. Use `data-*` attributes for JavaScript hooks if necessary, rather than relying on CSS classes.',
-        'Use React hooks (`useState`, `useEffect`) for managing state and side effects.',
-      ]
-    ],
-    'component_library' => [],
   ];
-
-  /**
-   * Constructor.
-   *
-   */
-  public function __construct()
-  { }
-
-  /**
-   * Analyzes the components and builds the style guide rules.
-   */
-  public function analyze($jsonString): void
+  public function analyze(string $jsonString): void
   {
     $decodedJson = json_decode($jsonString, true);
     if (json_last_error() !== JSON_ERROR_NONE) {
       throw new \InvalidArgumentException('Invalid JSON provided: ' . json_last_error_msg());
     }
-    $this->components = $decodedJson;
-    $componentIds = array_keys($this->components);
 
-    foreach ($this->components as $id => $component) {
-      $this->analyzeComponentDetails($id, $component, $componentIds);
+    $this->components = $decodedJson;
+
+    foreach ($this->components as $component) {
+      $this->analyzeCss($component);
+    }
+
+    // Deduplicate examples in all categories
+    foreach ($this->styleGuideRules['css'] as $key => &$category) {
+      if (is_array($category) && isset($category['examples'])) {
+        $category['examples'] = array_values(array_unique($category['examples']));
+      }
+      if ($key === 'categories') {
+        foreach ($category as &$subcat) {
+          $subcat['examples'] = array_values(array_unique($subcat['examples']));
+        }
+      }
     }
   }
 
-  /**
-   * Analyzes and stores the full details of a component for the reference library.
-   *
-   * @param string $id The component machine name.
-   * @param array $component The component definition.
-   * @param array $allComponentIds A list of all available component machine names.
-   */
-  private function analyzeComponentDetails(string $id, array $component, array $allComponentIds): void
+  private function analyzeCss(array $component): void
   {
-    $sourceCode = $component['sourceCodeJs'] ?? '';
-    // Clean the source code for better LLM parsing (remove trailing commas, etc.)
-    $cleanedSourceCode = rtrim(trim($sourceCode), ',');
-
-    $declarationPattern = '/^\s*const\s+defaultImage\s*=\s*[\'"`]data:.*?[\'"`];?\s*\n/m';
-    // Removing the data urls stored in default image variable.
-    if (preg_match($declarationPattern, $cleanedSourceCode)) {
-      $cleanedSourceCode = preg_replace($declarationPattern, '', $cleanedSourceCode);
-      $usagePattern = '/\s+\w+\s*=\s*\{defaultImage\}/';
-      $cleanedSourceCode = preg_replace($usagePattern, '', $cleanedSourceCode);
+    if (empty($component['sourceCodeJs'])) {
+      return;
     }
-    $details = [
-      'name' => $component['name'] ?? $id,
-      'props_table' => 'This component has no configurable properties.',
-      'slots' => 'This component does not define any slots.',
-      'composition' => 'This component is self-contained and does not use other library components.',
-      'sourceCodeJs' => $cleanedSourceCode ?: '// No source code available.',
-    ];
 
-    $this->styleGuideRules['component_library'][$id] = $details;
+    $js = $component['sourceCodeJs'];
+    $this->styleGuideRules['components'][] = $component['machineName'];
+    $this->styleGuideRules[$component['machineName']]['js'] = $js;
+
+    preg_match_all('/([\'"])(.*?)\1/', $js, $stringMatches);
+    preg_match_all('/([A-Za-z0-9_]+)\s*:\s*([\'"])(.*?)\2/', $js, $varMatches);
+
+    $classesRaw = [];
+
+    foreach ($stringMatches[2] as $match) {
+      $classesRaw = array_merge($classesRaw, preg_split('/\s+/', $match));
+    }
+
+    foreach ($varMatches[3] as $match) {
+      $classesRaw = array_merge($classesRaw, preg_split('/\s+/', $match));
+    }
+
+    $classesRaw = array_filter(array_unique(array_map('trim', $classesRaw)));
+
+    foreach ($classesRaw as $class) {
+      if (empty($class)) {
+        continue;
+      }
+
+      // Utility classes (prefix present)
+      if (strpos($class, ':') !== false) {
+        $prefix = substr($class, 0, strpos($class, ':'));
+        if (is_null($this->styleGuideRules['css']['utility_classes']['prefix'])) {
+          $this->styleGuideRules['css']['utility_classes']['prefix'] = $prefix;
+        }
+        $this->styleGuideRules['css']['utility_classes']['examples'][] = "`{$class}`";
+      }
+      // State/Modifier classes (contains --)
+      if (strpos($class, '--') !== false) {
+        $this->styleGuideRules['css']['state_classes']['examples'][] = "`{$class}`";
+        $this->styleGuideRules['css']['categories']['states']['examples'][] = "`{$class}`";
+        continue;
+      }
+
+      // Further categorize by semantic meaning (tailwind-inspired examples)
+      if (preg_match('/^(bg|text|border|from|to|via)-/', $class)) {
+        $this->styleGuideRules['css']['categories']['colors']['examples'][] = "`{$class}`";
+      } elseif (preg_match('/^(text|font|tracking|leading|capitalize|uppercase|lowercase|italic|not-italic|underline|line-through)/', $class)) {
+        $this->styleGuideRules['css']['categories']['typography']['examples'][] = "`{$class}`";
+      } elseif (preg_match('/^(m|p|mt|mb|ml|mr|mx|my|pt|pb|pl|pr|px|py)-/', $class)) {
+        $this->styleGuideRules['css']['categories']['spacing']['examples'][] = "`{$class}`";
+      } elseif (preg_match('/^(grid|col|row|flex|block|inline|hidden|container|gap|justify|items|align|place|overflow|z-)/', $class)) {
+        $this->styleGuideRules['css']['categories']['layouts']['examples'][] = "`{$class}`";
+      } elseif (preg_match('/^(icon|svg|fill|stroke|w-|h-|size|rotate|transform)/', $class)) {
+        $this->styleGuideRules['css']['categories']['iconography']['examples'][] = "`{$class}`";
+      } else {
+        // Default to component classes if no match
+        $this->styleGuideRules['css']['component_classes']['examples'][] = "`{$class}`";
+      }
+    }
   }
 
   /**
@@ -109,50 +153,52 @@ class StyleGuideGenerator
    */
   public function generateMarkdown(): string
   {
-    $markdown = $this->styleGuideRules['preamble']['title'] . "\n\n";
-    $markdown .= $this->styleGuideRules['preamble']['introduction'] . "\n\n";
+    $markdown = "# Component Style Guide \n\n";
+    $markdown .= "This document outlines the principles and conventions for creating components within the design system. Adhere to these rules to ensure consistency, scalability, and maintainability.\n\n";
 
-    $markdown .= "## 1. Guiding Principles\n\n";
-    foreach ($this->styleGuideRules['principles'] as $principle) {
-      $markdown .= "- **" . $principle . "**\n";
-    }
-    $markdown .= "\n";
+    $markdown .= "## 1. Source code for selected components:-\n\n";
 
-    $markdown .= "## 2. Tooling & Libraries\n\n";
-    $markdown .= "You MUST use the following stack for component development:\n\n";
-    foreach ($this->styleGuideRules['tooling'] as $tool) {
-      $markdown .= "- {$tool}\n";
-    }
-    $markdown .= "\n";
-
-    $markdown .= "## 4. HTML, JSX & JS Guidelines\n\n";
-    $markdown .= "**HTML & JSX:**\n";
-    foreach ($this->styleGuideRules['html']['rules'] as $rule) {
-      $markdown .= "- {$rule}\n";
-    }
-    $markdown .= "\n**JavaScript:**\n";
-    foreach ($this->styleGuideRules['javascript']['rules'] as $rule) {
-      $markdown .= "- {$rule}\n";
-    }
-    $markdown .= "\n";
-
-    $markdown .= "## 5. Component Reference Library\n\n";
-    $markdown .= "The following components serve as the ground truth for our design system. Study their props, structure, composition, and source code carefully before generating new components.\n\n";
-
-    ksort($this->styleGuideRules['component_library']);
-
-    foreach ($this->styleGuideRules['component_library'] as $id => $details) {
-      $markdown .= "---\n\n";
-      $markdown .= "### Component: `{$details['name']}` \n\n";
-
-      $markdown .= "**Source Code (`{$id}.jsx`)**\n";
+    foreach ($this->styleGuideRules['components'] as $component) {
+      $markdown .= "**Source Code for (`{$component}.jsx`) **\n";
       $markdown .= "```jsx\n";
-      $markdown .= $details['sourceCodeJs'] . "\n";
+      $markdown .= $this->styleGuideRules[$component]['js'] . "\n";
       $markdown .= "```\n\n";
     }
 
-    $markdown .= "---\n\n## 6. Your Task\n\n";
-    $markdown .= "Now, using the rules and examples above, please fulfill the following request. Ensure the output is a single, complete JSX file that is ready to be used.\n";
+    $markdown .= "## 2. CSS Guidelines\n\n";
+    $markdown .= "A hybrid approach using utility, component, and state classes is employed.\n\n";
+
+    $utilityPrefix = $this->styleGuideRules['css']['utility_classes']['prefix'] ?? '';
+    $markdown .= "### Utility-First Classes (Prefix: `" . ($utilityPrefix ? $utilityPrefix . ':' : 'none') . "`)\n\n";
+    $markdown .= $this->styleGuideRules['css']['utility_classes']['description'] . "\n";
+    if (!empty($this->styleGuideRules['css']['utility_classes']['examples'])) {
+      $markdown .= "**Examples:** " . implode(', ', $this->styleGuideRules['css']['utility_classes']['examples']) . "\n\n";
+    }
+
+    $markdown .= "### Component Classes\n\n";
+    $markdown .= $this->styleGuideRules['css']['component_classes']['description'] . "\n";
+    if (!empty($this->styleGuideRules['css']['component_classes']['examples'])) {
+      $markdown .= "**Examples:** " . implode(', ', $this->styleGuideRules['css']['component_classes']['examples']) . "\n\n";
+    }
+
+    $markdown .= "### State & Modifier Classes\n\n";
+    $markdown .= $this->styleGuideRules['css']['state_classes']['description'] . "\n";
+    if (!empty($this->styleGuideRules['css']['state_classes']['examples'])) {
+      $markdown .= "**Examples:** " . implode(', ', $this->styleGuideRules['css']['state_classes']['examples']) . "\n\n";
+    }
+
+    $markdown .= "### CSS Class Categories for LLM Guidance\n\n";
+
+    foreach ($this->styleGuideRules['css']['categories'] as $categoryName => $categoryData) {
+      $markdown .= "#### " . ucfirst($categoryName) . "\n\n";
+      $markdown .= $categoryData['description'] . "\n";
+      if (!empty($categoryData['examples'])) {
+        $markdown .= "**Examples:** " . implode(', ', $categoryData['examples']) . "\n";
+      }
+      $markdown .= "\n";
+    }
+
+    $markdown .= "Use these categories to decide which classes to apply when generating new components. For example, use **Colors** classes for color styling, **Typography** for text styles, **Spacing** for margins and padding, **Layouts** for positioning, **Iconography** for icons, and **States** for interactive or conditional styles.\n";
 
     return $markdown;
   }
