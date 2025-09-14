@@ -1,0 +1,32 @@
+$schema: https://git.drupalcode.org/project/drupal/-/raw/HEAD/core/assets/schemas/v1/metadata.schema.json
+name: Nuxt Component
+description: Experimental wrapper around nuxt components
+libraryOverrides:
+  js: []
+  #  my-component.js: { attributes: { defer: true } }
+  #  my-other-file.js: {}
+props:
+  type: object
+  required:
+    - component_name
+  properties:
+    component_name:
+      type: string
+      title: Component name
+      description: The name
+      examples:
+        - drupal-markup
+    content:
+      type: string
+      title: Markup
+      examples:
+        - Watch him as he goes!
+    class:
+      type: string
+      title: Some classes to merge into
+      examples:
+        - text-bold
+    attributes:
+      type: Drupal\Core\Template\Attribute
+      name: Attributes
+      title: Attributes
