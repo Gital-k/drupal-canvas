@@ -14,6 +14,8 @@ use Drupal\canvas\Attribute\ComponentSource;
 use Drupal\canvas\ComponentDoesNotMeetRequirementsException;
 use Drupal\canvas\ComponentSource\UrlRewriteInterface;
 use Drupal\canvas\Entity\Component as ComponentEntity;
+use Drupal\canvas\Entity\ComponentInterface;
+use Drupal\canvas\Entity\VersionedConfigEntityBase;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -52,16 +54,10 @@ final class JavaScriptComponent extends GeneratedFieldExplicitInputUxComponentSo
     WidgetPluginManager $fieldWidgetPluginManager,
     EntityTypeManagerInterface $entityTypeManager,
   ) {
-    // If prop_field_definitions is empty, generate from props in config
-    // entity settings.
-    if (empty($configuration['prop_field_definitions']) && !empty($configuration['props'])) {
-      // Reuse SDC's prop generation logic.
-      // Use the already configured mock SDC plugin for prop generation.
-      $plugin = $this->getSdcPlugin();
-      $configuration['prop_field_definitions'] = GeneratedFieldExplicitInputUxComponentSourceBase::getPropsForComponentPlugin($plugin);
-    }
-
     assert(array_key_exists('local_source_id', $configuration));
+    // Expect prop_field_definitions to be set by the config entity.
+    assert(array_key_exists('prop_field_definitions', $configuration));
+
     parent::__construct(
       $configuration,
       $plugin_id,
@@ -125,27 +121,7 @@ final class JavaScriptComponent extends GeneratedFieldExplicitInputUxComponentSo
    */
   public function getSdcPlugin(): ComponentPlugin {
     if ($this->componentPlugin === NULL) {
-      // The Component class expects to create metadata from plugin_definition.
-      // We need to structure the plugin_definition to include all metadata.
-      $plugin_definition = [
-        'id' => 'javascript:' . $this->configuration['local_source_id'],
-        'machineName' => $this->configuration['local_source_id'],
-        'path' => 'mock-path',
-        'name' => $this->configuration['label'],
-        'template' => 'mock-template.html.twig',
-        'provider' => NULL,
-        // Direct SDC props structure.
-        'props' => $this->configuration['props'],
-        // Direct SDC slots structure.
-        'slots' => $this->configuration['slots'],
-      ];
-
-      // Component class creates its own metadata from plugin_definition.
-      $this->componentPlugin = new SdcPlugin(
-        ['app_root' => '', 'enforce_schemas' => FALSE],
-        'javascript:' . $this->configuration['local_source_id'],
-        $plugin_definition
-      );
+      $this->componentPlugin = static::createSdcPluginFromConfiguration($this->configuration);
     }
     return $this->componentPlugin;
   }
@@ -201,10 +177,14 @@ final class JavaScriptComponent extends GeneratedFieldExplicitInputUxComponentSo
    */
   public static function createTestComponentEntities(?string $component_name = NULL): ComponentEntity {
     $component_name = $component_name ?? 'drupal-markup';
-    $version = '1';
+    // Convert component name to label: 'drupal-markup' -> 'Drupal Markup'.
+    $label = str_replace('-', ' ', $component_name);
+    $label = ucwords($label);
 
     // Settings with 1:1 SDC metadata structure - same for all components.
     $settings = [
+      'label' => $label,
+      'local_source_id' => $component_name,
       // Props - exactly like SDC.
       'props' => [
         'type' => 'object',
@@ -212,7 +192,6 @@ final class JavaScriptComponent extends GeneratedFieldExplicitInputUxComponentSo
         'properties' => [
           'content' => [
             'type' => 'string',
-            'format' => 'html',
             'title' => 'Markup',
             'examples' => ['<p>Watch him as he goes!</p>'],
           ],
@@ -227,13 +206,7 @@ final class JavaScriptComponent extends GeneratedFieldExplicitInputUxComponentSo
       'slots' => [],
       // JavaScript-specific.
       'drupal_library' => 'canvas/nuxt_components',
-      // Auto-generate prop_field_definitions.
-      'prop_field_definitions' => [],
     ];
-
-    // Convert component name to label: 'drupal-markup' -> 'Drupal Markup'.
-    $label = str_replace('-', ' ', $component_name);
-    $label = ucwords($label);
 
     $component = ComponentEntity::create([
       'id' => 'javascript.' . $component_name,
@@ -242,15 +215,103 @@ final class JavaScriptComponent extends GeneratedFieldExplicitInputUxComponentSo
       'source' => self::SOURCE_PLUGIN_ID,
       'provider' => NULL,
       'source_local_id' => $component_name,
-      'active_version' => $version,
+      'active_version' => 'v1',
       'versioned_properties' => [
-        $version => ['settings' => $settings],
+        // The 'active' version is required by VersionedConfigEntityBase.
+        VersionedConfigEntityBase::ACTIVE_VERSION => ['settings' => $settings],
       ],
       'status' => TRUE,
     ]);
 
+    static::ensurePropFieldDefinitions($component);
     $component->save();
     return $component;
+  }
+
+  /**
+   * Ensures all props have field definitions for a component entity.
+   *
+   * Generates missing field definitions from the props schema using SDC's
+   * prop generation logic and updates the component entity's settings.
+   *
+   * @param \Drupal\canvas\Entity\ComponentInterface $component
+   *   The component entity to update.
+   */
+  public static function ensurePropFieldDefinitions(ComponentInterface $component): void {
+    // Load the active version to work with the settings.
+    $version = $component->getActiveVersion();
+    $component->loadVersion($version);
+
+    $settings = $component->getSettings();
+
+    if (!empty($settings['props']['properties'])) {
+      // Initialize prop_field_definitions if not set.
+      if (!isset($settings['prop_field_definitions'])) {
+        $settings['prop_field_definitions'] = [];
+      }
+
+      // Check if any prop is missing its field definition.
+      $prop_names = array_keys($settings['props']['properties']);
+      $missing_props = array_diff($prop_names, array_keys($settings['prop_field_definitions']));
+
+      if (!empty($missing_props)) {
+        // Create mock SDC plugin and generate field definitions.
+        $sdc_plugin = static::createSdcPluginFromConfiguration([
+          'local_source_id' => $component->get('source_local_id'),
+          'label' => $settings['label'] ?? $component->label(),
+          'props' => $settings['props'],
+          'slots' => $settings['slots'] ?? [],
+        ]);
+        $generated_definitions = self::getPropsForComponentPlugin($sdc_plugin);
+
+        foreach ($missing_props as $prop_name) {
+          if (isset($generated_definitions[$prop_name])) {
+            $settings['prop_field_definitions'][$prop_name] = $generated_definitions[$prop_name];
+          }
+        }
+        $component->setSettings($settings);
+      }
+    }
+  }
+
+  /**
+   * Creates a mock SDC plugin from configuration.
+   *
+   * This static helper creates a mock SDC plugin that can be used to generate
+   * prop field definitions without needing to instantiate the full class.
+   *
+   * @param array $configuration
+   *   Configuration array that must contain:
+   *   - local_source_id: The component's local source ID.
+   *   - label: The component's human-readable label.
+   *   - props: SDC-style props schema array.
+   *   - slots: SDC-style slots definition array.
+   *
+   * @return \Drupal\Core\Plugin\Component
+   *   A mock SDC plugin configured with the given settings.
+   */
+  protected static function createSdcPluginFromConfiguration(array $configuration): ComponentPlugin {
+    // The Component class expects to create metadata from plugin_definition.
+    // We need to structure the plugin_definition to include all metadata.
+    $plugin_definition = [
+      'id' => 'javascript:' . $configuration['local_source_id'],
+      'machineName' => $configuration['local_source_id'],
+      'path' => 'mock-path',
+      'name' => $configuration['label'],
+      'template' => 'mock-template.html.twig',
+      'provider' => NULL,
+      // Direct SDC props structure.
+      'props' => $configuration['props'],
+      // Direct SDC slots structure.
+      'slots' => $configuration['slots'],
+    ];
+
+    // Component class creates its own metadata from plugin_definition.
+    return new SdcPlugin(
+      ['app_root' => '', 'enforce_schemas' => FALSE],
+      'javascript:' . $configuration['local_source_id'],
+      $plugin_definition
+    );
   }
 
   /**
