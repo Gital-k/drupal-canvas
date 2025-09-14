@@ -5,24 +5,16 @@ declare(strict_types=1);
 namespace Drupal\canvas\Plugin\Canvas\ComponentSource;
 
 use Drupal\Core\Entity\EntityTypeManagerInterface;
-use Drupal\Core\Extension\ModuleHandlerInterface;
-use Drupal\Core\Extension\ThemeHandlerInterface;
 use Drupal\Core\Field\WidgetPluginManager;
 use Drupal\Core\Plugin\Component as ComponentPlugin;
+use Drupal\Core\Plugin\Component as SdcPlugin;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\Theme\Component\ComponentValidator;
-use Drupal\Core\Theme\ComponentPluginManager;
-use Drupal\Core\Theme\ExtensionType;
 use Drupal\canvas\Attribute\ComponentSource;
 use Drupal\canvas\ComponentDoesNotMeetRequirementsException;
-use Drupal\canvas\ComponentMetadataRequirementsChecker;
-use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\canvas\ComponentSource\UrlRewriteInterface;
 use Drupal\canvas\Entity\Component as ComponentEntity;
-use Drupal\canvas\Entity\ComponentInterface;
-use Drupal\canvas\Entity\VersionedConfigEntityBase;
 use Symfony\Component\DependencyInjection\ContainerInterface;
-use Symfony\Component\Filesystem\Path;
 
 /**
  * Defines a generic JavaScript component source.
@@ -34,10 +26,10 @@ use Symfony\Component\Filesystem\Path;
 )]
 final class JavaScriptComponent extends GeneratedFieldExplicitInputUxComponentSourceBase implements UrlRewriteInterface {
 
-  public const SOURCE_PLUGIN_ID = 'sdc';
+  public const SOURCE_PLUGIN_ID = 'javascript';
 
   /**
-   * Constructs a new SingleDirectoryComponent.
+   * Constructs a new JavaScriptComponent.
    *
    * @param array $configuration
    *   Configuration.
@@ -45,12 +37,12 @@ final class JavaScriptComponent extends GeneratedFieldExplicitInputUxComponentSo
    *   Plugin ID.
    * @param array $plugin_definition
    *   Plugin definition.
-   * @param \Drupal\Core\Theme\ComponentPluginManager $componentPluginManager
-   *   Component manager.
-   * @param \Drupal\Core\Extension\ModuleHandlerInterface $moduleHandler
-   *   Module handler.
-   * @param \Drupal\Core\Extension\ThemeHandlerInterface $themeHandler
-   *   Theme handler.
+   * @param \Drupal\Core\Theme\Component\ComponentValidator $componentValidator
+   *   Component validator.
+   * @param \Drupal\Core\Field\WidgetPluginManager $fieldWidgetPluginManager
+   *   Field widget plugin manager.
+   * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entityTypeManager
+   *   Entity type manager.
    */
   public function __construct(
     array $configuration,
@@ -59,10 +51,16 @@ final class JavaScriptComponent extends GeneratedFieldExplicitInputUxComponentSo
     ComponentValidator $componentValidator,
     WidgetPluginManager $fieldWidgetPluginManager,
     EntityTypeManagerInterface $entityTypeManager,
-    private readonly ComponentPluginManager $componentPluginManager,
-    private readonly ModuleHandlerInterface $moduleHandler,
-    private readonly ThemeHandlerInterface $themeHandler,
   ) {
+    // If prop_field_definitions is empty, generate from props in config
+    // entity settings.
+    if (empty($configuration['prop_field_definitions']) && !empty($configuration['props'])) {
+      // Reuse SDC's prop generation logic.
+      // Use the already configured mock SDC plugin for prop generation.
+      $plugin = $this->getSdcPlugin();
+      $configuration['prop_field_definitions'] = GeneratedFieldExplicitInputUxComponentSourceBase::getPropsForComponentPlugin($plugin);
+    }
+
     assert(array_key_exists('local_source_id', $configuration));
     parent::__construct(
       $configuration,
@@ -85,17 +83,7 @@ final class JavaScriptComponent extends GeneratedFieldExplicitInputUxComponentSo
       $container->get(ComponentValidator::class),
       $container->get('plugin.manager.field.widget'),
       $container->get(EntityTypeManagerInterface::class),
-      $container->get(ComponentPluginManager::class),
-      $container->get(ModuleHandlerInterface::class),
-      $container->get(ThemeHandlerInterface::class),
     );
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getSdcPlugin(): ComponentPlugin {
-    return $this->getComponentPlugin();
   }
 
   /**
@@ -103,7 +91,18 @@ final class JavaScriptComponent extends GeneratedFieldExplicitInputUxComponentSo
    */
   public function defaultConfiguration(): array {
     return parent::defaultConfiguration() + [
+    // Component name (duplicates source_local_id from entity)
       'local_source_id' => NULL,
+      // The following will be populated from the Component config entity
+      // settings.
+    // SDC-style props schema.
+      'props' => [],
+    // SDC-style slots definition.
+      'slots' => [],
+    // JavaScript library to load.
+      'drupal_library' => NULL,
+    // Human-readable label.
+      'label' => NULL,
     ];
   }
 
@@ -111,20 +110,42 @@ final class JavaScriptComponent extends GeneratedFieldExplicitInputUxComponentSo
    * {@inheritdoc}
    */
   public function getReferencedPluginClass(): ?string {
-    return $this->componentPluginManager->getDefinition($this->configuration['local_source_id'])['class'];
+    // JavaScript components don't have PHP classes.
+    return NULL;
   }
 
   /**
    * {@inheritdoc}
+   *
+   * Creates a mock SDC plugin for JavaScript components. This mock plugin
+   * allows us to reuse the explicit UX field generation logic implemented by
+   * the parent GeneratedFieldExplicitInputUxComponentSourceBase class.
+   *
+   * @todo Remove in https://www.drupal.org/project/canvas/issues/3503038
    */
-  protected function getComponentPlugin(): ComponentPlugin {
-    // @todo this should probably use DefaultSingleLazyPluginCollection
-    if (is_null($this->configuration['local_source_id'])) {
-      throw new ComponentDoesNotMeetRequirementsException(['Component has no valid source plugin_id value.']);
-    }
+  public function getSdcPlugin(): ComponentPlugin {
     if ($this->componentPlugin === NULL) {
-      // Statically cache the loaded plugin.
-      $this->componentPlugin = $this->componentPluginManager->find($this->configuration['local_source_id']);
+      // The Component class expects to create metadata from plugin_definition.
+      // We need to structure the plugin_definition to include all metadata.
+      $plugin_definition = [
+        'id' => 'javascript:' . $this->configuration['local_source_id'],
+        'machineName' => $this->configuration['local_source_id'],
+        'path' => 'mock-path',
+        'name' => $this->configuration['label'],
+        'template' => 'mock-template.html.twig',
+        'provider' => NULL,
+        // Direct SDC props structure.
+        'props' => $this->configuration['props'],
+        // Direct SDC slots structure.
+        'slots' => $this->configuration['slots'],
+      ];
+
+      // Component class creates its own metadata from plugin_definition.
+      $this->componentPlugin = new SdcPlugin(
+        ['app_root' => '', 'enforce_schemas' => FALSE],
+        'javascript:' . $this->configuration['local_source_id'],
+        $plugin_definition
+      );
     }
     return $this->componentPlugin;
   }
@@ -132,51 +153,30 @@ final class JavaScriptComponent extends GeneratedFieldExplicitInputUxComponentSo
   /**
    * {@inheritdoc}
    */
-  public function calculateDependencies(): array {
-    $dependencies = parent::calculateDependencies();
-    $component = $this->getComponentPlugin();
-    $provider = $component->getBaseId();
-    if ($this->moduleHandler->moduleExists($provider)) {
-      $dependencies['module'][] = $provider;
-    }
-    if ($this->themeHandler->themeExists($provider)) {
-      $dependencies['theme'][] = $provider;
-    }
-    return $dependencies;
+  protected function getComponentPlugin(): ComponentPlugin {
+    return $this->getSdcPlugin();
   }
 
   /**
    * {@inheritdoc}
    */
   public function getComponentDescription(): TranslatableMarkup {
-    try {
-      $component = $this->getComponentPlugin();
-      return new TranslatableMarkup('Single-directory component: %name', [
-        '%name' => $component->metadata->name ?? $component->getPluginId(),
-      ]);
-    }
-    catch (\Exception) {
-      return new TranslatableMarkup('Invalid/broken Single-directory component');
-    }
+    $component = $this->getComponentPlugin();
+    return new TranslatableMarkup('JavaScript component: %name', [
+      '%name' => $component->metadata->name,
+    ]);
   }
 
   /**
    * {@inheritdoc}
    */
   public function renderComponent(array $inputs, string $componentUuid, bool $isPreview = FALSE): array {
+    // @todo Implement JavaScript component rendering
     return [
-      '#type' => 'component',
-      '#component' => $this->configuration['local_source_id'],
-      '#props' => ($inputs[self::EXPLICIT_INPUT_NAME] ?? []) + [
-        'canvas_uuid' => $componentUuid,
-        'canvas_slot_ids' => \array_keys($this->getSlotDefinitions()),
-        'canvas_is_preview' => $isPreview,
-      ],
-      '#attached' => [
-        'library' => [
-          'core/components.' . str_replace(':', '--', $this->configuration['local_source_id']),
-        ],
-      ],
+      '#markup' => sprintf(
+        '<div>JavaScript Component: %s (rendering not implemented)</div>',
+        $this->configuration['local_source_id']
+      ),
     ];
   }
 
@@ -188,144 +188,98 @@ final class JavaScriptComponent extends GeneratedFieldExplicitInputUxComponentSo
   }
 
   /**
-   * Converts an SDC plugin machine name into a config entity ID.
+   * Create test Component config entities for JavaScript components.
    *
-   * The naming convention for SDC plugin components is [module/theme]:[component machine name]. Colon is invalid config entity name, so we replace it with '.'.
+   * This creates and saves test component entities with the given name.
+   * All components use the same metadata structure.
    *
-   * @param string $machine_name
-   *   The SDC plugin.
-   *
-   * @return string
-   *   The config entity ID.
-   *
-   * @see \Drupal\Core\Plugin\Component::$machineName
-   * @see https://www.drupal.org/docs/develop/theming-drupal/using-single-directory-components/api-for-single-directory-components
-   */
-  public static function convertMachineNameToId(string $machine_name): string {
-    assert(str_contains($machine_name, ':'));
-    return 'sdc.' . str_replace(':', '.', $machine_name);
-  }
-
-  /**
-   * Create a Component config entity for a Single Directory Component plugin.
-   *
-   * @param \Drupal\Core\Plugin\Component $component_plugin
-   *   The SDC plugin.
+   * @param string|null $component_name
+   *   Optional component name. Defaults to 'drupal-markup'.
    *
    * @return \Drupal\canvas\Entity\Component
-   *   The component config entity.
+   *   The saved component config entity.
    */
-  public static function createConfigEntity(ComponentPlugin $component_plugin): ComponentEntity {
-    assert(is_array($component_plugin->metadata->schema));
-    $props = self::getPropsForComponentPlugin($component_plugin);
-    assert(is_array($component_plugin->getPluginDefinition()));
-    // Disabled if obsolete or flagged with noUi.
-    $status = !(
-      (isset($component_plugin->metadata->noUi) && $component_plugin->metadata->noUi === TRUE)
-      // The above only works on Drupal core >=11.3.
-      // @todo Remove in https://www.drupal.org/i/3537695
-      || ($component_plugin->getPluginDefinition()['noUi'] ?? FALSE)
-      || (isset($component_plugin->metadata->status) && $component_plugin->metadata->status === 'obsolete')
-    );
+  public static function createTestComponentEntities(?string $component_name = NULL): ComponentEntity {
+    $component_name = $component_name ?? 'drupal-markup';
+    $version = '1';
 
+    // Settings with 1:1 SDC metadata structure - same for all components.
     $settings = [
-      'prop_field_definitions' => $props,
+      // Props - exactly like SDC.
+      'props' => [
+        'type' => 'object',
+        'required' => ['content'],
+        'properties' => [
+          'content' => [
+            'type' => 'string',
+            'format' => 'html',
+            'title' => 'Markup',
+            'examples' => ['<p>Watch him as he goes!</p>'],
+          ],
+          'class' => [
+            'type' => 'string',
+            'title' => 'CSS Classes',
+            'examples' => ['text-bold'],
+          ],
+        ],
+      ],
+      // Slots - empty for this example.
+      'slots' => [],
+      // JavaScript-specific.
+      'drupal_library' => 'canvas/nuxt_components',
+      // Auto-generate prop_field_definitions.
+      'prop_field_definitions' => [],
     ];
-    $sdc_source = \Drupal::service(ComponentSourceManager::class)->createInstance(self::SOURCE_PLUGIN_ID, [
-      'local_source_id' => $component_plugin->getPluginId(),
-      ...$settings,
-    ]);
-    assert($sdc_source instanceof self);
-    $version = $sdc_source->generateVersionHash();
-    return ComponentEntity::create([
-      'id' => self::convertMachineNameToId($component_plugin->getPluginId()),
-      'label' => $component_plugin->getPluginDefinition()['name'] ?? $component_plugin->getPluginId(),
-      'category' => $component_plugin->getPluginDefinition()['category'],
+
+    // Convert component name to label: 'drupal-markup' -> 'Drupal Markup'.
+    $label = str_replace('-', ' ', $component_name);
+    $label = ucwords($label);
+
+    $component = ComponentEntity::create([
+      'id' => 'javascript.' . $component_name,
+      'label' => $label,
+      'category' => 'JavaScript Components',
       'source' => self::SOURCE_PLUGIN_ID,
-      'provider' => $component_plugin->getPluginDefinition()['provider'],
-      'source_local_id' => $component_plugin->getPluginId(),
+      'provider' => NULL,
+      'source_local_id' => $component_name,
       'active_version' => $version,
       'versioned_properties' => [
-        VersionedConfigEntityBase::ACTIVE_VERSION => ['settings' => $settings],
+        $version => ['settings' => $settings],
       ],
-      'status' => $status,
+      'status' => TRUE,
     ]);
+
+    $component->save();
+    return $component;
   }
 
   /**
    * {@inheritdoc}
    */
   protected function getSourceLabel(): TranslatableMarkup {
-    $component_plugin = $this->getComponentPlugin();
-    assert(is_array($component_plugin->getPluginDefinition()));
-
-    // The 'extension_type' key is guaranteed to be set.
-    // @see \Drupal\Core\Theme\ComponentPluginManager::alterDefinition()
-    $extension_type = $component_plugin->getPluginDefinition()['extension_type'];
-    assert($extension_type instanceof ExtensionType);
-    return match ($extension_type) {
-      ExtensionType::Module => $this->t('Module component'),
-      ExtensionType::Theme => $this->t('Theme component'),
-    };
+    return $this->t('JavaScript component');
   }
 
   /**
    * {@inheritdoc}
    */
   public function checkRequirements(): void {
-    self::componentMeetsRequirements($this->getComponentPlugin());
-  }
-
-  public static function componentMeetsRequirements(ComponentPlugin $component_plugin): void {
-    $definition = $component_plugin->getPluginDefinition();
-    \assert(\is_array($definition));
-
-    if (isset($definition['status']) && $definition['status'] === 'obsolete') {
-      throw new ComponentDoesNotMeetRequirementsException(['Component has "obsolete" status']);
+    // JavaScript components requirements.
+    if (empty($this->configuration['local_source_id'])) {
+      throw new ComponentDoesNotMeetRequirementsException(['Component name is required']);
     }
-
-    // Special case exception for 'all-props' SDC.
-    // (This is used to develop support for more prop shapes.)
-    if ($definition['id'] === 'sdc_test_all_props:all-props') {
-      return;
+    if (empty($this->configuration['drupal_library'])) {
+      throw new ComponentDoesNotMeetRequirementsException(['Drupal library is required']);
     }
-
-    $required = $definition['props']['required'] ?? [];
-    ComponentMetadataRequirementsChecker::check($definition['id'], $component_plugin->metadata, $required);
   }
 
   /**
    * {@inheritdoc}
    */
   public function rewriteExampleUrl(string $url): string {
-    $parsed_url = parse_url($url);
-    \assert(\is_array($parsed_url));
-    if (array_intersect_key($parsed_url, array_flip(['scheme', 'host']))) {
-      return $url;
-    }
-
-    \assert(isset($parsed_url['path']));
-    $path = ltrim($parsed_url['path'], '/');
-    $template_path = $this->getSdcPlugin()->getTemplatePath();
-    \assert(\is_string($template_path));
-    $referenced_asset_path = Path::canonicalize(dirname($template_path) . '/' . $path);
-    if (is_file($referenced_asset_path)) {
-      // SDC example values pointing to assets included in the SDC.
-      // For example, an "avatar" SDC that shows an image, and:
-      // - the example value is `avatar.png`
-      // - the SDC contains a file called `avatar.png`
-      // - this returns `/path/to/drupal/path/to/sdc/avatar.png`, resulting in a
-      //   working preview.
-      return \base_path() . $referenced_asset_path;
-    }
-
-    // SDC example values pointing to sample locations, not actual assets.
-    // For example, a "call to action" SDC that points to a destination, and:
-    // - the example value is `adopt-a-llama`
-    // - this returns `/path/to/drupal/adopt-a-llama`, resulting in a
-    //   reasonable preview, even though there is unlikely to be a page on the
-    //   site with the `adapt-a-llama` path.
-    return \base_path() . $path;
+    // For JavaScript components, just return the URL as-is
+    // since there's no physical template path to resolve.
+    return $url;
   }
 
 }
