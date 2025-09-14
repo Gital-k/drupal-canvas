@@ -166,16 +166,14 @@ final class JavaScriptComponent extends GeneratedFieldExplicitInputUxComponentSo
   /**
    * Create test Component config entities for JavaScript components.
    *
-   * This creates and saves test component entities with the given name.
-   * All components use the same metadata structure.
+   * This creates and saves test component entities. If a component name
+   * is provided, only that component is created. Otherwise, multiple
+   * test components may be created.
    *
    * @param string|null $component_name
-   *   Optional component name. Defaults to 'drupal-markup'.
-   *
-   * @return \Drupal\canvas\Entity\Component
-   *   The saved component config entity.
+   *   Optional component name. If provided, only creates that component.
    */
-  public static function createTestComponentEntities(?string $component_name = NULL): ComponentEntity {
+  public static function createTestComponentEntities(?string $component_name = NULL): void {
     $component_name = $component_name ?? 'drupal-markup';
     // Convert component name to label: 'drupal-markup' -> 'Drupal Markup'.
     $label = str_replace('-', ' ', $component_name);
@@ -225,7 +223,6 @@ final class JavaScriptComponent extends GeneratedFieldExplicitInputUxComponentSo
 
     static::ensurePropFieldDefinitions($component);
     $component->save();
-    return $component;
   }
 
   /**
