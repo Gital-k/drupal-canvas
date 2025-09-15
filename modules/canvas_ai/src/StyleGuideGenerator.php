@@ -90,6 +90,7 @@ class StyleGuideGenerator {
     }
 
     $js = $component['sourceCodeJs'];
+    $js = preg_replace('/([\'"])data:[^\'"]+\1/', "''", $js);
     $this->styleGuideRules['components'][] = $component['machineName'];
     $this->styleGuideRules[$component['machineName']]['js'] = $js;
 

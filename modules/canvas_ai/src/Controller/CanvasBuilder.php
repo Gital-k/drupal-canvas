@@ -100,11 +100,18 @@ final class CanvasBuilder extends ControllerBase {
     $machine_names = new \stdClass();
 
     foreach (json_decode($available_components) as $component) {
+<<<<<<< HEAD
       $machine_names->{$component->machineNgame} = $component->machineName;
     }
 
     $machine_names_json = json_encode($machine_names);
     $this->styleGuideGenerator->setGlobalCSS($prompt['global_css'] ?? '');
+=======
+      $machine_names->{$component->machineName} = $component->machineName;
+    }
+
+    $machine_names_json = json_encode($machine_names);
+>>>>>>> 59396a90 (Modified prompt and refactored list of components)
     // If $prompt['messages'] is missing or invalid, this code reconstructs it
     // by scanning for keys named 'message <number>', and
     // assembling them into an ordered 'messages' array, while cleaning up old keys
@@ -247,10 +254,14 @@ final class CanvasBuilder extends ControllerBase {
       'page_title' => $prompt['page_title'] ?? NULL,
       'page_description' => $prompt['page_description'] ?? NULL,
       'active_component_uuid' => $prompt['active_component_uuid'] ?? 'None',
+<<<<<<< HEAD
       'menu_fetch_source' => $menu_fetch_source,
       'json_api_module_status' => $json_api_module_status,
       'available_components'=> $machine_names_json,
     ]);
+=======
+      'available_components'=> $machine_names_json]);
+>>>>>>> 59396a90 (Modified prompt and refactored list of components)
     $solvability = $agent->determineSolvability();
     $status = FALSE;
     $message = '';
