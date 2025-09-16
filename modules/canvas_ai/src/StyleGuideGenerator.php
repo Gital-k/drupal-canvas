@@ -94,6 +94,9 @@ class StyleGuideGenerator {
     $this->styleGuideRules['components'][] = $component['machineName'];
     $this->styleGuideRules[$component['machineName']]['js'] = $js;
 
+    // Add custom CSS for components.
+    $this->styleGuideRules[$component['machineName']]['customCss'] = $component['sourceCodeCss'];
+
     preg_match_all('/([\'"])(.*?)\1/', $js, $stringMatches);
     preg_match_all('/([A-Za-z0-9_]+)\s*:\s*([\'"])(.*?)\2/', $js, $varMatches);
 
@@ -166,7 +169,18 @@ class StyleGuideGenerator {
       $markdown .= "```\n\n";
     }
 
-    $markdown .= "## 2. CSS Guidelines\n\n";
+    $markdown .= "## 2. Custom CSS for the selected component:-\n\n";
+    foreach ($this->styleGuideRules['components'] as $component) {
+      // Check if there is any custom CSS to avoid creating empty blocks.
+      if (!empty($this->styleGuideRules[$component]['customCss'])) {
+        $markdown .= "**CSS for (`{$component}.jsx`)**\n";
+        $markdown .= "```css\n";
+        $markdown .= $this->styleGuideRules[$component]['customCss'] . "\n";
+        $markdown .= "```\n\n";
+      }
+    }
+
+    $markdown .= "## 3. CSS Guidelines\n\n";
     $markdown .= "A hybrid approach using utility, component, and state classes is employed.\n\n";
 
     $utilityPrefix = $this->styleGuideRules['css']['utility_classes']['prefix'] ?? '';
