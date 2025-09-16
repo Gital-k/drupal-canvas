@@ -36,7 +36,7 @@ const savedState = loadSavedState();
 const initialState: PrimaryPanelState = {
   activePanel: savedState.activePanel || 'layers',
   isHidden: false,
-  aiPanelOpen: false,
+  aiPanelOpen: savedState.aiPanelOpen || false,
 };
 
 // Temporary workaround to persist primary panel state when switching between entities until
@@ -45,6 +45,7 @@ const saveToLocalStorage = (state: PrimaryPanelState) => {
   try {
     const dataToSave = {
       activePanel: state.activePanel,
+      aiPanelOpen: state.aiPanelOpen,
     };
     localStorage.setItem(PANEL_STATE_KEY, JSON.stringify(dataToSave));
   } catch (e) {
@@ -68,9 +69,11 @@ export const primaryPanelSlice = createAppSlice({
     }),
     setAiPanelOpen: create.reducer((state) => {
       state.aiPanelOpen = true;
+      saveToLocalStorage(state);
     }),
     setAiPanelClosed: create.reducer((state) => {
       state.aiPanelOpen = false;
+      saveToLocalStorage(state);
     }),
   }),
   selectors: {
