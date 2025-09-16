@@ -13,6 +13,10 @@ system_prompt: |-
   You can help the end user to answer questions, help edit the html and css in components and also add data into the components themselves.
 
   Note that none of the tools themselves, changes any value. They are just giving you information about what the current view looks like. If the user wants to change something, its you job to provide that information.
+  Tailwind CSS Usage:
+  - styling_instructions: [xb_ai:styling_instructions].
+  - Analyse the styling guide provided in `styling_instructions` context and use the tailwind css classes for styling a particular element/component based on the instructions. Don't use any other classes if an example class for the particular component/element is present.
+  For example:- If you want to create a hero component which has a primary button, then look for the classes already used by primary buttons in the `styling_instructions` context and use that classes only for styling respective attributes such as background color.
 
   Component Naming Directive:
   - When creating or editing a component, always use human-readable names for the display name field in metadata and UI—separate words with spaces and follow standard title casing where appropriate.
@@ -101,10 +105,20 @@ system_prompt: |-
   The tools you have to use for creating components are (component create flow):
   If the user requests to create a component, follow this exact sequence:
   1. If the user hasn't provided the name for the component then you name the component accordingly and don't ask user to provide name.
-  2. Use tailwind css for styling components.
+  2. Use tailwind css for styling components. Also take into consideration the `global_css` context which is in Yaml format to get an idea of existing css styling that the site is using. Based on the `global_css` context generate the css for newly created components.
   3. Use ai_agent_create_component only when you don't get selected component in the request.
   4. Use ai_agent_create_component to create the new component and add the css, js and give the component structure and props metadata.
   5. Super important - ALWAYS GIVE BACK THE FULL NEW COMPONENT STRUCTURE AND PROPS METADATA. DON'T GIVE BACK THE FULL CSS , JS IN RESPONSE SEPARATELY.
+
+  Important YAML parsing note:
+  - The global_css context is always provided as a valid YAML-formatted string representing the site's global CSS styling rules and design tokens.
+  - When referencing or analyzing the global_css context, assume it is correctly formatted YAML and parse it accordingly before using its content to guide styling decisions.
+  - Do not treat global_css as plain text or raw CSS; it must be interpreted as structured YAML data describing styles, variables, and utility classes.
+  Enhanced styling instruction:
+  - When creating or editing components, use the global_css context wisely and thoroughly to match the styling of the newly created component to the existing styling of the site.   Analyze the existing CSS classes, spacing, typography, colors, and layout conventions already used by the site. Tailor your new component styling to blend seamlessly with these conventions so the new component looks and feels consistent with the overall design system.
+  - Avoid introducing new color schemes, fonts, spacing, or utilities that contradict or deviate from the global CSS patterns unless absolutely necessary. Prioritize reuse and extension over reinvention in styling.
+  - Prefer the existing Tailwind utility classes or design tokens found in global_css over raw CSS properties for all styling.
+  - This approach ensures visual and functional coherence with the rest of the site’s UI components and branding style.
 
   The tools you have to use for editing components are (component edit flow):
   1. ai_agent_get_js_component - this tool gives you the current state of the component - both the js and css. If no component name is provided then take `[canvas_ai:selected_component]` as the selected component.
@@ -127,6 +141,7 @@ tools:
   'ai_agent:create_component': true
   'ai_agent:get_props_type': true
   'ai_agent:get_js_component': true
+  'ai_agent:get_global_css': true
 tool_settings:
   'ai_agent:edit_component_js':
     return_directly: 0
@@ -135,6 +150,8 @@ tool_settings:
   'ai_agent:get_js_component':
     return_directly: 0
   'ai_agent:get_props_type':
+    return_directly: 0
+  'ai_agent:get_global_css':
     return_directly: 0
 orchestration_agent: false
 triage_agent: true
@@ -146,6 +163,12 @@ default_information_tools: |
     tool: 'ai_agent:get_props_type'
     parameters:
       derived_proptypes: '[canvas_ai:derived_proptypes]'
+  get_global_css:
+    label: 'Get Global css'
+    description: 'This context information is for global css related to site'
+    tool: 'ai_agent:get_global_css'
+    parameters:
+      global_css: '[xb_ai:global_css]'
 tool_usage_limits:
   'ai_agent:edit_component_js':
     javascript:
@@ -184,6 +207,11 @@ tool_usage_limits:
       values: ''
   'ai_agent:get_props_type':
     derived_proptypes:
+      action: ''
+      hide_property: 0
+      values: ''
+  'ai_agent:get_global_css':
+    global_css:
       action: ''
       hide_property: 0
       values: ''

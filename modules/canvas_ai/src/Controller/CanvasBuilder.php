@@ -44,6 +44,7 @@ final class CanvasBuilder extends ControllerBase {
     protected CanvasAiPageBuilderHelper $canvasAiPageBuilderHelper,
     protected CanvasAiTempStore $canvasAiTempStore,
     protected FileSystemInterface $fileSystem,
+    protected readonly XbAiPageBuilderHelper $pageBuilderHelper,
   ) {}
 
   /**
@@ -57,6 +58,7 @@ final class CanvasBuilder extends ControllerBase {
       $container->get('canvas_ai.page_builder_helper'),
       $container->get('canvas_ai.tempstore'),
       $container->get('file_system'),
+      $container->get('xb_ai.page_builder_helper'),
     );
   }
 
@@ -109,6 +111,7 @@ final class CanvasBuilder extends ControllerBase {
       }
     }
     $image_files = [];
+//    $available_components = $this->pageBuilderHelper->getAllComponentsKeyedBySource();
     foreach ($files as $file) {
       $allowed_image_types = ['image/jpeg', 'image/png'];
       $mime_type = $file->getClientMimeType();
@@ -152,6 +155,58 @@ final class CanvasBuilder extends ControllerBase {
     $agent->setChatInput(new ChatInput([
       new ChatMessage($task_message['role'], $task_message['text'], $image_files),
     ]));
+    $styling_instructions = '# Button Component Style Guide
+This document defines the style rules for the Button component.
+An LLM or rendering system should use this style guide to decide
+the appropriate style attributes for different button variants.
+
+------------------------------------------------------------
+1. Background Colors
+------------------------------------------------------------
+- Primary Button: Use a solid background color red-900.
+- Secondary Button: Use a neutral background color (e.g., Gray: #6B7280)
+- Success Button: Use a green background color (e.g., Green: #16A34A)
+- Danger Button: Use a red background color (e.g., Red: #DC2626)
+- Disabled Button: Use a light gray background (e.g., #E5E7EB)
+
+------------------------------------------------------------
+2. Text Sizes
+------------------------------------------------------------
+- Small Button: 12px, medium weight
+- Medium Button: 14px, medium weight
+- Large Button: 16px, semi-bold weight
+
+All button text should be high contrast (white for dark backgrounds,
+dark gray/black for light backgrounds).
+
+------------------------------------------------------------
+3. Padding and Shape
+------------------------------------------------------------
+- Small Button: 6px vertical, 12px horizontal, border-radius 4px
+- Medium Button: 8px vertical, 16px horizontal, border-radius 6px
+- Large Button: 10px vertical, 20px horizontal, border-radius 8px
+
+------------------------------------------------------------
+4. Hover and Active States
+------------------------------------------------------------
+- On hover: Darken the background color by 10%
+- On active/pressed: Darken background by 15%
+- On disabled: No hover or active states
+
+------------------------------------------------------------
+5. Text Alignment
+------------------------------------------------------------
+- Button text should always be centered both vertically and horizontally.
+
+------------------------------------------------------------
+Usage Notes
+------------------------------------------------------------
+- Use Primary Button for main actions
+- Use Secondary Button for less important actions
+- Use Success Button for confirmation or completion
+- Use Danger Button for destructive actions (deletes, etc.)
+- Disabled state should clearly indicate non-interactive behavior
+';
 
     // Store the current layout in the temp store. This will be later used by
     // the ai agents.
@@ -206,7 +261,7 @@ final class CanvasBuilder extends ControllerBase {
     $agent->setModelName($default['model_id']);
     $agent->setAiConfiguration([]);
     $agent->setCreateDirectly(TRUE);
-    $agent->setTokenContexts(['entity_type' => $prompt['entity_type'], 'entity_id' => $prompt['entity_id'], 'selected_component' => $prompt['selected_component'] ?? NULL, 'layout' => $prompt['layout'] ?? NULL, 'derived_proptypes' => JSON::encode($prompt['derived_proptypes']) ?? NULL, 'page_title' => $prompt['page_title'], 'page_description' => $prompt['page_description'] ?? NULL, 'active_component_uuid' => $prompt['active_component_uuid'] ?? 'None']);
+    $agent->setTokenContexts(['entity_type' => $prompt['entity_type'], 'entity_id' => $prompt['entity_id'], 'selected_component' => $prompt['selected_component'] ?? NULL, 'layout' => $prompt['layout'] ?? NULL, 'derived_proptypes' => JSON::encode($prompt['derived_proptypes']) ?? NULL, 'page_title' => $prompt['page_title'], 'page_description' => $prompt['page_description'] ?? NULL, 'active_component_uuid' => $prompt['active_component_uuid'] ?? 'None', 'global_css' => $prompt['global_css'] ?? NULL, 'styling_instructions' => $styling_instructions]);
     $solvability = $agent->determineSolvability();
     $status = FALSE;
     $message = '';

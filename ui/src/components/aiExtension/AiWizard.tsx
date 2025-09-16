@@ -16,7 +16,7 @@ import { Box, Flex, Text } from '@radix-ui/themes';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import {
-  selectCodeComponentProperty,
+  selectCodeComponentProperty, selectGlobalAssetLibraryProperty,
   setCodeComponentProperty,
 } from '@/features/code-editor/codeEditorSlice';
 import {
@@ -267,6 +267,9 @@ const AiWizard = () => {
   const params = useParams();
   const codeComponentName = useAppSelector(
     selectCodeComponentProperty('machineName'),
+  );
+  const globalOriginalCss = useAppSelector(
+    selectGlobalAssetLibraryProperty(['css', 'original']),
   );
   const model = useAppSelector(selectModel);
   const textPropsMap = Object.fromEntries(
@@ -615,6 +618,7 @@ const AiWizard = () => {
                       currentValuesRef.current.pageData[
                         'description[0][value]'
                       ],
+                    global_css: globalOriginalCss,
                   });
                   headers['Content-Type'] = 'application/json';
                 }
