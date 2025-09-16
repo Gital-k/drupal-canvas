@@ -26,6 +26,7 @@ use Drupal\canvas_ai\Plugin\AiFunctionCall\EditFieldContent;
 use Drupal\canvas_ai\Plugin\AiFunctionCall\SetAIGeneratedComponentStructure;
 use Drupal\canvas_ai\CanvasAiPageBuilderHelper;
 use Drupal\canvas_ai\CanvasAiTempStore;
+use Drupal\canvas_ai\StyleGuideGenerator;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -67,6 +68,7 @@ final class CanvasBuilder extends ControllerBase {
       $container->get('ai_agents.agent_status_poller'),
       $container->get('canvas_ai.styleguidegenerator'),
       $container->get('canvas_ai.apigenerator'),
+      $container->get('xb_ai.styleguidegenerator'),
     );
   }
 
@@ -100,18 +102,12 @@ final class CanvasBuilder extends ControllerBase {
     $machine_names = new \stdClass();
 
     foreach (json_decode($available_components) as $component) {
-<<<<<<< HEAD
       $machine_names->{$component->machineNgame} = $component->machineName;
     }
 
     $machine_names_json = json_encode($machine_names);
     $this->styleGuideGenerator->setGlobalCSS($prompt['global_css'] ?? '');
-=======
-      $machine_names->{$component->machineName} = $component->machineName;
-    }
-
-    $machine_names_json = json_encode($machine_names);
->>>>>>> 59396a90 (Modified prompt and refactored list of components)
+    $this->styleGuideGenerator->setGlobalCSS($prompt['global_css']);
     // If $prompt['messages'] is missing or invalid, this code reconstructs it
     // by scanning for keys named 'message <number>', and
     // assembling them into an ordered 'messages' array, while cleaning up old keys
@@ -254,14 +250,10 @@ final class CanvasBuilder extends ControllerBase {
       'page_title' => $prompt['page_title'] ?? NULL,
       'page_description' => $prompt['page_description'] ?? NULL,
       'active_component_uuid' => $prompt['active_component_uuid'] ?? 'None',
-<<<<<<< HEAD
       'menu_fetch_source' => $menu_fetch_source,
       'json_api_module_status' => $json_api_module_status,
       'available_components'=> $machine_names_json,
     ]);
-=======
-      'available_components'=> $machine_names_json]);
->>>>>>> 59396a90 (Modified prompt and refactored list of components)
     $solvability = $agent->determineSolvability();
     $status = FALSE;
     $message = '';

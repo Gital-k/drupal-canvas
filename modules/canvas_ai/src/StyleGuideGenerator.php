@@ -57,6 +57,30 @@ class StyleGuideGenerator {
       ],
     ],
   ];
+
+  /**
+   * Sets the global CSS content to be included in the style guide.
+   *
+   * @param string $css
+   * The global CSS as a string.
+   */
+  public function setGlobalCSS(string $css): void {
+    $this->styleGuideRules['globalCSS'] = $css;
+  }
+
+  /**
+   * Analyzes a JSON string containing component data.
+   *
+   * This method decodes the JSON, iterates through each component,
+   * and calls the CSS analyzer to extract style information. It then
+   * deduplicates the findings.
+   *
+   * @param string $jsonString
+   * A JSON string representing an array of components.
+   *
+   * @throws \InvalidArgumentException
+   * If the provided string is not valid JSON.
+   */
   public function analyze(string $jsonString): void
   {
     $decodedJson = json_decode($jsonString, true);
@@ -83,6 +107,16 @@ class StyleGuideGenerator {
     }
   }
 
+  /**
+   * Analyzes the CSS classes from a single component's source code.
+   *
+   * Extracts and categorizes CSS classes from the component's JavaScript
+   * source code and populates the style guide rules.
+   *
+   * @param array $component
+   * An associative array representing a single component, including its
+   * 'sourceCodeJs' and 'sourceCodeCss'.
+   */
   private function analyzeCss(array $component): void
   {
     if (empty($component['sourceCodeJs'])) {
@@ -169,10 +203,10 @@ class StyleGuideGenerator {
       $markdown .= "```\n\n";
     }
 
-    $markdown .= "## 2. Custom CSS for the selected component:-\n\n";
     foreach ($this->styleGuideRules['components'] as $component) {
       // Check if there is any custom CSS to avoid creating empty blocks.
       if (!empty($this->styleGuideRules[$component]['customCss'])) {
+        $markdown .= "## 2. Custom CSS for the selected component:-\n\n";
         $markdown .= "**CSS for (`{$component}.jsx`)**\n";
         $markdown .= "```css\n";
         $markdown .= $this->styleGuideRules[$component]['customCss'] . "\n";
@@ -180,7 +214,10 @@ class StyleGuideGenerator {
       }
     }
 
-    $markdown .= "## 3. CSS Guidelines\n\n";
+    $markdown .= "## 3.Global CSS \n\n";
+    $markdown .= $this->styleGuideRules['globalCSS'] = "```\n";
+
+    $markdown .= "## 4. CSS Guidelines\n\n";
     $markdown .= "A hybrid approach using utility, component, and state classes is employed.\n\n";
 
     $utilityPrefix = $this->styleGuideRules['css']['utility_classes']['prefix'] ?? '';
