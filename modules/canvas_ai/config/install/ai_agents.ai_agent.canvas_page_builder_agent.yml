@@ -21,12 +21,13 @@ system_prompt: |
   For each task, you will be provided with:
 
   1.  **Available Components Catalog:** Your absolute source of truth. A list of components with their `id`, `description`, `props` (with types/enums), and `slots`. You must study and adhere to these definitions precisely.
-  2.  **Current Page Layout:** A JSON object representing the page's current state.
-  3.  **Page Title:** The current title of the page.
-  4.  **Page Description:** The current page description/metadata.
-  5.  **Entity Type:** The `entity_type` value of entity being built (e.g., `canvas_page`).
-  6.  **Selected Component UUID:** (Optional) The UUID of a component the user has selected. Its presence indicates a contextual request.
-  7.  **User Request:** A natural language string describing the desired change.
+  2.  **Available Patterns Catalog:** A list of available patterns with their `layout`. **This is your absolute source of truth.** The layout consists of various components(might be nested too). You must study it and analyze how the components are placed.
+  3.  **Current Page Layout:** A JSON object representing the page's current state.
+  4.  **Page Title:** The current title of the page.
+  5.  **Page Description:** The current page description/metadata.
+  6.  **Entity Type:** The `entity_type` value of entity being built (e.g., `canvas_page`).
+  7.  **Selected Component UUID:** (Optional) The UUID of a component the user has selected. Its presence indicates a contextual request.
+  8.  **User Request:** A natural language string describing the desired change.
 
   ---
 
@@ -47,8 +48,9 @@ system_prompt: |
   #### **Step 2: Analyze Context and Request**
 
   1.  **Component Study:** Thoroughly analyze the `Available Components Catalog`. This is your definitive guide for component structure, props, and slots.
-  2.  **Layout Comprehension:** Parse the `Current Page Layout` to understand the existing structure, regions, and the `nodepath` and `uuid` of every component.
-  3.  **Identify Component Names:** From the `User Request`, identify the names of any components the user explicitly wants to add.
+  2.  **Pattern Study:** Thoroughly analyze the `Available Patterns Catalog`. Each pattern in the catalog consists of layout whose value is a nested array of components. This catalog is your definitive guide for understanding each pattern and analyze how some components should be placed. If any pattern is relevant for the current user requirement you should follow that pattern strictly to place the same components in the same manner only.
+  3.  **Layout Comprehension:** Parse the `Current Page Layout` to understand the existing structure, regions, and the `nodepath` and `uuid` of every component.
+  4.  **Identify Component Names:** From the `User Request`, identify the names of any components the user explicitly wants to add.
 
   #### **Step 3: CRITICAL Pre-Execution Validation**
 
@@ -241,6 +243,11 @@ default_information_tools: |
     parameters:
       page_title: '[canvas_ai:page_title]'
       page_description: '[canvas_ai:page_description]'
+  available_patterns:
+    label: 'Available patterns'
+    description: 'These are the patterns available to look at'
+    tool: 'canvas_ai:get_pattern_context'
+    parameters: {  }
 tool_usage_limits:
   'canvas_ai:set_component_structure':
     component_structure:

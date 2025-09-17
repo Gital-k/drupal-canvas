@@ -2,6 +2,8 @@
 
 namespace Drupal\canvas_ai;
 
+use Drupal\canvas\Controller\ApiConfigControllers;
+use Drupal\canvas\Entity\Pattern;
 use Drupal\Component\Serialization\Json;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Theme\ComponentPluginManager;
@@ -38,10 +40,15 @@ class CanvasAiPageBuilderHelper {
    *   The HTTP kernel.
    * @param \Symfony\Component\HttpFoundation\RequestStack $requestStack
    *   The stack of requests.
+<<<<<<< HEAD
    * @param \Drupal\Component\Uuid\UuidInterface $uuidService
    *   The UUID service.
    * @param \Drupal\canvas_ai\CanvasAiTempStore $canvasAiTempstore
    *   The Canvas AI tempstore.
+=======
+   * @param \Drupal\canvas\Controller\ApiConfigControllers $apiConfigControllers
+   *    The API config controllers service.
+>>>>>>> 0747efe3 (provide pattern context to AI)
    */
   public function __construct(
     private readonly ComponentPluginManager $componentPluginManager,
@@ -51,6 +58,7 @@ class CanvasAiPageBuilderHelper {
     private readonly RequestStack $requestStack,
     private readonly UuidInterface $uuidService,
     private readonly CanvasAiTempStore $canvasAiTempstore,
+    private readonly ApiConfigControllers $apiConfigControllers,
   ) {
   }
 
@@ -75,6 +83,25 @@ class CanvasAiPageBuilderHelper {
 
     }
     return Yaml::dump($component_context, 4, 2);
+  }
+
+  /**
+   * Gets the data of all the patterns.
+   *
+   * The output will be used as the context for the AI agent.
+   */
+  public function getPatternContextForAi(): string {
+    $output = [];
+    $available_patterns_response = $this->apiConfigControllers->list(Pattern::ENTITY_TYPE_ID);
+    $available_patterns = (string) $available_patterns_response->getContent();
+    $available_patterns = Json::decode($available_patterns);
+    if (empty($available_patterns)) {
+      return "";
+    }
+    foreach ($available_patterns as $pattern_name => $pattern) {
+      $output[$pattern_name]['layout'] = $pattern['layoutModel']['layout'];
+    }
+    return Yaml::dump($output, 4, 2);
   }
 
   /**
