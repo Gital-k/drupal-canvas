@@ -12,7 +12,7 @@ test.describe('Menu Component', () => {
     async ({ browser, drupalSite }) => {
       const page = await browser.newPage();
       const drupal: Drupal = new Drupal({ page, drupalSite });
-      await drupal.setupMinimalXBTestSite();
+      await drupal.installModules(['experience_builder']);
       const moduleDir = await getModuleDir();
       await drupal.applyRecipe(
         `${moduleDir}/experience_builder/tests/fixtures/recipes/menu`,
@@ -20,11 +20,13 @@ test.describe('Menu Component', () => {
       // @todo remove the cache clear once https://www.drupal.org/project/drupal/issues/3534825
       // is fixed.
       await drupal.drush('cr');
+      await page.close();
     },
   );
 
   test('Add and test menu component', async ({ page, drupal, xBEditor }) => {
     await drupal.loginAsAdmin();
+    await drupal.createXbPage('Homepage', '/homepage');
     await page.goto('/homepage');
     await xBEditor.goToEditor();
     const moduleDir = await getModuleDir();
@@ -33,11 +35,8 @@ test.describe('Menu Component', () => {
       `${moduleDir}/experience_builder/tests/fixtures/code_components/menus/Menu.jsx`,
       'utf-8',
     );
-    await xBEditor.addCodeComponent('Menu', code);
-    const preview = page
-      .locator('.xb-mosaic-window-preview iframe')
-      .contentFrame()
-      .locator('#xb-code-editor-preview-root');
+    await xBEditor.createCodeComponent('Menu', code);
+    const preview = xBEditor.getCodePreviewFrame();
 
     await expect(preview).toContainText('JSON:API Menu');
     await expect(preview).toContainText('Core Linkset Menu');

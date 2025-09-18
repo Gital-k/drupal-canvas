@@ -7,6 +7,7 @@ namespace Drupal\experience_builder\Hook;
 use Drupal\Component\Serialization\Json;
 use Drupal\Core\Asset\LibraryDiscoveryInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
+use Drupal\Core\Hook\Order\OrderAfter;
 use Drupal\Core\Security\TrustedCallbackInterface;
 use Drupal\Core\Url;
 use Drupal\Core\Form\FormStateInterface;
@@ -14,7 +15,7 @@ use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\Core\Render\Element;
 use Drupal\Core\Routing\CurrentRouteMatch;
 use Drupal\Core\Theme\ThemeManagerInterface;
-use Drupal\experience_builder\Form\ComponentInputsForm;
+use Drupal\experience_builder\Form\ComponentInstanceForm;
 use Drupal\media_library\MediaLibraryState;
 use Symfony\Component\HttpFoundation\RequestStack;
 
@@ -130,7 +131,7 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
     // the media library is opened for a field widget of a field instance on the
     // host entity type. That is not true for XB's "static prop sources".
     // @see \Drupal\experience_builder\PropSource\StaticPropSource
-    // @see \Drupal\experience_builder\Form\ComponentInputsForm::buildForm()
+    // @see \Drupal\experience_builder\Form\ComponentInstanceForm::buildForm()
     if ($form_state->get('is_xb_static_prop_source') !== \TRUE) {
       return;
     }
@@ -192,7 +193,7 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
     ];
   }
 
-  #[Hook('element_info_alter')]
+  #[Hook('element_info_alter', order: new OrderAfter(['editor']))]
   public function elementInfoAlter(array &$info): void {
     if (isset($info['text_format'])) {
       $info['text_format']['#process'][] = [ReduxIntegratedFieldWidgetsHooks::class, 'processTextFormat'];
@@ -211,7 +212,7 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
     // If we aren't in the component instance form, remove text formats that are
     // exclusive to that form.
     // @see \Drupal\experience_builder\Hook\ShapeMatchingHooks::filterFormatAccess()
-    if ($form_id !== ComponentInputsForm::FORM_ID) {
+    if ($form_id !== ComponentInstanceForm::FORM_ID) {
       // @see config/install/filter.format.xb_html_block.yml
       unset($element['format']['format']['#options']['xb_html_block']);
       // @see config/install/filter.format.xb_html_inline.yml
@@ -224,7 +225,7 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
     // Only proceed if this is an XB page data or component instance form.
     // This restructures the render array to simplify integration of the
     // CKEditor5 React component.
-    if (isset($element['#attributes']['data-form-id']) && in_array($element['#attributes']['data-form-id'], [ComponentInputsForm::FORM_ID, ModuleHooks::PAGE_DATA_FORM_ID])) {
+    if (isset($element['#attributes']['data-form-id']) && in_array($element['#attributes']['data-form-id'], [ComponentInstanceForm::FORM_ID, ModuleHooks::PAGE_DATA_FORM_ID])) {
       $element['value']['#attributes']['data-form-id'] = $element['#attributes']['data-form-id'];
       // The data-editor-for attribute triggers a vanilla JS initialization of
       // CKEditor5. Rename the attribute so we can instead use a React-specific

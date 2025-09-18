@@ -7,6 +7,7 @@ namespace Drupal\Tests\experience_builder\Kernel;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Field\WidgetPluginManager;
 use Drupal\Core\Form\FormState;
+use Drupal\Core\Plugin\Component as ComponentPlugin;
 use Drupal\datetime\Plugin\Field\FieldType\DateTimeItem;
 use Drupal\experience_builder\Entity\Component;
 use Drupal\experience_builder\JsonSchemaInterpreter\JsonSchemaStringFormat;
@@ -22,6 +23,7 @@ use Drupal\experience_builder\PropSource\StaticPropSource;
 use Drupal\experience_builder\ShapeMatcher\JsonSchemaFieldInstanceMatcher;
 use Drupal\experience_builder\TypedData\BetterEntityDataDefinition;
 use Drupal\KernelTests\KernelTestBase;
+use Drupal\Tests\experience_builder\Kernel\Traits\VfsPublicStreamUrlTrait;
 use Drupal\Tests\experience_builder\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\user\Entity\User;
 use JsonSchema\Constraints\Constraint;
@@ -33,6 +35,7 @@ use JsonSchema\Validator;
 class PropShapeRepositoryTest extends KernelTestBase {
 
   use ContribStrictConfigSchemaTestTrait;
+  use VfsPublicStreamUrlTrait;
 
   /**
    * {@inheritdoc}
@@ -87,6 +90,16 @@ class PropShapeRepositoryTest extends KernelTestBase {
     assert($matcher instanceof JsonSchemaFieldInstanceMatcher);
 
     $components = $sdc_manager->getAllComponents();
+    // Shape matching is only ever relevant to SDCs that may appear in the UI,
+    // and hence also in XB. Omit SDCs with `noUi: true`.
+    $components = array_filter(
+      $components,
+      fn (ComponentPlugin $c) => (property_exists($c->metadata, 'noUi') && $c->metadata->noUi === FALSE)
+        // The above only works on Drupal core >=11.3.
+        // @todo Remove in https://www.drupal.org/i/3537695
+        // @phpstan-ignore-next-line offsetAccess.nonOffsetAccessible
+        || ($c->getPluginDefinition()['noUi'] ?? FALSE) === FALSE,
+    );
     $unique_prop_shapes = [];
     foreach ($components as $component) {
       foreach (PropShape::getComponentProps($component) as $prop_shape) {
@@ -129,7 +142,9 @@ class PropShapeRepositoryTest extends KernelTestBase {
       new PropShape(['type' => 'string']),
       new PropShape(['type' => 'string', '$ref' => 'json-schema-definitions://experience_builder.module/heading-element']),
       new PropShape(['type' => 'string', '$ref' => 'json-schema-definitions://experience_builder.module/image-uri']),
+      new PropShape(['type' => 'string', '$ref' => 'json-schema-definitions://experience_builder.module/stream-wrapper-image-uri']),
       new PropShape(['type' => 'string', '$ref' => 'json-schema-definitions://experience_builder.module/textarea']),
+      new PropShape(['type' => 'string', 'contentMediaType' => 'image/*', 'format' => 'uri-reference', 'pattern' => '^(/|https?://)?(?!.*\://)[^\s]+$']),
       new PropShape(['type' => 'string', 'contentMediaType' => 'text/html']),
       new PropShape(['type' => 'string', 'contentMediaType' => 'text/html', 'x-formatting-context' => 'block']),
       new PropShape(['type' => 'string', 'contentMediaType' => 'text/html', 'x-formatting-context' => 'inline']),
@@ -146,6 +161,7 @@ class PropShapeRepositoryTest extends KernelTestBase {
       new PropShape(['type' => 'string', 'enum' => ['foo', 'bar']]),
       new PropShape(['type' => 'string', 'enum' => ['full', 'wide', 'normal', 'narrow']]),
       new PropShape(['type' => 'string', 'enum' => ['horizontal', 'vertical']]),
+      new PropShape(['type' => 'string', 'enum' => ['lazy', 'eager']]),
       new PropShape(['type' => 'string', 'enum' => ['moon-stars-fill', 'moon-stars', 'star-fill', 'star', 'stars', 'rocket-fill', 'rocket-takeoff-fill', 'rocket-takeoff', 'rocket']]),
       new PropShape(['type' => 'string', 'enum' => ['power', 'like', 'external']]),
       new PropShape(['type' => 'string', 'enum' => ['prefix', 'suffix']]),
@@ -233,6 +249,26 @@ class PropShapeRepositoryTest extends KernelTestBase {
         fieldTypeProp: new FieldTypePropExpression('string', 'value'),
         fieldWidget: 'string_textfield',
       ),
+      // ⚠️Identical to the below, because its `$ref` resolves to this.
+      'type=string&contentMediaType=image/*&format=uri-reference&pattern=^(/|https?://)?(?!.*\://)[^\s]+$' => new StorablePropShape(
+        shape: new PropShape(['type' => 'string', 'contentMediaType' => 'image/*', 'format' => 'uri-reference', 'pattern' => '^(/|https?://)?(?!.*\://)[^\s]+$']),
+        fieldTypeProp: new FieldTypePropExpression('image', 'src_with_alternate_widths'),
+        fieldWidget: 'image_image',
+      ),
+      // ⚠️Identical to the above, because `$ref` resolves to the above.
+      'type=string&$ref=json-schema-definitions://experience_builder.module/image-uri' => new StorablePropShape(
+        shape: new PropShape(['type' => 'string', 'contentMediaType' => 'image/*', 'format' => 'uri-reference', 'pattern' => '^(/|https?://)?(?!.*\://)[^\s]+$']),
+        fieldTypeProp: new FieldTypePropExpression('image', 'src_with_alternate_widths'),
+        fieldWidget: 'image_image',
+      ),
+      'type=string&$ref=json-schema-definitions://experience_builder.module/stream-wrapper-image-uri' => new StorablePropShape(
+        shape: new PropShape(['type' => 'string', 'contentMediaType' => 'image/*', 'format' => 'uri', 'pattern' => '^(?!https?://)[\w\-]+://']),
+        fieldTypeProp: new ReferenceFieldTypePropExpression(
+          referencer: new FieldTypePropExpression('image', 'entity'),
+          referenced: new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'uri', NULL, 'value'),
+        ),
+        fieldWidget: 'image_image',
+      ),
       'type=object&$ref=json-schema-definitions://experience_builder.module/image' => new StorablePropShape(
         shape: new PropShape(['type' => 'object', '$ref' => 'json-schema-definitions://experience_builder.module/image']),
         fieldTypeProp: new FieldTypeObjectPropsExpression('image', [
@@ -310,6 +346,17 @@ class PropShapeRepositoryTest extends KernelTestBase {
         shape: new PropShape([
           'type' => 'string',
           'enum' => ['full', 'wide', 'normal', 'narrow'],
+        ]),
+        fieldTypeProp: new FieldTypePropExpression('list_string', 'value'),
+        fieldWidget: 'options_select',
+        fieldStorageSettings: [
+          'allowed_values_function' => 'experience_builder_load_allowed_values_for_component_prop',
+        ],
+      ),
+      'type=string&enum[0]=lazy&enum[1]=eager' => new StorablePropShape(
+        shape: new PropShape([
+          'type' => 'string',
+          'enum' => ['lazy', 'eager'],
         ]),
         fieldTypeProp: new FieldTypePropExpression('list_string', 'value'),
         fieldWidget: 'options_select',
@@ -603,7 +650,6 @@ class PropShapeRepositoryTest extends KernelTestBase {
       'type=array&items[type]=integer&minItems=1' => new PropShape(['type' => 'array', 'items' => ['type' => 'integer'], 'minItems' => 1]),
       'type=array&items[type]=integer&minItems=2' => new PropShape(['type' => 'array', 'items' => ['type' => 'integer'], 'minItems' => 2]),
       'type=object&$ref=json-schema-definitions://sdc_test_all_props.module/date-range' => new PropShape(['type' => 'object', '$ref' => 'json-schema-definitions://sdc_test_all_props.module/date-range']),
-      'type=string&$ref=json-schema-definitions://experience_builder.module/image-uri' => new PropShape(['type' => 'string', '$ref' => 'json-schema-definitions://experience_builder.module/image-uri']),
       'type=object&$ref=json-schema-definitions://experience_builder.module/shoe-icon' => new PropShape(['type' => 'object', '$ref' => 'json-schema-definitions://experience_builder.module/shoe-icon']),
       'type=string&format=duration' => new PropShape(['type' => 'string', 'format' => JsonSchemaStringFormat::Duration->value]),
       'type=string&format=hostname' => new PropShape(['type' => 'string', 'format' => JsonSchemaStringFormat::Hostname->value]),
@@ -701,7 +747,7 @@ class PropShapeRepositoryTest extends KernelTestBase {
     // A StaticPropSource is never rendered in an abstract context; it's always
     // rendered for a concrete component's prop. So, this test should do the
     // same.
-    // @see \Drupal\experience_builder\Form\ComponentInputsForm
+    // @see \Drupal\experience_builder\Form\ComponentInstanceForm
     $sdc_manager = \Drupal::service('plugin.manager.sdc');
     $components = $sdc_manager->getAllComponents();
     $some_sdc_prop_for_unique_prop_shape = [];
@@ -714,7 +760,7 @@ class PropShapeRepositoryTest extends KernelTestBase {
           $some_sdc_prop_for_unique_prop_shape[$prop_shape->uniquePropSchemaKey()] = [
             $component_id,
             // Note: on the live site, an older version than the active version
-            // may be used in the ComponentInputsForm, because the Content
+            // may be used in the ComponentInstanceForm, because the Content
             // Author may be editing an ancient component instance. For the
             // purpose of this test, the active version is fine.
             Component::load($component_id)?->getActiveVersion(),
@@ -780,7 +826,9 @@ class PropShapeRepositoryTest extends KernelTestBase {
         $validator->getErrors(),
         sprintf("Sample value %s generated by field type %s for %s is invalid!",
           json_encode($random_value),
-          $storable_prop_shape->fieldTypeProp->fieldType,
+          $storable_prop_shape->fieldTypeProp instanceof ReferenceFieldTypePropExpression
+            ? $storable_prop_shape->fieldTypeProp->referencer->fieldType
+            : $storable_prop_shape->fieldTypeProp->fieldType,
           $storable_prop_shape->shape->uniquePropSchemaKey()
         )
       );

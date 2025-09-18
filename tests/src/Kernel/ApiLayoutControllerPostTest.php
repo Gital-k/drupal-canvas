@@ -206,8 +206,14 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
     $this->assertResponseAutoSaves($response, [$node], TRUE);
     $json = self::decodeResponse($response);
     $model = $json['model'];
+    $crawler = new Crawler($json['html']);
+    self::assertCount(2, $crawler->filter(\sprintf('a[href="%s"].my-hero__cta--primary', 'https://drupal.org')));
+    self::assertSame('https://drupal.org', $model[XBTestSetup::UUID_STATIC_CARD1]['source']['cta1href']['value']['uri']);
+    self::assertSame('https://drupal.org', $model[XBTestSetup::UUID_STATIC_CARD2]['source']['cta1href']['value']['uri']);
     $original_content = $response->getContent();
     self::assertIsString($original_content);
+
+    // Generate preview; must not generate an auto-save entry.
     $response = $this->request(Request::create('/xb/api/v0/layout/node/1', method: 'POST', content: $this->filterLayoutForPost($original_content)));
     $this->assertResponseAutoSaves($response, [$node]);
     $autoSave = $this->container->get(AutoSaveManager::class);
@@ -244,13 +250,17 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
       'type' => 'sdc.xb_test_sdc.heading@9616e3c4ab9b4fce',
       'slots' => [],
     ];
-    // And update the card model to use a URI reference.
+    // And update the first card model to use a URI reference.
     $json['model'][XBTestSetup::UUID_STATIC_CARD1]['resolved']['cta1href'] = 'entity:node/1';
     $json['model'][XBTestSetup::UUID_STATIC_CARD1]['source']['cta1href']['value']['uri'] = 'entity:node/1';
 
     $json += $this->getPostContentsDefaults($node);
+    // The first card model has been updated, the second is unchanged.
+    self::assertSame('entity:node/1', $json['model'][XBTestSetup::UUID_STATIC_CARD1]['source']['cta1href']['value']['uri']);
+    self::assertSame('https://drupal.org', $json['model'][XBTestSetup::UUID_STATIC_CARD2]['source']['cta1href']['value']['uri']);
     $response = $this->request(Request::create('/xb/api/v0/layout/node/1', method: 'POST', content: \json_encode($json, JSON_THROW_ON_ERROR)));
     $crawler = new Crawler($this->getRawContent());
+    self::assertCount(1, $crawler->filter(\sprintf('a[href="%s"].my-hero__cta--primary', 'https://drupal.org')));
     self::assertCount(1, $crawler->filter(\sprintf('a[href="%s"].my-hero__cta--primary', $node->toUrl()->toString())));
     $this->assertResponseAutoSaves($response, [$node]);
     self::assertFalse($autoSave->getAutoSaveEntity($node)->isEmpty());
@@ -477,8 +487,8 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
     self::assertNotNull($content_region);
 
     $crawler = new Crawler($this->content);
-    $element = $crawler->filter('astro-island')->eq(1);
-    self::assertNotFalse(str_contains($content_region, 'astro-island'));
+    $element = $crawler->filter('xb-island')->eq(1);
+    self::assertNotFalse(str_contains($content_region, 'xb-island'));
     self::assertNotFalse(str_contains($content_region, $uuid));
     self::assertEquals($uuid, $element->attr('uid'));
 

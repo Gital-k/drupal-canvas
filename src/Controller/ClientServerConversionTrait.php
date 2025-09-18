@@ -6,6 +6,7 @@ namespace Drupal\experience_builder\Controller;
 
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Validation\BasicRecursiveValidatorFactory;
+use Drupal\experience_builder\ComponentSource\ComponentSourceWithSwitchCasesInterface;
 use Drupal\experience_builder\Entity\Component;
 use Drupal\experience_builder\Entity\ComponentInterface;
 use Drupal\experience_builder\Entity\EntityConstraintViolationList;
@@ -40,7 +41,11 @@ trait ClientServerConversionTrait {
     // Transform client-side representation to server-side representation.
     $items = [];
     foreach ($layout as $component) {
-      assert($component['nodeType'] === 'component');
+      // @todo In https://www.drupal.org/project/experience_builder/issues/3525746, generate `switch` + `case` client-side node types for the Personalization ComponentSource's components — this requires synchronous changes on the client side.
+      // @see https://www.drupal.org/project/experience_builder/issues/3525746#comment-16121437
+      // @see \Drupal\experience_builder\Plugin\Field\FieldType\ComponentTreeItem::getClientSideRepresentation()
+      // @see \Drupal\experience_builder\Plugin\Field\FieldType\ComponentTreeItemList::getClientSideRepresentation()
+      assert(in_array($component['nodeType'], ['component', ComponentSourceWithSwitchCasesInterface::SWITCH, ComponentSourceWithSwitchCasesInterface::CASE]));
       $items = \array_merge($items, self::doClientComponentToServerTree($component, $model, ComponentTreeItemList::ROOT_UUID, NULL));
     }
     if ($validate) {
@@ -79,7 +84,7 @@ trait ClientServerConversionTrait {
    */
   private static function doClientComponentToServerTree(array $layout, array $model, string $parent_uuid, ?string $parent_slot): array {
     \assert(\array_key_exists('nodeType', $layout));
-    \assert($layout['nodeType'] === 'component');
+    assert(in_array($layout['nodeType'], ['component', ComponentSourceWithSwitchCasesInterface::SWITCH, ComponentSourceWithSwitchCasesInterface::CASE]));
 
     $uuid = $layout['uuid'] ?? NULL;
     $component_id = $layout['type'] ?? NULL;
@@ -129,7 +134,7 @@ trait ClientServerConversionTrait {
     if ($validate) {
       $violation_list = $entity ? new EntityConstraintViolationList($entity) : new ConstraintViolationList();
     }
-    foreach ($items as $delta => ['uuid' => $uuid, 'component_id' => $component_id, 'inputs' => $inputs]) {
+    foreach ($items as $delta => ['uuid' => $uuid, 'component_id' => $component_id, 'inputs' => $inputs, 'component_version' => $version]) {
       $component = $components[$component_id] ?? NULL;
       // If validation is requested, this has already been validated in
       // ::clientToServerTree
@@ -138,6 +143,7 @@ trait ClientServerConversionTrait {
         continue;
       }
       assert($component instanceof ComponentInterface);
+      $component->loadVersion($version);
       $source = $component->getComponentSource();
       // First we transform the incoming client model into input values using
       // the source plugin.

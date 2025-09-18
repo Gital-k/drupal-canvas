@@ -19,6 +19,7 @@ use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\file\Entity\File;
 use Drupal\file\Plugin\Field\FieldType\FileFieldItemList;
 use Drupal\KernelTests\KernelTestBase;
+use Drupal\media\Entity\Media;
 use Drupal\node\Entity\Node;
 use Drupal\node\Entity\NodeType;
 use Drupal\taxonomy\Entity\Term;
@@ -26,6 +27,7 @@ use Drupal\taxonomy\Entity\Vocabulary;
 use Drupal\Tests\experience_builder\Unit\PropExpressionTest;
 use Drupal\Tests\field\Traits\EntityReferenceFieldCreationTrait;
 use Drupal\Tests\image\Kernel\ImageFieldCreationTrait;
+use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
 use Drupal\user\Entity\User;
 
 /**
@@ -42,6 +44,9 @@ class PropExpressionDependenciesTest extends KernelTestBase {
 
   use EntityReferenceFieldCreationTrait;
   use ImageFieldCreationTrait;
+  use MediaTypeCreationTrait;
+
+  public const NODE_1_UUID = '406ff859-f31b-4247-8b76-56cda80c06b9';
 
   /**
    * {@inheritdoc}
@@ -66,6 +71,14 @@ class PropExpressionDependenciesTest extends KernelTestBase {
   /**
    * {@inheritdoc}
    */
+  protected static $configSchemaCheckerExclusions = [
+    // @todo Core bug: this is missing config schema: `type: field.storage_settings.file_uri` does not exist! This is being fixed in https://www.drupal.org/project/drupal/issues/3324140.
+    'field.storage.node.bar',
+  ];
+
+  /**
+   * {@inheritdoc}
+   */
   protected function setUp(): void {
     parent::setUp();
     $this->installEntitySchema('file');
@@ -74,6 +87,10 @@ class PropExpressionDependenciesTest extends KernelTestBase {
     $this->installEntitySchema('user');
     $this->installSchema('file', 'file_usage');
     $this->installEntitySchema('media');
+
+    $this->createMediaType('image', ['id' => 'image']);
+    $this->createMediaType('image', ['id' => 'baby_photos']);
+    $this->createMediaType('image', ['id' => 'vacation_photos']);
 
     // `article` node type.
     NodeType::create([
@@ -103,6 +120,27 @@ class PropExpressionDependenciesTest extends KernelTestBase {
       'label' => 'Body',
     ])->save();
     $this->createImageField('field_image', 'node', 'article');
+    $this->createEntityReferenceField('node', 'article', 'yo_ho', 'Yo Ho', 'media', selection_handler_settings: [
+      'target_bundles' => ['image'],
+    ]);
+
+    // `foo` node type.
+    NodeType::create([
+      'type' => 'foo',
+      'name' => 'Foo',
+    ])->save();
+    FieldStorageConfig::create([
+      'field_name' => 'bar',
+      'type' => 'file_uri',
+      'entity_type' => 'node',
+      'cardinality' => 1,
+    ])->save();
+    FieldConfig::create([
+      'field_name' => 'bar',
+      'entity_type' => 'node',
+      'bundle' => 'foo',
+      'label' => 'The bar file URI field',
+    ])->save();
 
     // `news` node type.
     NodeType::create([
@@ -132,12 +170,21 @@ class PropExpressionDependenciesTest extends KernelTestBase {
       'name' => 'term2',
       'vid' => 'tags',
     ])->save();
-    File::create([
+    $image_file = File::create([
       'uuid' => 'some-image-uuid',
       'uri' => 'public://example.png',
       'filename' => 'example.png',
-    ])->save();
+    ]);
+    $image_file->save();
+    $image_media = Media::create([
+      'name' => 'Example image',
+      'bundle' => 'image',
+      'field_media_image' => $image_file,
+      'uuid' => 'some-media-uuid',
+    ]);
+    $image_media->save();
     Node::create([
+      'uuid' => self::NODE_1_UUID,
       'title' => 'dummy_title',
       'type' => 'article',
       'uid' => 1,
@@ -158,6 +205,27 @@ class PropExpressionDependenciesTest extends KernelTestBase {
           'height' => 11,
         ],
       ],
+      'yo_ho' => [
+        'target_id' => $image_media->id(),
+      ],
+    ])->save();
+
+    // `xyz` node type.
+    NodeType::create([
+      'type' => 'xyz',
+      'name' => 'XYZ',
+    ])->save();
+    FieldStorageConfig::create([
+      'field_name' => 'abc',
+      'type' => 'map',
+      'entity_type' => 'node',
+      'cardinality' => 1,
+    ])->save();
+    FieldConfig::create([
+      'field_name' => 'abc',
+      'entity_type' => 'node',
+      'bundle' => 'xyz',
+      'label' => 'The XYZ map field',
     ])->save();
   }
 

@@ -2,7 +2,13 @@
  * ⚠️ This is highly experimental and *will* be refactored.
  */
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
-import { useEffect, useRef, useState, useCallback } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  useCallback,
+  useSyncExternalStore,
+} from 'react';
 import { DeepChat } from 'deep-chat-react';
 import styles from './AiWizard.module.css';
 import {
@@ -17,7 +23,10 @@ import {
 import { getDrupalSettings } from '@/utils/drupal-globals';
 import { Box, Flex, Text } from '@radix-ui/themes';
 import type { CodeComponent } from '@/types/CodeComponent';
-import { updatePageDataExternally } from '@/features/pageData/pageDataSlice';
+import {
+  selectPageData,
+  updatePageDataExternally,
+} from '@/features/pageData/pageDataSlice';
 import {
   selectModel,
   setUpdatePreview,
@@ -29,6 +38,71 @@ import type {
 } from '@/features/layout/layoutModelSlice';
 import AiWelcome from '@assets/icons/ai-welcome.svg?react';
 import fixtureProps from '../../../../modules/xb_ai/src/PropsSchema.json';
+
+const DB_NAME = 'aiWizardDB';
+const STORE_NAME = 'chatHistory';
+const KEY = 'history';
+
+const withStore = (
+  type: IDBTransactionMode,
+  callback: (store: IDBObjectStore) => void,
+): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, 1);
+    request.onupgradeneeded = () =>
+      request.result.createObjectStore(STORE_NAME);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const db = request.result;
+      const tx = db.transaction(STORE_NAME, type);
+      callback(tx.objectStore(STORE_NAME));
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    };
+  });
+};
+
+const db = {
+  get: (): Promise<any[]> =>
+    new Promise((resolve) => {
+      let req: IDBRequest;
+      withStore('readonly', (store) => {
+        req = store.get(KEY);
+      }).then(() => resolve(req?.result || []));
+    }),
+  set: (data: any[]) => withStore('readwrite', (store) => store.put(data, KEY)),
+  clear: () => withStore('readwrite', (store) => store.clear()),
+};
+
+const createHistoryStore = () => {
+  let history: any[] = [];
+  const subscribers = new Set<() => void>();
+
+  db.get().then((initialHistory) => {
+    history = initialHistory;
+    subscribers.forEach((callback) => callback());
+  });
+
+  return {
+    addMessage(message: any) {
+      history = [...history, message];
+      db.set(history);
+    },
+    clearHistory() {
+      history = [];
+      db.clear();
+      subscribers.forEach((callback) => callback());
+    },
+    subscribe(callback: () => void) {
+      subscribers.add(callback);
+      return () => subscribers.delete(callback);
+    },
+    getSnapshot() {
+      return history;
+    },
+  };
+};
+const historyStore = createHistoryStore();
 
 const simplePropertyHandler = (
   property: string,
@@ -95,7 +169,7 @@ const editContentHandler = {
 const metadataHandler = {
   canHandle: (msg: any) => 'metadata' in msg && msg.metadata,
   handle: async ({ message, dispatch }: { message: any; dispatch: any }) => {
-    const value = JSON.parse(message.metadata);
+    const value = message.metadata;
     dispatch(setUpdatePreview(true));
     dispatch(
       updatePageDataExternally({
@@ -116,14 +190,16 @@ const operationsHandler = {
     availableComponents,
     layoutUtils,
     componentSelectionUtils,
+    navigate,
   }: {
     message: any;
     dispatch: any;
     availableComponents: any;
     layoutUtils: any;
     componentSelectionUtils: any;
+    navigate: any;
   }) => {
-    // Logic for placing components (SDCs/Blocks/Code components) to the canvas.
+    // Logic for placing components (SDCs/Blocks/Code components) to the editor frame.
     for (const op of message.operations) {
       // Only 'Add' operation is supported for now.
       if (
@@ -133,56 +209,15 @@ const operationsHandler = {
         availableComponents
       ) {
         for (const component of op.components) {
-          if (
-            component.id &&
-            component.nodePath &&
-            availableComponents[component.id]
-          ) {
-            let componentToUse: XBComponent = availableComponents[component.id];
-            if (component.fieldValues) {
-              // Create a copy of the component to set the field values
-              // as it is not possible to update the original component
-              // object directly.
-              const componentCopy = structuredClone(
-                availableComponents[component.id],
-              );
-              // Set the values to the props.
-              Object.entries(component.fieldValues).forEach(
-                ([fieldName, value]) => {
-                  const propSource = (componentCopy as any).propSources?.[
-                    fieldName
-                  ];
-                  if (propSource) {
-                    // Ensure default_values exists
-                    if (!propSource.default_values) {
-                      propSource.default_values = {};
-                    }
-                    if (propSource.jsonSchema.format === 'uri-reference') {
-                      propSource.default_values.source = [value];
-                    } else {
-                      // Ensure source exists and is an array
-                      if (!Array.isArray(propSource.default_values.source)) {
-                        propSource.default_values.source = [{}];
-                      }
-                      // Ensure the first element exists
-                      if (!propSource.default_values.source[0]) {
-                        propSource.default_values.source[0] = {};
-                      }
-                      // Now set the value
-                      propSource.default_values.source[0].value = value;
-                      // @todo Revisit once https://www.drupal.org/node/3538576 is in.
-                      propSource.default_values.resolved = value;
-                    }
-                  }
-                },
-              );
-              componentToUse = componentCopy;
-            }
+          if (component.id && availableComponents[component.id]) {
+            const componentToUse: XBComponent =
+              availableComponents[component.id];
             dispatch(
               layoutUtils.addNewComponentToLayout(
                 {
-                  to: component.nodePath,
                   component: componentToUse,
+                  withValues: component.fieldValues,
+                  to: component.nodePath,
                 },
                 componentSelectionUtils.setSelectedComponent,
               ),
@@ -193,6 +228,8 @@ const operationsHandler = {
         }
       }
     }
+    // Redirect to /editor.
+    navigate('/editor');
   },
 };
 
@@ -211,19 +248,8 @@ function getHandlersForMessage(message: any) {
   return messageHandlers.filter((handler) => handler.canHandle(message));
 }
 
-const SESSION_STORAGE_KEY = 'aiWizardChatHistory';
-
-function loadChatHistory() {
-  const data = sessionStorage.getItem(SESSION_STORAGE_KEY);
-  if (!data) return [];
-  try {
-    return JSON.parse(data);
-  } catch {
-    return [];
-  }
-}
-
 const AiWizard = () => {
+  const pageData = useAppSelector(selectPageData);
   const dispatch = useAppDispatch();
   const drupalSettings = getDrupalSettings();
   const chatElementRef = useRef<any>(null);
@@ -238,8 +264,12 @@ const AiWizard = () => {
     Object.entries(model).map(([uuid, comp]) => [uuid, comp.resolved]),
   );
   const textPropsMapString = JSON.stringify(textPropsMap);
-  const [, setChatHistory] = useState(() => loadChatHistory());
+  const chatHistory = useSyncExternalStore(
+    historyStore.subscribe,
+    historyStore.getSnapshot,
+  );
   let isComponentRendered = false;
+  const welcomeTextRef = useRef<HTMLSpanElement>(null);
 
   // Create a ref to store current values for Deep Chat's connect prop.
   // Accessing these ensures we're working with fresh values even after the Deep
@@ -247,6 +277,7 @@ const AiWizard = () => {
   const currentValuesRef = useRef({
     codeComponentName,
     textPropsMapString,
+    pageData,
   });
 
   // Update the ref whenever tracked values change.
@@ -254,8 +285,9 @@ const AiWizard = () => {
     currentValuesRef.current = {
       codeComponentName,
       textPropsMapString,
+      pageData,
     };
-  }, [codeComponentName, textPropsMapString]);
+  }, [codeComponentName, textPropsMapString, pageData]);
   // Access layoutUtils and componentSelectionUtils from drupalSettings.xb
   const layoutUtils = drupalSettings.xb?.layoutUtils as any;
   const componentSelectionUtils = drupalSettings.xb
@@ -265,16 +297,28 @@ const AiWizard = () => {
   const theLayoutModel = useAppSelector(
     (state) => state?.layoutModel?.present as LayoutModelSliceState,
   );
+  const layoutModelRef = useRef(theLayoutModel);
+  useEffect(() => {
+    layoutModelRef.current = theLayoutModel;
+  }, [theLayoutModel]);
   const selectedComponent = useAppSelector(
     (state) => state.ui.selection.items[0],
   );
   const { data: availableComponents } = useGetComponentsQuery();
+  const componentsRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (availableComponents && !componentsRef.current) {
+      componentsRef.current = availableComponents;
+    }
+  }, [availableComponents]);
 
   // Helper to transform the current layout into a JSON representation.
   const transformLayout = () => {
-    if (!theLayoutModel?.layout) return null;
+    const theLayout = layoutModelRef.current;
+    if (!theLayout?.layout) return null;
     const result: any = { layout: {} };
-    theLayoutModel.layout.forEach((region, regionIndex) => {
+    theLayout.layout.forEach((region, regionIndex) => {
       result.layout[region.id] = {
         nodePathPrefix: [regionIndex],
         components: [],
@@ -357,34 +401,31 @@ const AiWizard = () => {
     async (message: any) => {
       try {
         const handlers = getHandlersForMessage(message);
-        // If the handler is operationsHandler, do not await it here.
-        if (handlers.some((h) => h === operationsHandler)) {
-          // Show the message in the chat immediately.
-          setTimeout(() => {
-            // Do the async work in the background.
-            operationsHandler.handle({
+        for (const handler of handlers) {
+          // If the handler is operationsHandler, do not await it here.
+          if (handler === operationsHandler) {
+            setTimeout(() => {
+              // Do the async work in the background.
+              operationsHandler.handle({
+                message,
+                dispatch,
+                availableComponents: componentsRef.current,
+                layoutUtils,
+                componentSelectionUtils,
+                navigate,
+              });
+            }, 0);
+          } else {
+            await handler.handle({
               message,
               dispatch,
-              availableComponents,
+              createCodeComponent,
+              navigate,
+              availableComponents: componentsRef.current,
               layoutUtils,
               componentSelectionUtils,
             });
-          }, 0);
-          // Return the message to DeepChat so it is displayed immediately.
-          return { text: message.message };
-        }
-
-        // For other handlers, await as usual.
-        for (const handler of handlers) {
-          await handler.handle({
-            message,
-            dispatch,
-            createCodeComponent,
-            navigate,
-            availableComponents,
-            layoutUtils,
-            componentSelectionUtils,
-          });
+          }
         }
         return { text: message.message };
       } catch (error) {
@@ -399,7 +440,6 @@ const AiWizard = () => {
       dispatch,
       createCodeComponent,
       navigate,
-      availableComponents,
       layoutUtils,
       componentSelectionUtils,
     ],
@@ -411,10 +451,10 @@ const AiWizard = () => {
     const handler = (event: { detail: { message: any; isHistory: any } }) => {
       const { message, isHistory } = event.detail;
       if (!isHistory) {
-        const oldHistoryStr = sessionStorage.getItem(SESSION_STORAGE_KEY);
-        const oldHistory = oldHistoryStr ? JSON.parse(oldHistoryStr) : [];
-        const updated = [...oldHistory, message];
-        sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(updated));
+        if (welcomeTextRef.current) {
+          welcomeTextRef.current.style.display = 'none';
+        }
+        historyStore.addMessage(message);
       }
     };
     chatEl.addEventListener('message', handler);
@@ -423,15 +463,18 @@ const AiWizard = () => {
     };
   }, [csrfToken]);
 
-  // Set up the chat element to handle messages and history.
-  useEffect(() => {
-    if (chatElementRef.current && csrfToken) {
-      // Load chat history from sessionStorage.
-      chatElementRef.current.loadHistory = () => {
-        return loadChatHistory();
-      };
+  // Handle text input changes to enable/disable submit button.
+  const handleTextInput = () => {
+    const chatEl = chatElementRef.current;
+    const deepChatEl = document.querySelector('deep-chat') as any;
+    const inputText =
+      deepChatEl?.shadowRoot?.querySelector('#text-input')?.textContent || '';
+    if (inputText.trim().length > 0) {
+      chatEl.disableSubmitButton(false);
+    } else {
+      chatEl.disableSubmitButton();
     }
-  }, [csrfToken, receiveMessage]);
+  };
 
   return (
     csrfToken && (
@@ -456,12 +499,13 @@ const AiWizard = () => {
               <Text className={styles.aiWizardBeta}>Beta</Text>
             </Box>
           </Flex>
-          <Text className={styles.aiWizardSubtitle}>
+          <Text ref={welcomeTextRef} className={styles.aiWizardSubtitle}>
             Hello, how can I help you today?
           </Text>
         </Flex>
         <DeepChat
           ref={chatElementRef}
+          history={chatHistory}
           images={{
             files: {
               acceptedFormats: '.jpg, .png, .jpeg',
@@ -537,6 +581,12 @@ const AiWizard = () => {
                     active_component_uuid: selectedComponent ?? '',
                     current_layout: transformLayout(),
                     derived_proptypes: fixtureProps,
+                    page_title:
+                      currentValuesRef.current.pageData['title[0][value]'],
+                    page_description:
+                      currentValuesRef.current.pageData[
+                        'description[0][value]'
+                      ],
                   });
                   headers['Content-Type'] = 'application/json';
                 }
@@ -559,13 +609,17 @@ const AiWizard = () => {
                   role: 'error',
                 });
               }
+              setTimeout(() => {
+                chatElementRef.current?.disableSubmitButton();
+              }, 0);
             },
           }}
+          onInput={handleTextInput}
           onComponentRender={() => {
             if (!isComponentRendered) {
               chatElementRef.current.clearMessages();
-              sessionStorage.removeItem(SESSION_STORAGE_KEY);
-              setChatHistory([]);
+              historyStore.clearHistory();
+              chatElementRef.current.disableSubmitButton();
               isComponentRendered = true;
             }
           }}

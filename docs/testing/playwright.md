@@ -4,6 +4,12 @@
 These tests are in the `tests/src/Playwright` folder and make use of the recipes
 located in `tests/fixtures/recipes`.
 
+>>>
+❗ Setup
+First follow the global [setup instructions](./setup.md) to ensure you have all
+the required PHP dependencies.
+>>>
+
 ## Running Tests
 
 If you are not using ddev, copy `.env.defaults` to `.env` and modify the values
@@ -52,6 +58,11 @@ separate files are run in parallel. You can override this per [test file](https:
 and opt into fully parallel mode, however keep in mind that for each test worker
 that starts it will install a new Drupal site. You will also incur any
 additional overhead required to set up Experience Builder for each worker.
+
+However, you should still write each test as if it could run in parallel i.e.
+do not rely on a state from the previous test. This is because when a test fails,
+crashes, or flakes, then it can retry. It will do this by first running the
+`beforeAll` function, and then skipping straight to the test in question.
 
 ```typescript
 import { expect } from '@playwright/test';

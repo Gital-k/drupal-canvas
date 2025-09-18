@@ -13,24 +13,23 @@ test.describe('Global elements', () => {
     async ({ browser, drupalSite }) => {
       const page = await browser.newPage();
       const drupal: Drupal = new Drupal({ page, drupalSite });
-      await drupal.setupMinimalXBTestSite();
+      await drupal.installModules(['experience_builder']);
+      await page.close();
     },
   );
 
   test('Page title', async ({ page, xBEditor, drupal }) => {
     await drupal.loginAsAdmin();
-    await page.goto('/homepage');
+    await drupal.createXbPage('Page Title', '/page-title');
+    await page.goto('/page-title');
     await xBEditor.goToEditor();
     const moduleDir = await getModuleDir();
     const code = await readFile(
       `${moduleDir}/experience_builder/tests/fixtures/code_components/page-elements/PageTitle.jsx`,
       'utf-8',
     );
-    await xBEditor.addCodeComponent('PageTitle', code);
-    const preview = page
-      .locator('.xb-mosaic-window-preview iframe')
-      .contentFrame()
-      .locator('#xb-code-editor-preview-root');
+    await xBEditor.createCodeComponent('PageTitle', code);
+    const preview = xBEditor.getCodePreviewFrame();
     // @see \Drupal\experience_builder\Controller\ExperienceBuilderController::__invoke
     await expect(
       preview.getByRole('heading', {
@@ -41,18 +40,16 @@ test.describe('Global elements', () => {
 
   test('Site branding', async ({ page, xBEditor, drupal }) => {
     await drupal.loginAsAdmin();
-    await page.goto('/homepage');
+    await drupal.createXbPage('Site Branding', '/site-branding');
+    await page.goto('/site-branding');
     await xBEditor.goToEditor();
     const moduleDir = await getModuleDir();
     const code = await readFile(
       `${moduleDir}/experience_builder/tests/fixtures/code_components/page-elements/SiteBranding.jsx`,
       'utf-8',
     );
-    await xBEditor.addCodeComponent('SiteBranding', code);
-    const preview = page
-      .locator('.xb-mosaic-window-preview iframe')
-      .contentFrame()
-      .locator('#xb-code-editor-preview-root');
+    await xBEditor.createCodeComponent('SiteBranding', code);
+    const preview = xBEditor.getCodePreviewFrame();
     // Site name defaults to 'Drupal'.
     // @see \Drupal\Core\Command\InstallCommand::configure
     await expect(preview.getByRole('link', { name: 'Drupal' })).toBeVisible();
@@ -60,18 +57,16 @@ test.describe('Global elements', () => {
 
   test('Breadcrumbs', async ({ page, xBEditor, drupal }) => {
     await drupal.loginAsAdmin();
-    await page.goto('/homepage');
+    await drupal.createXbPage('Breadcrumbs', '/breadcrumbs');
+    await page.goto('/breadcrumbs');
     await xBEditor.goToEditor();
     const moduleDir = await getModuleDir();
     const code = await readFile(
       `${moduleDir}/experience_builder/tests/fixtures/code_components/page-elements/Breadcrumbs.jsx`,
       'utf-8',
     );
-    await xBEditor.addCodeComponent('Breadcrumbs', code);
-    const preview = page
-      .locator('.xb-mosaic-window-preview iframe')
-      .contentFrame()
-      .locator('#xb-code-editor-preview-root');
+    await xBEditor.createCodeComponent('Breadcrumbs', code);
+    const preview = xBEditor.getCodePreviewFrame();
     // @see \Drupal\experience_builder\Controller\ExperienceBuilderController::__invoke
     await expect(preview.getByRole('link', { name: 'Home' })).toBeVisible();
     await expect(

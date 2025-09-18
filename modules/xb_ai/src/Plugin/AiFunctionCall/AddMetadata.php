@@ -49,8 +49,13 @@ class AddMetadata extends FunctionCallBase implements ExecutableFunctionCallInte
    * {@inheritdoc}
    */
   public function getReadableOutput(): string {
+    // \Drupal\xb_ai\Controller\XbBuilder::render() expects a YAML parsable
+    // string.
+    // @see \Drupal\xb_ai\Controller\XbBuilder::render()
     return Yaml::dump([
-      'metadata' => $this->metadata,
+      'metadata' => [
+        'metatag_description' => $this->metadata,
+      ],
     ], 10, 2);
   }
 

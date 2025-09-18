@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Drupal\Tests\xb_ai\Kernel\Plugin\AiFunctionCall;
 
 use Drupal\ai\Service\FunctionCalling\ExecutableFunctionCallInterface;
-use Drupal\Component\Serialization\Json;
 use Drupal\KernelTests\KernelTestBase;
 use Symfony\Component\Yaml\Yaml;
 
@@ -50,19 +49,20 @@ class AddMetadataTest extends KernelTestBase {
     $tool = $this->functionCallManager->createInstance('ai_agent:add_metadata');
     $this->assertInstanceOf(ExecutableFunctionCallInterface::class, $tool);
 
-    $generated_metadata = [
+    $generated_metadata = 'This is metatag description';
+    $expected_result = [
       'metadata' => [
-        'metatag_description' => 'This is metatag description',
+        'metatag_description' => $generated_metadata,
       ],
     ];
-    $tool->setContextValue('metadata', Json::encode($generated_metadata));
+    $tool->setContextValue('metadata', $generated_metadata);
     $tool->execute();
     $result = $tool->getReadableOutput();
     $this->assertIsString($result);
 
     $parsed_result = Yaml::parse($result);
     $this->assertArrayHasKey('metadata', $parsed_result);
-    $this->assertEquals($generated_metadata, Json::decode($parsed_result['metadata']));
+    $this->assertEquals($expected_result, $parsed_result);
   }
 
 }

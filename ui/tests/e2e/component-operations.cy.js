@@ -1,4 +1,6 @@
-describe('Perform CRUD operations on components that require disabled CSS aggregation', () => {
+// WARNING: describe.skip() is used to ignore this entire spec as it was ported to Playwright in https://www.drupal.org/i/3537664
+// eslint-disable-next-line mocha/no-pending-tests
+describe.skip('Perform CRUD operations on components that require disabled CSS aggregation', () => {
   before(() => {
     cy.drupalXbInstall([], { disableAggregation: true });
   });
@@ -30,7 +32,9 @@ describe('Perform CRUD operations on components that require disabled CSS aggreg
   });
 });
 
-describe('Perform CRUD operations on components', () => {
+// WARNING: describe.skip() is used to ignore this entire spec as it was ported to Playwright in https://www.drupal.org/i/3537664
+// eslint-disable-next-line mocha/no-pending-tests
+describe.skip('Perform CRUD operations on components', () => {
   before(() => {
     cy.drupalXbInstall();
   });
@@ -191,7 +195,7 @@ describe('Perform CRUD operations on components', () => {
           'Deprecated SDC',
           'Experimental SDC',
           'Heading',
-          'Image',
+          'Test SDC Image',
           'Hero',
           'Pattern',
           'One Column',
@@ -261,7 +265,7 @@ describe('Perform CRUD operations on components', () => {
       },
     );
 
-    cy.clickComponentInPreview('Image');
+    cy.clickComponentInPreview('Test SDC Image');
     cy.openLibraryPanel();
 
     cy.get('.primaryPanelContent').should('contain.text', 'Components');
@@ -357,16 +361,16 @@ describe('Perform CRUD operations on components', () => {
     cy.loadURLandWaitForXBLoaded();
 
     // Delete the two existing image components.
-    cy.clickComponentInPreview('Image');
+    cy.clickComponentInPreview('Test SDC Image');
     cy.realPress('{del}');
-    cy.clickComponentInPreview('Image');
+    cy.clickComponentInPreview('Test SDC Image');
     cy.realPress('{del}');
 
-    cy.waitForComponentNotInPreview('Image');
+    cy.waitForComponentNotInPreview('Test SDC Image');
 
     cy.openLibraryPanel();
 
-    cy.get('.primaryPanelContent').findByText('Image').click();
+    cy.get('.primaryPanelContent').findByText('Test SDC Image').click();
 
     cy.intercept('POST', '**/xb/api/v0/layout/node/1').then(cy.log);
 
@@ -382,12 +386,12 @@ describe('Perform CRUD operations on components', () => {
     cy.loadURLandWaitForXBLoaded();
 
     // Delete the two existing image components.
-    cy.clickComponentInPreview('Image');
+    cy.clickComponentInPreview('Test SDC Image');
     cy.realPress('{del}');
-    cy.clickComponentInPreview('Image');
+    cy.clickComponentInPreview('Test SDC Image');
     cy.realPress('{del}');
 
-    cy.waitForComponentNotInPreview('Image');
+    cy.waitForComponentNotInPreview('Test SDC Image');
 
     cy.openLibraryPanel();
     cy.get('.primaryPanelContent')

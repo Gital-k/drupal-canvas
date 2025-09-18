@@ -28,6 +28,7 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
     // XB's dependencies (the subset that is needed for these tests).
     'file',
     'image',
+    'link',
     'options',
   ];
 
@@ -322,6 +323,35 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
   }
 
   /**
+   * Tests `type: string` `format: …` validation edge cases.
+   *
+   * @testWith [{"format": "uri-reference"}, "https://example.com", null]
+   *           [{"format": "uri-reference"}, "ftp://example.com", null]
+   *           [{"format": "uri-reference"}, "/node/1", null]
+   *           [{"format": "uri-reference"}, "bunny.jpg", null]
+   *           [{"format": "uri"}, "https://example.com", null]
+   *           [{"format": "uri"}, "ftp://example.com", null]
+   *           [{"format": "uri"}, "/node/1", "Invalid URL format"]
+   *           [{"format": "uri"}, "bunny.jpg", "Invalid URL format"]
+   *
+   * @todo Expand this test coverage in https://www.drupal.org/project/experience_builder/issues/3542890 — this shows what is allowed by the two choices offered by the UI.
+   */
+  public function testStringFormatPropDefinition(array $string_definition, string $example, ?string $validation_error): void {
+    $this->entity->set('props', [
+      'beep' => [
+        'type' => 'string',
+        'title' => 'A meaningful title, but irrelevant in this test',
+        ...$string_definition,
+        'examples' => [$example],
+      ],
+    ]);
+    $expected_validation_errors = is_null($validation_error)
+      ? []
+      : ['' => 'Prop "beep" has invalid example value: [] ' . $validation_error];
+    $this->assertValidationErrors($expected_validation_errors);
+  }
+
+  /**
    * Tests `type: object` validation and edge cases.
    *
    * (Cannot be tested generically, like `string`, `integer` and `number`.)
@@ -355,19 +385,26 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
             // Missing required 'src'.
             'width' => 1200,
           ],
+          [
+            // Valid (although basically nonsensical) relative path.
+            'src' => 'path/to/image.png',
+          ],
+          [
+            // Valid root-relative URL.
+            'src' => '/root/relative/path/to/image.png',
+          ],
         ],
       ],
     ]);
     $this->assertValidationErrors([
-      '' => 'Prop "some_object" has invalid example value: [src] The property src is required
-[] Does not have a value in the enumeration [null]',
+      '' => 'Prop "some_object" has invalid example value: [src] The property src is required',
       'props.some_object.enum.0' => 'This value should not be null.',
       'props.some_object.examples.0' => [
         'This value should not be blank.',
         "'src' is a required key.",
       ],
       'props.some_object.examples.1' => 'This value should not be null.',
-      'props.some_object.examples.4.src' => '<em class="placeholder">&quot;hi mum, this is not a url&quot;</em> does not match the pattern <em class="placeholder">@^(/|https?://)?.*\.([Pp][Nn][Gg]|[Gg][Ii][Ff]|[Jj][Pp][Gg]|[Jj][Pp][Ee][Gg]|[Ww][Ee][Bb][Pp]|[Aa][Vv][Ii][Ff])(\?.*)?(#.*)?$@</em>.',
+      'props.some_object.examples.4.src' => '<em class="placeholder">&quot;hi mum, this is not a url&quot;</em> does not match the pattern <em class="placeholder">@^(/|https?://)?(?!.*\://)[^\s]+$@</em>.',
       'props.some_object.examples.5' => "'src' is a required key.",
     ]);
   }

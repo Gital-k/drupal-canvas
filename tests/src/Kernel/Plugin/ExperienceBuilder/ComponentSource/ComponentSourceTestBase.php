@@ -26,11 +26,11 @@ use Drupal\experience_builder\Entity\Page;
 use Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase;
 use Drupal\experience_builder\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
 use Drupal\experience_builder\Plugin\Field\FieldType\ComponentTreeItemList;
-use Drupal\experience_builder\PropExpressions\StructuredData\FieldTypePropExpression;
 use Drupal\experience_builder\PropSource\StaticPropSource;
 use Drupal\experience_builder\Storage\ComponentTreeLoader;
 use Drupal\KernelTests\KernelTestBase;
 use Drupal\Tests\experience_builder\Kernel\Traits\CiModulePathTrait;
+use Drupal\Tests\experience_builder\Kernel\Traits\VfsPublicStreamUrlTrait;
 use Drupal\Tests\experience_builder\Traits\ConstraintViolationsTestTrait;
 use Drupal\Tests\experience_builder\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\experience_builder\Traits\CrawlerTrait;
@@ -62,12 +62,20 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
 
   use RfcLoggerTrait;
   use UninstallValidatorTestTrait;
+  use VfsPublicStreamUrlTrait;
 
   protected const string UUID_CRASH_TEST_DUMMY = '3204a711-a1bd-401d-9ce0-895665487eaa';
 
   private const string UUID_FALLBACK_ROOT = 'd61651f3-e46b-45fa-aff1-beb95c64a886';
 
   protected array $logMessages = [];
+
+  /**
+   * The number of Component config entities to expect prior to discovery.
+   *
+   * @var int
+   */
+  protected int $expectedDefaultComponentInstallCount = 0;
 
   /**
    * {@inheritdoc}
@@ -160,7 +168,7 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
    */
   protected function getAllSettings(array $component_ids): array {
     $this->assertNotEmpty($component_ids);
-    $this->assertCount(0, $this->componentStorage->loadMultiple());
+    $this->assertCount($this->expectedDefaultComponentInstallCount, $this->componentStorage->loadMultiple());
     $this->generateComponentConfig();
     $components = $this->componentStorage->loadMultiple($component_ids);
 
@@ -179,7 +187,7 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
    */
   protected function callSourceMethodForEach(string $method_name, array $component_ids): array {
     $this->assertNotEmpty($component_ids);
-    $this->assertCount(0, $this->componentStorage->loadMultiple());
+    $this->assertCount($this->expectedDefaultComponentInstallCount, $this->componentStorage->loadMultiple());
     $this->generateComponentConfig();
     $components = $this->componentStorage->loadMultiple($component_ids);
 
@@ -233,7 +241,7 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
    * @return array<ComponentConfigEntityId, class-string|null>
    */
   protected function getReferencedPluginClasses(array $component_ids): array {
-    $this->assertCount(0, $this->componentStorage->loadMultiple());
+    $this->assertCount($this->expectedDefaultComponentInstallCount, $this->componentStorage->loadMultiple());
     $this->generateComponentConfig();
 
     $actual_classes = [];
@@ -248,7 +256,7 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
    * @param array<ComponentConfigEntityId> $component_ids
    */
   protected function renderComponentsLive(array $component_ids, callable $get_default_input): array {
-    $this->assertCount(0, $this->componentStorage->loadMultiple());
+    $this->assertCount($this->expectedDefaultComponentInstallCount, $this->componentStorage->loadMultiple());
     $this->generateComponentConfig();
 
     $rendered = [];
@@ -270,8 +278,12 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
       $html = str_replace(self::getCiModulePath(), '::XB_MODULE_PATH::', $html);
       // Ensure predictable order of cache contexts & tags.
       // @see https://www.drupal.org/node/3230171
-      sort($build['#cache']['contexts']);
-      sort($build['#cache']['tags']);
+      if (isset($build['#cache']['contexts'])) {
+        sort($build['#cache']['contexts']);
+      }
+      if (isset($build['#cache']['tags'])) {
+        sort($build['#cache']['tags']);
+      }
       $rendered[$component_id] = [
         'html' => $html,
         'cacheability' => CacheableMetadata::createFromRenderArray($build),
@@ -348,7 +360,7 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
    */
   protected function generateCrashTestDummyComponentTree(string $component_id, array $inputs, bool $assertCount = TRUE): ComponentTreeItemList {
     if ($assertCount) {
-      $this->assertCount(0, $this->componentStorage->loadMultiple());
+      $this->assertCount($this->expectedDefaultComponentInstallCount, $this->componentStorage->loadMultiple());
       $this->generateComponentConfig();
     }
 
@@ -358,10 +370,7 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
         'uuid' => '38b79bf8-53d0-4307-b9ef-221c6a63023a',
         'component_id' => 'sdc.xb_test_sdc.two_column',
         'inputs' => [
-          'width' => StaticPropSource::generate(
-            expression: new FieldTypePropExpression('integer', 'value'),
-            cardinality: 1,
-          )->withValue(33)->toArray(),
+          'width' => 33,
         ],
       ],
       [

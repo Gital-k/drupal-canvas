@@ -1,24 +1,25 @@
-const iterations = [
-  {
-    removeText: 'Remove The bones are their money',
-    selectNewText: 'Select Sorry I resemble a dog',
-    removeAriaLabel: 'Remove Sorry I resemble a dog',
-    expectedAlt: 'My barber may have been looking at a picture of a dog',
-  },
-  {
-    removeText: 'Remove Sorry I resemble a dog',
-    selectNewText: 'Select The bones are their money',
-    removeAriaLabel: 'Remove The bones are their money',
-    expectedAlt: 'The bones equal dollars',
-  },
-  {
-    removeText: 'Remove The bones are their money',
-    selectNewText: 'Select Sorry I resemble a dog',
-    removeAriaLabel: 'Remove Sorry I resemble a dog',
-    expectedAlt: 'My barber may have been looking at a picture of a dog',
-  },
-];
 const testMediaLibraryInEntityForm = (cy, loadOptions = {}, title) => {
+  const iterations = [
+    {
+      removeText: 'Remove The bones are their money',
+      selectNewText: 'Select Sorry I resemble a dog',
+      removeAriaLabel: 'Remove Sorry I resemble a dog',
+      expectedAlt: 'My barber may have been looking at a picture of a dog',
+    },
+    {
+      removeText: 'Remove Sorry I resemble a dog',
+      selectNewText: 'Select The bones are their money',
+      removeAriaLabel: 'Remove The bones are their money',
+      expectedAlt: 'The bones equal dollars',
+    },
+    {
+      removeText: 'Remove The bones are their money',
+      selectNewText: 'Select Sorry I resemble a dog',
+      removeAriaLabel: 'Remove Sorry I resemble a dog',
+      expectedAlt: 'My barber may have been looking at a picture of a dog',
+    },
+  ];
+
   cy.drupalLogin('xbUser', 'xbUser');
   // Node 1 includes prop sources that make use of adapters, we need to
   // make sure there are no auto-save entries for that node before we attempt
@@ -84,14 +85,14 @@ const testMediaLibraryInEntityForm = (cy, loadOptions = {}, title) => {
     cy.log(`Iteration ${ix + 1}: Adding ${step.expectedAlt} complete`);
   });
 
-  // Add a new component which should trigger opening the component inputs form
+  // Add a new component which should trigger opening the component instance form
   // in the contextual panel.
   cy.openLibraryPanel();
   cy.get('.primaryPanelContent').should('contain.text', 'Components');
   cy.get('.primaryPanelContent').findByText('Hero').click();
   cy.findByTestId('xb-contextual-panel').should('exist');
   cy.get(
-    '[class*="contextualPanel"] [data-drupal-selector="component-inputs-form"]',
+    '[class*="contextualPanel"] [data-drupal-selector="component-instance-form"]',
   ).within(() => {
     cy.findAllByLabelText('Heading').should('exist');
   });
@@ -134,7 +135,7 @@ const testMediaLibraryInEntityForm = (cy, loadOptions = {}, title) => {
 
 describe('Media Library In Entity (page data) Form', () => {
   before(() => {
-    cy.drupalXbInstall();
+    cy.drupalXbInstall([], {}, ['administer nodes']);
   });
 
   beforeEach(() => {

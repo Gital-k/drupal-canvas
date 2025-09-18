@@ -59,19 +59,38 @@ final class FieldObjectPropsExpression implements StructuredDataPropExpressionIn
       . static::PREFIX_FIELD_ITEM_LEVEL . ($this->delta ?? '')
       . static::PREFIX_PROPERTY_LEVEL . static::PREFIX_OBJECT
       . implode(',', array_map(
-        fn (
+        function (
           string $obj_prop_name,
-          FieldPropExpression|ReferenceFieldPropExpression $expr
-        ) => sprintf(
-          '%s%s%s',
-          $obj_prop_name,
-          $expr instanceof ReferenceFieldPropExpression
-            ? self::SYMBOL_OBJECT_MAPPED_FOLLOW_REFERENCE
-            : self::SYMBOL_OBJECT_MAPPED_USE_PROP,
-          $expr instanceof ReferenceFieldPropExpression
-            ? $expr->referencer->propName . static::PREFIX_ENTITY_LEVEL . self::withoutPrefix((string) $expr->referenced)
-            : $expr->propName,
-        ),
+          FieldPropExpression|ReferenceFieldPropExpression $expr,
+        ) {
+          // It is guaranteed that every referencer's fieldName matches exactly
+          // and is hence guaranteed to be a string. Which automatically means
+          // propName must also be a string.
+          // Assert it here both to satisfy PHPStan and to prove it while
+          // assertions are on.
+          // @see __construct()
+          // @see \Drupal\experience_builder\PropExpressions\StructuredData\FieldPropExpression::__construct()
+          // @see \Drupal\Tests\experience_builder\Unit\PropExpressionTest::testInvalidFieldPropExpressionDueToMultipleFieldPropNamesWithoutMultipleFieldNames()
+          assert(($expr instanceof ReferenceFieldPropExpression && is_string($expr->referencer->propName)) || ($expr instanceof FieldPropExpression && is_string($expr->propName)));
+          $tail = match (get_class($expr)) {
+            ReferenceFieldPropExpression::class => (function () use ($expr) {
+              assert(is_string($expr->referencer->propName));
+              return $expr->referencer->propName . static::PREFIX_ENTITY_LEVEL . self::withoutPrefix((string) $expr->referenced);
+            })(),
+            FieldPropExpression::class => (function () use ($expr) {
+              assert(is_string($expr->propName));
+              return $expr->propName;
+            })(),
+          };
+          return sprintf(
+            '%s%s%s',
+            $obj_prop_name,
+            $expr instanceof ReferenceFieldPropExpression
+              ? self::SYMBOL_OBJECT_MAPPED_FOLLOW_REFERENCE
+              : self::SYMBOL_OBJECT_MAPPED_USE_PROP,
+            $tail,
+          );
+        },
         array_keys($this->objectPropsToFieldProps),
         array_values($this->objectPropsToFieldProps),
       ))
@@ -121,9 +140,11 @@ final class FieldObjectPropsExpression implements StructuredDataPropExpressionIn
       else {
         [$sdc_obj_prop_name, $obj_prop_mapping_remainder] = explode(self::SYMBOL_OBJECT_MAPPED_FOLLOW_REFERENCE, $obj_prop_mapping);
         [$field_instance_prop_name, $field_prop_ref_expr] = explode(self::PREFIX_ENTITY_LEVEL, $obj_prop_mapping_remainder, 2);
+        $referenced = StructuredDataPropExpression::fromString(self::PREFIX . $field_prop_ref_expr);
+        assert($referenced instanceof ReferenceFieldPropExpression || $referenced instanceof FieldPropExpression || $referenced instanceof FieldObjectPropsExpression);
         $objectPropsToFieldTypeProps[$sdc_obj_prop_name] = new ReferenceFieldPropExpression(
           new FieldPropExpression($entity_data_definition, $field_name, NULL, $field_instance_prop_name),
-          FieldPropExpression::fromString(self::PREFIX . $field_prop_ref_expr)
+          $referenced,
         );
       }
     }

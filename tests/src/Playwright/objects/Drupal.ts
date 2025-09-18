@@ -35,11 +35,11 @@ export class Drupal {
   }
 
   disableDrush() {
-    this.drupalSite.hasDrush = true;
+    this.drupalSite.hasDrush = false;
   }
 
   enableDrush() {
-    this.drupalSite.hasDrush = false;
+    this.drupalSite.hasDrush = true;
   }
 
   setDrush(enabled: boolean) {
@@ -50,6 +50,7 @@ export class Drupal {
     return await execDrush(command, this.drupalSite);
   }
 
+  // @todo deprecate this as it sets the site up into a weird state.
   async setupXBTestSite() {
     const moduleDir = await getModuleDir();
     await this.enableTestExtensions();
@@ -62,10 +63,9 @@ export class Drupal {
     );
   }
 
-  async setupMinimalXBTestSite() {
-    await this.installModules(['experience_builder', 'xb_test_sdc']);
+  async createXbPage(title: string, alias: string) {
     await this.drush(
-      "php-eval \"Drupal\\experience_builder\\Entity\\Page::create(['title' => 'Homepage', 'type' => 'xb_page', 'path' => ['alias' => '/homepage', 'langcode' => 'en']])->save();\"",
+      `php-eval "Drupal\\experience_builder\\Entity\\Page::create(['title' => '${title}', 'type' => 'xb_page', 'path' => ['alias' => '${alias}', 'langcode' => 'en']])->save();"`,
     );
   }
 
@@ -232,12 +232,12 @@ export class Drupal {
       }
       await page.locator('[data-drupal-selector="edit-submit"]').click();
       for (const module of modules) {
-        const checkbox = await page.locator(
+        const checkbox = page.locator(
           `[data-drupal-selector="edit-modules-${this.normalizeAttribute(
             module,
           )}-enable"]`,
         );
-        await expect(checkbox).toBeTruthy();
+        expect(checkbox).toBeTruthy();
         await expect(checkbox).toBeDisabled();
       }
       await expect(page.locator('//*[@data-drupal-messages]')).toContainText(
@@ -277,7 +277,65 @@ export class Drupal {
     );
   }
 
-  async addMedia(path: string, alt: string) {
+  async setPreprocessing({
+    css,
+    javascript,
+  }: {
+    css?: boolean;
+    javascript?: boolean;
+  }) {
+    let changedCss, changedJs;
+
+    if (this.hasDrush()) {
+      if (css !== undefined) {
+        changedCss = true;
+        await this.drush(
+          `config:set system.performance css.preprocess ${css ? '1' : '0'}`,
+        );
+      }
+      if (javascript !== undefined) {
+        changedJs = true;
+        await this.drush(
+          `config:set system.performance js.preprocess ${javascript ? '1' : '0'}`,
+        );
+      }
+      if (changedCss || changedJs) {
+        await this.drush('cache:clear css-js');
+      }
+    } else {
+      await this.page.goto('/admin/config/development/performance');
+      if (css !== undefined) {
+        changedCss = true;
+        await this.page.getByLabel('Aggregate CSS files').setChecked(css);
+      }
+      if (javascript !== undefined) {
+        changedJs = true;
+        await this.page
+          .getByLabel('Aggregate JavaScript files')
+          .setChecked(javascript);
+      }
+      await this.page
+        .getByRole('button', { name: 'Save configuration' })
+        .click();
+    }
+
+    // If either CSS or JS was changed, verify the setting is applied
+    if (changedCss || changedJs) {
+      await this.page.goto(`/admin/config/development/performance`);
+      if (changedCss) {
+        await expect(this.page.getByLabel('Aggregate CSS files')).toBeChecked({
+          checked: !!css,
+        });
+      }
+      if (changedJs) {
+        await expect(
+          this.page.getByLabel('Aggregate JavaScript files'),
+        ).toBeChecked({ checked: !!javascript });
+      }
+    }
+  }
+
+  async addMediaGenericFile(path: string) {
     await this.page
       .locator('[data-testid="xb-contextual-panel"] input[value="Add media"]')
       .first() // @todo shouldn't need this but XB is currently rendering two fields
@@ -287,10 +345,37 @@ export class Drupal {
         'form[data-drupal-selector^="media-library-add-form-upload"] input[name="files[upload]"]',
       )
       .setInputFiles(nodePath.join(__dirname, path));
+    await this.page.getByRole('button', { name: 'Save', exact: true }).click();
+    // @todo select the item we just uploaded rather than the first.
+    await this.page
+      .locator(
+        '.media-library-widget-modal input[data-drupal-selector^="edit-media-library-select-form"]',
+      )
+      .first()
+      .setChecked(true, { force: true });
+    await this.page
+      .getByRole('button', { name: 'Insert selected', exact: true })
+      .click();
+    await expect(
+      this.page.locator(
+        '[data-testid="xb-contextual-panel"] .js-media-library-item input[data-xb-media-remove-button="true"]',
+      ),
+    ).toBeVisible();
+  }
+
+  async addMediaImage(path: string, alt: string) {
+    await this.page.getByRole('button', { name: 'Add media' }).click();
+
+    await this.page
+      .locator(
+        'form[data-drupal-selector^="media-library-add-form-upload"] input[name="files[upload]"]',
+      )
+      .setInputFiles(nodePath.join(__dirname, path));
 
     // It should be possible to set the alt text with the following, but there's currently a bug
     // await this.page.getByLabel('Alternative text').fill('A cute dog');
     // instead we use the evaluate method to set the value directly.
+    // https://www.drupal.org/project/experience_builder/issues/3535215
     await this.page
       .locator('input[name="media[0][fields][field_media_image][0][alt]"]')
       .evaluate((el: HTMLInputElement, value) => {
@@ -320,6 +405,24 @@ export class Drupal {
       return window.drupalSettings;
     });
     return value;
+  }
+
+  async selectMedia(media: string) {
+    await this.page
+      .locator('[data-testid="xb-contextual-panel"] input[value="Add media"]')
+      .first() // @todo Remove this line in https://www.drupal.org/project/experience_builder/issues/3535220
+      .click();
+    await this.page
+      .locator(`div.xb-media-preview-label:has-text("${media}")`)
+      .click();
+    await this.page
+      .getByRole('button', { name: 'Insert selected', exact: true })
+      .click();
+    expect(
+      this.page.locator(
+        '[data-testid="xb-contextual-panel"] .js-media-library-item-preview img',
+      ),
+    );
   }
 
   normalizeAttribute(attribute: string) {

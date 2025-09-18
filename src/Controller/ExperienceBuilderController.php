@@ -16,10 +16,12 @@ use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Field\WidgetPluginManager;
 use Drupal\Core\Render\HtmlResponse;
 use Drupal\Core\Render\RendererInterface;
+use Drupal\Core\Routing\UrlGeneratorInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Template\Attribute;
 use Drupal\Core\Theme\ThemeInitializationInterface;
 use Drupal\Core\Theme\ThemeManagerInterface;
+use Drupal\Core\Url;
 use Drupal\experience_builder\AssetRenderer;
 use Drupal\experience_builder\AutoSave\AutoSaveManager;
 use Drupal\experience_builder\Entity\ContentTemplate;
@@ -45,6 +47,7 @@ final class ExperienceBuilderController {
     private readonly EntityTypeManagerInterface $entityTypeManager,
     private readonly EntityFieldManagerInterface $entityFieldManager,
     private readonly EntityTypeBundleInfoInterface $entityTypeBundleInfo,
+    private readonly UrlGeneratorInterface $urlGenerator,
   ) {}
 
   private const HTML = <<<HTML
@@ -85,7 +88,7 @@ final class ExperienceBuilderController {
 </html>
 HTML;
 
-  public function __invoke(string $entity_type, ?EntityInterface $entity) : HtmlResponse {
+  public function __invoke(?string $entity_type, ?EntityInterface $entity) : HtmlResponse {
     // @phpstan-ignore-next-line function.alreadyNarrowedType
     assert($this->validateTransformAssetLibraries());
     // List of libraries to load in the preview iframe.
@@ -104,6 +107,8 @@ HTML;
     $dev_mode = $this->moduleHandler->moduleExists('xb_dev_mode');
     // ⚠️ This is highly experimental and *will* be refactored.
     $ai_extension_available = $this->moduleHandler->moduleExists('xb_ai');
+    // ⚠️ This is highly experimental and *will* be refactored.
+    $personalization_extension_available = $this->moduleHandler->moduleExists('xb_personalization');
     $system_site_config = $this->configFactory->get('system.site');
 
     return (new HtmlResponse($this->buildHtml()))->addCacheableDependency($system_site_config)->setAttachments([
@@ -120,12 +125,18 @@ HTML;
       ],
       'drupalSettings' => [
         'xb' => [
-          'base' => \sprintf('xb/%s/%s', $entity_type, $entity?->id()),
+          'base' => $entity_type !== NULL
+            ? Url::fromRoute('experience_builder.boot.entity', [
+              'entity_type' => $entity_type,
+              'entity' => $entity?->id(),
+            ])->getInternalPath()
+            : Url::fromRoute('experience_builder.boot.empty')->getInternalPath(),
           'entityType' => $entity_type,
           'entity' => $entity?->id(),
           'entityTypeKeys' => $entity?->getEntityType()->getKeys(),
           'devMode' => $dev_mode,
           'aiExtensionAvailable' => $ai_extension_available,
+          'personalizationExtensionAvailable' => $personalization_extension_available,
           // Allow for perfect component previews, by letting the client side
           // know what global assets to load in component preview <iframe>s.
           // @see ui/src/components/ComponentPreview.tsx
@@ -144,6 +155,7 @@ HTML;
           ],
           'contentEntityCreateOperations' => $this->getContentEntityCreateOperations(),
           'homepagePath' => $system_site_config->get('page.front'),
+          'loginUrl' => $this->urlGenerator->generateFromRoute('user.login'),
         ],
         // Override actual `xbData` with dummy data for code component editor
         // development purposes.

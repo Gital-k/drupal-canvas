@@ -108,15 +108,19 @@ Cypress.Commands.add('drupalEnableThemeForXb', (themeMachineName) => {
   });
 });
 
-Cypress.Commands.add('drupalXbInstall', (extraModules = [], options = {}) => {
-  cy.task('log', `The setup file ${Cypress.env('setupFile')}`);
-  cy.task('log', `Extra modules ${extraModules}`);
-  cy.drupalInstall({
-    setupFile: Cypress.env('setupFile'),
-    extraModules,
-    options,
-  });
-});
+Cypress.Commands.add(
+  'drupalXbInstall',
+  (extraModules = [], options = {}, extraPermissions = []) => {
+    cy.task('log', `The setup file ${Cypress.env('setupFile')}`);
+    cy.task('log', `Extra modules ${extraModules}`);
+    cy.drupalInstall({
+      setupFile: Cypress.env('setupFile'),
+      extraModules,
+      options,
+      extraPermissions,
+    });
+  },
+);
 
 Cypress.Commands.add(
   'drupalInstall',
@@ -395,7 +399,7 @@ Cypress.Commands.add(
   'previewReady',
   (iframeSelector = initializedReadyPreviewIframeSelector) => {
     // Not logging these assertions to try and keep the command log a bit tidier
-    cy.get('.xbCanvasScalingContainer', { log: false }).should(
+    cy.get('.xbEditorFrameScalingContainer', { log: false }).should(
       'have.css',
       'opacity',
       '1',
@@ -525,15 +529,17 @@ Cypress.Commands.add(
       }).should(() => {
         const frameContent = doc
           .querySelector(iframeSelector)
-          ?.contentWindow?.document?.body.querySelector(selector);
+          ?.contentWindow?.document?.body.querySelectorAll(selector);
         expect(
-          !!frameContent,
+          frameContent.length,
           `'${selector}' was found in iframe '${iframeSelector}'`,
-        ).to.equal(true);
+        ).to.be.greaterThan(0);
         expect(
-          frameContent?.textContent?.includes(textContent),
+          Array.from(frameContent).filter((el) =>
+            el.textContent?.includes(textContent),
+          ).length,
           `${iframeSelector} in iframe includes text ${textContent}`,
-        ).to.equal(true);
+        ).to.be.greaterThan(0);
       });
     });
   },
@@ -646,7 +652,7 @@ Cypress.Commands.add('openLayersPanel', () => {
  * using .val(101).trigger('change') or .trigger('input') does not seem to work. https://github.com/cypress-io/cypress/issues/1570
  * @example
  * ```javascript
- *    cy.findByLabelText('Canvas zoom level').setRangeValue('101');
+ *    cy.findByLabelText('Select zoom level').setRangeValue('101');
  * ```
  */
 Cypress.Commands.add(
@@ -758,7 +764,7 @@ Cypress.Commands.add(
 );
 
 Cypress.Commands.add('getElementScaledDimensions', ($item) => {
-  cy.findByTestId('xb-canvas-scaling').then(($parent) => {
+  cy.findByTestId('xb-editor-frame-scaling').then(($parent) => {
     const computedStyle = window.getComputedStyle($parent[0]);
     const matrix = computedStyle.transform;
     if (matrix !== 'none') {
@@ -921,7 +927,7 @@ Cypress.Commands.add('hidePanels', () => {
   cy.findByTestId('xb-primary-panel').then(hide);
   cy.findByTestId('xb-topbar').then(hide);
   cy.findByTestId('xb-contextual-panel').then(hide);
-  cy.findByTestId('xb-canvas-controls').then(hide);
+  cy.findByTestId('xb-editor-frame-controls').then(hide);
 });
 
 /**
@@ -935,18 +941,18 @@ Cypress.Commands.add('showPanels', () => {
   cy.findByTestId('xb-primary-panel').then(show);
   cy.findByTestId('xb-topbar').then(show);
   cy.findByTestId('xb-contextual-panel').then(show);
-  cy.findByTestId('xb-canvas-controls').then(show);
+  cy.findByTestId('xb-editor-frame-controls').then(show);
 });
 
 /**
- * Set the canvas to be static and scrollable so that Cypress is better able to interact with elements in the canvas.
+ * Set the editor frame to be static and scrollable so that Cypress is better able to interact with elements in the editor frame.
  */
-Cypress.Commands.add('disableCanvasPanning', () => {
-  cy.findByTestId('xb-canvas').then(($canvas) => {
-    $canvas.css({ padding: '100px 0 0 0' });
+Cypress.Commands.add('disableEditorPanning', () => {
+  cy.findByTestId('xb-editor-frame').then(($editorFrame) => {
+    $editorFrame.css({ padding: '100px 0 0 0' });
   });
 
-  cy.findByTestId('xb-canvas')
+  cy.findByTestId('xb-editor-frame')
     .parent()
     .then(($parent) => {
       $parent.css({
@@ -961,14 +967,14 @@ Cypress.Commands.add('disableCanvasPanning', () => {
 });
 
 /**
- * Reset the canvas to its normal behavior after disabling it with cy.disableCanvasPanning();
+ * Reset the editor frame to its normal behavior after disabling it with cy.disableEditorPanning();
  */
 Cypress.Commands.add('reEnableCanvasPanning', () => {
-  cy.findByTestId('xb-canvas').then(($canvas) => {
-    $canvas.css({ padding: '' });
+  cy.findByTestId('xb-editor-frame').then(($editorFrame) => {
+    $editorFrame.css({ padding: '' });
   });
 
-  cy.findByTestId('xb-canvas')
+  cy.findByTestId('xb-editor-frame')
     .parent()
     .then(($parent) => {
       $parent.css({ overflow: '', display: '', position: '' });
@@ -1023,13 +1029,13 @@ Cypress.Commands.add('editHeroComponent', () => {
 
   // The drawer contains a component edit form.
   cy.get(
-    '[class*="contextualPanel"] [data-drupal-selector="component-inputs-form"]',
+    '[class*="contextualPanel"] [data-drupal-selector="component-instance-form"]',
   ).within(() => {
     cy.findAllByLabelText('Heading').should('exist');
   });
 
   cy.get(
-    '[class*="contextualPanel"] [data-drupal-selector="component-inputs-form"]',
+    '[class*="contextualPanel"] [data-drupal-selector="component-instance-form"]',
   ).then(($form) => {
     expect($form).to.exist;
     $form.find('label').each((index, label) => {

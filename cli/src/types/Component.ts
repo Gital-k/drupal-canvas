@@ -13,6 +13,7 @@ export interface Component {
   sourceCodeCss?: string;
   compiledCss?: string;
   importedJsComponents: string[];
+  dataDependencies: string[];
 }
 
 export interface AssetLibrary {
@@ -26,10 +27,4 @@ export interface AssetLibrary {
     original: string;
     compiled: string;
   };
-}
-
-export interface Metadata {
-  name: string;
-  machineName: string;
-  slots: object;
 }

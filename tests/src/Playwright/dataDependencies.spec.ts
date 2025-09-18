@@ -14,7 +14,9 @@ test.describe('Data dependencies', () => {
     async ({ browser, drupalSite }) => {
       const page = await browser.newPage();
       const drupal: Drupal = new Drupal({ page, drupalSite });
-      await drupal.setupMinimalXBTestSite();
+      await drupal.installModules(['experience_builder']);
+      await drupal.createXbPage('Homepage', '/homepage');
+      await page.close();
     },
   );
 
@@ -31,11 +33,8 @@ test.describe('Data dependencies', () => {
       `${moduleDir}/experience_builder/tests/fixtures/code_components/page-elements/PageTitle.jsx`,
       'utf-8',
     );
-    await xBEditor.addCodeComponent('PageTitle', code);
-    const preview = page
-      .locator('.xb-mosaic-window-preview iframe')
-      .contentFrame()
-      .locator('#xb-code-editor-preview-root');
+    await xBEditor.createCodeComponent('PageTitle', code);
+    const preview = xBEditor.getCodePreviewFrame();
     // @see \Drupal\experience_builder\Controller\ExperienceBuilderController::__invoke
     await expect(
       preview.getByRole('heading', {
@@ -45,13 +44,11 @@ test.describe('Data dependencies', () => {
     await xBEditor.publishAllChanges(['PageTitle', 'Global CSS']);
     await page.getByRole('button', { name: 'Add to components' }).click();
     await page.getByRole('dialog').getByRole('button', { name: 'Add' }).click();
-    await xBEditor.addComponent('js.pagetitle', false, false);
+    await xBEditor.addComponent({ id: 'js.pagetitle' }, { hasInputs: false });
     await xBEditor.publishAllChanges(['Homepage']);
     await page.goto('/homepage');
-    expect(
-      await page
-        .locator('astro-island')
-        .getByRole('heading', { name: 'Homepage' }),
+    await expect(
+      page.locator('xb-island').getByRole('heading', { name: 'Homepage' }),
     ).toBeVisible();
   });
 });

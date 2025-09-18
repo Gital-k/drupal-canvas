@@ -7,16 +7,21 @@ atrule
 autocompleteresponse
 autocompletesearch
 autocompleteselect
+autodocs
 autolayout
 !autosave # Use "auto-save", "AutoSave", or "auto_save" instead.
 !Autosave # Use "auto-save", "AutoSave", or "auto_save" instead.
 basepath
+biscoff
 Carden
 cebe
 CODEOWNERS
 codespaces
 cqmr
 csstree
+ddev
+dedreux
+delaville
 devizzent
 dhta
 diaclone
@@ -28,6 +33,7 @@ endapply
 entityviewdisplay
 extralight
 fieldtext
+folderfy
 gerbeaud
 heredocs
 hyperscriptification
@@ -107,3 +113,6 @@ interactable
 nodepath
 nodepaths
 proptypes
+herobanner
+herobannersecond
+Cdiv

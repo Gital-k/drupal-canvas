@@ -13,7 +13,7 @@ export default defineConfig({
   /* Retry */
   retries: 2,
   /* Maximum failures */
-  maxFailures: 1,
+  maxFailures: 0,
   /* Parallel test workers, leave undefined for automatic */
   workers: undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
@@ -29,6 +29,8 @@ export default defineConfig({
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
     baseURL: process.env.DRUPAL_TEST_BASE_URL,
+    /* https://playwright.dev/docs/api/class-testoptions#test-options-ignore-https-errors */
+    ignoreHTTPSErrors: true,
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
     /* Take screenshot automatically on test failure */
@@ -51,7 +53,7 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         deviceScaleFactor: 1,
-        /* Making the browser window/viewport much bigger avoids weird issues like the UI covering up part of the preview canvas etc. */
+        /* Making the browser window/viewport much bigger avoids weird issues like the UI covering up part of the editor frame etc. */
         viewport: { width: 2560, height: 1440 },
       },
       dependencies: ['setup'],

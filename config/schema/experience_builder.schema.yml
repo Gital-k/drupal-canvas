@@ -521,10 +521,14 @@ experience_builder.generated_field_explicit_input_ux:
           # The default value must be retrievable
           expression:
             type: string
-            label: ''
-            constraints: { }
-            # @todo Add `StructuredDataPropExpression` validation constraint that fails if StructuredDataPropExpression::fromString() fails
-            # StructuredDataPropExpression: [field_type]
+            label: 'The expression that contains the field evaluation instructions'
+            constraints:
+              ValidStructuredDataPropExpression:
+                choices:
+                  - FieldTypePropExpression
+                  - FieldTypeObjectPropsExpression
+                  - ReferenceFieldTypePropExpression
+                message: 'The expression is valid, but not one of the allowed types: %choices.'
 
 experience_builder.component_source_local_id.js:
   type: experience_builder.component_source_local_id.*
@@ -728,6 +732,9 @@ experience_builder.content_template.*.*.*:
         PluginExists:
           manager: entity_type.manager
           interface: Drupal\Core\Entity\ContentEntityInterface
+        # @todo Update this in https://www.drupal.org/project/experience_builder/issues/3518272
+        Choice:
+          - node
     content_entity_type_bundle:
       type: string
       label: 'Bundle'
@@ -868,3 +875,41 @@ experience_builder.staged_config_update.*:
             label: 'Input'
             constraints:
               NotBlank: [ ]
+
+experience_builder.folder.*:
+  type: config_entity
+  constraints:
+    FullyValidatable: ~
+  mapping:
+    name:
+      type: required_label
+      label: 'Name'
+      constraints:
+        UniqueNamePerFolderTypeConstraint:
+          id: '%parent.uuid'
+          configEntityTypeId: '%parent.configEntityTypeId'
+    configEntityTypeId:
+      type: string
+      label: 'Folder type'
+      constraints:
+        # Accept only config entity types that implement FolderItemInterface.
+        PluginExists:
+          manager: entity_type.manager
+          interface: Drupal\experience_builder\Entity\FolderItemInterface
+    weight:
+      type: weight
+      label: 'Weight'
+    items:
+      type: sequence
+      orderby: value
+      sequence:
+        type: string
+        label: 'Folder items IDs'
+        constraints:
+          BetterConfigExists:
+            prefix: 'experience_builder.[%parent.%parent.configEntityTypeId].'
+          OneFolderPerItemLimitConstraint:
+            id: '%parent.%parent.uuid'
+            configEntityTypeId: '%parent.%parent.configEntityTypeId'
+      constraints:
+        Unique: ~

@@ -62,9 +62,10 @@ use Drupal\experience_builder\Plugin\Field\FieldType\ComponentTreeItemList;
     'exposed_slots',
   ],
 )]
-final class ContentTemplate extends ConfigEntityBase implements ComponentTreeEntityInterface, EntityViewDisplayInterface {
+final class ContentTemplate extends ConfigEntityBase implements ComponentTreeEntityInterface, EntityViewDisplayInterface, AutoSavePublishAwareInterface {
 
   use ComponentTreeItemListInstantiatorTrait;
+  use ConfigUpdaterAwareEntityTrait;
 
   public const string ENTITY_TYPE_ID = 'content_template';
 
@@ -113,6 +114,13 @@ final class ContentTemplate extends ConfigEntityBase implements ComponentTreeEnt
   protected ?array $exposed_slots = [];
 
   /**
+   * Disabled by default.
+   *
+   * @var bool
+   */
+  protected $status = FALSE;
+
+  /**
    * Tries to load a template for a particular entity, in a specific view mode.
    *
    * @param \Drupal\Core\Entity\FieldableEntityInterface $entity
@@ -146,6 +154,7 @@ final class ContentTemplate extends ConfigEntityBase implements ComponentTreeEnt
   public function preSave(EntityStorageInterface $storage): void {
     $this->id = $this->id();
     parent::preSave($storage);
+    self::getConfigUpdater()->updateConfigEntityWithComponentTreeInputs($this);
   }
 
   /**
@@ -383,6 +392,14 @@ final class ContentTemplate extends ConfigEntityBase implements ComponentTreeEnt
       $value = self::generateComponentTreeKeys($value);
     }
     return parent::set($property_name, $value);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function autoSavePublish(): self {
+    $this->setStatus(TRUE);
+    return $this;
   }
 
 }

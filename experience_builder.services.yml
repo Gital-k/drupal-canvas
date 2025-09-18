@@ -9,6 +9,7 @@ services:
     arguments:
       $constraintManager: '@validation.constraint'
       $cache: '@cache.static'
+      $extensionMimeTypeGuesser: '@file.mime_type.guesser.extension'
   Drupal\experience_builder\ShapeMatcher\FieldForComponentSuggester:
     public: true
   Drupal\experience_builder\ComponentIncompatibilityReasonRepository: {}
@@ -129,6 +130,9 @@ services:
   Drupal\experience_builder\Access\XbUiAccessCheck:
     tags:
       - { name: access_check, applies_to: _xb_ui_access }
+  Drupal\experience_builder\Access\AuthenticationAccessChecker:
+    tags:
+      - { name: access_check, applies_to: _xb_authentication_required }
 
   # Twig.
   Drupal\experience_builder\Extension\XbTwigExtension:
@@ -147,6 +151,7 @@ services:
   Drupal\experience_builder\Controller\ComponentAuditController: {}
   Drupal\experience_builder\Controller\ExperienceBuilderController: {}
   Drupal\experience_builder\Controller\ApiAutoSaveController: {}
+  Drupal\experience_builder\Controller\ApiUiContentTemplateControllers: {}
 
   # Decorators.
   Drupal\experience_builder\Render\ImportMapResponseAttachmentsProcessor:

@@ -11,7 +11,6 @@ use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\TypedData\Attribute\DataType;
 use Drupal\Core\TypedData\TypedData;
-use Drupal\experience_builder\ComponentSource\ComponentSourceInterface;
 use Drupal\experience_builder\MissingComponentInputsException;
 use Drupal\experience_builder\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\experience_builder\PropSource\ContentAwareDependentInterface;
@@ -157,7 +156,7 @@ final class ComponentInputs extends TypedData implements ContentAwareDependentIn
         // @see \Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::collapse()
         // @see \Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::uncollapse()
         try {
-          $parsed_default_prop_source = array_key_exists($name, $default_prop_sources) && is_array($default_prop_sources[$name])
+          $parsed_default_prop_source = array_key_exists($name, $default_prop_sources) && is_array($default_prop_sources[$name]) && array_key_exists('sourceType', $default_prop_sources[$name])
             ? PropSource::parse($default_prop_sources[$name])
             : NULL;
           // If it indeed was a collapsed StaticPropSource, un-collapse it.
@@ -200,7 +199,9 @@ final class ComponentInputs extends TypedData implements ContentAwareDependentIn
     assert($item instanceof ComponentTreeItem);
     $component_instance_uuid = $item->getUuid();
     $source = $item->getComponent()?->getComponentSource();
-    \assert($source instanceof ComponentSourceInterface);
+    if ($source === NULL) {
+      throw new \UnexpectedValueException('Missing component source');
+    }
     // Still in default value state.
     // @see ::applyDefaultValue()
     if ($this->value === '{}') {

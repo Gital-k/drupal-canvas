@@ -177,6 +177,8 @@ paths:
                       - No items to publish
         '422':
           $ref: '#/components/responses/ClientErrorResponse'
+        '500':
+          $ref: '#/components/responses/ClientErrorResponse'
   /xb/api/v0/auto-saves/{entityTypeId}/{entityId}:
     description:  Interact with an auto-save entry for a particular entity
     parameters:
@@ -338,6 +340,98 @@ paths:
                 # @see \Drupal\Core\Plugin\Component::$machineName
                 additionalProperties:
                   $ref: '#/components/schemas/Component'
+  /xb/api/v0/config/folder:
+    description: TODO
+    get:
+      description: TODO
+      responses:
+        '200':
+          description: Collection of Folders
+          content:
+            application/json:
+              schema:
+                type: object
+                minProperties: 0
+                additionalProperties:
+                  $ref: '#/components/schemas/ExistingFolder'
+    post:
+      description: TODO
+      requestBody:
+        description: Create new Folder.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewFolder'
+            examples:
+              example with one folder:
+                name: Test folder
+                type: component
+                weight: 0
+                items: [ ]
+      responses:
+        '201':
+          description: Successful save of Folder
+          content:
+            application/json:
+              examples:
+                example with one component type folder:
+                  id: 75144f9b-1bfc-4874-b848-b5889f066222
+                  name: Test Folder
+                  type: component
+                  weight: 0
+                  items: [ ]
+              schema:
+                $ref: '#/components/schemas/ExistingFolder'
+        '409':
+          description: Folder with same ID already exists.
+          $ref: '#/components/responses/ClientErrorResponse'
+        '422':
+          description: Validation errors exist
+          $ref: '#/components/responses/ClientErrorResponse'
+  '/xb/api/v0/config/folder/{configEntityId}':
+    description: TODO
+    get:
+      description: TODO
+      parameters:
+        - $ref: '#/components/parameters/configEntityId'
+      responses:
+        '200':
+          description: Individual Folder
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExistingFolder'
+    patch:
+      description: TODO
+      requestBody:
+        description: Update specific Folder.
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              allOf:
+                - required:
+                    - name
+                    - weight
+                    - items
+                - $ref: '#/components/schemas/Folder'
+      parameters:
+        - $ref: '#/components/parameters/configEntityId'
+      responses:
+        '200':
+          description: Individual Folder
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExistingFolder'
+    delete:
+      description: Deletes a Folder.
+      parameters:
+        - $ref: '#/components/parameters/configEntityId'
+      responses:
+        '204':
+          description: Deleted individual Folder.
   /xb/api/v0/config/js_component:
     get:
       description: Collection of Code Components
@@ -381,6 +475,9 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CodeComponent'
+        '401':
+          description: Unauthorized (unauthenticated) response.
+          $ref: '#/components/responses/UnauthorizedErrorResponse'
         '403':
           description: Access denied response.
           $ref: '#/components/responses/AuthenticationErrorResponse'
@@ -399,6 +496,9 @@ paths:
       responses:
         '204':
           description: Deleted individual Code Component
+        '401':
+          description: Unauthorized (unauthenticated) response.
+          $ref: '#/components/responses/UnauthorizedErrorResponse'
         '403':
           description: Access denied response.
           $ref: '#/components/responses/AuthenticationErrorResponse'
@@ -413,6 +513,9 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CodeComponent'
+        '401':
+          description: Unauthorized (unauthenticated) response.
+          $ref: '#/components/responses/UnauthorizedErrorResponse'
         '403':
           description: Access denied response.
           $ref: '#/components/responses/AuthenticationErrorResponse'
@@ -433,6 +536,9 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CodeComponent'
+        '401':
+          description: Unauthorized (unauthenticated) response.
+          $ref: '#/components/responses/UnauthorizedErrorResponse'
         '403':
           description: Access denied response.
           $ref: '#/components/responses/AuthenticationErrorResponse'
@@ -607,6 +713,7 @@ paths:
                               "matching": "starts_with"
                           negate: false
                           all: true
+                      weight: 0
     post:
       description: Creates a new Personalization Segment.
       requestBody:
@@ -634,6 +741,7 @@ paths:
                         "matching": "starts_with"
                     negate: false
                     all: true
+                weight: 0
       responses:
         '201':
           description: Created entity successfully
@@ -660,6 +768,7 @@ paths:
                             "matching": "starts_with"
                         negate: false
                         all: true
+                    weight: 0
         '409':
           description: Personalization Segment with same ID already exists.
           $ref: '#/components/responses/ClientErrorResponse'
@@ -697,6 +806,7 @@ paths:
                           "matching": "starts_with"
                       negate: false
                       all: true
+                  weight: 0
     patch:
       description: Updates a specific Asset Library.
       requestBody:
@@ -1027,7 +1137,7 @@ paths:
       description: TODO
       responses:
         '200':
-          description: Component inputs form
+          description: Component instance form
           content:
             application/json:
               schema:
@@ -1306,6 +1416,9 @@ paths:
                     # @see \Drupal\Core\Entity\EntityPublishedInterface
                     # @see https://www.drupal.org/project/experience_builder/issues/3505118#comment-15982801
                     description: Whether the edited content entity is marked as published.
+        '401':
+          description: Unauthorized (unauthenticated) response.
+          $ref: '#/components/responses/UnauthorizedErrorResponse'
         '403':
           description: Access denied response.
           $ref: '#/components/responses/AuthenticationErrorResponse'
@@ -1352,6 +1465,9 @@ paths:
                   autoSaves:
                     type: object
                     description: Auto-saved entries with hash values for concurrency control
+        '401':
+          description: Unauthorized (unauthenticated) response.
+          $ref: '#/components/responses/UnauthorizedErrorResponse'
         '403':
           description: Access denied response.
           $ref: '#/components/responses/AuthenticationErrorResponse'
@@ -1396,6 +1512,9 @@ paths:
                   autoSaves:
                     type: object
                     description: Auto-saved entries with hash values for concurrency control
+        '401':
+          description: Unauthorized (unauthenticated) response.
+          $ref: '#/components/responses/UnauthorizedErrorResponse'
         '403':
           description: Access denied response.
           $ref: '#/components/responses/AuthenticationErrorResponse'
@@ -1513,6 +1632,59 @@ paths:
                     examples:
                       - Missing data
                       - Missing clientInstanceId
+  /xb/api/v0/ui/content_template/suggestions/structured-data-for-prop_shapes/{entityTypeId}/{bundle}/{configEntityId}:
+    description: Provides suggestions for populating the props of a given component using structured data of the specified entity type and bundle.
+    get:
+      description: Get suggestions for populating the props of a given component using structured data of the specified entity type and bundle.
+      parameters:
+        - $ref: '#/components/parameters/entityTypeId'
+        - $ref: '#/components/parameters/bundle'
+        - $ref: '#/components/parameters/configEntityId'
+      responses:
+        '200':
+          description: suggestions for populating the props of a given component using structured data of the specified entity type and bundle.
+          content:
+            application/json:
+              schema:
+                type: object
+                # There may be 0 props for this component.
+                minProperties: 0
+                additionalProperties:
+                  type: object
+                  # There may be 0 suggestions for this prop for this component.
+                  minProperties: 0
+                  additionalProperties:
+                    $ref: '#/components/schemas/StructuredDataForPropShapeSuggestion'
+              examples:
+                Suggestions for a 'xb_test_sdc.heading' SDC component instance in the context of an article node:
+                  value:
+                    text:
+                      256dc2b8dcec7355:
+                        label: "This Article's Title"
+                        source:
+                          sourceType: "dynamic"
+                          expression: "ℹ︎␜entity:node:article␝title␞␟value"
+                    style: []
+                    element: []
+                Suggestions for a 'xb_test_sdc.video' SDC component instance in the context of an article node:
+                  value:
+                    video: []
+                    display_width: []
+        # @todo fix in https://www.drupal.org/project/experience_builder/issues/3541366
+        '401':
+          description: Unauthorized (unauthenticated) response.
+          $ref: '#/components/responses/UnauthorizedErrorResponse'
+        '403':
+          description: Access denied response.
+          $ref: '#/components/responses/AuthenticationErrorResponse'
+        # @todo fix in https://www.drupal.org/project/experience_builder/issues/3541366
+        '400':
+          description: Invalid request from the UI.
+          $ref: '#/components/responses/ClientErrorResponse'
+        # @todo fix in https://www.drupal.org/project/experience_builder/issues/3541366
+        '404':
+          description: Non-existent content entity type, bundle or Component.
+          $ref: '#/components/responses/ClientErrorResponse'
 # @see https://spec.openapis.org/oas/v3.1.0.html#components-object
 components:
   # @see https://spec.openapis.org/oas/v3.1.0.html#schema-object
@@ -1938,6 +2110,7 @@ components:
         # We only require id, as we want to allow partial updates with PATCH.
         # Complete constraint-based validation will happen on entity validation.
         - id
+      additionalProperties: false
       properties:
         id:
           type: string
@@ -1959,6 +2132,22 @@ components:
             type: object
             allOf:
               - $ref: '#/components/schemas/SegmentationRule'
+        weight:
+          type: integer
+          description: The weight of the segment, used for ordering segments.
+    StructuredDataForPropShapeSuggestion:
+      title: Suggested structured data (DynamicPropSource) for prop shape
+      type: object
+      required:
+        - label
+        - source
+      properties:
+        label:
+          type: string
+          description: Human-readable label
+        source:
+          type: object
+          description: The object representation of the DynamicPropSource that, if selected by the human, the client should use verbatim as the source to populate this component instance's prop.
     Error:
       type: object
       required:
@@ -1991,7 +2180,7 @@ components:
             - entity_type
             - entity_id
             - entity_label
-            - auto_save_key
+            - api_auto_save_key
           properties:
             entity_type:
               type: string
@@ -2010,7 +2199,7 @@ components:
               examples:
                 - Spring sale now on
               title: Item label
-            auto_save_key:
+            api_auto_save_key:
               type: string
               examples:
                 - 'node:4:en'
@@ -2085,6 +2274,53 @@ components:
             - layout
             - model
         - $ref: '#/components/schemas/Pattern'
+    Folder:
+      title: Folder
+      type: object
+      properties:
+        id:
+          type: string
+          description: The ID.
+        name:
+          type: string
+          description: Human-readable name.
+        type:
+          $ref: '#/components/schemas/FolderType'
+        weight:
+          type: integer
+          description: Position of the Folder relative to other Folders.
+        items:
+          type: array
+          description: Numbered array of Folder item entity IDs, where numbers refer to items position in a Folder.
+          items:
+            type: string
+            description: Singular Folder item id.
+      additionalProperties: false
+    FolderType:
+      type: string
+      enum:
+        - component
+        - js_component
+        - pattern
+    ExistingFolder:
+      type: object
+      allOf:
+        - required:
+            - id
+            - name
+            - type
+            - weight
+            - items
+        - $ref: '#/components/schemas/Folder'
+    NewFolder:
+      type: object
+      allOf:
+        - required:
+            - name
+            - type
+            - weight
+            - items
+        - $ref: '#/components/schemas/Folder'
     StagedConfigUpdate:
       title: Staged Config Update
       type: object
@@ -2150,6 +2386,23 @@ components:
                   type: object
                   schema:
                     $ref: '#/components/schemas/Error'
+    UnauthorizedErrorResponse:
+      description: Error when unauthenticated.
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - errors
+            additionalProperties: false
+            properties:
+              errors:
+                type: array
+                description: Error items
+                items:
+                  type: object
+                  schema:
+                    $ref: '#/components/schemas/Error'
     AuthenticationErrorResponse:
       description: Access denied response.
       content:
@@ -2176,6 +2429,14 @@ components:
       schema:
         type: string
       example: node
+    bundle:
+      name: bundle
+      in: path
+      required: true
+      description: The bundle
+      schema:
+        type: string
+      example: article
     entityId:
       name: entityId
       in: path
@@ -2195,7 +2456,9 @@ components:
         type: string
       examples:
         arbitraryEntityId:
-          value: hopefully_meaningful_name
+          value:
+            - hopefully_meaningful_name
+            - sdc.xb_test_sdc.my-cta
   # @see https://spec.openapis.org/oas/v3.1.0.html#header-object
   requestBodies:
     Layout:

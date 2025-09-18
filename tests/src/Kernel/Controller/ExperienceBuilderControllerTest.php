@@ -99,21 +99,11 @@ final class ExperienceBuilderControllerTest extends KernelTestBase {
 
     $this->setUpCurrentUser([], $permissions);
 
-    if ($entity_type === Page::ENTITY_TYPE_ID) {
-      $add_url = Url::fromRoute('experience_builder.experience_builder', [
-        'entity_type' => $entity_type,
-        'entity' => '',
-      ])->toString();
-      self::assertEquals("/xb/$entity_type", $add_url);
-      $this->request(Request::create($add_url));
-      $this->assertExperienceBuilderMount($entity_type);
-    }
-
     $storage = $this->container->get('entity_type.manager')->getStorage($entity_type);
     $sut = $storage->create($values);
     $sut->save();
 
-    $edit_url = Url::fromRoute('experience_builder.experience_builder', [
+    $edit_url = Url::fromRoute('experience_builder.boot.entity', [
       'entity_type' => $entity_type,
       'entity' => $sut->id(),
     ])->toString();
@@ -157,8 +147,7 @@ final class ExperienceBuilderControllerTest extends KernelTestBase {
         [
           'name' => 'Test entity',
         ],
-        // @todo Update in https://www.drupal.org/i/3498525.
-        'For now XB only works if the entity is an xb_page or an article node! Other entity types and bundles must be tested before they are supported, to help see https://drupal.org/i/3493675.',
+        'This entity does not have an XB field!',
       ],
     ];
   }
@@ -178,14 +167,14 @@ final class ExperienceBuilderControllerTest extends KernelTestBase {
 
     $this->setUpCurrentUser([], $permissions);
 
-    $add_url = Url::fromRoute('experience_builder.experience_builder', [
-      'entity_type' => Page::ENTITY_TYPE_ID,
+    $xb_url = Url::fromRoute('experience_builder.boot.empty', [
+      'entity_type' => '',
       'entity' => '',
     ])->toString();
-    self::assertEquals("/xb/xb_page", $add_url);
+    self::assertEquals("/xb", $xb_url);
 
     /** @var \Drupal\Core\Render\HtmlResponse $response */
-    $response = $this->request(Request::create($add_url));
+    $response = $this->request(Request::create($xb_url));
 
     $this->assertSame($expectedPermissionFlags, $this->drupalSettings['xb']['permissions']);
     self::assertSame([
@@ -299,14 +288,14 @@ final class ExperienceBuilderControllerTest extends KernelTestBase {
 
     $this->setUpCurrentUser([], $permissions);
 
-    $add_url = Url::fromRoute('experience_builder.experience_builder', [
-      'entity_type' => Page::ENTITY_TYPE_ID,
+    $xb_url = Url::fromRoute('experience_builder.boot.empty', [
+      'entity_type' => '',
       'entity' => '',
     ])->toString();
-    self::assertEquals("/xb/xb_page", $add_url);
+    self::assertEquals("/xb", $xb_url);
 
     /** @var \Drupal\Core\Render\HtmlResponse $response */
-    $response = $this->request(Request::create($add_url));
+    $response = $this->request(Request::create($xb_url));
 
     $this->assertSame($expectedCreateOperations, $this->drupalSettings['xb']['contentEntityCreateOperations']);
     self::assertSame([
@@ -347,6 +336,86 @@ final class ExperienceBuilderControllerTest extends KernelTestBase {
             'article' => 'Amazing article',
           ],
         ],
+      ],
+    ];
+  }
+
+  /**
+   * Tests controller feature flags.
+   *
+   * @param array $modules
+   *   The modules to enable.
+   * @param array $expectedFeatureFlags
+   *   The expected feature flags values.
+   *
+   * @dataProvider featureFlagsData
+   */
+  public function testControllerExposedFeatureFlags(array $modules, array $expectedFeatureFlags): void {
+    $this->installEntitySchema(Page::ENTITY_TYPE_ID);
+    $permissions = [
+      'access content',
+      Page::CREATE_PERMISSION,
+      Page::EDIT_PERMISSION,
+      Page::DELETE_PERMISSION,
+    ];
+    if (!empty($modules)) {
+      $this->enableModules($modules);
+    }
+
+    $this->setUpCurrentUser([], $permissions);
+
+    $xb_url = Url::fromRoute('experience_builder.boot.empty', [
+      'entity_type' => '',
+      'entity' => '',
+    ])->toString();
+    self::assertEquals("/xb", $xb_url);
+
+    /** @var \Drupal\Core\Render\HtmlResponse $response */
+    $response = $this->request(Request::create($xb_url));
+
+    foreach ($expectedFeatureFlags as $featureFlag => $featureFlagValue) {
+      $this->assertSame($featureFlagValue, $this->drupalSettings['xb'][$featureFlag]);
+    }
+
+    self::assertSame([
+      'user.permissions',
+      'languages:language_interface',
+      'theme',
+    ], $response->getCacheableMetadata()->getCacheContexts());
+    self::assertSame([
+      'config:system.site',
+      'http_response',
+    ], $response->getCacheableMetadata()->getCacheTags());
+
+  }
+
+  public static function featureFlagsData(): \Generator {
+    yield 'none' => [
+      [],
+      [
+        'aiExtensionAvailable' => FALSE,
+        'personalizationExtensionAvailable' => FALSE,
+      ],
+    ];
+    yield 'ai' => [
+      ['xb_ai'],
+      [
+        'aiExtensionAvailable' => TRUE,
+        'personalizationExtensionAvailable' => FALSE,
+      ],
+    ];
+    yield 'personalization' => [
+      ['xb_personalization'],
+      [
+        'aiExtensionAvailable' => FALSE,
+        'personalizationExtensionAvailable' => TRUE,
+      ],
+    ];
+    yield 'all' => [
+      ['xb_ai', 'xb_personalization'],
+      [
+        'aiExtensionAvailable' => TRUE,
+        'personalizationExtensionAvailable' => TRUE,
       ],
     ];
   }

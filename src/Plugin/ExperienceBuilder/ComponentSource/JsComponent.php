@@ -68,7 +68,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
   /**
    * {@inheritdoc}
    */
-  protected function getSdcPlugin(): SdcPlugin {
+  public function getSdcPlugin(): SdcPlugin {
     if ($this->componentPlugin === NULL) {
       // Statically cache the loaded plugin.
       $this->componentPlugin = self::buildEphemeralSdcPluginInstance($this->getJavaScriptComponent());
@@ -294,6 +294,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
     return ComponentEntity::create([
       'id' => self::SOURCE_PLUGIN_ID . '.' . $js_component->id(),
       'label' => $js_component->label(),
+      // @todo Update in https://www.drupal.org/project/experience_builder/issues/3541364. This causes a "@todo" Folder to be created.
       'category' => '@todo',
       'provider' => NULL,
       'source' => self::SOURCE_PLUGIN_ID,

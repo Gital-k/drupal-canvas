@@ -6,6 +6,8 @@ import styles from '@/features/layout/preview/Preview.module.css';
 import clsx from 'clsx';
 import { useAppSelector } from '@/app/hooks';
 import { selectDragging } from '@/features/ui/uiSlice';
+import type { ComponentPreviewUpdateEvent } from '@/components/form/formUtil';
+import { COMPONENT_PREVIEW_UPDATE_EVENT } from '@/components/form/formUtil';
 
 interface IFrameSwapperProps {
   srcDocument: string;
@@ -44,27 +46,85 @@ const IFrameSwapper = forwardRef<HTMLIFrameElement, IFrameSwapperProps>(
       return { activeIFrame, inactiveIFrame };
     }, []);
 
-    const swapIFrames = useCallback(
-      (e: Event) => {
-        const iframe = e.target as HTMLIFrameElement | null;
-        if (!iframe?.srcdoc?.length) {
-          // The load event in some browsers (e.g., Safari) fires on page load if the srcdoc is empty, but we don't want to swap in that case.
+    const swapIFrames = useCallback((e: Event) => {
+      // The event target is the iframe about to become active.
+      const iframe = e.target as HTMLIFrameElement | null;
+      if (!iframe?.srcdoc?.length) {
+        // The load event in some browsers (e.g., Safari) fires on page load if the srcdoc is empty, but we don't want to swap in that case.
+        return;
+      }
+
+      iframe.style.display = '';
+
+      const startTime = Date.now();
+      const checkIFrameContent = () => {
+        // Find all <template>s pending hydration by Astro. Once hydration is complete, there should be no pending templates remaining.
+        const pendingTemplates = iframe?.contentDocument?.querySelectorAll(
+          'template[data-astro-template]',
+        ).length;
+
+        // Ensure there are no pending templates (non-hydrated astro-islands) before swapping in the iframe.
+        if (pendingTemplates === 0) {
+          setWhichActive((current) => 1 - current);
+        } else if (Date.now() - startTime < 1000) {
+          // If the hydration still hasn't finished and 1 second hasn't yet elapsed, try again after the next animation frame.
+          requestAnimationFrame(checkIFrameContent);
+        } else {
+          // Fallback to ensure iframe is swapped after 1s in case the iframe content never loads (or is really slow).
+          console.warn(
+            'Astro hydration in iFrame did not complete within 1 second, swapping anyway.',
+          );
+          setWhichActive((current) => 1 - current);
+        }
+      };
+
+      // Continuously monitor the iframe content for non-hydrated templates every 'tick'.
+      // Only swap the iframe once all templates are hydrated or 1 second has elapsed.
+      requestAnimationFrame(checkIFrameContent);
+    }, []);
+
+    // Sync the whichActiveRef to the whichActive state and then set isReloading back to false.
+    useEffect(() => {
+      const listener = (e: ComponentPreviewUpdateEvent) => {
+        const { activeIFrame } = getIFrames();
+        // Find the xb-island elements for the updated component.
+        const component = activeIFrame.contentDocument?.querySelector(
+          `xb-island[uid="${e.componentUuid}"]`,
+        );
+        if (!component) {
+          // We need a round trip to update the preview here.
+          e.setPreviewBackgroundUpdate(false);
           return;
         }
-        setWhichActive((current) => (current ? 0 : 1));
-        setTimeout(() => {
-          const { activeIFrame } = getIFrames();
-          activeIFrame.style.display = '';
-          setIsReloading(false);
-        }, 0);
-      },
-      [getIFrames, setIsReloading],
-    );
+        // We can update the preview in the background.
+        e.setPreviewBackgroundUpdate(true);
+
+        component.setAttribute(
+          'props',
+          JSON.stringify({
+            ...JSON.parse(component.getAttribute('props')!),
+            [e.propName]: ['raw', e.propValue],
+          }),
+        );
+      };
+      document.addEventListener(
+        COMPONENT_PREVIEW_UPDATE_EVENT,
+        listener as any as EventListener,
+      );
+      return () => {
+        document.removeEventListener(
+          COMPONENT_PREVIEW_UPDATE_EVENT,
+          listener as any as EventListener,
+        );
+      };
+    }, [getIFrames]);
 
     useEffect(() => {
       whichActiveRef.current = whichActive;
-    }, [whichActive]);
+      setIsReloading(false);
+    }, [getIFrames, setIsReloading, whichActive]);
 
+    // Run when the srcDocument changes
     useEffect(() => {
       // Important to change a state ensure parent re-renders (and re-calls hooks) once the iframe is swapped.
       setIsReloading(true);

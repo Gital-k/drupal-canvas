@@ -7,12 +7,15 @@ namespace Drupal\Tests\experience_builder\Functional;
 use Drupal\Component\Serialization\Json;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Component\Utility\Random;
+use Drupal\Component\Uuid\Uuid;
 use Drupal\Core\Cache\Cache;
+use Drupal\Core\Config\Entity\ConfigEntityType;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Url;
 use Drupal\experience_builder\Audit\ComponentAudit;
 use Drupal\experience_builder\AutoSave\AutoSaveManager;
 use Drupal\experience_builder\Entity\AssetLibrary;
+use Drupal\experience_builder\Entity\Folder;
 use Drupal\experience_builder\Entity\Component;
 use Drupal\experience_builder\Entity\ComponentInterface;
 use Drupal\experience_builder\Entity\JavaScriptComponent;
@@ -64,6 +67,164 @@ class XbConfigEntityHttpApiTest extends HttpApiTestBase {
 
   protected readonly UserInterface $httpApiUser;
 
+  protected array $defaultFolders = [
+    '0bac3d4b-3ee1-47e7-9124-0d0b6882055d' => [
+      'name' => 'Atom/Media',
+      'id' => '0bac3d4b-3ee1-47e7-9124-0d0b6882055d',
+      'type' => 'component',
+      'weight' => 0,
+      'items' => [
+        'sdc.xb_test_sdc.video',
+      ],
+    ],
+    '1e06667f-933d-49ff-8966-c8ab5a11720d' => [
+      'name' => 'Lists (Views)',
+      'id' => '1e06667f-933d-49ff-8966-c8ab5a11720d',
+      'type' => 'component',
+      'weight' => 0,
+      'items' => [
+        'block.views_block.content_recent-block_1',
+        'block.views_block.who_s_online-who_s_online_block',
+      ],
+    ],
+    '344a9eb6-7abe-457e-b732-2698672f0779' => [
+      'name' => 'Forms',
+      'id' => '344a9eb6-7abe-457e-b732-2698672f0779',
+      'type' => 'component',
+      'weight' => 0,
+      'items' => [
+        'block.user_login_block',
+      ],
+    ],
+    '359f17e0-9786-43e0-86cd-0619394bf12a' => [
+      'name' => 'User',
+      'id' => '359f17e0-9786-43e0-86cd-0619394bf12a',
+      'type' => 'component',
+      'weight' => 0,
+      'items' => [
+        'block.views_block.who_s_new-block_1',
+      ],
+    ],
+    '54d29693-2b4e-46d2-83a6-8d6ffdbd7eae' => [
+      'name' => 'Container/Special',
+      'id' => '54d29693-2b4e-46d2-83a6-8d6ffdbd7eae',
+      'type' => 'component',
+      'weight' => 0,
+      'items' => [
+        'sdc.xb_test_sdc.shoe_tab_group',
+      ],
+    ],
+    '5ef4ff01-32b2-40d9-8471-15c9288c67ea' => [
+      'name' => 'System',
+      'id' => '5ef4ff01-32b2-40d9-8471-15c9288c67ea',
+      'type' => 'component',
+      'weight' => 0,
+      'items' => [
+        'block.system_clear_cache_block',
+        'block.system_branding_block',
+        'block.system_breadcrumb_block',
+        'block.system_messages_block',
+        'block.system_powered_by_block',
+      ],
+    ],
+    '8150c8fa-26e9-403c-8225-852a32490c35' => [
+      'name' => 'Atom/Text',
+      'id' => '8150c8fa-26e9-403c-8225-852a32490c35',
+      'type' => 'component',
+      'weight' => 0,
+      'items' => [
+        'sdc.xb_test_sdc.heading',
+        'sdc.xb_test_sdc.shoe_badge',
+      ],
+    ],
+    '8bacc99f-b9b8-418b-b14a-db564364592d' => [
+      'name' => 'core',
+      'id' => '8bacc99f-b9b8-418b-b14a-db564364592d',
+      'type' => 'component',
+      'weight' => 0,
+      'items' => [
+        'block.local_actions_block',
+        'block.local_tasks_block',
+        'block.page_title_block',
+      ],
+    ],
+    '912ee056-75f7-490e-84ad-cc485e469f13' => [
+      'name' => 'Menus',
+      'id' => '912ee056-75f7-490e-84ad-cc485e469f13',
+      'type' => 'component',
+      'weight' => 0,
+      'items' => [
+        'block.system_menu_block.account',
+        'block.system_menu_block.admin',
+        'block.system_menu_block.footer',
+        'block.system_menu_block.main',
+        'block.system_menu_block.tools',
+      ],
+    ],
+    'cf03636e-6f4f-4cef-992d-bcf319a7cb69' => [
+      'name' => 'Other',
+      'id' => 'cf03636e-6f4f-4cef-992d-bcf319a7cb69',
+      'type' => 'component',
+      'weight' => 0,
+      'items' => [
+        'sdc.xb_broken_sdcs.invalid-filter',
+        'sdc.xb_test_sdc.my-cta',
+        'sdc.xb_test_sdc.component-no-meta-enum',
+        'sdc.xb_test_sdc.card',
+        'sdc.xb_test_sdc.props-no-slots',
+        'sdc.xb_test_sdc.image-required-with-example',
+        'sdc.xb_test_sdc.card-with-stream-wrapper-image',
+        'sdc.xb_test_sdc.my-hero',
+        'sdc.xb_test_sdc.props-slots',
+        'sdc.xb_test_sdc.my-section',
+        'sdc.xb_test_sdc.crash',
+        'sdc.xb_test_sdc.card-with-local-image',
+        'sdc.xb_test_sdc.image-optional-with-example',
+        'sdc.xb_test_sdc.image',
+        'sdc.xb_test_sdc.attributes',
+        'sdc.xb_test_sdc.image-optional-with-example-and-additional-prop',
+        'sdc.xb_test_sdc.sparkline',
+        'sdc.xb_test_sdc.image-optional-without-example',
+        'sdc.xb_test_sdc.card-with-remote-image',
+        'sdc.xb_test_sdc.image-gallery',
+        'sdc.xb_test_sdc.druplicon',
+      ],
+    ],
+    'd0ba87b2-79b4-4622-98e1-cf82dc3655a0' => [
+      'name' => 'Container',
+      'id' => 'd0ba87b2-79b4-4622-98e1-cf82dc3655a0',
+      'type' => 'component',
+      'weight' => 0,
+      'items' => [
+        'sdc.xb_test_sdc.grid-container',
+        'sdc.xb_test_sdc.one_column',
+        'sdc.xb_test_sdc.two_column',
+      ],
+    ],
+    'd64b91c6-f99e-43fc-b251-777c7e2f4669' => [
+      'name' => 'Atom/Tabs',
+      'id' => 'd64b91c6-f99e-43fc-b251-777c7e2f4669',
+      'type' => 'component',
+      'weight' => 0,
+      'items' => [
+        'sdc.xb_test_sdc.shoe_tab_panel',
+        'sdc.xb_test_sdc.shoe_tab',
+      ],
+    ],
+    'e3fac676-8929-4205-abe8-df94ec85e0d2' => [
+      'name' => 'Status',
+      'id' => 'e3fac676-8929-4205-abe8-df94ec85e0d2',
+      'type' => 'component',
+      'weight' => 0,
+      'items' => [
+        'sdc.xb_test_sdc.experimental',
+        'sdc.xb_test_sdc.deprecated',
+      ],
+    ],
+  ];
+
+  protected readonly UserInterface $limitedPermissionsUser;
+
   protected function setUp(): void {
     parent::setUp();
     $user = $this->createUser([
@@ -72,9 +233,16 @@ class XbConfigEntityHttpApiTest extends HttpApiTestBase {
       Component::ADMIN_PERMISSION,
       JavaScriptComponent::ADMIN_PERMISSION,
       Pattern::ADMIN_PERMISSION,
+      Folder::ADMIN_PERMISSION,
     ]);
     assert($user instanceof UserInterface);
     $this->httpApiUser = $user;
+
+    // Create a user with an arbitrary permission that is not related to
+    // accessing any XB resources.
+    $user2 = $this->createUser(['view media']);
+    assert($user2 instanceof UserInterface);
+    $this->limitedPermissionsUser = $user2;
   }
 
   /**
@@ -103,6 +271,7 @@ class XbConfigEntityHttpApiTest extends HttpApiTestBase {
    */
   public function testPattern(): void {
     // cspell:ignore testpatternpleaseignore
+    $this->drupalLogin($this->limitedPermissionsUser);
     $this->assertAuthenticationAndAuthorization('pattern');
 
     $base = rtrim(base_path(), '/');
@@ -473,6 +642,7 @@ class XbConfigEntityHttpApiTest extends HttpApiTestBase {
    * @see \Drupal\experience_builder\Entity\JavaScriptComponent
    */
   public function testJavaScriptComponent(): void {
+    $this->drupalLogin($this->limitedPermissionsUser);
     $this->assertAuthenticationAndAuthorization(JavaScriptComponent::ENTITY_TYPE_ID);
 
     $base = rtrim(base_path(), '/');
@@ -1153,6 +1323,7 @@ class XbConfigEntityHttpApiTest extends HttpApiTestBase {
     $library = AssetLibrary::load(AssetLibrary::GLOBAL_ID);
     \assert($library instanceof AssetLibrary);
     $library->delete();
+    $this->drupalLogin($this->limitedPermissionsUser);
     $this->assertAuthenticationAndAuthorization(AssetLibrary::ENTITY_TYPE_ID, FALSE);
 
     $base = rtrim(base_path(), '/');
@@ -1277,11 +1448,11 @@ class XbConfigEntityHttpApiTest extends HttpApiTestBase {
     $this->assertExpectedResponse('DELETE', Url::fromUri('base:/xb/api/v0/config/xb_asset_library/global'), [], 403, NULL, NULL, NULL, NULL);
   }
 
-  private function assertAuthenticationAndAuthorization(string $entity_type_id, bool $delete_allowed = TRUE): void {
+  private function assertAuthenticationAndAuthorization(string $entity_type_id, bool $delete_allowed = TRUE, array $initial_items = []): void {
     $list_url = Url::fromUri("base:/xb/api/v0/config/$entity_type_id");
 
-    // Anonymously: 403.
-    $body = $this->assertExpectedResponse('GET', $list_url, [], 403, ['user.permissions'], ['4xx-response', 'config:user.role.anonymous', 'http_response'], 'MISS', NULL);
+    // Insufficient Permissions: 403.
+    $body = $this->assertExpectedResponse('GET', $list_url, [], 403, ['user.permissions'], ['4xx-response', 'http_response'], 'UNCACHEABLE (request policy)', NULL);
     $this->assertSame([
       'errors' => [
         'Requires >=1 content entity type with an XB field that can be created or edited.',
@@ -1291,7 +1462,12 @@ class XbConfigEntityHttpApiTest extends HttpApiTestBase {
     // Authenticated & authorized: 200, but empty list.
     $this->drupalLogin($this->httpApiUser);
     $body = $this->assertExpectedResponse('GET', $list_url, [], 200, ['user.permissions'], ["config:{$entity_type_id}_list", 'http_response'], 'UNCACHEABLE (request policy)', 'MISS');
-    $this->assertSame([], $body);
+    if (empty($initial_items)) {
+      $this->assertSame([], $body);
+    }
+    else {
+      $this->assertSameFoldersSansUuids($initial_items, $body ?? []);
+    }
 
     // Send a POST request without the CSRF token.
     $request_options = [
@@ -1319,12 +1495,20 @@ class XbConfigEntityHttpApiTest extends HttpApiTestBase {
     $response = $this->makeApiRequest('POST', $list_url, $request_options);
     self::assertEquals(Response::HTTP_CREATED, $response->getStatusCode());
     $body = json_decode((string) $response->getBody(), TRUE);
-    $idKey = $this->container->get(EntityTypeManagerInterface::class)->getDefinition($entity_type_id)->getKey('id');
+    $config_entity_type_definition = $this->container->get(EntityTypeManagerInterface::class)->getDefinition($entity_type_id);
+    assert($config_entity_type_definition instanceof ConfigEntityType);
+    $idKey = $config_entity_type_definition->get('xb_client_id_key') ?? $config_entity_type_definition->getKey('id');
     $this->assertArrayHasKey($idKey, $body);
     $id = $body[$idKey];
 
     $this->drupalLogout();
     // Verify we cannot access it as anonymous.
+    $canonical_url = Url::fromUri("base:/xb/api/v0/config/$entity_type_id/$id");
+    $response = $this->makeApiRequest('GET', $canonical_url, []);
+    $this->assertSame(401, $response->getStatusCode());
+
+    $this->drupalLogin($this->limitedPermissionsUser);
+    // Verify we cannot access it with insufficient permissions.
     $canonical_url = Url::fromUri("base:/xb/api/v0/config/$entity_type_id/$id");
     $response = $this->makeApiRequest('GET', $canonical_url, []);
     $this->assertSame(403, $response->getStatusCode());
@@ -1388,6 +1572,7 @@ class XbConfigEntityHttpApiTest extends HttpApiTestBase {
       'node_list',
       'user:1',
       'user:2',
+      'user:3',
       'user_list',
     ];
     // If expected adds new components, those components add additional cache tags. If those cache tags are not
@@ -1403,7 +1588,7 @@ class XbConfigEntityHttpApiTest extends HttpApiTestBase {
   }
 
   public function testComponent(): void {
-    $this->container->get('theme_installer')->install(['stark', 'olivero']);
+    $this->container->get('theme_installer')->install(['stark', 'test_theme_child']);
 
     // Ensure we have an interesting set of Component config entities: the ones
     // provided by the modules & themes, including:
@@ -1417,15 +1602,6 @@ class XbConfigEntityHttpApiTest extends HttpApiTestBase {
     // - one that does not originate from any extension, but is a code component
     //   created from scratch and exposed as a Component
     $this->createMyCtaComponentFromSdc();
-
-    // @todo Remove in https://www.drupal.org/project/experience_builder/issues/3537695
-    if (version_compare(\Drupal::VERSION, '11.3', '<')) {
-      // SDC `noUi` handling didn't happen before Drupal core 11.3, so disable
-      // the `noUi` component.
-      $no_ui_component = Component::load('sdc.xb_test_sdc.no-ui-sdc');
-      assert($no_ui_component instanceof Component);
-      $no_ui_component->setStatus(FALSE)->save();
-    }
 
     $page = $this->getSession()->getPage();
     $this->drupalLogin($this->httpApiUser);
@@ -1449,6 +1625,7 @@ class XbConfigEntityHttpApiTest extends HttpApiTestBase {
       'node_list',
       'user:1',
       'user:2',
+      'user:3',
       'user_list',
       AutoSaveManager::CACHE_TAG,
     ];
@@ -1488,22 +1665,24 @@ class XbConfigEntityHttpApiTest extends HttpApiTestBase {
     // 2. Test results depending on the default theme.
     // Stark has no SDCs.
     $this->assertSame('stark', $this->config('system.theme')->get('default'));
-    $this->assertArrayNotHasKey('sdc.olivero.teaser', $data);
-    // Olivero does have an SDC, and it's enabled, but it is omitted because the
+    $this->assertArrayNotHasKey('sdc.test_theme_child.test-child', $data);
+    // Test Theme Child does have an SDC, and it's enabled, but it is omitted because the
     // default theme is Stark.
-    $this->assertInstanceOf(Component::class, Component::load('sdc.olivero.teaser'));
-    $this->assertTrue(Component::load('sdc.olivero.teaser')->status());
-    $this->assertSame('olivero', Component::load('sdc.olivero.teaser')->get('provider'));
-    // Change the default theme from Stark to Olivero, and observe the impact on
-    // the list of Components returned.
-    $this->container->get('config.factory')->getEditable('system.theme')->set('default', 'olivero')->save();
+    $this->assertInstanceOf(Component::class, Component::load('sdc.test_theme_child.test-child'));
+    $this->assertTrue(Component::load('sdc.test_theme_child.test-child')->status());
+    $this->assertSame('test_theme_child', Component::load('sdc.test_theme_child.test-child')->get('provider'));
+    // Change the default theme from Stark to Test Theme Child, and observe the
+    // impact on the list of Components returned.
+    $this->container->get('config.factory')->getEditable('system.theme')->set('default', 'test_theme_child')->save();
     $this->rebuildAll();
     $this->drupalGet('xb/api/v0/config/component');
     $this->assertDynamicPageCacheAccelerated(maxAge: '-1 (Permanent)');
     $data = Json::decode($page->getText());
-    // Olivero does have an SDC!
-    $this->assertSame('olivero', $this->config('system.theme')->get('default'));
-    $this->assertArrayHasKey('sdc.olivero.teaser', $data);
+    // Test Theme Child does have an SDC!
+    $this->assertSame('test_theme_child', $this->config('system.theme')->get('default'));
+    $this->assertArrayHasKey('sdc.test_theme_child.test-child', $data);
+    // Also verify that the Components from the base themes are available.
+    $this->assertArrayHasKey('sdc.test_theme_base.test-base', $data);
 
     // 3. Test that good cacheability is guaranteed.
     // As soon as the "recent content" block has any nodes to list, due to its
@@ -1546,6 +1725,203 @@ class XbConfigEntityHttpApiTest extends HttpApiTestBase {
     }
     $this->assertSession()->responseHeaderEquals('X-Drupal-Dynamic-Cache', 'HIT');
     $this->assertSession()->responseHeaderEquals('X-Drupal-Cache', 'UNCACHEABLE (request policy)');
+  }
+
+  /**
+   * @see \Drupal\experience_builder\Entity\Folder
+   */
+  public function testFolder(): void {
+    $this->drupalLogin($this->limitedPermissionsUser);
+    $this->assertAuthenticationAndAuthorization('folder', initial_items: $this->defaultFolders);
+
+    $list_url = Url::fromUri("base:/xb/api/v0/config/folder");
+
+    $request_options = [
+      RequestOptions::HEADERS => [
+        'Content-Type' => 'application/json',
+      ],
+    ];
+
+    // Create a Folder via the XB HTTP API, but forget crucial data that causes
+    // the required shape to be violated: 500, courtesy of OpenAPI.
+    $folder_to_send = [
+      'name' => 'Test folder, please ignore',
+      'type' => Component::ENTITY_TYPE_ID,
+      'weight' => 0,
+    ];
+    $request_options[RequestOptions::JSON] = $folder_to_send;
+    $body = $this->assertExpectedResponse('POST', $list_url, $request_options, 500, NULL, NULL, NULL, NULL);
+    $this->assertSame([
+      'message' => 'Body does not match schema for content-type "application/json" for Request [post /xb/api/v0/config/folder]. [Keyword validation failed: Required property \'items\' must be present in the object in items]',
+    ], $body, 'Fails with missing data.');
+
+    // Add missing crucial data, but leave a required shape violation: 500,
+    // courtesy of OpenAPI.
+    $folder_to_send['items'] = [
+      1,
+    ];
+    $request_options[RequestOptions::JSON] = $folder_to_send;
+    $body = $this->assertExpectedResponse('POST', $list_url, $request_options, 500, NULL, NULL, NULL, NULL);
+    $this->assertSame([
+      'message' => 'Body does not match schema for content-type "application/json" for Request [post /xb/api/v0/config/folder]. [Value expected to be \'string\', but \'integer\' given in items->0]',
+    ], $body, 'Fails with invalid shape.');
+
+    // Meet data shape requirements, but violate constraint in `items`
+    $folder_to_send['items'] = ['fake_component'];
+    $request_options[RequestOptions::JSON] = $folder_to_send;
+    $body = $this->assertExpectedResponse('POST', $list_url, $request_options, 422, NULL, NULL, NULL, NULL);
+    $this->assertSame([
+      'errors' => [
+        [
+          'detail' => 'The \'experience_builder.component.fake_component\' config does not exist.',
+          'source' => ['pointer' => 'items.0'],
+        ],
+      ],
+    ], $body);
+
+    // Re-retrieve list: 200, unchanged.
+    $body = $this->assertExpectedResponse('GET', $list_url, [], 200, ['user.permissions'], ['config:folder_list', 'http_response'], 'UNCACHEABLE (request policy)', 'MISS');
+    $this->assertSameFoldersSansUuids($this->defaultFolders, $body ?? []);
+
+    // Re-retrieve list: 200, unchanged, but now is a Dynamic Page Cache hit.
+    $body = $this->assertExpectedResponse('GET', $list_url, [], 200, ['user.permissions'], ['config:folder_list', 'http_response'], 'UNCACHEABLE (request policy)', 'HIT');
+    $this->assertSameFoldersSansUuids($this->defaultFolders, $body ?? []);
+
+    // Create a Folder via the XB HTTP API, correctly: 201.
+    $folder_to_send['items'] = [];
+    $request_options[RequestOptions::JSON] = $folder_to_send;
+    $body = $this->assertExpectedResponse('POST', $list_url, $request_options, 201, NULL, NULL, NULL, NULL);
+    assert(is_array($body));
+    ksort($folder_to_send);
+    ksort($body);
+    $new_folder = Folder::loadByNameAndConfigEntityTypeId($folder_to_send['name'], $folder_to_send['type']);
+    assert($new_folder instanceof Folder);
+    $id = $new_folder->id();
+    $this->assertEquals($folder_to_send + ['id' => $id], $body);
+
+    // Creating a Folder with an already-in-use name: 422.
+    $request_options[RequestOptions::JSON] = $folder_to_send;
+    $body = $this->assertExpectedResponse('POST', $list_url, $request_options, 422, NULL, NULL, NULL, NULL);
+    $this->assertSame([
+      'errors' => [
+        [
+          'detail' => 'Name <em class="placeholder">Test folder, please ignore</em> is not unique in Folder type "<em class="placeholder">component</em>"',
+          'source' => ['pointer' => 'name'],
+        ],
+      ],
+    ], $body);
+
+    // Create a Folder with BE generated id: 201.
+    $new_folder_to_send = $folder_to_send;
+    $new_folder_to_send['name'] = 'Unique test name, please ignore.';
+    // Create folder with weight of -1 to place at the bottom of the list.
+    $new_folder_to_send['weight'] = -1;
+    $request_options[RequestOptions::JSON] = $new_folder_to_send;
+    $body = $this->assertExpectedResponse('POST', $list_url, $request_options, 201, NULL, NULL, NULL, NULL);
+    assert(is_array($body));
+    $this->assertArrayHasKey('id', $body);
+    $this->assertNotEquals($body['id'], $id);
+    $this->assertTrue(Uuid::isValid($body['id']));
+    $new_folder_id = $body['id'];
+
+    // Create folder with weight of 1 to place at the bottom of the list.
+    $temp_folder = Folder::create([
+      'name' => 'Temp Folder',
+      'configEntityTypeId' => Component::ENTITY_TYPE_ID,
+      'weight' => 1,
+      'items' => [],
+    ]);
+    $temp_folder->save();
+
+    // Fetch list of Folders to verify correct they are sorted correctly.
+    $body = $this->assertExpectedResponse('GET', $list_url, [], 200, ['user.permissions'], ['config:folder_list', 'http_response'], 'UNCACHEABLE (request policy)', 'MISS');
+    assert(is_array($body));
+    $this->assertCount(count($this->defaultFolders) + 3, $body);
+    $this->assertEquals($new_folder_id, array_keys($body)[0]);
+    $this->assertEquals($temp_folder->id(), array_keys($body)[count($body) - 1]);
+    $temp_folder->delete();
+
+    // Delete Folder via the XB HTTP API: 204.
+    $this->assertExpectedResponse('DELETE', Url::fromUri('base:/xb/api/v0/config/folder/' . $new_folder_id), [], 204, NULL, NULL, NULL, NULL);
+
+    // Re-retrieve list: 200, non-empty list. Dynamic Page Cache miss.
+    // Use the individual URL in the list response body.
+    $body = $this->assertExpectedResponse('GET', $list_url, [], 200, ['user.permissions'], ['config:folder_list', 'http_response'], 'UNCACHEABLE (request policy)', 'MISS');
+    self::assertNotNull($body);
+    $this->assertEquals(array_keys(Folder::loadMultiple()), array_keys($body));
+    $this->assertArrayHasKey($id, $body);
+    $this->assertEquals($folder_to_send + ['id' => $id], $body[$id]);
+    $individual_body = $this->assertExpectedResponse('GET', Url::fromUri('base:/xb/api/v0/config/folder/' . $id), [], 200, ['user.permissions'], ['config:experience_builder.folder.' . $id, 'http_response'], 'UNCACHEABLE (request policy)', 'MISS');
+    $this->assertEquals($folder_to_send + ['id' => $id], $individual_body);
+
+    // Modify a Folder incorrectly (shape-wise): 500.
+    $request_options[RequestOptions::JSON] = [
+      'id' => $id,
+      'weight' => 0,
+      'items' => NULL,
+      'name' => 'Test',
+    ];
+    $body = $this->assertExpectedResponse('PATCH', Url::fromUri('base:/xb/api/v0/config/folder/' . $id), $request_options, 500, NULL, NULL, NULL, NULL);
+    $this->assertSame([
+      'message' => 'Body does not match schema for content-type "application/json" for Request [patch /xb/api/v0/config/folder/{configEntityId}]. [Keyword validation failed: Value cannot be null in items]',
+    ], $body, 'Fails with an invalid \'items\' value.');
+
+    $request_options[RequestOptions::JSON] = [
+      'id' => $id,
+      'weight' => 0,
+      'name' => NULL,
+      'items' => [],
+    ];
+    $body = $this->assertExpectedResponse('PATCH', Url::fromUri('base:/xb/api/v0/config/folder/' . $id), $request_options, 500, NULL, NULL, NULL, NULL);
+    $this->assertSame([
+      'message' => 'Body does not match schema for content-type "application/json" for Request [patch /xb/api/v0/config/folder/{configEntityId}]. [Keyword validation failed: Value cannot be null in name]',
+    ], $body, 'Fails with an invalid \'name\' value.');
+
+    // Modify a Folder incorrectly (items constraint validation fail): 422.
+    $request_options[RequestOptions::JSON] = [
+      'id' => $id,
+      'weight' => 0,
+      'name' => 'Test',
+      'items' => ['fake_component'],
+    ];
+    $body = $this->assertExpectedResponse('PATCH', Url::fromUri('base:/xb/api/v0/config/folder/' . $id), $request_options, 422, NULL, NULL, NULL, NULL);
+    $this->assertSame([
+      'errors' => [
+        [
+          'detail' => 'The \'experience_builder.component.fake_component\' config does not exist.',
+          'source' => ['pointer' => 'items.0'],
+        ],
+      ],
+    ], $body);
+
+    // Modify a Folder correctly: 200.
+    $request_options[RequestOptions::JSON] = $folder_to_send;
+    $body = $this->assertExpectedResponse('PATCH', Url::fromUri('base:/xb/api/v0/config/folder/' . $id), $request_options, 200, NULL, NULL, NULL, NULL);
+    $this->assertEquals($folder_to_send + ['id' => $id], $body);
+
+    // Partially modify a Folder: 200.
+    $folder_to_send['name'] = 'Updated test Folder name';
+    $request_options[RequestOptions::JSON] = [
+      'name' => $folder_to_send['name'],
+      'weight' => $folder_to_send['weight'],
+      'items' => $folder_to_send['items'],
+    ];
+    $body = $this->assertExpectedResponse('PATCH', Url::fromUri('base:/xb/api/v0/config/folder/' . $id), $request_options, 200, NULL, NULL, NULL, NULL);
+    $this->assertEquals($folder_to_send + ['id' => $id], $body);
+
+    // Re-retrieve list: 200, non-empty list. Dynamic Page Cache miss.
+    $body = $this->assertExpectedResponse('GET', $list_url, [], 200, ['user.permissions'], ['config:folder_list', 'http_response'], 'UNCACHEABLE (request policy)', 'MISS');
+    self::assertNotNull($body);
+    $this->assertEquals(array_keys(Folder::loadMultiple()), array_keys($body));
+    $this->assertArrayHasKey($id, $body);
+    $this->assertEquals($folder_to_send + ['id' => $id], $body[$id]);
+
+    // Delete the recently added Folder via the XB HTTP API: 204.
+    $folders_with_a_delete = $this->defaultFolders;
+    unset($folders_with_a_delete[$id]);
+    $this->assertDeletionAndEmptyList(Url::fromUri('base:/xb/api/v0/config/folder/' . $id), $list_url, 'config:folder_list', $folders_with_a_delete);
+
+    // This was now tested full circle! ✅
   }
 
 }

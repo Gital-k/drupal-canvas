@@ -15,7 +15,10 @@ import {
 import Viewport from '@/features/layout/preview/Viewport';
 import ComponentHtmlMapProvider from '@/features/layout/preview/DataToHtmlMapContext';
 import { selectPageData } from '@/features/pageData/pageDataSlice';
-import { selectPreviewHtml } from '@/features/pagePreview/previewSlice';
+import {
+  selectPreviewHtml,
+  selectPreviewBackgroundUpdate,
+} from '@/features/pagePreview/previewSlice';
 import { contentApi } from '@/services/content';
 import { selectSelectedComponentUuid } from '@/features/ui/uiSlice';
 import { getXbSettings } from '@/utils/drupal-globals';
@@ -30,10 +33,11 @@ const Preview: React.FC<PreviewProps> = () => {
   const updatePreview = useAppSelector(selectUpdatePreview);
   const model = useAppSelector(selectModel);
   const selectedComponent = useAppSelector(selectSelectedComponentUuid);
+  const backgroundUpdate = useAppSelector(selectPreviewBackgroundUpdate);
   const selectedComponentId = selectedComponent || 'noop';
   const entity_form_fields = useAppSelector(selectPageData);
   const [postPreview, { isLoading: isFetching }] = usePostPreviewMutation({
-    fixedCacheKey: 'canvasPreview',
+    fixedCacheKey: 'editorFramePreview',
   });
   const isPatching = useAppSelector((state) =>
     selectUpdateComponentLoadingState(state, selectedComponentId),
@@ -91,7 +95,7 @@ const Preview: React.FC<PreviewProps> = () => {
     <ComponentHtmlMapProvider>
       <Viewport
         frameSrcDoc={frameSrcDoc}
-        isFetching={isFetching || isPatching}
+        isFetching={(isFetching || isPatching) && !backgroundUpdate}
       />
     </ComponentHtmlMapProvider>
   );

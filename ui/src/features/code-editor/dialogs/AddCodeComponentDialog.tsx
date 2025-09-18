@@ -61,8 +61,9 @@ const AddCodeComponentDialog = () => {
       setValidationError('');
       dispatch(closeAllDialogs());
       navigate(`/code-editor/code/${data.machineName}`);
+      reset();
     }
-  }, [isSuccess, data?.machineName, dispatch, navigate, componentName]);
+  }, [isSuccess, data?.machineName, dispatch, navigate, componentName, reset]);
 
   useEffect(() => {
     if (isError) {
@@ -113,6 +114,7 @@ const AddCodeComponentDialog = () => {
             Component name
           </DialogFieldLabel>
           <TextField.Root
+            autoComplete="off"
             id={'componentName'}
             value={componentName}
             onChange={(e) => handleOnChange(e.target.value)}

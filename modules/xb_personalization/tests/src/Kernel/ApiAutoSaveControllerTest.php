@@ -12,6 +12,7 @@ use Drupal\experience_builder\Controller\ErrorCodesEnum;
 use Drupal\experience_builder\Entity\Page;
 use Drupal\KernelTests\KernelTestBase;
 use Drupal\Tests\experience_builder\Kernel\Traits\RequestTrait;
+use Drupal\Tests\experience_builder\Kernel\Traits\VfsPublicStreamUrlTrait;
 use Drupal\Tests\experience_builder\TestSite\XBTestSetup;
 use Drupal\Tests\experience_builder\Traits\AutoSaveManagerTestTrait;
 use Drupal\Tests\experience_builder\Traits\AutoSaveRequestTestTrait;
@@ -38,6 +39,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
   use OpenApiSpecTrait;
   use RequestTrait;
   use XBFieldTrait;
+  use VfsPublicStreamUrlTrait;
 
   /**
    * {@inheritdoc}
@@ -54,7 +56,6 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
   protected function setUp(): void {
     parent::setUp();
     $this->installConfig('system');
-    $this->installConfig('xb_personalization');
     (new XBTestSetup())->setup();
   }
 

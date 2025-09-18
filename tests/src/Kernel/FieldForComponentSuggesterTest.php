@@ -369,6 +369,14 @@ class FieldForComponentSuggesterTest extends KernelTestBase {
           ],
           'adapters' => [],
         ],
+        '⿲sdc_test_all_props:all-props␟test_REQUIRED_string_format_uri' => [
+          'required' => TRUE,
+          'instances' => [
+            "Subset of this Foo's field_silly_image: entity (1 of 7 props — absent: alt, title, width, height, srcset_candidate_uri_template, src_with_alternate_widths)" => 'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝uri␞␟value',
+            "Subset of this Foo's field_silly_image: src_with_alternate_widths (1 of 7 props — absent: entity, alt, title, width, height, srcset_candidate_uri_template)" => 'ℹ︎␜entity:node:foo␝field_silly_image␞␟src_with_alternate_widths',
+          ],
+          'adapters' => [],
+        ],
         '⿲sdc_test_all_props:all-props␟test_string_format_uri' => [
           'required' => FALSE,
           'instances' => [
@@ -378,6 +386,16 @@ class FieldForComponentSuggesterTest extends KernelTestBase {
           'adapters' => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_string_format_uri_image' => [
+          'required' => FALSE,
+          'instances' => [
+            "Subset of this Foo's field_silly_image: entity (1 of 7 props — absent: alt, title, width, height, srcset_candidate_uri_template, src_with_alternate_widths)" => 'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝uri␞␟url',
+            "Subset of this Foo's field_silly_image: src_with_alternate_widths (1 of 7 props — absent: entity, alt, title, width, height, srcset_candidate_uri_template)" => 'ℹ︎␜entity:node:foo␝field_silly_image␞␟src_with_alternate_widths',
+          ],
+          'adapters' => [
+            'Extract image URL' => 'image_extract_url',
+          ],
+        ],
+        '⿲sdc_test_all_props:all-props␟test_string_format_uri_image_using_ref' => [
           'required' => FALSE,
           'instances' => [
             "Subset of this Foo's field_silly_image: entity (1 of 7 props — absent: alt, title, width, height, srcset_candidate_uri_template, src_with_alternate_widths)" => 'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝uri␞␟url',

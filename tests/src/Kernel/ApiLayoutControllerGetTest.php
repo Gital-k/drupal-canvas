@@ -315,7 +315,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
                 [
                   'uuid' => XBTestSetup::UUID_STATIC_CARD1,
                   'nodeType' => 'component',
-                  'type' => 'sdc.xb_test_sdc.my-hero@060b3f2620eb7f36',
+                  'type' => 'sdc.xb_test_sdc.my-hero@888412021fbcc837',
                   'name' => NULL,
                   'slots' => [],
                 ],
@@ -350,14 +350,14 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
                 [
                   'uuid' => XBTestSetup::UUID_STATIC_CARD2,
                   'nodeType' => 'component',
-                  'type' => 'sdc.xb_test_sdc.my-hero@060b3f2620eb7f36',
+                  'type' => 'sdc.xb_test_sdc.my-hero@888412021fbcc837',
                   'name' => NULL,
                   'slots' => [],
                 ],
                 [
                   'uuid' => XBTestSetup::UUID_STATIC_CARD3,
                   'nodeType' => 'component',
-                  'type' => 'sdc.xb_test_sdc.my-hero@060b3f2620eb7f36',
+                  'type' => 'sdc.xb_test_sdc.my-hero@888412021fbcc837',
                   'name' => NULL,
                   'slots' => [],
                 ],
@@ -492,7 +492,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
     /** @var \Drupal\experience_builder\Controller\ApiLayoutController $controller */
     $controller = \Drupal::classResolver(ApiLayoutController::class);
     $this->expectException(\LogicException::class);
-    $this->expectExceptionMessage('For now XB only works if the entity is an xb_page or an article node! Other entity types and bundles must be tested before they are supported, to help see https://drupal.org/i/3493675.');
+    $this->expectExceptionMessage('This entity does not have an XB field!');
     $controller->get($node);
   }
 
