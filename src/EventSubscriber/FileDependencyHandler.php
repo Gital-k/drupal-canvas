@@ -1,13 +1,13 @@
 <?php
 
-namespace Drupal\experience_builder\EventSubscriber;
+namespace Drupal\canvas\EventSubscriber;
 
 use Drupal\Core\Config\ConfigEvents;
 use Drupal\Core\Config\StorageTransformEvent;
 use Drupal\Core\Entity\EntityRepositoryInterface;
 use Drupal\Core\File\FileExists;
 use Drupal\Core\File\FileSystemInterface;
-use Drupal\experience_builder\Entity\JavaScriptComponent;
+use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\file\Entity\File;
 use Drupal\file\FileInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
@@ -26,7 +26,7 @@ final class FileDependencyHandler implements EventSubscriberInterface {
     $storage = $event->getStorage();
 
     foreach ($storage->listAll() as $name) {
-      if (!str_starts_with($name, 'experience_builder.js_component.')) {
+      if (!str_starts_with($name, 'canvas.js_component.')) {
         continue;
       }
       $config = $storage->read($name);
@@ -55,7 +55,7 @@ final class FileDependencyHandler implements EventSubscriberInterface {
     $this->fileSystem->prepareDirectory($temporary_image_directory, FileSystemInterface:: CREATE_DIRECTORY | FileSystemInterface::MODIFY_PERMISSIONS);
 
     foreach ($storage->listAll() as $name) {
-      if (!str_starts_with($name, 'experience_builder.js_component.')) {
+      if (!str_starts_with($name, 'canvas.js_component.')) {
         continue;
       }
       $config = $storage->read($name);

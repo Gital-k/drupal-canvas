@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 // cspell:ignore kiki
 
-namespace Drupal\Tests\experience_builder\Traits;
+namespace Drupal\Tests\canvas\Traits;
 
 use Drupal\Core\Database\StatementInterface;
 use Drupal\Core\Entity\EntityRepositoryInterface;
@@ -51,9 +51,9 @@ trait ExampleImagesTrait {
     assert($file instanceof FileInterface);
     $usage = \Drupal::service('file.usage')->listUsage($file);
     assert(is_array($usage));
-    assert(isset($usage['experience_builder']['js_component']));
-    $this->assertArrayHasKey($componentId, $usage['experience_builder']['js_component']);
-    $this->assertSame("1", $usage['experience_builder']['js_component'][$componentId]);
+    assert(isset($usage['canvas']['js_component']));
+    $this->assertArrayHasKey($componentId, $usage['canvas']['js_component']);
+    $this->assertSame("1", $usage['canvas']['js_component'][$componentId]);
   }
 
 }

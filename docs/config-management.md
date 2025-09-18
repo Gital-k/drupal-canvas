@@ -219,10 +219,10 @@ overrides the "Published" (saved) version on certain routes, thanks to a conditi
 #### 3.2.2 _Code components_ can "carry" (synchronizable) files used to populate examples
 
 See:
-- `\Drupal\experience_builder\EventSubscriber\FileDependencyHandler::onExportTransform()`
-- `\Drupal\experience_builder\EventSubscriber\FileDependencyHandler::onImportTransform()`
-- `\Drupal\experience_builder\Entity\JavaScriptComponent::preSave()`
-- `\Drupal\experience_builder\Entity\JavaScriptComponent::postSave()`
+- `\Drupal\canvas\EventSubscriber\FileDependencyHandler::onExportTransform()`
+- `\Drupal\canvas\EventSubscriber\FileDependencyHandler::onImportTransform()`
+- `\Drupal\canvas\Entity\JavaScriptComponent::preSave()`
+- `\Drupal\canvas\Entity\JavaScriptComponent::postSave()`
 
 Code components can have example values assigned to their props, including example images. When creating a `File` entity
 used for an example image prop value, its UUID is based on the file's content hash. If an example image is assigned to a

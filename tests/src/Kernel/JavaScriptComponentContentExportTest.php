@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Drupal\Tests\experience_builder\Kernel;
+namespace Drupal\Tests\canvas\Kernel;
 
+use Drupal\canvas\Entity\Component;
+use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\Core\Config\ConfigImporter;
 use Drupal\Core\Config\ExportStorageManager;
 use Drupal\Core\Config\MemoryStorage;
@@ -12,13 +14,11 @@ use Drupal\Core\Database\StatementInterface;
 use Drupal\Core\Entity\EntityRepositoryInterface;
 use Drupal\Core\File\FileSystemInterface;
 use Drupal\Core\Lock\NullLockBackend;
-use Drupal\experience_builder\Entity\Component;
-use Drupal\experience_builder\Entity\JavaScriptComponent;
 use Drupal\file\Entity\File;
 use Drupal\file\FileInterface;
 use Drupal\KernelTests\KernelTestBase;
-use Drupal\Tests\experience_builder\Traits\ContribStrictConfigSchemaTestTrait;
-use Drupal\Tests\experience_builder\Traits\ExampleImagesTrait;
+use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
+use Drupal\Tests\canvas\Traits\ExampleImagesTrait;
 
 class JavaScriptComponentContentExportTest extends KernelTestBase {
 
@@ -38,7 +38,7 @@ class JavaScriptComponentContentExportTest extends KernelTestBase {
     'field',
     'file',
     'image',
-    'experience_builder',
+    'canvas',
   ];
 
   protected array $encodedFiles;
