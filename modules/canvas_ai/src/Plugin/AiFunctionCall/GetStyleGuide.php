@@ -18,7 +18,7 @@ use Drupal\ai_agents\PluginInterfaces\AiAgentContextInterface;
   name: 'Get style guide',
   description: 'This method gets the style guide for selected components.',
   group: 'information_tools',
-  module_dependencies: ['experience_builder'],
+  module_dependencies: ['canvas'],
   context_definitions: [
     'components_to_use' => new ContextDefinition(
       data_type: 'string',
