@@ -2,9 +2,10 @@
  * Provides utility functions for the PublishReview components
  */
 
-import { FallbackColor } from '@/types/Review';
 import { differenceInMonths, format, formatDistanceToNow } from 'date-fns';
 import { kebabCase } from 'lodash';
+
+import { FallbackColor } from '@/types/Review';
 
 // @todo https://www.drupal.org/i/3501449 - this color randomizer should be replaced with a proper solution
 const colors = Object.values(FallbackColor);
@@ -44,16 +45,18 @@ export function getGroupLabel(entityType: string): string {
   switch (entityType) {
     case 'node':
       return 'Content';
-    case 'xb_page':
+    case 'canvas_page':
       return 'Pages';
     case 'js_component':
       return 'Components';
-    case 'xb_asset_library':
+    case 'asset_library':
       return 'Assets';
     case 'page_region':
       return 'Regions';
     case 'staged_config_update':
       return 'Configuration updates';
+    case 'content_template':
+      return 'Content templates';
     default:
       return kebabCase(entityType);
   }
@@ -78,7 +81,7 @@ export const getTimeAgo = (timestamp: number) => {
 
   // If the date is older than 1 month, use "dd MMM" format
   if (monthsDifference >= 1) {
-    // @todo Implement Drupal-Specific Date Formatting(https://www.drupal.org/project/experience_builder/issues/3493779)
+    // @todo Implement Drupal-Specific Date Formatting(https://www.drupal.org/project/canvas/issues/3493779)
     return format(inputDate, 'd MMM');
   }
 

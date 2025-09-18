@@ -4,21 +4,26 @@ import {
   Outlet,
   RouterProvider,
 } from 'react-router-dom';
-import App from '@/app/App';
-import { RouteErrorBoundary } from '@/components/error/ErrorBoundary';
-import PagePreview from '@/features/pagePreview/PagePreview';
-import Editor from '@/features/editor/Editor';
-import DummyPropsEditForm from '@/components/DummyPropsEditForm';
-import type React from 'react';
-import MosaicContainer from '@/features/code-editor/MosaicContainer';
-import CodeComponentDialogs from '@/features/code-editor/dialogs/CodeComponentDialogs';
-import PrimaryPanel from '@/components/sidePanel/PrimaryPanel';
-import SideMenu from '@/components/sideMenu/SideMenu';
-import PermissionCheck from '@/components/PermissionCheck';
-import ErrorCard from '@/components/error/ErrorCard';
 import { Flex } from '@radix-ui/themes';
-import SegmentPanel from '@/features/personalization/SegmentPanel';
+
+import App from '@/app/App';
+import ComponentInstanceForm from '@/components/ComponentInstanceForm';
+import { RouteErrorBoundary } from '@/components/error/ErrorBoundary';
+import ErrorCard from '@/components/error/ErrorCard';
+import PermissionCheck from '@/components/PermissionCheck';
+import SideMenu from '@/components/sideMenu/SideMenu';
+import PrimaryPanel from '@/components/sidePanel/PrimaryPanel';
+import CodeComponentDialogs from '@/features/code-editor/dialogs/CodeComponentDialogs';
+import MosaicContainer from '@/features/code-editor/MosaicContainer';
+import Editor from '@/features/editor/Editor';
+import TemplateRoot from '@/features/editor/TemplateRoot';
+import PagePreview from '@/features/pagePreview/PagePreview';
 import SegmentDashboard from '@/features/personalization/SegmentDashboard';
+import SegmentPanel from '@/features/personalization/SegmentPanel';
+import { EditorFrameContext } from '@/features/ui/uiSlice';
+import Welcome from '@/features/welcome/Welcome';
+
+import type React from 'react';
 
 interface AppRoutesInterface {
   basePath: string;
@@ -52,39 +57,80 @@ const AppRoutes: React.FC<AppRoutesInterface> = ({ basePath }) => {
         errorElement: <RouteErrorBoundary />,
         children: [
           {
-            path: '', // Base path
-            element: <Navigate to="/editor" replace />, // Redirect to /editor
+            index: true, // base path
+            element:
+              basePath === '/canvas' ? (
+                <Welcome />
+              ) : (
+                <Navigate to="/editor" replace />
+              ),
           },
           {
             path: '/editor/',
+            element: <Welcome />,
+          },
+          {
+            path: '/editor/:entityType/:entityId',
             element: (
               <>
                 <SideMenu />
-                <Editor />
+                <Editor context={EditorFrameContext.ENTITY} />
               </>
             ),
             children: [
               {
-                path: '/editor/region/:regionId/component/:componentId',
-                element: <DummyPropsEditForm />,
+                path: '/editor/:entityType/:entityId/region/:regionId/component/:componentId',
+                element: <ComponentInstanceForm />,
               },
               {
-                path: '/editor/region/:regionId',
-                element: <DummyPropsEditForm />,
+                path: '/editor/:entityType/:entityId/region/:regionId',
+                element: <ComponentInstanceForm />,
               },
               {
-                path: '/editor/component/:componentId',
-                element: <DummyPropsEditForm />,
+                path: '/editor/:entityType/:entityId/component/:componentId',
+                element: <ComponentInstanceForm />,
               },
             ],
           },
           {
-            path: '/preview/:width',
+            path: '/template/:entityType/:bundle/:viewMode',
+            element: (
+              <>
+                <SideMenu />
+                <TemplateRoot />
+              </>
+            ),
+          },
+          {
+            path: '/template/:entityType/:bundle/:viewMode/:previewEntityId',
+            element: (
+              <>
+                <SideMenu />
+                <Editor context={EditorFrameContext.TEMPLATE} />
+              </>
+            ),
+            children: [
+              {
+                path: '/template/:entityType/:bundle/:viewMode/:previewEntityId/region/:regionId/component/:componentId',
+                element: <ComponentInstanceForm />,
+              },
+              {
+                path: '/template/:entityType/:bundle/:viewMode/:previewEntityId/region/:regionId',
+                element: <ComponentInstanceForm />,
+              },
+              {
+                path: '/template/:entityType/:bundle/:viewMode/:previewEntityId/component/:componentId',
+                element: <ComponentInstanceForm />,
+              },
+            ],
+          },
+          {
+            path: '/preview/:entityType/:entityId/',
             element: <PagePreview />,
           },
           {
-            path: '/preview/',
-            element: <Navigate to="/preview/full" replace />,
+            path: 'preview/:entityType/:entityId/:width',
+            element: <PagePreview />,
           },
           {
             // Opens the code editor for an item under 'Code'.

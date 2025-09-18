@@ -1,12 +1,14 @@
-import type { Command } from 'commander';
-import * as p from '@clack/prompts';
 import chalk from 'chalk';
+import * as p from '@clack/prompts';
+
 import { ensureConfig, setConfig } from '../config.js';
+import { buildTailwindForComponents } from '../utils/build-tailwind';
 import { buildComponent } from '../utils/build.js';
 import { reportResults } from '../utils/report-results';
-import type { Result } from '../types/Result.js';
 import { selectLocalComponents } from '../utils/select-local-components.js';
-import { buildTailwindForComponents } from '../utils/build-tailwind';
+
+import type { Command } from 'commander';
+import type { Result } from '../types/Result.js';
 
 interface BuildOptions {
   dir?: string;
@@ -36,7 +38,7 @@ export function buildCommand(program: Command): void {
     .option('--site-url <url>', 'Site URL')
     .option('--verbose', 'Enable verbose output')
     .action(async (options: BuildOptions) => {
-      p.intro('Experience Builder Component Build');
+      p.intro('Drupal Canvas Component Build');
 
       const allFlag = options.all || false;
       const skipTailwind = !options.tailwind;

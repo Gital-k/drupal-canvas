@@ -1,14 +1,16 @@
-import { Button, Box, Flex, Text, TextField, Select } from '@radix-ui/themes';
+import { useEffect, useMemo, useState } from 'react';
 import { PlusIcon, TrashIcon } from '@radix-ui/react-icons';
-import {
-  FormElement,
-  Label,
-  Divider,
-} from '@/features/code-editor/component-data/FormElement';
+import { Box, Button, Flex, Select, Text, TextField } from '@radix-ui/themes';
+
 import { useAppDispatch } from '@/app/hooks';
 import { updateProp } from '@/features/code-editor/codeEditorSlice';
+import {
+  Divider,
+  FormElement,
+  Label,
+} from '@/features/code-editor/component-data/FormElement';
+
 import type { CodeComponentProp } from '@/types/CodeComponent';
-import { useState, useEffect, useMemo } from 'react';
 
 const NONE_VALUE = '_none_';
 
@@ -174,7 +176,7 @@ function EnumValuesForm({
             <FormElement>
               <TextField.Root
                 autoComplete="off"
-                data-testid={`xb-prop-enum-value-${propId}-${index}`}
+                data-testid={`canvas-prop-enum-value-${propId}-${index}`}
                 type={['integer', 'number'].includes(type) ? 'number' : 'text'}
                 step={type === 'integer' ? 1 : undefined}
                 value={value}
@@ -192,7 +194,7 @@ function EnumValuesForm({
             </FormElement>
           </Box>
           <Button
-            data-testid={`xb-prop-enum-value-delete-${propId}-${index}`}
+            data-testid={`canvas-prop-enum-value-delete-${propId}-${index}`}
             size="1"
             color="red"
             variant="soft"

@@ -1,33 +1,37 @@
-import { Flex, Link, Grid } from '@radix-ui/themes';
 import { ExternalLinkIcon } from '@radix-ui/react-icons';
+import { Flex, Grid, Link } from '@radix-ui/themes';
+
 import ExtensionButton from '@/components/extensions/ExtensionButton';
-import { handleNonWorkingBtn } from '@/utils/function-utils';
-import type React from 'react';
 import {
   getBaseUrl,
+  getCanvasSettings,
   getDrupalSettings,
-  getXbSettings,
 } from '@/utils/drupal-globals';
+import { handleNonWorkingBtn } from '@/utils/function-utils';
+
+import type React from 'react';
 
 interface ExtensionsPopoverProps {}
 
 const drupalSettings = getDrupalSettings();
 const baseUrl = getBaseUrl();
-const xbSettings = getXbSettings();
+const canvasSettings = getCanvasSettings();
 
 const ExtensionsList: React.FC<ExtensionsPopoverProps> = () => {
   let extensionsList = [];
-  if (drupalSettings && drupalSettings.xbExtension) {
-    extensionsList = Object.values(drupalSettings.xbExtension).map((value) => {
-      return {
-        ...value,
-        imgSrc:
-          value.imgSrc ||
-          `${baseUrl}${xbSettings.xbModulePath}/ui/assets/icons/extension-default-abstract.svg`,
-        name: value.name,
-        description: value.description,
-      };
-    });
+  if (drupalSettings && drupalSettings.canvasExtension) {
+    extensionsList = Object.values(drupalSettings.canvasExtension).map(
+      (value) => {
+        return {
+          ...value,
+          imgSrc:
+            value.imgSrc ||
+            `${baseUrl}${canvasSettings.canvasModulePath}/ui/assets/icons/extension-default-abstract.svg`,
+          name: value.name,
+          description: value.description,
+        };
+      },
+    );
   }
 
   return <ExtensionsListDisplay extensions={extensionsList || []} />;

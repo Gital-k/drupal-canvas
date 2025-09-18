@@ -24,10 +24,12 @@
 
 .folderTrigger {
   width: 100%;
-  border-radius: var(--radius-4);
-  &:hover {
+  border-radius: var(--radius-2);
+  .chevron {
     cursor: pointer;
-    background-color: #dbe6ff;
+    &:hover {
+        color: var(--blue-9);
+    }
   }
   .folderCount {
     background-color: var(--gray-3);

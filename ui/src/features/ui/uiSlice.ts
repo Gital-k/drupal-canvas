@@ -1,6 +1,8 @@
-import { createAppSlice } from '@/app/createAppSlice';
-import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSelector } from '@reduxjs/toolkit';
+
+import { createAppSlice } from '@/app/createAppSlice';
+
+import type { PayloadAction } from '@reduxjs/toolkit';
 
 export interface DraggingStatus {
   isDragging: boolean;
@@ -15,6 +17,11 @@ export interface EditorViewPort {
   scale: number;
 }
 
+export interface PreviouslyEdited {
+  name: string;
+  path: string;
+}
+
 export interface Selection {
   consecutive: boolean;
   items: string[];
@@ -25,6 +32,11 @@ export const DEFAULT_REGION = 'content' as const;
 export enum EditorFrameMode {
   INTERACTIVE = 'interactive',
   EDIT = 'edit',
+}
+
+export enum EditorFrameContext {
+  ENTITY = 'entity',
+  TEMPLATE = 'template',
 }
 
 export type UndoRedoType = 'layoutModel' | 'pageData';
@@ -45,8 +57,10 @@ export interface uiSliceState {
   latestUndoRedoActionId: string;
   firstLoadComplete: boolean;
   editorFrameMode: EditorFrameMode;
+  editorFrameContext: EditorFrameContext;
   undoStack: Array<UndoRedoType>;
   redoStack: Array<UndoRedoType>;
+  PreviouslyEdited: PreviouslyEdited;
 }
 
 type UpdateViewportPayload = {
@@ -80,11 +94,13 @@ export const initialState: uiSliceState = {
   latestUndoRedoActionId: '',
   firstLoadComplete: false,
   editorFrameMode: EditorFrameMode.EDIT,
+  editorFrameContext: EditorFrameContext.ENTITY,
   selection: {
     consecutive: false,
     items: [],
   },
   collapsedLayers: [],
+  PreviouslyEdited: { name: '', path: '' },
 };
 
 export interface ScaleValue {
@@ -259,6 +275,11 @@ export const uiSlice = createAppSlice({
     setEditorFrameModeInteractive: create.reducer((state) => {
       state.editorFrameMode = EditorFrameMode.INTERACTIVE;
     }),
+    setEditorFrameContext: create.reducer(
+      (state, action: PayloadAction<EditorFrameContext>) => {
+        state.editorFrameContext = action.payload;
+      },
+    ),
     clearSelection: create.reducer((state) => {
       state.selection.items.length = 0;
     }),
@@ -276,6 +297,14 @@ export const uiSlice = createAppSlice({
         }
       },
     ),
+    setPreviouslyEdited: create.reducer(
+      (state, action: PayloadAction<PreviouslyEdited>) => {
+        state.PreviouslyEdited = action.payload;
+      },
+    ),
+    unsetPreviouslyEdited: create.reducer((state) => {
+      state.PreviouslyEdited = { name: '', path: '' };
+    }),
     setCollapsedLayers: (state, action: PayloadAction<string[]>) => {
       state.collapsedLayers = action.payload;
     },
@@ -343,6 +372,9 @@ export const uiSlice = createAppSlice({
     selectEditorFrameMode: (ui): EditorFrameMode => {
       return ui.editorFrameMode;
     },
+    selectEditorFrameContext: (ui): EditorFrameContext => {
+      return ui.editorFrameContext;
+    },
     selectSelection: (ui): Selection => {
       return ui.selection;
     },
@@ -363,6 +395,9 @@ export const uiSlice = createAppSlice({
     },
     selectCollapsedLayers: (ui): string[] => {
       return ui.collapsedLayers;
+    },
+    selectPreviouslyEdited: (ui): PreviouslyEdited => {
+      return ui.PreviouslyEdited;
     },
   },
 });
@@ -390,10 +425,13 @@ export const {
   setFirstLoadComplete,
   setEditorFrameModeEditing,
   setEditorFrameModeInteractive,
+  setEditorFrameContext,
   pushUndo,
   performUndoOrRedo,
   clearSelection,
   setSelection,
+  setPreviouslyEdited,
+  unsetPreviouslyEdited,
   setCollapsedLayers,
   toggleCollapsedLayer,
   removeCollapsedLayers,
@@ -413,11 +451,13 @@ export const {
   selectLatestUndoRedoActionId,
   selectFirstLoadComplete,
   selectEditorFrameMode,
+  selectEditorFrameContext,
   selectUndoType,
   selectRedoType,
   selectSelection,
   selectIsMultiSelect,
   selectCollapsedLayers,
+  selectPreviouslyEdited,
 } = uiSlice.selectors;
 
 // Memoized selectors using createSelector for better performance

@@ -1,11 +1,15 @@
+import { useEffect, useState } from 'react';
+import { useErrorBoundary } from 'react-error-boundary';
+import { NavLink, useLocation, useParams } from 'react-router-dom';
+import TemplateIcon from '@assets/icons/template.svg?react';
 import {
   ChevronLeftIcon,
   CodeIcon,
   CubeIcon,
-  FileIcon,
+  FileTextIcon,
+  HomeIcon,
   SectionIcon,
   StackIcon,
-  HomeIcon,
 } from '@radix-ui/react-icons';
 import {
   Badge,
@@ -14,77 +18,93 @@ import {
   Flex,
   Popover,
 } from '@radix-ui/themes';
+
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
-import { selectPageData } from '@/features/pageData/pageDataSlice';
-import type { ReactElement } from 'react';
-import { useEffect } from 'react';
-import useDebounce from '@/hooks/useDebounce';
-import { DEFAULT_REGION } from '@/features/ui/uiSlice';
-import { NavLink, useParams } from 'react-router-dom';
-import { selectLayout } from '@/features/layout/layoutModelSlice';
-import { selectCodeComponentProperty } from '@/features/code-editor/codeEditorSlice';
-import Navigation from '@/components/navigation/Navigation';
-import {
-  useDeleteContentMutation,
-  useGetContentListQuery,
-  useCreateContentMutation,
-  useSetStagedConfigMutation,
-  useGetStagedConfigQuery,
-} from '@/services/content';
-import useEditorNavigation from '@/hooks/useEditorNavigation';
-import { useErrorBoundary } from 'react-error-boundary';
-import { useState } from 'react';
-import type { ContentStub } from '@/types/Content';
 import ErrorCard from '@/components/error/ErrorCard';
+import Navigation from '@/components/navigation/Navigation';
 import PageStatus from '@/components/pageStatus/PageStatus';
 import Panel from '@/components/Panel';
+import { selectCodeComponentProperty } from '@/features/code-editor/codeEditorSlice';
 import {
-  selectEntityId,
-  selectEntityType,
-  selectHomepagePath,
-  setHomepagePath,
   extractHomepagePathFromStagedConfig,
+  selectHomepagePath,
   selectHomepageStagedConfigExists,
+  setHomepagePath,
 } from '@/features/configuration/configurationSlice';
-import { getBaseUrl, getXbSettings } from '@/utils/drupal-globals';
-import { getQueryErrorMessage } from '@/utils/error-handling';
+import { selectLayout } from '@/features/layout/layoutModelSlice';
+import {
+  DEFAULT_REGION,
+  selectEditorFrameContext,
+  selectPreviouslyEdited,
+} from '@/features/ui/uiSlice';
+import useDebounce from '@/hooks/useDebounce';
+import useEditorNavigation from '@/hooks/useEditorNavigation';
+import { useEntityTitle } from '@/hooks/useEntityTitle';
+import { useTemplateCaption } from '@/hooks/useTemplateCaption';
+import {
+  useCreateContentMutation,
+  useDeleteContentMutation,
+  useGetContentListQuery,
+  useGetStagedConfigQuery,
+  useSetStagedConfigMutation,
+} from '@/services/content';
 import { pageDataFormApi } from '@/services/pageDataForm';
+import { getBaseUrl, getCanvasSettings } from '@/utils/drupal-globals';
+import { getQueryErrorMessage } from '@/utils/error-handling';
+import {
+  removeComponentFromPathname,
+  removeRegionFromPathname,
+} from '@/utils/route-utils';
+
+import type { ReactElement } from 'react';
+import type { ContentStub } from '@/types/Content';
 
 interface PageType {
   [key: string]: ReactElement;
 }
 
 const iconMap: PageType = {
-  Page: <FileIcon />,
+  Page: <FileTextIcon />,
   ContentType: <StackIcon />,
   ComponentName: <CodeIcon />,
   GlobalPatternName: <SectionIcon />,
   Homepage: <HomeIcon />,
+  Template: <TemplateIcon />,
 };
 
-const xbSettings = getXbSettings();
+const canvasSettings = getCanvasSettings();
 
-export const HOMEPAGE_CONFIG_ID = 'xb_set_homepage';
+export const HOMEPAGE_CONFIG_ID = 'canvas_set_homepage';
 
 const PageInfo = () => {
   const { showBoundary } = useErrorBoundary();
   const { setEditorEntity } = useEditorNavigation();
-  const { regionId: focusedRegion = DEFAULT_REGION } = useParams();
+  const {
+    regionId: focusedRegion = DEFAULT_REGION,
+    entityType,
+    entityId,
+  } = useParams();
   const codeComponentName = useAppSelector(selectCodeComponentProperty('name'));
   const isCodeEditor = codeComponentName !== '';
   const layout = useAppSelector(selectLayout);
+  const previouslyEdited = useAppSelector(selectPreviouslyEdited);
   const dispatch = useAppDispatch();
   const focusedRegionName = layout.find(
     (region) => region.id === focusedRegion,
   )?.name;
-  const entity_form_fields = useAppSelector(selectPageData);
-  const title =
-    entity_form_fields[`${xbSettings.entityTypeKeys.label}[0][value]`];
+  const location = useLocation();
+  const title = useEntityTitle();
+
+  // Check if we're on a template route
+  const isTemplateRoute =
+    useAppSelector(selectEditorFrameContext) === 'template';
+  const templateCaption = useTemplateCaption();
+
   const [searchTerm, setSearchTerm] = useState<string>('');
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
   // @todo: https://www.drupal.org/i/3513566 this needs to be generalized to check all content entity types.
   const canCreatePages =
-    !!xbSettings.contentEntityCreateOperations?.xb_page?.xb_page;
+    !!canvasSettings.contentEntityCreateOperations?.canvas_page?.canvas_page;
   const {
     data: pageItems,
     isLoading: isPageItemsLoading,
@@ -92,11 +112,10 @@ const PageInfo = () => {
     isSuccess: isGetPageItemsSuccess,
   } = useGetContentListQuery({
     // @todo Generalize in https://www.drupal.org/i/3498525
-    entityType: 'xb_page',
+    entityType: 'canvas_page',
     search: debouncedSearchTerm,
   });
-  const entityId = useAppSelector(selectEntityId);
-  const entityType = useAppSelector(selectEntityType);
+
   const baseUrl = getBaseUrl();
   const [
     createContent,
@@ -126,7 +145,7 @@ const PageInfo = () => {
         (page) => page.internalPath === homepagePath,
       );
       setIsCurrentPageHomepage(
-        entityType === 'xb_page' && entityId === String(homepage?.id),
+        entityType === 'canvas_page' && entityId === String(homepage?.id),
       );
     }
   }, [entityId, entityType, homepagePath, isGetPageItemsSuccess, pageItems]);
@@ -141,7 +160,7 @@ const PageInfo = () => {
 
   function handleNewPage() {
     createContent({
-      entity_type: 'xb_page',
+      entity_type: 'canvas_page',
     });
   }
 
@@ -156,23 +175,23 @@ const PageInfo = () => {
       pageItems?.filter((page) => page.id !== item.id) || [];
     const pageToDeleteId = String(item.id);
     await deleteContent({
-      entityType: 'xb_page',
+      entityType: 'canvas_page',
       entityId: pageToDeleteId,
     });
     const homepage = pageItems?.find(
       (page) => page.internalPath === homepagePath,
     );
     // If the current page is the one being deleted, redirect to the homepage.
-    if (entityType === 'xb_page' && entityId === pageToDeleteId) {
+    if (entityType === 'canvas_page' && entityId === pageToDeleteId) {
       if (homepage) {
-        setEditorEntity('xb_page', String(homepage.id));
+        setEditorEntity('canvas_page', String(homepage.id));
       } else if (remainingPages.length > 0) {
         // It's possible there is no homepage set yet right now, so we redirect to the first remaining page.
-        setEditorEntity('xb_page', String(remainingPages[0].id));
+        setEditorEntity('canvas_page', String(remainingPages[0].id));
       } else {
-        // If there are no more pages, redirect out of XB.
+        // If there are no more pages, redirect out of Canvas.
         // @todo: Remove this in https://www.drupal.org/i/3506434
-        //   since deleting the homepage in XB should be disallowed in that issue so remaining pages should never be 0.
+        //   since deleting the homepage in Canvas should be disallowed in that issue so remaining pages should never be 0.
         setTimeout(() => {
           window.location.href = baseUrl;
         }, 100);
@@ -180,20 +199,20 @@ const PageInfo = () => {
     }
     // Keep local storage tidy and clear out the array of collapsed layers for the deleted item.
     window.localStorage.removeItem(
-      `XB.collapsedLayers.xb_page.${pageToDeleteId}`,
+      `Canvas.collapsedLayers.canvas_page.${pageToDeleteId}`,
     );
   }
 
   function handleDuplication(item: ContentStub) {
     createContent({
-      entity_type: 'xb_page',
+      entity_type: 'canvas_page',
       entity_id: String(item.id),
     });
   }
 
   // @todo https://www.drupal.org/i/3498525 should generalize this to all eligible content entity types.
   function handleOnSelect(item: ContentStub) {
-    setEditorEntity('xb_page', String(item.id));
+    setEditorEntity('canvas_page', String(item.id));
   }
 
   function handleSetHomepage(item: ContentStub) {
@@ -246,18 +265,62 @@ const PageInfo = () => {
 
   return (
     <Flex gap="2" align="center">
-      {focusedRegion === DEFAULT_REGION && !isCodeEditor ? (
+      {isCodeEditor && previouslyEdited.path ? (
+        <NavLink
+          to={{
+            pathname: previouslyEdited.path,
+          }}
+          aria-label={`Back`}
+          title={`${previouslyEdited.name}`}
+          onClick={() => {
+            // Fetch a new version of the page data form as it has been
+            // unmounted and the cached versions won't reflect any AJAX updates
+            // to the form.
+            dispatch(
+              pageDataFormApi.util.invalidateTags([
+                { type: 'PageDataForm', id: 'FORM' },
+              ]),
+            );
+          }}
+        >
+          <Button color="sky" variant="soft" size="1">
+            <ChevronLeftIcon />
+            Back
+          </Button>
+        </NavLink>
+      ) : null}
+      {focusedRegion === DEFAULT_REGION ? (
         <Popover.Root>
           <Popover.Trigger>
             <Button
               color="gray"
               variant="soft"
               size="1"
-              data-testid="xb-navigation-button"
+              data-testid="canvas-navigation-button"
             >
               <Flex gap="2" align="center">
-                {isCurrentPageHomepage ? iconMap['Homepage'] : iconMap['Page']}
-                {title}
+                {isCodeEditor ? (
+                  <>
+                    <CodeIcon />
+                    {codeComponentName}
+                  </>
+                ) : isTemplateRoute ? (
+                  <>
+                    {iconMap['Template']}
+                    {templateCaption || 'Template'}
+                  </>
+                ) : (
+                  <>
+                    {isCurrentPageHomepage
+                      ? iconMap['Homepage']
+                      : iconMap['Page']}
+                    {title !== undefined
+                      ? title
+                        ? title
+                        : 'Untitled page'
+                      : 'No page selected'}
+                  </>
+                )}
                 <ChevronDownIcon />
               </Flex>
             </Button>
@@ -269,7 +332,7 @@ const PageInfo = () => {
             asChild
             align="center"
           >
-            <Panel className="xb-app" mt="4">
+            <Panel className="canvas-app" mt="4">
               {!pageItemsError && (
                 <Navigation
                   loading={isPageItemsLoading}
@@ -295,7 +358,9 @@ const PageInfo = () => {
       ) : (
         <NavLink
           to={{
-            pathname: '/editor',
+            pathname: removeComponentFromPathname(
+              removeRegionFromPathname(location.pathname),
+            ),
           }}
           aria-label="Back to Content region"
           onClick={() => {
@@ -309,15 +374,15 @@ const PageInfo = () => {
             );
           }}
         >
-          <Badge color={isCodeEditor ? 'sky' : 'grass'} size="2">
+          <Badge color="grass" size="2">
             <ChevronLeftIcon />
-            {isCodeEditor ? <CodeIcon /> : <CubeIcon />}
-            {isCodeEditor ? codeComponentName : focusedRegionName}
+            <CubeIcon />
+            {focusedRegionName}
           </Badge>
         </NavLink>
       )}
 
-      <PageStatus />
+      {entityId && <PageStatus />}
     </Flex>
   );
 };

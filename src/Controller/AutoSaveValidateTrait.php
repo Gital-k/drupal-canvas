@@ -1,11 +1,9 @@
 <?php
 
-namespace Drupal\experience_builder\Controller;
+namespace Drupal\canvas\Controller;
 
-use Drupal\Core\Entity\EntityChangedInterface;
 use Drupal\Core\Entity\EntityInterface;
-use Drupal\Core\Entity\RevisionableInterface;
-use Drupal\experience_builder\AutoSave\AutoSaveManager;
+use Drupal\canvas\AutoSave\AutoSaveManager;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 /**
@@ -15,14 +13,14 @@ use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
  * auto-saves for both:
  * 1. data part of the page preview:
  *    - the component tree (`layout` + `model` in the client-side representation)
- *    - values for all entity fields besides the XB field (aka component tree)
+ *    - values for all entity fields besides the Canvas field (aka component tree)
  *    - PageRegion config entities
  * 2. config entities which are explicitly edited and auto-saved
  *    - JavaScriptComponent config entities
  *    - AssetLibrary config entities.
  *
- * @see \Drupal\experience_builder\Controller\ApiLayoutController
- * @see \Drupal\experience_builder\Controller\ApiConfigAutoSaveControllers
+ * @see \Drupal\canvas\Controller\ApiLayoutController
+ * @see \Drupal\canvas\Controller\ApiConfigAutoSaveControllers
  * @internal
  */
 trait AutoSaveValidateTrait {
@@ -30,7 +28,7 @@ trait AutoSaveValidateTrait {
   /**
    * Validates the client has the latest auto-saves for an array of entities.
    *
-   * Currently, Experience Builder does not support concurrent editing. This
+   * Currently, Drupal Canvas does not support concurrent editing. This
    * function enforces this by ensuring the client has the latest changes as
    * determined by the auto-save data stored on the server.
    *
@@ -54,7 +52,7 @@ trait AutoSaveValidateTrait {
     foreach ($entitiesToValidate as $entityToValidate) {
       assert($entityToValidate instanceof EntityInterface);
       $autoSaveEntity = $this->autoSaveManager->getAutoSaveEntity($entityToValidate);
-      $expected_auto_saves[AutoSaveManager::getAutoSaveKey($entityToValidate)] = $this->getClientAutoSaveData($entityToValidate);
+      $expected_auto_saves[AutoSaveManager::getAutoSaveKey($entityToValidate)] = $this->autoSaveManager->getClientAutoSaveData($entityToValidate);
       $foundClientIdMismatch = $foundClientIdMismatch || (!$autoSaveEntity->isEmpty() && $autoSaveEntity->clientId !== $clientId);
     }
     $expected_auto_saves = array_filter($expected_auto_saves);
@@ -79,36 +77,13 @@ trait AutoSaveValidateTrait {
   }
 
   /**
-   * @param \Drupal\Core\Entity\EntityInterface $entity
-   * @return array{autoSaveStartingPoint: int|string|null, hash: string|null}
+   * @todo Move this logic elsewhere in https://www.drupal.org/project/canvas/issues/3535458
    */
-  protected function getClientAutoSaveData(EntityInterface $entity): array {
-    $autoSaveEntity = $this->autoSaveManager->getAutoSaveEntity($entity);
-    // We must use the saved entity to get the revision ID and changed time
-    // because these values might have changed in the auto-save version.
-    \assert($entity->id() !== NULL);
-    $savedEntity = $this->entityTypeManager->getStorage($entity->getEntityTypeId())->loadUnchanged($entity->id());
-    assert($savedEntity instanceof EntityInterface);
-    // If available we must use the revision ID and the changed time because
-    // not all entity types will increment the revision ID on every change.
-    // @todo Move this logic elsewhere in https://www.drupal.org/project/experience_builder/issues/3535458
-    $autoSaveStartRevision = $savedEntity instanceof RevisionableInterface ?
-      $savedEntity->getRevisionId() :
-      \hash('xxh64', \json_encode($entity->toArray(), JSON_THROW_ON_ERROR));
-    if ($savedEntity instanceof EntityChangedInterface) {
-      $autoSaveStartRevision .= '-' . $savedEntity->getChangedTime();
-    }
-    return [
-      'autoSaveStartingPoint' => $autoSaveStartRevision,
-      'hash' => $autoSaveEntity->hash,
-    ];
-  }
-
   protected function getAutoSaveHashes(array $entities): array {
     $autoSaveHashes = [];
     foreach ($entities as $entity) {
       \assert($entity instanceof EntityInterface);
-      $autoSaveHashes[AutoSaveManager::getAutoSaveKey($entity)] = $this->getClientAutoSaveData($entity);
+      $autoSaveHashes[AutoSaveManager::getAutoSaveKey($entity)] = $this->autoSaveManager->getClientAutoSaveData($entity);
     }
     return array_filter($autoSaveHashes);
   }

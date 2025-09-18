@@ -1,21 +1,23 @@
-import { expect } from '@playwright/test';
-import { test } from './fixtures/DrupalSite';
-import { getModuleDir } from './utilities/DrupalFilesystem';
 import { readFile } from 'fs/promises';
+import { expect } from '@playwright/test';
+
+import { test } from './fixtures/DrupalSite';
 import { Drupal } from './objects/Drupal';
+import { getModuleDir } from './utilities/DrupalFilesystem';
+
 /**
- * Tests installing Experience Builder.
+ * Tests installing Drupal Canvas.
  */
 test.describe('Menu Component', () => {
   test.beforeAll(
-    'Setup test site with Experience Builder',
+    'Setup test site with Drupal Canvas',
     async ({ browser, drupalSite }) => {
       const page = await browser.newPage();
       const drupal: Drupal = new Drupal({ page, drupalSite });
-      await drupal.installModules(['experience_builder']);
+      await drupal.installModules(['canvas']);
       const moduleDir = await getModuleDir();
       await drupal.applyRecipe(
-        `${moduleDir}/experience_builder/tests/fixtures/recipes/menu`,
+        `${moduleDir}/canvas/tests/fixtures/recipes/menu`,
       );
       // @todo remove the cache clear once https://www.drupal.org/project/drupal/issues/3534825
       // is fixed.
@@ -24,19 +26,23 @@ test.describe('Menu Component', () => {
     },
   );
 
-  test('Add and test menu component', async ({ page, drupal, xBEditor }) => {
+  test('Add and test menu component', async ({
+    page,
+    drupal,
+    canvasEditor,
+  }) => {
     await drupal.loginAsAdmin();
-    await drupal.createXbPage('Homepage', '/homepage');
+    await drupal.createCanvasPage('Homepage', '/homepage');
     await page.goto('/homepage');
-    await xBEditor.goToEditor();
+    await canvasEditor.goToEditor();
     const moduleDir = await getModuleDir();
 
     const code = await readFile(
-      `${moduleDir}/experience_builder/tests/fixtures/code_components/menus/Menu.jsx`,
+      `${moduleDir}/canvas/tests/fixtures/code_components/menus/Menu.jsx`,
       'utf-8',
     );
-    await xBEditor.createCodeComponent('Menu', code);
-    const preview = xBEditor.getCodePreviewFrame();
+    await canvasEditor.createCodeComponent('Menu', code);
+    const preview = canvasEditor.getCodePreviewFrame();
 
     await expect(preview).toContainText('JSON:API Menu');
     await expect(preview).toContainText('Core Linkset Menu');

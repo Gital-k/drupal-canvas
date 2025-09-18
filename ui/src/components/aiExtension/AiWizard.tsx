@@ -1,43 +1,48 @@
 /**
  * ⚠️ This is highly experimental and *will* be refactored.
  */
-import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
-  useCallback,
   useSyncExternalStore,
 } from 'react';
 import { DeepChat } from 'deep-chat-react';
-import styles from './AiWizard.module.css';
+import { useParams } from 'react-router';
+import { useNavigate } from 'react-router-dom';
+import AiWelcome from '@assets/icons/ai-welcome.svg?react';
+import { Box, Flex, Text } from '@radix-ui/themes';
+
+import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import {
   selectCodeComponentProperty,
   setCodeComponentProperty,
 } from '@/features/code-editor/codeEditorSlice';
-import { useNavigate } from 'react-router-dom';
 import {
-  useCreateCodeComponentMutation,
-  useGetComponentsQuery,
-} from '@/services/componentAndLayout';
-import { getDrupalSettings } from '@/utils/drupal-globals';
-import { Box, Flex, Text } from '@radix-ui/themes';
-import type { CodeComponent } from '@/types/CodeComponent';
+  selectModel,
+  setUpdatePreview,
+} from '@/features/layout/layoutModelSlice';
 import {
   selectPageData,
   updatePageDataExternally,
 } from '@/features/pageData/pageDataSlice';
 import {
-  selectModel,
-  setUpdatePreview,
-} from '@/features/layout/layoutModelSlice';
-import type { XBComponent } from '@/types/Component';
+  useCreateCodeComponentMutation,
+  useGetComponentsQuery,
+} from '@/services/componentAndLayout';
+import { getDrupalSettings } from '@/utils/drupal-globals';
+
+import fixtureProps from '../../../../modules/canvas_ai/src/PropsSchema.json';
+
 import type {
-  LayoutModelSliceState,
   ComponentNode,
+  LayoutModelSliceState,
 } from '@/features/layout/layoutModelSlice';
-import AiWelcome from '@assets/icons/ai-welcome.svg?react';
-import fixtureProps from '../../../../modules/xb_ai/src/PropsSchema.json';
+import type { CodeComponent } from '@/types/CodeComponent';
+import type { CanvasComponent } from '@/types/Component';
+
+import styles from './AiWizard.module.css';
 
 const DB_NAME = 'aiWizardDB';
 const STORE_NAME = 'chatHistory';
@@ -191,6 +196,7 @@ const operationsHandler = {
     layoutUtils,
     componentSelectionUtils,
     navigate,
+    params,
   }: {
     message: any;
     dispatch: any;
@@ -198,6 +204,7 @@ const operationsHandler = {
     layoutUtils: any;
     componentSelectionUtils: any;
     navigate: any;
+    params: any;
   }) => {
     // Logic for placing components (SDCs/Blocks/Code components) to the editor frame.
     for (const op of message.operations) {
@@ -210,7 +217,7 @@ const operationsHandler = {
       ) {
         for (const component of op.components) {
           if (component.id && availableComponents[component.id]) {
-            const componentToUse: XBComponent =
+            const componentToUse: CanvasComponent =
               availableComponents[component.id];
             dispatch(
               layoutUtils.addNewComponentToLayout(
@@ -228,8 +235,9 @@ const operationsHandler = {
         }
       }
     }
+    const { entityId, entityType } = params;
     // Redirect to /editor.
-    navigate('/editor');
+    navigate(`/editor/${entityType}/${entityId}`);
   },
 };
 
@@ -256,6 +264,7 @@ const AiWizard = () => {
   const [csrfToken, setCsrfToken] = useState<string | null>(null);
   const [createCodeComponent] = useCreateCodeComponentMutation();
   const navigate = useNavigate();
+  const params = useParams();
   const codeComponentName = useAppSelector(
     selectCodeComponentProperty('machineName'),
   );
@@ -278,6 +287,7 @@ const AiWizard = () => {
     codeComponentName,
     textPropsMapString,
     pageData,
+    params,
   });
 
   // Update the ref whenever tracked values change.
@@ -286,11 +296,12 @@ const AiWizard = () => {
       codeComponentName,
       textPropsMapString,
       pageData,
+      params,
     };
-  }, [codeComponentName, textPropsMapString, pageData]);
-  // Access layoutUtils and componentSelectionUtils from drupalSettings.xb
-  const layoutUtils = drupalSettings.xb?.layoutUtils as any;
-  const componentSelectionUtils = drupalSettings.xb
+  }, [codeComponentName, textPropsMapString, pageData, params]);
+  // Access layoutUtils and componentSelectionUtils from drupalSettings.canvas
+  const layoutUtils = drupalSettings.canvas?.layoutUtils as any;
+  const componentSelectionUtils = drupalSettings.canvas
     ?.componentSelectionUtils as any;
 
   // Get the current layout, selected component, and available components from Redux state
@@ -371,7 +382,7 @@ const AiWizard = () => {
   useEffect(() => {
     const fetchToken = async () => {
       try {
-        const response = await fetch('/admin/api/xb/token', {
+        const response = await fetch('/admin/api/canvas/token', {
           credentials: 'same-origin',
         });
         if (!response.ok) {
@@ -383,7 +394,7 @@ const AiWizard = () => {
         setCsrfToken(token);
       } catch (error) {
         console.error('Failed to fetch CSRF token:', error);
-        const event = new CustomEvent('xb-csrf-token-error', {
+        const event = new CustomEvent('canvas-csrf-token-error', {
           detail: {
             error,
             time: new Date(),
@@ -413,6 +424,7 @@ const AiWizard = () => {
                 layoutUtils,
                 componentSelectionUtils,
                 navigate,
+                params,
               });
             }, 0);
           } else {
@@ -424,6 +436,7 @@ const AiWizard = () => {
               availableComponents: componentsRef.current,
               layoutUtils,
               componentSelectionUtils,
+              params,
             });
           }
         }
@@ -438,10 +451,11 @@ const AiWizard = () => {
     },
     [
       dispatch,
-      createCodeComponent,
-      navigate,
       layoutUtils,
       componentSelectionUtils,
+      navigate,
+      createCodeComponent,
+      params,
     ],
   );
 
@@ -493,9 +507,7 @@ const AiWizard = () => {
           </Flex>
           <Flex direction="row" align="center" gap="0">
             <Box className={styles.aiWizardTitleContainer}>
-              <Text className={styles.aiWizardTitle}>
-                Experience Builder AI
-              </Text>
+              <Text className={styles.aiWizardTitle}>Drupal Canvas AI</Text>
               <Text className={styles.aiWizardBeta}>Beta</Text>
             </Box>
           </Flex>
@@ -556,12 +568,28 @@ const AiWizard = () => {
                 };
 
                 if (hasFiles) {
+                  const files = body.getAll('files');
+                  const MAX_FILE_SIZE =
+                    drupalSettings?.canvas?.canvasAiMaxFileSize;
+
+                  for (const file of files) {
+                    if (file instanceof File && file.size > MAX_FILE_SIZE) {
+                      signals.onResponse({
+                        text: `File is too large. Maximum allowed size is ${MAX_FILE_SIZE / (1024 * 1024)}MB.`,
+                        role: 'error',
+                      });
+                      return;
+                    }
+                  }
                   requestBody = body as FormData;
                   requestBody.append(
                     'entity_type',
-                    drupalSettings.xb.entityType,
+                    currentValuesRef.current.params.entityType || '',
                   );
-                  requestBody.append('entity_id', drupalSettings.xb.entity);
+                  requestBody.append(
+                    'entity_id',
+                    currentValuesRef.current.params.entityId || '',
+                  );
                   requestBody.append(
                     'selected_component',
                     currentValuesRef.current.codeComponentName,
@@ -573,8 +601,8 @@ const AiWizard = () => {
                 } else {
                   requestBody = JSON.stringify({
                     ...body,
-                    entity_type: drupalSettings.xb.entityType,
-                    entity_id: drupalSettings.xb.entity,
+                    entity_type: currentValuesRef.current.params.entityType,
+                    entity_id: currentValuesRef.current.params.entityId,
                     selected_component:
                       currentValuesRef.current.codeComponentName,
                     layout: currentValuesRef.current.textPropsMapString,
@@ -590,7 +618,7 @@ const AiWizard = () => {
                   });
                   headers['Content-Type'] = 'application/json';
                 }
-                const response = await fetch('/admin/api/xb/ai', {
+                const response = await fetch('/admin/api/canvas/ai', {
                   method: 'POST',
                   headers,
                   body: requestBody,

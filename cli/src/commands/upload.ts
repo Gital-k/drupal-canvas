@@ -1,21 +1,23 @@
-import type { Command } from 'commander';
-import * as p from '@clack/prompts';
+import fs from 'fs/promises';
 import path from 'path';
 import chalk from 'chalk';
-import { setConfig, getConfig, ensureConfig } from '../config.js';
-import type { ApiService } from '../services/api.js';
+import * as p from '@clack/prompts';
+
+import { ensureConfig, getConfig, setConfig } from '../config.js';
 import { createApiService } from '../services/api.js';
-import {
-  processComponentFiles,
-  createComponentPayload,
-} from '../utils/process-component-files.js';
-import type { Result } from '../types/Result.js';
 import { buildComponent } from '../utils/build';
-import fs from 'fs/promises';
-import { reportResults } from '../utils/report-results';
-import { fileExists } from '../utils/utils';
-import { selectLocalComponents } from '../utils/select-local-components.js';
 import { buildTailwindForComponents } from '../utils/build-tailwind.js';
+import {
+  createComponentPayload,
+  processComponentFiles,
+} from '../utils/process-component-files.js';
+import { reportResults } from '../utils/report-results';
+import { selectLocalComponents } from '../utils/select-local-components.js';
+import { fileExists } from '../utils/utils';
+
+import type { Command } from 'commander';
+import type { ApiService } from '../services/api.js';
+import type { Result } from '../types/Result.js';
 
 interface UploadOptions {
   clientId?: string;
@@ -48,7 +50,7 @@ export function uploadCommand(program: Command): void {
       const skipTailwind = !options.tailwind;
 
       try {
-        p.intro('Experience Builder Component Upload');
+        p.intro('Drupal Canvas Component Upload');
 
         // Update config with CLI options
         if (options.clientId) setConfig({ clientId: options.clientId });
@@ -221,7 +223,7 @@ async function getBuildAndUploadResults(
         }
       } catch (error) {
         // If the error is a 422 and specifies dataDependencies as the problem,
-        // it might be due to running a version of XB that does not yet support
+        // it might be due to running a version of Canvas that does not yet support
         // this property. Remove dataDependencies from the payload and make
         // another attempts.
         if (

@@ -1,29 +1,35 @@
 <?php
 
-namespace Drupal\experience_builder\Controller;
+declare(strict_types=1);
 
+namespace Drupal\canvas\Controller;
+
+use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\Core\Cache\CacheableJsonResponse;
+use Drupal\Core\Cache\CacheableMetadata;
+use Drupal\Core\Entity\EntityDisplayRepositoryInterface;
+use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeBundleInfoInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\TypedData\EntityDataDefinition;
-use Drupal\experience_builder\Entity\Component;
-use Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase;
-use Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\SingleDirectoryComponent;
-use Drupal\experience_builder\PropExpressions\Component\ComponentPropExpression;
-use Drupal\experience_builder\PropExpressions\StructuredData\StructuredDataPropExpressionInterface;
-use Drupal\experience_builder\PropSource\DynamicPropSource;
-use Drupal\experience_builder\ShapeMatcher\FieldForComponentSuggester;
+use Drupal\canvas\Entity\Component;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase;
+use Drupal\canvas\PropExpressions\Component\ComponentPropExpression;
+use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpressionInterface;
+use Drupal\canvas\PropSource\DynamicPropSource;
+use Drupal\canvas\ShapeMatcher\FieldForComponentSuggester;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
- * Controllers exposing HTTP API for powering XB's Content Template editor UI.
+ * Controllers exposing HTTP API for powering Canvas's Content Template editor UI.
  *
- * @internal This HTTP API is intended only for the XB UI. These controllers
+ * @internal This HTTP API is intended only for the Canvas UI. These controllers
  *   and associated routes may change at any time.
  *
- * @see \Drupal\experience_builder\ShapeMatcher\FieldForComponentSuggester
+ * @see \Drupal\canvas\ShapeMatcher\FieldForComponentSuggester
  */
 final class ApiUiContentTemplateControllers extends ApiControllerBase {
 
@@ -31,6 +37,8 @@ final class ApiUiContentTemplateControllers extends ApiControllerBase {
     private readonly EntityTypeManagerInterface $entityTypeManager,
     private readonly EntityTypeBundleInfoInterface $entityTypeBundleInfo,
     private readonly FieldForComponentSuggester $fieldForComponentSuggester,
+    private readonly EntityTypeBundleInfoInterface $bundleInfo,
+    private readonly EntityDisplayRepositoryInterface $entityDisplayRepository,
   ) {}
 
   /**
@@ -49,7 +57,7 @@ final class ApiUiContentTemplateControllers extends ApiControllerBase {
    * @throws \Symfony\Component\HttpKernel\Exception\BadRequestHttpException
    * @throws \Symfony\Component\HttpKernel\Exception\NotFoundHttpException
    */
-  public function suggestions(string $content_entity_type_id, string $bundle, string $component_config_entity_id): JsonResponse {
+  public function suggestStructuredDataForPropShapes(string $content_entity_type_id, string $bundle, string $component_config_entity_id): JsonResponse {
     // @see \Drupal\Core\EventSubscriber\ExceptionJsonSubscriber
     $this->validateRequest($content_entity_type_id, $bundle, $component_config_entity_id);
     // @phpstan-ignore-next-line
@@ -57,7 +65,8 @@ final class ApiUiContentTemplateControllers extends ApiControllerBase {
     assert($source instanceof GeneratedFieldExplicitInputUxComponentSourceBase);
 
     $suggestions = $this->fieldForComponentSuggester->suggest(
-      $source->getSdcPlugin()->getPluginId(),
+      $source->getSourceSpecificComponentId(),
+      $source->getMetadata(),
       EntityDataDefinition::createFromDataType("entity:$content_entity_type_id:$bundle"),
     );
 
@@ -112,11 +121,6 @@ final class ApiUiContentTemplateControllers extends ApiControllerBase {
       throw new BadRequestHttpException('Only components that define their inputs using JSON Schema and use fields to populate their inputs are currently supported.');
     }
 
-    // @todo Add support for suggestions for code components in https://www.drupal.org/i/3503038
-    if (!$source instanceof SingleDirectoryComponent) {
-      throw new BadRequestHttpException('Code components are not supported yet.');
-    }
-
     if ($this->entityTypeManager->getDefinition($content_entity_type_id, FALSE) === NULL) {
       throw new NotFoundHttpException(sprintf("The `%s` content entity type does not exist.", $content_entity_type_id));
     }
@@ -124,6 +128,76 @@ final class ApiUiContentTemplateControllers extends ApiControllerBase {
     if (!array_key_exists($bundle, $this->entityTypeBundleInfo->getBundleInfo($content_entity_type_id))) {
       throw new NotFoundHttpException(sprintf("The `%s` content entity type does not have a `%s` bundle.", $content_entity_type_id, $bundle));
     }
+  }
+
+  public function suggestPreviewContentEntities(string $entity_type_id, string $bundle): CacheableJsonResponse {
+    $entity_query = ContentTemplate::getPreviewSuggestionQuery(
+      $entity_type_id,
+      $bundle,
+      10,
+    );
+
+    $entity_definition = $this->entityTypeManager->getDefinition($entity_type_id);
+    $entity_storage = $this->entityTypeManager->getStorage($entity_type_id);
+
+    $entity_ids = $entity_query->execute();
+    assert(is_array($entity_ids));
+    $entity_query_cacheability = (new CacheableMetadata())
+      ->addCacheTags($entity_definition->getBundleListCacheTags($bundle))
+      ->addCacheContexts($entity_storage->getEntityType()->getListCacheContexts());
+
+    $entities = $entity_storage->loadMultiple($entity_ids);
+
+    $entities = array_filter($entities, function ($entity) use ($entity_query_cacheability): bool {
+      $access = $entity->access('view', return_as_object: TRUE);
+      if ($access->isAllowed()) {
+        $entity_query_cacheability->addCacheableDependency($access);
+        $entity_query_cacheability->addCacheableDependency($entity);
+      }
+      return $access->isAllowed();
+    });
+
+    $entities_data = array_map(fn (EntityInterface $entity) => [
+      'id' => $entity->id(),
+      'label' => $entity->label(),
+    ], $entities);
+    $response = new CacheableJsonResponse($entities_data);
+    $response->addCacheableDependency($entity_query_cacheability);
+    return $response;
+  }
+
+  public function listViewModes(): JsonResponse {
+    $data = [];
+
+    // @todo Generalize to other content entity types in https://www.drupal.org/i/3498525
+    $entity_type_id = 'node';
+    $entity_view_modes = $this->entityDisplayRepository->getViewModeOptions($entity_type_id);
+
+    foreach ($entity_view_modes as $view_mode => $view_mode_label) {
+      // @see \Drupal\Core\Entity\Entity\EntityViewMode
+      if ($view_mode === 'default') {
+        continue;
+      }
+
+      $bundle_info = $this->bundleInfo->getBundleInfo($entity_type_id);
+      $template_keys = $this->entityTypeManager->getStorage(ContentTemplate::ENTITY_TYPE_ID)->getQuery()
+        // TRICKY: not checking access is acceptable because the route requires
+        // "create" access for ContentTemplates. This is only exposing labels
+        // (the "view label" operation) and whether a ContentTemplate exists.
+        ->accessCheck(FALSE)
+        ->condition('content_entity_type_id', $entity_type_id)
+        ->condition('content_entity_type_view_mode', $view_mode)
+        ->execute();
+      foreach (array_keys($bundle_info) as $bundle) {
+        $template_id = "$entity_type_id.$bundle.$view_mode";
+        $data[$entity_type_id][$bundle][$view_mode] = [
+          'label' => $view_mode_label,
+          'hasTemplate' => in_array($template_id, $template_keys, TRUE),
+        ];
+      }
+    }
+
+    return new JsonResponse(data: $data, status: Response::HTTP_OK);
   }
 
 }

@@ -1,13 +1,21 @@
-import type { Dispatch, SetStateAction, Ref } from 'react';
-import { useCallback } from 'react';
-import { useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { forwardRef } from 'react';
-import styles from '@/features/layout/preview/Preview.module.css';
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react';
 import clsx from 'clsx';
+
 import { useAppSelector } from '@/app/hooks';
-import { selectDragging } from '@/features/ui/uiSlice';
-import type { ComponentPreviewUpdateEvent } from '@/components/form/formUtil';
 import { COMPONENT_PREVIEW_UPDATE_EVENT } from '@/components/form/formUtil';
+import { selectDragging } from '@/features/ui/uiSlice';
+
+import type { Dispatch, Ref, SetStateAction } from 'react';
+import type { ComponentPreviewUpdateEvent } from '@/components/form/formUtil';
+
+import styles from '@/features/layout/preview/Preview.module.css';
 
 interface IFrameSwapperProps {
   srcDocument: string;
@@ -87,9 +95,9 @@ const IFrameSwapper = forwardRef<HTMLIFrameElement, IFrameSwapperProps>(
     useEffect(() => {
       const listener = (e: ComponentPreviewUpdateEvent) => {
         const { activeIFrame } = getIFrames();
-        // Find the xb-island elements for the updated component.
+        // Find the canvas-island elements for the updated component.
         const component = activeIFrame.contentDocument?.querySelector(
-          `xb-island[uid="${e.componentUuid}"]`,
+          `canvas-island[uid="${e.componentUuid}"]`,
         );
         if (!component) {
           // We need a round trip to update the preview here.
@@ -138,7 +146,7 @@ const IFrameSwapper = forwardRef<HTMLIFrameElement, IFrameSwapperProps>(
 
       // Immediately set the currently active iframe to not initialized
       if (activeIFrame) {
-        activeIFrame.dataset.testXbContentInitialized = 'false';
+        activeIFrame.dataset.testCanvasContentInitialized = 'false';
       }
 
       // Set up load event listener and update content for inactive iframe. Once loaded, it will be swapped in.
@@ -165,8 +173,8 @@ const IFrameSwapper = forwardRef<HTMLIFrameElement, IFrameSwapperProps>(
       className: clsx(styles.preview, {
         [styles.interactable]: isDragging || interactive,
       }),
-      'data-xb-preview': 'true',
-      'data-test-xb-content-initialized': 'false',
+      'data-canvas-preview': 'true',
+      'data-test-canvas-content-initialized': 'false',
     };
 
     return (
@@ -175,18 +183,18 @@ const IFrameSwapper = forwardRef<HTMLIFrameElement, IFrameSwapperProps>(
           // Set the tab index to 0 when the iframe is interactive, -1 when it is not.
           tabIndex={!interactive || whichActive === 1 ? -1 : 0}
           ref={(el) => (iFrameRefs.current[0] = el)}
-          data-xb-swap-active={whichActive === 0 ? 'true' : 'false'}
+          data-canvas-swap-active={whichActive === 0 ? 'true' : 'false'}
           title={whichActive === 0 ? 'Preview' : 'Inactive preview'}
-          data-xb-iframe="A"
+          data-canvas-iframe="A"
           scrolling="no"
           {...commonIFrameProps}
         ></iframe>
         <iframe
           tabIndex={!interactive || whichActive === 0 ? -1 : 0}
           ref={(el) => (iFrameRefs.current[1] = el)}
-          data-xb-swap-active={whichActive === 1 ? 'true' : 'false'}
+          data-canvas-swap-active={whichActive === 1 ? 'true' : 'false'}
           title={whichActive === 1 ? 'Preview' : 'Inactive preview'}
-          data-xb-iframe="B"
+          data-canvas-iframe="B"
           scrolling="no"
           {...commonIFrameProps}
         ></iframe>

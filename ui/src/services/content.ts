@@ -1,8 +1,10 @@
 import { createApi } from '@reduxjs/toolkit/query/react';
-import { baseQuery } from '@/services/baseQuery';
-import type { ContentStub } from '@/types/Content';
-import type { StagedConfig } from '@/types/Config';
+
 import { HOMEPAGE_CONFIG_ID } from '@/components/pageInfo/PageInfo';
+import { baseQuery } from '@/services/baseQuery';
+
+import type { StagedConfig } from '@/types/Config';
+import type { ContentStub } from '@/types/Content';
 
 export interface ContentListResponse {
   [key: string]: ContentStub;
@@ -41,7 +43,7 @@ export const contentApi = createApi({
           params.append('search', normalizedSearch);
         }
         return {
-          url: `/xb/api/v0/content/${entityType}`,
+          url: `/canvas/api/v0/content/${entityType}`,
           params: search ? params : undefined,
         };
       },
@@ -52,7 +54,7 @@ export const contentApi = createApi({
     }),
     deleteContent: builder.mutation<void, DeleteContentRequest>({
       query: ({ entityType, entityId }) => ({
-        url: `/xb/api/v0/content/${entityType}/${entityId}`,
+        url: `/canvas/api/v0/content/${entityType}/${entityId}`,
         method: 'DELETE',
       }),
       invalidatesTags: [{ type: 'Content', id: 'LIST' }],
@@ -62,7 +64,7 @@ export const contentApi = createApi({
       CreateContentRequest
     >({
       query: ({ entity_type, entity_id }) => ({
-        url: `/xb/api/v0/content/${entity_type}`,
+        url: `/canvas/api/v0/content/${entity_type}`,
         method: 'POST',
         body: entity_id ? { entity_id } : {},
       }),
@@ -70,7 +72,7 @@ export const contentApi = createApi({
     }),
     getStagedConfig: builder.query<StagedConfig, string>({
       query: (entityId) => ({
-        url: `/xb/api/v0/config/auto-save/staged_config_update/${entityId}`,
+        url: `/canvas/api/v0/config/auto-save/staged_config_update/${entityId}`,
         method: 'GET',
       }),
       providesTags: (_result, _error, entityId) => [
@@ -79,7 +81,7 @@ export const contentApi = createApi({
     }),
     setStagedConfig: builder.mutation<void, StagedConfig>({
       query: (body) => ({
-        url: `/xb/api/v0/staged-update/auto-save`,
+        url: `/canvas/api/v0/staged-update/auto-save`,
         method: 'POST',
         body,
       }),

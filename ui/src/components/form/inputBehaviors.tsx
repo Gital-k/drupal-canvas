@@ -1,12 +1,18 @@
-import type * as React from 'react';
 import { useCallback, useEffect, useState } from 'react';
-import { getDefaultValue } from '@/components/form/formUtil';
-import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import { debounce } from 'lodash';
+
+import { useAppDispatch, useAppSelector } from '@/app/hooks';
+import { getDefaultValue } from '@/components/form/formUtil';
+
+import type * as React from 'react';
+
 import './InputBehaviors.css';
-import type { PropsValues } from '@/types/Form';
-import type { Attributes } from '@/types/DrupalAttribute';
-import type { FormId } from '@/features/form/formStateSlice';
+
+import Ajv from 'ajv';
+
+import { InputBehaviorsComponentPropsForm } from '@/components/form/InputBehaviorsComponentPropsForm';
+import { InputBehaviorsEntityForm } from '@/components/form/InputBehaviorsEntityForm';
+import { FORM_TYPES } from '@/features/form/constants';
 import {
   clearFieldError,
   selectFieldError,
@@ -14,13 +20,13 @@ import {
   setFieldError,
   setFieldValue,
 } from '@/features/form/formStateSlice';
-import type { ErrorObject } from 'ajv/dist/types';
-import { FORM_TYPES } from '@/features/form/constants';
-import type { AjaxUpdateFormBuildIdEvent } from '@/types/Ajax';
 import { AJAX_UPDATE_FORM_BUILD_ID_EVENT } from '@/types/Ajax';
-import { InputBehaviorsEntityForm } from '@/components/form/InputBehaviorsEntityForm';
-import { InputBehaviorsComponentPropsForm } from '@/components/form/InputBehaviorsComponentPropsForm';
-import Ajv from 'ajv';
+
+import type { ErrorObject } from 'ajv/dist/types';
+import type { FormId } from '@/features/form/formStateSlice';
+import type { AjaxUpdateFormBuildIdEvent } from '@/types/Ajax';
+import type { Attributes } from '@/types/DrupalAttribute';
+import type { PropsValues } from '@/types/Form';
 
 const ajv = new Ajv();
 
@@ -83,7 +89,8 @@ export const InputBehaviorsCommon = ({
   );
 
   const formId = attributes['data-form-id'] as FormId;
-  const fieldName = (attributes.name || attributes['data-xb-name']) as string;
+  const fieldName = (attributes.name ||
+    attributes['data-canvas-name']) as string;
 
   const fieldIdentifier = {
     formId,
@@ -94,7 +101,7 @@ export const InputBehaviorsCommon = ({
   );
   // Include the input's default value in the form state on init - including
   // when an element is added via AJAX.
-  const elementType = attributes.type || attributes['data-xb-type'];
+  const elementType = attributes.type || attributes['data-canvas-type'];
   useEffect(() => {
     if (
       // Ignore radios in indeterminate (initial unset) state.
@@ -200,11 +207,11 @@ export const InputBehaviorsCommon = ({
       // Update the value of the input in the local state.
       setInputValue(newValue);
 
-      // The data-xb-no-update indicates we should return early and not update the
+      // The data-canvas-no-update indicates we should return early and not update the
       // store.
       if (
         typeof e?.target?.hasAttribute === 'function' &&
-        e.target.hasAttribute('data-xb-no-update')
+        e.target.hasAttribute('data-canvas-no-update')
       ) {
         return;
       }

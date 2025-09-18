@@ -1,34 +1,36 @@
-import type React from 'react';
-import { useMemo } from 'react';
-import { useEffect, useRef, useState } from 'react';
-import styles from './PreviewOverlay.module.css';
-import useSyncPreviewElementSize from '@/hooks/useSyncPreviewElementSize';
-import useSyncPreviewElementOffset from '@/hooks/useSyncPreviewElementOffset';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import clsx from 'clsx';
+import { useDraggable } from '@dnd-kit/core';
+
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
+import ComponentContextMenu from '@/features/layout/preview/ComponentContextMenu';
+import { useDataToHtmlMapValue } from '@/features/layout/preview/DataToHtmlMapContext';
+import { ComponentNameTag } from '@/features/layout/preview/NameTag';
+import ComponentDropZone from '@/features/layout/previewOverlay/ComponentDropZone';
+import SlotOverlay from '@/features/layout/previewOverlay/SlotOverlay';
 import {
-  selectEditorViewPortScale,
   selectComponentIsSelected,
   selectDragging,
+  selectEditorViewPortScale,
   selectIsComponentHovered,
   selectIsComponentUpdating,
   setHoveredComponent,
   unsetHoveredComponent,
 } from '@/features/ui/uiSlice';
-import clsx from 'clsx';
-import { ComponentNameTag } from '@/features/layout/preview/NameTag';
-import SlotOverlay from '@/features/layout/previewOverlay/SlotOverlay';
+import useComponentSelection from '@/hooks/useComponentSelection';
+import useGetComponentName from '@/hooks/useGetComponentName';
+import useSyncPreviewElementOffset from '@/hooks/useSyncPreviewElementOffset';
+import useSyncPreviewElementSize from '@/hooks/useSyncPreviewElementSize';
+
+import type React from 'react';
 import type {
   ComponentNode,
   RegionNode,
   SlotNode,
 } from '@/features/layout/layoutModelSlice';
-import ComponentContextMenu from '@/features/layout/preview/ComponentContextMenu';
-import useGetComponentName from '@/hooks/useGetComponentName';
-import { useDataToHtmlMapValue } from '@/features/layout/preview/DataToHtmlMapContext';
-import useComponentSelection from '@/hooks/useComponentSelection';
-import ComponentDropZone from '@/features/layout/previewOverlay/ComponentDropZone';
-import { useDraggable } from '@dnd-kit/core';
 import type { StackDirection } from '@/types/Annotations';
+
+import styles from './PreviewOverlay.module.css';
 
 export interface ComponentOverlayProps {
   component: ComponentNode;
@@ -184,7 +186,7 @@ const ComponentOverlay: React.FC<ComponentOverlayProps> = (props) => {
       onMouseOut={handleItemMouseOut}
       onClick={handleComponentClick}
       onKeyDown={handleKeyDown}
-      data-xb-selected={isSelected}
+      data-canvas-selected={isSelected}
       className={clsx('componentOverlay', styles.componentOverlay, {
         [styles.selected]: isSelected,
         [styles.hovered]: isHovered,
@@ -203,15 +205,15 @@ const ComponentOverlay: React.FC<ComponentOverlayProps> = (props) => {
           ref={setNodeRef}
           {...listeners}
           {...attributes}
-          className={clsx('xb--sortable-item', styles.sortableItem)}
-          data-xb-component-id={componentType}
-          data-xb-uuid={component.uuid}
-          data-xb-type={component.nodeType}
-          data-xb-overlay="true"
+          className={clsx('canvas--sortable-item', styles.sortableItem)}
+          data-canvas-component-id={componentType}
+          data-canvas-uuid={component.uuid}
+          data-canvas-type={component.nodeType}
+          data-canvas-overlay="true"
         />
       </ComponentContextMenu>
       {(isHovered || isSelected) && (
-        <div className={clsx(styles.xbNameTag)}>
+        <div className={clsx(styles.canvasNameTag)}>
           <ComponentNameTag
             name={name}
             id={component.uuid}

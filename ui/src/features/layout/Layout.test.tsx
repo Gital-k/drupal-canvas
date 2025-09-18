@@ -1,16 +1,18 @@
-import { beforeEach, describe, it, vi, expect } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from '@testing-library/react';
-import { makeStore } from '@/app/store';
 import AppWrapper from '@tests/vitest/components/AppWrapper';
+
+import { makeStore } from '@/app/store';
 import Layout from '@/features/layout/Layout';
-import { useGetLayoutByIdQuery } from '@/services/componentAndLayout';
+import { useGetPageLayoutQuery } from '@/services/componentAndLayout';
+
 import type { AppStore } from '@/app/store';
 
 vi.mock('@/services/componentAndLayout', async () => {
   const originalModule = await vi.importActual('@/services/componentAndLayout');
   return {
     ...originalModule,
-    useGetLayoutByIdQuery: vi.fn(),
+    useGetPageLayoutQuery: vi.fn(),
   };
 });
 
@@ -20,7 +22,7 @@ describe('Layout', () => {
   beforeEach(() => {
     store = makeStore({});
 
-    (useGetLayoutByIdQuery as ReturnType<typeof vi.fn>).mockReturnValue({
+    (useGetPageLayoutQuery as ReturnType<typeof vi.fn>).mockReturnValue({
       data: {
         layout: [],
         model: {},

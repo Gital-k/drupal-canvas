@@ -1,5 +1,7 @@
-import styles from './Spotlight.module.css';
 import clsx from 'clsx';
+
+import styles from './Spotlight.module.css';
+
 type Props = {
   top: number;
   left: number;
@@ -27,7 +29,7 @@ export const Spotlight = (props: Props) => {
       <div />
       <div
         className={styles.highlighted}
-        data-testid="xb-region-spotlight-highlight"
+        data-testid="canvas-region-spotlight-highlight"
         style={{ width: `${width}px`, height: `${height}px` }}
       ></div>
       <div />

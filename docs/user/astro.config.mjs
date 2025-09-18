@@ -7,12 +7,12 @@ export default defineConfig({
   trailingSlash: 'never',
   integrations: [
     starlight({
-      title: 'Experience Builder',
+      title: 'Drupal Canvas',
       social: [
         {
           icon: 'gitlab',
           label: 'GitLab',
-          href: 'https://git.drupalcode.org/project/experience_builder/',
+          href: 'https://git.drupalcode.org/project/canvas/',
         },
         {
           icon: 'slack',
@@ -22,7 +22,7 @@ export default defineConfig({
         {
           icon: 'bun',
           label: 'drupal.org',
-          href: 'https://www.drupal.org/project/experience_builder',
+          href: 'https://www.drupal.org/project/canvas',
         },
       ],
       sidebar: [
@@ -44,6 +44,33 @@ export default defineConfig({
             },
           ],
         },
+        {
+          label: 'SDC components',
+          items: [
+            { label: 'Introduction', slug: 'sdc-components' },
+            { label: 'Props', slug: 'sdc-components/props' },
+            { label: 'Slots', slug: 'sdc-components/slots' },
+            { label: 'Image', slug: 'sdc-components/image' },
+            {
+              label: 'Validations',
+              slug: 'sdc-components/validations',
+            },
+            { label: 'Troubleshooting', slug: 'sdc-components/troubleshooting' },
+          ],
+        },
+        {
+          label: 'AI assistant',
+          items: [
+            { label: 'Introduction', slug: 'ai-assistant' }
+          ],
+        },
+        {
+          label: 'APIs',
+          items: [
+            { label: 'Introduction', slug: 'apis' },
+            { label: 'Customizing forms', slug: 'apis/customizing-forms' },
+          ],
+        }
       ],
     }),
   ],

@@ -1,6 +1,8 @@
-import type React from 'react';
-import styles from './PreviewOverlay.module.css';
 import clsx from 'clsx';
+
+import type React from 'react';
+
+import styles from './PreviewOverlay.module.css';
 
 /**
  * Renders a div at a level above where we scale the editor frame into which we can portal the UI and overlay that sits over
@@ -9,7 +11,7 @@ import clsx from 'clsx';
 const PreviewOverlay: React.FC = () => {
   return (
     <div
-      id="xbPreviewOverlay"
+      id="canvasPreviewOverlay"
       className={clsx('previewOverlay', styles.overlay)}
     ></div>
   );

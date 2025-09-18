@@ -1,7 +1,8 @@
+import AxeBuilder from '@axe-core/playwright';
 import { expect } from '@playwright/test';
+
 import { test } from './fixtures/DrupalSite';
 import { Drupal } from './objects/Drupal';
-import AxeBuilder from '@axe-core/playwright';
 
 /**
  * Perfunctory accessibility scan.
@@ -9,17 +10,17 @@ import AxeBuilder from '@axe-core/playwright';
 
 test.describe('Basic accessibility', () => {
   test.beforeAll(
-    'Setup minimal test site with Experience Builder',
+    'Setup minimal test site with Drupal Canvas',
     async ({ browser, drupalSite }) => {
       const page = await browser.newPage();
       const drupal: Drupal = new Drupal({ page, drupalSite });
-      await drupal.installModules(['experience_builder', 'xb_test_sdc']);
-      await drupal.createXbPage('Homepage', '/homepage');
+      await drupal.installModules(['canvas', 'canvas_test_sdc']);
+      await drupal.createCanvasPage('Homepage', '/homepage');
       await page.close();
     },
   );
 
-  test('Axe scan', async ({ page, drupal, xBEditor }, testInfo) => {
+  test('Axe scan', async ({ page, drupal, canvasEditor }, testInfo) => {
     // These are the rules that these screens currently violate.
     // @todo not do that.
     const baseline = [
@@ -35,7 +36,7 @@ test.describe('Basic accessibility', () => {
     ];
     await drupal.loginAsAdmin();
     await page.goto('/homepage');
-    await xBEditor.goToEditor();
+    await canvasEditor.goToEditor();
     const editorScan = await new AxeBuilder({ page })
       .disableRules(baseline)
       .analyze();
@@ -46,7 +47,7 @@ test.describe('Basic accessibility', () => {
     expect(editorScan.violations).toEqual([]);
 
     // Layers Panel.
-    await xBEditor.openLayersPanel();
+    await canvasEditor.openLayersPanel();
     const layersScan = await new AxeBuilder({ page })
       .disableRules(baseline)
       .analyze();
@@ -57,7 +58,7 @@ test.describe('Basic accessibility', () => {
     expect(layersScan.violations).toEqual([]);
 
     // Library Panel.
-    await xBEditor.openLibraryPanel();
+    await canvasEditor.openLibraryPanel();
     const libraryScan = await new AxeBuilder({ page })
       .disableRules(baseline)
       .analyze();
@@ -68,7 +69,7 @@ test.describe('Basic accessibility', () => {
     expect(libraryScan.violations).toEqual([]);
 
     // Props Panel.
-    xBEditor.addComponent({ id: 'sdc.xb_test_sdc.my-hero' });
+    canvasEditor.addComponent({ id: 'sdc.canvas_test_sdc.my-hero' });
     const propsScan = await new AxeBuilder({ page })
       .disableRules(baseline)
       .analyze();

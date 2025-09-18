@@ -1,18 +1,15 @@
 import { useEffect, useMemo } from 'react';
 import { useErrorBoundary } from 'react-error-boundary';
-import List from '@/components/list/List';
-import { useGetPatternsQuery } from '@/services/patterns';
-import {
-  LayoutItemType,
-  selectUniqueListId,
-} from '@/features/ui/primaryPanelSlice';
-import { useAppSelector } from '@/app/hooks';
-import { useGetFoldersQuery } from '@/services/componentAndLayout';
 
 import FolderList, {
   folderfyComponents,
   sortFolderList,
 } from '@/components/list/FolderList';
+import List from '@/components/list/List';
+import { LayoutItemType } from '@/features/ui/primaryPanelSlice';
+import { useGetFoldersQuery } from '@/services/componentAndLayout';
+import { useGetPatternsQuery } from '@/services/patterns';
+
 import type { PatternsList } from '@/types/Pattern';
 
 const PatternList = () => {
@@ -23,7 +20,6 @@ const PatternList = () => {
     isLoading: foldersLoading,
   } = useGetFoldersQuery({ status: false });
   const { showBoundary } = useErrorBoundary();
-  const id = useAppSelector(selectUniqueListId);
 
   useEffect(() => {
     if (error || foldersError) {
@@ -50,9 +46,9 @@ const PatternList = () => {
     <>
       {/* First, render any folders and the items they contain. */}
       {folderEntries.length > 0 &&
-        folderEntries.map((folder, index) => {
+        folderEntries.map((folder) => {
           return (
-            <FolderList key={index} folder={folder}>
+            <FolderList key={folder.id} folder={folder}>
               <List
                 items={folder.items as PatternsList}
                 isLoading={isLoading}
@@ -74,7 +70,6 @@ const PatternList = () => {
           isLoading={isLoading || foldersLoading}
           type={LayoutItemType.PATTERN}
           label="Patterns"
-          key={id}
         />
       )}
     </>

@@ -1,10 +1,10 @@
-import { mergeTests } from '@playwright/test';
-import { test as base } from '@playwright/test';
+import { test as base, mergeTests } from '@playwright/test';
+
+import { Ai } from '../objects/Ai';
+import { CanvasEditor } from '../objects/CanvasEditor';
 import { Drupal } from '../objects/Drupal';
-import { XBEditor } from '../objects/XBEditor';
 import { exec } from '../utilities/DrupalExec';
 import { hasDrush } from '../utilities/DrupalFilesystem';
-import { Ai } from '../objects/Ai';
 
 export type DrupalSite = {
   dbPrefix: string;
@@ -65,15 +65,15 @@ const drupal = base.extend<DrupalObj>({
   ],
 });
 
-type XBEditorObj = {
-  xBEditor: XBEditor;
+type CanvasEditorObj = {
+  canvasEditor: CanvasEditor;
 };
 
-const xBEditor = base.extend<XBEditorObj>({
-  xBEditor: [
+const canvasEditor = base.extend<CanvasEditorObj>({
+  canvasEditor: [
     async ({ page }, use) => {
-      const xBEditor = new XBEditor({ page });
-      await use(xBEditor);
+      const canvasEditor = new CanvasEditor({ page });
+      await use(canvasEditor);
     },
     { auto: true },
   ],
@@ -114,7 +114,7 @@ const beforeEachTest = base.extend<{ forEachTest: void }>({
 export const test = mergeTests(
   drupalSite,
   drupal,
-  xBEditor,
+  canvasEditor,
   ai,
   beforeAllTests,
   beforeEachTest,

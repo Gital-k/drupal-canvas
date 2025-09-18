@@ -2,17 +2,19 @@
 
 declare(strict_types=1);
 
-namespace Drupal\experience_builder;
+namespace Drupal\canvas;
 
+use Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase;
 use Drupal\Core\Template\Attribute;
 use Drupal\Core\Theme\Component\ComponentMetadata;
-use Drupal\experience_builder\PropExpressions\Component\ComponentPropExpression;
-use Drupal\experience_builder\PropShape\PropShape;
-use Drupal\experience_builder\PropShape\StorablePropShape;
+use Drupal\canvas\PropExpressions\Component\ComponentPropExpression;
+use Drupal\canvas\PropShape\StorablePropShape;
 use JsonSchema\Validator;
 
 /**
  * Defines a class for checking if component metadata meets requirements.
+ *
+ * @todo Move into a new \Drupal\Canvas\ComponentMetadataDerivers namespace, alongside ComponentPropExpression
  */
 final class ComponentMetadataRequirementsChecker {
 
@@ -26,12 +28,12 @@ final class ComponentMetadataRequirementsChecker {
    * @param string[] $required_props
    *   Array of required prop names.
    *
-   * @throws \Drupal\experience_builder\ComponentDoesNotMeetRequirementsException
+   * @throws \Drupal\canvas\ComponentDoesNotMeetRequirementsException
    *   When the component does not meet requirements.
    */
   public static function check(string $component_id, ComponentMetadata $metadata, array $required_props): void {
     $messages = [];
-    // XB always requires schema, even for theme components.
+    // Canvas always requires schema, even for theme components.
     // @see \Drupal\Core\Theme\ComponentPluginManager::shouldEnforceSchemas()
     // @see \Drupal\Core\Theme\Component\ComponentMetadata::parseSchemaInfo()
     if ($metadata->schema === NULL) {
@@ -49,7 +51,7 @@ final class ComponentMetadataRequirementsChecker {
       }
     }
 
-    $props_for_metadata = PropShape::getComponentPropsForMetadata($component_id, $metadata);
+    $props_for_metadata = GeneratedFieldExplicitInputUxComponentSourceBase::getComponentInputsForMetadata($component_id, $metadata);
     $validator = new Validator();
     foreach ($metadata->schema['properties'] as $prop_name => $prop) {
       if (in_array(Attribute::class, $prop['type'], TRUE)) {
@@ -140,7 +142,7 @@ final class ComponentMetadataRequirementsChecker {
       if ($storable_prop_shape instanceof StorablePropShape) {
         continue;
       }
-      $messages[] = \sprintf('Experience Builder does not know of a field type/widget to allow populating the <code>%s</code> prop, with the shape <code>%s</code>.', $prop_name, json_encode($prop_shape->schema, JSON_UNESCAPED_SLASHES));
+      $messages[] = \sprintf('Drupal Canvas does not know of a field type/widget to allow populating the <code>%s</code> prop, with the shape <code>%s</code>.', $prop_name, json_encode($prop_shape->schema, JSON_UNESCAPED_SLASHES));
     }
     if (!empty($messages)) {
       throw new ComponentDoesNotMeetRequirementsException($messages);

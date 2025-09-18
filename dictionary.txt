@@ -15,6 +15,8 @@ basepath
 biscoff
 Carden
 cebe
+cnvs
+cnvst # Used for "canvas tests"
 CODEOWNERS
 codespaces
 cqmr
@@ -40,6 +42,7 @@ hyperscriptification
 hyperscriptified
 hyperscriptify
 hyperscriptifying
+ianvs
 importmap
 inwidget
 jangregor
@@ -66,7 +69,9 @@ propless
 propsify
 Pryce's
 pubout
+Qqtnj
 rdndmb
+redocly
 redoable
 reduxjs
 renderify
@@ -85,6 +90,7 @@ subcontent
 subroute
 subtrigger
 superstrongpassword
+SVAY
 tseslint
 testid
 toolset
@@ -103,9 +109,9 @@ upserts
 useswr
 Validatable
 vaul
-xbstark
-xbrc
-xbxb
+canvasstark
+canvasrc
+canvascanvas
 xmdi
 ymls
 Deepchat

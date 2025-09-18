@@ -2,23 +2,23 @@
 
 declare(strict_types=1);
 
-namespace Drupal\experience_builder\EntityHandlers;
+namespace Drupal\canvas\EntityHandlers;
 
 use Drupal\Component\Utility\NestedArray;
+use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\EntityViewBuilder;
 use Drupal\Core\Entity\EntityViewBuilderInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
-use Drupal\experience_builder\Entity\ContentTemplate;
-use Drupal\experience_builder\Storage\ComponentTreeLoader;
+use Drupal\canvas\Entity\ContentTemplate;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * Decorates a view builder so it can take advantage of content templates.
  *
- * @see \Drupal\experience_builder\Hook\ContentTemplateHooks::entityTypeAlter()
+ * @see \Drupal\canvas\Hook\ContentTemplateHooks::entityTypeAlter()
  */
 final class ContentTemplateAwareViewBuilder extends EntityViewBuilder {
 
@@ -27,7 +27,7 @@ final class ContentTemplateAwareViewBuilder extends EntityViewBuilder {
    *
    * @var string
    */
-  public const string DECORATED_HANDLER_KEY = 'xb_original_view_builder';
+  public const string DECORATED_HANDLER_KEY = 'canvas_original_view_builder';
 
   /**
    * The decorated view builder.
@@ -36,12 +36,7 @@ final class ContentTemplateAwareViewBuilder extends EntityViewBuilder {
    */
   private EntityViewBuilderInterface $decorated;
 
-  /**
-   * The component tree loader service.
-   *
-   * @var \Drupal\experience_builder\Storage\ComponentTreeLoader
-   */
-  private ComponentTreeLoader $componentTreeLoader;
+  private EntityTypeManagerInterface $entityTypeManager;
 
   /**
    * {@inheritdoc}
@@ -49,12 +44,12 @@ final class ContentTemplateAwareViewBuilder extends EntityViewBuilder {
   public static function createInstance(ContainerInterface $container, EntityTypeInterface $entity_type): self {
     $instance = parent::createInstance($container, $entity_type);
 
-    $original_view_builder = $container->get(EntityTypeManagerInterface::class)
+    $instance->entityTypeManager = $container->get(EntityTypeManagerInterface::class);
+    $original_view_builder = $instance->entityTypeManager
       ->getHandler($entity_type->id(), self::DECORATED_HANDLER_KEY);
     assert($original_view_builder instanceof EntityViewBuilderInterface);
     $instance->decorated = $original_view_builder;
 
-    $instance->componentTreeLoader = $container->get(ComponentTreeLoader::class);
     return $instance;
   }
 
@@ -63,26 +58,36 @@ final class ContentTemplateAwareViewBuilder extends EntityViewBuilder {
    */
   protected function getBuildDefaults(EntityInterface $entity, $view_mode) {
     $defaults = parent::getBuildDefaults($entity, $view_mode);
+    \assert($entity instanceof FieldableEntityInterface);
+    $template = ContentTemplate::loadForEntity($entity, $view_mode);
+
+    // If a template exists, no matter if disabled, this render array depends
+    // on it changing.
+    if ($template) {
+      CacheableMetadata::createFromObject($template)->applyTo($defaults);
+    }
+    // We need to ensure as soon as a content template is added, we are using it.
+    else {
+      (new CacheableMetadata())->addCacheTags(
+        $this->entityTypeManager->getStorage(ContentTemplate::ENTITY_TYPE_ID)->getEntityType()->getListCacheTags()
+      )->applyTo($defaults);
+    }
+
     $keys = NestedArray::getValue($defaults, ['#cache', 'keys']);
     if ($keys !== NULL) {
-      // This entity has render caching, so add a cache key indicating whether
-      // or not it's opted into XB.
-      \assert($entity instanceof FieldableEntityInterface);
-      try {
-        $this->componentTreeLoader->getXbFieldName($entity);
-        $keys[] = 'with-xb';
-        // We don't want to use the default theme template as preprocess functions
-        // etc might make assumptions about various fields being present.
-        // @see template_preprocess_node.
-        // @todo Remove in https://www.drupal.org/i/3534128 when https://drupal.org/i/3524738 is fixed
+      if ($template && $template->status()) {
+        // This entity has render caching, so add a cache key indicating whether
+        // or not it's opted into Canvas.
+        $keys[] = 'with-canvas';
+        // We don't want to use the default theme template (such as
+        // `node.html.twig`) because any content entity type that uses Canvas'
+        // ContentTemplates is opting in to full control via Canvas.
         unset($defaults['#theme']);
       }
-      catch (\LogicException) {
-        $keys[] = 'without-xb';
+      else {
+        $keys[] = 'without-canvas';
       }
-      finally {
-        NestedArray::setValue($defaults, ['#cache', 'keys'], $keys);
-      }
+      NestedArray::setValue($defaults, ['#cache', 'keys'], $keys);
     }
     return $defaults;
   }
@@ -99,18 +104,10 @@ final class ContentTemplateAwareViewBuilder extends EntityViewBuilder {
         continue;
       }
 
-      \assert($entity instanceof FieldableEntityInterface);
-      try {
-        $this->componentTreeLoader->getXbFieldName($entity);
-      }
-      catch (\LogicException) {
-        // This entity isn't opted into XB, so there's nothing else to do.
-        continue;
-      }
-
       // See if we can find a template for this entity, in the requested view
       // mode. If we do, use that template to render the entity only if the
       // status is set to true.
+      assert($entity instanceof FieldableEntityInterface);
       $template = ContentTemplate::loadForEntity($entity, $view_mode);
       if ($template && $template->status()) {
         $displays[$bundle] = $template;
@@ -120,11 +117,11 @@ final class ContentTemplateAwareViewBuilder extends EntityViewBuilder {
     // would do, to stay as close as possible to the original execution flow.
     // This means `hook_entity_prepare_view()` will still be invoked. Then,
     // `ContentTemplate::buildMultiple()` will be called for the entities that
-    // are being rendered by XB, which in turn will call
+    // are being rendered by Canvas, which in turn will call
     // `ComponentTreeHydrated::toRenderable()`.
     // @see \Drupal\Core\Entity\EntityViewBuilder::buildComponents()
-    // @see \Drupal\experience_builder\Entity\ContentTemplate::buildMultiple()
-    // @see \Drupal\experience_builder\Plugin\DataType\ComponentTreeHydrated::toRenderable()
+    // @see \Drupal\canvas\Entity\ContentTemplate::buildMultiple()
+    // @see \Drupal\canvas\Plugin\DataType\ComponentTreeHydrated::toRenderable()
     $this->decorated->buildComponents($build, $entities, $displays, $view_mode);
   }
 

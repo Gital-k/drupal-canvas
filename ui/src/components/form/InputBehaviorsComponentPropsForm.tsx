@@ -1,23 +1,7 @@
+import { useRef } from 'react';
+
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
-import {
-  selectCurrentComponent,
-  selectFormValues,
-} from '@/features/form/formStateSlice';
-import type {
-  ComponentModels,
-  ResolvedValues,
-  Sources,
-} from '@/features/layout/layoutModelSlice';
-import {
-  isEvaluatedComponentModel,
-  selectLayout,
-  selectModel,
-} from '@/features/layout/layoutModelSlice';
-import { useGetComponentsQuery } from '@/services/componentAndLayout';
-import { useComponentTransforms } from '@/components/DummyPropsEditForm';
-import { findComponentByUuid } from '@/features/layout/layoutUtils';
-import type { InputUIData, PropsValues } from '@/types/Form';
-import { useUpdateComponentMutation } from '@/services/preview';
+import { useComponentTransforms } from '@/components/ComponentInstanceForm';
 import {
   ComponentPreviewUpdateEvent,
   getPropSchemas,
@@ -27,16 +11,35 @@ import {
   toPropName,
   validateProp,
 } from '@/components/form/formUtil';
-import { setPreviewBackgroundUpdate } from '@/features/pagePreview/previewSlice';
-import { flaggedForRemoval, parseValue } from '@/utils/function-utils';
 import {
   InputBehaviorsCommon,
   POLLED_BACKGROUND_TIMEOUT,
 } from '@/components/form/inputBehaviors';
 import { FORM_TYPES } from '@/features/form/constants';
-import type { XBComponent } from '@/types/Component';
+import {
+  selectCurrentComponent,
+  selectFormValues,
+} from '@/features/form/formStateSlice';
+import {
+  isEvaluatedComponentModel,
+  selectLayout,
+  selectModel,
+} from '@/features/layout/layoutModelSlice';
+import { findComponentByUuid } from '@/features/layout/layoutUtils';
+import { setPreviewBackgroundUpdate } from '@/features/pagePreview/previewSlice';
+import { selectEditorFrameContext } from '@/features/ui/uiSlice';
+import { useGetComponentsQuery } from '@/services/componentAndLayout';
+import { useUpdateComponentMutation } from '@/services/preview';
 import { componentHasFieldData } from '@/types/Component';
-import { useRef } from 'react';
+import { flaggedForRemoval, parseValue } from '@/utils/function-utils';
+
+import type {
+  ComponentModels,
+  ResolvedValues,
+  Sources,
+} from '@/features/layout/layoutModelSlice';
+import type { CanvasComponent } from '@/types/Component';
+import type { InputUIData, PropsValues } from '@/types/Form';
 
 export const InputBehaviorsComponentPropsForm = (
   OriginalInput: React.FC,
@@ -49,6 +52,7 @@ export const InputBehaviorsComponentPropsForm = (
    * We already have a workaround for this for the Redux provider, could we do the same for the React Router context?
    */
   const currentComponent = useAppSelector(selectCurrentComponent);
+  const editorFrameContext = useAppSelector(selectEditorFrameContext);
   const dispatch = useAppDispatch();
   const selectedComponent = currentComponent || 'noop';
   const polledBackgroundUpdate = useRef<number | null>(null);
@@ -76,7 +80,7 @@ export const InputBehaviorsComponentPropsForm = (
     fixedCacheKey: selectedComponent,
   });
 
-  const fieldName = attributes.name || attributes['data-xb-name'];
+  const fieldName = attributes.name || attributes['data-canvas-name'];
   const propName = toPropName(fieldName, selectedComponent);
   // Scalar prop-types might be able to perform real-time updates.
   const isScalarProp = ['number', 'integer', 'string', 'boolean'].includes(
@@ -147,6 +151,7 @@ export const InputBehaviorsComponentPropsForm = (
     if (isEvaluatedComponentModel(selectedModel) && component) {
       const updateBackend = () => {
         patchComponent({
+          type: editorFrameContext,
           componentInstanceUuid: selectedComponent,
           componentType: `${selectedComponentType}@${version}`,
           model: {
@@ -178,6 +183,7 @@ export const InputBehaviorsComponentPropsForm = (
       return;
     }
     patchComponent({
+      type: editorFrameContext,
       componentInstanceUuid: selectedComponent,
       componentType: `${selectedComponentType}@${version}`,
       model: {
@@ -281,7 +287,7 @@ export const InputBehaviorsComponentPropsForm = (
 
 export const syncPropSourcesToResolvedValues = (
   sources: Sources,
-  component: XBComponent,
+  component: CanvasComponent,
   resolvedValues: ResolvedValues,
 ): Sources => {
   if (!componentHasFieldData(component)) {

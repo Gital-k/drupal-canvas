@@ -2,21 +2,23 @@
 
 declare(strict_types=1);
 
-namespace Drupal\Tests\experience_builder\Kernel\Entity;
+namespace Drupal\Tests\canvas\Kernel\Entity;
 
-use Drupal\experience_builder\AutoSave\AutoSaveManager;
-use Drupal\experience_builder\Controller\EntityFormController;
-use Drupal\experience_builder\Entity\Page;
+use Drupal\canvas\AutoSave\AutoSaveManager;
+use Drupal\canvas\Controller\EntityFormController;
+use Drupal\canvas\Entity\Page;
+use Drupal\Core\Extension\ThemeHandlerInterface;
+use Drupal\Core\Extension\ThemeInstallerInterface;
 use Drupal\file\Entity\File;
 use Drupal\KernelTests\KernelTestBase;
 use Drupal\media\Entity\Media;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
 use Drupal\Tests\TestFileCreationTrait;
-use Drupal\Tests\experience_builder\Kernel\Traits\PageTrait;
+use Drupal\Tests\canvas\Kernel\Traits\PageTrait;
 use Symfony\Component\HttpFoundation\RequestStack;
 
 /**
- * @group experience_builder
+ * @group canvas
  * @requires function Drupal\metatag\MetatagManager::tagsFromEntity
  */
 final class PageMetatagIntegrationTest extends KernelTestBase {
@@ -29,11 +31,11 @@ final class PageMetatagIntegrationTest extends KernelTestBase {
    * {@inheritdoc}
    */
   protected static $modules = [
-    'experience_builder',
+    'canvas',
     'block',
     'sdc',
     'sdc_test',
-    'xb_test_sdc',
+    'canvas_test_sdc',
     // Modules providing field types + widgets for the SDC Components'
     // `prop_field_definitions`.
     'file',
@@ -145,6 +147,7 @@ final class PageMetatagIntegrationTest extends KernelTestBase {
   }
 
   public function testSeoSettingsForm(): void {
+    \Drupal::service(ThemeInstallerInterface::class)->install(['canvas_stark']);
     $this->container->get('module_installer')->install(['metatag']);
     $page = Page::create([
       'title' => 'Test page',
@@ -153,7 +156,9 @@ final class PageMetatagIntegrationTest extends KernelTestBase {
       'components' => [],
     ]);
     self::assertSaveWithoutViolations($page);
-    $sut = new EntityFormController($this->container->get(AutoSaveManager::class), $this->container->get(RequestStack::class));
+    $themeHandler = $this->container->get('theme_handler');
+    assert($themeHandler instanceof ThemeHandlerInterface);
+    $sut = new EntityFormController($this->container->get(AutoSaveManager::class), $this->container->get(RequestStack::class), $themeHandler);
     $form = $sut->form(Page::ENTITY_TYPE_ID, $page, 'default');
     self::assertArrayHasKey('image', $form['seo_settings']);
     self::assertArrayHasKey('description', $form['seo_settings']);

@@ -1,9 +1,10 @@
 import { createApi } from '@reduxjs/toolkit/query/react';
+
 import { baseQueryWithAutoSaves } from '@/services/baseQuery';
 import { handleAutoSavesHashUpdate } from '@/utils/autoSaves';
 
-import type { AssetLibrary } from '@/types/CodeComponent';
 import type { AutoSavesHash } from '@/types/AutoSaves';
+import type { AssetLibrary } from '@/types/CodeComponent';
 
 export const assetLibraryApi = createApi({
   reducerPath: 'assetLibraryApi',
@@ -11,16 +12,16 @@ export const assetLibraryApi = createApi({
   tagTypes: ['AssetLibraries', 'AssetLibrariesAutoSave'],
   endpoints: (builder) => ({
     getAssetLibraries: builder.query<Record<string, AssetLibrary>, void>({
-      query: () => 'xb/api/v0/config/xb_asset_library',
+      query: () => 'canvas/api/v0/config/asset_library',
       providesTags: () => [{ type: 'AssetLibraries', id: 'LIST' }],
     }),
     getAssetLibrary: builder.query<AssetLibrary, string>({
-      query: (id) => `xb/api/v0/config/xb_asset_library/${id}`,
+      query: (id) => `canvas/api/v0/config/asset_library/${id}`,
       providesTags: (result, error, id) => [{ type: 'AssetLibraries', id }],
     }),
     createAssetLibrary: builder.mutation<AssetLibrary, Partial<AssetLibrary>>({
       query: (body) => ({
-        url: 'xb/api/v0/config/xb_asset_library',
+        url: 'canvas/api/v0/config/asset_library',
         method: 'POST',
         body,
       }),
@@ -31,7 +32,7 @@ export const assetLibraryApi = createApi({
       { id: string; changes: Partial<AssetLibrary> }
     >({
       query: ({ id, changes }) => ({
-        url: `xb/api/v0/config/xb_asset_library/${id}`,
+        url: `canvas/api/v0/config/asset_library/${id}`,
         method: 'PATCH',
         body: changes,
       }),
@@ -42,7 +43,7 @@ export const assetLibraryApi = createApi({
     }),
     deleteAssetLibrary: builder.mutation<void, string>({
       query: (id) => ({
-        url: `xb/api/v0/config/xb_asset_library/${id}`,
+        url: `canvas/api/v0/config/asset_library/${id}`,
         method: 'DELETE',
       }),
       invalidatesTags: [{ type: 'AssetLibraries', id: 'LIST' }],
@@ -51,7 +52,7 @@ export const assetLibraryApi = createApi({
       { data: AssetLibrary; autoSaves: AutoSavesHash },
       string
     >({
-      query: (id) => `xb/api/v0/config/auto-save/xb_asset_library/${id}`,
+      query: (id) => `canvas/api/v0/config/auto-save/asset_library/${id}`,
       providesTags: (result, error, id) => [
         { type: 'AssetLibrariesAutoSave', id },
       ],
@@ -73,7 +74,7 @@ export const assetLibraryApi = createApi({
       }
     >({
       query: ({ id, data }) => ({
-        url: `xb/api/v0/config/auto-save/xb_asset_library/${id}`,
+        url: `canvas/api/v0/config/auto-save/asset_library/${id}`,
         method: 'PATCH',
         body: { data },
       }),

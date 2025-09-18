@@ -1,22 +1,23 @@
-import { v4 as uuidv4 } from 'uuid';
 import { camelCase, isEqual } from 'lodash';
-import derivedPropTypes from '@/features/code-editor/component-data/derivedPropTypes';
-import { getXbModuleBaseUrl } from '@/utils/drupal-globals';
+import { v4 as uuidv4 } from 'uuid';
 
+import derivedPropTypes from '@/features/code-editor/component-data/derivedPropTypes';
+import { CONFIG_EXAMPLE_URLS } from '@/features/code-editor/component-data/forms/FormPropTypeVideo';
+import { getCanvasModuleBaseUrl } from '@/utils/drupal-globals';
+
+import type { File } from '@babel/types';
 import type {
+  CodeComponent,
   CodeComponentProp,
+  CodeComponentPropImageExample,
   CodeComponentPropPreviewValue,
   CodeComponentPropSerialized,
+  CodeComponentPropVideoExample,
+  CodeComponentSerialized,
   CodeComponentSlot,
   CodeComponentSlotSerialized,
-  CodeComponentPropImageExample,
-  CodeComponent,
-  CodeComponentSerialized,
-  CodeComponentPropVideoExample,
   DataDependencies,
 } from '@/types/CodeComponent';
-import type { File } from '@babel/types';
-import { CONFIG_EXAMPLE_URLS } from '@/features/code-editor/component-data/forms/FormPropTypeVideo';
 
 export function getPropMachineName(name: string) {
   return camelCase(name);
@@ -431,7 +432,7 @@ function serializeVideoSrc(example: CodeComponentPropVideoExample) {
 }
 
 function deserializeVideoSrc(example: CodeComponentPropVideoExample) {
-  const moduleBaseUrl = getXbModuleBaseUrl();
+  const moduleBaseUrl = getCanvasModuleBaseUrl();
   const configExampleUrls = Object.values(CONFIG_EXAMPLE_URLS);
   for (const configUrl of configExampleUrls) {
     if (example.src.includes(configUrl)) {

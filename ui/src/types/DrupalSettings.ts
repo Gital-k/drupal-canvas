@@ -2,13 +2,19 @@ import type { PropsValues } from '@/types/Form';
 import type { FormatType } from '@/types/FormatType';
 
 export interface DrupalSettings {
-  xb: {
+  canvas: {
     base: string;
     entityType: string;
     entity: string;
     entityTypeKeys: {
-      id: string;
-      label: string;
+      [entityType: string]: {
+        id: string;
+        label: string;
+        [key: string]: string;
+      };
+    };
+    entityTypeLabels: {
+      [entityType: string]: string | { [key: string]: string };
     };
     globalAssets: {
       css: string;
@@ -18,7 +24,7 @@ export interface DrupalSettings {
     layoutUtils: PropsValues;
     componentSelectionUtils: PropsValues;
     navUtils: PropsValues;
-    xbModulePath: string;
+    canvasModulePath: string;
     selectedComponent: string;
     devMode: boolean;
     dialogCss: string[];
@@ -27,8 +33,10 @@ export interface DrupalSettings {
     loginUrl: string;
     // ⚠️ This is highly experimental and *will* be refactored.
     personalizationExtensionAvailable: boolean;
+    // ⚠️ This is highly experimental and *will* be refactored.
+    canvasAiMaxFileSize: number;
   };
-  xbData: {
+  canvasData: {
     v0: {
       pageTitle: string;
       branding: {
@@ -47,7 +55,7 @@ export interface DrupalSettings {
       };
     };
   };
-  xbExtension: object;
+  canvasExtension: object;
   path: {
     baseUrl: string;
   };

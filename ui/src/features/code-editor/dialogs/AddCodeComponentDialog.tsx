@@ -1,18 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import parse from 'html-react-parser';
+import { useParams } from 'react-router';
 import { useNavigate } from 'react-router-dom';
-import { Flex, TextField, Text } from '@radix-ui/themes';
-import { useCreateCodeComponentMutation } from '@/services/componentAndLayout';
+import { Flex, Text, TextField } from '@radix-ui/themes';
+
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
+import Dialog, { DialogFieldLabel } from '@/components/Dialog';
+import { setCodeComponentProperty } from '@/features/code-editor/codeEditorSlice';
+import getStarterComponentTemplate from '@/features/code-editor/starterComponentTemplate';
+import { extractErrorMessageFromApiResponse } from '@/features/error-handling/error-handling';
 import {
   closeAllDialogs,
   selectDialogStates,
 } from '@/features/ui/codeComponentDialogSlice';
-import Dialog, { DialogFieldLabel } from '@/components/Dialog';
-import { setCodeComponentProperty } from '@/features/code-editor/codeEditorSlice';
-import getStarterComponentTemplate from '@/features/code-editor/starterComponentTemplate';
 import { validateMachineNameClientSide } from '@/features/validation/validation';
-import parse from 'html-react-parser';
-import { extractErrorMessageFromApiResponse } from '@/features/error-handling/error-handling';
+import { useCreateCodeComponentMutation } from '@/services/componentAndLayout';
 
 const AddCodeComponentDialog = () => {
   const [componentName, setComponentName] = useState('');
@@ -24,6 +26,7 @@ const AddCodeComponentDialog = () => {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const { isAddDialogOpen } = useAppSelector(selectDialogStates);
+  const { entityId, entityType } = useParams();
 
   const handleSave = async () => {
     if (validationError) {
@@ -63,7 +66,16 @@ const AddCodeComponentDialog = () => {
       navigate(`/code-editor/code/${data.machineName}`);
       reset();
     }
-  }, [isSuccess, data?.machineName, dispatch, navigate, componentName, reset]);
+  }, [
+    isSuccess,
+    data?.machineName,
+    dispatch,
+    navigate,
+    componentName,
+    reset,
+    entityType,
+    entityId,
+  ]);
 
   useEffect(() => {
     if (isError) {

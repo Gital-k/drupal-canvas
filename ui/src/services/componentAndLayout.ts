@@ -1,15 +1,24 @@
 import { createApi } from '@reduxjs/toolkit/query/react';
-import { baseQueryWithAutoSaves } from '@/services/baseQuery';
-import type { CodeComponentSerialized } from '@/types/CodeComponent';
-import type { ComponentsList, libraryTypes } from '@/types/Component';
-import type { RootLayoutModel } from '@/features/layout/layoutModelSlice';
+
+import { setPostPreviewCompleted } from '@/components/review/PublishReview.slice';
+import { setLayoutModel } from '@/features/layout/layoutModelSlice';
 import {
-  setPageData,
   setInitialPageData,
+  setPageData,
 } from '@/features/pageData/pageDataSlice';
 import { setHtml } from '@/features/pagePreview/previewSlice';
-import type { AutoSavesHash } from '@/types/AutoSaves';
+import { baseQueryWithAutoSaves } from '@/services/baseQuery';
+import { pendingChangesApi } from '@/services/pendingChangesApi';
 import { handleAutoSavesHashUpdate } from '@/utils/autoSaves';
+
+import type { RootLayoutModel } from '@/features/layout/layoutModelSlice';
+import type {
+  UpdateComponentQueryArg,
+  UpdateComponentResultType,
+} from '@/services/preview';
+import type { AutoSavesHash } from '@/types/AutoSaves';
+import type { CodeComponentSerialized } from '@/types/CodeComponent';
+import type { ComponentsList, libraryTypes } from '@/types/Component';
 
 type getComponentsQueryOptions = {
   libraries: libraryTypes[];
@@ -24,6 +33,59 @@ type LayoutApiResponse = RootLayoutModel & {
   autoSaves: AutoSavesHash;
 };
 
+export type TemplateViewMode = {
+  entityType: string;
+  bundle: string;
+  viewMode: string;
+  viewModeLabel: string;
+  label: string;
+  status: boolean;
+  id: string;
+  suggestedPreviewEntityId?: number;
+};
+
+export type TemplateInBundle = {
+  label: string;
+  viewModes: {
+    [key: string]: TemplateViewMode;
+  };
+  deleteUrl?: string;
+  editFieldsUrl?: string;
+};
+
+export type TemplatesInBundle = {
+  [key: string]: TemplateInBundle;
+};
+
+type TemplateList = {
+  [key: string]: {
+    label: string;
+    bundles: TemplatesInBundle;
+  };
+};
+
+export type ModeData = {
+  label: string;
+  hasTemplate: boolean;
+};
+
+export type ViewModesListItem = {
+  [key: string]: ModeData;
+};
+
+export type ViewModesList = {
+  [key: string]: ViewModesListItem;
+};
+
+export type PreviewContentEntity = {
+  id: string;
+  label: string;
+};
+
+export type PreviewContentEntitiesResponse = {
+  [key: string]: PreviewContentEntity;
+};
+
 export const componentAndLayoutApi = createApi({
   reducerPath: 'componentAndLayoutApi',
   baseQuery: baseQueryWithAutoSaves,
@@ -33,13 +95,16 @@ export const componentAndLayoutApi = createApi({
     'CodeComponentAutoSave',
     'Layout',
     'Folders',
+    'ContentTemplates',
+    'ViewModes',
+    'PreviewContentEntities',
   ],
   endpoints: (builder) => ({
     getComponents: builder.query<
       ComponentsList,
       getComponentsQueryOptions | void
     >({
-      query: () => `xb/api/v0/config/component`,
+      query: () => `canvas/api/v0/config/component`,
       providesTags: () => [{ type: 'Components', id: 'LIST' }],
       transformResponse: (response: ComponentsList) => {
         return Object.fromEntries(
@@ -49,10 +114,12 @@ export const componentAndLayoutApi = createApi({
         );
       },
     }),
-    getLayoutById: builder.query<LayoutApiResponse, string>({
-      query: (nodeId) => `xb/api/v0/layout/{entity_type}/${nodeId}`,
+    getPageLayout: builder.query<LayoutApiResponse, void>({
+      query: () => {
+        return `canvas/api/v0/layout/{entity_type}/{entity_id}`;
+      },
       providesTags: () => [{ type: 'Layout' }],
-      async onQueryStarted(id, { dispatch, queryFulfilled }) {
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
         try {
           const {
             data: { entity_form_fields, html, autoSaves },
@@ -66,11 +133,78 @@ export const componentAndLayoutApi = createApi({
         }
       },
     }),
+    getTemplateLayout: builder.query<LayoutApiResponse, void>({
+      query: () => {
+        return `canvas/api/v0/layout-content-template/{entity_type}.{template_bundle}.{template_view_mode}/{entity_id}`;
+      },
+      providesTags: () => [{ type: 'Layout' }],
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        try {
+          const {
+            data: { entity_form_fields, html, autoSaves },
+            meta,
+          } = await queryFulfilled;
+          dispatch(setInitialPageData(entity_form_fields));
+          dispatch(setHtml(html));
+          handleAutoSavesHashUpdate(dispatch, autoSaves, meta);
+        } catch (err) {
+          dispatch(setPageData({}));
+        }
+      },
+    }),
+    postTemplateLayout: builder.mutation<
+      { html: string; autoSaves: AutoSavesHash },
+      { layout: any; model: any; entity_form_fields: any }
+    >({
+      query: (body) => ({
+        url: 'canvas/api/v0/layout-content-template/{entity_type}.{template_bundle}.{template_view_mode}/{entity_id}',
+        method: 'POST',
+        body,
+      }),
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        const { data, meta } = await queryFulfilled;
+        const { html, autoSaves } = data;
+        dispatch(
+          pendingChangesApi.util.invalidateTags([
+            { type: 'PendingChanges', id: 'LIST' },
+          ]),
+        );
+        // Update our template preview slice.
+        dispatch(setHtml(html));
+        handleAutoSavesHashUpdate(dispatch, autoSaves, meta);
+        dispatch(setPostPreviewCompleted(true));
+      },
+    }),
+    updateComponentInTemplate: builder.mutation<
+      UpdateComponentResultType,
+      UpdateComponentQueryArg
+    >({
+      query: (body) => ({
+        url: 'canvas/api/v0/layout-content-template/{entity_type}.{template_bundle}.{template_view_mode}/{entity_id}',
+        method: 'PATCH',
+        body,
+      }),
+      async onQueryStarted(body, { dispatch, queryFulfilled }) {
+        const { data, meta } = await queryFulfilled;
+        const { html, layout, model, autoSaves } = data;
+        dispatch(
+          pendingChangesApi.util.invalidateTags([
+            { type: 'PendingChanges', id: 'LIST' },
+          ]),
+        );
+        dispatch(setHtml(html));
+        handleAutoSavesHashUpdate(dispatch, autoSaves, meta);
+        // Pass update preview false to prevent a subsequent preview update,
+        // we have the data here.
+        dispatch(setLayoutModel({ layout, model, updatePreview: false }));
+      },
+    }),
+
     getCodeComponents: builder.query<
       Record<string, CodeComponentSerialized>,
       { status?: boolean } | void
     >({
-      query: () => 'xb/api/v0/config/js_component',
+      query: () => 'canvas/api/v0/config/js_component',
       providesTags: () => [{ type: 'CodeComponents', id: 'LIST' }],
       transformResponse: (
         response: Record<string, CodeComponentSerialized>,
@@ -99,7 +233,7 @@ export const componentAndLayoutApi = createApi({
       },
     }),
     getCodeComponent: builder.query<CodeComponentSerialized, string>({
-      query: (id) => `xb/api/v0/config/js_component/${id}`,
+      query: (id) => `canvas/api/v0/config/js_component/${id}`,
       providesTags: (result, error, id) => [{ type: 'CodeComponents', id }],
     }),
     createCodeComponent: builder.mutation<
@@ -107,7 +241,7 @@ export const componentAndLayoutApi = createApi({
       Partial<CodeComponentSerialized>
     >({
       query: (body) => ({
-        url: 'xb/api/v0/config/js_component',
+        url: 'canvas/api/v0/config/js_component',
         method: 'POST',
         body,
       }),
@@ -118,7 +252,7 @@ export const componentAndLayoutApi = createApi({
       { id: string; changes: Partial<CodeComponentSerialized> }
     >({
       query: ({ id, changes }) => ({
-        url: `xb/api/v0/config/js_component/${id}`,
+        url: `canvas/api/v0/config/js_component/${id}`,
         method: 'PATCH',
         body: changes,
       }),
@@ -132,7 +266,7 @@ export const componentAndLayoutApi = createApi({
     }),
     deleteCodeComponent: builder.mutation<void, string>({
       query: (id) => ({
-        url: `xb/api/v0/config/js_component/${id}`,
+        url: `canvas/api/v0/config/js_component/${id}`,
         method: 'DELETE',
       }),
       // Manually delete the cache entry for the deleted component.
@@ -165,7 +299,7 @@ export const componentAndLayoutApi = createApi({
     }),
     createFolder: builder.mutation<any, any>({
       query: (body) => ({
-        url: 'xb/api/v0/config/folder',
+        url: 'canvas/api/v0/config/folder',
         method: 'POST',
         body: {
           items: body.items || [],
@@ -177,7 +311,7 @@ export const componentAndLayoutApi = createApi({
       invalidatesTags: [{ type: 'Folders', id: 'LIST' }],
     }),
     getFolders: builder.query<any, any>({
-      query: () => 'xb/api/v0/config/folder',
+      query: () => 'canvas/api/v0/config/folder',
       providesTags: () => [{ type: 'Folders', id: 'LIST' }],
       transformResponse: (response: any) => {
         // Create a mapping of component IDs to folder IDs for quick access.
@@ -205,7 +339,7 @@ export const componentAndLayoutApi = createApi({
       { data: CodeComponentSerialized; autoSaves: AutoSavesHash },
       string
     >({
-      query: (id) => `xb/api/v0/config/auto-save/js_component/${id}`,
+      query: (id) => `canvas/api/v0/config/auto-save/js_component/${id}`,
       providesTags: (result, error, id) => [
         { type: 'CodeComponentAutoSave', id },
       ],
@@ -229,7 +363,7 @@ export const componentAndLayoutApi = createApi({
       }
     >({
       query: ({ id, data }) => ({
-        url: `xb/api/v0/config/auto-save/js_component/${id}`,
+        url: `canvas/api/v0/config/auto-save/js_component/${id}`,
         method: 'PATCH',
         body: { data },
       }),
@@ -238,12 +372,54 @@ export const componentAndLayoutApi = createApi({
         { type: 'Components', id: 'LIST' }, // The component list contains markup for the preview thumbnails.
       ],
     }),
+    createContentTemplate: builder.mutation<any, any>({
+      query: (body) => ({
+        url: 'canvas/api/v0/config/content_template',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: [
+        { type: 'ContentTemplates', id: 'LIST' },
+        { type: 'ViewModes', id: 'LIST' },
+      ],
+    }),
+    deleteContentTemplate: builder.mutation<void, string>({
+      query: (id: string) => ({
+        url: `canvas/api/v0/config/content_template/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: [
+        { type: 'ContentTemplates', id: 'LIST' },
+        { type: 'ViewModes', id: 'LIST' },
+      ],
+    }),
+    getContentTemplates: builder.query<TemplateList, void>({
+      query: () => `canvas/api/v0/config/content_template`,
+      providesTags: () => [{ type: 'ContentTemplates', id: 'LIST' }],
+    }),
+    getViewModes: builder.query<ViewModesList, void>({
+      query: () => `canvas/api/v0/ui/content_template/view_modes/node`,
+      providesTags: () => [{ type: 'ViewModes', id: 'LIST' }],
+    }),
+    getPreviewContentEntities: builder.query<
+      PreviewContentEntitiesResponse,
+      { entityTypeId: string; bundle: string }
+    >({
+      query: ({ entityTypeId, bundle }) =>
+        `canvas/api/v0/ui/content_template/suggestions/preview/${entityTypeId}/${bundle}`,
+      providesTags: (result, error, { entityTypeId, bundle }) => [
+        { type: 'PreviewContentEntities', id: `${entityTypeId}-${bundle}` },
+      ],
+    }),
   }),
 });
 
 export const {
   useGetComponentsQuery,
-  useGetLayoutByIdQuery,
+  useGetPageLayoutQuery,
+  useGetTemplateLayoutQuery,
+  usePostTemplateLayoutMutation,
+  useUpdateComponentInTemplateMutation,
   useGetCodeComponentsQuery,
   useGetCodeComponentQuery,
   useCreateCodeComponentMutation,
@@ -253,4 +429,9 @@ export const {
   useGetFoldersQuery,
   useGetAutoSaveQuery,
   useUpdateAutoSaveMutation,
+  useCreateContentTemplateMutation,
+  useDeleteContentTemplateMutation,
+  useGetContentTemplatesQuery,
+  useGetViewModesQuery,
+  useGetPreviewContentEntitiesQuery,
 } = componentAndLayoutApi;

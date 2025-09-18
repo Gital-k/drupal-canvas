@@ -1,28 +1,31 @@
+import { useEffect, useMemo, useState } from 'react';
+import clsx from 'clsx';
+import { CheckIcon, Cross2Icon } from '@radix-ui/react-icons';
 import {
   Box,
   Button,
-  Flex,
-  Text,
-  Heading,
-  ScrollArea,
   Checkbox,
+  Flex,
+  Heading,
+  Popover,
+  ScrollArea,
   Spinner,
+  Text,
 } from '@radix-ui/themes';
-import { CheckIcon, Cross2Icon } from '@radix-ui/react-icons';
-import { useMemo, useState, useEffect } from 'react';
-import { Popover } from '@radix-ui/themes';
 
-import styles from './PublishReview.module.css';
+import PermissionCheck from '@/components/PermissionCheck';
+import ReviewErrors from '@/components/review/ReviewErrors';
+import { Divider } from '@/features/code-editor/component-data/FormElement';
+
+import ChangeList from './changes/ChangeList';
+
 import type { ErrorResponse } from '@/services/pendingChangesApi';
 import type {
   UnpublishedChange,
   UnpublishedChangeGroups,
 } from '@/types/Review';
-import ReviewErrors from '@/components/review/ReviewErrors';
-import PermissionCheck from '@/components/PermissionCheck';
-import { Divider } from '@/features/code-editor/component-data/FormElement';
-import ChangeList from './changes/ChangeList';
-import clsx from 'clsx';
+
+import styles from './PublishReview.module.css';
 
 export const DEFAULT_TITLE = 'Unpublished changes';
 
@@ -150,7 +153,7 @@ const PublishReview: React.FC<PublishReviewProps> = ({
         <Button
           variant="solid"
           disabled={!changes?.length || isBusy}
-          data-testid="xb-publish-review"
+          data-testid="canvas-publish-review"
           className={clsx(styles.triggerButton, {
             [styles.disableClick]: isBusy,
             [styles.noChanges]: !changes?.length,
@@ -161,7 +164,7 @@ const PublishReview: React.FC<PublishReviewProps> = ({
       </Popover.Trigger>
       <Popover.Content
         asChild
-        data-testid="xb-publish-reviews-content"
+        data-testid="canvas-publish-reviews-content"
         width="100vw"
         maxWidth="360px"
       >
@@ -192,7 +195,7 @@ const PublishReview: React.FC<PublishReviewProps> = ({
                   onCheckedChange={handleSelectAll}
                   size="1"
                   aria-label="Select all changes"
-                  data-testid="xb-publish-review-select-all"
+                  data-testid="canvas-publish-review-select-all"
                 />
                 Select All
               </Flex>

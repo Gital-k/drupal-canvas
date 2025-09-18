@@ -1,9 +1,11 @@
-import type { Command } from 'commander';
-import * as p from '@clack/prompts';
 import fs from 'fs/promises';
 import path from 'path';
 import chalk from 'chalk';
+import * as p from '@clack/prompts';
+
 import { getConfig, setConfig } from '../config.js';
+
+import type { Command } from 'commander';
 
 interface ScaffoldOptions {
   name?: string;
@@ -18,7 +20,7 @@ interface ScaffoldOptions {
 export function scaffoldCommand(program: Command): void {
   program
     .command('scaffold')
-    .description('create a new code component scaffold for Experience Builder')
+    .description('create a new code component scaffold for Drupal Canvas')
     .option(
       '-n, --name <n>',
       'Component name (used for directory and metadata)',
@@ -29,7 +31,7 @@ export function scaffoldCommand(program: Command): void {
     )
     .option('--verbose', 'Enable verbose output')
     .action(async (options: ScaffoldOptions) => {
-      p.intro('Experience Builder Component Scaffold');
+      p.intro('Drupal Canvas Component Scaffold');
 
       try {
         // Update config with CLI options

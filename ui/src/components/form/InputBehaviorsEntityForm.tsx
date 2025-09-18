@@ -1,16 +1,17 @@
-import type * as React from 'react';
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
+import { InputBehaviorsCommon } from '@/components/form/inputBehaviors';
+import { FORM_TYPES } from '@/features/form/constants';
+import { selectFormValues } from '@/features/form/formStateSlice';
+import { setUpdatePreview } from '@/features/layout/layoutModelSlice';
 import {
+  externalUpdateComplete,
   selectPageData,
   setPageData,
-  externalUpdateComplete,
 } from '@/features/pageData/pageDataSlice';
 import { selectLatestUndoRedoActionId } from '@/features/ui/uiSlice';
-import { selectFormValues } from '@/features/form/formStateSlice';
-import { FORM_TYPES } from '@/features/form/constants';
+
+import type * as React from 'react';
 import type { PropsValues } from '@/types/Form';
-import { setUpdatePreview } from '@/features/layout/layoutModelSlice';
-import { InputBehaviorsCommon } from '@/components/form/inputBehaviors';
 
 // Provides a higher order component to wrap a form element that is part of the
 // entity fields form.
@@ -26,7 +27,7 @@ export const InputBehaviorsEntityForm = (
   );
 
   const { attributes } = props;
-  const fieldName = attributes.name || attributes['data-xb-name'];
+  const fieldName = attributes.name || attributes['data-canvas-name'];
   if (!['changed', 'externalUpdates'].includes(fieldName)) {
     let newValue = pageData[fieldName] || null;
 
@@ -39,7 +40,7 @@ export const InputBehaviorsEntityForm = (
       newValue = formState.form_build_id;
     }
 
-    const elementType = attributes.type || attributes['data-xb-type'];
+    const elementType = attributes.type || attributes['data-canvas-type'];
     if (!['radio', 'hidden', 'submit'].includes(elementType as string)) {
       attributes.value = newValue;
     }

@@ -1,20 +1,14 @@
-import { useDisplayContext } from '@/components/sidePanel/DisplayContext';
-import { useState } from 'react';
+import SidebarFolder from '@/components/sidePanel/SidebarFolder';
+
 import type { ReactNode } from 'react';
-import * as Collapsible from '@radix-ui/react-collapsible';
-import clsx from 'clsx';
-import listStyles from '@/components/list/List.module.css';
-import { Flex, Text } from '@radix-ui/themes';
-import { ChevronRightIcon } from '@radix-ui/react-icons';
-import FolderIcon from '@assets/icons/folder.svg?react';
+import type { FolderCodeComponent } from '@/features/code-editor/CodeComponentList';
+import type { CodeComponentSerialized } from '@/types/CodeComponent';
 import type {
   ComponentsList,
   FolderInList,
   FoldersInList,
 } from '@/types/Component';
 import type { PatternsList } from '@/types/Pattern';
-import type { FolderCodeComponent } from '@/features/code-editor/CodeComponentList';
-import type { CodeComponentSerialized } from '@/types/CodeComponent';
 
 interface FolderData {
   componentIndexedFolders: Record<string, string>;
@@ -32,9 +26,6 @@ const FolderList = ({
   folder: FolderInList | FolderCodeComponent;
   children: ReactNode;
 }) => {
-  const displayContext = useDisplayContext();
-  const [isOpen, setIsOpen] = useState(true);
-
   // Determine the length of items in the folder, be it object or array.
   const getItemsLength = () => {
     if (Array.isArray(folder.items)) {
@@ -44,49 +35,9 @@ const FolderList = ({
   };
 
   return (
-    <Collapsible.Root open={isOpen} onOpenChange={setIsOpen}>
-      <Collapsible.Trigger
-        className={clsx(listStyles.folderTrigger)}
-        data-xb-folder-name={folder.name}
-      >
-        <Flex flexGrow="1" align="center" overflow="hidden" pb="2" pt="2">
-          <Flex pl="2" align="center" flexShrink="0">
-            <FolderIcon className={listStyles.folderIcon} />
-          </Flex>
-          <Flex px="2" align="center" flexGrow="1" overflow="hidden">
-            <Text size="1" weight="medium">
-              {folder.name}
-            </Text>
-          </Flex>
-          {/* Display item count only in manage-library context. */}
-          {displayContext === 'manage-library' && (
-            <Flex
-              align="end"
-              flexShrink="0"
-              px="1"
-              justify="center"
-              className={listStyles.folderCount}
-            >
-              <Text size="1" weight="medium">
-                {String(getItemsLength())}
-              </Text>
-            </Flex>
-          )}
-          <Flex pl="2" align="end" flexShrink="0">
-            <ChevronRightIcon
-              className={clsx(listStyles.chevron, {
-                [listStyles.isOpen]: isOpen,
-              })}
-            />
-          </Flex>
-        </Flex>
-      </Collapsible.Trigger>
-      <Collapsible.Content>
-        <Flex pl="5" direction="column">
-          {children}
-        </Flex>
-      </Collapsible.Content>
-    </Collapsible.Root>
+    <SidebarFolder name={folder.name} count={getItemsLength()}>
+      {children}
+    </SidebarFolder>
   );
 };
 

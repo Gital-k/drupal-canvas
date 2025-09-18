@@ -1,12 +1,14 @@
+import { useEffect } from 'react';
 import { Box, Flex, ScrollArea, Spinner, Tabs } from '@radix-ui/themes';
-import { addDataFetch } from '@/features/code-editor/codeEditorSlice';
+
 import { useAppDispatch } from '@/app/hooks';
+import ErrorBoundary from '@/components/error/ErrorBoundary';
+import { addDataFetch } from '@/features/code-editor/codeEditorSlice';
+import DataFetch from '@/features/code-editor/component-data/DataFetch';
 import Props from '@/features/code-editor/component-data/Props';
 import Slots from '@/features/code-editor/component-data/Slots';
-import ErrorBoundary from '@/components/error/ErrorBoundary';
+
 import styles from './ComponentData.module.css';
-import DataFetch from '@/features/code-editor/component-data/DataFetch';
-import { useEffect } from 'react';
 
 export default function ComponentData({
   isLoading = false,
@@ -23,7 +25,7 @@ export default function ComponentData({
         return;
       }
       switch (event.data?.type) {
-        case '_xb_useswr_data_fetch':
+        case '_canvas_useswr_data_fetch':
           dispatch(
             addDataFetch({
               id: event.data.id,
@@ -32,7 +34,7 @@ export default function ComponentData({
             }),
           );
           break;
-        case '_xb_useswr_error':
+        case '_canvas_useswr_error':
           dispatch(
             addDataFetch({
               id: event.data.id,

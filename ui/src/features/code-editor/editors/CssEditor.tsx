@@ -1,6 +1,7 @@
-import CodeMirror from '@uiw/react-codemirror';
-import { githubLight } from '@uiw/codemirror-theme-github';
 import { css } from '@codemirror/lang-css';
+import { githubLight } from '@uiw/codemirror-theme-github';
+import CodeMirror from '@uiw/react-codemirror';
+
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import {
   selectCodeComponentProperty,
@@ -19,7 +20,7 @@ const CssEditor = ({ isLoading }: { isLoading: boolean }) => {
   }
   return (
     <CodeMirror
-      className="xb-code-mirror-editor"
+      className="canvas-code-mirror-editor"
       value={value}
       onChange={onChangeHandler}
       theme={githubLight}

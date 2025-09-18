@@ -1,6 +1,7 @@
-import CodeMirror from '@uiw/react-codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 import { githubLight } from '@uiw/codemirror-theme-github';
+import CodeMirror from '@uiw/react-codemirror';
+
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import {
   selectCodeComponentProperty,
@@ -22,7 +23,7 @@ const JavaScriptEditor = ({ isLoading }: { isLoading: boolean }) => {
     <>
       <ImportButton />
       <CodeMirror
-        className="xb-code-mirror-editor"
+        className="canvas-code-mirror-editor"
         value={value}
         onChange={onChangeHandler}
         theme={githubLight}

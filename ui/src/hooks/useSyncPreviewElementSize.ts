@@ -1,4 +1,5 @@
-import { useState, useCallback, useRef, useMemo, useLayoutEffect } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
+
 import { calculateBoundingRect, elemIsVisible } from '@/utils/function-utils';
 
 /**
@@ -138,7 +139,7 @@ function useSyncPreviewElementSize(input: HTMLElement[] | HTMLElement | null) {
 
     elementsRef.current?.forEach((element) => {
       /**
-       * <xb-island> elements (XB Code Components) are display: contents; and that means you can't observe them with
+       * <canvas-island> elements (Canvas Code Components) are display: contents; and that means you can't observe them with
        * resizeObserver. Here, if the element we're syncing with can't be observed we traverse up the DOM to find the
        * first parent that can be and watch that instead
        */

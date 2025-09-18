@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Drupal\experience_builder\ComponentSource;
+namespace Drupal\canvas\ComponentSource;
 
 use Drupal\Component\Plugin\ConfigurableInterface;
 use Drupal\Component\Plugin\DependentPluginInterface;
@@ -13,15 +13,15 @@ use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Plugin\ContextAwarePluginInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
-use Drupal\experience_builder\Entity\Component;
-use Drupal\experience_builder\Plugin\Field\FieldType\ComponentTreeItem;
+use Drupal\canvas\Entity\Component;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Symfony\Component\Validator\ConstraintViolationListInterface;
 
 /**
  * Defines an interface for component source plugins.
  *
  * A Component is a config entity created by a site builder that allows
- * placement of that component in Experience Builder.
+ * placement of that component in Drupal Canvas.
  *
  * Each Component config entity is handled by a component source. For example
  * there might be:
@@ -31,15 +31,17 @@ use Symfony\Component\Validator\ConstraintViolationListInterface;
  *   settings for the block plugin
  *
  * Not all component sources support slots. A source that supports slots should
- * implement \Drupal\experience_builder\ComponentSource\ComponentSourceWithSlotsInterface.
+ * implement \Drupal\canvas\ComponentSource\ComponentSourceWithSlotsInterface.
  *
- * @phpstan-import-type PropSourceArray from \Drupal\experience_builder\PropSource\PropSourceBase
- * @phpstan-import-type SingleComponentInputArray from \Drupal\experience_builder\Plugin\DataType\ComponentInputs
+ * @phpstan-import-type PropSourceArray from \Drupal\canvas\PropSource\PropSourceBase
+ * @phpstan-import-type SingleComponentInputArray from \Drupal\canvas\Plugin\DataType\ComponentInputs
+ * @phpstan-import-type OptimizedExplicitInput from \Drupal\canvas\Plugin\DataType\ComponentInputs
+ * @phpstan-import-type OptimizedSingleComponentInputArray from \Drupal\canvas\Plugin\DataType\ComponentInputs
  *
- * @see \Drupal\experience_builder\Attribute\ComponentSource
- * @see \Drupal\experience_builder\ComponentSource\ComponentSourceBase
- * @see \Drupal\experience_builder\ComponentSource\ComponentSourceManager
- * @see \Drupal\experience_builder\ComponentSource\ComponentSourceWithSlotsInterface
+ * @see \Drupal\canvas\Attribute\ComponentSource
+ * @see \Drupal\canvas\ComponentSource\ComponentSourceBase
+ * @see \Drupal\canvas\ComponentSource\ComponentSourceManager
+ * @see \Drupal\canvas\ComponentSource\ComponentSourceWithSlotsInterface
  */
 interface ComponentSourceInterface extends PluginInspectionInterface, DerivativeInspectionInterface, ConfigurableInterface, DependentPluginInterface, ContextAwarePluginInterface {
 
@@ -56,6 +58,23 @@ interface ComponentSourceInterface extends PluginInspectionInterface, Derivative
    *   referencing here.
    */
   public function getReferencedPluginClass(): ?string;
+
+  /**
+   * Gets the ID that this source knows to interpret.
+   *
+   * ⚠️ This is NOT to be confused with the Component config entity's ID!
+   *
+   * For example:
+   * - `sdc.olivero.teaser` is the ID of a Component config entity
+   * - that Component config entity uses the `sdc` ComponentSource plugin
+   * - that Component config entity has its `source_local_id` property set to
+   *   `olivero:teaser`
+   * - `olivero:teaser` is the source-specific ID: only that ComponentSource
+   *   plugin knows how to load it.
+   *
+   * @return string
+   */
+  public function getSourceSpecificComponentId(): string;
 
   /**
    * Gets a description of the component.
@@ -100,9 +119,15 @@ interface ComponentSourceInterface extends PluginInspectionInterface, Derivative
   /**
    * Retrieves the component instance's explicit (possibly empty) input.
    *
-   * @todo Add ::getImplicitInput() in https://www.drupal.org/project/experience_builder/issues/3485502 — SDCs don't have implicit inputs, but Block plugins do: contexts
+   * @param \Drupal\Core\Entity\FieldableEntityInterface|null $host_entity
+   *   Host entity. Required when a component instance has inputs populated by
+   *   DynamicPropSources AND the parent entity of $item is not the host entity
+   *   to use during evaluation of the DynamicPropSources. (Typically: when
+   *   this is a component instance in a ContentTemplate.)
+   *
+   * @todo Add ::getImplicitInput() in https://www.drupal.org/project/canvas/issues/3485502 — SDCs don't have implicit inputs, but Block plugins do: contexts
    */
-  public function getExplicitInput(string $uuid, ComponentTreeItem $item): array;
+  public function getExplicitInput(string $uuid, ComponentTreeItem $item, ?FieldableEntityInterface $host_entity = NULL): array;
 
   /**
    * Hydrates a component with its explicit input plus slots (if any).
@@ -113,7 +138,7 @@ interface ComponentSourceInterface extends PluginInspectionInterface, Derivative
    *
    * @return array{'slots'?: array<string, string>}
    *
-   * @see \Drupal\experience_builder\ComponentSource\ComponentSourceWithSlotsInterface::setSlots()
+   * @see \Drupal\canvas\ComponentSource\ComponentSourceWithSlotsInterface::setSlots()
    */
   public function hydrateComponent(array $explicit_input): array;
 
@@ -131,7 +156,7 @@ interface ComponentSourceInterface extends PluginInspectionInterface, Derivative
    * @see ComponentModel
    * @see openapi.yml
    * @see ::clientModelToInput()
-   * @see \Drupal\experience_builder\Entity\XbHttpApiEligibleConfigEntityInterface::normalizeForClientSide
+   * @see \Drupal\canvas\Entity\CanvasHttpApiEligibleConfigEntityInterface::normalizeForClientSide
    */
   public function inputToClientModel(array $explicit_input): array;
 
@@ -144,15 +169,15 @@ interface ComponentSourceInterface extends PluginInspectionInterface, Derivative
   public function getPluginDefinition(): array;
 
   /**
-   * Returns information the client side needs for the XB UI.
+   * Returns information the client side needs for the Canvas UI.
    *
-   * @param \Drupal\experience_builder\Entity\Component $component
+   * @param \Drupal\canvas\Entity\Component $component
    *   A component config entity that uses this source.
    *
    * @return array{'source'?: string, 'build': array<string, mixed>, propSources?: array<string, array>}
    *   Client side metadata including a build array for the default markup.
    *
-   * @see \Drupal\experience_builder\Controller\ApiComponentsController
+   * @see \Drupal\canvas\Controller\ApiComponentsController
    */
   public function getClientSideInfo(Component $component): array;
 
@@ -163,7 +188,7 @@ interface ComponentSourceInterface extends PluginInspectionInterface, Derivative
    *   An associative array containing the initial structure of the plugin form.
    * @param \Drupal\Core\Form\FormStateInterface $form_state
    *   The current state of the form.
-   * @param \Drupal\experience_builder\Entity\Component|null $component
+   * @param \Drupal\canvas\Entity\Component|null $component
    *   The component configuration entity.
    * @param string $component_instance_uuid
    *   The component instance UUID.
@@ -203,22 +228,26 @@ interface ComponentSourceInterface extends PluginInspectionInterface, Derivative
    *
    * @param string $component_instance_uuid
    *   Component instance UUID.
-   * @param \Drupal\experience_builder\Entity\Component $component
+   * @param \Drupal\canvas\Entity\Component $component
    *   Component for this instance.
    * @param array{source: SingleComponentInputArray, resolved: array<string, mixed>} $client_model
    *   Client model for this component.
+   * @param \Drupal\Core\Entity\FieldableEntityInterface|null $host_entity
+   *   Host entity. Required when a component instance has inputs populated by
+   *   DynamicPropSources.
    * @param \Symfony\Component\Validator\ConstraintViolationListInterface|null $violations
    *   If validation should be performed, a violation constraint list, or NULL
    *   otherwise. Use ::addViolation to add violations detected during conversion.
    *
    * @phpcs:ignore
-   * @return SingleComponentInputArray
+   * @return OptimizedSingleComponentInputArray
    *
    * @see ::inputToClientModel()
-   * @see \Drupal\experience_builder\AutoSave\AutoSaveManager::saveComponentInstanceFormViolations
+   * @see \Drupal\canvas\AutoSave\AutoSaveManager::saveComponentInstanceFormViolations
+   * @see \Drupal\canvas\PropSource\DynamicPropSource
    * @todo Refactor to use the Symfony denormalizer infrastructure?
    */
-  public function clientModelToInput(string $component_instance_uuid, Component $component, array $client_model, ?ConstraintViolationListInterface $violations = NULL): array;
+  public function clientModelToInput(string $component_instance_uuid, Component $component, array $client_model, ?FieldableEntityInterface $host_entity, ?ConstraintViolationListInterface $violations = NULL): array;
 
   /**
    * Validates component input.
@@ -238,7 +267,7 @@ interface ComponentSourceInterface extends PluginInspectionInterface, Derivative
   /**
    * Checks if component meets requirements.
    *
-   * @throws \Drupal\experience_builder\ComponentDoesNotMeetRequirementsException
+   * @throws \Drupal\canvas\ComponentDoesNotMeetRequirementsException
    *   When the component does not meet requirements.
    */
   public function checkRequirements(): void;
@@ -249,10 +278,10 @@ interface ComponentSourceInterface extends PluginInspectionInterface, Derivative
    * For example a component source plugin may with to store a normalized
    * representation of its data.
    *
-   * @param array $values
+   * @param SingleComponentInputArray|OptimizedSingleComponentInputArray $values
    *   Input values to optimize.
    *
-   * @return array
+   * @return OptimizedSingleComponentInputArray
    *   Optimized values.
    */
   public function optimizeExplicitInput(array $values): array;

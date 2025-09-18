@@ -1,14 +1,16 @@
 // cspell:ignore uuidv
-import type { RootState, AppThunk } from '@/app/store';
-import type { ComponentsList, XBComponent } from '@/types/Component';
-import { componentHasFieldData } from '@/types/Component';
-import type { UUID } from '@/types/UUID';
-import type { PayloadAction } from '@reduxjs/toolkit';
-import { createSelector } from '@reduxjs/toolkit';
-import { createSlice } from '@reduxjs/toolkit';
-import type { StateWithHistory } from 'redux-undo';
 import { v4 as uuidv4 } from 'uuid';
-import { setXbDrupalSetting } from '@/utils/drupal-globals';
+import { createSelector, createSlice } from '@reduxjs/toolkit';
+
+import { syncPropSourcesToResolvedValues } from '@/components/form/InputBehaviorsComponentPropsForm';
+import { selectEditorFrameContext } from '@/features/ui/uiSlice';
+import { previewApi } from '@/services/preview';
+import { componentHasFieldData } from '@/types/Component';
+import {
+  getCanvasSettings,
+  setCanvasDrupalSetting,
+} from '@/utils/drupal-globals';
+
 import {
   findComponentByUuid,
   findNodePathByUuid,
@@ -18,10 +20,14 @@ import {
   removeComponentByUuid,
   replaceUUIDsAndUpdateModel,
 } from './layoutUtils';
-import { previewApi } from '@/services/preview';
-import { syncPropSourcesToResolvedValues } from '@/components/form/InputBehaviorsComponentPropsForm';
-import { getXbSettings } from '@/utils/drupal-globals';
-const xbSettings = getXbSettings();
+
+import type { PayloadAction } from '@reduxjs/toolkit';
+import type { StateWithHistory } from 'redux-undo';
+import type { AppThunk, RootState } from '@/app/store';
+import type { CanvasComponent, ComponentsList } from '@/types/Component';
+import type { UUID } from '@/types/UUID';
+
+const canvasSettings = getCanvasSettings();
 
 export enum NodeType {
   Region = 'region',
@@ -116,7 +122,7 @@ type InsertMultipleNodesPayload = {
 
 type AddNewNodePayload = {
   to: number[];
-  component: XBComponent;
+  component: CanvasComponent;
   withValues?: Record<string, any>;
 };
 
@@ -132,17 +138,17 @@ type SortNodePayload = {
 
 type AnyValue = string | boolean | [] | number | {} | null;
 
-// @see \Drupal\experience_builder\PropSource\PropSource::parse()
+// @see \Drupal\canvas\PropSource\PropSource::parse()
 interface BasePropSource {
   sourceType: string;
   value?: any;
 }
-// @see \Drupal\experience_builder\PropSource\DynamicPropSource
+// @see \Drupal\canvas\PropSource\DynamicPropSource
 export interface DynamicPropSource extends BasePropSource {
   expression: string;
 }
 
-// @see \Drupal\experience_builder\PropSource\StaticPropSource
+// @see \Drupal\canvas\PropSource\StaticPropSource
 export interface StaticPropSource extends BasePropSource {
   expression: string;
   // This can be omitted if it duplicates the resolved value. There are some
@@ -153,7 +159,7 @@ export interface StaticPropSource extends BasePropSource {
   sourceTypeSettings: Record<string, AnyValue>;
 }
 
-// @see \Drupal\experience_builder\PropSource\AdaptedPropSource
+// @see \Drupal\canvas\PropSource\AdaptedPropSource
 export interface AdaptedPropSource extends BasePropSource {
   adapterInputs: Record<string, PropSource>;
 }
@@ -173,14 +179,14 @@ export interface ComponentModel {
   // TRICKY: any ComponentSource that wants to support client-side preview updates MUST ensure that `resolved` contains
   // values that are considered valid by the component's logic; otherwise rendering will fail. IOW: they must meet the
   // specified types/schema.
-  // @see \Drupal\experience_builder\ComponentSource\ComponentSourceBase::getExplicitInputDefinitions()
+  // @see \Drupal\canvas\ComponentSource\ComponentSourceBase::getExplicitInputDefinitions()
   // TRICKY: conversely, this means that any ComponentSource that does not support client-side rendering is free to use
   // whichever structure it likes, as long as its ::inputToClientModel() and ::clientModelToInput() methods are each
   // others' inverses. This is why for example the `block` ComponentSource opted to transform the stored (server-side)
   // explicit inputs to the form structure for its client-side `resolved` values.
-  // @see \Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\BlockComponent
+  // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent
   // @see docs/components.md#3.2.1
-  // @todo Make this less confusing in https://www.drupal.org/project/experience_builder/issues/3521041
+  // @todo Make this less confusing in https://www.drupal.org/project/canvas/issues/3521041
   resolved: ResolvedValues;
 }
 
@@ -194,11 +200,11 @@ export interface EvaluatedComponentModel extends ComponentModel {
   // (PropSources are used by ComponentSources without an explicit input UX, but only a schema — such as SDCs. The
   // schema is mapped to PropSources that are able to meet the schema expectations, and to resolve the values stored in
   // those PropSources, evaluation is needed.)
-  // @see \Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase
+  // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase
   // @see docs/components.md#3.1.1
-  // @see \Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\SingleDirectoryComponent
+  // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent
   // @see docs/components.md#3.3.1
-  // @see \Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\JsComponent
+  // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent
   source: Sources;
 }
 
@@ -422,6 +428,9 @@ export const layoutModelSlice = createSlice({
         }
       },
     ),
+    setInitialized: create.reducer((state, action: PayloadAction<boolean>) => {
+      state.isInitialized = action.payload;
+    }),
     setLayoutModel: create.reducer(
       (state, action: PayloadAction<LayoutModelSliceState>) => {
         const { layout, model, updatePreview } = action.payload;
@@ -467,7 +476,7 @@ export const _addNewComponentToLayout =
   (dispatch, getState) => {
     const { to, component, withValues } = payload;
     // Populate the model data with the default values
-    const buildInitialData = (component: XBComponent): ComponentModel => {
+    const buildInitialData = (component: CanvasComponent): ComponentModel => {
       if (componentHasFieldData(component)) {
         const initialData: EvaluatedComponentModel = {
           resolved: {},
@@ -498,7 +507,7 @@ export const _addNewComponentToLayout =
     // specifies values that should override the defaults for the newly inserted
     // component.
     const updateValues = (
-      component: XBComponent,
+      component: CanvasComponent,
       initialData: ComponentModel | EvaluatedComponentModel,
       newValues: Record<string, any>,
     ) => {
@@ -612,7 +621,7 @@ export const addNewComponentToLayout =
 export const updateExistingComponentValues =
   (payload: any): AppThunk =>
   async (dispatch, getState) => {
-    const { componentSelectionUtils } = xbSettings;
+    const { componentSelectionUtils } = canvasSettings;
     const state = getState();
     const components: ComponentsList | undefined = state?.componentAndLayoutApi
       ?.queries?.['getComponents(undefined)']?.data as
@@ -658,8 +667,12 @@ export const updateExistingComponentValues =
       ...model.resolved,
       ...values,
     };
+    // Help, how do I get the editor frame context here
+
+    const type = selectEditorFrameContext(state);
     if (isEvaluatedComponentModel(model) && componentMetadata) {
       const valuePayload = {
+        type,
         componentInstanceUuid: componentToUpdateId,
         componentType: `${selectedComponentType}@${version}`,
         model: {
@@ -678,6 +691,7 @@ export const updateExistingComponentValues =
       );
     } else {
       const valuePayload = {
+        type,
         componentInstanceUuid: componentToUpdateId,
         componentType: `${selectedComponentType}@${version}`,
         model: {
@@ -725,6 +739,7 @@ export const addNewPatternToLayout =
 export const {
   deleteNode,
   setLayoutModel,
+  setInitialized,
   setInitialLayoutModel,
   duplicateNode,
   moveNode,
@@ -771,4 +786,4 @@ const layoutUtils = {
   selectLayoutForRegion,
   updateExistingComponentValues,
 };
-setXbDrupalSetting('layoutUtils', layoutUtils);
+setCanvasDrupalSetting('layoutUtils', layoutUtils);

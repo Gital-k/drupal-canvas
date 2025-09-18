@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Drupal\experience_builder\Hook;
+namespace Drupal\canvas\Hook;
 
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Asset\AttachedAssetsInterface;
@@ -13,17 +13,19 @@ use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
 use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\Core\Theme\ThemeManagerInterface;
-use Drupal\experience_builder\CodeComponentDataProvider;
-use Drupal\experience_builder\Entity\AssetLibrary;
-use Drupal\experience_builder\Plugin\ComponentPluginManager;
+use Drupal\canvas\CodeComponentDataProvider;
+use Drupal\canvas\Entity\AssetLibrary;
+use Drupal\canvas\Plugin\ComponentPluginManager;
 use Symfony\Component\DependencyInjection\ContainerInterface;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\Routing\Route;
 
 /**
  * @file
  * Hook implementations that make Component Sources work.
  *
- * @see https://www.drupal.org/project/issues/experience_builder?component=Component+sources
+ * @see https://www.drupal.org/project/issues/canvas?component=Component+sources
  * @see docs/components.md
  */
 readonly final class ComponentSourceHooks implements ContainerInjectionInterface {
@@ -34,6 +36,7 @@ readonly final class ComponentSourceHooks implements ContainerInjectionInterface
     private LibraryDependencyResolverInterface $libraryDependencyResolver,
     private ThemeManagerInterface $themeManager,
     private ConfigFactoryInterface $configFactory,
+    private RequestStack $requestStack,
   ) {}
 
   public static function create(ContainerInterface $container): self {
@@ -43,8 +46,17 @@ readonly final class ComponentSourceHooks implements ContainerInjectionInterface
       $container->get(LibraryDependencyResolverInterface::class),
       $container->get(ThemeManagerInterface::class),
       $container->get(ConfigFactoryInterface::class),
+      $container->get(RequestStack::class),
     );
   }
+
+  const ASSET_LIBRARY_METHOD_MAPPING = [
+    'canvas/canvasData.v0.baseUrl' => 'getCanvasDataBaseUrlV0',
+    'canvas/canvasData.v0.branding' => 'getCanvasDataBrandingV0',
+    'canvas/canvasData.v0.breadcrumbs' => 'getCanvasDataBreadcrumbsV0',
+    'canvas/canvasData.v0.pageTitle' => 'getCanvasDataPageTitleV0',
+    'canvas/canvasData.v0.jsonapiSettings' => 'getCanvasDataJsonApiSettingsV0',
+  ];
 
   /**
    * Implements hook_rebuild().
@@ -52,11 +64,11 @@ readonly final class ComponentSourceHooks implements ContainerInjectionInterface
   #[Hook('rebuild')]
   public function rebuild(): void {
     // The module installer cleared all plugin caches. Create/update Component
-    // config entities for all XB Component source plugins.
-    // @see \Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\BlockComponent
+    // config entities for all Canvas Component source plugins.
+    // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent
     // @phpstan-ignore-next-line
     \Drupal::service(BlockManagerInterface::class)->getDefinitions();
-    // @see \Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\SingleDirectoryComponent
+    // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent
     // @phpstan-ignore-next-line
     \Drupal::service(ComponentPluginManager::class)->getDefinitions();
   }
@@ -86,7 +98,7 @@ readonly final class ComponentSourceHooks implements ContainerInjectionInterface
    *
    * For code components.
    *
-   * @see \Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\JsComponent
+   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent
    */
   #[Hook('page_attachments')]
   public function pageAttachments(array &$page): void {
@@ -102,7 +114,7 @@ readonly final class ComponentSourceHooks implements ContainerInjectionInterface
 
     $route = $this->routeMatch->getRouteObject();
     assert($route instanceof Route);
-    $is_preview = $route->getOption('_xb_use_template_draft') === TRUE;
+    $is_preview = $route->getOption('_canvas_use_template_draft') === TRUE;
     // TRICKY: the `route` cache context varies also by route parameters, that
     // is unnecessary here, because this only varies by route definition.
     $page['#cache']['contexts'][] = 'route.name';
@@ -119,47 +131,74 @@ readonly final class ComponentSourceHooks implements ContainerInjectionInterface
    */
   #[Hook('js_settings_alter')]
   public function jsSettingsAlter(array &$settings, AttachedAssetsInterface $assets): void {
-    $path = [CodeComponentDataProvider::XB_DATA_KEY, CodeComponentDataProvider::V0];
-    $xbData = $settings[CodeComponentDataProvider::XB_DATA_KEY] ?? [];
+    $path = [CodeComponentDataProvider::CANVAS_DATA_KEY, CodeComponentDataProvider::V0];
+    $canvasData = $settings[CodeComponentDataProvider::CANVAS_DATA_KEY] ?? [];
 
     // This is an oversight in core infra; this should not be necessary.
     $all_attached_asset_libraries = $this->libraryDependencyResolver->getLibrariesWithDependencies($assets->getLibraries());
 
-    $all = in_array('experience_builder/xbData.v0', $all_attached_asset_libraries, TRUE);
-    if ($all || in_array('experience_builder/xbData.v0.baseUrl', $all_attached_asset_libraries, TRUE)) {
+    $request = $this->requestStack->getCurrentRequest();
+    \assert($request instanceof Request);
+
+    $all = in_array('canvas/canvasData.v0', $all_attached_asset_libraries, TRUE);
+    if ($all || in_array('canvas/canvasData.v0.baseUrl', $all_attached_asset_libraries, TRUE)) {
       // Allow overrides: only set if still NULL.
       if (NestedArray::getValue($settings, [...$path, 'baseUrl']) === NULL) {
-        $xbData = array_replace_recursive($xbData, $this->codeComponentDataProvider->getXbDataBaseUrlV0());
+        $canvasData = array_replace_recursive($canvasData, $this->memoize($request, 'canvas/canvasData.v0.baseUrl'));
       }
     }
-    if ($all || in_array('experience_builder/xbData.v0.branding', $all_attached_asset_libraries, TRUE)) {
+    if ($all || in_array('canvas/canvasData.v0.branding', $all_attached_asset_libraries, TRUE)) {
       // Allow overrides: only set if still NULL.
       if (NestedArray::getValue($settings, [...$path, 'branding', 'homeUrl']) === NULL) {
-        $xbData = array_replace_recursive($xbData, $this->codeComponentDataProvider->getXbDataBrandingV0());
+        $canvasData = array_replace_recursive($canvasData, $this->memoize($request, 'canvas/canvasData.v0.branding'));
       }
     }
-    if ($all || in_array('experience_builder/xbData.v0.breadcrumbs', $all_attached_asset_libraries, TRUE)) {
+    if ($all || in_array('canvas/canvasData.v0.breadcrumbs', $all_attached_asset_libraries, TRUE)) {
       // Allow overrides: only set if still NULL.
       if (NestedArray::getValue($settings, [...$path, 'breadcrumbs']) === NULL) {
-        $xbData = array_replace_recursive($xbData, $this->codeComponentDataProvider->getXbDataBreadcrumbsV0());
+        $canvasData = array_replace_recursive($canvasData, $this->memoize($request, 'canvas/canvasData.v0.breadcrumbs'));
       }
     }
-    if ($all || in_array('experience_builder/xbData.v0.pageTitle', $all_attached_asset_libraries, TRUE)) {
+    if ($all || in_array('canvas/canvasData.v0.pageTitle', $all_attached_asset_libraries, TRUE)) {
       // Allow overrides: only set if still NULL.
       if (NestedArray::getValue($settings, [...$path, 'pageTitle']) === NULL) {
-        $xbData = array_replace_recursive($xbData, $this->codeComponentDataProvider->getXbDataPageTitleV0());
+        $canvasData = array_replace_recursive($canvasData, $this->memoize($request, 'canvas/canvasData.v0.pageTitle'));
       }
     }
-    if ($all || in_array('experience_builder/xbData.v0.jsonapiSettings', $all_attached_asset_libraries, TRUE)) {
+    if ($all || in_array('canvas/canvasData.v0.jsonapiSettings', $all_attached_asset_libraries, TRUE)) {
       // Allow overrides: only set if still NULL.
       if (NestedArray::getValue($settings, [...$path, 'jsonapiSettings']) === NULL) {
-        $xbData = array_replace_recursive($xbData, $this->codeComponentDataProvider->getXbDataJsonApiSettingsV0());
+        $canvasData = array_replace_recursive($canvasData, $this->memoize($request, 'canvas/canvasData.v0.jsonapiSettings'));
       }
     }
-    if (!empty($xbData)) {
-      ksort($xbData[CodeComponentDataProvider::V0]);
-      $settings[CodeComponentDataProvider::XB_DATA_KEY] = $xbData;
+    if (!empty($canvasData)) {
+      ksort($canvasData[CodeComponentDataProvider::V0]);
+      $settings[CodeComponentDataProvider::CANVAS_DATA_KEY] = $canvasData;
     }
+  }
+
+  /**
+   * Avoids repeated calls to CodeComponentDataProvider for the same request.
+   *
+   * @see \Drupal\canvas\CodeComponentDataProvider
+   */
+  private function memoize(Request $request, string $asset_library): array {
+    assert(str_starts_with($asset_library, 'canvas/canvasData.v0.'));
+
+    static $cached;
+    if (!isset($cached)) {
+      $cached = [];
+    }
+    if (!isset($cached[$asset_library])) {
+      $cached[$asset_library] = new \SplObjectStorage();
+    }
+    if (!isset($cached[$asset_library][$request])) {
+      $method = self::ASSET_LIBRARY_METHOD_MAPPING[$asset_library];
+      assert(method_exists($this->codeComponentDataProvider, $method));
+      $cached[$asset_library][$request] = $this->codeComponentDataProvider->$method();
+    }
+
+    return $cached[$asset_library][$request];
   }
 
 }

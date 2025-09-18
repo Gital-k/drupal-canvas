@@ -1,12 +1,13 @@
-import { defineConfig } from 'cypress';
-import minimist from 'minimist';
-import webpackPreprocessor from '@cypress/webpack-preprocessor';
-import { fileURLToPath } from 'url';
 import * as fs from 'fs';
 import * as path from 'path';
-import glob from 'fast-glob';
-import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import { defineConfig } from 'cypress';
 import installLogsPrinter from 'cypress-terminal-report/src/installLogsPrinter.js';
+import dotenv from 'dotenv';
+import glob from 'fast-glob';
+import minimist from 'minimist';
+import webpackPreprocessor from '@cypress/webpack-preprocessor';
+
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
@@ -43,7 +44,7 @@ export default defineConfig({
     coreDir: process.env.DRUPAL_ROOT_CORE || getCoreDir(),
     testWebserverUser: process.env.DRUPAL_TEST_WEBSERVER_USER,
     args: minimist(process.argv),
-    setupFile: path.resolve('../tests/src/TestSite/XBTestSetup.php'),
+    setupFile: path.resolve('../tests/src/TestSite/CanvasTestSetup.php'),
     // Set this to true to enable our custom debugPause Cypress command,
     // otherwise this has no effect.
     debugPauses: false,

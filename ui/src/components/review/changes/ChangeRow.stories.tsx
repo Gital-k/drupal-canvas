@@ -1,9 +1,11 @@
 // cspell:ignore Balint Takacs Chueka
-import type { Meta, StoryObj } from '@storybook/react';
-import { fn } from '@storybook/test';
 import { useState } from 'react';
-import type { UnpublishedChange } from '@/types/Review';
+import { fn } from '@storybook/test';
+
 import ChangeRow from './ChangeRow';
+
+import type { Meta, StoryObj } from '@storybook/react';
+import type { UnpublishedChange } from '@/types/Review';
 
 // Mock data for different entity types and scenarios
 const mockChanges: Record<string, UnpublishedChange> = {
@@ -39,10 +41,10 @@ const mockChanges: Record<string, UnpublishedChange> = {
     },
   },
   asset: {
-    pointer: 'xb_asset_library:3:en',
+    pointer: 'asset_library:3:en',
     label: 'Brand Assets Library',
     updated: Math.floor(Date.now() / 1000) - 24 * 60 * 60, // 1 day ago
-    entity_type: 'xb_asset_library',
+    entity_type: 'asset_library',
     data_hash: 'data-hash-3',
     entity_id: 3,
     langcode: 'en',

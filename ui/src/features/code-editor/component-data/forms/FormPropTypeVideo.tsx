@@ -1,19 +1,21 @@
+import { useEffect, useState } from 'react';
 import { Flex, Select } from '@radix-ui/themes';
-import {
-  FormElement,
-  Label,
-  Divider,
-} from '@/features/code-editor/component-data/FormElement';
+
 import { useAppDispatch } from '@/app/hooks';
 import { updateProp } from '@/features/code-editor/codeEditorSlice';
+import {
+  Divider,
+  FormElement,
+  Label,
+} from '@/features/code-editor/component-data/FormElement';
+import { getCanvasModuleBaseUrl } from '@/utils/drupal-globals';
+
 import type {
   CodeComponentProp,
   CodeComponentPropVideoExample,
 } from '@/types/CodeComponent';
-import { useState, useEffect } from 'react';
-import { getXbModuleBaseUrl } from '@/utils/drupal-globals';
 
-const moduleBaseUrl = getXbModuleBaseUrl() || '';
+const moduleBaseUrl = getCanvasModuleBaseUrl() || '';
 
 const POSTER_SERVICE_URL = 'https://placehold.co/';
 export const CONFIG_EXAMPLE_URLS = {
@@ -116,7 +118,7 @@ export default function FormPropTypeVideo({
         id,
         updates: {
           example: {
-            // ⚠️ @todo This uses the SAME URL for both the live preview and to send to the server at `xb/api/v0/config/auto-save/js_component/…`.
+            // ⚠️ @todo This uses the SAME URL for both the live preview and to send to the server at `canvas/api/v0/config/auto-save/js_component/…`.
             // This needs to send different values for either:
             // - one of CONFIG_EXAMPLE_URLS to the server
             // - one of VIDEO_SERVICE_URLS for the live preview

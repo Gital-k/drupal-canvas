@@ -1,56 +1,22 @@
-import {
-  Text,
-  Flex,
-  Checkbox,
-  Avatar,
-  Tooltip,
-  Box,
-  IconButton,
-  DropdownMenu,
-} from '@radix-ui/themes';
-import {
-  CubeIcon,
-  FileIcon,
-  Component1Icon,
-  CodeIcon,
-  DotsVerticalIcon,
-  HomeIcon,
-} from '@radix-ui/react-icons';
 import { useCallback, useMemo } from 'react';
-import styles from './ChangeRow.module.css';
-import type { UnpublishedChange } from '@/types/Review';
+import { DotsVerticalIcon } from '@radix-ui/react-icons';
+import {
+  Avatar,
+  Box,
+  Checkbox,
+  DropdownMenu,
+  Flex,
+  IconButton,
+  Text,
+  Tooltip,
+} from '@radix-ui/themes';
+
 import { getAvatarInitialColor, getTimeAgo } from '../utils';
-import { useAppSelector } from '@/app/hooks';
-import { selectHomepagePath } from '@/features/configuration/configurationSlice';
+import ChangeIcon from './ChangeIcon';
 
-const ChangeIcon = (props: {
-  entityType: string;
-  entityId: string | number;
-}) => {
-  const { entityType, entityId } = props;
-  const homepagePath = useAppSelector(selectHomepagePath);
+import type { UnpublishedChange } from '@/types/Review';
 
-  switch (entityType) {
-    case 'js_component':
-      return <Component1Icon className={styles.changeIcon} />;
-    case 'xb_asset_library':
-      return <CodeIcon className={styles.changeIcon} />;
-    case 'page_region':
-      return <CubeIcon className={styles.changeIcon} />;
-    case 'staged_config_update':
-      // Currently the only staged config update supported is setting
-      // the homepage.
-      return <HomeIcon className={styles.changeIcon} />;
-    case 'xb_page':
-      if (homepagePath === `/page/${entityId}`) {
-        return <HomeIcon className={styles.changeIcon} />;
-      } else {
-        return <FileIcon className={styles.changeIcon} />;
-      }
-    default:
-      return <FileIcon className={styles.changeIcon} />;
-  }
-};
+import styles from './ChangeRow.module.css';
 
 interface ChangeRowProps {
   change: UnpublishedChange;
@@ -94,9 +60,9 @@ const ChangeRow = ({
 
   return (
     <li className={styles.changeRow} data-testid="pending-change-row">
-      <Flex as="div" direction="row" align="center" justify="between" gap="4">
+      <Flex as="div" direction="row" align="start" justify="between" gap="4">
         <Text as="label" color={color} weight={weight} size="1">
-          <Flex as="div" direction="row" align="center" gap="2">
+          <Flex as="div" direction="row" align="start" gap="2" pt="1">
             <Checkbox
               size="1"
               disabled={isBusy}
@@ -104,62 +70,64 @@ const ChangeRow = ({
               onCheckedChange={handleChangeSelection}
               checked={isSelected}
             />
-            <Box pt="1">
+            <Flex height="16px" align="center">
               <ChangeIcon
                 entityType={change.entity_type}
                 entityId={change.entity_id}
               />
-            </Box>
+            </Flex>
             {change.label}
           </Flex>
         </Text>
         <Flex
           as="div"
           direction="row"
-          align="center"
+          align="start"
           gap="2"
           className={styles.changeRowRight}
         >
-          <Tooltip content={date.toLocaleString()}>
-            <Text className={styles.time} size="1">
-              {getTimeAgo(change.updated)}
-            </Text>
-          </Tooltip>
+          <Box pt="1">
+            <Tooltip content={date.toLocaleString()}>
+              <Text className={styles.time} size="1" wrap="nowrap">
+                {getTimeAgo(change.updated)}
+              </Text>
+            </Tooltip>
+          </Box>
           <Tooltip content={`By ${change.owner.name}`}>
-            <Box>
-              <Avatar
-                highContrast
-                size="1"
-                fallback={initial}
-                className={styles.avatar}
-                {...(change.owner.avatar
-                  ? { src: change.owner.avatar }
-                  : {
-                      style: {
-                        borderColor: `var(--${avatarColor}-11)`,
-                      },
-                      color: avatarColor,
-                    })}
-              />
-            </Box>
+            <Avatar
+              highContrast
+              size="1"
+              fallback={initial}
+              className={styles.avatar}
+              {...(change.owner.avatar
+                ? { src: change.owner.avatar }
+                : {
+                    style: {
+                      border: `1px solid var(--${avatarColor}-11)`,
+                    },
+                    color: avatarColor,
+                  })}
+            />
           </Tooltip>
-          <DropdownMenu.Root>
-            <DropdownMenu.Trigger>
-              <IconButton disabled={isBusy} aria-label="More options">
-                <DotsVerticalIcon />
-              </IconButton>
-            </DropdownMenu.Trigger>
-            <DropdownMenu.Content>
-              {onViewClick && (
-                <DropdownMenu.Item onSelect={() => onViewClick(change)}>
-                  View changes
+          <Box pt="1">
+            <DropdownMenu.Root>
+              <DropdownMenu.Trigger>
+                <IconButton disabled={isBusy} aria-label="More options">
+                  <DotsVerticalIcon />
+                </IconButton>
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Content>
+                {onViewClick && (
+                  <DropdownMenu.Item onSelect={() => onViewClick(change)}>
+                    View changes
+                  </DropdownMenu.Item>
+                )}
+                <DropdownMenu.Item onSelect={() => onDiscardClick(change)}>
+                  Discard changes
                 </DropdownMenu.Item>
-              )}
-              <DropdownMenu.Item onSelect={() => onDiscardClick(change)}>
-                Discard changes
-              </DropdownMenu.Item>
-            </DropdownMenu.Content>
-          </DropdownMenu.Root>
+              </DropdownMenu.Content>
+            </DropdownMenu.Root>
+          </Box>
         </Flex>
       </Flex>
     </li>

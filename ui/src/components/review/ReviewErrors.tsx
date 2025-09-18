@@ -1,3 +1,10 @@
+import { useState } from 'react';
+import clsx from 'clsx';
+import * as Collapsible from '@radix-ui/react-collapsible';
+import {
+  ExclamationTriangleIcon,
+  OpenInNewWindowIcon,
+} from '@radix-ui/react-icons';
 import {
   Box,
   ChevronDownIcon,
@@ -6,18 +13,14 @@ import {
   Separator,
   Text,
 } from '@radix-ui/themes';
-import * as Collapsible from '@radix-ui/react-collapsible';
-import {
-  ExclamationTriangleIcon,
-  FileIcon,
-  OpenInNewWindowIcon,
-} from '@radix-ui/react-icons';
-import style from '@/components/review/ReviewErrors.module.css';
-import detailsStyle from '@/components/form/components/AccordionAndDetails.module.css';
-import type { ErrorResponse } from '@/services/pendingChangesApi';
-import { useState } from 'react';
-import clsx from 'clsx';
+
+import ChangeIcon from '@/components/review/changes/ChangeIcon';
 import { getBaseUrl } from '@/utils/drupal-globals';
+
+import type { ErrorResponse } from '@/services/pendingChangesApi';
+
+import detailsStyle from '@/components/form/components/AccordionAndDetails.module.css';
+import style from '@/components/review/ReviewErrors.module.css';
 
 interface ReviewErrorsProps {
   errorState: ErrorResponse | undefined;
@@ -56,7 +59,10 @@ const ErrorGroup: React.FC<ErrorGroupProps> = ({ errorGroup }) => {
     >
       <Collapsible.Trigger className={style.collapseButton}>
         <Flex px="1" py="2" gap="2" align="center">
-          <FileIcon width="12" height="12" className={style.labelIcon} />
+          <ChangeIcon
+            entityType={errorGroup[0]?.meta?.entity_type || ''}
+            entityId={errorGroup[0]?.meta?.entity_id || ''}
+          />
           <Heading as="h4" size="1" weight="regular">
             {errorGroup[0].entityLabel}
           </Heading>
@@ -68,7 +74,6 @@ const ErrorGroup: React.FC<ErrorGroupProps> = ({ errorGroup }) => {
       </Collapsible.Trigger>
 
       <Collapsible.Content
-        forceMount
         className={clsx(detailsStyle.content, detailsStyle.detailsContent)}
       >
         {errorGroup.map((error: EntityError, ix: number) => {
@@ -76,7 +81,7 @@ const ErrorGroup: React.FC<ErrorGroupProps> = ({ errorGroup }) => {
           let errorPath =
             error?.meta?.entity_type &&
             error?.meta?.entity_id &&
-            `${baseUrl}xb/${error.meta.entity_type}/${error.meta.entity_id}/editor`;
+            `${baseUrl}canvas/editor/${error.meta.entity_type}/${error.meta.entity_id}`;
 
           if (typeof error?.source?.pointer === 'string') {
             const sourcePointerParts = error.source.pointer.split('.');
@@ -97,7 +102,7 @@ const ErrorGroup: React.FC<ErrorGroupProps> = ({ errorGroup }) => {
           return (
             <Flex px="5" py="1" gap="2" align="start" key={ix}>
               <Flex pt="2.5px">
-                <ExclamationTriangleIcon color="red" width="12" height="12" />
+                <ExclamationTriangleIcon color="red" />
               </Flex>
               <Text size="1" data-testid="publish-error-detail">
                 {error.detail}{' '}
@@ -150,7 +155,7 @@ const ReviewErrors: React.FC<ReviewErrorsProps> = ({ errorState }) => {
     );
     return (
       <Box
-        data-testid="xb-review-publish-errors"
+        data-testid="canvas-review-publish-errors"
         maxWidth="360px"
         className={style.reviewErrors}
       >
@@ -158,7 +163,7 @@ const ReviewErrors: React.FC<ReviewErrorsProps> = ({ errorState }) => {
           <Collapsible.Root open={isOpen} onOpenChange={setIsOpen}>
             <Collapsible.Trigger className={style.collapseButton}>
               <Flex gap="2" mb="1" align="center">
-                <ExclamationTriangleIcon color="red" width="12" height="12" />
+                <ExclamationTriangleIcon color="red" />
                 <Heading as="h3" size="1" mb="0">
                   {errorState.errors.length} Error
                   {errorState.errors.length > 1 ? 's' : ''}
@@ -170,7 +175,6 @@ const ReviewErrors: React.FC<ReviewErrorsProps> = ({ errorState }) => {
             </Collapsible.Trigger>
 
             <Collapsible.Content
-              forceMount
               className={clsx(
                 detailsStyle.content,
                 detailsStyle.detailsContent,

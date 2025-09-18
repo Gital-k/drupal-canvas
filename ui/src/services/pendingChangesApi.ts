@@ -1,11 +1,12 @@
 // Need to use the React-specific entry point to import createApi
 import { createApi } from '@reduxjs/toolkit/query/react';
-import { baseQuery } from '@/services/baseQuery';
+
 import {
   setConflicts,
   setErrors,
   setPreviousPendingChanges,
 } from '@/components/review/PublishReview.slice';
+import { baseQuery } from '@/services/baseQuery';
 
 interface Owner {
   name: string;
@@ -67,7 +68,7 @@ export const pendingChangesApi = createApi({
   tagTypes: ['PendingChanges'],
   endpoints: (builder) => ({
     getAllPendingChanges: builder.query<PendingChanges, void>({
-      query: () => `/xb/api/v0/auto-saves/pending`,
+      query: () => `/canvas/api/v0/auto-saves/pending`,
       providesTags: () => [{ type: 'PendingChanges', id: 'LIST' }],
     }),
     publishAllPendingChanges: builder.mutation<
@@ -75,7 +76,7 @@ export const pendingChangesApi = createApi({
       PendingChanges
     >({
       query: (body) => ({
-        url: `/xb/api/v0/auto-saves/publish`,
+        url: `/canvas/api/v0/auto-saves/publish`,
         method: 'POST',
         body,
       }),
@@ -117,7 +118,7 @@ export const pendingChangesApi = createApi({
       PendingChange
     >({
       query: (change: PendingChange) => ({
-        url: `/xb/api/v0/auto-saves/${change.entity_type}/${change.entity_id}`,
+        url: `/canvas/api/v0/auto-saves/${change.entity_type}/${change.entity_id}`,
         method: 'DELETE',
       }),
       async onQueryStarted(change, { dispatch, queryFulfilled }) {

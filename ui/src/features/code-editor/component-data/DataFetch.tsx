@@ -1,14 +1,16 @@
+import { Accordion } from 'radix-ui';
 import { JSONTree } from 'react-json-tree';
+import { ChevronDownIcon, InfoCircledIcon } from '@radix-ui/react-icons';
+import { Box, Callout } from '@radix-ui/themes';
+
 import { useAppSelector } from '@/app/hooks';
 import { selectCodeComponentProperty } from '@/features/code-editor/codeEditorSlice';
-import { Box, Callout } from '@radix-ui/themes';
-import { ChevronDownIcon, InfoCircledIcon } from '@radix-ui/react-icons';
-import { Accordion } from 'radix-ui';
+
 import styles from './DataFetch.module.css';
 
 const theme = {
   scheme: 'github-light-custom',
-  author: 'xb',
+  author: 'canvas',
   base00: '#ffffff',
   base01: '#f6f8fa',
   base02: '#e1e4e8',

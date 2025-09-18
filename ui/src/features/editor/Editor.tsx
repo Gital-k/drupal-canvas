@@ -1,32 +1,57 @@
-import EditorFrame from '@/features/editorFrame/EditorFrame';
+import { useEffect } from 'react';
+import { useParams } from 'react-router';
+
+import { useAppDispatch, useAppSelector } from '@/app/hooks';
+import ErrorBoundary from '@/components/error/ErrorBoundary';
+import ExtensionDialog from '@/components/extensions/ExtensionDialog';
+import ContextualPanel from '@/components/panel/ContextualPanel';
 import PrimaryPanel from '@/components/sidePanel/PrimaryPanel';
 import CodeComponentDialogs from '@/features/code-editor/dialogs/CodeComponentDialogs';
-import ContextualPanel from '@/components/panel/ContextualPanel';
-import Layout from '@/features/layout/Layout';
-import { useEffect } from 'react';
-import { setFirstLoadComplete } from '@/features/ui/uiSlice';
-import { useAppDispatch, useAppSelector } from '@/app/hooks';
-import ExtensionDialog from '@/components/extensions/ExtensionDialog';
-import PatternDialogs from '@/features/pattern/PatternDialogs';
-import useLayoutWatcher from '@/hooks/useLayoutWatcher';
-import useSyncParamsToState from '@/hooks/useSyncParamsToState';
-import styles from './Editor.module.css';
-import ErrorBoundary from '@/components/error/ErrorBoundary';
-import { useUndoRedo } from '@/hooks/useUndoRedo';
-import { selectLatestError } from '@/features/error-handling/queryErrorSlice';
 import ConflictWarning from '@/features/editor/ConflictWarning';
-const Editor = () => {
+import EditorFrame from '@/features/editorFrame/EditorFrame';
+import { selectLatestError } from '@/features/error-handling/queryErrorSlice';
+import Layout from '@/features/layout/Layout';
+import { setUpdatePreview } from '@/features/layout/layoutModelSlice';
+import TemplateLayout from '@/features/layout/TemplateLayout';
+import PatternDialogs from '@/features/pattern/PatternDialogs';
+import {
+  setEditorFrameContext,
+  setFirstLoadComplete,
+} from '@/features/ui/uiSlice';
+import useLayoutWatcher from '@/hooks/useLayoutWatcher';
+import useReturnableLocation from '@/hooks/useReturnableLocation';
+import useSyncParamsToState from '@/hooks/useSyncParamsToState';
+import { useUndoRedo } from '@/hooks/useUndoRedo';
+
+import type { EditorFrameContext } from '@/features/ui/uiSlice';
+
+import styles from './Editor.module.css';
+
+interface EditorProps {
+  context: EditorFrameContext;
+}
+
+const Editor: React.FC<EditorProps> = ({ context }) => {
   const dispatch = useAppDispatch();
   useLayoutWatcher();
   useSyncParamsToState();
+  useReturnableLocation();
   const { isUndoable, dispatchUndo } = useUndoRedo();
   const latestError = useAppSelector(selectLatestError);
+  const params = useParams();
 
   useEffect(() => {
+    dispatch(setEditorFrameContext(context));
     return () => {
       dispatch(setFirstLoadComplete(false));
     };
-  }, [dispatch]);
+  }, [context, dispatch]);
+
+  useEffect(() => {
+    dispatch(setUpdatePreview(false));
+    // When the entityId or entityType changes, we want to reset the first load complete state
+    dispatch(setFirstLoadComplete(false));
+  }, [dispatch, params.entityId, params.entityType]);
 
   if (latestError) {
     if (latestError.status === '409') {
@@ -44,10 +69,11 @@ const Editor = () => {
         onReset={isUndoable ? dispatchUndo : undefined}
         resetButtonText={isUndoable ? 'Undo last action' : undefined}
       >
-        <Layout />
+        {context === 'entity' && <Layout />}
+        {context === 'template' && <TemplateLayout />}
       </ErrorBoundary>
       <EditorFrame />
-      <ContextualPanel />
+      <ContextualPanel context={context} />
       <div className={styles.absoluteContainer}>
         <PatternDialogs />
         <CodeComponentDialogs />

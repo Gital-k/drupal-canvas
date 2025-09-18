@@ -1,15 +1,13 @@
-import { Badge } from '@radix-ui/themes';
-import { useAppDispatch, useAppSelector } from '@/app/hooks';
-import {
-  selectEntityId,
-  selectEntityType,
-  setHomepageStagedConfigExists,
-} from '@/features/configuration/configurationSlice';
-import { useGetAllPendingChangesQuery } from '@/services/pendingChangesApi';
 import { useEffect, useState } from 'react';
-import { useGetLayoutByIdQuery } from '@/services/componentAndLayout';
-import { findInChanges } from '@/utils/function-utils';
+import { useParams } from 'react-router';
+import { Badge } from '@radix-ui/themes';
+
+import { useAppDispatch } from '@/app/hooks';
 import { HOMEPAGE_CONFIG_ID } from '@/components/pageInfo/PageInfo';
+import { setHomepageStagedConfigExists } from '@/features/configuration/configurationSlice';
+import { useGetPageLayoutQuery } from '@/services/componentAndLayout';
+import { useGetAllPendingChangesQuery } from '@/services/pendingChangesApi';
+import { findInChanges } from '@/utils/function-utils';
 
 export interface PageStatusBadgeProps {
   isNew: boolean;
@@ -56,10 +54,9 @@ export const PageStatusBadge: React.FC<PageStatusBadgeProps> = ({
 const PageStatus = () => {
   const { data: changes, isSuccess: isGetPendingChangesSuccess } =
     useGetAllPendingChangesQuery();
-  const entityId = useAppSelector(selectEntityId);
-  const entityType = useAppSelector(selectEntityType);
+  const { entityType, entityId } = useParams();
   const [hasAutoSave, setHasAutoSave] = useState(false);
-  const { data: fetchedLayout, isError } = useGetLayoutByIdQuery(entityId);
+  const { data: fetchedLayout, isError } = useGetPageLayoutQuery();
   const dispatch = useAppDispatch();
 
   useEffect(() => {

@@ -1,34 +1,37 @@
-import type React from 'react';
 import { useCallback } from 'react';
-import { Box, Flex } from '@radix-ui/themes';
+import clsx from 'clsx';
+import { useDraggable } from '@dnd-kit/core';
+import { CollapsibleContent } from '@radix-ui/react-collapsible';
+import * as Collapsible from '@radix-ui/react-collapsible';
 import { TriangleDownIcon, TriangleRightIcon } from '@radix-ui/react-icons';
-import SidebarNode from '@/components/sidePanel/SidebarNode';
+import { Box, Flex } from '@radix-ui/themes';
+
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
+import SidebarNode from '@/components/sidePanel/SidebarNode';
+import LayersDropZone from '@/features/layout/layers/LayersDropZone';
+import SlotLayer from '@/features/layout/layers/SlotLayer';
+import ComponentContextMenu, {
+  ComponentContextMenuContent,
+} from '@/features/layout/preview/ComponentContextMenu';
 import {
+  selectCollapsedLayers,
   selectComponentIsSelected,
   selectIsComponentHovered,
   setHoveredComponent,
-  unsetHoveredComponent,
   toggleCollapsedLayer,
-  selectCollapsedLayers,
+  unsetHoveredComponent,
 } from '@/features/ui/uiSlice';
+import useComponentSelection from '@/hooks/useComponentSelection';
+import useGetComponentName from '@/hooks/useGetComponentName';
+
+import type React from 'react';
+import type { CollapsibleTriggerProps } from '@radix-ui/react-collapsible';
 import type {
   ComponentNode,
   LayoutNode,
 } from '@/features/layout/layoutModelSlice';
-import type { CollapsibleTriggerProps } from '@radix-ui/react-collapsible';
-import { CollapsibleContent } from '@radix-ui/react-collapsible';
-import ComponentContextMenu, {
-  ComponentContextMenuContent,
-} from '@/features/layout/preview/ComponentContextMenu';
-import useGetComponentName from '@/hooks/useGetComponentName';
-import * as Collapsible from '@radix-ui/react-collapsible';
-import SlotLayer from '@/features/layout/layers/SlotLayer';
-import useComponentSelection from '@/hooks/useComponentSelection';
+
 import styles from './ComponentLayer.module.css';
-import clsx from 'clsx';
-import { useDraggable } from '@dnd-kit/core';
-import LayersDropZone from '@/features/layout/layers/LayersDropZone';
 
 interface ComponentLayerProps {
   component: ComponentNode;
@@ -120,9 +123,9 @@ const ComponentLayer: React.FC<ComponentLayerProps> = ({
       ref={setNodeRef}
       role="treeitem"
       aria-roledescription="Draggable component"
-      data-xb-uuid={componentId}
-      data-xb-type={component.nodeType}
-      data-xb-selected={isSelected}
+      data-canvas-uuid={componentId}
+      data-canvas-type={component.nodeType}
+      data-canvas-selected={isSelected}
       onClick={handleItemClick}
       onDragStart={handleItemDragStart}
       onContextMenu={handleContextMenu}
@@ -131,17 +134,18 @@ const ComponentLayer: React.FC<ComponentLayerProps> = ({
     >
       <ComponentContextMenu component={component}>
         <Collapsible.Root
-          className="xb--collapsible-root"
+          className="canvas--collapsible-root"
           open={!isCollapsed}
           onOpenChange={handleOpenChange}
-          data-xb-uuid={component.uuid}
+          data-canvas-uuid={component.uuid}
         >
           <SidebarNode
             id={`layer-${componentId}-name`}
             onMouseEnter={handleItemMouseEnter}
             onMouseLeave={handleItemMouseLeave}
-            className="xb-drag-handle"
+            className="canvas-drag-handle"
             title={nodeName}
+            draggable={true}
             variant="component"
             hovered={isHovered}
             selected={isSelected}
@@ -157,7 +161,7 @@ const ComponentLayer: React.FC<ComponentLayerProps> = ({
               <Flex>
                 <Box
                   width={`calc(${indent} * var(--space-2))`}
-                  className="xb-layer-indent"
+                  className="canvas-layer-indent"
                 />
                 <Box width="var(--space-4)" mr="1">
                   {component.slots.length > 0 ? (

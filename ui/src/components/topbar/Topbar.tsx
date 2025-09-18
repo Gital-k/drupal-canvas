@@ -1,66 +1,78 @@
-import * as Menubar from '@radix-ui/react-menubar';
-import styles from './Topbar.module.css';
-import { Button, Flex, Grid, Tooltip, Box } from '@radix-ui/themes';
-import UndoRedo from '@/components/UndoRedo';
-import DropIcon from '@assets/icons/drop.svg?react';
-import {
-  CardStackPlusIcon,
-  EyeNoneIcon,
-  EyeOpenIcon,
-  PersonIcon,
-} from '@radix-ui/react-icons';
-import { useLocation, useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
-import UnpublishedChanges from '@/components/review/UnpublishedChanges';
-import PageInfo from '../pageInfo/PageInfo';
-import PreviewWidthSelector from '@/features/pagePreview/PreviewWidthSelector';
-import AIToggleButton from '@/components/aiExtension/AiToggleButton';
-import { getDrupalSettings } from '@/utils/drupal-globals';
-import { pageDataFormApi } from '@/services/pageDataForm';
-import { useAppDispatch } from '@/app/hooks';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import DropIcon from '@assets/icons/drop.svg?react';
+import { CardStackPlusIcon, PersonIcon } from '@radix-ui/react-icons';
+import * as Menubar from '@radix-ui/react-menubar';
+import { Box, Button, Flex, Grid, Tooltip } from '@radix-ui/themes';
 
-const PREVIOUS_URL_STORAGE_KEY = 'XBPreviousURL';
+import { useAppSelector } from '@/app/hooks';
+import AIToggleButton from '@/components/aiExtension/AiToggleButton';
+import PreviewControls from '@/components/PreviewControls';
+import UnpublishedChanges from '@/components/review/UnpublishedChanges';
+import ContentPreviewSelector from '@/components/templates/ContentPreviewSelector';
+import UndoRedo from '@/components/UndoRedo';
+import { selectEditorFrameContext } from '@/features/ui/uiSlice';
+import { useGetPreviewContentEntitiesQuery } from '@/services/componentAndLayout';
+import { getDrupalSettings } from '@/utils/drupal-globals';
+
+import PageInfo from '../pageInfo/PageInfo';
+
+import styles from './Topbar.module.css';
+
+const PREVIOUS_URL_STORAGE_KEY = 'CanvasPreviousURL';
 
 const Topbar = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { entityType, bundle, viewMode, previewEntityId } = useParams();
   const isPreview = location.pathname.includes('/preview');
   const isEditor = location.pathname.includes('/editor');
   const isSegments = location.pathname.includes('/segments');
-  const dispatch = useAppDispatch();
+  const isTemplateRoute =
+    useAppSelector(selectEditorFrameContext) === 'template';
 
   let hasAiExtensionAvailable = false;
   let hasPersonalizeExtensionAvailable = false;
 
   const drupalSettings = getDrupalSettings();
-  if (drupalSettings && drupalSettings.xb.aiExtensionAvailable) {
+  if (
+    drupalSettings?.canvas?.aiExtensionAvailable &&
+    (drupalSettings.canvas as any).permissions?.useCanvasAi === true
+  ) {
     hasAiExtensionAvailable = true;
   }
-  if (drupalSettings && drupalSettings.xb.personalizationExtensionAvailable) {
+  if (
+    drupalSettings &&
+    drupalSettings.canvas.personalizationExtensionAvailable
+  ) {
     hasPersonalizeExtensionAvailable = true;
   }
 
-  function handleChangeModeClick() {
-    if (isPreview) {
-      // Fetch a new version of the page data form as it has been
-      // unmounted and the cached versions won't reflect any AJAX updates
-      // to the form.
-      dispatch(
-        pageDataFormApi.util.invalidateTags([
-          { type: 'PageDataForm', id: 'FORM' },
-        ]),
+  // Fetch preview content entities for template routes
+  const { data: previewEntities = {} } = useGetPreviewContentEntitiesQuery(
+    {
+      entityTypeId: entityType || '',
+      bundle: bundle || '',
+    },
+    {
+      skip: !isTemplateRoute || !entityType || !bundle,
+    },
+  );
+
+  // Handle preview entity selection change
+  const handlePreviewEntityChange = (selectedEntityId: string) => {
+    if (entityType && bundle && viewMode) {
+      navigate(
+        `/template/${entityType}/${bundle}/${viewMode}/${selectedEntityId}`,
       );
-      navigate(`/editor`);
-    } else {
-      navigate(`/preview/full`);
     }
-  }
+  };
 
   const backHref =
     window.sessionStorage.getItem(PREVIOUS_URL_STORAGE_KEY) ?? '/';
 
   return (
-    <Menubar.Root data-testid="xb-topbar" asChild>
+    <Menubar.Root data-testid="canvas-topbar" asChild>
       <Box
         className={clsx(styles.root, styles.topBar, {
           [styles.inPreview]: isPreview,
@@ -69,14 +81,14 @@ const Topbar = () => {
       >
         <Grid columns="3" gap="0" width="auto" height="100%">
           <Flex align="center" gap="2">
-            <Tooltip content="Exit Experience Builder">
+            <Tooltip content="Exit Drupal Canvas">
               <a
                 href={backHref}
                 aria-labelledby="back-to-previous-label"
                 className={clsx(styles.topBarButton, styles.exitButton)}
               >
                 <span className="visually-hidden" id="back-to-previous-label">
-                  Exit Experience Builder
+                  Exit Drupal Canvas
                 </span>
                 <DropIcon
                   className={styles.drupalLogo}
@@ -124,29 +136,16 @@ const Topbar = () => {
           </Flex>
           <Flex align="center" justify="center" gap="2">
             <PageInfo />
+            {isTemplateRoute && (
+              <ContentPreviewSelector
+                items={previewEntities}
+                selectedItemId={previewEntityId}
+                onSelectionChange={handlePreviewEntityChange}
+              />
+            )}
           </Flex>
           <Flex align="center" justify="end" gap="2">
-            {isPreview && (
-              <>
-                <PreviewWidthSelector />
-                <Button
-                  variant="outline"
-                  color="blue"
-                  onClick={handleChangeModeClick}
-                >
-                  <EyeNoneIcon /> Exit Preview
-                </Button>
-              </>
-            )}
-            {!isPreview && (
-              <Button
-                variant="outline"
-                color="blue"
-                onClick={handleChangeModeClick}
-              >
-                <EyeOpenIcon /> Preview
-              </Button>
-            )}
+            <PreviewControls isPreview={isPreview} />
             <UnpublishedChanges />
           </Flex>
         </Grid>

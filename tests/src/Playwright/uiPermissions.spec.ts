@@ -1,33 +1,34 @@
-import { test } from './fixtures/DrupalSite';
 import { expect } from '@playwright/test';
+
+import { test } from './fixtures/DrupalSite';
 import { Drupal } from './objects/Drupal';
 
 /**
- * This test suite checks that the Experience Builder UI shows/hides UI interface based on the permissions of users
+ * This test suite checks that the Drupal Canvas UI shows/hides UI interface based on the permissions of users
  * with different roles. It first ensures that a user with admin permissions can see all the buttons and options in the UI,
  * then it checks that a user with minimal permissions can still access the UI but with limited functionality.
  */
-test.describe('XB UI Permissions', () => {
+test.describe('Canvas UI Permissions', () => {
   test.beforeAll(
-    'Setup test site with Experience Builder',
+    'Setup test site with Drupal Canvas',
     async ({ browser, drupalSite }) => {
       const page = await browser.newPage();
       const drupal: Drupal = new Drupal({ page, drupalSite });
-      await drupal.installModules(['experience_builder']);
+      await drupal.installModules(['canvas']);
       await drupal.applyRecipe(`core/recipes/image_media_type`);
-      await drupal.setupXBTestSite();
+      await drupal.setupCanvasTestSite();
       await page.close();
     },
   );
 
-  test('User with admin permissions can load XB UI and see lots of buttons', async ({
+  test('User with admin permissions can load Canvas UI and see lots of buttons', async ({
     page,
     drupal,
-    xBEditor,
+    canvasEditor,
   }) => {
     await drupal.loginAsAdmin();
     await page.goto('/first');
-    await xBEditor.goToEditor();
+    await canvasEditor.goToEditor();
     await page.getByText('Two Column').click({ button: 'right' });
 
     const menu = page.getByRole('menu', {
@@ -39,9 +40,11 @@ test.describe('XB UI Permissions', () => {
     await page.locator('body').click(); // Dismiss the context menu
     await expect(menu).not.toBeAttached();
 
-    await page.getByTestId('xb-navigation-button').click();
-    await expect(page.locator('#xb-navigation-search')).toBeVisible();
-    await expect(page.getByTestId('xb-navigation-new-button')).toBeAttached();
+    await page.getByTestId('canvas-navigation-button').click();
+    await expect(page.locator('#canvas-navigation-search')).toBeVisible();
+    await expect(
+      page.getByTestId('canvas-navigation-new-button'),
+    ).toBeAttached();
 
     // Click the dropdown button with the aria-label
     const dropdownButton = page.getByLabel(
@@ -62,11 +65,11 @@ test.describe('XB UI Permissions', () => {
     await page.locator('body').click(); // Dismiss the context menu
     await expect(contextMenu).not.toBeAttached();
 
-    await xBEditor.openLibraryPanel();
-    // Check that a button with the text "Add new" exists inside xb-primary-panel
-    const primaryPanel = page.getByTestId('xb-primary-panel');
+    await canvasEditor.openLibraryPanel();
+    // Check that a button with the text "Add new" exists inside canvas-primary-panel
+    const primaryPanel = page.getByTestId('canvas-primary-panel');
     await expect(
-      primaryPanel.getByRole('button', { name: 'Add new' }),
+      primaryPanel.getByRole('button', { name: 'Create code component' }),
     ).toBeVisible();
 
     // Make a change to the page
@@ -81,22 +84,22 @@ test.describe('XB UI Permissions', () => {
     await page.getByLabel('Sub-heading').fill('New Heading');
     await expect(page.getByLabel('Sub-heading')).toHaveValue('New Heading');
     await page.getByText('Review 1 change').click();
-    await page.getByTestId('xb-publish-review-select-all').click();
+    await page.getByTestId('canvas-publish-review-select-all').click();
     await expect(page.getByText('Publish 1 selected')).toBeAttached();
   });
 
-  test('User with no XB permissions can load XB UI', async ({
+  test('User with no Canvas permissions can load Canvas UI', async ({
     page,
     drupal,
-    xBEditor,
+    canvasEditor,
   }) => {
-    // Create a role with no (well, minimal) XB permissions
-    await drupal.createRole({ name: 'xb_no_permissions' });
+    // Create a role with no (well, minimal) Canvas permissions
+    await drupal.createRole({ name: 'canvas_no_permissions' });
     await drupal.addPermissions({
-      role: 'xb_no_permissions',
+      role: 'canvas_no_permissions',
       permissions: [
         'view the administration theme',
-        'edit xb_page',
+        'edit canvas_page',
         'edit any page content',
         'edit any article content',
       ],
@@ -108,12 +111,12 @@ test.describe('XB UI Permissions', () => {
       // cspell:disable-next-line
       username: 'noperms',
       password: 'superstrongpassword1337',
-      roles: ['xb_no_permissions'],
+      roles: ['canvas_no_permissions'],
     };
     await drupal.createUser(user);
     await drupal.login(user);
     await page.goto('/first');
-    await xBEditor.goToEditor();
+    await canvasEditor.goToEditor();
 
     await page.getByText('Two Column').click({ button: 'right' });
     const menu = page.getByRole('menu', {
@@ -125,10 +128,10 @@ test.describe('XB UI Permissions', () => {
     await page.locator('body').click(); // Dismiss the context menu
     await expect(menu).not.toBeAttached();
 
-    await page.getByTestId('xb-navigation-button').click();
-    await expect(page.locator('#xb-navigation-search')).toBeVisible();
+    await page.getByTestId('canvas-navigation-button').click();
+    await expect(page.locator('#canvas-navigation-search')).toBeVisible();
     await expect(
-      page.getByTestId('xb-navigation-new-button'),
+      page.getByTestId('canvas-navigation-new-button'),
     ).not.toBeAttached();
 
     // Click the dropdown button with the aria-label
@@ -153,12 +156,12 @@ test.describe('XB UI Permissions', () => {
     await expect(contextMenu).not.toBeAttached();
 
     // Open the library panel
-    await xBEditor.openLibraryPanel();
+    await canvasEditor.openLibraryPanel();
 
-    // Check that a button with the text "Add new" does not exist inside xb-primary-panel
-    const primaryPanel = page.getByTestId('xb-primary-panel');
+    // Check that a button with the text "Add new" does not exist inside canvas-primary-panel
+    const primaryPanel = page.getByTestId('canvas-primary-panel');
     await expect(
-      primaryPanel.getByRole('button', { name: 'Add new' }),
+      primaryPanel.getByRole('button', { name: 'Create code component' }),
     ).not.toBeAttached();
     await expect(
       primaryPanel.getByRole('button', { name: 'Code' }),
@@ -166,17 +169,17 @@ test.describe('XB UI Permissions', () => {
 
     // Ensure the "Patterns" button is visible - users with no permissions should still be able to use patterns.
     await expect(
-      primaryPanel.getByRole('button', { name: 'Patterns' }),
+      primaryPanel.getByTestId('canvas-manage-library-patterns-tab-select'),
     ).toBeAttached();
 
     // A change to the page was made in the previous test, so it should be visible.
     await page.getByText('Review 1 change').click();
-    await page.getByTestId('xb-publish-review-select-all').click();
+    await page.getByTestId('canvas-publish-review-select-all').click();
     // but the user should not be able to publish changes.
     await expect(page.getByText('Publish 1 selected')).not.toBeAttached();
 
     // User without "administer components" should not be able to access the code editor.
-    await page.goto('/xb/node/1/code-editor/code/foobar');
+    await page.goto('/canvas/code-editor/code/foobar');
     await expect(
       page.getByText('You do not have permission to access the code editor.'),
     ).toBeVisible();

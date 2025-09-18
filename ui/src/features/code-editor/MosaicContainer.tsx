@@ -1,28 +1,35 @@
-import type { MosaicNode } from 'react-mosaic-component';
 import {
-  MosaicWithoutDragDropContext,
   MosaicWindow,
+  MosaicWithoutDragDropContext,
 } from 'react-mosaic-component';
-import './xb-react-mosaic-component.css';
+
+import type { MosaicNode } from 'react-mosaic-component';
+
+import './canvas-react-mosaic-component.css';
+
 import { useState } from 'react';
-import JavaScriptEditor from '@/features/code-editor/editors/JavaScriptEditor';
-import { Box, Button, ScrollArea, Tabs } from '@radix-ui/themes';
 import { LayoutIcon } from '@radix-ui/react-icons';
-import GlobalCssEditor from '@/features/code-editor/editors/GlobalCssEditor';
+import { Box, Button, ScrollArea, Tabs } from '@radix-ui/themes';
+
 import CssEditor from '@/features/code-editor/editors/CssEditor';
+import GlobalCssEditor from '@/features/code-editor/editors/GlobalCssEditor';
+import JavaScriptEditor from '@/features/code-editor/editors/JavaScriptEditor';
+
 import styles from './MosaicContainer.module.css';
-import './xb-code-mirror.css';
-import Preview from '@/features/code-editor/Preview';
-import ComponentData from '@/features/code-editor/component-data/ComponentData';
-import useCodeEditor from '@/features/code-editor/hooks/useCodeEditor';
-import { openAddToComponentsDialog } from '@/features/ui/codeComponentDialogSlice';
+
+import './canvas-code-mirror.css';
+
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import {
   selectCodeComponentProperty,
   selectCodeComponentSerialized,
 } from '@/features/code-editor/codeEditorSlice';
-import { selectLatestError } from '@/features/error-handling/queryErrorSlice';
+import ComponentData from '@/features/code-editor/component-data/ComponentData';
+import useCodeEditor from '@/features/code-editor/hooks/useCodeEditor';
+import Preview from '@/features/code-editor/Preview';
 import ConflictWarning from '@/features/editor/ConflictWarning';
+import { selectLatestError } from '@/features/error-handling/queryErrorSlice';
+import { openAddToComponentsDialog } from '@/features/ui/codeComponentDialogSlice';
 
 const defaultLayout: MosaicNode<string> = {
   direction: 'row',
@@ -108,7 +115,7 @@ const MosaicContainer = () => {
   };
 
   return (
-    <div id="xb-mosaic-container" data-testid="xb-mosaic-container">
+    <div id="canvas-mosaic-container" data-testid="canvas-mosaic-container">
       {/* `DndProvider` is added in `ui/src/app/App.tsx` */}
       <MosaicWithoutDragDropContext
         value={layout}
@@ -125,7 +132,7 @@ const MosaicContainer = () => {
             case 'Editor':
               return (
                 <MosaicWindow<string>
-                  className="xb-mosaic-window-editor"
+                  className="canvas-mosaic-window-editor"
                   path={path}
                   draggable={false}
                   toolbarControls={
@@ -150,7 +157,7 @@ const MosaicContainer = () => {
             case 'Preview':
               return (
                 <MosaicWindow<string>
-                  className="xb-mosaic-window-preview"
+                  className="canvas-mosaic-window-preview"
                   path={path}
                   title="Preview"
                   draggable={false}
@@ -187,7 +194,7 @@ const MosaicContainer = () => {
             case 'Component data':
               return (
                 <MosaicWindow<string>
-                  className="xb-mosaic-window-component-data"
+                  className="canvas-mosaic-window-component-data"
                   path={path}
                   title="Component data"
                   draggable={false}

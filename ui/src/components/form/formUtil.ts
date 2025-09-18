@@ -1,20 +1,23 @@
-import type { FieldDataItem } from '@/types/Component';
+import Ajv from 'ajv';
+import addFormats from 'ajv-formats';
+import addDraft2019 from 'ajv-formats-draft2019';
+import qs from 'qs';
+
 import { componentHasFieldData } from '@/types/Component';
-import type { InputUIData, PropsValues } from '@/types/Form';
+import { getDrupal } from '@/utils/drupal-globals';
+import transforms from '@/utils/transforms';
+
+import type * as React from 'react';
+import type { SchemaObject, ValidateFunction } from 'ajv';
+import type { ParsedQs } from 'qs';
 import type {
   ComponentModel,
   EvaluatedComponentModel,
 } from '@/features/layout/layoutModelSlice';
-import Ajv from 'ajv';
-import type { SchemaObject, ValidateFunction } from 'ajv';
-import type * as React from 'react';
-import addFormats from 'ajv-formats';
-import type { ParsedQs } from 'qs';
+import type { FieldDataItem } from '@/types/Component';
+import type { InputUIData, PropsValues } from '@/types/Form';
 import type { TransformConfig, Transforms } from '@/utils/transforms';
-import transforms from '@/utils/transforms';
-import qs from 'qs';
-import addDraft2019 from 'ajv-formats-draft2019';
-import { getDrupal } from '@/utils/drupal-globals';
+
 const ajv = new Ajv();
 addFormats(ajv);
 addDraft2019(ajv);
@@ -191,7 +194,7 @@ export function validateProp(
  */
 export function toPropName(inputName: string, selectedComponent: string) {
   return inputName
-    .replace(`xb_component_props[${selectedComponent}][`, '')
+    .replace(`canvas_component_props[${selectedComponent}][`, '')
     .replace(/\].*$/, '');
 }
 
@@ -235,7 +238,7 @@ export function propInputData(
   // props that have multiple single-value fields associated with them.
   const propsInThisForm: string[] = [];
   Object.keys(formState).forEach((itemKey) => {
-    if (itemKey.includes(`xb_component_props[${selectedComponent}][`)) {
+    if (itemKey.includes(`canvas_component_props[${selectedComponent}][`)) {
       const propName = itemKey.split('][')[1];
       if (propsInThisForm.includes(propName)) {
         // If we hit a prop that is already in `propsInThisForm`, add it
@@ -323,9 +326,9 @@ export const formStateToObject = (
     params.append(key, value);
   });
   const parsed = qs.parse(params.toString());
-  if (isParsedQ(parsed.xb_component_props)) {
-    if (parsed.xb_component_props[componentId]) {
-      return parsed.xb_component_props[componentId] as PropsValues;
+  if (isParsedQ(parsed.canvas_component_props)) {
+    if (parsed.canvas_component_props[componentId]) {
+      return parsed.canvas_component_props[componentId] as PropsValues;
     }
   }
   return {};
@@ -366,9 +369,9 @@ export function getPropsValues(
   // a component input to create propsValues, which will ultimately be
   // used to update this component's model.
   const Drupal = getDrupal() || {
-    Drupal: { xbTransforms: transforms },
+    Drupal: { canvasTransforms: transforms },
   };
-  const transformsList: Transforms = Drupal?.xbTransforms || transforms;
+  const transformsList: Transforms = Drupal?.canvasTransforms || transforms;
   const propsValues = Object.entries(
     formStateToObject(formState, selectedComponent),
   ).reduce((carry: PropsValues, [key, value]) => {
@@ -468,7 +471,7 @@ export function getPropsValues(
   return { propsValues, selectedModel };
 }
 
-export const COMPONENT_PREVIEW_UPDATE_EVENT = 'xb:component_preview_update';
+export const COMPONENT_PREVIEW_UPDATE_EVENT = 'canvas:component_preview_update';
 
 // A custom event class for communicating model updates to power client-side
 // preview updates.
@@ -476,18 +479,18 @@ export class ComponentPreviewUpdateEvent extends Event {
   componentUuid: string;
   propName: string;
   propValue: any;
-  #previewBackgroundUpdate: boolean;
+  private previewBackgroundUpdate: boolean;
   constructor(componentUuid: string, propName: string, propValue: any) {
     super(COMPONENT_PREVIEW_UPDATE_EVENT);
     this.componentUuid = componentUuid;
     this.propName = propName;
     this.propValue = propValue;
-    this.#previewBackgroundUpdate = false;
+    this.previewBackgroundUpdate = false;
   }
   setPreviewBackgroundUpdate(update: boolean) {
-    this.#previewBackgroundUpdate = update;
+    this.previewBackgroundUpdate = update;
   }
   getPreviewBackgroundUpdate(): boolean {
-    return this.#previewBackgroundUpdate;
+    return this.previewBackgroundUpdate;
   }
 }

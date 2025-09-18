@@ -1,18 +1,19 @@
 /* cspell:ignore Mycomponentname HelloWorldexample */
-import { describe, it, expect } from 'vitest';
-import {
-  deserializeProps,
-  serializeProps,
-  serializeSlots,
-  deserializeSlots,
-  getPropValuesForPreview,
-  formatToValidImportName,
-  getImportsFromAst,
-  getDataDependenciesFromAst,
-} from '@/features/code-editor/utils';
+import { describe, expect, it } from 'vitest';
+import { parse } from '@babel/parser';
 import fixtureProps from '@tests/fixtures/code-component-props.json';
 import fixtureSlots from '@tests/fixtures/code-component-slots.json';
-import { parse } from '@babel/parser';
+
+import {
+  deserializeProps,
+  deserializeSlots,
+  formatToValidImportName,
+  getDataDependenciesFromAst,
+  getImportsFromAst,
+  getPropValuesForPreview,
+  serializeProps,
+  serializeSlots,
+} from '@/features/code-editor/utils';
 
 const {
   deserialized: deserializedPropsFixture,
@@ -270,7 +271,7 @@ describe('Code editor preview utilities', () => {
   it('extracts values from props for preview', () => {
     expect(getPropValuesForPreview(deserializedPropsFixture)).toEqual({
       stringWithNoExampleValue: '',
-      stringWithExampleValue: 'Experience Builder',
+      stringWithExampleValue: 'Drupal Canvas',
       integerWithNoExampleValue: 0,
       integerWithExampleValue: 922,
       numberWithNoExampleValue: 0,
@@ -302,7 +303,7 @@ describe('Code editor preview utilities', () => {
         "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged.",
       videoWithNoExampleValue: '',
       videoWithExampleValue: {
-        src: '/modules/contrib/experience_builder/ui/assets/videos/mountain_wide.mp4',
+        src: '/modules/contrib/canvas/ui/assets/videos/mountain_wide.mp4',
         poster: 'https://placehold.co/1920x1080.png?text=Horizontal',
       },
     });

@@ -1,60 +1,55 @@
+import { readFileSync } from 'node:fs';
+import { expect } from '@playwright/test';
+
 import { test } from './fixtures/DrupalSite';
 import { Drupal } from './objects/Drupal';
-import { expect } from '@playwright/test';
-import { readFileSync } from 'node:fs';
 
-// @cspell:ignore xbai
+// @cspell:ignore canvasai
 /**
- * This test suite will verify XB AI related features.
+ * This test suite will verify Canvas AI related features.
  */
 
 test.describe('AI Features', () => {
   test.beforeAll(
-    'Setup test site with Experience Builder',
+    'Setup test site with Drupal Canvas',
     async ({ browser, drupalSite }) => {
       const page = await browser.newPage();
       const drupal = new Drupal({ page, drupalSite });
-      await drupal.installModules([
-        'experience_builder',
-        'xb_ai',
-        'xb_ai_test',
-      ]);
-      await drupal.createRole({ name: 'xb_ai' });
+      await drupal.installModules(['canvas', 'canvas_ai', 'canvas_ai_test']);
+      await drupal.createRole({ name: 'canvas_ai' });
       await drupal.addPermissions({
-        role: 'xb_ai',
-        permissions: ['view the administration theme', 'edit xb_page'],
+        role: 'canvas_ai',
+        permissions: ['view the administration theme', 'edit canvas_page'],
       });
       await drupal.createUser({
-        email: `xbai@example.com`,
-        username: 'xbai',
+        email: `canvasai@example.com`,
+        username: 'canvasai',
         password: 'superstrongpassword1337',
-        roles: ['xb_ai'],
+        roles: ['canvas_ai'],
       });
       await page.close();
     },
   );
 
-  test('Show AI panel only to users with XB AI permissions', async ({
+  test('Show AI panel only to users with Canvas AI permissions', async ({
     page,
     drupal,
-    xBEditor,
+    canvasEditor,
   }) => {
     await drupal.login({
-      username: 'xbai',
+      username: 'canvasai',
       password: 'superstrongpassword1337',
     });
-    await drupal.createXbPage('XB AI User', '/xbai_user');
-    await page.goto('/xbai_user');
-    await xBEditor.goToEditor();
-
-    // @todo This test should fail once https://www.drupal.org/i/3533449 is implemented
+    await drupal.createCanvasPage('Canvas AI User', '/canvasai_user');
+    await page.goto('/canvasai_user');
+    await canvasEditor.goToEditor();
     await expect(
       page.getByRole('button', { name: 'Open AI Panel' }),
-    ).toBeAttached();
+    ).not.toBeAttached();
 
     await drupal.addPermissions({
-      role: 'xb_ai',
-      permissions: ['use experience builder ai'],
+      role: 'canvas_ai',
+      permissions: ['use Drupal Canvas AI'],
     });
     await page.reload();
     await expect(
@@ -62,17 +57,22 @@ test.describe('AI Features', () => {
     ).toBeAttached();
   });
 
-  test('Create component workflow', async ({ page, drupal, xBEditor, ai }) => {
+  test('Create component workflow', async ({
+    page,
+    drupal,
+    canvasEditor,
+    ai,
+  }) => {
     await drupal.loginAsAdmin();
-    await drupal.createXbPage('XB AI component', '/xbai_component');
-    await page.goto('/xbai_component');
-    await xBEditor.goToEditor();
+    await drupal.createCanvasPage('Canvas AI component', '/canvasai_component');
+    await page.goto('/canvasai_component');
+    await canvasEditor.goToEditor();
     await ai.openPanel();
     await ai.submitQuery('Create component');
     await expect(page).toHaveURL(
-      /\/xb\/xb_page\/\d+\/code-editor\/component\/herobanner/,
+      /\/canvas\/code-editor\/component\/herobanner/,
     );
-    await page.getByTestId('xb-publish-review').click();
+    await page.getByTestId('canvas-publish-review').click();
     await page
       .getByRole('checkbox', { name: 'Select all changes in Components' })
       .click();
@@ -82,39 +82,39 @@ test.describe('AI Features', () => {
     await page.getByRole('button', { name: 'Publish 2 selected' }).click();
     await page.getByRole('button', { name: 'Add to components' }).click();
     await page.getByRole('button', { name: 'Add' }).click();
-    await expect(page).toHaveURL(/\/xb\/xb_page\/\d+\/editor/);
-    await page.getByRole('button', { name: 'Add' }).click();
+    await expect(page).toHaveURL(/\/canvas\/editor\/canvas_page\/\d+$/);
+    await canvasEditor.openLibraryPanel();
     await page
       .locator('div')
       .filter({ hasText: /^HeroBanner$/ })
       .nth(4)
       .click();
-    await xBEditor.clickPreviewComponent('js.herobanner');
+    await canvasEditor.clickPreviewComponent('js.herobanner');
 
     // Create a second component.
     await ai.submitQuery('Create second component');
     await expect(page).toHaveURL(
-      /\/xb\/xb_page\/\d+\/code-editor\/component\/herobannersecond/,
+      /\/canvas\/code-editor\/component\/herobannersecond/,
     );
-    const preview = xBEditor.getCodePreviewFrame();
+    const preview = canvasEditor.getCodePreviewFrame();
     const redElements = preview.locator('.bg-red-600');
     const blueElements = preview.locator('.bg-blue-600');
     await expect(redElements).toHaveCount(1);
     await expect(blueElements).toHaveCount(0);
 
     await ai.submitQuery('Edit component');
-    const updatedPreview = xBEditor.getCodePreviewFrame();
+    const updatedPreview = canvasEditor.getCodePreviewFrame();
     const redElementsUpdated = updatedPreview.locator('.bg-red-600');
     const blueElementsUpdated = updatedPreview.locator('.bg-blue-600');
     await expect(redElementsUpdated).toHaveCount(0);
     await expect(blueElementsUpdated).toHaveCount(1);
   });
 
-  test('Image upload', async ({ page, drupal, xBEditor, ai }) => {
+  test('Image upload', async ({ page, drupal, canvasEditor, ai }) => {
     await drupal.loginAsAdmin();
-    await drupal.createXbPage('XB AI image upload', '/xbai_image');
-    await page.goto('/xbai_image');
-    await xBEditor.goToEditor();
+    await drupal.createCanvasPage('Canvas AI image upload', '/canvasai_image');
+    await page.goto('/canvasai_image');
+    await canvasEditor.goToEditor();
     await ai.openPanel();
 
     const buffer = readFileSync('tests/fixtures/images/gracie-big.jpg');
@@ -127,7 +127,7 @@ test.describe('AI Features', () => {
       return dt;
     }, buffer.toString('binary'));
     await page.dispatchEvent(
-      '[data-testid="xb-ai-panel"] deep-chat #drag-and-drop',
+      '[data-testid="canvas-ai-panel"] deep-chat #drag-and-drop',
       'drop',
       {
         dataTransfer,
@@ -142,7 +142,7 @@ test.describe('AI Features', () => {
     ).toBeVisible();
 
     const submitButton = page
-      .getByTestId('xb-ai-panel')
+      .getByTestId('canvas-ai-panel')
       .locator('.input-button.inside-right');
     await expect(submitButton).not.toBeVisible();
 
@@ -162,14 +162,14 @@ test.describe('AI Features', () => {
     ).not.toBeVisible();
   });
 
-  test('Generate title', async ({ page, drupal, xBEditor, ai }) => {
+  test('Generate title', async ({ page, drupal, canvasEditor, ai }) => {
     await drupal.loginAsAdmin();
-    await drupal.createXbPage('XB AI title', '/xbai_title');
-    await page.goto('/xbai_title');
-    await xBEditor.goToEditor();
+    await drupal.createCanvasPage('Canvas AI title', '/canvasai_title');
+    await page.goto('/canvasai_title');
+    await canvasEditor.goToEditor();
     await ai.openPanel();
     await expect(page.getByRole('textbox', { name: 'Title*' })).toHaveValue(
-      'XB AI title',
+      'Canvas AI title',
     );
     await ai.submitQuery('Generate title');
     await expect(page.getByRole('textbox', { name: 'Title*' })).toHaveValue(
@@ -177,11 +177,11 @@ test.describe('AI Features', () => {
     );
   });
 
-  test('Generate metadata', async ({ page, drupal, xBEditor, ai }) => {
+  test('Generate metadata', async ({ page, drupal, canvasEditor, ai }) => {
     await drupal.loginAsAdmin();
-    await drupal.createXbPage('XB AI metadata', '/xbai_metadata');
-    await page.goto('/xbai_metadata');
-    await xBEditor.goToEditor();
+    await drupal.createCanvasPage('Canvas AI metadata', '/canvasai_metadata');
+    await page.goto('/canvasai_metadata');
+    await canvasEditor.goToEditor();
     await ai.openPanel();
     await expect(
       page.getByRole('textbox', { name: 'Meta description' }),

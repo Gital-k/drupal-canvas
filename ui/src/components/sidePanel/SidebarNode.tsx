@@ -1,5 +1,6 @@
 import * as React from 'react';
-
+import { clsx } from 'clsx';
+import TemplateIcon from '@assets/icons/template.svg?react';
 import {
   BoxModelIcon,
   CodeIcon,
@@ -8,11 +9,11 @@ import {
   ComponentBooleanIcon,
   CubeIcon,
   DotsHorizontalIcon,
-  FileIcon,
+  FileTextIcon,
+  HomeIcon,
   SectionIcon,
 } from '@radix-ui/react-icons';
 import { DropdownMenu, Flex, Text } from '@radix-ui/themes';
-import { clsx } from 'clsx';
 
 import styles from './SidebarNode.module.css';
 
@@ -21,16 +22,18 @@ const VARIANTS = {
   code: { icon: <CodeIcon /> },
   codeComponent: { icon: <Component2Icon /> },
   dynamicComponent: { icon: <ComponentBooleanIcon /> },
-  page: { icon: <FileIcon /> },
+  homepage: { icon: <HomeIcon /> },
+  page: { icon: <FileTextIcon /> },
   region: { icon: <CubeIcon /> },
   pattern: { icon: <SectionIcon /> },
   slot: { icon: <BoxModelIcon /> },
+  template: { icon: <TemplateIcon /> },
 } as const;
 
 export type SideBarNodeVariant = keyof typeof VARIANTS;
 
 const SidebarNode = React.forwardRef<
-  HTMLDivElement,
+  HTMLDivElement | HTMLAnchorElement,
   {
     title: string;
     variant: SideBarNodeVariant;
@@ -44,6 +47,7 @@ const SidebarNode = React.forwardRef<
     className?: string;
     onMenuOpenChange?: (open: boolean) => void;
     includeDropdown?: boolean;
+    href?: string;
   } & React.HTMLAttributes<HTMLDivElement>
 >(
   (
@@ -53,20 +57,20 @@ const SidebarNode = React.forwardRef<
       leadingContent,
       hovered = false,
       selected = false,
-      draggable = true,
+      draggable = false,
       disabled = false,
       dropdownMenuContent = null,
       open = false,
       className,
       onMenuOpenChange,
       includeDropdown = true,
+      href,
       ...props
     },
     ref,
   ) => {
-    return (
+    const content = (
       <Flex
-        ref={ref}
         align="center"
         pr="2"
         maxWidth="100%"
@@ -99,7 +103,7 @@ const SidebarNode = React.forwardRef<
             {VARIANTS[variant].icon}
           </Flex>
           <Flex px="2" align="center" flexGrow="1" overflow="hidden">
-            <Text size="1" className={styles.title}>
+            <Text size="1" truncate className={styles.title}>
               {title}
             </Text>
           </Flex>
@@ -121,6 +125,19 @@ const SidebarNode = React.forwardRef<
         )}
       </Flex>
     );
+
+    if (href) {
+      return (
+        <a
+          href={href}
+          style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}
+        >
+          {content}
+        </a>
+      );
+    }
+
+    return <>{content}</>;
   },
 );
 

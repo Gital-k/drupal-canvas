@@ -2,21 +2,26 @@
  * ⚠️ This is highly experimental and *will* be refactored.
  */
 import clsx from 'clsx';
-import styles from '@/components/sidePanel/PrimaryPanel.module.css';
+import { Cross2Icon } from '@radix-ui/react-icons';
 import { Box, Button, Flex, Heading, ScrollArea } from '@radix-ui/themes';
+
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
+import ErrorBoundary from '@/components/error/ErrorBoundary';
+import ExtensionsList from '@/components/extensions/ExtensionsList';
 import Library from '@/components/sidePanel/Library';
 import ManageLibrary from '@/components/sidePanel/ManageLibrary';
+import Pages from '@/components/sidePanel/Pages';
+import Templates from '@/components/sidePanel/Templates';
+import Layers from '@/features/layout/layers/Layers';
 import {
   selectActivePanel,
   unsetActivePanel,
 } from '@/features/ui/primaryPanelSlice';
 import useHidePanelClasses from '@/hooks/useHidePanelClasses';
-import ErrorBoundary from '@/components/error/ErrorBoundary';
-import Layers from '@/features/layout/layers/Layers';
-import ExtensionsList from '@/components/extensions/ExtensionsList';
-import { Cross2Icon } from '@radix-ui/react-icons';
+
 import AiWizard from '../aiExtension/AiWizard';
+
+import styles from '@/components/sidePanel/PrimaryPanel.module.css';
 
 export const PrimaryPanel = () => {
   const activePanel = useAppSelector(selectActivePanel);
@@ -29,12 +34,14 @@ export const PrimaryPanel = () => {
     manageLibrary: 'Manage library',
     extensions: 'Extensions',
     aiWizard: 'AI',
+    templates: 'Templates',
+    pages: 'Pages',
   };
 
   return (
     <Flex
       className={clsx(styles.primaryPanel, ...offLeftClasses)}
-      data-testid="xb-primary-panel"
+      data-testid="canvas-primary-panel"
       direction="column"
     >
       <Flex align="center" className={styles.header} px="4" flexShrink="0">
@@ -72,6 +79,11 @@ export const PrimaryPanel = () => {
                 <ManageLibrary />
               </ErrorBoundary>
             )}
+            {activePanel === 'pages' && (
+              <ErrorBoundary>
+                <Pages />
+              </ErrorBoundary>
+            )}
             {activePanel === 'extensions' && (
               <ErrorBoundary>
                 <ExtensionsList />
@@ -80,6 +92,11 @@ export const PrimaryPanel = () => {
             {activePanel === 'aiWizard' && (
               <ErrorBoundary>
                 <AiWizard />
+              </ErrorBoundary>
+            )}
+            {activePanel === 'templates' && (
+              <ErrorBoundary>
+                <Templates />
               </ErrorBoundary>
             )}
           </Box>

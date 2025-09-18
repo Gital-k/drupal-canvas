@@ -81,7 +81,7 @@ variables:
   # https://project.pages.drupalcode.org/gitlab_templates/info/test-locally/
   DRUPALORG_CI_SERVER_URL: https://git.drupalcode.org
   # Set this as CI_PROJECT_NAME changes on forks.
-  CI_PARENT_PROJECT_NAME: experience_builder
+  CI_PARENT_PROJECT_NAME: canvas
   PHPUNIT_FAIL_ON_PHPUNIT_DEPRECATION: 0
   _CONCURRENCY_THREADS: '12'
 
@@ -105,6 +105,9 @@ variables:
   - if: $_FOR_EVERY_MR_COMMIT == "true" || $_FOR_EVERY_MR_COMMIT == null
     changes:
       - "**/*.css"
+      - package.json
+      - ui/package.json
+      - .prettierrc.json
     when: on_success
 
 # @todo Remove when https://www.drupal.org/project/gitlab_templates/issues/3452183 lands.
@@ -179,7 +182,7 @@ phpcs-rules-match-drupal-11:
       if [ $DIFF_EXIT_CODE -ne 0 ]; then
         echo "🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥"
         echo "Error: core.phpcs.xml.dist not up to date with Drupal 11.x core/phpcs.xml.dist. Please create an issue to update this file."
-        echo "Issue template: https://www.drupal.org/node/add/project-issue/experience_builder?title=Update%20PHPCS%20config%20to%20match%20Drupal%2011&field_issue_parent=3512890&clone_body=1&categories=2&priorities=100&status=1&version=0.x-dev&component=Code&assigned=0&tags="
+        echo "Issue template: https://www.drupal.org/node/add/project-issue/canvas?title=Update%20PHPCS%20config%20to%20match%20Drupal%2011&field_issue_parent=3512890&clone_body=1&categories=2&priorities=100&status=1&version=0.x-dev&component=Code&assigned=0&tags="
       else
         echo "👍👍👍👍👍👍👍👍👍👍👍👍👍👍👍👍👍👍"
         echo "core.phpcs.xml.dist is up to date with Drupal 11.x core/phpcs.xml.dist"
@@ -187,7 +190,7 @@ phpcs-rules-match-drupal-11:
 
       # Exit with the exit code of the diff command
       exit $DIFF_EXIT_CODE
-  # Allow this to fail, to avoid disrupting XB's CI when upstream changes.
+  # Allow this to fail, to avoid disrupting Canvas's CI when upstream changes.
   allow_failure: true
 stylelint:
   allow_failure: false
@@ -200,6 +203,10 @@ stylelint:
   script:
     - cd $_WEB_ROOT/core && corepack enable && yarn add @gitlab-formatters/stylelint-formatter-gitlab
     - cd $CI_PROJECT_DIR/$_WEB_ROOT/modules/custom/$CI_PROJECT_NAME
+    # Install packages in the Canvas module's root directory.
+    # When stylelint runs Prettier, plugins are resolved relative to .prettierrc.json location, not the Prettier binary
+    # (which is in the Drupal core folder).
+    - npm ci
     - echo "Stylelint version $(${CI_PROJECT_DIR}/${_WEB_ROOT}/core/node_modules/.bin/stylelint --version)"
     - $CI_PROJECT_DIR/$_WEB_ROOT/core/node_modules/.bin/stylelint --ignore-path ./.stylelintignore --config $CI_PROJECT_DIR/$_WEB_ROOT/core/.stylelintrc.json ./**/*.css --formatter verbose --color $_STYLELINT_EXTRA || true
     - $CI_PROJECT_DIR/$_WEB_ROOT/core/node_modules/.bin/stylelint --ignore-path ./.stylelintignore --config $CI_PROJECT_DIR/$_WEB_ROOT/core/.stylelintrc.json ./**/*.css --custom-formatter=@gitlab-formatters/stylelint-formatter-gitlab --output-file=$CI_PROJECT_DIR/gl-codequality.json $_STYLELINT_EXTRA
@@ -211,7 +218,7 @@ stylelint:
 
 phpunit:
   variables:
-    # Note: XB uses `@group #slow` to start slow tests early. The threshold is (at the time of writing) ~60 seconds.
+    # Note: Canvas uses `@group #slow` to start slow tests early. The threshold is (at the time of writing) ~60 seconds.
     _PHPUNIT_CONCURRENT: 1
   needs:
     - composer
@@ -257,9 +264,17 @@ eslint:
   allow_failure: false
   before_script:
     # 🤷‍.eslintignore already instructs eslint to ignore this, but it does not seem to work. This is validated by the `UI eslint` job below.
+    # @todo Remove when https://www.drupal.org/project/gitlab_templates/issues/3452183 lands.
     - rm -rf ui
     - rm -rf tests/src/Playwright playwright.config.ts eslint.config.mjs
-  # @todo Remove when https://www.drupal.org/project/gitlab_templates/issues/3452183 lands.
+    # This job runs ESLint and Prettier checks using what's installed in Drupal core.
+    # Delete our custom .prettierrc.json, and use the one from Drupal core instead. This avoids problems with Prettier
+    # plugins that are not installed in Drupal core, e.g., @ianvs/prettier-plugin-sort-imports.
+    - rm -rf .prettierrc.json
+    # The eslint job in gitlab_templates creates a symlink if a Prettier config file is not found.
+    # However, some misterious race condition recreates the file before the symlink is created, so we create the symlink
+    # here with the -f (force) option.
+    - ln -sf $CI_PROJECT_DIR/$_WEB_ROOT/core/.prettierrc.json .
   rules:
     - *is-push-rule
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -428,13 +443,13 @@ cypress unit:
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_PROJECT_ROOT_NAMESPACE == "project"
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
-        - docs/XB.dsl
+        - docs/Canvas.dsl
         - docs/diagrams/*
   image:
     name: structurizr/cli
     entrypoint: [""]
   script:
-    - /usr/local/structurizr-cli/structurizr.sh export --workspace docs/XB.dsl --format mermaid --output $CI_PROJECT_DIR/docs/diagrams
+    - /usr/local/structurizr-cli/structurizr.sh export --workspace docs/Canvas.dsl --format mermaid --output $CI_PROJECT_DIR/docs/diagrams
     # Prepend the prefix
     #   ```mermaid
     # and the
@@ -496,6 +511,15 @@ lint (node):
   script:
     - npm ci
     - npm run lint
+
+lint (OpenAPI):
+  stage: validate
+  needs: []
+  image: node:24-alpine
+  script:
+    - npx @redocly/cli@latest lint openapi.yml
+  variables:
+    FORCE_COLOR: "1"
 
 playwright:
   stage: test
@@ -562,10 +586,10 @@ CLI Test:
     - if: '$CI_COMMIT_TAG =~ /^cli-\d+\.\d+\.\d+(-\w+\d*)?$/'
   before_script:
     mkdir -p test-results
-  # This job must pass, but must also not disrupt XB's CI if dependencies have a security vulnerability.
+  # This job must pass, but must also not disrupt Canvas's CI if dependencies have a security vulnerability.
   allow_failure:
     exit_codes:
-      # `npm audit …` fails (implies upstream security vulnerability that may or may not affect XB)
+      # `npm audit …` fails (implies upstream security vulnerability that may or may not affect Canvas)
       - 100
   script:
     - npm ci

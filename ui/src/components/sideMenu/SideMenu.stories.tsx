@@ -1,8 +1,11 @@
-import type { Meta, StoryObj } from '@storybook/react';
-import { SideMenu } from './SideMenu';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
+
 import { primaryPanelSlice } from '@/features/ui/primaryPanelSlice';
+
+import { SideMenu } from './SideMenu';
+
+import type { Meta, StoryObj } from '@storybook/react';
 
 // Define the Story args interface separately
 interface StoryArgs {
@@ -33,8 +36,7 @@ const createMockStore = (
       primaryPanel: {
         activePanel,
         isHidden: false,
-        openLayoutItems: ['component'],
-        uniqueListId: '',
+        aiPanelOpen: false,
       },
     },
   });

@@ -1,16 +1,18 @@
-import type { Command } from 'commander';
-import * as p from '@clack/prompts';
 import fs from 'fs/promises';
 import path from 'path';
 import chalk from 'chalk';
-import { getConfig, setConfig, ensureConfig } from '../config';
-import { createApiService } from '../services/api';
 import yaml from 'js-yaml';
-import type { Component } from '../types/Component';
+import * as p from '@clack/prompts';
+
+import { ensureConfig, getConfig, setConfig } from '../config';
+import { createApiService } from '../services/api';
 import { reportResults } from '../utils/report-results';
 import { directoryExists } from '../utils/utils';
-import type { Result } from '../types/Result';
+
+import type { Command } from 'commander';
+import type { Component } from '../types/Component';
 import type { Metadata } from '../types/Metadata';
+import type { Result } from '../types/Result';
 
 interface DownloadOptions {
   clientId?: string;
@@ -37,7 +39,7 @@ export function downloadCommand(program: Command): void {
     .option('--all', 'Download all components')
     .option('--verbose', 'Enable verbose output')
     .action(async (options: DownloadOptions) => {
-      p.intro('Experience Builder Component Download');
+      p.intro('Drupal Canvas Component Download');
 
       try {
         // Update config with CLI options

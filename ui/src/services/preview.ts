@@ -1,20 +1,23 @@
+import { createSelector } from '@reduxjs/toolkit';
 import { createApi } from '@reduxjs/toolkit/query/react';
-import { baseQueryWithAutoSaves } from '@/services/baseQuery';
-import type { AutoSavesHash } from '@/types/AutoSaves';
+
 import { setPostPreviewCompleted } from '@/components/review/PublishReview.slice';
+import { setLayoutModel } from '@/features/layout/layoutModelSlice';
+import { setHtml } from '@/features/pagePreview/previewSlice';
+import { baseQueryWithAutoSaves } from '@/services/baseQuery';
+import { pendingChangesApi } from '@/services/pendingChangesApi';
+import { handleAutoSavesHashUpdate } from '@/utils/autoSaves';
+
+import type { RootState } from '@/app/store';
 import type {
   ComponentModel,
   EvaluatedComponentModel,
 } from '@/features/layout/layoutModelSlice';
-import { setLayoutModel } from '@/features/layout/layoutModelSlice';
-import { setHtml } from '@/features/pagePreview/previewSlice';
+import type { EditorFrameContext } from '@/features/ui/uiSlice';
 import type { ConflictError } from '@/services/pendingChangesApi';
-import { pendingChangesApi } from '@/services/pendingChangesApi';
-import { createSelector } from '@reduxjs/toolkit';
-import type { RootState } from '@/app/store';
-import { handleAutoSavesHashUpdate } from '@/utils/autoSaves';
+import type { AutoSavesHash } from '@/types/AutoSaves';
 
-type UpdateComponentResultType = {
+export type UpdateComponentResultType = {
   html: string;
   layout: any;
   model: any;
@@ -22,7 +25,8 @@ type UpdateComponentResultType = {
   errors?: Array<ConflictError>;
 };
 
-type UpdateComponentQueryArg = {
+export type UpdateComponentQueryArg = {
+  type: EditorFrameContext;
   componentInstanceUuid: string;
   componentType: string;
   model: Omit<ComponentModel, 'name'> | Omit<EvaluatedComponentModel, 'name'>;
@@ -37,7 +41,7 @@ export const previewApi = createApi({
       { layout: any; model: any; entity_form_fields: any }
     >({
       query: (body) => ({
-        url: 'xb/api/v0/layout/{entity_type}/{entity_id}',
+        url: 'canvas/api/v0/layout/{entity_type}/{entity_id}',
         method: 'POST',
         body,
       }),
@@ -59,11 +63,20 @@ export const previewApi = createApi({
       UpdateComponentResultType,
       UpdateComponentQueryArg
     >({
-      query: (body) => ({
-        url: 'xb/api/v0/layout/{entity_type}/{entity_id}',
-        method: 'PATCH',
-        body,
-      }),
+      query: ({ type, ...body }) => {
+        let url = '';
+        if (type === 'entity') {
+          url = 'canvas/api/v0/layout/{entity_type}/{entity_id}';
+        } else if (type === 'template') {
+          url =
+            'canvas/api/v0/layout-content-template/{entity_type}.{template_bundle}.{template_view_mode}/{entity_id}';
+        }
+        return {
+          url,
+          method: 'PATCH',
+          body,
+        };
+      },
       async onQueryStarted(body, { dispatch, queryFulfilled }) {
         const { data, meta } = await queryFulfilled;
         const { html, layout, model, autoSaves } = data;
