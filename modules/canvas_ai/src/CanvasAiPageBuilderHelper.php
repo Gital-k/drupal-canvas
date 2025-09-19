@@ -92,9 +92,25 @@ class CanvasAiPageBuilderHelper {
    */
   public function getPatternContextForAi(): string {
     $output = [];
-    $available_patterns_response = $this->apiConfigControllers->list(Pattern::ENTITY_TYPE_ID);
-    $available_patterns = (string) $available_patterns_response->getContent();
-    $available_patterns = Json::decode($available_patterns);
+    $current_request = $this->requestStack->getCurrentRequest();
+    $sub_request = Request::create(
+      Url::fromRoute('canvas.api.config.list', ['canvas_config_entity_type_id' => Pattern::ENTITY_TYPE_ID])->toString(),
+      'GET',
+      [],
+      $current_request?->cookies->all() ?? [],
+      [],
+      $current_request?->server->all() ?? []
+    );
+    $sub_request->attributes->set('_format', 'json');
+    try {
+      $available_patterns_response = $this->httpKernel->handle($sub_request, HttpKernelInterface::SUB_REQUEST);
+      $available_patterns = (string) $available_patterns_response->getContent();
+      $available_patterns = Json::decode($available_patterns);
+    }
+    catch (\Exception) {
+      return "";
+    }
+
     if (empty($available_patterns)) {
       return "";
     }
