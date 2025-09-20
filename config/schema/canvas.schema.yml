@@ -154,6 +154,20 @@ canvas.js_component.*:
     # component should be exposed in Drupal Canvas's component library or not. (See its ComponentSource plugin.)
     status:
       label: "Available in Drupal Canvas's component library"
+    encoded_files:
+      requiredKey: false
+      type: sequence
+      nullable: true
+      sequence:
+        type: canvas.encoded_file
+      constraints:
+        NotBlank:
+          allowNull: true
+        SequenceKeysMatchRegex:
+          # Sequence keys must be valid UUID.
+          # @see \Drupal\Component\Uuid\Uuid::VALID_PATTERN
+          pattern: '/^[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}$/'
+          message: "%value is not a valid UUID."
     # See core/assets/schemas/v1/metadata-full.schema.json#properties.machineName
     machineName:
       type: machine_name
@@ -814,6 +828,17 @@ canvas.content_template.*.*.*:
           # @see \Drupal\canvas\Plugin\Validation\Constraint\ValidSlotNameConstraint::VALID_NAME
           pattern: '/^[a-z0-9]+([a-z0-9_-]+)[a-z0-9]+$/'
           message: "%value is not a valid exposed slot name."
+canvas.encoded_file:
+  label: 'Encoded file with UUID based on hash of file contents'
+  type: mapping
+  mapping:
+    # ⚠️ Note the absence of `data` in this mapping! The `data` key-value pair is not part of the config schema, because
+    # `data` is dynamically added/removed to synchronize the contents of the file during config export/import.
+    # @see \Drupal\experience_builder\EventSubscriber\FileDependencyHandler::onExportTransform()
+    # @see \Drupal\experience_builder\EventSubscriber\FileDependencyHandler::onImportTransform()
+    filename:
+      label: 'Original filename of file upload'
+      type: string
 
 canvas.staged_config_update.*:
   type: config_entity

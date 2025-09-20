@@ -216,6 +216,45 @@ Finally:
 overrides the "Published" (saved) version on certain routes, thanks to a conditional config override. (See
 `\Drupal\canvas\Config\CanvasConfigOverrides`.)
 
+#### 3.2.2 _Code components_ can "carry" (synchronizable) files used to populate examples
+
+See:
+- `\Drupal\canvas\EventSubscriber\FileDependencyHandler::onExportTransform()`
+- `\Drupal\canvas\EventSubscriber\FileDependencyHandler::onImportTransform()`
+- `\Drupal\canvas\Entity\JavaScriptComponent::preSave()`
+- `\Drupal\canvas\Entity\JavaScriptComponent::postSave()`
+
+Code components can have example values assigned to their props, including example images. When creating a `File` entity
+used for an example image prop value, its UUID is based on the file's content hash. If an example image is assigned to a
+_code component_ prop, the following happens:
+- `File` entity usage by the `JavaScript Component config entity` (`js_component`) is recorded (added to the `file_usage` database
+  table, see `\Drupal\file\FileUsage\FileUsageInterface::add()`)
+- The `JavaScript Component config entity` gets the relevant `content` dependency declared
+- The original `File` entity _filename_ is stored in `encoded_files` using the `File` entity
+  UUID as sequence key
+
+Upon exporting a `JavaScript Component config entity` containing `encoded_files`, the following happens:
+- `File` entities used for _code component_ props' example values are loaded
+- Contents of each `File` entity are encoded with base64
+- Encoded file contents are appended as `data` property to the relevant `encoded_files` sequence item.
+
+Upon importing a `JavaScript Component config entity`, the following happens:
+- All `js_component` entities are checked for `encoded_files` properties
+- If `encoded_files` is not empty, an attempt to load `File` entity with relevant UUID is made
+- If a `File` entity with that UUID exists, no further actions are required
+- Otherwise, a temporary `File` entity is created
+- All `js_component` entities have their `encoded_files` properties modified by unsetting `data` property
+- Config is imported
+- `JavaScript::postSave()` method checks if its dependencies are stored as temporary `File`s
+  - If no, no further action is required
+  - If yes, `File`s are moved to permanent storage and their usage tracking is updated
+
+This allows easy transfer of _code component_s' example images between environments, without having to worry about
+duplicate `File` entities, changing file paths and without having to store large amounts of base64-encoded data in
+config entity storage (which is stored in the database).
+
+⚠️ The exact approach might change in the future, but we expect functionality to remain very close to current
+implementation.
 
 ### 3.3 `PageRegion config entity`
 

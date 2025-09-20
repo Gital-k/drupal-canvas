@@ -19,9 +19,9 @@ describe('Image code component', () => {
       cy.loadURLandWaitForCanvasLoaded({ url: 'canvas/editor/node/2' });
       cy.openLibraryPanel();
       cy.get('.primaryPanelContent').findByText('Vanilla Image').click();
-      // Check the default image src is set.
+      // Check the example image src is set.
       cy.waitForElementInIframe(
-        'img[src="https://placehold.co/1200x900@2x.png"]',
+        'img[src*="files/js_component/examples/cosmo.jpg"]',
         '[data-test-canvas-content-initialized="true"][data-canvas-swap-active="true"]',
         10000,
       );
@@ -30,7 +30,7 @@ describe('Image code component', () => {
       }).should('exist');
       cy.publishAllPendingChanges('I am an empty node');
       cy.visit('/node/2');
-      cy.get('img[src="https://placehold.co/1200x900@2x.png"]').should(
+      cy.get('img[src*="files/js_component/defaults/cosmo.jpg"]').should(
         'exist',
         {
           timeout: 10000,

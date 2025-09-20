@@ -13,8 +13,11 @@ use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
 use Drupal\Core\Config\Entity\ConfigEntityBase;
 use Drupal\Core\Config\Entity\ConfigEntityTypeInterface;
 use Drupal\Core\Entity\Attribute\ConfigEntityType;
+use Drupal\Core\Entity\EntityRepositoryInterface;
 use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Entity\Query\QueryInterface;
+use Drupal\Core\File\FileExists;
+use Drupal\Core\File\FileSystemInterface;
 use Drupal\Core\File\FileUrlGeneratorInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\Url;
@@ -23,6 +26,8 @@ use Drupal\canvas\ClientSideRepresentation;
 use Drupal\canvas\EntityHandlers\JavascriptComponentStorage;
 use Drupal\canvas\EntityHandlers\VisibleWhenDisabledCanvasConfigEntityAccessControlHandler;
 use Drupal\canvas\Exception\ConstraintViolationException;
+use Drupal\file\Entity\File;
+use Drupal\file\FileInterface;
 use Symfony\Component\Validator\ConstraintViolation;
 
 #[ConfigEntityType(
@@ -42,6 +47,7 @@ use Symfony\Component\Validator\ConstraintViolation;
     'status' => 'status',
   ],
   config_export: [
+    'encoded_files',
     'machineName',
     'name',
     'props',
@@ -62,6 +68,8 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
 
   public const string ENTITY_TYPE_ID = 'js_component';
   public const string ADMIN_PERMISSION = 'administer code components';
+  public const string PUBLIC_IMAGE_DIRECTORY = 'public://js_component/examples';
+  public const string TEMPORARY_IMAGE_DIRECTORY = 'temporary://js_component/examples';
   private const string ASSETS_DIRECTORY = 'assets://astro-island/';
 
   /**
@@ -73,6 +81,8 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
    * The human-readable label of the component.
    */
   protected ?string $name;
+
+  protected ?array $encoded_files;
 
   /**
    * The props of the component.
@@ -245,6 +255,48 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
         'compiled' => $data['compiledJs'] ?? '',
       ]);
     }
+
+    // @todo Refactor in https://www.drupal.org/project/canvas/issues/3538711
+    if (array_key_exists('exampleImages', $data)) {
+      $encoded_files = NULL;
+      foreach ($data['exampleImages'] as $example_image) {
+        /** @var array{data: string, filename: string} $example_image */
+        $uuid = self::generateImageUuid(\base64_decode($example_image['data']));
+        $encoded_files[$uuid] = $example_image;
+      }
+      $this->set('encoded_files', $encoded_files);
+    }
+  }
+
+  /**
+   * Generates UUID based on image file content.
+   *
+   * This is intentionally here until FE counterpart of this work is in.
+   * After that work is complete and merged, UUID generation based on hash
+   * can be refactored and moved into form submission, somewhere in
+   * JavascriptComponent or into some utility class.
+   *
+   * @param string $data
+   *
+   * @return string
+   *
+   * @todo Refactor in https://www.drupal.org/project/canvas/issues/3537728
+   */
+  public static function generateImageUuid(string $data): string {
+    $hashing = hash('sha1', $data);
+    return sprintf('%08s-%04s-%04x-%04x-%12s',
+      // 32 bits for the time_low
+      substr($hashing, 0, 8),
+      // 16 bits for the time_mid
+      substr($hashing, 8, 4),
+      // 16 bits for the time_hi,
+      (hexdec(substr($hashing, 12, 4)) & 0x0fff) | 0x5000,
+      // 8 bits and 16 bits for the clk_seq_hi_res,
+      // 8 bits for the clk_seq_low,
+      (hexdec(substr($hashing, 16, 4)) & 0x3fff) | 0x8000,
+      // 48 bits for the node
+      substr($hashing, 20, 12)
+    );
   }
 
   /**
@@ -346,6 +398,29 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
   public function preSave(EntityStorageInterface $storage): void {
     parent::preSave($storage);
     static::getConfigUpdater()->updateJavaScriptComponent($this);
+    if ($this->isSyncing()) {
+      return;
+    }
+    // Check for referenced files, if any. Convert them into File entities
+    // managed by Experience Builder.
+    $encoded_files = $this->get('encoded_files');
+    if (!is_array($encoded_files)) {
+      return;
+    }
+    assert(!empty($encoded_files));
+
+    /** @var \Drupal\Core\File\FileSystemInterface $file_system */
+    $file_system = \Drupal::service('file_system');
+    assert($file_system instanceof FileSystemInterface);
+    $temporary_image_directory = self::TEMPORARY_IMAGE_DIRECTORY;
+    $file_system->prepareDirectory($temporary_image_directory, FileSystemInterface:: CREATE_DIRECTORY | FileSystemInterface::MODIFY_PERMISSIONS);
+
+    foreach ($encoded_files as $uuid => $encoded_file) {
+      $this->processEncodedFile($uuid, $encoded_file, $file_system);
+      $this->addDependency('content', 'file:file:' . $uuid);
+      $encoded_files[$uuid] = $encoded_file;
+    }
+    $this->set('encoded_files', $encoded_files);
   }
 
   /**
@@ -353,6 +428,31 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
    */
   public function postSave(EntityStorageInterface $storage, $update = TRUE): void {
     parent::postSave($storage, $update);
+    if (isset($this->dependencies['content'])) {
+      $repository = \Drupal::service(EntityRepositoryInterface::class);
+      $file_repository = \Drupal::service('file.repository');
+      $file_system = \Drupal::service('file_system');
+      $file_usage = \Drupal::service('file.usage');
+      assert(is_array($this->encoded_files));
+      $example_image_directory = self::PUBLIC_IMAGE_DIRECTORY;
+      $file_system->prepareDirectory($example_image_directory, FileSystemInterface:: CREATE_DIRECTORY | FileSystemInterface::MODIFY_PERMISSIONS);
+      foreach ($this->encoded_files as $uuid => $encoded_file) {
+        $file = $repository->loadEntityByUuid('file', $uuid);
+        if (!$file instanceof FileInterface) {
+          continue;
+        }
+        if ($file->isTemporary()) {
+          /** @var \Drupal\Core\File\FileSystemInterface $file_system */
+          $new_file_uri = str_replace('temporary://', 'public://', (string) $file->getFileUri());
+          $file = $file_repository->move($file, $new_file_uri, FileExists::Rename);
+        }
+        $usage = $file_usage->listUsage($file);
+        if (!isset($usage[$this->getEntityType()->getProvider()][$this->getEntityTypeId()][$this->id()])) {
+          $file_usage->add($file, $this->getEntityType()->getProvider(), $this->getEntityTypeId(), (string) $this->id());
+        }
+      }
+    }
+
     // The files generated in CanvasAssetStorage::doSave() have a content-dependent
     // hash in their name. This has 2 consequences:
     // 1. Cached responses that referred to an older version, continue to work.
@@ -361,6 +461,30 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
     //    be recalculated.
     // @see \canvas_library_info_build()
     Cache::invalidateTags(['library_info']);
+  }
+
+  protected function processEncodedFile(string $uuid, array &$encoded_file, FileSystemInterface $file_system): void {
+    $entity = \Drupal::service(EntityRepositoryInterface::class)->loadEntityByUuid('file', $uuid);
+    // Uuid is hash based, so updated image won't be even loaded.
+    if ($entity instanceof File) {
+      unset($encoded_file['data']);
+      return;
+    }
+    if (!isset($encoded_file['data'])) {
+      return;
+    }
+
+    $filename = $file_system->createFilename($encoded_file['filename'], self::TEMPORARY_IMAGE_DIRECTORY);
+    $file = File::create([
+      'uuid' => $uuid,
+      'uri' => $filename,
+    ]);
+    $file_system->saveData(base64_decode($encoded_file['data']), (string) $file->getFileUri(), FileExists::Rename);
+
+    $file->setTemporary();
+    $file->save();
+
+    unset($encoded_file['data']);
   }
 
   /**

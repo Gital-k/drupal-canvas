@@ -27,6 +27,7 @@ class FolderValidationTest extends BetterConfigEntityValidationTestBase {
     // Canvas's dependencies (modules providing field types + widgets).
     'datetime',
     'file',
+    'user',
     'image',
     'options',
     'path',
@@ -39,6 +40,9 @@ class FolderValidationTest extends BetterConfigEntityValidationTestBase {
   protected function setUp(): void {
     parent::setUp();
     $this->installConfig('canvas');
+    $this->installEntitySchema('file');
+    $this->installEntitySchema('user');
+    $this->installSchema('file', ['file_usage']);
     $this->entity = Folder::create([
       'name' => 'Test folder, please ignore',
       'configEntityTypeId' => Component::ENTITY_TYPE_ID,

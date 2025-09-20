@@ -15,6 +15,9 @@ use Drupal\Core\Asset\AttachedAssets;
 use Drupal\Core\Cache\CacheableDependencyInterface;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Extension\ModuleExtensionList;
+use Drupal\Core\Entity\EntityRepositoryInterface;
+use Drupal\Core\File\FileExists;
+use Drupal\Core\File\FileSystemInterface;
 use Drupal\Core\File\FileUrlGeneratorInterface;
 use Drupal\Core\StreamWrapper\StreamWrapperInterface;
 use Drupal\Core\StreamWrapper\StreamWrapperManagerInterface;
@@ -32,6 +35,8 @@ use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
 use Drupal\canvas\PropExpressions\StructuredData\FieldTypePropExpression;
 use Drupal\canvas\PropSource\StaticPropSource;
 use Drupal\canvas\Render\ImportMapResponseAttachmentsProcessor;
+use Drupal\file\Entity\File;
+use Drupal\file\FileInterface;
 use Drupal\media\Entity\MediaType;
 use Drupal\canvas_test_code_components\Hook\IslandCastaway;
 
@@ -63,6 +68,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
     'media_library',
     'views',
     'canvas_test_video_fixture',
+    'file',
   ];
 
   /**
@@ -70,6 +76,8 @@ final class JsComponentTest extends ComponentSourceTestBase {
    */
   public function setUp(): void {
     parent::setUp();
+    $this->installEntitySchema('file');
+    $this->installSchema('file', 'file_usage');
     $this->assetResolver = $this->container->get(AssetResolverInterface::class);
     $this->codeComponentDataProvider = $this->container->get(CodeComponentDataProvider::class);
 
@@ -1201,6 +1209,25 @@ final class JsComponentTest extends ComponentSourceTestBase {
    * {@inheritdoc}
    */
   public static function getExpectedClientSideInfo(): array {
+    $example_image = \Drupal::service(EntityRepositoryInterface::class)->loadEntityByUuid('file', 'f8133ff8-3276-5d4d-b3f9-8fb6b363fb70');
+    if (!$example_image instanceof FileInterface) {
+      $directory = JavaScriptComponent::PUBLIC_IMAGE_DIRECTORY;
+      $fixture_image_path = \dirname(__DIR__, 5) . '/fixtures/images/cosmo.jpg';
+      $contents = \file_get_contents($fixture_image_path);
+      \assert(\is_string($contents));
+      $file_system = \Drupal::service(FileSystemInterface::class);
+      $file_system->prepareDirectory($directory, FileSystemInterface:: CREATE_DIRECTORY | FileSystemInterface::MODIFY_PERMISSIONS);
+      $filename = $file_system->createFilename(\basename($fixture_image_path), $directory);
+      $filename = $file_system->saveData($contents, $filename, FileExists::Replace);
+      $example_image = File::create([
+        'uuid' => 'f8133ff8-3276-5d4d-b3f9-8fb6b363fb70',
+        'uri' => $filename,
+      ]);
+      $example_image->setPermanent();
+      $example_image->save();
+    }
+
+    assert($example_image instanceof File);
     return [
       'js.canvas_test_code_components_captioned_video' => [
         'expected_output_selectors' => [
@@ -1347,7 +1374,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
       ],
       'js.canvas_test_code_components_vanilla_image' => [
         'expected_output_selectors' => [
-          'canvas-island[opts*="Vanilla Image"][props*="placehold.co"]',
+          'canvas-island[opts*="Vanilla Image"][props*="' . $example_image->getFilename() . '"]',
           'script[blocking="render"][src*="/ui/lib/astro-hydration/dist/client.js"]',
         ],
         'source' => 'Code component',
@@ -1388,7 +1415,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
             'default_values' => [
               'source' => [],
               'resolved' => [
-                'src' => 'https://placehold.co/1200x900@2x.png',
+                'src' => $example_image->createFileUrl(TRUE),
                 'width' => 1200,
                 'height' => 900,
                 'alt' => 'Example image placeholder',

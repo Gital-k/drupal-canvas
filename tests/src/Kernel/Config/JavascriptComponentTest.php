@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Config;
 
+use Drupal\Core\Entity\EntityRepositoryInterface;
 use Drupal\canvas\Entity\EntityConstraintViolationList;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Exception\ConstraintViolationException;
+use Drupal\file\Entity\File;
 use Drupal\KernelTests\KernelTestBase;
+use Drupal\Tests\canvas\Traits\ExampleImagesTrait;
 
 /**
  * @coversDefaultClass \Drupal\canvas\Entity\JavaScriptComponent
@@ -15,9 +18,20 @@ use Drupal\KernelTests\KernelTestBase;
  */
 class JavascriptComponentTest extends KernelTestBase {
 
+  use ExampleImagesTrait;
+
   protected static $modules = [
     'canvas',
+    'file',
+    'user',
   ];
+
+  protected function setUp(): void {
+    parent::setUp();
+    $this->installEntitySchema('file');
+    $this->installEntitySchema('user');
+    $this->installSchema('file', ['file_usage']);
+  }
 
   /**
    * @covers ::createFromClientSide
@@ -113,6 +127,34 @@ class JavascriptComponentTest extends KernelTestBase {
     $this->assertSame([
       'config:canvas.js_component.test',
     ], $js_component->getCacheTags());
+  }
+
+  public function testExampleImages(): void {
+    $client_data = [
+      'machineName' => 'test',
+      'name' => 'Test Code Component',
+      'status' => FALSE,
+      'required' => [],
+      'props' => [],
+      'slots' => [],
+      'sourceCodeJs' => '',
+      'sourceCodeCss' => '',
+      'compiledJs' => '',
+      'compiledCss' => '',
+      'importedJsComponents' => [],
+    ];
+    $js_component = JavaScriptComponent::createFromClientSide($client_data);
+    $this->assertSame(SAVED_NEW, $js_component->save());
+    $client_data['exampleImages'] = self::getEncodedImages();
+    $js_component->updateFromClientSide($client_data);
+    $this->assertIsArray($js_component->get('encoded_files'));
+    $this->assertSame(SAVED_UPDATED, $js_component->save());
+    $encoded_files = $js_component->get('encoded_files');
+    foreach ($encoded_files as $uuid => $encoded_file) {
+      $file = \Drupal::service(EntityRepositoryInterface::class)->loadEntityByUuid('file', $uuid);
+      $this->assertTrue($file instanceof File);
+      $this->assertArrayNotHasKey('data', $encoded_file);
+    }
   }
 
 }

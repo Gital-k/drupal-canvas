@@ -7,6 +7,7 @@ namespace Drupal\canvas\Plugin\Canvas\ComponentSource;
 use Drupal\Core\Asset\AssetQueryStringInterface;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Config\Entity\ConfigEntityStorageInterface;
+use Drupal\Core\Entity\EntityRepositoryInterface;
 use Drupal\Core\Extension\ExtensionPathResolver;
 use Drupal\Core\File\FileUrlGeneratorInterface;
 use Drupal\Core\Plugin\Component as ComponentPlugin;
@@ -27,6 +28,7 @@ use Drupal\canvas\ComponentSource\UrlRewriteInterface;
 use Drupal\canvas\Entity\VersionedConfigEntityBase;
 use Drupal\canvas\Render\ImportMapResponseAttachmentsProcessor;
 use Drupal\canvas\Version;
+use Drupal\file\Entity\File;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -49,6 +51,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
   protected FileUrlGeneratorInterface $fileUrlGenerator;
   protected Version $version;
   protected AssetQueryStringInterface $assetQueryString;
+  protected EntityRepositoryInterface $entityRepository;
   protected ?JavaScriptComponent $jsComponent = NULL;
 
   public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
@@ -58,6 +61,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
     $instance->fileUrlGenerator = $container->get(FileUrlGeneratorInterface::class);
     $instance->version = $container->get(Version::class);
     $instance->assetQueryString = $container->get(AssetQueryStringInterface::class);
+    $instance->entityRepository = $container->get(EntityRepositoryInterface::class);
     return $instance;
   }
 
@@ -399,6 +403,17 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
    * {@inheritdoc}
    */
   public function rewriteExampleUrl(string $url): string {
+    $encoded_files = $this->getJavaScriptComponent()->get('encoded_files');
+    if (is_array($encoded_files)) {
+      foreach ($encoded_files as $uuid => $encoded_file) {
+        if ($encoded_file['filename'] === $url) {
+          $file = $this->entityRepository->loadEntityByUuid('file', $uuid);
+          assert($file instanceof File);
+          return $file->createFileUrl(TRUE);
+        }
+      }
+    }
+
     // Allow any fully qualified URL.
     $parsed_url = parse_url($url);
     \assert(\is_array($parsed_url));

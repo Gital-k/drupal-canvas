@@ -107,6 +107,7 @@ services:
   Drupal\canvas\EventSubscriber\RecipeSubscriber:
     tags:
       - { name: service_collector, call: addComponentSource, tag: canvas.component_source }
+  Drupal\canvas\EventSubscriber\FileDependencyHandler: ~
 
   # Routing.
   Drupal\canvas\Entity\Routing\CanvasHtmlRouteEnhancer:
