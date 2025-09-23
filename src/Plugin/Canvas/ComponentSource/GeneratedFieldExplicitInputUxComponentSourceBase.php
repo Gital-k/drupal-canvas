@@ -342,7 +342,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       'resolved' => array_map(
         fn(array $prop_source): mixed => PropSource::parse($prop_source)
           ->evaluate($entity, is_required: FALSE),
-        $values,
+        array_filter($values, fn($item) => is_array($item) && isset($item['sourceType'])),
       ),
     ];
   }
@@ -473,7 +473,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       $resolvedInputValues = array_map(
         fn(array $prop_source): mixed => PropSource::parse($prop_source)
           ->evaluate($entity, is_required: FALSE),
-        $inputValues,
+        array_filter($inputValues, fn($item) => is_array($item) && isset($item['sourceType'])),
       );
     }
     catch (MissingHostEntityException $e) {
