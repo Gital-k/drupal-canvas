@@ -107,7 +107,6 @@ final class CanvasBuilder extends ControllerBase {
 
     $machine_names_json = json_encode($machine_names);
     $this->styleGuideGenerator->setGlobalCSS($prompt['global_css'] ?? '');
-    $this->styleGuideGenerator->setGlobalCSS($prompt['global_css']);
     // If $prompt['messages'] is missing or invalid, this code reconstructs it
     // by scanning for keys named 'message <number>', and
     // assembling them into an ordered 'messages' array, while cleaning up old keys
