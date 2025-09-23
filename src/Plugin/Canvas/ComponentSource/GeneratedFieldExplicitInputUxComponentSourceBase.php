@@ -211,9 +211,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     }
     assert(array_key_exists(0, $this->getMetadata()->schema['properties'][$prop_name]['examples'] ?? []));
     $default_relative_url_prop_source = new DefaultRelativeUrlPropSource(
-    // @phpstan-ignore-next-line offsetAccess.notFound
       value: $this->getMetadata()->schema['properties'][$prop_name]['examples'][0],
-      // @phpstan-ignore-next-line offsetAccess.notFound
       jsonSchema: PropShape::normalize($this->getMetadata()->schema['properties'][$prop_name])->resolvedSchema,
       componentId: $component_id,
     );
@@ -333,7 +331,6 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     return [
       'source' => $values,
       'resolved' => array_map(
-      // @phpstan-ignore-next-line
         fn(array $prop_source): mixed => PropSource::parse($prop_source)
           ->evaluate($entity, is_required: FALSE),
         $values,
@@ -465,7 +462,6 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     }
     try {
       $resolvedInputValues = array_map(
-      // @phpstan-ignore-next-line
         fn(array $prop_source): mixed => PropSource::parse($prop_source)
           ->evaluate($entity, is_required: FALSE),
         $inputValues,
@@ -897,7 +893,6 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       return self::fieldTypePropExpressionExampleRequiresEntity($storable_prop_shape->fieldTypeProp) ?? FALSE;
     }
 
-    // @phpstan-ignore-next-line instanceof.alwaysTrue
     if ($storable_prop_shape->fieldTypeProp instanceof FieldTypeObjectPropsExpression) {
       if ($storable_prop_shape->fieldTypeProp->fieldType === 'entity_reference') {
         return TRUE;
