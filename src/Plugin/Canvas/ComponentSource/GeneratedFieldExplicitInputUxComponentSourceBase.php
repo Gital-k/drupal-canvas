@@ -336,7 +336,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     return [
       'source' => $values,
       'resolved' => array_map(
-        fn(array $prop_source): mixed => StaticPropSource::parse($prop_source)
+        fn(array $prop_source): mixed => PropSource::parse($prop_source)
           ->evaluate($entity, is_required: FALSE),
         array_filter($values, fn($item) => is_array($item) && isset($item['sourceType'])),
       ),
