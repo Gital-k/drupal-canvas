@@ -210,13 +210,14 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       return $this->defaultRelativeUrlPropSources[$prop_name];
     }
     $schema = $this->getMetadata()->schema;
-    $examples = $schema['properties'][$prop_name]['examples'] ?? null;
-    $value = is_array($examples) && isset($examples[0]) ? $examples[0] : null;
+    $property = $schema['properties'][$prop_name] ?? NULL;
+    $examples = $property['examples'] ?? NULL;
+    $value = is_array($examples) && isset($examples[0]) ? $examples[0] : NULL;
 
     assert(array_key_exists(0, $examples ?? []));
     $default_relative_url_prop_source = new DefaultRelativeUrlPropSource(
       value: $value,
-      jsonSchema: PropShape::normalize($schema['properties'][$prop_name])->resolvedSchema,
+      jsonSchema: PropShape::normalize($property)->resolvedSchema,
       componentId: $component_id,
     );
     $this->defaultRelativeUrlPropSources[$prop_name] = $default_relative_url_prop_source;
