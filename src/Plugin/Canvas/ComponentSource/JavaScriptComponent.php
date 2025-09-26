@@ -183,55 +183,195 @@ final class JavaScriptComponent extends GeneratedFieldExplicitInputUxComponentSo
    *   Optional component name. If provided, only creates that component.
    */
   public static function createTestComponentEntities(?string $component_name = NULL): void {
-    $component_name = $component_name ?? 'drupal-markup';
-    // Convert component name to label: 'drupal-markup' -> 'Drupal Markup'.
-    $label = str_replace('-', ' ', $component_name);
-    $label = ucwords($label);
-
-    // Settings with 1:1 SDC metadata structure - same for all components.
-    $settings = [
-      'label' => $label,
-      'local_source_id' => $component_name,
-      // Props - exactly like SDC.
-      'props' => [
-        'type' => 'object',
-        'required' => ['content'],
-        'properties' => [
-          'content' => [
-            'type' => 'string',
-            'title' => 'Markup',
-            'examples' => ['<p>Watch him as he goes!</p>'],
-          ],
-          'class' => [
-            'type' => 'string',
-            'title' => 'CSS Classes',
-            'examples' => ['text-bold'],
+    $components = [
+      'TestButton' => [
+        'label' => 'Test Button',
+        'category' => 'Vue Components',
+        'props' => [
+          'type' => 'object',
+          'properties' => [
+            'label' => [
+              'type' => 'string',
+              'title' => 'Button Label',
+              'default' => 'Click me',
+              'examples' => ['Submit', 'Cancel', 'Learn More'],
+            ],
+            'variant' => [
+              'type' => 'string',
+              'title' => 'Button Variant',
+              'default' => 'primary',
+              'enum' => ['primary', 'secondary', 'success', 'danger'],
+              'examples' => ['primary', 'success'],
+            ],
+            'size' => [
+              'type' => 'string',
+              'title' => 'Button Size',
+              'default' => 'medium',
+              'enum' => ['small', 'medium', 'large'],
+              'examples' => ['medium'],
+            ],
+            'disabled' => [
+              'type' => 'boolean',
+              'title' => 'Disabled',
+              'default' => FALSE,
+              'examples' => [FALSE],
+            ],
           ],
         ],
       ],
-      // Slots - empty for this example.
-      'slots' => [],
-      // JavaScript-specific.
-      'drupal_library' => 'canvas/nuxt_components',
+
+      'TestCard' => [
+        'label' => 'Test Card',
+        'category' => 'Vue Components',
+        'props' => [
+          'type' => 'object',
+          'required' => ['title'],
+          'properties' => [
+            'title' => [
+              'type' => 'string',
+              'title' => 'Card Title',
+              'default' => 'Card Title',
+              'examples' => ['Featured Article', 'Product Showcase'],
+            ],
+            'description' => [
+              'type' => 'string',
+              'title' => 'Card Description',
+              'default' => 'Card description goes here',
+              'examples' => ['Learn more about our services', 'Discover new features'],
+            ],
+          ],
+        ],
+      ],
+
+      // TwoColumnLayout component (SDC-style). Not working atm.
+      'TwoColumnLayout' => [
+        'label' => 'Two Column Layout',
+        'category' => 'Vue Components',
+        'props' => [
+          'type' => 'object',
+          'properties' => [
+            'width' => [
+              'type' => 'integer',
+              'title' => 'First Column Width (%)',
+              'description' => 'The width of the first column as a percentage',
+              'default' => 50,
+              'enum' => [25, 33, 34, 50, 66, 67, 75],
+              'examples' => [33, 50, 66],
+            ],
+          ],
+        ],
+      ],
+
+      'TestPopover' => [
+        'label' => 'Test Popover',
+        'category' => 'Vue Components',
+        'props' => [
+          'type' => 'object',
+          'properties' => [
+            'placement' => [
+              'type' => 'string',
+              'title' => 'Popover Placement',
+              'default' => 'bottom',
+              'enum' => ['top', 'bottom', 'left', 'right', 'top-start', 'top-end', 'bottom-start', 'bottom-end'],
+              'examples' => ['bottom', 'top'],
+            ],
+            'trigger' => [
+              'type' => 'string',
+              'title' => 'Trigger Type',
+              'default' => 'click',
+              'enum' => ['click', 'hover'],
+              'examples' => ['click'],
+            ],
+            'offset' => [
+              'type' => 'integer',
+              'title' => 'Offset (px)',
+              'default' => 8,
+              'examples' => [8, 12, 16],
+            ],
+            'showArrow' => [
+              'type' => 'boolean',
+              'title' => 'Show Arrow',
+              'default' => TRUE,
+              'examples' => [TRUE],
+            ],
+            'closeOnClickOutside' => [
+              'type' => 'boolean',
+              'title' => 'Close on Click Outside',
+              'default' => TRUE,
+              'examples' => [TRUE],
+            ],
+            'delay' => [
+              'type' => 'integer',
+              'title' => 'Delay (ms)',
+              'default' => 0,
+              'examples' => [0, 200, 500],
+            ],
+          ],
+        ],
+      ],
+
+      'TestMarkup' => [
+        'label' => 'Test Markup',
+        'category' => 'Vue Components',
+        'props' => [
+          'type' => 'object',
+          'required' => ['content'],
+          'properties' => [
+            'content' => [
+              'type' => 'string',
+              'title' => 'HTML Content',
+              'examples' => ['<p>Hello World</p>', '<div>Custom HTML content</div>'],
+            ],
+          ],
+        ],
+      ],
     ];
 
-    $component = ComponentEntity::create([
-      'id' => 'javascript.' . $component_name,
-      'label' => $label,
-      'category' => 'JavaScript Components',
-      'source' => self::SOURCE_PLUGIN_ID,
-      'provider' => NULL,
-      'source_local_id' => $component_name,
-      'active_version' => 'v1',
-      'versioned_properties' => [
-        // The 'active' version is required by VersionedConfigEntityBase.
-        VersionedConfigEntityBase::ACTIVE_VERSION => ['settings' => $settings],
-      ],
-      'status' => TRUE,
-    ]);
+    // If a specific component is requested, filter to just that one.
+    if ($component_name !== NULL) {
+      if (!isset($components[$component_name])) {
+        // If component not found, return early.
+        return;
+      }
+      $components = [$component_name => $components[$component_name]];
+    }
 
-    static::ensurePropFieldDefinitions($component);
-    $component->save();
+    foreach ($components as $name => $config) {
+      $component_id = 'javascript.' . $name;
+      $existing = ComponentEntity::load($component_id);
+      if ($existing) {
+        continue;
+      }
+
+      // Create the component settings, leaving slots out for now.
+      $settings = [
+        'label' => $config['label'],
+        'local_source_id' => $name,
+        'props' => $config['props'],
+        'slots' => [],
+        'drupal_library' => 'canvas/nuxt_components',
+        // Initialize empty, will be populated by ::ensurePropFieldDefinitions()
+        'prop_field_definitions' => [],
+      ];
+
+      $component = ComponentEntity::create([
+        'id' => $component_id,
+        'label' => $config['label'],
+        'category' => $config['category'],
+        'source' => self::SOURCE_PLUGIN_ID,
+        'provider' => NULL,
+        'source_local_id' => $name,
+        'active_version' => 'v1',
+        'versioned_properties' => [
+          VersionedConfigEntityBase::ACTIVE_VERSION => ['settings' => $settings],
+        ],
+        'status' => TRUE,
+      ]);
+
+      // Ensure prop field definitions are set up.
+      static::ensurePropFieldDefinitions($component);
+      $component->save();
+    }
   }
 
   /**
