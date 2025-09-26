@@ -88,6 +88,7 @@ final class CanvasBuilder extends ControllerBase {
       $prompt = $request->request->all();
       $files = $request->files->all();
       $prompt['derived_proptypes'] = Json::decode($prompt['derived_proptypes']);
+      $prompt['custom_libraries'] = Json::decode($prompt['custom_libraries']);
     }
     // If $prompt['messages'] is missing or invalid, this code reconstructs it
     // by scanning for keys named 'message <number>', and
@@ -222,7 +223,7 @@ final class CanvasBuilder extends ControllerBase {
     $agent->setCreateDirectly(TRUE);
     $menu_fetch_source = $this->getMenuFetchSource();
     $json_api_module_status = $this->moduleHandler()->moduleExists('jsonapi') ? 'enabled' : 'disabled';
-    $agent->setTokenContexts(['entity_type' => $prompt['entity_type'] ?? NULL, 'entity_id' => $prompt['entity_id'] ?? NULL, 'selected_component' => $prompt['selected_component'] ?? NULL, 'layout' => $prompt['layout'] ?? NULL, 'derived_proptypes' => isset($prompt['derived_proptypes']) ? JSON::encode($prompt['derived_proptypes']) : NULL, 'page_title' => $prompt['page_title'] ?? NULL, 'page_description' => $prompt['page_description'] ?? NULL, 'active_component_uuid' => $prompt['active_component_uuid'] ?? 'None', 'menu_fetch_source' => $menu_fetch_source, 'json_api_module_status' => $json_api_module_status]);
+    $agent->setTokenContexts(['entity_type' => $prompt['entity_type'] ?? NULL, 'entity_id' => $prompt['entity_id'] ?? NULL, 'selected_component' => $prompt['selected_component'] ?? NULL, 'layout' => $prompt['layout'] ?? NULL, 'derived_proptypes' => isset($prompt['derived_proptypes']) ? JSON::encode($prompt['derived_proptypes']) : NULL, 'page_title' => $prompt['page_title'] ?? NULL, 'page_description' => $prompt['page_description'] ?? NULL, 'active_component_uuid' => $prompt['active_component_uuid'] ?? 'None', 'menu_fetch_source' => $menu_fetch_source, 'json_api_module_status' => $json_api_module_status, 'custom_libraries' => isset($prompt['custom_libraries']) ? JSON::encode($prompt['custom_libraries']) : NULL]);
     $solvability = $agent->determineSolvability();
     $status = FALSE;
     $message = '';

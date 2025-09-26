@@ -75,6 +75,10 @@ class CanvasAiHooks {
             'name' => $this->t('JSON API Module status'),
             'description' => $this->t('Returns the status of JSON API module.'),
           ],
+          'custom_libraries' => [
+            'name' => $this->t('Custom libraries in canvas.'),
+            'description' => $this->t('Returns the custom libraries in canvas.'),
+          ],
         ],
       ],
     ];
@@ -128,6 +132,10 @@ class CanvasAiHooks {
 
           case 'json_api_module_status':
             $replacements[$original] = $data['json_api_module_status'];
+            break;
+
+          case 'custom_libraries':
+            $replacements[$original] = $data['custom_libraries'];
             break;
         }
       }

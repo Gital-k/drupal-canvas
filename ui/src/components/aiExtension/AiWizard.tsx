@@ -33,6 +33,7 @@ import {
 } from '@/services/componentAndLayout';
 import { getDrupalSettings } from '@/utils/drupal-globals';
 
+import CustomLibraries from '../../../../modules/canvas_ai/src/CustomLibraries.json';
 import fixtureProps from '../../../../modules/canvas_ai/src/PropsSchema.json';
 
 import type {
@@ -757,6 +758,10 @@ const AiWizard = () => {
                     'derived_proptypes',
                     JSON.stringify(fixtureProps),
                   );
+                  requestBody.append(
+                    'custom_libraries',
+                    JSON.stringify(CustomLibraries),
+                  );
                 } else {
                   requestBody = JSON.stringify({
                     ...body,
@@ -775,6 +780,7 @@ const AiWizard = () => {
                       currentValuesRef.current.pageData[
                         'description[0][value]'
                       ],
+                    custom_libraries: CustomLibraries,
                   });
                   headers['Content-Type'] = 'application/json';
                 }
