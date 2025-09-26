@@ -1,12 +1,6 @@
-import { useState } from 'react';
-import clsx from 'clsx';
-import FolderIcon from '@assets/icons/folder.svg?react';
-import * as Collapsible from '@radix-ui/react-collapsible';
-import { ChevronRightIcon } from '@radix-ui/react-icons';
-import { Flex, Text } from '@radix-ui/themes';
+import SidebarFolder from '@/components/sidePanel/SidebarFolder';
 
 import type { ReactNode } from 'react';
-import type { FolderCodeComponent } from '@/features/code-editor/CodeComponentList';
 import type { CodeComponentSerialized } from '@/types/CodeComponent';
 import type {
   ComponentsList,
@@ -14,8 +8,6 @@ import type {
   FoldersInList,
 } from '@/types/Component';
 import type { PatternsList } from '@/types/Pattern';
-
-import listStyles from '@/components/list/List.module.css';
 
 interface FolderData {
   componentIndexedFolders: Record<string, string>;
@@ -30,11 +22,9 @@ const FolderList = ({
   folder,
   children,
 }: {
-  folder: FolderInList | FolderCodeComponent;
+  folder: FolderInList;
   children: ReactNode;
 }) => {
-  const [isOpen, setIsOpen] = useState(true);
-
   // Determine the length of items in the folder, be it object or array.
   const getItemsLength = () => {
     if (Array.isArray(folder.items)) {
@@ -44,46 +34,9 @@ const FolderList = ({
   };
 
   return (
-    <Collapsible.Root open={isOpen} onOpenChange={setIsOpen}>
-      <Collapsible.Trigger
-        className={clsx(listStyles.folderTrigger)}
-        data-canvas-folder-name={folder.name}
-      >
-        <Flex flexGrow="1" align="center" overflow="hidden" pb="2" pt="2">
-          <Flex pl="2" align="center" flexShrink="0">
-            <FolderIcon className={listStyles.folderIcon} />
-          </Flex>
-          <Flex px="2" align="center" flexGrow="1" overflow="hidden">
-            <Text size="1" weight="medium">
-              {folder.name}
-            </Text>
-          </Flex>
-          <Flex
-            align="end"
-            flexShrink="0"
-            px="1"
-            justify="center"
-            className={listStyles.folderCount}
-          >
-            <Text size="1" weight="medium">
-              {String(getItemsLength())}
-            </Text>
-          </Flex>
-          <Flex pl="2" align="end" flexShrink="0">
-            <ChevronRightIcon
-              className={clsx(listStyles.chevron, {
-                [listStyles.isOpen]: isOpen,
-              })}
-            />
-          </Flex>
-        </Flex>
-      </Collapsible.Trigger>
-      <Collapsible.Content>
-        <Flex pl="5" direction="column">
-          {children}
-        </Flex>
-      </Collapsible.Content>
-    </Collapsible.Root>
+    <SidebarFolder name={folder.name} count={getItemsLength()}>
+      {children}
+    </SidebarFolder>
   );
 };
 
@@ -106,7 +59,7 @@ export const folderfyComponents = (
   foldersLoading: boolean,
   type: string,
 ): FolderComponentsResult => {
-  if (isLoading || foldersLoading || !folders || !components) {
+  if (isLoading || foldersLoading || (!folders && !components)) {
     return { folderComponents: {}, topLevelComponents: {} };
   }
 
@@ -114,7 +67,7 @@ export const folderfyComponents = (
   const topLevelComponents: Record<string, any> = {};
 
   Object.entries(components || {}).forEach(([id, component]) => {
-    if (folders.componentIndexedFolders[id]) {
+    if (folders && folders.componentIndexedFolders[id]) {
       const folderId = folders.componentIndexedFolders[id];
       if (!folderComponents[folderId]) {
         folderComponents[folderId] = {
@@ -129,7 +82,7 @@ export const folderfyComponents = (
       topLevelComponents[id] = component;
     }
   });
-  Object.entries(folders.folders).forEach(([id, folder]) => {
+  Object.entries(folders?.folders || []).forEach(([id, folder]) => {
     if (folder.items.length === 0 && folder.type === type) {
       folderComponents[id] = {
         id,
@@ -161,5 +114,7 @@ export const sortFolderList = (
       ) as FoldersInList)
     : [];
 };
+
+export type { FolderData };
 
 export default FolderList;

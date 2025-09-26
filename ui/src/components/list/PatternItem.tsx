@@ -1,23 +1,31 @@
 import { ContextMenu } from '@radix-ui/themes';
 
-import { useAppDispatch } from '@/app/hooks';
+import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import PermissionCheck from '@/components/PermissionCheck';
-import { useDisplayContext } from '@/components/sidePanel/DisplayContext';
 import SidebarNode from '@/components/sidePanel/SidebarNode';
 import UnifiedMenu from '@/components/UnifiedMenu';
 import { setDialogWithDataOpen } from '@/features/ui/dialogSlice';
+import { selectActivePanel } from '@/features/ui/primaryPanelSlice';
 
 import type React from 'react';
 import type { Pattern } from '@/types/Pattern';
 
-const PatternNode: React.FC<{
+const PatternItem: React.FC<{
   pattern: Pattern;
   onMenuOpenChange: (open: boolean) => void;
   disabled: boolean;
+  insertMenuItem?: React.ReactNode;
+  menuTitleItems?: React.ReactNode;
 }> = (props) => {
-  const { pattern, onMenuOpenChange, disabled } = props;
+  const {
+    pattern,
+    onMenuOpenChange,
+    disabled,
+    insertMenuItem,
+    menuTitleItems,
+  } = props;
   const dispatch = useAppDispatch();
-  const displayContext = useDisplayContext();
+  const activePanel = useAppSelector(selectActivePanel);
 
   const handleDeleteClick = (e: React.MouseEvent<HTMLDivElement>) => {
     e.stopPropagation();
@@ -30,16 +38,22 @@ const PatternNode: React.FC<{
   };
 
   const menuItems = (
-    <PermissionCheck
-      hasPermission="patterns"
-      denied={
-        <UnifiedMenu.Item disabled>No actions available</UnifiedMenu.Item>
-      }
-    >
-      <UnifiedMenu.Item color="red" onClick={handleDeleteClick}>
-        Delete pattern
-      </UnifiedMenu.Item>
-    </PermissionCheck>
+    <>
+      {menuTitleItems}
+      {activePanel === 'library' && insertMenuItem}
+      {activePanel === 'manageLibrary' && (
+        <PermissionCheck
+          hasPermission="patterns"
+          denied={
+            <UnifiedMenu.Item disabled>No actions available</UnifiedMenu.Item>
+          }
+        >
+          <UnifiedMenu.Item color="red" onClick={handleDeleteClick}>
+            Delete pattern
+          </UnifiedMenu.Item>
+        </PermissionCheck>
+      )}
+    </>
   );
 
   return (
@@ -55,8 +69,7 @@ const PatternNode: React.FC<{
             </UnifiedMenu.Content>
           }
           onMenuOpenChange={onMenuOpenChange}
-          includeDropdown={displayContext !== 'manage-library'}
-          draggable={displayContext !== 'manage-library'}
+          draggable={activePanel !== 'manageLibrary'}
         />
       </ContextMenu.Trigger>
       <UnifiedMenu.Content
@@ -71,4 +84,4 @@ const PatternNode: React.FC<{
   );
 };
 
-export default PatternNode;
+export default PatternItem;

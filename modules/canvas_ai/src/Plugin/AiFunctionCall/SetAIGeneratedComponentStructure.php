@@ -8,10 +8,10 @@ use Drupal\ai\Attribute\FunctionCall;
 use Drupal\ai\Base\FunctionCallBase;
 use Drupal\ai\Service\FunctionCalling\ExecutableFunctionCallInterface;
 use Drupal\ai\Service\FunctionCalling\FunctionCallInterface;
-use Drupal\ai\Utility\ContextDefinitionNormalizer;
 use Drupal\ai_agents\PluginInterfaces\AiAgentContextInterface;
 use Drupal\canvas_ai\AiResponseValidator;
 use Drupal\canvas_ai\CanvasAiPageBuilderHelper;
+use Drupal\canvas_ai\CanvasAiPermissions;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 use Drupal\Core\Session\AccountProxyInterface;
@@ -73,7 +73,7 @@ final class SetAIGeneratedComponentStructure extends FunctionCallBase implements
       $configuration,
       $plugin_id,
       $plugin_definition,
-      new ContextDefinitionNormalizer(),
+      $container->get('ai.context_definition_normalizer'),
     );
     $instance->pageBuilderHelper = $container->get('canvas_ai.page_builder_helper');
     $instance->loggerFactory = $container->get('logger.factory');
@@ -87,7 +87,7 @@ final class SetAIGeneratedComponentStructure extends FunctionCallBase implements
    */
   public function execute(): void {
     // Make sure that the user has the right permissions.
-    if (!$this->currentUser->hasPermission('use Drupal Canvas ai')) {
+    if (!$this->currentUser->hasPermission(CanvasAiPermissions::USE_CANVAS_AI)) {
       throw new \Exception('The current user does not have the right permissions to run this tool.');
     }
     try {

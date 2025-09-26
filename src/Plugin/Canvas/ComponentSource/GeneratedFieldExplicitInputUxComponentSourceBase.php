@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Plugin\Canvas\ComponentSource;
 
+use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\PropSource\DynamicPropSource;
+use Drupal\canvas\ShapeMatcher\FieldForComponentSuggester;
 use Drupal\Component\Plugin\DependentPluginInterface;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Entity\EntityInterface;
@@ -12,11 +14,12 @@ use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Field\WidgetPluginManager;
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\Core\Plugin\Component as SdcPlugin;
+use Drupal\Core\Plugin\Component as ComponentPlugin;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Drupal\Core\Render\Component\Exception\ComponentNotFoundException;
 use Drupal\Core\Render\Component\Exception\InvalidComponentException;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\Core\Template\Attribute;
 use Drupal\Core\Theme\Component\ComponentMetadata;
 use Drupal\Core\Theme\Component\ComponentValidator;
 use Drupal\canvas\ComponentSource\ComponentSourceBase;
@@ -51,6 +54,11 @@ use Symfony\Component\Validator\ConstraintViolationListInterface;
  * are stored in dangling field instances, by mapping schema to field types.
  *
  * @see \Drupal\Core\Theme\Component\ComponentMetadata
+ * @see \Drupal\canvas\JsonSchemaInterpreter\JsonSchemaType::computeStorablePropShape()
+ *
+ * They can *also* be populated using structured data whose shape matches the
+ * shape specified in the SDC metadata.
+ *
  * @see \Drupal\canvas\ShapeMatcher\JsonSchemaFieldInstanceMatcher
  *
  * Component Source plugins included in the Drupal Canvas module using it:
@@ -71,12 +79,16 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
   public const EXPLICIT_INPUT_NAME = 'props';
 
   /**
-   * @var array<string, \Drupal\canvas\PropSource\StaticPropSource> */
+   * @var array<string, \Drupal\canvas\PropSource\StaticPropSource>
+   */
   private array $defaultStaticPropSources = [];
+
   /**
-   * @var array<string, \Drupal\canvas\PropSource\DefaultRelativeUrlPropSource> */
+   * @var array<string, \Drupal\canvas\PropSource\DefaultRelativeUrlPropSource>
+   */
   private array $defaultRelativeUrlPropSources = [];
-  protected ?SdcPlugin $componentPlugin = NULL;
+  protected ?ComponentPlugin $componentPlugin = NULL;
+  protected ?ComponentMetadata $metadata;
 
   public function __construct(
     array $configuration,
@@ -85,6 +97,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     private readonly ComponentValidator $componentValidator,
     private readonly WidgetPluginManager $fieldWidgetPluginManager,
     protected readonly EntityTypeManagerInterface $entityTypeManager,
+    private readonly FieldForComponentSuggester $fieldForComponentSuggester,
   ) {
     assert(array_key_exists('local_source_id', $configuration));
     parent::__construct($configuration, $plugin_id, $plugin_definition);
@@ -102,19 +115,33 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       $container->get(ComponentValidator::class),
       $container->get('plugin.manager.field.widget'),
       $container->get(EntityTypeManagerInterface::class),
+      $container->get(FieldForComponentSuggester::class),
     );
   }
 
   /**
-   * The SDC metadata that everything else in this trait builds upon.
+   * When validating explicit inputs, an SDC plugin instance is needed.
    *
-   * @todo Refactor to only need ComponentMetadata, but that requires refactoring Canvas's shape matching infrastructure
-   *   as well as core's component validator.
-   * @see \Drupal\Core\Theme\Component\ComponentMetadata
-   * @see \Drupal\canvas\PropShape\PropShape::getComponentProps()
-   * @todo Remove in https://www.drupal.org/project/canvas/issues/3503038
+   * This is imposed by the SDC validation infrastructure provided by Drupal
+   * core.
+   *
+   * @see ::validateComponentInput()
+   * @see \Drupal\Core\Theme\Component\ComponentValidator::validateProps()
+   * @todo Deprecate and then remove this once ComponentValidator::validateProps() accepts a plugin ID + component metadata
    */
-  abstract public function getSdcPlugin(): SdcPlugin;
+  abstract protected function getComponentPlugin(): ComponentPlugin;
+
+  /**
+   * The crucial metadata: describes the explicit inputs and slots.
+   *
+   * @return \Drupal\Core\Theme\Component\ComponentMetadata
+   */
+  public function getMetadata(): ComponentMetadata {
+    if (!isset($this->metadata)) {
+      $this->metadata = $this->getComponentPlugin()->metadata;
+    }
+    return $this->metadata;
+  }
 
   /**
    * {@inheritdoc}
@@ -157,7 +184,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     }
     assert(isset($this->configuration['prop_field_definitions']));
     assert(is_array($this->configuration['prop_field_definitions']));
-    $component_schema = $this->getSdcPlugin()->metadata->schema ?? [];
+    $component_schema = $this->getMetadata()->schema ?? [];
     if ($validate_prop_name && !array_key_exists($prop_name, $component_schema['properties'] ?? [])) {
       throw new \OutOfRangeException(sprintf("'%s' is not a prop on the component '%s'.", $prop_name, $this->getComponentDescription()));
     }
@@ -186,13 +213,12 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     if (\array_key_exists($prop_name, $this->defaultRelativeUrlPropSources)) {
       return $this->defaultRelativeUrlPropSources[$prop_name];
     }
-    $component_plugin = $this->getSdcPlugin();
-    assert(array_key_exists(0, $component_plugin->metadata->schema['properties'][$prop_name]['examples'] ?? []));
+    assert(array_key_exists(0, $this->getMetadata()->schema['properties'][$prop_name]['examples'] ?? []));
     $default_relative_url_prop_source = new DefaultRelativeUrlPropSource(
     // @phpstan-ignore-next-line offsetAccess.notFound
-      value: $component_plugin->metadata->schema['properties'][$prop_name]['examples'][0],
+      value: $this->getMetadata()->schema['properties'][$prop_name]['examples'][0],
       // @phpstan-ignore-next-line offsetAccess.notFound
-      jsonSchema: PropShape::normalize($component_plugin->metadata->schema['properties'][$prop_name])->resolvedSchema,
+      jsonSchema: PropShape::normalize($this->getMetadata()->schema['properties'][$prop_name])->resolvedSchema,
       componentId: $component_id,
     );
     $this->defaultRelativeUrlPropSources[$prop_name] = $default_relative_url_prop_source;
@@ -200,17 +226,17 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
   }
 
   public function getSlotDefinitions(): array {
-    return $this->getSdcPlugin()->metadata->slots;
+    return $this->getMetadata()->slots;
   }
 
   /**
    * {@inheritdoc}
    */
   protected function getExplicitInputDefinitions(): array {
-    $sdc_plugin = $this->getSdcPlugin();
-    $prop_shapes = PropShape::getComponentProps($this->getSdcPlugin());
+    $prop_shapes = self::getComponentInputsForMetadata($this->getSourceSpecificComponentId(), $this->getMetadata());
+
     return [
-      'required' => $sdc_plugin->metadata->schema['required'] ?? [],
+      'required' => $this->getMetadata()->schema['required'] ?? [],
       'shapes' => array_combine(
         array_map(fn (string $cpe) => ComponentPropExpression::fromString($cpe)->propName, array_keys($prop_shapes)),
         array_map(fn (PropShape $shape) => $shape->schema, $prop_shapes),
@@ -219,27 +245,62 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
   }
 
   /**
+   * @param string $plugin_id
+   * @param \Drupal\Core\Theme\Component\ComponentMetadata $metadata
+   *
+   * @return \Drupal\canvas\PropShape\PropShape[]
+   */
+  public static function getComponentInputsForMetadata(string $plugin_id, ComponentMetadata $metadata): array {
+    $prop_shapes = [];
+
+    // Retrieve the full JSON schema definition from the SDC's metadata.
+    // @see \Drupal\sdc\Component\ComponentValidator::validateProps()
+    // @see \Drupal\sdc\Component\ComponentMetadata::parseSchemaInfo()
+    /** @var array<string, mixed> $component_schema */
+    $component_schema = $metadata->schema;
+    foreach ($component_schema['properties'] ?? [] as $prop_name => $prop_schema) {
+      // TRICKY: `Attribute`-typed props are a special case that we need to ignore.
+      // Even more TRICKY, `attributes` named prop is even a more special case —
+      // as it's initialized by default.
+      // @see \Drupal\sdc\Twig\TwigExtension::mergeAdditionalRenderContext()
+      // @see https://www.drupal.org/project/drupal/issues/3352063#comment-15277820
+      // @see `canvas_test_sdc:attributes` component template as an example for
+      // how to initialize the `Attribute`-typed prop.
+      if (in_array(Attribute::class, $prop_schema['type'], TRUE)) {
+        continue;
+      }
+
+      $component_prop_expression = new ComponentPropExpression($plugin_id, $prop_name);
+      $prop_shapes[(string) $component_prop_expression] = PropShape::normalize($prop_schema);
+    }
+
+    return $prop_shapes;
+  }
+
+  /**
    * @return array<int, array{'value': mixed, 'label': 'string'}>
    *
    * @see \canvas_load_allowed_values_for_component_prop()
-   * @todo Ensure that when Canvas adds translation support, that SDC `meta:enum`s are loaded from interface translation, and those for code components from config translation.
+   * @todo Ensure that when Canvas adds translation support, that SDC
+   *   `meta:enum`s are loaded from interface translation, and those for code
+   *   components from config translation.
    */
   public function getOptionsForExplicitInputEnumProp(string $prop_name): array {
     $explicit_input_definitions = $this->getExplicitInputDefinitions();
     if (!array_key_exists($prop_name, $explicit_input_definitions['shapes'])) {
-      throw new \LogicException("`$prop_name` is not an explicit input prop on `{$this->getPluginId()}.{$this->getSdcPlugin()->getPluginId()}`.");
+      throw new \LogicException("`$prop_name` is not an explicit input prop on `{$this->getPluginId()}.{$this->getSourceSpecificComponentId()}`.");
     }
 
     // Retrieve the JSON schema for this explicit input prop.
     $schema = (new PropShape($explicit_input_definitions['shapes'][$prop_name]))->resolvedSchema;
     if (!array_key_exists('enum', $schema)) {
-      throw new \LogicException("`enum` is missing for schema of `$prop_name` explicit input prop of `{$this->getPluginId()}.{$this->getSdcPlugin()->getPluginId()}`.");
+      throw new \LogicException("`enum` is missing for schema of `$prop_name` explicit input prop of `{$this->getPluginId()}.{$this->getSourceSpecificComponentId()}`.");
     }
     // @todo Simplify in https://www.drupal.org/project/canvas/issues/3518247
-    $raw_schema = $this->getSdcPlugin()->metadata->schema['properties'][$prop_name] ?? [];
+    $raw_schema = $this->getMetadata()->schema['properties'][$prop_name] ?? [];
     if (!array_key_exists('meta:enum', $schema)) {
       if (!array_key_exists('meta:enum', $raw_schema)) {
-        throw new \LogicException("`meta:enum` is missing for schema of `$prop_name` explicit input prop of `{$this->getPluginId()}.{$this->getSdcPlugin()->getPluginId()}`.");
+        throw new \LogicException("`meta:enum` is missing for schema of `$prop_name` explicit input prop of `{$this->getPluginId()}.{$this->getSourceSpecificComponentId()}`.");
       }
       else {
         $schema['meta:enum'] = $raw_schema['meta:enum'];
@@ -348,7 +409,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
    * {@inheritdoc}
    */
   public function requiresExplicitInput(): bool {
-    return !empty($this->getSdcPlugin()->metadata->schema['properties']);
+    return !empty($this->getMetadata()->schema['properties']);
   }
 
   /**
@@ -440,7 +501,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     }
 
     try {
-      $this->componentValidator->validateProps($resolvedInputValues, $this->getSdcPlugin());
+      $this->componentValidator->validateProps($resolvedInputValues, $this->getComponentPlugin());
     }
     catch (ComponentNotFoundException) {
       // The violation for a missing component will be added in the validation
@@ -491,26 +552,36 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     FormStateInterface $form_state,
     ?Component $component = NULL,
     string $component_instance_uuid = '',
-    array $client_model = [],
+    array $inputValues = [],
     ?EntityInterface $entity = NULL,
     array $settings = [],
   ): array {
     $transforms = [];
-    assert($entity instanceof FieldableEntityInterface);
-    $component_plugin = $this->getSdcPlugin();
-    $component_schema = $component_plugin->metadata->schema ?? [];
+    $component_schema = $this->getMetadata()->schema ?? [];
+
+    // @todo Uncomment this once it is guaranteed that the POST request to add
+    // the component instance happens first.
+    // assert(!is_null(\Drupal::service(ComponentTreeLoader::class)->load($entity)->getComponentTreeItemByUuid($component_instance_uuid)), 'The passed $entity does not contain the component instance being edited.');
+
+    // Some field widgets need an entity object. Provide such a "parent" entity.
+    // @see \Drupal\Core\Field\FieldItemListInterface::getEntity()
+    // @see \Drupal\canvas\PropSource\StaticPropSource::formTemporaryRemoveThisExclamationExclamationExclamation()
+    $entity_object_for_field_widget = match (TRUE) {
+      $entity instanceof FieldableEntityInterface => $entity,
+      $entity instanceof ContentTemplate => $entity->createEmptyTargetEntity(),
+      default => throw new \LogicException(),
+    };
 
     // Allow form alterations specific to Canvas component instance forms (currently
     // only "static prop sources").
     $form_state->set('is_canvas_static_prop_source', TRUE);
 
     $prop_field_definitions = $settings['prop_field_definitions'];
-    $default_prop_sources = $this->getDefaultExplicitInput();
 
     // To ensure the order of the fields always matches the order of the schema
     // we loop over the properties from the schema, but first we have to
     // exclude props that aren't storable.
-    foreach (PropShape::getComponentProps($component_plugin) as $component_prop_expression => $prop_shape) {
+    foreach (self::getComponentInputsForMetadata($this->getSourceSpecificComponentId(), $this->getMetadata()) as $component_prop_expression => $prop_shape) {
       $storable_prop_shape = $prop_shape->getStorage();
       // @todo Remove this once every SDC prop shape can be stored. See PropShapeRepositoryTest::getExpectedUnstorablePropShapes()
       // @todo Create a status report that lists which SDC prop shapes are not storable.
@@ -520,17 +591,23 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
 
       $component_prop = ComponentPropExpression::fromString($component_prop_expression);
       $sdc_prop_name = $component_prop->propName;
-      $source = $this->uncollapse($client_model[$sdc_prop_name] ?? $default_prop_sources[$sdc_prop_name], $sdc_prop_name);
+      // Uncollapse if set; otherwise fall back to the default static prop
+      // source, but *made empty* instead of the default value.
+      // Note that ::clientModelToInput() guarantees $inputValues contains a
+      // value for every required prop, even when a required property is allowed
+      // to be empty during editing for improved usability.
+      // @see ::getDefaultExplicitInput()
+      // @see ::clientModelToInput()
+      // @see https://www.drupal.org/i/3529788
+      assert(array_key_exists($sdc_prop_name, $inputValues) || !in_array($sdc_prop_name, $this->getExplicitInputDefinitions()['required'], TRUE));
+      $source = $this->uncollapse($inputValues[$sdc_prop_name] ?? NULL, $sdc_prop_name);
       $disabled = FALSE;
-      $label_suffix = '';
+      $linked_prop_source = $source instanceof DynamicPropSource ? $source : NULL;
       if (!$source instanceof StaticPropSource) {
         // @todo Build DynamicPropSource UX in https://www.drupal.org/i/3541037. Related: https://www.drupal.org/project/canvas/issues/3459234
         // @todo Design is undefined for the AdaptedPropSource UX.
         // Fall back to the static version, disabled for now where the design is undefined.
         $disabled = !$source instanceof DefaultRelativeUrlPropSource;
-        if ($source instanceof DynamicPropSource) {
-          $label_suffix = sprintf(" — ⚠️ DISABLED because this prop is actually populated by a DynamicPropSource (%s)", $source->toArray()['expression']);
-        }
         $source = $this->getDefaultStaticPropSource($sdc_prop_name);
       }
 
@@ -545,10 +622,45 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       assert(isset($component_schema['properties'][$sdc_prop_name]['title']));
       $label = $component_schema['properties'][$sdc_prop_name]['title'];
       assert($component instanceof Component);
-      $widget = $source->getWidget($component->id(), $component->getLoadedVersion(), $sdc_prop_name, $label . $label_suffix, $field_widget_plugin_id);
+      $widget = $source->getWidget($component->id(), $component->getLoadedVersion(), $sdc_prop_name, $label, $field_widget_plugin_id);
       $is_required = isset($component_schema['required']) && in_array($sdc_prop_name, $component_schema['required'], TRUE);
-      $form[$sdc_prop_name] = $source->formTemporaryRemoveThisExclamationExclamationExclamation($widget, $sdc_prop_name, $is_required, $entity, $form, $form_state);
+      $form[$sdc_prop_name] = $source->formTemporaryRemoveThisExclamationExclamationExclamation($widget, $sdc_prop_name, $is_required, $entity_object_for_field_widget, $form, $form_state);
       $form[$sdc_prop_name]['#disabled'] = $disabled;
+
+      if ($entity instanceof ContentTemplate) {
+        $suggestions = FieldForComponentSuggester::structureSuggestionsForResponse($this->fieldForComponentSuggester->suggest(
+          $this->getSourceSpecificComponentId(),
+          $this->getMetadata(),
+          $entity->getTargetEntityDataDefinition(),
+        ));
+        $could_use_dynamic_prop_source = !empty($suggestions[$sdc_prop_name]);
+
+        // If the prop is already linked, replace the widget entirely. The
+        // replacement will show the linker by the field label, and replace the
+        // form elements with a linked field badge.
+        if ($linked_prop_source) {
+          // This full replacement of the widget ensures that the resulting form
+          // has consistent and valid html, regardless of field type and widget.
+          $form[$sdc_prop_name]['widget'] = [
+            '#type' => 'linked_prop_source',
+            '#sdc_prop_name' => $sdc_prop_name,
+            '#sdc_prop_label' => $label,
+            '#linked_prop_source' => $linked_prop_source,
+            '#field_link_suggestions' => $suggestions[$sdc_prop_name],
+            '#component' => $component,
+            '#is_required' => $is_required,
+          ];
+        }
+        // If the prop can be linked, but isn't yet, add attributes that will
+        // result in the prop linker appearing next to the field label.
+        elseif ($could_use_dynamic_prop_source) {
+          $form[$sdc_prop_name]['widget']['#prop_link_data'] = [
+            'linked' => FALSE,
+            'prop_name' => $form[$sdc_prop_name]['widget']['#field_name'],
+            'suggestions' => $suggestions[$sdc_prop_name],
+          ];
+        }
+      }
 
       $widget_definition = $this->fieldWidgetPluginManager->getDefinition($widget->getPluginId());
       if (\array_key_exists('canvas', $widget_definition) && \array_key_exists('transforms', $widget_definition['canvas'])) {
@@ -558,28 +670,63 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
         throw new \LogicException(sprintf(
           "Drupal Canvas determined the `%s` field widget plugin must be used to populate the `%s` prop on the `%s` component. However, no `canvas.transforms` metadata is defined on the field widget plugin definition. This makes it impossible for this widget to work. Please define the missing metadata. See %s for guidance.",
           $field_widget_plugin_id,
-          $component_plugin->getPluginId(),
+          $this->getSourceSpecificComponentId(),
           $sdc_prop_name,
           'https://git.drupalcode.org/project/canvas/-/raw/0.x/canvas.api.php?ref_type=heads',
         ));
       }
     }
     $form['#attached']['canvas-transforms'] = $transforms;
+    if ($entity instanceof ContentTemplate) {
+      $form['#after_build'][] = [static::class, 'moveSuggestionsToLabel'];
+    }
     return $form;
+  }
+
+  public static function moveSuggestionsToLabel(array $element, FormStateInterface $form_state): array {
+    // Recursively traverse elements and add prop_link_data to title attributes
+    static::processElementTreeLinkerLabels($element);
+    return $element;
+  }
+
+  /**
+   * Recursively processes the element so labels get link suggestion data.
+   *
+   * @param array $element
+   *   The form element to process.
+   * @param array $propLinkData
+   *   Prop link data from a parent element to pass down.
+   */
+  public static function processElementTreeLinkerLabels(array &$element, array $propLinkData = []): void {
+    // If this element has prop_link_data, use it for this subtree
+    if (!empty($element['#prop_link_data'])) {
+      $propLinkData = $element['#prop_link_data'];
+    }
+
+    // If we have prop link data and this element has a title display, add the
+    // data to label attributes.
+    if (!empty($propLinkData) && isset($element['#title_display'])) {
+      $element['#label_attributes']['prop_link_data'] = $propLinkData;
+    }
+
+    foreach ($element as $key => &$child) {
+      if (is_array($child) && $key[0] !== '#') {
+        static::processElementTreeLinkerLabels($child, $propLinkData);
+      }
+    }
   }
 
   /**
    * {@inheritdoc}
    */
   public function getClientSideInfo(ComponentEntity $component): array {
-    $component_plugin = $this->getSdcPlugin();
     $prop_field_definitions = $component->getSettings()['prop_field_definitions'];
 
     $field_data = [];
     $default_props_for_default_markup = [];
     $unpopulated_props_for_default_markup = [];
     $transforms = [];
-    foreach (PropShape::getComponentProps($component_plugin) as $component_prop_expression => $prop_shape) {
+    foreach (self::getComponentInputsForMetadata($this->getSourceSpecificComponentId(), $this->getMetadata()) as $component_prop_expression => $prop_shape) {
       $storable_prop_shape = $prop_shape->getStorage();
       // @todo Remove this once every SDC prop shape can be stored. See PropShapeRepositoryTest::getExpectedUnstorablePropShapes()
       // @todo Create a status report that lists which SDC prop shapes are not storable.
@@ -643,8 +790,8 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       elseif (self::exampleValueRequiresEntity($storable_prop_shape)) {
         // An example may be present in the SDC metadata, it just cannot be
         // mapped to a default value in the prop source.
-        if (isset($component_plugin->metadata->schema['properties'][$prop_name]['examples'][0])) {
-          $default_resolved_value = $component_plugin->metadata->schema['properties'][$prop_name]['examples'][0];
+        if (isset($this->getMetadata()->schema['properties'][$prop_name]['examples'][0])) {
+          $default_resolved_value = $this->getMetadata()->schema['properties'][$prop_name]['examples'][0];
         }
       }
 
@@ -665,7 +812,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       // generate a form.
       // @see \Drupal\canvas\Form\ComponentInstanceForm
       $field_data[$prop_name] = [
-        'required' => in_array($prop_name, $component_plugin->metadata->schema['required'] ?? [], TRUE),
+        'required' => in_array($prop_name, $this->getMetadata()->schema['required'] ?? [], TRUE),
         'jsonSchema' => array_diff_key($prop_shape->resolvedSchema, array_flip(['meta:enum', 'x-translation-context'])),
       ] + \array_diff_key($default_static_prop_source->toArray(), \array_flip(['value']));
       if ($default_resolved_value !== NULL) {
@@ -698,7 +845,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
         throw new \LogicException(sprintf(
           "Drupal Canvas determined the `%s` field widget plugin must be used to populate the `%s` prop on the `%s` component. However, no `canvas.transforms` metadata is defined on the field widget plugin definition. This makes it impossible for this widget to work. Please define the missing metadata. See %s for guidance.",
           $field_widget_plugin_id,
-          $component_prop->componentName,
+          $component_prop->sourceSpecificComponentId,
           $component_prop->propName,
           'https://git.drupalcode.org/project/canvas/-/raw/0.x/canvas.api.php?ref_type=heads',
         ));
@@ -733,9 +880,9 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
    * @return array<string, array{field_type: string, field_widget: string, expression: string, default_value: mixed, field_storage_settings: array<string, mixed>, field_instance_settings: array<string, mixed>, cardinality?: int}>
    *   The prop settings.
    */
-  public static function getPropsForComponentPlugin(SdcPlugin $component_plugin): array {
+  public static function getPropsForComponentPlugin(ComponentPlugin $component_plugin): array {
     $props = [];
-    foreach (PropShape::getComponentProps($component_plugin) as $cpe_string => $prop_shape) {
+    foreach (self::getComponentInputsForMetadata($component_plugin->pluginId, $component_plugin->metadata) as $cpe_string => $prop_shape) {
       $cpe = ComponentPropExpression::fromString($cpe_string);
 
       $storable_prop_shape = $prop_shape->getStorage();
@@ -805,8 +952,8 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
    * Whether this storable prop shape needs a (referenceable) entity created.
    *
    * TRICKY: SDCs whose storable prop shape uses an entity reference CAN NOT
-   * ever have a default value specified in their corresponding Component config
-   * entity.
+   * ever have a default value specified in their corresponding Component
+   * config entity.
    *
    * It is in fact possible to transform the example value in the SDC into a
    * corresponding real (saved) entity in Drupal, but that would pollute the
@@ -816,8 +963,8 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
    * To avoid this pollution, we allow such SDC props to not specify a default
    * value for its StorablePropShape stored in the Component config entity.
    * To offer an equivalently smooth experience, with the specified example
-   * value, Canvas instead is able to generate valid values for rendering the SDC
-   * using a transformed-at-runtime relative URL.
+   * value, Canvas instead is able to generate valid values for rendering the
+   * SDC using a transformed-at-runtime relative URL.
    *
    * Typical examples:
    * - an SDC prop accepting an image, i.e.
@@ -827,8 +974,8 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
    *
    * This is only necessary for URL-shaped props, because URLs must be
    * resolvable (by the browser), and for a relative URL to be resolvable it
-   * must be rewritten for the current site. By contrast, other prop shapes work
-   * in isolation.
+   * must be rewritten for the current site. By contrast, other prop shapes
+   * work in isolation.
    *
    * @see \Drupal\canvas\PropSource\DefaultRelativeUrlPropSource
    * @see \Drupal\canvas\ComponentSource\UrlRewriteInterface
@@ -924,8 +1071,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
         // @see ::exampleValueRequiresEntity()
         if ($default_source_value === []) {
           assert($this->configuration['prop_field_definitions'][$prop]['default_value'] === []);
-          $component_plugin = $this->getSdcPlugin();
-          if (array_key_exists(0, $component_plugin->metadata->schema['properties'][$prop]['examples'] ?? [])) {
+          if (array_key_exists(0, $this->getMetadata()->schema['properties'][$prop]['examples'] ?? [])) {
             // Detect 2 possible `resolved` values from the client model:
             // 1. the empty array
             // 2. an exact match for what's in the client-side info
@@ -943,9 +1089,9 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
 
         // @see PropSourceComponent type-script definition.
         // @see EvaluatedComponentModel type-script definition.
-        // Undo what ::inputToClientModel() did: restore the omitted `'value'`
-        // in cases where it is the same as the source value.
-        if (!\array_key_exists('value', $prop_source)) {
+        // For static props undo what ::inputToClientModel() did: restore the
+        // omitted `'value'` in cases where it is the same as the source value.
+        if (str_starts_with($prop_source['sourceType'] ?? '', StaticPropSource::getSourceTypePrefix()) && !\array_key_exists('value', $prop_source)) {
           $prop_source['value'] = $prop_value;
         }
         $source = PropSource::parse($prop_source);

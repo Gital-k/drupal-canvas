@@ -60,6 +60,23 @@ interface ComponentSourceInterface extends PluginInspectionInterface, Derivative
   public function getReferencedPluginClass(): ?string;
 
   /**
+   * Gets the ID that this source knows to interpret.
+   *
+   * ⚠️ This is NOT to be confused with the Component config entity's ID!
+   *
+   * For example:
+   * - `sdc.olivero.teaser` is the ID of a Component config entity
+   * - that Component config entity uses the `sdc` ComponentSource plugin
+   * - that Component config entity has its `source_local_id` property set to
+   *   `olivero:teaser`
+   * - `olivero:teaser` is the source-specific ID: only that ComponentSource
+   *   plugin knows how to load it.
+   *
+   * @return string
+   */
+  public function getSourceSpecificComponentId(): string;
+
+  /**
    * Gets a description of the component.
    *
    * @return \Drupal\Core\StringTranslation\TranslatableMarkup
@@ -175,8 +192,9 @@ interface ComponentSourceInterface extends PluginInspectionInterface, Derivative
    *   The component configuration entity.
    * @param string $component_instance_uuid
    *   The component instance UUID.
-   * @param array $client_model
-   *   Current client model values for the component from the incoming request.
+   * @param array $inputValues
+   *   Current client model values for the component from the incoming request,
+   *   as returned by ::clientModelToInput().
    * @param \Drupal\Core\Entity\EntityInterface|null $entity
    *   The host entity (for evaluated input).
    * @param array $settings
@@ -194,7 +212,7 @@ interface ComponentSourceInterface extends PluginInspectionInterface, Derivative
     FormStateInterface $form_state,
     ?Component $component = NULL,
     string $component_instance_uuid = '',
-    array $client_model = [],
+    array $inputValues = [],
     ?EntityInterface $entity = NULL,
     array $settings = [],
   ): array;

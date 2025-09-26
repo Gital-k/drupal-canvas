@@ -6,10 +6,10 @@ use Drupal\ai\Attribute\FunctionCall;
 use Drupal\ai\Base\FunctionCallBase;
 use Drupal\ai\Service\FunctionCalling\ExecutableFunctionCallInterface;
 use Drupal\ai\Service\FunctionCalling\FunctionCallInterface;
-use Drupal\ai\Utility\ContextDefinitionNormalizer;
 use Drupal\ai_agents\PluginInterfaces\AiAgentContextInterface;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\canvas_ai\CanvasAiTempStore;
+use Drupal\canvas_ai\CanvasAiPermissions;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -52,7 +52,7 @@ final class GetCurrentLayout extends FunctionCallBase implements ExecutableFunct
       $configuration,
       $plugin_id,
       $plugin_definition,
-      new ContextDefinitionNormalizer(),
+      $container->get('ai.context_definition_normalizer'),
     );
     $instance->canvasAiTempStore = $container->get('canvas_ai.tempstore');
     $instance->currentUser = $container->get('current_user');
@@ -64,7 +64,7 @@ final class GetCurrentLayout extends FunctionCallBase implements ExecutableFunct
    */
   public function execute(): void {
     // Make sure that the user has the right permissions.
-    if (!$this->currentUser->hasPermission('use Drupal Canvas ai')) {
+    if (!$this->currentUser->hasPermission(CanvasAiPermissions::USE_CANVAS_AI)) {
       throw new \Exception('The current user does not have the right permissions to run this tool.');
     }
     $current_layout = $this->canvasAiTempStore->getData(CanvasAiTempStore::CURRENT_LAYOUT_KEY);

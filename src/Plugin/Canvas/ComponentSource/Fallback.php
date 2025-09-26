@@ -28,6 +28,15 @@ use Symfony\Component\Validator\ConstraintViolationListInterface;
 final class Fallback extends ComponentSourceBase implements ComponentSourceWithSlotsInterface {
   public const string PLUGIN_ID = 'fallback';
 
+  /**
+   * The `fallback` plugin is not required to specify a source-local ID.
+   *
+   * @see config/schema/canvas.schema.yml:canvas.component_source_settings.fallback
+   */
+  public function getSourceSpecificComponentId(): string {
+    return '';
+  }
+
   public function defaultConfiguration(): array {
     return parent::defaultConfiguration() + ['slots' => []];
   }
@@ -99,7 +108,7 @@ final class Fallback extends ComponentSourceBase implements ComponentSourceWithS
     ];
   }
 
-  public function buildComponentInstanceForm(array $form, FormStateInterface $form_state, ?Component $component = NULL, string $component_instance_uuid = '', array $client_model = [], ?EntityInterface $entity = NULL, array $settings = []): array {
+  public function buildComponentInstanceForm(array $form, FormStateInterface $form_state, ?Component $component = NULL, string $component_instance_uuid = '', array $inputValues = [], ?EntityInterface $entity = NULL, array $settings = []): array {
     // @todo Improve this in https://drupal.org/i/3524299.
     $form['warning'] = [
       '#type' => 'html_tag',
@@ -108,7 +117,7 @@ final class Fallback extends ComponentSourceBase implements ComponentSourceWithS
     ];
     $form['input'] = [
       '#type' => 'textarea',
-      '#value' => \json_encode($client_model, \JSON_PRETTY_PRINT & \JSON_THROW_ON_ERROR),
+      '#value' => \json_encode($inputValues, \JSON_PRETTY_PRINT & \JSON_THROW_ON_ERROR),
       '#disabled' => TRUE,
       '#title' => $this->t('Previously stored input'),
     ];

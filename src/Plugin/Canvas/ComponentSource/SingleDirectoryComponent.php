@@ -21,6 +21,7 @@ use Drupal\canvas\ComponentSource\UrlRewriteInterface;
 use Drupal\canvas\Entity\Component as ComponentEntity;
 use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\canvas\Entity\VersionedConfigEntityBase;
+use Drupal\canvas\ShapeMatcher\FieldForComponentSuggester;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Filesystem\Path;
 
@@ -45,12 +46,20 @@ final class SingleDirectoryComponent extends GeneratedFieldExplicitInputUxCompon
    *   Plugin ID.
    * @param array $plugin_definition
    *   Plugin definition.
+   * @param \Drupal\Core\Theme\Component\ComponentValidator $componentValidator
+   *   Component validator.
+   * @param \Drupal\Core\Field\WidgetPluginManager $fieldWidgetPluginManager
+   *   Field widget plugin manager.
+   * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entityTypeManager
+   *   Entity type manager.
    * @param \Drupal\Core\Theme\ComponentPluginManager $componentPluginManager
    *   Component manager.
    * @param \Drupal\Core\Extension\ModuleHandlerInterface $moduleHandler
    *   Module handler.
    * @param \Drupal\Core\Extension\ThemeHandlerInterface $themeHandler
    *   Theme handler.
+   * @param \Drupal\canvas\ShapeMatcher\FieldForComponentSuggester $fieldForComponentSuggester
+   *   Field for component suggester.
    */
   public function __construct(
     array $configuration,
@@ -62,6 +71,8 @@ final class SingleDirectoryComponent extends GeneratedFieldExplicitInputUxCompon
     private readonly ComponentPluginManager $componentPluginManager,
     private readonly ModuleHandlerInterface $moduleHandler,
     private readonly ThemeHandlerInterface $themeHandler,
+    // @phpstan-ignore-next-line property.onlyWritten
+    private readonly FieldForComponentSuggester $fieldForComponentSuggester,
   ) {
     assert(array_key_exists('local_source_id', $configuration));
     parent::__construct(
@@ -71,6 +82,7 @@ final class SingleDirectoryComponent extends GeneratedFieldExplicitInputUxCompon
       $componentValidator,
       $fieldWidgetPluginManager,
       $entityTypeManager,
+      $fieldForComponentSuggester,
     );
   }
 
@@ -88,14 +100,20 @@ final class SingleDirectoryComponent extends GeneratedFieldExplicitInputUxCompon
       $container->get(ComponentPluginManager::class),
       $container->get(ModuleHandlerInterface::class),
       $container->get(ThemeHandlerInterface::class),
+      $container->get('Drupal\canvas\ShapeMatcher\FieldForComponentSuggester'),
     );
   }
 
   /**
    * {@inheritdoc}
    */
-  public function getSdcPlugin(): ComponentPlugin {
-    return $this->getComponentPlugin();
+  protected function getComponentPlugin(): ComponentPlugin {
+    // @todo this should probably use DefaultSingleLazyPluginCollection
+    if ($this->componentPlugin === NULL) {
+      // Statically cache the loaded plugin.
+      $this->componentPlugin = $this->componentPluginManager->find($this->getSourceSpecificComponentId());
+    }
+    return $this->componentPlugin;
   }
 
   /**
@@ -111,22 +129,7 @@ final class SingleDirectoryComponent extends GeneratedFieldExplicitInputUxCompon
    * {@inheritdoc}
    */
   public function getReferencedPluginClass(): ?string {
-    return $this->componentPluginManager->getDefinition($this->configuration['local_source_id'])['class'];
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  protected function getComponentPlugin(): ComponentPlugin {
-    // @todo this should probably use DefaultSingleLazyPluginCollection
-    if (is_null($this->configuration['local_source_id'])) {
-      throw new ComponentDoesNotMeetRequirementsException(['Component has no valid source plugin_id value.']);
-    }
-    if ($this->componentPlugin === NULL) {
-      // Statically cache the loaded plugin.
-      $this->componentPlugin = $this->componentPluginManager->find($this->configuration['local_source_id']);
-    }
-    return $this->componentPlugin;
+    return $this->componentPluginManager->getDefinition($this->getSourceSpecificComponentId())['class'];
   }
 
   /**
@@ -152,7 +155,7 @@ final class SingleDirectoryComponent extends GeneratedFieldExplicitInputUxCompon
     try {
       $component = $this->getComponentPlugin();
       return new TranslatableMarkup('Single-directory component: %name', [
-        '%name' => $component->metadata->name ?? $component->getPluginId(),
+        '%name' => $this->getMetadata()->name ?? $component->getPluginId(),
       ]);
     }
     catch (\Exception) {
@@ -166,7 +169,7 @@ final class SingleDirectoryComponent extends GeneratedFieldExplicitInputUxCompon
   public function renderComponent(array $inputs, string $componentUuid, bool $isPreview = FALSE): array {
     return [
       '#type' => 'component',
-      '#component' => $this->configuration['local_source_id'],
+      '#component' => $this->getSourceSpecificComponentId(),
       '#props' => ($inputs[self::EXPLICIT_INPUT_NAME] ?? []) + [
         'canvas_uuid' => $componentUuid,
         'canvas_slot_ids' => \array_keys($this->getSlotDefinitions()),
@@ -174,7 +177,7 @@ final class SingleDirectoryComponent extends GeneratedFieldExplicitInputUxCompon
       ],
       '#attached' => [
         'library' => [
-          'core/components.' . str_replace(':', '--', $this->configuration['local_source_id']),
+          'core/components.' . str_replace(':', '--', $this->getSourceSpecificComponentId()),
         ],
       ],
     ];
@@ -343,7 +346,7 @@ final class SingleDirectoryComponent extends GeneratedFieldExplicitInputUxCompon
 
     \assert(isset($parsed_url['path']));
     $path = ltrim($parsed_url['path'], '/');
-    $template_path = $this->getSdcPlugin()->getTemplatePath();
+    $template_path = $this->getComponentPlugin()->getTemplatePath();
     \assert(\is_string($template_path));
     $referenced_asset_path = Path::canonicalize(dirname($template_path) . '/' . $path);
     if (is_file($referenced_asset_path)) {
