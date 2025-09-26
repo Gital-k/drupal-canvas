@@ -340,8 +340,35 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     return [
       'source' => $values,
       'resolved' => array_map(
-        fn(array $prop_source): mixed => PropSource::parse($prop_source)
-          ->evaluate($entity, is_required: FALSE),
+        function(array $prop_source) use ($entity): mixed {
+          // Transform to match expected structure
+          $formatted_source = [
+            'sourceType' => $prop_source['sourceType'],
+          ];
+
+          // Determine which structure to use based on available data
+          if (isset($prop_source['adapterInputs'])) {
+            // Structure 1: {sourceType: string, adapterInputs: array<string, mixed>}
+            $formatted_source['adapterInputs'] = $prop_source['adapterInputs'];
+          } elseif (isset($prop_source['expression'])) {
+            // Structure 2: {sourceType: string, expression: string, value?: mixed, sourceTypeSettings?: array{...}}
+            $formatted_source['expression'] = $prop_source['expression'];
+            if (isset($prop_source['value'])) {
+              $formatted_source['value'] = $prop_source['value'];
+            }
+            if (isset($prop_source['sourceTypeSettings'])) {
+              $formatted_source['sourceTypeSettings'] = $prop_source['sourceTypeSettings'];
+            }
+          } else {
+            // Structure 3: {sourceType: string, value: mixed, jsonSchema: array, componentId: string}
+            $formatted_source['value'] = $prop_source['value'] ?? null;
+            $formatted_source['jsonSchema'] = $prop_source['jsonSchema'] ?? [];
+            $formatted_source['componentId'] = $prop_source['componentId'] ?? '';
+          }
+
+          return PropSource::parse($formatted_source)
+            ->evaluate($entity, is_required: FALSE);
+        },
         array_filter($values, fn($item) => is_array($item) && isset($item['sourceType'])),
       ),
     ];
@@ -471,9 +498,36 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     }
     try {
       $resolvedInputValues = array_map(
-        fn(array $prop_source): mixed => PropSource::parse($prop_source)
-          ->evaluate($entity, is_required: FALSE),
-        array_filter($inputValues, fn($item) => is_array($item) && isset($item['sourceType'])),
+        function(array $prop_source) use ($entity): mixed {
+          // Create a properly structured array for PropSource::parse()
+          $formatted_source = [
+            'sourceType' => $prop_source['sourceType'],
+          ];
+
+          // Choose the appropriate structure based on available data
+          if (isset($prop_source['adapterInputs']) && is_array($prop_source['adapterInputs'])) {
+            // Structure 1: {sourceType: string, adapterInputs: array<string, mixed>}
+            $formatted_source['adapterInputs'] = $prop_source['adapterInputs'];
+          } elseif (isset($prop_source['expression']) && is_string($prop_source['expression'])) {
+            // Structure 2: {sourceType: string, expression: string, value?: mixed, sourceTypeSettings?: array{...}}
+            $formatted_source['expression'] = $prop_source['expression'];
+            if (isset($prop_source['value'])) {
+              $formatted_source['value'] = $prop_source['value'];
+            }
+            if (isset($prop_source['sourceTypeSettings']) && is_array($prop_source['sourceTypeSettings'])) {
+              $formatted_source['sourceTypeSettings'] = $prop_source['sourceTypeSettings'];
+            }
+          } else {
+            // Structure 3: {sourceType: string, value: mixed, jsonSchema: array, componentId: string}
+            $formatted_source['value'] = $prop_source['value'] ?? null;
+            $formatted_source['jsonSchema'] = $prop_source['jsonSchema'] ?? [];
+            $formatted_source['componentId'] = $prop_source['componentId'] ?? '';
+          }
+
+          return PropSource::parse($formatted_source)
+            ->evaluate($entity, is_required: FALSE);
+        },
+        array_filter($inputValues, fn($item) => is_array($item) && isset($item['sourceType']))
       );
     }
     catch (MissingHostEntityException $e) {
