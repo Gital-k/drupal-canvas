@@ -16,6 +16,7 @@ use Drupal\canvas\ComponentSource\UrlRewriteInterface;
 use Drupal\canvas\Entity\Component as ComponentEntity;
 use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\canvas\Entity\VersionedConfigEntityBase;
+use Drupal\custom_elements\CustomElement;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -147,13 +148,21 @@ final class JavaScriptComponent extends GeneratedFieldExplicitInputUxComponentSo
    * {@inheritdoc}
    */
   public function renderComponent(array $inputs, string $componentUuid, bool $isPreview = FALSE): array {
-    // @todo Implement JavaScript component rendering
-    return [
-      '#markup' => sprintf(
-        '<div>JavaScript Component: %s (rendering not implemented)</div>',
-        $this->configuration['local_source_id']
-      ),
-    ];
+    $resolver = \Drupal::service('custom_elements.preview_resolver');
+    $custom_element = CustomElement::create($this->configuration['local_source_id']);
+
+    // Add component inputs as attributes.
+    // If inputs has a 'props' key, use those as top-level attributes.
+    $inputs += ['props' => []];
+    foreach ($inputs['props'] as $key => $value) {
+      $custom_element->setAttribute($key, $value);
+    }
+    // @todo Support slots in the future.
+
+    // Get the appropriate preview provider and generate preview.
+    $provider = $resolver->getProvider(\Drupal::request());
+    $preview = $provider->preview($custom_element);
+    return $preview;
   }
 
   /**
