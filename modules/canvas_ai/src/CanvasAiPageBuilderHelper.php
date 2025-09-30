@@ -331,6 +331,12 @@ class CanvasAiPageBuilderHelper {
       if ($components['enabled']) {
         $enabled_sources[$source] = Yaml::parse($components['data']);
       }
+      foreach (Yaml::parse($components['data']) as $component_id => $component_data) {
+        // If a component is marked as hidden, remove it from the context.
+        if (isset($component_data['hidden']) && $component_data['hidden']) {
+          unset($enabled_sources[$source][$component_id]);
+        }
+      }
     }
 
     return $enabled_sources ?? [];
