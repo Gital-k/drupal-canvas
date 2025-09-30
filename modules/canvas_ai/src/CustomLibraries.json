@@ -1,30 +1,37 @@
 {
   "Importing_packages": {
     "type": "External npm package",
+    "description": "Although a number of useful built-in and bundled packages are provided, you can also import any npm package through the web using a service like esm.sh.",
     "code": "import { motion } from 'https://esm.sh/motion/react?external=react,react-dom';"
   },
   "FormattedText": {
     "type": "Built-in custom package",
+    "description": "A component to render trusted HTML using `dangerouslySetInnerHTML`. It's designed to safely display content processed through Drupal's filter system.",
     "code": "import FormattedText from '@/lib/FormattedText';\n\nexport default function Example() {\n  return (\n    <FormattedText>\n      <em>Hello, world!</em>\n    </FormattedText>\n  );\n}"
   },
   "cn": {
     "type": "Built-in custom package",
+    "description": "A utility function for conditionally combining Tailwind CSS classes, making it easier to manage dynamic styles in your components.",
     "code": "import { cn } from '@/lib/utils';\n\nexport default function Example() {\n  return <ControlDots className=\"top-4 left-4 stroke-white absolute\" />;\n}\n\nconst ControlDots = ({ className }) => (\n  <svg\n    xmlns=\"http://www.w3.org/2000/svg\"\n    viewBox=\"0 0 31 9\"\n    fill=\"none\"\n    strokeWidth=\"2\"\n    className={cn('w-12', className)}\n  >\n    <ellipse cx=\"4.13\" cy=\"4.97\" rx=\"3.13\" ry=\"2.97\" />\n    <ellipse cx=\"15.16\" cy=\"4.97\" rx=\"3.13\" ry=\"2.97\" />\n    <ellipse cx=\"26.19\" cy=\"4.97\" rx=\"3.13\" ry=\"2.97\" />\n  </svg>\n);"
   },
   "Tailwind": {
     "type": "Bundled npm package",
+    "description": "A utility-first CSS framework (Tailwind 4) available by default. It allows you to build custom designs directly in your markup and customize theme variables.",
     "code": "@theme {\n  --color-drupal-blue: #009cde;\n}\n\nexport default function Example() {\n  return <div className=\"bg-drupal-blue\">Drupal Blue</div>;\n}"
   },
   "clsx": {
     "type": "Bundled npm package",
+    "description": "A tiny and fast utility for constructing `className` strings conditionally, which is useful for applying classes based on state or props.",
     "code": "import { clsx } from 'clsx'\n\nexport default function Example() {\n  return (\n    <div className={clsx('foo', true && 'bar', 'baz');} />\n    // => 'foo bar baz'\n  );\n};"
   },
   "class-variance-authority": {
     "type": "Bundled npm package",
+    "description": "A library for creating components with multiple visual variants (e.g., size, color) in a clean, type-safe, and composable way.",
     "code": "import { cva } from 'class-variance-authority';\n\nconst button = cva(\n  'font-semibold border rounded', // base classes\n  {\n    variants: {\n      intent: {\n        primary: 'bg-blue-500 text-white border-blue-500',\n        secondary: 'bg-gray-200 text-gray-900 border-gray-200',\n      },\n      size: {\n        small: 'text-sm py-1 px-2',\n        medium: 'text-base py-2 px-4',\n      },\n    },\n    defaultVariants: {\n      intent: 'primary',\n      size: 'medium',\n    },\n  },\n);\n\n// Usage\nbutton({ intent: 'secondary', size: 'small' });\n// Returns: \"font-semibold border rounded bg-gray-200 text-gray-900 border-gray-200 text-sm py-1 px-2\""
   },
   "tailwind-merge": {
     "type": "Bundled npm package",
+    "description": "A utility function to intelligently merge multiple Tailwind CSS classes in JavaScript, automatically resolving conflicts between them.",
     "code": "import { twMerge } from 'tailwind-merge';\n\ntwMerge('px-2 py-1 bg-red hover:bg-dark-red', 'p-3 bg-[#B91C1C]');\n// → 'hover:bg-dark-red p-3 bg-[#B91C1C]'"
   }
 }
