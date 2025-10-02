@@ -243,4 +243,8 @@ HTML,
     throw new \LogicException('Not implemented.');
   }
 
+  public function testIsBroken(): void {
+    $this->markTestSkipped('Not implemented.');
+  }
+
 }
