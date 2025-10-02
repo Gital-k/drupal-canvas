@@ -1,6 +1,6 @@
-experience_builder.component_source_settings.layout:
+canvas.component_source_settings.layout:
   label: 'Layout settings'
-  type: experience_builder.component_source_settings.*
+  type: canvas.component_source_settings.*
   mapping:
     default_settings:
       type: layout_plugin.settings.[%parent.%parent.%parent.%parent.source_local_id]

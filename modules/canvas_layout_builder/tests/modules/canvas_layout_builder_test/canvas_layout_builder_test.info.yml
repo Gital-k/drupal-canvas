@@ -1,0 +1,4 @@
+name: 'Canvas Layout Builder test'
+type: module
+description: 'Support module for testing layouts in Canvas.'
+package: Testing

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Drupal\xb_layout_builder\Plugin\ExperienceBuilder\ComponentSource;
+namespace Drupal\canvas_layout_builder\Plugin\Canvas\ComponentSource;
 
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
@@ -14,14 +14,14 @@ use Drupal\Core\Plugin\PluginFormInterface;
 use Drupal\Core\Render\Element;
 use Drupal\Core\Render\Markup;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
-use Drupal\experience_builder\Attribute\ComponentSource;
-use Drupal\experience_builder\ComponentSource\ComponentSourceBase;
-use Drupal\experience_builder\ComponentSource\ComponentSourceWithSlotsInterface;
-use Drupal\experience_builder\Entity\Component;
-use Drupal\experience_builder\Entity\Component as ComponentEntity;
-use Drupal\experience_builder\MissingComponentInputsException;
-use Drupal\experience_builder\Plugin\Field\FieldType\ComponentTreeItem;
-use Drupal\xb_layout_builder\Plugin\LayoutManager;
+use Drupal\canvas\Attribute\ComponentSource;
+use Drupal\canvas\ComponentSource\ComponentSourceBase;
+use Drupal\canvas\ComponentSource\ComponentSourceWithSlotsInterface;
+use Drupal\canvas\Entity\Component;
+use Drupal\canvas\Entity\Component as ComponentEntity;
+use Drupal\canvas\MissingComponentInputsException;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
+use Drupal\canvas_layout_builder\Plugin\LayoutManager;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Validator\ConstraintViolationList;
 use Symfony\Component\Validator\ConstraintViolationListInterface;
@@ -140,15 +140,15 @@ final class LayoutComponent extends ComponentSourceBase implements ContainerFact
         }
       }
     }
-    $content['#xb_slot_ids'] = $layout->getPluginDefinition()->getRegionNames();
+    $content['#canvas_slot_ids'] = $layout->getPluginDefinition()->getRegionNames();
     $content['#props'] = [
-      'xb_uuid' => $componentUuid,
-      'xb_slot_ids' => $layout->getPluginDefinition()->getRegionNames(),
-      'xb_is_preview' => $isPreview,
+      'canvas_uuid' => $componentUuid,
+      'canvas_slot_ids' => $layout->getPluginDefinition()->getRegionNames(),
+      'canvas_is_preview' => $isPreview,
     ];
     if ($isPreview) {
       foreach (Element::children($content) as $child) {
-        $startString = '<!-- xb-slot-start-%s/%s -->';
+        $startString = '<!-- canvas-slot-start-%s/%s -->';
         if ($content[$child] === []) {
           // If the region is empty, add text after the comment to render
           // the region in the preview.
@@ -158,7 +158,7 @@ final class LayoutComponent extends ComponentSourceBase implements ContainerFact
           '#markup' => Markup::create(\sprintf($startString, $componentUuid, $child)),
         ]);
         array_push($content[$child], [
-          '#markup' => Markup::create(\sprintf('<!-- xb-slot-end-%s/%s -->', $componentUuid, $child)),
+          '#markup' => Markup::create(\sprintf('<!-- canvas-slot-end-%s/%s -->', $componentUuid, $child)),
         ]);
       }
     }

@@ -2,26 +2,26 @@
 
 declare(strict_types=1);
 
-namespace Drupal\Tests\xb_layout_builder\Kernel\Plugin\ExperienceBuilder\ComponentSource;
+namespace Drupal\Tests\canvas_layout_builder\Kernel\Plugin\Canvas\ComponentSource;
 
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Extension\ModuleInstallerInterface;
-use Drupal\experience_builder\Entity\Component;
-use Drupal\experience_builder\Entity\ComponentInterface;
-use Drupal\experience_builder\Plugin\ComponentPluginManager;
-use Drupal\experience_builder\Plugin\Field\FieldType\ComponentTreeItemList;
+use Drupal\canvas\Entity\Component;
+use Drupal\canvas\Entity\ComponentInterface;
+use Drupal\canvas\Plugin\ComponentPluginManager;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Drupal\system\Entity\Menu;
-use Drupal\Tests\experience_builder\Kernel\Plugin\ExperienceBuilder\ComponentSource\ComponentSourceTestBase;
-use Drupal\xb_layout_builder\Plugin\ExperienceBuilder\ComponentSource\LayoutComponent;
-use Drupal\xb_layout_builder\Plugin\LayoutManager;
-use Drupal\xb_layout_builder_test\Plugin\Layout\TestLayout;
+use Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource\ComponentSourceTestBase;
+use Drupal\canvas_layout_builder\Plugin\Canvas\ComponentSource\LayoutComponent;
+use Drupal\canvas_layout_builder\Plugin\LayoutManager;
+use Drupal\canvas_layout_builder_test\Plugin\Layout\TestLayout;
 
 /**
- * @coversDefaultClass \Drupal\xb_layout_builder\Plugin\ExperienceBuilder\ComponentSource\LayoutComponent
- * @group experience_builder
+ * @coversDefaultClass \Drupal\canvas_layout_builder\Plugin\Canvas\ComponentSource\LayoutComponent
+ * @group canvas
  * @group layout_builder
  * @group #slow
- * @phpstan-import-type ComponentConfigEntityId from \Drupal\experience_builder\Entity\Component
+ * @phpstan-import-type ComponentConfigEntityId from \Drupal\canvas\Entity\Component
  */
 final class LayoutComponentTest extends ComponentSourceTestBase {
 
@@ -31,13 +31,13 @@ final class LayoutComponentTest extends ComponentSourceTestBase {
   protected static $modules = [
     'layout_builder',
     'layout_discovery',
-    'xb_layout_builder',
-    'xb_layout_builder_test',
+    'canvas_layout_builder',
+    'canvas_layout_builder_test',
   ];
 
   public function testDiscovery(): array {
-    self::assertSame([], $this->findIneligibleComponents(LayoutComponent::SOURCE_PLUGIN_ID, 'xb_layout_builder_test'));
-    self::assertSame([], $this->findCreatedComponentConfigEntities(LayoutComponent::SOURCE_PLUGIN_ID, 'xb_layout_builder_test'));
+    self::assertSame([], $this->findIneligibleComponents(LayoutComponent::SOURCE_PLUGIN_ID, 'canvas_layout_builder_test'));
+    self::assertSame([], $this->findCreatedComponentConfigEntities(LayoutComponent::SOURCE_PLUGIN_ID, 'canvas_layout_builder_test'));
 
     $layoutManager = \Drupal::service(LayoutManager::class);
     \assert($layoutManager instanceof LayoutManager);
@@ -46,9 +46,9 @@ final class LayoutComponentTest extends ComponentSourceTestBase {
     $layoutManager->clearCachedDefinitions();
     $layoutManager->getDefinitions();
     $createdComponents = \array_map(static fn(ComponentInterface $component) => $component->id(), Component::loadMultiple());
-    $testPlugins = \array_filter($createdComponents, static fn(string $id) => \str_starts_with($id, 'layout.xb_layout_builder_test'));
+    $testPlugins = \array_filter($createdComponents, static fn(string $id) => \str_starts_with($id, 'layout.canvas_layout_builder_test'));
     self::assertSame([
-      'layout.xb_layout_builder_test_layout' => 'layout.xb_layout_builder_test_layout',
+      'layout.canvas_layout_builder_test_layout' => 'layout.canvas_layout_builder_test_layout',
     ], $testPlugins);
 
     return $testPlugins;
@@ -59,7 +59,7 @@ final class LayoutComponentTest extends ComponentSourceTestBase {
    */
   public function testGetReferencedPluginClass(array $component_ids): void {
     self::assertSame([
-      'layout.xb_layout_builder_test_layout' => TestLayout::class,
+      'layout.canvas_layout_builder_test_layout' => TestLayout::class,
     ], $this->getReferencedPluginClasses($component_ids));
   }
 
@@ -68,7 +68,7 @@ final class LayoutComponentTest extends ComponentSourceTestBase {
    */
   public function testSettings(array $component_ids): void {
     self::assertSame([
-      'layout.xb_layout_builder_test_layout' => [
+      'layout.canvas_layout_builder_test_layout' => [
         'label' => '',
       ],
     ], $this->getAllSettings($component_ids));
@@ -99,13 +99,13 @@ final class LayoutComponentTest extends ComponentSourceTestBase {
     $default_cacheability = (new CacheableMetadata())
       ->setCacheContexts($default_render_cache_contexts);
     $this->assertEquals([
-      'layout.xb_layout_builder_test_layout' => [
+      'layout.canvas_layout_builder_test_layout' => [
         'html' => <<<HTML
-<div class="layout layout--xb-layout-builder-test-layout">
- <div class="xb-main-test layout__region layout__region--main">
+<div class="layout layout--canvas-layout-builder-test-layout">
+ <div class="canvas-main-test layout__region layout__region--main">
 
  </div>
- <div class="xb-sidebar-test layout__region layout__region--sidebar">
+ <div class="canvas-sidebar-test layout__region layout__region--sidebar">
 
  </div>
  </div>
@@ -122,20 +122,20 @@ HTML,
   public function testCalculateDependencies(array $component_ids): void {
     $dependencies = [
       'module' => [
-        'xb_layout_builder_test',
+        'canvas_layout_builder_test',
       ],
       'config' => [
         'system.menu.menu' => 'system.menu.menu',
       ],
     ];
     self::assertSame([
-      'layout.xb_layout_builder_test_layout' => $dependencies,
+      'layout.canvas_layout_builder_test_layout' => $dependencies,
     ], $this->callSourceMethodForEach('calculateDependencies', $component_ids));
   }
 
   public static function providerRenderComponentFailure(): \Generator {
     yield "Layout render failure" => [
-      'component_id' => 'layout.xb_layout_builder_test_layout',
+      'component_id' => 'layout.canvas_layout_builder_test_layout',
       'inputs' => [],
       'expected_validation_errors' => [],
       'expected_exception' => NULL,
@@ -145,8 +145,8 @@ HTML,
 
   public static function getExpectedClientSideInfo(): array {
     return [
-      'layout.xb_layout_builder_test_layout' => [
-        'expected_output_selectors' => ['.xb-main-test'],
+      'layout.canvas_layout_builder_test_layout' => [
+        'expected_output_selectors' => ['.canvas-main-test'],
         'source' => 'Layout builder layout',
         'metadata' => [
           'slots' => [
@@ -174,21 +174,21 @@ HTML,
   }
 
   protected function createAndSaveInUseComponentForFallbackTesting(): ComponentInterface {
-    /** @var \Drupal\experience_builder\Entity\ComponentInterface */
-    return Component::load('layout.xb_layout_builder_test_layout');
+    /** @var \Drupal\canvas\Entity\ComponentInterface */
+    return Component::load('layout.canvas_layout_builder_test_layout');
   }
 
   protected function createAndSaveUnusedComponentForFallbackTesting(): ComponentInterface {
-    /** @var \Drupal\experience_builder\Entity\ComponentInterface */
-    return Component::load('layout.xb_layout_builder_unused_layout');
+    /** @var \Drupal\canvas\Entity\ComponentInterface */
+    return Component::load('layout.canvas_layout_builder_unused_layout');
   }
 
   protected function forceComponentFallback(ComponentInterface $used_component, ComponentInterface $unused_component): void {
-    \Drupal::service(ModuleInstallerInterface::class)->uninstall(['xb_layout_builder_test']);
+    \Drupal::service(ModuleInstallerInterface::class)->uninstall(['canvas_layout_builder_test']);
   }
 
   protected function recoverComponentFallback(ComponentInterface $component): void {
-    \Drupal::service(ModuleInstallerInterface::class)->install(['xb_layout_builder_test']);
+    \Drupal::service(ModuleInstallerInterface::class)->install(['canvas_layout_builder_test']);
     $this->generateComponentConfig();
   }
 
@@ -219,13 +219,13 @@ HTML,
   }
 
   protected function createAndSaveInUseComponentForUninstallValidationTesting(): ComponentInterface {
-    /** @var \Drupal\experience_builder\Entity\ComponentInterface */
-    return Component::load('layout.xb_layout_builder_test_layout');
+    /** @var \Drupal\canvas\Entity\ComponentInterface */
+    return Component::load('layout.canvas_layout_builder_test_layout');
   }
 
   protected function createAndSaveUnusedComponentForUninstallValidationTesting(): ComponentInterface {
-    /** @var \Drupal\experience_builder\Entity\ComponentInterface */
-    return Component::load('layout.xb_layout_builder_unused_layout');
+    /** @var \Drupal\canvas\Entity\ComponentInterface */
+    return Component::load('layout.canvas_layout_builder_unused_layout');
   }
 
   protected function getNotAllowedModuleForUninstallValidatorTesting(): string {
@@ -234,7 +234,7 @@ HTML,
 
   protected function getAllowedModuleForUninstallValidatorTesting(): string {
     Menu::load('menu')?->delete();
-    return 'xb_layout_builder_test';
+    return 'canvas_layout_builder_test';
   }
 
 }

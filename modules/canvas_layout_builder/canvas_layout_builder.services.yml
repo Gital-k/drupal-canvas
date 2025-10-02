@@ -1,0 +1,8 @@
+services:
+  _defaults:
+    autoconfigure: true
+    autowire: true
+  Drupal\canvas_layout_builder\Plugin\LayoutManager:
+    decorates: plugin.manager.core.layout
+    parent: Drupal\Core\Layout\LayoutPluginManagerInterface
+    arguments: ['@Drupal\canvas\ComponentIncompatibilityReasonRepository', '@Drupal\canvas\ComponentSource\ComponentSourceManager']

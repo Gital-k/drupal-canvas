@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Drupal\xb_layout_builder_test\Plugin\Layout;
+namespace Drupal\canvas_layout_builder_test\Plugin\Layout;
 
 use Drupal\Core\Layout\Attribute\Layout;
 use Drupal\Core\Layout\LayoutDefault;
@@ -10,11 +10,11 @@ use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\system\Entity\Menu;
 
 /**
- * Layout Builder Test Layout for testing an unused layout plugin.
+ * Layout Builder Test Layout.
  */
 #[Layout(
   id: self::PLUGIN_ID,
-  label: new TranslatableMarkup('Layout Builder unused test plugin'),
+  label: new TranslatableMarkup('Layout Builder Test Plugin'),
   regions: [
     self::MAIN_REGION => [
       "label" => new TranslatableMarkup("Main Region"),
@@ -25,9 +25,9 @@ use Drupal\system\Entity\Menu;
   ],
   category: new TranslatableMarkup("Layout Builder Test"),
 )]
-class UnusedLayout extends LayoutDefault {
+class TestLayout extends LayoutDefault {
 
-  const PLUGIN_ID = 'xb_layout_builder_unused_layout';
+  const PLUGIN_ID = 'canvas_layout_builder_test_layout';
 
   const MAIN_REGION = 'main';
   const SIDEBAR_REGION = 'sidebar';
@@ -37,13 +37,13 @@ class UnusedLayout extends LayoutDefault {
    */
   public function build(array $regions) {
     $build = parent::build($regions);
-    $build[self::MAIN_REGION]['#attributes']['class'][] = 'xb-main-unused-test';
+    $build[self::MAIN_REGION]['#attributes']['class'][] = 'canvas-main-test';
     if ($this->inPreview) {
-      $build[self::MAIN_REGION]['#attributes']['class'][] = 'xb-main-unused-preview';
+      $build[self::MAIN_REGION]['#attributes']['class'][] = 'canvas-main-test-preview';
     }
-    $build[self::SIDEBAR_REGION]['#attributes']['class'][] = 'xb-sidebar--unused-test';
+    $build[self::SIDEBAR_REGION]['#attributes']['class'][] = 'canvas-sidebar-test';
     if ($this->inPreview) {
-      $build[self::SIDEBAR_REGION]['#attributes']['class'][] = 'xb-sidebar-unused-preview';
+      $build[self::SIDEBAR_REGION]['#attributes']['class'][] = 'canvas-sidebar-test-preview';
     }
     return $build;
   }

@@ -1,7 +1,7 @@
 type: module
-name: Experience Builder Layout builder integration
+name: Canvas Layout builder integration
 description: ""
 core_version_requirement: ^10 || ^11
 dependencies:
-  - experience_builder:experience_builder
+  - canvas:canvas
   - drupal:layout_builder

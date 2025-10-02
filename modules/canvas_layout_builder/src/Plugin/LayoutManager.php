@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Drupal\xb_layout_builder\Plugin;
+namespace Drupal\canvas_layout_builder\Plugin;
 
 use Drupal\Core\Cache\CacheBackendInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
@@ -10,19 +10,19 @@ use Drupal\Core\Extension\ThemeHandlerInterface;
 use Drupal\Core\Layout\LayoutDefinition;
 use Drupal\Core\Layout\LayoutInterface;
 use Drupal\Core\Layout\LayoutPluginManager;
-use Drupal\experience_builder\ComponentDoesNotMeetRequirementsException;
-use Drupal\experience_builder\ComponentIncompatibilityReasonRepository;
-use Drupal\experience_builder\ComponentSource\ComponentSourceManager;
-use Drupal\experience_builder\Entity\Component;
-use Drupal\experience_builder\Entity\ComponentInterface;
-use Drupal\experience_builder\Entity\VersionedConfigEntityBase;
-use Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\BlockComponent;
-use Drupal\xb_layout_builder\Plugin\ExperienceBuilder\ComponentSource\LayoutComponent;
+use Drupal\canvas\ComponentDoesNotMeetRequirementsException;
+use Drupal\canvas\ComponentIncompatibilityReasonRepository;
+use Drupal\canvas\ComponentSource\ComponentSourceManager;
+use Drupal\canvas\Entity\Component;
+use Drupal\canvas\Entity\ComponentInterface;
+use Drupal\canvas\Entity\VersionedConfigEntityBase;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent;
+use Drupal\canvas_layout_builder\Plugin\Canvas\ComponentSource\LayoutComponent;
 
 /**
- * Decorator that auto-creates/updates an Experience Builder Component entity per Layout plugin.
+ * Decorator that auto-creates/updates a Canvas Component entity per Layout plugin.
  *
- * @see \Drupal\experience_builder\Entity\Component
+ * @see \Drupal\canvas\Entity\Component
  * @see docs/components.md#3.2
  */
 final class LayoutManager extends LayoutPluginManager {
@@ -47,8 +47,8 @@ final class LayoutManager extends LayoutPluginManager {
   protected function setCachedDefinitions($definitions): array {
     parent::setCachedDefinitions($definitions);
 
-    // Do not auto-create/update XB configuration when syncing config/deploying.
-    // @todo Introduce a "XB development mode" similar to Twig's: https://www.drupal.org/node/3359728
+    // Do not auto-create/update Canvas configuration when syncing config/deploying.
+    // @todo Introduce a "Canvas development mode" similar to Twig's: https://www.drupal.org/node/3359728
     // @phpstan-ignore-next-line
     if (\Drupal::isConfigSyncing()) {
       return $definitions;

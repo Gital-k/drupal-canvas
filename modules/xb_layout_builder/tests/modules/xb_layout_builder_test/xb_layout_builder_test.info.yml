@@ -1,4 +1,0 @@
-name: 'XB Layout Builder test'
-type: module
-description: 'Support module for testing layouts in XB.'
-package: Testing
