@@ -11,6 +11,7 @@ use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\canvas\Plugin\ComponentPluginManager;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Drupal\system\Entity\Menu;
+use Drupal\Tests\canvas\Kernel\BrokenPluginManagerInterface;
 use Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource\ComponentSourceTestBase;
 use Drupal\canvas_layout_builder\Plugin\Canvas\ComponentSource\LayoutComponent;
 use Drupal\canvas_layout_builder\Plugin\LayoutManager;
@@ -235,6 +236,11 @@ HTML,
   protected function getAllowedModuleForUninstallValidatorTesting(): string {
     Menu::load('menu')?->delete();
     return 'canvas_layout_builder_test';
+  }
+
+  protected function triggerBrokenComponent(ComponentInterface $component): ?BrokenPluginManagerInterface {
+    // @todo not sure what to do here.
+    throw new \LogicException('Not implemented.');
   }
 
 }
