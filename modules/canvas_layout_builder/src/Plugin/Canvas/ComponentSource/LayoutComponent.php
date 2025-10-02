@@ -203,7 +203,7 @@ final class LayoutComponent extends ComponentSourceBase implements ContainerFact
   public function getClientSideInfo(ComponentEntity $component): array {
     return [
       'source' => (string) new TranslatableMarkup('Layout builder layout'),
-      'build' => $this->renderComponent([], $component->uuid()),
+      'build' => $this->renderComponent([], $component->getSlotDefinitions(), $component->uuid(), TRUE),
       'metadata' => ['slots' => $this->getSlotDefinitions()],
       'field_data' => [],
       'dynamic_prop_source_candidates' => [],
