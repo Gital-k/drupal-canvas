@@ -111,7 +111,7 @@ final class LayoutComponent extends ComponentSourceBase implements ContainerFact
     return $this->layoutManager->getDefinition($this->configuration['plugin_id'] ?? $this->configuration['local_source_id'])?->getClass();
   }
 
-  public function renderComponent(array $inputs, string $componentUuid, bool $isPreview = FALSE,): array {
+  public function renderComponent(array $inputs, array $slot_definitions, string $componentUuid, bool $isPreview = FALSE,): array {
     $layout = $this->getLayoutPlugin();
     // @todo access.
     // @todo cache.
@@ -136,7 +136,7 @@ final class LayoutComponent extends ComponentSourceBase implements ContainerFact
             continue;
           }
           $source = $componentEntity->getComponentSource();
-          $content[$key][$subkey] = $source->renderComponent($component, $componentEntity->uuid(), $isPreview);
+          $content[$key][$subkey] = $source->renderComponent($component, $slot_definitions, $componentEntity->uuid(), $isPreview);
         }
       }
     }
@@ -171,7 +171,7 @@ final class LayoutComponent extends ComponentSourceBase implements ContainerFact
     return !empty($this->getDefaultExplicitInput());
   }
 
-  public function getExplicitInput(string $uuid, ComponentTreeItem $item): array {
+  public function getExplicitInput(string $uuid, ComponentTreeItem $item, ?FieldableEntityInterface $host_entity = NULL): array {
     try {
       return $item->getInputs() ?? [];
     }
@@ -183,7 +183,7 @@ final class LayoutComponent extends ComponentSourceBase implements ContainerFact
     }
   }
 
-  public function hydrateComponent(array $explicit_input): array {
+  public function hydrateComponent(array $explicit_input, array $slot_definitions): array {
     $hydrated = [];
     if ($slots = $this->getSlotDefinitions()) {
       $hydrated['slots'] = array_map(fn($slot) => $slot['examples'][0] ?? '', $slots);
@@ -211,7 +211,7 @@ final class LayoutComponent extends ComponentSourceBase implements ContainerFact
     ];
   }
 
-  public function clientModelToInput(string $component_instance_uuid, ComponentEntity $component, array $client_model, ?ConstraintViolationListInterface $violations = NULL): array {
+  public function clientModelToInput(string $component_instance_uuid, ComponentEntity $component, array $client_model, ?FieldableEntityInterface $host_entity, ?ConstraintViolationListInterface $violations = NULL): array {
     $defaults = $component->get('settings')['default_settings'];
     $input = $client_model['resolved'] ?? [];
     // We don't need to store these as they can be recalculated based on the
@@ -265,6 +265,11 @@ final class LayoutComponent extends ComponentSourceBase implements ContainerFact
   protected function getExplicitInputDefinitions(): array {
     // @todo Implement.
     return [];
+  }
+
+  public function isBroken(): bool {
+    // @todo Implement.
+    return FALSE;
   }
 
 }
