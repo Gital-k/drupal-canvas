@@ -212,7 +212,7 @@ final class LayoutComponent extends ComponentSourceBase implements ContainerFact
   }
 
   public function clientModelToInput(string $component_instance_uuid, ComponentEntity $component, array $client_model, ?FieldableEntityInterface $host_entity, ?ConstraintViolationListInterface $violations = NULL): array {
-    $defaults = $component->get('settings')['default_settings'];
+    $defaults = $component->get('settings')['default_settings'] ?? [];
     $input = $client_model['resolved'] ?? [];
     // We don't need to store these as they can be recalculated based on the
     // plugin ID.
