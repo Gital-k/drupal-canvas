@@ -70,10 +70,11 @@ const withStore = (
 const db = {
   get: (): Promise<any[]> =>
     new Promise((resolve) => {
-      let req: IDBRequest;
       withStore('readonly', (store) => {
-        req = store.get(KEY);
-      }).then(() => resolve(req?.result || []));
+        const req = store.get(KEY);
+        req.onsuccess = () => resolve(req.result || []);
+        req.onerror = () => resolve([]);
+      });
     }),
   set: (data: any[]) => withStore('readwrite', (store) => store.put(data, KEY)),
   clear: () => withStore('readwrite', (store) => store.clear()),
@@ -834,8 +835,6 @@ const AiWizard = () => {
           onInput={handleTextInput}
           onComponentRender={() => {
             if (!isComponentRendered) {
-              chatElementRef.current.clearMessages();
-              historyStore.clearHistory();
               chatElementRef.current.disableSubmitButton();
               isComponentRendered = true;
             }
