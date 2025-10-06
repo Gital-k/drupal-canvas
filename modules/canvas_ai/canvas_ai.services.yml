@@ -17,4 +17,3 @@ services:
     class: Drupal\canvas_ai\StyleGuideGenerator
   canvas_ai.apigenerator:
     class: Drupal\canvas\Controller\ApiConfigControllers
-g
