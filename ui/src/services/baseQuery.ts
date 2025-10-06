@@ -22,8 +22,10 @@ export const baseQuery: BaseQueryFn<
 > = async (args, api, extraOptions) => {
   const state = api.getState() as RootState;
   const canvasSettings = getCanvasSettings();
-  const dt = new Date().getTime();
-  const flagForAjax = typeof args === 'object' && args?.method === 'PATCH' && args?.url.includes('/form');
+  const flagForAjax =
+    typeof args === 'object' &&
+    args?.method === 'PATCH' &&
+    args?.url.includes('/form');
   if (flagForAjax) {
     if (typeof canvasSettings?.canvasLayoutRequestInProgress === 'undefined') {
       canvasSettings.canvasLayoutRequestInProgress = [];
