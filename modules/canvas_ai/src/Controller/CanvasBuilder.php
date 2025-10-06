@@ -10,6 +10,7 @@ use Drupal\ai\OperationType\Chat\ChatMessage;
 use Drupal\ai\OperationType\GenericType\ImageFile;
 use Drupal\ai_agents\Service\AgentStatus\Interfaces\AiAgentStatusPollerServiceInterface;
 use Drupal\ai_agents\Service\AgentStatus\UpdateItems\TextGenerated;
+use Drupal\canvas\Controller\ApiConfigControllers;
 use Drupal\Component\Plugin\PluginManagerInterface;
 use Drupal\Component\Serialization\Json;
 use Drupal\Core\Access\CsrfTokenGenerator;
@@ -25,6 +26,7 @@ use Drupal\canvas_ai\Plugin\AiFunctionCall\EditFieldContent;
 use Drupal\canvas_ai\Plugin\AiFunctionCall\SetAIGeneratedComponentStructure;
 use Drupal\canvas_ai\CanvasAiPageBuilderHelper;
 use Drupal\canvas_ai\CanvasAiTempStore;
+use Drupal\canvas_ai\StyleGuideGenerator;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -48,6 +50,8 @@ final class CanvasBuilder extends ControllerBase {
     protected CanvasAiTempStore $canvasAiTempStore,
     protected FileSystemInterface $fileSystem,
     protected AiAgentStatusPollerServiceInterface $poller,
+    protected StyleGuideGenerator $styleGuideGenerator,
+    protected ApiConfigControllers $apiConfigControllers,
   ) {}
 
   /**
@@ -62,6 +66,8 @@ final class CanvasBuilder extends ControllerBase {
       $container->get('canvas_ai.tempstore'),
       $container->get('file_system'),
       $container->get('ai_agents.agent_status_poller'),
+      $container->get('canvas_ai.styleguidegenerator'),
+      $container->get('canvas_ai.apigenerator'),
     );
   }
 
@@ -89,6 +95,17 @@ final class CanvasBuilder extends ControllerBase {
       $files = $request->files->all();
       $prompt['derived_proptypes'] = Json::decode($prompt['derived_proptypes']);
     }
+
+    $available_components_response = $this->apiConfigControllers->list('js_component');
+    $available_components = (string) $available_components_response->getContent();
+    $machine_names = new \stdClass();
+
+    foreach (json_decode($available_components) as $component) {
+      $machine_names->{$component->machineName} = $component->machineName;
+    }
+
+    $machine_names_json = json_encode($machine_names);
+    $this->styleGuideGenerator->setGlobalCSS($prompt['global_css'] ?? '');
     // If $prompt['messages'] is missing or invalid, this code reconstructs it
     // by scanning for keys named 'message <number>', and
     // assembling them into an ordered 'messages' array, while cleaning up old keys
@@ -222,7 +239,19 @@ final class CanvasBuilder extends ControllerBase {
     $agent->setCreateDirectly(TRUE);
     $menu_fetch_source = $this->getMenuFetchSource();
     $json_api_module_status = $this->moduleHandler()->moduleExists('jsonapi') ? 'enabled' : 'disabled';
-    $agent->setTokenContexts(['entity_type' => $prompt['entity_type'] ?? NULL, 'entity_id' => $prompt['entity_id'] ?? NULL, 'selected_component' => $prompt['selected_component'] ?? NULL, 'layout' => $prompt['layout'] ?? NULL, 'derived_proptypes' => isset($prompt['derived_proptypes']) ? JSON::encode($prompt['derived_proptypes']) : NULL, 'page_title' => $prompt['page_title'] ?? NULL, 'page_description' => $prompt['page_description'] ?? NULL, 'active_component_uuid' => $prompt['active_component_uuid'] ?? 'None', 'menu_fetch_source' => $menu_fetch_source, 'json_api_module_status' => $json_api_module_status]);
+    $agent->setTokenContexts([
+      'entity_type' => $prompt['entity_type'] ?? NULL,
+      'entity_id' => $prompt['entity_id'] ?? NULL,
+      'selected_component' => $prompt['selected_component'] ?? NULL,
+      'layout' => $prompt['layout'] ?? NULL,
+      'derived_proptypes' => isset($prompt['derived_proptypes']) ? JSON::encode($prompt['derived_proptypes']) : NULL,
+      'page_title' => $prompt['page_title'] ?? NULL,
+      'page_description' => $prompt['page_description'] ?? NULL,
+      'active_component_uuid' => $prompt['active_component_uuid'] ?? 'None',
+      'menu_fetch_source' => $menu_fetch_source,
+      'json_api_module_status' => $json_api_module_status,
+      'available_components'=> $machine_names_json,
+    ]);
     $solvability = $agent->determineSolvability();
     $status = FALSE;
     $message = '';
