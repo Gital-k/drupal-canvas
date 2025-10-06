@@ -1,0 +1,470 @@
+diff --git a/modules/canvas_ai/canvas_ai.services.yml b/modules/canvas_ai/canvas_ai.services.yml
+index d873d9ac..308ced1c 100644
+--- a/modules/canvas_ai/canvas_ai.services.yml
++++ b/modules/canvas_ai/canvas_ai.services.yml
+@@ -7,3 +7,7 @@ services:
+   canvas_ai.tempstore:
+     class: Drupal\canvas_ai\CanvasAiTempStore
+   Drupal\Core\Cache\CacheBackendInterface: '@cache.default'
++  canvas_ai.styleguidegenerator:
++    class: Drupal\canvas_ai\StyleGuideGenerator
++  canvas_ai.apigenerator:
++    class: Drupal\canvas\Controller\ApiConfigControllers
+diff --git a/modules/canvas_ai/config/install/ai_agents.ai_agent.canvas_component_agent.yml b/modules/canvas_ai/config/install/ai_agents.ai_agent.canvas_component_agent.yml
+index 16d6ec0e..087078fc 100644
+--- a/modules/canvas_ai/config/install/ai_agents.ai_agent.canvas_component_agent.yml
++++ b/modules/canvas_ai/config/install/ai_agents.ai_agent.canvas_component_agent.yml
+@@ -14,6 +14,9 @@ system_prompt: |-
+ 
+   Note that none of the tools themselves, changes any value. They are just giving you information about what the current view looks like. If the user wants to change something, its you job to provide that information.
+ 
++  You MUST adhere strictly to the principles, conventions, and examples provided in this guide to ensure all generated components are consistent with the existing design system.
++  Use the [canvas_ai: style_guide] context as a reference for styling and structure of the components.
++
+   Component Naming Directive:
+   - When creating or editing a component, always use human-readable names for the display name field in metadata and UI—separate words with spaces and follow standard title casing where appropriate.
+   - Example: The component should be named "Hero Banner", not "HeroBanner" or "herobanner".
+diff --git a/modules/canvas_ai/src/Controller/CanvasBuilder.php b/modules/canvas_ai/src/Controller/CanvasBuilder.php
+index 77e62a1c..f0259c76 100644
+--- a/modules/canvas_ai/src/Controller/CanvasBuilder.php
++++ b/modules/canvas_ai/src/Controller/CanvasBuilder.php
+@@ -7,6 +7,7 @@ use Drupal\ai_agents\Plugin\AiFunctionCall\AiAgentWrapper;
+ use Drupal\ai\OperationType\Chat\ChatInput;
+ use Drupal\ai\OperationType\Chat\ChatMessage;
+ use Drupal\ai\OperationType\GenericType\ImageFile;
++use Drupal\canvas\Controller\ApiConfigControllers;
+ use Drupal\Component\Plugin\PluginManagerInterface;
+ use Drupal\Component\Serialization\Json;
+ use Drupal\Core\Access\CsrfTokenGenerator;
+@@ -21,7 +22,9 @@ use Drupal\canvas_ai\Plugin\AiFunctionCall\CreateFieldContent;
+ use Drupal\canvas_ai\Plugin\AiFunctionCall\EditFieldContent;
+ use Drupal\canvas_ai\Plugin\AiFunctionCall\SetAIGeneratedComponentStructure;
+ use Drupal\canvas_ai\CanvasAiPageBuilderHelper;
++use Drupal\canvas_ai\StyleGuideGenerator;
+ use Drupal\canvas_ai\CanvasAiTempStore;
++use Drupal\Core\Url;
+ use Symfony\Component\DependencyInjection\ContainerInterface;
+ use Symfony\Component\HttpFoundation\JsonResponse;
+ use Symfony\Component\HttpFoundation\Request;
+@@ -44,6 +47,8 @@ final class CanvasBuilder extends ControllerBase {
+     protected CanvasAiPageBuilderHelper $canvasAiPageBuilderHelper,
+     protected CanvasAiTempStore $canvasAiTempStore,
+     protected FileSystemInterface $fileSystem,
++    protected StyleGuideGenerator $styleGuideGenerator,
++    protected ApiConfigControllers $apiConfigControllers,
+   ) {}
+ 
+   /**
+@@ -57,6 +62,8 @@ final class CanvasBuilder extends ControllerBase {
+       $container->get('canvas_ai.page_builder_helper'),
+       $container->get('canvas_ai.tempstore'),
+       $container->get('file_system'),
++      $container->get('canvas_ai.styleguidegenerator'),
++      $container->get('canvas_ai.apigenerator'),
+     );
+   }
+ 
+@@ -83,6 +90,12 @@ final class CanvasBuilder extends ControllerBase {
+       $prompt = $request->request->all();
+       $files = $request->files->all();
+     }
++
++    $available_components_response = $this->apiConfigControllers->list('js_component');
++    $available_components = (string) $available_components_response->getContent();
++    $this->styleGuideGenerator->analyze($available_components);
++    // This styleguide is passed as a context to the component agent.
++    $styleGuide = $this->styleGuideGenerator->generateMarkdown();
+     // If $prompt['messages'] is missing or invalid, this code reconstructs it
+     // by scanning for keys named 'message <number>', and
+     // assembling them into an ordered 'messages' array, while cleaning up old keys
+@@ -206,7 +219,7 @@ final class CanvasBuilder extends ControllerBase {
+     $agent->setModelName($default['model_id']);
+     $agent->setAiConfiguration([]);
+     $agent->setCreateDirectly(TRUE);
+-    $agent->setTokenContexts(['entity_type' => $prompt['entity_type'], 'entity_id' => $prompt['entity_id'], 'selected_component' => $prompt['selected_component'] ?? NULL, 'layout' => $prompt['layout'] ?? NULL, 'derived_proptypes' => JSON::encode($prompt['derived_proptypes']) ?? NULL, 'page_title' => $prompt['page_title'], 'page_description' => $prompt['page_description'] ?? NULL, 'active_component_uuid' => $prompt['active_component_uuid'] ?? 'None']);
++    $agent->setTokenContexts(['entity_type' => $prompt['entity_type'], 'entity_id' => $prompt['entity_id'], 'selected_component' => $prompt['selected_component'] ?? NULL, 'layout' => $prompt['layout'] ?? NULL, 'derived_proptypes' => JSON::encode($prompt['derived_proptypes']) ?? NULL, 'page_title' => $prompt['page_title'], 'page_description' => $prompt['page_description'] ?? NULL, 'active_component_uuid' => $prompt['active_component_uuid'] ?? 'None', 'style_guide' => $styleGuide]);
+     $solvability = $agent->determineSolvability();
+     $status = FALSE;
+     $message = '';
+diff --git a/modules/canvas_ai/src/Hook/CanvasAiHooks.php b/modules/canvas_ai/src/Hook/CanvasAiHooks.php
+index 81b714ca..bc039317 100644
+--- a/modules/canvas_ai/src/Hook/CanvasAiHooks.php
++++ b/modules/canvas_ai/src/Hook/CanvasAiHooks.php
+@@ -59,6 +59,10 @@ class CanvasAiHooks {
+             'name' => $this->t('Active Component UUID'),
+             'description' => $this->t('Returns the UUID of the active component in the page.'),
+           ],
++          'style_guide' => [
++            'name' => $this->t('Style Guide'),
++            'description' => $this->t('Style guide for the site.'),
++          ],
+         ],
+       ],
+     ];
+@@ -105,6 +109,10 @@ class CanvasAiHooks {
+           case 'active_component_uuid':
+             $replacements[$original] = !empty($data['active_component_uuid']) ? $data['active_component_uuid'] : 'None';
+             break;
++
++          case 'style_guide':
++            $replacements[$original] = !empty($data['style_guide']) ? $data['style_guide'] : '';
++            break;
+         }
+       }
+     }
+diff --git a/modules/canvas_ai/src/StyleGuideGenerator.php b/modules/canvas_ai/src/StyleGuideGenerator.php
+new file mode 100644
+index 00000000..4f6fad0c
+--- /dev/null
++++ b/modules/canvas_ai/src/StyleGuideGenerator.php
+@@ -0,0 +1,269 @@
++<?php
++
++namespace Drupal\canvas_ai;
++
++/**
++ * An optimized class to generate a detailed style guide from SDC component definitions.
++ * This class parses component JSON, extracts granular details like defaults and examples,
++ * analyzes component composition, and outputs a highly structured Markdown guide for an LLM prompt.
++ */
++class StyleGuideGenerator
++{
++  /**
++   * @var array An array holding the parsed component definitions.
++   */
++  private array $components;
++
++  /**
++   * @var array An array to store the extracted style guide rules.
++   */
++  private array $styleGuideRules = [
++    'preamble' => [
++      'title' => '#Component Generation Guide',
++      'introduction' => "You are an expert React component generator. Your task is to create new components based on a user's request. You MUST adhere strictly to the principles, conventions, and examples provided in this guide to ensure all generated components are consistent with the existing design system.",
++    ],
++    'principles' => [
++      'Component-Based Architecture: The UI is built from self-contained, reusable components defined in JSX.',
++      'Utility-First CSS: Styling is primarily achieved using Tailwind CSS utility classes directly within the JSX. This is the preferred method for layout, spacing, and styling.',
++      'Semantic & Accessible HTML: Markup must be meaningful and adhere to accessibility standards (e.g., `alt` text for images, `<label>` for forms, correct use of `<nav>`, `<button>`, etc.).',
++      'Structured Component API: Component properties (`props`) must be clearly defined with types, defaults, examples, and JSON schemas. Variants and states are managed via props.',
++    ],
++    'tooling' => [
++      '**React/JSX:** All components are written in JSX.',
++      '**Tailwind CSS:** A utility-first CSS framework used for all styling. Do not write separate CSS files.',
++      '**`class-variance-authority` (`cva`):** Used to manage component variants and styles based on props (e.g., button variants, heading sizes).',
++      '**`@/lib/utils/cn`:** A utility function to conditionally combine CSS classes. Always use `cn()` when applying classes that might be combined with external class names or variants from `cva`.',
++    ],
++    'naming' => [
++      'pattern' => 'Component `machineName` should be a descriptive, snake_case identifier.',
++      'examples' => [],
++      'rules' => [
++        '**Name:** A human-readable component name (e.g., `Blockquote`).',
++        '**Machine Name:** A snake_case identifier used in code and for the file name (e.g., `blockquote`).'
++      ],
++    ],
++    'html' => [
++      'rules' => [
++        'Use semantic tags (`<nav>`, `<footer>`, `<button>`) over generic `<div>`s where appropriate.',
++        'All `<img>` tags or image components MUST have a descriptive `alt` attribute.',
++        'All form inputs MUST have a corresponding `<label>` or an `aria-label`.',
++      ],
++    ],
++    'javascript' => [
++      'rules' => [
++        'Decouple logic from styling. Use `data-*` attributes for JavaScript hooks if necessary, rather than relying on CSS classes.',
++        'Use React hooks (`useState`, `useEffect`) for managing state and side effects.',
++      ]
++    ],
++    'component_library' => [], // This will store the detailed component examples.
++  ];
++
++  /**
++   * Constructor.
++   *
++   */
++  public function __construct()
++  {
++  }
++
++  /**
++   * Analyzes the components and builds the style guide rules.
++   */
++  public function analyze($jsonString): void
++  {
++    $decodedJson = json_decode($jsonString, true);
++    if (json_last_error() !== JSON_ERROR_NONE) {
++      throw new \InvalidArgumentException('Invalid JSON provided: ' . json_last_error_msg());
++    }
++    $this->components = $decodedJson;
++    $componentIds = array_keys($this->components);
++
++    foreach ($this->components as $id => $component) {
++      $this->analyzeNaming($id, $component);
++      $this->analyzeComponentDetails($id, $component, $componentIds);
++    }
++
++    // Deduplicate and sort naming examples
++    $this->styleGuideRules['naming']['examples'] = array_values(array_unique($this->styleGuideRules['naming']['examples']));
++    sort($this->styleGuideRules['naming']['examples']);
++  }
++
++  /**
++   * Analyzes the component ID for naming conventions.
++   *
++   * @param string $id The component machine name.
++   * @param array $component The component definition.
++   */
++  private function analyzeNaming(string $id, array $component): void
++  {
++    $name = $component['name'] ?? $id;
++    $this->styleGuideRules['naming']['examples'][] = "`{$id}` (Name: \"{$name}\")";
++  }
++
++  /**
++   * Analyzes and stores the full details of a component for the reference library.
++   *
++   * @param string $id The component machine name.
++   * @param array $component The component definition.
++   * @param array $allComponentIds A list of all available component machine names.
++   */
++  private function analyzeComponentDetails(string $id, array $component, array $allComponentIds): void
++  {
++    $sourceCode = $component['sourceCodeJs'] ?? '';
++    // Clean the source code for better LLM parsing (remove trailing commas, etc.)
++    $cleanedSourceCode = rtrim(trim($sourceCode), ',');
++
++    $details = [
++      'name' => $component['name'] ?? $id,
++      'props_table' => 'This component has no configurable properties.',
++      'slots' => 'This component does not define any slots.',
++      'composition' => 'This component is self-contained and does not use other library components.',
++      'sourceCodeJs' => $cleanedSourceCode ?: '// No source code available.',
++    ];
++
++    // Analyze Props with more detail
++    if (!empty($component['props'])) {
++      $propsTable = "| Prop Name    | Type   | Required | Default | Description & Examples |\n";
++      $propsTable .= "|:-------------|:-------|:---------|:--------|:-----------------------|\n";
++      $requiredProps = $component['required'] ?? [];
++
++      foreach ($component['props'] as $propName => $propDetails) {
++        $type = $propDetails['type'] ?? 'N/A';
++        if (!empty($propDetails['enum'])) {
++          $type = 'enum';
++        }
++        $required = in_array($propName, $requiredProps) ? 'Yes' : 'No';
++        $description = $propDetails['title'] ?? 'No description.';
++
++        // Extract default value from source code if possible
++        $default = '`N/A`';
++        if (preg_match("/{$propName}\s*=\s*['\"]([^'\"]+)['\"]/", $sourceCode, $matches)) {
++          $default = "`\"{$matches[1]}\"`";
++        } elseif (preg_match("/{$propName}\s*=\s*(\w+)/", $sourceCode, $matches) && !in_array($matches[1], ['true', 'false', 'null'])) {
++          // handles cases like height = "Small"
++        }  elseif (preg_match("/{$propName}\s*=\s*([true|false|null|\d]+)/", $sourceCode, $matches)) {
++          $default = "`{$matches[1]}`";
++        }
++
++
++        $examples = '';
++        if (!empty($propDetails['examples'])) {
++          $exampleValues = array_map(fn($ex) => is_array($ex) ? json_encode($ex) : $ex, $propDetails['examples']);
++          $examples = ' Example: `' . implode('`, `', $exampleValues) . '`';
++        }
++
++        if ($type === 'enum') {
++          $description .= ' (Options: `' . implode('`, `', $propDetails['enum']) . '`)';
++        }
++
++        $propsTable .= "| `{$propName}` | `{$type}` | {$required} | {$default} | {$description}{$examples} |\n";
++      }
++      $details['props_table'] = $propsTable;
++    }
++
++    // Analyze Slots
++    if (!empty($component['slots'])) {
++      $slotsList = "This component accepts content in the following slots:\n";
++      foreach ($component['slots'] as $slotName => $slotDetails) {
++        $title = $slotDetails['title'] ?? $slotName;
++        $slotsList .= "- **`{$slotName}`**: {$title}\n";
++      }
++      $details['slots'] = $slotsList;
++    }
++
++    // Analyze Composition
++    $usedComponents = [];
++    foreach ($allComponentIds as $componentId) {
++      // Look for usage like: <Component... or import Component from '@/components/component_name'
++      $pascalCaseComponent = str_replace('_', '', ucwords($componentId, '_'));
++      if (preg_match("/<{$pascalCaseComponent}|from\s*['\"]@[^'\"]+\/{$componentId}['\"]/", $sourceCode)) {
++        if ($id !== $componentId) { // A component can't use itself in this context
++          $usedComponents[] = "`{$componentId}`";
++        }
++      }
++    }
++
++    if (!empty($usedComponents)) {
++      $details['composition'] = 'This component uses the following library components: ' . implode(', ', $usedComponents) . '.';
++    }
++
++    $this->styleGuideRules['component_library'][$id] = $details;
++  }
++
++  /**
++   * Generates the final Markdown output.
++   *
++   * @return string The style guide in Markdown format.
++   */
++  public function generateMarkdown(): string
++  {
++    $markdown = $this->styleGuideRules['preamble']['title'] . "\n\n";
++    $markdown .= $this->styleGuideRules['preamble']['introduction'] . "\n\n";
++
++    $markdown .= "## 1. Guiding Principles\n\n";
++    foreach ($this->styleGuideRules['principles'] as $principle) {
++      $markdown .= "- **" . $principle . "**\n";
++    }
++    $markdown .= "\n";
++
++    $markdown .= "## 2. Tooling & Libraries\n\n";
++    $markdown .= "You MUST use the following stack for component development:\n\n";
++    foreach ($this->styleGuideRules['tooling'] as $tool) {
++      $markdown .= "- {$tool}\n";
++    }
++    $markdown .= "\n";
++
++    $markdown .= "## 3. Naming & Structure\n\n";
++    $markdown .= $this->styleGuideRules['naming']['pattern'] . "\n\n";
++    foreach ($this->styleGuideRules['naming']['rules'] as $rule) {
++      $markdown .= "- {$rule}\n";
++    }
++    $markdown .= "\n**Examples:**\n";
++    foreach ($this->styleGuideRules['naming']['examples'] as $example) {
++      $markdown .= "- {$example}\n";
++    }
++    $markdown .= "\n";
++
++    $markdown .= "## 4. HTML, JSX & JS Guidelines\n\n";
++    $markdown .= "**HTML & JSX:**\n";
++    foreach ($this->styleGuideRules['html']['rules'] as $rule) {
++      $markdown .= "- {$rule}\n";
++    }
++    $markdown .= "\n**JavaScript:**\n";
++    foreach ($this->styleGuideRules['javascript']['rules'] as $rule) {
++      $markdown .= "- {$rule}\n";
++    }
++    $markdown .= "\n";
++
++    $markdown .= "## 5. Component Reference Library\n\n";
++    $markdown .= "The following components serve as the ground truth for our design system. Study their props, structure, composition, and source code carefully before generating new components.\n\n";
++
++    ksort($this->styleGuideRules['component_library']); // Sort components alphabetically
++
++    foreach ($this->styleGuideRules['component_library'] as $id => $details) {
++      $markdown .= "---\n\n";
++      $markdown .= "### Component: `{$id}` (\"{$details['name']}\")\n\n";
++
++      $markdown .= "**Props Definition**\n";
++      $markdown .= $details['props_table'] . "\n";
++
++      $markdown .= "**Slots**\n";
++      $markdown .= $details['slots'] . "\n\n";
++
++      $markdown .= "**Composition**\n";
++      $markdown .= $details['composition'] . "\n\n";
++
++      $markdown .= "**Source Code (`{$id}.jsx`)**\n";
++      $markdown .= "```jsx\n";
++      $markdown .= $details['sourceCodeJs'] . "\n";
++      $markdown .= "```\n\n";
++    }
++
++    $markdown .= "---\n\n## 6. Your Task\n\n";
++    $markdown .= "Now, using the rules and examples above, please fulfill the following request. Ensure the output is a single, complete JSX file that is ready to be used.\n";
++
++    return $markdown;
++  }
++}
++
++?>
+diff --git a/ui/src/components/aiExtension/AiWizard.tsx b/ui/src/components/aiExtension/AiWizard.tsx
+index ff085d32..4d6c9322 100644
+--- a/ui/src/components/aiExtension/AiWizard.tsx
++++ b/ui/src/components/aiExtension/AiWizard.tsx
+@@ -204,14 +204,12 @@ const operationsHandler = {
+     availableComponents,
+     layoutUtils,
+     componentSelectionUtils,
+-    navigate,
+   }: {
+     message: any;
+     dispatch: any;
+     availableComponents: any;
+     layoutUtils: any;
+     componentSelectionUtils: any;
+-    navigate: any;
+   }) => {
+     // Logic for placing components (SDCs/Blocks/Code components) to the editor frame.
+     for (const op of message.operations) {
+@@ -242,8 +240,6 @@ const operationsHandler = {
+         }
+       }
+     }
+-    // Redirect to /editor.
+-    navigate('/editor');
+   },
+ };
+ 
+@@ -293,6 +289,7 @@ const AiWizard = () => {
+     codeComponentName,
+     textPropsMapString,
+     pageData,
++    params,
+   });
+ 
+   // Update the ref whenever tracked values change.
+@@ -301,8 +298,9 @@ const AiWizard = () => {
+       codeComponentName,
+       textPropsMapString,
+       pageData,
++      params,
+     };
+-  }, [codeComponentName, textPropsMapString, pageData]);
++  }, [codeComponentName, textPropsMapString, pageData, params]);
+   // Access layoutUtils and componentSelectionUtils from drupalSettings.canvas
+   const layoutUtils = drupalSettings.canvas?.layoutUtils as any;
+   const componentSelectionUtils = drupalSettings.canvas
+@@ -427,7 +425,6 @@ const AiWizard = () => {
+                 availableComponents: componentsRef.current,
+                 layoutUtils,
+                 componentSelectionUtils,
+-                navigate,
+               });
+             }, 0);
+           } else {
+@@ -574,9 +571,12 @@ const AiWizard = () => {
+                   requestBody = body as FormData;
+                   requestBody.append(
+                     'entity_type',
+-                    drupalSettings.canvas.entityType,
++                    currentValuesRef.current.params.entityType || '',
++                  );
++                  requestBody.append(
++                    'entity_id',
++                    currentValuesRef.current.params.entityId || '',
+                   );
+-                  requestBody.append('entity_id', drupalSettings.canvas.entity);
+                   requestBody.append(
+                     'selected_component',
+                     currentValuesRef.current.codeComponentName,
+@@ -588,8 +588,8 @@ const AiWizard = () => {
+                 } else {
+                   requestBody = JSON.stringify({
+                     ...body,
+-                    entity_type: drupalSettings.canvas.entityType,
+-                    entity_id: drupalSettings.canvas.entity,
++                    entity_type: currentValuesRef.current.params.entityType,
++                    entity_id: currentValuesRef.current.params.entityId,
+                     selected_component:
+                       currentValuesRef.current.codeComponentName,
+                     layout: currentValuesRef.current.textPropsMapString,

@@ -75,6 +75,10 @@ class CanvasAiHooks {
             'name' => $this->t('JSON API Module status'),
             'description' => $this->t('Returns the status of JSON API module.'),
           ],
+          'style_guide' => [
+            'name' => $this->t('Style Guide'),
+            'description' => $this->t('Style guide for the site.'),
+          ],
         ],
       ],
     ];
@@ -121,13 +125,16 @@ class CanvasAiHooks {
           case 'active_component_uuid':
             $replacements[$original] = !empty($data['active_component_uuid']) ? $data['active_component_uuid'] : 'None';
             break;
-
           case 'menu_fetch_source':
             $replacements[$original] = !empty($data['menu_fetch_source']) ? $data['menu_fetch_source'] : NULL;
             break;
 
           case 'json_api_module_status':
             $replacements[$original] = $data['json_api_module_status'];
+            break;
+
+          case 'style_guide':
+            $replacements[$original] = !empty($data['style_guide']) ? $data['style_guide'] : '';
             break;
         }
       }
