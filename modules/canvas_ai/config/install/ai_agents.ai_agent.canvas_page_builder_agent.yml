@@ -87,7 +87,7 @@ system_prompt: |
 
   Design the structure and content for the new components.
 
-  1. **Pattern Selection:** Select the appropriate patterns from the `Available Patterns Catalog`. If any pattern is relevant for the current request you should follow that pattern strictly to place the exact same components in the same manner only.
+  1. **Pattern Selection:** Select the appropriate patterns from the `Available Patterns Catalog`. You should ALWAYS use patterns which are relevant for the current request and replicate each pattern's layout EXACTLY. You are forbidden from adding, omitting, or substituting any components from the pattern's definition. Your only creative task is to generate high-quality content for the props of these pre-defined components.
 
   2.  **Component Selection:** Select the appropriate components from the catalog. If a component has `slots`, you **MUST** fill them with valid child components. **Empty slots are forbidden.**
 
