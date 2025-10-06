@@ -21,6 +21,7 @@ import {
   setFieldValue,
 } from '@/features/form/formStateSlice';
 import { AJAX_UPDATE_FORM_BUILD_ID_EVENT } from '@/types/Ajax';
+import { getDrupal } from '@/utils/drupal-globals';
 
 import type { ErrorObject } from 'ajv/dist/types';
 import type { FormId } from '@/features/form/formStateSlice';
@@ -28,6 +29,7 @@ import type { AjaxUpdateFormBuildIdEvent } from '@/types/Ajax';
 import type { Attributes } from '@/types/DrupalAttribute';
 import type { PropsValues } from '@/types/Form';
 
+const Drupal = getDrupal();
 const ajv = new Ajv();
 
 export const POLLED_BACKGROUND_TIMEOUT = 1000;
@@ -253,7 +255,29 @@ export const InputBehaviorsCommon = ({
         }
       }
 
-      storeUpdateCallback({ ...formValues, [fieldName]: newValue });
+      const isAjaxing = () =>
+        Drupal.ajax.instances.some(
+          (instance: { ajaxing: boolean }) =>
+            instance && instance.ajaxing === true,
+        );
+
+      if (!isAjaxing()) {
+        storeUpdateCallback({ ...formValues, [fieldName]: newValue });
+      } else {
+        let attempts = 0;
+        const intervalDuration = 5;
+        const intervalId = setInterval(() => {
+          attempts += 1;
+          if (!isAjaxing() || attempts * intervalDuration > 600) {
+            clearInterval(intervalId);
+            console.log(
+              `Waiting  ${attempts * intervalDuration}ms for AJAX to complete before PATCH`,
+              isAjaxing(),
+            );
+            storeUpdateCallback({ ...formValues, [fieldName]: newValue });
+          }
+        }, intervalDuration);
+      }
     };
 
     attributes.onBlur = (e: React.FocusEvent) => {

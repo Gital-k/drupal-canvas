@@ -1,5 +1,7 @@
 import { fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
+import { getCanvasSettings } from '@/utils/drupal-globals';
+
 import type {
   BaseQueryApi,
   BaseQueryFn,
@@ -9,13 +11,49 @@ import type {
 import type { RootState } from '@/app/store';
 import type { AppConfiguration } from '@/features/configuration/configurationSlice';
 
+interface FetchArgsWithMethod extends FetchArgs {
+  method?: string;
+}
+
 export const baseQuery: BaseQueryFn<
-  string | FetchArgs,
+  string | FetchArgsWithMethod,
   unknown,
   FetchBaseQueryError
 > = async (args, api, extraOptions) => {
   const state = api.getState() as RootState;
-  return rawBaseQuery(state.configuration)(args, api, extraOptions);
+  const canvasSettings = getCanvasSettings();
+  const dt = new Date().getTime();
+  const flagForAjax = typeof args === 'object' && args?.method === 'PATCH' && args?.url.includes('/form');
+  if (flagForAjax) {
+    if (typeof canvasSettings?.canvasLayoutRequestInProgress === 'undefined') {
+      canvasSettings.canvasLayoutRequestInProgress = [];
+    }
+    canvasSettings.canvasLayoutRequestInProgress.push(true);
+    window.document
+      .querySelectorAll('[data-once="drupal-ajax"]')
+      // @ts-ignore
+      .forEach((ajaxItem) => {
+        // @ts-ignore
+        ajaxItem.style.color = 'red';
+      });
+  }
+
+  const result = await rawBaseQuery(state.configuration)(
+    args,
+    api,
+    extraOptions,
+  );
+  if (flagForAjax) {
+    window.document
+      .querySelectorAll('[data-once="drupal-ajax"]')
+      // @ts-ignore
+      .forEach((ajaxItem) => {
+        // @ts-ignore
+        ajaxItem.style.color = 'black';
+      });
+    canvasSettings.canvasLayoutRequestInProgress.pop();
+  }
+  return result;
 };
 /**
  * Extracts entityType and entityId from a URL

@@ -580,4 +580,23 @@
       };
     },
   };
+
+  const originalEventResponse = Drupal.Ajax.prototype.eventResponse;
+  Drupal.Ajax.prototype.eventResponse = function(...args) {
+    if (!drupalSettings?.canvas?.canvasLayoutRequestInProgress || drupalSettings.canvas.canvasLayoutRequestInProgress.length === 0) {
+      originalEventResponse.apply(this, args)
+    } else {
+      let attempts = 0;
+      const intervalDuration = 5;
+      const intervalId = setInterval(() => {
+        const layoutDone = !drupalSettings?.canvasLayoutRequestInProgress || drupalSettings.canvasLayoutRequestInProgress.length === 0
+        attempts += 1;
+        if (layoutDone || attempts >= 5000) {
+          clearInterval(intervalId);
+          console.log(`Waited  ${attempts * intervalDuration}ms for PATCH requests to complete before AJAX`)
+          originalEventResponse.apply(this, args)
+        }
+      }, intervalDuration)
+    }
+  }
 })(Drupal, csstree, drupalSettings);
