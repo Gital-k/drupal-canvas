@@ -101,7 +101,7 @@ final class CanvasBuilder extends ControllerBase {
     $machine_names = new \stdClass();
 
     foreach (json_decode($available_components) as $component) {
-      $machine_names->{$component->machineNgame} = $component->machineName;
+      $machine_names->{$component->machineName} = $component->machineName;
     }
 
     $machine_names_json = json_encode($machine_names);
