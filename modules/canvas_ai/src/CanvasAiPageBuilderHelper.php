@@ -62,17 +62,33 @@ class CanvasAiPageBuilderHelper {
   public function getComponentContextForAi(): string {
     $component_context = [];
     $component_context_from_config = $this->getComponentContextFromConfig();
-    $available_components = !empty($component_context_from_config) ? $component_context_from_config : $this->getAllComponentsKeyedBySource();
+    $available_components = $this->getAllComponentsKeyedBySource();
+
+    foreach ($component_context_from_config as $components) {
+      foreach ($components as $component_id => $data) {
+        $component_context[$component_id] = $data;
+      }
+    }
+
     foreach ($available_components as $components) {
       // Component info would be under 'components' key, when not loaded from
       // config.
       if (isset($components['components'])) {
-        $component_context += $components['components'];
+        foreach ($components['components'] as $component_id => $data) {
+          // Check if the data differs from the config data.
+          if (isset($component_context[$component_id]) && $component_context[$component_id] !== $data) {
+            // Merge the data, giving preference to the non-config data.
+            $component_context[$component_id] = ($component_context[$component_id] ?? []) + $data;
+          }
+        }
       }
       else {
-        $component_context += $components;
+        foreach ($components as $component_id => $data) {
+          if (isset($component_context[$component_id]) && $component_context[$component_id] !== $data) {
+            $component_context[$component_id] = ($component_context[$component_id] ?? []) + $data;
+          }
+        }
       }
-
     }
     return Yaml::dump($component_context, 4, 2);
   }
