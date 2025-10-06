@@ -67,7 +67,6 @@ class CanvasAiHooks {
             'name' => $this->t('Active Component UUID'),
             'description' => $this->t('Returns the UUID of the active component in the page.'),
           ],
-<<<<<<< HEAD
           'menu_fetch_source' => [
             'name' => $this->t('Menu Fetch Source'),
             'description' => $this->t('Returns the source for menu fetching.'),
@@ -76,10 +75,7 @@ class CanvasAiHooks {
             'name' => $this->t('JSON API Module status'),
             'description' => $this->t('Returns the status of JSON API module.'),
           ],
-          'style_guide' => [
-=======
           'available_component' => [
->>>>>>> 43f2ff49 (Added updated version of styleguide and instructions for it)
             'name' => $this->t('Available components'),
             'description' => $this->t('Available components for the site.'),
           ],

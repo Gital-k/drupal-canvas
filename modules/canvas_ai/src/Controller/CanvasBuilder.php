@@ -68,7 +68,6 @@ final class CanvasBuilder extends ControllerBase {
       $container->get('ai_agents.agent_status_poller'),
       $container->get('canvas_ai.styleguidegenerator'),
       $container->get('canvas_ai.apigenerator'),
-      $container->get('canvas_ai.styleguidegenerator'),
     );
   }
 
