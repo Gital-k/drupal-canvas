@@ -122,6 +122,7 @@ export function createComponentPayload(params: {
   sourceCodeCss: string;
   compiledCss: string;
   importedJsComponents: string[];
+  dataDependencies: string[];
 }): Component {
   const {
     metadata,
@@ -131,6 +132,8 @@ export function createComponentPayload(params: {
     compiledJs,
     sourceCodeCss,
     compiledCss,
+    importedJsComponents,
+    dataDependencies
   } = params;
 
   // Ensure props is correctly structured
@@ -153,7 +156,7 @@ export function createComponentPayload(params: {
     compiledJs: compiledJs,
     sourceCodeCss: sourceCodeCss,
     compiledCss: compiledCss,
-    importedJsComponents: metadata.importedJsComponents || [],
-    dataDependencies: metadata.dataDependencies || [],
+    importedJsComponents: importedJsComponents,
+    dataDependencies: dataDependencies,
   };
 }

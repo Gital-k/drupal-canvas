@@ -1,6 +1,6 @@
 // Main entry point for @drupal-canvas/ui package.
 // Export utilities and functions that can be used by other packages (like CLI)
-export * from './utils';
+export * from './features/code-editor/utils';
 
 // Export specific hooks if needed
 // export * from './hooks';

@@ -2,23 +2,29 @@ import fs from 'fs/promises';
 import path from 'path';
 import chalk from 'chalk';
 import * as p from '@clack/prompts';
+import { getDataDependenciesFromAs, getDataDependenciesFromAst, getImportsFromAst } from '@drupal-canvas/ui/features/code-editor/utils';
+
+
 
 import { ensureConfig, getConfig, setConfig } from '../config.js';
 import { createApiService } from '../services/api.js';
 import { buildComponent } from '../utils/build';
 import { buildTailwindForComponents } from '../utils/build-tailwind.js';
-import {
-  createComponentPayload,
-  processComponentFiles,
-} from '../utils/process-component-files.js';
+import { createComponentPayload, processComponentFiles } from '../utils/process-component-files.js';
 import { reportResults } from '../utils/report-results';
 import { selectLocalComponents } from '../utils/select-local-components.js';
 import { fileExists } from '../utils/utils';
 
+
+
 import type { Command } from 'commander';
 import type { ApiService } from '../services/api.js';
 import type { Result } from '../types/Result.js';
-import { getImportsFromAst, getDataDependenciesFromAs } from '@drupal-canvas/ui/utils';
+import { parse } from '@babel/parser';
+
+
+
+
 
 interface UploadOptions {
   clientId?: string;
@@ -191,7 +197,25 @@ async function getBuildAndUploadResults(
 
       // @todo: Add code from /ui to automatically detect first party imports
       //   without relying on yml metadata.
-      const importedJsComponents = metadata.importedJsComponents || [];
+      let importedJsComponents = [] as string[];
+      let dataDependencies = [] as string[];
+      // Collect Js imports from source code.
+      try {
+        const ast = parse(sourceCodeJs, {
+          sourceType: 'module',
+          plugins: ['jsx'],
+        });
+        const scope = '@/components/';
+        importedJsComponents = getImportsFromAst(ast, scope);
+        dataDependencies = getDataDependenciesFromAst(ast);
+
+        console.log('Parsinggggggggg (todo update msg)');
+      } catch (error) {
+        // This error will also be caught by the JavaScript compiler, and
+        // `previewCompilationError` will be set to true in the code editor
+        // Redux slice.
+        console.error('Error parsing source code:', error);
+      }
 
       const componentPayloadArg = {
         metadata,
@@ -202,6 +226,7 @@ async function getBuildAndUploadResults(
         sourceCodeCss,
         compiledCss,
         importedJsComponents,
+        dataDependencies,
       };
       const componentPayload = createComponentPayload(componentPayloadArg);
 
@@ -223,6 +248,7 @@ async function getBuildAndUploadResults(
           await apiService.createComponent(componentPayload, true);
         }
       } catch (error) {
+        // @todo: Note to self, see if u can remove this
         // If the error is a 422 and specifies dataDependencies as the problem,
         // it might be due to running a version of Canvas that does not yet support
         // this property. Remove dataDependencies from the payload and make
