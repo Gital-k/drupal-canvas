@@ -84,7 +84,7 @@ final class GetPatternContextTest extends KernelTestBase {
       ],
       'pattern_2' => [
         'layout' => [],
-      ]
+      ],
     ];
     $expected_yaml = Yaml::dump($test_data, 4, 2);
     $mock_helper->expects($this->once())
@@ -123,7 +123,7 @@ final class GetPatternContextTest extends KernelTestBase {
       ],
       'pattern_2' => [
         'layout' => [],
-      ]
+      ],
     ];
     // The expectation is verified by the mock - if getPatternContextForAi
     // wasn't called exactly once, the test would fail.
