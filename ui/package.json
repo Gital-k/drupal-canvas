@@ -11,6 +11,9 @@
     "node": "^20.0.0"
   },
   "type": "module",
+  "exports": {
+    ".": "./dist/index.ts"
+  },
   "scripts": {
     "drupaldev": "VITE_DRUPAL=true vite",
     "start": "vite",

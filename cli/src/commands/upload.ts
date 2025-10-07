@@ -18,6 +18,7 @@ import { fileExists } from '../utils/utils';
 import type { Command } from 'commander';
 import type { ApiService } from '../services/api.js';
 import type { Result } from '../types/Result.js';
+import { getImportsFromAst, getDataDependenciesFromAs } from '@drupal-canvas/ui/utils';
 
 interface UploadOptions {
   clientId?: string;

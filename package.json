@@ -9,7 +9,8 @@
   },
   "workspaces": [
     "cli",
-    "docs/user"
+    "docs/user",
+    "ui"
   ],
   "scripts": {
     "test:playwright": "playwright install && playwright test -x",
