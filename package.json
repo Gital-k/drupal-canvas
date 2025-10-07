@@ -12,7 +12,7 @@
     "docs/user",
     "ui",
     "ui/lib/astro-hydration"
-  ],g
+  ],
   "scripts": {
     "test:playwright": "playwright install && playwright test -x",
     "lint:eslint": "eslint cli tests/src/Playwright playwright.congfig.ts eslint.config.mjs",
