@@ -40,15 +40,12 @@ class CanvasAiPageBuilderHelper {
    *   The HTTP kernel.
    * @param \Symfony\Component\HttpFoundation\RequestStack $requestStack
    *   The stack of requests.
-<<<<<<< HEAD
    * @param \Drupal\Component\Uuid\UuidInterface $uuidService
    *   The UUID service.
    * @param \Drupal\canvas_ai\CanvasAiTempStore $canvasAiTempstore
    *   The Canvas AI tempstore.
-=======
    * @param \Drupal\canvas\Controller\ApiConfigControllers $apiConfigControllers
    *    The API config controllers service.
->>>>>>> 0747efe3 (provide pattern context to AI)
    */
   public function __construct(
     private readonly ComponentPluginManager $componentPluginManager,
