@@ -223,7 +223,7 @@ const AddTemplateDialog = ({
               <Select.Content>
                 {bundleLabelType === 'object' &&
                   Object.entries(entityBundleLabels).map(([type, label]) => (
-                    <Select.Item key={type} value={type}>
+                    <Select.Item data-testid='template-bundle-option' key={type} value={type}>
                       {String(label)}
                     </Select.Item>
                   ))}
