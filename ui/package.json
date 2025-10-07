@@ -3,14 +3,14 @@
   "description": "A React application powering the Drupal Canvas UI.",
   "homepage": "https://www.drupal.org/project/canvas",
   "private": true,
-  "workspaces": [
-    "lib/astro-hydration"
-  ],
   "version": "0.0.0",
   "engines": {
     "node": "^20.0.0"
   },
   "type": "module",
+  "exports": {
+    ".": "./dist/index.ts"
+  },
   "scripts": {
     "drupaldev": "VITE_DRUPAL=true vite",
     "start": "vite",

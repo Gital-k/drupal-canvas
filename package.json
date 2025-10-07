@@ -9,7 +9,9 @@
   },
   "workspaces": [
     "cli",
-    "docs/user"
+    "docs/user",
+    "ui",
+    "ui/lib/astro-hydration"
   ],
   "scripts": {
     "test:playwright": "playwright install && playwright test -x",
