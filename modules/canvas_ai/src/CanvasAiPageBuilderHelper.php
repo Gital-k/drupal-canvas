@@ -2,7 +2,6 @@
 
 namespace Drupal\canvas_ai;
 
-use Drupal\canvas\Controller\ApiConfigControllers;
 use Drupal\canvas\Entity\Pattern;
 use Drupal\Component\Serialization\Json;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
@@ -44,8 +43,6 @@ class CanvasAiPageBuilderHelper {
    *   The UUID service.
    * @param \Drupal\canvas_ai\CanvasAiTempStore $canvasAiTempstore
    *   The Canvas AI tempstore.
-   * @param \Drupal\canvas\Controller\ApiConfigControllers $apiConfigControllers
-   *    The API config controllers service.
    */
   public function __construct(
     private readonly ComponentPluginManager $componentPluginManager,
@@ -55,7 +52,6 @@ class CanvasAiPageBuilderHelper {
     private readonly RequestStack $requestStack,
     private readonly UuidInterface $uuidService,
     private readonly CanvasAiTempStore $canvasAiTempstore,
-    private readonly ApiConfigControllers $apiConfigControllers,
   ) {
   }
 
