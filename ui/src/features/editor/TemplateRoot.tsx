@@ -4,10 +4,10 @@ import { ExclamationTriangleIcon, PlusIcon } from '@radix-ui/react-icons';
 import { Button, Flex, Text } from '@radix-ui/themes';
 
 import { useAppDispatch } from '@/app/hooks';
-import PrimaryPanel from '@/components/sidePanel/PrimaryPanel';
 import {
   EditorFrameContext,
   setEditorFrameContext,
+  unsetEditorFrameContext,
 } from '@/features/ui/uiSlice';
 import { useGetContentTemplatesQuery } from '@/services/componentAndLayout';
 import { getBaseUrl } from '@/utils/drupal-globals';
@@ -49,7 +49,7 @@ const TemplateRoot = () => {
   useEffect(() => {
     dispatch(setEditorFrameContext(EditorFrameContext.TEMPLATE));
     return () => {
-      dispatch(setEditorFrameContext(EditorFrameContext.NONE));
+      dispatch(unsetEditorFrameContext());
     };
   }, [dispatch]);
 
@@ -113,7 +113,6 @@ const TemplateRoot = () => {
 
   return (
     <>
-      <PrimaryPanel />
       <Flex
         className={styles.noContentNotice}
         align="center"

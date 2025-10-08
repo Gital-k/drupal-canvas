@@ -5,21 +5,19 @@ import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import ErrorBoundary from '@/components/error/ErrorBoundary';
 import ContextualPanel from '@/components/panel/ContextualPanel';
-import PrimaryPanel from '@/components/sidePanel/PrimaryPanel';
 import ConflictWarning from '@/features/editor/ConflictWarning';
 import EditorFrame from '@/features/editorFrame/EditorFrame';
 import { selectLatestError } from '@/features/error-handling/queryErrorSlice';
-import Layout from '@/features/layout/Layout';
+import LayoutLoader from '@/features/layout/LayoutLoader';
 import { setUpdatePreview } from '@/features/layout/layoutModelSlice';
 import TemplateLayout from '@/features/layout/TemplateLayout';
 import {
+  selectEditorFrameContext,
   setEditorFrameContext,
   setFirstLoadComplete,
   unsetEditorFrameContext,
 } from '@/features/ui/uiSlice';
-import useLayoutWatcher from '@/hooks/useLayoutWatcher';
 import useReturnableLocation from '@/hooks/useReturnableLocation';
-import useSyncParamsToState from '@/hooks/useSyncParamsToState';
 import { useUndoRedo } from '@/hooks/useUndoRedo';
 
 import type { EditorFrameContext } from '@/features/ui/uiSlice';
@@ -30,11 +28,10 @@ interface EditorProps {
 
 const Editor: React.FC<EditorProps> = ({ context }) => {
   const dispatch = useAppDispatch();
-  useLayoutWatcher();
-  useSyncParamsToState();
   useReturnableLocation();
   const { isUndoable, dispatchUndo } = useUndoRedo();
   const latestError = useAppSelector(selectLatestError);
+  const editorFrameContext = useAppSelector(selectEditorFrameContext);
   const params = useParams();
   const navigate = useNavigate();
 
@@ -59,32 +56,50 @@ const Editor: React.FC<EditorProps> = ({ context }) => {
     }
   }
 
+  if (context === 'none' || editorFrameContext === 'none') {
+    return null;
+  }
+
+  // Render content based on context.
+  const renderContextContent = () => {
+    switch (editorFrameContext) {
+      case 'entity':
+        return (
+          <ErrorBoundary
+            title="An unexpected error has occurred while fetching the layout."
+            variant="alert"
+            onReset={isUndoable ? dispatchUndo : undefined}
+            resetButtonText={isUndoable ? 'Undo last action' : undefined}
+          >
+            <LayoutLoader />
+          </ErrorBoundary>
+        );
+      case 'template':
+        return (
+          <ErrorBoundary
+            title="An error has occurred while fetching the template."
+            variant="alert"
+            onReset={() =>
+              navigate(
+                `/template/${params.entityType}/${params.bundle}/${params.viewMode}`,
+                { replace: true },
+              )
+            }
+            resetButtonText="Return to templates"
+          >
+            <TemplateLayout />
+          </ErrorBoundary>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <>
-      <PrimaryPanel />
-      <ErrorBoundary
-        title="An unexpected error has occurred while fetching the layout."
-        variant="alert"
-        onReset={isUndoable ? dispatchUndo : undefined}
-        resetButtonText={isUndoable ? 'Undo last action' : undefined}
-      >
-        {context === 'entity' && <Layout />}
-      </ErrorBoundary>
-      <ErrorBoundary
-        title="An error has occurred while fetching the template."
-        variant="alert"
-        onReset={() =>
-          navigate(
-            `/template/${params.entityType}/${params.bundle}/${params.viewMode}`,
-            { replace: true },
-          )
-        }
-        resetButtonText="Return to templates"
-      >
-        {context === 'template' && <TemplateLayout />}
-      </ErrorBoundary>
+      {renderContextContent()}
       <EditorFrame />
-      <ContextualPanel context={context} />
+      <ContextualPanel />
     </>
   );
 };
