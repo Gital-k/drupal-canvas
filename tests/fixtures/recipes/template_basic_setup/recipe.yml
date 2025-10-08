@@ -1,0 +1,31 @@
+name: 'Template test setup'
+description: 'A basic setup for testing templates.'
+type: 'Canvas'
+install:
+  - node
+  - path
+  - canvas_dev_mode
+  - content_moderation
+  - workflows
+config:
+  strict: false
+  import:
+    field:
+      - field.field.node.article.field_link
+      - field.storage.node.field_link
+    canvas:
+      - canvas.content_template.node.article.full
+      - canvas.content_template.node.page.full
+  actions:
+    core.entity_view_display.node.article.default:
+      setComponent:
+        name: field_canvas_demo
+        options:
+          type: canvas_naive_render_sdc_tree
+          label: hidden
+          settings: { }
+          third_party_settings: { }
+          weight: -2
+          region: content
+    field.field.node.article.field_media_image:
+      setRequired: true

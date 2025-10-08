@@ -85,7 +85,7 @@ const LinkedFieldBox = ({
   };
 
   return (
-    <Flex className={styles.wrapper} mb="4">
+    <Flex className={styles.wrapper} mb="4" data-linked-field-box={propName}>
       <Text className={clsx(styles.linkIcon, styles.iconBox)}>
         <TextIcon />
       </Text>

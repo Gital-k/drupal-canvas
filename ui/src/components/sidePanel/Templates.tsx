@@ -223,7 +223,11 @@ const AddTemplateDialog = ({
               <Select.Content>
                 {bundleLabelType === 'object' &&
                   Object.entries(entityBundleLabels).map(([type, label]) => (
-                    <Select.Item data-testid='template-bundle-option' key={type} value={type}>
+                    <Select.Item
+                      data-bundle-option={type}
+                      key={type}
+                      value={type}
+                    >
                       {String(label)}
                     </Select.Item>
                   ))}
@@ -271,6 +275,7 @@ const AddTemplateDialog = ({
                           disabled={
                             mode !== 'full' || typedModeData.hasTemplate
                           }
+                          data-template-option={mode}
                         >
                           {typedModeData.label}{' '}
                           {typedModeData.hasTemplate &&

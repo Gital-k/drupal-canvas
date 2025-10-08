@@ -1,0 +1,36 @@
+_meta:
+  version: '1.0'
+  entity_type: media
+  uuid: 11dd63b7-b6aa-4fe8-8a2e-29887696bd19
+  bundle: image
+  default_langcode: en
+  depends:
+    887e718a-4312-4b48-9ccd-d85d2ee3585c: file
+default:
+  status:
+    -
+      value: true
+  uid:
+    -
+      target_id: 1
+      target_uuid: ''
+  name:
+    -
+      value: hello-folks.jpg
+  created:
+    -
+      value: 1759946458
+  revision_translation_affected:
+    -
+      value: true
+  path:
+    -
+      langcode: en
+      alias: null
+  field_media_image:
+    -
+      alt: 'hello there everyone'
+      title: ''
+      width: 800
+      height: 600
+      entity: 887e718a-4312-4b48-9ccd-d85d2ee3585c

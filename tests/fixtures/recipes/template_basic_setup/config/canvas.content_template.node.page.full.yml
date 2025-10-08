@@ -1,0 +1,12 @@
+uuid: d6902d10-f1e5-4aaf-a1a6-3f0cc77ed9f1
+langcode: en
+status: false
+dependencies:
+  config:
+    - core.entity_view_mode.node.full
+id: node.page.full
+content_entity_type_id: node
+content_entity_type_bundle: page
+content_entity_type_view_mode: full
+component_tree: {  }
+exposed_slots: {  }

@@ -1,0 +1,68 @@
+uuid: d8312100-9079-4c64-ac55-94d4e7d11c78
+langcode: en
+status: true
+dependencies:
+  module:
+    - canvas_test_sdc
+    - link
+active_version: 9b3e9e65c8101bab
+versioned_properties:
+  active:
+    settings:
+      prop_field_definitions:
+        cta1:
+          field_type: string
+          field_storage_settings: {  }
+          field_instance_settings: {  }
+          field_widget: string_textfield
+          default_value:
+            -
+              value: View
+          expression: ℹ︎string␟value
+        cta1href:
+          field_type: link
+          field_storage_settings: {  }
+          field_instance_settings:
+            title: 0
+            link_type: 17
+          field_widget: link_default
+          default_value:
+            -
+              uri: 'https://example.com'
+              options: {  }
+          expression: ℹ︎link␟url
+        cta2:
+          field_type: string
+          field_storage_settings: {  }
+          field_instance_settings: {  }
+          field_widget: string_textfield
+          default_value:
+            -
+              value: Click
+          expression: ℹ︎string␟value
+        heading:
+          field_type: string
+          field_storage_settings: {  }
+          field_instance_settings: {  }
+          field_widget: string_textfield
+          default_value:
+            -
+              value: 'There goes my hero'
+          expression: ℹ︎string␟value
+        subheading:
+          field_type: string
+          field_storage_settings: {  }
+          field_instance_settings: {  }
+          field_widget: string_textfield
+          default_value:
+            -
+              value: 'Watch him as he goes!'
+          expression: ℹ︎string␟value
+    fallback_metadata:
+      slot_definitions: {  }
+label: Hero
+id: sdc.canvas_test_sdc.my-hero
+provider: canvas_test_sdc
+source: sdc
+source_local_id: 'canvas_test_sdc:my-hero'
+category: Other

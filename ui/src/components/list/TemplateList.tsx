@@ -208,6 +208,7 @@ const TemplateListItem = ({ viewMode }: { viewMode: TemplateViewMode }) => {
             }
             selected={selectedTemplateId === viewMode.id}
             indent={2.5}
+            data-template-list-item={`${viewMode.bundle} ${viewMode.viewModeLabel}`}
           />
         </ContextMenu.Trigger>
         <UnifiedMenu.Content

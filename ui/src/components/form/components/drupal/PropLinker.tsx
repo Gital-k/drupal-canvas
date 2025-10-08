@@ -84,7 +84,7 @@ const PropLinker = ({ propName, linked, suggestions }: PropLinkerProps) => {
 
   return (
     <DropdownMenu.Root onOpenChange={(open) => setLinkerOpen(open)}>
-      <DropdownMenu.Trigger>
+      <DropdownMenu.Trigger data-prop-linker-for={propName}>
         <span
           className={clsx(styles.linker, {
             [styles.linkerOpen]: linkerOpen,
@@ -103,6 +103,7 @@ const PropLinker = ({ propName, linked, suggestions }: PropLinkerProps) => {
             className={clsx({
               [styles.disabled]: value.source.expression === currentExpression,
             })}
+            data-link-suggestion-option={(value as LinkSuggestion).label}
           >
             {value.source.expression === currentExpression && '(active) '}
             {(value as LinkSuggestion).label}
