@@ -1,0 +1,27 @@
+_meta:
+  version: '1.0'
+  entity_type: file
+  uuid: 900f5050-e75d-4ac6-802f-dbe90ca6bbc2
+  default_langcode: en
+default:
+  uid:
+    -
+      target_id: 1
+  filename:
+    -
+      value: hello-folks_1.jpg
+  uri:
+    -
+      value: 'public://2025-10/hello-folks_1.jpg'
+  filemime:
+    -
+      value: image/jpeg
+  filesize:
+    -
+      value: 181005
+  status:
+    -
+      value: true
+  created:
+    -
+      value: 1760033996

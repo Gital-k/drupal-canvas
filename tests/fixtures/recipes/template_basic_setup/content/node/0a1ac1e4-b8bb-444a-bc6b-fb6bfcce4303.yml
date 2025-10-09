@@ -1,0 +1,84 @@
+_meta:
+  version: '1.0'
+  entity_type: node
+  uuid: 0a1ac1e4-b8bb-444a-bc6b-fb6bfcce4303
+  bundle: article
+  default_langcode: en
+  depends:
+    ecae8874-f750-45de-b134-9ce1ed14e53f: file
+    6dbcc7a2-d1a0-452e-a72d-1233c8cf77b8: media
+    971482e4-c008-46e8-a36e-6a37635c4bc5: taxonomy_term
+default:
+  revision_uid:
+    -
+      target_id: 1
+  revision_log:
+    -
+      value: 'making content three'
+  status:
+    -
+      value: true
+  uid:
+    -
+      target_id: 1
+  title:
+    -
+      value: 'I am an empty node'
+  created:
+    -
+      value: 1748379635
+  promote:
+    -
+      value: true
+  sticky:
+    -
+      value: false
+  revision_translation_affected:
+    -
+      value: true
+  path:
+    -
+      alias: /i-am-an-empty-node
+      langcode: en
+  body:
+    -
+      value: '<p>Node three, ennui!</p>'
+      format: basic_html
+      summary: ''
+  comment:
+    -
+      status: 2
+      cid: 0
+      last_comment_timestamp: 1760027172
+      last_comment_name: ''
+      last_comment_uid: 1
+      comment_count: 0
+  field_an_email_field:
+    -
+      value: three@three.com
+  field_a_boolean_field:
+    -
+      value: false
+  field_a_link_field:
+    -
+      uri: 'https://react.dev'
+      title: 'Please study the materials'
+      options: {  }
+  field_image:
+    -
+      alt: 'cool cat'
+      title: ''
+      width: 600
+      height: 800
+      entity: ecae8874-f750-45de-b134-9ce1ed14e53f
+  field_integer_list:
+    -
+      value: 3
+  field_media_image:
+    -
+      target_uuid: ''
+      entity: 6dbcc7a2-d1a0-452e-a72d-1233c8cf77b8
+  field_single_tag:
+    -
+      target_uuid: ''
+      entity: 971482e4-c008-46e8-a36e-6a37635c4bc5

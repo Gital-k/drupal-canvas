@@ -1,0 +1,133 @@
+_meta:
+  version: '1.0'
+  entity_type: node
+  uuid: c66664af-53b9-42f4-a0ca-8ecc9edacb8c
+  bundle: article
+  default_langcode: en
+  depends:
+    900f5050-e75d-4ac6-802f-dbe90ca6bbc2: file
+    6dbcc7a2-d1a0-452e-a72d-1233c8cf77b8: media
+    a34f94d4-0f8c-431f-9f48-0d9b5920094f: taxonomy_term
+default:
+  revision_uid:
+    -
+      target_id: 1
+  revision_log:
+    -
+      value: 'making content two'
+  status:
+    -
+      value: true
+  uid:
+    -
+      target_id: 1
+  title:
+    -
+      value: 'Canvas Needs This For The Time Being'
+  created:
+    -
+      value: 1748352688
+  promote:
+    -
+      value: true
+  sticky:
+    -
+      value: false
+  revision_translation_affected:
+    -
+      value: true
+  path:
+    -
+      alias: /first
+      langcode: en
+  body:
+    -
+      value: '<p>Node 2, <strong>so true!</strong></p>'
+      format: basic_html
+      summary: ''
+  comment:
+    -
+      status: 2
+      cid: 0
+      last_comment_timestamp: 1760027172
+      last_comment_name: ''
+      last_comment_uid: 1
+      comment_count: 0
+  field_an_email_field:
+    -
+      value: two@two.com
+  field_a_boolean_field:
+    -
+      value: true
+  field_a_link_field:
+    -
+      uri: 'https://drupal.org'
+      title: 'Some blog a guy wrote'
+      options: {  }
+  field_canvas_demo:
+    -
+      parent_uuid: ''
+      slot: ''
+      uuid: 7480dded-2e3e-4425-82c3-3da911442040
+      component_id: sdc.canvas_test_sdc.two_column
+      component_version: f90c1f6cfb2fc04a
+      inputs: '{"width":50}'
+      label: ''
+    -
+      parent_uuid: 7480dded-2e3e-4425-82c3-3da911442040
+      slot: column_one
+      uuid: 348bfa10-af72-49cd-900b-084d617c87df
+      component_id: sdc.canvas_test_sdc.image
+      component_version: abadf2538ecfdecc
+      inputs: '{"image":{"target_uuid":"346210de-12d8-4d02-9db4-455f1bdd99f7"}}'
+      label: ''
+    -
+      parent_uuid: 7480dded-2e3e-4425-82c3-3da911442040
+      slot: column_one
+      uuid: 0a476da3-8daa-4409-85a8-ef7c2ed5ee5f
+      component_id: sdc.canvas_test_sdc.my-hero
+      component_version: a681ae184a8f6b7f
+      inputs: '{"heading":"meow!","subheading":"this is a hero","cta1":"View","cta1href":{"uri":"https:\/\/drupal.org","options":[]},"cta2":"Click"}'
+      label: ''
+    -
+      parent_uuid: 7480dded-2e3e-4425-82c3-3da911442040
+      slot: column_one
+      uuid: 15952413-432a-41d6-a6b6-c492dfbedf20
+      component_id: js.canvas_test_code_components_with_props
+      component_version: 35f5dc23af5896ac
+      inputs: '{"name":"Kitty","age":50}'
+      label: ''
+    -
+      parent_uuid: 7480dded-2e3e-4425-82c3-3da911442040
+      slot: column_one
+      uuid: 9fd85ace-6a33-421b-8237-3416fcf39c30
+      component_id: sdc.canvas_test_sdc.one_column
+      component_version: 80cc82f44d0a94f2
+      inputs: '{"width":"full"}'
+      label: ''
+    -
+      parent_uuid: 7480dded-2e3e-4425-82c3-3da911442040
+      slot: column_two
+      uuid: a9727e4b-42a7-4621-a502-be43cab1e20a
+      component_id: sdc.canvas_test_sdc.my-hero
+      component_version: a681ae184a8f6b7f
+      inputs: '{"heading":"hello, world!","subheading":"protect yourself from dangerous cats","cta1":"Yes","cta1href":{"uri":"https:\/\/drupal.org","options":[]},"cta2":"No thanks"}'
+      label: ''
+  field_image:
+    -
+      alt: 'hello folks'
+      title: ''
+      width: 800
+      height: 600
+      entity: 900f5050-e75d-4ac6-802f-dbe90ca6bbc2
+  field_integer_list:
+    -
+      value: 2
+  field_media_image:
+    -
+      target_uuid: ''
+      entity: 6dbcc7a2-d1a0-452e-a72d-1233c8cf77b8
+  field_single_tag:
+    -
+      target_uuid: ''
+      entity: a34f94d4-0f8c-431f-9f48-0d9b5920094f

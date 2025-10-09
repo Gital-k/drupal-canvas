@@ -1,10 +1,12 @@
 name: 'Template test setup'
 description: 'A basic setup for testing templates.'
 type: 'Canvas'
-install:
-  - canvas_test_linkable_props
+#install:
+#  - canvas_test_linkable_props
 config:
   strict: false
+
+
   import:
     canvas:
       - canvas.content_template.node.article.full
