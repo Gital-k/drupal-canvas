@@ -10,7 +10,14 @@ The [next-image-standalone](https://www.npmjs.com/package/next-image-standalone)
 import Image from 'next-image-standalone';
 
 const MyComponent = ({ photo }) => {
-  return <Image {...photo} />;
+  return (
+    <Image
+      src={photo.src}
+      alt={photo.alt}
+      width={photo.width}
+      height={photo.height}
+    />
+  );
 };
 
 export default MyComponent;
@@ -27,7 +34,12 @@ export default MyComponent;
 Image prop includes all the required props.
 
 ```jsx
-<Image {...photo} />
+<Image
+  src={photo.src}
+  alt={photo.alt}
+  width={photo.width}
+  height={photo.height}
+/>
 ```
 
 ##### Static values
@@ -50,7 +62,10 @@ The parent element must assign `position: relative`, `position: fixed`, or `posi
 ```jsx
 <div style={{ position: 'relative', width: '300px', height: '500px' }}>
   <Image
-    {...photo}
+    src={photo.src}
+    alt={photo.alt}
+    width={photo.width}
+    height={photo.height}
     fill
     style={{
       objectFit: 'cover', // cover, contain, none, scale-down, fill
@@ -65,7 +80,10 @@ Defines which image sizes to download at different breakpoints. The value of siz
 
 ```jsx
 <Image
-  {...photo}
+  src={photo.src}
+  alt={photo.alt}
+  width={photo.width}
+  height={photo.height}
   sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
 />
 ```
@@ -77,7 +95,10 @@ performance. Possible values are `empty`, or `data:[dataUrl]`.
 
 ```jsx
 <Image
-  {...photo}
+  src={photo.src}
+  alt={photo.alt}
+  width={photo.width}
+  height={photo.height}
   placeholder="blur"
 />
 ```
@@ -88,7 +109,10 @@ Allows passing CSS styles to the underlying image element.
 
 ```jsx
 <Image
-  {...photo}
+  src={photo.src}
+  alt={photo.alt}
+  width={photo.width}
+  height={photo.height}
   style={{
     width: '100%',
     height: 'auto',
@@ -102,7 +126,10 @@ A callback function that is invoked once the image is completely loaded and the 
 
 ```jsx
 <Image
-  {...photo}
+  src={photo.src}
+  alt={photo.alt}
+  width={photo.width}
+  height={photo.height}
   onLoad={(e) => console.log(e.target.naturalWidth, e.target.naturalHeight)}
 />
 ```
@@ -113,7 +140,10 @@ A callback function that is invoked if the image fails to load.
 
 ```jsx
 <Image
-  {...photo}
+  src={photo.src}
+  alt={photo.alt}
+  width={photo.width}
+  height={photo.height}
   onError={(e) => console.error('Image failed to load')}
 />
 ```
@@ -128,7 +158,10 @@ When `eager`, load the image immediately.
 
 ```jsx
 <Image
-  {...photo}
+  src={photo.src}
+  alt={photo.alt}
+  width={photo.width}
+  height={photo.height}
   loading="eager"
 />
 ```
