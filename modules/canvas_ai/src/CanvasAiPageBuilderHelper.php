@@ -1186,12 +1186,12 @@ class CanvasAiPageBuilderHelper {
   }
 
   /**
-   * Converts markdown content of code components/packages into plain structured array
-   * keeping only package name keys, type, description, and code blocks.
+   * Converts markdown content of code components/packages into plain structured array.
    *
-   * This version uses robust snake_case conversion for keys, filters out
-   * packages that lack both a description and a code block, and preserves
-   * the mark-down code fences (```js, ```jsx) in the 'code' output.
+   * Keeps only package name keys, type, description, and code blocks. This
+   * version uses robust snake_case conversion for keys, filters out packages
+   * that lack both a description and a code block, and preserves the mark-down
+   * code fences (```js, ```jsx) in the 'code' output.
    *
    * @param string $md
    * The markdown content.
@@ -1199,8 +1199,7 @@ class CanvasAiPageBuilderHelper {
    * @return array
    * Extracted info indexed by package/library name keys.
    */
-  function md_to_plain_text_array(string $md): array
-  {
+  public function md_to_plain_text_array(string $md): array {
     $type_map = [
       'Importing packages' => 'External npm package',
       'Built-in custom packages' => 'Built-in custom package',
@@ -1214,11 +1213,11 @@ class CanvasAiPageBuilderHelper {
     // Helper function for robust snake_case conversion
     $to_snake_case = function (string $input): string {
       // 1. Insert underscore before uppercase letters (e.g., FormattedText -> Formatted_Text)
-      $key = preg_replace('/(?<!^)([A-Z])/', '_$1', $input);
+      $key = (string) preg_replace('/(?<!^)([A-Z])/', '_$1', $input);
       // 2. Convert to lowercase
       $key = strtolower($key);
       // 3. Replace all remaining non-alphanumeric characters (including symbols and multiple underscores) with a single underscore
-      $key = preg_replace('/[^a-z0-9]+/', '_', $key);
+      $key = (string) preg_replace('/[^a-z0-9]+/', '_', $key);
       // 4. Remove leading/trailing underscores
       return trim($key, '_');
     };
@@ -1227,7 +1226,7 @@ class CanvasAiPageBuilderHelper {
     for ($i = 1; $i < count($sections); $i += 2) {
       $section_title = trim($sections[$i]);
       $section_body = $sections[$i + 1] ?? '';
-      $type = $type_map[$section_title] ?? null;
+      $type = $type_map[$section_title] ?? NULL;
 
       if (!$type || !$section_body) {
         continue;
@@ -1245,9 +1244,10 @@ class CanvasAiPageBuilderHelper {
         $parts = preg_split('/```[a-z]*\s*[\s\S]+?```/', $section_body, 2);
         $desc_text = $parts[0] ?? '';
 
-        $desc_text = preg_replace('/import\s+[^\n]+/', '', $desc_text);
-        $desc_text = trim(strip_tags($desc_text));
-        $desc_text = preg_replace('/\s+/', ' ', $desc_text);
+        $desc_text = (string) preg_replace('/import\s+[^\n]+/', '', $desc_text);
+        // Explicitly cast to string for strip_tags.
+        $desc_text = trim(strip_tags((string) $desc_text));
+        $desc_text = (string) preg_replace('/\s+/', ' ', $desc_text);
 
         if (!empty($desc_text) || !empty($code)) {
           $result['importing_packages'] = [
@@ -1279,7 +1279,7 @@ class CanvasAiPageBuilderHelper {
         }
 
         // Determine the start of the next package block or end of section
-        $next_pos = null;
+        $next_pos = NULL;
         // Look at the next match in the PREG_SET_ORDER array
         if (isset($matches_headers[$index + 1])) {
           // The offset of the next full match
@@ -1287,14 +1287,15 @@ class CanvasAiPageBuilderHelper {
         }
 
         // Isolate the block of content for the current package
-        $pkg_block = $next_pos === null
+        $pkg_block = $next_pos === NULL
           ? substr($section_body, $pos)
           : substr($section_body, $pos, $next_pos - $pos);
 
         // --- Extract Description ---
         // We still use the package name to remove the title and any LinkButton with the same text
         $title_pattern = preg_quote($pkg_name, '/');
-        $desc = preg_replace(
+        // Explicitly cast result to string.
+        $desc = (string) preg_replace(
           '/^###\s+' . $title_pattern . '\s*|' .
           '<LinkButton[^>]*>' . $title_pattern . '<\/LinkButton>\s*/s',
           '',
@@ -1303,12 +1304,13 @@ class CanvasAiPageBuilderHelper {
         );
 
         // Remove any remaining <LinkButton> tags and code blocks from the text.
-        // NOTE: This MUST use the simple regex without capturing groups to remove the code from the description text.
-        $desc = preg_replace('/<LinkButton[^>]*>[\s\S]*?<\/LinkButton>/', '', $desc);
-        $desc = preg_replace('/```[a-z]*\s*[\s\S]*?```/', '', $desc);
+        // Explicitly cast subjects/results to string.
+        $desc = (string) preg_replace('/<LinkButton[^>]*>[\s\S]*?<\/LinkButton>/', '', (string) $desc);
+        $desc = (string) preg_replace('/```[a-z]*\s*[\s\S]*?```/', '', (string) $desc);
 
-        $desc = trim(strip_tags($desc));
-        $desc = preg_replace('/\s+/', ' ', $desc);
+        // Explicitly cast to string for strip_tags.
+        $desc = trim(strip_tags((string) $desc));
+        $desc = (string) preg_replace('/\s+/', ' ', $desc);
 
         // --- Extract Code Block ---
         $code = '';
