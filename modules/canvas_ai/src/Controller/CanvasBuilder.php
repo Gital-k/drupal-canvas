@@ -90,6 +90,9 @@ final class CanvasBuilder extends ControllerBase {
       $prompt['derived_proptypes'] = Json::decode($prompt['derived_proptypes']);
       $prompt['custom_libraries'] = Json::decode($prompt['custom_libraries']);
     }
+    $mdFilePath = __DIR__ . '/../../../../docs/user/src/content/docs/code-components/packages.mdx';
+    $markdown = file_get_contents($mdFilePath);
+    $libraries = $this->canvasAiPageBuilderHelper->md_to_plain_text_array($markdown);
     // If $prompt['messages'] is missing or invalid, this code reconstructs it
     // by scanning for keys named 'message <number>', and
     // assembling them into an ordered 'messages' array, while cleaning up old keys
@@ -223,7 +226,7 @@ final class CanvasBuilder extends ControllerBase {
     $agent->setCreateDirectly(TRUE);
     $menu_fetch_source = $this->getMenuFetchSource();
     $json_api_module_status = $this->moduleHandler()->moduleExists('jsonapi') ? 'enabled' : 'disabled';
-    $agent->setTokenContexts(['entity_type' => $prompt['entity_type'] ?? NULL, 'entity_id' => $prompt['entity_id'] ?? NULL, 'selected_component' => $prompt['selected_component'] ?? NULL, 'layout' => $prompt['layout'] ?? NULL, 'derived_proptypes' => isset($prompt['derived_proptypes']) ? JSON::encode($prompt['derived_proptypes']) : NULL, 'page_title' => $prompt['page_title'] ?? NULL, 'page_description' => $prompt['page_description'] ?? NULL, 'active_component_uuid' => $prompt['active_component_uuid'] ?? 'None', 'menu_fetch_source' => $menu_fetch_source, 'json_api_module_status' => $json_api_module_status, 'custom_libraries' => isset($prompt['custom_libraries']) ? JSON::encode($prompt['custom_libraries']) : NULL]);
+    $agent->setTokenContexts(['entity_type' => $prompt['entity_type'] ?? NULL, 'entity_id' => $prompt['entity_id'] ?? NULL, 'selected_component' => $prompt['selected_component'] ?? NULL, 'layout' => $prompt['layout'] ?? NULL, 'derived_proptypes' => isset($prompt['derived_proptypes']) ? JSON::encode($prompt['derived_proptypes']) : NULL, 'page_title' => $prompt['page_title'] ?? NULL, 'page_description' => $prompt['page_description'] ?? NULL, 'active_component_uuid' => $prompt['active_component_uuid'] ?? 'None', 'menu_fetch_source' => $menu_fetch_source, 'json_api_module_status' => $json_api_module_status, 'custom_libraries' => JSON::encode($libraries) ?? NULL]);
     $solvability = $agent->determineSolvability();
     $status = FALSE;
     $message = '';
