@@ -582,3 +582,22 @@ entity.component.enable:
     _canvas_authentication_required: TRUE
     _entity_access: 'component.enable'
     _csrf_token: 'TRUE'
+
+canvas.canvas_page.add:
+  path: '/admin/content/pages/add'
+  defaults:
+    _controller: 'Drupal\canvas\Controller\PageController::addPage'
+    _title: 'Add Page'
+  requirements:
+    _entity_create_access: 'canvas_page:canvas_page'
+    _csrf_token: 'TRUE'
+  options:
+    _admin_route: TRUE
+canvas.canvas_pages_overview:
+  path: '/admin/content/pages'
+  defaults:
+    _title: 'Canvas Pages'
+  requirements:
+    _permission: 'edit canvas_page'
+  options:
+    _admin_route: TRUE

@@ -1,0 +1,5 @@
+canvas.add_canvas_page:
+  route_name: canvas.canvas_page.add
+  title: 'Add page'
+  appears_on:
+    - canvas.canvas_pages_overview
