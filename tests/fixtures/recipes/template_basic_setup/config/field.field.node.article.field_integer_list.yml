@@ -1,0 +1,21 @@
+uuid: 759f7851-9c2b-4cf5-9743-34d10ba121b9
+langcode: en
+status: true
+dependencies:
+  config:
+    - field.storage.node.field_integer_list
+    - node.type.article
+  module:
+    - options
+id: node.article.field_integer_list
+field_name: field_integer_list
+entity_type: node
+bundle: article
+label: 'Integer List'
+description: ''
+required: false
+translatable: false
+default_value: {  }
+default_value_callback: ''
+settings: {  }
+field_type: list_integer

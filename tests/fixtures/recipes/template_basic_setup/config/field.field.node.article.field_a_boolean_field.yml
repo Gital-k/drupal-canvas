@@ -1,0 +1,21 @@
+uuid: ec85790a-e7dd-4954-b15b-4e285a1c58f4
+langcode: en
+status: true
+dependencies:
+  config:
+    - field.storage.node.field_a_boolean_field
+    - node.type.article
+id: node.article.field_a_boolean_field
+field_name: field_a_boolean_field
+entity_type: node
+bundle: article
+label: 'A boolean field'
+description: ''
+required: false
+translatable: false
+default_value: {  }
+default_value_callback: ''
+settings:
+  on_label: 'On'
+  off_label: 'Off'
+field_type: boolean

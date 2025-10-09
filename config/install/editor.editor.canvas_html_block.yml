@@ -25,6 +25,7 @@ settings:
       properties:
         reversed: false
         startIndex: false
+        styles: false
       # For now, restrict to simple lists.
       # @see https://ckeditor.com/docs/ckeditor5/latest/features/lists/lists-editing.html#simple-lists
       multiBlock: false

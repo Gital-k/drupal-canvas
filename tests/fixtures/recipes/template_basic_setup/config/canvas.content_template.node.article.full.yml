@@ -1,23 +1,12 @@
-# cspell:ignore tnid centity dtitle
-uuid: eae580fc-03fb-4905-b715-8abfc7837992
+uuid: b70fa4fa-54e5-4184-b8a1-d27f5f44c0d9
 langcode: en
 status: true
 dependencies:
   config:
-    - canvas.component.sdc.canvas_test_sdc.my-hero
     - core.entity_view_mode.node.full
-    - node.type.article
-  module:
-    - link
-    - node
 id: node.article.full
 content_entity_type_id: node
 content_entity_type_bundle: article
 content_entity_type_view_mode: full
-component_tree:
-  -
-    uuid: 7ade17b0-df3f-4c5e-a23d-93b5859d0336
-    component_id: sdc.canvas_test_sdc.my-hero
-    component_version: 9b3e9e65c8101bab
-    inputs: '{"heading":{"sourceType":"dynamic","expression":"\u2139\ufe0e\u241centity:node:article\u241dtitle\u241e\u241fvalue"},"subheading":"submarine","cta1":"View","cta1href":{"uri":"https:\/\/example.com","options":[]},"cta2":"Click"}'
+component_tree: {  }
 exposed_slots: {  }
