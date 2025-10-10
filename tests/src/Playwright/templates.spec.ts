@@ -2,6 +2,7 @@ import { expect } from '@playwright/test';
 
 import { test } from './fixtures/DrupalSite';
 import { Drupal } from './objects/Drupal';
+import editor from '../../../ui/src/features/editor/Editor';
 
 test.describe('Templates', () => {
   test.beforeAll(
@@ -9,13 +10,10 @@ test.describe('Templates', () => {
     async ({ browser, drupalSite }) => {
       const page = await browser.newPage();
       const drupal: Drupal = new Drupal({ page, drupalSite });
-      await drupal.drush('cr');
-
-      await drupal.installModules(['canvas_dev_mode']);
       await drupal.setupCanvasTestSite();
       // @todo remove the cache clear once https://www.drupal.org/project/drupal/issues/3534825
       // is fixed.
-      await drupal.drush('cr');
+      // await drupal.drush('cr');
       await page.close();
     },
   );
@@ -76,6 +74,7 @@ test.describe('Templates', () => {
       .locator('[data-template-list-item="article Full content"]')
       .click();
     expect(page.url()).toContain('canvas/template/node/article/full/1');
+    await canvasEditor.openLibraryPanel();
     await canvasEditor.addComponent({ id: 'sdc.canvas_test_sdc.my-hero' });
 
     const nodeTitle = 'Canvas With a block in the layout';
