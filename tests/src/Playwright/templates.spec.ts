@@ -178,11 +178,15 @@ test.describe('Templates', () => {
     drupal,
     canvasEditor,
   }) => {
+    await drupal.drush( 'cr');
     const moduleDir = await getModuleDir();
-    await drupal.applyRecipe(`${moduleDir}/canvas/tests/fixtures/recipes/base`);
+    //canvas_test_linkable_props
+    await drupal.applyRecipe(`${moduleDir}/canvas/tests/fixtures/recipes/template_basic_setup`);
+    await drupal.drush( 'cr');
     await drupal.loginAsAdmin();
-    await page.goto('/canvas/template/page/article/full/1');
+    await page.goto('/canvas/template/node/page/full/4');
+    await expect(page.getByTestId('canvas-empty-region-drop-zone-content')).toBeVisible();
+    await canvasEditor.openLibraryPanel();
     await canvasEditor.addComponent({ id: 'sdc.canvas_test_linkable_props.linkable-props' });
-
   });
 });

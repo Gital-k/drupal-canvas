@@ -3,6 +3,9 @@ description: 'A basic setup for testing templates.'
 type: 'Canvas'
 install:
   - canvas_test_linkable_props
+recipes:
+  - ./core/recipes/tags_taxonomy
+  - ./core/recipes/basic_html_format_editor
 config:
   strict: false
   import:

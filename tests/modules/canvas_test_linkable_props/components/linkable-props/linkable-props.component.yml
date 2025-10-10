@@ -30,12 +30,7 @@ props:
     test_string_multiline:
       title: 'String — multi-line'
       type: string
-      $ref: json-schema-definitions://canvas.module/textarea
-      # Pattern in $ref:
-      # @see https://json-schema.org/understanding-json-schema/reference/regular_expressions
-      #pattern: '(.|\r?\n)*'
-      # This pattern needs to match the pattern added in
-      # \Drupal\canvas\Plugin\Field\FieldTypeOverride\StringLongItemOverride::propertyDefinitions.
+      pattern: '(.|\r?\n)*'
       examples:
         - "Hello,\nmultiline\nworld!"
     test_REQUIRED_string:
@@ -65,21 +60,6 @@ props:
         2: 2
       examples:
         - 1
-
-    # Built-in formats: dates and times
-    # @see https://json-schema.org/understanding-json-schema/reference/string#dates-and-times
-    test_string_format_date_time:
-      title: 'String, format=date-time'
-      type: string
-      format: date-time
-      examples:
-        - '2016-09-16T20:20:39+00:00'
-    test_string_format_date:
-      title: 'String, format=date'
-      type: string
-      format: date
-      examples:
-        - '2018-11-13'
     test_string_format_email:
       title: 'String, format=email'
       type: string
