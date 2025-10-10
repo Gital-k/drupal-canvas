@@ -1194,12 +1194,12 @@ class CanvasAiPageBuilderHelper {
    * code fences (```js, ```jsx) in the 'code' output.
    *
    * @param string $md
-   * The markdown content.
+   *  The markdown content.
    *
    * @return array
-   * Extracted info indexed by package/library name keys.
+   *  Extracted info indexed by package/library name keys.
    */
-  public function md_to_plain_text_array(string $md): array {
+  public function mdToPlainText(string $md): array {
     $type_map = [
       'Importing packages' => 'External npm package',
       'Built-in custom packages' => 'Built-in custom package',
@@ -1237,7 +1237,8 @@ class CanvasAiPageBuilderHelper {
         // MODIFIED: Capture the full code block, including fences and language tag.
         if (preg_match('/(```[a-z]*\s*[\s\S]+?```)/', $section_body, $code_match)) {
           $code = trim($code_match[1]);
-        } else {
+        }
+        else {
           $code = '';
         }
 

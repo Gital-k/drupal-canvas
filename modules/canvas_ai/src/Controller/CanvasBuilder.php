@@ -92,7 +92,7 @@ final class CanvasBuilder extends ControllerBase {
     }
     $mdFilePath = __DIR__ . '/../../../../docs/user/src/content/docs/code-components/packages.mdx';
     $markdown = file_get_contents($mdFilePath);
-    $libraries = $this->canvasAiPageBuilderHelper->md_to_plain_text_array($markdown);
+    $libraries = $this->canvasAiPageBuilderHelper->mdToPlainText($markdown);
     // If $prompt['messages'] is missing or invalid, this code reconstructs it
     // by scanning for keys named 'message <number>', and
     // assembling them into an ordered 'messages' array, while cleaning up old keys
