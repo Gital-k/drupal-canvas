@@ -197,6 +197,7 @@ final class SingleDirectoryComponentTest extends ComponentSourceTestBase {
       'sdc.canvas_test_sdc.card-with-local-image',
       'sdc.canvas_test_sdc.card-with-remote-image',
       'sdc.canvas_test_sdc.card-with-stream-wrapper-image',
+      'sdc.canvas_test_sdc.columns',
       'sdc.canvas_test_sdc.component-no-meta-enum',
       'sdc.canvas_test_sdc.crash',
       'sdc.canvas_test_sdc.deprecated',
@@ -632,6 +633,17 @@ HTML,
           ],
         ],
       ],
+      'sdc.canvas_test_sdc.columns' => [
+        'cacheability' => $default_cacheability,
+        'html' => '<div  data-component-id="canvas_test_sdc:columns"></div>
+',
+        'attachments' => [
+          'library' => [
+            'core/components.canvas_test_sdc--columns',
+            'core/components.canvas_test_sdc--columns',
+          ],
+        ],
+      ],
       'sdc.canvas_test_sdc.component-no-meta-enum' => [
         'cacheability' => $default_cacheability,
         'html' => '<span  data-component-id="canvas_test_sdc:component-no-meta-enum">
@@ -998,7 +1010,7 @@ activation="auto">
   }
 
   protected function generateCrashTestDummyComponentTree(string $component_id, array $inputs, bool $assertCount = TRUE): ComponentTreeItemList {
-    if ($component_id === 'sdc.canvas_broken_sdcs.invalid-filter') {
+    if (str_starts_with($component_id, 'sdc.canvas_broken_sdcs.')) {
       // This component needs an extra module.
       $this->assertCount(0, $this->componentStorage->loadMultiple());
       \Drupal::service(ModuleInstallerInterface::class)->install(['canvas_broken_sdcs']);
@@ -1091,7 +1103,7 @@ activation="auto">
       'expected_output_selector' => NULL,
     ];
 
-    yield "SDC with invalid Twig" => [
+    yield "SDC with invalid Twig (due to filter)" => [
       'component_id' => 'sdc.canvas_broken_sdcs.invalid-filter',
       'inputs' => [
         'name' => 'Gaia',
@@ -1100,6 +1112,31 @@ activation="auto">
       'expected_exception' => [
         'class' => SyntaxError::class,
         'message' => 'Unknown "invalidFilter" filter',
+      ],
+      'expected_output_selector' => NULL,
+    ];
+
+    yield "SDC with valid prop, but invalid Twig (due to printing an object-shaped prop)" => [
+      'component_id' => 'sdc.canvas_broken_sdcs.malformed-image',
+      'inputs' => [
+        'image' => [
+          // TRICKY: Intentionally use a StaticPropSource powered by the `uri`
+          // field type (instead of the `image` field type), because it allows
+          // this test to specify an arbitrary URL as the image URL, instead of
+          // having to create a File entity that is referenced by the `image`
+          // field. Hence also use a FieldTypeObjectPropsExpression to transform
+          // it to the `type: object` prop shape expected by the SDC.
+          'sourceType' => "static:field_item:uri",
+          'value' => 'https://example.com/llama.jpg',
+          'expression' => 'ℹ︎uri␟{src↠value}',
+        ],
+      ],
+      // Note there's no validation error: the evaluated StaticPropSource yields
+      // a valid value for the SDC prop.
+      'expected_validation_errors' => [],
+      'expected_exception' => [
+        'class' => RuntimeError::class,
+        'message' => 'An exception has been thrown during the rendering of a template (""src" is an invalid render array key. Value should be an array but got a string.") in "canvas_broken_sdcs:malformed-image" at line 2.',
       ],
       'expected_output_selector' => NULL,
     ];
@@ -1463,6 +1500,21 @@ activation="auto">
             'field_widget' => 'image_image',
             'default_value' => [],
             'expression' => 'ℹ︎image␟entity␜␜entity:file␝uri␞␟value',
+          ],
+        ],
+      ],
+      'sdc.canvas_test_sdc.columns' => [
+        'prop_field_definitions' => [
+          'columns' => [
+            'required' => TRUE,
+            'field_type' => 'list_integer',
+            'field_storage_settings' => [
+              'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
+            ],
+            'field_instance_settings' => [],
+            'field_widget' => 'options_select',
+            'default_value' => [0 => ['value' => 2]],
+            'expression' => 'ℹ︎list_integer␟value',
           ],
         ],
       ],
@@ -2180,6 +2232,13 @@ activation="auto">
           'core',
           'file',
           'image',
+          'options',
+          'canvas_test_sdc',
+        ],
+      ],
+      'sdc.canvas_test_sdc.columns' => [
+        'module' => [
+          'core',
           'options',
           'canvas_test_sdc',
         ],
@@ -2926,6 +2985,71 @@ activation="auto">
                 ],
               ],
               'resolved' => 'lazy',
+            ],
+          ],
+        ],
+        'transforms' => [],
+      ],
+      'sdc.canvas_test_sdc.columns' => [
+        'expected_output_selectors' => [
+          // TRICKY: there's no content to assert, because the preview by
+          // default doe snot use slot values.
+          'div[data-component-id="canvas_test_sdc:columns"]',
+        ],
+        'source' => 'Module component',
+        'metadata' => [
+          'slots' => [
+            'column_1' => [
+              'title' => 'Column One',
+              'description' => 'The contents of the first column.',
+              'examples' => ['<p>This is column 1 content</p>'],
+            ],
+            'column_2' => [
+              'title' => 'Column Two',
+              'description' => 'The contents of the second column.',
+              'examples' => ['<p>This is column 2 content</p>'],
+            ],
+            'column_3' => [
+              'title' => 'Column Three',
+              'description' => 'The contents of the third column.',
+              'examples' => ['<p>This is column 3 content</p>'],
+            ],
+            'column_4' => [
+              'title' => 'Column Four',
+              'description' => 'The contents of the fourth column.',
+              'examples' => ['<p>This is column 4 content</p>'],
+            ],
+            'column_5' => [
+              'title' => 'Column Five',
+              'description' => 'The contents of the fifth column.',
+              'examples' => ['<p>This is column 5 content</p>'],
+            ],
+            'column_6' => [
+              'title' => 'Column Six',
+              'description' => 'The contents of the sixth column.',
+              'examples' => ['<p>This is column 6 content</p>'],
+            ],
+          ],
+        ],
+        'propSources' => [
+          'columns' => [
+            'required' => TRUE,
+            'jsonSchema' => [
+              'type' => 'integer',
+              'enum' => [1, 2, 3, 4, 5, 6],
+            ],
+            'sourceType' => 'static:field_item:list_integer',
+            'expression' => 'ℹ︎list_integer␟value',
+            'sourceTypeSettings' => [
+              'storage' => [
+                'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
+              ],
+            ],
+            'default_values' => [
+              'source' => [
+                0 => ['value' => 2],
+              ],
+              'resolved' => 2,
             ],
           ],
         ],
