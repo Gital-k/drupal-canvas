@@ -2,7 +2,7 @@ import { expect } from '@playwright/test';
 
 import { test } from './fixtures/DrupalSite';
 import { Drupal } from './objects/Drupal';
-import editor from '../../../ui/src/features/editor/Editor';
+import { getModuleDir } from './utilities/DrupalFilesystem';
 
 test.describe('Templates', () => {
   test.beforeAll(
@@ -11,9 +11,6 @@ test.describe('Templates', () => {
       const page = await browser.newPage();
       const drupal: Drupal = new Drupal({ page, drupalSite });
       await drupal.setupCanvasTestSite();
-      // @todo remove the cache clear once https://www.drupal.org/project/drupal/issues/3534825
-      // is fixed.
-      // await drupal.drush('cr');
       await page.close();
     },
   );
@@ -174,5 +171,18 @@ test.describe('Templates', () => {
     await expect(
       page.locator(`.my-hero__subheading:has-text("submarine")`),
     ).toBeVisible();
+  });
+
+  test.only('Template - available suggestions', async ({
+    page,
+    drupal,
+    canvasEditor,
+  }) => {
+    const moduleDir = await getModuleDir();
+    await drupal.applyRecipe(`${moduleDir}/canvas/tests/fixtures/recipes/base`);
+    await drupal.loginAsAdmin();
+    await page.goto('/canvas/template/page/article/full/1');
+    await canvasEditor.addComponent({ id: 'sdc.canvas_test_linkable_props.linkable-props' });
+
   });
 });
