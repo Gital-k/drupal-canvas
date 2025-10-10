@@ -1,17 +1,17 @@
-uuid: decd048f-396e-4edb-9347-f4db5103b5a0
+uuid: 6b654b72-b5f4-4bca-a842-642426ee16c7
 langcode: en
 status: true
 dependencies:
   config:
-    - field.storage.node.field_a_link_field
-    - node.type.article
+    - field.storage.node.field_the_link
+    - node.type.page
   module:
     - link
-id: node.article.field_a_link_field
-field_name: field_a_link_field
+id: node.page.field_the_link
+field_name: field_the_link
 entity_type: node
-bundle: article
-label: 'A link field'
+bundle: page
+label: 'The Link'
 description: ''
 required: false
 translatable: false

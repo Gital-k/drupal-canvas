@@ -1,7 +1,7 @@
 _meta:
   version: '1.0'
   entity_type: taxonomy_term
-  uuid: 971482e4-c008-46e8-a36e-6a37635c4bc5
+  uuid: 4f797556-f1bd-4bf2-a034-2550afa55c5d
   bundle: tags
   default_langcode: en
 default:

@@ -1,17 +1,17 @@
-uuid: 759f7851-9c2b-4cf5-9743-34d10ba121b9
+uuid: e1b1092e-ffe8-4c70-b301-41c63a4816b7
 langcode: en
 status: true
 dependencies:
   config:
-    - field.storage.node.field_integer_list
-    - node.type.article
+    - field.storage.node.field_number_list
+    - node.type.page
   module:
     - options
-id: node.article.field_integer_list
-field_name: field_integer_list
+id: node.page.field_number_list
+field_name: field_number_list
 entity_type: node
-bundle: article
-label: 'Integer List'
+bundle: page
+label: 'Number List'
 description: ''
 required: false
 translatable: false

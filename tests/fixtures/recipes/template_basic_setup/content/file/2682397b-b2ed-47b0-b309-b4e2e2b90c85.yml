@@ -1,7 +1,7 @@
 _meta:
   version: '1.0'
   entity_type: file
-  uuid: 2658e81d-1915-49bc-a88d-333ad4f73fc2
+  uuid: 2682397b-b2ed-47b0-b309-b4e2e2b90c85
   default_langcode: en
 default:
   uid:
@@ -9,19 +9,19 @@ default:
       target_id: 1
   filename:
     -
-      value: PrincesHead.jpg
+      value: cool-cat.jpg
   uri:
     -
-      value: 'public://2025-05/PrincesHead.jpg'
+      value: 'public://2025-10/cool-cat_2.jpg'
   filemime:
     -
       value: image/jpeg
   filesize:
     -
-      value: 101974
+      value: 276380
   status:
     -
       value: true
   created:
     -
-      value: 1747824139
+      value: 1760098449

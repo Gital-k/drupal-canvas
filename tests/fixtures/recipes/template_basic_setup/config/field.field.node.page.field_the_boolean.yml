@@ -1,15 +1,15 @@
-uuid: ec85790a-e7dd-4954-b15b-4e285a1c58f4
+uuid: 6d220708-61ef-4f3c-aa13-ef42cb22967e
 langcode: en
 status: true
 dependencies:
   config:
-    - field.storage.node.field_a_boolean_field
-    - node.type.article
-id: node.article.field_a_boolean_field
-field_name: field_a_boolean_field
+    - field.storage.node.field_the_boolean
+    - node.type.page
+id: node.page.field_the_boolean
+field_name: field_the_boolean
 entity_type: node
-bundle: article
-label: 'A boolean field'
+bundle: page
+label: 'The Boolean'
 description: ''
 required: false
 translatable: false

@@ -1,7 +1,7 @@
 _meta:
   version: '1.0'
   entity_type: file
-  uuid: 1f6052b6-60ee-4ded-a291-3ea0501ef2e1
+  uuid: b056131d-fdc2-4aeb-9776-3e8001c1a0d1
   default_langcode: en
 default:
   uid:
@@ -9,10 +9,10 @@ default:
       target_id: 1
   filename:
     -
-      value: secret-plans_1.jpg
+      value: secret-plans_2.jpg
   uri:
     -
-      value: 'public://2025-10/secret-plans_1.jpg'
+      value: 'public://2025-10/secret-plans_2.jpg'
   filemime:
     -
       value: image/jpeg
@@ -24,4 +24,4 @@ default:
       value: true
   created:
     -
-      value: 1760033987
+      value: 1760098357

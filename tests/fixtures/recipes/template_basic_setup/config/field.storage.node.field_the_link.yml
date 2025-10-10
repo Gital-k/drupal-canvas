@@ -1,17 +1,16 @@
-uuid: 74de0fed-351a-4aab-ac68-918836b1b1ac
+uuid: 3e266adc-e11d-4479-b6b3-2f32411deaad
 langcode: en
 status: true
 dependencies:
   module:
+    - link
     - node
-    - taxonomy
-id: node.field_single_tag
-field_name: field_single_tag
+id: node.field_the_link
+field_name: field_the_link
 entity_type: node
-type: entity_reference
-settings:
-  target_type: taxonomy_term
-module: core
+type: link
+settings: {  }
+module: link
 locked: false
 cardinality: 1
 translatable: true

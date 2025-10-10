@@ -1,7 +1,7 @@
 _meta:
   version: '1.0'
   entity_type: file
-  uuid: 900f5050-e75d-4ac6-802f-dbe90ca6bbc2
+  uuid: 811ced3c-81e9-49b9-a82d-ef4da8772e9f
   default_langcode: en
 default:
   uid:
@@ -9,10 +9,10 @@ default:
       target_id: 1
   filename:
     -
-      value: hello-folks_1.jpg
+      value: hello-folks_2.jpg
   uri:
     -
-      value: 'public://2025-10/hello-folks_1.jpg'
+      value: 'public://2025-10/hello-folks_2.jpg'
   filemime:
     -
       value: image/jpeg
@@ -24,4 +24,4 @@ default:
       value: true
   created:
     -
-      value: 1760033996
+      value: 1760098462
