@@ -1194,10 +1194,10 @@ class CanvasAiPageBuilderHelper {
    * code fences (```js, ```jsx) in the 'code' output.
    *
    * @param string $md
-   *  The markdown content.
+   *   The markdown content.
    *
    * @return array
-   *  Extracted info indexed by package/library name keys.
+   *   Extracted info indexed by package/library name keys.
    */
   public function mdToPlainText(string $md): array {
     $type_map = [
@@ -1209,6 +1209,9 @@ class CanvasAiPageBuilderHelper {
     // Split markdown by ## section headers, capturing the header text.
     $sections = preg_split('/^##\s+(.*)$/m', $md, -1, PREG_SPLIT_DELIM_CAPTURE);
     $result = [];
+    if (!is_array($sections)) {
+      return [];
+    }
 
     // Helper function for robust snake_case conversion
     $to_snake_case = function (string $input): string {

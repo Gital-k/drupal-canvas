@@ -91,7 +91,7 @@ final class CanvasBuilder extends ControllerBase {
       $prompt['custom_libraries'] = Json::decode($prompt['custom_libraries']);
     }
     $mdFilePath = __DIR__ . '/../../../../docs/user/src/content/docs/code-components/packages.mdx';
-    $markdown = file_get_contents($mdFilePath);
+    $markdown = file_get_contents($mdFilePath) ?? '';
     $libraries = $this->canvasAiPageBuilderHelper->mdToPlainText($markdown);
     // If $prompt['messages'] is missing or invalid, this code reconstructs it
     // by scanning for keys named 'message <number>', and
