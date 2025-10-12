@@ -43,12 +43,13 @@ final class GetPageDataTest extends KernelTestBase {
   }
 
   /**
-   * Tests fetching a field from an entity.
+   * Tests fetching a field from canvas page.
    */
-  public function testPageData(): void {
+  public function testPageDataForCanvasPage(): void {
     $tool = $this->functionCallManager->createInstance('ai_agent:get_page_data');
     $this->assertInstanceOf(ExecutableFunctionCallInterface::class, $tool);
 
+    $tool->setContextValue('entity_type', 'canvas_page');
     $tool->setContextValue('page_title', 'Title of the page');
     $tool->setContextValue('page_description', 'Description of the page');
     $tool->execute();
@@ -61,6 +62,25 @@ final class GetPageDataTest extends KernelTestBase {
 
     $this->assertArrayHasKey('page_description', $parsed_result);
     $this->assertEquals('Description of the page', $parsed_result['page_description']);
+  }
+
+  /**
+   * Tests fetching a field from non canvas page.
+   */
+  public function testPageDataForNonCanvasPage(): void {
+    $tool = $this->functionCallManager->createInstance('ai_agent:get_page_data');
+    $this->assertInstanceOf(ExecutableFunctionCallInterface::class, $tool);
+
+    $tool->setContextValue('entity_type', 'node');
+    $tool->setContextValue('page_title', 'Title of the page');
+    $tool->setContextValue('page_description', 'Description of the page');
+    $tool->execute();
+
+    $result = $tool->getReadableOutput();
+    $parsed_result = Yaml::parse($result);
+
+    $this->assertArrayHasKey('error', $parsed_result);
+    $this->assertEquals('This operation is only valid for Drupal Canvas pages. Do not process further. Return with provided message only.', $parsed_result['error']);
   }
 
 }

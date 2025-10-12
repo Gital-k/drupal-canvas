@@ -22,6 +22,12 @@ use Symfony\Component\Yaml\Yaml;
   group: 'information_tools',
   module_dependencies: ['canvas'],
   context_definitions: [
+    'entity_type' => new ContextDefinition(
+      data_type: 'string',
+      label: new TranslatableMarkup("Entity Type"),
+      description: new TranslatableMarkup("The entity type for which you want to perform operations."),
+      required: TRUE
+    ),
     'page_title' => new ContextDefinition(
       data_type: 'string',
       label: new TranslatableMarkup("Page Title"),
@@ -37,6 +43,13 @@ use Symfony\Component\Yaml\Yaml;
   ],
 )]
 class GetPageData extends FunctionCallBase implements ExecutableFunctionCallInterface, AiAgentContextInterface, ContainerFactoryPluginInterface {
+
+  /**
+   * The entity type.
+   *
+   * @var string
+   */
+  protected string $entityType;
 
   /**
    * The page title.
@@ -56,6 +69,7 @@ class GetPageData extends FunctionCallBase implements ExecutableFunctionCallInte
    * {@inheritdoc}
    */
   public function execute(): void {
+    $this->entityType = $this->getContextValue('entity_type');
     $this->pageTitle = $this->getContextValue('page_title');
     $this->pageDescription = $this->getContextValue('page_description') ?? NULL;
   }
@@ -64,6 +78,9 @@ class GetPageData extends FunctionCallBase implements ExecutableFunctionCallInte
    * {@inheritdoc}
    */
   public function getReadableOutput(): string {
+    if ($this->entityType !== 'canvas_page') {
+      return Yaml::dump(['error' => 'This operation is only valid for Drupal Canvas pages. Do not process further. Return with provided message only.'], 10, 2);
+    }
     return Yaml::dump([
       'page_title' => $this->pageTitle,
       'page_description' => $this->pageDescription,

@@ -82,6 +82,7 @@ default_information_tools: |
     description: 'Page data'
     tool: 'ai_agent:get_page_data'
     parameters:
+      entity_type: '[canvas_ai:entity_type]'
       page_title: '[canvas_ai:page_title]'
 tool_usage_limits:
   'ai_agent:edit_field_content':
