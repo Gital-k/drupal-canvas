@@ -100,4 +100,8 @@ final class ReferenceFieldPropExpression implements StructuredDataPropExpression
     return $this->referencer->getHostEntityDataDefinition();
   }
 
+  public function getHostEntityDataDefinition(): EntityDataDefinitionInterface {
+    return $this->referencer->getHostEntityDataDefinition();
+  }
+
 }
