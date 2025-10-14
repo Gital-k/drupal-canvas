@@ -7,6 +7,7 @@ namespace Drupal\canvas\PropExpressions\StructuredData;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
+use Drupal\Core\Entity\TypedData\EntityDataDefinitionInterface;
 use Drupal\Core\Field\FieldItemInterface;
 use Drupal\Core\Field\FieldItemListInterface;
 
@@ -60,6 +61,9 @@ final class ReferenceFieldPropExpression implements StructuredDataPropExpression
       foreach ($referenced_content_entities as $referenced_content_entity) {
         $dependencies = NestedArray::mergeDeep($dependencies, $this->referenced->calculateDependencies($referenced_content_entity));
       }
+      if (empty($referenced_content_entities)) {
+        $dependencies = NestedArray::mergeDeep($dependencies, $this->referenced->calculateDependencies());
+      }
     }
     return $dependencies;
   }
@@ -79,7 +83,7 @@ final class ReferenceFieldPropExpression implements StructuredDataPropExpression
     return new static($referencer, $referenced);
   }
 
-  public function isSupported(EntityInterface|FieldItemInterface|FieldItemListInterface $entity): bool {
+  public function validateSupport(EntityInterface|FieldItemInterface|FieldItemListInterface $entity): void {
     assert($entity instanceof EntityInterface);
     $expected_entity_type_id = $this->referencer->entityType->getEntityTypeId();
     $expected_bundles = $this->referencer->entityType->getBundles() ?? [$expected_entity_type_id];
@@ -90,7 +94,10 @@ final class ReferenceFieldPropExpression implements StructuredDataPropExpression
       throw new \DomainException(sprintf("`%s` is an expression for entity type `%s`, bundle(s) `%s`, but the provided entity is of the bundle `%s`.", (string) $this, $expected_entity_type_id, implode(', ', $expected_bundles), $entity->bundle()));
     }
     // @todo validate that the field exists?
-    return TRUE;
+  }
+
+  public function getHostEntityDataDefinition(): EntityDataDefinitionInterface {
+    return $this->referencer->getHostEntityDataDefinition();
   }
 
 }

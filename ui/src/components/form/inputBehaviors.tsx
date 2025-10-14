@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
-import { debounce } from 'lodash';
+import { useEffect, useState } from 'react';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import { getDefaultValue } from '@/components/form/formUtil';
@@ -62,7 +61,6 @@ export const InputBehaviorsCommon = ({
   OriginalInput,
   props,
   callbacks,
-  shouldDebounce = true,
 }: {
   OriginalInput: React.FC<InputProps>;
   props: {
@@ -78,7 +76,6 @@ export const InputBehaviorsCommon = ({
     parseNewValue: (newValue: React.ChangeEvent) => any;
     validateNewValue: (e: React.ChangeEvent, newValue: any) => ValidationResult;
   };
-  shouldDebounce?: boolean;
 }) => {
   const { attributes, options, value, ...passProps } = props;
   const { commitFormState, parseNewValue, validateNewValue } = callbacks;
@@ -159,25 +156,6 @@ export const InputBehaviorsCommon = ({
       );
     };
   }, [dispatch, fieldName, formId, setInputValue]);
-
-  // Use debounce to prevent excessive repaints of the layout if the wrapping
-  // component requests it.
-  const debounceStoreUpdate = shouldDebounce
-    ? debounce(
-        commitFormState,
-        ['checkbox', 'radio'].includes(elementType as string)
-          ? IMMEDIATE_TIMEOUT
-          : DEBOUNCE_TIMEOUT,
-      )
-    : commitFormState;
-
-  // Register the debounced store function as a callback so debouncing is
-  // preserved between renders.
-  const storeUpdateCallback = useCallback(
-    (value: PropsValues) => debounceStoreUpdate(value),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  );
 
   // Don't track the value of hidden fields except for form_build_id or ones
   // with the 'data-track-hidden-value' attribute set.
@@ -262,7 +240,7 @@ export const InputBehaviorsCommon = ({
         );
 
       if (!isAjaxing()) {
-        storeUpdateCallback({ ...formValues, [fieldName]: newValue });
+        commitFormState({ ...formValues, [fieldName]: newValue });
       } else {
         let attempts = 0;
         const intervalDuration = 5;
@@ -274,7 +252,7 @@ export const InputBehaviorsCommon = ({
               `Waiting  ${attempts * intervalDuration}ms for AJAX to complete before PATCH`,
               isAjaxing(),
             );
-            storeUpdateCallback({ ...formValues, [fieldName]: newValue });
+            commitFormState({ ...formValues, [fieldName]: newValue });
           }
         }, intervalDuration);
       }

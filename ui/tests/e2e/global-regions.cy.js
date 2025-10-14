@@ -12,10 +12,8 @@ describe('Operate on components in global regions', () => {
       cy.visit('/admin/appearance/component/');
       cy.findByText('block.system_menu_block.account')
         .parent('tr')
-        .findByText('List additional actions')
+        .findByText('Enable')
         .click({ force: true });
-
-      cy.findAllByText('Enable').filter(':visible').click();
     });
     cy.viewport('macbook-13');
   });
@@ -49,6 +47,7 @@ describe('Operate on components in global regions', () => {
       cy.log(
         'Can hover a region in the library and see the overlay in the preview (checking for the nameTag)',
       );
+      cy.openLayersPanel();
       cy.get('.primaryPanelContent')
         .findByText('Content Above')
         .trigger('mouseover', { force: true, scrollBehavior: false });
@@ -93,6 +92,7 @@ describe('Operate on components in global regions', () => {
 
   it('Can focus on global regions and see their child components', () => {
     cy.loadURLandWaitForCanvasLoaded();
+    cy.openLayersPanel();
     cy.focusRegion('Content Above');
     cy.get('.spotlight').should('exist');
     cy.get('.spotlight')
@@ -115,8 +115,8 @@ describe('Operate on components in global regions', () => {
     { retries: { openMode: 0, runMode: 3 } },
     () => {
       cy.loadURLandWaitForCanvasLoaded();
+      cy.openLayersPanel();
       cy.findByTestId('canvas-primary-panel').as('layersTree');
-
       cy.focusRegion('Breadcrumb');
       cy.findByTestId('canvas-topbar')
         .findByLabelText('Back to Content region')

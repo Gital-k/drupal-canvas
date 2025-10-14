@@ -29,6 +29,7 @@ export interface DrupalSettings {
     selectedComponent: string;
     devMode: boolean;
     dialogCss: string[];
+    extensionsAvailable: boolean;
     // ⚠️ This is highly experimental and *will* be refactored.
     aiExtensionAvailable: boolean;
     loginUrl: string;

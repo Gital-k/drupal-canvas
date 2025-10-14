@@ -329,6 +329,17 @@ const startPolling = (
     }
   };
 
+  const cleanupPollingMessageOnError = () => {
+    if (chatEl && pollingMessageIndex >= 0) {
+      try {
+        chatEl.updateMessage({ html: '' }, pollingMessageIndex);
+        pollingMessageIndex = -1;
+      } catch (error) {
+        console.warn('Failed to hide polling message on error:', error);
+      }
+    }
+  };
+
   const handlePollingComplete = () => {
     const finalContent = buildHtmlContent();
     if (finalContent) {
@@ -339,6 +350,7 @@ const startPolling = (
 
   const poll = async () => {
     if (stopSignal?.stopped) {
+      cleanupPollingMessageOnError();
       return;
     }
     try {
@@ -383,6 +395,7 @@ const startPolling = (
       }
     } catch (error) {
       console.error('Polling request failed:', error);
+      cleanupPollingMessageOnError();
       handlePollingComplete();
     }
   };
@@ -421,6 +434,10 @@ const AiWizard = () => {
     (state) => state?.layoutModel?.present as LayoutModelSliceState,
   );
 
+  const selectedComponent = useAppSelector(
+    (state) => state.ui.selection.items[0],
+  );
+
   // Create a ref to store current values for Deep Chat's connect prop.
   // Accessing these ensures we're working with fresh values even after the Deep
   // Chat component has been mounted.
@@ -430,6 +447,7 @@ const AiWizard = () => {
     pageData,
     params,
     theLayoutModel,
+    selectedComponent,
   });
 
   // Update the ref whenever tracked values change.
@@ -440,16 +458,21 @@ const AiWizard = () => {
       pageData,
       params,
       theLayoutModel,
+      selectedComponent,
     };
-  }, [codeComponentName, textPropsMapString, pageData, params, theLayoutModel]);
+  }, [
+    codeComponentName,
+    textPropsMapString,
+    pageData,
+    params,
+    selectedComponent,
+    theLayoutModel,
+  ]);
   // Access layoutUtils and componentSelectionUtils from drupalSettings.canvas
   const layoutUtils = drupalSettings.canvas?.layoutUtils as any;
   const componentSelectionUtils = drupalSettings.canvas
     ?.componentSelectionUtils as any;
 
-  const selectedComponent = useAppSelector(
-    (state) => state.ui.selection.items[0],
-  );
   const { data: availableComponents } = useGetComponentsQuery();
   const componentsRef = useRef<any>(null);
 
@@ -604,6 +627,13 @@ const AiWizard = () => {
           welcomeTextRef.current.style.display = 'none';
         }
         historyStore.addMessage(message);
+        const event = new CustomEvent('canvas-message', {
+          detail: {
+            message: message,
+            time: new Date(),
+          },
+        });
+        window.dispatchEvent(event);
       }
     };
     chatEl.addEventListener('message', handler);
@@ -748,7 +778,8 @@ const AiWizard = () => {
                     selected_component:
                       currentValuesRef.current.codeComponentName,
                     layout: currentValuesRef.current.textPropsMapString,
-                    active_component_uuid: selectedComponent ?? '',
+                    active_component_uuid:
+                      currentValuesRef.current.selectedComponent ?? '',
                     current_layout: transformLayout(),
                     derived_proptypes: fixtureProps,
                     page_title:
@@ -801,6 +832,13 @@ const AiWizard = () => {
                       throw new Error(`HTTP error. Status: ${response.status}`);
                     }
                     const data = await response.json();
+
+                    if (data.status === false) {
+                      throw new Error(
+                        data.message ||
+                          'An error occurred while processing your request. Please try again.',
+                      );
+                    }
                     // Store the response instead of processing it
                     pendingResponse = data;
                   })
@@ -808,7 +846,9 @@ const AiWizard = () => {
                     console.error('AI request failed:', error);
                     stopPolling.stopped = true;
                     signals.onResponse({
-                      text: 'An error occurred while processing your request. Please try again.',
+                      text: error.message
+                        ? error.message
+                        : 'An error occurred while processing your request. Please try again.',
                       role: 'error',
                     });
                     setTimeout(() => {
