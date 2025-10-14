@@ -581,17 +581,21 @@
     },
   };
 
+  const ajaxCanProceed = () => !drupalSettings?.canvas?.canvasLayoutRequestInProgress || drupalSettings.canvas.canvasLayoutRequestInProgress.length === 0;
   const originalEventResponse = Drupal.Ajax.prototype.eventResponse;
   Drupal.Ajax.prototype.eventResponse = function(...args) {
-    if (!drupalSettings?.canvas?.canvasLayoutRequestInProgress || drupalSettings.canvas.canvasLayoutRequestInProgress.length === 0) {
+    if (ajaxCanProceed()) {
       originalEventResponse.apply(this, args)
     } else {
       let attempts = 0;
-      const intervalDuration = 5;
+      // Set the interval duration to 50ms as when this is triggered, it
+      // typically requires a >=3 digit ms wait time. This should keep the
+      // total wait time to a minimum while minimizing the number of checks.
+      const intervalDuration = 50;
       const intervalId = setInterval(() => {
-        const layoutDone = !drupalSettings?.canvasLayoutRequestInProgress || drupalSettings.canvasLayoutRequestInProgress.length === 0
         attempts += 1;
-        if (layoutDone || attempts >= 5000) {
+        // Allow for a high number of attempts to account for slow connections.
+        if (ajaxCanProceed() || attempts >= 500) {
           clearInterval(intervalId);
           console.log(`Waited  ${attempts * intervalDuration}ms for PATCH requests to complete before AJAX`)
           originalEventResponse.apply(this, args)

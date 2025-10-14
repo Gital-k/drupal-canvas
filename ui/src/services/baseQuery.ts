@@ -22,10 +22,16 @@ export const baseQuery: BaseQueryFn<
 > = async (args, api, extraOptions) => {
   const state = api.getState() as RootState;
   const canvasSettings = getCanvasSettings();
+  // Some requests that update components or their form should not occur at the
+  // same time as a Drupal AJAX request. Those requests are identified here,
+  // then a variable in canvasSettings is used to track such a request being in
+  // progress. AJAX events will wait until these requests are complete.
+  // @see the override of Drupal.Ajax.prototype.eventResponse in
+  //   ajax.command.customizations.js
   const flagForAjax =
     typeof args === 'object' &&
     args?.method === 'PATCH' &&
-    args?.url.includes('/form');
+    ['updateComponent', 'getComponentInstanceForm'].includes(api?.endpoint);
   if (flagForAjax) {
     if (typeof canvasSettings?.canvasLayoutRequestInProgress === 'undefined') {
       canvasSettings.canvasLayoutRequestInProgress = [];
@@ -46,6 +52,10 @@ export const baseQuery: BaseQueryFn<
     extraOptions,
   );
   if (flagForAjax) {
+    // When an ajax-postponing request has completed, remove its addition
+    // array of flags. Once the array is empty, ajax requests will proceed.
+    // @see the override of Drupal.Ajax.prototype.eventResponse in
+    //   ajax.command.customizations.js
     window.document
       .querySelectorAll('[data-once="drupal-ajax"]')
       // @ts-ignore

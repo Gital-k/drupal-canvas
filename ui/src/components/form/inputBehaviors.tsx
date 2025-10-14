@@ -233,19 +233,29 @@ export const InputBehaviorsCommon = ({
         }
       }
 
+      // Checks if a Drupal AJAX operation is in progress.
       const isAjaxing = () =>
         Drupal.ajax.instances.some(
-          (instance: { ajaxing: boolean }) =>
-            instance && instance.ajaxing === true,
+          (instance: { ajaxing: boolean }) => instance && instance.ajaxing,
         );
 
+      // If no AJAX operations are in progress, update the form state and store.
       if (!isAjaxing()) {
         commitFormState({ ...formValues, [fieldName]: newValue });
       } else {
+        // This is only reached if AJAX operations are in progress. Set an
+        // interval that will run until no AJAX operations are in progress
+        // or a timeout is reached, then update the form state and store.
         let attempts = 0;
+
+        // An intentionally short interval as many AJAX operations complete
+        // quite quickly and we don't want to introduce a noticeable delay.
+        // It is a slight boost from the default of 5ms to make it easier to do
+        // math in ones head.
         const intervalDuration = 5;
         const intervalId = setInterval(() => {
           attempts += 1;
+          console.log('still ajaxing...', attempts, isAjaxing());
           if (!isAjaxing() || attempts * intervalDuration > 600) {
             clearInterval(intervalId);
             console.log(
