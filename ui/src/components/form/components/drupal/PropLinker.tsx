@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import clsx from 'clsx';
-import { Link1Icon, LinkNone1Icon } from '@radix-ui/react-icons';
-import { DropdownMenu } from '@radix-ui/themes';
+import { CheckIcon, Link1Icon, LinkNone1Icon } from '@radix-ui/react-icons';
+import { DropdownMenu, Separator } from '@radix-ui/themes';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import {
@@ -20,16 +20,16 @@ import type {
 import styles from './PropLinker.module.css';
 
 export interface LinkSuggestion {
+  id?: string;
   label: string;
-  source: any;
+  source?: any;
+  items?: LinkSuggestion[];
 }
 
 export interface PropLinkerProps {
   propName: string;
   linked: boolean;
-  suggestions: {
-    [suggestionKey: string]: LinkSuggestion;
-  };
+  suggestions: LinkSuggestion[];
 }
 
 /**
@@ -82,6 +82,65 @@ const PropLinker = ({ propName, linked, suggestions }: PropLinkerProps) => {
     currentExpression = fieldSource.expression;
   }
 
+  const DropdownMenuItem = ({
+    item,
+    isActive,
+  }: {
+    item: LinkSuggestion;
+    isActive: boolean;
+  }) => {
+    return (
+      <DropdownMenu.Item
+        onClick={() => handleFieldClick(item)}
+        disabled={isActive}
+        className={clsx({
+          [styles.disabled]: isActive,
+        })}
+      >
+        {isActive && <CheckIcon />}
+        {item.label}
+      </DropdownMenu.Item>
+    );
+  };
+
+  const NestedDropdownItem = ({ item }: { item: LinkSuggestion }) => {
+    const isActive = item.source?.expression === currentExpression;
+
+    if (item.items && item.items.length > 0) {
+      return (
+        <DropdownMenu.Sub>
+          <DropdownMenu.SubTrigger
+            className={clsx(styles.subTrigger, {
+              [styles.disabled]: isActive && item.source,
+            })}
+          >
+            {item.label}
+          </DropdownMenu.SubTrigger>
+
+          <DropdownMenu.SubContent>
+            {/* Show the parent item in its own menu if it has a source itself to link to. */}
+            {item.source && (
+              <>
+                <DropdownMenuItem
+                  key={item.id}
+                  item={item}
+                  isActive={isActive}
+                />
+                <Separator orientation="horizontal" size="4" my="2" />
+              </>
+            )}
+
+            {item.items.map((sub, index) => (
+              <NestedDropdownItem key={sub.id || index} item={sub} />
+            ))}
+          </DropdownMenu.SubContent>
+        </DropdownMenu.Sub>
+      );
+    }
+
+    return <DropdownMenuItem key={item.id} item={item} isActive={isActive} />;
+  };
+
   return (
     <DropdownMenu.Root onOpenChange={(open) => setLinkerOpen(open)}>
       <DropdownMenu.Trigger>
@@ -95,19 +154,24 @@ const PropLinker = ({ propName, linked, suggestions }: PropLinkerProps) => {
         </span>
       </DropdownMenu.Trigger>
       <DropdownMenu.Content align="end" side="bottom">
-        {Object.entries(suggestions || {}).map(([key, value]) => (
-          <DropdownMenu.Item
-            key={key}
-            onClick={() => handleFieldClick(value as LinkSuggestion)}
-            disabled={value.source.expression === currentExpression}
-            className={clsx({
-              [styles.disabled]: value.source.expression === currentExpression,
-            })}
-          >
-            {value.source.expression === currentExpression && '(active) '}
-            {(value as LinkSuggestion).label}
-          </DropdownMenu.Item>
-        ))}
+        {suggestions.map((suggestion, index) => {
+          if (suggestion.items && suggestion.items.length > 0) {
+            return (
+              <NestedDropdownItem
+                key={suggestion.id || index}
+                item={suggestion}
+              />
+            );
+          }
+          const isActive = suggestion.source?.expression === currentExpression;
+          return (
+            <DropdownMenuItem
+              key={suggestion.id}
+              item={suggestion}
+              isActive={isActive}
+            />
+          );
+        })}
       </DropdownMenu.Content>
     </DropdownMenu.Root>
   );

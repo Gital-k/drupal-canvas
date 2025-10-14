@@ -329,6 +329,17 @@ const startPolling = (
     }
   };
 
+  const cleanupPollingMessageOnError = () => {
+    if (chatEl && pollingMessageIndex >= 0) {
+      try {
+        chatEl.updateMessage({ html: '' }, pollingMessageIndex);
+        pollingMessageIndex = -1;
+      } catch (error) {
+        console.warn('Failed to hide polling message on error:', error);
+      }
+    }
+  };
+
   const handlePollingComplete = () => {
     const finalContent = buildHtmlContent();
     if (finalContent) {
@@ -339,6 +350,7 @@ const startPolling = (
 
   const poll = async () => {
     if (stopSignal?.stopped) {
+      cleanupPollingMessageOnError();
       return;
     }
     try {
@@ -383,6 +395,7 @@ const startPolling = (
       }
     } catch (error) {
       console.error('Polling request failed:', error);
+      cleanupPollingMessageOnError();
       handlePollingComplete();
     }
   };
@@ -614,6 +627,13 @@ const AiWizard = () => {
           welcomeTextRef.current.style.display = 'none';
         }
         historyStore.addMessage(message);
+        const event = new CustomEvent('canvas-message', {
+          detail: {
+            message: message,
+            time: new Date(),
+          },
+        });
+        window.dispatchEvent(event);
       }
     };
     chatEl.addEventListener('message', handler);
@@ -812,6 +832,13 @@ const AiWizard = () => {
                       throw new Error(`HTTP error. Status: ${response.status}`);
                     }
                     const data = await response.json();
+
+                    if (data.status === false) {
+                      throw new Error(
+                        data.message ||
+                          'An error occurred while processing your request. Please try again.',
+                      );
+                    }
                     // Store the response instead of processing it
                     pendingResponse = data;
                   })
@@ -819,7 +846,9 @@ const AiWizard = () => {
                     console.error('AI request failed:', error);
                     stopPolling.stopped = true;
                     signals.onResponse({
-                      text: 'An error occurred while processing your request. Please try again.',
+                      text: error.message
+                        ? error.message
+                        : 'An error occurred while processing your request. Please try again.',
                       role: 'error',
                     });
                     setTimeout(() => {

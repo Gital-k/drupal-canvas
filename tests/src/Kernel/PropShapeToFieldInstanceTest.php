@@ -433,6 +433,15 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
         ],
+        'REQUIRED, type=integer&enum[0]=1&enum[1]=2&enum[2]=3&enum[3]=4&enum[4]=5&enum[5]=6' => [
+          'SDC props' => [
+            0 => '⿲canvas_test_sdc:columns␟columns',
+          ],
+          'static prop source' => 'ℹ︎list_integer␟value',
+          'instances' => [],
+          'adapter_matches_field_type' => [],
+          'adapter_matches_instance' => [],
+        ],
         'REQUIRED, type=object&$ref=json-schema-definitions://canvas.module/image' => [
           'SDC props' => [
             '⿲canvas_test_sdc:card␟image',
@@ -559,7 +568,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           'SDC props' => [
             '⿲sdc_test_all_props:all-props␟test_REQUIRED_string_html',
           ],
-          'static prop source' => 'ℹ︎text_long␟value',
+          'static prop source' => 'ℹ︎text_long␟processed',
           'instances' => [],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
@@ -568,7 +577,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           'SDC props' => [
             '⿲sdc_test_all_props:all-props␟test_REQUIRED_string_html_block',
           ],
-          'static prop source' => 'ℹ︎text_long␟value',
+          'static prop source' => 'ℹ︎text_long␟processed',
           'instances' => [],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
@@ -577,7 +586,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           'SDC props' => [
             '⿲sdc_test_all_props:all-props␟test_REQUIRED_string_html_inline',
           ],
-          'static prop source' => 'ℹ︎text␟value',
+          'static prop source' => 'ℹ︎text␟processed',
           'instances' => [],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
@@ -1374,25 +1383,6 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
             ],
           ],
         ],
-        'optional, type=string&$ref=json-schema-definitions://canvas.module/textarea' => [
-          'SDC props' => [
-            '⿲sdc_test_all_props:all-props␟test_string_multiline',
-          ],
-          'static prop source' => 'ℹ︎string_long␟value',
-          'instances' => [
-            'ℹ︎␜entity:canvas_page␝description␞␟value',
-            'ℹ︎␜entity:canvas_page␝image␞␟entity␜␜entity:media␝revision_log_message␞␟value',
-            'ℹ︎␜entity:canvas_page␝revision_log␞␟value',
-            'ℹ︎␜entity:media:baby_videos␝revision_log_message␞␟value',
-            'ℹ︎␜entity:media:press_releases␝revision_log_message␞␟value',
-            'ℹ︎␜entity:media:vacation_videos␝revision_log_message␞␟value',
-            'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝revision_log_message␞␟value',
-            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝revision_log_message␞␟value',
-            'ℹ︎␜entity:node:foo␝revision_log␞␟value',
-          ],
-          'adapter_matches_field_type' => [],
-          'adapter_matches_instance' => [],
-        ],
         'optional, type=string&contentMediaType=image/*&format=uri-reference&x-allowed-schemes[0]=http&x-allowed-schemes[1]=https' => [
           'SDC props' => [
             '⿲sdc_test_all_props:all-props␟test_string_format_' . JsonSchemaStringFormat::Uri->value . '_image',
@@ -1437,7 +1427,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           'SDC props' => [
             '⿲sdc_test_all_props:all-props␟test_string_html',
           ],
-          'static prop source' => 'ℹ︎text_long␟value',
+          'static prop source' => 'ℹ︎text_long␟processed',
           'instances' => [],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
@@ -1446,7 +1436,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           'SDC props' => [
             '⿲sdc_test_all_props:all-props␟test_string_html_block',
           ],
-          'static prop source' => 'ℹ︎text_long␟value',
+          'static prop source' => 'ℹ︎text_long␟processed',
           'instances' => [],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
@@ -1455,7 +1445,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           'SDC props' => [
             '⿲sdc_test_all_props:all-props␟test_string_html_inline',
           ],
-          'static prop source' => 'ℹ︎text␟value',
+          'static prop source' => 'ℹ︎text␟processed',
           'instances' => [],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
@@ -1963,6 +1953,25 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
             'ℹ︎␜entity:node:foo␝uuid␞␟value',
             'ℹ︎␜entity:path_alias␝uuid␞␟value',
             'ℹ︎␜entity:user␝uuid␞␟value',
+          ],
+          'adapter_matches_field_type' => [],
+          'adapter_matches_instance' => [],
+        ],
+        'optional, type=string&pattern=(.|\r?\n)*' => [
+          'SDC props' => [
+            '⿲sdc_test_all_props:all-props␟test_string_multiline',
+          ],
+          'static prop source' => 'ℹ︎string_long␟value',
+          'instances' => [
+            'ℹ︎␜entity:canvas_page␝description␞␟value',
+            'ℹ︎␜entity:canvas_page␝image␞␟entity␜␜entity:media␝revision_log_message␞␟value',
+            'ℹ︎␜entity:canvas_page␝revision_log␞␟value',
+            'ℹ︎␜entity:media:baby_videos␝revision_log_message␞␟value',
+            'ℹ︎␜entity:media:press_releases␝revision_log_message␞␟value',
+            'ℹ︎␜entity:media:vacation_videos␝revision_log_message␞␟value',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝revision_log_message␞␟value',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝revision_log_message␞␟value',
+            'ℹ︎␜entity:node:foo␝revision_log␞␟value',
           ],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],

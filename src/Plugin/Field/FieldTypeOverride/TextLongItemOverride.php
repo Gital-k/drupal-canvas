@@ -16,6 +16,9 @@ use Drupal\text\Plugin\Field\FieldType\TextLongItem;
  */
 class TextLongItemOverride extends TextLongItem {
 
+  use CoreBugFixTextItemBaseDefaultValueTrait;
+  use CoreBugFixTextItemBaseGenerateSampleValueTrait;
+
   /**
    * {@inheritdoc}
    */
