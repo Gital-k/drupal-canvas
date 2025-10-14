@@ -1,5 +1,7 @@
 import { fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
+import { getCanvasSettings } from '@/utils/drupal-globals';
+
 import type {
   BaseQueryApi,
   BaseQueryFn,
@@ -9,13 +11,61 @@ import type {
 import type { RootState } from '@/app/store';
 import type { AppConfiguration } from '@/features/configuration/configurationSlice';
 
+interface FetchArgsWithMethod extends FetchArgs {
+  method?: string;
+}
+
 export const baseQuery: BaseQueryFn<
-  string | FetchArgs,
+  string | FetchArgsWithMethod,
   unknown,
   FetchBaseQueryError
 > = async (args, api, extraOptions) => {
   const state = api.getState() as RootState;
-  return rawBaseQuery(state.configuration)(args, api, extraOptions);
+  const canvasSettings = getCanvasSettings();
+  // Some requests that update components or their form should not occur at the
+  // same time as a Drupal AJAX request. Those requests are identified here,
+  // then a variable in canvasSettings is used to track such a request being in
+  // progress. AJAX events will wait until these requests are complete.
+  // @see the override of Drupal.Ajax.prototype.eventResponse in
+  //   ajax.command.customizations.js
+  const flagForAjax =
+    typeof args === 'object' &&
+    args?.method === 'PATCH' &&
+    ['updateComponent', 'getComponentInstanceForm'].includes(api?.endpoint);
+  if (flagForAjax) {
+    if (typeof canvasSettings?.canvasLayoutRequestInProgress === 'undefined') {
+      canvasSettings.canvasLayoutRequestInProgress = [];
+    }
+    canvasSettings.canvasLayoutRequestInProgress.push(true);
+    window.document
+      .querySelectorAll('[data-once="drupal-ajax"]')
+      // @ts-ignore
+      .forEach((ajaxItem) => {
+        // @ts-ignore
+        ajaxItem.style.color = 'red';
+      });
+  }
+
+  const result = await rawBaseQuery(state.configuration)(
+    args,
+    api,
+    extraOptions,
+  );
+  if (flagForAjax) {
+    // When an ajax-postponing request has completed, remove its addition
+    // array of flags. Once the array is empty, ajax requests will proceed.
+    // @see the override of Drupal.Ajax.prototype.eventResponse in
+    //   ajax.command.customizations.js
+    window.document
+      .querySelectorAll('[data-once="drupal-ajax"]')
+      // @ts-ignore
+      .forEach((ajaxItem) => {
+        // @ts-ignore
+        ajaxItem.style.color = 'black';
+      });
+    canvasSettings.canvasLayoutRequestInProgress.pop();
+  }
+  return result;
 };
 /**
  * Extracts entityType and entityId from a URL
