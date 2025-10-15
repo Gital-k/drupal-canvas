@@ -556,8 +556,7 @@ const AiWizard = () => {
       } catch (error: any) {
         console.error('Failed to fetch CSRF token:', error);
         setInitializationError(
-          'Failed to fetch CSRF token: ' + error.message ||
-            'Failed to fetch CSRF token',
+          "Failed to load AI panel. Check your browser's developer console for more details.",
         );
         const event = new CustomEvent('canvas-csrf-token-error', {
           detail: {
