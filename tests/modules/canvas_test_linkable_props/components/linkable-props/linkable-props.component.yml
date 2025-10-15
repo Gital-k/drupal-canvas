@@ -148,11 +148,6 @@ props:
       examples:
         - 1730718000
 
-    test_number:
-      title: 'Number'
-      type: number
-      examples:
-        - 3.14
 
     # The "image" predefined object format.
     # @todo Agree on one special case, for ecosystem-wide formats: `json-schema-definitions://drupal/<something>`, so `json-schema-definitions://drupal/image` here.

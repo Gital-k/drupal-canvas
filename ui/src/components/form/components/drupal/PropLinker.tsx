@@ -85,9 +85,13 @@ const PropLinker = ({ propName, linked, suggestions }: PropLinkerProps) => {
   const DropdownMenuItem = ({
     item,
     isActive,
+    depth = 0,
+    childOf,
   }: {
     item: LinkSuggestion;
     isActive: boolean;
+    depth?: number;
+    childOf?: string;
   }) => {
     return (
       <DropdownMenu.Item
@@ -97,6 +101,8 @@ const PropLinker = ({ propName, linked, suggestions }: PropLinkerProps) => {
           [styles.disabled]: isActive,
         })}
         data-link-suggestion-option={item.label}
+        data-dropdown-depth={depth}
+        data-child-of={childOf}
       >
         {isActive && <CheckIcon />}
         {item.label}
@@ -104,7 +110,15 @@ const PropLinker = ({ propName, linked, suggestions }: PropLinkerProps) => {
     );
   };
 
-  const NestedDropdownItem = ({ item }: { item: LinkSuggestion }) => {
+  const NestedDropdownItem = ({
+    item,
+    depth = 0,
+    parent,
+  }: {
+    item: LinkSuggestion;
+    depth?: number;
+    parent?: string;
+  }) => {
     const isActive = item.source?.expression === currentExpression;
 
     if (item.items && item.items.length > 0) {
@@ -115,6 +129,9 @@ const PropLinker = ({ propName, linked, suggestions }: PropLinkerProps) => {
               [styles.disabled]: isActive && item.source,
             })}
             data-link-suggestion-option={item.label}
+            data-dropdown-depth={depth}
+            data-child-of={parent}
+            data-has-submenu
           >
             {item.label}
           </DropdownMenu.SubTrigger>
@@ -127,25 +144,43 @@ const PropLinker = ({ propName, linked, suggestions }: PropLinkerProps) => {
                   key={item.id}
                   item={item}
                   isActive={isActive}
+                  depth={depth}
+                  childOf={parent}
                 />
                 <Separator orientation="horizontal" size="4" my="2" />
               </>
             )}
 
             {item.items.map((sub, index) => (
-              <NestedDropdownItem key={sub.id || index} item={sub} />
+              <NestedDropdownItem
+                key={sub.id || index}
+                item={sub}
+                depth={depth}
+                parent={item.label}
+              />
             ))}
           </DropdownMenu.SubContent>
         </DropdownMenu.Sub>
       );
     }
 
-    return <DropdownMenuItem key={item.id} item={item} isActive={isActive} />;
+    return (
+      <DropdownMenuItem
+        key={item.id}
+        item={item}
+        isActive={isActive}
+        depth={depth}
+        childOf={parent}
+      />
+    );
   };
 
   return (
     <DropdownMenu.Root onOpenChange={(open) => setLinkerOpen(open)}>
-      <DropdownMenu.Trigger data-prop-linker-for={propName}>
+      <DropdownMenu.Trigger
+        data-prop-linker-for={propName}
+        data-dropdown-depth={0}
+      >
         <span
           className={clsx(styles.linker, {
             [styles.linkerOpen]: linkerOpen,
@@ -155,13 +190,19 @@ const PropLinker = ({ propName, linked, suggestions }: PropLinkerProps) => {
           {!linked && <LinkNone1Icon className={styles.default} />}
         </span>
       </DropdownMenu.Trigger>
-      <DropdownMenu.Content align="end" side="bottom">
+      <DropdownMenu.Content
+        align="end"
+        side="bottom"
+        data-prop-suggestions-for={propName}
+      >
         {suggestions.map((suggestion, index) => {
           if (suggestion.items && suggestion.items.length > 0) {
             return (
               <NestedDropdownItem
                 key={suggestion.id || index}
                 item={suggestion}
+                depth={1}
+                parent={'root'}
               />
             );
           }
@@ -171,6 +212,8 @@ const PropLinker = ({ propName, linked, suggestions }: PropLinkerProps) => {
               key={suggestion.id}
               item={suggestion}
               isActive={isActive}
+              depth={0}
+              childOf='root'
             />
           );
         })}
