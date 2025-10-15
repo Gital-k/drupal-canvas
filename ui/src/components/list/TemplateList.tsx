@@ -211,12 +211,7 @@ const TemplateListItem = ({ viewMode }: { viewMode: TemplateViewMode }) => {
             data-template-list-item={`${viewMode.bundle} ${viewMode.viewModeLabel}`}
           />
         </ContextMenu.Trigger>
-        <UnifiedMenu.Content
-          onClick={(e) => e.stopPropagation()}
-          menuType="context"
-          align="start"
-          side="right"
-        >
+        <UnifiedMenu.Content menuType="context" align="start" side="right">
           {menuItems}
         </UnifiedMenu.Content>
       </ContextMenu.Root>
