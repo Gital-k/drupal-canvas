@@ -53,6 +53,12 @@ use Symfony\Component\Yaml\Yaml;
       description: new TranslatableMarkup("Metadata for props"),
       required: FALSE
     ),
+    'slots_metadata' => new ContextDefinition(
+      data_type: 'string',
+      label: new TranslatableMarkup("Slots"),
+      description: new TranslatableMarkup("Metadata for slots"),
+      required: FALSE
+    ),
   ],
 )]
 final class CreateComponent extends FunctionCallBase implements ExecutableFunctionCallInterface, AiAgentContextInterface {
@@ -91,6 +97,7 @@ final class CreateComponent extends FunctionCallBase implements ExecutableFuncti
       // Collect the context values.
       $component_name = $this->getContextValue('component_name');
       $javascript = $this->getContextValue('js_structure') ?? '';
+      $slots = $this->getContextValue('slots_metadata') ?? [];
       $css = $this->getContextValue('css_structure') ?? '';
       $props = $this->getContextValue('props_metadata') ?? '';
       $machine_name = strtolower(preg_replace('/\s+/', '_', $component_name));
@@ -137,6 +144,7 @@ final class CreateComponent extends FunctionCallBase implements ExecutableFuncti
         'sourceCodeCss' => $css,
         'compiledJs' => '',
         'compiledCss' => '',
+        'slots' => Json::decode($slots),
         'importedJsComponents' => [],
         'props' => $transformed_props,
         'dataDependencies' => [],
