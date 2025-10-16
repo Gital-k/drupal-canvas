@@ -4,6 +4,7 @@ import { test } from './fixtures/DrupalSite';
 import { Drupal } from './objects/Drupal';
 import { getModuleDir } from './utilities/DrupalFilesystem';
 
+// cspell:ignore Bwidth Fitok treehouse
 test.describe.skip('Templates - General', () => {
   test.beforeAll(
     'Setup test site with Drupal Canvas',
@@ -219,83 +220,69 @@ test.describe('Linking Basic Page fields ', () => {
     expect(propLinkerCount).toBeGreaterThanOrEqual(20);
 
     // Recursive function to build menu structure
-    async function buildMenuTree(parentMenu, parentDepth = 0) {
+    async function buildMenuTree(parentMenu) {
       const items = await page
-        .locator(
-          `[role="menuitem"][data-child-of="${parentMenu}"]`.trim(),
-        )
+        .locator(`[role="menuitem"][data-child-of="${parentMenu}"]`.trim())
         .elementHandles();
-      `[role="menuitem"][data-child-of="${parentMenu}"]`
-      console.log(`SOO [role="menuitem"][data-child-of="${parentMenu}"]`, items.length)
       const tree = [];
-
-
       for (const itemHandle of items) {
         const itemText = await itemHandle.textContent();
-        const classes = await itemHandle.getAttribute('class');
-        const isSubmenu = await itemHandle.getAttribute('data-has-submenu')
-        console.log(`Itemtext: ${itemText}, classes ${classes}, isSubmenu: ${isSubmenu}`);
-        const isDropdown =
-          classes && classes.includes('rt-DropdownMenuSubTrigger');
+        const isSubmenu = await itemHandle.getAttribute('data-has-submenu');
         const node = { text: itemText, children: [] };
-        if (isDropdown) {
-          console.log('IS DROPDOWN!!!', itemText);
-          const depthAttr = await itemHandle.getAttribute(
-            'data-dropdown-depth',
-          );
-          const currentDropdownDepth = depthAttr ? parseInt(depthAttr, 10) : 0;
-          await itemHandle.hover();
+        if (isSubmenu) {
+          const childOf = await itemHandle.getAttribute('data-child-of');
+          if (childOf === 'root') {
+            await itemHandle.hover({ force: true });
+          } else {
+            await page.keyboard.press('ArrowRight');
+          }
+
+          await page.waitForTimeout(500); // adjust if needed
+          await expect(
+            page.locator(`[role="menuitem"][data-child-of="${itemText}"]`, {
+              strict: false,
+            }),
+          ).toBeVisible();
           // Wait for dropdown to appear
-           await page.waitForTimeout(500); // adjust if needed
-          // Find child menuitems with depth = currentDropdownDepth + 1
-          const childLocator = page
-            .locator(
-              `[role="menuitem"][data-child-of="${itemText}"]`,
-            );
+          const childLocator = page.locator(
+            `[role="menuitem"][data-child-of="${itemText}"]`,
+          );
 
           const childHandles = await childLocator.elementHandles();
-          console.log(
-            `${itemText} seek [role="menuitem"][data-dropdown-depth="${currentDropdownDepth + 1}"]`,
-            childHandles.length,
-          );
 
           if (childHandles.length > 0) {
-            node.children = await buildMenuTree(itemText, currentDropdownDepth + 1);
+            node.children = await buildMenuTree(itemText);
           }
+          await page.keyboard.press('ArrowLeft');
         }
         tree.push(node);
       }
       return tree;
     }
 
+    await expect(propLinkerCount).toEqual(
+      Object.keys(expectedSuggestionsTree).length,
+    );
+
     for (let i = 0; i < propLinkerCount; i++) {
       const linker = propLinkerLocators.nth(i);
       const linkerValue = await linker.getAttribute('data-prop-linker-for');
-      if (linkerValue === 'test_string') {
-        await linker.click();
-        const suggestionsLocator = page.locator(
-          `[data-prop-suggestions-for="${linkerValue}"]`,
-        );
-        await expect(suggestionsLocator).toBeVisible();
-        const menuItems = await suggestionsLocator
-          .locator('[role="menuitem"]')
-          .allTextContents();
+      await linker.click();
+      const suggestionsLocator = page.locator(
+        `[data-prop-suggestions-for="${linkerValue}"]`,
+      );
+      await expect(suggestionsLocator).toBeVisible();
 
-        console.log(`Suggestions for ${linkerValue}:`, menuItems);
-        if (expectedSuggestions[linkerValue]) {
-          expect(menuItems).toEqual(expectedSuggestions[linkerValue]);
-        }
-        // Build and log menu tree
-        const menuTree = await buildMenuTree(
-          `root`,
+      if (expectedSuggestionsTree[linkerValue]) {
+        const menuTree = await buildMenuTree(`root`);
+        expect(menuTree, `Check menu tree for ${linkerValue}`).toEqual(
+          expectedSuggestionsTree[linkerValue],
         );
-        console.log(
-          `Menu tree for ${linkerValue}:`,
-          JSON.stringify(menuTree, null, 2),
-        );
-        await linker.click();
-        await expect(suggestionsLocator).not.toBeVisible();
+      } else {
+        throw Error(`Missing tree for ${linkerValue}`);
       }
+      await linker.click();
+      await expect(suggestionsLocator).not.toBeVisible();
     }
   });
 });
@@ -390,86 +377,288 @@ export const entityValuesNode4 = {
   },
 };
 
-const expectedSuggestions = {
+// expectedSuggestionsTree: for deep menu structure comparisons
+export const expectedSuggestionsTree = {
   test_bool_default_false: [
-    'Promoted to front page',
-    'Published',
-    'Sticky at top of lists',
-    'The Boolean',
-    'Default translation',
-    'Default revision',
-    'Image Upload',
-    'Revision user',
-    'Authored by',
-    'One Tag',
-    'Image Media',
+    { text: 'Promoted to front page', children: [] },
+    { text: 'Published', children: [] },
+    { text: 'Sticky at top of lists', children: [] },
+    { text: 'The Boolean', children: [] },
+    { text: 'Default translation', children: [] },
+    { text: 'Default revision', children: [] },
+    { text: 'Image Upload', children: [{ text: 'Status', children: [] }] },
+    { text: 'Revision user', children: [{ text: 'User', children: [] }] },
+    { text: 'Authored by', children: [{ text: 'User', children: [] }] },
+    { text: 'One Tag', children: [{ text: 'Taxonomy term', children: [] }] },
+    { text: 'Image Media', children: [{ text: 'Media', children: [] }] },
   ],
   test_bool_default_true: [
-    'Promoted to front page',
-    'Published',
-    'Sticky at top of lists',
-    'The Boolean',
-    'Default translation',
-    'Default revision',
-    'Image Upload',
-    'Revision user',
-    'Authored by',
-    'One Tag',
-    'Image Media',
+    { text: 'Promoted to front page', children: [] },
+    { text: 'Published', children: [] },
+    { text: 'Sticky at top of lists', children: [] },
+    { text: 'The Boolean', children: [] },
+    { text: 'Default translation', children: [] },
+    { text: 'Default revision', children: [] },
+    { text: 'Image Upload', children: [{ text: 'Status', children: [] }] },
+    {
+      text: 'Revision user',
+      children: [
+        {
+          text: 'User',
+          children: [
+            { text: 'Default translation', children: [] },
+            { text: 'User status', children: [] },
+          ],
+        },
+      ],
+    },
+    {
+      text: 'Authored by',
+      children: [
+        {
+          text: 'User',
+          children: [
+            { text: 'User status', children: [] },
+            { text: 'Default translation', children: [] },
+          ],
+        },
+      ],
+    },
+    { text: 'One Tag', children: [{ text: 'Taxonomy term', children: [] }] },
+    { text: 'Image Media', children: [{ text: 'Media', children: [] }] },
   ],
   test_string: [
-    'Title',
-    'Revision log message',
-    'Image Upload',
-    'The Link',
-    'Image Media',
-    'One Tag',
-    'Authored by',
-    'Revision user',
+    { text: 'Title', children: [] },
+    { text: 'Revision log message', children: [] },
+    {
+      text: 'Image Upload',
+      children: [
+        { text: 'Alternative text', children: [] },
+        { text: 'Title', children: [] },
+      ],
+    },
+    { text: 'The Link', children: [] },
+    {
+      text: 'Image Media',
+      children: [
+        {
+          text: 'Media',
+          children: [
+            { text: 'Name', children: [] },
+            { text: 'Revision log message', children: [] },
+          ],
+        },
+      ],
+    },
+    { text: 'One Tag', children: [{ text: 'Taxonomy term', children: [] }] },
+    {
+      text: 'Authored by',
+      children: [{ text: 'User', children: [{ text: 'Name', children: [] }] }],
+    },
+    {
+      text: 'Revision user',
+      children: [{ text: 'User', children: [{ text: 'Name', children: [] }] }],
+    },
   ],
-  test_string_multiline: ['Revision log message', 'One Tag', 'Image Media'],
-  test_REQUIRED_string: ['Title', 'Image Media'],
-  test_string_format_email: ['The Email', 'Revision user', 'Authored by'],
-  test_string_format_idn_email: ['The Email', 'Revision user', 'Authored by'],
-  test_REQUIRED_string_format_uri: ['Image Upload'],
-  test_REQUIRED_string_format_uri_reference_web_links: ['Image Upload'],
-  test_string_format_uri: ['Image Upload', 'Image Media'],
-  test_string_format_uri_image: ['Image Upload', 'Image Media'],
-  test_string_format_uri_image_using_ref: ['Image Upload', 'Image Media'],
-  test_string_format_uri_reference: ['The Link', 'Image Upload', 'Image Media'],
-  test_string_format_iri: ['Image Upload', 'Image Media'],
-  test_string_format_iri_reference: ['The Link', 'Image Upload', 'Image Media'],
+  test_string_multiline: [
+    { text: 'Revision log message', children: [] },
+    { text: 'One Tag', children: [{ text: 'Taxonomy term', children: [] }] },
+    {
+      text: 'Image Media',
+      children: [
+        {
+          text: 'Media',
+          children: [{ text: 'Revision log message', children: [] }],
+        },
+      ],
+    },
+  ],
+  test_REQUIRED_string: [
+    { text: 'Title', children: [] },
+    {
+      text: 'Image Media',
+      children: [{ text: 'Media', children: [{ text: 'Name', children: [] }] }],
+    },
+  ],
+  test_string_format_email: [
+    { text: 'The Email', children: [] },
+    {
+      text: 'Revision user',
+      children: [
+        {
+          text: 'User',
+          children: [
+            { text: 'Initial email', children: [] },
+            { text: 'Email', children: [] },
+          ],
+        },
+      ],
+    },
+    {
+      text: 'Authored by',
+      children: [
+        {
+          text: 'User',
+          children: [
+            { text: 'Email', children: [] },
+            { text: 'Initial email', children: [] },
+          ],
+        },
+      ],
+    },
+  ],
+  test_string_format_idn_email: [
+    { text: 'The Email', children: [] },
+    {
+      text: 'Revision user',
+      children: [
+        {
+          text: 'User',
+          children: [
+            { text: 'Initial email', children: [] },
+            { text: 'Email', children: [] },
+          ],
+        },
+      ],
+    },
+    {
+      text: 'Authored by',
+      children: [
+        {
+          text: 'User',
+          children: [
+            { text: 'Email', children: [] },
+            { text: 'Initial email', children: [] },
+          ],
+        },
+      ],
+    },
+  ],
+  test_REQUIRED_string_format_uri: [
+    { text: 'Image Upload', children: [{ text: 'URI', children: [] }] },
+  ],
+  test_REQUIRED_string_format_uri_reference_web_links: [
+    { text: 'Image Upload', children: [{ text: 'URI', children: [] }] },
+  ],
+  test_string_format_uri: [
+    { text: 'Image Upload', children: [{ text: 'URI', children: [] }] },
+    {
+      text: 'Image Media',
+      children: [
+        { text: 'Media', children: [{ text: 'Thumbnail', children: [] }] },
+      ],
+    },
+  ],
+  test_string_format_uri_image: [
+    { text: 'Image Upload', children: [{ text: 'URI', children: [] }] },
+    { text: 'Image Media', children: [{ text: 'Media', children: [] }] },
+  ],
+  test_string_format_uri_image_using_ref: [
+    { text: 'Image Upload', children: [{ text: 'URI', children: [] }] },
+    { text: 'Image Media', children: [{ text: 'Media', children: [] }] },
+  ],
+  test_string_format_uri_reference: [
+    { text: 'The Link', children: [{ text: 'Resolved URL', children: [] }] },
+    { text: 'Image Upload', children: [{ text: 'URI', children: [] }] },
+    { text: 'Image Media', children: [{ text: 'Media', children: [] }] },
+  ],
+  test_string_format_iri: [
+    { text: 'Image Upload', children: [{ text: 'URI', children: [] }] },
+    {
+      text: 'Image Media',
+      children: [
+        { text: 'Media', children: [{ text: 'Thumbnail', children: [] }] },
+      ],
+    },
+  ],
+  test_string_format_iri_reference: [
+    { text: 'The Link', children: [{ text: 'Resolved URL', children: [] }] },
+    { text: 'Image Upload', children: [{ text: 'URI', children: [] }] },
+    { text: 'Image Media', children: [{ text: 'Media', children: [] }] },
+  ],
   test_integer: [
-    'Authored on',
-    'Changed',
-    'Number List',
-    'The Number',
-    'Revision create time',
-    'Image Upload',
-    'Revision user',
-    'Authored by',
-    'One Tag',
-    'Image Media',
+    { text: 'Authored on', children: [] },
+    { text: 'Changed', children: [] },
+    { text: 'Number List', children: [] },
+    { text: 'The Number', children: [] },
+    { text: 'Revision create time', children: [] },
+    {
+      text: 'Image Upload',
+      children: [
+        { text: 'Width', children: [] },
+        { text: 'Height', children: [] },
+        { text: 'File size', children: [] },
+        { text: 'Changed', children: [] },
+        { text: 'Created', children: [] },
+      ],
+    },
+    { text: 'Revision user', children: [] },
+    {
+      text: 'Authored by',
+      children: [
+        {
+          text: 'User',
+          children: [
+            { text: 'Last access', children: [] },
+            { text: 'Changed', children: [] },
+            { text: 'Last login', children: [] },
+            { text: 'Created', children: [] },
+          ],
+        },
+      ],
+    },
+    {
+      text: 'One Tag',
+      children: [
+        {
+          text: 'Taxonomy term',
+          children: [
+            { text: 'Weight', children: [] },
+            { text: 'Changed', children: [] },
+            { text: 'Revision create time', children: [] },
+          ],
+        },
+      ],
+    },
+    {
+      text: 'Image Media',
+      children: [
+        {
+          text: 'Media',
+          children: [
+            { text: 'Changed', children: [] },
+            { text: 'Revision create time', children: [] },
+            { text: 'Authored on', children: [] },
+          ],
+        },
+      ],
+    },
   ],
   test_integer_range_minimum_maximum_timestamps: [
-    'Authored by',
-    'Revision user',
+    { text: 'Authored by', children: [{ text: 'User', children: [] }] },
+    { text: 'Revision user', children: [{ text: 'User', children: [] }] },
   ],
-  test_number: [
-    'Authored on',
-    'Changed',
-    'Number List',
-    'The Number',
-    'Revision create time',
-    'Image Upload',
-    'Revision user',
-    'Authored by',
-    'One Tag',
-    'Image Media',
+  test_object_drupal_image: [{ text: 'Image Upload', children: [] }],
+  test_string_html_block: [
+    {
+      text: 'Body',
+      children: [
+        { text: 'Processed summary', children: [] },
+        { text: 'Processed text', children: [] },
+      ],
+    },
+    { text: 'One Tag', children: [{ text: 'Taxonomy term', children: [] }] },
   ],
-  test_object_drupal_image: ['Image Upload'],
-  test_string_html_block: ['Body', 'One Tag'],
-  test_string_html: ['Body', 'One Tag'],
+  test_string_html: [
+    {
+      text: 'Body',
+      children: [
+        { text: 'Processed summary', children: [] },
+        { text: 'Processed text', children: [] },
+      ],
+    },
+    { text: 'One Tag', children: [{ text: 'Taxonomy term', children: [] }] },
+  ],
 };
 
 // Maps property titles to their HTML id selectors as rendered in linkable-props.twig
