@@ -1,5 +1,5 @@
-import fs from 'fs';
-import path from 'path';
+const fs = require('fs');
+const path = require('path');
 
 const NODE_INDEX = Number(process.env.CI_NODE_INDEX || 1);
 const NODE_TOTAL = Number(process.env.CI_NODE_TOTAL || 1);
