@@ -2,7 +2,19 @@
 # cspell:ignore REQS pycache
 FROM registry.gitlab.com/drupal-infrastructure/drupalci/drupalci-environments/php-8.3-apache:production
 
-RUN sudo apt-get -y update
+RUN sudo apt-get update -y && \
+    sudo apt-get remove sqlite3 -y && \
+    sudo apt-get install build-essential wget -y
+RUN cd /tmp && \
+    wget https://www.sqlite.org/2025/sqlite-autoconf-3500400.tar.gz && \
+    tar xvfz sqlite-autoconf-3500400.tar.gz &&\
+    cd sqlite-autoconf-3500400 && \
+    ./configure --prefix=/usr/local && \
+    make && \
+    sudo make install && \
+    sudo ldconfig && \
+    sudo ln -sf /usr/local/bin/sqlite3 /usr/bin/sqlite3
+RUN sqlite3 --version
 
 RUN rm -f /usr/bin/node /usr/bin/npm /usr/bin/npx
 ENV NVM_DIR=/root/.nvm
