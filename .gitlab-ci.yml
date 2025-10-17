@@ -361,7 +361,6 @@ vitest:
       junit: ui-vitest-junit.xml
 
 .cypress-base:
-  image: justafish/drupalci-environments-playwright:latest
   stage: test
   needs:
     - composer
@@ -415,12 +414,14 @@ vitest:
         - ui/junit-*.xml
 
 cypress E2E:
+  image: justafish/drupalci-environments-playwright:latest
   extends: .cypress-base
   parallel: 4
   script:
     - CYPRESS_CACHE_FOLDER=./cycache node ./node_modules/.bin/cypress run --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml" --spec=`node ./tests/support/parallel.cjs`
 
 cypress unit:
+  image: justafish/drupalci-environments-playwright:latest
   extends: .cypress-base
   script:
     - CYPRESS_CACHE_FOLDER=./cycache node ./node_modules/.bin/cypress run --component --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml"
