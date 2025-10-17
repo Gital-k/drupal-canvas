@@ -414,7 +414,7 @@ vitest:
         - ui/junit-*.xml
 
 cypress E2E:
-  image: justafish/drupalci-environments-playwright:latest
+  image: node:24-alpine
   extends: .cypress-base
   parallel: 4
   script:
@@ -422,7 +422,7 @@ cypress E2E:
     - CYPRESS_CACHE_FOLDER=./cycache node ./node_modules/.bin/cypress run --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml" --spec=`node ./tests/support/parallel.cjs`
 
 cypress unit:
-  image: justafish/drupalci-environments-playwright:latest
+  image: node:24-alpine
   extends: .cypress-base
   script:
     - CYPRESS_CACHE_FOLDER=./cycache node ./node_modules/.bin/cypress run --component --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml"
