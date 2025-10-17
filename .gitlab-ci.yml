@@ -525,7 +525,7 @@ lint (OpenAPI):
 playwright:
   stage: test
   needs: []
-  image: ghcr.io/justafish/drupal-testing:sha256-b356ca5ed76208509b538a36eee9d39cc3dd03cca97c3b6b002dc8c5b19eac1f
+  image: ghcr.io/justafish/drupal-testing:main
   # This doesn't actually work 🤦‍♀️
   # https://www.drupal.org/project/infrastructure/issues/3387117
   cache:
