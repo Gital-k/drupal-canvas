@@ -547,6 +547,7 @@ playwright:
     DRUPAL_TEST_BASE_URL: http://localhost
     DRUPAL_TEST_WEBSERVER_USER: www-data
     DRUPAL_TEST_PLAYWRIGHT_SKIP_TEARDOWN: true
+    COMPOSER_IGNORE_PLATFORM_REQS:
   before_script:
     - !reference [ .drupal ]
     - composer run install-dev-deps
