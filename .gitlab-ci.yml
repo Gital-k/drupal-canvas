@@ -361,6 +361,7 @@ vitest:
       junit: ui-vitest-junit.xml
 
 .cypress-base:
+  image: justafish/drupalci-environments-playwright:latest
   stage: test
   needs:
     - composer
