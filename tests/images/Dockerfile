@@ -44,7 +44,6 @@ RUN rm -rf /usr/share/doc/* \
     && rm -rf /var/cache/apt/archives/* \
     && rm -rf /tmp/* \
     && rm -rf /var/tmp/* \
-    && rm -rf /var/log/* \
     && find /var/lib/apt -type f -delete \
     && find /usr/share/locale -mindepth 1 -maxdepth 1 ! -name 'en*' ! -name 'locale.alias' -exec rm -rf {} + \
     && find /usr/lib/locale -mindepth 1 -maxdepth 1 ! -name 'C.utf8' ! -name 'en_US.utf8' -exec rm -rf {} + 2>/dev/null || true \
@@ -58,5 +57,4 @@ RUN rm -rf /usr/share/doc/* \
     && find /usr -type d -name "doc" -exec rm -rf {} + 2>/dev/null || true \
     && find /usr -type d -name "man*" -exec rm -rf {} + 2>/dev/null || true \
     && find /usr -name "*.a" -delete 2>/dev/null || true \
-    && find /usr -name "*.h" -path "*/include/*" -delete 2>/dev/null || true \
-    && find /var/log -type f -delete 2>/dev/null || true
+    && find /usr -name "*.h" -path "*/include/*" -delete 2>/dev/null || true
