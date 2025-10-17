@@ -417,7 +417,7 @@ cypress E2E:
   extends: .cypress-base
   parallel: 4
   script:
-    - CYPRESS_CACHE_FOLDER=./cycache ./node_modules/.bin/cypress run --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml" --spec=`node ./tests/support/parallel.js`
+    - CYPRESS_CACHE_FOLDER=./cycache ./node_modules/.bin/cypress run --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml" --spec=`node ./tests/support/parallel.cjs`
 
 cypress unit:
   extends: .cypress-base
