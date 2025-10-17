@@ -1,4 +1,5 @@
 # Testing image used for GitLab CI
+# cspell:ignore REQS pycache
 FROM registry.gitlab.com/drupal-infrastructure/drupalci/drupalci-environments/php-8.3-apache:production
 
 RUN sudo apt-get -y update
