@@ -20,7 +20,7 @@
   # Add core-dev and Drupal Canvas
   - |
     composer config repositories.$CI_PARENT_PROJECT_NAME --json '{"type": "path", "url": "../'$CI_PROJECT_NAME'", "options": { "symlink": false } }'
-  - composer require drupal/core-dev
+  - composer require drupal/core-dev --with-all-dependencies
   - composer require "drupal/$CI_PARENT_PROJECT_NAME @dev" --with-all-dependencies --prefer-source
   - ls -lha web/modules/contrib/canvas
   - |
