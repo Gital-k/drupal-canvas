@@ -361,7 +361,6 @@ vitest:
       junit: ui-vitest-junit.xml
 
 .cypress-base:
-  image: node:20-alpine
   stage: test
   needs:
     - composer
