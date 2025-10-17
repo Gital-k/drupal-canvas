@@ -16,7 +16,20 @@ RUN cd /tmp && \
     sudo make install && \
     sudo ldconfig && \
     sudo ln -sf /usr/local/bin/sqlite3 /usr/bin/sqlite3
-RUN sqlite3 --version
+
+# Now install PHP development files and recompile PDO SQLite
+ENV PHP_VERSION=8.3
+RUN apt-get install -y libsqlite3-dev php-dev autoconf \
+    && cd /tmp \
+    && PHP_VERSION=$(php -r "echo PHP_VERSION;") \
+    && wget https://www.php.net/distributions/php-${PHP_VERSION}.tar.gz \
+    && tar xzf php-${PHP_VERSION}.tar.gz \
+    && cd php-${PHP_VERSION}/ext/pdo_sqlite \
+    && phpize \
+    && ./configure --with-pdo-sqlite=/usr/local \
+    && make \
+    && make install \
+    && cd /tmp && rm -rf php-${PHP_VERSION}*
 
 RUN rm -f /usr/bin/node /usr/bin/npm /usr/bin/npx
 ENV NVM_DIR=/root/.nvm
