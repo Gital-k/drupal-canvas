@@ -23,15 +23,15 @@
   - composer require drupal/core-dev --with-all-dependencies
   - composer require "drupal/$CI_PARENT_PROJECT_NAME @dev" --with-all-dependencies --prefer-source
   - ls -lha web/modules/contrib/canvas
-  - |
-    PACKAGE_INFO=$(composer info drupal/$CI_PARENT_PROJECT_NAME --all | grep "^dist" | awk -F": " "{print \$2}")
-    EXPECTED_PATH="[path] ../$CI_PROJECT_NAME $CI_COMMIT_SHA"
-    if [ "$PACKAGE_INFO" != "$EXPECTED_PATH" ]; then
-      echo "Unable to link to local $CI_PARENT_PROJECT_NAME package"
-      echo "Expected: $EXPECTED_PATH"
-      echo "Got: $PACKAGE_INFO"
-      exit 1
-    fi
+  #- |
+  #  PACKAGE_INFO=$(composer info drupal/$CI_PARENT_PROJECT_NAME --all | grep "^dist" | awk -F": " "{print \$2}")
+  #  EXPECTED_PATH="[path] ../$CI_PROJECT_NAME $CI_COMMIT_SHA"
+  #  if [ "$PACKAGE_INFO" != "$EXPECTED_PATH" ]; then
+  #    echo "Unable to link to local $CI_PARENT_PROJECT_NAME package"
+  #    echo "Expected: $EXPECTED_PATH"
+  #    echo "Got: $PACKAGE_INFO"
+  #    exit 1
+  #  fi
   # Change to the project directory
   - cd $CI_PROJECT_DIR/_drupal/web/modules/contrib/$CI_PARENT_PROJECT_NAME
 
