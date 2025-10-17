@@ -5,6 +5,8 @@ FROM registry.gitlab.com/drupal-infrastructure/drupalci/drupalci-environments/ph
 RUN sudo apt-get update -y && \
     sudo apt-get remove sqlite3 -y && \
     sudo apt-get install build-essential wget -y
+
+# Update SQLite as the default image's version is below Drupal's requirements.
 RUN cd /tmp && \
     wget https://www.sqlite.org/2025/sqlite-autoconf-3500400.tar.gz && \
     tar xvfz sqlite-autoconf-3500400.tar.gz &&\
