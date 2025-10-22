@@ -60,6 +60,11 @@ export default defineConfig({
             `--window-size=${viewportWidth},${viewportHeight}`,
           );
           launchOptions.args.push('--force-device-scale-factor=1');
+
+          // Add these flags for Chrome in Docker/headless environments
+          launchOptions.args.push('--disable-dev-shm-usage');
+          launchOptions.args.push('--no-sandbox');
+          launchOptions.args.push('--disable-gpu');
         }
 
         if (browser.name === 'electron' && browser.isHeadless) {
