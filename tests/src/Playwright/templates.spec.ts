@@ -328,7 +328,7 @@ test.describe('Linking Basic Page fields ', () => {
     await testPropLinking({ page, drupal, canvasEditor, inputName });
   });
 
-  test.only('required string format uri reference web links', async ({
+  test('required string format uri reference web links', async ({
     page,
     drupal,
     canvasEditor,
@@ -337,7 +337,7 @@ test.describe('Linking Basic Page fields ', () => {
     await testPropLinking({ page, drupal, canvasEditor, inputName });
   });
 
-  test('string format uri', async ({ page, drupal, canvasEditor }) => {
+  test.only('string format uri', async ({ page, drupal, canvasEditor }) => {
     const inputName = 'test_string_format_uri';
     await testPropLinking({ page, drupal, canvasEditor, inputName });
   });
@@ -574,10 +574,10 @@ export const entityValuesNode4 = {
   'Image Media > Media > Default translation': 'true',
   'Image Media > Media > Default revision': 'true',
   'Image Media > Media > Revision log message': 'A page that was made',
-  'Image Media > Media > Thumbnail > URI': '*SKIP* (this crashes)',
+  // 'Image Media > Media > Thumbnail > URI': '*SKIP* (this crashes)',
   // 'Image Media > Media > Thumbnail': '/sites/default/files/2025-10/treehouse_0.jpeg?alternateWidths=/sites/default/files/styles/canvas_parametrized_width--%7Bwidth%7D/public/2025-10/treehouse_0.jpeg.webp%3Fitok%3DtXFJ9L1o',
   'Image Media > Media > Thumbnail > URI':
-    '/sites/default/files/2025-10/treehouse_0.jpeg?alternateWidths=/sites/default/files/styles/canvas_parametrized_width--%7Bwidth%7D/public/2025-10/treehouse_0.jpeg.webp%3Fitok%3DtXFJ9L1o',
+    '/files/2025-10/treehouse_0.jpeg?alternateWidths=/sites/default/files/styles/canvas_parametrized_width--%7Bwidth%7D/public/2025-10/treehouse_0.jpeg.webp%3Fitok%3DtXFJ9L1o',
   'Image Media': {
     Media: {
       Name: 'treehouse.jpg',
@@ -1091,7 +1091,7 @@ const suggestionsByProp = {
         text: 'URI',
       },
     },
-    //🤔multilevel not working?
+    // This crashes the ui in a difficult to recover way.
     // {
     //   text: 'Image Media',
     //   child: {
