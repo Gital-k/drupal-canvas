@@ -33,6 +33,7 @@ const getCoreDir = () => {
 
 export default defineConfig({
   chromeWebSecurity: false,
+  experimentalMemoryManagement: true,
   defaultBrowser: process.env.DRUPAL_TEST_DEFAULT_BROWSER || 'chrome',
   watchForFileChanges: false,
   retries: { openMode: 0, runMode: 3 },
