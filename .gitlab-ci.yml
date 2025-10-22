@@ -376,12 +376,25 @@ cypress E2E:
     BASE_URL: http://localhost
     DRUPAL_TEST_DB_URL: sqlite://localhost/sites/default/files/db.sqlite
     DRUPAL_ROOT_CORE: '${CI_PROJECT_DIR}/_drupal/web/core'
+    NODE_OPTIONS: "--max-old-space-size=4096"
   before_script:
     - !reference [ .drupal ]
     - composer run install-dev-deps
   script:
     - cd ui
-    - npm run cy:run -- --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml" --spec=`node ./tests/support/parallel.cjs` tests/e2e/autocomplete-props.cy.js
+    - |
+      # Get all spec files
+      SPECS=($(find tests/e2e -name "*.cy.js" | sort))
+      TOTAL_SPECS=${#SPECS[@]}
+
+      # Calculate which specs this job should run
+      for i in $(seq 0 $(($TOTAL_SPECS - 1))); do
+        if [ $(($i % $CI_NODE_TOTAL)) -eq $(($CI_NODE_INDEX - 1)) ]; then
+          SPEC=${SPECS[$i]}
+          echo "Running $SPEC"
+          npx cypress run --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml" --spec "$SPEC"
+        fi
+      done
 
 cypress unit:
   image: ghcr.io/drupal-xb/drupal-testing:1.0.0
