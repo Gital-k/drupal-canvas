@@ -363,6 +363,7 @@ vitest:
 cypress E2E:
   image: ghcr.io/drupal-xb/drupal-testing:1.0.0
   needs: []
+  interruptible: true
   stage: test
   parallel: 4
   variables:
@@ -385,6 +386,7 @@ cypress E2E:
 cypress unit:
   image: ghcr.io/drupal-xb/drupal-testing:1.0.0
   needs: []
+  interruptible: true
   stage: test
   variables:
     GIT_DEPTH: 1
@@ -397,7 +399,7 @@ cypress unit:
     DRUPAL_TEST_DB_URL: sqlite://localhost/sites/default/files/db.sqlite
     DRUPAL_ROOT_CORE: '${CI_PROJECT_DIR}/_drupal/web/core'
   script:
-    - npm run cy:run -- --component --browser /usr/local/bin/google-chrome --headless --reporter junit --reporter-options "mochaFile=junit-[hash].xml"
+    - npm run cy:run -- --component --browser /usr/local/bin/google-chrome --headless--reporter junit --reporter-options "mochaFile=junit-[hash].xml"
   rules:
     - *is-push-rule
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
