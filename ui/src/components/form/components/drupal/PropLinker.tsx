@@ -145,7 +145,7 @@ const PropLinker = ({ propName, linked, suggestions }: PropLinkerProps) => {
                   item={item}
                   isActive={isActive}
                   depth={depth}
-                  childOf={parent}
+                  childOf="myself"
                 />
                 <Separator orientation="horizontal" size="4" my="2" />
               </>
@@ -181,14 +181,14 @@ const PropLinker = ({ propName, linked, suggestions }: PropLinkerProps) => {
         data-prop-linker-for={propName}
         data-dropdown-depth={0}
       >
-        <span
+        <button
           className={clsx(styles.linker, {
             [styles.linkerOpen]: linkerOpen,
           })}
         >
           {linked && <Link1Icon className={styles.default} />}
           {!linked && <LinkNone1Icon className={styles.default} />}
-        </span>
+        </button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Content
         align="end"
