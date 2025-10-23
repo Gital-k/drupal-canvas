@@ -1072,26 +1072,27 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       return self::fieldTypePropExpressionExampleRequiresEntity($storable_prop_shape->fieldTypeProp) ?? FALSE;
     }
 
-    \assert($storable_prop_shape->fieldTypeProp instanceof FieldTypeObjectPropsExpression);
-    if ($storable_prop_shape->fieldTypeProp->fieldType === 'entity_reference') {
-      return TRUE;
-    }
-    else {
-      foreach ($storable_prop_shape->fieldTypeProp->objectPropsToFieldTypeProps as $field_type_prop) {
-        if ($field_type_prop instanceof ReferenceFieldTypePropExpression) {
-          return TRUE;
-        }
+    if (\assert($storable_prop_shape->fieldTypeProp instanceof FieldTypeObjectPropsExpression)) {
+      if ($storable_prop_shape->fieldTypeProp->fieldType === 'entity_reference') {
+        return TRUE;
+      }
+      else {
+        foreach ($storable_prop_shape->fieldTypeProp->objectPropsToFieldTypeProps as $field_type_prop) {
+          if ($field_type_prop instanceof ReferenceFieldTypePropExpression) {
+            return TRUE;
+          }
 
-        // If this is a field property that computes the combination of
-        // multiple other field properties, then this property may actually
-        // also be relying on a (referenced) entity.
-        // @see \Drupal\canvas\Plugin\DataType\ComputedUrlWithQueryString
-        // @todo Consider dropping this in favor of adding adapter support in https://www.drupal.org/project/canvas/issues/3464003
-        $indirectly_uses_entity = self::fieldTypePropExpressionExampleRequiresEntity($field_type_prop);
-        if ($indirectly_uses_entity === NULL) {
-          continue;
+          // If this is a field property that computes the combination of
+          // multiple other field properties, then this property may actually
+          // also be relying on a (referenced) entity.
+          // @see \Drupal\canvas\Plugin\DataType\ComputedUrlWithQueryString
+          // @todo Consider dropping this in favor of adding adapter support in https://www.drupal.org/project/canvas/issues/3464003
+          $indirectly_uses_entity = self::fieldTypePropExpressionExampleRequiresEntity($field_type_prop);
+          if ($indirectly_uses_entity === NULL) {
+            continue;
+          }
+          return $indirectly_uses_entity;
         }
-        return $indirectly_uses_entity;
       }
     }
     return FALSE;
