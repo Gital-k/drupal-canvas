@@ -58,7 +58,7 @@ config:
             weight: 128
             region: content
             settings:
-               display_label: true
+              display_label: true
         - name: field_the_email
           options:
             type: email_default
