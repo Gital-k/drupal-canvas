@@ -2,6 +2,7 @@
 
 namespace Drupal\canvas_ai;
 
+use Drupal\canvas\Entity\Pattern;
 use Drupal\Component\Serialization\Json;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Theme\ComponentPluginManager;
@@ -75,6 +76,41 @@ class CanvasAiPageBuilderHelper {
 
     }
     return Yaml::dump($component_context, 4, 2);
+  }
+
+  /**
+   * Gets the data of all the patterns.
+   *
+   * The output will be used as the context for the AI agent.
+   */
+  public function getPatternContextForAi(): string {
+    $output = [];
+    $current_request = $this->requestStack->getCurrentRequest();
+    $sub_request = Request::create(
+      Url::fromRoute('canvas.api.config.list', ['canvas_config_entity_type_id' => Pattern::ENTITY_TYPE_ID])->toString(),
+      'GET',
+      [],
+      $current_request?->cookies->all() ?? [],
+      [],
+      $current_request?->server->all() ?? []
+    );
+    $sub_request->attributes->set('_format', 'json');
+    try {
+      $available_patterns_response = $this->httpKernel->handle($sub_request, HttpKernelInterface::SUB_REQUEST);
+      $available_patterns = (string) $available_patterns_response->getContent();
+      $available_patterns = Json::decode($available_patterns);
+    }
+    catch (\Exception) {
+      return "";
+    }
+
+    if (empty($available_patterns)) {
+      return "";
+    }
+    foreach ($available_patterns as $pattern_name => $pattern) {
+      $output[$pattern_name]['layout'] = $pattern['layoutModel']['layout'];
+    }
+    return Yaml::dump($output, 4, 2);
   }
 
   /**
