@@ -279,7 +279,7 @@ test.describe('Linking Basic Page fields ', () => {
     }
   };
 
-  test.only('bool default false', async ({ page, drupal, canvasEditor }) => {
+  test('bool default false', async ({ page, drupal, canvasEditor }) => {
     const inputName = 'test_bool_default_false';
     await testPropLinking({ page, drupal, canvasEditor, inputName });
   });
