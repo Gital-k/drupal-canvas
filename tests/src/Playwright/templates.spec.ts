@@ -126,7 +126,7 @@ test.describe('Templates - General', () => {
 
     // Add a fixed timeout to allow for any problems with the prop linker to
     // occur - they don't necessarily happen immediately.
-    await page.waitForTimeout(1000);
+    await new Promise((resolve) => setTimeout(resolve, 1000));
     await expect(page.locator(inputLocator)).not.toBeAttached();
     await expect(page.locator(linkedBoxLocator)).toBeVisible();
     // Confirm that the heading is still linked after making a change to an
@@ -243,6 +243,14 @@ test.describe('Linking Basic Page fields ', () => {
           await step.waitFor();
           if (stepCount === suggestionPath.length) {
             await step.click({ force: true });
+            await page.waitForResponse(
+              (response) =>
+                response
+                  .url()
+                  .includes(
+                    '/api/v0/form/component-instance/content_template',
+                  ) && response.status() === 200,
+            );
             await expect(
               page.locator(`[data-linked-field-box="${inputName}"]`),
             ).toBeVisible();
@@ -252,7 +260,6 @@ test.describe('Linking Basic Page fields ', () => {
             itemSelected = true;
           } else {
             parent = pathItem;
-            console.log(`hover ${pathItem} of ${suggestionOption}`);
             await step.hover({ force: true });
             // Radix responds to hover via a pointermove event.
             await step.dispatchEvent('pointermove');
@@ -262,7 +269,7 @@ test.describe('Linking Basic Page fields ', () => {
         }
       });
       await expect(itemSelected).toBe(true);
-      await page.waitForTimeout(500);
+      await new Promise((resolve) => setTimeout(resolve, 500));
       await test.step(`Verify preview for ${suggestionOption} for ${inputName}`, async () => {
         const previewSelector = propNameToSelector[inputName];
         const expectedValue = entityValuesNode4[suggestionPath.join(' > ')];
@@ -477,23 +484,23 @@ export const entityValuesNode4 = {
 
 const suggestionsByProp = {
   test_bool_default_false: [
+    'Default revision',
+    'Default translation',
+    'Image Media > Media > Published',
+    'Image Media > Media > Default translation',
+    'Image Media > Media > Default revision',
     'One Tag > Taxonomy term > Published',
     'One Tag > Taxonomy term > Default revision',
     'One Tag > Taxonomy term > Default translation',
-    'Promoted to front page',
-    'Published',
-    'Sticky at top of lists',
-    'The Boolean',
-    'Default translation',
-    'Default revision',
-    'Image Upload > Status',
     'Revision user > User > Default translation',
     'Revision user > User > User status',
     'Authored by > User > User status',
     'Authored by > User > Default translation',
-    'Image Media > Media > Published',
-    'Image Media > Media > Default translation',
-    'Image Media > Media > Default revision',
+    'Image Upload > Status',
+    'Promoted to front page',
+    'Published',
+    'Sticky at top of lists',
+    'The Boolean',
   ],
   test_bool_default_true: [
     'One Tag > Taxonomy term > Published',
