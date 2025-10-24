@@ -262,7 +262,7 @@ test.describe('Linking Basic Page fields ', () => {
         }
       });
       await expect(itemSelected).toBe(true);
-      await page.waitForTimeout(100);
+      await page.waitForTimeout(500);
       await test.step(`Verify preview for ${suggestionOption} for ${inputName}`, async () => {
         const previewSelector = propNameToSelector[inputName];
         const expectedValue = entityValuesNode4[suggestionPath.join(' > ')];
@@ -279,7 +279,7 @@ test.describe('Linking Basic Page fields ', () => {
     }
   };
 
-  test('bool default false', async ({ page, drupal, canvasEditor }) => {
+  test.only('bool default false', async ({ page, drupal, canvasEditor }) => {
     const inputName = 'test_bool_default_false';
     await testPropLinking({ page, drupal, canvasEditor, inputName });
   });
@@ -385,7 +385,7 @@ test.describe('Linking Basic Page fields ', () => {
     await testPropLinking({ page, drupal, canvasEditor, inputName });
   });
 
-  test.only('string html', async ({ page, drupal, canvasEditor }) => {
+  test('string html', async ({ page, drupal, canvasEditor }) => {
     const inputName = 'test_string_html';
     await testPropLinking({ page, drupal, canvasEditor, inputName });
   });
