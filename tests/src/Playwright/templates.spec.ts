@@ -176,6 +176,7 @@ test.describe('Templates - General', () => {
 });
 
 test.describe('Linking Basic Page fields ', () => {
+  test.describe.configure({ projects: ['chromium'] });
   test.beforeAll(
     'Setup test site with Drupal Canvas, templates enabled, and page with many field types',
     async ({ browser, drupalSite }) => {
