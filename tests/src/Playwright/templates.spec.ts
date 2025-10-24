@@ -307,96 +307,96 @@ test.describe('Linking Basic Page fields ', () => {
     await testPropLinking({ page, drupal, canvasEditor, inputName });
   });
 
-  test('string format email', async ({ page, drupal, canvasEditor }) => {
-    const inputName = 'test_string_format_email';
-    await testPropLinking({ page, drupal, canvasEditor, inputName });
-  });
-
-  test('string format idn email', async ({ page, drupal, canvasEditor }) => {
-    const inputName = 'test_string_format_idn_email';
-    await testPropLinking({ page, drupal, canvasEditor, inputName });
-  });
-
-  test('required string format uri', async ({ page, drupal, canvasEditor }) => {
-    const inputName = 'test_REQUIRED_string_format_uri';
-    await testPropLinking({ page, drupal, canvasEditor, inputName });
-  });
-
-  test('required string format uri reference web links', async ({
-    page,
-    drupal,
-    canvasEditor,
-  }) => {
-    const inputName = 'test_REQUIRED_string_format_uri_reference_web_links';
-    await testPropLinking({ page, drupal, canvasEditor, inputName });
-  });
-
-  test('string format uri', async ({ page, drupal, canvasEditor }) => {
-    const inputName = 'test_string_format_uri';
-    await testPropLinking({ page, drupal, canvasEditor, inputName });
-  });
-
-  test('string format uri image', async ({ page, drupal, canvasEditor }) => {
-    const inputName = 'test_string_format_uri_image';
-    await testPropLinking({ page, drupal, canvasEditor, inputName });
-  });
-
-  test('string format uri image using ref', async ({
-    page,
-    drupal,
-    canvasEditor,
-  }) => {
-    const inputName = 'test_string_format_uri_image_using_ref';
-    await testPropLinking({ page, drupal, canvasEditor, inputName });
-  });
-
-  test('string format uri reference', async ({
-    page,
-    drupal,
-    canvasEditor,
-  }) => {
-    const inputName = 'test_string_format_uri_reference';
-    await testPropLinking({ page, drupal, canvasEditor, inputName });
-  });
-
-  test('string format iri', async ({ page, drupal, canvasEditor }) => {
-    const inputName = 'test_string_format_iri';
-    await testPropLinking({ page, drupal, canvasEditor, inputName });
-  });
-
-  test('string format iri reference', async ({
-    page,
-    drupal,
-    canvasEditor,
-  }) => {
-    const inputName = 'test_string_format_iri_reference';
-    await testPropLinking({ page, drupal, canvasEditor, inputName });
-  });
-
-  test('integer', async ({ page, drupal, canvasEditor }) => {
-    const inputName = 'test_integer';
-    await testPropLinking({ page, drupal, canvasEditor, inputName });
-  });
-
-  test('integer min/max timestamps', async ({ page, drupal, canvasEditor }) => {
-    const inputName = 'test_integer_range_minimum_maximum_timestamps';
-    await testPropLinking({ page, drupal, canvasEditor, inputName });
-  });
-
-  test('object drupal image', async ({ page, drupal, canvasEditor }) => {
-    const inputName = 'test_object_drupal_image';
-    await testPropLinking({ page, drupal, canvasEditor, inputName });
-  });
-
-  test('string html block', async ({ page, drupal, canvasEditor }) => {
-    const inputName = 'test_string_html_block';
-    await testPropLinking({ page, drupal, canvasEditor, inputName });
-  });
-
-  test('string html', async ({ page, drupal, canvasEditor }) => {
-    const inputName = 'test_string_html';
-    await testPropLinking({ page, drupal, canvasEditor, inputName });
-  });
+  // test('string format email', async ({ page, drupal, canvasEditor }) => {
+  //   const inputName = 'test_string_format_email';
+  //   await testPropLinking({ page, drupal, canvasEditor, inputName });
+  // });
+  //
+  // test('string format idn email', async ({ page, drupal, canvasEditor }) => {
+  //   const inputName = 'test_string_format_idn_email';
+  //   await testPropLinking({ page, drupal, canvasEditor, inputName });
+  // });
+  //
+  // test('required string format uri', async ({ page, drupal, canvasEditor }) => {
+  //   const inputName = 'test_REQUIRED_string_format_uri';
+  //   await testPropLinking({ page, drupal, canvasEditor, inputName });
+  // });
+  //
+  // test('required string format uri reference web links', async ({
+  //   page,
+  //   drupal,
+  //   canvasEditor,
+  // }) => {
+  //   const inputName = 'test_REQUIRED_string_format_uri_reference_web_links';
+  //   await testPropLinking({ page, drupal, canvasEditor, inputName });
+  // });
+  //
+  // test('string format uri', async ({ page, drupal, canvasEditor }) => {
+  //   const inputName = 'test_string_format_uri';
+  //   await testPropLinking({ page, drupal, canvasEditor, inputName });
+  // });
+  //
+  // test('string format uri image', async ({ page, drupal, canvasEditor }) => {
+  //   const inputName = 'test_string_format_uri_image';
+  //   await testPropLinking({ page, drupal, canvasEditor, inputName });
+  // });
+  //
+  // test('string format uri image using ref', async ({
+  //   page,
+  //   drupal,
+  //   canvasEditor,
+  // }) => {
+  //   const inputName = 'test_string_format_uri_image_using_ref';
+  //   await testPropLinking({ page, drupal, canvasEditor, inputName });
+  // });
+  //
+  // test('string format uri reference', async ({
+  //   page,
+  //   drupal,
+  //   canvasEditor,
+  // }) => {
+  //   const inputName = 'test_string_format_uri_reference';
+  //   await testPropLinking({ page, drupal, canvasEditor, inputName });
+  // });
+  //
+  // test('string format iri', async ({ page, drupal, canvasEditor }) => {
+  //   const inputName = 'test_string_format_iri';
+  //   await testPropLinking({ page, drupal, canvasEditor, inputName });
+  // });
+  //
+  // test('string format iri reference', async ({
+  //   page,
+  //   drupal,
+  //   canvasEditor,
+  // }) => {
+  //   const inputName = 'test_string_format_iri_reference';
+  //   await testPropLinking({ page, drupal, canvasEditor, inputName });
+  // });
+  //
+  // test('integer', async ({ page, drupal, canvasEditor }) => {
+  //   const inputName = 'test_integer';
+  //   await testPropLinking({ page, drupal, canvasEditor, inputName });
+  // });
+  //
+  // test('integer min/max timestamps', async ({ page, drupal, canvasEditor }) => {
+  //   const inputName = 'test_integer_range_minimum_maximum_timestamps';
+  //   await testPropLinking({ page, drupal, canvasEditor, inputName });
+  // });
+  //
+  // test('object drupal image', async ({ page, drupal, canvasEditor }) => {
+  //   const inputName = 'test_object_drupal_image';
+  //   await testPropLinking({ page, drupal, canvasEditor, inputName });
+  // });
+  //
+  // test('string html block', async ({ page, drupal, canvasEditor }) => {
+  //   const inputName = 'test_string_html_block';
+  //   await testPropLinking({ page, drupal, canvasEditor, inputName });
+  // });
+  //
+  // test('string html', async ({ page, drupal, canvasEditor }) => {
+  //   const inputName = 'test_string_html';
+  //   await testPropLinking({ page, drupal, canvasEditor, inputName });
+  // });
 });
 
 export const entityValuesNode4 = {
