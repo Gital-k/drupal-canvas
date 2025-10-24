@@ -213,7 +213,7 @@ const PropLinker = ({ propName, linked, suggestions }: PropLinkerProps) => {
               item={suggestion}
               isActive={isActive}
               depth={0}
-              childOf='root'
+              childOf="root"
             />
           );
         })}
