@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useState } from 'react';
+import isEqual from 'lodash/isEqual';
 
 import type { ReactNode } from 'react';
 import type { ComponentsMap, RegionsMap, SlotsMap } from '@/types/Annotations';
@@ -49,18 +50,49 @@ export const ComponentHtmlMapProvider: React.FC<
   const [componentsMap, setComponentsMap] = useState<ComponentsMap>({});
   const [slotsMap, setSlotsMap] = useState<SlotsMap>({});
 
-  // Memoized updater functions
-  const updateRegionsMap = useCallback((newRegions: RegionsMap) => {
-    setRegionsMap(newRegions);
-  }, []);
+  const updateRegionsMap = useCallback(
+    (newRegions: RegionsMap) => {
+      setRegionsMap((prevRegions) => {
+        // Avoid unnecessary re-renders by checking for deep equality before updating state.
+        if (isEqual(prevRegions, newRegions)) {
+          return prevRegions;
+        }
+        return newRegions;
+      });
+      return isEqual(regionsMap, newRegions) ? regionsMap : newRegions;
+    },
+    [regionsMap],
+  );
 
-  const updateComponentsMap = useCallback((newComponents: ComponentsMap) => {
-    setComponentsMap(newComponents);
-  }, []);
+  const updateComponentsMap = useCallback(
+    (newComponents: ComponentsMap) => {
+      setComponentsMap((prevComponents) => {
+        // Avoid unnecessary re-renders by checking for deep equality before updating state.
+        if (isEqual(prevComponents, newComponents)) {
+          return prevComponents;
+        }
+        return newComponents;
+      });
+      return isEqual(componentsMap, newComponents)
+        ? componentsMap
+        : newComponents;
+    },
+    [componentsMap],
+  );
 
-  const updateSlotsMap = useCallback((newSlots: SlotsMap) => {
-    setSlotsMap(newSlots);
-  }, []);
+  const updateSlotsMap = useCallback(
+    (newSlots: SlotsMap) => {
+      setSlotsMap((prevSlots) => {
+        // Avoid unnecessary re-renders by checking for deep equality before updating state.
+        if (isEqual(prevSlots, newSlots)) {
+          return prevSlots;
+        }
+        return newSlots;
+      });
+      return isEqual(slotsMap, newSlots) ? slotsMap : newSlots;
+    },
+    [slotsMap],
+  );
 
   return (
     <ValueContext.Provider value={{ regionsMap, componentsMap, slotsMap }}>

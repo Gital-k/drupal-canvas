@@ -74,7 +74,6 @@ const SlotOverlay: React.FC<SlotOverlayProps> = (props) => {
   useEffect(() => {
     const elementInsideIframe = slotsMap[slotId]?.element;
     if (elementInsideIframe) {
-      console.log('actually calculating slots mapchange', slotsMap);
       const computedStyle = window.getComputedStyle(elementInsideIframe);
       setPadding({
         paddingTop: computedStyle.paddingTop,
