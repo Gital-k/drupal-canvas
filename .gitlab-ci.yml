@@ -388,17 +388,19 @@ cypress E2E:
     - echo "DRUPAL_ROOT_CORE='${CI_PROJECT_DIR}/${_WEB_ROOT}/core'" >> ./ui/.env
     - cd ./ui/
     - cat .env
-    - mkdir -p ./cycache /var/www/.npm /home/apache/.cache/fontconfig ~/.cache /usr/share/fonts/ /var/cache/fontconfig
-    - chown -R www-data:www-data ./cycache /var/www/.npm /usr/bin/npm /home/apache/.cache/fontconfig ~/.cache /usr/share/fonts/ /var/cache/fontconfig
-    - chmod -R 755 ./cycache
-    - sudo -u www-data CYPRESS_CACHE_FOLDER=./cycache node ./node_modules/.bin/cypress install
+    - mkdir -p ~/.cache/Cypress
+    - echo -e "[DEBUG] Running npm ci..."
+    - npm ci
+    - echo -e "[DEBUG] Installing Cypress binary..."
+    - npx cypress install
     - echo -e "\e[0Ksection_end:`date +%s`:Cypress-install\r\e[0K"
-    - sudo -u www-data CYPRESS_CACHE_FOLDER=./cycache node ./node_modules/.bin/cypress --version
+    - npx cypress --version
   cache:
     key: ${CI_JOB_NAME}
     paths:
       - modules/custom/$CI_PROJECT_NAME/ui/node_modules/
       - modules/custom/$CI_PROJECT_NAME/ui/.cache/Cypress
+      - modules/custom/$CI_PROJECT_NAME/ui/ ~/.cache/Cypress
   variables:
     _TARGET_DB_TYPE: sqlite
   artifacts:
@@ -411,7 +413,7 @@ cypress E2E:
         - ui/junit-*.xml
   script:
     - cd $_WEB_ROOT/modules/custom/$CI_PROJECT_NAME/ui
-    - CYPRESS_CACHE_FOLDER=./cycache node ./node_modules/.bin/cypress run --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml" --spec=`node ./tests/support/parallel.js`
+    - npx cypress run --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml" --spec=`node ./tests/support/parallel.js`
 
 🗺️ C4 model diagrams:
   stage: validate
