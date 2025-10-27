@@ -103,8 +103,8 @@ final class ComponentMetadataRequirementsChecker {
           continue;
         }
       }
-      if (array_key_exists('format', $prop) && $prop['format'] === JsonSchemaStringFormat::URI && array_key_exists('contentMediaType', $prop) && $prop['contentMediaType'] === 'application/oembed+json' && isset($prop['x-oembed-type'])) {
-        if (!in_array($prop['x-oembed-type'], ['video'], TRUE)) {
+      if (array_key_exists('format', $prop) && $prop['format'] === JsonSchemaStringFormat::Uri && array_key_exists('contentMediaType', $prop) && $prop['contentMediaType'] === 'application/oembed+json' && isset($prop['x-oembed-type'])) {
+        if ($prop['x-oembed-type'] !== 'video') {
           $messages[] = \sprintf('Invalid value "%s" for "x-oembed-type". For now, only "video" is allowed.', $prop['x-oembed-type']);
           continue;
         }
