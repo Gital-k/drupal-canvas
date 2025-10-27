@@ -24,8 +24,9 @@ export default defineConfig({
     ['html', { host: '0.0.0.0', open: 'never' }],
   ],
   /* https://playwright.dev/docs/test-timeouts */
-  timeout: process.env.CI ? 120_000 : 30_000,
+  timeout: process.env.CI ? 40_000 : 30_000,
   expect: { timeout: 10_000 },
+  globalTimeout: 3_600_000,
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
