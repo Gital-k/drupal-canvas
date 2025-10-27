@@ -193,21 +193,20 @@ test.describe('Linking Basic Page fields ', () => {
     },
   );
 
-  const addLinkablePropsComponent = async ({ page, drupal, canvasEditor }) => {
-    await drupal.loginAsAdmin();
-    await page.goto('/canvas/template/node/page/full/4');
-    await expect(
-      page.getByTestId('canvas-empty-region-drop-zone-content'),
-    ).toBeVisible();
-    await canvasEditor.openLibraryPanel();
-    await canvasEditor.addComponent({
-      id: 'sdc.canvas_test_linkable_props.linkable-props',
-    });
-  };
+  // const addLinkablePropsComponent = async ({ page, drupal, canvasEditor }) => {
+  //   await drupal.loginAsAdmin();
+  //   await page.goto('/canvas/template/node/page/full/4');
+  //   await expect(
+  //     page.getByTestId('canvas-empty-region-drop-zone-content'),
+  //   ).toBeVisible();
+  //   await canvasEditor.openLibraryPanel();
+  //   await canvasEditor.addComponent({
+  //     id: 'sdc.canvas_test_linkable_props.linkable-props',
+  //   });
+  // };
 
   const ensureLinkablePropsComponent = async ({
     page,
-    drupal,
     canvasEditor,
   }) => {
     // Always navigate so each test starts from the template.
@@ -337,8 +336,8 @@ test.describe('Linking Basic Page fields ', () => {
             inputName,
             suggestions: chunk
           });
-        }
-      });
+        });
+      }
       testsAdded += 1;
     });
   }
