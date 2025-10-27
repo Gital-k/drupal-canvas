@@ -225,8 +225,10 @@ test.describe('Linking Basic Page fields ', () => {
     await page.goto('/canvas/template/node/page/full/4');
     await canvasEditor.waitForCanvasUi();
 
-    // await ensureLinkablePropsComponent({ page, drupal, canvasEditor });
-
+    // Add styles that allow nested suggestions to not overlap each other, so
+    // e2e tests can properly access these items without the parent menu
+    // closing. This includes widening the contextual panel, and positioning
+    // the linker element underneath its corresponding label.
     await page.addStyleTag({
       content: `
       .canvas-linked-prop-label-wrapper {
@@ -260,6 +262,7 @@ test.describe('Linking Basic Page fields ', () => {
             `[data-link-suggestion-option="${pathItem}"][data-child-of="${parentName}"]`,
           );
           await step.waitFor();
+          // If this is the final step in the suggestion path, click to select.
           if (stepCount === suggestionPath.length) {
             await step.click({ force: true });
             await page.waitForResponse(
@@ -313,7 +316,7 @@ test.describe('Linking Basic Page fields ', () => {
   });
 
   for (const [inputName, suggestions] of Object.entries(suggestionsByProp)) {
-    const chunkSize = 6;
+    const chunkSize = 9;
     const chunks = [];
 
     for (let i = 0; i < suggestions.length; i += chunkSize) {
@@ -340,120 +343,11 @@ test.describe('Linking Basic Page fields ', () => {
       });
     });
   }
-
-  // test('bool default false', async ({ page, drupal, canvasEditor }) => {
-  //   const inputName = 'test_bool_default_false';
-  //   await testPropLinking({ page, drupal, canvasEditor, inputName });
-  // });
-  //
-  // test('bool default true', async ({ page, drupal, canvasEditor }) => {
-  //   const inputName = 'test_bool_default_true';
-  //   await testPropLinking({ page, drupal, canvasEditor, inputName });
-  // });
-  //
-  // test('string', async ({ page, drupal, canvasEditor }) => {
-  //   const inputName = 'test_string';
-  //   await testPropLinking({ page, drupal, canvasEditor, inputName });
-  // });
-  //
-  // test('required string', async ({ page, drupal, canvasEditor }) => {
-  //   const inputName = 'test_REQUIRED_string';
-  //   await testPropLinking({ page, drupal, canvasEditor, inputName });
-  // });
-
-  // test('string format email', async ({ page, drupal, canvasEditor }) => {
-  //   const inputName = 'test_string_format_email';
-  //   await testPropLinking({ page, drupal, canvasEditor, inputName });
-  // });
-  //
-  // test('string format idn email', async ({ page, drupal, canvasEditor }) => {
-  //   const inputName = 'test_string_format_idn_email';
-  //   await testPropLinking({ page, drupal, canvasEditor, inputName });
-  // });
-  //
-  // test('required string format uri', async ({ page, drupal, canvasEditor }) => {
-  //   const inputName = 'test_REQUIRED_string_format_uri';
-  //   await testPropLinking({ page, drupal, canvasEditor, inputName });
-  // });
-  //
-  // test('required string format uri reference web links', async ({
-  //   page,
-  //   drupal,
-  //   canvasEditor,
-  // }) => {
-  //   const inputName = 'test_REQUIRED_string_format_uri_reference_web_links';
-  //   await testPropLinking({ page, drupal, canvasEditor, inputName });
-  // });
-  //
-  // test('string format uri', async ({ page, drupal, canvasEditor }) => {
-  //   const inputName = 'test_string_format_uri';
-  //   await testPropLinking({ page, drupal, canvasEditor, inputName });
-  // });
-  //
-  // test('string format uri image', async ({ page, drupal, canvasEditor }) => {
-  //   const inputName = 'test_string_format_uri_image';
-  //   await testPropLinking({ page, drupal, canvasEditor, inputName });
-  // });
-  //
-  // test('string format uri image using ref', async ({
-  //   page,
-  //   drupal,
-  //   canvasEditor,
-  // }) => {
-  //   const inputName = 'test_string_format_uri_image_using_ref';
-  //   await testPropLinking({ page, drupal, canvasEditor, inputName });
-  // });
-  //
-  // test('string format uri reference', async ({
-  //   page,
-  //   drupal,
-  //   canvasEditor,
-  // }) => {
-  //   const inputName = 'test_string_format_uri_reference';
-  //   await testPropLinking({ page, drupal, canvasEditor, inputName });
-  // });
-  //
-  // test('string format iri', async ({ page, drupal, canvasEditor }) => {
-  //   const inputName = 'test_string_format_iri';
-  //   await testPropLinking({ page, drupal, canvasEditor, inputName });
-  // });
-  //
-  // test('string format iri reference', async ({
-  //   page,
-  //   drupal,
-  //   canvasEditor,
-  // }) => {
-  //   const inputName = 'test_string_format_iri_reference';
-  //   await testPropLinking({ page, drupal, canvasEditor, inputName });
-  // });
-  //
-  // test('integer', async ({ page, drupal, canvasEditor }) => {
-  //   const inputName = 'test_integer';
-  //   await testPropLinking({ page, drupal, canvasEditor, inputName });
-  // });
-  //
-  // test('integer min/max timestamps', async ({ page, drupal, canvasEditor }) => {
-  //   const inputName = 'test_integer_range_minimum_maximum_timestamps';
-  //   await testPropLinking({ page, drupal, canvasEditor, inputName });
-  // });
-  //
-  // test('object drupal image', async ({ page, drupal, canvasEditor }) => {
-  //   const inputName = 'test_object_drupal_image';
-  //   await testPropLinking({ page, drupal, canvasEditor, inputName });
-  // });
-  //
-  // test('string html block', async ({ page, drupal, canvasEditor }) => {
-  //   const inputName = 'test_string_html_block';
-  //   await testPropLinking({ page, drupal, canvasEditor, inputName });
-  // });
-  //
-  // test('string html', async ({ page, drupal, canvasEditor }) => {
-  //   const inputName = 'test_string_html';
-  //   await testPropLinking({ page, drupal, canvasEditor, inputName });
-  // });
 });
 
 const entityValuesNode4 = {
+  Title: 'Debut Page',
+  'Revision log message': 'A page that was made',
   'Promoted to front page': 'false',
   Published: 'true',
   'Sticky at top of lists': 'false',
@@ -461,7 +355,11 @@ const entityValuesNode4 = {
   'Default translation': 'true',
   'Default revision': 'true',
   Status: 'true',
-  'Authored by > User': 'true',
+  'Authored on': '1760098151',
+  Changed: /\d{9,}/,
+  'Number List': '1',
+  'The Number': '33',
+  'Revision create time': /\d{9,}/,
   'Image Upload > Status': 'true',
   'Image Upload > Alternative text': 'secret plans',
   'Image Upload > Title': '',
@@ -471,8 +369,6 @@ const entityValuesNode4 = {
   'Image Upload > URI > Root-relative file URL':
     '/files/2025-10/secret-plans_2.jpg',
   'Image Upload > URI > URI': 'public://2025-10/secret-plans_2.jpg',
-  'Image Media > Media > Thumbnail > URI > Root-relative file URL':
-    '/files/2025-10/secret-plans_2.jpg',
   'Image Upload > Width': '1000',
   'Image Upload > Height': '1333',
   'Image Upload > File size': '318082',
@@ -489,6 +385,7 @@ const entityValuesNode4 = {
   'Revision user > User > Last access': /\d{9,}/,
   'Revision user > User > Created': /\d{9,}/,
   'Revision user > User > Last login': /\d{9,}/,
+  'Authored by > User': 'true',
   'Authored by > User > Name': 'admin',
   'Authored by > User > Email': 'admin@example.com',
   'Authored by > User > Initial email': 'admin@example.com',
@@ -521,17 +418,12 @@ const entityValuesNode4 = {
     '/files/styles/canvas_parametrized_width--%7Bwidth%7D/public/2025-10/treehouse_0.jpeg.webp%3Fitok',
   'Image Media > Media > Thumbnail > Thumbnail':
     '/files/styles/canvas_parametrized_width--%7Bwidth%7D/public/2025-10/treehouse_0.jpeg.webp%3Fitok',
-  Title: 'Debut Page',
-  'Revision log message': 'A page that was made',
+  'Image Media > Media > Thumbnail > URI > Root-relative file URL':
+    '/files/2025-10/secret-plans_2.jpg',
   'The Link > Link text': 'Dinosaur Comics',
   'The Link > The Link': 'https://qwantz.com',
   'The Link > Resolved URL': 'https://qwantz.com',
   'The Email': 'one@one.com',
-  'Authored on': '1760098151',
-  Changed: /\d{9,}/,
-  'Number List': '1',
-  'The Number': '33',
-  'Revision create time': /\d{9,}/,
   'Body > Processed summary': '',
   'Body > Processed text':
     'This page emerged on the scene. This page was met with indifference.',
