@@ -11,7 +11,7 @@ props:
     document:
       title: Document
       type: object
-      $ref: json-schema-definitions://experience_builder.module/document
+      $ref: json-schema-definitions://canvas.module/document
       description: The document object.
       examples:
         - src: https://example.com/file.txt

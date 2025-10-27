@@ -11,7 +11,7 @@ props:
     video:
       title: Video via oEmbed
       type: object
-      $ref: json-schema-definitions://experience_builder.module/oembed_video
+      $ref: json-schema-definitions://canvas.module/oembed_video
       description: The video object.
       examples:
         - url: https://www.youtube.com/watch?v=PWjcqE3QKBg

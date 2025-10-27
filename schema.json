@@ -317,7 +317,7 @@
       "properties": {
         "src": {
           "title": "Document URL",
-          "$ref": "json-schema-definitions://experience_builder.module/document-uri"
+          "$ref": "json-schema-definitions://canvas.module/document-uri"
         },
         "title": {
           "title": "Document title",

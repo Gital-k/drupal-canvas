@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Drupal\experience_builder\Plugin\Field\FieldTypeOverride;
+namespace Drupal\canvas\Plugin\Field\FieldTypeOverride;
 
 use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Field\Plugin\Field\FieldType\StringItem;
@@ -11,7 +11,7 @@ use Drupal\media\Entity\MediaType;
 /**
  * @todo Fix upstream.
  * @see \Drupal\media\Plugin\media\Source\OEmbedDeriver::getDerivativeDefinitions()
- * @see \Drupal\experience_builder\Hook\ShapeMatchingHooks::entityBaseFieldInfoAlter()
+ * @see \Drupal\canvas\Hook\ShapeMatchingHooks::entityBaseFieldInfoAlter()
  * @internal
  */
 final class OembedStringItemOverride extends StringItem {

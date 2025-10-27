@@ -279,16 +279,16 @@ props:
           poster: /sites/default/files/600x400.png
     # The "remote_video" (oembed:video) predefined object format.
     test_object_drupal_oembed_video:
-      title: 'Object, $ref=json-schema-definitions://experience_builder.module/oembed_video'
-      $ref: json-schema-definitions://experience_builder.module/oembed_video
+      title: 'Object, $ref=json-schema-definitions://canvas.module/oembed_video'
+      $ref: json-schema-definitions://canvas.module/oembed_video
       type: object
       examples:
         - url: https://youtu.be/dQw4w9WgXcQ
           title: 'Example oEmbed video title'
     # The "document" predefined object format.
     test_object_drupal_document:
-      title: 'Object, $ref=json-schema-definitions://experience_builder.module/document'
-      $ref: json-schema-definitions://experience_builder.module/document
+      title: 'Object, $ref=json-schema-definitions://canvas.module/document'
+      $ref: json-schema-definitions://canvas.module/document
       type: object
       examples:
         - src: https://example.com/file.txt
