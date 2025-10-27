@@ -1,14 +1,8 @@
 import { expect } from '@playwright/test';
 
-
-
 import { test } from './fixtures/DrupalSite';
 import { Drupal } from './objects/Drupal';
 import { getModuleDir } from './utilities/DrupalFilesystem';
-
-
-
-
 
 const suggestionsByProp = {
   test_bool_default_false: [
@@ -174,10 +168,12 @@ const suggestionsByProp = {
   ],
 };
 
-
 // cspell:ignore Bwidth Fitok treehouse
 test.describe('Linking Basic Page fields ', () => {
-  test.skip(({ browserName }) => browserName !== 'chromium', 'Only runs in chromium');
+  test.skip(
+    ({ browserName }) => browserName !== 'chromium',
+    'Only runs in chromium',
+  );
   test.beforeAll(
     'Setup test site with Drupal Canvas, templates enabled, and page with many field types',
     async ({ browser, drupalSite }) => {
@@ -205,12 +201,10 @@ test.describe('Linking Basic Page fields ', () => {
   //   });
   // };
 
-  const ensureLinkablePropsComponent = async ({
-    page,
-    canvasEditor,
-  }) => {
+  const ensureLinkablePropsComponent = async ({ page, canvasEditor }) => {
     // Always navigate so each test starts from the template.
     await page.goto('/canvas/template/node/page/full/4');
+    await canvasEditor.waitForCanvasUi();
 
     // If already present, do nothing (persisted from earlier test).
     const alreadyThere = await page
@@ -229,9 +223,17 @@ test.describe('Linking Basic Page fields ', () => {
       id: 'sdc.canvas_test_linkable_props.linkable-props',
     });
   };
-  const testPropLinking = async ({ page, drupal, canvasEditor, inputName, suggestions }) => {
+  const testPropLinking = async ({
+    page,
+    drupal,
+    canvasEditor,
+    inputName,
+    suggestions,
+  }) => {
     await drupal.loginAsAdmin();
-    await ensureLinkablePropsComponent({ page, drupal, canvasEditor });
+    await page.goto('/canvas/template/node/page/full/4');
+    await canvasEditor.waitForCanvasUi();
+    // await ensureLinkablePropsComponent({ page, drupal, canvasEditor });
 
     await page.addStyleTag({
       content: `
@@ -249,6 +251,7 @@ test.describe('Linking Basic Page fields ', () => {
       width: 600px;}
     `,
     });
+    await page.locator('[aria-label="Linkable props"]').click();
     const linker = await page.locator(`[data-prop-linker-for="${inputName}"]`);
     await expect(linker).toBeAttached();
     const suggestionsTree = suggestions || suggestionsByProp[inputName];
@@ -309,6 +312,12 @@ test.describe('Linking Basic Page fields ', () => {
       });
     }
   };
+
+  test('pre loop setup', async ({ page, drupal, canvasEditor }) => {
+    await drupal.loginAsAdmin();
+    await ensureLinkablePropsComponent({ page, canvasEditor });
+  });
+
   let testsAdded = 0;
   for (const [inputName, suggestions] of Object.entries(suggestionsByProp)) {
     const chunkSize = 6;
@@ -322,11 +331,12 @@ test.describe('Linking Basic Page fields ', () => {
 
     chunks.forEach((chunk, index) => {
       const baseName = inputName.replace(/_/g, ' ').replace(/test /g, '');
-      const testName = totalChunks > 1
-        ? `${baseName} ${index + 1} of ${totalChunks}`
-        : baseName;
+      const testName =
+        totalChunks > 1
+          ? `${baseName} ${index + 1} of ${totalChunks}`
+          : baseName;
       // Temporarily limit the number of tests added to avoid long test runs.
-      if (testsAdded < 6) {
+      if (testsAdded < 15) {
         test(testName, async ({ page, drupal, canvasEditor }) => {
           console.log(`running ${testName}`, chunk);
           await testPropLinking({
@@ -334,14 +344,13 @@ test.describe('Linking Basic Page fields ', () => {
             drupal,
             canvasEditor,
             inputName,
-            suggestions: chunk
+            suggestions: chunk,
           });
         });
       }
       testsAdded += 1;
     });
   }
-
 
   // test('bool default false', async ({ page, drupal, canvasEditor }) => {
   //   const inputName = 'test_bool_default_false';

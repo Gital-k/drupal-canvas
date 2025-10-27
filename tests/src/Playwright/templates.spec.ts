@@ -2,7 +2,6 @@ import { expect } from '@playwright/test';
 
 import { test } from './fixtures/DrupalSite';
 import { Drupal } from './objects/Drupal';
-import { getModuleDir } from './utilities/DrupalFilesystem';
 
 // cspell:ignore Bwidth Fitok treehouse
 test.describe('Templates - General', () => {
