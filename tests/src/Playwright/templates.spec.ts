@@ -73,10 +73,12 @@ test.describe('Templates - General', () => {
     expect(page.url()).toContain('canvas/template/node/article/full/1');
     await canvasEditor.openLibraryPanel();
     await canvasEditor.addComponent({ id: 'sdc.canvas_test_sdc.my-hero' });
-    const currentEntityTitle = await page.getByTestId('select-content-preview-item').textContent();
+    const currentEntityTitle = await page
+      .getByTestId('select-content-preview-item')
+      .textContent();
     let nodeTitle = 'Canvas With a block in the layout';
     let newArticleTitle = 'Canvas Needs This For The Time Being';
-    // Account for entity ids being different on CI vs vlocal.
+    // Account for unreliable entity ids.
     if (currentEntityTitle !== nodeTitle) {
       newArticleTitle = nodeTitle;
       nodeTitle = currentEntityTitle;

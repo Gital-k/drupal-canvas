@@ -4,6 +4,8 @@ import { test } from './fixtures/DrupalSite';
 import { Drupal } from './objects/Drupal';
 import { getModuleDir } from './utilities/DrupalFilesystem';
 
+// Each object property is a prop type with a value of an array of the available
+// suggestions to it.
 const suggestionsByProp = {
   test_bool_default_false: [
     'Default revision',
@@ -60,9 +62,9 @@ const suggestionsByProp = {
   ],
   test_string_multiline: [
     'Revision log message',
-    //👇crashes ui  NULL  value found, but a string or an object is required"
+    // 👇Crashes: "NULL value found, but a string or an object is required"
     // 'One Tag > Taxonomy term > Revision log message',
-    //👇crashes ui  NULL  value found, but a string or an object is required"
+    // 👇Crashes: "NULL value found, but a string or an object is required"
     // 'Image Media > Media > Revision log message',
   ],
   test_REQUIRED_string: ['Title', 'Image Media > Media > Name'],
@@ -87,12 +89,13 @@ const suggestionsByProp = {
   ],
   test_string_format_uri: [
     'Image Upload > URI',
+    //👇Crashes :"Object of type Drupal\file\Entity\File cannot be printed."
     // 'Image Media > Media > Thumbnail > URI',
   ],
   test_string_format_uri_image: [
     'Image Upload > URI > Root-relative file URL',
     'Image Upload > Image Upload',
-    //👇crashes "Object of type Drupal\file\Entity\File cannot be printed."
+    //👇Crashes: "Object of type Drupal\file\Entity\File cannot be printed."
     // 'Image Media > Media > Thumbnail > URI > Root-relative file URL',
     'Image Media > Media > Thumbnail > Thumbnail',
   ],
@@ -100,22 +103,21 @@ const suggestionsByProp = {
     'Image Upload > URI > Root-relative file URL',
     'Image Upload > Image Upload',
     'Image Media > Media > Thumbnail > Thumbnail',
-    // crashes the ui in a difficult to recover way.
+    //👇Crashes: "Object of type Drupal\file\Entity\File cannot be printed."
     // 'Image Media > Media > Thumbnail > URI > Root-relative file URL',
   ],
   test_string_format_uri_reference: [
-    // crashes the ui in a difficult to recover way.
-    // 'The Link > Resolved URL',
+    'The Link > Resolved URL',
     'The Link > The Link',
     'Image Upload > Image Upload',
     'Image Upload > URI > Root-relative file URL',
     'Image Upload > URI > URI',
-    // crashes the ui in a difficult to recover way.
+    //👇Crashes: "Object of type Drupal\file\Entity\File cannot be printed."
     // 'Image Media > Media > Thumbnail > URI > Root-relative file URL',
   ],
   test_string_format_iri: [
     'Image Upload > URI',
-    // crashes the ui in a difficult to recover way.
+    //👇Crashes: "Object of type Drupal\file\Entity\File cannot be printed."
     // 'Image Media > Media > Thumbnail > URI',
   ],
   test_string_format_iri_reference: [
@@ -125,7 +127,9 @@ const suggestionsByProp = {
     'Image Upload > URI > Root-relative file URL',
     'Image Upload > URI > URI',
     'Image Media > Media > Thumbnail > Thumbnail',
+    //👇Crashes: "Object of type Drupal\file\Entity\File cannot be printed."
     // 'Image Media > Media > Thumbnail > URI > Root-relative file URL',
+    //👇Crashes: "Object of type Drupal\file\Entity\File cannot be printed."
     // 'Image Media > Media > Thumbnail > URI > URI',
   ],
   test_integer: [
@@ -175,9 +179,11 @@ const suggestionsByProp = {
 
 // cspell:ignore Bwidth Fitok treehouse
 test.describe('Linking Basic Page fields ', () => {
+  // These tests can take a long time to run and are not particularly browser
+  // dependent. Only run in Chromium to keep test duration reasonable.
   test.skip(
     ({ browserName }) => browserName !== 'chromium',
-    'Only runs in chromium',
+    'Only runs in Chromium',
   );
   test.beforeAll(
     'Setup test site with Drupal Canvas, templates enabled, and page with many field types',
@@ -194,18 +200,7 @@ test.describe('Linking Basic Page fields ', () => {
     },
   );
 
-  const ensureLinkablePropsComponent = async ({ page, canvasEditor }) => {
-    // Always navigate so each test starts from the template.
-
-    // If already present, do nothing (persisted from earlier test).
-    const alreadyThere = await page
-      .locator('[aria-label="Linkable props"]')
-      .first()
-      .count();
-    if (alreadyThere) {
-      return;
-    }
-
+  const addLinkablePropsComponent = async ({ page, canvasEditor }) => {
     await expect(
       page.getByTestId('canvas-empty-region-drop-zone-content'),
     ).toBeVisible();
@@ -214,6 +209,11 @@ test.describe('Linking Basic Page fields ', () => {
       id: 'sdc.canvas_test_linkable_props.linkable-props',
     });
   };
+
+  // In addition to the standard page, drupal, and canvasEditor arguments:
+  // - inputName: The name of the prop input to test linking to.
+  // - suggestions: An array of suggestion strings to select for the prop, the
+  //   strings may include nested paths separated by " > ".
   const testPropLinking = async ({
     page,
     drupal,
@@ -245,11 +245,16 @@ test.describe('Linking Basic Page fields ', () => {
       width: 600px;}
     `,
     });
+    // Select the linkable props component.
     await page.locator('[aria-label="Linkable props"]').click();
+
+    // Open the linker for the specified input.
     const linker = await page.locator(`[data-prop-linker-for="${inputName}"]`);
     await expect(linker).toBeAttached();
-    const suggestionsTree = suggestions || suggestionsByProp[inputName];
-    for (const suggestionOption of suggestionsTree) {
+
+    // Go through every suggestion and confirm it can link and provide the
+    // expected value in the preview.
+    for (const suggestionOption of suggestions) {
       await linker.click();
       const suggestionPath = suggestionOption.split(' > ');
       let itemSelected = false;
@@ -290,35 +295,37 @@ test.describe('Linking Basic Page fields ', () => {
           stepCount += 1;
         }
       });
+
+      // Confirm an item was selected.
       await expect(itemSelected).toBe(true);
-      await new Promise((resolve) => setTimeout(resolve, 500));
+
       await test.step(`Verify preview for ${suggestionOption} for ${inputName}`, async () => {
         const previewSelector = propNameToSelector[inputName];
-        const expectedValue = entityValuesNode4[suggestionPath.join(' > ')];
-        if (expectedValue !== '*SKIP* (this crashes)') {
-          await expect(
-            (await canvasEditor.getActivePreviewFrame()).locator(
-              previewSelector,
-            ),
-          ).toContainText(expectedValue);
-        } else {
-          await test.step(`Skipping preview check for ${suggestionPath.join(' > ')} as it crashes`, async () => {});
-        }
+        const expectedValue = entityValuesNode4[suggestionOption];
+        await expect(
+          (await canvasEditor.getActivePreviewFrame()).locator(previewSelector),
+        ).toContainText(expectedValue);
       });
     }
   };
 
+  // We provide setup for the tests here as Playwright disallows contexts in the
+  // before callbacks. This adds a component used by all the tests that follow.
+  // Although they work in the same context, separating them into individual
+  // makes debugging easier and prevents random failures that seem to occur
+  // after 10 consecutive linking of props.
   test('pre loop setup', async ({ page, drupal, canvasEditor }) => {
     await drupal.loginAsAdmin();
     await page.goto('/canvas/template/node/page/full/4');
     await canvasEditor.waitForCanvasUi();
-    await ensureLinkablePropsComponent({ page, canvasEditor });
+    await addLinkablePropsComponent({ page, canvasEditor });
   });
 
   for (const [inputName, suggestions] of Object.entries(suggestionsByProp)) {
+    // Separate tests into chunks of no more than 9 suggestions, to prevent
+    // random failure after >=10 consecutive linking operations.
     const chunkSize = 9;
     const chunks = [];
-
     for (let i = 0; i < suggestions.length; i += chunkSize) {
       chunks.push(suggestions.slice(i, i + chunkSize));
     }
@@ -345,6 +352,7 @@ test.describe('Linking Basic Page fields ', () => {
   }
 });
 
+// Object mapping suggestion paths to their expected preview values.
 const entityValuesNode4 = {
   Title: 'Debut Page',
   'Revision log message': 'A page that was made',
@@ -429,6 +437,7 @@ const entityValuesNode4 = {
     'This page emerged on the scene. This page was met with indifference.',
 };
 
+// Object mapping prop names to their corresponding preview selectors.
 const propNameToSelector = {
   test_bool_default_false: '#test-bool-default-false',
   test_bool_default_true: '#test-bool-default-true',
