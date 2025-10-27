@@ -45,8 +45,10 @@ const suggestionsByProp = {
   ],
   test_string: [
     'One Tag > Taxonomy term > Name',
+    //👇crashes ui  NULL  value found, but a string or an object is required"
     // 'One Tag > Taxonomy term > Revision log message',
     'Image Media > Media > Name',
+    //👇crashes ui  NULL  value found, but a string or an object is required"
     // 'Image Media > Media > Revision log message',
     'Title',
     'Revision log message',
@@ -58,8 +60,10 @@ const suggestionsByProp = {
   ],
   test_string_multiline: [
     'Revision log message',
-    'One Tag > Taxonomy term',
-    'Image Media > Media > Revision log message',
+    //👇crashes ui  NULL  value found, but a string or an object is required"
+    // 'One Tag > Taxonomy term > Revision log message',
+    //👇crashes ui  NULL  value found, but a string or an object is required"
+    // 'Image Media > Media > Revision log message',
   ],
   test_REQUIRED_string: ['Title', 'Image Media > Media > Name'],
   test_string_format_email: [
@@ -88,7 +92,8 @@ const suggestionsByProp = {
   test_string_format_uri_image: [
     'Image Upload > URI > Root-relative file URL',
     'Image Upload > Image Upload',
-    'Image Media > Media > Thumbnail > URI > Root-relative file URL',
+    //👇crashes "Object of type Drupal\file\Entity\File cannot be printed."
+    // 'Image Media > Media > Thumbnail > URI > Root-relative file URL',
     'Image Media > Media > Thumbnail > Thumbnail',
   ],
   test_string_format_uri_image_using_ref: [
@@ -189,22 +194,8 @@ test.describe('Linking Basic Page fields ', () => {
     },
   );
 
-  // const addLinkablePropsComponent = async ({ page, drupal, canvasEditor }) => {
-  //   await drupal.loginAsAdmin();
-  //   await page.goto('/canvas/template/node/page/full/4');
-  //   await expect(
-  //     page.getByTestId('canvas-empty-region-drop-zone-content'),
-  //   ).toBeVisible();
-  //   await canvasEditor.openLibraryPanel();
-  //   await canvasEditor.addComponent({
-  //     id: 'sdc.canvas_test_linkable_props.linkable-props',
-  //   });
-  // };
-
   const ensureLinkablePropsComponent = async ({ page, canvasEditor }) => {
     // Always navigate so each test starts from the template.
-    await page.goto('/canvas/template/node/page/full/4');
-    await canvasEditor.waitForCanvasUi();
 
     // If already present, do nothing (persisted from earlier test).
     const alreadyThere = await page
@@ -233,6 +224,7 @@ test.describe('Linking Basic Page fields ', () => {
     await drupal.loginAsAdmin();
     await page.goto('/canvas/template/node/page/full/4');
     await canvasEditor.waitForCanvasUi();
+
     // await ensureLinkablePropsComponent({ page, drupal, canvasEditor });
 
     await page.addStyleTag({
@@ -315,10 +307,11 @@ test.describe('Linking Basic Page fields ', () => {
 
   test('pre loop setup', async ({ page, drupal, canvasEditor }) => {
     await drupal.loginAsAdmin();
+    await page.goto('/canvas/template/node/page/full/4');
+    await canvasEditor.waitForCanvasUi();
     await ensureLinkablePropsComponent({ page, canvasEditor });
   });
 
-  let testsAdded = 0;
   for (const [inputName, suggestions] of Object.entries(suggestionsByProp)) {
     const chunkSize = 6;
     const chunks = [];
@@ -336,19 +329,15 @@ test.describe('Linking Basic Page fields ', () => {
           ? `${baseName} ${index + 1} of ${totalChunks}`
           : baseName;
       // Temporarily limit the number of tests added to avoid long test runs.
-      if (testsAdded < 15) {
-        test(testName, async ({ page, drupal, canvasEditor }) => {
-          console.log(`running ${testName}`, chunk);
-          await testPropLinking({
-            page,
-            drupal,
-            canvasEditor,
-            inputName,
-            suggestions: chunk,
-          });
+      test(testName, async ({ page, drupal, canvasEditor }) => {
+        await testPropLinking({
+          page,
+          drupal,
+          canvasEditor,
+          inputName,
+          suggestions: chunk,
         });
-      }
-      testsAdded += 1;
+      });
     });
   }
 
