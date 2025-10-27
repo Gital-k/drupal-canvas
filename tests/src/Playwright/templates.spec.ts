@@ -73,11 +73,18 @@ test.describe('Templates - General', () => {
     expect(page.url()).toContain('canvas/template/node/article/full/1');
     await canvasEditor.openLibraryPanel();
     await canvasEditor.addComponent({ id: 'sdc.canvas_test_sdc.my-hero' });
-
-    const nodeTitle = 'Canvas With a block in the layout';
+    const currentEntityTitle = await page.getByTestId('select-content-preview-item').textContent();
+    let nodeTitle = 'Canvas With a block in the layout';
+    let newArticleTitle = 'Canvas Needs This For The Time Being';
+    // Account for entity ids being different on CI vs vlocal.
+    if (currentEntityTitle !== nodeTitle) {
+      newArticleTitle = nodeTitle;
+      nodeTitle = currentEntityTitle;
+    }
     const defaultHeading = 'There goes my hero';
     const inputLocator = `[data-testid="canvas-contextual-panel"] [data-drupal-selector="component-instance-form"] .field--name-heading input`;
     const linkedBoxLocator = '[data-linked-field-box="heading"]';
+
     await expect(page.locator(inputLocator)).toBeVisible();
     await expect(page.locator(inputLocator)).toHaveValue(defaultHeading);
     await expect(page.locator(linkedBoxLocator)).not.toBeAttached();
@@ -142,7 +149,6 @@ test.describe('Templates - General', () => {
       ),
     ).not.toContainText(defaultHeading);
 
-    const newArticleTitle = 'Canvas Needs This For The Time Being';
     await page.getByTestId('select-content-preview-item').click();
     await page
       .locator(`[data-preview-option-item="${newArticleTitle}"]`)
