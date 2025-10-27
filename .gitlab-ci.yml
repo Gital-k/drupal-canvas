@@ -366,9 +366,6 @@ cypress E2E:
     - UI
   parallel: 4
   before_script:
-    - echo "[DEBUG] Node version: $(node -v)"
-    - echo "[DEBUG] NPM version: $(npm -v)"
-    # Drupal setup steps (reintroduced)
     - echo -e "\e[0Ksection_start:`date +%s`:Cypress-deps[collapsed=true]\r\e[0KInstall Cypress dependencies."
     - sudo apt-get -y update
     - sudo apt-get -y install libgtk2.0-0t64 libgtk-3-0t64 libgbm-dev libnotify-dev libnss3 libxss1 libasound2t64 libxtst6 xauth xvfb alsa-utils pulseaudio
@@ -376,29 +373,27 @@ cypress E2E:
     - echo "ctl.!default { type pulse }" >> ~/.asoundrc
     - pulseaudio --system --disallow-exit --disallow-module-loading &
     - echo -e "\e[0Ksection_end:`date +%s`:Cypress-deps\r\e[0K"
-    # Drupal webserver and DB setup (inline, replace with your actual setup commands if needed)
-    - echo "[DEBUG] Setting up Drupal webserver and DB (replace with actual setup commands if needed)"
+    # Copied from `.nightwatch-base`, but converted to use GitLab CI references.
+    - !reference [ .setup-webserver ]
+    - !reference [ .simpletest-db ]
     - export DRUPAL_TEST_DB_URL=$SIMPLETEST_DB
-    - echo "[DEBUG] Showing environment variables..."
-    - env | sort
+    - !reference [ .show-environment-variables ]
     - cd $_WEB_ROOT
     - cd modules/custom/$CI_PROJECT_NAME
-    # .env setup for Cypress
-    - echo -e "[DEBUG] Setting up .env for Cypress..."
+    - echo -e "\e[0Ksection_start:`date +%s`:Cypress-install[collapsed=true]\r\e[0KInstall Cypress."
     - cp ./ui/.env.example ./ui/.env
     - echo "BASE_URL='${SIMPLETEST_BASE_URL}'" >> ./ui/.env
     - echo "DB_URL='${DRUPAL_TEST_DB_URL}'" >> ./ui/.env
     - echo "DRUPAL_TEST_WEBSERVER_USER=www-data" >> ./ui/.env
     - echo "DRUPAL_ROOT_CORE='${CI_PROJECT_DIR}/${_WEB_ROOT}/core'" >> ./ui/.env
     - cd ./ui/
-    - echo "[DEBUG]
-    - echo "[DEBUG] .env contents:" && cat .env
-    # Cypress and npm install
-    - echo "[DEBUG] Running npm ci..."
-    - npm ci
-    - echo "[DEBUG] Installing Cypress binary..."
-    - npx cypress install
-    - echo "[DEBUG] Cypress version: $(npx cypress --version)"
+    - cat .env
+    - mkdir -p ./cycache /var/www/.npm /home/apache/.cache/fontconfig ~/.cache /usr/share/fonts/ /var/cache/fontconfig
+    - chown -R www-data:www-data ./cycache /var/www/.npm /usr/bin/npm /home/apache/.cache/fontconfig ~/.cache /usr/share/fonts/ /var/cache/fontconfig
+    - chmod -R 755 ./cycache
+    - sudo -u www-data CYPRESS_CACHE_FOLDER=./cycache node ./node_modules/.bin/cypress install
+    - echo -e "\e[0Ksection_end:`date +%s`:Cypress-install\r\e[0K"
+    - sudo -u www-data CYPRESS_CACHE_FOLDER=./cycache node ./node_modules/.bin/cypress --version
   cache:
     key: ${CI_JOB_NAME}
     paths:
@@ -415,9 +410,8 @@ cypress E2E:
       junit:
         - ui/junit-*.xml
   script:
-    - echo "[DEBUG] Running Cypress E2E tests..."
     - cd $_WEB_ROOT/modules/custom/$CI_PROJECT_NAME/ui
-    - npx cypress run --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml" --spec="$(node ./tests/support/parallel.js)"
+    - CYPRESS_CACHE_FOLDER=./cycache node ./node_modules/.bin/cypress run --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml" --spec=`node ./tests/support/parallel.js`
 
 🗺️ C4 model diagrams:
   stage: validate
