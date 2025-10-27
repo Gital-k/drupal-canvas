@@ -391,6 +391,7 @@ cypress E2E:
     - echo "DRUPAL_TEST_WEBSERVER_USER=www-data" >> ./ui/.env
     - echo "DRUPAL_ROOT_CORE='${CI_PROJECT_DIR}/${_WEB_ROOT}/core'" >> ./ui/.env
     - cd ./ui/
+    - echo "[DEBUG]
     - echo "[DEBUG] .env contents:" && cat .env
     # Cypress and npm install
     - echo "[DEBUG] Running npm ci..."
