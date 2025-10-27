@@ -2,25 +2,23 @@
 
 declare(strict_types=1);
 
-namespace Drupal\experience_builder\EntityHandlers;
+namespace Drupal\canvas\EntityHandlers;
 
-use Drupal\Core\Cache\Cache;
 use Drupal\Core\Config\ConfigInstallerInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
-use Drupal\experience_builder\ComponentDoesNotMeetRequirementsException;
-use Drupal\experience_builder\ComponentIncompatibilityReasonRepository;
-use Drupal\experience_builder\Entity\Component;
-use Drupal\experience_builder\Entity\JavaScriptComponent;
-use Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\BlockComponent;
-use Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\JsComponent;
+use Drupal\canvas\ComponentDoesNotMeetRequirementsException;
+use Drupal\canvas\ComponentIncompatibilityReasonRepository;
+use Drupal\canvas\Entity\Component;
+use Drupal\canvas\Entity\JavaScriptComponent;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * Defines storage handler for JavascriptComponents.
  */
-final class JavascriptComponentStorage extends XbAssetStorage {
+final class JavascriptComponentStorage extends CanvasAssetStorage {
 
   private ConfigInstallerInterface $configInstaller;
   private EntityTypeManagerInterface $entityTypeManager;
@@ -43,7 +41,16 @@ final class JavascriptComponentStorage extends XbAssetStorage {
   protected function doPostSave(EntityInterface $entity, $update): void {
     parent::doPostSave($entity, $update);
     \assert($entity instanceof JavascriptComponent);
-    $this->activateBlockOverride($entity);
+    // @todo Fix upstream core bug in Recipes: it inconsistently claims to be
+    // syncing when installing modules, but not when installing configuration.
+    // Even though it is listed under `import`, and that should hence match the
+    // behavior of the /admin/config/development/configuration/single/import UI.
+    if (in_array('installRecipeConfig', array_column(debug_backtrace(), 'function'), TRUE)) {
+      // Assert the bug is still present. This will start failing as soon as the
+      // upstream bug is fixed.
+      assert(!$this->configInstaller->isSyncing());
+      return;
+    }
     if ($this->configInstaller->isSyncing()) {
       return;
     }
@@ -51,50 +58,9 @@ final class JavascriptComponentStorage extends XbAssetStorage {
   }
 
   /**
-   * Activates the block override, if any, if enabled, and invalidates caches.
-   *
-   * ⚠️ This is highly experimental and *will* be refactored.
-   */
-  private function activateBlockOverride(JavaScriptComponent $entity): void {
-    $block_override = $entity->get('block_override');
-
-    // Nothing to do if there is no block override, or the overriding code
-    // component is disabled.
-    if ($block_override === NULL || $entity->status() === FALSE) {
-      return;
-    }
-
-    $component_storage = $this->entityTypeManager->getStorage(Component::ENTITY_TYPE_ID);
-    $ids = $component_storage
-      ->getQuery()
-      ->accessCheck(FALSE)
-      ->condition(
-        'id',
-        sprintf('%s.%s.', BlockComponent::SOURCE_PLUGIN_ID, $block_override),
-        'STARTS_WITH',
-      )
-      ->execute();
-
-    $overridden_block_components = $component_storage->loadMultiple($ids);
-
-    // Ensure all existing block component instances' cached representations are
-    // invalidated, to force them to be re-rendered. They will now be rendered
-    // using a JavaScriptComponent instead.
-    // @see \Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\BlockComponent::renderComponent()
-    Cache::invalidateTags(array_reduce(
-      $overridden_block_components,
-      static fn (array $all_cache_tags, Component $component): array => [
-        ...$all_cache_tags,
-        ...$component->getCacheTagsToInvalidate(),
-      ],
-      []
-    ));
-  }
-
-  /**
    * Gets the corresponding component entity for the given JS component.
    *
-   * @param \Drupal\experience_builder\Entity\JavaScriptComponent $entity
+   * @param \Drupal\canvas\Entity\JavaScriptComponent $entity
    *   Javascript component being saved.
    */
   protected function createOrUpdateComponentEntity(JavaScriptComponent $entity): void {
@@ -114,11 +80,9 @@ final class JavascriptComponentStorage extends XbAssetStorage {
       return;
     }
 
-    // Before exposing a JavaScriptComponent as an XB Component for the first
-    // time, it must be flagged as being added to XB's component library, and it
-    // must not be a block override.
-    // ⚠️ The second condition is highly experimental and *will* be refactored.
-    if ($entity->status() === FALSE || $entity->get('block_override') !== NULL) {
+    // Before exposing a JavaScriptComponent as an Canvas Component for the first
+    // time it must be flagged as being added to Canvas's component library.
+    if ($entity->status() === FALSE) {
       return;
     }
     try {

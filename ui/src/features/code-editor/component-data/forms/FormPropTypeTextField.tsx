@@ -1,11 +1,13 @@
 import { Flex, TextField } from '@radix-ui/themes';
-import {
-  FormElement,
-  Label,
-  Divider,
-} from '@/features/code-editor/component-data/FormElement';
+
 import { useAppDispatch } from '@/app/hooks';
 import { updateProp } from '@/features/code-editor/codeEditorSlice';
+import {
+  Divider,
+  FormElement,
+  Label,
+} from '@/features/code-editor/component-data/FormElement';
+
 import type { CodeComponentProp } from '@/types/CodeComponent';
 
 export default function FormPropTypeTextField({
@@ -26,6 +28,7 @@ export default function FormPropTypeTextField({
       <FormElement>
         <Label htmlFor={`prop-example-${id}`}>Example value</Label>
         <TextField.Root
+          autoComplete="off"
           id={`prop-example-${id}`}
           type={['integer', 'number'].includes(type) ? 'number' : 'text'}
           step={type === 'integer' ? 1 : undefined}

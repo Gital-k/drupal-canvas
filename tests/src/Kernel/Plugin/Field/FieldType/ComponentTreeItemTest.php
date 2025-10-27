@@ -2,28 +2,30 @@
 
 declare(strict_types=1);
 
-namespace Drupal\Tests\experience_builder\Kernel\Plugin\Field\FieldType;
+namespace Drupal\Tests\canvas\Kernel\Plugin\Field\FieldType;
 
 use Drupal\Core\Field\BaseFieldDefinition;
-use Drupal\experience_builder\Entity\Component;
-use Drupal\experience_builder\Entity\ComponentInterface;
-use Drupal\experience_builder\Entity\JavaScriptComponent;
-use Drupal\experience_builder\Plugin\Field\FieldType\ComponentTreeItem;
-use Drupal\experience_builder\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
+use Drupal\canvas\Entity\Component;
+use Drupal\canvas\Entity\ComponentInterface;
+use Drupal\canvas\Entity\JavaScriptComponent;
+use Drupal\canvas\Entity\VersionedConfigEntityBase;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
 use Drupal\KernelTests\KernelTestBase;
 use Drupal\node\Entity\Node;
 use Drupal\node\Entity\NodeType;
-use Drupal\Tests\experience_builder\Kernel\Traits\CiModulePathTrait;
-use Drupal\Tests\experience_builder\Traits\ConstraintViolationsTestTrait;
-use Drupal\Tests\experience_builder\Traits\ContribStrictConfigSchemaTestTrait;
-use Drupal\Tests\experience_builder\Traits\GenerateComponentConfigTrait;
-use Drupal\Tests\experience_builder\Traits\SingleDirectoryComponentTreeTestTrait;
+use Drupal\Tests\canvas\Kernel\Traits\CiModulePathTrait;
+use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
+use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
+use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
+use Drupal\Tests\canvas\Traits\SingleDirectoryComponentTreeTestTrait;
 use Drupal\Tests\image\Kernel\ImageFieldCreationTrait;
+use Drupal\Tests\user\Traits\UserCreationTrait;
 
 /**
- * @coversDefaultClass \Drupal\experience_builder\Plugin\Field\FieldType\ComponentTreeItem
- * @group experience_builder
- * @group #slow
+ * @coversDefaultClass \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem
+ * @group canvas
  */
 class ComponentTreeItemTest extends KernelTestBase {
 
@@ -33,16 +35,17 @@ class ComponentTreeItemTest extends KernelTestBase {
   use ContribStrictConfigSchemaTestTrait;
   use GenerateComponentConfigTrait;
   use CiModulePathTrait;
+  use UserCreationTrait;
   use ImageFieldCreationTrait;
 
   /**
    * {@inheritdoc}
    */
   protected static $modules = [
-    'experience_builder',
+    'canvas',
     'sdc',
     'sdc_test',
-    'xb_test_sdc',
+    'canvas_test_sdc',
     // Dependencies must actually exist.
     'field',
     'user',
@@ -55,7 +58,10 @@ class ComponentTreeItemTest extends KernelTestBase {
     'link',
     'system',
     'media',
-    'xb_test_code_components',
+    'canvas_test_code_components',
+    'filter',
+    'ckeditor5',
+    'editor',
   ];
 
   /**
@@ -64,6 +70,7 @@ class ComponentTreeItemTest extends KernelTestBase {
   protected function setUp(): void {
     parent::setUp();
 
+    $this->installConfig('canvas');
     $this->generateComponentConfig();
     $this->installEntitySchema('user');
     $this->installEntitySchema('node_type');
@@ -71,9 +78,72 @@ class ComponentTreeItemTest extends KernelTestBase {
   }
 
   /**
+   * @covers ::setValue
+   * @covers ::onChange
+   */
+  public function testSetValue(): void {
+    $this->generateComponentConfig();
+    $component = Component::load('sdc.canvas_test_sdc.props-slots');
+    assert($component !== NULL);
+
+    // The test Component has a single version; create a second version.
+    self::assertCount(1, $component->getVersions());
+    $settings = $component->getSettings();
+    $settings['prop_field_definitions']['heading']['default_value'][0]['value'] = 'Updated example value 👋';
+    $component->createVersion('bcf3fbf52a2b169b')
+      ->setSettings($settings)
+      ->save();
+    $violations = $component->getTypedData()->validate();
+    self::assertSame([], self::violationsToArray($violations));
+    self::assertCount(2, $component->getVersions());
+
+    // A helper method to set 2 instances of the exact same component to two
+    // different versions, and assert that this is A) valid, B) successful.
+    $set_values = function (ComponentTreeItemList $item_list) use ($component) {
+      $inputs = [
+        'heading' => 'This is really tricky for a first-timer …',
+      ];
+      $item_list->setValue([
+        [
+          'uuid' => '947c196f-f108-43fd-a446-03a08100d571',
+          'component_id' => 'sdc.canvas_test_sdc.props-slots',
+          // ⚠️ Note the absence of a component version!
+          'inputs' => $inputs,
+        ],
+        [
+          'uuid' => '947c196f-f108-43fd-a446-03a08100d572',
+          'component_id' => 'sdc.canvas_test_sdc.props-slots',
+          'component_version' => $component->getVersions()[1],
+          'inputs' => $inputs,
+        ],
+      ]);
+      $violations = $item_list->validate();
+      self::assertSame([], self::violationsToArray($violations));
+      self::assertInstanceOf(ComponentTreeItem::class, $item_list->get(0));
+      self::assertInstanceOf(ComponentTreeItem::class, $item_list->get(1));
+      self::assertSame($component->getActiveVersion(), $item_list->get(0)->getComponentVersion());
+      self::assertSame($component->getVersions()[0], $item_list->get(0)->getComponentVersion());
+      self::assertSame($component->getVersions()[1], $item_list->get(1)->getComponentVersion());
+    };
+
+    // Create a component tree item list using the oldest version; then try
+    // editing it. The component version should not change.
+    $component_tree = $this->createDanglingComponentTreeItemList();
+
+    // Iteration 1: populate the empty component tree item list.
+    self::assertTrue($component_tree->isEmpty());
+    $set_values($component_tree);
+
+    // Iteration 2: check idempotency — setting the same values should yield the
+    // same result. Anything else would be data loss.
+    self::assertFalse($component_tree->isEmpty());
+    $set_values($component_tree);
+  }
+
+  /**
    * @testWith ["not-a-uuid", {"0.parent_uuid": "This is not a valid UUID."}]
    *           ["", {"0.parent_uuid": "This value should not be blank."}]
-   * @covers \Drupal\experience_builder\Plugin\Validation\Constraint\ComponentTreeStructureConstraintValidator
+   * @covers \Drupal\canvas\Plugin\Validation\Constraint\ComponentTreeStructureConstraintValidator
    */
   public function testInvalidParentUuid(string $parent_uuid, array $expected_violations): void {
     $this->generateComponentConfig();
@@ -82,13 +152,9 @@ class ComponentTreeItemTest extends KernelTestBase {
       [
         'parent_uuid' => $parent_uuid,
         'uuid' => '947c196f-f108-43fd-a446-03a08100d579',
-        'component_id' => 'sdc.xb_test_sdc.props-slots',
+        'component_id' => 'sdc.canvas_test_sdc.props-slots',
         'inputs' => [
-          'heading' => [
-            'sourceType' => 'static:field_item:string',
-            'value' => 'This is really tricky for a first-timer …',
-            'expression' => 'ℹ︎string␟value',
-          ],
+          'heading' => 'This is really tricky for a first-timer …',
         ],
       ],
     ]);
@@ -98,7 +164,7 @@ class ComponentTreeItemTest extends KernelTestBase {
   }
 
   /**
-   * @testWith ["not-a-slot", {"1.slot": "Invalid component subtree. This component subtree contains an invalid slot name for component <em class=\"placeholder\">sdc.xb_test_sdc.props-slots</em>: <em class=\"placeholder\">not-a-slot</em>. Valid slot names are: <em class=\"placeholder\">the_body, the_footer, the_colophon</em>."}]
+   * @testWith ["not-a-slot", {"1.slot": "Invalid component subtree. This component subtree contains an invalid slot name for component <em class=\"placeholder\">sdc.canvas_test_sdc.props-slots</em>: <em class=\"placeholder\">not-a-slot</em>. Valid slot names are: <em class=\"placeholder\">the_body, the_footer, the_colophon</em>."}]
    *           ["", {"1.slot": "This value should not be blank."}]
    *           ["_", {"1.slot": "<em class=\"placeholder\">&quot;_&quot;</em> is not a valid slot name."}]
    *           ["-", {"1.slot": "<em class=\"placeholder\">&quot;-&quot;</em> is not a valid slot name."}]
@@ -108,7 +174,7 @@ class ComponentTreeItemTest extends KernelTestBase {
    *           ["invalid_", {"1.slot": "<em class=\"placeholder\">&quot;invalid_&quot;</em> is not a valid slot name."}]
    *           [null, {"1.slot": "Invalid component tree item with UUID <em class=\"placeholder\">8b6b47ec-1167-433b-975d-e2d97739f5a6</em>. A slot name must be present if a parent uuid is provided."}]
    *           ["the_body", {}]
-   * @covers \Drupal\experience_builder\Plugin\Validation\Constraint\ComponentTreeStructureConstraintValidator
+   * @covers \Drupal\canvas\Plugin\Validation\Constraint\ComponentTreeStructureConstraintValidator
    */
   public function testInvalidSlot(?string $slot, array $expected_violations): void {
     $root_uuid = '947c196f-f108-43fd-a446-03a08100d579';
@@ -119,26 +185,18 @@ class ComponentTreeItemTest extends KernelTestBase {
     $item_list->setValue([
       [
         'uuid' => $root_uuid,
-        'component_id' => 'sdc.xb_test_sdc.props-slots',
+        'component_id' => 'sdc.canvas_test_sdc.props-slots',
         'inputs' => [
-          'heading' => [
-            'sourceType' => 'static:field_item:string',
-            'value' => 'This is really tricky for a first-timer …',
-            'expression' => 'ℹ︎string␟value',
-          ],
+          'heading' => 'This is really tricky for a first-timer …',
         ],
       ],
       [
         'parent_uuid' => $root_uuid,
         'slot' => $slot,
         'uuid' => $child_uuid,
-        'component_id' => 'sdc.xb_test_sdc.props-no-slots',
+        'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
         'inputs' => [
-          'heading' => [
-            'sourceType' => 'static:field_item:string',
-            'value' => '… but eventually it all makes sense. Wished I RTFMd.',
-            'expression' => 'ℹ︎string␟value',
-          ],
+          'heading' => '… but eventually it all makes sense. Wished I RTFMd.',
         ],
       ],
     ]);
@@ -148,7 +206,7 @@ class ComponentTreeItemTest extends KernelTestBase {
   }
 
   /**
-   * @covers \Drupal\experience_builder\Plugin\Validation\Constraint\ValidConfigEntityVersionConstraintValidator
+   * @covers \Drupal\canvas\Plugin\Validation\Constraint\ValidConfigEntityVersionConstraintValidator
    */
   public function testInvalidVersion(): void {
     $root_uuid = '947c196f-f108-43fd-a446-03a08100d579';
@@ -159,36 +217,28 @@ class ComponentTreeItemTest extends KernelTestBase {
     $item_list->setValue([
       [
         'uuid' => $root_uuid,
-        'component_id' => 'sdc.xb_test_sdc.props-slots',
+        'component_id' => 'sdc.canvas_test_sdc.props-slots',
         'component_version' => 'lol',
         'inputs' => [
-          'heading' => [
-            'sourceType' => 'static:field_item:string',
-            'value' => 'This is really tricky for a first-timer …',
-            'expression' => 'ℹ︎string␟value',
-          ],
+          'heading' => 'This is really tricky for a first-timer …',
         ],
       ],
       [
         'parent_uuid' => $root_uuid,
         'slot' => 'the_body',
         'uuid' => $child_uuid,
-        'component_id' => 'sdc.xb_test_sdc.props-no-slots',
-        'component_version' => 'hah',
+        'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+        'component_version' => VersionedConfigEntityBase::ACTIVE_VERSION,
         'inputs' => [
-          'heading' => [
-            'sourceType' => 'static:field_item:string',
-            'value' => '… but eventually it all makes sense. Wished I RTFMd.',
-            'expression' => 'ℹ︎string␟value',
-          ],
+          'heading' => '… but eventually it all makes sense. Wished I RTFMd.',
         ],
       ],
     ]);
     $this->assertCount(2, $item_list);
     $violations = $item_list->validate();
     $this->assertSame([
-      '0.component_version' => "'lol' is not a version that exists on component config entity 'sdc.xb_test_sdc.props-slots'. Available versions: 'ab4d3ddce315cf64'.",
-      '1.component_version' => "'hah' is not a version that exists on component config entity 'sdc.xb_test_sdc.props-no-slots'. Available versions: '95f4f1d5ee47663b'.",
+      '0.component_version' => "'lol' is not a version that exists on component config entity 'sdc.canvas_test_sdc.props-slots'. Available versions: '85a5c0c7dd53e0bb'.",
+      '1.component_version' => "'active' is not a version that exists on component config entity 'sdc.canvas_test_sdc.props-no-slots'. Available versions: 'b1e991f726a2a266'.",
     ], self::violationsToArray($violations));
   }
 
@@ -206,10 +256,10 @@ class ComponentTreeItemTest extends KernelTestBase {
     $js_uuid = '0aaa0f58-287c-453d-be65-81ba0f4e6f1c';
 
     $this->generateComponentConfig();
-    $this->installConfig('xb_test_code_components');
+    $this->installConfig('canvas_test_code_components');
 
     $item_list = $this->createDanglingComponentTreeItemList();
-    $js_component_id = 'js.xb_test_code_components_with_props';
+    $js_component_id = 'js.canvas_test_code_components_with_props';
 
     $js_component = Component::load($js_component_id);
     \assert($js_component instanceof ComponentInterface);
@@ -218,42 +268,26 @@ class ComponentTreeItemTest extends KernelTestBase {
     $item_list->setValue([
       [
         'uuid' => $root_uuid,
-        'component_id' => 'sdc.xb_test_sdc.props-slots',
+        'component_id' => 'sdc.canvas_test_sdc.props-slots',
         'inputs' => [
-          'heading' => [
-            'sourceType' => 'static:field_item:string',
-            'value' => 'This is really tricky for a first-timer …',
-            'expression' => 'ℹ︎string␟value',
-          ],
+          'heading' => 'This is really tricky for a first-timer …',
         ],
       ],
       [
         'parent_uuid' => $root_uuid,
         'slot' => 'the_body',
         'uuid' => $child_uuid,
-        'component_id' => 'sdc.xb_test_sdc.props-no-slots',
+        'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
         'inputs' => [
-          'heading' => [
-            'sourceType' => 'static:field_item:string',
-            'value' => '… but eventually it all makes sense. Wished I RTFMd.',
-            'expression' => 'ℹ︎string␟value',
-          ],
+          'heading' => '… but eventually it all makes sense. Wished I RTFMd.',
         ],
       ],
       [
         'uuid' => $js_uuid,
         'component_id' => $js_component_id,
         'inputs' => [
-          'name' => [
-            'sourceType' => 'static:field_item:string',
-            'value' => 'Mad Dog Morgan',
-            'expression' => 'ℹ︎string␟value',
-          ],
-          'age' => [
-            'sourceType' => 'static:field_item:integer',
-            'value' => '35',
-            'expression' => 'ℹ︎integer␟value',
-          ],
+          'name' => 'Mad Dog Morgan',
+          'age' => '35',
         ],
       ],
     ]);
@@ -266,9 +300,9 @@ class ComponentTreeItemTest extends KernelTestBase {
     $this->assertNull($root->getParentUuid());
     $this->assertNull($root->getParentComponentTreeItem());
     $this->assertNull($root->getSlot());
-    $this->assertSame('sdc.xb_test_sdc.props-slots', $root->getComponentId());
+    $this->assertSame('sdc.canvas_test_sdc.props-slots', $root->getComponentId());
     $this->assertInstanceOf(Component::class, $root->getComponent());
-    $component = Component::load('sdc.xb_test_sdc.props-slots');
+    $component = Component::load('sdc.canvas_test_sdc.props-slots');
     $this->assertSame($component?->toArray(), $root->getComponent()->toArray());
     $this->assertSame($root_uuid, $root->getUuid());
     self::assertEquals($component->getLoadedVersion(), $root->getComponentVersion());
@@ -279,14 +313,14 @@ class ComponentTreeItemTest extends KernelTestBase {
     $this->assertSame($root_uuid, $child->getParentUuid());
     $this->assertSame($root, $child->getParentComponentTreeItem());
     $this->assertSame('the_body', $child->getSlot());
-    $this->assertSame('sdc.xb_test_sdc.props-no-slots', $child->getComponentId());
+    $this->assertSame('sdc.canvas_test_sdc.props-no-slots', $child->getComponentId());
     $this->assertInstanceOf(Component::class, $child->getComponent());
-    $this->assertSame(Component::load('sdc.xb_test_sdc.props-no-slots')?->toArray(), $child->getComponent()->toArray());
+    $this->assertSame(Component::load('sdc.canvas_test_sdc.props-no-slots')?->toArray(), $child->getComponent()->toArray());
     $this->assertSame($child_uuid, $child->getUuid());
 
     // Add a new prop to the JS component and assert that the loaded version for
     // the saved item still uses the original version.
-    $js_component_entity = JavaScriptComponent::load('xb_test_code_components_with_props');
+    $js_component_entity = JavaScriptComponent::load('canvas_test_code_components_with_props');
     \assert($js_component_entity instanceof JavaScriptComponent);
     $props = $js_component_entity->getProps();
     $props['real_name'] = [
@@ -309,21 +343,9 @@ class ComponentTreeItemTest extends KernelTestBase {
       'uuid' => '85fe2843-acac-4f17-b17b-0eeaa648ea2f',
       'component_id' => $js_component_id,
       'inputs' => [
-        'name' => [
-          'sourceType' => 'static:field_item:string',
-          'value' => 'Mad Dog Morgan',
-          'expression' => 'ℹ︎string␟value',
-        ],
-        'real_name' => [
-          'sourceType' => 'static:field_item:string',
-          'value' => 'John Owen',
-          'expression' => 'ℹ︎string␟value',
-        ],
-        'age' => [
-          'sourceType' => 'static:field_item:integer',
-          'value' => '35',
-          'expression' => 'ℹ︎integer␟value',
-        ],
+        'name' => 'Mad Dog Morgan',
+        'real_name' => 'John Owen',
+        'age' => '35',
       ],
     ]);
 
@@ -356,9 +378,9 @@ class ComponentTreeItemTest extends KernelTestBase {
     $type->save();
     $this->createImageField('field_hero', 'node', 'article', storage_settings: [
       // @todo Remove once https://drupal.org/i/3513317 is fixed.
-      // We cannot rely on the override because experience_builder module is not
+      // We cannot rely on the override because canvas module is not
       // yet installed so need to manually specify it here for testing sake.
-      // @see \Drupal\experience_builder\Plugin\Field\FieldTypeOverride\ImageItemOverride::defaultStorageSettings
+      // @see \Drupal\canvas\Plugin\Field\FieldTypeOverride\ImageItemOverride::defaultStorageSettings
       'display_default' => TRUE,
     ]);
 
@@ -366,13 +388,15 @@ class ComponentTreeItemTest extends KernelTestBase {
     $this->assertSame(
       [
         'config' => [
-          'experience_builder.component.sdc.experience_builder.image',
-          'experience_builder.component.sdc.xb_test_sdc.my-cta',
+          'canvas.component.sdc.canvas_test_sdc.image',
+          'canvas.component.sdc.canvas_test_sdc.my-cta',
           'field.field.node.article.field_hero',
+          'image.style.canvas_parametrized_width',
           'node.type.article',
         ],
         'content' => [],
         'module' => [
+          'file',
           'node',
         ],
         'theme' => [],
@@ -382,7 +406,7 @@ class ComponentTreeItemTest extends KernelTestBase {
           [
             [
               'uuid' => $uuid->generate(),
-              'component_id' => 'sdc.experience_builder.image',
+              'component_id' => 'sdc.canvas_test_sdc.image',
               'inputs' => [
                 'image' => [
                   'sourceType' => 'dynamic',
@@ -392,13 +416,9 @@ class ComponentTreeItemTest extends KernelTestBase {
             ],
             [
               'uuid' => $uuid->generate(),
-              'component_id' => 'sdc.xb_test_sdc.my-cta',
+              'component_id' => 'sdc.canvas_test_sdc.my-cta',
               'inputs' => [
-                'text' => [
-                  'sourceType' => 'static:field_item:string',
-                  'value' => 'hello, world!',
-                  'expression' => 'ℹ︎string␟value',
-                ],
+                'text' => 'hello, world!',
                 'href' => [
                   'sourceType' => 'static:field_item:uri',
                   'value' => 'https://drupal.org',
@@ -408,7 +428,7 @@ class ComponentTreeItemTest extends KernelTestBase {
             ],
             [
               'uuid' => $uuid->generate(),
-              'component_id' => 'sdc.xb_test_sdc.my-cta',
+              'component_id' => 'sdc.canvas_test_sdc.my-cta',
               'inputs' => [
                 'text' => [
                   'sourceType' => 'dynamic',
@@ -423,7 +443,7 @@ class ComponentTreeItemTest extends KernelTestBase {
             ],
             [
               'uuid' => $uuid->generate(),
-              'component_id' => 'sdc.xb_test_sdc.my-cta',
+              'component_id' => 'sdc.canvas_test_sdc.my-cta',
               'inputs' => [
                 'text' => [
                   'sourceType' => 'dynamic',
@@ -437,7 +457,7 @@ class ComponentTreeItemTest extends KernelTestBase {
             ],
             [
               'uuid' => $uuid->generate(),
-              'component_id' => 'sdc.experience_builder.image',
+              'component_id' => 'sdc.canvas_test_sdc.image',
               'inputs' => [
                 'image' => [
                   'sourceType' => 'adapter:image_apply_style',
@@ -465,63 +485,67 @@ class ComponentTreeItemTest extends KernelTestBase {
     array_walk($test_cases, fn(array &$test_case) => $test_case[] = []);
     $test_cases = array_merge($test_cases, static::getInvalidTreeTestCases());
     $test_cases['invalid values using dynamic inputs'][] = [
-      'field_xb_test.0' => "The 'dynamic' prop source type must be absent.",
+      'field_canvas_test.0' => "The 'dynamic' prop source type must be absent.",
     ];
+    $test_cases['invalid values using dynamic inputs'][] = ['access content'];
     $test_cases['invalid UUID, missing component_id key'][] = [
-      'field_xb_test.0.uuid' => 'This is not a valid UUID.',
-      'field_xb_test.0.component_id' => 'This value should not be blank.',
-      'field_xb_test.0.component_version' => 'This value should not be blank.',
+      'field_canvas_test.0.uuid' => 'This is not a valid UUID.',
+      'field_canvas_test.0.component_id' => 'This value should not be blank.',
+      'field_canvas_test.0.component_version' => 'This value should not be blank.',
     ];
     $test_cases['missing components, using dynamic inputs'][] = [
-      'field_xb_test.0.component_id' => "The 'experience_builder.component.sdc.sdc_test.missing' config does not exist.",
-      'field_xb_test.1.component_id' => "The 'experience_builder.component.sdc.sdc_test.missing-also' config does not exist.",
-      'field_xb_test.0' => "The 'dynamic' prop source type must be absent.",
-      'field_xb_test.1' => "The 'dynamic' prop source type must be absent.",
-      'field_xb_test.2' => "The 'dynamic' prop source type must be absent.",
+      'field_canvas_test.0.component_id' => "The 'canvas.component.sdc.sdc_test.missing' config does not exist.",
+      'field_canvas_test.1.component_id' => "The 'canvas.component.sdc.sdc_test.missing-also' config does not exist.",
+      'field_canvas_test.0' => "The 'dynamic' prop source type must be absent.",
+      'field_canvas_test.1' => "The 'dynamic' prop source type must be absent.",
+      'field_canvas_test.2' => "The 'dynamic' prop source type must be absent.",
     ];
+    $test_cases['missing components, using dynamic inputs'][] = ['access content'];
     $test_cases['missing components, using only static inputs'][] = [
-      'field_xb_test.0.component_id' => "The 'experience_builder.component.sdc.sdc_test.missing' config does not exist.",
+      'field_canvas_test.0.component_id' => "The 'canvas.component.sdc.sdc_test.missing' config does not exist.",
     ];
     $test_cases['inputs invalid, using dynamic inputs'][] = [
-      \sprintf('field_xb_test.0.inputs.%s.heading', self::UUID_DYNAMIC_STATIC_CARD_2) => 'The property heading is required.',
-      'field_xb_test.0' => "The 'dynamic' prop source type must be absent.",
-      \sprintf('field_xb_test.1.inputs.%s.heading', self::UUID_DYNAMIC_STATIC_CARD_3) => 'The property heading is required.',
-      'field_xb_test.1' => "The 'dynamic' prop source type must be absent.",
-      'field_xb_test.2' => "The 'dynamic' prop source type must be absent.",
+      \sprintf('field_canvas_test.0.inputs.%s.heading', self::UUID_DYNAMIC_STATIC_CARD_2) => 'The property heading is required.',
+      'field_canvas_test.0' => "The 'dynamic' prop source type must be absent.",
+      \sprintf('field_canvas_test.1.inputs.%s.heading', self::UUID_DYNAMIC_STATIC_CARD_3) => 'The property heading is required.',
+      'field_canvas_test.1' => "The 'dynamic' prop source type must be absent.",
+      'field_canvas_test.2' => "The 'dynamic' prop source type must be absent.",
     ];
+    $test_cases['inputs invalid, using dynamic inputs'][] = ['access content'];
     $test_cases['inputs invalid, using only static inputs'][] = [
-      \sprintf('field_xb_test.0.inputs.%s.heading', self::UUID_DYNAMIC_STATIC_CARD_2) => 'The property heading is required.',
+      \sprintf('field_canvas_test.0.inputs.%s.heading', self::UUID_DYNAMIC_STATIC_CARD_2) => 'The property heading is required.',
     ];
     $test_cases['missing inputs key'][] = [
-      \sprintf('field_xb_test.0.inputs.%s', self::UUID_DYNAMIC_STATIC_CARD_2) => 'The required properties are missing.',
-      \sprintf('field_xb_test.1.inputs.%s', self::UUID_DYNAMIC_STATIC_CARD_3) => 'The required properties are missing.',
-      \sprintf('field_xb_test.2.inputs.%s', self::UUID_DYNAMIC_STATIC_CARD_4) => 'The required properties are missing.',
+      \sprintf('field_canvas_test.0.inputs.%s', self::UUID_DYNAMIC_STATIC_CARD_2) => 'The required properties are missing.',
+      \sprintf('field_canvas_test.1.inputs.%s', self::UUID_DYNAMIC_STATIC_CARD_3) => 'The required properties are missing.',
+      \sprintf('field_canvas_test.2.inputs.%s', self::UUID_DYNAMIC_STATIC_CARD_4) => 'The required properties are missing.',
     ];
     $test_cases['non unique uuids'][] = [
-      'field_xb_test' => 'Not all component instance UUIDs in this component tree are unique.',
+      'field_canvas_test' => 'Not all component instance UUIDs in this component tree are unique.',
     ];
     $test_cases['invalid parent'][] = [
-      'field_xb_test.1.parent_uuid' => 'Invalid component tree item with UUID <em class="placeholder">e303dd88-9409-4dc7-8a8b-a31602884a94</em> references an invalid parent <em class="placeholder">6381352f-5b0a-4ca1-960d-a5505b37b27c</em>.',
+      'field_canvas_test.1.parent_uuid' => 'Invalid component tree item with UUID <em class="placeholder">e303dd88-9409-4dc7-8a8b-a31602884a94</em> references an invalid parent <em class="placeholder">6381352f-5b0a-4ca1-960d-a5505b37b27c</em>.',
     ];
     $test_cases['invalid slot'][] = [
-      'field_xb_test.1.slot' => 'Invalid component subtree. This component subtree contains an invalid slot name for component <em class="placeholder">sdc.xb_test_sdc.props-slots</em>: <em class="placeholder">banana</em>. Valid slot names are: <em class="placeholder">the_body, the_footer, the_colophon</em>.',
+      'field_canvas_test.1.slot' => 'Invalid component subtree. This component subtree contains an invalid slot name for component <em class="placeholder">sdc.canvas_test_sdc.props-slots</em>: <em class="placeholder">banana</em>. Valid slot names are: <em class="placeholder">the_body, the_footer, the_colophon</em>.',
     ];
     return $test_cases;
   }
 
   /**
-   * @coversClass \Drupal\experience_builder\Plugin\Validation\Constraint\ValidComponentTreeItemConstraintValidator
+   * @coversClass \Drupal\canvas\Plugin\Validation\Constraint\ValidComponentTreeItemConstraintValidator
    * @param array $field_values
    * @param array $expected_violations
    *
    * @dataProvider providerInvalidField
    */
-  public function testInvalidField(array $field_values, array $expected_violations): void {
-    $this->container->get('module_installer')->install(['xb_test_config_node_article']);
+  public function testInvalidField(array $field_values, array $expected_violations, array $permissions = []): void {
+    $this->setUpCurrentUser(permissions: $permissions);
+    $this->container->get('module_installer')->install(['canvas_test_config_node_article']);
     $node = Node::create([
       'title' => 'Test node',
       'type' => 'article',
-      'field_xb_test' => $field_values,
+      'field_canvas_test' => $field_values,
     ]);
     $violations = $node->validate();
     $this->assertSame($expected_violations, self::violationsToArray($violations));

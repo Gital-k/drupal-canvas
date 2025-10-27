@@ -1,4 +1,4 @@
-import { useAppDispatch, useAppSelector } from '@/app/hooks';
+import { InfoCircledIcon } from '@radix-ui/react-icons';
 import {
   Box,
   Callout,
@@ -7,6 +7,8 @@ import {
   Switch,
   TextField,
 } from '@radix-ui/themes';
+
+import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import {
   addProp,
   removeProp,
@@ -15,25 +17,26 @@ import {
   toggleRequired,
   updateProp,
 } from '@/features/code-editor/codeEditorSlice';
-import FormPropTypeBoolean from '@/features/code-editor/component-data/forms/FormPropTypeBoolean';
-import FormPropTypeEnum from '@/features/code-editor/component-data/forms/FormPropTypeEnum';
-import FormPropTypeTextField from '@/features/code-editor/component-data/forms/FormPropTypeTextField';
-import FormPropTypeLink from '@/features/code-editor/component-data/forms/FormPropTypeLink';
-import FormPropTypeFormattedText from '@/features/code-editor/component-data/forms/FormPropTypeFormattedText';
-import FormPropTypeImage from '@/features/code-editor/component-data/forms/FormPropTypeImage';
-import SortableList from '@/features/code-editor/component-data/SortableList';
+import derivedPropTypes from '@/features/code-editor/component-data/derivedPropTypes';
 import {
   FormElement,
   Label,
 } from '@/features/code-editor/component-data/FormElement';
+import FormPropTypeBoolean from '@/features/code-editor/component-data/forms/FormPropTypeBoolean';
+import FormPropTypeEnum from '@/features/code-editor/component-data/forms/FormPropTypeEnum';
+import FormPropTypeFormattedText from '@/features/code-editor/component-data/forms/FormPropTypeFormattedText';
+import FormPropTypeImage from '@/features/code-editor/component-data/forms/FormPropTypeImage';
+import FormPropTypeLink from '@/features/code-editor/component-data/forms/FormPropTypeLink';
+import FormPropTypeTextField from '@/features/code-editor/component-data/forms/FormPropTypeTextField';
+import FormPropTypeVideo from '@/features/code-editor/component-data/forms/FormPropTypeVideo';
+import SortableList from '@/features/code-editor/component-data/SortableList';
+import { getPropMachineName } from '@/features/code-editor/utils/utils';
+
 import type {
   CodeComponentProp,
   CodeComponentPropImageExample,
+  CodeComponentPropVideoExample,
 } from '@/types/CodeComponent';
-import { getPropMachineName } from '@/features/code-editor/utils';
-import { InfoCircledIcon } from '@radix-ui/react-icons';
-
-import derivedPropTypes from '@/features/code-editor/component-data/derivedPropTypes';
 
 export default function Props() {
   const dispatch = useAppDispatch();
@@ -62,6 +65,7 @@ export default function Props() {
             <FormElement>
               <Label htmlFor={`prop-name-${prop.id}`}>Prop name</Label>
               <TextField.Root
+                autoComplete="off"
                 id={`prop-name-${prop.id}`}
                 placeholder="Enter a name"
                 value={prop.name}
@@ -175,6 +179,15 @@ export default function Props() {
                   required={required.includes(propName)}
                 />
               );
+            case 'video':
+              return (
+                <FormPropTypeVideo
+                  id={prop.id}
+                  example={prop.example as CodeComponentPropVideoExample}
+                  isDisabled={componentStatus}
+                  required={required.includes(propName)}
+                />
+              );
             case 'boolean':
               return (
                 <FormPropTypeBoolean
@@ -185,7 +198,6 @@ export default function Props() {
               );
             case 'listText':
             case 'listInteger':
-            case 'listNumber':
               return (
                 <FormPropTypeEnum
                   type={prop.type as 'string' | 'number' | 'integer'}

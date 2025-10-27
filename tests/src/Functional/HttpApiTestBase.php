@@ -2,24 +2,26 @@
 
 declare(strict_types=1);
 
-namespace Drupal\Tests\experience_builder\Functional;
+namespace Drupal\Tests\canvas\Functional;
 
+use Drupal\Core\Cache\Cache;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Url;
-use Drupal\experience_builder\AutoSave\AutoSaveManager;
-use Drupal\experience_builder\Entity\XbHttpApiEligibleConfigEntityInterface;
+use Drupal\canvas\AutoSave\AutoSaveManager;
+use Drupal\canvas\Entity\CanvasHttpApiEligibleConfigEntityInterface;
 use Drupal\Tests\ApiRequestTrait;
-use Drupal\Tests\experience_builder\Traits\AutoSaveManagerTestTrait;
+use Drupal\Tests\canvas\Traits\AutoSaveManagerTestTrait;
 use Drupal\user\UserInterface;
 use GuzzleHttp\RequestOptions;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Base class for functional tests of XB's internal HTTP API.
+ * Base class for functional tests of Canvas's internal HTTP API.
  *
  * Provides helper methods for making API requests and asserting response cacheability.
  *
- * @group experience_builder
+ * @group canvas
  */
 abstract class HttpApiTestBase extends FunctionalTestBase {
 
@@ -77,15 +79,31 @@ abstract class HttpApiTestBase extends FunctionalTestBase {
    * Asserts the given data can be auto-saved (and retrieved) correctly.
    */
   protected function performAutoSave(array $data_to_auto_save, array $expected_auto_save_entity, string $entity_type_id, string $entity_id): void {
+    static $clientIdNumber = 0;
+    $auto_save_url = Url::fromUri("base:/canvas/api/v0/config/auto-save/$entity_type_id/$entity_id");
     $request_options = [
       RequestOptions::HEADERS => [
         'Content-Type' => 'application/json',
       ],
     ];
-    $auto_save_url = Url::fromUri("base:/xb/api/v0/config/auto-save/$entity_type_id/$entity_id");
-    $request_options[RequestOptions::JSON] = $data_to_auto_save;
+    $getResponse = $this->makeApiRequest('GET', $auto_save_url, $request_options);
+    self::assertSame(Response::HTTP_OK, $getResponse->getStatusCode());
+    $decoded = json_decode((string) $getResponse->getBody(), associative: TRUE, flags: JSON_THROW_ON_ERROR);
+    self::assertArrayHasKey('autoSaves', $decoded);
+    $autoSaves = $decoded['autoSaves'];
+    $request_options[RequestOptions::JSON] = [
+      'data' => $data_to_auto_save,
+      'autoSaves' => $autoSaves,
+      // Use a unique client instance ID to ensure that auto-save hashes are
+      // always verified, except when we are explicitly testing using the same
+      // client.
+      // @see \Drupal\Tests\canvas\Kernel\AutoSave\AutoSaveConflictTestTrait::testOutdatedAutoSave()
+      // @see \Drupal\canvas\Controller\AutoSaveTrait::validateAutoSaves()
+      'clientInstanceId' => 'test-client-' . (++$clientIdNumber),
+    ];
     $patch_response = $this->assertExpectedResponse('PATCH', $auto_save_url, $request_options, 200, NULL, NULL, NULL, NULL);
-    $this->assertSame([], $patch_response);
+    $entity = $this->container->get(EntityTypeManagerInterface::class)->getStorage($entity_type_id)->load($entity_id);
+    self::assertSame($this->getClientAutoSaves([$entity]), $patch_response);
 
     $this->assertCurrentAutoSave(200, $expected_auto_save_entity, $entity_type_id, $entity_id);
   }
@@ -99,15 +117,26 @@ abstract class HttpApiTestBase extends FunctionalTestBase {
         'Content-Type' => 'application/json',
       ],
     ];
-    $auto_save_url = Url::fromUri("base:/xb/api/v0/config/auto-save/$entity_type_id/$entity_id");
+    $auto_save_url = Url::fromUri("base:/canvas/api/v0/config/auto-save/$entity_type_id/$entity_id");
+    // Because the 'autoSaveStartingPoint`, which is returned from the
+    // $auto_save_url GET request, is created using the saved entity in addition
+    // to the auto-save entry we need to expect the cache tags of the entity.
+    // @see \Drupal\canvas\Controller\AutoSaveValidateTrait::getClientAutoSaveData()
+    $entity = $this->container->get(EntityTypeManagerInterface::class)->getStorage($entity_type_id)->load($entity_id);
+    $cacheTags = [AutoSaveManager::CACHE_TAG, 'http_response'];
+    if ($entity instanceof EntityInterface) {
+      $cacheTags = Cache::mergeTags($cacheTags, $entity->getCacheTags());
+    }
 
     // First GET request: auto-save retrieved successfully?
     // - 200 if there is a current auto-save
     // - 204 if there isn't one
     // - 404 if this entity does not exist (anymore)
     if ($expected_status_code < 400) {
-      $auto_save_data = $this->assertExpectedResponse('GET', $auto_save_url, $request_options, $expected_status_code, ['user.permissions'], [AutoSaveManager::CACHE_TAG, 'http_response'], 'UNCACHEABLE (request policy)', 'MISS');
-      $this->assertSame($expected_auto_save, $auto_save_data);
+      $auto_save_data = $this->assertExpectedResponse('GET', $auto_save_url, $request_options, $expected_status_code, ['user.permissions'], $cacheTags, 'UNCACHEABLE (request policy)', 'MISS');
+      $this->assertIsArray($auto_save_data);
+      $this->assertArrayHasKey('data', $auto_save_data);
+      $this->assertSame($expected_auto_save, $auto_save_data['data']);
     }
     else {
       $this->assertExpectedResponse('GET', $auto_save_url, $request_options, $expected_status_code, NULL, NULL, 'UNCACHEABLE (request policy)', 'UNCACHEABLE (no cacheability)');
@@ -116,8 +145,10 @@ abstract class HttpApiTestBase extends FunctionalTestBase {
     if ($expected_status_code < 400) {
       // Repeat the same request: same status code, but now is a Dynamic Page
       // Cache hit.
-      $auto_save_data = $this->assertExpectedResponse('GET', $auto_save_url, $request_options, $expected_status_code, ['user.permissions'], [AutoSaveManager::CACHE_TAG, 'http_response'], 'UNCACHEABLE (request policy)', 'HIT');
-      $this->assertSame($expected_auto_save, $auto_save_data);
+      $auto_save_data = $this->assertExpectedResponse('GET', $auto_save_url, $request_options, $expected_status_code, ['user.permissions'], $cacheTags, 'UNCACHEABLE (request policy)', 'HIT');
+      $this->assertIsArray($auto_save_data);
+      $this->assertArrayHasKey('data', $auto_save_data);
+      $this->assertSame($expected_auto_save, $auto_save_data['data']);
     }
 
     // The expected array must also match what the AutoSaveManager currently contains.
@@ -137,23 +168,43 @@ abstract class HttpApiTestBase extends FunctionalTestBase {
     }
     \assert($entity instanceof EntityInterface);
     $data = $this->container->get(AutoSaveManager::class)->getAutoSaveEntity($entity)->entity;
-    \assert($data instanceof XbHttpApiEligibleConfigEntityInterface);
-    $this->assertSame($expected_auto_save, $data->normalizeForClientSide()->values);
+    \assert($data instanceof CanvasHttpApiEligibleConfigEntityInterface);
+
+    // Auto-save normalizations must NEVER provide links to convey available
+    // entity operations. That is for the canonical routes to provide.
+    $this->assertSame(
+      $expected_auto_save,
+      array_diff_key(
+        $data->normalizeForClientSide()->values,
+        array_flip(['links']),
+      ),
+    );
   }
 
   /**
    * Asserts we can delete a resource, and we get an empty list afterward.
    */
-  protected function assertDeletionAndEmptyList(Url $resource_url, Url $list_url, string $list_cache_tag): void {
-    // Delete the sole remaining segment via the XB HTTP API: 204.
+  protected function assertDeletionAndEmptyList(Url $resource_url, Url $list_url, string $list_cache_tag, array $default_list = []): void {
+    // Delete the sole remaining segment via the Canvas HTTP API: 204.
     $body = $this->assertExpectedResponse('DELETE', $resource_url, [], 204, NULL, NULL, NULL, NULL);
     $this->assertNull($body);
 
     // Re-retrieve list: 200, empty list. Dynamic Page Cache miss.
-    $body = $this->assertExpectedResponse('GET', $list_url, [], 200, ['user.roles:authenticated'], [$list_cache_tag, 'http_response'], 'UNCACHEABLE (request policy)', 'MISS');
-    $this->assertSame([], $body);
+    $body = $this->assertExpectedResponse('GET', $list_url, [], 200, ['user.permissions'], [$list_cache_tag, 'http_response'], 'UNCACHEABLE (request policy)', 'MISS');
+    if (empty($default_list)) {
+      $this->assertSame([], $body);
+    }
+    else {
+      // If the default list is not empty, check against that instead of an
+      // empty array. We only expect this for the Folder config entity type.
+      // @see \Drupal\Tests\canvas\Functional\CanvasConfigEntityHttpApiTest::$defaultFolders
+      assert(str_contains($list_url->getUri(), 'folder'));
+      $this->assertSameFoldersSansUuids($default_list, $body ?? []);
+    }
     $individual_body = $this->assertExpectedResponse('GET', $resource_url, [], 404, NULL, NULL, 'UNCACHEABLE (request policy)', 'UNCACHEABLE (no cacheability)');
-    $this->assertSame([], $individual_body);
+    if (empty($default_list)) {
+      $this->assertSame([], $individual_body);
+    }
   }
 
   protected function assertSingleConfigAutoSaveList(EntityInterface $entity, UserInterface $user): void {
@@ -176,7 +227,7 @@ abstract class HttpApiTestBase extends FunctionalTestBase {
         'label' => $entity->label(),
       ],
     ];
-    $body = $this->assertExpectedResponse('GET', Url::fromUri("base:/xb/api/v0/auto-saves/pending"), $request_options, 200, ['user.permissions'], ['config:user.settings', AutoSaveManager::CACHE_TAG, 'http_response', 'user:2'], 'UNCACHEABLE (request policy)', 'MISS');
+    $body = $this->assertExpectedResponse('GET', Url::fromUri("base:/canvas/api/v0/auto-saves/pending"), $request_options, 200, ['user.permissions'], [...$entity->getCacheTags(), 'config:user.settings', AutoSaveManager::CACHE_TAG, 'http_response', "user:{$user->id()}"], 'UNCACHEABLE (request policy)', 'MISS');
     $id = array_keys($expected_list)[0];
     \assert(\is_array($body));
     self::assertArrayHasKey($id, $body);
@@ -184,6 +235,39 @@ abstract class HttpApiTestBase extends FunctionalTestBase {
     self::assertArrayHasKey('updated', $body[$id]);
     unset($body[$id]['updated'], $body[$id]['data_hash']);
     $this->assertSame($expected_list, $body);
+  }
+
+  /**
+   * Asserts that two Folders match other than their UUIDs.
+   *
+   * (Folder auto-creation means that names of Folders are predictable, but not
+   * their UUIDs, which are randomly generated by the configuration system.)
+   */
+  protected function assertSameFoldersSansUuids(array $expected, array $actual): void {
+    $this->assertCount(count($expected), $actual);
+
+    $expected_values = array_map(function ($item) {
+      unset($item['id']);
+      $items = $item['items'];
+      asort($items);
+      $item['items'] = array_values($items);
+      return $item;
+    }, array_values($expected));
+    usort($expected_values, function ($a, $b) {
+      return strcmp($a['name'], $b['name']);
+    });
+
+    $actual_values = array_map(function ($item) {
+      unset($item['id']);
+      $items = $item['items'];
+      asort($items);
+      $item['items'] = array_values($items);
+      return $item;
+    }, array_values($actual));
+    usort($actual_values, function ($a, $b) {
+      return strcmp($a['name'], $b['name']);
+    });
+    $this->assertSame($expected_values, $actual_values);
   }
 
 }

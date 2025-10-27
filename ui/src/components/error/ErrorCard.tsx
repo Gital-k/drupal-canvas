@@ -1,5 +1,6 @@
-import { Box, Button, Callout } from '@radix-ui/themes';
 import { ExclamationTriangleIcon, ReloadIcon } from '@radix-ui/react-icons';
+import { Box, Button, Callout } from '@radix-ui/themes';
+
 import type React from 'react';
 
 const DEFAULT_TITLE = 'An unexpected error has occurred.';
@@ -20,7 +21,7 @@ const ErrorCard: React.FC<{
   asChild = false,
   children,
 }) => (
-  <Box data-testid="xb-error-card" maxWidth="520px" mt="4">
+  <Box data-testid="canvas-error-card" maxWidth="520px" mt="4">
     <Callout.Root color="red" role="alert">
       <Callout.Icon>
         <ExclamationTriangleIcon />
@@ -33,7 +34,7 @@ const ErrorCard: React.FC<{
       </Box>
       {resetErrorBoundary && (
         <Box mt="1">
-          <Button data-testid="xb-error-reset" onClick={resetErrorBoundary}>
+          <Button data-testid="canvas-error-reset" onClick={resetErrorBoundary}>
             <ReloadIcon />
             {resetButtonText}
           </Button>

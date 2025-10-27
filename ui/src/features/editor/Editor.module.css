@@ -1,12 +1,9 @@
-.xbContainer {
+.canvasContainer {
   position: fixed;
   inset: var(--topbar-height) 0 0 0;
   background-color: white;
 }
-.absoluteContainer {
-  position: absolute;
-}
-.xbCalloutContainer {
+.canvasCalloutContainer {
   position: fixed;
   z-index: 9999;
   display: none;
@@ -18,10 +15,10 @@
 }
 
 @media (max-width: 1023px) {
-  .xbCalloutContainer {
+  .canvasCalloutContainer {
     display: flex;
   }
-  .xbAppContent {
+  .canvasAppContent {
     display: none;
   }
 }

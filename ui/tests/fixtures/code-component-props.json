@@ -10,7 +10,7 @@
     {
       "name": "String with example value",
       "type": "string",
-      "example": "Experience Builder",
+      "example": "Drupal Canvas",
       "id": "1c374686-8c73-4a01-8727-a36ff1cc59eb",
       "derivedType": "text"
     },
@@ -59,7 +59,20 @@
     {
       "name": "Text list with no example value",
       "type": "string",
-      "enum": ["Not Started", "In Progress", "Completed"],
+      "enum": [
+        {
+          "label": "Pending",
+          "value": "Not Started"
+        },
+        {
+          "label": "Thinking",
+          "value": "In Progress"
+        },
+        {
+          "label": "Finished",
+          "value": "Completed"
+        }
+      ],
       "example": "",
       "id": "aa2e3ece-9431-4db9-a64e-1d2f0699912d",
       "derivedType": "listText"
@@ -67,7 +80,20 @@
     {
       "name": "Text list with example value",
       "type": "string",
-      "enum": ["Not Started", "In Progress", "Completed"],
+      "enum": [
+        {
+          "label": "Pending",
+          "value": "Not Started"
+        },
+        {
+          "label": "Thinking",
+          "value": "In Progress"
+        },
+        {
+          "label": "Finished",
+          "value": "Completed"
+        }
+      ],
       "example": "In Progress",
       "id": "80c7cc4c-4e84-41fc-a42e-2bfbc19f4a96",
       "derivedType": "listText"
@@ -75,7 +101,20 @@
     {
       "name": "Integer list with no example value",
       "type": "integer",
-      "enum": ["1", "2", "3"],
+      "enum": [
+        {
+          "label": "One",
+          "value": 1
+        },
+        {
+          "label": "Two",
+          "value": 2
+        },
+        {
+          "label": "Three",
+          "value": 3
+        }
+      ],
       "example": "",
       "id": "a361cca0-6aca-4d55-907d-10275df8c7fa",
       "derivedType": "listInteger"
@@ -83,26 +122,23 @@
     {
       "name": "Integer list with example value",
       "type": "integer",
-      "enum": ["1", "2", "3"],
+      "enum": [
+        {
+          "label": "One",
+          "value": 1
+        },
+        {
+          "label": "Two",
+          "value": 2
+        },
+        {
+          "label": "Three",
+          "value": 3
+        }
+      ],
       "example": "2",
       "id": "30b57352-8c6c-48b1-a782-8bcbc69d7df7",
       "derivedType": "listInteger"
-    },
-    {
-      "name": "Number list with no example value",
-      "type": "number",
-      "enum": ["1.1", "2.2", "3.3"],
-      "example": "",
-      "id": "ee5110ad-332b-48f4-b4c8-75e685bbe2ba",
-      "derivedType": "listNumber"
-    },
-    {
-      "name": "Number list with example value",
-      "type": "number",
-      "enum": ["1.1", "2.2", "3.3"],
-      "example": "2.2",
-      "id": "a411ac98-ab57-45f1-9b48-596fa1276f8e",
-      "derivedType": "listNumber"
     },
     {
       "name": "Formatted text with no example value",
@@ -125,7 +161,7 @@
     {
       "name": "Image with no example value",
       "type": "object",
-      "$ref": "json-schema-definitions://experience_builder.module/image",
+      "$ref": "json-schema-definitions://canvas.module/image",
       "example": "",
       "id": "af004b63-5f58-4923-be8e-3249dde1b32e",
       "derivedType": "image"
@@ -133,7 +169,7 @@
     {
       "name": "Image with example value",
       "type": "object",
-      "$ref": "json-schema-definitions://experience_builder.module/image",
+      "$ref": "json-schema-definitions://canvas.module/image",
       "example": {
         "src": "https://placehold.co/1200x900@2x.png",
         "width": 1200,
@@ -192,8 +228,26 @@
       "derivedType": "formattedText",
       "contentMediaType": "text/html",
       "x-formatting-context": "block"
+    },
+    {
+      "name": "Video with no example value",
+      "type": "object",
+      "$ref": "json-schema-definitions://canvas.module/video",
+      "example": "",
+      "id": "12af6543-df85-4e6f-9054-8b6617b02c25",
+      "derivedType": "video"
+    },
+    {
+      "name": "Video with example value",
+      "type": "object",
+      "$ref": "json-schema-definitions://canvas.module/video",
+      "example": {
+        "src": "/modules/contrib/canvas/ui/assets/videos/mountain_wide.mp4",
+        "poster": "https://placehold.co/1920x1080.png?text=Horizontal"
+      },
+      "id": "4ea2a14d-7828-467c-a505-063f006f1ebf",
+      "derivedType": "video"
     }
-
   ],
   "serialized": {
     "stringWithNoExampleValue": {
@@ -203,7 +257,7 @@
     "stringWithExampleValue": {
       "title": "String with example value",
       "type": "string",
-      "examples": ["Experience Builder"]
+      "examples": ["Drupal Canvas"]
     },
     "integerWithNoExampleValue": {
       "title": "Integer with no example value",
@@ -236,35 +290,44 @@
     "textListWithNoExampleValue": {
       "title": "Text list with no example value",
       "type": "string",
-      "enum": ["Not Started", "In Progress", "Completed"]
+      "enum": ["Not Started", "In Progress", "Completed"],
+      "meta:enum": {
+        "Not Started": "Pending",
+        "In Progress": "Thinking",
+        "Completed": "Finished"
+      }
     },
     "textListWithExampleValue": {
       "title": "Text list with example value",
       "type": "string",
       "enum": ["Not Started", "In Progress", "Completed"],
-      "examples": ["In Progress"]
+      "examples": ["In Progress"],
+      "meta:enum": {
+        "Not Started": "Pending",
+        "In Progress": "Thinking",
+        "Completed": "Finished"
+      }
     },
     "integerListWithNoExampleValue": {
       "title": "Integer list with no example value",
       "type": "integer",
-      "enum": [1, 2, 3]
+      "enum": [1, 2, 3],
+      "meta:enum": {
+        "1": "One",
+        "2": "Two",
+        "3": "Three"
+      }
     },
     "integerListWithExampleValue": {
       "title": "Integer list with example value",
       "type": "integer",
       "enum": [1, 2, 3],
-      "examples": [2]
-    },
-    "numberListWithNoExampleValue": {
-      "title": "Number list with no example value",
-      "type": "number",
-      "enum": [1.1, 2.2, 3.3]
-    },
-    "numberListWithExampleValue": {
-      "title": "Number list with example value",
-      "type": "number",
-      "enum": [1.1, 2.2, 3.3],
-      "examples": [2.2]
+      "examples": [2],
+      "meta:enum": {
+        "1": "One",
+        "2": "Two",
+        "3": "Three"
+      }
     },
     "formattedTextWithNoExampleValue": {
       "title": "Formatted text with no example value",
@@ -282,7 +345,7 @@
     "imageWithNoExampleValue": {
       "title": "Image with no example value",
       "type": "object",
-      "$ref": "json-schema-definitions://experience_builder.module/image"
+      "$ref": "json-schema-definitions://canvas.module/image"
     },
     "imageWithExampleValue": {
       "title": "Image with example value",
@@ -293,7 +356,7 @@
         "height": 900,
         "alt": "Example image placeholder"
       }],
-      "$ref": "json-schema-definitions://experience_builder.module/image"
+      "$ref": "json-schema-definitions://canvas.module/image"
     },
     "relativePathLinkWithNoExampleValue": {
       "title": "Relative path link with no example value",
@@ -320,14 +383,27 @@
     "deprecatedTextAreaWithNoExampleValue": {
       "title": "Deprecated text area with no example value",
       "type": "string",
-      "$ref": "json-schema-definitions://experience_builder.module/textarea"
+      "$ref": "json-schema-definitions://canvas.module/textarea"
     },
     "deprecatedTextAreaWithExampleValue": {
       "title": "Deprecated text area with example value",
       "type": "string",
       "examples": ["Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged."],
-      "$ref": "json-schema-definitions://experience_builder.module/textarea"
+      "$ref": "json-schema-definitions://canvas.module/textarea"
+    },
+    "videoWithNoExampleValue": {
+      "title": "Video with no example value",
+      "type": "object",
+      "$ref": "json-schema-definitions://canvas.module/video"
+    },
+    "videoWithExampleValue": {
+      "title": "Video with example value",
+      "type": "object",
+      "examples": [{
+        "src": "/ui/assets/videos/mountain_wide.mp4",
+        "poster": "https://placehold.co/1920x1080.png?text=Horizontal"
+      }],
+      "$ref": "json-schema-definitions://canvas.module/video"
     }
-
   }
 }

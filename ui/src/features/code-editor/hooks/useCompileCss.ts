@@ -8,9 +8,10 @@
 
 import { useCallback } from 'react';
 import {
+  compilePartialCss,
+  compileCss as compileTailwindCss,
   extractClassNameCandidates,
   transformCss,
-  compileCss as compileTailwindCss,
 } from 'tailwindcss-in-browser';
 
 const useCompileCss = (): {
@@ -19,7 +20,11 @@ const useCompileCss = (): {
   buildTailwindCssFromClassNameCandidates: (
     classNameCandidates: string[],
     configurationCss: string,
-  ) => Promise<string>;
+  ) => Promise<{ css: string; error?: string }>;
+  buildComponentCss: (
+    componentCss: string,
+    configurationCss: string,
+  ) => Promise<{ css: string; error?: string }>;
 } => ({
   /**
    * Extracts class names candidates from markup.
@@ -47,15 +52,50 @@ const useCompileCss = (): {
    */
   buildTailwindCssFromClassNameCandidates: useCallback(
     async (classNameCandidates: string[], configurationCss: string) => {
-      const compiledCss = await compileTailwindCss(
-        classNameCandidates,
-        configurationCss,
-      );
-      // The CSS syntax needs to be transformed.
-      return await transformCss(compiledCss);
+      try {
+        const compiledCss = await compileTailwindCss(
+          classNameCandidates,
+          configurationCss,
+        );
+        // The CSS syntax needs to be transformed.
+        const transformedCss = await transformCss(compiledCss);
+        return { css: transformedCss };
+      } catch (error) {
+        console.error('Failed to compile Tailwind CSS:', error);
+        return {
+          css: '/*! Compiling Tailwind CSS failed. */',
+          error: `Failed to compile Tailwind CSS:', ${error}`,
+        };
+      }
     },
     [],
   ),
+
+  /**
+   * Builds Component CSS with Tailwind CSS resolving @apply directives.
+   *
+   * @param componentCss - Component CSS.
+   * @param configurationCss - Global CSS / Tailwind CSS configuration.
+   *
+   * @see https://www.npmjs.com/package/tailwindcss-in-browser#tailwind-css-4-configuration
+   */
+  buildComponentCss: useCallback(async (componentCss, configurationCss) => {
+    try {
+      const compiledComponentCss = await compilePartialCss(
+        componentCss,
+        configurationCss,
+      );
+      // The CSS syntax needs to be transformed.
+      const transformedComponentCss = await transformCss(compiledComponentCss);
+      return { css: transformedComponentCss };
+    } catch (error) {
+      console.error('Failed to compile component CSS:', error);
+      return {
+        css: '/*! Compiling component CSS failed. */',
+        error: `Failed to compile component CSS:', ${error}`,
+      };
+    }
+  }, []),
 });
 
 export default useCompileCss;

@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace Drupal\experience_builder\ShapeMatcher;
+namespace Drupal\canvas\ShapeMatcher;
 
 /**
  * Describes a single shape requirement for a Drupal data type.
  *
  * @see \Drupal\Core\TypedData\Attribute\DataType
- * @see \Drupal\experience_builder\JsonSchemaInterpreter\DataTypeShapeRequirements
+ * @see \Drupal\canvas\JsonSchemaInterpreter\DataTypeShapeRequirements
  */
-final class DataTypeShapeRequirement {
+final class DataTypeShapeRequirement implements \IteratorAggregate {
 
   /**
    * @param array<mixed> $constraintOptions
@@ -27,6 +27,10 @@ final class DataTypeShapeRequirement {
     if ($this->interface !== NULL && $this->constraint !== 'PrimitiveType') {
       throw new \DomainException('An interface restriction only makes sense when the `PrimitiveType` constraint is used.');
     }
+  }
+
+  public function getIterator(): \Traversable {
+    return new \ArrayIterator([$this]);
   }
 
 }

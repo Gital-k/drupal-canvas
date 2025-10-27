@@ -1,46 +1,51 @@
-import type { Action, Middleware, ThunkAction } from '@reduxjs/toolkit';
+import undoable from 'redux-undo';
+import { v4 as uuidv4 } from 'uuid';
 import { combineSlices, configureStore } from '@reduxjs/toolkit';
 import { setupListeners } from '@reduxjs/toolkit/query';
-import { v4 as uuidv4 } from 'uuid';
-import { rtkQueryErrorHandler } from '@/utils/rtkQuery-error';
-import type { UndoRedoType } from '@/features/ui/uiSlice';
+
+import { publishReviewSlice } from '@/components/review/PublishReview.slice';
+import codeEditorSlice from '@/features/code-editor/codeEditorSlice';
+import { configurationSlice } from '@/features/configuration/configurationSlice';
+import { queryErrorSlice } from '@/features/error-handling/queryErrorSlice';
+import { extensionsSlice } from '@/features/extensions/extensionsSlice';
+import { formStateSlice } from '@/features/form/formStateSlice';
+import {
+  layoutModelReducer,
+  setInitialLayoutModel,
+  setUpdatePreview,
+} from '@/features/layout/layoutModelSlice';
+import {
+  pageDataReducer,
+  setInitialPageData,
+} from '@/features/pageData/pageDataSlice';
+import { previewSlice } from '@/features/pagePreview/previewSlice';
+import { personalizationSlice } from '@/features/personalization/personalizationSlice';
+import { codeComponentDialogSlice } from '@/features/ui/codeComponentDialogSlice';
+import { dialogSlice } from '@/features/ui/dialogSlice';
+import { primaryPanelSlice } from '@/features/ui/primaryPanelSlice';
 import {
   performUndoOrRedo,
   pushUndo,
   setLatestUndoRedoActionId,
   uiSlice,
 } from '@/features/ui/uiSlice';
-import { primaryPanelSlice } from '@/features/ui/primaryPanelSlice';
-import { dialogSlice } from '@/features/ui/dialogSlice';
-import { codeComponentDialogSlice } from '@/features/ui/codeComponentDialogSlice';
-import { previewApi } from '@/services/preview';
-import undoable from 'redux-undo';
-import type { LayoutModelSliceState } from '@/features/layout/layoutModelSlice';
-import {
-  setUpdatePreview,
-  setInitialLayoutModel,
-} from '@/features/layout/layoutModelSlice';
-import { layoutModelReducer } from '@/features/layout/layoutModelSlice';
-import type { PageDataState } from '@/features/pageData/pageDataSlice';
-import {
-  pageDataReducer,
-  setInitialPageData,
-} from '@/features/pageData/pageDataSlice';
-import { dummyPropsFormApi } from '@/services/dummyPropsForm';
-import { pageDataFormApi } from '@/services/pageDataForm';
-import { configurationSlice } from '@/features/configuration/configurationSlice';
-import { sectionApi } from '@/services/sections';
-import { extensionsSlice } from '@/features/extensions/extensionsSlice';
 import { assetLibraryApi } from '@/services/assetLibrary';
 import { componentAndLayoutApi } from '@/services/componentAndLayout';
-import { formStateSlice } from '@/features/form/formStateSlice';
-import type { UnknownAction } from 'redux';
-import { pendingChangesApi } from '@/services/pendingChangesApi';
-import { publishReviewSlice } from '@/components/review/PublishReview.slice';
-import codeEditorSlice from '@/features/code-editor/codeEditorSlice';
-import { previewSlice } from '@/features/pagePreview/previewSlice';
+import { componentInstanceFormApi } from '@/services/componentInstanceForm';
 import { contentApi } from '@/services/content';
-import { queryErrorSlice } from '@/features/error-handling/queryErrorSlice';
+import { extensionsApi } from '@/services/extensions';
+import { pageDataFormApi } from '@/services/pageDataForm';
+import { patternApi } from '@/services/patterns';
+import { pendingChangesApi } from '@/services/pendingChangesApi';
+import { personalizationApi } from '@/services/personalization';
+import { previewApi } from '@/services/preview';
+import { rtkQueryErrorHandler } from '@/utils/rtkQuery-error';
+
+import type { Action, Middleware, ThunkAction } from '@reduxjs/toolkit';
+import type { UnknownAction } from 'redux';
+import type { LayoutModelSliceState } from '@/features/layout/layoutModelSlice';
+import type { PageDataState } from '@/features/pageData/pageDataSlice';
+import type { UndoRedoStackItem, UndoRedoType } from '@/features/ui/uiSlice';
 
 // Reducer enhancer to decorate undoable aware reducers and unset future state
 // if an action is performed on another undoable slice.
@@ -57,8 +62,10 @@ const historyEraser = <T>(
     const type = action.type;
     if (
       type === 'ui/pushUndo' &&
-      action.payload !== undefined &&
-      action.payload !== thisType &&
+      action.payload !== null &&
+      typeof action.payload === 'object' &&
+      'targetSlice' in action.payload &&
+      (action.payload as UndoRedoStackItem).targetSlice !== thisType &&
       newState.future.length > 0
     ) {
       // Discard the future (redo) states for this slice as we've moved into a
@@ -125,12 +132,14 @@ const rootReducer = combineSlices(
       'pageData',
     ),
   },
-  sectionApi,
+  patternApi,
   assetLibraryApi,
+  personalizationApi,
   componentAndLayoutApi,
   previewApi,
-  dummyPropsFormApi,
+  componentInstanceFormApi,
   pageDataFormApi,
+  extensionsApi,
   configurationSlice,
   primaryPanelSlice,
   dialogSlice,
@@ -144,6 +153,7 @@ const rootReducer = combineSlices(
   codeEditorSlice,
   previewSlice,
   queryErrorSlice,
+  personalizationSlice,
 );
 // Infer the `RootState` type from the root reducer
 export type RootState = ReturnType<typeof rootReducer>;
@@ -179,7 +189,21 @@ const undoRedoActionIdMiddleware: Middleware<{}, RootState> =
     }
     const [slice] = type.split('/');
     if (slice === 'layoutModel' || slice === 'pageData') {
-      store.dispatch(pushUndo(slice as UndoRedoType));
+      // Get current route from state and push undo with route snapshot.
+      const state = store.getState();
+      const currentRoute = state.ui.currentRoute;
+      store.dispatch(
+        pushUndo({
+          targetSlice: slice as UndoRedoType,
+          routeSnapshot: currentRoute,
+          ...(import.meta.env.DEV &&
+            import.meta.env.TEST === false && {
+              // Add debug info for the action that triggered the undo/redo,
+              // only in development mode.
+              debugInfoAction: action as Action,
+            }),
+        }),
+      );
     }
     return next(action);
   };
@@ -193,18 +217,38 @@ export const makeStore = (preloadedState?: Partial<RootState>) => {
     // and other useful features of `rtk-query`.
     middleware: (getDefaultMiddleware) => {
       return getDefaultMiddleware().concat(
-        sectionApi.middleware,
+        patternApi.middleware,
         assetLibraryApi.middleware,
+        personalizationApi.middleware,
         componentAndLayoutApi.middleware,
         previewApi.middleware,
-        dummyPropsFormApi.middleware,
+        componentInstanceFormApi.middleware,
         pageDataFormApi.middleware,
+        extensionsApi.middleware,
         undoRedoActionIdMiddleware,
         pendingChangesApi.middleware,
         contentApi.middleware,
         rtkQueryErrorHandler, // Add the error handling middleware
       );
     },
+    ...(import.meta.env.DEV && {
+      // Configuration passed to Redux DevTools.
+      // @see https://github.com/reduxjs/redux-devtools/blob/main/extension/docs/API/Arguments.md
+      devTools: {
+        actionsDenylist: [
+          // Do not include actions from RTK Query in the logs. They are
+          // usually not useful for debugging, and can be very verbose.
+          '.*Api/.*',
+          '__rtkq',
+          // The following actions from the UI slice can fill up the list of
+          // actions very quickly. It's better to comment out the following
+          // lines when they're specifically needed for debugging.
+          'ui/setIsPanning',
+          'ui/setHoveredComponent',
+          'ui/unsetHoveredComponent',
+        ],
+      },
+    }),
     preloadedState,
   });
   // configure listeners using the provided defaults

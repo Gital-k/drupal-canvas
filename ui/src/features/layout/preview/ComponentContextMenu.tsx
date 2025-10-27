@@ -1,28 +1,32 @@
-import type React from 'react';
-import type { ReactNode } from 'react';
 import { useCallback, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ContextMenu } from '@radix-ui/themes';
-import { UnifiedMenu } from '@/components/UnifiedMenu';
+
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
-import {
-  selectCanvasViewPortScale,
-  unsetHoveredComponent,
-} from '@/features/ui/uiSlice';
-import type { UnifiedMenuType } from '@/components/UnifiedMenu';
-import type { ComponentNode } from '@/features/layout/layoutModelSlice';
+import PermissionCheck from '@/components/PermissionCheck';
+import { UnifiedMenu } from '@/components/UnifiedMenu';
 import {
   deleteNode,
   duplicateNode,
   shiftNode,
 } from '@/features/layout/layoutModelSlice';
-import { setDialogOpen } from '@/features/ui/dialogSlice';
-import useGetComponentName from '@/hooks/useGetComponentName';
+import ComponentContextMenuMoveInto from '@/features/layout/preview/ComponentContextMenuMoveInto';
 import ComponentContextMenuRegions from '@/features/layout/preview/ComponentContextMenuRegions';
+import { setDialogOpen } from '@/features/ui/dialogSlice';
+import {
+  selectEditorViewPortScale,
+  selectSelectedComponentUuid,
+  unsetHoveredComponent,
+} from '@/features/ui/uiSlice';
 import useComponentSelection from '@/hooks/useComponentSelection';
-import { selectSelectedComponentUuid } from '@/features/ui/uiSlice';
 import useCopyPasteComponents from '@/hooks/useCopyPasteComponents';
+import useGetComponentName from '@/hooks/useGetComponentName';
 import { useGetComponentsQuery } from '@/services/componentAndLayout';
-import { useNavigate } from 'react-router-dom';
+
+import type React from 'react';
+import type { ReactNode } from 'react';
+import type { UnifiedMenuType } from '@/components/UnifiedMenu';
+import type { ComponentNode } from '@/features/layout/layoutModelSlice';
 
 interface ComponentContextMenuProps {
   children: ReactNode;
@@ -38,7 +42,7 @@ export const ComponentContextMenuContent: React.FC<
   const navigate = useNavigate();
   const { data: components } = useGetComponentsQuery();
   const componentName = useGetComponentName(component);
-  const canvasViewPortScale = useAppSelector(selectCanvasViewPortScale);
+  const editorViewPortScale = useAppSelector(selectEditorViewPortScale);
   const selectedComponent = useAppSelector(selectSelectedComponentUuid);
   const { setSelectedComponent, unsetSelectedComponent } =
     useComponentSelection();
@@ -121,13 +125,13 @@ export const ComponentContextMenuContent: React.FC<
     [dispatch, componentUuid],
   );
 
-  const handleCreateSectionClick = useCallback(
+  const handleCreatePatternClick = useCallback(
     (e: React.MouseEvent<HTMLElement>) => {
       e.stopPropagation();
       if (componentUuid !== selectedComponent) {
         setSelectedComponent(componentUuid);
       }
-      dispatch(setDialogOpen('saveAsSection'));
+      dispatch(setDialogOpen('saveAsPattern'));
     },
     [componentUuid, dispatch, selectedComponent, setSelectedComponent],
   );
@@ -141,7 +145,7 @@ export const ComponentContextMenuContent: React.FC<
         navigate(`/code-editor/component/${machineName}`);
       }
     },
-    [navigate, component.type],
+    [component.type, navigate],
   );
 
   const closeContextMenu = () => {
@@ -159,7 +163,7 @@ export const ComponentContextMenuContent: React.FC<
     // If the user zooms, close the context menu. Panning is no problem as the context menu prevents scrolling with the
     // mouse wheel, and it is closed automatically when panning via clicking the mouse.
     closeContextMenu();
-  }, [canvasViewPortScale]);
+  }, [editorViewPortScale]);
 
   return (
     <UnifiedMenu.Content
@@ -170,9 +174,11 @@ export const ComponentContextMenuContent: React.FC<
     >
       <UnifiedMenu.Label>{componentName}</UnifiedMenu.Label>
       {isCodeComponent && (
-        <UnifiedMenu.Item onClick={handleEditCodeClick}>
-          Edit code
-        </UnifiedMenu.Item>
+        <PermissionCheck hasPermission="codeComponents">
+          <UnifiedMenu.Item onClick={handleEditCodeClick}>
+            Edit code
+          </UnifiedMenu.Item>
+        </PermissionCheck>
       )}
       <UnifiedMenu.Separator />
 
@@ -185,10 +191,12 @@ export const ComponentContextMenuContent: React.FC<
       <UnifiedMenu.Item onClick={handlePasteClick} shortcut="⌘ V">
         Paste
       </UnifiedMenu.Item>
-      <UnifiedMenu.Separator />
-      <UnifiedMenu.Item onClick={handleCreateSectionClick}>
-        Create section
-      </UnifiedMenu.Item>
+      <PermissionCheck hasPermission="patterns">
+        <UnifiedMenu.Separator />
+        <UnifiedMenu.Item onClick={handleCreatePatternClick}>
+          Create pattern
+        </UnifiedMenu.Item>
+      </PermissionCheck>
       <UnifiedMenu.Separator />
 
       <UnifiedMenu.Sub>
@@ -202,12 +210,17 @@ export const ComponentContextMenuContent: React.FC<
           </UnifiedMenu.Item>
 
           <UnifiedMenu.Separator />
-          <UnifiedMenu.Item onClick={() => alert('Todo')}>
-            Move into
-          </UnifiedMenu.Item>
+          {components && Object.keys(components).length > 0 && (
+            <ComponentContextMenuMoveInto
+              component={component}
+              components={components}
+            />
+          )}
         </UnifiedMenu.SubContent>
       </UnifiedMenu.Sub>
-      <ComponentContextMenuRegions component={component} />
+      <PermissionCheck hasPermission="globalRegions">
+        <ComponentContextMenuRegions component={component} />
+      </PermissionCheck>
       <UnifiedMenu.Separator />
       <UnifiedMenu.Item shortcut="⌫" color="red" onClick={handleDeleteClick}>
         Delete

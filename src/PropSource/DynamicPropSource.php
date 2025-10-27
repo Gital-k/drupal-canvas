@@ -2,25 +2,30 @@
 
 declare(strict_types=1);
 
-namespace Drupal\experience_builder\PropSource;
+namespace Drupal\canvas\PropSource;
 
+use Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression;
+use Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression;
+use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Field\FieldItemListInterface;
-use Drupal\experience_builder\MissingHostEntityException;
-use Drupal\experience_builder\PropExpressions\StructuredData\Evaluator;
-use Drupal\experience_builder\PropExpressions\StructuredData\StructuredDataPropExpression;
-use Drupal\experience_builder\PropExpressions\StructuredData\StructuredDataPropExpressionInterface;
+use Drupal\canvas\MissingHostEntityException;
+use Drupal\canvas\PropExpressions\StructuredData\Evaluator;
+use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
 
 /**
  * Describes structured data to map to 1 explicit input of a component instance.
  *
- * @see \Drupal\experience_builder\ShapeMatcher\JsonSchemaFieldInstanceMatcher
+ * @see \Drupal\canvas\ShapeMatcher\JsonSchemaFieldInstanceMatcher
  * @internal
+ *
+ * @phpstan-import-type PropSourceArray from PropSourceBase
  */
 final class DynamicPropSource extends PropSourceBase {
 
   public function __construct(
-    private readonly StructuredDataPropExpressionInterface $expression,
+    public readonly FieldPropExpression|ReferenceFieldPropExpression|FieldObjectPropsExpression $expression,
   ) {}
 
   /**
@@ -39,6 +44,8 @@ final class DynamicPropSource extends PropSourceBase {
 
   /**
    * {@inheritdoc}
+   *
+   * @return PropSourceArray
    */
   public function toArray(): array {
     return [
@@ -58,17 +65,18 @@ final class DynamicPropSource extends PropSourceBase {
     }
     assert(array_key_exists('expression', $sdc_prop_source));
 
+    // @phpstan-ignore-next-line argument.type
     return new DynamicPropSource(StructuredDataPropExpression::fromString($sdc_prop_source['expression']));
   }
 
   /**
    * {@inheritdoc}
    */
-  public function evaluate(?FieldableEntityInterface $host_entity): mixed {
+  public function evaluate(?FieldableEntityInterface $host_entity, bool $is_required): mixed {
     if ($host_entity === NULL) {
       throw new MissingHostEntityException();
     }
-    return Evaluator::evaluate($host_entity, $this->expression);
+    return Evaluator::evaluate($host_entity, $this->expression, $is_required);
   }
 
   public function asChoice(): string {
@@ -84,8 +92,27 @@ final class DynamicPropSource extends PropSourceBase {
     // is given, then `content` dependencies may appear as well; otherwise the
     // calculated dependencies will be limited to the entity types, bundle (if
     // any) and fields (if any) that this expression depends on.
-    // @see \Drupal\Tests\experience_builder\Kernel\PropExpressionDependenciesTest
+    // @see \Drupal\Tests\canvas\Kernel\PropExpressionDependenciesTest
     return $this->expression->calculateDependencies($host_entity);
+  }
+
+  public function label(): TranslatableMarkup|string {
+    $entity_data_definition = $this->expression instanceof ReferenceFieldPropExpression
+      ? $this->expression->referencer->entityType
+      : $this->expression->entityType;
+    $field_definitions = $entity_data_definition->getPropertyDefinitions();
+
+    $field_name = $this->expression instanceof ReferenceFieldPropExpression
+      ? $this->expression->referencer->fieldName
+      : $this->expression->fieldName;
+    // TRICKY: FieldPropExpression::$fieldName can be an array, but only
+    // when used in a reference.
+    // @see https://www.drupal.org/i/3530521
+    assert(is_string($field_name));
+
+    \assert(\array_key_exists($field_name, $field_definitions));
+    // @phpstan-ignore-next-line return.type
+    return $field_definitions[$field_name]->getLabel();
   }
 
 }

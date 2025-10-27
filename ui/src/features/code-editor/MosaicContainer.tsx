@@ -1,26 +1,40 @@
-import type { MosaicNode } from 'react-mosaic-component';
 import {
-  MosaicWithoutDragDropContext,
   MosaicWindow,
+  MosaicWithoutDragDropContext,
 } from 'react-mosaic-component';
-import './xb-react-mosaic-component.css';
-import { useState } from 'react';
-import JavaScriptEditor from '@/features/code-editor/editors/JavaScriptEditor';
-import { Box, Button, ScrollArea, Tabs } from '@radix-ui/themes';
+
+import type { MosaicNode } from 'react-mosaic-component';
+
+import './canvas-react-mosaic-component.css';
+
+import { useEffect, useState } from 'react';
 import { LayoutIcon } from '@radix-ui/react-icons';
-import GlobalCssEditor from '@/features/code-editor/editors/GlobalCssEditor';
+import { Box, Button, ScrollArea, Tabs } from '@radix-ui/themes';
+
 import CssEditor from '@/features/code-editor/editors/CssEditor';
+import GlobalCssEditor from '@/features/code-editor/editors/GlobalCssEditor';
+import JavaScriptEditor from '@/features/code-editor/editors/JavaScriptEditor';
+
 import styles from './MosaicContainer.module.css';
-import './xb-code-mirror.css';
-import Preview from '@/features/code-editor/Preview';
-import ComponentData from '@/features/code-editor/component-data/ComponentData';
-import useCodeEditor from '@/features/code-editor/hooks/useCodeEditor';
-import { openAddToComponentsDialog } from '@/features/ui/codeComponentDialogSlice';
+
+import './canvas-code-mirror.css';
+
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import {
   selectCodeComponentProperty,
   selectCodeComponentSerialized,
 } from '@/features/code-editor/codeEditorSlice';
+import ComponentData from '@/features/code-editor/component-data/ComponentData';
+import useCodeEditor from '@/features/code-editor/hooks/useCodeEditor';
+import Preview from '@/features/code-editor/Preview';
+import ConflictWarning from '@/features/editor/ConflictWarning';
+import { selectLatestError } from '@/features/error-handling/queryErrorSlice';
+import { openAddToComponentsDialog } from '@/features/ui/codeComponentDialogSlice';
+import {
+  setActivePanel,
+  setManageLibraryTab,
+  unsetActivePanel,
+} from '@/features/ui/primaryPanelSlice';
 
 const defaultLayout: MosaicNode<string> = {
   direction: 'row',
@@ -52,11 +66,27 @@ const MosaicContainer = () => {
   const dispatch = useAppDispatch();
   const selectedComponent = useAppSelector(selectCodeComponentSerialized);
   const componentStatus = useAppSelector(selectCodeComponentProperty('status'));
-  const blockOverride = useAppSelector(
-    selectCodeComponentProperty('blockOverride'),
-  );
+  const latestError = useAppSelector(selectLatestError);
 
   const { isLoading } = useCodeEditor();
+
+  /**
+   * Set the active panel to "manageLibrary" and tab to "code" when the code editor loads
+   * Close the panel when it unloads.
+   */
+  useEffect(() => {
+    dispatch(setActivePanel('manageLibrary'));
+    dispatch(setManageLibraryTab('code'));
+    return () => {
+      dispatch(unsetActivePanel());
+      dispatch(setManageLibraryTab('components'));
+    };
+  }, [dispatch]);
+
+  // Check for conflict errors (same as Editor.tsx)
+  if (latestError && latestError.status === '409') {
+    return <ConflictWarning />;
+  }
 
   const TabGroup = () => {
     function tabChangeHandler(selectedTab: string) {
@@ -103,7 +133,7 @@ const MosaicContainer = () => {
   };
 
   return (
-    <div id="xb-mosaic-container" data-testid="xb-mosaic-container">
+    <div id="canvas-mosaic-container" data-testid="canvas-mosaic-container">
       {/* `DndProvider` is added in `ui/src/app/App.tsx` */}
       <MosaicWithoutDragDropContext
         value={layout}
@@ -120,7 +150,7 @@ const MosaicContainer = () => {
             case 'Editor':
               return (
                 <MosaicWindow<string>
-                  className="xb-mosaic-window-editor"
+                  className="canvas-mosaic-window-editor"
                   path={path}
                   draggable={false}
                   toolbarControls={
@@ -145,31 +175,30 @@ const MosaicContainer = () => {
             case 'Preview':
               return (
                 <MosaicWindow<string>
-                  className="xb-mosaic-window-preview"
+                  className="canvas-mosaic-window-preview"
                   path={path}
                   title="Preview"
                   draggable={false}
                   renderToolbar={({ title }) => {
                     return (
                       <Box width="100%">
-                        {componentStatus === false &&
-                          blockOverride === null && (
-                            <Box px="4">
-                              <Box className={styles.addToComponentsButton}>
-                                <Button
-                                  onClick={() => {
-                                    dispatch(
-                                      openAddToComponentsDialog(
-                                        selectedComponent,
-                                      ),
-                                    );
-                                  }}
-                                >
-                                  Add to components
-                                </Button>
-                              </Box>
+                        {componentStatus === false && (
+                          <Box px="4">
+                            <Box className={styles.addToComponentsButton}>
+                              <Button
+                                onClick={() => {
+                                  dispatch(
+                                    openAddToComponentsDialog(
+                                      selectedComponent,
+                                    ),
+                                  );
+                                }}
+                              >
+                                Add to components
+                              </Button>
                             </Box>
-                          )}
+                          </Box>
+                        )}
                         <div className="mosaic-window-title">
                           <span>{title}</span>
                         </div>
@@ -183,11 +212,9 @@ const MosaicContainer = () => {
             case 'Component data':
               return (
                 <MosaicWindow<string>
-                  className="xb-mosaic-window-component-data"
+                  className="canvas-mosaic-window-component-data"
                   path={path}
-                  title={
-                    blockOverride ? 'Example component data' : 'Component data'
-                  }
+                  title="Component data"
                   draggable={false}
                 >
                   <ComponentData isLoading={isLoading} />

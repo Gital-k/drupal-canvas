@@ -2,38 +2,48 @@
 
 declare(strict_types=1);
 
-namespace Drupal\Tests\experience_builder\Kernel;
+namespace Drupal\Tests\canvas\Kernel;
 
-use Drupal\experience_builder\AutoSave\AutoSaveManager;
-use Drupal\experience_builder\Entity\PageRegion;
+use Drupal\canvas\AutoSave\AutoSaveManager;
+use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\canvas\Entity\PageRegion;
+use Drupal\Core\Entity\ContentEntityInterface;
+use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Url;
 use Drupal\KernelTests\KernelTestBase;
-use Drupal\Tests\experience_builder\Kernel\Traits\RequestTrait;
-use Drupal\Tests\experience_builder\Traits\AutoSaveManagerTestTrait;
+use Drupal\node\Entity\Node;
+use Drupal\Tests\canvas\Kernel\Traits\RequestTrait;
+use Drupal\Tests\canvas\Kernel\Traits\VfsPublicStreamUrlTrait;
+use Drupal\Tests\canvas\Traits\AutoSaveManagerTestTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
-use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 /**
- * @phpstan-import-type ComponentConfigEntityId from \Drupal\experience_builder\Entity\Component
+ * @phpstan-import-type ComponentConfigEntityId from \Drupal\canvas\Entity\Component
  */
 class ApiLayoutControllerTestBase extends KernelTestBase {
 
   use AutoSaveManagerTestTrait;
 
-  const REGION_PATTERN = '/<!-- xb-region-start-%1$s -->([\n\s\S]*)<!-- xb-region-end-%1$s -->/';
+  const REGION_PATTERN = '/<!-- canvas-region-start-%1$s -->([\n\s\S]*)<!-- canvas-region-end-%1$s -->/';
 
   use RequestTrait {
     request as parentRequest;
   }
   use UserCreationTrait;
+  use VfsPublicStreamUrlTrait;
 
-  protected static function decodeResponse(Response $response): array {
-    self::assertInstanceOf(JsonResponse::class, $response);
-    self::assertIsString($response->getContent());
-    self::assertJson($response->getContent());
-    return \json_decode($response->getContent(), TRUE);
+  protected ?ContentEntityInterface $previewEntity;
+
+  protected static function getAdminPermission(EntityInterface $entity): string {
+    if ($entity instanceof Node) {
+      return 'edit any ' . $entity->bundle() . ' content';
+    }
+    if ($entity instanceof ContentTemplate) {
+      return ContentTemplate::ADMIN_PERMISSION;
+    }
+    throw new \LogicException('Unsupported entity type: ' . $entity->getEntityTypeId());
   }
 
   /**
@@ -49,16 +59,6 @@ class ApiLayoutControllerTestBase extends KernelTestBase {
     return $response;
   }
 
-  protected function assertRequestAutoSaveConflict(Request $request): void {
-    try {
-      $this->request($request);
-      $this->fail('Expected exception');
-    }
-    catch (ConflictHttpException $exception) {
-      self::assertSame('You do not have the latest changes, please refresh your browser.', $exception->getMessage());
-    }
-  }
-
   /**
    * Omit information received in the GET response that cannot be POSTed.
    */
@@ -67,6 +67,25 @@ class ApiLayoutControllerTestBase extends KernelTestBase {
     unset($json['isNew'], $json['isPublished'], $json['html']);
     $json += ['clientInstanceId' => $this->randomString(100)];
     return \json_encode($json, JSON_THROW_ON_ERROR);
+  }
+
+  protected function getLayoutUrl(EntityInterface $entity): Url {
+    if ($entity instanceof ContentTemplate) {
+      $route_name = 'canvas.api.layout.get.content_template';
+      self::assertInstanceOf(ContentEntityInterface::class, $this->previewEntity);
+      $url_args = [
+        'entity' => $entity->id(),
+        'preview_entity' => $this->previewEntity->id(),
+      ];
+    }
+    else {
+      $url_args = [
+        'entity' => $entity->id(),
+        'entity_type' => $entity->getEntityTypeId(),
+      ];
+      $route_name = 'canvas.api.layout.get';
+    }
+    return Url::fromRoute($route_name, $url_args);
   }
 
   /**
@@ -106,7 +125,7 @@ class ApiLayoutControllerTestBase extends KernelTestBase {
       $html = $decoded['html'] ?? $html;
     }
     $matches = [];
-    \preg_match_all('/(xb-start-)(.*?)[\/ \t](.*?)(-->)(.*?)/', $html, $matches);
+    \preg_match_all('/(canvas-start-)(.*?)[\/ \t](.*?)(-->)(.*?)/', $html, $matches);
     return $matches[2];
   }
 
@@ -123,9 +142,43 @@ class ApiLayoutControllerTestBase extends KernelTestBase {
       self::assertArrayHasKey(AutoSaveManager::getAutoSaveKey($entity), $data['autoSaves']);
       self::assertSame(
         $data['autoSaves'][AutoSaveManager::getAutoSaveKey($entity)],
-        $this->getClientAutoSaveData($entity),
+        $this->container->get(AutoSaveManager::class)->getClientAutoSaveData($entity),
       );
     }
+  }
+
+  /**
+   * Gets a test entity of the given type.
+   *
+   * @param string $entity_type_id
+   *   The entity type ID.
+   *
+   * @return \Drupal\Core\Entity\ContentEntityInterface|\Drupal\canvas\Entity\ContentTemplate
+   *   The test entity.
+   *
+   * @see \Drupal\Tests\canvas\TestSite\CanvasTestSetup::setup()
+   */
+  protected function getTestEntity(string $entity_type_id): ContentEntityInterface|ContentTemplate {
+    if ($entity_type_id === 'node') {
+      $entity = Node::load(1);
+      $this->previewEntity = NULL;
+    }
+    elseif ($entity_type_id === ContentTemplate::ENTITY_TYPE_ID) {
+      $entity = ContentTemplate::load('node.article.full');
+      $this->previewEntity = Node::load(1);
+    }
+    else {
+      throw new \InvalidArgumentException('Unsupported entity type: ' . $entity_type_id);
+    }
+    self::assertNotNull($entity);
+    return $entity;
+  }
+
+  public static function providerEntityTypes(): array {
+    return [
+      'Content entity type with component tree: Node' => ['node'],
+      'Config entity type with component tree: ContentTemplate' => [ContentTemplate::ENTITY_TYPE_ID],
+    ];
   }
 
 }

@@ -8,14 +8,21 @@
 
 import { useEffect, useState } from 'react';
 import { useErrorBoundary } from 'react-error-boundary';
+
+import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import {
-  useGetCodeComponentQuery,
-  useGetAutoSaveQuery as useGetAutoSaveQueryCodeComponent,
-} from '@/services/componentAndLayout';
+  selectForceRefresh,
+  setForceRefresh,
+} from '@/features/code-editor/codeEditorSlice';
 import {
   useGetAssetLibraryQuery,
   useGetAutoSaveQuery as useGetAutoSaveQueryAssetLibrary,
 } from '@/services/assetLibrary';
+import {
+  useGetAutoSaveQuery as useGetAutoSaveQueryCodeComponent,
+  useGetCodeComponentQuery,
+} from '@/services/componentAndLayout';
+
 import type {
   AssetLibrary,
   CodeComponentSerialized,
@@ -35,7 +42,8 @@ const useGetCodeEditorData = (
   { skip }: { skip?: boolean } = { skip: false },
 ): CodeEditorData => {
   const { showBoundary } = useErrorBoundary();
-
+  const forceRefresh = useAppSelector(selectForceRefresh);
+  const dispatch = useAppDispatch();
   // Returned values are tracked in local states.
   const [dataCodeComponent, setDataCodeComponent] = useState<
     CodeEditorData['dataCodeComponent'] | undefined
@@ -55,7 +63,7 @@ const useGetCodeEditorData = (
     isFetching: isLoadingGetAutoSaveCodeComponent,
     isSuccess: isSuccessGetAutoSaveCodeComponent,
   } = useGetAutoSaveQueryCodeComponent(currentComponentId, {
-    skip,
+    skip: skip && !forceRefresh,
   });
 
   // Get the code component data, but skip if auto-saved data exists.
@@ -68,12 +76,20 @@ const useGetCodeEditorData = (
     skip:
       skip ||
       isLoadingGetAutoSaveCodeComponent ||
-      (isSuccessGetAutoSaveCodeComponent && !!dataGetAutoSaveCodeComponent),
+      (isSuccessGetAutoSaveCodeComponent &&
+        dataGetAutoSaveCodeComponent &&
+        ('data' in dataGetAutoSaveCodeComponent
+          ? !!dataGetAutoSaveCodeComponent.data
+          : !!dataGetAutoSaveCodeComponent)),
   });
 
   // Set the code component data in a local state.
   useEffect(() => {
-    setDataCodeComponent(dataGetAutoSaveCodeComponent || dataGetCodeComponent);
+    const autoSaveData =
+      dataGetAutoSaveCodeComponent && 'data' in dataGetAutoSaveCodeComponent
+        ? dataGetAutoSaveCodeComponent.data
+        : dataGetAutoSaveCodeComponent;
+    setDataCodeComponent(autoSaveData || dataGetCodeComponent);
   }, [dataGetAutoSaveCodeComponent, dataGetCodeComponent]);
 
   // Get the auto-saved data of the global asset library if it exists.
@@ -96,14 +112,20 @@ const useGetCodeEditorData = (
     skip:
       skip ||
       isLoadingGetAutoSaveAssetLibrary ||
-      (isSuccessGetAutoSaveAssetLibrary && !!dataGetAutoSaveAssetLibrary),
+      (isSuccessGetAutoSaveAssetLibrary &&
+        dataGetAutoSaveAssetLibrary &&
+        ('data' in dataGetAutoSaveAssetLibrary
+          ? !!dataGetAutoSaveAssetLibrary.data
+          : !!dataGetAutoSaveAssetLibrary)),
   });
 
   // Set the global asset library data in a local state.
   useEffect(() => {
-    setDataGlobalAssetLibrary(
-      dataGetAutoSaveAssetLibrary || dataGetAssetLibrary,
-    );
+    const autoSaveData =
+      dataGetAutoSaveAssetLibrary && 'data' in dataGetAutoSaveAssetLibrary
+        ? dataGetAutoSaveAssetLibrary.data
+        : dataGetAutoSaveAssetLibrary;
+    setDataGlobalAssetLibrary(autoSaveData || dataGetAssetLibrary);
   }, [dataGetAutoSaveAssetLibrary, dataGetAssetLibrary]);
 
   // Set the loading state in a local state.
@@ -151,6 +173,15 @@ const useGetCodeEditorData = (
     errorGetAssetLibrary,
     showBoundary,
   ]);
+
+  if (
+    forceRefresh &&
+    !isLoadingGetAutoSaveCodeComponent &&
+    isSuccessGetAutoSaveCodeComponent
+  ) {
+    // We successfully fetched the auto-save data, turn off force refresh.
+    dispatch(setForceRefresh(false));
+  }
 
   return { dataCodeComponent, dataGlobalAssetLibrary, isLoading, isSuccess };
 };

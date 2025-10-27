@@ -1,11 +1,21 @@
-import type { Dispatch, SetStateAction, Ref } from 'react';
-import { useCallback } from 'react';
-import { useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { forwardRef } from 'react';
-import styles from '@/features/layout/preview/Preview.module.css';
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react';
 import clsx from 'clsx';
+
 import { useAppSelector } from '@/app/hooks';
+import { COMPONENT_PREVIEW_UPDATE_EVENT } from '@/components/form/formUtil';
 import { selectDragging } from '@/features/ui/uiSlice';
+
+import type { Dispatch, Ref, SetStateAction } from 'react';
+import type { ComponentPreviewUpdateEvent } from '@/components/form/formUtil';
+
+import styles from '@/features/layout/preview/Preview.module.css';
 
 interface IFrameSwapperProps {
   srcDocument: string;
@@ -44,19 +54,85 @@ const IFrameSwapper = forwardRef<HTMLIFrameElement, IFrameSwapperProps>(
       return { activeIFrame, inactiveIFrame };
     }, []);
 
-    const swapIFrames = useCallback(() => {
-      setWhichActive((current) => (current ? 0 : 1));
-      setTimeout(() => {
+    const swapIFrames = useCallback((e: Event) => {
+      // The event target is the iframe about to become active.
+      const iframe = e.target as HTMLIFrameElement | null;
+      if (!iframe?.srcdoc?.length) {
+        // The load event in some browsers (e.g., Safari) fires on page load if the srcdoc is empty, but we don't want to swap in that case.
+        return;
+      }
+
+      iframe.style.display = '';
+
+      const startTime = Date.now();
+      const checkIFrameContent = () => {
+        // Find all <template>s pending hydration by Astro. Once hydration is complete, there should be no pending templates remaining.
+        const pendingTemplates = iframe?.contentDocument?.querySelectorAll(
+          'template[data-astro-template]',
+        ).length;
+
+        // Ensure there are no pending templates (non-hydrated astro-islands) before swapping in the iframe.
+        if (pendingTemplates === 0) {
+          setWhichActive((current) => 1 - current);
+        } else if (Date.now() - startTime < 1000) {
+          // If the hydration still hasn't finished and 1 second hasn't yet elapsed, try again after the next animation frame.
+          requestAnimationFrame(checkIFrameContent);
+        } else {
+          // Fallback to ensure iframe is swapped after 1s in case the iframe content never loads (or is really slow).
+          console.warn(
+            'Astro hydration in iFrame did not complete within 1 second, swapping anyway.',
+          );
+          setWhichActive((current) => 1 - current);
+        }
+      };
+
+      // Continuously monitor the iframe content for non-hydrated templates every 'tick'.
+      // Only swap the iframe once all templates are hydrated or 1 second has elapsed.
+      requestAnimationFrame(checkIFrameContent);
+    }, []);
+
+    // Sync the whichActiveRef to the whichActive state and then set isReloading back to false.
+    useEffect(() => {
+      const listener = (e: ComponentPreviewUpdateEvent) => {
         const { activeIFrame } = getIFrames();
-        activeIFrame.style.display = '';
-        setIsReloading(false);
-      }, 0);
-    }, [getIFrames, setIsReloading]);
+        // Find the canvas-island elements for the updated component.
+        const component = activeIFrame.contentDocument?.querySelector(
+          `canvas-island[uid="${e.componentUuid}"]`,
+        );
+        if (!component) {
+          // We need a round trip to update the preview here.
+          e.setPreviewBackgroundUpdate(false);
+          return;
+        }
+        // We can update the preview in the background.
+        e.setPreviewBackgroundUpdate(true);
+
+        component.setAttribute(
+          'props',
+          JSON.stringify({
+            ...JSON.parse(component.getAttribute('props')!),
+            [e.propName]: ['raw', e.propValue],
+          }),
+        );
+      };
+      document.addEventListener(
+        COMPONENT_PREVIEW_UPDATE_EVENT,
+        listener as any as EventListener,
+      );
+      return () => {
+        document.removeEventListener(
+          COMPONENT_PREVIEW_UPDATE_EVENT,
+          listener as any as EventListener,
+        );
+      };
+    }, [getIFrames]);
 
     useEffect(() => {
       whichActiveRef.current = whichActive;
-    }, [whichActive]);
+      setIsReloading(false);
+    }, [getIFrames, setIsReloading, whichActive]);
 
+    // Run when the srcDocument changes
     useEffect(() => {
       // Important to change a state ensure parent re-renders (and re-calls hooks) once the iframe is swapped.
       setIsReloading(true);
@@ -70,7 +146,7 @@ const IFrameSwapper = forwardRef<HTMLIFrameElement, IFrameSwapperProps>(
 
       // Immediately set the currently active iframe to not initialized
       if (activeIFrame) {
-        activeIFrame.dataset.testXbContentInitialized = 'false';
+        activeIFrame.dataset.testCanvasContentInitialized = 'false';
       }
 
       // Set up load event listener and update content for inactive iframe. Once loaded, it will be swapped in.
@@ -97,8 +173,8 @@ const IFrameSwapper = forwardRef<HTMLIFrameElement, IFrameSwapperProps>(
       className: clsx(styles.preview, {
         [styles.interactable]: isDragging || interactive,
       }),
-      'data-xb-preview': 'true',
-      'data-test-xb-content-initialized': 'false',
+      'data-canvas-preview': 'true',
+      'data-test-canvas-content-initialized': 'false',
     };
 
     return (
@@ -107,18 +183,18 @@ const IFrameSwapper = forwardRef<HTMLIFrameElement, IFrameSwapperProps>(
           // Set the tab index to 0 when the iframe is interactive, -1 when it is not.
           tabIndex={!interactive || whichActive === 1 ? -1 : 0}
           ref={(el) => (iFrameRefs.current[0] = el)}
-          data-xb-swap-active={whichActive === 0 ? 'true' : 'false'}
+          data-canvas-swap-active={whichActive === 0 ? 'true' : 'false'}
           title={whichActive === 0 ? 'Preview' : 'Inactive preview'}
-          data-xb-iframe="A"
+          data-canvas-iframe="A"
           scrolling="no"
           {...commonIFrameProps}
         ></iframe>
         <iframe
           tabIndex={!interactive || whichActive === 0 ? -1 : 0}
           ref={(el) => (iFrameRefs.current[1] = el)}
-          data-xb-swap-active={whichActive === 1 ? 'true' : 'false'}
+          data-canvas-swap-active={whichActive === 1 ? 'true' : 'false'}
           title={whichActive === 1 ? 'Preview' : 'Inactive preview'}
-          data-xb-iframe="B"
+          data-canvas-iframe="B"
           scrolling="no"
           {...commonIFrameProps}
         ></iframe>

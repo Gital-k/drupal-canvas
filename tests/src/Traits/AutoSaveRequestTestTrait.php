@@ -2,13 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Drupal\Tests\experience_builder\Traits;
+namespace Drupal\Tests\canvas\Traits;
 
 use Drupal\Core\Url;
-use Drupal\experience_builder\Controller\ApiAutoSaveController;
+use Drupal\canvas\Controller\ApiAutoSaveController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 trait AutoSaveRequestTestTrait {
 
@@ -34,7 +35,7 @@ trait AutoSaveRequestTestTrait {
       $data = $this->getAutoSaveStatesFromServer();
     }
     $request = Request::create(
-      Url::fromRoute('experience_builder.api.auto-save.post')->toString(),
+      Url::fromRoute('canvas.api.auto-save.post')->toString(),
       'POST',
       content: (string) json_encode($data),
     );
@@ -42,6 +43,16 @@ trait AutoSaveRequestTestTrait {
     $response = $this->request($request);
     assert($response instanceof JsonResponse);
     return $response;
+  }
+
+  protected function assertRequestAutoSaveConflict(Request $request): void {
+    try {
+      $this->request($request);
+      $this->fail('Expected exception');
+    }
+    catch (ConflictHttpException $exception) {
+      self::assertSame('You do not have the latest changes, please refresh your browser.', $exception->getMessage());
+    }
   }
 
 }

@@ -1,13 +1,15 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useUpdateCodeComponentMutation } from '@/services/componentAndLayout';
+
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
+import Dialog from '@/components/Dialog';
 import {
   closeAllDialogs,
   selectDialogStates,
   selectSelectedCodeComponent,
 } from '@/features/ui/codeComponentDialogSlice';
-import Dialog from '@/components/Dialog';
+import { selectPreviouslyEdited } from '@/features/ui/uiSlice';
+import { useUpdateCodeComponentMutation } from '@/services/componentAndLayout';
 
 // This handles the dialog for adding a JS component to components. This changes
 // the component from being "internal" to "exposed".
@@ -18,6 +20,7 @@ const AddToComponentsDialog = () => {
     useUpdateCodeComponentMutation();
   const dispatch = useAppDispatch();
   const { isAddToComponentsDialogOpen } = useAppSelector(selectDialogStates);
+  const previouslyEdited = useAppSelector(selectPreviouslyEdited);
 
   const handleSave = async () => {
     if (!selectedComponent) return;
@@ -30,7 +33,7 @@ const AddToComponentsDialog = () => {
         ...selectedComponent,
         // Mark this code component as "exposed", to make it available to content creators.
         // @see docs/config-management.md, section 3.2.1
-        // @see \Drupal\experience_builder\EntityHandlers\JavascriptComponentStorage::createOrUpdateComponentEntity()
+        // @see \Drupal\canvas\EntityHandlers\JavascriptComponentStorage::createOrUpdateComponentEntity()
         status: true,
       },
     });
@@ -46,9 +49,13 @@ const AddToComponentsDialog = () => {
   useEffect(() => {
     if (isSuccess) {
       dispatch(closeAllDialogs());
-      navigate('/editor');
+      if (!previouslyEdited.path) {
+        navigate('/editor');
+      } else {
+        navigate(previouslyEdited.path);
+      }
     }
-  }, [isSuccess, dispatch, navigate]);
+  }, [isSuccess, dispatch, navigate, previouslyEdited.path]);
 
   useEffect(() => {
     if (isError) {

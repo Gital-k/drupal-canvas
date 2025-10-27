@@ -1,16 +1,15 @@
+import { makeStore } from '@/app/store';
 import {
+  clearFieldError,
+  clearFieldValues,
   formStateSlice,
   initialState,
+  setCurrentComponent,
   setFieldError,
   setFieldValue,
-  clearFieldValues,
-  clearFieldError,
-  setCurrentComponent,
 } from '@/features/form/formStateSlice';
 
-import { makeStore } from '@/app/store';
-
-const formId = 'component_inputs_form';
+const formId = 'component_instance_form';
 const fieldName = 'b741';
 
 describe('Form state slice 🔪', () => {
@@ -23,7 +22,7 @@ describe('Form state slice 🔪', () => {
         value: "Okay, let's ride",
       }),
     );
-    expect(state.component_inputs_form.values).to.deep.eq({
+    expect(state.component_instance_form.values).to.deep.eq({
       b741: "Okay, let's ride",
     });
   });
@@ -38,7 +37,7 @@ describe('Form state slice 🔪', () => {
         message: 'Its tempo paints my world in gray',
       }),
     );
-    expect(state.component_inputs_form.errors).to.deep.eq({
+    expect(state.component_instance_form.errors).to.deep.eq({
       b741: { type: 'error', message: 'Its tempo paints my world in gray' },
     });
   });
@@ -59,7 +58,7 @@ describe('Form state slice 🔪', () => {
       },
       clearFieldError({ formId, fieldName }),
     );
-    expect(state.component_inputs_form.errors).to.deep.eq({});
+    expect(state.component_instance_form.errors).to.deep.eq({});
   });
 
   it('Should clear values', () => {
@@ -75,7 +74,7 @@ describe('Form state slice 🔪', () => {
       },
       clearFieldValues(formId),
     );
-    expect(state.component_inputs_form.values).to.deep.eq({});
+    expect(state.component_instance_form.values).to.deep.eq({});
   });
 
   it('Should clear form state when component changes', () => {
@@ -90,12 +89,14 @@ describe('Form state slice 🔪', () => {
         },
       },
     });
-    expect(store.getState().formState.component_inputs_form.values).to.deep.eq({
+    expect(
+      store.getState().formState.component_instance_form.values,
+    ).to.deep.eq({
       b741: "Okay, let's ride",
     });
     store.dispatch(setCurrentComponent('clench-the-moment'));
-    expect(store.getState().formState.component_inputs_form.values).to.deep.eq(
-      {},
-    );
+    expect(
+      store.getState().formState.component_instance_form.values,
+    ).to.deep.eq({});
   });
 });

@@ -2,17 +2,17 @@
 
 declare(strict_types=1);
 
-namespace Drupal\experience_builder\ShapeMatcher;
+namespace Drupal\canvas\ShapeMatcher;
 
 /**
  * Describes a set of shape requirements for a Drupal data type.
  *
- * @see \Drupal\experience_builder\ShapeMatcher\DataTypeShapeRequirement
+ * @see \Drupal\canvas\ShapeMatcher\DataTypeShapeRequirement
  */
-final class DataTypeShapeRequirements {
+final class DataTypeShapeRequirements implements \IteratorAggregate {
 
   /**
-   * @param \Drupal\experience_builder\ShapeMatcher\DataTypeShapeRequirement[] $requirements
+   * @param \Drupal\canvas\ShapeMatcher\DataTypeShapeRequirement[] $requirements
    */
   public function __construct(
     public readonly array $requirements,
@@ -22,6 +22,10 @@ final class DataTypeShapeRequirements {
         throw new \LogicException();
       }
     }
+  }
+
+  public function getIterator(): \Traversable {
+    return new \ArrayIterator($this->requirements);
   }
 
 }

@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 // cspell:ignore vlaquxuup
-namespace Drupal\Tests\experience_builder\Kernel\Plugin\Field\FieldType;
+namespace Drupal\Tests\canvas\Kernel\Plugin\Field\FieldType;
 
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Access\AccessResultAllowed;
@@ -13,26 +13,27 @@ use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Render\Markup;
 use Drupal\Core\Render\RendererInterface;
 use Drupal\Core\TypedData\TypedDataManagerInterface;
-use Drupal\experience_builder\AutoSave\AutoSaveManager;
-use Drupal\experience_builder\Element\RenderSafeComponentContainer;
-use Drupal\experience_builder\Entity\AssetLibrary;
-use Drupal\experience_builder\Entity\Component;
-use Drupal\experience_builder\Entity\ComponentInterface;
-use Drupal\experience_builder\Entity\Page;
-use Drupal\experience_builder\Exception\SubtreeInjectionException;
-use Drupal\experience_builder\Plugin\Field\FieldType\ComponentTreeItemList;
-use Drupal\experience_builder\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
-use Drupal\experience_builder\Render\ImportMapResponseAttachmentsProcessor;
+use Drupal\canvas\AutoSave\AutoSaveManager;
+use Drupal\canvas\Element\RenderSafeComponentContainer;
+use Drupal\canvas\Entity\AssetLibrary;
+use Drupal\canvas\Entity\Component;
+use Drupal\canvas\Entity\ComponentInterface;
+use Drupal\canvas\Entity\Page;
+use Drupal\canvas\Exception\SubtreeInjectionException;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
+use Drupal\canvas\Render\ImportMapResponseAttachmentsProcessor;
 use Drupal\KernelTests\KernelTestBase;
-use Drupal\Tests\experience_builder\Kernel\Traits\CiModulePathTrait;
-use Drupal\Tests\experience_builder\Traits\ConstraintViolationsTestTrait;
-use Drupal\Tests\experience_builder\Traits\CreateTestJsComponentTrait;
-use Drupal\Tests\experience_builder\Traits\GenerateComponentConfigTrait;
+use Drupal\Tests\canvas\Kernel\Traits\CacheBustingTrait;
+use Drupal\Tests\canvas\Kernel\Traits\CiModulePathTrait;
+use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
+use Drupal\Tests\canvas\Traits\CreateTestJsComponentTrait;
+use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 
 /**
- * @coversDefaultClass \Drupal\experience_builder\Plugin\Field\FieldType\ComponentTreeItemList
- * @group experience_builder
+ * @coversDefaultClass \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList
+ * @group canvas
  */
 class ComponentTreeItemListTest extends KernelTestBase {
 
@@ -42,15 +43,16 @@ class ComponentTreeItemListTest extends KernelTestBase {
   use CiModulePathTrait;
   use UserCreationTrait;
   use ComponentTreeItemListInstantiatorTrait;
+  use CacheBustingTrait;
 
   /**
    * {@inheritdoc}
    */
   protected static $modules = [
-    'experience_builder',
-    'xb_test_sdc',
+    'canvas',
+    'canvas_test_sdc',
     'block',
-    // XB's dependencies (modules providing field types + widgets).
+    // Canvas's dependencies (modules providing field types + widgets).
     'datetime',
     'file',
     'image',
@@ -69,8 +71,8 @@ class ComponentTreeItemListTest extends KernelTestBase {
   protected function setUp(): void {
     parent::setUp();
     $this->config('system.site')
-      ->set('name', 'XB Test Site')
-      ->set('slogan', 'Experience Builder Test Site')
+      ->set('name', 'Canvas Test Site')
+      ->set('slogan', 'Drupal Canvas Test Site')
       ->save();
     $this->generateComponentConfig();
     $this->createMyCtaComponentFromSdc();
@@ -83,6 +85,9 @@ class ComponentTreeItemListTest extends KernelTestBase {
    * @dataProvider provider
    */
   public function testHydrationAndRendering(array $value, array $expected_value, array $expected_renderable, string $expected_html, array $expected_cache_tags, bool $isPreview): void {
+    // We need to force the cache busting query to ensure we use it correctly.
+    $this->setCacheBustingQueryString($this->container, '2.1.0-alpha3');
+
     $typed_data_manager = $this->container->get(TypedDataManagerInterface::class);
     $list_definition = $typed_data_manager->createListDataDefinition('field_item:component_tree');
     \assert(\method_exists($list_definition, 'setCardinality'));
@@ -103,7 +108,7 @@ class ComponentTreeItemListTest extends KernelTestBase {
     // representations:
     // 1. raw (`::getValue()`)
     // 2. Drupal renderable (`::toRenderable()`)
-    // 3. the resulting HTML markup.assert($node->field_xb_test[0] instanceof ComponentTreeItem);
+    // 3. the resulting HTML markup.assert($node->field_canvas_test[0] instanceof ComponentTreeItem);
     $hydrated_value = \Closure::bind(function () {
       return $this->getHydratedTree();
     }, $item_list, $item_list)();
@@ -125,9 +130,9 @@ class ComponentTreeItemListTest extends KernelTestBase {
     $html = preg_replace('/ +$/m', '', $html);
     $this->assertIsString($html);
     // Make it easier to write expectations containing root-relative URLs
-    // pointing to XB-owned assets.
-    $xb_dir_root_relative_url = base_path() . $this->getModulePath('experience_builder');
-    $html = str_replace($xb_dir_root_relative_url, '::XB_DIR_BASE_URL::', $html);
+    // pointing to Canvas-owned assets.
+    $canvas_dir_root_relative_url = base_path() . $this->getModulePath('canvas');
+    $html = str_replace($canvas_dir_root_relative_url, '::CANVAS_DIR_BASE_URL::', $html);
     // Make it easier to write expectations containing root-relative URLs
     // pointing somewhere into the site-specific directory.
     $html = str_replace($vfs_site_base_url, '::SITE_DIR_BASE_URL::', $html);
@@ -137,10 +142,10 @@ class ComponentTreeItemListTest extends KernelTestBase {
 
   public static function modifyExpectationFromLiveToPreview(array $expectation, bool $is_preview): array {
     \array_walk_recursive($expectation['expected_renderable'], function (mixed &$value, mixed $key) use ($is_preview) {
-      if ($key === '#is_preview' || $key === 'xb_is_preview') {
+      if ($key === '#is_preview' || $key === 'canvas_is_preview') {
         $value = $is_preview;
       }
-      if (is_string($value) && str_starts_with($value, 'experience_builder/')) {
+      if (is_string($value) && str_starts_with($value, 'canvas/')) {
         $value .= '.draft';
       }
     });
@@ -148,7 +153,7 @@ class ComponentTreeItemListTest extends KernelTestBase {
     // Add slot placeholders to the expected renderable array.
     $expectation['expected_renderable'] = self::addSlotPlaceholders($expectation['expected_renderable']);
     // Update expected HTML to only show empty slot placeholder.
-    $expectation['expected_html'] = preg_replace('#(<div class="xb--slot-empty-placeholder">.*?</div>)(.*?)(?=<!--)#', '<div class="xb--slot-empty-placeholder"></div>', $expectation['expected_html']);
+    $expectation['expected_html'] = preg_replace('#(<div class="canvas--slot-empty-placeholder">.*?</div>)(.*?)(?=<!--)#', '<div class="canvas--slot-empty-placeholder"></div>', $expectation['expected_html']);
 
     return $expectation;
   }
@@ -173,7 +178,7 @@ class ComponentTreeItemListTest extends KernelTestBase {
           foreach ($value as $slot_key => $slot_value) {
             if (isset($slot_value["#plain_text"]) || isset($slot_value["#markup"])) {
               $expectation[$key][$slot_key] = [
-                '#markup' => Markup::create('<div class="xb--slot-empty-placeholder"></div>'),
+                '#markup' => Markup::create('<div class="canvas--slot-empty-placeholder"></div>'),
               ];
             }
             else {
@@ -210,7 +215,7 @@ class ComponentTreeItemListTest extends KernelTestBase {
     // Remove the prefix and suffix from the expected renderable array.
     $expectation['expected_renderable'] = self::removePrefixSuffixKeysRecursive($expectation['expected_renderable']);
     // Remove all html comments & empty slot placeholders from expected html.
-    $expectation['expected_html'] = preg_replace(['/<!--(.*?)-->/', '#<div class="xb--slot-empty-placeholder"></div>#'], '', $expectation['expected_html']);
+    $expectation['expected_html'] = preg_replace(['/<!--(.*?)-->/', '#<div class="canvas--slot-empty-placeholder"></div>#'], '', $expectation['expected_html']);
     // Remove extra tabbing so expectation matches actual output.
     $expectation['expected_html'] = preg_replace('/[ \t]+\n/', "\n", $expectation['expected_html']);
 
@@ -221,7 +226,6 @@ class ComponentTreeItemListTest extends KernelTestBase {
     $generate_static_prop_source = function (string $label): string {
       return "Hello, $label!";
     };
-
     $empty_component_tree = [
       'value' => [],
       'expected_value' => [
@@ -238,7 +242,7 @@ class ComponentTreeItemListTest extends KernelTestBase {
       'value' => [
         [
           'uuid' => '41595148-e5c1-4873-b373-be3ae6e21340',
-          'component_id' => 'sdc.xb_test_sdc.props-slots',
+          'component_id' => 'sdc.canvas_test_sdc.props-slots',
           'inputs' => [
             'heading' => $generate_static_prop_source('world'),
           ],
@@ -247,7 +251,7 @@ class ComponentTreeItemListTest extends KernelTestBase {
       'expected_value' => [
         ComponentTreeItemList::ROOT_UUID => [
           '41595148-e5c1-4873-b373-be3ae6e21340' => [
-            'component' => 'sdc.xb_test_sdc.props-slots',
+            'component' => 'sdc.canvas_test_sdc.props-slots',
             'props' => ['heading' => 'Hello, world!'],
             'slots' => [
               // TRICKY: this is different from the *stored* representation of a
@@ -255,9 +259,9 @@ class ComponentTreeItemListTest extends KernelTestBase {
               // is the *hydrated* representation of
               // component tree, each slot merits being explicitly present, and
               // list its default value.
-              // @see \Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\SingleDirectoryComponent::hydrateComponent()
-              // @see \Drupal\experience_builder\Plugin\Validation\Constraint\ComponentTreeStructureConstraintValidator
-              // @see \Drupal\Tests\experience_builder\Kernel\DataType\ComponentTreeStructureTest
+              // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent::hydrateComponent()
+              // @see \Drupal\canvas\Plugin\Validation\Constraint\ComponentTreeStructureConstraintValidator
+              // @see \Drupal\Tests\canvas\Kernel\DataType\ComponentTreeStructureTest
               'the_body' => '<p>Example value for <strong>the_body</strong> slot in <strong>prop-slots</strong> component.</p>',
               'the_footer' => 'Example value for <strong>the_footer</strong>.',
               'the_colophon' => '',
@@ -275,16 +279,16 @@ class ComponentTreeItemListTest extends KernelTestBase {
             '#component' => [
               '#type' => 'component',
               '#cache' => [
-                'tags' => ['config:experience_builder.component.sdc.xb_test_sdc.props-slots'],
+                'tags' => ['config:canvas.component.sdc.canvas_test_sdc.props-slots'],
                 'contexts' => [],
                 'max-age' => Cache::PERMANENT,
               ],
-              '#component' => 'xb_test_sdc:props-slots',
+              '#component' => 'canvas_test_sdc:props-slots',
               '#props' => [
                 'heading' => 'Hello, world!',
-                'xb_uuid' => '41595148-e5c1-4873-b373-be3ae6e21340',
-                'xb_slot_ids' => ['the_body', 'the_footer', 'the_colophon'],
-                'xb_is_preview' => FALSE,
+                'canvas_uuid' => '41595148-e5c1-4873-b373-be3ae6e21340',
+                'canvas_slot_ids' => ['the_body', 'the_footer', 'the_colophon'],
+                'canvas_is_preview' => FALSE,
               ],
               '#slots' => [
                 'the_body' => [
@@ -300,11 +304,11 @@ class ComponentTreeItemListTest extends KernelTestBase {
                   '#plain_text' => '',
                 ],
               ],
-              '#prefix' => Markup::create('<!-- xb-start-41595148-e5c1-4873-b373-be3ae6e21340 -->'),
-              '#suffix' => Markup::create('<!-- xb-end-41595148-e5c1-4873-b373-be3ae6e21340 -->'),
+              '#prefix' => Markup::create('<!-- canvas-start-41595148-e5c1-4873-b373-be3ae6e21340 -->'),
+              '#suffix' => Markup::create('<!-- canvas-end-41595148-e5c1-4873-b373-be3ae6e21340 -->'),
               '#attached' => [
                 'library' => [
-                  'core/components.xb_test_sdc--props-slots',
+                  'core/components.canvas_test_sdc--props-slots',
                 ],
               ],
             ],
@@ -312,22 +316,22 @@ class ComponentTreeItemListTest extends KernelTestBase {
         ],
       ],
       'expected_html' => <<<HTML
-<!-- xb-start-41595148-e5c1-4873-b373-be3ae6e21340 --><div  data-component-id="xb_test_sdc:props-slots" style="font-family: Helvetica, Arial, sans-serif; width: 100%; height: 100vh; background-color: #f5f5f5; display: flex; justify-content: center; align-items: center; flex-direction: column; text-align: center; padding: 20px; box-sizing: border-box;">
-  <h1 style="font-size: 3em; margin: 0.5em 0; color: #333;"><!-- xb-prop-start-41595148-e5c1-4873-b373-be3ae6e21340/heading -->Hello, world!<!-- xb-prop-end-41595148-e5c1-4873-b373-be3ae6e21340/heading --></h1>
+<!-- canvas-start-41595148-e5c1-4873-b373-be3ae6e21340 --><div  data-component-id="canvas_test_sdc:props-slots" style="font-family: Helvetica, Arial, sans-serif; width: 100%; height: 100vh; background-color: #f5f5f5; display: flex; justify-content: center; align-items: center; flex-direction: column; text-align: center; padding: 20px; box-sizing: border-box;">
+  <h1 style="font-size: 3em; margin: 0.5em 0; color: #333;"><!-- canvas-prop-start-41595148-e5c1-4873-b373-be3ae6e21340/heading -->Hello, world!<!-- canvas-prop-end-41595148-e5c1-4873-b373-be3ae6e21340/heading --></h1>
   <div class="component--props-slots--body">
-        <!-- xb-slot-start-41595148-e5c1-4873-b373-be3ae6e21340/the_body --><div class="xb--slot-empty-placeholder"></div><p>Example value for <strong>the_body</strong> slot in <strong>prop-slots</strong> component.</p><!-- xb-slot-end-41595148-e5c1-4873-b373-be3ae6e21340/the_body -->
+        <!-- canvas-slot-start-41595148-e5c1-4873-b373-be3ae6e21340/the_body --><div class="canvas--slot-empty-placeholder"></div><p>Example value for <strong>the_body</strong> slot in <strong>prop-slots</strong> component.</p><!-- canvas-slot-end-41595148-e5c1-4873-b373-be3ae6e21340/the_body -->
     </div>
   <div class="component--props-slots--footer">
-        <!-- xb-slot-start-41595148-e5c1-4873-b373-be3ae6e21340/the_footer --><div class="xb--slot-empty-placeholder"></div>Example value for &lt;strong&gt;the_footer&lt;/strong&gt;.<!-- xb-slot-end-41595148-e5c1-4873-b373-be3ae6e21340/the_footer -->
+        <!-- canvas-slot-start-41595148-e5c1-4873-b373-be3ae6e21340/the_footer --><div class="canvas--slot-empty-placeholder"></div>Example value for &lt;strong&gt;the_footer&lt;/strong&gt;.<!-- canvas-slot-end-41595148-e5c1-4873-b373-be3ae6e21340/the_footer -->
     </div>
   <div class="component--props-slots--colophon">
-        <!-- xb-slot-start-41595148-e5c1-4873-b373-be3ae6e21340/the_colophon --><div class="xb--slot-empty-placeholder"></div><!-- xb-slot-end-41595148-e5c1-4873-b373-be3ae6e21340/the_colophon -->
+        <!-- canvas-slot-start-41595148-e5c1-4873-b373-be3ae6e21340/the_colophon --><div class="canvas--slot-empty-placeholder"></div><!-- canvas-slot-end-41595148-e5c1-4873-b373-be3ae6e21340/the_colophon -->
     </div>
 </div>
-<!-- xb-end-41595148-e5c1-4873-b373-be3ae6e21340 -->
+<!-- canvas-end-41595148-e5c1-4873-b373-be3ae6e21340 -->
 HTML,
       'expected_cache_tags' => [
-        'config:experience_builder.component.sdc.xb_test_sdc.props-slots',
+        'config:canvas.component.sdc.canvas_test_sdc.props-slots',
       ],
     ];
 
@@ -403,18 +407,18 @@ HTML,
                   '#access' => TRUE,
                 ],
                 'site_name' => [
-                  '#markup' => 'XB Test Site',
+                  '#markup' => 'Canvas Test Site',
                   '#access' => TRUE,
                 ],
                 'site_slogan' => [
-                  '#markup' => 'Experience Builder Test Site',
+                  '#markup' => 'Drupal Canvas Test Site',
                   '#access' => TRUE,
                 ],
               ],
               '#cache' => [
                 'tags' => [
                   'config:system.site',
-                  'config:experience_builder.component.block.system_branding_block',
+                  'config:canvas.component.block.system_branding_block',
                 ],
                 'contexts' => [],
                 'max-age' => Cache::PERMANENT,
@@ -426,17 +430,17 @@ HTML,
         ],
       ],
       'expected_html' => <<<HTML
-<!-- xb-start-41595148-e5c1-4873-b373-be3ae6e21340 --><div id="block-41595148-e5c1-4873-b373-be3ae6e21340">
+<!-- canvas-start-41595148-e5c1-4873-b373-be3ae6e21340 --><div id="block-41595148-e5c1-4873-b373-be3ae6e21340">
 
 
-          <a href="/" rel="home">XB Test Site</a>
-    Experience Builder Test Site
+          <a href="/" rel="home">Canvas Test Site</a>
+    Drupal Canvas Test Site
 </div>
-<!-- xb-end-41595148-e5c1-4873-b373-be3ae6e21340 -->
+<!-- canvas-end-41595148-e5c1-4873-b373-be3ae6e21340 -->
 HTML,
       'expected_cache_tags' => [
         'config:system.site',
-        'config:experience_builder.component.block.system_branding_block',
+        'config:canvas.component.block.system_branding_block',
       ],
     ];
     yield 'component tree with a single block component' => [...self::removePrefixSuffix($component_tree_with_single_block_component), 'isPreview' => FALSE];
@@ -446,14 +450,14 @@ HTML,
       'value' => [
         [
           'uuid' => '41595148-e5c1-4873-b373-be3ae6e21340',
-          'component_id' => 'sdc.xb_test_sdc.props-no-slots',
+          'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
           'inputs' => [
             'heading' => $generate_static_prop_source('world'),
           ],
         ],
         [
           'uuid' => 'fcf67861-87da-45e5-916b-31f5b74be747',
-          'component_id' => 'sdc.xb_test_sdc.props-no-slots',
+          'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
           'inputs' => [
             'heading' => $generate_static_prop_source('another world'),
           ],
@@ -462,11 +466,11 @@ HTML,
       'expected_value' => [
         ComponentTreeItemList::ROOT_UUID => [
           '41595148-e5c1-4873-b373-be3ae6e21340' => [
-            'component' => 'sdc.xb_test_sdc.props-no-slots',
+            'component' => 'sdc.canvas_test_sdc.props-no-slots',
             'props' => ['heading' => 'Hello, world!'],
           ],
           'fcf67861-87da-45e5-916b-31f5b74be747' => [
-            'component' => 'sdc.xb_test_sdc.props-no-slots',
+            'component' => 'sdc.canvas_test_sdc.props-no-slots',
             'props' => ['heading' => 'Hello, another world!'],
           ],
         ],
@@ -481,22 +485,22 @@ HTML,
             '#component' => [
               '#type' => 'component',
               '#cache' => [
-                'tags' => ['config:experience_builder.component.sdc.xb_test_sdc.props-no-slots'],
+                'tags' => ['config:canvas.component.sdc.canvas_test_sdc.props-no-slots'],
                 'contexts' => [],
                 'max-age' => Cache::PERMANENT,
               ],
-              '#component' => 'xb_test_sdc:props-no-slots',
+              '#component' => 'canvas_test_sdc:props-no-slots',
               '#props' => [
                 'heading' => 'Hello, world!',
-                'xb_uuid' => '41595148-e5c1-4873-b373-be3ae6e21340',
-                'xb_slot_ids' => [],
-                'xb_is_preview' => FALSE,
+                'canvas_uuid' => '41595148-e5c1-4873-b373-be3ae6e21340',
+                'canvas_slot_ids' => [],
+                'canvas_is_preview' => FALSE,
               ],
-              '#prefix' => Markup::create('<!-- xb-start-41595148-e5c1-4873-b373-be3ae6e21340 -->'),
-              '#suffix' => Markup::create('<!-- xb-end-41595148-e5c1-4873-b373-be3ae6e21340 -->'),
+              '#prefix' => Markup::create('<!-- canvas-start-41595148-e5c1-4873-b373-be3ae6e21340 -->'),
+              '#suffix' => Markup::create('<!-- canvas-end-41595148-e5c1-4873-b373-be3ae6e21340 -->'),
               '#attached' => [
                 'library' => [
-                  'core/components.xb_test_sdc--props-no-slots',
+                  'core/components.canvas_test_sdc--props-no-slots',
                 ],
               ],
             ],
@@ -509,22 +513,22 @@ HTML,
             '#component' => [
               '#type' => 'component',
               '#cache' => [
-                'tags' => ['config:experience_builder.component.sdc.xb_test_sdc.props-no-slots'],
+                'tags' => ['config:canvas.component.sdc.canvas_test_sdc.props-no-slots'],
                 'contexts' => [],
                 'max-age' => Cache::PERMANENT,
               ],
-              '#component' => 'xb_test_sdc:props-no-slots',
+              '#component' => 'canvas_test_sdc:props-no-slots',
               '#props' => [
                 'heading' => 'Hello, another world!',
-                'xb_uuid' => 'fcf67861-87da-45e5-916b-31f5b74be747',
-                'xb_slot_ids' => [],
-                'xb_is_preview' => FALSE,
+                'canvas_uuid' => 'fcf67861-87da-45e5-916b-31f5b74be747',
+                'canvas_slot_ids' => [],
+                'canvas_is_preview' => FALSE,
               ],
-              '#prefix' => Markup::create('<!-- xb-start-fcf67861-87da-45e5-916b-31f5b74be747 -->'),
-              '#suffix' => Markup::create('<!-- xb-end-fcf67861-87da-45e5-916b-31f5b74be747 -->'),
+              '#prefix' => Markup::create('<!-- canvas-start-fcf67861-87da-45e5-916b-31f5b74be747 -->'),
+              '#suffix' => Markup::create('<!-- canvas-end-fcf67861-87da-45e5-916b-31f5b74be747 -->'),
               '#attached' => [
                 'library' => [
-                  'core/components.xb_test_sdc--props-no-slots',
+                  'core/components.canvas_test_sdc--props-no-slots',
                 ],
               ],
             ],
@@ -532,16 +536,16 @@ HTML,
         ],
       ],
       'expected_html' => <<<HTML
-<!-- xb-start-41595148-e5c1-4873-b373-be3ae6e21340 --><div  data-component-id="xb_test_sdc:props-no-slots" style="font-family: Helvetica, Arial, sans-serif; width: 100%; height: 100vh; background-color: #f5f5f5; display: flex; justify-content: center; align-items: center; flex-direction: column; text-align: center; padding: 20px; box-sizing: border-box;">
-  <h1 style="font-size: 3em; margin: 0.5em 0; color: #333;"><!-- xb-prop-start-41595148-e5c1-4873-b373-be3ae6e21340/heading -->Hello, world!<!-- xb-prop-end-41595148-e5c1-4873-b373-be3ae6e21340/heading --></h1>
+<!-- canvas-start-41595148-e5c1-4873-b373-be3ae6e21340 --><div  data-component-id="canvas_test_sdc:props-no-slots" style="font-family: Helvetica, Arial, sans-serif; width: 100%; height: 100vh; background-color: #f5f5f5; display: flex; justify-content: center; align-items: center; flex-direction: column; text-align: center; padding: 20px; box-sizing: border-box;">
+  <h1 style="font-size: 3em; margin: 0.5em 0; color: #333;"><!-- canvas-prop-start-41595148-e5c1-4873-b373-be3ae6e21340/heading -->Hello, world!<!-- canvas-prop-end-41595148-e5c1-4873-b373-be3ae6e21340/heading --></h1>
 </div>
-<!-- xb-end-41595148-e5c1-4873-b373-be3ae6e21340 --><!-- xb-start-fcf67861-87da-45e5-916b-31f5b74be747 --><div  data-component-id="xb_test_sdc:props-no-slots" style="font-family: Helvetica, Arial, sans-serif; width: 100%; height: 100vh; background-color: #f5f5f5; display: flex; justify-content: center; align-items: center; flex-direction: column; text-align: center; padding: 20px; box-sizing: border-box;">
-  <h1 style="font-size: 3em; margin: 0.5em 0; color: #333;"><!-- xb-prop-start-fcf67861-87da-45e5-916b-31f5b74be747/heading -->Hello, another world!<!-- xb-prop-end-fcf67861-87da-45e5-916b-31f5b74be747/heading --></h1>
+<!-- canvas-end-41595148-e5c1-4873-b373-be3ae6e21340 --><!-- canvas-start-fcf67861-87da-45e5-916b-31f5b74be747 --><div  data-component-id="canvas_test_sdc:props-no-slots" style="font-family: Helvetica, Arial, sans-serif; width: 100%; height: 100vh; background-color: #f5f5f5; display: flex; justify-content: center; align-items: center; flex-direction: column; text-align: center; padding: 20px; box-sizing: border-box;">
+  <h1 style="font-size: 3em; margin: 0.5em 0; color: #333;"><!-- canvas-prop-start-fcf67861-87da-45e5-916b-31f5b74be747/heading -->Hello, another world!<!-- canvas-prop-end-fcf67861-87da-45e5-916b-31f5b74be747/heading --></h1>
 </div>
-<!-- xb-end-fcf67861-87da-45e5-916b-31f5b74be747 -->
+<!-- canvas-end-fcf67861-87da-45e5-916b-31f5b74be747 -->
 HTML,
       'expected_cache_tags' => [
-        'config:experience_builder.component.sdc.xb_test_sdc.props-no-slots',
+        'config:canvas.component.sdc.canvas_test_sdc.props-no-slots',
       ],
     ];
     yield 'simplest component tree without nesting' => [...self::removePrefixSuffix($simplest_component_tree_without_nesting), 'isPreview' => FALSE];
@@ -551,14 +555,14 @@ HTML,
       'value' => [
         [
           'uuid' => '41595148-e5c1-4873-b373-be3ae6e21340',
-          'component_id' => 'sdc.xb_test_sdc.props-slots',
+          'component_id' => 'sdc.canvas_test_sdc.props-slots',
           'inputs' => [
             'heading' => $generate_static_prop_source('world'),
           ],
         ],
         [
           'uuid' => '3b305d86-86a7-4684-8664-7ef1fc2be070',
-          'component_id' => 'sdc.xb_test_sdc.props-no-slots',
+          'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
           'parent_uuid' => '41595148-e5c1-4873-b373-be3ae6e21340',
           'slot' => 'the_body',
           'inputs' => [
@@ -569,17 +573,17 @@ HTML,
       'expected_value' => [
         ComponentTreeItemList::ROOT_UUID => [
           '41595148-e5c1-4873-b373-be3ae6e21340' => [
-            'component' => 'sdc.xb_test_sdc.props-slots',
+            'component' => 'sdc.canvas_test_sdc.props-slots',
             'props' => ['heading' => 'Hello, world!'],
             'slots' => [
-              'the_footer' => 'Example value for <strong>the_footer</strong>.',
-              'the_colophon' => '',
               'the_body' => [
                 '3b305d86-86a7-4684-8664-7ef1fc2be070' => [
-                  'component' => 'sdc.xb_test_sdc.props-no-slots',
+                  'component' => 'sdc.canvas_test_sdc.props-no-slots',
                   'props' => ['heading' => 'Hello, from a slot!'],
                 ],
               ],
+              'the_footer' => 'Example value for <strong>the_footer</strong>.',
+              'the_colophon' => '',
             ],
           ],
         ],
@@ -594,22 +598,18 @@ HTML,
             '#component' => [
               '#type' => 'component',
               '#cache' => [
-                'tags' => ['config:experience_builder.component.sdc.xb_test_sdc.props-slots'],
+                'tags' => ['config:canvas.component.sdc.canvas_test_sdc.props-slots'],
                 'contexts' => [],
                 'max-age' => Cache::PERMANENT,
               ],
-              '#component' => 'xb_test_sdc:props-slots',
+              '#component' => 'canvas_test_sdc:props-slots',
               '#props' => [
                 'heading' => 'Hello, world!',
-                'xb_uuid' => '41595148-e5c1-4873-b373-be3ae6e21340',
-                'xb_slot_ids' => ['the_body', 'the_footer', 'the_colophon'],
-                'xb_is_preview' => FALSE,
+                'canvas_uuid' => '41595148-e5c1-4873-b373-be3ae6e21340',
+                'canvas_slot_ids' => ['the_body', 'the_footer', 'the_colophon'],
+                'canvas_is_preview' => FALSE,
               ],
               '#slots' => [
-                'the_footer' => [
-                  '#plain_text' => 'Example value for <strong>the_footer</strong>.',
-                ],
-                'the_colophon' => ['#plain_text' => ''],
                 'the_body' => [
                   '3b305d86-86a7-4684-8664-7ef1fc2be070' => [
                     '#type' => RenderSafeComponentContainer::PLUGIN_ID,
@@ -619,33 +619,37 @@ HTML,
                     '#component' => [
                       '#type' => 'component',
                       '#cache' => [
-                        'tags' => ['config:experience_builder.component.sdc.xb_test_sdc.props-no-slots'],
+                        'tags' => ['config:canvas.component.sdc.canvas_test_sdc.props-no-slots'],
                         'contexts' => [],
                         'max-age' => Cache::PERMANENT,
                       ],
-                      '#component' => 'xb_test_sdc:props-no-slots',
+                      '#component' => 'canvas_test_sdc:props-no-slots',
                       '#props' => [
                         'heading' => 'Hello, from a slot!',
-                        'xb_uuid' => '3b305d86-86a7-4684-8664-7ef1fc2be070',
-                        'xb_slot_ids' => [],
-                        'xb_is_preview' => FALSE,
+                        'canvas_uuid' => '3b305d86-86a7-4684-8664-7ef1fc2be070',
+                        'canvas_slot_ids' => [],
+                        'canvas_is_preview' => FALSE,
                       ],
-                      '#prefix' => Markup::create('<!-- xb-start-3b305d86-86a7-4684-8664-7ef1fc2be070 -->'),
-                      '#suffix' => Markup::create('<!-- xb-end-3b305d86-86a7-4684-8664-7ef1fc2be070 -->'),
+                      '#prefix' => Markup::create('<!-- canvas-start-3b305d86-86a7-4684-8664-7ef1fc2be070 -->'),
+                      '#suffix' => Markup::create('<!-- canvas-end-3b305d86-86a7-4684-8664-7ef1fc2be070 -->'),
                       '#attached' => [
                         'library' => [
-                          'core/components.xb_test_sdc--props-no-slots',
+                          'core/components.canvas_test_sdc--props-no-slots',
                         ],
                       ],
                     ],
                   ],
                 ],
+                'the_footer' => [
+                  '#plain_text' => 'Example value for <strong>the_footer</strong>.',
+                ],
+                'the_colophon' => ['#plain_text' => ''],
               ],
-              '#prefix' => Markup::create('<!-- xb-start-41595148-e5c1-4873-b373-be3ae6e21340 -->'),
-              '#suffix' => Markup::create('<!-- xb-end-41595148-e5c1-4873-b373-be3ae6e21340 -->'),
+              '#prefix' => Markup::create('<!-- canvas-start-41595148-e5c1-4873-b373-be3ae6e21340 -->'),
+              '#suffix' => Markup::create('<!-- canvas-end-41595148-e5c1-4873-b373-be3ae6e21340 -->'),
               '#attached' => [
                 'library' => [
-                  'core/components.xb_test_sdc--props-slots',
+                  'core/components.canvas_test_sdc--props-slots',
                 ],
               ],
             ],
@@ -653,26 +657,26 @@ HTML,
         ],
       ],
       'expected_html' => <<<HTML
-<!-- xb-start-41595148-e5c1-4873-b373-be3ae6e21340 --><div  data-component-id="xb_test_sdc:props-slots" style="font-family: Helvetica, Arial, sans-serif; width: 100%; height: 100vh; background-color: #f5f5f5; display: flex; justify-content: center; align-items: center; flex-direction: column; text-align: center; padding: 20px; box-sizing: border-box;">
-  <h1 style="font-size: 3em; margin: 0.5em 0; color: #333;"><!-- xb-prop-start-41595148-e5c1-4873-b373-be3ae6e21340/heading -->Hello, world!<!-- xb-prop-end-41595148-e5c1-4873-b373-be3ae6e21340/heading --></h1>
+<!-- canvas-start-41595148-e5c1-4873-b373-be3ae6e21340 --><div  data-component-id="canvas_test_sdc:props-slots" style="font-family: Helvetica, Arial, sans-serif; width: 100%; height: 100vh; background-color: #f5f5f5; display: flex; justify-content: center; align-items: center; flex-direction: column; text-align: center; padding: 20px; box-sizing: border-box;">
+  <h1 style="font-size: 3em; margin: 0.5em 0; color: #333;"><!-- canvas-prop-start-41595148-e5c1-4873-b373-be3ae6e21340/heading -->Hello, world!<!-- canvas-prop-end-41595148-e5c1-4873-b373-be3ae6e21340/heading --></h1>
   <div class="component--props-slots--body">
-        <!-- xb-slot-start-41595148-e5c1-4873-b373-be3ae6e21340/the_body --><!-- xb-start-3b305d86-86a7-4684-8664-7ef1fc2be070 --><div  data-component-id="xb_test_sdc:props-no-slots" style="font-family: Helvetica, Arial, sans-serif; width: 100%; height: 100vh; background-color: #f5f5f5; display: flex; justify-content: center; align-items: center; flex-direction: column; text-align: center; padding: 20px; box-sizing: border-box;">
-  <h1 style="font-size: 3em; margin: 0.5em 0; color: #333;"><!-- xb-prop-start-3b305d86-86a7-4684-8664-7ef1fc2be070/heading -->Hello, from a slot!<!-- xb-prop-end-3b305d86-86a7-4684-8664-7ef1fc2be070/heading --></h1>
+        <!-- canvas-slot-start-41595148-e5c1-4873-b373-be3ae6e21340/the_body --><!-- canvas-start-3b305d86-86a7-4684-8664-7ef1fc2be070 --><div  data-component-id="canvas_test_sdc:props-no-slots" style="font-family: Helvetica, Arial, sans-serif; width: 100%; height: 100vh; background-color: #f5f5f5; display: flex; justify-content: center; align-items: center; flex-direction: column; text-align: center; padding: 20px; box-sizing: border-box;">
+  <h1 style="font-size: 3em; margin: 0.5em 0; color: #333;"><!-- canvas-prop-start-3b305d86-86a7-4684-8664-7ef1fc2be070/heading -->Hello, from a slot!<!-- canvas-prop-end-3b305d86-86a7-4684-8664-7ef1fc2be070/heading --></h1>
 </div>
-<!-- xb-end-3b305d86-86a7-4684-8664-7ef1fc2be070 --><!-- xb-slot-end-41595148-e5c1-4873-b373-be3ae6e21340/the_body -->
+<!-- canvas-end-3b305d86-86a7-4684-8664-7ef1fc2be070 --><!-- canvas-slot-end-41595148-e5c1-4873-b373-be3ae6e21340/the_body -->
     </div>
   <div class="component--props-slots--footer">
-        <!-- xb-slot-start-41595148-e5c1-4873-b373-be3ae6e21340/the_footer --><div class="xb--slot-empty-placeholder"></div>Example value for &lt;strong&gt;the_footer&lt;/strong&gt;.<!-- xb-slot-end-41595148-e5c1-4873-b373-be3ae6e21340/the_footer -->
+        <!-- canvas-slot-start-41595148-e5c1-4873-b373-be3ae6e21340/the_footer --><div class="canvas--slot-empty-placeholder"></div>Example value for &lt;strong&gt;the_footer&lt;/strong&gt;.<!-- canvas-slot-end-41595148-e5c1-4873-b373-be3ae6e21340/the_footer -->
     </div>
   <div class="component--props-slots--colophon">
-        <!-- xb-slot-start-41595148-e5c1-4873-b373-be3ae6e21340/the_colophon --><div class="xb--slot-empty-placeholder"></div><!-- xb-slot-end-41595148-e5c1-4873-b373-be3ae6e21340/the_colophon -->
+        <!-- canvas-slot-start-41595148-e5c1-4873-b373-be3ae6e21340/the_colophon --><div class="canvas--slot-empty-placeholder"></div><!-- canvas-slot-end-41595148-e5c1-4873-b373-be3ae6e21340/the_colophon -->
     </div>
 </div>
-<!-- xb-end-41595148-e5c1-4873-b373-be3ae6e21340 -->
+<!-- canvas-end-41595148-e5c1-4873-b373-be3ae6e21340 -->
 HTML,
       'expected_cache_tags' => [
-        'config:experience_builder.component.sdc.xb_test_sdc.props-slots',
-        'config:experience_builder.component.sdc.xb_test_sdc.props-no-slots',
+        'config:canvas.component.sdc.canvas_test_sdc.props-slots',
+        'config:canvas.component.sdc.canvas_test_sdc.props-no-slots',
       ],
     ];
     yield 'simplest component tree with nesting' => [...self::removePrefixSuffix($simplest_component_tree_with_nesting), 'isPreview' => FALSE];
@@ -684,14 +688,14 @@ HTML,
         // Note how these are NOT sequentially ordered.
         [
           'uuid' => 'dfd2e899-6d88-46f8-b6aa-98929d1586dd',
-          'component_id' => 'sdc.xb_test_sdc.props-slots',
+          'component_id' => 'sdc.canvas_test_sdc.props-slots',
           'parent_uuid' => '41595148-e5c1-4873-b373-be3ae6e21340',
           'slot' => 'the_body',
           'inputs' => ['heading' => $generate_static_prop_source('from slot level 1')],
         ],
         [
           'uuid' => '81c63cac-187d-4f05-8acc-1c38fb2489d3',
-          'component_id' => 'sdc.xb_test_sdc.props-no-slots',
+          'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
           'parent_uuid' => 'e0b92f23-c177-4196-8fa4-3e837f99a357',
           'slot' => 'the_body',
           'inputs' => ['heading' => $generate_static_prop_source('from slot level 3')],
@@ -714,32 +718,38 @@ HTML,
           'component_id' => 'js.my-cta',
           'parent_uuid' => 'e0b92f23-c177-4196-8fa4-3e837f99a357',
           'slot' => 'the_body',
-          'inputs' => ['text' => $generate_static_prop_source('from a "code component"')],
+          'inputs' => [
+            'text' => $generate_static_prop_source('from a "code component"'),
+            'href' => 'https://example.com',
+          ],
         ],
         [
           'uuid' => 'b4bc6c8f-66f7-458a-99a9-41c29b2801e7',
           'component_id' => 'js.my-cta-with-auto-save',
           'parent_uuid' => 'e0b92f23-c177-4196-8fa4-3e837f99a357',
           'slot' => 'the_body',
-          'inputs' => ['text' => $generate_static_prop_source('from a "auto-save code component"')],
+          'inputs' => [
+            'text' => $generate_static_prop_source('from a "auto-save code component"'),
+            'href' => 'https://example.com',
+          ],
         ],
         [
           'uuid' => '9f09ecd8-ec65-408c-b5c8-ef036e6aeb97',
-          'component_id' => 'sdc.xb_test_sdc.props-no-slots',
+          'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
           'parent_uuid' => 'e0b92f23-c177-4196-8fa4-3e837f99a357',
           'slot' => 'the_body',
           'inputs' => ['heading' => $generate_static_prop_source('from slot <LAST ONE>')],
         ],
         [
           'uuid' => 'e0b92f23-c177-4196-8fa4-3e837f99a357',
-          'component_id' => 'sdc.xb_test_sdc.props-slots',
+          'component_id' => 'sdc.canvas_test_sdc.props-slots',
           'parent_uuid' => 'dfd2e899-6d88-46f8-b6aa-98929d1586dd',
           'slot' => 'the_body',
           'inputs' => ['heading' => $generate_static_prop_source('from slot level 2')],
         ],
         [
           'uuid' => '41595148-e5c1-4873-b373-be3ae6e21340',
-          'component_id' => 'sdc.xb_test_sdc.props-slots',
+          'component_id' => 'sdc.canvas_test_sdc.props-slots',
           'inputs' => [
             'heading' => $generate_static_prop_source('world'),
           ],
@@ -749,28 +759,22 @@ HTML,
         // Note how these are sequentially ordered.
         ComponentTreeItemList::ROOT_UUID => [
           '41595148-e5c1-4873-b373-be3ae6e21340' => [
-            'component' => 'sdc.xb_test_sdc.props-slots',
+            'component' => 'sdc.canvas_test_sdc.props-slots',
             'props' => ['heading' => 'Hello, world!'],
             'slots' => [
-              'the_footer' => 'Example value for <strong>the_footer</strong>.',
-              'the_colophon' => '',
               'the_body' => [
                 'dfd2e899-6d88-46f8-b6aa-98929d1586dd' => [
-                  'component' => 'sdc.xb_test_sdc.props-slots',
+                  'component' => 'sdc.canvas_test_sdc.props-slots',
                   'props' => ['heading' => 'Hello, from slot level 1!'],
                   'slots' => [
-                    'the_footer' => 'Example value for <strong>the_footer</strong>.',
-                    'the_colophon' => '',
                     'the_body' => [
                       'e0b92f23-c177-4196-8fa4-3e837f99a357' => [
-                        'component' => 'sdc.xb_test_sdc.props-slots',
+                        'component' => 'sdc.canvas_test_sdc.props-slots',
                         'props' => ['heading' => 'Hello, from slot level 2!'],
                         'slots' => [
-                          'the_footer' => 'Example value for <strong>the_footer</strong>.',
-                          'the_colophon' => '',
                           'the_body' => [
                             '81c63cac-187d-4f05-8acc-1c38fb2489d3' => [
-                              'component' => 'sdc.xb_test_sdc.props-no-slots',
+                              'component' => 'sdc.canvas_test_sdc.props-no-slots',
                               'props' => ['heading' => 'Hello, from slot level 3!'],
                             ],
                             '68167e4a-9245-41be-b564-f1e1dcad1dec' => [
@@ -785,23 +789,35 @@ HTML,
                             ],
                             '2f57ba57-f32a-4a7b-9896-9d1104b446f1' => [
                               'component' => 'js.my-cta',
-                              'props' => ['text' => 'Hello, from a "code component"!'],
+                              'props' => [
+                                'text' => 'Hello, from a "code component"!',
+                                'href' => 'https://example.com',
+                              ],
                             ],
                             'b4bc6c8f-66f7-458a-99a9-41c29b2801e7' => [
                               'component' => 'js.my-cta-with-auto-save',
-                              'props' => ['text' => 'Hello, from a "auto-save code component"!'],
+                              'props' => [
+                                'text' => 'Hello, from a "auto-save code component"!',
+                                'href' => 'https://example.com',
+                              ],
                             ],
                             '9f09ecd8-ec65-408c-b5c8-ef036e6aeb97' => [
-                              'component' => 'sdc.xb_test_sdc.props-no-slots',
+                              'component' => 'sdc.canvas_test_sdc.props-no-slots',
                               'props' => ['heading' => 'Hello, from slot <LAST ONE>!'],
                             ],
                           ],
+                          'the_footer' => 'Example value for <strong>the_footer</strong>.',
+                          'the_colophon' => '',
                         ],
                       ],
                     ],
+                    'the_footer' => 'Example value for <strong>the_footer</strong>.',
+                    'the_colophon' => '',
                   ],
                 ],
               ],
+              'the_footer' => 'Example value for <strong>the_footer</strong>.',
+              'the_colophon' => '',
             ],
           ],
         ],
@@ -817,22 +833,18 @@ HTML,
             '#component' => [
               '#type' => 'component',
               '#cache' => [
-                'tags' => ['config:experience_builder.component.sdc.xb_test_sdc.props-slots'],
+                'tags' => ['config:canvas.component.sdc.canvas_test_sdc.props-slots'],
                 'contexts' => [],
                 'max-age' => Cache::PERMANENT,
               ],
-              '#component' => 'xb_test_sdc:props-slots',
+              '#component' => 'canvas_test_sdc:props-slots',
               '#props' => [
                 'heading' => 'Hello, world!',
-                'xb_uuid' => '41595148-e5c1-4873-b373-be3ae6e21340',
-                'xb_slot_ids' => ['the_body', 'the_footer', 'the_colophon'],
-                'xb_is_preview' => FALSE,
+                'canvas_uuid' => '41595148-e5c1-4873-b373-be3ae6e21340',
+                'canvas_slot_ids' => ['the_body', 'the_footer', 'the_colophon'],
+                'canvas_is_preview' => FALSE,
               ],
               '#slots' => [
-                'the_footer' => [
-                  '#plain_text' => 'Example value for <strong>the_footer</strong>.',
-                ],
-                'the_colophon' => ['#plain_text' => ''],
                 'the_body' => [
                   'dfd2e899-6d88-46f8-b6aa-98929d1586dd' => [
                     '#type' => RenderSafeComponentContainer::PLUGIN_ID,
@@ -842,26 +854,18 @@ HTML,
                     '#component' => [
                       '#type' => 'component',
                       '#cache' => [
-                        'tags' => ['config:experience_builder.component.sdc.xb_test_sdc.props-slots'],
+                        'tags' => ['config:canvas.component.sdc.canvas_test_sdc.props-slots'],
                         'contexts' => [],
                         'max-age' => Cache::PERMANENT,
                       ],
-                      '#component' => 'xb_test_sdc:props-slots',
+                      '#component' => 'canvas_test_sdc:props-slots',
                       '#props' => [
                         'heading' => 'Hello, from slot level 1!',
-                        'xb_uuid' => 'dfd2e899-6d88-46f8-b6aa-98929d1586dd',
-                        'xb_slot_ids' => ['the_body', 'the_footer', 'the_colophon'],
-                        'xb_is_preview' => FALSE,
+                        'canvas_uuid' => 'dfd2e899-6d88-46f8-b6aa-98929d1586dd',
+                        'canvas_slot_ids' => ['the_body', 'the_footer', 'the_colophon'],
+                        'canvas_is_preview' => FALSE,
                       ],
                       '#slots' => [
-                        'the_footer' => [
-                          // This string is the first example value for this slot.
-                          '#plain_text' => 'Example value for <strong>the_footer</strong>.',
-                        ],
-                        'the_colophon' => [
-                          // This slot has no example value defined.
-                          '#plain_text' => '',
-                        ],
                         'the_body' => [
                           'e0b92f23-c177-4196-8fa4-3e837f99a357' => [
                             '#type' => RenderSafeComponentContainer::PLUGIN_ID,
@@ -871,22 +875,18 @@ HTML,
                             '#component' => [
                               '#type' => 'component',
                               '#cache' => [
-                                'tags' => ['config:experience_builder.component.sdc.xb_test_sdc.props-slots'],
+                                'tags' => ['config:canvas.component.sdc.canvas_test_sdc.props-slots'],
                                 'contexts' => [],
                                 'max-age' => Cache::PERMANENT,
                               ],
-                              '#component' => 'xb_test_sdc:props-slots',
+                              '#component' => 'canvas_test_sdc:props-slots',
                               '#props' => [
                                 'heading' => 'Hello, from slot level 2!',
-                                'xb_uuid' => 'e0b92f23-c177-4196-8fa4-3e837f99a357',
-                                'xb_slot_ids' => ['the_body', 'the_footer', 'the_colophon'],
-                                'xb_is_preview' => FALSE,
+                                'canvas_uuid' => 'e0b92f23-c177-4196-8fa4-3e837f99a357',
+                                'canvas_slot_ids' => ['the_body', 'the_footer', 'the_colophon'],
+                                'canvas_is_preview' => FALSE,
                               ],
                               '#slots' => [
-                                'the_footer' => [
-                                  '#plain_text' => 'Example value for <strong>the_footer</strong>.',
-                                ],
-                                'the_colophon' => ['#plain_text' => ''],
                                 'the_body' => [
                                   '81c63cac-187d-4f05-8acc-1c38fb2489d3' => [
                                     '#type' => RenderSafeComponentContainer::PLUGIN_ID,
@@ -896,22 +896,22 @@ HTML,
                                     '#component' => [
                                       '#type' => 'component',
                                       '#cache' => [
-                                        'tags' => ['config:experience_builder.component.sdc.xb_test_sdc.props-no-slots'],
+                                        'tags' => ['config:canvas.component.sdc.canvas_test_sdc.props-no-slots'],
                                         'contexts' => [],
                                         'max-age' => Cache::PERMANENT,
                                       ],
-                                      '#component' => 'xb_test_sdc:props-no-slots',
+                                      '#component' => 'canvas_test_sdc:props-no-slots',
                                       '#props' => [
                                         'heading' => 'Hello, from slot level 3!',
-                                        'xb_uuid' => '81c63cac-187d-4f05-8acc-1c38fb2489d3',
-                                        'xb_slot_ids' => [],
-                                        'xb_is_preview' => FALSE,
+                                        'canvas_uuid' => '81c63cac-187d-4f05-8acc-1c38fb2489d3',
+                                        'canvas_slot_ids' => [],
+                                        'canvas_is_preview' => FALSE,
                                       ],
-                                      '#prefix' => Markup::create('<!-- xb-start-81c63cac-187d-4f05-8acc-1c38fb2489d3 -->'),
-                                      '#suffix' => Markup::create('<!-- xb-end-81c63cac-187d-4f05-8acc-1c38fb2489d3 -->'),
+                                      '#prefix' => Markup::create('<!-- canvas-start-81c63cac-187d-4f05-8acc-1c38fb2489d3 -->'),
+                                      '#suffix' => Markup::create('<!-- canvas-end-81c63cac-187d-4f05-8acc-1c38fb2489d3 -->'),
                                       '#attached' => [
                                         'library' => [
-                                          'core/components.xb_test_sdc--props-no-slots',
+                                          'core/components.canvas_test_sdc--props-no-slots',
                                         ],
                                       ],
                                     ],
@@ -955,24 +955,24 @@ HTML,
                                           '#access' => TRUE,
                                         ],
                                         'site_name' => [
-                                          '#markup' => 'XB Test Site',
+                                          '#markup' => 'Canvas Test Site',
                                           '#access' => TRUE,
                                         ],
                                         'site_slogan' => [
-                                          '#markup' => 'Experience Builder Test Site',
+                                          '#markup' => 'Drupal Canvas Test Site',
                                           '#access' => TRUE,
                                         ],
                                       ],
                                       '#cache' => [
                                         'tags' => [
                                           'config:system.site',
-                                          'config:experience_builder.component.block.system_branding_block',
+                                          'config:canvas.component.block.system_branding_block',
                                         ],
                                         'contexts' => [],
                                         'max-age' => Cache::PERMANENT,
                                       ],
-                                      '#prefix' => Markup::create('<!-- xb-start-68167e4a-9245-41be-b564-f1e1dcad1dec -->'),
-                                      '#suffix' => Markup::create('<!-- xb-end-68167e4a-9245-41be-b564-f1e1dcad1dec -->'),
+                                      '#prefix' => Markup::create('<!-- canvas-start-68167e4a-9245-41be-b564-f1e1dcad1dec -->'),
+                                      '#suffix' => Markup::create('<!-- canvas-end-68167e4a-9245-41be-b564-f1e1dcad1dec -->'),
                                     ],
                                   ],
                                   '2f57ba57-f32a-4a7b-9896-9d1104b446f1' => [
@@ -984,28 +984,31 @@ HTML,
                                       '#type' => 'astro_island',
                                       '#cache' => [
                                         'tags' => [
-                                          'config:experience_builder.js_component.my-cta',
-                                          'config:experience_builder.component.js.my-cta',
+                                          'config:canvas.js_component.my-cta',
+                                          'config:canvas.component.js.my-cta',
                                         ],
                                         'contexts' => [],
                                         'max-age' => Cache::PERMANENT,
                                       ],
                                       '#import_maps' => [
                                         ImportMapResponseAttachmentsProcessor::GLOBAL_IMPORTS => [
-                                          'preact' => \sprintf('%s/ui/lib/astro-hydration/dist/preact.module.js', $path),
-                                          'preact/hooks' => \sprintf('%s/ui/lib/astro-hydration/dist/hooks.module.js', $path),
-                                          'react/jsx-runtime' => \sprintf('%s/ui/lib/astro-hydration/dist/jsxRuntime.module.js', $path),
-                                          'react' => \sprintf('%s/ui/lib/astro-hydration/dist/compat.module.js', $path),
-                                          'react-dom' => \sprintf('%s/ui/lib/astro-hydration/dist/compat.module.js', $path),
-                                          'react-dom/client' => \sprintf('%s/ui/lib/astro-hydration/dist/compat.module.js', $path),
-                                          'clsx' => \sprintf('%s/ui/lib/astro-hydration/dist/clsx.js', $path),
-                                          'class-variance-authority' => \sprintf('%s/ui/lib/astro-hydration/dist/class-variance-authority.js', $path),
-                                          'tailwind-merge' => \sprintf('%s/ui/lib/astro-hydration/dist/tailwind-merge.js', $path),
-                                          '@/lib/FormattedText' => \sprintf('%s/ui/lib/astro-hydration/dist/FormattedText.js', $path),
-                                          '@/lib/utils' => \sprintf('%s/ui/lib/astro-hydration/dist/utils.js', $path),
-                                          '@drupal-api-client/json-api-client' => \sprintf('%s/ui/lib/astro-hydration/dist/json-api-client.js', $path),
-                                          'drupal-jsonapi-params' => \sprintf('%s/ui/lib/astro-hydration/dist/jsonapi-params.js', $path),
-                                          'swr' => \sprintf('%s/ui/lib/astro-hydration/dist/swr.js', $path),
+                                          'preact' => \sprintf('%s/ui/lib/astro-hydration/dist/preact.module.js?2.1.0-alpha3', $path),
+                                          'preact/hooks' => \sprintf('%s/ui/lib/astro-hydration/dist/hooks.module.js?2.1.0-alpha3', $path),
+                                          'react/jsx-runtime' => \sprintf('%s/ui/lib/astro-hydration/dist/jsx-runtime-default.js?2.1.0-alpha3', $path),
+                                          'react' => \sprintf('%s/ui/lib/astro-hydration/dist/compat.module.js?2.1.0-alpha3', $path),
+                                          'react-dom' => \sprintf('%s/ui/lib/astro-hydration/dist/compat.module.js?2.1.0-alpha3', $path),
+                                          'react-dom/client' => \sprintf('%s/ui/lib/astro-hydration/dist/compat.module.js?2.1.0-alpha3', $path),
+                                          'clsx' => \sprintf('%s/ui/lib/astro-hydration/dist/clsx.js?2.1.0-alpha3', $path),
+                                          'class-variance-authority' => \sprintf('%s/ui/lib/astro-hydration/dist/class-variance-authority.js?2.1.0-alpha3', $path),
+                                          'tailwind-merge' => \sprintf('%s/ui/lib/astro-hydration/dist/tailwind-merge.js?2.1.0-alpha3', $path),
+                                          '@/lib/FormattedText' => \sprintf('%s/ui/lib/astro-hydration/dist/FormattedText.js?2.1.0-alpha3', $path),
+                                          'next-image-standalone' => \sprintf('%s/ui/lib/astro-hydration/dist/next-image-standalone.js?2.1.0-alpha3', $path),
+                                          '@/lib/utils' => \sprintf('%s/ui/lib/astro-hydration/dist/utils.js?2.1.0-alpha3', $path),
+                                          '@drupal-api-client/json-api-client' => \sprintf('%s/ui/lib/astro-hydration/dist/jsonapi-client.js?2.1.0-alpha3', $path),
+                                          'drupal-jsonapi-params' => \sprintf('%s/ui/lib/astro-hydration/dist/jsonapi-params.js?2.1.0-alpha3', $path),
+                                          '@/lib/jsonapi-utils' => \sprintf('%s/ui/lib/astro-hydration/dist/jsonapi-utils.js?2.1.0-alpha3', $path),
+                                          '@/lib/drupal-utils' => \sprintf('%s/ui/lib/astro-hydration/dist/drupal-utils.js?2.1.0-alpha3', $path),
+                                          'swr' => \sprintf('%s/ui/lib/astro-hydration/dist/swr.js?2.1.0-alpha3', $path),
                                         ],
                                       ],
                                       '#attached' => [
@@ -1014,32 +1017,33 @@ HTML,
                                             [
                                               'rel' => 'modulepreload',
                                               'fetchpriority' => 'high',
-                                              'href' => \sprintf('%s/ui/lib/astro-hydration/dist/signals.module.js', $path),
+                                              'href' => \sprintf('%s/ui/lib/astro-hydration/dist/signals.module.js?2.1.0-alpha3', $path),
                                             ],
                                           ],
                                           [
                                             [
                                               'rel' => 'modulepreload',
                                               'fetchpriority' => 'high',
-                                              'href' => \sprintf('%s/ui/lib/astro-hydration/dist/preload-helper.js', $path),
+                                              'href' => \sprintf('%s/ui/lib/astro-hydration/dist/preload-helper.js?2.1.0-alpha3', $path),
                                             ],
                                           ],
                                         ],
                                         'library' => [
-                                          'experience_builder/astro_island.my-cta',
-                                          'experience_builder/asset_library.' . AssetLibrary::GLOBAL_ID,
+                                          'canvas/astro_island.my-cta',
+                                          'canvas/asset_library.' . AssetLibrary::GLOBAL_ID,
                                         ],
                                       ],
                                       '#name' => 'My First Code Component',
                                       '#component_url' => '::SITE_DIR_BASE_URL::/files/astro-island/zp6hEMcVLAQUXUUP3gsBwM5-MNs4_2kJ_7z16CTg1Sk.js',
                                       '#props' => [
                                         'text' => 'Hello, from a "code component"!',
-                                        'xb_uuid' => '2f57ba57-f32a-4a7b-9896-9d1104b446f1',
-                                        'xb_slot_ids' => [],
-                                        'xb_is_preview' => FALSE,
+                                        'href' => 'https://example.com',
+                                        'canvas_uuid' => '2f57ba57-f32a-4a7b-9896-9d1104b446f1',
+                                        'canvas_slot_ids' => [],
+                                        'canvas_is_preview' => FALSE,
                                       ],
-                                      '#prefix' => Markup::create('<!-- xb-start-2f57ba57-f32a-4a7b-9896-9d1104b446f1 -->'),
-                                      '#suffix' => Markup::create('<!-- xb-end-2f57ba57-f32a-4a7b-9896-9d1104b446f1 -->'),
+                                      '#prefix' => Markup::create('<!-- canvas-start-2f57ba57-f32a-4a7b-9896-9d1104b446f1 -->'),
+                                      '#suffix' => Markup::create('<!-- canvas-end-2f57ba57-f32a-4a7b-9896-9d1104b446f1 -->'),
                                       '#uuid' => '2f57ba57-f32a-4a7b-9896-9d1104b446f1',
                                     ],
                                   ],
@@ -1052,28 +1056,31 @@ HTML,
                                       '#type' => 'astro_island',
                                       '#cache' => [
                                         'tags' => [
-                                          'config:experience_builder.js_component.my-cta-with-auto-save',
-                                          'config:experience_builder.component.js.my-cta-with-auto-save',
+                                          'config:canvas.js_component.my-cta-with-auto-save',
+                                          'config:canvas.component.js.my-cta-with-auto-save',
                                         ],
                                         'contexts' => [],
                                         'max-age' => Cache::PERMANENT,
                                       ],
                                       '#import_maps' => [
                                         ImportMapResponseAttachmentsProcessor::GLOBAL_IMPORTS => [
-                                          'preact' => \sprintf('%s/ui/lib/astro-hydration/dist/preact.module.js', $path),
-                                          'preact/hooks' => \sprintf('%s/ui/lib/astro-hydration/dist/hooks.module.js', $path),
-                                          'react/jsx-runtime' => \sprintf('%s/ui/lib/astro-hydration/dist/jsxRuntime.module.js', $path),
-                                          'react' => \sprintf('%s/ui/lib/astro-hydration/dist/compat.module.js', $path),
-                                          'react-dom' => \sprintf('%s/ui/lib/astro-hydration/dist/compat.module.js', $path),
-                                          'react-dom/client' => \sprintf('%s/ui/lib/astro-hydration/dist/compat.module.js', $path),
-                                          'clsx' => \sprintf('%s/ui/lib/astro-hydration/dist/clsx.js', $path),
-                                          'class-variance-authority' => \sprintf('%s/ui/lib/astro-hydration/dist/class-variance-authority.js', $path),
-                                          'tailwind-merge' => \sprintf('%s/ui/lib/astro-hydration/dist/tailwind-merge.js', $path),
-                                          '@/lib/FormattedText' => \sprintf('%s/ui/lib/astro-hydration/dist/FormattedText.js', $path),
-                                          '@/lib/utils' => \sprintf('%s/ui/lib/astro-hydration/dist/utils.js', $path),
-                                          '@drupal-api-client/json-api-client' => \sprintf('%s/ui/lib/astro-hydration/dist/json-api-client.js', $path),
-                                          'drupal-jsonapi-params' => \sprintf('%s/ui/lib/astro-hydration/dist/jsonapi-params.js', $path),
-                                          'swr' => \sprintf('%s/ui/lib/astro-hydration/dist/swr.js', $path),
+                                          'preact' => \sprintf('%s/ui/lib/astro-hydration/dist/preact.module.js?2.1.0-alpha3', $path),
+                                          'preact/hooks' => \sprintf('%s/ui/lib/astro-hydration/dist/hooks.module.js?2.1.0-alpha3', $path),
+                                          'react/jsx-runtime' => \sprintf('%s/ui/lib/astro-hydration/dist/jsx-runtime-default.js?2.1.0-alpha3', $path),
+                                          'react' => \sprintf('%s/ui/lib/astro-hydration/dist/compat.module.js?2.1.0-alpha3', $path),
+                                          'react-dom' => \sprintf('%s/ui/lib/astro-hydration/dist/compat.module.js?2.1.0-alpha3', $path),
+                                          'react-dom/client' => \sprintf('%s/ui/lib/astro-hydration/dist/compat.module.js?2.1.0-alpha3', $path),
+                                          'clsx' => \sprintf('%s/ui/lib/astro-hydration/dist/clsx.js?2.1.0-alpha3', $path),
+                                          'class-variance-authority' => \sprintf('%s/ui/lib/astro-hydration/dist/class-variance-authority.js?2.1.0-alpha3', $path),
+                                          'tailwind-merge' => \sprintf('%s/ui/lib/astro-hydration/dist/tailwind-merge.js?2.1.0-alpha3', $path),
+                                          '@/lib/FormattedText' => \sprintf('%s/ui/lib/astro-hydration/dist/FormattedText.js?2.1.0-alpha3', $path),
+                                          'next-image-standalone' => \sprintf('%s/ui/lib/astro-hydration/dist/next-image-standalone.js?2.1.0-alpha3', $path),
+                                          '@/lib/utils' => \sprintf('%s/ui/lib/astro-hydration/dist/utils.js?2.1.0-alpha3', $path),
+                                          '@drupal-api-client/json-api-client' => \sprintf('%s/ui/lib/astro-hydration/dist/jsonapi-client.js?2.1.0-alpha3', $path),
+                                          'drupal-jsonapi-params' => \sprintf('%s/ui/lib/astro-hydration/dist/jsonapi-params.js?2.1.0-alpha3', $path),
+                                          '@/lib/jsonapi-utils' => \sprintf('%s/ui/lib/astro-hydration/dist/jsonapi-utils.js?2.1.0-alpha3', $path),
+                                          '@/lib/drupal-utils' => \sprintf('%s/ui/lib/astro-hydration/dist/drupal-utils.js?2.1.0-alpha3', $path),
+                                          'swr' => \sprintf('%s/ui/lib/astro-hydration/dist/swr.js?2.1.0-alpha3', $path),
                                         ],
                                       ],
                                       '#attached' => [
@@ -1082,32 +1089,33 @@ HTML,
                                             [
                                               'rel' => 'modulepreload',
                                               'fetchpriority' => 'high',
-                                              'href' => \sprintf('%s/ui/lib/astro-hydration/dist/signals.module.js', $path),
+                                              'href' => \sprintf('%s/ui/lib/astro-hydration/dist/signals.module.js?2.1.0-alpha3', $path),
                                             ],
                                           ],
                                           [
                                             [
                                               'rel' => 'modulepreload',
                                               'fetchpriority' => 'high',
-                                              'href' => \sprintf('%s/ui/lib/astro-hydration/dist/preload-helper.js', $path),
+                                              'href' => \sprintf('%s/ui/lib/astro-hydration/dist/preload-helper.js?2.1.0-alpha3', $path),
                                             ],
                                           ],
                                         ],
                                         'library' => [
-                                          'experience_builder/astro_island.my-cta-with-auto-save',
-                                          'experience_builder/asset_library.' . AssetLibrary::GLOBAL_ID,
+                                          'canvas/astro_island.my-cta-with-auto-save',
+                                          'canvas/asset_library.' . AssetLibrary::GLOBAL_ID,
                                         ],
                                       ],
                                       '#name' => 'My Code Component with Auto-Save',
                                       '#component_url' => '::SITE_DIR_BASE_URL::/files/astro-island/dErbetE11Vm2Twy1AoP3OU8bws4QaYAih9Gd8PgRrm4.js',
                                       '#props' => [
                                         'text' => 'Hello, from a "auto-save code component"!',
-                                        'xb_uuid' => 'b4bc6c8f-66f7-458a-99a9-41c29b2801e7',
-                                        'xb_slot_ids' => [],
-                                        'xb_is_preview' => FALSE,
+                                        'href' => 'https://example.com',
+                                        'canvas_uuid' => 'b4bc6c8f-66f7-458a-99a9-41c29b2801e7',
+                                        'canvas_slot_ids' => [],
+                                        'canvas_is_preview' => FALSE,
                                       ],
-                                      '#prefix' => Markup::create('<!-- xb-start-b4bc6c8f-66f7-458a-99a9-41c29b2801e7 -->'),
-                                      '#suffix' => Markup::create('<!-- xb-end-b4bc6c8f-66f7-458a-99a9-41c29b2801e7 -->'),
+                                      '#prefix' => Markup::create('<!-- canvas-start-b4bc6c8f-66f7-458a-99a9-41c29b2801e7 -->'),
+                                      '#suffix' => Markup::create('<!-- canvas-end-b4bc6c8f-66f7-458a-99a9-41c29b2801e7 -->'),
                                       '#uuid' => 'b4bc6c8f-66f7-458a-99a9-41c29b2801e7',
                                     ],
                                   ],
@@ -1119,55 +1127,71 @@ HTML,
                                     '#component' => [
                                       '#type' => 'component',
                                       '#cache' => [
-                                        'tags' => ['config:experience_builder.component.sdc.xb_test_sdc.props-no-slots'],
+                                        'tags' => ['config:canvas.component.sdc.canvas_test_sdc.props-no-slots'],
                                         'contexts' => [],
                                         'max-age' => Cache::PERMANENT,
                                       ],
-                                      '#component' => 'xb_test_sdc:props-no-slots',
+                                      '#component' => 'canvas_test_sdc:props-no-slots',
                                       '#props' => [
                                         'heading' => 'Hello, from slot <LAST ONE>!',
-                                        'xb_uuid' => '9f09ecd8-ec65-408c-b5c8-ef036e6aeb97',
-                                        'xb_slot_ids' => [],
-                                        'xb_is_preview' => FALSE,
+                                        'canvas_uuid' => '9f09ecd8-ec65-408c-b5c8-ef036e6aeb97',
+                                        'canvas_slot_ids' => [],
+                                        'canvas_is_preview' => FALSE,
                                       ],
-                                      '#prefix' => Markup::create('<!-- xb-start-last-in-tree -->'),
-                                      '#suffix' => Markup::create('<!-- xb-end-9f09ecd8-ec65-408c-b5c8-ef036e6aeb97 -->'),
+                                      '#prefix' => Markup::create('<!-- canvas-start-last-in-tree -->'),
+                                      '#suffix' => Markup::create('<!-- canvas-end-9f09ecd8-ec65-408c-b5c8-ef036e6aeb97 -->'),
                                       '#attached' => [
                                         'library' => [
-                                          'core/components.xb_test_sdc--props-no-slots',
+                                          'core/components.canvas_test_sdc--props-no-slots',
                                         ],
                                       ],
                                     ],
                                   ],
                                 ],
+                                'the_footer' => [
+                                  '#plain_text' => 'Example value for <strong>the_footer</strong>.',
+                                ],
+                                'the_colophon' => ['#plain_text' => ''],
                               ],
-                              '#prefix' => Markup::create('<!-- xb-start-e0b92f23-c177-4196-8fa4-3e837f99a357 -->'),
-                              '#suffix' => Markup::create('<!-- xb-end-e0b92f23-c177-4196-8fa4-3e837f99a357 -->'),
+                              '#prefix' => Markup::create('<!-- canvas-start-e0b92f23-c177-4196-8fa4-3e837f99a357 -->'),
+                              '#suffix' => Markup::create('<!-- canvas-end-e0b92f23-c177-4196-8fa4-3e837f99a357 -->'),
                               '#attached' => [
                                 'library' => [
-                                  'core/components.xb_test_sdc--props-slots',
+                                  'core/components.canvas_test_sdc--props-slots',
                                 ],
                               ],
                             ],
                           ],
                         ],
+                        'the_footer' => [
+                          // This string is the first example value for this slot.
+                          '#plain_text' => 'Example value for <strong>the_footer</strong>.',
+                        ],
+                        'the_colophon' => [
+                          // This slot has no example value defined.
+                          '#plain_text' => '',
+                        ],
                       ],
-                      '#prefix' => Markup::create('<!-- xb-start-dfd2e899-6d88-46f8-b6aa-98929d1586dd -->'),
-                      '#suffix' => Markup::create('<!-- xb-end-dfd2e899-6d88-46f8-b6aa-98929d1586dd -->'),
+                      '#prefix' => Markup::create('<!-- canvas-start-dfd2e899-6d88-46f8-b6aa-98929d1586dd -->'),
+                      '#suffix' => Markup::create('<!-- canvas-end-dfd2e899-6d88-46f8-b6aa-98929d1586dd -->'),
                       '#attached' => [
                         'library' => [
-                          'core/components.xb_test_sdc--props-slots',
+                          'core/components.canvas_test_sdc--props-slots',
                         ],
                       ],
                     ],
                   ],
                 ],
+                'the_footer' => [
+                  '#plain_text' => 'Example value for <strong>the_footer</strong>.',
+                ],
+                'the_colophon' => ['#plain_text' => ''],
               ],
-              '#prefix' => Markup::create('<!-- xb-start-41595148-e5c1-4873-b373-be3ae6e21340 -->'),
-              '#suffix' => Markup::create('<!-- xb-end-41595148-e5c1-4873-b373-be3ae6e21340 -->'),
+              '#prefix' => Markup::create('<!-- canvas-start-41595148-e5c1-4873-b373-be3ae6e21340 -->'),
+              '#suffix' => Markup::create('<!-- canvas-end-41595148-e5c1-4873-b373-be3ae6e21340 -->'),
               '#attached' => [
                 'library' => [
-                  'core/components.xb_test_sdc--props-slots',
+                  'core/components.canvas_test_sdc--props-slots',
                 ],
               ],
             ],
@@ -1175,77 +1199,77 @@ HTML,
         ],
       ],
       'expected_html' => <<<HTML
-<!-- xb-start-41595148-e5c1-4873-b373-be3ae6e21340 --><div  data-component-id="xb_test_sdc:props-slots" style="font-family: Helvetica, Arial, sans-serif; width: 100%; height: 100vh; background-color: #f5f5f5; display: flex; justify-content: center; align-items: center; flex-direction: column; text-align: center; padding: 20px; box-sizing: border-box;">
-  <h1 style="font-size: 3em; margin: 0.5em 0; color: #333;"><!-- xb-prop-start-41595148-e5c1-4873-b373-be3ae6e21340/heading -->Hello, world!<!-- xb-prop-end-41595148-e5c1-4873-b373-be3ae6e21340/heading --></h1>
+<!-- canvas-start-41595148-e5c1-4873-b373-be3ae6e21340 --><div  data-component-id="canvas_test_sdc:props-slots" style="font-family: Helvetica, Arial, sans-serif; width: 100%; height: 100vh; background-color: #f5f5f5; display: flex; justify-content: center; align-items: center; flex-direction: column; text-align: center; padding: 20px; box-sizing: border-box;">
+  <h1 style="font-size: 3em; margin: 0.5em 0; color: #333;"><!-- canvas-prop-start-41595148-e5c1-4873-b373-be3ae6e21340/heading -->Hello, world!<!-- canvas-prop-end-41595148-e5c1-4873-b373-be3ae6e21340/heading --></h1>
   <div class="component--props-slots--body">
-        <!-- xb-slot-start-41595148-e5c1-4873-b373-be3ae6e21340/the_body --><!-- xb-start-dfd2e899-6d88-46f8-b6aa-98929d1586dd --><div  data-component-id="xb_test_sdc:props-slots" style="font-family: Helvetica, Arial, sans-serif; width: 100%; height: 100vh; background-color: #f5f5f5; display: flex; justify-content: center; align-items: center; flex-direction: column; text-align: center; padding: 20px; box-sizing: border-box;">
-  <h1 style="font-size: 3em; margin: 0.5em 0; color: #333;"><!-- xb-prop-start-dfd2e899-6d88-46f8-b6aa-98929d1586dd/heading -->Hello, from slot level 1!<!-- xb-prop-end-dfd2e899-6d88-46f8-b6aa-98929d1586dd/heading --></h1>
+        <!-- canvas-slot-start-41595148-e5c1-4873-b373-be3ae6e21340/the_body --><!-- canvas-start-dfd2e899-6d88-46f8-b6aa-98929d1586dd --><div  data-component-id="canvas_test_sdc:props-slots" style="font-family: Helvetica, Arial, sans-serif; width: 100%; height: 100vh; background-color: #f5f5f5; display: flex; justify-content: center; align-items: center; flex-direction: column; text-align: center; padding: 20px; box-sizing: border-box;">
+  <h1 style="font-size: 3em; margin: 0.5em 0; color: #333;"><!-- canvas-prop-start-dfd2e899-6d88-46f8-b6aa-98929d1586dd/heading -->Hello, from slot level 1!<!-- canvas-prop-end-dfd2e899-6d88-46f8-b6aa-98929d1586dd/heading --></h1>
   <div class="component--props-slots--body">
-        <!-- xb-slot-start-dfd2e899-6d88-46f8-b6aa-98929d1586dd/the_body --><!-- xb-start-e0b92f23-c177-4196-8fa4-3e837f99a357 --><div  data-component-id="xb_test_sdc:props-slots" style="font-family: Helvetica, Arial, sans-serif; width: 100%; height: 100vh; background-color: #f5f5f5; display: flex; justify-content: center; align-items: center; flex-direction: column; text-align: center; padding: 20px; box-sizing: border-box;">
-  <h1 style="font-size: 3em; margin: 0.5em 0; color: #333;"><!-- xb-prop-start-e0b92f23-c177-4196-8fa4-3e837f99a357/heading -->Hello, from slot level 2!<!-- xb-prop-end-e0b92f23-c177-4196-8fa4-3e837f99a357/heading --></h1>
+        <!-- canvas-slot-start-dfd2e899-6d88-46f8-b6aa-98929d1586dd/the_body --><!-- canvas-start-e0b92f23-c177-4196-8fa4-3e837f99a357 --><div  data-component-id="canvas_test_sdc:props-slots" style="font-family: Helvetica, Arial, sans-serif; width: 100%; height: 100vh; background-color: #f5f5f5; display: flex; justify-content: center; align-items: center; flex-direction: column; text-align: center; padding: 20px; box-sizing: border-box;">
+  <h1 style="font-size: 3em; margin: 0.5em 0; color: #333;"><!-- canvas-prop-start-e0b92f23-c177-4196-8fa4-3e837f99a357/heading -->Hello, from slot level 2!<!-- canvas-prop-end-e0b92f23-c177-4196-8fa4-3e837f99a357/heading --></h1>
   <div class="component--props-slots--body">
-        <!-- xb-slot-start-e0b92f23-c177-4196-8fa4-3e837f99a357/the_body --><!-- xb-start-81c63cac-187d-4f05-8acc-1c38fb2489d3 --><div  data-component-id="xb_test_sdc:props-no-slots" style="font-family: Helvetica, Arial, sans-serif; width: 100%; height: 100vh; background-color: #f5f5f5; display: flex; justify-content: center; align-items: center; flex-direction: column; text-align: center; padding: 20px; box-sizing: border-box;">
-  <h1 style="font-size: 3em; margin: 0.5em 0; color: #333;"><!-- xb-prop-start-81c63cac-187d-4f05-8acc-1c38fb2489d3/heading -->Hello, from slot level 3!<!-- xb-prop-end-81c63cac-187d-4f05-8acc-1c38fb2489d3/heading --></h1>
+        <!-- canvas-slot-start-e0b92f23-c177-4196-8fa4-3e837f99a357/the_body --><!-- canvas-start-81c63cac-187d-4f05-8acc-1c38fb2489d3 --><div  data-component-id="canvas_test_sdc:props-no-slots" style="font-family: Helvetica, Arial, sans-serif; width: 100%; height: 100vh; background-color: #f5f5f5; display: flex; justify-content: center; align-items: center; flex-direction: column; text-align: center; padding: 20px; box-sizing: border-box;">
+  <h1 style="font-size: 3em; margin: 0.5em 0; color: #333;"><!-- canvas-prop-start-81c63cac-187d-4f05-8acc-1c38fb2489d3/heading -->Hello, from slot level 3!<!-- canvas-prop-end-81c63cac-187d-4f05-8acc-1c38fb2489d3/heading --></h1>
 </div>
-<!-- xb-end-81c63cac-187d-4f05-8acc-1c38fb2489d3 --><!-- xb-start-68167e4a-9245-41be-b564-f1e1dcad1dec --><div id="block-68167e4a-9245-41be-b564-f1e1dcad1dec">
+<!-- canvas-end-81c63cac-187d-4f05-8acc-1c38fb2489d3 --><!-- canvas-start-68167e4a-9245-41be-b564-f1e1dcad1dec --><div id="block-68167e4a-9245-41be-b564-f1e1dcad1dec">
 
 
-          <a href="/" rel="home">XB Test Site</a>
-    Experience Builder Test Site
+          <a href="/" rel="home">Canvas Test Site</a>
+    Drupal Canvas Test Site
 </div>
-<!-- xb-end-68167e4a-9245-41be-b564-f1e1dcad1dec --><!-- xb-start-2f57ba57-f32a-4a7b-9896-9d1104b446f1 --><astro-island uid="2f57ba57-f32a-4a7b-9896-9d1104b446f1"
-        component-url="::SITE_DIR_BASE_URL::/files/astro-island/zp6hEMcVLAQUXUUP3gsBwM5-MNs4_2kJ_7z16CTg1Sk.js"
-        component-export="default"
-        renderer-url="::XB_DIR_BASE_URL::/ui/lib/astro-hydration/dist/client.js"
-        props="{&quot;text&quot;:[&quot;raw&quot;,&quot;Hello, from a \&quot;code component\&quot;!&quot;]}"
-        ssr="" client="only"
-        opts="{&quot;name&quot;:&quot;My First Code Component&quot;,&quot;value&quot;:&quot;preact&quot;}"><script type="module" src="::XB_DIR_BASE_URL::/ui/lib/astro-hydration/dist/client.js" blocking="render"></script><script type="module" src="::SITE_DIR_BASE_URL::/files/astro-island/zp6hEMcVLAQUXUUP3gsBwM5-MNs4_2kJ_7z16CTg1Sk.js" blocking="render"></script></astro-island><!-- xb-end-2f57ba57-f32a-4a7b-9896-9d1104b446f1 --><!-- xb-start-b4bc6c8f-66f7-458a-99a9-41c29b2801e7 --><astro-island uid="b4bc6c8f-66f7-458a-99a9-41c29b2801e7"
-        component-url="::SITE_DIR_BASE_URL::/files/astro-island/dErbetE11Vm2Twy1AoP3OU8bws4QaYAih9Gd8PgRrm4.js"
-        component-export="default"
-        renderer-url="::XB_DIR_BASE_URL::/ui/lib/astro-hydration/dist/client.js"
-        props="{&quot;text&quot;:[&quot;raw&quot;,&quot;Hello, from a \&quot;auto-save code component\&quot;!&quot;]}"
-        ssr="" client="only"
-        opts="{&quot;name&quot;:&quot;My Code Component with Auto-Save&quot;,&quot;value&quot;:&quot;preact&quot;}"><script type="module" src="::XB_DIR_BASE_URL::/ui/lib/astro-hydration/dist/client.js" blocking="render"></script><script type="module" src="::SITE_DIR_BASE_URL::/files/astro-island/dErbetE11Vm2Twy1AoP3OU8bws4QaYAih9Gd8PgRrm4.js" blocking="render"></script></astro-island><!-- xb-end-b4bc6c8f-66f7-458a-99a9-41c29b2801e7 --><!-- xb-start-9f09ecd8-ec65-408c-b5c8-ef036e6aeb97 --><div  data-component-id="xb_test_sdc:props-no-slots" style="font-family: Helvetica, Arial, sans-serif; width: 100%; height: 100vh; background-color: #f5f5f5; display: flex; justify-content: center; align-items: center; flex-direction: column; text-align: center; padding: 20px; box-sizing: border-box;">
-  <h1 style="font-size: 3em; margin: 0.5em 0; color: #333;"><!-- xb-prop-start-9f09ecd8-ec65-408c-b5c8-ef036e6aeb97/heading -->Hello, from slot &lt;LAST ONE&gt;!<!-- xb-prop-end-9f09ecd8-ec65-408c-b5c8-ef036e6aeb97/heading --></h1>
+<!-- canvas-end-68167e4a-9245-41be-b564-f1e1dcad1dec --><!-- canvas-start-2f57ba57-f32a-4a7b-9896-9d1104b446f1 --><canvas-island uid="2f57ba57-f32a-4a7b-9896-9d1104b446f1"
+      component-url="::SITE_DIR_BASE_URL::/files/astro-island/zp6hEMcVLAQUXUUP3gsBwM5-MNs4_2kJ_7z16CTg1Sk.js"
+      component-export="default"
+      renderer-url="::CANVAS_DIR_BASE_URL::/ui/lib/astro-hydration/dist/client.js"
+      props="{&quot;text&quot;:[&quot;raw&quot;,&quot;Hello, from a \&quot;code component\&quot;!&quot;],&quot;href&quot;:[&quot;raw&quot;,&quot;https:\/\/example.com&quot;]}"
+      ssr="" client="only"
+      opts="{&quot;name&quot;:&quot;My First Code Component&quot;,&quot;value&quot;:&quot;preact&quot;}"><script type="module" src="::CANVAS_DIR_BASE_URL::/ui/lib/astro-hydration/dist/client.js" blocking="render"></script><script type="module" src="::SITE_DIR_BASE_URL::/files/astro-island/zp6hEMcVLAQUXUUP3gsBwM5-MNs4_2kJ_7z16CTg1Sk.js" blocking="render"></script></canvas-island><!-- canvas-end-2f57ba57-f32a-4a7b-9896-9d1104b446f1 --><!-- canvas-start-b4bc6c8f-66f7-458a-99a9-41c29b2801e7 --><canvas-island uid="b4bc6c8f-66f7-458a-99a9-41c29b2801e7"
+      component-url="::SITE_DIR_BASE_URL::/files/astro-island/dErbetE11Vm2Twy1AoP3OU8bws4QaYAih9Gd8PgRrm4.js"
+      component-export="default"
+      renderer-url="::CANVAS_DIR_BASE_URL::/ui/lib/astro-hydration/dist/client.js"
+      props="{&quot;text&quot;:[&quot;raw&quot;,&quot;Hello, from a \&quot;auto-save code component\&quot;!&quot;],&quot;href&quot;:[&quot;raw&quot;,&quot;https:\/\/example.com&quot;]}"
+      ssr="" client="only"
+      opts="{&quot;name&quot;:&quot;My Code Component with Auto-Save&quot;,&quot;value&quot;:&quot;preact&quot;}"><script type="module" src="::CANVAS_DIR_BASE_URL::/ui/lib/astro-hydration/dist/client.js" blocking="render"></script><script type="module" src="::SITE_DIR_BASE_URL::/files/astro-island/dErbetE11Vm2Twy1AoP3OU8bws4QaYAih9Gd8PgRrm4.js" blocking="render"></script></canvas-island><!-- canvas-end-b4bc6c8f-66f7-458a-99a9-41c29b2801e7 --><!-- canvas-start-9f09ecd8-ec65-408c-b5c8-ef036e6aeb97 --><div  data-component-id="canvas_test_sdc:props-no-slots" style="font-family: Helvetica, Arial, sans-serif; width: 100%; height: 100vh; background-color: #f5f5f5; display: flex; justify-content: center; align-items: center; flex-direction: column; text-align: center; padding: 20px; box-sizing: border-box;">
+  <h1 style="font-size: 3em; margin: 0.5em 0; color: #333;"><!-- canvas-prop-start-9f09ecd8-ec65-408c-b5c8-ef036e6aeb97/heading -->Hello, from slot &lt;LAST ONE&gt;!<!-- canvas-prop-end-9f09ecd8-ec65-408c-b5c8-ef036e6aeb97/heading --></h1>
 </div>
-<!-- xb-end-9f09ecd8-ec65-408c-b5c8-ef036e6aeb97 --><!-- xb-slot-end-e0b92f23-c177-4196-8fa4-3e837f99a357/the_body -->
+<!-- canvas-end-9f09ecd8-ec65-408c-b5c8-ef036e6aeb97 --><!-- canvas-slot-end-e0b92f23-c177-4196-8fa4-3e837f99a357/the_body -->
     </div>
   <div class="component--props-slots--footer">
-        <!-- xb-slot-start-e0b92f23-c177-4196-8fa4-3e837f99a357/the_footer --><div class="xb--slot-empty-placeholder"></div>Example value for &lt;strong&gt;the_footer&lt;/strong&gt;.<!-- xb-slot-end-e0b92f23-c177-4196-8fa4-3e837f99a357/the_footer -->
+        <!-- canvas-slot-start-e0b92f23-c177-4196-8fa4-3e837f99a357/the_footer --><div class="canvas--slot-empty-placeholder"></div>Example value for &lt;strong&gt;the_footer&lt;/strong&gt;.<!-- canvas-slot-end-e0b92f23-c177-4196-8fa4-3e837f99a357/the_footer -->
     </div>
   <div class="component--props-slots--colophon">
-        <!-- xb-slot-start-e0b92f23-c177-4196-8fa4-3e837f99a357/the_colophon --><div class="xb--slot-empty-placeholder"></div><!-- xb-slot-end-e0b92f23-c177-4196-8fa4-3e837f99a357/the_colophon -->
+        <!-- canvas-slot-start-e0b92f23-c177-4196-8fa4-3e837f99a357/the_colophon --><div class="canvas--slot-empty-placeholder"></div><!-- canvas-slot-end-e0b92f23-c177-4196-8fa4-3e837f99a357/the_colophon -->
     </div>
 </div>
-<!-- xb-end-e0b92f23-c177-4196-8fa4-3e837f99a357 --><!-- xb-slot-end-dfd2e899-6d88-46f8-b6aa-98929d1586dd/the_body -->
+<!-- canvas-end-e0b92f23-c177-4196-8fa4-3e837f99a357 --><!-- canvas-slot-end-dfd2e899-6d88-46f8-b6aa-98929d1586dd/the_body -->
     </div>
   <div class="component--props-slots--footer">
-        <!-- xb-slot-start-dfd2e899-6d88-46f8-b6aa-98929d1586dd/the_footer --><div class="xb--slot-empty-placeholder"></div>Example value for &lt;strong&gt;the_footer&lt;/strong&gt;.<!-- xb-slot-end-dfd2e899-6d88-46f8-b6aa-98929d1586dd/the_footer -->
+        <!-- canvas-slot-start-dfd2e899-6d88-46f8-b6aa-98929d1586dd/the_footer --><div class="canvas--slot-empty-placeholder"></div>Example value for &lt;strong&gt;the_footer&lt;/strong&gt;.<!-- canvas-slot-end-dfd2e899-6d88-46f8-b6aa-98929d1586dd/the_footer -->
     </div>
   <div class="component--props-slots--colophon">
-        <!-- xb-slot-start-dfd2e899-6d88-46f8-b6aa-98929d1586dd/the_colophon --><div class="xb--slot-empty-placeholder"></div><!-- xb-slot-end-dfd2e899-6d88-46f8-b6aa-98929d1586dd/the_colophon -->
+        <!-- canvas-slot-start-dfd2e899-6d88-46f8-b6aa-98929d1586dd/the_colophon --><div class="canvas--slot-empty-placeholder"></div><!-- canvas-slot-end-dfd2e899-6d88-46f8-b6aa-98929d1586dd/the_colophon -->
     </div>
 </div>
-<!-- xb-end-dfd2e899-6d88-46f8-b6aa-98929d1586dd --><!-- xb-slot-end-41595148-e5c1-4873-b373-be3ae6e21340/the_body -->
+<!-- canvas-end-dfd2e899-6d88-46f8-b6aa-98929d1586dd --><!-- canvas-slot-end-41595148-e5c1-4873-b373-be3ae6e21340/the_body -->
     </div>
   <div class="component--props-slots--footer">
-        <!-- xb-slot-start-41595148-e5c1-4873-b373-be3ae6e21340/the_footer --><div class="xb--slot-empty-placeholder"></div>Example value for &lt;strong&gt;the_footer&lt;/strong&gt;.<!-- xb-slot-end-41595148-e5c1-4873-b373-be3ae6e21340/the_footer -->
+        <!-- canvas-slot-start-41595148-e5c1-4873-b373-be3ae6e21340/the_footer --><div class="canvas--slot-empty-placeholder"></div>Example value for &lt;strong&gt;the_footer&lt;/strong&gt;.<!-- canvas-slot-end-41595148-e5c1-4873-b373-be3ae6e21340/the_footer -->
     </div>
   <div class="component--props-slots--colophon">
-        <!-- xb-slot-start-41595148-e5c1-4873-b373-be3ae6e21340/the_colophon --><div class="xb--slot-empty-placeholder"></div><!-- xb-slot-end-41595148-e5c1-4873-b373-be3ae6e21340/the_colophon -->
+        <!-- canvas-slot-start-41595148-e5c1-4873-b373-be3ae6e21340/the_colophon --><div class="canvas--slot-empty-placeholder"></div><!-- canvas-slot-end-41595148-e5c1-4873-b373-be3ae6e21340/the_colophon -->
     </div>
 </div>
-<!-- xb-end-41595148-e5c1-4873-b373-be3ae6e21340 -->
+<!-- canvas-end-41595148-e5c1-4873-b373-be3ae6e21340 -->
 HTML,
       'expected_cache_tags' => [
-        'config:experience_builder.component.sdc.xb_test_sdc.props-slots',
-        'config:experience_builder.component.sdc.xb_test_sdc.props-no-slots',
-        'config:experience_builder.js_component.my-cta-with-auto-save',
-        'config:experience_builder.component.js.my-cta-with-auto-save',
-        'config:experience_builder.js_component.my-cta',
-        'config:experience_builder.component.js.my-cta',
+        'config:canvas.component.sdc.canvas_test_sdc.props-slots',
+        'config:canvas.component.sdc.canvas_test_sdc.props-no-slots',
+        'config:canvas.js_component.my-cta-with-auto-save',
+        'config:canvas.component.js.my-cta-with-auto-save',
+        'config:canvas.js_component.my-cta',
+        'config:canvas.component.js.my-cta',
         'config:system.site',
-        'config:experience_builder.component.block.system_branding_block',
+        'config:canvas.component.block.system_branding_block',
       ],
     ];
 
@@ -1283,15 +1307,15 @@ HTML,
           ],
           [
             'parents' => [...$path_to_auto_saved_js_component, '#component_url'],
-            'value' => '/xb/api/v0/auto-saves/js/js_component/my-cta-with-auto-save',
+            'value' => '/canvas/api/v0/auto-saves/js/js_component/my-cta-with-auto-save',
           ],
           [
             'parents' => [...$path_to_auto_saved_js_component, '#cache'],
             'value' => [
               'tags' => [
                 AutoSaveManager::CACHE_TAG,
-                'config:experience_builder.js_component.my-cta-with-auto-save',
-                'config:experience_builder.component.js.my-cta-with-auto-save',
+                'config:canvas.js_component.my-cta-with-auto-save',
+                'config:canvas.component.js.my-cta-with-auto-save',
               ],
               'contexts' => [],
               'max-age' => Cache::PERMANENT,
@@ -1302,15 +1326,15 @@ HTML,
           // that its title does not get a "draft" suffix.
           [
             'parents' => [...$path_to_js_component, '#component_url'],
-            'value' => '/xb/api/v0/auto-saves/js/js_component/my-cta',
+            'value' => '/canvas/api/v0/auto-saves/js/js_component/my-cta',
           ],
           [
             'parents' => [...$path_to_js_component, '#cache'],
             'value' => [
               'tags' => [
                 AutoSaveManager::CACHE_TAG,
-                'config:experience_builder.js_component.my-cta',
-                'config:experience_builder.component.js.my-cta',
+                'config:canvas.js_component.my-cta',
+                'config:canvas.component.js.my-cta',
               ],
               'contexts' => [],
               'max-age' => Cache::PERMANENT,
@@ -1319,79 +1343,79 @@ HTML,
         ],
       ),
       'expected_html' => <<<HTML
-<!-- xb-start-41595148-e5c1-4873-b373-be3ae6e21340 --><div  data-component-id="xb_test_sdc:props-slots" style="font-family: Helvetica, Arial, sans-serif; width: 100%; height: 100vh; background-color: #f5f5f5; display: flex; justify-content: center; align-items: center; flex-direction: column; text-align: center; padding: 20px; box-sizing: border-box;">
-  <h1 style="font-size: 3em; margin: 0.5em 0; color: #333;"><!-- xb-prop-start-41595148-e5c1-4873-b373-be3ae6e21340/heading -->Hello, world!<!-- xb-prop-end-41595148-e5c1-4873-b373-be3ae6e21340/heading --></h1>
+<!-- canvas-start-41595148-e5c1-4873-b373-be3ae6e21340 --><div  data-component-id="canvas_test_sdc:props-slots" style="font-family: Helvetica, Arial, sans-serif; width: 100%; height: 100vh; background-color: #f5f5f5; display: flex; justify-content: center; align-items: center; flex-direction: column; text-align: center; padding: 20px; box-sizing: border-box;">
+  <h1 style="font-size: 3em; margin: 0.5em 0; color: #333;"><!-- canvas-prop-start-41595148-e5c1-4873-b373-be3ae6e21340/heading -->Hello, world!<!-- canvas-prop-end-41595148-e5c1-4873-b373-be3ae6e21340/heading --></h1>
   <div class="component--props-slots--body">
-        <!-- xb-slot-start-41595148-e5c1-4873-b373-be3ae6e21340/the_body --><!-- xb-start-dfd2e899-6d88-46f8-b6aa-98929d1586dd --><div  data-component-id="xb_test_sdc:props-slots" style="font-family: Helvetica, Arial, sans-serif; width: 100%; height: 100vh; background-color: #f5f5f5; display: flex; justify-content: center; align-items: center; flex-direction: column; text-align: center; padding: 20px; box-sizing: border-box;">
-  <h1 style="font-size: 3em; margin: 0.5em 0; color: #333;"><!-- xb-prop-start-dfd2e899-6d88-46f8-b6aa-98929d1586dd/heading -->Hello, from slot level 1!<!-- xb-prop-end-dfd2e899-6d88-46f8-b6aa-98929d1586dd/heading --></h1>
+        <!-- canvas-slot-start-41595148-e5c1-4873-b373-be3ae6e21340/the_body --><!-- canvas-start-dfd2e899-6d88-46f8-b6aa-98929d1586dd --><div  data-component-id="canvas_test_sdc:props-slots" style="font-family: Helvetica, Arial, sans-serif; width: 100%; height: 100vh; background-color: #f5f5f5; display: flex; justify-content: center; align-items: center; flex-direction: column; text-align: center; padding: 20px; box-sizing: border-box;">
+  <h1 style="font-size: 3em; margin: 0.5em 0; color: #333;"><!-- canvas-prop-start-dfd2e899-6d88-46f8-b6aa-98929d1586dd/heading -->Hello, from slot level 1!<!-- canvas-prop-end-dfd2e899-6d88-46f8-b6aa-98929d1586dd/heading --></h1>
   <div class="component--props-slots--body">
-        <!-- xb-slot-start-dfd2e899-6d88-46f8-b6aa-98929d1586dd/the_body --><!-- xb-start-e0b92f23-c177-4196-8fa4-3e837f99a357 --><div  data-component-id="xb_test_sdc:props-slots" style="font-family: Helvetica, Arial, sans-serif; width: 100%; height: 100vh; background-color: #f5f5f5; display: flex; justify-content: center; align-items: center; flex-direction: column; text-align: center; padding: 20px; box-sizing: border-box;">
-  <h1 style="font-size: 3em; margin: 0.5em 0; color: #333;"><!-- xb-prop-start-e0b92f23-c177-4196-8fa4-3e837f99a357/heading -->Hello, from slot level 2!<!-- xb-prop-end-e0b92f23-c177-4196-8fa4-3e837f99a357/heading --></h1>
+        <!-- canvas-slot-start-dfd2e899-6d88-46f8-b6aa-98929d1586dd/the_body --><!-- canvas-start-e0b92f23-c177-4196-8fa4-3e837f99a357 --><div  data-component-id="canvas_test_sdc:props-slots" style="font-family: Helvetica, Arial, sans-serif; width: 100%; height: 100vh; background-color: #f5f5f5; display: flex; justify-content: center; align-items: center; flex-direction: column; text-align: center; padding: 20px; box-sizing: border-box;">
+  <h1 style="font-size: 3em; margin: 0.5em 0; color: #333;"><!-- canvas-prop-start-e0b92f23-c177-4196-8fa4-3e837f99a357/heading -->Hello, from slot level 2!<!-- canvas-prop-end-e0b92f23-c177-4196-8fa4-3e837f99a357/heading --></h1>
   <div class="component--props-slots--body">
-        <!-- xb-slot-start-e0b92f23-c177-4196-8fa4-3e837f99a357/the_body --><!-- xb-start-81c63cac-187d-4f05-8acc-1c38fb2489d3 --><div  data-component-id="xb_test_sdc:props-no-slots" style="font-family: Helvetica, Arial, sans-serif; width: 100%; height: 100vh; background-color: #f5f5f5; display: flex; justify-content: center; align-items: center; flex-direction: column; text-align: center; padding: 20px; box-sizing: border-box;">
-  <h1 style="font-size: 3em; margin: 0.5em 0; color: #333;"><!-- xb-prop-start-81c63cac-187d-4f05-8acc-1c38fb2489d3/heading -->Hello, from slot level 3!<!-- xb-prop-end-81c63cac-187d-4f05-8acc-1c38fb2489d3/heading --></h1>
+        <!-- canvas-slot-start-e0b92f23-c177-4196-8fa4-3e837f99a357/the_body --><!-- canvas-start-81c63cac-187d-4f05-8acc-1c38fb2489d3 --><div  data-component-id="canvas_test_sdc:props-no-slots" style="font-family: Helvetica, Arial, sans-serif; width: 100%; height: 100vh; background-color: #f5f5f5; display: flex; justify-content: center; align-items: center; flex-direction: column; text-align: center; padding: 20px; box-sizing: border-box;">
+  <h1 style="font-size: 3em; margin: 0.5em 0; color: #333;"><!-- canvas-prop-start-81c63cac-187d-4f05-8acc-1c38fb2489d3/heading -->Hello, from slot level 3!<!-- canvas-prop-end-81c63cac-187d-4f05-8acc-1c38fb2489d3/heading --></h1>
 </div>
-<!-- xb-end-81c63cac-187d-4f05-8acc-1c38fb2489d3 --><!-- xb-start-68167e4a-9245-41be-b564-f1e1dcad1dec --><div id="block-68167e4a-9245-41be-b564-f1e1dcad1dec">
+<!-- canvas-end-81c63cac-187d-4f05-8acc-1c38fb2489d3 --><!-- canvas-start-68167e4a-9245-41be-b564-f1e1dcad1dec --><div id="block-68167e4a-9245-41be-b564-f1e1dcad1dec">
 
 
-          <a href="/" rel="home">XB Test Site</a>
-    Experience Builder Test Site
+          <a href="/" rel="home">Canvas Test Site</a>
+    Drupal Canvas Test Site
 </div>
-<!-- xb-end-68167e4a-9245-41be-b564-f1e1dcad1dec --><!-- xb-start-2f57ba57-f32a-4a7b-9896-9d1104b446f1 --><astro-island uid="2f57ba57-f32a-4a7b-9896-9d1104b446f1"
-        component-url="/xb/api/v0/auto-saves/js/js_component/my-cta"
-        component-export="default"
-        renderer-url="::XB_DIR_BASE_URL::/ui/lib/astro-hydration/dist/client.js"
-        props="{&quot;text&quot;:[&quot;raw&quot;,&quot;Hello, from a \&quot;code component\&quot;!&quot;]}"
-        ssr="" client="only"
-        opts="{&quot;name&quot;:&quot;My First Code Component&quot;,&quot;value&quot;:&quot;preact&quot;}"><script type="module" src="::XB_DIR_BASE_URL::/ui/lib/astro-hydration/dist/client.js" blocking="render"></script><script type="module" src="/xb/api/v0/auto-saves/js/js_component/my-cta" blocking="render"></script></astro-island><!-- xb-end-2f57ba57-f32a-4a7b-9896-9d1104b446f1 --><!-- xb-start-b4bc6c8f-66f7-458a-99a9-41c29b2801e7 --><astro-island uid="b4bc6c8f-66f7-458a-99a9-41c29b2801e7"
-        component-url="/xb/api/v0/auto-saves/js/js_component/my-cta-with-auto-save"
-        component-export="default"
-        renderer-url="::XB_DIR_BASE_URL::/ui/lib/astro-hydration/dist/client.js"
-        props="{&quot;text&quot;:[&quot;raw&quot;,&quot;Hello, from a \&quot;auto-save code component\&quot;!&quot;]}"
-        ssr="" client="only"
-        opts="{&quot;name&quot;:&quot;My Code Component with Auto-Save - Draft&quot;,&quot;value&quot;:&quot;preact&quot;}"><script type="module" src="::XB_DIR_BASE_URL::/ui/lib/astro-hydration/dist/client.js" blocking="render"></script><script type="module" src="/xb/api/v0/auto-saves/js/js_component/my-cta-with-auto-save" blocking="render"></script></astro-island><!-- xb-end-b4bc6c8f-66f7-458a-99a9-41c29b2801e7 --><!-- xb-start-9f09ecd8-ec65-408c-b5c8-ef036e6aeb97 --><div  data-component-id="xb_test_sdc:props-no-slots" style="font-family: Helvetica, Arial, sans-serif; width: 100%; height: 100vh; background-color: #f5f5f5; display: flex; justify-content: center; align-items: center; flex-direction: column; text-align: center; padding: 20px; box-sizing: border-box;">
-  <h1 style="font-size: 3em; margin: 0.5em 0; color: #333;"><!-- xb-prop-start-9f09ecd8-ec65-408c-b5c8-ef036e6aeb97/heading -->Hello, from slot &lt;LAST ONE&gt;!<!-- xb-prop-end-9f09ecd8-ec65-408c-b5c8-ef036e6aeb97/heading --></h1>
+<!-- canvas-end-68167e4a-9245-41be-b564-f1e1dcad1dec --><!-- canvas-start-2f57ba57-f32a-4a7b-9896-9d1104b446f1 --><canvas-island uid="2f57ba57-f32a-4a7b-9896-9d1104b446f1"
+      component-url="/canvas/api/v0/auto-saves/js/js_component/my-cta"
+      component-export="default"
+      renderer-url="::CANVAS_DIR_BASE_URL::/ui/lib/astro-hydration/dist/client.js"
+      props="{&quot;text&quot;:[&quot;raw&quot;,&quot;Hello, from a \&quot;code component\&quot;!&quot;],&quot;href&quot;:[&quot;raw&quot;,&quot;https:\/\/example.com&quot;]}"
+      ssr="" client="only"
+      opts="{&quot;name&quot;:&quot;My First Code Component&quot;,&quot;value&quot;:&quot;preact&quot;}"><script type="module" src="::CANVAS_DIR_BASE_URL::/ui/lib/astro-hydration/dist/client.js" blocking="render"></script><script type="module" src="/canvas/api/v0/auto-saves/js/js_component/my-cta" blocking="render"></script></canvas-island><!-- canvas-end-2f57ba57-f32a-4a7b-9896-9d1104b446f1 --><!-- canvas-start-b4bc6c8f-66f7-458a-99a9-41c29b2801e7 --><canvas-island uid="b4bc6c8f-66f7-458a-99a9-41c29b2801e7"
+      component-url="/canvas/api/v0/auto-saves/js/js_component/my-cta-with-auto-save"
+      component-export="default"
+      renderer-url="::CANVAS_DIR_BASE_URL::/ui/lib/astro-hydration/dist/client.js"
+      props="{&quot;text&quot;:[&quot;raw&quot;,&quot;Hello, from a \&quot;auto-save code component\&quot;!&quot;],&quot;href&quot;:[&quot;raw&quot;,&quot;https:\/\/example.com&quot;]}"
+      ssr="" client="only"
+      opts="{&quot;name&quot;:&quot;My Code Component with Auto-Save - Draft&quot;,&quot;value&quot;:&quot;preact&quot;}"><script type="module" src="::CANVAS_DIR_BASE_URL::/ui/lib/astro-hydration/dist/client.js" blocking="render"></script><script type="module" src="/canvas/api/v0/auto-saves/js/js_component/my-cta-with-auto-save" blocking="render"></script></canvas-island><!-- canvas-end-b4bc6c8f-66f7-458a-99a9-41c29b2801e7 --><!-- canvas-start-9f09ecd8-ec65-408c-b5c8-ef036e6aeb97 --><div  data-component-id="canvas_test_sdc:props-no-slots" style="font-family: Helvetica, Arial, sans-serif; width: 100%; height: 100vh; background-color: #f5f5f5; display: flex; justify-content: center; align-items: center; flex-direction: column; text-align: center; padding: 20px; box-sizing: border-box;">
+  <h1 style="font-size: 3em; margin: 0.5em 0; color: #333;"><!-- canvas-prop-start-9f09ecd8-ec65-408c-b5c8-ef036e6aeb97/heading -->Hello, from slot &lt;LAST ONE&gt;!<!-- canvas-prop-end-9f09ecd8-ec65-408c-b5c8-ef036e6aeb97/heading --></h1>
 </div>
-<!-- xb-end-9f09ecd8-ec65-408c-b5c8-ef036e6aeb97 --><!-- xb-slot-end-e0b92f23-c177-4196-8fa4-3e837f99a357/the_body -->
+<!-- canvas-end-9f09ecd8-ec65-408c-b5c8-ef036e6aeb97 --><!-- canvas-slot-end-e0b92f23-c177-4196-8fa4-3e837f99a357/the_body -->
     </div>
   <div class="component--props-slots--footer">
-        <!-- xb-slot-start-e0b92f23-c177-4196-8fa4-3e837f99a357/the_footer --><div class="xb--slot-empty-placeholder"></div><!-- xb-slot-end-e0b92f23-c177-4196-8fa4-3e837f99a357/the_footer -->
+        <!-- canvas-slot-start-e0b92f23-c177-4196-8fa4-3e837f99a357/the_footer --><div class="canvas--slot-empty-placeholder"></div><!-- canvas-slot-end-e0b92f23-c177-4196-8fa4-3e837f99a357/the_footer -->
     </div>
   <div class="component--props-slots--colophon">
-        <!-- xb-slot-start-e0b92f23-c177-4196-8fa4-3e837f99a357/the_colophon --><div class="xb--slot-empty-placeholder"></div><!-- xb-slot-end-e0b92f23-c177-4196-8fa4-3e837f99a357/the_colophon -->
+        <!-- canvas-slot-start-e0b92f23-c177-4196-8fa4-3e837f99a357/the_colophon --><div class="canvas--slot-empty-placeholder"></div><!-- canvas-slot-end-e0b92f23-c177-4196-8fa4-3e837f99a357/the_colophon -->
     </div>
 </div>
-<!-- xb-end-e0b92f23-c177-4196-8fa4-3e837f99a357 --><!-- xb-slot-end-dfd2e899-6d88-46f8-b6aa-98929d1586dd/the_body -->
+<!-- canvas-end-e0b92f23-c177-4196-8fa4-3e837f99a357 --><!-- canvas-slot-end-dfd2e899-6d88-46f8-b6aa-98929d1586dd/the_body -->
     </div>
   <div class="component--props-slots--footer">
-        <!-- xb-slot-start-dfd2e899-6d88-46f8-b6aa-98929d1586dd/the_footer --><div class="xb--slot-empty-placeholder"></div><!-- xb-slot-end-dfd2e899-6d88-46f8-b6aa-98929d1586dd/the_footer -->
+        <!-- canvas-slot-start-dfd2e899-6d88-46f8-b6aa-98929d1586dd/the_footer --><div class="canvas--slot-empty-placeholder"></div><!-- canvas-slot-end-dfd2e899-6d88-46f8-b6aa-98929d1586dd/the_footer -->
     </div>
   <div class="component--props-slots--colophon">
-        <!-- xb-slot-start-dfd2e899-6d88-46f8-b6aa-98929d1586dd/the_colophon --><div class="xb--slot-empty-placeholder"></div><!-- xb-slot-end-dfd2e899-6d88-46f8-b6aa-98929d1586dd/the_colophon -->
+        <!-- canvas-slot-start-dfd2e899-6d88-46f8-b6aa-98929d1586dd/the_colophon --><div class="canvas--slot-empty-placeholder"></div><!-- canvas-slot-end-dfd2e899-6d88-46f8-b6aa-98929d1586dd/the_colophon -->
     </div>
 </div>
-<!-- xb-end-dfd2e899-6d88-46f8-b6aa-98929d1586dd --><!-- xb-slot-end-41595148-e5c1-4873-b373-be3ae6e21340/the_body -->
+<!-- canvas-end-dfd2e899-6d88-46f8-b6aa-98929d1586dd --><!-- canvas-slot-end-41595148-e5c1-4873-b373-be3ae6e21340/the_body -->
     </div>
   <div class="component--props-slots--footer">
-        <!-- xb-slot-start-41595148-e5c1-4873-b373-be3ae6e21340/the_footer --><div class="xb--slot-empty-placeholder"></div><!-- xb-slot-end-41595148-e5c1-4873-b373-be3ae6e21340/the_footer -->
+        <!-- canvas-slot-start-41595148-e5c1-4873-b373-be3ae6e21340/the_footer --><div class="canvas--slot-empty-placeholder"></div><!-- canvas-slot-end-41595148-e5c1-4873-b373-be3ae6e21340/the_footer -->
     </div>
   <div class="component--props-slots--colophon">
-        <!-- xb-slot-start-41595148-e5c1-4873-b373-be3ae6e21340/the_colophon --><div class="xb--slot-empty-placeholder"></div><!-- xb-slot-end-41595148-e5c1-4873-b373-be3ae6e21340/the_colophon -->
+        <!-- canvas-slot-start-41595148-e5c1-4873-b373-be3ae6e21340/the_colophon --><div class="canvas--slot-empty-placeholder"></div><!-- canvas-slot-end-41595148-e5c1-4873-b373-be3ae6e21340/the_colophon -->
     </div>
 </div>
-<!-- xb-end-41595148-e5c1-4873-b373-be3ae6e21340 -->
+<!-- canvas-end-41595148-e5c1-4873-b373-be3ae6e21340 -->
 HTML,
       'isPreview' => TRUE,
       'expected_cache_tags' => [
-        'config:experience_builder.component.sdc.xb_test_sdc.props-slots',
-        'config:experience_builder.component.sdc.xb_test_sdc.props-no-slots',
+        'config:canvas.component.sdc.canvas_test_sdc.props-slots',
+        'config:canvas.component.sdc.canvas_test_sdc.props-no-slots',
         AutoSaveManager::CACHE_TAG,
-        'config:experience_builder.js_component.my-cta-with-auto-save',
-        'config:experience_builder.component.js.my-cta-with-auto-save',
-        'config:experience_builder.js_component.my-cta',
-        'config:experience_builder.component.js.my-cta',
+        'config:canvas.js_component.my-cta-with-auto-save',
+        'config:canvas.component.js.my-cta-with-auto-save',
+        'config:canvas.js_component.my-cta',
+        'config:canvas.component.js.my-cta',
         'config:system.site',
-        'config:experience_builder.component.block.system_branding_block',
+        'config:canvas.component.block.system_branding_block',
       ],
     ];
 
@@ -1412,7 +1436,7 @@ HTML,
     $initial_tree = [
       [
         'uuid' => '72eb7863-ea7f-4e31-8cfe-01f0d0471682',
-        'component_id' => 'sdc.xb_test_sdc.props-slots',
+        'component_id' => 'sdc.canvas_test_sdc.props-slots',
         'parent_uuid' => NULL,
         'inputs' => [
           'heading' => [
@@ -1432,7 +1456,7 @@ HTML,
     $valid_subtree = [
       [
         'uuid' => 'caac2f59-6a47-41d5-8dc9-0fa99a7e6101',
-        'component_id' => 'sdc.xb_test_sdc.props-no-slots',
+        'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
         'parent_uuid' => '72eb7863-ea7f-4e31-8cfe-01f0d0471682',
         'slot' => 'the_body',
         'inputs' => [
@@ -1467,7 +1491,7 @@ HTML,
     $tree_with_non_empty_slot = $initial_tree;
     $tree_with_non_empty_slot[] = [
       'uuid' => '2b86e95d-ebc3-4cdb-a7af-b203f415f08e',
-      'component_id' => 'sdc.xb_test_sdc.props-no-slots',
+      'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
       'parent_uuid' => '72eb7863-ea7f-4e31-8cfe-01f0d0471682',
       'slot' => 'the_body',
       'inputs' => [
@@ -1490,7 +1514,7 @@ HTML,
     // subtree.
     $tree_with_conflicting_components[] = [
       'uuid' => 'caac2f59-6a47-41d5-8dc9-0fa99a7e6101',
-      'component_id' => 'sdc.xb_test_sdc.props-no-slots',
+      'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
       'inputs' => [
         'heading' => [
           'sourceType' => 'static:field_item:string',

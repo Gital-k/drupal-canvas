@@ -2,8 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Drupal\Tests\experience_builder\Kernel;
+namespace Drupal\Tests\canvas\Kernel;
 
+use Drupal\canvas\MissingHostEntityException;
+use Drupal\canvas\PropSource\HostEntityUrlPropSource;
+use Drupal\Component\Utility\UrlHelper;
+use Drupal\Core\Entity\EntityRepositoryInterface;
+use Drupal\Core\Entity\Exception\UndefinedLinkTemplateException;
 use Drupal\Core\Extension\ExtensionPathResolver;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Field\Plugin\Field\FieldWidget\BooleanCheckboxWidget;
@@ -12,52 +17,68 @@ use Drupal\Core\Field\Plugin\Field\FieldWidget\NumberWidget;
 use Drupal\Core\Field\Plugin\Field\FieldWidget\StringTextfieldWidget;
 use Drupal\Core\Field\Plugin\Field\FieldWidget\UriWidget;
 use Drupal\Core\File\FileExists;
+use Drupal\Core\Http\Exception\CacheableAccessDeniedHttpException;
+use Drupal\Core\Site\Settings;
 use Drupal\Core\StreamWrapper\PublicStream;
 use Drupal\Core\Url;
 use Drupal\datetime\Plugin\Field\FieldType\DateTimeItem;
 use Drupal\datetime_range\Plugin\Field\FieldWidget\DateRangeDatelistWidget;
 use Drupal\datetime_range\Plugin\Field\FieldWidget\DateRangeDefaultWidget;
-use Drupal\experience_builder\Plugin\ComponentPluginManager;
-use Drupal\experience_builder\PropExpressions\StructuredData\FieldObjectPropsExpression;
-use Drupal\experience_builder\PropExpressions\StructuredData\FieldPropExpression;
-use Drupal\experience_builder\PropExpressions\StructuredData\FieldTypeObjectPropsExpression;
-use Drupal\experience_builder\PropExpressions\StructuredData\FieldTypePropExpression;
-use Drupal\experience_builder\PropExpressions\StructuredData\ReferenceFieldPropExpression;
-use Drupal\experience_builder\PropExpressions\StructuredData\StructuredDataPropExpression;
-use Drupal\experience_builder\PropSource\AdaptedPropSource;
-use Drupal\experience_builder\PropSource\DefaultRelativeUrlPropSource;
-use Drupal\experience_builder\PropSource\DynamicPropSource;
-use Drupal\experience_builder\PropSource\PropSource;
-use Drupal\experience_builder\PropSource\StaticPropSource;
+use Drupal\canvas\Plugin\ComponentPluginManager;
+use Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression;
+use Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression;
+use Drupal\canvas\PropExpressions\StructuredData\FieldTypeObjectPropsExpression;
+use Drupal\canvas\PropExpressions\StructuredData\FieldTypePropExpression;
+use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression;
+use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
+use Drupal\canvas\PropSource\AdaptedPropSource;
+use Drupal\canvas\PropSource\DefaultRelativeUrlPropSource;
+use Drupal\canvas\PropSource\DynamicPropSource;
+use Drupal\canvas\PropSource\PropSource;
+use Drupal\canvas\PropSource\StaticPropSource;
 use Drupal\file\Entity\File;
 use Drupal\KernelTests\KernelTestBase;
 use Drupal\media\Entity\Media;
 use Drupal\media_library\Plugin\Field\FieldWidget\MediaLibraryWidget;
 use Drupal\node\Entity\NodeType;
-use Drupal\Tests\experience_builder\Traits\ContribStrictConfigSchemaTestTrait;
+use Drupal\Tests\canvas\Kernel\Traits\VfsPublicStreamUrlTrait;
+use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
+use Drupal\Tests\image\Kernel\ImageFieldCreationTrait;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
+use Drupal\Tests\node\Traits\ContentTypeCreationTrait;
 use Drupal\Tests\node\Traits\NodeCreationTrait;
+use Drupal\Tests\TestFileCreationTrait;
+use Drupal\Tests\user\Traits\UserCreationTrait;
 use Drupal\user\Entity\Role;
 use Drupal\user\Entity\User;
+use PHPUnit\Framework\Attributes\TestWith;
 
 /**
- * @coversDefaultClass \Drupal\experience_builder\PropSource\PropSource
- * @group experience_builder
+ * @coversDefaultClass \Drupal\canvas\PropSource\PropSource
+ * @group canvas
  */
 class PropSourceTest extends KernelTestBase {
 
+  private const FILE_UUID1 = 'a461c159-039a-4de2-96e5-07d1112105df';
+  private const FILE_UUID2 = '792ea357-71d6-45fa-a12b-78d029edbe4c';
   private const IMAGE_MEDIA_UUID1 = '83b145bb-d8c3-4410-bbd6-fdcd06e27c29';
   private const IMAGE_MEDIA_UUID2 = '93b145bb-d8c3-4410-bbd6-fdcd06e27c29';
+  private const TEST_MEDIA = '43b145bb-d8c3-4410-bbd6-fdcd06e27c29';
 
+  use ContentTypeCreationTrait;
   use ContribStrictConfigSchemaTestTrait;
+  use ImageFieldCreationTrait;
   use MediaTypeCreationTrait;
   use NodeCreationTrait;
+  use UserCreationTrait;
+  use TestFileCreationTrait;
+  use VfsPublicStreamUrlTrait;
 
   /**
    * {@inheritdoc}
    */
   protected static $modules = [
-    'experience_builder',
+    'canvas',
     'field',
     'file',
     'image',
@@ -67,9 +88,13 @@ class PropSourceTest extends KernelTestBase {
     'datetime_range',
     'media',
     'media_library',
+    'media_test_source',
     'system',
     'media',
     'views',
+    'filter',
+    'ckeditor5',
+    'editor',
   ];
 
   /**
@@ -77,11 +102,15 @@ class PropSourceTest extends KernelTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
+    $this->installConfig('canvas');
     $this->installEntitySchema('field_storage_config');
     $this->installEntitySchema('field_config');
+    $this->installEntitySchema('media');
 
     $this->createMediaType('image', ['id' => 'image']);
     $this->createMediaType('image', ['id' => 'anything_is_possible']);
+    // @see \Drupal\media_test_source\Plugin\media\Source\Test
+    $this->createMediaType('test', ['id' => 'image_but_not_image_media_source']);
 
     /** @var \Drupal\Core\File\FileSystemInterface $file_system */
     $file_system = \Drupal::service('file_system');
@@ -94,6 +123,7 @@ class PropSourceTest extends KernelTestBase {
       $file_system->copy(\Drupal::root() . '/core/tests/fixtures/files/image-2.jpg', PublicStream::basePath(), FileExists::Replace);
     }
     $file1 = File::create([
+      'uuid' => self::FILE_UUID1,
       'uri' => $file_uri,
       'status' => 1,
     ]);
@@ -103,6 +133,7 @@ class PropSourceTest extends KernelTestBase {
       $file_system->copy(\Drupal::root() . '/core/tests/fixtures/files/image-3.jpg', PublicStream::basePath(), FileExists::Replace);
     }
     $file2 = File::create([
+      'uuid' => self::FILE_UUID2,
       'uri' => $file_uri,
       'status' => 1,
     ]);
@@ -134,29 +165,49 @@ class PropSourceTest extends KernelTestBase {
       ],
     ]);
     $image2->save();
+    $test_media = Media::create([
+      'uuid' => self::TEST_MEDIA,
+      'bundle' => 'image_but_not_image_media_source',
+      'name' => 'contrived example',
+      'field_media_test' => [
+        'value' => 'Jack is awesome!',
+      ],
+    ]);
+    $test_media->save();
+
+    // Fixate the private key & hash salt to get predictable `itok`.
+    $this->container->get('state')->set('system.private_key', 'dynamic_image_style_private_key');
+    $settings_class = new \ReflectionClass(Settings::class);
+    $instance_property = $settings_class->getProperty('instance');
+    $settings = new Settings([
+      'hash_salt' => 'dynamic_image_style_hash_salt',
+    ]);
+    $instance_property->setValue(NULL, $settings);
   }
 
   /**
-   * @coversClass \Drupal\experience_builder\PropSource\StaticPropSource
+   * @coversClass \Drupal\canvas\PropSource\StaticPropSource
    * @dataProvider providerStaticPropSource
    */
   public function testStaticPropSource(
-    string $source_type,
-    array|null $source_type_settings,
+    string $sourceType,
+    array|null $sourceTypeSettings,
     mixed $value,
     string $expression,
     string $expected_json_representation,
     array|null $field_widgets,
     mixed $expected_user_value,
-    string $expected_prop_expression_class,
+    string $expected_prop_expression,
     array $expected_dependencies,
+    array $permissions = [],
   ): void {
+    $this->setUpCurrentUser([], $permissions);
     // @phpstan-ignore-next-line
     $prop_source_example = StaticPropSource::parse([
-      'sourceType' => $source_type,
+      'sourceType' => $sourceType,
       'value' => $value,
       'expression' => $expression,
-      'sourceTypeSettings' => $source_type_settings,
+      'sourceTypeSettings' => $sourceTypeSettings,
     ]);
     // First, get the string representation and parse it back, to prove
     // serialization and deserialization works.
@@ -166,20 +217,20 @@ class PropSourceTest extends KernelTestBase {
     $prop_source_example = PropSource::parse($decoded_representation);
     $this->assertInstanceOf(StaticPropSource::class, $prop_source_example);
     // The contained information read back out.
-    $this->assertSame($source_type, $prop_source_example->getSourceType());
-    /** @var class-string $expected_prop_expression_class */
-    $this->assertInstanceOf($expected_prop_expression_class, StructuredDataPropExpression::fromString($prop_source_example->asChoice()));
+    $this->assertSame($sourceType, $prop_source_example->getSourceType());
+    /** @var class-string $expected_prop_expression */
+    $this->assertInstanceOf($expected_prop_expression, StructuredDataPropExpression::fromString($prop_source_example->asChoice()));
     self::assertSame($expected_dependencies, $prop_source_example->calculateDependencies());
     // - generate a widget to edit the stored value — using the default widget
     //   or a specified widget.
-    // @see \Drupal\experience_builder\Entity\Component::$defaults
+    // @see \Drupal\canvas\Entity\Component::$defaults
     \assert(is_array($field_widgets));
     // Ensure we always test the default widget.
     \assert(isset($field_widgets[NULL]));
     // Ensure an unknown widget type is handled gracefully.
     $field_widgets['not_real'] = $field_widgets[NULL];
     foreach ($field_widgets as $widget_type => $expected_widget_class) {
-      $this->assertInstanceOf($expected_widget_class, $prop_source_example->getWidget('irrelevant-for-test', $this->randomString(), $widget_type));
+      $this->assertInstanceOf($expected_widget_class, $prop_source_example->getWidget('irrelevant-for-test', 'irrelevant-for-test', 'irrelevant-for-test', $this->randomString(), $widget_type));
     }
     if (NULL === $value) {
       $this->assertNull($expected_user_value);
@@ -200,6 +251,7 @@ class PropSourceTest extends KernelTestBase {
       // Make it easier to write expectations containing root-relative URLs
       // pointing somewhere into the site-specific directory.
       $expected_user_value['src'] = str_replace('::SITE_DIR_BASE_URL::', \base_path() . $this->siteDirectory, $expected_user_value['src']);
+      $expected_user_value['src'] = str_replace(UrlHelper::encodePath('::SITE_DIR_BASE_URL::'), UrlHelper::encodePath(\base_path() . $this->siteDirectory), $expected_user_value['src']);
     }
     if (is_array($expected_user_value) && array_is_list($expected_user_value)) {
       foreach (array_keys($expected_user_value) as $i) {
@@ -207,10 +259,11 @@ class PropSourceTest extends KernelTestBase {
           // Make it easier to write expectations containing root-relative URLs
           // pointing somewhere into the site-specific directory.
           $expected_user_value[$i]['src'] = str_replace('::SITE_DIR_BASE_URL::', \base_path() . $this->siteDirectory, $expected_user_value[$i]['src']);
+          $expected_user_value[$i]['src'] = str_replace(UrlHelper::encodePath('::SITE_DIR_BASE_URL::'), UrlHelper::encodePath(\base_path() . $this->siteDirectory), $expected_user_value[$i]['src']);
         }
       }
     }
-    $this->assertSame($expected_user_value, $prop_source_example->evaluate(User::create([])));
+    $this->assertSame($expected_user_value, $prop_source_example->evaluate(User::create([]), is_required: TRUE));
     // - the field type's item's raw value is minimized if it is single-property
     $this->assertSame($value, $prop_source_example->getValue());
   }
@@ -367,8 +420,8 @@ class PropSourceTest extends KernelTestBase {
         ],
       ],
       'value' => NULL,
-      'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:image␝field_media_image␞␟entity␜␜entity:file␝uri␞␟url,alt↝entity␜␜entity:media:image␝field_media_image␞␟alt,width↝entity␜␜entity:media:image␝field_media_image␞␟width,height↝entity␜␜entity:media:image␝field_media_image␞␟height}',
-      'expected_json_representation' => '{"sourceType":"static:field_item:entity_reference","value":null,"expression":"ℹ︎entity_reference␟{src↝entity␜␜entity:media:image␝field_media_image␞␟entity␜␜entity:file␝uri␞␟url,alt↝entity␜␜entity:media:image␝field_media_image␞␟alt,width↝entity␜␜entity:media:image␝field_media_image␞␟width,height↝entity␜␜entity:media:image␝field_media_image␞␟height}","sourceTypeSettings":{"storage":{"target_type":"media"},"instance":{"handler":"default:media","handler_settings":{"target_bundles":{"image":"image"}}}}}',
+      'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:image␝field_media_image␞␟src_with_alternate_widths,alt↝entity␜␜entity:media:image␝field_media_image␞␟alt,width↝entity␜␜entity:media:image␝field_media_image␞␟width,height↝entity␜␜entity:media:image␝field_media_image␞␟height}',
+      'expected_json_representation' => '{"sourceType":"static:field_item:entity_reference","value":null,"expression":"ℹ︎entity_reference␟{src↝entity␜␜entity:media:image␝field_media_image␞␟src_with_alternate_widths,alt↝entity␜␜entity:media:image␝field_media_image␞␟alt,width↝entity␜␜entity:media:image␝field_media_image␞␟width,height↝entity␜␜entity:media:image␝field_media_image␞␟height}","sourceTypeSettings":{"storage":{"target_type":"media"},"instance":{"handler":"default:media","handler_settings":{"target_bundles":{"image":"image"}}}}}',
       'field_widgets' => [
         NULL => EntityReferenceAutocompleteWidget::class,
         'media_library_widget' => MediaLibraryWidget::class,
@@ -377,10 +430,13 @@ class PropSourceTest extends KernelTestBase {
       'expected_prop_expression' => FieldTypeObjectPropsExpression::class,
       'expected_dependencies' => [
         'config' => [
+          'field.field.media.image.field_media_image',
+          'image.style.canvas_parametrized_width',
           'media.type.image',
         ],
         'content' => [],
         'module' => [
+          'file',
           'media',
         ],
       ],
@@ -396,158 +452,313 @@ class PropSourceTest extends KernelTestBase {
             'target_bundles' => [
               'image' => 'image',
               'anything_is_possible' => 'anything_is_possible',
+              'image_but_not_image_media_source' => 'image_but_not_image_media_source',
             ],
           ],
         ],
       ],
-      'value' => [['target_id' => 2], ['target_id' => 1]],
-      'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:anything_is_possible|image␝field_media_image_1|field_media_image␞␟entity␜␜entity:file␝uri␞␟url,alt↝entity␜␜entity:media:anything_is_possible|image␝field_media_image_1|field_media_image␞␟alt,width↝entity␜␜entity:media:anything_is_possible|image␝field_media_image_1|field_media_image␞␟width,height↝entity␜␜entity:media:anything_is_possible|image␝field_media_image_1|field_media_image␞␟height}',
-      'expected_json_representation' => '{"sourceType":"static:field_item:entity_reference","value":[{"target_id":2},{"target_id":1}],"expression":"ℹ︎entity_reference␟{src↝entity␜␜entity:media:anything_is_possible|image␝field_media_image_1|field_media_image␞␟entity␜␜entity:file␝uri␞␟url,alt↝entity␜␜entity:media:anything_is_possible|image␝field_media_image_1|field_media_image␞␟alt,width↝entity␜␜entity:media:anything_is_possible|image␝field_media_image_1|field_media_image␞␟width,height↝entity␜␜entity:media:anything_is_possible|image␝field_media_image_1|field_media_image␞␟height}","sourceTypeSettings":{"storage":{"target_type":"media"},"instance":{"handler":"default:media","handler_settings":{"target_bundles":{"image":"image","anything_is_possible":"anything_is_possible"}}},"cardinality":5}}',
+      'value' => [['target_id' => 2], ['target_id' => 1], ['target_id' => 3]],
+      'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:anything_is_possible|image|image_but_not_image_media_source␝field_media_image_1|field_media_image|field_media_test␞␟src_with_alternate_widths|src_with_alternate_widths|value,alt↝entity␜␜entity:media:anything_is_possible|image|image_but_not_image_media_source␝field_media_image_1|field_media_image|field_media_test␞␟alt|alt|␀,width↝entity␜␜entity:media:anything_is_possible|image|image_but_not_image_media_source␝field_media_image_1|field_media_image|field_media_test␞␟width|width|␀,height↝entity␜␜entity:media:anything_is_possible|image|image_but_not_image_media_source␝field_media_image_1|field_media_image|field_media_test␞␟height|height|␀}',
+      'expected_json_representation' => '{"sourceType":"static:field_item:entity_reference","value":[{"target_id":2},{"target_id":1},{"target_id":3}],"expression":"ℹ︎entity_reference␟{src↝entity␜␜entity:media:anything_is_possible|image|image_but_not_image_media_source␝field_media_image_1|field_media_image|field_media_test␞␟src_with_alternate_widths|src_with_alternate_widths|value,alt↝entity␜␜entity:media:anything_is_possible|image|image_but_not_image_media_source␝field_media_image_1|field_media_image|field_media_test␞␟alt|alt|␀,width↝entity␜␜entity:media:anything_is_possible|image|image_but_not_image_media_source␝field_media_image_1|field_media_image|field_media_test␞␟width|width|␀,height↝entity␜␜entity:media:anything_is_possible|image|image_but_not_image_media_source␝field_media_image_1|field_media_image|field_media_test␞␟height|height|␀}","sourceTypeSettings":{"storage":{"target_type":"media"},"instance":{"handler":"default:media","handler_settings":{"target_bundles":{"image":"image","anything_is_possible":"anything_is_possible","image_but_not_image_media_source":"image_but_not_image_media_source"}}},"cardinality":5}}',
       'field_widgets' => [
         NULL => EntityReferenceAutocompleteWidget::class,
         'media_library_widget' => MediaLibraryWidget::class,
       ],
       'expected_user_value' => [
         [
-          'src' => '::SITE_DIR_BASE_URL::/files/image-3.jpg',
+          'src' => '::SITE_DIR_BASE_URL::/files/image-3.jpg?alternateWidths=' . UrlHelper::encodePath('::SITE_DIR_BASE_URL::/files/styles/canvas_parametrized_width--{width}/public/image-3.jpg.webp?itok=spSF5vvd'),
           'alt' => 'amazing',
           'width' => 80,
           'height' => 60,
         ],
         [
-          'src' => '::SITE_DIR_BASE_URL::/files/image-2.jpg',
+          'src' => '::SITE_DIR_BASE_URL::/files/image-2.jpg?alternateWidths=' . UrlHelper::encodePath('::SITE_DIR_BASE_URL::/files/styles/canvas_parametrized_width--{width}/public/image-2.jpg.webp?itok=SnSVAYVj'),
           'alt' => 'An image so amazing that to gaze upon it would melt your face',
           'width' => 80,
           'height' => 60,
+        ],
+        [
+          'src' => 'Jack is awesome!',
         ],
       ],
       'expected_prop_expression' => FieldTypeObjectPropsExpression::class,
       'expected_dependencies' => [
         'config' => [
+          'field.field.media.anything_is_possible.field_media_image_1',
+          'field.field.media.image.field_media_image',
+          'field.field.media.image_but_not_image_media_source.field_media_test',
+          'image.style.canvas_parametrized_width',
           'media.type.anything_is_possible',
           'media.type.image',
+          'media.type.image_but_not_image_media_source',
         ],
         'content' => [
+          'file:file:' . self::FILE_UUID2,
+          'file:file:' . self::FILE_UUID1,
           'media:anything_is_possible:' . self::IMAGE_MEDIA_UUID2,
           'media:image:' . self::IMAGE_MEDIA_UUID1,
+          'media:image_but_not_image_media_source:' . self::TEST_MEDIA,
         ],
         'module' => [
+          'file',
           'media',
         ],
       ],
+      'permissions' => ['view media', 'access content'],
     ];
   }
 
   /**
-   * @coversClass \Drupal\experience_builder\PropSource\DynamicPropSource
+   * @coversClass \Drupal\canvas\PropSource\DynamicPropSource
+   * @dataProvider providerDynamicPropSource
    */
-  public function testDynamicPropSource(): void {
+  public function testDynamicPropSource(
+    array $permissions,
+    string $expression,
+    string $expected_json_representation,
+    string $expected_expression_class,
+    mixed $expected_evaluation_with_user_host_entity,
+    ?string $expected_user_access_denied_message,
+    mixed $expected_evaluation_with_node_host_entity,
+    ?string $expected_node_access_denied_message,
+    array $expected_dependencies_expression_only,
+    array $expected_dependencies_with_host_entity,
+  ): void {
+    // Evaluating dynamic props requires entity and field access of the data
+    // being accessed.
+
+    // For testing expressions relying on users.
     $this->installEntitySchema('user');
-    $user = User::create(['name' => 'John Doe']);
+    $user = User::create([
+      'uuid' => '881261cd-c9e2-4dcd-b0a8-1efa2e319a13',
+      'name' => 'John Doe',
+      'status' => 1,
+    ]);
     $user->save();
 
-    // A simple example: FieldPropExpression.
-    $simple_example = DynamicPropSource::parse([
-      'sourceType' => 'dynamic',
-      'expression' => 'ℹ︎␜entity:user␝name␞␟value',
-    ]);
-    // First, get the string representation and parse it back, to prove
-    // serialization and deserialization works.
-    $json_representation = (string) $simple_example;
-    $this->assertSame('{"sourceType":"dynamic","expression":"ℹ︎␜entity:user␝name␞␟value"}', $json_representation);
-    $simple_example = PropSource::parse(json_decode($json_representation, TRUE));
-    $this->assertInstanceOf(DynamicPropSource::class, $simple_example);
-    // The contained information read back out.
-    $this->assertSame('dynamic', $simple_example->getSourceType());
-    $this->assertInstanceOf(FieldPropExpression::class, StructuredDataPropExpression::fromString($simple_example->asChoice()));
-    // Test the functionality of a DynamicPropSource:
-    // - evaluate it to populate an SDC prop
-    $this->assertSame('John Doe', $simple_example->evaluate($user));
-    // - calculate its dependencies
-    $this->assertSame([
-      'module' => [
-        'user',
-      ],
-    ], $simple_example->calculateDependencies($user));
-
-    // A reference example: ReferenceFieldPropExpression.
+    // For testing expressions relying on nodes.
     $this->installEntitySchema('node');
     NodeType::create(['type' => 'page', 'name' => 'page'])->save();
-    $node = $this->createNode(['uid' => $user->id()]);
-    $object_example = DynamicPropSource::parse([
-      'sourceType' => 'dynamic',
-      'expression' => 'ℹ︎␜entity:node:page␝uid␞␟entity␜␜entity:user␝name␞␟value',
-    ]);
-    // First, get the string representation and parse it back, to prove
-    // serialization and deserialization works.
-    $json_representation = (string) $object_example;
-    $this->assertSame('{"sourceType":"dynamic","expression":"ℹ︎␜entity:node:page␝uid␞␟entity␜␜entity:user␝name␞␟value"}', $json_representation);
-    $simple_example = PropSource::parse(json_decode($json_representation, TRUE));
-    $this->assertInstanceOf(DynamicPropSource::class, $simple_example);
-    // The contained information read back out.
-    $this->assertSame('dynamic', $simple_example->getSourceType());
-    $this->assertInstanceOf(ReferenceFieldPropExpression::class, StructuredDataPropExpression::fromString($object_example->asChoice()));
-    // Test the functionality of a DynamicPropSource:
-    // - evaluate it to populate an SDC prop
-    try {
-      $simple_example->evaluate($user);
-      self::fail('Should throw an exception.');
-    }
-    catch (\DomainException $e) {
-      self::assertSame('`ℹ︎␜entity:node:page␝uid␞␟entity␜␜entity:user␝name␞␟value` is an expression for entity type `node`, but the provided entity is of type `user`.', $e->getMessage());
-    }
-    $this->assertSame('John Doe', $simple_example->evaluate($node));
-    // - calculate its dependencies
-    $this->assertSame([
-      'module' => ['node'],
-      'config' => ['node.type.page'],
-      'content' => ['user:user:' . $user->uuid()],
-    ], $simple_example->calculateDependencies($node));
+    $this->createImageField('field_image', 'node', 'page');
+    $node = $this->createNode(['uid' => $user->id(), 'field_image' => ['target_id' => 1]]);
 
-    // A complex object example: FieldObjectPropsExpression containing a
-    // ReferenceFieldPropExpression.
-    $object_example = DynamicPropSource::parse([
+    // For testing expressions relying on multiple bundles of the `node` entity
+    // type.
+    NodeType::create(['type' => 'bio', 'name' => 'biography'])->save();
+    $this->createImageField('field_photo', 'node', 'bio');
+    $node2 = $this->createNode(['uid' => $user->id(), 'type' => 'bio', 'field_photo' => ['target_id' => 2]]);
+
+    $original = DynamicPropSource::parse([
       'sourceType' => 'dynamic',
-      'expression' => 'ℹ︎␜entity:node:page␝uid␞␟{human_id↝entity␜␜entity:user␝name␞␟value,machine_id↠target_id}',
+      'expression' => $expression,
     ]);
     // First, get the string representation and parse it back, to prove
     // serialization and deserialization works.
-    $json_representation = (string) $object_example;
-    $this->assertSame('{"sourceType":"dynamic","expression":"ℹ︎␜entity:node:page␝uid␞␟{human_id↝entity␜␜entity:user␝name␞␟value,machine_id↠target_id}"}', $json_representation);
-    $simple_example = PropSource::parse(json_decode($json_representation, TRUE));
-    $this->assertInstanceOf(DynamicPropSource::class, $simple_example);
+    $json_representation = (string) $original;
+    $this->assertSame($expected_json_representation, $json_representation);
+    $parsed = PropSource::parse(json_decode($json_representation, TRUE));
+    $this->assertInstanceOf(DynamicPropSource::class, $parsed);
     // The contained information read back out.
-    $this->assertSame('dynamic', $simple_example->getSourceType());
-    $this->assertInstanceOf(FieldObjectPropsExpression::class, StructuredDataPropExpression::fromString($object_example->asChoice()));
+    $this->assertSame('dynamic', $parsed->getSourceType());
+    // @phpstan-ignore-next-line argument.type
+    $this->assertInstanceOf($expected_expression_class, StructuredDataPropExpression::fromString($parsed->asChoice()));
+
     // Test the functionality of a DynamicPropSource:
-    // - evaluate it to populate an SDC prop
+    $parsed_expression = StructuredDataPropExpression::fromString($expression);
+    $correct_host_entity_type = match (get_class($parsed_expression)) {
+      FieldPropExpression::class, FieldObjectPropsExpression::class => $parsed_expression->entityType->getEntityTypeId(),
+      ReferenceFieldPropExpression::class => $parsed_expression->referencer->entityType->getEntityTypeId(),
+      default => throw new \LogicException(),
+    };
+    // - evaluate it to populate an SDC prop using a `user` host entity
+    // First try without the correct permissions.
+    if ($expected_evaluation_with_user_host_entity !== \DomainException::class) {
+      self::assertNotNull($expected_user_access_denied_message);
+      try {
+        $parsed->evaluate($user, is_required: TRUE);
+        $this->fail('Should throw an access exception.');
+      }
+      catch (CacheableAccessDeniedHttpException $e) {
+        self::assertSame($expected_user_access_denied_message, $e->getMessage());
+      }
+    }
+    $this->setUpCurrentUser(permissions: $permissions);
     try {
-      $simple_example->evaluate($user);
-      self::fail('Should throw an exception.');
+      $result = $parsed->evaluate($user, is_required: TRUE);
+      if ($expected_evaluation_with_user_host_entity === \DomainException::class) {
+        self::fail('Should throw an exception.');
+      }
+      else {
+        self::assertSame($expected_evaluation_with_user_host_entity, $result);
+      }
     }
     catch (\DomainException $e) {
-      self::assertSame('`ℹ︎␜entity:node:page␝uid␞␟{human_id↝entity␜␜entity:user␝name␞␟value,machine_id↠target_id}` is an expression for entity type `node`, but the provided entity is of type `user`.', $e->getMessage());
+      self::assertSame($expected_evaluation_with_user_host_entity, \DomainException::class);
+      self::assertSame(sprintf("`%s` is an expression for entity type `%s`, but the provided entity is of type `user`.", (string) $parsed_expression, $correct_host_entity_type), $e->getMessage());
     }
-    $this->assertSame([
-      'human_id' => 'John Doe',
-      'machine_id' => 1,
-    ], $simple_example->evaluate($node));
+
+    // - evaluate it to populate an SDC prop using a `node` host entity
+    // First try without the correct permissions.
+    $this->setUpCurrentUser();
+    if ($expected_evaluation_with_node_host_entity !== \DomainException::class) {
+      self::assertNotNull($expected_node_access_denied_message);
+      try {
+        $parsed->evaluate($node, is_required: TRUE);
+        $this->fail('Should throw an access exception.');
+      }
+      catch (CacheableAccessDeniedHttpException $e) {
+        self::assertSame($expected_node_access_denied_message, $e->getMessage());
+      }
+    }
+    $this->setUpCurrentUser(permissions: $permissions);
+    try {
+      $result = $parsed->evaluate($node, is_required: TRUE);
+      if ($expected_evaluation_with_node_host_entity === \DomainException::class) {
+        self::fail('Should throw an exception.');
+      }
+      else {
+        // TRICKY: this one test case is hard to parametrize using a data
+        // provider, see the more precise/expansive assertions at the end of the
+        // test method.
+        if ($expression !== 'ℹ︎␜entity:node:page|bio␝field_photo|field_image␞␟srcset_candidate_uri_template|src_with_alternate_widths') {
+          self::assertSame($expected_evaluation_with_node_host_entity, $result);
+        }
+      }
+    }
+    catch (\DomainException $e) {
+      self::assertSame($expected_evaluation_with_node_host_entity, \DomainException::class);
+      self::assertSame(sprintf("`%s` is an expression for entity type `%s`, but the provided entity is of type `node`.", (string) $parsed_expression, $correct_host_entity_type), $e->getMessage());
+    }
+
     // - calculate its dependencies
-    $this->assertSame([
+    $this->assertSame($expected_dependencies_expression_only, $parsed->calculateDependencies());
+    $correct_host_entity = match ($correct_host_entity_type) {
+      'user' => $user,
+      'node' => $node,
+      default => throw new \LogicException(),
+    };
+    $this->assertSame($expected_dependencies_with_host_entity, $parsed->calculateDependencies($correct_host_entity));
+
+    if ($expression === 'ℹ︎␜entity:node:page|bio␝field_photo|field_image␞␟srcset_candidate_uri_template|src_with_alternate_widths') {
+      // For the "bio" node, expect `image-2` and an `alternateWidths` query
+      // string (NOT: a URI template).
+      $this->assertStringContainsString('image-2', $parsed->evaluate($node, is_required: TRUE));
+      $this->assertStringContainsString('?alternateWidths=', $parsed->evaluate($node, is_required: TRUE));
+      $this->assertStringNotContainsString('{width}', $parsed->evaluate($node, is_required: TRUE));
+      // For the "bio" node, expect `image-3` and a URI template (NOT: an
+      // `alternateWidths` query string).
+      $this->assertStringContainsString('image-3', $parsed->evaluate($node2, is_required: TRUE));
+      $this->assertStringContainsString('{width}', $parsed->evaluate($node2, is_required: TRUE));
+      $this->assertStringNotContainsString('?alternateWidths=', $parsed->evaluate($node2, is_required: TRUE));
+
+      // The expression in the context of node 2 (a `bio` node), which surfaces
+      // no `content` dependencies because the `srcset_candidate_uri_template`
+      // property does not provide such a dependency
+      // @see \Drupal\canvas\TypedData\ImageDerivativeWithParametrizedWidth
+      $this->assertSame($expected_dependencies_expression_only, $parsed->calculateDependencies($node2));
+    }
+  }
+
+  public static function providerDynamicPropSource(): \Generator {
+    yield "simple: FieldPropExpression" => [
+      'permissions' => ['access user profiles'],
+      'expression' => 'ℹ︎␜entity:user␝name␞␟value',
+      'expected_json_representation' => '{"sourceType":"dynamic","expression":"ℹ︎␜entity:user␝name␞␟value"}',
+      'expected_expression_class' => FieldPropExpression::class,
+      'expected_evaluation_with_user_host_entity' => 'John Doe',
+      'expected_user_access_denied_message' => "Access denied to entity while evaluating expression, ℹ︎␜entity:user␝name␞␟value, reason: The 'access user profiles' permission is required.",
+      'expected_evaluation_with_node_host_entity' => \DomainException::class,
+      'expected_node_access_denied_message' => NULL,
+      'expected_dependencies_expression_only' => ['module' => ['user']],
+      'expected_dependencies_with_host_entity' => ['module' => ['user']],
+    ];
+
+    yield "entity reference: ReferenceFieldPropExpression" => [
+      'permissions' => ['access content', 'access user profiles'],
+      'expression' => 'ℹ︎␜entity:node:page␝uid␞␟entity␜␜entity:user␝name␞␟value',
+      'expected_json_representation' => '{"sourceType":"dynamic","expression":"ℹ︎␜entity:node:page␝uid␞␟entity␜␜entity:user␝name␞␟value"}',
+      'expected_expression_class' => ReferenceFieldPropExpression::class,
+      'expected_evaluation_with_user_host_entity' => \DomainException::class,
+      'expected_user_access_denied_message' => NULL,
+      'expected_evaluation_with_node_host_entity' => 'John Doe',
+      'expected_node_access_denied_message' => "Access denied to entity while evaluating expression, ℹ︎␜entity:node:page␝uid␞␟entity␜␜entity:user␝name␞␟value, reason: The 'access content' permission is required.",
+      'expected_dependencies_expression_only' => [
+        'module' => ['node', 'user'],
+        'config' => ['node.type.page'],
+      ],
+      'expected_dependencies_with_host_entity' => [
+        'module' => ['node', 'user'],
+        'config' => ['node.type.page'],
+        'content' => [
+          'user:user:881261cd-c9e2-4dcd-b0a8-1efa2e319a13',
+        ],
+      ],
+    ];
+
+    yield "complex object: FieldObjectPropsExpression containing a ReferenceFieldPropExpression" => [
+      'permissions' => ['access content', 'access user profiles'],
+      'expression' => 'ℹ︎␜entity:node:page␝uid␞␟{human_id↝entity␜␜entity:user␝name␞␟value,machine_id↠target_id}',
+      'expected_json_representation' => '{"sourceType":"dynamic","expression":"ℹ︎␜entity:node:page␝uid␞␟{human_id↝entity␜␜entity:user␝name␞␟value,machine_id↠target_id}"}',
+      'expected_expression_class' => FieldObjectPropsExpression::class,
+      'expected_evaluation_with_user_host_entity' => \DomainException::class,
+      'expected_user_access_denied_message' => NULL,
+      'expected_evaluation_with_node_host_entity' => [
+        'human_id' => 'John Doe',
+        'machine_id' => 1,
+      ],
+      'expected_node_access_denied_message' => "Access denied to entity while evaluating expression, ℹ︎␜entity:node:page␝uid␞␟{human_id↝entity␜␜entity:user␝name␞␟value,machine_id↠target_id}, reason: The 'access content' permission is required.",
+      'expected_dependencies_expression_only' => [
+        'module' => ['node', 'user', 'node'],
+        'config' => ['node.type.page', 'node.type.page'],
+      ],
+      'expected_dependencies_with_host_entity' => [
+        'module' => ['node', 'user', 'node'],
+        'config' => ['node.type.page', 'node.type.page'],
+        'content' => [
+          'user:user:881261cd-c9e2-4dcd-b0a8-1efa2e319a13',
+        ],
+      ],
+    ];
+
+    $expected_dependencies_expression = [
       'module' => [
         'node',
-        'node',
+        'file',
+        'file',
       ],
       'config' => [
+        'node.type.bio',
         'node.type.page',
-        'node.type.page',
+        'field.field.node.bio.field_photo',
+        'image.style.canvas_parametrized_width',
+        'field.field.node.page.field_image',
+        'image.style.canvas_parametrized_width',
       ],
-      'content' => ['user:user:' . $user->uuid()],
-    ], $simple_example->calculateDependencies($node));
+    ];
+    // The expression in the context of the `page` node, which surfaces content
+    // dependencies because the `src_with_alternate_widths` property DOES
+    // provide such dependencies
+    // @see \Drupal\canvas\Plugin\DataType\ComputedUrlWithQueryString
+    $expected_node_1_expression_dependencies = $expected_dependencies_expression;
+    $expected_node_1_expression_dependencies['module'][] = 'file';
+    $expected_node_1_expression_dependencies['content'][] = 'file:file:' . self::FILE_UUID1;
+
+    yield "Contrived multi-bundle example, with per-bundle field names *and* per-field property names" => [
+      'permissions' => ['access content'],
+      'expression' => 'ℹ︎␜entity:node:page|bio␝field_photo|field_image␞␟srcset_candidate_uri_template|src_with_alternate_widths',
+      'expected_json_representation' => '{"sourceType":"dynamic","expression":"ℹ︎␜entity:node:bio|page␝field_photo|field_image␞␟srcset_candidate_uri_template|src_with_alternate_widths"}',
+      'expected_expression_class' => FieldPropExpression::class,
+      'expected_evaluation_with_user_host_entity' => \DomainException::class,
+      'expected_user_access_denied_message' => NULL,
+      'expected_evaluation_with_node_host_entity' => '<impossible to express in a data provider, see test>',
+      'expected_node_access_denied_message' => "Access denied to entity while evaluating expression, ℹ︎␜entity:node:bio|page␝field_photo|field_image␞␟srcset_candidate_uri_template|src_with_alternate_widths, reason: The 'access content' permission is required.",
+      'expected_dependencies_expression_only' => $expected_dependencies_expression,
+      'expected_dependencies_with_host_entity' => $expected_node_1_expression_dependencies,
+    ];
   }
 
   /**
-   * @covers \Drupal\experience_builder\PropExpressions\StructuredData\Evaluator
+   * @covers \Drupal\canvas\PropExpressions\StructuredData\Evaluator
    * @testWith ["ℹ︎␜entity:user␝name␞␟value", null, "John Doe"]
    *           ["ℹ︎␜entity:user␝name␞0␟value", null, "John Doe"]
    *           ["ℹ︎␜entity:user␝name␞-1␟value", "Requested delta -1, but deltas must be positive integers.", "💩"]
@@ -559,6 +770,7 @@ class PropSourceTest extends KernelTestBase {
    *           ["ℹ︎␜entity:user␝roles␞-1␟target_id", "Requested delta -1, but deltas must be positive integers.", "💩"]
    */
   public function testInvalidDynamicPropSourceFieldPropExpressionDueToDelta(string $expression, ?string $expected_message, mixed $expected_value): void {
+    $this->setUpCurrentUser(permissions: ['administer permissions', 'access user profiles', 'administer users']);
     Role::create(['id' => 'test_role_a', 'label' => 'Test role A'])->save();
     Role::create(['id' => 'test_role_b', 'label' => 'Test role B'])->save();
     $user = User::create([
@@ -567,8 +779,9 @@ class PropSourceTest extends KernelTestBase {
         'test_role_a',
         'test_role_b',
       ],
-    ]);
+    ])->activate();
 
+    // @phpstan-ignore-next-line argument.type
     $dynamic_prop_source_delta_test = new DynamicPropSource(StructuredDataPropExpression::fromString($expression));
 
     if ($expected_message !== NULL) {
@@ -576,11 +789,11 @@ class PropSourceTest extends KernelTestBase {
       $this->expectExceptionMessage($expected_message);
     }
 
-    self::assertSame($expected_value, $dynamic_prop_source_delta_test->evaluate($user));
+    self::assertSame($expected_value, $dynamic_prop_source_delta_test->evaluate($user, is_required: TRUE));
   }
 
   /**
-   * @coversClass \Drupal\experience_builder\PropSource\AdaptedPropSource
+   * @coversClass \Drupal\canvas\PropSource\AdaptedPropSource
    */
   public function testAdaptedPropSource(): void {
     // 2. user created access
@@ -618,10 +831,10 @@ class PropSourceTest extends KernelTestBase {
     $this->assertSame('adapter:day_count', $simple_static_example->getSourceType());
     // Test the functionality of a DynamicPropSource:
     // - evaluate it to populate an SDC prop
-    $this->assertSame(1663, $simple_static_example->evaluate(User::create(['name' => 'John Doe', 'created' => 694695600, 'access' => 1720602713])));
+    $this->assertSame(1663, $simple_static_example->evaluate(User::create(['name' => 'John Doe', 'created' => 694695600, 'access' => 1720602713]), is_required: TRUE));
     self::assertSame([
       'module' => [
-        'experience_builder',
+        'canvas',
         'datetime_range',
         'datetime_range',
       ],
@@ -661,14 +874,15 @@ class PropSourceTest extends KernelTestBase {
     $this->assertSame('adapter:day_count', $simple_dynamic_example->getSourceType());
     // Test the functionality of a DynamicPropSource:
     // - evaluate it to populate an SDC prop
+    $this->setUpCurrentUser(permissions: ['access user profiles', 'administer users']);
     $user = User::create(['name' => 'John Doe', 'created' => 694695600, 'access' => 1720602713]);
-    $this->assertSame(11874, $simple_dynamic_example->evaluate($user));
+    $this->assertSame(11874, $simple_dynamic_example->evaluate($user, is_required: TRUE));
     self::assertSame([
       'module' => [
-        'experience_builder',
-        'experience_builder',
+        'canvas',
+        'canvas',
         'user',
-        'experience_builder',
+        'canvas',
         'user',
       ],
     ], $simple_dynamic_example->calculateDependencies($user));
@@ -708,22 +922,22 @@ class PropSourceTest extends KernelTestBase {
     $this->assertSame('adapter:day_count', $complex_example->getSourceType());
     // Test the functionality of a DynamicPropSource:
     // - evaluate it to populate an SDC prop
-    $this->assertSame(1546, $complex_example->evaluate(User::create(['name' => 'John Doe', 'created' => 694695600, 'access' => 1720602713])));
+    $this->assertSame(1546, $complex_example->evaluate(User::create(['name' => 'John Doe', 'created' => 694695600, 'access' => 1720602713]), is_required: TRUE));
     self::assertSame([
       'module' => [
-        'experience_builder',
+        'canvas',
         'datetime',
-        'experience_builder',
+        'canvas',
         'user',
       ],
     ], $complex_example->calculateDependencies($user));
   }
 
   /**
-   * @coversClass \Drupal\experience_builder\PropSource\DefaultRelativeUrlPropSource
+   * @coversClass \Drupal\canvas\PropSource\DefaultRelativeUrlPropSource
    */
   public function testDefaultRelativeUrlPropSource(): void {
-    $this->enableModules(['xb_test_sdc', 'link', 'image', 'options']);
+    $this->enableModules(['canvas_test_sdc', 'link', 'image', 'options']);
     // Force rebuilding of the definitions which will create the required
     // component.
     $plugin_manager = $this->container->get(ComponentPluginManager::class);
@@ -743,9 +957,10 @@ class PropSourceTest extends KernelTestBase {
         'properties' => [
           'src' => [
             'type' => 'string',
+            'contentMediaType' => 'image/*',
             'format' => 'uri-reference',
-            'pattern' => '^(/|https?://)?.*\.([Pp][Nn][Gg]|[Gg][Ii][Ff]|[Jj][Pp][Gg]|[Jj][Pp][Ee][Gg]|[Ww][Ee][Bb][Pp])(\?.*)?(#.*)?$',
             'title' => 'Image URL',
+            'x-allowed-schemes' => ['http', 'https'],
           ],
           'alt' => [
             'type' => 'string',
@@ -761,13 +976,13 @@ class PropSourceTest extends KernelTestBase {
           ],
         ],
       ],
-      componentId: 'sdc.xb_test_sdc.image-optional-with-example-and-additional-prop',
+      componentId: 'sdc.canvas_test_sdc.image-optional-with-example-and-additional-prop',
     );
     // First, get the string representation and parse it back, to prove
     // serialization and deserialization works.
     // Note: title of properties have been omitted; only essential data is kept.
     $json_representation = (string) $source;
-    self::assertSame('{"sourceType":"default-relative-url","value":{"src":"gracie.jpg","alt":"A good dog","width":601,"height":402},"jsonSchema":{"type":"object","properties":{"src":{"type":"string","format":"uri-reference","pattern":"^(\/|https?:\/\/)?.*\\\.([Pp][Nn][Gg]|[Gg][Ii][Ff]|[Jj][Pp][Gg]|[Jj][Pp][Ee][Gg]|[Ww][Ee][Bb][Pp])(\\\?.*)?(#.*)?$"},"alt":{"type":"string"},"width":{"type":"integer"},"height":{"type":"integer"}},"required":["src"]},"componentId":"sdc.xb_test_sdc.image-optional-with-example-and-additional-prop"}', $json_representation);
+    self::assertSame('{"sourceType":"default-relative-url","value":{"src":"gracie.jpg","alt":"A good dog","width":601,"height":402},"jsonSchema":{"type":"object","properties":{"src":{"type":"string","contentMediaType":"image\/*","format":"uri-reference","x-allowed-schemes":["http","https"]},"alt":{"type":"string"},"width":{"type":"integer"},"height":{"type":"integer"}},"required":["src"]},"componentId":"sdc.canvas_test_sdc.image-optional-with-example-and-additional-prop"}', $json_representation);
     $decoded = json_decode($json_representation, TRUE);
     // Ensure that DefaultRelativeUrlPropSource::parse() does not care about key
     // order for the JSON Schema definition it contains.
@@ -775,7 +990,7 @@ class PropSourceTest extends KernelTestBase {
     $source = PropSource::parse($decoded);
     self::assertInstanceOf(DefaultRelativeUrlPropSource::class, $source);
     self::assertSame('default-relative-url', $source->getSourceType());
-    $path = $this->container->get(ExtensionPathResolver::class)->getPath('module', 'xb_test_sdc') . '/components/image-optional-with-example-and-additional-prop';
+    $path = $this->container->get(ExtensionPathResolver::class)->getPath('module', 'canvas_test_sdc') . '/components/image-optional-with-example-and-additional-prop';
     // Prove that using a `$ref` results in the same JSON representation.
     $equivalent_source = new DefaultRelativeUrlPropSource(
       value: [
@@ -785,9 +1000,9 @@ class PropSourceTest extends KernelTestBase {
         'height' => 402,
       ],
       jsonSchema: [
-        '$ref' => 'json-schema-definitions://experience_builder.module/image',
+        '$ref' => 'json-schema-definitions://canvas.module/image',
       ],
-      componentId: 'sdc.xb_test_sdc.image-optional-with-example-and-additional-prop',
+      componentId: 'sdc.canvas_test_sdc.image-optional-with-example-and-additional-prop',
     );
     self::assertSame((string) $equivalent_source, $json_representation);
     // Test that the URL resolves on evaluation.
@@ -796,13 +1011,61 @@ class PropSourceTest extends KernelTestBase {
       'alt' => 'A good dog',
       'width' => 601,
       'height' => 402,
-    ], $source->evaluate(NULL));
+    ], $source->evaluate(NULL, is_required: TRUE));
     self::assertSame([
-      'config' => ['experience_builder.component.sdc.xb_test_sdc.image-optional-with-example-and-additional-prop'],
+      'config' => ['canvas.component.sdc.canvas_test_sdc.image-optional-with-example-and-additional-prop'],
     ], $source->calculateDependencies());
     // This is never a choice presented to the end user; this is a purely internal prop source.
     $this->expectException(\LogicException::class);
     $source->asChoice();
+  }
+
+  /**
+   * @param string $entity_type_id
+   * @param string $entity_uuid
+   * @param string|null $expected_url
+   * @param class-string<\Throwable>|null $expected_exception
+   */
+  #[TestWith(['media', self::IMAGE_MEDIA_UUID1, '/media/1/edit', NULL])]
+  #[TestWith(['file', self::FILE_UUID1, NULL, UndefinedLinkTemplateException::class])]
+  #[TestWith(['media', 'not-a-real-uuid', NULL, MissingHostEntityException::class])]
+  #[TestWith(['node', 'with-alias', '/awesome-page', NULL])]
+  #[TestWith(['node', 'without-alias', '/node/1', NULL])]
+  public function testHostEntityUrlPropSource(string $entity_type_id, string $entity_uuid, ?string $expected_url, ?string $expected_exception): void {
+    $source = new HostEntityUrlPropSource();
+    // First, get the string representation and parse it back, to prove
+    // serialization and deserialization works.
+    $json_representation = (string) $source;
+    self::assertSame('{"sourceType":"host-entity-url"}', $json_representation);
+    $decoded = json_decode($json_representation, TRUE);
+    $source = PropSource::parse($decoded);
+    self::assertInstanceOf(HostEntityUrlPropSource::class, $source);
+    self::assertSame('host-entity-url', $source->getSourceType());
+    self::assertSame([], $source->calculateDependencies());
+    self::assertSame('host-entity-url:absolute:canonical', $source->asChoice());
+
+    $this->enableModules(['path', 'path_alias', 'text']);
+    $this->installConfig('node');
+    $this->installEntitySchema('node');
+    $this->installEntitySchema('path_alias');
+    $this->createContentType(['type' => 'page']);
+    $this->createNode([
+      'type' => 'page',
+      'uuid' => 'without-alias',
+    ]);
+    $this->createNode([
+      'type' => 'page',
+      'uuid' => 'with-alias',
+      'path' => ['alias' => '/awesome-page'],
+    ]);
+
+    $entity = $this->container->get(EntityRepositoryInterface::class)
+      ->loadEntityByUuid($entity_type_id, $entity_uuid);
+
+    if ($expected_exception) {
+      $this->expectException($expected_exception);
+    }
+    self::assertSame($GLOBALS['base_url'] . $expected_url, $source->evaluate($entity, TRUE));
   }
 
 }

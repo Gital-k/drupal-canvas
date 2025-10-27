@@ -1,18 +1,20 @@
-import styles from './PagePreview.module.css';
-import { usePostPreviewMutation } from '@/services/preview';
-import { useAppSelector } from '@/app/hooks';
-import {
-  selectUpdatePreview,
-  selectLayout,
-  selectModel,
-} from '@/features/layout/layoutModelSlice';
 import { useCallback, useEffect, useState } from 'react';
 import { useErrorBoundary } from 'react-error-boundary';
+import { useParams } from 'react-router';
 import { AlertDialog, Button, Flex } from '@radix-ui/themes';
+
+import { useAppSelector } from '@/app/hooks';
+import {
+  selectLayout,
+  selectModel,
+  selectUpdatePreview,
+} from '@/features/layout/layoutModelSlice';
 import { selectPageData } from '@/features/pageData/pageDataSlice';
 import { selectPreviewHtml } from '@/features/pagePreview/previewSlice';
+import { usePostPreviewMutation } from '@/services/preview';
 import { viewportSizes } from '@/types/Preview';
-import { useParams } from 'react-router';
+
+import styles from './PagePreview.module.css';
 
 const PagePreview = () => {
   const layout = useAppSelector(selectLayout);
@@ -25,6 +27,7 @@ const PagePreview = () => {
   const [widthVal, setWidthVal] = useState('100%');
   const { width } = useParams();
   const [linkIntercepted, setLinkIntercepted] = useState('');
+  const [submissionIntercepted, setSubmissionIntercepted] = useState(false);
 
   useEffect(() => {
     const sendPreviewRequest = async () => {
@@ -51,7 +54,7 @@ const PagePreview = () => {
   ]);
 
   useEffect(() => {
-    if (width === 'full') {
+    if (!width || width === 'full') {
       setWidthVal('100%');
     } else {
       viewportSizes.find((vs) => {
@@ -65,8 +68,11 @@ const PagePreview = () => {
 
   useEffect(() => {
     function handlePreviewLinkClick(event: MessageEvent) {
-      if (event.data && event.data.xbPreviewClickedUrl) {
-        setLinkIntercepted(event.data.xbPreviewClickedUrl);
+      if (event.data && event.data.canvasPreviewClickedUrl) {
+        setLinkIntercepted(event.data.canvasPreviewClickedUrl);
+      }
+      if (event.data && event.data.canvasPreviewFormSubmitted) {
+        setSubmissionIntercepted(true);
       }
     }
     window.addEventListener('message', handlePreviewLinkClick);
@@ -79,6 +85,7 @@ const PagePreview = () => {
   const handleDialogOpenChange = (isOpen: boolean) => {
     if (!isOpen) {
       setLinkIntercepted('');
+      setSubmissionIntercepted(false);
     }
   };
 
@@ -98,37 +105,58 @@ const PagePreview = () => {
         ></iframe>
       </div>
       <AlertDialog.Root
-        open={!!linkIntercepted}
+        open={!!linkIntercepted || submissionIntercepted}
         defaultOpen={false}
         onOpenChange={handleDialogOpenChange}
       >
         <AlertDialog.Content maxWidth="450px">
-          <AlertDialog.Title>Link clicked</AlertDialog.Title>
-          <AlertDialog.Description size="2" mb="4">
-            You clicked a link in the preview and we intercepted it so that you
-            are not navigated away from this page.
-          </AlertDialog.Description>
+          {linkIntercepted && (
+            <>
+              <AlertDialog.Title>Link clicked</AlertDialog.Title>
+              <AlertDialog.Description size="2" mb="4">
+                You attempted to open a link in the preview but it was
+                intercepted before you were navigated away from this page.
+              </AlertDialog.Description>
 
-          <AlertDialog.Description size="2">
-            The link goes to <strong>{linkIntercepted}</strong>
-          </AlertDialog.Description>
+              <AlertDialog.Description size="2">
+                The link goes to <strong>{linkIntercepted}</strong>
+              </AlertDialog.Description>
 
-          <Flex gap="3" mt="4" justify="end">
-            <AlertDialog.Cancel>
-              <Button variant="soft" color="gray">
-                Done
-              </Button>
-            </AlertDialog.Cancel>
-            <AlertDialog.Action>
-              <Button
-                variant="solid"
-                color="blue"
-                onClick={handleLinkOpenClick}
-              >
-                Open in new window
-              </Button>
-            </AlertDialog.Action>
-          </Flex>
+              <Flex gap="3" mt="4" justify="end">
+                <AlertDialog.Cancel>
+                  <Button variant="soft" color="gray">
+                    Close
+                  </Button>
+                </AlertDialog.Cancel>
+                <AlertDialog.Action>
+                  <Button
+                    variant="solid"
+                    color="blue"
+                    onClick={handleLinkOpenClick}
+                  >
+                    Open in new window
+                  </Button>
+                </AlertDialog.Action>
+              </Flex>
+            </>
+          )}
+          {submissionIntercepted && (
+            <>
+              <AlertDialog.Title>Form submitted</AlertDialog.Title>
+              <AlertDialog.Description size="2" mb="4">
+                You attempted to submit a form in the preview but it was
+                intercepted before you were navigated away from this page.
+              </AlertDialog.Description>
+
+              <Flex gap="3" mt="4" justify="end">
+                <AlertDialog.Cancel>
+                  <Button variant="soft" color="gray">
+                    Close
+                  </Button>
+                </AlertDialog.Cancel>
+              </Flex>
+            </>
+          )}
         </AlertDialog.Content>
       </AlertDialog.Root>
     </>

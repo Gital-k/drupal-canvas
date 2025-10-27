@@ -1,3 +1,5 @@
+import type { CodeComponentSerialized } from '@/types/CodeComponent';
+import type { PatternsList } from '@/types/Pattern';
 import type { TransformConfig } from '@/utils/transforms';
 
 export interface FieldData {
@@ -30,14 +32,15 @@ interface BaseComponent {
   id: string;
   name: string;
   library: string;
-  category: string;
   source: string;
   default_markup: string;
   css: string;
   js_header: string;
   js_footer: string;
   version: string;
+  // @todo Move to PropSourceComponent in https://www.drupal.org/project/canvas/issues/3521041
   propSources: FieldData;
+  broken: boolean;
 }
 
 export type libraryTypes =
@@ -74,26 +77,52 @@ export interface PropSourceComponent extends BaseComponent {
   transforms: TransformConfig;
 }
 // Union type for any component
-export type XBComponent = DynamicComponent | JSComponent | PropSourceComponent;
+export type CanvasComponent =
+  | DynamicComponent
+  | JSComponent
+  | PropSourceComponent;
 
 // ComponentsList representing the API response
 export interface ComponentsList {
-  [key: string]: XBComponent;
+  [key: string]: CanvasComponent;
 }
+
+export type Folder = {
+  id: string;
+  name: string;
+  items: string[];
+  weight?: number;
+};
+
+export interface Folders {
+  [key: string]: Folder;
+}
+
+export type FolderInList = {
+  id: string;
+  name: string;
+  weight?: number;
+  items:
+    | ComponentsList
+    | Record<string, CodeComponentSerialized>
+    | PatternsList;
+};
+
+export type FoldersInList = FolderInList[];
 
 /**
  * Type predicate.
  *
- * @param {XBComponent | undefined} component
+ * @param {CanvasComponent | undefined} component
  *   Component to test.
  *
  * @return boolean
  *   TRUE if the component has field data.
  *
- * @todo rename this to componentHasPropSources in https://www.drupal.org/project/experience_builder/issues/3504421
+ * @todo rename this to componentHasPropSources in https://www.drupal.org/project/canvas/issues/3504421
  */
 export const componentHasFieldData = (
-  component: XBComponent | undefined,
+  component: CanvasComponent | undefined,
 ): component is PropSourceComponent => {
   return component !== undefined && 'propSources' in component;
 };

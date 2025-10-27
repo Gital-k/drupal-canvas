@@ -2,13 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Drupal\experience_builder;
+namespace Drupal\canvas;
 
 use Drupal\Core\Breadcrumb\ChainBreadcrumbBuilderInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Controller\TitleResolverInterface;
 use Drupal\Core\Link;
 use Drupal\Core\Routing\RouteMatchInterface;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\Routing\Route;
@@ -17,12 +18,12 @@ use Symfony\Component\Routing\Route;
  * Provides a service to expose site metadata to drupalSettings for JS components.
  *
  * This includes site branding, breadcrumbs, page title and base URL.
- * Intended for use with dynamic JavaScript components such as those in Experience Builder.
+ * Intended for use with dynamic JavaScript components such as those in Drupal Canvas.
  */
 readonly final class CodeComponentDataProvider {
 
   public const string V0 = 'v0';
-  public const string XB_DATA_KEY = 'xbData';
+  public const string CANVAS_DATA_KEY = 'canvasData';
 
   public function __construct(
     private ConfigFactoryInterface $configFactory,
@@ -30,45 +31,37 @@ readonly final class CodeComponentDataProvider {
     private RouteMatchInterface $routeMatch,
     private TitleResolverInterface $titleResolver,
     private ChainBreadcrumbBuilderInterface $breadcrumbManager,
+    private ContainerInterface $container,
   ) {}
 
   /**
-   * Builds version 0 of the xbData array.
+   * Returns the BaseUrl for V0 of drupalSettings.canvasData.
    *
    * @return array[]
    */
-  public function getDrupalSettingsV0(): array {
-    return array_replace_recursive(
-      $this->getXbDataBaseUrlV0(),
-      $this->getXbDataBrandingV0(),
-      $this->getXbDataBreadcrumbsV0(),
-      $this->getXbDataPageTitleV0(),
-    );
-  }
-
-  /**
-   * Returns the BaseUrl for V0 of drupalSettings.xbData.
-   *
-   * @return array[]
-   */
-  public function getXbDataBaseUrlV0(): array {
+  public function getCanvasDataBaseUrlV0(): array {
     $request = $this->requestStack->getCurrentRequest();
     \assert($request instanceof Request);
-    $request->getSchemeAndHttpHost();
 
     return [
       self::V0 => [
-        'baseUrl' => $request->getSchemeAndHttpHost(),
+        // ⚠️ Not the same as `drupalSettings.path.baseUrl` nor Symfony's
+        // definition of a base URL.
+        // JavaScript tools like @drupal-api-client/json-api-client usually need
+        // a full absolute URL.
+        // @see \Symfony\Component\HttpFoundation\Request::getBaseUrl()
+        // @see \Drupal\system\Hook\SystemHooks::jsSettingsAlter()
+        'baseUrl' => $request->getSchemeAndHttpHost() . $request->getBaseUrl(),
       ],
     ];
   }
 
   /**
-   * Returns the Branding array for V0 of drupalSettings.xbData.
+   * Returns the Branding array for V0 of drupalSettings.canvasData.
    *
    * @return array[]
    */
-  public function getXbDataBrandingV0(): array {
+  public function getCanvasDataBrandingV0(): array {
     $site_config = $this->configFactory->get('system.site');
     return [
       self::V0 => [
@@ -82,11 +75,11 @@ readonly final class CodeComponentDataProvider {
   }
 
   /**
-   * Returns the Breadcrumbs for V0 of drupalSettings.xbData.
+   * Returns the Breadcrumbs for V0 of drupalSettings.canvasData.
    *
    * @return array[]
    */
-  public function getXbDataBreadcrumbsV0(): array {
+  public function getCanvasDataBreadcrumbsV0(): array {
     return [
       self::V0 => [
         'breadcrumbs' => array_map(static function (Link $link) {
@@ -102,11 +95,11 @@ readonly final class CodeComponentDataProvider {
   }
 
   /**
-   * Returns the PageTitle for V0 of drupalSettings.xbData.
+   * Returns the PageTitle for V0 of drupalSettings.canvasData.
    *
    * @return array[]
    */
-  public function getXbDataPageTitleV0(): array {
+  public function getCanvasDataPageTitleV0(): array {
     $request = $this->requestStack->getCurrentRequest();
     \assert($request instanceof Request);
     $route = $this->routeMatch->getRouteObject();
@@ -120,6 +113,35 @@ readonly final class CodeComponentDataProvider {
   }
 
   /**
+   * Returns settings for using JSON:API for V0 of drupalSettings.canvasData.
+   *
+   * @return array
+   */
+  public function getCanvasDataJsonApiSettingsV0(): array {
+    if (!$this->container->hasParameter('jsonapi.base_path')) {
+      // If the `jsonapi.base_path` service parameter is not available, it means
+      // the JSON:API module is not installed.
+      // In contrast to the other settings, this may hence not change the
+      // placeholder values in `canvas/canvasData.v0.jsonapiSettings` at
+      // all.
+      return [
+        self::V0 => [
+          'jsonapiSettings' => NULL,
+        ],
+      ];
+    }
+    $jsonapi_base_path = $this->container->getParameter('jsonapi.base_path');
+    \assert(is_string($jsonapi_base_path));
+    return [
+      self::V0 => [
+        'jsonapiSettings' => [
+          'apiPrefix' => ltrim($jsonapi_base_path, '/'),
+        ],
+      ],
+    ];
+  }
+
+  /**
    * Parses the js code and attach the associated library.
    *
    * @param string $jsCode
@@ -128,58 +150,9 @@ readonly final class CodeComponentDataProvider {
    * @return array|string[]
    *   The array of the drupalSettings libraries.
    */
-  public static function getRequiredXbDataLibraries(string $jsCode): array {
-    // @todo Improve how is this being done https://drupal.org/i/3533458
-    // Using the compiled variables because drupalSettings.xbData.v0 was not
-    // reliable and we will always have the compiled variable.
-    $map = [
-      '_drupalSettings_xbData_v0_baseUrl' => 'experience_builder/xbData.v0.baseUrl',
-      '_drupalSettings_xbData_v0_branding' => 'experience_builder/xbData.v0.branding',
-      '_drupalSettings_xbData_v0_breadcrumbs' => 'experience_builder/xbData.v0.breadcrumbs',
-      '_drupalSettings_xbData_v0_pageTitle' => 'experience_builder/xbData.v0.pageTitle',
-    ];
-    $libraries = [];
-    foreach ($map as $var => $library) {
-      if (str_contains($jsCode, $var)) {
-        $libraries[] = $library;
-      }
-    }
-    if (!empty($libraries)) {
-      return $libraries;
-    }
-
-    // There is only drupalSettings.xbData?.v0 to load the whole library
-    if (preg_match('/_drupalSettings_xbData(_v0)?/', $jsCode)) {
-      return ['experience_builder/xbData.v0'];
-    }
-
+  public static function getRequiredCanvasDataLibraries(string $jsCode): array {
+    @trigger_error('Calling ' . __METHOD__ . '() is deprecated in canvas:0.7.3-alpha1 and will be removed from canvas:1.0.0. There is no replacement. See https://www.drupal.org/node/3538276', E_USER_DEPRECATED);
     return [];
-  }
-
-  /**
-   * Constructs a partial xbData array based on provided settings.
-   *
-   * @param array $settings
-   *   An associative array of settings containing xbData keys.
-   *
-   * @return array
-   *   A partially constructed xbData array with identified settings.
-   */
-  public function getPartialXbDataFromSettingsV0(array $settings): array {
-    $xbData = [];
-    if (isset($settings[self::XB_DATA_KEY][self::V0]['branding'])) {
-      $xbData = array_replace_recursive($xbData, $this->getXbDataBrandingV0());
-    }
-    if (isset($settings[self::XB_DATA_KEY][self::V0]['baseUrl'])) {
-      $xbData = array_replace_recursive($xbData, $this->getXbDataBaseUrlV0());
-    }
-    if (isset($settings[self::XB_DATA_KEY][self::V0]['breadcrumbs'])) {
-      $xbData = array_replace_recursive($xbData, $this->getXbDataBreadcrumbsV0());
-    }
-    if (isset($settings[self::XB_DATA_KEY][self::V0]['pageTitle'])) {
-      $xbData = array_replace_recursive($xbData, $this->getXbDataPageTitleV0());
-    }
-    return $xbData;
   }
 
 }

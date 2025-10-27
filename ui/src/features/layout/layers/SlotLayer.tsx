@@ -1,26 +1,27 @@
-import type React from 'react';
 import { useCallback } from 'react';
-import { Flex, Box } from '@radix-ui/themes';
-import SidebarNode from '@/components/sidePanel/SidebarNode';
-import { TriangleDownIcon, TriangleRightIcon } from '@radix-ui/react-icons';
-
-import type {
-  ComponentNode,
-  SlotNode,
-} from '@/features/layout/layoutModelSlice';
-import useGetComponentName from '@/hooks/useGetComponentName';
-import type { CollapsibleTriggerProps } from '@radix-ui/react-collapsible';
 import { CollapsibleContent } from '@radix-ui/react-collapsible';
 import * as Collapsible from '@radix-ui/react-collapsible';
+import { TriangleDownIcon, TriangleRightIcon } from '@radix-ui/react-icons';
+import { Box, Flex } from '@radix-ui/themes';
+
+import { useAppDispatch, useAppSelector } from '@/app/hooks';
+import SidebarNode from '@/components/sidePanel/SidebarNode';
 import ComponentLayer from '@/features/layout/layers/ComponentLayer';
+import LayersDropZone from '@/features/layout/layers/LayersDropZone';
 import {
   selectCollapsedLayers,
   setHoveredComponent,
   toggleCollapsedLayer,
   unsetHoveredComponent,
 } from '@/features/ui/uiSlice';
-import { useAppDispatch, useAppSelector } from '@/app/hooks';
-import LayersDropZone from '@/features/layout/layers/LayersDropZone';
+import useGetComponentName from '@/hooks/useGetComponentName';
+
+import type React from 'react';
+import type { CollapsibleTriggerProps } from '@radix-ui/react-collapsible';
+import type {
+  ComponentNode,
+  SlotNode,
+} from '@/features/layout/layoutModelSlice';
 
 interface SlotLayerProps {
   slot: SlotNode;
@@ -64,8 +65,8 @@ const SlotLayer: React.FC<SlotLayerProps> = ({
 
   return (
     <Box
-      data-xb-uuid={slotId}
-      data-xb-type={slot.nodeType}
+      data-canvas-uuid={slotId}
+      data-canvas-type={slot.nodeType}
       aria-labelledby={`layer-${slotId}-name`}
       position="relative"
       onClick={(e) => {
@@ -73,10 +74,10 @@ const SlotLayer: React.FC<SlotLayerProps> = ({
       }}
     >
       <Collapsible.Root
-        className="xb--collapsible-root"
+        className="canvas--collapsible-root"
         open={!isCollapsed}
         onOpenChange={handleOpenChange}
-        data-xb-uuid={slotId}
+        data-canvas-uuid={slotId}
       >
         <SidebarNode
           id={`layer-${slotId}-name`}
@@ -87,12 +88,9 @@ const SlotLayer: React.FC<SlotLayerProps> = ({
           variant="slot"
           open={!isCollapsed}
           disabled={disableDrop}
+          indent={indent}
           leadingContent={
             <Flex>
-              <Box
-                width={`calc(${indent} * var(--space-2))`}
-                className="xb-layer-indent"
-              />
               <Box width="var(--space-4)" mr="1">
                 {slot.components.length > 0 ? (
                   <Box>

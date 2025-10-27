@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Drupal\experience_builder\PropExpressions\StructuredData;
+namespace Drupal\canvas\PropExpressions\StructuredData;
 
 use Drupal\Component\Assertion\Inspector;
 use Drupal\Component\Utility\NestedArray;
@@ -11,7 +11,7 @@ use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Entity\TypedData\EntityDataDefinitionInterface;
 use Drupal\Core\Field\FieldItemInterface;
 use Drupal\Core\Field\FieldItemListInterface;
-use Drupal\experience_builder\TypedData\BetterEntityDataDefinition;
+use Drupal\canvas\TypedData\BetterEntityDataDefinition;
 
 final class FieldObjectPropsExpression implements StructuredDataPropExpressionInterface {
 
@@ -59,19 +59,38 @@ final class FieldObjectPropsExpression implements StructuredDataPropExpressionIn
       . static::PREFIX_FIELD_ITEM_LEVEL . ($this->delta ?? '')
       . static::PREFIX_PROPERTY_LEVEL . static::PREFIX_OBJECT
       . implode(',', array_map(
-        fn (
+        function (
           string $obj_prop_name,
-          FieldPropExpression|ReferenceFieldPropExpression $expr
-        ) => sprintf(
-          '%s%s%s',
-          $obj_prop_name,
-          $expr instanceof ReferenceFieldPropExpression
-            ? self::SYMBOL_OBJECT_MAPPED_FOLLOW_REFERENCE
-            : self::SYMBOL_OBJECT_MAPPED_USE_PROP,
-          $expr instanceof ReferenceFieldPropExpression
-            ? $expr->referencer->propName . static::PREFIX_ENTITY_LEVEL . self::withoutPrefix((string) $expr->referenced)
-            : $expr->propName,
-        ),
+          FieldPropExpression|ReferenceFieldPropExpression $expr,
+        ) {
+          // It is guaranteed that every referencer's fieldName matches exactly
+          // and is hence guaranteed to be a string. Which automatically means
+          // propName must also be a string.
+          // Assert it here both to satisfy PHPStan and to prove it while
+          // assertions are on.
+          // @see __construct()
+          // @see \Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression::__construct()
+          // @see \Drupal\Tests\canvas\Unit\PropExpressionTest::testInvalidFieldPropExpressionDueToMultipleFieldPropNamesWithoutMultipleFieldNames()
+          assert(($expr instanceof ReferenceFieldPropExpression && is_string($expr->referencer->propName)) || ($expr instanceof FieldPropExpression && is_string($expr->propName)));
+          $tail = match (get_class($expr)) {
+            ReferenceFieldPropExpression::class => (function () use ($expr) {
+              assert(is_string($expr->referencer->propName));
+              return $expr->referencer->propName . static::PREFIX_ENTITY_LEVEL . self::withoutPrefix((string) $expr->referenced);
+            })(),
+            FieldPropExpression::class => (function () use ($expr) {
+              assert(is_string($expr->propName));
+              return $expr->propName;
+            })(),
+          };
+          return sprintf(
+            '%s%s%s',
+            $obj_prop_name,
+            $expr instanceof ReferenceFieldPropExpression
+              ? self::SYMBOL_OBJECT_MAPPED_FOLLOW_REFERENCE
+              : self::SYMBOL_OBJECT_MAPPED_USE_PROP,
+            $tail,
+          );
+        },
         array_keys($this->objectPropsToFieldProps),
         array_values($this->objectPropsToFieldProps),
       ))
@@ -121,9 +140,11 @@ final class FieldObjectPropsExpression implements StructuredDataPropExpressionIn
       else {
         [$sdc_obj_prop_name, $obj_prop_mapping_remainder] = explode(self::SYMBOL_OBJECT_MAPPED_FOLLOW_REFERENCE, $obj_prop_mapping);
         [$field_instance_prop_name, $field_prop_ref_expr] = explode(self::PREFIX_ENTITY_LEVEL, $obj_prop_mapping_remainder, 2);
+        $referenced = StructuredDataPropExpression::fromString(self::PREFIX . $field_prop_ref_expr);
+        assert($referenced instanceof ReferenceFieldPropExpression || $referenced instanceof FieldPropExpression || $referenced instanceof FieldObjectPropsExpression);
         $objectPropsToFieldTypeProps[$sdc_obj_prop_name] = new ReferenceFieldPropExpression(
           new FieldPropExpression($entity_data_definition, $field_name, NULL, $field_instance_prop_name),
-          FieldPropExpression::fromString(self::PREFIX . $field_prop_ref_expr)
+          $referenced,
         );
       }
     }
@@ -136,7 +157,7 @@ final class FieldObjectPropsExpression implements StructuredDataPropExpressionIn
     );
   }
 
-  public function isSupported(EntityInterface|FieldItemInterface|FieldItemListInterface $entity): bool {
+  public function validateSupport(EntityInterface|FieldItemInterface|FieldItemListInterface $entity): void {
     assert($entity instanceof EntityInterface);
     $expected_entity_type_id = $this->entityType->getEntityTypeId();
     $expected_bundle = $this->entityType->getBundles()[0] ?? $expected_entity_type_id;
@@ -147,7 +168,10 @@ final class FieldObjectPropsExpression implements StructuredDataPropExpressionIn
       throw new \DomainException(sprintf("`%s` is an expression for entity type `%s`, bundle `%s`, but the provided entity is of the bundle `%s`.", (string) $this, $expected_entity_type_id, $expected_bundle, $entity->bundle()));
     }
     // @todo validate that the field exists?
-    return TRUE;
+  }
+
+  public function getHostEntityDataDefinition(): EntityDataDefinitionInterface {
+    return $this->entityType;
   }
 
 }

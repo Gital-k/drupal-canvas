@@ -1,5 +1,9 @@
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { parse } from '@babel/parser';
+import { Flex, ScrollArea, Spinner } from '@radix-ui/themes';
+
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
+import ErrorCard from '@/components/error/ErrorCard';
 import {
   clearDataFetches,
   selectCodeComponentProperty,
@@ -8,42 +12,40 @@ import {
   selectStatus,
   setCodeComponentProperty,
 } from '@/features/code-editor/codeEditorSlice';
-import { parse } from '@babel/parser';
-import type { File } from '@babel/types';
-import styles from './Preview.module.css';
-import ErrorCard from '@/components/error/ErrorCard';
+import {
+  getDataDependenciesFromAst,
+  getImportsFromAst,
+} from '@/features/code-editor/utils/ast-utils';
+import {
+  getPropValuesForPreview,
+  getSlotNamesForPreview,
+} from '@/features/code-editor/utils/utils';
+import { useGetCodeComponentsQuery } from '@/services/componentAndLayout';
+import {
+  getBaseUrl,
+  getCanvasSettings,
+  getDrupal,
+  getDrupalSettings,
+} from '@/utils/drupal-globals';
+
 import MissingDefaultExportMessage, {
   CodeBlock,
   TextBlock,
 } from './errors/MissingDefaultExportMessage';
-import { Flex, ScrollArea, Spinner } from '@radix-ui/themes';
-import {
-  getExamplePropValuesForOverridePreview,
-  getExampleSlotNamesForOverridePreview,
-  getImportsFromAst,
-  getPropValuesForPreview,
-  getSlotNamesForPreview,
-} from '@/features/code-editor/utils';
-import { useGetCodeComponentsQuery } from '@/services/componentAndLayout';
-import {
-  getBaseUrl,
-  getDrupal,
-  getDrupalSettings,
-  getXbSettings,
-} from '@/utils/drupal-globals';
+
+import type { File } from '@babel/types';
+
+import styles from './Preview.module.css';
 
 const Drupal = getDrupal();
-const XB_MODULE_UI_PATH =
-  `${getBaseUrl()}${getXbSettings().xbModulePath}/ui` as const;
+const CANVAS_MODULE_UI_PATH =
+  `${getBaseUrl()}${getCanvasSettings().canvasModulePath}/ui` as const;
 const PREVIEW_LIB_PATH = 'dist/assets/code-editor-preview.js' as const;
 
 const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
   const dispatch = useAppDispatch();
   const componentId = useAppSelector(
     selectCodeComponentProperty('machineName'),
-  );
-  const blockOverride = useAppSelector(
-    selectCodeComponentProperty('blockOverride'),
   );
   const sourceCodeJs = useAppSelector(
     selectCodeComponentProperty('sourceCodeJs'),
@@ -66,9 +68,7 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const parentRef = useRef<HTMLDivElement>(null);
   const [isJsImportError, setIsJsImportError] = useState(false);
-  const { data: codeComponents } = useGetCodeComponentsQuery({
-    override: false,
-  });
+  const { data: codeComponents } = useGetCodeComponentsQuery();
   const [jsImportNameWithError, setJsImportNameWithError] = useState('');
 
   const [iframeSrcDoc, setIframeSrcDoc] = useState('');
@@ -77,23 +77,28 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
   const importMap = useMemo(
     () => ({
       imports: {
-        // Map to XB generated libraries.
-        preact: `${XB_MODULE_UI_PATH}/lib/astro-hydration/dist/preact.module.js`,
-        'preact/hooks': `${XB_MODULE_UI_PATH}/lib/astro-hydration/dist/hooks.module.js`,
-        'react/jsx-runtime': `${XB_MODULE_UI_PATH}/lib/astro-hydration/dist/jsxRuntime.module.js`,
-        react: `${XB_MODULE_UI_PATH}/lib/astro-hydration/dist/compat.module.js`,
-        'react-dom': `${XB_MODULE_UI_PATH}/lib/astro-hydration/dist/compat.module.js`,
-        'react-dom/client': `${XB_MODULE_UI_PATH}/lib/astro-hydration/dist/compat.module.js`,
+        // Map to Canvas generated libraries.
+        preact: `${CANVAS_MODULE_UI_PATH}/lib/astro-hydration/dist/preact.module.js`,
+        'preact/hooks': `${CANVAS_MODULE_UI_PATH}/lib/astro-hydration/dist/hooks.module.js`,
+        'react/jsx-runtime': `${CANVAS_MODULE_UI_PATH}/lib/astro-hydration/dist/jsx-runtime-default.js`,
+        react: `${CANVAS_MODULE_UI_PATH}/lib/astro-hydration/dist/compat.module.js`,
+        'react-dom': `${CANVAS_MODULE_UI_PATH}/lib/astro-hydration/dist/compat.module.js`,
+        'react-dom/client': `${CANVAS_MODULE_UI_PATH}/lib/astro-hydration/dist/compat.module.js`,
         // @todo Remove hardcoding and allow components to nominate their own?
-        clsx: `${XB_MODULE_UI_PATH}/lib/astro-hydration/dist/clsx.js`,
-        'class-variance-authority': `${XB_MODULE_UI_PATH}/lib/astro-hydration/dist/class-variance-authority.js`,
-        'tailwind-merge': `${XB_MODULE_UI_PATH}/lib/astro-hydration/dist/tailwind-merge.js`,
-        '@/lib/FormattedText': `${XB_MODULE_UI_PATH}/lib/astro-hydration/dist/FormattedText.js`,
-        '@/lib/utils': `${XB_MODULE_UI_PATH}/lib/astro-hydration/dist/utils.js`,
-        '@/components/': Drupal.url('xb/api/v0/auto-saves/js/js_component/'),
-        '@drupal-api-client/json-api-client': `${XB_MODULE_UI_PATH}/lib/astro-hydration/dist/json-api-client.js`,
-        'drupal-jsonapi-params': `${XB_MODULE_UI_PATH}/lib/astro-hydration/dist/jsonapi-params.js`,
-        swr: `${XB_MODULE_UI_PATH}/lib/astro-hydration/dist/swr.js`,
+        clsx: `${CANVAS_MODULE_UI_PATH}/lib/astro-hydration/dist/clsx.js`,
+        'class-variance-authority': `${CANVAS_MODULE_UI_PATH}/lib/astro-hydration/dist/class-variance-authority.js`,
+        'tailwind-merge': `${CANVAS_MODULE_UI_PATH}/lib/astro-hydration/dist/tailwind-merge.js`,
+        '@/lib/FormattedText': `${CANVAS_MODULE_UI_PATH}/lib/astro-hydration/dist/FormattedText.js`,
+        'next-image-standalone': `${CANVAS_MODULE_UI_PATH}/lib/astro-hydration/dist/next-image-standalone.js`,
+        '@/lib/utils': `${CANVAS_MODULE_UI_PATH}/lib/astro-hydration/dist/utils.js`,
+        '@/components/': Drupal.url(
+          'canvas/api/v0/auto-saves/js/js_component/',
+        ),
+        '@drupal-api-client/json-api-client': `${CANVAS_MODULE_UI_PATH}/lib/astro-hydration/dist/jsonapi-client.js`,
+        'drupal-jsonapi-params': `${CANVAS_MODULE_UI_PATH}/lib/astro-hydration/dist/jsonapi-params.js`,
+        '@/lib/jsonapi-utils': `${CANVAS_MODULE_UI_PATH}/lib/astro-hydration/dist/jsonapi-utils.js`,
+        '@/lib/drupal-utils': `${CANVAS_MODULE_UI_PATH}/lib/astro-hydration/dist/drupal-utils.js`,
+        swr: `${CANVAS_MODULE_UI_PATH}/lib/astro-hydration/dist/swr.js`,
       },
     }),
     [],
@@ -127,19 +132,19 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
                 )
                 .map(
                   (componentName) =>
-                    `<link rel="stylesheet" href="${Drupal.url(`xb/api/v0/auto-saves/css/js_component/${componentName}`)}" />`,
+                    `<link rel="stylesheet" href="${Drupal.url(`canvas/api/v0/auto-saves/css/js_component/${componentName}`)}" />`,
                 )
                 .join('\n')
             : ''
         }
         <style>${previewCss}</style>
-        <script id="xb-code-editor-preview-data" type="application/json">
+        <script id="canvas-code-editor-preview-data" type="application/json">
           ${previewJsData}
         </script>
-        <script type="module" src="${XB_MODULE_UI_PATH}/${PREVIEW_LIB_PATH}"></script>
+        <script type="module" src="${CANVAS_MODULE_UI_PATH}/${PREVIEW_LIB_PATH}"></script>
       </head>
       <body>
-        <div id="xb-code-editor-preview-root"></div>
+        <div id="canvas-code-editor-preview-root"></div>
         <script>
           document.addEventListener('click', function (e) {
             const anchor = e.target.closest('a');
@@ -177,8 +182,12 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
       // ex. [ 'my_button', 'my_heading']
       const scope = '@/components/';
       const imports = getImportsFromAst(ast, scope);
+      const dataDependencies = getDataDependenciesFromAst(ast);
       dispatch(clearDataFetches());
       dispatch(setCodeComponentProperty(['importedJsComponents', imports]));
+      dispatch(
+        setCodeComponentProperty(['dataDependencies', dataDependencies]),
+      );
       setIsJsImportError(false);
       if (imports.length > 0) {
         imports.map((importName) => {
@@ -225,16 +234,12 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
     // being added to the iframe inline because of Content Security Policy (CSP)
     // restrictions.
     // @see ui/lib/code-editor-preview.js
-    const propValues = !blockOverride
-      ? getPropValuesForPreview(props)
-      : getExamplePropValuesForOverridePreview(blockOverride);
-    const slotNames = !blockOverride
-      ? getSlotNamesForPreview(slots)
-      : getExampleSlotNamesForOverridePreview(blockOverride);
-    // Remove the `xb` and `xbExtension` properties from `drupalSettings`.
-    // They are only added for the XB UI, and are not available normally.
+    const propValues = getPropValuesForPreview(props);
+    const slotNames = getSlotNamesForPreview(slots);
+    // Remove the `canvas` and `canvasExtension` properties from `drupalSettings`.
+    // They are only added for the Canvas UI, and are not available normally.
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { xb, xbExtension, ...drupalSettings } = getDrupalSettings();
+    const { canvas, canvasExtension, ...drupalSettings } = getDrupalSettings();
     const previewJsData = JSON.stringify({
       compiledJsUrl: URL.createObjectURL(
         new Blob([compiledJs], { type: 'text/javascript' }),
@@ -254,7 +259,6 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
       }),
     );
   }, [
-    blockOverride,
     compiledCss,
     compiledGlobalCss,
     compiledJs,
@@ -354,12 +358,12 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
         {activeErrors.length === 0 && (
           <iframe
             className={styles.iframe}
-            title="XB Code Editor Preview"
+            title="Canvas Code Editor Preview"
             ref={iframeRef}
             height="100%"
             width="100%"
             srcDoc={iframeSrcDoc}
-            data-xb-iframe="xb-code-editor-preview"
+            data-canvas-iframe="canvas-code-editor-preview"
             // @todo: Remove 'allow-same-origin' in https://www.drupal.org/i/3527515.
             sandbox="allow-scripts allow-same-origin"
           />

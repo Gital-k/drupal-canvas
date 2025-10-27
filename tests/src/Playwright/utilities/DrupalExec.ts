@@ -1,10 +1,12 @@
 import { exec as execNode } from 'node:child_process';
-import { promisify } from 'util';
-import { getRootDir, getVendorDir } from './DrupalFilesystem';
 import * as path from 'node:path';
+import { promisify } from 'util';
+
+import { getRootDir, getVendorDir } from './DrupalFilesystem';
+
 const execPromise = promisify(execNode);
 
-export const exec = async (command: string): Promise<string> => {
+export const exec = async (command: string, cwd?: string): Promise<string> => {
   let sudo = ``;
   if (
     process.env.DRUPAL_TEST_WEBSERVER_USER &&
@@ -15,7 +17,7 @@ export const exec = async (command: string): Promise<string> => {
   try {
     const { stdout }: { stdout: string } = await execPromise(
       `${sudo}${command}`,
-      { cwd: getRootDir() },
+      { cwd: cwd ?? getRootDir() },
     );
     return stdout;
   } catch (error) {

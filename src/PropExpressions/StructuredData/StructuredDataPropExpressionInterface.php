@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Drupal\experience_builder\PropExpressions\StructuredData;
+namespace Drupal\canvas\PropExpressions\StructuredData;
 
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Field\FieldItemInterface;
 use Drupal\Core\Field\FieldItemListInterface;
-use Drupal\experience_builder\PropExpressions\PropExpressionInterface;
-use Drupal\experience_builder\PropSource\ContentAwareDependentInterface;
+use Drupal\canvas\PropExpressions\PropExpressionInterface;
+use Drupal\canvas\PropSource\ContentAwareDependentInterface;
 
 interface StructuredDataPropExpressionInterface extends PropExpressionInterface, ContentAwareDependentInterface {
 
@@ -26,6 +26,7 @@ interface StructuredDataPropExpressionInterface extends PropExpressionInterface,
   const SUFFIX_OBJECT = '}';
   const SYMBOL_OBJECT_MAPPED_FOLLOW_REFERENCE = '↝';
   const SYMBOL_OBJECT_MAPPED_USE_PROP = '↠';
+  const SYMBOL_OBJECT_MAPPED_OPTIONAL_PROP = '␀';
 
   /**
    * Assesses whether the given evaluation context is supported.
@@ -38,8 +39,8 @@ interface StructuredDataPropExpressionInterface extends PropExpressionInterface,
    *   - A field item when the expression starts in a single-cardinality field
    *     type.
    *
-   * @return bool
+   * @return void
    */
-  public function isSupported(EntityInterface|FieldItemInterface|FieldItemListInterface $entity_or_field): bool;
+  public function validateSupport(EntityInterface|FieldItemInterface|FieldItemListInterface $entity_or_field): void;
 
 }

@@ -17,7 +17,7 @@
  * Which would be derived as the "link" type. The same shape without the
  * "format" property would be derived as the "text" type.
  *
- * @see config/schema/experience_builder.schema.yml#experience_builder.js_component.*.mapping.props
+ * @see config/schema/canvas.schema.yml#canvas.js_component.*.mapping.props
  */
 
 import type { CodeComponentPropSerialized } from '@/types/CodeComponent';
@@ -42,11 +42,8 @@ const derivedPropTypes = [
     displayName: 'Formatted text',
     derive: (prop: CodeComponentPropSerialized) =>
       prop.type === 'string' &&
-      ((prop.contentMediaType === 'text/html' &&
-        prop['x-formatting-context'] === 'block') ||
-        // Backwards compatibility
-        // @see https://www.drupal.org/i/3520843
-        prop.$ref?.includes('textarea')),
+      prop.contentMediaType === 'text/html' &&
+      prop['x-formatting-context'] === 'block',
     init: {
       type: 'string',
       contentMediaType: 'text/html',
@@ -71,7 +68,17 @@ const derivedPropTypes = [
       prop.type === 'object' && prop.$ref?.includes('image'),
     init: {
       type: 'object',
-      $ref: 'json-schema-definitions://experience_builder.module/image',
+      $ref: 'json-schema-definitions://canvas.module/image',
+    },
+  },
+  {
+    type: 'video' as const,
+    displayName: 'Video',
+    derive: (prop: CodeComponentPropSerialized) =>
+      prop.type === 'object' && prop.$ref?.includes('video'),
+    init: {
+      type: 'object',
+      $ref: 'json-schema-definitions://canvas.module/video',
     },
   },
   {
@@ -118,16 +125,6 @@ const derivedPropTypes = [
       prop.type === 'integer' && prop.enum && prop.enum.length > 0,
     init: {
       type: 'integer',
-      enum: [],
-    },
-  },
-  {
-    type: 'listNumber' as const,
-    displayName: 'List: number',
-    derive: (prop: CodeComponentPropSerialized) =>
-      prop.type === 'number' && prop.enum && prop.enum.length > 0,
-    init: {
-      type: 'number',
       enum: [],
     },
   },

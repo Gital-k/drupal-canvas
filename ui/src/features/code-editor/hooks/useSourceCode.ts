@@ -18,14 +18,8 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
-import useCompileCss from '@/features/code-editor/hooks/useCompileCss';
-import useCompileJavaScript from '@/features/code-editor/hooks/useCompileJavaScript';
-import { upsertClassNameCandidatesInComment } from '@/features/code-editor/utils/classNameCandidates';
-import {
-  getJsForExampleSlotsOverridePreview,
-  getJsForSlotsPreview,
-} from '@/features/code-editor/utils';
 import {
   selectCodeComponentProperty,
   selectGlobalAssetLibraryProperty,
@@ -35,6 +29,18 @@ import {
   setPreviewCompiledJsForSlots,
   setStatus,
 } from '@/features/code-editor/codeEditorSlice';
+import useCompileCss from '@/features/code-editor/hooks/useCompileCss';
+import useCompileJavaScript from '@/features/code-editor/hooks/useCompileJavaScript';
+import { upsertClassNameCandidatesInComment } from '@/features/code-editor/utils/classNameCandidates';
+import {
+  detectValidPropOrSlotChange,
+  getJsForSlotsPreview,
+} from '@/features/code-editor/utils/utils';
+
+import type {
+  CodeComponentProp,
+  CodeComponentSlot,
+} from '@/types/CodeComponent';
 
 const useSourceCode = (requestedComponentId: string): void => {
   const dispatch = useAppDispatch();
@@ -48,7 +54,7 @@ const useSourceCode = (requestedComponentId: string): void => {
   const {
     extractClassNameCandidates,
     buildTailwindCssFromClassNameCandidates,
-    transformCss,
+    buildComponentCss,
   } = useCompileCss();
   const { isJavaScriptCompilerReady, compileJavaScript } =
     useCompileJavaScript();
@@ -63,9 +69,7 @@ const useSourceCode = (requestedComponentId: string): void => {
   const sourceCodeCSS = useAppSelector(
     selectCodeComponentProperty('sourceCodeCss'),
   );
-  const blockOverride = useAppSelector(
-    selectCodeComponentProperty('blockOverride'),
-  );
+  const props = useAppSelector(selectCodeComponentProperty('props'));
   const slots = useAppSelector(selectCodeComponentProperty('slots'));
   const globalSourceCodeCSS = useAppSelector(
     selectGlobalAssetLibraryProperty(['css', 'original']),
@@ -95,15 +99,27 @@ const useSourceCode = (requestedComponentId: string): void => {
   const lastSourceCodeCSSRef = useRef<string>('');
   const lastGlobalSourceCodeCSSRef = useRef<string>('');
   const lastGlobalSourceCodeJSRef = useRef<string>('');
+  const lastPropsRef = useRef<CodeComponentProp[]>([]);
+  const lastSlotsRef = useRef<CodeComponentSlot[]>([]);
 
   // Set hasUnsavedChanges flag whenever source code changes
   useEffect(() => {
-    // @todo: Also check for props and slots changes in https://www.drupal.org/i/3525907.
+    const propsChanged = detectValidPropOrSlotChange(
+      props,
+      lastPropsRef.current,
+    );
+    const slotsChanged = detectValidPropOrSlotChange(
+      slots,
+      lastSlotsRef.current,
+    );
+
     const sourceCodeChanged =
       sourceCodeJS !== lastSourceCodeJSRef.current ||
       sourceCodeCSS !== lastSourceCodeCSSRef.current ||
       globalSourceCodeCSS !== lastGlobalSourceCodeCSSRef.current ||
-      globalSourceCodeJS !== lastGlobalSourceCodeJSRef.current;
+      globalSourceCodeJS !== lastGlobalSourceCodeJSRef.current ||
+      propsChanged ||
+      slotsChanged;
     if (
       requestedComponentId === componentId &&
       componentId &&
@@ -115,6 +131,8 @@ const useSourceCode = (requestedComponentId: string): void => {
       lastSourceCodeCSSRef.current = sourceCodeCSS;
       lastGlobalSourceCodeCSSRef.current = globalSourceCodeCSS;
       lastGlobalSourceCodeJSRef.current = globalSourceCodeJS;
+      lastPropsRef.current = props;
+      lastSlotsRef.current = slots;
     }
   }, [
     sourceCodeJS,
@@ -124,6 +142,8 @@ const useSourceCode = (requestedComponentId: string): void => {
     dispatch,
     globalSourceCodeCSS,
     globalSourceCodeJS,
+    props,
+    slots,
   ]);
 
   useEffect(() => {
@@ -152,10 +172,11 @@ const useSourceCode = (requestedComponentId: string): void => {
       // Build Tailwind CSS from the class name candidates. This will be our
       // global CSS. The global CSS source is the Tailwind CSS configuration, but
       // it can also contain arbitrary CSS.
-      const globalCompiledCss = await buildTailwindCssFromClassNameCandidates(
-        nextClassNameCandidates,
-        globalSourceCodeCSS,
-      );
+      const { css: globalCompiledCss, error: compiledTailwindError } =
+        await buildTailwindCssFromClassNameCandidates(
+          nextClassNameCandidates,
+          globalSourceCodeCSS,
+        );
       // Compile the component's JS code.
       const { code: compiledJs, error: compiledJsError } = compileJavaScript(
         sourceCodeJS,
@@ -164,13 +185,10 @@ const useSourceCode = (requestedComponentId: string): void => {
       // Compile the component's JS code for previewing slot examples in the
       // code editor's preview.
       const { code: compiledJsForSlots, error: compiledJsForSlotsError } =
-        compileJavaScript(
-          !blockOverride
-            ? getJsForSlotsPreview(slots)
-            : getJsForExampleSlotsOverridePreview(blockOverride),
-        );
+        compileJavaScript(getJsForSlotsPreview(slots));
       // Compile the component's own CSS.
-      const compiledCss = await transformCss(sourceCodeCSS);
+      const { css: compiledCss, error: compiledCssError } =
+        await buildComponentCss(sourceCodeCSS, globalSourceCodeCSS);
 
       // Save everything to the Redux store.
       // (These updates are automatically batched since React 18+.)
@@ -211,7 +229,11 @@ const useSourceCode = (requestedComponentId: string): void => {
       dispatch(setPreviewCompiledJsForSlots(compiledJsForSlots));
       dispatch(
         setStatus({
-          compilationError: !!compiledJsError || !!compiledJsForSlotsError,
+          compilationError:
+            !!compiledJsError ||
+            !!compiledJsForSlotsError ||
+            !!compiledTailwindError ||
+            !!compiledCssError,
           isCompiling: false,
         }),
       );
@@ -234,8 +256,8 @@ const useSourceCode = (requestedComponentId: string): void => {
       }
     };
   }, [
-    blockOverride,
     buildTailwindCssFromClassNameCandidates,
+    buildComponentCss,
     compileJavaScript,
     componentId,
     dispatch,
@@ -246,7 +268,6 @@ const useSourceCode = (requestedComponentId: string): void => {
     slots,
     sourceCodeCSS,
     sourceCodeJS,
-    transformCss,
   ]);
 };
 

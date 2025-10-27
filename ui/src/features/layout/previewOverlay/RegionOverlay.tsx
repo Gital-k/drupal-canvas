@@ -1,27 +1,31 @@
-import type React from 'react';
 import { useEffect, useState } from 'react';
+import clsx from 'clsx';
+import { useParams } from 'react-router';
+
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
-import type { RegionNode } from '@/features/layout/layoutModelSlice';
 import { selectLayoutForRegion } from '@/features/layout/layoutModelSlice';
+import { useDataToHtmlMapValue } from '@/features/layout/preview/DataToHtmlMapContext';
+import { RegionNameTag } from '@/features/layout/preview/NameTag';
+import RegionContextMenu from '@/features/layout/preview/RegionContextMenu';
 import ComponentOverlay from '@/features/layout/previewOverlay/ComponentOverlay';
-import styles from './PreviewOverlay.module.css';
+import EmptyRegionDropZone from '@/features/layout/previewOverlay/EmptyRegionDropZone';
+import RegionDropZone from '@/features/layout/previewOverlay/RegionDropZone';
 import {
   DEFAULT_REGION,
-  selectCanvasViewPortScale,
   selectDragging,
+  selectEditorViewPortScale,
   selectIsComponentHovered,
   selectTargetSlot,
   setHoveredComponent,
   unsetHoveredComponent,
 } from '@/features/ui/uiSlice';
-import { RegionNameTag } from '@/features/layout/preview/NameTag';
-import clsx from 'clsx';
-import { useDataToHtmlMapValue } from '@/features/layout/preview/DataToHtmlMapContext';
-import useSyncPreviewElementSize from '@/hooks/useSyncPreviewElementSize';
-import RegionDropZone from '@/features/layout/previewOverlay/RegionDropZone';
-import EmptyRegionDropZone from '@/features/layout/previewOverlay/EmptyRegionDropZone';
 import useEditorNavigation from '@/hooks/useEditorNavigation';
-import { useParams } from 'react-router';
+import useSyncPreviewElementSize from '@/hooks/useSyncPreviewElementSize';
+
+import type React from 'react';
+import type { RegionNode } from '@/features/layout/layoutModelSlice';
+
+import styles from './PreviewOverlay.module.css';
 
 interface RegionOverlayProps {
   iframeRef: React.RefObject<HTMLIFrameElement>;
@@ -36,10 +40,10 @@ const RegionOverlay: React.FC<RegionOverlayProps> = ({ iframeRef, region }) => {
   );
   const { regionsMap } = useDataToHtmlMapValue();
   const { regionId: focusedRegion = DEFAULT_REGION } = useParams();
-  const elementRect = useSyncPreviewElementSize(
+  const { elementRect } = useSyncPreviewElementSize(
     regionsMap[region.id]?.elements,
   );
-  const canvasViewPortScale = useAppSelector(selectCanvasViewPortScale);
+  const editorViewPortScale = useAppSelector(selectEditorViewPortScale);
   const [overlayStyles, setOverlayStyles] = useState({});
   const targetSlot = useAppSelector(selectTargetSlot);
   const disableRegion = focusedRegion !== region.id;
@@ -54,12 +58,12 @@ const RegionOverlay: React.FC<RegionOverlayProps> = ({ iframeRef, region }) => {
 
   useEffect(() => {
     setOverlayStyles({
-      top: `${elementRect.top * canvasViewPortScale}px`,
-      left: `${elementRect.left * canvasViewPortScale}px`,
-      width: `${elementRect.width * canvasViewPortScale}px`,
-      height: `${elementRect.height * canvasViewPortScale}px`,
+      top: `${elementRect.top * editorViewPortScale}px`,
+      left: `${elementRect.left * editorViewPortScale}px`,
+      width: `${elementRect.width * editorViewPortScale}px`,
+      height: `${elementRect.height * editorViewPortScale}px`,
     });
-  }, [elementRect, canvasViewPortScale, region.id, disableRegion, regionsMap]);
+  }, [elementRect, editorViewPortScale, region.id, disableRegion, regionsMap]);
 
   function handleItemMouseOver(event: React.MouseEvent<HTMLDivElement>) {
     event.stopPropagation();
@@ -93,20 +97,31 @@ const RegionOverlay: React.FC<RegionOverlayProps> = ({ iframeRef, region }) => {
           [styles.dropTarget]: region.id === targetSlot,
           [styles.hovered]: showHovered,
         },
-        `xb--region-overlay__${region.id}`,
+        `canvas--region-overlay__${region.id}`,
       )}
       style={overlayStyles}
       onMouseOver={handleItemMouseOver}
       onMouseOut={handleItemMouseOut}
       onDoubleClick={handleRegionDblClick}
     >
-      <div className={clsx(styles.xbNameTag)}>
+      {!isPage && (
+        <RegionContextMenu region={region}>
+          <div
+            aria-label={`Global region ${region.name}`}
+            className={styles.regionItem}
+            data-canvas-overlay="true"
+          />
+        </RegionContextMenu>
+      )}
+
+      <div className={clsx(styles.canvasNameTag)}>
         <RegionNameTag
           name={region.name}
           id={region.id}
           nodeType={isPage ? 'page' : 'region'}
         />
       </div>
+
       {!disableRegion && (
         <>
           {layout.components.map((component, index) => (

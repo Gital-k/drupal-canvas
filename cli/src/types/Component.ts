@@ -1,28 +1,7 @@
-export interface Component {
-  machineName: string;
-  name: string;
-  status: boolean;
-  framework?: 'react' | 'vue' | 'unknown';
-  required?: string[];
-  props?: Record<string, any>;
-  slots?: Record<string, any>;
-  sourceCodeJs?: string;
-  compiledJs?: string;
-  sourceCodeCss?: string;
-  compiledCss?: string;
-  blockOverride?: string | null;
-  importedJsComponents: string[];
-}
+import type {
+  AssetLibrary,
+  CodeComponentSerialized as Component,
+  DataDependencies,
+} from '@drupal-canvas/ui/types/CodeComponent';
 
-export interface AssetLibrary {
-  id: string;
-  label: string;
-  css: {
-    original: string;
-    compiled: string;
-  };
-  js: {
-    original: string;
-    compiled: string;
-  };
-}
+export { AssetLibrary, Component, DataDependencies };

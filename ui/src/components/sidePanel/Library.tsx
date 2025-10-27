@@ -1,98 +1,65 @@
-import { Flex } from '@radix-ui/themes';
-import {
-  AccordionRoot,
-  AccordionDetails,
-} from '@/components/form/components/Accordion';
-import ComponentList from '@/components/list/ComponentList';
-import SectionList from '@/components/list/SectionList';
-import CodeComponentList from '@/features/code-editor/CodeComponentList';
-import AddCodeComponentButton from '@/features/code-editor/AddCodeComponentButton';
+import { useState } from 'react';
+import { Flex, Tabs } from '@radix-ui/themes';
+
 import ErrorBoundary from '@/components/error/ErrorBoundary';
-import {
-  selectOpenLayoutItems,
-  setOpenLayoutItem,
-  setCloseLayoutItem,
-  LayoutItemType,
-} from '@/features/ui/primaryPanelSlice';
-import { useAppDispatch, useAppSelector } from '@/app/hooks';
+import ComponentList from '@/components/list/ComponentList';
+import PatternList from '@/components/list/PatternList';
+import LibraryToolbar from '@/components/sidePanel/LibraryToolbar';
+import useDebounce from '@/hooks/useDebounce';
+
 import styles from './Library.module.css';
-import DynamicComponentList from '@/components/list/DynamicComponentList';
 
 const Library = () => {
-  const openItems = useAppSelector(selectOpenLayoutItems);
-  const dispatch = useAppDispatch();
-
-  const onClickHandler = (nodeType: string) => {
-    // If the item is already open, close it
-    if (openItems.includes(nodeType)) {
-      dispatch(setCloseLayoutItem(nodeType));
-    } else {
-      dispatch(setOpenLayoutItem(nodeType));
-    }
-  };
-
+  const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
   return (
     <>
-      <Flex direction="column" mb="4">
-        <AddCodeComponentButton />
-      </Flex>
-      <AccordionRoot value={openItems} onValueChange={() => setOpenLayoutItem}>
-        <AccordionDetails
-          value={LayoutItemType.SECTION}
-          title="Sections"
-          onTriggerClick={() => onClickHandler(LayoutItemType.SECTION)}
-          className={styles.accordionDetails}
-          triggerClassName={styles.accordionDetailsTrigger}
-        >
-          <ErrorBoundary title="An unexpected error has occurred while fetching sections.">
-            <SectionList />
-          </ErrorBoundary>
-        </AccordionDetails>
-        <AccordionDetails
-          value={LayoutItemType.COMPONENT}
-          title="Components"
-          onTriggerClick={() => onClickHandler(LayoutItemType.COMPONENT)}
-          className={styles.accordionDetails}
-          triggerClassName={styles.accordionDetailsTrigger}
-        >
-          <ErrorBoundary title="An unexpected error has occurred while fetching components.">
-            <ComponentList />
-          </ErrorBoundary>
-        </AccordionDetails>
-        <AccordionDetails
-          value={LayoutItemType.CODE}
-          title="Code"
-          onTriggerClick={() => onClickHandler(LayoutItemType.CODE)}
-          className={styles.accordionDetails}
-          triggerClassName={styles.accordionDetailsTrigger}
-        >
-          <ErrorBoundary title="An unexpected error has occurred while fetching code components.">
-            <CodeComponentList />
-          </ErrorBoundary>
-        </AccordionDetails>
-        <AccordionDetails
-          value={LayoutItemType.DYNAMIC}
-          title="Dynamic Components"
-          onTriggerClick={() => onClickHandler(LayoutItemType.DYNAMIC)}
-          className={styles.accordionDetails}
-          triggerClassName={styles.accordionDetailsTrigger}
-        >
-          <ErrorBoundary title="An unexpected error has occurred while fetching dynamic components.">
-            <DynamicComponentList />
-          </ErrorBoundary>
-        </AccordionDetails>
-        <AccordionDetails
-          value={LayoutItemType.OVERRIDE}
-          title="Overrides"
-          onTriggerClick={() => onClickHandler(LayoutItemType.OVERRIDE)}
-          className={styles.accordionDetails}
-          triggerClassName={styles.accordionDetailsTrigger}
-        >
-          <ErrorBoundary title="An unexpected error has occurred while fetching overrides.">
-            <CodeComponentList type="override" />
-          </ErrorBoundary>
-        </AccordionDetails>
-      </AccordionRoot>
+      <Tabs.Root defaultValue="components">
+        <Tabs.List justify="start" mt="-2" size="1">
+          <Tabs.Trigger
+            value="components"
+            data-testid="canvas-manage-library-components-tab-select"
+          >
+            Components
+          </Tabs.Trigger>
+          <Tabs.Trigger
+            value="patterns"
+            data-testid="canvas-manage-library-patterns-tab-select"
+          >
+            Patterns
+          </Tabs.Trigger>
+        </Tabs.List>
+        <Flex py="2" className={styles.tabWrapper}>
+          <Tabs.Content
+            value={'components'}
+            className={styles.tabContent}
+            data-testid="canvas-manage-library-components-tab-content"
+          >
+            <ErrorBoundary title="An unexpected error has occurred while fetching components.">
+              <LibraryToolbar
+                type={'component'}
+                searchTerm={searchTerm}
+                onSearch={setSearchTerm}
+              />
+              <ComponentList searchTerm={debouncedSearchTerm} />
+            </ErrorBoundary>
+          </Tabs.Content>
+          <Tabs.Content
+            value={'patterns'}
+            className={styles.tabContent}
+            data-testid="canvas-manage-library-patterns-tab-content"
+          >
+            <ErrorBoundary title="An unexpected error has occurred while fetching patterns.">
+              <LibraryToolbar
+                type={'pattern'}
+                searchTerm={searchTerm}
+                onSearch={setSearchTerm}
+              />
+              <PatternList searchTerm={debouncedSearchTerm} />
+            </ErrorBoundary>
+          </Tabs.Content>
+        </Flex>
+      </Tabs.Root>
     </>
   );
 };

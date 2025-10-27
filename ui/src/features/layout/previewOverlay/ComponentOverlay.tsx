@@ -1,34 +1,36 @@
-import type React from 'react';
-import { useMemo } from 'react';
-import { useEffect, useRef, useState } from 'react';
-import styles from './PreviewOverlay.module.css';
-import useSyncPreviewElementSize from '@/hooks/useSyncPreviewElementSize';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import clsx from 'clsx';
+import { useDraggable } from '@dnd-kit/core';
+
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
+import ComponentContextMenu from '@/features/layout/preview/ComponentContextMenu';
+import { useDataToHtmlMapValue } from '@/features/layout/preview/DataToHtmlMapContext';
+import { ComponentNameTag } from '@/features/layout/preview/NameTag';
+import ComponentDropZone from '@/features/layout/previewOverlay/ComponentDropZone';
+import SlotOverlay from '@/features/layout/previewOverlay/SlotOverlay';
 import {
-  selectCanvasViewPortScale,
   selectComponentIsSelected,
   selectDragging,
+  selectEditorViewPortScale,
   selectIsComponentHovered,
   selectIsComponentUpdating,
   setHoveredComponent,
   unsetHoveredComponent,
 } from '@/features/ui/uiSlice';
-import clsx from 'clsx';
-import { ComponentNameTag } from '@/features/layout/preview/NameTag';
-import SlotOverlay from '@/features/layout/previewOverlay/SlotOverlay';
+import useComponentSelection from '@/hooks/useComponentSelection';
+import useGetComponentName from '@/hooks/useGetComponentName';
+import useSyncPreviewElementOffset from '@/hooks/useSyncPreviewElementOffset';
+import useSyncPreviewElementSize from '@/hooks/useSyncPreviewElementSize';
+
+import type React from 'react';
 import type {
   ComponentNode,
   RegionNode,
   SlotNode,
 } from '@/features/layout/layoutModelSlice';
-import ComponentContextMenu from '@/features/layout/preview/ComponentContextMenu';
-import { getDistanceBetweenElements } from '@/utils/function-utils';
-import useGetComponentName from '@/hooks/useGetComponentName';
-import { useDataToHtmlMapValue } from '@/features/layout/preview/DataToHtmlMapContext';
-import useComponentSelection from '@/hooks/useComponentSelection';
-import ComponentDropZone from '@/features/layout/previewOverlay/ComponentDropZone';
-import { useDraggable } from '@dnd-kit/core';
 import type { StackDirection } from '@/types/Annotations';
+
+import styles from './PreviewOverlay.module.css';
 
 export interface ComponentOverlayProps {
   component: ComponentNode;
@@ -37,12 +39,8 @@ export interface ComponentOverlayProps {
   parentRegion?: RegionNode;
   index: number;
   disableDrop?: boolean;
+  forceRecalculate?: number; // Increment this prop to trigger a re-calculation of the component overlay's border rect
 }
-
-type ElementOffset = {
-  horizontalDistance: number | undefined;
-  verticalDistance: number | undefined;
-};
 
 const ComponentOverlay: React.FC<ComponentOverlayProps> = (props) => {
   const {
@@ -52,16 +50,25 @@ const ComponentOverlay: React.FC<ComponentOverlayProps> = (props) => {
     iframeRef,
     index,
     disableDrop = false,
+    forceRecalculate = 0,
   } = props;
 
   const { componentsMap, slotsMap, regionsMap } = useDataToHtmlMapValue();
-  const rect = useSyncPreviewElementSize(
+  const { elementRect, recalculateBorder } = useSyncPreviewElementSize(
     componentsMap[component.uuid]?.elements,
   );
-  const [elementOffset, setElementOffset] = useState<ElementOffset>({
-    horizontalDistance: undefined,
-    verticalDistance: undefined,
-  });
+
+  let parentElementInsideIframe = null;
+  if (parentRegion?.id) {
+    parentElementInsideIframe = regionsMap[parentRegion.id]?.elements;
+  }
+  if (parentSlot?.id) {
+    parentElementInsideIframe = slotsMap[parentSlot.id]?.element;
+  }
+  const { offset, recalculateOffset } = useSyncPreviewElementOffset(
+    componentsMap[component.uuid]?.elements,
+    parentElementInsideIframe ? parentElementInsideIframe : null,
+  );
   const [initialized, setInitialized] = useState(false);
   const isHovered = useAppSelector((state) => {
     return selectIsComponentHovered(state, component.uuid);
@@ -69,7 +76,7 @@ const ComponentOverlay: React.FC<ComponentOverlayProps> = (props) => {
   const isUpdating = useAppSelector((state) => {
     return selectIsComponentUpdating(state, component.uuid);
   });
-  const canvasViewPortScale = useAppSelector(selectCanvasViewPortScale);
+  const editorViewPortScale = useAppSelector(selectEditorViewPortScale);
   const dispatch = useAppDispatch();
   const { setSelectedComponent, handleComponentSelection } =
     useComponentSelection();
@@ -90,6 +97,7 @@ const ComponentOverlay: React.FC<ComponentOverlayProps> = (props) => {
       elementsInsideIframe: elementsInsideIframe.current,
     },
   });
+  const [forceRecalculateChildren, setForceRecalculateChildren] = useState(0);
 
   const isSelected = useAppSelector((state) =>
     selectComponentIsSelected(state, component.uuid),
@@ -102,54 +110,24 @@ const ComponentOverlay: React.FC<ComponentOverlayProps> = (props) => {
     }
 
     elementsInsideIframe.current = componentsMap[component.uuid]?.elements;
-
-    let parentElementInsideIframe = null;
-    if (parentRegion?.id) {
-      parentElementInsideIframe = regionsMap[parentRegion.id]?.elements[0];
-    }
-    if (parentSlot?.id) {
-      parentElementInsideIframe = slotsMap[parentSlot.id].element;
-    }
-
-    if (parentElementInsideIframe && elementsInsideIframe.current.length) {
-      setElementOffset((prevOffsets) => {
-        const newOffsets = {
-          ...getDistanceBetweenElements(
-            parentElementInsideIframe,
-            elementsInsideIframe.current,
-          ),
-        };
-
-        if (
-          prevOffsets.horizontalDistance !== newOffsets.horizontalDistance ||
-          prevOffsets.verticalDistance !== newOffsets.verticalDistance
-        ) {
-          return newOffsets;
-        }
-        return prevOffsets;
-      });
-    }
-  }, [
-    slotsMap,
-    componentsMap,
-    rect,
-    component.uuid,
-    iframeRef,
-    parentSlot?.id,
-    parentRegion?.id,
-    regionsMap,
-  ]);
+  }, [slotsMap, componentsMap, elementRect, component.uuid, iframeRef]);
 
   useEffect(() => {
-    if (
-      elementOffset.horizontalDistance !== undefined ||
-      elementOffset.verticalDistance !== undefined
-    ) {
-      // Only set this to true once the offset has been correctly calculated to avoid the border flickering to the top
-      // left when the preview updates.
+    if (offset.offsetLeft !== undefined || offset.offsetTop !== undefined) {
       setInitialized(true);
     }
-  }, [elementOffset.horizontalDistance, elementOffset.verticalDistance]);
+  }, [offset.offsetLeft, offset.offsetTop]);
+
+  // Recalculate the children's borders when the elementRect changes
+  useEffect(() => {
+    setForceRecalculateChildren((prev) => prev + 1);
+  }, [elementRect]);
+
+  // Recalculate the border when the parent increments the forceRecalculate prop
+  useEffect(() => {
+    recalculateBorder();
+    recalculateOffset();
+  }, [forceRecalculate, recalculateBorder, recalculateOffset]);
 
   function handleComponentClick(event: React.MouseEvent<HTMLElement>) {
     event.stopPropagation();
@@ -179,12 +157,18 @@ const ComponentOverlay: React.FC<ComponentOverlayProps> = (props) => {
   const style: React.CSSProperties = useMemo(
     () => ({
       opacity: initialized ? '1' : '0',
-      height: rect.height * canvasViewPortScale,
-      width: rect.width * canvasViewPortScale,
-      top: (elementOffset.verticalDistance || 0) * canvasViewPortScale,
-      left: (elementOffset.horizontalDistance || 0) * canvasViewPortScale,
+      height: elementRect.height * editorViewPortScale,
+      width: elementRect.width * editorViewPortScale,
+      top: (offset.offsetTop || 0) * editorViewPortScale,
+      left: (offset.offsetLeft || 0) * editorViewPortScale,
     }),
-    [initialized, rect.height, rect.width, canvasViewPortScale, elementOffset],
+    [
+      initialized,
+      elementRect.height,
+      elementRect.width,
+      editorViewPortScale,
+      offset,
+    ],
   );
 
   let stackDirection: StackDirection = 'vertical';
@@ -202,7 +186,7 @@ const ComponentOverlay: React.FC<ComponentOverlayProps> = (props) => {
       onMouseOut={handleItemMouseOut}
       onClick={handleComponentClick}
       onKeyDown={handleKeyDown}
-      data-xb-selected={isSelected}
+      data-canvas-selected={isSelected}
       className={clsx('componentOverlay', styles.componentOverlay, {
         [styles.selected]: isSelected,
         [styles.hovered]: isHovered,
@@ -221,15 +205,15 @@ const ComponentOverlay: React.FC<ComponentOverlayProps> = (props) => {
           ref={setNodeRef}
           {...listeners}
           {...attributes}
-          className={clsx('xb--sortable-item', styles.sortableItem)}
-          data-xb-component-id={componentType}
-          data-xb-uuid={component.uuid}
-          data-xb-type={component.nodeType}
-          data-xb-overlay="true"
+          className={clsx('canvas--sortable-item', styles.sortableItem)}
+          data-canvas-component-id={componentType}
+          data-canvas-uuid={component.uuid}
+          data-canvas-type={component.nodeType}
+          data-canvas-overlay="true"
         />
       </ComponentContextMenu>
       {(isHovered || isSelected) && (
-        <div className={clsx(styles.xbNameTag)}>
+        <div className={clsx(styles.canvasNameTag)}>
           <ComponentNameTag
             name={name}
             id={component.uuid}
@@ -244,6 +228,7 @@ const ComponentOverlay: React.FC<ComponentOverlayProps> = (props) => {
           parentComponent={component}
           slot={slot}
           disableDrop={disableDrop || isComponentDragged}
+          forceRecalculate={forceRecalculateChildren}
         />
       ))}
 

@@ -2,14 +2,14 @@
 
 declare(strict_types = 1);
 
-namespace Drupal\experience_builder\Plugin\Validation\Constraint;
+namespace Drupal\canvas\Plugin\Validation\Constraint;
 
 use Drupal\Core\Config\Schema\TypeResolver;
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
 use Drupal\Core\Render\Component\Exception\ComponentNotFoundException;
 use Drupal\Core\Theme\ComponentPluginManager;
-use Drupal\experience_builder\PropExpressions\Component\ComponentPropExpression;
-use Drupal\experience_builder\PropShape\PropShape;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase;
+use Drupal\canvas\PropExpressions\Component\ComponentPropExpression;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\ConstraintValidator;
@@ -66,7 +66,7 @@ final class SdcPropKeysConstraintValidator extends ConstraintValidator implement
     }
 
     // Fetch the props defined in the SDC's metadata.
-    $prop_shapes = PropShape::getComponentProps($sdc);
+    $prop_shapes = GeneratedFieldExplicitInputUxComponentSourceBase::getComponentInputsForMetadata($sdc->getPluginId(), $sdc->metadata);
     $expected_keys = array_map(
       fn (string $component_prop_expression) => ComponentPropExpression::fromString($component_prop_expression)->propName,
       array_keys($prop_shapes)
@@ -76,7 +76,7 @@ final class SdcPropKeysConstraintValidator extends ConstraintValidator implement
       if (!array_key_exists($expected_key, $mapping)) {
         $this->context->buildViolation($constraint->message)
           // `title` is guaranteed to exist.
-          // @see \Drupal\experience_builder\Plugin\ComponentPluginManager::componentMeetsRequirements()
+          // @see \Drupal\canvas\Plugin\ComponentPluginManager::componentMeetsRequirements()
           // @phpstan-ignore-next-line
           ->setParameter('%prop_title', $sdc->metadata->schema['properties'][$expected_key]['title'])
           ->setParameter('%prop_machine_name', $expected_key)

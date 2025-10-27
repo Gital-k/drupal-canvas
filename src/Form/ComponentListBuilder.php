@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Drupal\experience_builder\Form;
+namespace Drupal\canvas\Form;
 
 use Drupal\Core\Config\Entity\ConfigEntityListBuilder;
 use Drupal\Core\Entity\EntityInterface;
@@ -10,8 +10,8 @@ use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Url;
-use Drupal\experience_builder\Audit\ComponentAudit;
-use Drupal\experience_builder\Entity\Component;
+use Drupal\canvas\Audit\ComponentAudit;
+use Drupal\canvas\Entity\Component;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -76,13 +76,12 @@ final class ComponentListBuilder extends ConfigEntityListBuilder {
   }
 
   public function getOperations(EntityInterface $entity): array {
-    return [
+    return parent::getOperations($entity) + [
       'audit' => [
         'title' => $this->t('Audit'),
-        'weight' => 10,
         'url' => Url::fromRoute('entity.component.audit', ['component' => $entity->id()]),
       ],
-    ] + parent::getOperations($entity);
+    ];
   }
 
 }

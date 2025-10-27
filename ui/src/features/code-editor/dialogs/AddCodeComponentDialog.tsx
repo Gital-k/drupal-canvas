@@ -1,18 +1,24 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import parse from 'html-react-parser';
+import { useParams } from 'react-router';
 import { useNavigate } from 'react-router-dom';
-import { Flex, TextField, Text } from '@radix-ui/themes';
-import { useCreateCodeComponentMutation } from '@/services/componentAndLayout';
+import { Flex, Text, TextField } from '@radix-ui/themes';
+
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
+import Dialog, { DialogFieldLabel } from '@/components/Dialog';
+import { setCodeComponentProperty } from '@/features/code-editor/codeEditorSlice';
+import getStarterComponentTemplate from '@/features/code-editor/starterComponentTemplate';
+import { extractErrorMessageFromApiResponse } from '@/features/error-handling/error-handling';
 import {
   closeAllDialogs,
   selectDialogStates,
 } from '@/features/ui/codeComponentDialogSlice';
-import Dialog, { DialogFieldLabel } from '@/components/Dialog';
-import { setCodeComponentProperty } from '@/features/code-editor/codeEditorSlice';
-import getStarterComponentTemplate from '@/features/code-editor/starterComponentTemplate';
-import { validateMachineNameClientSide } from '@/features/validation/validation';
-import parse from 'html-react-parser';
-import { extractErrorMessageFromApiResponse } from '@/features/error-handling/error-handling';
+import {
+  setActivePanel,
+  setManageLibraryTab,
+} from '@/features/ui/primaryPanelSlice';
+import { validateCodeMachineNameClientSide } from '@/features/validation/validation';
+import { useCreateCodeComponentMutation } from '@/services/componentAndLayout';
 
 const AddCodeComponentDialog = () => {
   const [componentName, setComponentName] = useState('');
@@ -24,6 +30,7 @@ const AddCodeComponentDialog = () => {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const { isAddDialogOpen } = useAppSelector(selectDialogStates);
+  const { entityId, entityType } = useParams();
 
   const handleSave = async () => {
     if (validationError) {
@@ -41,7 +48,10 @@ const AddCodeComponentDialog = () => {
       compiledJs: '',
       compiledCss: '',
       importedJsComponents: [],
+      dataDependencies: {},
     });
+    dispatch(setManageLibraryTab('code'));
+    dispatch(setActivePanel('manageLibrary'));
   };
 
   const handleOpenChange = (open: boolean) => {
@@ -60,19 +70,29 @@ const AddCodeComponentDialog = () => {
       setValidationError('');
       dispatch(closeAllDialogs());
       navigate(`/code-editor/code/${data.machineName}`);
+      reset();
     }
-  }, [isSuccess, data?.machineName, dispatch, navigate, componentName]);
+  }, [
+    isSuccess,
+    data?.machineName,
+    dispatch,
+    navigate,
+    componentName,
+    reset,
+    entityType,
+    entityId,
+  ]);
 
   useEffect(() => {
     if (isError) {
-      console.error('Failed to add code component:', error);
+      console.error('Failed to create code component:', error);
     }
   }, [isError, error]);
 
   const handleOnChange = (newName: string) => {
     setComponentName(newName);
     setValidationError(
-      newName.trim() ? validateMachineNameClientSide(newName) : '',
+      newName.trim() ? validateCodeMachineNameClientSide(newName) : '',
     );
   };
 
@@ -80,11 +100,11 @@ const AddCodeComponentDialog = () => {
     <Dialog
       open={isAddDialogOpen}
       onOpenChange={handleOpenChange}
-      title="Add new code component"
+      title="Create new code component"
       error={
         isError
           ? {
-              title: 'Failed to add code component',
+              title: 'Failed to create code component',
               message: parse(extractErrorMessageFromApiResponse(error)),
               resetButtonText: 'Try again',
               onReset: handleSave,
@@ -93,7 +113,7 @@ const AddCodeComponentDialog = () => {
       }
       footer={{
         cancelText: 'Cancel',
-        confirmText: 'Add',
+        confirmText: 'Create',
         onConfirm: handleSave,
         isConfirmDisabled: !componentName.trim() || !!validationError,
         isConfirmLoading: isLoading,
@@ -112,6 +132,7 @@ const AddCodeComponentDialog = () => {
             Component name
           </DialogFieldLabel>
           <TextField.Root
+            autoComplete="off"
             id={'componentName'}
             value={componentName}
             onChange={(e) => handleOnChange(e.target.value)}

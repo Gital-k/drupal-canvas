@@ -2,26 +2,27 @@
 
 declare(strict_types=1);
 
-namespace Drupal\Tests\experience_builder\Kernel\Config;
+namespace Drupal\Tests\canvas\Kernel\Config;
 
 use Drupal\Core\Entity\EntityTypeManagerInterface;
-use Drupal\experience_builder\ComponentIncompatibilityReasonRepository;
-use Drupal\experience_builder\Entity\Component;
-use Drupal\experience_builder\Entity\ComponentInterface;
-use Drupal\experience_builder\Entity\JavaScriptComponent;
-use Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\JsComponent;
-use Drupal\Tests\experience_builder\Traits\ConstraintViolationsTestTrait;
-use Drupal\Tests\experience_builder\Traits\GenerateComponentConfigTrait;
+use Drupal\Core\Extension\ThemeInstallerInterface;
+use Drupal\canvas\ComponentIncompatibilityReasonRepository;
+use Drupal\canvas\Entity\Component;
+use Drupal\canvas\Entity\ComponentInterface;
+use Drupal\canvas\Entity\JavaScriptComponent;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
+use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
+use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 
 /**
  * Tests JavascriptComponentStorage.
  *
- * @covers \Drupal\experience_builder\EntityHandlers\JavascriptComponentStorage
- * @covers \Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\JsComponent::createConfigEntity
- * @covers \Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\JsComponent::updateConfigEntity
+ * @covers \Drupal\canvas\EntityHandlers\JavascriptComponentStorage
+ * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::createConfigEntity
+ * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::updateConfigEntity
  * @group JavaScriptComponents
- * @group experience_builder
+ * @group canvas
  */
 final class JavascriptComponentStorageTest extends AssetLibraryStorageTest {
 
@@ -33,16 +34,19 @@ final class JavascriptComponentStorageTest extends AssetLibraryStorageTest {
    * {@inheritdoc}
    */
   protected static $modules = [
-    'experience_builder',
+    'canvas',
     'user',
     'system',
-    // XB's dependencies (modules providing field types + widgets).
+    // Canvas's dependencies (modules providing field types + widgets).
     'datetime',
     'file',
     'image',
     'options',
     'path',
     'link',
+    'filter',
+    'ckeditor5',
+    'editor',
   ];
 
   /**
@@ -52,10 +56,12 @@ final class JavascriptComponentStorageTest extends AssetLibraryStorageTest {
     parent::setUp();
     $this->installEntitySchema('user');
     $this->installConfig(['system']);
+    $this->container->get(ThemeInstallerInterface::class)->install(['stark']);
+    $this->installConfig(['canvas']);
   }
 
   /**
-   * @covers \Drupal\experience_builder\EntityHandlers\XbAssetStorage::generateFiles()
+   * @covers \Drupal\canvas\EntityHandlers\CanvasAssetStorage::generateFiles()
    */
   public function testGeneratedFiles(): void {
     $js_component = JavaScriptComponent::create([
@@ -73,80 +79,13 @@ final class JavascriptComponentStorageTest extends AssetLibraryStorageTest {
         'original' => '.test { display: none; }',
         'compiled' => '.test { display: none; }',
       ],
+      'dataDependencies' => [],
     ]);
     $this->assertGeneratedFiles($js_component);
   }
 
   /**
-   * @covers \Drupal\experience_builder\Entity\JavaScriptComponent::$block_override
-   * @covers \Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\BlockComponent::renderComponent()
-   */
-  public function testBlockOverrideActivation(): void {
-    // Initial situation: block module is installed, Components are created for
-    // those blocks.
-    $this->enableModules(['block']);
-    $this->generateComponentConfig();
-    $this->assertInstanceOf(Component::class, Component::load('block.system_menu_block.main'));
-    $this->assertInstanceOf(Component::class, Component::load('block.system_menu_block.tools'));
-
-    // Simulate those block components having been instantiated, rendered, and
-    // live in render cache, Dynamic Page Cache and Page Cache.
-    // @see \Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\BlockComponent::renderComponent()
-    $cache = \Drupal::cache();
-    $cache->set('✋', $this->randomString(), tags: Component::load('block.system_menu_block.main')->getCacheTags());
-    $cache->set('🛠️', $this->randomString(), tags: Component::load('block.system_menu_block.tools')->getCacheTags());
-    $this->assertNotNull($cache->get('✋'));
-    $this->assertNotNull($cache->get('🛠️'));
-
-    // Now create a JavaScript Component.
-    $js_component = JavaScriptComponent::create([
-      'machineName' => $this->randomMachineName(),
-      'name' => $this->getRandomGenerator()->sentences(5),
-      'status' => FALSE,
-      'props' => [],
-      'required' => [],
-      'slots' => [],
-      'js' => [
-        'original' => 'console.log("hey");',
-        'compiled' => 'console.log("hey");',
-      ],
-      'css' => [
-        'original' => '.test { display: none; }',
-        'compiled' => '.test { display: none; }',
-      ],
-    ]);
-    $js_component->save();
-
-    // It is valid, and render cached block component instances still exist.
-    self::assertEmpty($js_component->getTypedData()->validate());
-    $this->assertNotNull($cache->get('✋'));
-    $this->assertNotNull($cache->get('🛠️'));
-
-    // Specify unsupported block override: error.
-    $js_component->set('block_override', 'local_tasks_block');
-    self::assertSame('The value you selected is not a valid choice.', (string) $js_component->getTypedData()->validate()->get(0)->getMessage());
-
-    // Specify supported block override: valid.
-    $js_component->set('block_override', 'system_menu_block');
-    self::assertEmpty($js_component->getTypedData()->validate());
-    $js_component->save();
-    // Render cached block component instances still exist, because the code
-    // component is "internal".
-    $this->assertNotNull($cache->get('✋'));
-    $this->assertNotNull($cache->get('🛠️'));
-
-    // Now change the code component from "internal" to "exposed".
-    $js_component->enable()->save();
-    // Render cached block component instances NO LONGER exist.
-    $this->assertFalse($cache->get('✋'));
-    $this->assertFalse($cache->get('🛠️'));
-
-    // This proves that the next time BlockComponent::renderComponent() runs, it
-    // will use the overriding JavaScriptComponent config entity instead.
-  }
-
-  /**
-   * @covers \Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\JsComponent::createConfigEntity()
+   * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::createConfigEntity()
    */
   public function testComponentEntityCreation(): array {
     $js_component_id = $this->randomMachineName();
@@ -181,6 +120,7 @@ final class JavascriptComponentStorageTest extends AssetLibraryStorageTest {
         'original' => '.test { display: none; }',
         'compiled' => '.test { display: none; }',
       ],
+      'dataDependencies' => [],
     ]);
     $this->assertSame([
       '' => 'Prop "title" is required, but does not have example value',
@@ -193,31 +133,28 @@ final class JavascriptComponentStorageTest extends AssetLibraryStorageTest {
     $js_component->save();
 
     // No Component config entity is ever created for JavaScript Components not
-    // explicitly flagged to be added to XB's component library.
+    // explicitly flagged to be added to Canvas's component library.
     $component = Component::load($component_id);
     self::assertEmpty($reason_repository->getReasons()[JsComponent::SOURCE_PLUGIN_ID] ?? []);
     self::assertNull($component);
 
     // Use a non-storable prop shape. The JavaScript Component config entity's
     // config schema SHOULD prevent the component author from choosing props
-    // that the Experience Builder cannot generate an input UX for.
-    // @see \Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase
-    // @see the `Choice` constraints on `type: experience_builder.js_component.*`'s for prop `format`.
+    // that the Drupal Canvas cannot generate an input UX for.
+    // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase
+    // @see the `Choice` constraints on `type: canvas.js_component.*`'s for prop `format`.
     $props['title']['format'] = 'hostname';
     $js_component->setProps($props);
     $this->assertSame([
-      '' => 'Experience Builder does not know of a field type/widget to allow populating the <code>title</code> prop, with the shape <code>{"type":"string","format":"hostname"}</code>.',
+      '' => 'Drupal Canvas does not know of a field type/widget to allow populating the <code>title</code> prop, with the shape <code>{"type":"string","format":"hostname"}</code>.',
       'props.title.format' => 'The value you selected is not a valid choice.',
     ], self::violationsToArray($js_component->getTypedData()->validate()));
-    // @see the `Choice` constraints on `type: experience_builder.js_component.*`'s for prop `type`.
+    // @see the `Choice` constraints on `type: canvas.js_component.*`'s for prop `type`.
     unset($props['title']['format']);
     $props['title']['type'] = 'array';
     $js_component->setProps($props);
     $this->assertSame([
-      '' => [
-        'Prop "title" has invalid example value: [] String value found, but an array or an object is required',
-        'Experience Builder does not know of a field type/widget to allow populating the <code>title</code> prop, with the shape <code>{"type":"array"}</code>.',
-      ],
+      '' => 'Prop "title" has invalid example value: [] String value found, but an array or an object is required',
       'props.title.type' => 'The value you selected is not a valid choice.',
     ], self::violationsToArray($js_component->getTypedData()->validate()));
 
@@ -257,7 +194,7 @@ final class JavascriptComponentStorageTest extends AssetLibraryStorageTest {
   }
 
   /**
-   * @covers \Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\JsComponent::updateConfigEntity()
+   * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::updateConfigEntity()
    * @depends testComponentEntityCreation
    */
   public function testComponentEntityUpdate(array $js_component_values): void {

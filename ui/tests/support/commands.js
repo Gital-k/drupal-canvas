@@ -1,16 +1,19 @@
 import '@testing-library/cypress/add-commands.js';
+
 import { realType } from 'cypress-real-events'; // eslint-disable-line  @typescript-eslint/no-unused-vars
+
+import { queries } from '@testing-library/dom';
+
 import { realDnd } from './realDnd.js';
 import { onlyVisibleChars } from './utils.js';
-import { queries } from '@testing-library/dom';
 
 // This selector gets the preview iframe ensuring that it is initialized and that it is the currently active/swapped in element.
 const initializedReadyPreviewIframeSelector =
-  '[data-test-xb-content-initialized="true"][data-xb-swap-active="true"]';
+  '[data-test-canvas-content-initialized="true"][data-canvas-swap-active="true"]';
 
 const commandAsWebserver = (command) => {
   if (Cypress.env('testWebserverUser')) {
-    return `sudo -u ${Cypress.env('testWebserverUser')} ${command}`;
+    return `sudo -u ${Cypress.env('testWebserverUser')} -E ${command}`;
   }
   return command;
 };
@@ -99,24 +102,28 @@ Cypress.Commands.add(
   },
 );
 
-Cypress.Commands.add('drupalEnableThemeForXb', (themeMachineName) => {
+Cypress.Commands.add('drupalEnableThemeForCanvas', (themeMachineName) => {
   cy.drupalLoginAsAdmin(() => {
     cy.drupalRelativeURL(`admin/appearance/settings/${themeMachineName}`);
-    cy.get(`input[name="use_xb"]`).click();
+    cy.get(`input[name="use_canvas"]`).click();
     cy.get('form').submit('#system-theme-settings');
-    cy.get(`input[name="use_xb"]`).should('be.checked');
+    cy.get(`input[name="use_canvas"]`).should('be.checked');
   });
 });
 
-Cypress.Commands.add('drupalXbInstall', (extraModules = [], options = {}) => {
-  cy.task('log', `The setup file ${Cypress.env('setupFile')}`);
-  cy.task('log', `Extra modules ${extraModules}`);
-  cy.drupalInstall({
-    setupFile: Cypress.env('setupFile'),
-    extraModules,
-    options,
-  });
-});
+Cypress.Commands.add(
+  'drupalCanvasInstall',
+  (extraModules = [], options = {}, extraPermissions = []) => {
+    cy.task('log', `The setup file ${Cypress.env('setupFile')}`);
+    cy.task('log', `Extra modules ${extraModules}`);
+    cy.drupalInstall({
+      setupFile: Cypress.env('setupFile'),
+      extraModules,
+      options,
+      extraPermissions,
+    });
+  },
+);
 
 Cypress.Commands.add(
   'drupalInstall',
@@ -136,17 +143,17 @@ Cypress.Commands.add(
       setupFile = setupFile ? `--setup-file "${setupFile}"` : '';
       installProfile = `--install-profile "${installProfile}"`;
       extraModules = extraModules.length
-        ? `XB_EXTRA_MODULES=${extraModules.join()}`
+        ? `CANVAS_EXTRA_MODULES=${extraModules.join()}`
         : '';
 
       const disableAggregationEnv =
         Object.prototype.hasOwnProperty.call(options, 'disableAggregation') &&
         options.disableAggregation
-          ? 'XB_DISABLE_AGGREGATION=true'
+          ? 'CANVAS_DISABLE_AGGREGATION=true'
           : '';
 
       extraPermissions = extraPermissions.length
-        ? `XB_EXTRA_PERMISSIONS="${extraPermissions.join()}"`
+        ? `CANVAS_EXTRA_PERMISSIONS="${extraPermissions.join()}"`
         : '';
 
       const langcodeOption = langcode ? `--langcode "${langcode}"` : '';
@@ -178,7 +185,7 @@ Cypress.Commands.add('drupalInstallModule', (modules, force, callback) => {
   cy.drupalLoginAsAdmin(() => {
     cy.drupalRelativeURL('/admin/modules');
 
-    // Open any collapsed sections in the modules page.
+    // Open any collapsed patterns in the modules page.
     cy.get(
       '[data-drupal-selector="system-modules"] > details > summary[aria-expanded="false"][aria-controls^="edit-modules"]',
     ).then(($closedDetails) => {
@@ -313,7 +320,7 @@ Cypress.Commands.add('drupalRelativeURL', (pathname, callback) => {
 });
 
 Cypress.Commands.add('drupalUninstall', (callback) => {
-  // immediately leave XB - otherwise when running headed the auto-save poll can fire during/after the db wipe and leave
+  // immediately leave Canvas - otherwise when running headed the auto-save poll can fire during/after the db wipe and leave
   // the env in a weird state.
   cy.visit('/');
   const prefix = Cypress.env('drupalDbPrefix');
@@ -353,9 +360,20 @@ Cypress.Commands.add('drupalUserIsLoggedIn', (callback) => {
 });
 
 Cypress.Commands.add('clearAutoSave', (type = 'node', id = '1') => {
+  cy.log('type', type);
   cy.request({
     method: 'GET',
-    url: `/xb-test/clear-auto-save/${type}/${id}`,
+    url: `/canvas-test/clear-auto-save/${type}/${id}`,
+  }).then((response) => {
+    expect(response.status).to.eq(200);
+  });
+});
+
+Cypress.Commands.add('setKeyValue', (collection, values) => {
+  cy.request({
+    method: 'POST',
+    url: `/canvas-test/set-key-value/${collection}`,
+    body: values,
   }).then((response) => {
     expect(response.status).to.eq(200);
   });
@@ -385,7 +403,7 @@ Cypress.Commands.add(
   'previewReady',
   (iframeSelector = initializedReadyPreviewIframeSelector) => {
     // Not logging these assertions to try and keep the command log a bit tidier
-    cy.get('.xbCanvasScalingContainer', { log: false }).should(
+    cy.get('.canvasEditorFrameScalingContainer', { log: false }).should(
       'have.css',
       'opacity',
       '1',
@@ -515,15 +533,17 @@ Cypress.Commands.add(
       }).should(() => {
         const frameContent = doc
           .querySelector(iframeSelector)
-          ?.contentWindow?.document?.body.querySelector(selector);
+          ?.contentWindow?.document?.body.querySelectorAll(selector);
         expect(
-          !!frameContent,
+          frameContent.length,
           `'${selector}' was found in iframe '${iframeSelector}'`,
-        ).to.equal(true);
+        ).to.be.greaterThan(0);
         expect(
-          frameContent?.textContent?.includes(textContent),
+          Array.from(frameContent).filter((el) =>
+            el.textContent?.includes(textContent),
+          ).length,
           `${iframeSelector} in iframe includes text ${textContent}`,
-        ).to.equal(true);
+        ).to.be.greaterThan(0);
       });
     });
   },
@@ -623,12 +643,27 @@ Cypress.Commands.add(
 );
 
 Cypress.Commands.add('openLibraryPanel', () => {
-  cy.findByTestId('xb-side-menu').findByLabelText('Add').click();
-  cy.findByTestId('xb-components-library-loading').should('not.exist');
+  cy.findByTestId('canvas-side-menu').findByLabelText('Add').click();
+
+  cy.findByText('Library', { selector: 'h4' }).should(($el) => {
+    expect(
+      $el.length,
+      'openLibraryPanel: Library panel did not open - was it already open?.',
+    ).to.be.greaterThan(0);
+  });
+
+  cy.findByTestId('canvas-components-library-loading').should('not.exist');
 });
 
 Cypress.Commands.add('openLayersPanel', () => {
-  cy.findByTestId('xb-side-menu').findByLabelText('Layers').click();
+  // Going to Library and then Layers ensures that if Layers is already open the panel won't get closed when clicking the Layers button.
+  cy.findByTestId('canvas-side-menu').findByLabelText('Layers').click();
+  cy.findByText('Layers', { selector: 'h4' }).should(($el) => {
+    expect(
+      $el.length,
+      'openLayersPanel: Layers panel did not open - was it already open?.',
+    ).to.be.greaterThan(0);
+  });
 });
 
 /**
@@ -636,7 +671,7 @@ Cypress.Commands.add('openLayersPanel', () => {
  * using .val(101).trigger('change') or .trigger('input') does not seem to work. https://github.com/cypress-io/cypress/issues/1570
  * @example
  * ```javascript
- *    cy.findByLabelText('Canvas zoom level').setRangeValue('101');
+ *    cy.findByLabelText('Select zoom level').setRangeValue('101');
  * ```
  */
 Cypress.Commands.add(
@@ -673,21 +708,21 @@ Cypress.Commands.add(
 );
 
 /**
- * Loads the XB page and waits to ensure initial backend requests have been returned and that the preview
+ * Loads the Canvas page and waits to ensure initial backend requests have been returned and that the preview
  * iFrame is initialized and ready to be interacted with.
  *
  * * @param {Object} options
  *  *   An options object to configure the command.
  *  * @param {string} options.url
- *  *   The URL you want to visit - defaults to '/xb/node/1'.
+ *  *   The URL you want to visit - defaults to '/canvas/editor/node/1'.
  *  * @param {boolean} options.clearAutoSave
  *  *   Can be set to false if you want the auto-save data to persist on loading a new page - defaults to true.
  *  */
-Cypress.Commands.add('loadURLandWaitForXBLoaded', (options = {}) => {
-  const { url = 'xb/node/1', clearAutoSave = true } = options;
+Cypress.Commands.add('loadURLandWaitForCanvasLoaded', (options = {}) => {
+  const { url = 'canvas/editor/node/1', clearAutoSave = true } = options;
 
   if (clearAutoSave) {
-    const [, entityType, entityId] = url.split('/');
+    const [, , entityType, entityId] = url.split('/');
     cy.clearAutoSave(entityType, entityId);
   }
   cy.drupalRelativeURL(url);
@@ -704,14 +739,13 @@ Cypress.Commands.add('recordFormBuildId', { prevSubject: true }, (subject) => {
 });
 
 Cypress.Commands.add(
-  'shouldHaveUpdatedFormBuildId',
-  {
-    prevSubject: true,
-  },
-  (subject, customTimeout) => {
-    cy.wrap(subject, {
+  'selectorShouldHaveUpdatedFormBuildId',
+  (selector, customTimeout) => {
+    cy.get('body', {
       timeout: customTimeout || Cypress.config('defaultCommandTimeout'),
-    }).should((subject) => {
+    }).should((body) => {
+      const subject = body.find(selector);
+      expect(subject).to.exist;
       const newFormBuildId = subject.find('input[name="form_build_id"]').val();
       expect(newFormBuildId).not.to.equal(formBuildId[subject.attr('id')]);
       formBuildId[subject.attr('id')] = newFormBuildId;
@@ -748,7 +782,7 @@ Cypress.Commands.add(
 );
 
 Cypress.Commands.add('getElementScaledDimensions', ($item) => {
-  cy.findByTestId('xb-canvas-scaling').then(($parent) => {
+  cy.findByTestId('canvas-editor-frame-scaling').then(($parent) => {
     const computedStyle = window.getComputedStyle($parent[0]);
     const matrix = computedStyle.transform;
     if (matrix !== 'none') {
@@ -779,7 +813,7 @@ Cypress.Commands.add(
   'clickComponentInPreview',
   (componentName, index = 0, regionId = 'content') => {
     cy.get(
-      `#xbPreviewOverlay .xb--viewport-overlay .xb--region-overlay__${regionId}`,
+      `#canvasPreviewOverlay .canvas--viewport-overlay .canvas--region-overlay__${regionId}`,
     )
       .findAllByLabelText(componentName)
       .eq(index)
@@ -793,7 +827,7 @@ Cypress.Commands.add(
   (componentName, index = 0, regionId = 'content') => {
     return cy
       .get(
-        `#xbPreviewOverlay .xb--viewport-overlay .xb--region-overlay__${regionId}`,
+        `#canvasPreviewOverlay .canvas--viewport-overlay .canvas--region-overlay__${regionId}`,
       )
       .findAllByLabelText(componentName)
       .eq(index);
@@ -805,7 +839,7 @@ Cypress.Commands.add(
   (componentName, regionId = 'content') => {
     return cy
       .get(
-        `#xbPreviewOverlay .xb--viewport-overlay .xb--region-overlay__${regionId}`,
+        `#canvasPreviewOverlay .canvas--viewport-overlay .canvas--region-overlay__${regionId}`,
       )
       .findAllByLabelText(componentName);
   },
@@ -839,6 +873,13 @@ Cypress.Commands.add(
 Cypress.Commands.add(
   'clickComponentInLayersView',
   (componentName, index = 0) => {
+    cy.findByText('Layers', { selector: 'h4' }).should(($el) => {
+      expect(
+        $el.length,
+        'The Layers panel must be open before calling clickComponentInLayersView.',
+      ).to.be.greaterThan(0);
+    });
+
     cy.get('.primaryPanelContent')
       .findAllByLabelText(componentName)
       .eq(index)
@@ -908,10 +949,10 @@ Cypress.Commands.add('hidePanels', () => {
     $el.css({ display: 'none' });
   }
 
-  cy.findByTestId('xb-primary-panel').then(hide);
-  cy.findByTestId('xb-topbar').then(hide);
-  cy.findByTestId('xb-contextual-panel').then(hide);
-  cy.findByTestId('xb-canvas-controls').then(hide);
+  cy.findByTestId('canvas-primary-panel').then(hide);
+  cy.findByTestId('canvas-topbar').then(hide);
+  cy.findByTestId('canvas-contextual-panel').then(hide);
+  cy.findByTestId('canvas-editor-frame-controls').then(hide);
 });
 
 /**
@@ -922,21 +963,21 @@ Cypress.Commands.add('showPanels', () => {
     $el.css({ display: '' });
   }
 
-  cy.findByTestId('xb-primary-panel').then(show);
-  cy.findByTestId('xb-topbar').then(show);
-  cy.findByTestId('xb-contextual-panel').then(show);
-  cy.findByTestId('xb-canvas-controls').then(show);
+  cy.findByTestId('canvas-primary-panel').then(show);
+  cy.findByTestId('canvas-topbar').then(show);
+  cy.findByTestId('canvas-contextual-panel').then(show);
+  cy.findByTestId('canvas-editor-frame-controls').then(show);
 });
 
 /**
- * Set the canvas to be static and scrollable so that Cypress is better able to interact with elements in the canvas.
+ * Set the editor frame to be static and scrollable so that Cypress is better able to interact with elements in the editor frame.
  */
-Cypress.Commands.add('disableCanvasPanning', () => {
-  cy.findByTestId('xb-canvas').then(($canvas) => {
-    $canvas.css({ padding: '100px 0 0 0' });
+Cypress.Commands.add('disableEditorPanning', () => {
+  cy.findByTestId('canvas-editor-frame').then(($editorFrame) => {
+    $editorFrame.css({ padding: '100px 0 0 0' });
   });
 
-  cy.findByTestId('xb-canvas')
+  cy.findByTestId('canvas-editor-frame')
     .parent()
     .then(($parent) => {
       $parent.css({
@@ -951,14 +992,14 @@ Cypress.Commands.add('disableCanvasPanning', () => {
 });
 
 /**
- * Reset the canvas to its normal behavior after disabling it with cy.disableCanvasPanning();
+ * Reset the editor frame to its normal behavior after disabling it with cy.disableEditorPanning();
  */
 Cypress.Commands.add('reEnableCanvasPanning', () => {
-  cy.findByTestId('xb-canvas').then(($canvas) => {
-    $canvas.css({ padding: '' });
+  cy.findByTestId('canvas-editor-frame').then(($editorFrame) => {
+    $editorFrame.css({ padding: '' });
   });
 
-  cy.findByTestId('xb-canvas')
+  cy.findByTestId('canvas-editor-frame')
     .parent()
     .then(($parent) => {
       $parent.css({ overflow: '', display: '', position: '' });
@@ -1001,7 +1042,7 @@ Cypress.Commands.add('toggleToggle', { prevSubject: 'element' }, (subject) => {
 
 Cypress.Commands.add('editHeroComponent', () => {
   // The right panel has opened.
-  cy.findByTestId('xb-contextual-panel').should('exist');
+  cy.findByTestId('canvas-contextual-panel').should('exist');
 
   const expectedLabels = [
     'Heading',
@@ -1013,13 +1054,13 @@ Cypress.Commands.add('editHeroComponent', () => {
 
   // The drawer contains a component edit form.
   cy.get(
-    '[class*="contextualPanel"] [data-drupal-selector="component-inputs-form"]',
+    '[class*="contextualPanel"] [data-drupal-selector="component-instance-form"]',
   ).within(() => {
     cy.findAllByLabelText('Heading').should('exist');
   });
 
   cy.get(
-    '[class*="contextualPanel"] [data-drupal-selector="component-inputs-form"]',
+    '[class*="contextualPanel"] [data-drupal-selector="component-instance-form"]',
   ).then(($form) => {
     expect($form).to.exist;
     $form.find('label').each((index, label) => {
@@ -1078,8 +1119,8 @@ Cypress.Commands.add('editHeroComponent', () => {
   };
 
   // Monitor the endpoint that processes changed values in the prop edit form.
-  cy.intercept('POST', '**/xb/api/v0/layout/node/1').as('getPreview');
-  cy.intercept('PATCH', '**/xb/api/v0/layout/node/1').as('patchPreview');
+  cy.intercept('POST', '**/canvas/api/v0/layout/node/1').as('getPreview');
+  cy.intercept('PATCH', '**/canvas/api/v0/layout/node/1').as('patchPreview');
   expectedLabels.forEach((label) => {
     // Type a new value into a given input.
     cy.findByLabelText(label).focus();
@@ -1140,12 +1181,12 @@ Cypress.Commands.add('focusRegion', (regionName) => {
   cy.get('@layersTree').findByText(regionName).dblclick();
 });
 Cypress.Commands.add('returnToContentRegion', () => {
-  cy.findByTestId('xb-topbar')
+  cy.findByTestId('canvas-topbar')
     .findByLabelText('Back to Content region')
     .click();
 });
 Cypress.Commands.add('sendComponentToRegion', (componentName, regionName) => {
-  cy.findByTestId('xb-primary-panel').as('layersTree');
+  cy.findByTestId('canvas-primary-panel').as('layersTree');
   cy.get('@layersTree')
     .findAllByText(componentName)
     .first()
@@ -1153,50 +1194,51 @@ Cypress.Commands.add('sendComponentToRegion', (componentName, regionName) => {
   cy.findByText('Move to global region').click();
   cy.get(`[data-region-name="${regionName}"]`).click();
 });
-Cypress.Commands.add('publishAllPendingChanges', (titles) => {
-  // Publish changes and make sure image persists.
-  // Wait for any pending changes to refresh.
-  cy.findByText(/Review \d+ change/, { timeout: 20000 }).should('exist');
-  cy.get('button', { timeout: 250_000 })
-    .contains(/Review \d+ change/, { timeout: 250_000 })
-    .as('review');
-  // We break this up to allow for the pending changes refresh which can disable
-  // the button whilst it is loading.
-  cy.get('@review').click();
-  // Enable extended debug output from failed publishing.
-  cy.intercept('**/xb/api/v0/auto-saves/publish');
-  cy.findByTestId('xb-publish-reviews-content')
-    .as('publishReview')
-    .should('exist');
-  // We put the whole publish review step in a single should so it can be
-  // retried as a group. Unfortunately this requires dropping down to raw
-  // testing library queries because you can't make use of cypress commands
-  // inside a should block.
-  cy.get('@publishReview', { timeout: 15000 }).should(async (element) => {
-    const container = element[0];
+Cypress.Commands.add(
+  'publishAllPendingChanges',
+  (titles, expectNoErrors = true) => {
     let titlesToMatch = titles;
     if (!Array.isArray(titles)) {
       titlesToMatch = [titles];
     }
-    const matchers = titlesToMatch.map((title) => {
-      return async () => {
-        const entity = await queries.findByText(container, title);
-        expect(entity).to.exist;
-      };
+    const changeCount = titlesToMatch.length;
+    // Publish changes and make sure image persists.
+    // Wait for any pending changes to refresh.
+    cy.findByText(/Review \d+ change/, { timeout: 20000 }).should('exist');
+    cy.get('button', { timeout: 20000 })
+      .contains(`Review ${changeCount} change`, { timeout: 20000 })
+      .as('review');
+    // We break this up to allow for the pending changes refresh which can disable
+    // the button whilst it is loading.
+    cy.get('@review').click();
+    // Enable extended debug output from failed publishing.
+    cy.intercept('**/canvas/api/v0/auto-saves/publish');
+    cy.findByTestId('canvas-publish-reviews-content')
+      .as('publishReview')
+      .should('exist');
+    // We put the whole publish review step in a single should so it can be
+    // retried as a group. Unfortunately this requires dropping down to raw
+    // testing library queries because you can't make use of cypress commands
+    // inside a should block.
+    cy.get('@publishReview', { timeout: 15000 }).should(async (element) => {
+      const container = element[0];
+      const matchers = titlesToMatch.map((title) => {
+        return async () => {
+          const entity = await queries.findByText(container, title);
+          // We use the existence of the entity to confirm
+          expect(entity).to.exist;
+        };
+      });
+      await Promise.all(matchers);
     });
-    await Promise.all(matchers);
-    const button = await queries.findByText(container, 'Publish all changes');
-    expect(button).to.exist;
-    Cypress.$(button).click();
-    const success = await queries.findByText(
-      container,
-      'All changes published!',
-    );
-    expect(success).to.exist;
-    const errors = await queries.queryByText(container, 'Errors');
-    expect(errors).not.to.exist;
-  });
-});
+    cy.findByTestId('canvas-publish-review-select-all').click();
+    cy.findByText(`Publish ${changeCount} selected`).click();
+    if (expectNoErrors) {
+      cy.findByText('All changes published!').should('exist');
+      cy.findByText('Errors').should('not.exist');
+    }
+  },
+);
 
 Cypress.Commands.add('waitForWindowProcess', (conditionFn, options = {}) => {
   const defaultOptions = {
@@ -1264,4 +1306,63 @@ Cypress.Commands.add('waitForAjax', () => {
         (instance) => instance && instance.ajaxing === true,
       ),
   );
+});
+
+Cypress.Commands.add('insertComponent', (identifier, options = {}) => {
+  const { id, name } = identifier;
+  const { hasInputs = true } = options;
+
+  cy.findByText('Library', { selector: 'h4' }).should(($el) => {
+    expect(
+      $el.length,
+      'The Library panel must be open before calling insertComponent.',
+    ).to.be.greaterThan(0);
+  });
+
+  let selector, previewSelector;
+  if (id) {
+    selector = `[data-canvas-type="component"][data-canvas-component-id="${id}"]`;
+    previewSelector = `#canvasPreviewOverlay [data-canvas-component-id="${id}"]`;
+  } else if (name) {
+    selector = `[data-canvas-type="component"][data-canvas-name="${name}"]`;
+    previewSelector = `#canvasPreviewOverlay [aria-label="${name}"]`;
+  } else {
+    throw new Error("Either 'id' or 'name' must be provided.");
+  }
+
+  // Count existing instances robustly (even if zero)
+  cy.document().then((doc) => {
+    const initialCount = doc.querySelectorAll(previewSelector).length;
+
+    // Open contextual menu and click Insert
+    cy.get('[data-testid="canvas-primary-panel"]')
+      .find(selector)
+      .trigger('contextmenu');
+
+    cy.findByText('Insert').click();
+    // Assert new instance appears
+    cy.get(previewSelector).should('have.length', initialCount + 1);
+
+    // Ensure the new instance is rendered
+    cy.get(previewSelector)
+      .eq(initialCount) // Get the newly added instance
+      .should('exist');
+
+    // @todo I'm not sure but it seems like some components DON'T have size (e.g. "Canvas test SDC with optional image, without example")
+    // Wait for all instances to have size
+    // cy.get(previewSelector).each(($el) => {
+    //   cy.wrap($el).should(($el) => {
+    //     const rect = $el[0].getBoundingClientRect();
+    //     expect(rect.width).to.be.greaterThan(0);
+    //     expect(rect.height).to.be.greaterThan(0);
+    //   });
+    // });
+
+    // Optionally wait for the component input form to have any html
+    if (hasInputs) {
+      cy.get('form[data-form-id="component_instance_form"]')
+        .should('exist')
+        .should('not.be.empty');
+    }
+  });
 });

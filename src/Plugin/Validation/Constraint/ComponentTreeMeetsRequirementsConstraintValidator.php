@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace Drupal\experience_builder\Plugin\Validation\Constraint;
+namespace Drupal\canvas\Plugin\Validation\Constraint;
 
 use Drupal\Core\Config\Schema\Sequence;
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
 use Drupal\Core\TypedData\TypedDataManagerInterface;
-use Drupal\experience_builder\Entity\Component;
-use Drupal\experience_builder\Plugin\Field\FieldType\ComponentTreeItem;
-use Drupal\experience_builder\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
-use Drupal\experience_builder\Plugin\Field\FieldType\ComponentTreeItemList;
+use Drupal\canvas\Entity\Component;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\ConstraintValidator;
@@ -68,9 +68,7 @@ final class ComponentTreeMeetsRequirementsConstraintValidator extends Constraint
       },
       default => throw new \UnexpectedValueException(sprintf('The value must be a ComponentTreeItem object, an array representing a single component tree, found %s.', gettype($value)))
     };
-    \assert(\is_callable($component_tree_item_list_factory));
     $component_tree_item_list = $component_tree_item_list_factory($value);
-    assert($component_tree_item_list instanceof ComponentTreeItemList);
 
     // Perform the necessary detections to check against what the constraint
     // options specify.

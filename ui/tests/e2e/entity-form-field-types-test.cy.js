@@ -12,9 +12,9 @@ describe(
           timezoneId: 'Australia/Sydney',
         },
       });
-      cy.drupalXbInstall([
+      cy.drupalCanvasInstall([
         // Adds the required fields.
-        'xb_test_article_fields',
+        'canvas_test_article_fields',
         // For validating the shape of the node.
         'jsonapi',
       ]);
@@ -29,22 +29,22 @@ describe(
     });
 
     it('Can interact with entity path field', () => {
-      cy.drupalLogin('xbUser', 'xbUser');
-      cy.loadURLandWaitForXBLoaded({ url: 'xb/node/2' });
+      cy.drupalLogin('canvasUser', 'canvasUser');
+      cy.loadURLandWaitForCanvasLoaded({ url: 'canvas/editor/node/2' });
 
-      cy.findByTestId('xb-contextual-panel--page-data').should(
+      cy.findByTestId('canvas-contextual-panel--page-data').should(
         'have.attr',
         'data-state',
         'active',
       );
-      cy.findByTestId('xb-page-data-form').as('entityForm');
+      cy.findByTestId('canvas-page-data-form').as('entityForm');
       // Log all ajax form requests to help with debugging.
-      cy.intercept('POST', '**/xb/api/v0/form/content-entity/**');
+      cy.intercept('POST', '**/canvas/api/v0/form/content-entity/**');
       // Make a record of the starting form build ID for the form
       cy.get('@entityForm').recordFormBuildId();
 
       cy.intercept({
-        url: '**/xb/api/v0/layout/node/2',
+        url: '**/canvas/api/v0/layout/node/2',
         times: 1,
         method: 'POST',
       }).as('updatePreview');
@@ -82,21 +82,78 @@ describe(
       });
     });
 
+    it('Can interact with checkbox fields that are not BooleanItem ', () => {
+      cy.drupalLogin('canvasUser', 'canvasUser');
+      cy.setKeyValue('canvas_state', {
+        canvas_test_article_fields_gravy_state: true,
+      });
+      cy.loadURLandWaitForCanvasLoaded({ url: 'canvas/editor/node/2' });
+
+      cy.findByTestId('canvas-contextual-panel--page-data').should(
+        'have.attr',
+        'data-state',
+        'active',
+      );
+      cy.findByTestId('canvas-page-data-form').as('entityForm');
+      // Log all ajax form requests to help with debugging.
+      cy.intercept('POST', '**/canvas/api/v0/form/content-entity/**');
+      // Make a record of the starting form build ID for the form
+      cy.get('@entityForm').recordFormBuildId();
+
+      cy.intercept({
+        url: '**/canvas/api/v0/layout/node/2',
+        times: 1,
+        method: 'POST',
+      }).as('updatePreview');
+
+      // Test can uncheck a checkbox and publish.
+      cy.findByLabelText('No more gravy please').as('checkbox');
+      cy.get('@checkbox').should('be.checked');
+      cy.get('@checkbox').click();
+      cy.get('@checkbox').should('not.be.checked');
+      // Wait for the preview to finish loading.
+      cy.wait('@updatePreview');
+      cy.findByLabelText('Loading Preview').should('not.exist');
+      cy.publishAllPendingChanges('Gravy!');
+
+      // Test can check a checkbox and publish, default value should now be
+      // unchecked.
+      cy.intercept({
+        url: '**/canvas/api/v0/layout/node/2',
+        times: 1,
+        method: 'POST',
+      }).as('updatePreview');
+      cy.loadURLandWaitForCanvasLoaded({ url: 'canvas/editor/node/2' });
+      cy.findByLabelText('No more gravy please').as('checkbox');
+      cy.get('@checkbox').should('not.be.checked');
+      cy.get('@checkbox').click();
+      cy.get('@checkbox').should('be.checked');
+      // Wait for the preview to finish loading.
+      cy.wait('@updatePreview');
+      cy.findByLabelText('Loading Preview').should('not.exist');
+      cy.publishAllPendingChanges('No more gravy');
+
+      // Default value now should be checked again.
+      cy.loadURLandWaitForCanvasLoaded({ url: 'canvas/editor/node/2' });
+      cy.findByLabelText('No more gravy please').as('checkbox');
+      cy.get('@checkbox').should('be.checked');
+    });
+
     it(
       'Can interact with form fields',
       { retries: { openMode: 0, runMode: 3 } },
       () => {
-        cy.drupalLogin('xbUser', 'xbUser');
-        cy.loadURLandWaitForXBLoaded({ url: 'xb/node/2' });
+        cy.drupalLogin('canvasUser', 'canvasUser');
+        cy.loadURLandWaitForCanvasLoaded({ url: 'canvas/editor/node/2' });
 
-        cy.findByTestId('xb-contextual-panel--page-data').should(
+        cy.findByTestId('canvas-contextual-panel--page-data').should(
           'have.attr',
           'data-state',
           'active',
         );
-        cy.findByTestId('xb-page-data-form').as('entityForm');
+        cy.findByTestId('canvas-page-data-form').as('entityForm');
         // Log all ajax form requests to help with debugging.
-        cy.intercept('POST', '**/xb/api/v0/form/content-entity/**');
+        cy.intercept('POST', '**/canvas/api/v0/form/content-entity/**');
         // Make a record of the starting form build ID for the form
         cy.get('@entityForm').recordFormBuildId();
 
@@ -110,7 +167,7 @@ describe(
         Object.entries(fields).forEach(([key, value]) => {
           cy.log(`Performing edits for ${key}`);
           cy.intercept({
-            url: '**/xb/api/v0/layout/node/2',
+            url: '**/canvas/api/v0/layout/node/2',
             times: 1,
             method: 'POST',
           }).as('updatePreview');

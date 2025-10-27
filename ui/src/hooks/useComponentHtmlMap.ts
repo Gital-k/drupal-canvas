@@ -1,10 +1,15 @@
 import { useEffect } from 'react';
-import { mapComponents, mapRegions, mapSlots } from '@/utils/function-utils';
+
 import { useDataToHtmlMapUpdater } from '@/features/layout/preview/DataToHtmlMapContext';
+import { mapComponents, mapRegions, mapSlots } from '@/utils/function-utils';
 
 export function useComponentHtmlMap(iframe: HTMLIFrameElement | null) {
   const { updateRegionsMap, updateComponentsMap, updateSlotsMap } =
     useDataToHtmlMapUpdater();
+
+  const pendingTemplates = iframe?.contentDocument?.querySelectorAll(
+    'template[data-astro-template]',
+  ).length;
 
   useEffect(() => {
     const iframeDocument = iframe?.contentDocument;
@@ -14,5 +19,11 @@ export function useComponentHtmlMap(iframe: HTMLIFrameElement | null) {
     updateRegionsMap(mapRegions(iframeDocument));
     updateComponentsMap(mapComponents(iframeDocument));
     updateSlotsMap(mapSlots(iframeDocument));
-  }, [iframe, updateComponentsMap, updateRegionsMap, updateSlotsMap]);
+  }, [
+    iframe,
+    updateComponentsMap,
+    updateRegionsMap,
+    updateSlotsMap,
+    pendingTemplates,
+  ]);
 }

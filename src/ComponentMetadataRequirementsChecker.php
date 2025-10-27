@@ -2,17 +2,20 @@
 
 declare(strict_types=1);
 
-namespace Drupal\experience_builder;
+namespace Drupal\canvas;
 
+use Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase;
+use Drupal\Core\Template\Attribute;
 use Drupal\Core\Theme\Component\ComponentMetadata;
-use Drupal\experience_builder\JsonSchemaInterpreter\JsonSchemaStringFormat;
-use Drupal\experience_builder\PropExpressions\Component\ComponentPropExpression;
-use Drupal\experience_builder\PropShape\PropShape;
-use Drupal\experience_builder\PropShape\StorablePropShape;
+use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaStringFormat;
+use Drupal\canvas\PropExpressions\Component\ComponentPropExpression;
+use Drupal\canvas\PropShape\StorablePropShape;
 use JsonSchema\Validator;
 
 /**
  * Defines a class for checking if component metadata meets requirements.
+ *
+ * @todo Move into a new \Drupal\Canvas\ComponentMetadataDerivers namespace, alongside ComponentPropExpression
  */
 final class ComponentMetadataRequirementsChecker {
 
@@ -26,12 +29,12 @@ final class ComponentMetadataRequirementsChecker {
    * @param string[] $required_props
    *   Array of required prop names.
    *
-   * @throws \Drupal\experience_builder\ComponentDoesNotMeetRequirementsException
+   * @throws \Drupal\canvas\ComponentDoesNotMeetRequirementsException
    *   When the component does not meet requirements.
    */
   public static function check(string $component_id, ComponentMetadata $metadata, array $required_props): void {
     $messages = [];
-    // XB always requires schema, even for theme components.
+    // Canvas always requires schema, even for theme components.
     // @see \Drupal\Core\Theme\ComponentPluginManager::shouldEnforceSchemas()
     // @see \Drupal\Core\Theme\Component\ComponentMetadata::parseSchemaInfo()
     if ($metadata->schema === NULL) {
@@ -42,10 +45,17 @@ final class ComponentMetadataRequirementsChecker {
       $messages[] = 'Component uses the reserved "Elements" category';
     }
 
-    $props_for_metadata = PropShape::getComponentPropsForMetadata($component_id, $metadata);
+    // Every slot must have a title.
+    foreach ($metadata->slots as $slot_name => $slot_definition) {
+      if (!array_key_exists('title', $slot_definition)) {
+        $messages[] = \sprintf('Slot "%s" must have title', $slot_name);
+      }
+    }
+
+    $props_for_metadata = GeneratedFieldExplicitInputUxComponentSourceBase::getComponentInputsForMetadata($component_id, $metadata);
     $validator = new Validator();
-    foreach ($metadata->schema['properties'] as $prop_name => $prop) {
-      if ($prop_name === 'attributes') {
+    foreach ($metadata->schema['properties'] ?? [] as $prop_name => $prop) {
+      if (in_array(Attribute::class, $prop['type'], TRUE)) {
         continue;
       }
 
@@ -104,6 +114,34 @@ final class ComponentMetadataRequirementsChecker {
       if (!isset($prop['title'])) {
         $messages[] = \sprintf('Prop "%s" must have title', $prop_name);
       }
+      if (isset($prop['enum'], $prop['meta:enum'])) {
+        foreach ($prop['meta:enum'] as $meta_key => $meta_value) {
+          if (str_contains((string) $meta_key, ".")) {
+            $messages[] = \sprintf('The "meta:enum" keys for the "%s" prop enum cannot contain a dot. Offending key: "%s"', $prop_name, $meta_key);
+          }
+        }
+
+        // Ensure we replace dots with underscores when checking meta:enums.
+        $meta_enum_valid_keys = array_map(function ($key) {
+          if (is_numeric($key) && !is_int($key)) {
+            // Dots are not valid for config schema, so we need to replace any
+            // dot in the key with an underscore.
+            return (string) str_replace('.', '_', (string) $key);
+          }
+          return $key;
+        }, $prop['enum']);
+        $enum_keys_diff = \array_diff($meta_enum_valid_keys, \array_keys($prop['meta:enum']));
+        if (!empty($enum_keys_diff)) {
+          $messages[] = \sprintf('The values for the "%s" prop enum must be defined in "meta:enum". Missing keys: "%s"', $prop_name, \implode(', ', $enum_keys_diff));
+        }
+      }
+
+      // If messages is not empty, we should stop checking,
+      // because $prop_shape->getStorage() could trigger warnings.
+      if (!empty($messages)) {
+        continue;
+      }
+
       // Every prop must have a StorablePropShape.
       $component_prop_expression = new ComponentPropExpression($component_id, $prop_name);
       $prop_shape = $props_for_metadata[(string) $component_prop_expression];
@@ -111,7 +149,7 @@ final class ComponentMetadataRequirementsChecker {
       if ($storable_prop_shape instanceof StorablePropShape) {
         continue;
       }
-      $messages[] = \sprintf('Experience Builder does not know of a field type/widget to allow populating the <code>%s</code> prop, with the shape <code>%s</code>.', $prop_name, json_encode($prop_shape->schema, JSON_UNESCAPED_SLASHES));
+      $messages[] = \sprintf('Drupal Canvas does not know of a field type/widget to allow populating the <code>%s</code> prop, with the shape <code>%s</code>.', $prop_name, json_encode($prop_shape->schema, JSON_UNESCAPED_SLASHES));
     }
     if (!empty($messages)) {
       throw new ComponentDoesNotMeetRequirementsException($messages);

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Drupal\experience_builder\PropSource;
+namespace Drupal\canvas\PropSource;
 
 use Drupal\Core\Entity\FieldableEntityInterface;
 
@@ -12,17 +12,18 @@ use Drupal\Core\Entity\FieldableEntityInterface;
  * TRICKY: adapters can be chained/nested, PHPStan does not allow expressing that.
  * @phpstan-type AdaptedPropSourceArray array{sourceType: string, adapterInputs: array<string, mixed>}
  * @phpstan-type DefaultRelativeUrlPropSourceArray array{sourceType: string, value: mixed, jsonSchema: array, componentId: string}
+ * @phpstan-type HostEntityUrlPropSourceArray array{sourceType: string}
  */
 abstract class PropSourceBase implements \Stringable, ContentAwareDependentInterface {
 
   const SOURCE_TYPE_PREFIX_SEPARATOR = ':';
 
   /**
-   * @param PropSourceArray|AdaptedPropSourceArray|DefaultRelativeUrlPropSourceArray $sdc_prop_source
+   * @param PropSourceArray|AdaptedPropSourceArray|DefaultRelativeUrlPropSourceArray|HostEntityUrlPropSourceArray $sdc_prop_source
    */
   abstract public static function parse(array $sdc_prop_source): static;
 
-  abstract public function evaluate(?FieldableEntityInterface $host_entity): mixed;
+  abstract public function evaluate(?FieldableEntityInterface $host_entity, bool $is_required): mixed;
 
   abstract public function asChoice(): string;
 
@@ -33,7 +34,7 @@ abstract class PropSourceBase implements \Stringable, ContentAwareDependentInter
   /**
    * Gets the array representation.
    *
-   * @return PropSourceArray|AdaptedPropSourceArray|DefaultRelativeUrlPropSourceArray
+   * @return PropSourceArray|AdaptedPropSourceArray|DefaultRelativeUrlPropSourceArray|HostEntityUrlPropSourceArray
    */
   abstract public function toArray(): array;
 

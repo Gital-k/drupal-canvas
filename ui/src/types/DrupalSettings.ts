@@ -2,13 +2,19 @@ import type { PropsValues } from '@/types/Form';
 import type { FormatType } from '@/types/FormatType';
 
 export interface DrupalSettings {
-  xb: {
+  canvas: {
     base: string;
     entityType: string;
     entity: string;
     entityTypeKeys: {
-      id: string;
-      label: string;
+      [entityType: string]: {
+        id: string;
+        label: string;
+        [key: string]: string;
+      };
+    };
+    entityTypeLabels: {
+      [entityType: string]: string | { [key: string]: string };
     };
     globalAssets: {
       css: string;
@@ -18,14 +24,39 @@ export interface DrupalSettings {
     layoutUtils: PropsValues;
     componentSelectionUtils: PropsValues;
     navUtils: PropsValues;
-    xbModulePath: string;
+    canvasModulePath: string;
     selectedComponent: string;
     devMode: boolean;
     dialogCss: string[];
+    extensionsAvailable: boolean;
     // ⚠️ This is highly experimental and *will* be refactored.
     aiExtensionAvailable: boolean;
+    loginUrl: string;
+    // ⚠️ This is highly experimental and *will* be refactored.
+    personalizationExtensionAvailable: boolean;
+    // ⚠️ This is highly experimental and *will* be refactored.
+    canvasAiMaxFileSize: number;
   };
-  xbExtension: object;
+  canvasData: {
+    v0: {
+      pageTitle: string;
+      branding: {
+        homeUrl: string;
+        siteName: string;
+        siteSlogan: string;
+      };
+      baseUrl: string;
+      breadcrumbs: Array<{
+        key: string;
+        text: string;
+        url: string;
+      }>;
+      jsonapiSettings: null | {
+        apiPrefix: string;
+      };
+    };
+  };
+  canvasExtension: object;
   path: {
     baseUrl: string;
   };

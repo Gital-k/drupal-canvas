@@ -2,19 +2,22 @@
 
 declare(strict_types=1);
 
-namespace Drupal\Tests\experience_builder\Kernel\EcosystemSupport;
+namespace Drupal\Tests\canvas\Kernel\EcosystemSupport;
 
+use Drupal\canvas\PropExpressions\StructuredData\Labeler;
 use Drupal\Core\Entity\TypedData\EntityDataDefinition;
 use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Field\TypedData\FieldItemDataDefinitionInterface;
+use Drupal\Core\Plugin\Component;
+use Drupal\Core\Theme\ComponentPluginManager;
 use Drupal\Core\TypedData\DataReferenceTargetDefinition;
-use Drupal\experience_builder\Plugin\Field\FieldType\ComponentTreeItem;
-use Drupal\experience_builder\PropExpressions\StructuredData\FieldObjectPropsExpression;
-use Drupal\experience_builder\PropExpressions\StructuredData\FieldPropExpression;
-use Drupal\experience_builder\PropExpressions\StructuredData\ReferenceFieldPropExpression;
-use Drupal\experience_builder\PropExpressions\StructuredData\StructuredDataPropExpressionInterface;
-use Drupal\experience_builder\ShapeMatcher\FieldForComponentSuggester;
-use Drupal\experience_builder\ShapeMatcher\JsonSchemaFieldInstanceMatcher;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
+use Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression;
+use Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression;
+use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression;
+use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpressionInterface;
+use Drupal\canvas\ShapeMatcher\FieldForComponentSuggester;
+use Drupal\canvas\ShapeMatcher\JsonSchemaFieldInstanceMatcher;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
 
@@ -29,34 +32,54 @@ use Drupal\field\Entity\FieldStorageConfig;
  * 1. installs every module providing >=1 field type
  * 2. creates both a required and optional instance of every field type on the
  *    `entity_test` entity type
- * 3. installs the module providing XB's special `all-props` SDC, which has one
+ * 3. installs the module providing Canvas's special `all-props` SDC, which has one
  *    prop of EVERY possible shape (JSON Schema `type`, `format`, etc.)
- * 4. then asks the XB infrastructure for suggesting all compatible field
+ * 4. then asks the Canvas infrastructure for suggesting all compatible field
  *    instances (2.) for the `all-props` SDC (3.)
  *
  * The result is that the purpose of this test is achieved while truly using the
- * very same infrastructure the rest of XB uses.
+ * very same infrastructure the rest of Canvas uses.
  *
- * @todo Also test non-default FieldStorageConfig setting in https://www.drupal.org/project/experience_builder/issues/3512848
+ * @todo Also test non-default FieldStorageConfig setting in https://www.drupal.org/project/canvas/issues/3512848
  *
- * @covers \Drupal\experience_builder\ShapeMatcher\FieldForComponentSuggester
- * @see \Drupal\Tests\experience_builder\Kernel\FieldForComponentSuggesterTest
- * @covers \Drupal\experience_builder\ShapeMatcher\JsonSchemaFieldInstanceMatcher
- * @see \Drupal\Tests\experience_builder\Kernel\PropShapeToFieldInstanceTest
+ * @covers \Drupal\canvas\ShapeMatcher\FieldForComponentSuggester
+ * @see \Drupal\Tests\canvas\Kernel\FieldForComponentSuggesterTest
+ * @covers \Drupal\canvas\ShapeMatcher\JsonSchemaFieldInstanceMatcher
+ * @see \Drupal\Tests\canvas\Kernel\PropShapeToFieldInstanceTest
  * @see docs/shape-matching-into-field-types.md#3.1.2.a
- * @group experience_builder
+ * @group canvas
  */
 final class FieldInstanceSupportTest extends EcosystemSupportTestBase {
 
   /**
-   * The current % of supported field types whose instances can be matched.
+   * Current % of CLAIMED supported field types whose instances can be matched.
+   *
+   * Should be 100% if what we claim to support is actually supported.
    */
-  public const COMPLETION = 0.8846153846153846;
+  public const MATCHING_CLAIMED_SUPPORTED_FIELD_TYPES = 1.0;
 
   /**
-   * The current % of supported field type props.
+   * Same as above, adjusted for total (including todo/irrelevant ones).
+   *
+   * (For example: the `password` field type never makes sense to match.)
+   *
+   * @see \Drupal\canvas\ShapeMatcher\JsonSchemaFieldInstanceMatcher::IGNORE_FIELD_TYPES
    */
-  public const COMPLETION_PROPS = 0.8947368421052632;
+  public const MATCHING_ALL_FIELD_TYPES = 0.8064516129032258;
+
+  /**
+   * Current % of CLAIMED supported field type field properties.
+   *
+   * Should be 100% if what we claim to support is actually supported.
+   */
+  public const MATCHING_CLAIMED_SUPPORTED_FIELD_TYPE_PROPERTIES = 1.0;
+
+  /**
+   * Same as above, adjusted for total (including irrelevant ones).
+   *
+   * (For example: the `password` field type never makes sense to match.)
+   */
+  public const MATCHING_ALL_FIELD_TYPE_PROPERTIES = 0.78;
 
   /**
    * Supported field types (keys), with explicitly unsupported props (values).
@@ -95,28 +118,24 @@ final class FieldInstanceSupportTest extends EcosystemSupportTestBase {
     ],
     'datetime' => [
       // 🐛 Core bug: this is the computed equivalent of `value`, should be marked internal.
-      // @todo Give this similar treatment as `daterange` in https://www.drupal.org/project/experience_builder/issues/3512853
+      // @see \Drupal\experience_builder\Plugin\Field\FieldTypeOverride\DateTimeItemOverride::propertyDefinitions()
       'date' => FALSE,
     ],
     'email' => [],
     'entity_reference' => [],
     'file' => [],
-    'file_uri' => [
-      // 🐛 Core bug: this is the computed equivalent of `value`, should be marked internal.
-      // @todo Give this similar treatment as `daterange` in https://www.drupal.org/project/experience_builder/issues/3512853
-      'url' => FALSE,
-    ],
+    'file_uri' => [],
     'float' => [],
-    'image' => [],
+    'image' => [
+      'srcset_candidate_uri_template' => FALSE,
+    ],
     'integer' => [],
     'link' => [
-      // @todo Decide in https://www.drupal.org/project/experience_builder/issues/3512849 whether this is okay or not; if it is: document rationale here.
+      // @todo Decide in https://www.drupal.org/project/canvas/issues/3512849 whether this is okay or not; if it is: document rationale here.
       'options' => FALSE,
-      // We want to support the computed 'url' field instead as this handles
-      // resolving URIs such as entity:node/1, base:/node/1 and
-      // route:entity.node.canonical;node=1
-      'uri' => FALSE,
     ],
+    'list_float' => [],
+    'list_integer' => [],
     // Note that 'password' is deliberately not here (unsupported) as we don't
     // want any of its properties to be associated with a dynamic prop source.
     'path' => [
@@ -141,13 +160,13 @@ final class FieldInstanceSupportTest extends EcosystemSupportTestBase {
   ];
 
   /**
-   * Intentionally unsupported field type instances.
+   * Intentionally unsupported field instances' field types.
    *
-   * @var string[]
+   * @var array<lowercase-string, array{class: class-string, exceptions: array<array>}>
    */
   public const INTENTIONALLY_UNSUPPORTED = JsonSchemaFieldInstanceMatcher::IGNORE_FIELD_TYPES;
 
-  private const XB_TEST_FIELD_PREFIX = 'test_';
+  private const CANVAS_TEST_FIELD_PREFIX = 'test_';
 
   /**
    * {@inheritdoc}
@@ -208,9 +227,10 @@ final class FieldInstanceSupportTest extends EcosystemSupportTestBase {
     $expected_supported_fields = [];
     $expected_unsupported_fields = [];
     $expected_supported_field_props = [];
+    $expected_unsupported_field_props = [];
     foreach ($entity_data->getPropertyDefinitions() as $field_name => $field_definition) {
       assert($field_definition instanceof FieldDefinitionInterface);
-      if (!str_starts_with($field_name, self::XB_TEST_FIELD_PREFIX)) {
+      if (!str_starts_with($field_name, self::CANVAS_TEST_FIELD_PREFIX)) {
         continue;
       }
       $expected_fields[] = $field_name;
@@ -218,7 +238,7 @@ final class FieldInstanceSupportTest extends EcosystemSupportTestBase {
       if (array_key_exists($field_type, self::SUPPORTED)) {
         $expected_supported_fields[] = $field_name;
       }
-      if (\array_key_exists($field_type, self::INTENTIONALLY_UNSUPPORTED)) {
+      if (\array_key_exists($field_type, self::INTENTIONALLY_UNSUPPORTED) && empty(self::INTENTIONALLY_UNSUPPORTED[$field_type]['exceptions'])) {
         $expected_unsupported_fields[] = $field_name;
         // Remove from expected fields.
         $expected_fields = \array_diff($expected_fields, [$field_name]);
@@ -239,16 +259,19 @@ final class FieldInstanceSupportTest extends EcosystemSupportTestBase {
           continue;
         }
         $all_field_props[] = "$field_name.$field_prop_name";
-        // All field props are expected to be supported by XB, except the ones
+        // All field props are expected to be supported by Canvas, except the ones
         // that are for known core bugs.
         if (!array_key_exists($field_type, self::SUPPORTED) || (self::SUPPORTED[$field_type][$field_prop_name] ?? TRUE) === TRUE) {
           $expected_field_props[] = "$field_name.$field_prop_name";
         }
         // All known-to-be-supported field types are expected to have all props
         // supported, except the ones known to not yet work, either due to a
-        // core bug, or due to an XB bug.
+        // core bug, or due to an Canvas bug.
         if (array_key_exists($field_type, self::SUPPORTED) && !array_key_exists($field_prop_name, self::SUPPORTED[$field_type])) {
           $expected_supported_field_props[] = "$field_name.$field_prop_name";
+        }
+        else {
+          $expected_unsupported_field_props[] = "$field_name.$field_prop_name";
         }
       }
     }
@@ -257,6 +280,7 @@ final class FieldInstanceSupportTest extends EcosystemSupportTestBase {
     sort($all_field_props);
     sort($expected_field_props);
     sort($expected_supported_field_props);
+    sort($expected_unsupported_field_props);
 
     // Ensure the Typed Data representation is in sync with the fields that were
     // created. This assertion is technically unnecessary, but helps ensure this
@@ -268,9 +292,12 @@ final class FieldInstanceSupportTest extends EcosystemSupportTestBase {
 
     // Perform the actual shape matching: find suggestions for every prop in the
     // test-only `all-props` SDC, which contains EVERY possible SDC prop shape.
+    $component = \Drupal::service(ComponentPluginManager::class)->find('sdc_test_all_props:all-props');
+    assert($component instanceof Component);
     $suggestions = $this->container->get(FieldForComponentSuggester::class)
       ->suggest(
-        'sdc_test_all_props:all-props',
+        $component->getPluginId(),
+        $component->metadata,
         EntityDataDefinition::createFromDataType('entity:entity_test:entity_test'),
       );
 
@@ -291,14 +318,14 @@ final class FieldInstanceSupportTest extends EcosystemSupportTestBase {
         // in JsonSchemaFieldInstanceMatcher asses one entity type + bundle at
         // time.
         assert(is_string($field_name));
-        if (!str_starts_with($field_name, self::XB_TEST_FIELD_PREFIX)) {
+        if (!str_starts_with($field_name, self::CANVAS_TEST_FIELD_PREFIX)) {
           continue;
         }
 
         // First: "field -> SDC".
         $compatible_sdc_prop_shapes_per_field[$field_name][] = $cpe;
         // Second: "field prop -> SDC".
-        foreach ((array) FieldForComponentSuggester::getUsedFieldProps($expr) as $field_prop_name) {
+        foreach ((array) Labeler::getUsedFieldProps($expr, $expr->getHostEntityDataDefinition()) as $field_prop_name) {
           $compatible_sdc_prop_shapes_per_field_prop["$field_name.$field_prop_name"][] = $cpe;
         }
       }
@@ -314,18 +341,23 @@ final class FieldInstanceSupportTest extends EcosystemSupportTestBase {
     // is for.
     // 💁‍♂️️ Debugging tip: put a breakpoint here and inspect $compatible_sdc_prop_shapes_per_field and $expected_supported_field_props.
     $this->assertSame([], array_values(array_diff($expected_supported_fields, array_keys($compatible_sdc_prop_shapes_per_field))), 'The known supported field types are actually supported.');
-    self::assertCount(0, \array_intersect(\array_keys($compatible_sdc_prop_shapes_per_field), $expected_unsupported_fields), 'The known supported field types are actually supported.');
+    self::assertSame([], \array_intersect(\array_keys($compatible_sdc_prop_shapes_per_field), $expected_unsupported_fields), 'The known supported field types are actually supported.');
     $actually_supported_fields = array_intersect($expected_fields, array_keys($compatible_sdc_prop_shapes_per_field));
     $missing_fields = array_diff($expected_fields, array_keys($compatible_sdc_prop_shapes_per_field));
+    self::assertSame([], $missing_fields, 'Additional field types encountered that are not yet explicitly tracked as unsupported.');
     $this->assertSame([], array_values(array_diff($expected_supported_fields, $actually_supported_fields)), 'Field types that were expected to be supported are NOT.');
     $this->assertSame([], array_values(array_diff($actually_supported_fields, $expected_supported_fields)), 'Field types that were NOT expected to be supported are.');
     $this->assertSame(
-      self::COMPLETION,
-      count($actually_supported_fields) / count($expected_fields),
+      self::MATCHING_CLAIMED_SUPPORTED_FIELD_TYPES,
+      (float) count($actually_supported_fields) / count($expected_fields),
       sprintf('Not yet supported: a JSON schema (prop shape) for the following fields: %s', implode(', ', $missing_fields))
     );
+    self::assertSame(
+      self::MATCHING_ALL_FIELD_TYPES,
+      (float) count($expected_fields) / (count($expected_supported_fields) + count($expected_unsupported_fields)),
+    );
     // @phpcs:ignore Drupal.Semantics.FunctionTriggerError.TriggerErrorTextLayoutRelaxed
-    @trigger_error(sprintf('Not yet supported: a JSON schema (prop shape) for the following fields: %s', implode(', ', $missing_fields)), E_USER_DEPRECATED);
+    @trigger_error(sprintf('Not yet supported: a JSON schema (prop shape) for the following fields: %s', implode(', ', $expected_unsupported_fields)), E_USER_DEPRECATED);
 
     // Verify that also at the field type props level, all expectations are met.
     $this->assertSame([], array_values(array_diff($expected_supported_field_props, array_keys($compatible_sdc_prop_shapes_per_field_prop))), 'The known supported field types are actually supported, for all their field props.');
@@ -334,12 +366,16 @@ final class FieldInstanceSupportTest extends EcosystemSupportTestBase {
     $this->assertSame([], array_values(array_diff($expected_supported_field_props, $actually_supported_field_props)), 'Field type props that were expected to be supported are NOT.');
     $this->assertSame([], array_values(array_diff($actually_supported_field_props, $expected_supported_field_props)), 'Field type props that were NOT expected to be supported are.');
     $this->assertSame(
-      self::COMPLETION_PROPS,
-      count($actually_supported_field_props) / count($expected_field_props),
+      self::MATCHING_CLAIMED_SUPPORTED_FIELD_TYPE_PROPERTIES,
+      (float) count($actually_supported_field_props) / count($expected_field_props),
       sprintf('Not yet supported: a JSON schema (prop shape) for the following field properties: %s', implode(', ', $missing_field_props))
     );
+    self::assertSame(
+      self::MATCHING_ALL_FIELD_TYPE_PROPERTIES,
+      (float) count($expected_field_props) / (count($expected_supported_field_props) + count($expected_unsupported_field_props)),
+    );
     // @phpcs:ignore Drupal.Semantics.FunctionTriggerError.TriggerErrorTextLayoutRelaxed
-    @trigger_error(sprintf('Not yet supported: a JSON schema (prop shape) for the following field properties: %s', implode(', ', $missing_field_props)), E_USER_DEPRECATED);
+    @trigger_error(sprintf('Not yet supported: a JSON schema (prop shape) for the following field properties: %s', implode(', ', $expected_unsupported_field_props)), E_USER_DEPRECATED);
   }
 
   private function createFieldsForAllFieldTypes(): array {
@@ -354,13 +390,13 @@ final class FieldInstanceSupportTest extends EcosystemSupportTestBase {
       if ($def['provider'] === 'entity_test') {
         continue;
       }
-      // There is no need to map XB component trees *into* XB component trees.
+      // There is no need to map Canvas component trees *into* Canvas component trees.
       if ($def['class'] === ComponentTreeItem::class) {
         continue;
       }
       foreach ([TRUE, FALSE] as $required) {
         $field_name = implode('', [
-          self::XB_TEST_FIELD_PREFIX,
+          self::CANVAS_TEST_FIELD_PREFIX,
           $required ? 'required__' : 'optional__',
           $field_type_id,
         ]);

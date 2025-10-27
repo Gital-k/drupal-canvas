@@ -1,15 +1,18 @@
-import type { Command } from 'commander';
-import * as p from '@clack/prompts';
 import fs from 'fs/promises';
 import path from 'path';
 import chalk from 'chalk';
-import { getConfig, setConfig, ensureConfig } from '../config';
-import { createApiService } from '../services/api';
 import yaml from 'js-yaml';
-import type { Component } from '../types/Component';
+import * as p from '@clack/prompts';
+
+import { ensureConfig, getConfig, setConfig } from '../config';
+import { createApiService } from '../services/api';
 import { reportResults } from '../utils/report-results';
-import type { Result } from '../types/Result';
 import { directoryExists } from '../utils/utils';
+
+import type { Command } from 'commander';
+import type { Component } from '../types/Component';
+import type { Metadata } from '../types/Metadata';
+import type { Result } from '../types/Result';
 
 interface DownloadOptions {
   clientId?: string;
@@ -19,13 +22,14 @@ interface DownloadOptions {
   dir?: string;
   component?: string;
   all?: boolean; // Download all components
+  verbose?: boolean;
 }
 
 // @todo: Support non-interactive download if user passes all necessary args in.
 export function downloadCommand(program: Command): void {
   program
     .command('download')
-    .description('Download components from Experience Builder')
+    .description('download components to your local filesystem')
     .option('--client-id <id>', 'Client ID')
     .option('--client-secret <secret>', 'Client Secret')
     .option('--site-url <url>', 'Site URL')
@@ -33,8 +37,9 @@ export function downloadCommand(program: Command): void {
     .option('-d, --dir <directory>', 'Component directory')
     .option('-c, --component <name>', 'Specific component to download')
     .option('--all', 'Download all components')
+    .option('--verbose', 'Enable verbose output')
     .action(async (options: DownloadOptions) => {
-      p.intro('Experience Builder Component Download');
+      p.intro('Drupal Canvas Component Download');
 
       try {
         // Update config with CLI options
@@ -45,6 +50,7 @@ export function downloadCommand(program: Command): void {
         if (options.dir) setConfig({ componentDir: options.dir });
         if (options.all) setConfig({ all: options.all });
         if (options.scope) setConfig({ scope: options.scope });
+        if (options.verbose) setConfig({ verbose: true });
         // Ensure all required config is present
         await ensureConfig([
           'siteUrl',
@@ -120,7 +126,7 @@ export function downloadCommand(program: Command): void {
             componentsToDownload = components;
           } else {
             componentsToDownload = Object.fromEntries(
-              Object.entries(components).filter(([_, component]) =>
+              Object.entries(components).filter(([, component]) =>
                 (selectedComponents as string[]).includes(
                   component.machineName,
                 ),
@@ -176,15 +182,15 @@ export function downloadCommand(program: Command): void {
             await fs.mkdir(componentDir, { recursive: true });
 
             // Create component.yml metadata file
-            const metadata = {
+            const metadata: Metadata = {
               name: component.name,
               machineName: component.machineName,
               status: component.status,
               required: component.required || [],
-              props: component.props || {},
+              props: {
+                properties: component.props || {},
+              },
               slots: component.slots || {},
-              blockOverride: component.blockOverride || null,
-              importedJsComponents: component.importedJsComponents || [],
             };
 
             await fs.writeFile(

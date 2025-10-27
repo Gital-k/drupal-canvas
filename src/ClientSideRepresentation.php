@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Drupal\experience_builder;
+namespace Drupal\canvas;
 
 use Drupal\Core\Asset\AttachedAssets;
 use Drupal\Core\Cache\CacheableMetadata;
@@ -10,7 +10,7 @@ use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
 use Drupal\Core\Cache\RefinableCacheableDependencyTrait;
 use Drupal\Core\Render\BubbleableMetadata;
 use Drupal\Core\Render\RendererInterface;
-use Drupal\experience_builder\Render\ImportMapResponseAttachmentsProcessor;
+use Drupal\canvas\Render\ImportMapResponseAttachmentsProcessor;
 
 /**
  * @see \Drupal\jsonapi\Normalizer\Value\CacheableNormalization
@@ -49,7 +49,11 @@ final class ClientSideRepresentation implements RefinableCacheableDependencyInte
     }
 
     $build = $this->preview;
-    $default_markup = $renderer->renderInIsolation($build);
+    $default_markup = !empty($build['#printed'])
+      // Already rendered, use the rendered markup.
+      ? $build['#markup']
+      // Render now.
+      : $renderer->renderInIsolation($build);
     $assets = AttachedAssets::createFromRenderArray($build);
     $import_map = ImportMapResponseAttachmentsProcessor::buildHtmlTagForAttachedImportMaps(BubbleableMetadata::createFromRenderArray($build)) ?? [];
 
@@ -78,7 +82,7 @@ final class ClientSideRepresentation implements RefinableCacheableDependencyInte
    *
    * @return $this
    *
-   * @see \Drupal\experience_builder\Controller\ApiConfigControllers::normalize()
+   * @see \Drupal\canvas\Controller\ApiConfigControllers::normalize()
    */
   public function removeCacheContexts(array $ignorable_cache_contexts): self {
     $this->cacheContexts = array_diff($this->cacheContexts, $ignorable_cache_contexts);

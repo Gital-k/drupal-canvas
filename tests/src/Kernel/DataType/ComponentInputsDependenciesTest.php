@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Drupal\Tests\experience_builder\Kernel\DataType;
+namespace Drupal\Tests\canvas\Kernel\DataType;
 
 use Drupal\Component\Uuid\UuidInterface;
-use Drupal\experience_builder\Entity\Page;
-use Drupal\experience_builder\Plugin\Field\FieldType\ComponentTreeItem;
-use Drupal\experience_builder\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
+use Drupal\canvas\Entity\Page;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\file\Entity\File;
@@ -16,16 +16,17 @@ use Drupal\KernelTests\KernelTestBase;
 use Drupal\media\Entity\Media;
 use Drupal\node\Entity\Node;
 use Drupal\node\Entity\NodeType;
-use Drupal\Tests\experience_builder\Traits\ConstraintViolationsTestTrait;
-use Drupal\Tests\experience_builder\Traits\ContribStrictConfigSchemaTestTrait;
-use Drupal\Tests\experience_builder\Traits\GenerateComponentConfigTrait;
+use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
+use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
+use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\image\Kernel\ImageFieldCreationTrait;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
+use Drupal\Tests\user\Traits\UserCreationTrait;
 
 /**
- * @covers \Drupal\experience_builder\Plugin\DataType\ComponentInputs::calculateDependencies()
- * @see \Drupal\Tests\experience_builder\Unit\DataType\ComponentInputsTest
- * @group experience_builder
+ * @covers \Drupal\canvas\Plugin\DataType\ComponentInputs::calculateDependencies()
+ * @see \Drupal\Tests\canvas\Unit\DataType\ComponentInputsTest
+ * @group canvas
  */
 class ComponentInputsDependenciesTest extends KernelTestBase {
 
@@ -35,12 +36,17 @@ class ComponentInputsDependenciesTest extends KernelTestBase {
   use GenerateComponentConfigTrait;
   use ImageFieldCreationTrait;
   use MediaTypeCreationTrait;
+  use UserCreationTrait;
+
+  private const TEST_IMAGE_UUID = 'd650b614-3219-4842-9a1f-f9976bdc20be';
 
   /**
    * {@inheritdoc}
    */
   protected static $modules = [
     'node',
+    'ckeditor5',
+    'editor',
     'field',
     'filter',
     'text',
@@ -50,9 +56,10 @@ class ComponentInputsDependenciesTest extends KernelTestBase {
     'user',
     'system',
     'path',
-    'experience_builder',
+    'canvas',
     'link',
     'options',
+    'canvas_test_sdc',
   ];
 
   /**
@@ -60,7 +67,10 @@ class ComponentInputsDependenciesTest extends KernelTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
-    $this->installConfig('filter');
+    $this->installConfig([
+      'canvas',
+      'filter',
+    ]);
     $this->installEntitySchema('user');
     $this->installEntitySchema('node_type');
     $this->installEntitySchema('node');
@@ -71,6 +81,7 @@ class ComponentInputsDependenciesTest extends KernelTestBase {
   }
 
   public function testCalculateDependencies(): void {
+    $this->setUpCurrentUser(permissions: ['access content']);
     $type = NodeType::create([
       'type' => 'alpha',
       'name' => 'Alpha',
@@ -90,9 +101,9 @@ class ComponentInputsDependenciesTest extends KernelTestBase {
     ])->save();
     $this->createImageField('field_hero', 'node', 'alpha', storage_settings: [
       // @todo Remove once https://drupal.org/i/3513317 is fixed.
-      // We cannot rely on the override because experience_builder module is not
+      // We cannot rely on the override because canvas module is not
       // yet installed so need to manually specify it here for testing sake.
-      // @see \Drupal\experience_builder\Plugin\Field\FieldTypeOverride\ImageItemOverride::defaultStorageSettings
+      // @see \Drupal\canvas\Plugin\Field\FieldTypeOverride\ImageItemOverride::defaultStorageSettings
       'display_default' => TRUE,
     ]);
     $this->createMediaType('image', ['id' => 'image', 'label' => 'Image']);
@@ -123,13 +134,9 @@ class ComponentInputsDependenciesTest extends KernelTestBase {
     // Create test data.
     $item_list->appendItem([
       'uuid' => $uuid->generate(),
-      'component_id' => 'sdc.experience_builder.heading',
+      'component_id' => 'sdc.canvas_test_sdc.heading',
       'inputs' => [
-        'text' => [
-          'sourceType' => 'static:field_item:string',
-          'value' => 'Test Title',
-          'expression' => 'ℹ︎string␟value',
-        ],
+        'text' => 'Test Title',
         'element' => [
           // ⚠️ Note that this is NOT the field type that's in the Component config entity.
           'sourceType' => 'static:field_item:string',
@@ -139,11 +146,11 @@ class ComponentInputsDependenciesTest extends KernelTestBase {
       ],
     ]);
     // Same as above, but now with collapsed values.
-    // @see \Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::rawInputValueToPropSourceArray()
-    // @see \Drupal\experience_builder\Plugin\DataType\ComponentInputs::getPropSources()
+    // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::rawInputValueToPropSourceArray()
+    // @see \Drupal\canvas\Plugin\DataType\ComponentInputs::getPropSources()
     $item_list->appendItem([
       'uuid' => $uuid->generate(),
-      'component_id' => 'sdc.experience_builder.heading',
+      'component_id' => 'sdc.canvas_test_sdc.heading',
       'inputs' => [
         'text' => 'Test Title',
         'element' => 'h1',
@@ -151,7 +158,7 @@ class ComponentInputsDependenciesTest extends KernelTestBase {
     ]);
     $item_list->appendItem([
       'uuid' => $uuid->generate(),
-      'component_id' => 'sdc.experience_builder.heading',
+      'component_id' => 'sdc.canvas_test_sdc.heading',
       'inputs' => [
         'heading' => [
           'sourceType' => 'dynamic',
@@ -160,12 +167,12 @@ class ComponentInputsDependenciesTest extends KernelTestBase {
       ],
     ]);
     $item_list->appendItem([
-      'uuid' => $uuid->generate(),
-      'component_id' => 'sdc.experience_builder.image',
+      'uuid' => self::TEST_IMAGE_UUID,
+      'component_id' => 'sdc.canvas_test_sdc.image',
       'inputs' => [
         'image' => [
           'sourceType' => 'dynamic',
-          'expression' => 'ℹ︎␜entity:node:alpha␝field_hero␞␟{src↝entity␜␜entity:file␝uri␞␟value,alt↠alt,width↠width,height↠height}',
+          'expression' => 'ℹ︎␜entity:node:alpha␝field_hero␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
         ],
       ],
     ]);
@@ -205,24 +212,52 @@ class ComponentInputsDependenciesTest extends KernelTestBase {
     self::assertSame([
       'module' => [
         'node',
+        'file',
+        'file',
         'node',
+        'file',
         'node',
+        'file',
         'node',
+        'file',
       ],
       'config' => [
         'node.type.alpha',
         'field.field.node.alpha.field_hero',
+        'image.style.canvas_parametrized_width',
         'node.type.alpha',
         'field.field.node.alpha.field_hero',
+        'image.style.canvas_parametrized_width',
         'node.type.alpha',
         'field.field.node.alpha.field_hero',
+        'image.style.canvas_parametrized_width',
         'node.type.alpha',
         'field.field.node.alpha.field_hero',
+        'image.style.canvas_parametrized_width',
       ],
       'content' => [
         'file:file:' . $file_uuid,
       ],
     ], $item_list->get(3)->get('inputs')->calculateDependencies($node));
+
+    // Prove it's possible to get the full list of content dependencies for a
+    // given component tree; this is necessary for e.g. default content.
+    $component_instances = iterator_to_array($item_list->componentTreeItemsIterator());
+    $component_instance_deps_by_uuid = array_filter(array_combine(
+      array_map(
+        fn (ComponentTreeItem $item) => $item->getUuid(),
+        $component_instances
+      ),
+      array_map(
+        fn (ComponentTreeItem $item) => $item->calculateFieldItemValueDependencies($node)['content'] ?? [],
+        $component_instances
+      ),
+    ));
+    self::assertSame([
+      self::TEST_IMAGE_UUID => [
+        'file:file:' . $file_uuid,
+      ],
+    ], $component_instance_deps_by_uuid);
   }
 
 }

@@ -2,22 +2,22 @@
 
 declare(strict_types=1);
 
-namespace Drupal\Tests\experience_builder\Kernel\Config;
+namespace Drupal\Tests\canvas\Kernel\Config;
 
 use Drupal\Core\Entity\EntityTypeInterface;
-use Drupal\experience_builder\Entity\ContentTemplate;
-use Drupal\experience_builder\Entity\Page;
-use Drupal\experience_builder\EntityHandlers\ContentTemplateAwareViewBuilder;
+use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\canvas\Entity\Page;
+use Drupal\canvas\EntityHandlers\ContentTemplateAwareViewBuilder;
 use Drupal\KernelTests\KernelTestBase;
 use Drupal\node\Entity\NodeType;
-use Drupal\Tests\experience_builder\Traits\ContribStrictConfigSchemaTestTrait;
-use Drupal\Tests\experience_builder\Traits\GenerateComponentConfigTrait;
+use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
+use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\node\Traits\ContentTypeCreationTrait;
 use Symfony\Component\Validator\ConstraintViolationInterface;
 
 /**
- * @coversDefaultClass \Drupal\experience_builder\Entity\ContentTemplate
- * @group experience_builder
+ * @coversDefaultClass \Drupal\canvas\Entity\ContentTemplate
+ * @group canvas
  */
 final class ContentTemplateTest extends KernelTestBase {
 
@@ -33,13 +33,13 @@ final class ContentTemplateTest extends KernelTestBase {
     'system',
     'user',
     // The module being tested.
-    'experience_builder',
+    'canvas',
     // The content entity type being tested plus bundle fields.
     'node',
     'field',
     'text',
     // Test components.
-    'xb_test_sdc',
+    'canvas_test_sdc',
     'block',
     // Field types used by test components.
     'media',
@@ -47,6 +47,9 @@ final class ContentTemplateTest extends KernelTestBase {
     'link',
     'file',
     'options',
+    'filter',
+    'ckeditor5',
+    'editor',
   ];
 
   /**
@@ -77,7 +80,7 @@ final class ContentTemplateTest extends KernelTestBase {
   }
 
   /**
-   * @covers \Drupal\experience_builder\Hook\ContentTemplateHooks::entityTypeAlter()
+   * @covers \Drupal\canvas\Hook\ContentTemplateHooks::entityTypeAlter()
    */
   public function testOnlyContentEntitiesCanUseTemplates(): void {
     $manager = \Drupal::entityTypeManager();
@@ -86,13 +89,13 @@ final class ContentTemplateTest extends KernelTestBase {
     $this->assertTrue($definition->hasHandlerClass(ContentTemplateAwareViewBuilder::DECORATED_HANDLER_KEY));
     $this->assertSame(ContentTemplateAwareViewBuilder::class, $definition->getViewBuilderClass());
 
-    // Config entities have no view builder and XB doesn't touch them.
+    // Config entities have no view builder and Canvas doesn't touch them.
     $definition = $manager->getDefinition('user_role');
     assert($definition instanceof EntityTypeInterface);
     $this->assertFalse($definition->hasViewBuilderClass());
     $this->assertFalse($definition->hasHandlerClass(ContentTemplateAwareViewBuilder::DECORATED_HANDLER_KEY));
 
-    // XB pages are left alone despite being content entities.
+    // Canvas pages are left alone despite being content entities.
     $definition = $manager->getDefinition(Page::ENTITY_TYPE_ID);
     assert($definition instanceof EntityTypeInterface);
     $this->assertFalse($definition->hasHandlerClass(ContentTemplateAwareViewBuilder::DECORATED_HANDLER_KEY));
@@ -101,17 +104,18 @@ final class ContentTemplateTest extends KernelTestBase {
   public function testTreeKeyOrdering(): void {
     $this->installConfig('node');
     $this->createContentType(['type' => 'alpha']);
+    $this->installConfig('canvas');
     $this->generateComponentConfig();
     $template = ContentTemplate::create([
       'content_entity_type_id' => 'node',
       'content_entity_type_bundle' => 'alpha',
       'content_entity_type_view_mode' => 'full',
     ]);
-    $template->set('component_tree', [
+    $template->setComponentTree([
       [
         'uuid' => 'b7e2cf39-d62f-4ee8-99b2-27a89f1ac196',
-        'component_id' => 'sdc.xb_test_sdc.props-no-slots',
-        'component_version' => '95f4f1d5ee47663b',
+        'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+        'component_version' => 'b1e991f726a2a266',
         'parent_uuid' => '3a76bf4f-9306-43e6-ba8f-cb4b5b6459df',
         'slot' => 'the_body',
         'inputs' => [
@@ -120,8 +124,8 @@ final class ContentTemplateTest extends KernelTestBase {
       ],
       [
         'uuid' => '4f785025-9bd9-4752-9dd6-068b957b03ee',
-        'component_id' => 'sdc.xb_test_sdc.props-slots',
-        'component_version' => 'ab4d3ddce315cf64',
+        'component_id' => 'sdc.canvas_test_sdc.props-slots',
+        'component_version' => '85a5c0c7dd53e0bb',
         'inputs' => [
           'heading' => 'Hello, world!',
         ],
@@ -139,8 +143,8 @@ final class ContentTemplateTest extends KernelTestBase {
       ],
       [
         'uuid' => '3a76bf4f-9306-43e6-ba8f-cb4b5b6459df',
-        'component_id' => 'sdc.xb_test_sdc.props-slots',
-        'component_version' => 'ab4d3ddce315cf64',
+        'component_id' => 'sdc.canvas_test_sdc.props-slots',
+        'component_version' => '85a5c0c7dd53e0bb',
         'parent_uuid' => '4f785025-9bd9-4752-9dd6-068b957b03ee',
         'slot' => 'the_body',
         'inputs' => [
@@ -149,8 +153,8 @@ final class ContentTemplateTest extends KernelTestBase {
       ],
       [
         'uuid' => '5f71027b-d9d3-4f3d-8990-a6502c0ba676',
-        'component_id' => 'sdc.xb_test_sdc.props-no-slots',
-        'component_version' => '95f4f1d5ee47663b',
+        'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+        'component_version' => 'b1e991f726a2a266',
         'inputs' => [
           'heading' => [
             'sourceType' => 'dynamic',
@@ -177,16 +181,16 @@ final class ContentTemplateTest extends KernelTestBase {
       [
         '0' => [
           'uuid' => '4f785025-9bd9-4752-9dd6-068b957b03ee',
-          'component_id' => 'sdc.xb_test_sdc.props-slots',
-          'component_version' => 'ab4d3ddce315cf64',
+          'component_id' => 'sdc.canvas_test_sdc.props-slots',
+          'component_version' => '85a5c0c7dd53e0bb',
           'inputs' => [
             'heading' => 'Hello, world!',
           ],
         ],
         '0:the_body:0' => [
           'uuid' => '3a76bf4f-9306-43e6-ba8f-cb4b5b6459df',
-          'component_id' => 'sdc.xb_test_sdc.props-slots',
-          'component_version' => 'ab4d3ddce315cf64',
+          'component_id' => 'sdc.canvas_test_sdc.props-slots',
+          'component_version' => '85a5c0c7dd53e0bb',
           'parent_uuid' => '4f785025-9bd9-4752-9dd6-068b957b03ee',
           'slot' => 'the_body',
           'inputs' => [
@@ -195,8 +199,8 @@ final class ContentTemplateTest extends KernelTestBase {
         ],
         '0:the_body:0:the_body:0' => [
           'uuid' => 'b7e2cf39-d62f-4ee8-99b2-27a89f1ac196',
-          'component_id' => 'sdc.xb_test_sdc.props-no-slots',
-          'component_version' => '95f4f1d5ee47663b',
+          'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+          'component_version' => 'b1e991f726a2a266',
           'parent_uuid' => '3a76bf4f-9306-43e6-ba8f-cb4b5b6459df',
           'slot' => 'the_body',
           'inputs' => [
@@ -230,8 +234,8 @@ final class ContentTemplateTest extends KernelTestBase {
         ],
         '1' => [
           'uuid' => '5f71027b-d9d3-4f3d-8990-a6502c0ba676',
-          'component_id' => 'sdc.xb_test_sdc.props-no-slots',
-          'component_version' => '95f4f1d5ee47663b',
+          'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+          'component_version' => 'b1e991f726a2a266',
           'inputs' => [
             'heading' => [
               'sourceType' => 'dynamic',

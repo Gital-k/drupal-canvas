@@ -1,12 +1,16 @@
-import { a2p } from '@/local_packages/utils.js';
-import TextArea from '@/components/form/components/TextArea';
-import InputBehaviors from '@/components/form/inputBehaviors';
 import { useRef, useState } from 'react';
 import { Flex } from '@radix-ui/themes';
-import type { Attributes } from '@/types/DrupalAttribute';
-import DrupalFormattedTextArea from './DrupalFormattedTextArea';
+
+import TextArea from '@/components/form/components/TextArea';
+import InputBehaviors from '@/components/form/inputBehaviors';
+import { a2p } from '@/local_packages/utils.js';
 import { getDrupalSettings } from '@/utils/drupal-globals';
+
+import DrupalFormattedTextArea from './DrupalFormattedTextArea';
+
+import type { Attributes } from '@/types/DrupalAttribute';
 import type { FormatType } from '@/types/FormatType';
+
 const drupalSettings = getDrupalSettings();
 
 const DrupalTextArea = ({
@@ -17,7 +21,7 @@ const DrupalTextArea = ({
   wrapperAttributes?: Attributes;
 }) => {
   const defaultFormatName =
-    (attributes?.['data-xb-text-format'] as string) || '';
+    (attributes?.['data-canvas-text-format'] as string) || '';
   const [format, setFormat] = useState<FormatType>(
     (defaultFormatName &&
       drupalSettings?.editor?.formats?.[defaultFormatName]) || {
@@ -27,13 +31,13 @@ const DrupalTextArea = ({
 
   const ref = useRef<HTMLTextAreaElement | null>(null);
   const availableFormats =
-    (attributes?.['data-xb-available-formats'] &&
-      JSON.parse(attributes['data-xb-available-formats'] as string)) ||
+    (attributes?.['data-canvas-available-formats'] &&
+      JSON.parse(attributes['data-canvas-available-formats'] as string)) ||
     null;
 
   const selectAttributes =
-    (attributes?.['data-xb-format-select-attributes'] &&
-      JSON.parse(`${attributes['data-xb-format-select-attributes']}`)) ||
+    (attributes?.['data-canvas-format-select-attributes'] &&
+      JSON.parse(`${attributes['data-canvas-format-select-attributes']}`)) ||
     {};
 
   return (

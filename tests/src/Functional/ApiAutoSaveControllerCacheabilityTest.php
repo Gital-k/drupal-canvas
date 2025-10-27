@@ -2,17 +2,17 @@
 
 declare(strict_types=1);
 
-namespace Drupal\Tests\experience_builder\Functional;
+namespace Drupal\Tests\canvas\Functional;
 
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Url;
 use Drupal\dynamic_page_cache\EventSubscriber\DynamicPageCacheSubscriber;
-use Drupal\experience_builder\AutoSave\AutoSaveManager;
+use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\node\Entity\Node;
 use Drupal\node\NodeInterface;
 use Drupal\Tests\ApiRequestTrait;
-use Drupal\Tests\experience_builder\TestSite\XBTestSetup;
-use Drupal\Tests\experience_builder\Traits\XBFieldTrait;
+use Drupal\Tests\canvas\TestSite\CanvasTestSetup;
+use Drupal\Tests\canvas\Traits\CanvasFieldTrait;
 use GuzzleHttp\RequestOptions;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -23,19 +23,20 @@ use Symfony\Component\HttpFoundation\Response;
  * prevents caching as the request is seen as coming from the command line.
  *
  * @see \Drupal\Core\PageCache\RequestPolicy\CommandLineOrUnsafeMethod
- * @coversDefaultClass \Drupal\experience_builder\Controller\ApiAutoSaveController
- * @group experience_builder
+ * @coversDefaultClass \Drupal\canvas\Controller\ApiAutoSaveController
+ * @group canvas
  */
 final class ApiAutoSaveControllerCacheabilityTest extends FunctionalTestBase {
 
   use ApiRequestTrait;
-  use XBFieldTrait;
+  use CanvasFieldTrait;
 
   /**
    * {@inheritdoc}
    */
   protected static $modules = [
     'dynamic_page_cache',
+    'node',
   ];
 
   /**
@@ -48,7 +49,7 @@ final class ApiAutoSaveControllerCacheabilityTest extends FunctionalTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
-    (new XBTestSetup())->setup();
+    (new CanvasTestSetup())->setup();
     $this->setUpImages();
   }
 
@@ -57,18 +58,17 @@ final class ApiAutoSaveControllerCacheabilityTest extends FunctionalTestBase {
    */
   public function testCaching(): void {
     $account1 = $this->createUser([
-      'access administration pages',
       'edit any article content',
     ]);
     self::assertInstanceOf(AccountInterface::class, $account1);
     $this->drupalLogin($account1);
-    /** @var \Drupal\experience_builder\AutoSave\AutoSaveManager $autoSave */
+    /** @var \Drupal\canvas\AutoSave\AutoSaveManager $autoSave */
     $autoSave = \Drupal::service(AutoSaveManager::class);
     $node1 = Node::load(1);
     \assert($node1 instanceof NodeInterface);
     $node1->setTitle($this->randomMachineName());
     $autoSave->saveEntity($node1);
-    $url = Url::fromRoute('experience_builder.api.auto-save.get');
+    $url = Url::fromRoute('canvas.api.auto-save.get');
     $this->drupalGet($url);
     $this->assertSession()->responseHeaderEquals(DynamicPageCacheSubscriber::HEADER, 'MISS');
     $content = \json_decode($this->getSession()->getPage()->getContent() ?: '{}', TRUE);
@@ -88,7 +88,7 @@ final class ApiAutoSaveControllerCacheabilityTest extends FunctionalTestBase {
 
     $response = $this->makeApiRequest(
       'POST',
-      Url::fromRoute('experience_builder.api.layout.post', [
+      Url::fromRoute('canvas.api.layout.post', [
         'entity_type' => 'node',
         'entity' => $node2->id(),
       ]),

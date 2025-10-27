@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Drupal\experience_builder\PropSource;
+namespace Drupal\canvas\PropSource;
 
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Datetime\DrupalDateTime;
@@ -18,14 +18,13 @@ use Drupal\Core\Field\WidgetInterface;
 use Drupal\Core\Field\WidgetPluginManager;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\TypedData\DataDefinition;
-use Drupal\Core\TypedData\DataDefinitionInterface;
 use Drupal\Core\TypedData\TypedDataManagerInterface;
-use Drupal\experience_builder\PropExpressions\StructuredData\Evaluator;
-use Drupal\experience_builder\PropExpressions\StructuredData\FieldTypeObjectPropsExpression;
-use Drupal\experience_builder\PropExpressions\StructuredData\FieldTypePropExpression;
-use Drupal\experience_builder\PropExpressions\StructuredData\ReferenceFieldTypePropExpression;
-use Drupal\experience_builder\PropExpressions\StructuredData\StructuredDataPropExpression;
-use Drupal\experience_builder\PropExpressions\StructuredData\StructuredDataPropExpressionInterface;
+use Drupal\canvas\PropExpressions\StructuredData\Evaluator;
+use Drupal\canvas\PropExpressions\StructuredData\FieldTypeObjectPropsExpression;
+use Drupal\canvas\PropExpressions\StructuredData\FieldTypePropExpression;
+use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression;
+use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
+use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpressionInterface;
 use Drupal\media\MediaInterface;
 
 /**
@@ -40,6 +39,8 @@ use Drupal\media\MediaInterface;
  * interact with only a FieldItemInterface, not a FieldItemListInterface.
  *
  * @internal
+ *
+ * @phpstan-import-type PropSourceArray from PropSourceBase
  */
 final class StaticPropSource extends PropSourceBase {
 
@@ -48,7 +49,7 @@ final class StaticPropSource extends PropSourceBase {
    */
   public function __construct(
     public readonly FieldItemListInterface $fieldItemList,
-    private readonly StructuredDataPropExpressionInterface $expression,
+    public readonly StructuredDataPropExpressionInterface $expression,
     // - which cardinality to use in case of a list (`type: array`)
     // @see \Drupal\Core\Field\FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED
     private readonly ?int $cardinality,
@@ -97,6 +98,8 @@ final class StaticPropSource extends PropSourceBase {
 
   /**
    * {@inheritdoc}
+   *
+   * @return PropSourceArray
    */
   public function toArray(): array {
     $array_representation = [
@@ -131,7 +134,7 @@ final class StaticPropSource extends PropSourceBase {
     // - field type
     // - cardinality
     // @see \Drupal\Core\Field\FieldStorageDefinitionInterface
-    // TRICKY: this does not work due to it using BaseFieldDefinition, and BaseFieldDefinition::getOptionsProvider() assuming it to exist on the host entity. Hence the use of XB's own \Drupal\experience_builder\PropSource\FieldStorageDefinition.
+    // TRICKY: this does not work due to it using BaseFieldDefinition, and BaseFieldDefinition::getOptionsProvider() assuming it to exist on the host entity. Hence the use of Canvas's own \Drupal\canvas\PropSource\FieldStorageDefinition.
     // @see \Drupal\Core\Field\TypedData\FieldItemDataDefinition::createFromDataType()
     // @todo Refactor this after https://www.drupal.org/node/2280639 is fixed.
     // $field_item_definition = $typed_data_manager->createDataDefinition($data_type);
@@ -185,10 +188,10 @@ final class StaticPropSource extends PropSourceBase {
   }
 
   /**
-   * @return \Drupal\experience_builder\PropSource\StaticPropSource
+   * @return \Drupal\canvas\PropSource\StaticPropSource
    *
    * @internal
-   *   This is currently only intended to be used by Experience Builder's tests.
+   *   This is currently only intended to be used by Drupal Canvas's tests.
    */
   public function randomizeValue(): static {
     // Determine how many values to generate.
@@ -237,9 +240,37 @@ final class StaticPropSource extends PropSourceBase {
     );
   }
 
-  public function withValue(mixed $value): static {
+  /**
+   * @param mixed $value
+   *   The value to initialize the field item list with.
+   * @param bool $allow_empty
+   *   By default, no empty values are allowed, because they're pointless to
+   *   store in a StaticPropSource.
+   *   In very specific circumstances, this may be acceptable and even necessary
+   *   though:
+   *   - when validating
+   *   - when loading stored data (a field type might change its logic for what
+   *     it considers empty)
+   *   - when *previewing* the user input, which may be "mid-input" and hence in
+   *     a temporarily empty state.
+   *   Validation will prevent empty values from being stored.
+   *
+   * @see \Drupal\canvas\PropSource\StaticPropSource::isMinimalRepresentation()
+   */
+  public function withValue(mixed $value, bool $allow_empty = FALSE): static {
     $field_item_list = clone $this->fieldItemList;
     $field_item_list->setValue($value);
+
+    if (!$allow_empty) {
+      // Detect values considered empty by the field type, and abort early.
+      $before = $field_item_list->count();
+      $field_item_list->filterEmptyItems();
+      $after = $field_item_list->count();
+      if ($before !== $after) {
+        throw new \LogicException(sprintf('%s called with invalid value for field type %s.', __METHOD__, $this->fieldItemList->getFieldDefinition()->getItemDefinition()->getDataType()));
+      }
+    }
+
     return new StaticPropSource(
       $field_item_list,
       $this->expression,
@@ -292,7 +323,7 @@ final class StaticPropSource extends PropSourceBase {
    *
    * @throws \LogicException
    *
-   * @see \Drupal\experience_builder\PropSource\StaticPropSource::denormalizeValue()
+   * @see \Drupal\canvas\PropSource\StaticPropSource::denormalizeValue()
    */
   public static function isMinimalRepresentation(array $sdc_prop_source): void {
     $expression = StructuredDataPropExpression::fromString($sdc_prop_source['expression']);
@@ -304,6 +335,15 @@ final class StaticPropSource extends PropSourceBase {
 
     $stored_value = $sdc_prop_source['value'];
     $field_item_list->setValue($stored_value);
+
+    // Detect values considered empty by the field type, and abort early.
+    // @see \Drupal\canvas\PropSource\StaticPropSource::withValue()
+    $before = $field_item_list->count();
+    $field_item_list->filterEmptyItems();
+    $after = $field_item_list->count();
+    if ($before !== $after) {
+      throw new \LengthException('Field item list length is a lie, because it contains items considered empty by the field type. This is acceptable when previewing and auto-saving, but unacceptable when saving.');
+    }
 
     // Single-cardinality StaticPropSources MUST store only a single value, in
     // minimal representation.
@@ -357,11 +397,11 @@ final class StaticPropSource extends PropSourceBase {
   /**
    * {@inheritdoc}
    */
-  public function evaluate(?FieldableEntityInterface $host_entity): mixed {
+  public function evaluate(?FieldableEntityInterface $host_entity, bool $is_required): mixed {
     return match ($this->getCardinality()) {
       // @phpstan-ignore-next-line
-      1 => Evaluator::evaluate($this->fieldItemList->first(), $this->expression),
-      default => Evaluator::evaluate($this->fieldItemList->isEmpty() ? NULL : $this->fieldItemList, $this->expression)
+      1 => Evaluator::evaluate($this->fieldItemList->first(), $this->expression, $is_required),
+      default => Evaluator::evaluate($this->fieldItemList->isEmpty() ? NULL : $this->fieldItemList, $this->expression, $is_required)
     };
   }
 
@@ -375,7 +415,7 @@ final class StaticPropSource extends PropSourceBase {
 
   public function getValue(): mixed {
     // ⚠️ TRICKY: we cannot use `::isEmpty()`, only `::count()`.
-    // @see https://www.drupal.org/project/experience_builder/issues/3467870#comment-15792177
+    // @see https://www.drupal.org/project/canvas/issues/3467870#comment-15792177
     if ($this->fieldItemList->count() === 0) {
       return match ($this->getCardinality()) {
         1 => NULL,
@@ -416,7 +456,7 @@ final class StaticPropSource extends PropSourceBase {
     };
   }
 
-  public function getWidget(string $sdc_prop_name, string $sdc_prop_label, ?string $field_widget_plugin_id): WidgetInterface {
+  public function getWidget(string $component_config_entity_id, ?string $component_config_entity_version, string $prop_name, string $sdc_prop_label, ?string $field_widget_plugin_id): WidgetInterface {
     // @phpstan-ignore-next-line
     $field_widget_plugin_manager = \Drupal::service('plugin.manager.field.widget');
     assert($field_widget_plugin_manager instanceof WidgetPluginManager);
@@ -428,7 +468,24 @@ final class StaticPropSource extends PropSourceBase {
     assert($field_storage_definition instanceof FieldStorageDefinition);
     $widget = $field_widget_plugin_manager->getInstance([
       'field_definition' => $field_storage_definition
-        ->setName($sdc_prop_name)
+        // TRICKY: we would need to set a name that uniquely identifies this SDC
+        // prop, to avoid the static caching in `options_allowed_values()`
+        // interfering. As this name is used in the client UI and can have
+        // consequences, `canvas_load_allowed_values_for_component_prop`
+        // won't allow  caching.
+        ->setName($prop_name)
+        // This is a conjured field storage definition; the widget needs precise
+        // context. (For example to load the correct allowed values.)
+        // @see \Drupal\Core\Field\FieldDefinitionInterface::getDisplayOptions
+        ->setDisplayOptions('form', [
+          'third_party_settings' => [
+            'canvas' => [
+              'component_id' => $component_config_entity_id,
+              'component_version' => $component_config_entity_version,
+              'explicit_input_prop_name' => $prop_name,
+            ],
+          ],
+        ])
         ->setLabel($sdc_prop_label),
       'configuration' => $configuration,
       'prepare' => TRUE,
@@ -446,11 +503,17 @@ final class StaticPropSource extends PropSourceBase {
     // prevent the field widget plugin from being able to modify this
     // StaticPropSource's field item list by reference.
     $field = clone $this->fieldItemList;
+    // Remove empty or invalid items.
+    $field->filterEmptyItems();
     // Widgets assume there is at least one field item present for editing.
-    $field->appendItem();
+    if ($field->count() === 0) {
+      $field->appendItem();
+    }
     // Most widgets do not need an entity context, but some do:
+    // @see \Drupal\Core\Field\FieldItemListInterface::getEntity()
     // @see \Drupal\file\Plugin\Field\FieldWidget\FileWidget
     // @see \Drupal\image\Plugin\Field\FieldWidget\ImageWidget
+    // @see \Drupal\Core\Field\Plugin\Field\FieldWidget\OptionsWidgetBase::getOptions()
     if ($host_entity) {
       $field->setContext(NULL, EntityAdapter::createFromEntity($host_entity));
     }
@@ -468,43 +531,6 @@ final class StaticPropSource extends PropSourceBase {
     return $widget_form;
   }
 
-  /**
-   * @param array<int, array<string, mixed>> $values
-   * @param array<mixed> $form
-   *
-   * @return mixed|array<string, mixed>
-   */
-  public function massageFormValuesTemporaryRemoveThisExclamationExclamationExclamation(?string $field_widget_plugin_id, string $sdc_prop_name, string $sdc_prop_label, array $values, array &$form, FormStateInterface $form_state): mixed {
-    // 1. Apply the field widget's transformation.
-    $massaged_values = $this->getWidget($sdc_prop_name, $sdc_prop_label, $field_widget_plugin_id)
-      ->massageFormValues($values, $form, $form_state);
-
-    // Work on a clone of the stored field item list to avoid side effects.
-    $field_item_list = clone $this->fieldItemList;
-
-    // 2. Apply the field type's transformation.
-    // @see \Drupal\link\Plugin\Field\FieldType\LinkItem::setValue()
-    $field_item_list->setValue($massaged_values);
-    // @see \Drupal\image\Plugin\Field\FieldType\ImageItem::preSave()
-    // @see \Drupal\experience_builder\Plugin\Field\FieldTypeOverride\ListIntegerItemOverride::preSave()
-    $field_item_list->preSave();
-    $actual_values = $field_item_list->getValue();
-
-    // 3. XB only needs to store non-computed values.
-    $item_definition = $this->fieldItemList->getItemDefinition();
-    assert($item_definition instanceof FieldItemDataDefinitionInterface);
-    $non_computed_properties = array_filter(
-      $item_definition->getPropertyDefinitions(),
-      fn (DataDefinitionInterface $def): bool => !$def->isComputed(),
-    );
-    $stored_values = array_map(
-      fn (mixed $field_item_value): mixed => array_intersect_key($actual_values, $non_computed_properties),
-      $actual_values
-    );
-
-    return $stored_values;
-  }
-
   private function getFieldItemDefinition(): FieldItemDataDefinitionInterface {
     // @phpstan-ignore-next-line
     return $this->fieldItemList->getItemDefinition();
@@ -519,7 +545,7 @@ final class StaticPropSource extends PropSourceBase {
     // is given, then `content` dependencies may appear as well; otherwise the
     // calculated dependencies will be limited to the entity types, bundle (if
     // any) and fields (if any) that this expression depends on.
-    // @see \Drupal\Tests\experience_builder\Kernel\PropExpressionDependenciesTest
+    // @see \Drupal\Tests\canvas\Kernel\PropExpressionDependenciesTest
     $expression_deps = $this->expression->calculateDependencies($this->fieldItemList);
 
     // Let the field type plugin specify its own dependencies, based on storage

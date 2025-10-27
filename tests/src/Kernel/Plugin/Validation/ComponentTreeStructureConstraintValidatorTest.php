@@ -2,18 +2,18 @@
 
 declare(strict_types=1);
 
-namespace Drupal\Tests\experience_builder\Kernel\Plugin\Validation;
+namespace Drupal\Tests\canvas\Kernel\Plugin\Validation;
 
 use Drupal\Core\Validation\BasicRecursiveValidatorFactory;
-use Drupal\experience_builder\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
-use Drupal\experience_builder\Plugin\Validation\Constraint\ComponentTreeStructureConstraint;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
+use Drupal\canvas\Plugin\Validation\Constraint\ComponentTreeStructureConstraint;
 use Drupal\KernelTests\KernelTestBase;
-use Drupal\Tests\experience_builder\Traits\ConstraintViolationsTestTrait;
-use Drupal\Tests\experience_builder\Traits\GenerateComponentConfigTrait;
+use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
+use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 
 /**
- * @coversDefaultClass \Drupal\experience_builder\Plugin\Validation\Constraint\ComponentTreeStructureConstraintValidator
- * @group experience_builder
+ * @coversDefaultClass \Drupal\canvas\Plugin\Validation\Constraint\ComponentTreeStructureConstraintValidator
+ * @group canvas
  */
 final class ComponentTreeStructureConstraintValidatorTest extends KernelTestBase {
 
@@ -22,10 +22,10 @@ final class ComponentTreeStructureConstraintValidatorTest extends KernelTestBase
   use ComponentTreeItemListInstantiatorTrait;
 
   protected static $modules = [
-    'experience_builder',
-    'xb_test_sdc',
+    'canvas',
+    'canvas_test_sdc',
     'block',
-    // XB's dependencies (modules providing field types + widgets).
+    // Canvas's dependencies (modules providing field types + widgets).
     'datetime',
     'file',
     'image',
@@ -88,7 +88,7 @@ final class ComponentTreeStructureConstraintValidatorTest extends KernelTestBase
     return [
       'INVALID: component instance keys wrong, string instead of arrays' => [
         [
-            ['component_id' => 'sdc.xb_test_sdc.props-slots'],
+            ['component_id' => 'sdc.canvas_test_sdc.props-slots'],
             ['wrong-key' => 'a value'],
           "string",
           'uuid-in-root' => [
@@ -128,8 +128,8 @@ final class ComponentTreeStructureConstraintValidatorTest extends KernelTestBase
         [
           [
             'uuid' => '2886421e-4ede-4bfb-956c-8afcd4ee8103',
-            'component_id' => 'sdc.xb_test_sdc.props-slots',
-            'component_version' => 'ab4d3ddce315cf64',
+            'component_id' => 'sdc.canvas_test_sdc.props-slots',
+            'component_version' => '85a5c0c7dd53e0bb',
           ],
         ],
         [],
@@ -138,15 +138,15 @@ final class ComponentTreeStructureConstraintValidatorTest extends KernelTestBase
         [
           [
             'uuid' => '2886421e-4ede-4bfb-956c-8afcd4ee8103',
-            'component_id' => 'sdc.xb_test_sdc.props-slots',
-            'component_version' => 'ab4d3ddce315cf64',
+            'component_id' => 'sdc.canvas_test_sdc.props-slots',
+            'component_version' => '85a5c0c7dd53e0bb',
           ],
           [
             'parent_uuid' => '2886421e-4ede-4bfb-956c-8afcd4ee8103',
             'slot' => 'the_body',
             'uuid' => '80bf49ec-3d3f-4e76-98ed-2ce147397643',
-            'component_id' => 'sdc.xb_test_sdc.props-no-slots',
-            'component_version' => '95f4f1d5ee47663b',
+            'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+            'component_version' => 'b1e991f726a2a266',
           ],
         ],
         [],
@@ -155,71 +155,71 @@ final class ComponentTreeStructureConstraintValidatorTest extends KernelTestBase
         [
           [
             'uuid' => '80bf49ec-3d3f-4e76-98ed-2ce147397643',
-            'component_id' => 'sdc.xb_test_sdc.props-slots',
-            'component_version' => 'ab4d3ddce315cf64',
+            'component_id' => 'sdc.canvas_test_sdc.props-slots',
+            'component_version' => '85a5c0c7dd53e0bb',
           ],
           [
             'uuid' => 'bcf003b2-a81b-48b6-bb4c-772814edaa2a',
-            'component_id' => 'sdc.xb_test_sdc.props-slots',
-            'component_version' => 'ab4d3ddce315cf64',
+            'component_id' => 'sdc.canvas_test_sdc.props-slots',
+            'component_version' => '85a5c0c7dd53e0bb',
           ],
 
           [
             'uuid' => '5067ea49-f893-4d9a-8587-6586e459bd6c',
-            'component_id' => 'sdc.xb_test_sdc.props-slots',
+            'component_id' => 'sdc.canvas_test_sdc.props-slots',
             'parent_uuid' => '50330afa-a840-4527-bc37-5921d99addf1',
             'slot' => 'the_body',
-            'component_version' => 'ab4d3ddce315cf64',
+            'component_version' => '85a5c0c7dd53e0bb',
           ],
           [
             'uuid' => '9b654898-2e58-4d3a-a160-bfde52796a11',
-            'component_id' => 'sdc.xb_test_sdc.props-no-slots',
+            'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
             'parent_uuid' => 'bcf003b2-a81b-48b6-bb4c-772814edaa2a',
             'slot' => 'slot1',
-            'component_version' => '95f4f1d5ee47663b',
+            'component_version' => 'b1e991f726a2a266',
           ],
           [
             'uuid' => 'e685308a-0d0f-44dd-830d-1ec7731810e7',
-            'component_id' => 'sdc.xb_test_sdc.props-no-slots',
+            'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
             'parent_uuid' => 'bcf003b2-a81b-48b6-bb4c-772814edaa2a',
             'slot' => 'slot2',
-            'component_version' => '95f4f1d5ee47663b',
+            'component_version' => 'b1e991f726a2a266',
           ],
           [
             'uuid' => '8bc0f436-1930-4a25-b891-632e55d07e27',
-            'component_id' => 'sdc.xb_test_sdc.props-no-slots',
+            'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
             'parent_uuid' => 'bcf003b2-a81b-48b6-bb4c-772814edaa2a',
             'slot' => 'the_body',
-            'component_version' => '95f4f1d5ee47663b',
+            'component_version' => 'b1e991f726a2a266',
           ],
           [
             'uuid' => '0df965c3-dda3-44a0-b3bb-b3dcd62a6817',
-            'component_id' => 'sdc.xb_test_sdc.props-no-slots',
+            'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
             'parent_uuid' => '8bc0f436-1930-4a25-b891-632e55d07e27',
             'slot' => 'slot3',
-            'component_version' => '95f4f1d5ee47663b',
+            'component_version' => 'b1e991f726a2a266',
           ],
         ],
         [
           'layout.2.parent_uuid' => 'Invalid component tree item with UUID <em class="placeholder">5067ea49-f893-4d9a-8587-6586e459bd6c</em> references an invalid parent <em class="placeholder">50330afa-a840-4527-bc37-5921d99addf1</em>.',
-          'layout.3.slot' => 'Invalid component subtree. This component subtree contains an invalid slot name for component <em class="placeholder">sdc.xb_test_sdc.props-slots</em>: <em class="placeholder">slot1</em>. Valid slot names are: <em class="placeholder">the_body, the_footer, the_colophon</em>.',
-          'layout.4.slot' => 'Invalid component subtree. This component subtree contains an invalid slot name for component <em class="placeholder">sdc.xb_test_sdc.props-slots</em>: <em class="placeholder">slot2</em>. Valid slot names are: <em class="placeholder">the_body, the_footer, the_colophon</em>.',
-          'layout.6.parent_uuid' => 'Invalid component subtree. A component subtree must only exist for components with >=1 slot, but the component <em class="placeholder">sdc.xb_test_sdc.props-no-slots</em> has no slots, yet a subtree exists for the instance with UUID <em class="placeholder">8bc0f436-1930-4a25-b891-632e55d07e27</em>.',
+          'layout.3.slot' => 'Invalid component subtree. This component subtree contains an invalid slot name for component <em class="placeholder">sdc.canvas_test_sdc.props-slots</em>: <em class="placeholder">slot1</em>. Valid slot names are: <em class="placeholder">the_body, the_footer, the_colophon</em>.',
+          'layout.4.slot' => 'Invalid component subtree. This component subtree contains an invalid slot name for component <em class="placeholder">sdc.canvas_test_sdc.props-slots</em>: <em class="placeholder">slot2</em>. Valid slot names are: <em class="placeholder">the_body, the_footer, the_colophon</em>.',
+          'layout.6.parent_uuid' => 'Invalid component subtree. A component subtree must only exist for components with >=1 slot, but the component <em class="placeholder">sdc.canvas_test_sdc.props-no-slots</em> has no slots, yet a subtree exists for the instance with UUID <em class="placeholder">8bc0f436-1930-4a25-b891-632e55d07e27</em>.',
         ],
       ],
       'INVALID: valid tree, with top level, under own branch' => [
         [
           [
             'uuid' => 'ad51078a-d1d5-4385-8693-2beaefcf30bf',
-            'component_id' => 'sdc.xb_test_sdc.props-no-slots',
-            'component_version' => '95f4f1d5ee47663b',
+            'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+            'component_version' => 'b1e991f726a2a266',
           ],
           [
             'uuid' => 'f67147cb-be50-459a-915d-34d8646012f4',
-            'component_id' => 'sdc.xb_test_sdc.props-slots',
+            'component_id' => 'sdc.canvas_test_sdc.props-slots',
             'parent_uuid' => 'f67147cb-be50-459a-915d-34d8646012f4',
             'slot' => 'the_body',
-            'component_version' => 'ab4d3ddce315cf64',
+            'component_version' => '85a5c0c7dd53e0bb',
           ],
         ],
         [
@@ -230,22 +230,22 @@ final class ComponentTreeStructureConstraintValidatorTest extends KernelTestBase
         [
           [
             'uuid' => '8d2e68e5-fd4a-47dc-a641-06062723525d',
-            'component_id' => 'sdc.xb_test_sdc.props-slots',
-            'component_version' => 'ab4d3ddce315cf64',
+            'component_id' => 'sdc.canvas_test_sdc.props-slots',
+            'component_version' => '85a5c0c7dd53e0bb',
           ],
           [
             'uuid' => 'a022682d-d94b-4f66-bfad-034f0eba5906',
-            'component_id' => 'sdc.xb_test_sdc.props-slots',
+            'component_id' => 'sdc.canvas_test_sdc.props-slots',
             'parent_uuid' => '8d2e68e5-fd4a-47dc-a641-06062723525d',
             'slot' => 'the_body',
-            'component_version' => 'ab4d3ddce315cf64',
+            'component_version' => '85a5c0c7dd53e0bb',
           ],
           [
             'uuid' => 'ffa4aa03-2bba-4d9b-81d7-37a412836838',
-            'component_id' => 'sdc.xb_test_sdc.props-no-slots',
+            'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
             'parent_uuid' => '8d2e68e5-fd4a-47dc-a641-06062723525d',
             'slot' => 'the_body',
-            'component_version' => '95f4f1d5ee47663b',
+            'component_version' => 'b1e991f726a2a266',
           ],
         ],
         [],
@@ -254,13 +254,13 @@ final class ComponentTreeStructureConstraintValidatorTest extends KernelTestBase
         [
           [
             'uuid' => '8d2e68e5-fd4a-47dc-a641-06062723525d',
-            'component_id' => 'sdc.xb_test_sdc.props-slots',
-            'component_version' => 'ab4d3ddce315cf64',
+            'component_id' => 'sdc.canvas_test_sdc.props-slots',
+            'component_version' => '85a5c0c7dd53e0bb',
           ],
           [
             'uuid' => '8d2e68e5-fd4a-47dc-a641-06062723525d',
-            'component_id' => 'sdc.xb_test_sdc.props-slots',
-            'component_version' => 'ab4d3ddce315cf64',
+            'component_id' => 'sdc.canvas_test_sdc.props-slots',
+            'component_version' => '85a5c0c7dd53e0bb',
           ],
         ],
         [
@@ -271,34 +271,34 @@ final class ComponentTreeStructureConstraintValidatorTest extends KernelTestBase
         [
           [
             'uuid' => '01703ce1-3eaa-4171-91d9-5b6fe22da2af',
-            'component_id' => 'sdc.xb_test_sdc.props-no-slots',
-            'component_version' => '95f4f1d5ee47663b',
+            'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+            'component_version' => 'b1e991f726a2a266',
           ],
           [
             'uuid' => 'cffc81cb-df7e-4481-83eb-d3ea71bba987',
-            'component_id' => 'sdc.xb_test_sdc.props-slots',
-            'component_version' => 'ab4d3ddce315cf64',
+            'component_id' => 'sdc.canvas_test_sdc.props-slots',
+            'component_version' => '85a5c0c7dd53e0bb',
           ],
           [
             'uuid' => 'd823d3c9-be9f-4053-8bc9-ad36914c345c',
-            'component_id' => 'sdc.xb_test_sdc.props-slots',
+            'component_id' => 'sdc.canvas_test_sdc.props-slots',
             'parent_uuid' => 'cffc81cb-df7e-4481-83eb-d3ea71bba987',
             'slot' => 'the_body',
-            'component_version' => 'ab4d3ddce315cf64',
+            'component_version' => '85a5c0c7dd53e0bb',
           ],
           [
             'uuid' => '357963ff-2eed-4e34-b768-0517cfb52207',
-            'component_id' => 'sdc.xb_test_sdc.props-no-slots',
+            'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
             'parent_uuid' => 'd823d3c9-be9f-4053-8bc9-ad36914c345c',
             'slot' => 'the_body',
-            'component_version' => '95f4f1d5ee47663b',
+            'component_version' => 'b1e991f726a2a266',
           ],
           [
             'uuid' => 'aa595654-57c9-463b-ad33-61f47dc7049b',
-            'component_id' => 'sdc.xb_test_sdc.props-no-slots',
+            'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
             'parent_uuid' => '7e090562-0f3b-4bec-8e43-f19e7408a4d9',
             'slot' => 'the_body',
-            'component_version' => '95f4f1d5ee47663b',
+            'component_version' => 'b1e991f726a2a266',
           ],
         ],
         [
@@ -309,14 +309,14 @@ final class ComponentTreeStructureConstraintValidatorTest extends KernelTestBase
         [
           [
             'uuid' => '01703ce1-3eaa-4171-91d9-5b6fe22da2af',
-            'component_id' => 'sdc.xb_test_sdc.props-no-slots',
-            'component_version' => '95f4f1d5ee47663b',
+            'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+            'component_version' => 'b1e991f726a2a266',
           ],
           [
             'uuid' => 'd823d3c9-be9f-4053-8bc9-ad36914c345c',
-            'component_id' => 'sdc.xb_test_sdc.props-slots',
+            'component_id' => 'sdc.canvas_test_sdc.props-slots',
             'parent_uuid' => '01703ce1-3eaa-4171-91d9-5b6fe22da2af',
-            'component_version' => 'ab4d3ddce315cf64',
+            'component_version' => '85a5c0c7dd53e0bb',
           ],
         ],
         [
@@ -327,55 +327,55 @@ final class ComponentTreeStructureConstraintValidatorTest extends KernelTestBase
         [
           [
             'uuid' => '80bf49ec-3d3f-4e76-98ed-2ce147397643',
-            'component_id' => 'sdc.xb_test_sdc.missing-component-1',
+            'component_id' => 'sdc.canvas_test_sdc.missing-component-1',
             'component_version' => 'irrelevant',
           ],
           [
             'uuid' => 'bcf003b2-a81b-48b6-bb4c-772814edaa2a',
-            'component_id' => 'sdc.xb_test_sdc.missing-component-1',
+            'component_id' => 'sdc.canvas_test_sdc.missing-component-1',
             'component_version' => 'irrelevant',
           ],
           [
             'uuid' => '50330afa-a840-4527-bc37-5921d99addf1-3',
-            'component_id' => 'sdc.xb_test_sdc.props-no-slots',
-            'component_version' => '95f4f1d5ee47663b',
+            'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+            'component_version' => 'b1e991f726a2a266',
           ],
           [
             'uuid' => '9b654898-2e58-4d3a-a160-bfde52796a11',
-            'component_id' => 'sdc.xb_test_sdc.missing-component-1',
+            'component_id' => 'sdc.canvas_test_sdc.missing-component-1',
             'parent_uuid' => '1be63e02-d343-4d67-a1fe-7fa533fba2c6',
             'slot' => 'the_body',
             'component_version' => 'irrelevant',
           ],
           [
             'uuid' => 'e685308a-0d0f-44dd-830d-1ec7731810e7',
-            'component_id' => 'sdc.xb_test_sdc.missing-component-2',
+            'component_id' => 'sdc.canvas_test_sdc.missing-component-2',
             'parent_uuid' => '1be63e02-d343-4d67-a1fe-7fa533fba2c6',
             'slot' => 'the_body',
             'component_version' => 'irrelevant',
           ],
           [
             'uuid' => '8bc0f436-1930-4a25-b891-632e55d07e27',
-            'component_id' => 'sdc.xb_test_sdc.missing-component-2',
+            'component_id' => 'sdc.canvas_test_sdc.missing-component-2',
             'parent_uuid' => '1be63e02-d343-4d67-a1fe-7fa533fba2c6',
             'slot' => 'the_body',
             'component_version' => 'irrelevant',
           ],
           [
             'uuid' => '9b6a4cf9-e707-48a1-babf-cb726b86726a',
-            'component_id' => 'sdc.xb_test_sdc.props-no-slots',
+            'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
             'parent_uuid' => '1be63e02-d343-4d67-a1fe-7fa533fba2c6',
             'slot' => 'the_body',
-            'component_version' => '95f4f1d5ee47663b',
+            'component_version' => 'b1e991f726a2a266',
           ],
         ],
         [
-          'layout.0.component_id' => "The 'experience_builder.component.sdc.xb_test_sdc.missing-component-1' config does not exist.",
-          'layout.1.component_id' => "The 'experience_builder.component.sdc.xb_test_sdc.missing-component-1' config does not exist.",
+          'layout.0.component_id' => "The 'canvas.component.sdc.canvas_test_sdc.missing-component-1' config does not exist.",
+          'layout.1.component_id' => "The 'canvas.component.sdc.canvas_test_sdc.missing-component-1' config does not exist.",
           'layout.2.uuid' => 'This is not a valid UUID.',
-          'layout.3.component_id' => "The 'experience_builder.component.sdc.xb_test_sdc.missing-component-1' config does not exist.",
-          'layout.4.component_id' => "The 'experience_builder.component.sdc.xb_test_sdc.missing-component-2' config does not exist.",
-          'layout.5.component_id' => "The 'experience_builder.component.sdc.xb_test_sdc.missing-component-2' config does not exist.",
+          'layout.3.component_id' => "The 'canvas.component.sdc.canvas_test_sdc.missing-component-1' config does not exist.",
+          'layout.4.component_id' => "The 'canvas.component.sdc.canvas_test_sdc.missing-component-2' config does not exist.",
+          'layout.5.component_id' => "The 'canvas.component.sdc.canvas_test_sdc.missing-component-2' config does not exist.",
           'layout.6.parent_uuid' => 'Invalid component tree item with UUID <em class="placeholder">9b6a4cf9-e707-48a1-babf-cb726b86726a</em> references an invalid parent <em class="placeholder">1be63e02-d343-4d67-a1fe-7fa533fba2c6</em>.',
         ],
       ],

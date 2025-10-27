@@ -4,9 +4,11 @@ props:
   type: object
   required:
     - test_REQUIRED_string
+    - test_REQUIRED_string_format_uri
     - test_REQUIRED_string_html_inline
     - test_REQUIRED_string_html_block
     - test_REQUIRED_string_html
+    - test_REQUIRED_string_format_uri_reference_web_links
   properties:
     test_bool_default_false:
       title: 'Bool (default false)'
@@ -28,12 +30,10 @@ props:
     test_string_multiline:
       title: 'String — multi-line'
       type: string
-      $ref: json-schema-definitions://experience_builder.module/textarea
-      # Pattern in $ref:
       # @see https://json-schema.org/understanding-json-schema/reference/regular_expressions
-      #pattern: '(.|\r?\n)*'
+      pattern: '(.|\r?\n)*'
       # This pattern needs to match the pattern added in
-      # \Drupal\experience_builder\Plugin\Field\FieldTypeOverride\StringLongItemOverride::propertyDefinitions.
+      # \Drupal\canvas\Plugin\Field\FieldTypeOverride\StringLongItemOverride::propertyDefinitions.
       examples:
         - "Hello,\nmultiline\nworld!"
     test_REQUIRED_string:
@@ -47,6 +47,9 @@ props:
       enum:
         - foo
         - bar
+      meta:enum:
+        foo: Foo
+        bar: Bar
       examples:
         - foo
     test_integer_enum:
@@ -55,6 +58,9 @@ props:
       enum:
         - 1
         - 2
+      meta:enum:
+        1: 1
+        2: 2
       examples:
         - 1
 
@@ -124,6 +130,22 @@ props:
       title: 'String, format=uuid'
       type: string
       format: uuid
+    test_REQUIRED_string_format_uri:
+      title: 'String, format=uri (required)'
+      type: string
+      format: uri
+      examples:
+        - https://uri.example.com
+    test_REQUIRED_string_format_uri_reference_web_links:
+      title: 'String, format=uri-reference, x-allowed-schemes: [http, https] (required)'
+      type: string
+      format: uri-reference
+      x-allowed-schemes:
+        - http
+        - https
+      examples:
+        - https://uri.example.com
+        - /my-account
     test_string_format_uri:
       title: 'String, format=uri'
       type: string
@@ -131,15 +153,22 @@ props:
       examples:
         - https://uri.example.com
     test_string_format_uri_image:
-      title: 'String, format=uri, images only'
-      $ref: json-schema-definitions://experience_builder.module/image-uri
+      title: 'String, format=uri, relative or absolute images only — using contentMediaType=image/* directly'
+      type: string
+      format: uri-reference
+      contentMediaType: image/*
+      # @see https://github.com/json-schema-org/json-schema-spec/issues/1557
+      x-allowed-schemes: [http, https]
+    test_string_format_uri_image_using_ref:
+      title: 'String, format=uri, relative or absolute images only — using $ref'
+      $ref: json-schema-definitions://canvas.module/image-uri
       # @todo Remove in https://www.drupal.org/project/drupal/issues/3352063 — should not be necessary, but removing this causes \Drupal\Core\Theme\Component\ComponentMetadata::parseSchemaInfo() to generate `type = ['', 'object'] 🐛
       type: string
       # ⚠️ The reference above is equivalent to:
       # type: string
-      # format: uri
-      # # @see \Drupal\image\Plugin\Field\FieldType\ImageItem::defaultFieldSettings()
-      # pattern: '\.([Pp][Nn][Gg]|[Gg][Ii][Ff]|[Jj][Pp][Gg]|[Jj][Pp][Ee][Gg]|[Ww][Ee][Bb][Pp])$'
+      # format: uri-reference
+      # contentMediaType: image/*
+      # x-allowed-schemes: [http, https]
     test_string_format_uri_reference:
       title: 'String, format=uri-reference'
       type: string
@@ -209,8 +238,8 @@ props:
     # The "image" predefined object format.
     # @todo Agree on one special case, for ecosystem-wide formats: `json-schema-definitions://drupal/<something>`, so `json-schema-definitions://drupal/image` here.
     test_object_drupal_image:
-      title: 'Object, $ref=json-schema-definitions://experience_builder.module/image'
-      $ref: json-schema-definitions://experience_builder.module/image
+      title: 'Object, $ref=json-schema-definitions://canvas.module/image'
+      $ref: json-schema-definitions://canvas.module/image
       # @todo Remove in https://www.drupal.org/project/drupal/issues/3352063 — should not be necessary, but removing this causes \Drupal\Core\Theme\Component\ComponentMetadata::parseSchemaInfo() to generate `type = ['', 'object'] 🐛
       type: object
       examples:
@@ -219,10 +248,10 @@ props:
           width: 600
           height: 400
     test_object_drupal_image_ARRAY:
-      title: 'Array of object, $ref=json-schema-definitions://experience_builder.module/image'
+      title: 'Array of object, $ref=json-schema-definitions://canvas.module/image'
       type: array
       items:
-        $ref: json-schema-definitions://experience_builder.module/image
+        $ref: json-schema-definitions://canvas.module/image
         # @todo `type: object` should not be necessary, it's because \Drupal\sdc\Component\ComponentValidator::getClassProps() does not yet support $ref
         type: object
       maxItems: 2
@@ -242,14 +271,12 @@ props:
           #  height: 402
     # The "video" predefined object format.
     test_object_drupal_video:
-      title: 'Object, $ref=json-schema-definitions://experience_builder.module/video'
-      $ref: json-schema-definitions://experience_builder.module/video
+      title: 'Object, $ref=json-schema-definitions://canvas.module/video'
+      $ref: json-schema-definitions://canvas.module/video
       type: object
       examples:
         - src: https://example.com/file.mp4
           poster: /sites/default/files/600x400.png
-          width: 600
-          height: 400
     # The "remote_video" (oembed:video) predefined object format.
     test_object_drupal_oembed_video:
       title: 'Object, $ref=json-schema-definitions://experience_builder.module/oembed_video'

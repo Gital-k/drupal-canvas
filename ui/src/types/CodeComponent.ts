@@ -1,10 +1,15 @@
 import type derivedPropTypes from '@/features/code-editor/component-data/derivedPropTypes';
 
+export interface DataFetch {
+  id: string;
+  data: any;
+  error: boolean;
+}
+
 export interface CodeComponent {
   machineName: string;
   name: string;
   status: boolean;
-  blockOverride: string | null;
   props: CodeComponentProp[];
   required: string[];
   slots: any[];
@@ -13,21 +18,40 @@ export interface CodeComponent {
   compiledJs: string;
   compiledCss: string;
   importedJsComponents: string[];
-  dataFetches: { [key: string]: any };
+  dataFetches: {
+    [key: string]: DataFetch;
+  };
+  dataDependencies: DataDependencies;
+}
+
+export interface DataDependencies {
+  drupalSettings?: Array<string>;
+  urls?: Array<string>;
 }
 
 export interface CodeComponentSerialized
-  extends Omit<CodeComponent, 'props' | 'slots'> {
+  extends Omit<CodeComponent, 'props' | 'slots' | 'dataFetches'> {
   props: Record<string, CodeComponentPropSerialized>;
   slots: Record<string, CodeComponentSlotSerialized>;
+  dataDependencies: DataDependencies;
+  links?: Record<string, string>;
+}
+
+export interface CodeComponentPropEnumItem {
+  label: string;
+  value: string | number;
 }
 
 export interface CodeComponentProp {
   id: string;
   name: string;
   type: 'string' | 'integer' | 'number' | 'boolean' | 'object';
-  enum?: string[];
-  example?: string | boolean | CodeComponentPropImageExample;
+  enum?: CodeComponentPropEnumItem[];
+  example?:
+    | string
+    | boolean
+    | CodeComponentPropImageExample
+    | CodeComponentPropVideoExample;
   $ref?: string;
   format?: string;
   derivedType: (typeof derivedPropTypes)[number]['type'] | null;
@@ -46,7 +70,17 @@ export interface CodeComponentPropSerialized {
   title: string;
   type: 'string' | 'integer' | 'number' | 'boolean' | 'object';
   enum?: (string | number)[];
-  examples?: (string | number | boolean | CodeComponentPropImageExample)[];
+  'meta:enum'?: Record<
+    CodeComponentPropEnumItem['value'],
+    CodeComponentPropEnumItem['label']
+  >;
+  examples?: (
+    | string
+    | number
+    | boolean
+    | CodeComponentPropImageExample
+    | CodeComponentPropVideoExample
+  )[];
   $ref?: string;
   format?: string;
   contentMediaType?: string;
@@ -77,4 +111,9 @@ export interface AssetLibrary {
     original: string;
     compiled: string;
   };
+}
+
+export interface CodeComponentPropVideoExample {
+  src: string;
+  poster: string;
 }

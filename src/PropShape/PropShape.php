@@ -2,14 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Drupal\experience_builder\PropShape;
+namespace Drupal\canvas\PropShape;
 
 use Drupal\Core\Extension\ModuleHandlerInterface;
-use Drupal\Core\Plugin\Component;
-use Drupal\Core\Template\Attribute;
-use Drupal\Core\Theme\Component\ComponentMetadata;
-use Drupal\experience_builder\JsonSchemaInterpreter\JsonSchemaType;
-use Drupal\experience_builder\PropExpressions\Component\ComponentPropExpression;
+use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaType;
 
 /**
  * A prop shape: a normalized component prop's JSON schema.
@@ -46,10 +42,11 @@ final class PropShape {
    * @param JsonSchema $schema
    * @return JsonSchema
    *
-   * @see \Drupal\experience_builder\Plugin\Adapter\AdapterBase::resolveSchemaReferences
+   * @see \Drupal\canvas\Plugin\Adapter\AdapterBase::resolveSchemaReferences
    */
   private static function resolveSchemaReferences(array $schema): array {
-    if (isset($schema['$ref'])) {
+    // @todo Refactor in https://www.drupal.org/i/3515074
+    if (isset($schema['$ref']) && str_starts_with($schema['$ref'], 'json-schema-definitions://')) {
       // Perform the same schema resolving as `justinrainbow/json-schema`.
       // @todo Delete this method, actually use `justinrainbow/json-schema`.
       $schema = json_decode(file_get_contents($schema['$ref']) ?: '{}', TRUE);
@@ -66,46 +63,6 @@ final class PropShape {
     return $schema;
   }
 
-  /**
-   * @param \Drupal\Core\Plugin\Component $component
-   *
-   * @return \Drupal\experience_builder\PropShape\PropShape[]
-   */
-  public static function getComponentProps(Component $component): array {
-    return self::getComponentPropsForMetadata($component->getPluginId(), $component->metadata);
-  }
-
-  /**
-   * @param string $plugin_id
-   * @param \Drupal\Core\Theme\Component\ComponentMetadata $metadata
-   *
-   * @return \Drupal\experience_builder\PropShape\PropShape[]
-   */
-  public static function getComponentPropsForMetadata(string $plugin_id, ComponentMetadata $metadata): array {
-    $prop_shapes = [];
-
-    // Retrieve the full JSON schema definition from the SDC's metadata.
-    // @see \Drupal\sdc\Component\ComponentValidator::validateProps()
-    // @see \Drupal\sdc\Component\ComponentMetadata::parseSchemaInfo()
-    /** @var array<string, mixed> $component_schema */
-    $component_schema = $metadata->schema;
-    foreach ($component_schema['properties'] ?? [] as $prop_name => $prop_schema) {
-      // TRICKY: `attributes` is a special case — it is kind of a reserved
-      // prop.
-      // @see \Drupal\sdc\Twig\TwigExtension::mergeAdditionalRenderContext()
-      // @see https://www.drupal.org/project/drupal/issues/3352063#comment-15277820
-      if ($prop_name === 'attributes') {
-        assert($prop_schema['type'][0] === Attribute::class);
-        continue;
-      }
-
-      $component_prop_expression = new ComponentPropExpression($plugin_id, $prop_name);
-      $prop_shapes[(string) $component_prop_expression] = static::normalize($prop_schema);
-    }
-
-    return $prop_shapes;
-  }
-
   public function uniquePropSchemaKey(): string {
     // A reliable key thanks to ::normalizePropSchema().
     return urldecode(http_build_query($this->schema));
@@ -120,6 +77,7 @@ final class PropShape {
     ksort($prop_schema);
 
     // Normalization is not (yet) possible when `$ref`s are still present.
+    // @todo Once https://www.drupal.org/i/3352063 is fixed and Canvas requires it, convert this to a \LogicException instead, because it should not be possible to occur anymore.
     if (!array_key_exists('type', $prop_schema) && array_key_exists('$ref', $prop_schema)) {
       return $prop_schema;
     }
@@ -127,12 +85,15 @@ final class PropShape {
     // Ensure that `type` is always listed first.
     $normalized_prop_schema = ['type' => $prop_schema['type']] + $prop_schema;
 
-    // Title, description and examples do not affect which field type + widget
-    // should be used.
+    // Title, description, examples and meta:enum (and its associated optional
+    // x-translation-context) do not affect which field type + widget should be
+    // used.
     unset($normalized_prop_schema['title']);
     unset($normalized_prop_schema['description']);
     unset($normalized_prop_schema['examples']);
-    // @todo Add support to `SDC` for `default` in https://www.drupal.org/project/experience_builder/issues/3462705?
+    unset($normalized_prop_schema['meta:enum']);
+    unset($normalized_prop_schema['x-translation-context']);
+    // @todo Add support to `SDC` for `default` in https://www.drupal.org/project/canvas/issues/3462705?
     // @see https://json-schema.org/draft/2020-12/draft-bhutton-json-schema-validation-00#rfc.section.9.2
     unset($normalized_prop_schema['default']);
 
@@ -144,7 +105,7 @@ final class PropShape {
 
     // If this is a `type: object` with not a `$ref` but `properties`, normalize
     // those too.
-    if ($normalized_prop_schema['type'] === JsonSchemaType::OBJECT->value && array_key_exists('properties', $normalized_prop_schema)) {
+    if ($normalized_prop_schema['type'] === JsonSchemaType::Object->value && array_key_exists('properties', $normalized_prop_schema)) {
       $normalized_prop_schema['properties'] = array_map(
         fn (array $prop_schema) => self::normalizePropSchema($prop_schema),
         $normalized_prop_schema['properties'],

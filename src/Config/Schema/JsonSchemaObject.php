@@ -2,8 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Drupal\experience_builder\Config\Schema;
+namespace Drupal\canvas\Config\Schema;
 
+use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaStringFormat;
+use Drupal\canvas\Plugin\Validation\Constraint\UriConstraint;
+use Drupal\canvas\Plugin\Validation\Constraint\UriSchemeConstraint;
 use Drupal\Core\Config\Schema\Mapping;
 use Drupal\Core\TypedData\DataDefinitionInterface;
 use Drupal\Core\TypedData\MapDataDefinition;
@@ -60,8 +63,21 @@ final class JsonSchemaObject extends Mapping {
           'message' => '%value does not match the pattern %pattern.',
         ];
       }
+      if ($detail['type'] === 'string' && \array_key_exists('format', $detail)) {
+        // @see \Drupal\canvas\JsonSchemaInterpreter\JsonSchemaStringFormat::toDataTypeShapeRequirements()
+        if (in_array($detail['format'], [JsonSchemaStringFormat::Iri->value, JsonSchemaStringFormat::IriReference->value, JsonSchemaStringFormat::Uri->value, JsonSchemaStringFormat::UriReference->value], TRUE)) {
+          $definition['mapping'][$property_name]['constraints'][UriConstraint::PLUGIN_ID] = [
+            'allowReferences' => in_array($detail['format'], [JsonSchemaStringFormat::IriReference->value, JsonSchemaStringFormat::UriReference->value], TRUE),
+          ];
+          if (array_key_exists('x-allowed-schemes', $detail)) {
+            $definition['mapping'][$property_name]['constraints'][UriSchemeConstraint::PLUGIN_ID] = [
+              'allowedSchemes' => $detail['x-allowed-schemes'],
+            ];
+          }
+        }
+      }
       if (\array_key_exists('enum', $detail)) {
-        $definition['mapping'][$property_name]['constraints']['Choice'] = $detail['enum'];
+        $definition['mapping'][$property_name]['constraints']['Choice'] = ['choices' => $detail['enum']];
       }
     }
     parent::__construct($definition, $name, $parent);

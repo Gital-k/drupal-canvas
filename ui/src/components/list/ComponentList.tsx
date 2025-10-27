@@ -1,38 +1,51 @@
 import { useEffect } from 'react';
 import { useErrorBoundary } from 'react-error-boundary';
-import List from '@/components/list/List';
-import { useAppSelector } from '@/app/hooks';
-import {
-  LayoutItemType,
-  selectUniqueListId,
-} from '@/features/ui/primaryPanelSlice';
-import { useGetFilteredComponentsQuery } from '@/hooks/useGetFilteredComponentsQuery';
 
-const ComponentList = () => {
+import ListItem from '@/components/list/ListItem';
+import { LayoutItemType } from '@/features/ui/primaryPanelSlice';
+import {
+  useGetComponentsQuery,
+  useGetFoldersQuery,
+} from '@/services/componentAndLayout';
+
+import LibraryItemList from './LibraryItemList';
+
+import type { CanvasComponent, ComponentsList } from '@/types/Component';
+import type { FolderData } from './FolderList';
+
+interface ComponentListProps {
+  searchTerm: string;
+}
+
+const ComponentList = ({ searchTerm }: ComponentListProps) => {
+  const { data: components, error, isLoading } = useGetComponentsQuery();
   const {
-    filteredComponents: components,
-    error,
-    isLoading,
-  } = useGetFilteredComponentsQuery({
-    mode: 'exclude',
-    libraries: ['dynamic_components'],
-  });
+    data: folders,
+    error: foldersError,
+    isLoading: foldersLoading,
+  } = useGetFoldersQuery({ status: false });
   const { showBoundary } = useErrorBoundary();
-  const id = useAppSelector(selectUniqueListId);
 
   useEffect(() => {
-    if (error) {
-      showBoundary(error);
+    if (error || foldersError) {
+      showBoundary(error || foldersError);
     }
-  }, [error, showBoundary]);
+  }, [error, foldersError, showBoundary]);
+
+  const renderItem = (item: CanvasComponent) => {
+    return <ListItem item={item} type={LayoutItemType.COMPONENT} />;
+  };
 
   return (
-    <List
-      items={components}
-      isLoading={isLoading}
-      type={LayoutItemType.COMPONENT}
-      label="Components"
-      key={id}
+    <LibraryItemList<CanvasComponent>
+      items={components as ComponentsList}
+      folders={folders as FolderData}
+      isLoading={isLoading || foldersLoading}
+      searchTerm={searchTerm}
+      layoutType={LayoutItemType.COMPONENT}
+      topLevelLabel="Components"
+      itemType="component"
+      renderItem={renderItem}
     />
   );
 };

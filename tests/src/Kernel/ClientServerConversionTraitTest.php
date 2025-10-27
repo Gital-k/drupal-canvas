@@ -2,20 +2,22 @@
 
 declare(strict_types=1);
 
-namespace Drupal\Tests\experience_builder\Kernel;
+namespace Drupal\Tests\canvas\Kernel;
 
-use Drupal\experience_builder\Controller\ClientServerConversionTrait;
-use Drupal\experience_builder\Entity\Pattern;
-use Drupal\experience_builder\Exception\ConstraintViolationException;
+use Drupal\canvas\Controller\ClientServerConversionTrait;
+use Drupal\canvas\Entity\Pattern;
+use Drupal\canvas\Exception\ConstraintViolationException;
 use Drupal\KernelTests\KernelTestBase;
 use Drupal\node\Entity\Node;
-use Drupal\Tests\experience_builder\TestSite\XBTestSetup;
-use Drupal\Tests\experience_builder\Traits\ConstraintViolationsTestTrait;
-use Drupal\Tests\experience_builder\Traits\ContribStrictConfigSchemaTestTrait;
-use Drupal\Tests\experience_builder\Traits\XBFieldTrait;
+use Drupal\Tests\canvas\Kernel\Traits\VfsPublicStreamUrlTrait;
+use Drupal\Tests\canvas\TestSite\CanvasTestSetup;
+use Drupal\Tests\canvas\Traits\CanvasFieldCreationTrait;
+use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
+use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
+use Drupal\Tests\canvas\Traits\CanvasFieldTrait;
 
 /**
- * @group experience_builder
+ * @group canvas
  */
 class ClientServerConversionTraitTest extends KernelTestBase {
 
@@ -23,22 +25,22 @@ class ClientServerConversionTraitTest extends KernelTestBase {
 
   private const NESTED_SLOT_COMPONENT_UUID = '8caf6e23-8fb4-4524-bdb6-f57a2a6e7859';
 
-
-  use XBFieldTrait {
+  use CanvasFieldTrait {
     getValidClientJson as traitGetValidClientJson;
     getValidConvertedInputs as traitGetValidConvertedInputs;
   }
-
+  use CanvasFieldCreationTrait;
   use ClientServerConversionTrait;
   use ContribStrictConfigSchemaTestTrait;
   use ConstraintViolationsTestTrait;
+  use VfsPublicStreamUrlTrait;
 
   /**
    * {@inheritdoc}
    */
   private function getValidClientJson(bool $dynamic_image = TRUE): array {
     $json = $this->traitGetValidClientJson(NULL, $dynamic_image);
-    // @see \Drupal\experience_builder\ClientDataToEntityConverter::convert()
+    // @see \Drupal\canvas\ClientDataToEntityConverter::convert()
     $content_region = \array_values(\array_filter($json['layout'], static fn(array $region) => $region['id'] === 'content'))[0];
     assert(count(array_intersect(['nodeType', 'id', 'name', 'components'], array_keys($content_region))) === 4);
     assert($content_region['nodeType'] === 'region');
@@ -47,7 +49,7 @@ class ClientServerConversionTraitTest extends KernelTestBase {
     $createComponentWithSlots = fn(string $uuid, array $body_component = []) => [
       'nodeType' => 'component',
       'uuid' => $uuid,
-      'type' => 'sdc.xb_test_sdc.props-slots@ab4d3ddce315cf64',
+      'type' => 'sdc.canvas_test_sdc.props-slots@85a5c0c7dd53e0bb',
       'slots' => [
         [
           'id' => "$uuid/the_body",
@@ -114,7 +116,7 @@ class ClientServerConversionTraitTest extends KernelTestBase {
   public function setUp(): void {
     parent::setUp();
     $this->container->get('module_installer')->install(['system']);
-    (new XBTestSetup())->setup();
+    (new CanvasTestSetup())->setup();
     $this->setUpImages();
   }
 
@@ -126,13 +128,13 @@ class ClientServerConversionTraitTest extends KernelTestBase {
     $this->assertSame([
       [
         'uuid' => self::TEST_HEADING_UUID,
-        'component_id' => 'sdc.experience_builder.heading',
-        'component_version' => '1b4f8df7c94d7e3c',
+        'component_id' => 'sdc.canvas_test_sdc.heading',
+        'component_version' => '8c01a2bdb897a810',
       ],
       [
         'uuid' => self::TEST_IMAGE_UUID,
-        'component_id' => 'sdc.experience_builder.image',
-        'component_version' => '02ac4f958c84990f',
+        'component_id' => 'sdc.canvas_test_sdc.image',
+        'component_version' => 'abadf2538ecfdecc',
       ],
       [
         'uuid' => self::TEST_BLOCK,
@@ -141,13 +143,13 @@ class ClientServerConversionTraitTest extends KernelTestBase {
       ],
       [
         'uuid' => self::TOP_LEVEL_SLOT_COMPONENT_UUID,
-        'component_id' => 'sdc.xb_test_sdc.props-slots',
-        'component_version' => 'ab4d3ddce315cf64',
+        'component_id' => 'sdc.canvas_test_sdc.props-slots',
+        'component_version' => '85a5c0c7dd53e0bb',
       ],
       [
         'uuid' => self::NESTED_SLOT_COMPONENT_UUID,
-        'component_id' => 'sdc.xb_test_sdc.props-slots',
-        'component_version' => 'ab4d3ddce315cf64',
+        'component_id' => 'sdc.canvas_test_sdc.props-slots',
+        'component_version' => '85a5c0c7dd53e0bb',
         'slot' => 'the_body',
         'parent_uuid' => self::TOP_LEVEL_SLOT_COMPONENT_UUID,
       ],
@@ -156,7 +158,7 @@ class ClientServerConversionTraitTest extends KernelTestBase {
     $node1 = Node::create([
       'type' => 'article',
       'title' => '5 amazing uses for old toothbrushes',
-      'field_xb_demo' => $converted_items,
+      'field_canvas_demo' => $converted_items,
     ]);
     $node1->validate();
     $node1->save();
@@ -164,10 +166,10 @@ class ClientServerConversionTraitTest extends KernelTestBase {
     $this->assertNodeValues(
       $node1,
       [
-        'sdc.experience_builder.heading',
-        'sdc.experience_builder.image',
+        'sdc.canvas_test_sdc.heading',
+        'sdc.canvas_test_sdc.image',
         'block.system_branding_block',
-        'sdc.xb_test_sdc.props-slots',
+        'sdc.canvas_test_sdc.props-slots',
       ],
       $expected_inputs,
       ['title' => '5 amazing uses for old toothbrushes']
@@ -179,13 +181,13 @@ class ClientServerConversionTraitTest extends KernelTestBase {
     $this->assertSame([
       [
         'uuid' => self::TEST_HEADING_UUID,
-        'component_id' => 'sdc.experience_builder.heading',
-        'component_version' => '1b4f8df7c94d7e3c',
+        'component_id' => 'sdc.canvas_test_sdc.heading',
+        'component_version' => '8c01a2bdb897a810',
       ],
       [
         'uuid' => self::TEST_IMAGE_UUID,
-        'component_id' => 'sdc.experience_builder.image',
-        'component_version' => '02ac4f958c84990f',
+        'component_id' => 'sdc.canvas_test_sdc.image',
+        'component_version' => 'abadf2538ecfdecc',
       ],
       [
         'uuid' => self::TEST_BLOCK,
@@ -219,17 +221,10 @@ class ClientServerConversionTraitTest extends KernelTestBase {
     );
 
     $invalid_tree_client_json = $valid_client_json;
-    $invalid_tree_client_json['layout'][1]['type'] = 'sdc.experience_builder.missing_component@no_such_thing';
+    $invalid_tree_client_json['layout'][1]['type'] = 'sdc.canvas.missing_component@no_such_thing';
     $this->assertConversionErrors(
       $invalid_tree_client_json,
-      ['layout.children.1.component_id' => "The 'experience_builder.component.sdc.experience_builder.missing_component' config does not exist."]
-    );
-
-    $invalid_block_settings = $valid_client_json;
-    $invalid_block_settings['model'][self::TEST_BLOCK]['resolved']['use_site_slogan'] = ['this is not a boolean'];
-    $this->assertConversionErrors(
-      $invalid_block_settings,
-      ['model.' . self::TEST_BLOCK . '.use_site_slogan' => 'This value should be of the correct primitive type.'],
+      ['layout.children.1.component_id' => "The 'canvas.component.sdc.canvas.missing_component' config does not exist."]
     );
   }
 
@@ -249,13 +244,13 @@ class ClientServerConversionTraitTest extends KernelTestBase {
         [
           'nodeType' => 'component',
           'uuid' => self::TEST_HEADING_UUID,
-          'type' => 'sdc.experience_builder.heading@1b4f8df7c94d7e3c',
+          'type' => 'sdc.canvas_test_sdc.heading@8c01a2bdb897a810',
           'slots' => [],
         ],
         [
           'nodeType' => 'component',
           'uuid' => self::TEST_IMAGE_UUID,
-          'type' => 'sdc.experience_builder.image@02ac4f958c84990f',
+          'type' => 'sdc.canvas_test_sdc.image@abadf2538ecfdecc',
           'slots' => [],
         ],
         [
@@ -282,16 +277,7 @@ class ClientServerConversionTraitTest extends KernelTestBase {
               'expression' => 'ℹ︎list_string␟value',
               'sourceTypeSettings' => [
                 'storage' => [
-                  'allowed_values' => [
-                    [
-                      'value' => 'primary',
-                      'label' => 'primary',
-                    ],
-                    [
-                      'value' => 'secondary',
-                      'label' => 'secondary',
-                    ],
-                  ],
+                  'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
                 ],
               ],
             ],
@@ -300,36 +286,7 @@ class ClientServerConversionTraitTest extends KernelTestBase {
               'expression' => 'ℹ︎list_string␟value',
               'sourceTypeSettings' => [
                 'storage' => [
-                  'allowed_values' => [
-                    [
-                      'value' => 'div',
-                      'label' => 'div',
-                    ],
-                    [
-                      'value' => 'h1',
-                      'label' => 'h1',
-                    ],
-                    [
-                      'value' => 'h2',
-                      'label' => 'h2',
-                    ],
-                    [
-                      'value' => 'h3',
-                      'label' => 'h3',
-                    ],
-                    [
-                      'value' => 'h4',
-                      'label' => 'h4',
-                    ],
-                    [
-                      'value' => 'h5',
-                      'label' => 'h5',
-                    ],
-                    [
-                      'value' => 'h6',
-                      'label' => 'h6',
-                    ],
-                  ],
+                  'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
                 ],
               ],
             ],
@@ -348,7 +305,7 @@ class ClientServerConversionTraitTest extends KernelTestBase {
             'image' => [
               'value' => $this->mediaEntity->id(),
               'sourceType' => 'static:field_item:entity_reference',
-              'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:image␝field_media_image␞␟entity␜␜entity:file␝uri␞␟url,alt↝entity␜␜entity:media:image␝field_media_image␞␟alt,width↝entity␜␜entity:media:image␝field_media_image␞␟width,height↝entity␜␜entity:media:image␝field_media_image␞␟height}',
+              'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:image␝field_media_image␞␟src_with_alternate_widths,alt↝entity␜␜entity:media:image␝field_media_image␞␟alt,width↝entity␜␜entity:media:image␝field_media_image␞␟width,height↝entity␜␜entity:media:image␝field_media_image␞␟height}',
               'sourceTypeSettings' => [
                 'storage' => ['target_type' => 'media'],
                 'instance' => [
@@ -363,9 +320,11 @@ class ClientServerConversionTraitTest extends KernelTestBase {
         ],
         self::TEST_BLOCK => [
           'resolved' => [
-            'use_site_logo' => TRUE,
-            'use_site_name' => TRUE,
-            'use_site_slogan' => FALSE,
+            'block_branding' => [
+              'use_site_logo' => TRUE,
+              'use_site_name' => TRUE,
+              'use_site_slogan' => FALSE,
+            ],
             'label' => '',
             'label_display' => FALSE,
           ],

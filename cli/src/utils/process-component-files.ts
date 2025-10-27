@@ -1,7 +1,9 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import * as yaml from 'js-yaml';
-import type { Component } from '../types/Component';
+
+import type { Component, DataDependencies } from '../types/Component';
+import type { Metadata } from '../types/Metadata';
 
 /**
  * Process and read component files
@@ -13,7 +15,7 @@ export async function processComponentFiles(componentDir: string): Promise<{
   compiledJs: string;
   sourceCodeCss: string;
   compiledCss: string;
-  metadata: any;
+  metadata: Metadata | undefined;
 }> {
   const metadataPath = await findMetadataPath(componentDir);
   const metadata = await readComponentMetadata(metadataPath);
@@ -34,7 +36,7 @@ export async function processComponentFiles(componentDir: string): Promise<{
     );
     // If source CSS exists, compiled CSS should also exist
     compiledCss = await fs.readFile(path.join(distDir, 'index.css'), 'utf-8');
-  } catch (e) {
+  } catch {
     // CSS files don't exist, use empty strings
   }
 
@@ -69,7 +71,9 @@ export async function findMetadataPath(componentDir: string): Promise<string> {
  * @param filePath Path to the YAML file
  * @returns Properly structured component metadata
  */
-export async function readComponentMetadata(filePath: string): Promise<any> {
+export async function readComponentMetadata(
+  filePath: string,
+): Promise<Metadata | undefined> {
   try {
     const content = await fs.readFile(filePath, 'utf-8');
     // Make sure we return an object even if the file is empty
@@ -79,11 +83,11 @@ export async function readComponentMetadata(filePath: string): Promise<any> {
       console.error(
         `Invalid metadata format in ${filePath}. Expected an object, got ${typeof rawMetadata}`,
       );
-      return { name: path.basename(path.dirname(filePath)) };
+      return undefined;
     }
 
     // Basic validation and normalization
-    const metadata = rawMetadata as any;
+    const metadata = rawMetadata as Metadata;
 
     // Ensure other required fields
     if (!metadata.name) {
@@ -100,6 +104,7 @@ export async function readComponentMetadata(filePath: string): Promise<any> {
     return metadata;
   } catch (error) {
     console.error(`Error reading component metadata from ${filePath}:`, error);
+    return undefined;
   }
 }
 
@@ -109,7 +114,7 @@ export async function readComponentMetadata(filePath: string): Promise<any> {
  * @returns Component payload for API
  */
 export function createComponentPayload(params: {
-  metadata: any;
+  metadata: Metadata;
   machineName: string;
   componentName: string;
   sourceCodeJs: string;
@@ -117,6 +122,7 @@ export function createComponentPayload(params: {
   sourceCodeCss: string;
   compiledCss: string;
   importedJsComponents: string[];
+  dataDependencies: DataDependencies;
 }): Component {
   const {
     metadata,
@@ -126,6 +132,8 @@ export function createComponentPayload(params: {
     compiledJs,
     sourceCodeCss,
     compiledCss,
+    importedJsComponents,
+    dataDependencies,
   } = params;
 
   // Ensure props is correctly structured
@@ -148,7 +156,7 @@ export function createComponentPayload(params: {
     compiledJs: compiledJs,
     sourceCodeCss: sourceCodeCss,
     compiledCss: compiledCss,
-    blockOverride: metadata.blockOverride || null,
-    importedJsComponents: metadata.importedJsComponents || [],
+    importedJsComponents: importedJsComponents || [],
+    dataDependencies: dataDependencies || {},
   };
 }

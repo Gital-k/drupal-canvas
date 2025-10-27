@@ -1,33 +1,38 @@
-import type React from 'react';
-import type { XBComponent, JSComponent } from '@/types/Component';
-import type { Section } from '@/types/Section';
 import { useState } from 'react';
 import clsx from 'clsx';
-import styles from '@/components/list/List.module.css';
+import { useParams } from 'react-router';
+import { useDraggable } from '@dnd-kit/core';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { Theme } from '@radix-ui/themes';
-import { findNodePathByUuid } from '@/features/layout/layoutUtils';
-import {
-  addNewComponentToLayout,
-  addNewSectionToLayout,
-  selectLayout,
-} from '@/features/layout/layoutModelSlice';
+
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import ComponentPreview from '@/components/ComponentPreview';
-import SidebarNode from '@/components/sidePanel/SidebarNode';
-import useComponentSelection from '@/hooks/useComponentSelection';
-import ExposedJsComponent from '@/components/list/ExposedJsComponent';
+import CodeComponentItem from '@/components/list/CodeComponentItem';
+import ComponentItem from '@/components/list/ComponentItem';
+import PatternItem from '@/components/list/PatternItem';
+import UnifiedMenu from '@/components/UnifiedMenu';
+import {
+  _addNewComponentToLayout,
+  addNewPatternToLayout,
+  selectLayout,
+} from '@/features/layout/layoutModelSlice';
+import { findNodePathByUuid } from '@/features/layout/layoutUtils';
+import { selectActivePanel } from '@/features/ui/primaryPanelSlice';
 import { DEFAULT_REGION } from '@/features/ui/uiSlice';
-import { useDraggable } from '@dnd-kit/core';
-import SectionNode from '@/components/list/SectionNode';
-import { useParams } from 'react-router';
+import useComponentSelection from '@/hooks/useComponentSelection';
+
+import type React from 'react';
 import type { LayoutItemType } from '@/features/ui/primaryPanelSlice';
+import type { CanvasComponent, JSComponent } from '@/types/Component';
+import type { Pattern } from '@/types/Pattern';
+
+import styles from '@/components/list/List.module.css';
 
 const ListItem: React.FC<{
-  item: XBComponent | Section;
+  item: CanvasComponent | Pattern;
   type:
     | LayoutItemType.COMPONENT
-    | LayoutItemType.SECTION
+    | LayoutItemType.PATTERN
     | LayoutItemType.DYNAMIC;
 }> = (props) => {
   const { item, type } = props;
@@ -35,7 +40,7 @@ const ListItem: React.FC<{
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const layout = useAppSelector(selectLayout);
   const [previewingComponent, setPreviewingComponent] = useState<
-    XBComponent | Section
+    CanvasComponent | Pattern
   >();
   const {
     componentId: selectedComponent,
@@ -51,8 +56,14 @@ const ListItem: React.FC<{
       name: item.name,
     },
   });
+  const activePanel = useAppSelector(selectActivePanel);
 
-  const clickToInsertHandler = (newId: string) => {
+  // Can't drag items from Manage library, and disable drag for broken components
+  const isDraggable = () =>
+    activePanel !== 'manageLibrary' && ('broken' in item ? !item.broken : true);
+
+  const handleInsertClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.stopPropagation();
     let path: number[] | null = [0];
     if (selectedComponent) {
       path = findNodePathByUuid(layout, selectedComponent);
@@ -65,20 +76,20 @@ const ListItem: React.FC<{
 
       if (type === 'component' || type === 'dynamicComponent') {
         dispatch(
-          addNewComponentToLayout(
+          _addNewComponentToLayout(
             {
               to: newPath,
-              component: item as XBComponent,
+              component: item as CanvasComponent,
             },
             setSelectedComponent,
           ),
         );
-      } else if (type === 'section') {
+      } else if (type === 'pattern') {
         dispatch(
-          addNewSectionToLayout(
+          addNewPatternToLayout(
             {
               to: newPath,
-              layoutModel: (item as Section).layoutModel,
+              layoutModel: (item as Pattern).layoutModel,
             },
             setSelectedComponent,
           ),
@@ -87,19 +98,32 @@ const ListItem: React.FC<{
     }
   };
 
-  const handleMouseEnter = (component: XBComponent | Section) => {
+  const handleMouseEnter = (component: CanvasComponent | Pattern) => {
     if (!isMenuOpen) {
       setPreviewingComponent(component);
     }
   };
 
+  const insertMenuItem = () => (
+    <UnifiedMenu.Item onClick={handleInsertClick}>Insert</UnifiedMenu.Item>
+  );
+
+  const menuTitleItems = () => (
+    <>
+      <UnifiedMenu.Label>{item.name}</UnifiedMenu.Label>
+      <UnifiedMenu.Separator />
+    </>
+  );
+
   const renderItem = () => {
-    if (type === 'section') {
+    if (type === 'pattern') {
       return (
-        <SectionNode
-          section={item as Section}
+        <PatternItem
+          pattern={item as Pattern}
           onMenuOpenChange={setIsMenuOpen}
           disabled={isDragging}
+          insertMenuItem={insertMenuItem()}
+          menuTitleItems={menuTitleItems()}
         />
       );
     }
@@ -108,40 +132,61 @@ const ListItem: React.FC<{
       (item as JSComponent).source === 'Code component'
     ) {
       return (
-        <ExposedJsComponent
+        <CodeComponentItem
           component={item as JSComponent}
+          exposed={true}
           onMenuOpenChange={setIsMenuOpen}
           disabled={isDragging}
+          insertMenuItem={insertMenuItem()}
+          menuTitleItems={menuTitleItems()}
         />
       );
     }
     return (
-      <SidebarNode
-        title={item.name}
-        disabled={isDragging}
-        variant={
-          type === 'component' && (item as XBComponent).source === 'Blocks'
-            ? 'dynamicComponent'
-            : type
-        }
-      />
+      <>
+        <ComponentItem
+          component={item as CanvasComponent}
+          onMenuOpenChange={setIsMenuOpen}
+          disabled={isDragging}
+          insertMenuItem={insertMenuItem()}
+          menuTitleItems={menuTitleItems()}
+        ></ComponentItem>
+      </>
     );
   };
 
+  let wrapperProps: React.HTMLAttributes<HTMLDivElement> &
+    React.RefAttributes<HTMLDivElement> & {
+      'data-canvas-component-id': string;
+      'data-canvas-name': string;
+      'data-canvas-type':
+        | LayoutItemType.PATTERN
+        | LayoutItemType.COMPONENT
+        | LayoutItemType.DYNAMIC;
+    } = {
+    role: 'listitem',
+    'data-canvas-component-id': item.id,
+    'data-canvas-name': item.name,
+    'data-canvas-type': type,
+    className: clsx(styles.listItem),
+  };
+
+  // Always attach onMouseEnter for preview, but only attach drag props if draggable
+  wrapperProps = {
+    ...wrapperProps,
+    onMouseEnter: () => handleMouseEnter(item),
+  };
+  if (isDraggable()) {
+    wrapperProps = {
+      ...attributes,
+      ...wrapperProps,
+      ...listeners,
+      ref: setNodeRef,
+    };
+  }
+
   return (
-    <div
-      key={item.id}
-      {...attributes}
-      {...listeners}
-      role="listitem"
-      ref={setNodeRef}
-      data-xb-component-id={item.id}
-      data-xb-name={item.name}
-      data-xb-type={type}
-      className={clsx(styles.listItem)}
-      onClick={() => clickToInsertHandler(item.id)}
-      onMouseEnter={() => handleMouseEnter(item)}
-    >
+    <div key={item.id} {...wrapperProps}>
       <Tooltip.Provider>
         <Tooltip.Root delayDuration={0}>
           <Tooltip.Trigger asChild={true} style={{ width: '100%' }}>
@@ -155,6 +200,7 @@ const ListItem: React.FC<{
               className={styles.componentPreviewTooltipContent}
               onClick={(e) => e.stopPropagation()}
               style={{ pointerEvents: 'none' }}
+              aria-label={`${item.name} preview thumbnail`}
             >
               <Theme>
                 {previewingComponent && !isMenuOpen && (

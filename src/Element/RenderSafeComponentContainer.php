@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Drupal\experience_builder\Element;
+namespace Drupal\canvas\Element;
 
+use Drupal\Core\Form\EnforcedResponseException;
+use Drupal\Core\Form\FormAjaxException;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Drupal\Core\Render\Attribute\RenderElement;
 use Drupal\Core\Render\Element\RenderElementBase;
@@ -60,17 +62,33 @@ final class RenderSafeComponentContainer extends RenderElementBase implements Co
       try {
         return $this->renderer->render($element['#component']);
       }
+      // @todo Remove when https://www.drupal.org/i/2367555 is fixed.
+      catch (EnforcedResponseException | FormAjaxException $e) {
+        throw $e;
+      }
       catch (\Throwable $e) {
         // In this scenario because rendering fails the context isn't updated or
         // bubbled.
-        $context->update($element);
-        $context->bubble();
+        // TRICKY: depending on where an exception is thrown, it is possible
+        // that the render context is in a broken state. Typically, the context
+        // count at this point should be 1. But in some cases (e.g. when a Twig
+        // RuntimeError occurs), it may be >1. This would in turn trigger a
+        // "Bubbling failed" assertion error in ::executeInRenderContext(). This
+        // defeats the purpose of the RenderSafeComponentContainer! So, unwind
+        // the render context to the top level when an exception occurs, so that
+        // ::handleComponentException() can safely render a fallback.
+        while ($context->count() > 1) {
+          $context->update($element);
+          $context->bubble();
+        }
         $fallback = self::handleComponentException(
           $e,
           $element['#component_context'] ?? '',
           $element['#is_preview'] ?? FALSE,
           $element['#component_uuid'] ?? '',
         );
+        // Convey to the caller that this component instance render crashed.
+        $element['#render_crashed'] = TRUE;
         return $this->renderer->render($fallback);
       }
     });
@@ -83,7 +101,7 @@ final class RenderSafeComponentContainer extends RenderElementBase implements Co
   }
 
   public static function handleComponentException(\Throwable $e, string $componentContext, bool $isPreview, string $componentUuid): array {
-    \Drupal::logger('experience_builder')->error(\sprintf('%s occurred during rendering of component %s in %s: %s', $e::class, $componentUuid, $componentContext, $e->getMessage()));
+    \Drupal::logger('canvas')->error(\sprintf('%s occurred during rendering of component %s in %s: %s', $e::class, $componentUuid, $componentContext, $e->getMessage()));
     if ($isPreview) {
       return [
         '#type' => 'container',

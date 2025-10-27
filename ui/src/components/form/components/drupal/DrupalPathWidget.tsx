@@ -1,14 +1,15 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+
 import TextField from '@/components/form/components/TextField';
+import InputBehaviors from '@/components/form/inputBehaviors';
+import { useEntityTitle } from '@/hooks/useEntityTitle';
 import { a2p } from '@/local_packages/utils.js';
+import { useGetPageLayoutQuery } from '@/services/componentAndLayout';
+import { getDrupalSettings } from '@/utils/drupal-globals';
+
 import type { Attributes } from '@/types/DrupalAttribute';
 import type { transliterate as TransliterateType } from '@/types/transliterate';
-import { useAppSelector } from '@/app/hooks';
-import { selectPageData } from '@/features/pageData/pageDataSlice';
-import { getDrupalSettings, getXbSettings } from '@/utils/drupal-globals';
-import { useGetLayoutByIdQuery } from '@/services/componentAndLayout';
-import { selectEntityId } from '@/features/configuration/configurationSlice';
-import InputBehaviors from '@/components/form/inputBehaviors';
+
 const getTransliterate = (): TransliterateType => {
   const { transliterate: drupalTransliterate } = window;
   return drupalTransliterate;
@@ -59,12 +60,8 @@ const DrupalPathWidget = ({
   const [pathValue, setPathValue] = useState<string>(initialValue.toString());
   const autoGenerateOn = useRef<boolean>(false);
 
-  const xbSettings = getXbSettings();
-  const entity_form_fields = useAppSelector(selectPageData);
-  const titleInput =
-    entity_form_fields[`${xbSettings.entityTypeKeys.label}[0][value]`];
-  const entityId = useAppSelector(selectEntityId);
-  const { data: fetchedLayout } = useGetLayoutByIdQuery(entityId);
+  const titleInput = useEntityTitle();
+  const { data: fetchedLayout } = useGetPageLayoutQuery();
   const isPublished = fetchedLayout?.isPublished;
 
   const handleChange = useCallback(
@@ -91,7 +88,7 @@ const DrupalPathWidget = ({
       return;
     }
 
-    const newValue = getPathAlias(titleInput);
+    const newValue = getPathAlias(titleInput ?? '');
     const syntheticEvent = {
       target: {
         value: newValue,
@@ -109,7 +106,7 @@ const DrupalPathWidget = ({
       return;
     }
 
-    const isOverridden = getPathAlias(titleInput) !== pathValue;
+    const isOverridden = getPathAlias(titleInput ?? '') !== pathValue;
     // Only auto-generate if the path hasn't been set manually and the content
     // hasn't been published.
     if (!isOverridden && !isPublished) {

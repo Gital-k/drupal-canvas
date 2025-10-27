@@ -1,9 +1,14 @@
 import { useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { DEFAULT_REGION } from '@/features/ui/uiSlice';
-import { getBaseUrl, getXbSettings } from '@/utils/drupal-globals';
+import { useLocation, useNavigate } from 'react-router-dom';
 
-const xbSettings = getXbSettings();
+import { DEFAULT_REGION } from '@/features/ui/uiSlice';
+import { getBaseUrl, getCanvasSettings } from '@/utils/drupal-globals';
+import {
+  removeComponentFromPathname,
+  setRegionInPathname,
+} from '@/utils/route-utils';
+
+const canvasSettings = getCanvasSettings();
 
 /**
  * Hook for editor navigation functions
@@ -11,31 +16,34 @@ const xbSettings = getXbSettings();
  */
 export function useEditorNavigation() {
   const navigate = useNavigate();
-  const baseUrl = getBaseUrl();
+  const location = useLocation();
+  const drupalBaseUrl = getBaseUrl();
 
   const setSelectedRegion = useCallback(
-    (regionId: string) => {
-      const baseUrl = '/editor';
-      if (regionId === DEFAULT_REGION) {
-        navigate(`${baseUrl}`);
-      } else {
-        navigate(`${baseUrl}/region/${regionId}`);
-      }
+    (regionId?: string) => {
+      // Remove any /component/:componentId from the path first
+      const basePath = removeComponentFromPathname(location.pathname);
+      // Use the utility to robustly set /region/:regionId
+      const newPath = setRegionInPathname(basePath, regionId, DEFAULT_REGION);
+      navigate(newPath);
     },
-    [navigate],
+    [navigate, location.pathname],
   );
 
-  // @todo revisit approach (like using routing) and see if timeout can be removed in https://www.drupal.org/i/3502887
   const setEditorEntity = useCallback(
     (entityType: string, entityId: string) => {
-      // Use a timeout to ensure that RTK query cleans up its subscriptions first before navigating away.
-      // Without this timeout, RTK throws an error because it tries to make a request following cache invalidation while
-      // the window.location.href is in progress.
+      // @todo revisit approach (like using FE routing) and see if timeout can be removed in follow up to https://www.drupal.org/i/3502887
+      // For now, we are using window.location.href to force a full page reload
+      // to ensure all state is reset when switching entities. Later we can use navigate:
+      // navigate(`${baseUrl}editor/${entityType}/${entityId}`);
       setTimeout(() => {
-        window.location.href = `${baseUrl}xb/${entityType}/${entityId}`;
+        // Use a timeout to ensure that RTK query cleans up its subscriptions first before navigating away.
+        // Without this timeout, RTK throws an error because it tries to make a request following cache invalidation while
+        // the window.location.href is in progress.
+        window.location.href = `${drupalBaseUrl}canvas/editor/${entityType}/${entityId}`;
       }, 100);
     },
-    [baseUrl],
+    [drupalBaseUrl],
   );
 
   const editorNavUtils = {
@@ -43,7 +51,7 @@ export function useEditorNavigation() {
     setEditorEntity,
   };
 
-  xbSettings.navUtils = editorNavUtils;
+  canvasSettings.navUtils = editorNavUtils;
 
   return editorNavUtils;
 }

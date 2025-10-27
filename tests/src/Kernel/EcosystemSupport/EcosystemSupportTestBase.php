@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-namespace Drupal\Tests\experience_builder\Kernel\EcosystemSupport;
+namespace Drupal\Tests\canvas\Kernel\EcosystemSupport;
 
 use Drupal\Core\Extension\Extension;
 use Drupal\Core\Extension\ExtensionLifecycle;
 use Drupal\Core\Extension\ModuleExtensionList;
 use Drupal\KernelTests\KernelTestBase;
-use Drupal\Tests\experience_builder\Traits\ContribStrictConfigSchemaTestTrait;
+use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 
 /**
- * Base class for testing XB support for some aspect of the Drupal ecosystem.
+ * Base class for testing Canvas support for some aspect of the Drupal ecosystem.
  */
 abstract class EcosystemSupportTestBase extends KernelTestBase {
 
@@ -23,8 +23,16 @@ abstract class EcosystemSupportTestBase extends KernelTestBase {
   protected static $modules = [
     'system',
     'user',
-    'experience_builder',
+    'filter',
+    'ckeditor5',
+    'editor',
+    'canvas',
   ];
+
+  protected function setUp(): void {
+    parent::setUp();
+    $this->installConfig('canvas');
+  }
 
   public static function getUninstalledStableModulesWithPlugin(string $plugin_type_subdir): array {
     return array_keys(array_filter(

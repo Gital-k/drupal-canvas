@@ -1,4 +1,11 @@
 /* cspell:ignore Insertable */
+import { useEffect, useMemo, useState } from 'react';
+import { useErrorBoundary } from 'react-error-boundary';
+import {
+  CheckIcon,
+  InfoCircledIcon,
+  PinBottomIcon,
+} from '@radix-ui/react-icons';
 import {
   Box,
   Callout,
@@ -8,33 +15,26 @@ import {
   Select,
   Tooltip,
 } from '@radix-ui/themes';
-import {
-  FormElement,
-  Label,
-} from '@/features/code-editor/component-data/FormElement';
-import { useEffect, useState, useMemo } from 'react';
-import styles from '@/features/code-editor/Import.module.css';
-import {
-  CheckIcon,
-  InfoCircledIcon,
-  PinBottomIcon,
-} from '@radix-ui/react-icons';
-import { useGetCodeComponentsQuery } from '@/services/componentAndLayout';
+
+import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import {
   selectCodeComponentProperty,
   setCodeComponentProperty,
 } from '@/features/code-editor/codeEditorSlice';
-import { useAppDispatch, useAppSelector } from '@/app/hooks';
-import { useErrorBoundary } from 'react-error-boundary';
-import { formatToValidImportName } from '@/features/code-editor/utils';
+import {
+  FormElement,
+  Label,
+} from '@/features/code-editor/component-data/FormElement';
+import { formatToValidImportName } from '@/features/code-editor/utils/utils';
+import { useGetCodeComponentsQuery } from '@/services/componentAndLayout';
+
+import styles from '@/features/code-editor/Import.module.css';
 
 const CodeComponentImports = () => {
   const currentComponentId = useAppSelector(
     selectCodeComponentProperty('machineName'),
   );
-  const { data: codeComponents, error } = useGetCodeComponentsQuery({
-    override: false,
-  });
+  const { data: codeComponents, error } = useGetCodeComponentsQuery();
   const { showBoundary } = useErrorBoundary();
   const [importName, setImportName] = useState('');
   const [importSource, setImportSource] = useState('');
@@ -175,7 +175,7 @@ const InsertableCodeBlock = ({ children }: { children: React.ReactNode }) => {
               onClick={handleInsert}
               aria-label="Insert code"
               variant="soft"
-              data-testid="xb-insert-import-button"
+              data-testid="canvas-insert-import-button"
               size="1"
             >
               {inserted ? <CheckIcon /> : <PinBottomIcon />}

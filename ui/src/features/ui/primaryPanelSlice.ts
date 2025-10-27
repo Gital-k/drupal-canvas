@@ -1,29 +1,60 @@
 import { createAppSlice } from '@/app/createAppSlice';
+
 import type { PayloadAction } from '@reduxjs/toolkit';
+
+const PANEL_STATE_KEY = 'canvas_panel_state';
+
+// Try to load initial state from localStorage.
+const loadSavedState = (): Partial<PrimaryPanelState> => {
+  try {
+    const saved = localStorage.getItem(PANEL_STATE_KEY);
+    if (saved) {
+      return JSON.parse(saved);
+    }
+  } catch (e) {
+    console.warn('Failed to load panel state from localStorage:', e);
+  }
+  return {};
+};
 
 export interface PrimaryPanelState {
   activePanel: string;
   isHidden: boolean;
-  openLayoutItems: string[];
-  uniqueListId: string;
+  aiPanelOpen: boolean;
+  manageLibraryTab: string | null;
 }
 
 export enum LayoutItemType {
-  SECTION = 'section',
+  PATTERN = 'pattern',
   COMPONENT = 'component',
   DYNAMIC = 'dynamicComponent',
   CODE = 'code',
-  OVERRIDE = 'override',
-  AIWIZARD = 'aiWizard',
   UNDEFINED = 'undefined',
 }
 
+const savedState = loadSavedState();
+
 const initialState: PrimaryPanelState = {
-  activePanel: 'layers',
+  activePanel: savedState.activePanel || '',
   isHidden: false,
-  // Open the component dropdown by default.
-  openLayoutItems: [LayoutItemType.COMPONENT],
-  uniqueListId: '',
+  aiPanelOpen: false,
+  manageLibraryTab: null,
+};
+
+// Temporary workaround to persist primary panel state when switching between entities until
+// we can use routing without full page reloads. It only remembers 'pages' or 'templates' as the active panel.
+const saveToLocalStorage = (state: PrimaryPanelState) => {
+  try {
+    const dataToSave = {
+      activePanel:
+        state.activePanel === 'templates' || state.activePanel === 'pages'
+          ? state.activePanel
+          : '',
+    };
+    localStorage.setItem(PANEL_STATE_KEY, JSON.stringify(dataToSave));
+  } catch (e) {
+    console.warn('Failed to save panel state to localStorage:', e);
+  }
 };
 
 export const primaryPanelSlice = createAppSlice({
@@ -34,35 +65,33 @@ export const primaryPanelSlice = createAppSlice({
   reducers: (create) => ({
     setActivePanel: create.reducer((state, action: PayloadAction<string>) => {
       state.activePanel = action.payload;
+      saveToLocalStorage(state);
     }),
     unsetActivePanel: create.reducer((state) => {
       state.activePanel = '';
+      saveToLocalStorage(state);
     }),
-    setOpenLayoutItem: create.reducer(
+    setAiPanelOpen: create.reducer((state) => {
+      state.aiPanelOpen = true;
+    }),
+    setAiPanelClosed: create.reducer((state) => {
+      state.aiPanelOpen = false;
+    }),
+    setManageLibraryTab: create.reducer(
       (state, action: PayloadAction<string>) => {
-        state.openLayoutItems = [...state.openLayoutItems, action.payload];
+        state.manageLibraryTab = action.payload;
       },
     ),
-    setCloseLayoutItem: create.reducer(
-      (state, action: PayloadAction<string>) => {
-        state.openLayoutItems = state.openLayoutItems.filter(
-          (item) => item !== action.payload,
-        );
-      },
-    ),
-    setUniqueListId: create.reducer((state, action: PayloadAction<string>) => {
-      state.uniqueListId = action.payload;
-    }),
   }),
   selectors: {
     selectActivePanel: (primaryPanel): string => {
       return primaryPanel.activePanel;
     },
-    selectOpenLayoutItems: (primaryPanel): string[] => {
-      return primaryPanel.openLayoutItems;
+    selectAiPanelOpen: (primaryPanel): boolean => {
+      return primaryPanel.aiPanelOpen;
     },
-    selectUniqueListId: (primaryPanel): string => {
-      return primaryPanel.uniqueListId;
+    selectManageLibraryTab: (primaryPanel): string | null => {
+      return primaryPanel.manageLibraryTab;
     },
   },
 });
@@ -71,11 +100,11 @@ export const primaryPanelSlice = createAppSlice({
 export const {
   setActivePanel,
   unsetActivePanel,
-  setOpenLayoutItem,
-  setCloseLayoutItem,
-  setUniqueListId,
+  setAiPanelOpen,
+  setAiPanelClosed,
+  setManageLibraryTab,
 } = primaryPanelSlice.actions;
 
 // Selectors returned by `slice.selectors` take the root state as their first argument.
-export const { selectActivePanel, selectOpenLayoutItems, selectUniqueListId } =
+export const { selectActivePanel, selectAiPanelOpen, selectManageLibraryTab } =
   primaryPanelSlice.selectors;

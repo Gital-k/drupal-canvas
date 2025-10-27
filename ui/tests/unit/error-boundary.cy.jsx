@@ -5,9 +5,10 @@ import {
   json,
   RouterProvider,
 } from 'react-router-dom';
+
 import ErrorBoundary, {
-  RouteErrorBoundary,
   RouteAsyncErrorBoundary,
+  RouteErrorBoundary,
 } from '@/components/error/ErrorBoundary';
 
 beforeEach(() => {
@@ -82,7 +83,7 @@ describe('ErrorBoundary handles errors', () => {
         <TroubleMaker shouldThrow={true} />
       </ErrorBoundary>,
     );
-    cy.findByTestId('xb-error-page')
+    cy.findByTestId('canvas-error-page')
       .should('exist')
       .invoke('text')
       .should('include', 'An unexpected error has occurred.')
@@ -94,7 +95,7 @@ describe('ErrorBoundary handles errors', () => {
         <TroubleMaker shouldThrow={true} />
       </ErrorBoundary>,
     );
-    cy.findByTestId('xb-error-card')
+    cy.findByTestId('canvas-error-card')
       .should('exist')
       .invoke('text')
       .should('include', 'An unexpected error has occurred.')
@@ -106,7 +107,7 @@ describe('ErrorBoundary handles errors', () => {
         <TroubleMaker shouldThrow={true} />
       </ErrorBoundary>,
     );
-    cy.findByTestId('xb-error-alert')
+    cy.findByTestId('canvas-error-alert')
       .should('exist')
       .invoke('text')
       .should('include', 'An unexpected error has occurred.')

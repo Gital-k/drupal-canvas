@@ -1,21 +1,29 @@
-import type { Command } from 'commander';
-import * as p from '@clack/prompts';
+import fs from 'fs/promises';
 import path from 'path';
 import chalk from 'chalk';
-import { setConfig, getConfig, ensureConfig } from '../config.js';
-import type { ApiService } from '../services/api.js';
-import { createApiService } from '../services/api.js';
+import { parse } from '@babel/parser';
+import * as p from '@clack/prompts';
 import {
-  processComponentFiles,
-  createComponentPayload,
-} from '../utils/process-component-files.js';
-import type { Result } from '../types/Result.js';
+  getDataDependenciesFromAst,
+  getImportsFromAst,
+} from '@drupal-canvas/ui/features/code-editor/utils/ast-utils';
+
+import { ensureConfig, getConfig, setConfig } from '../config.js';
+import { createApiService } from '../services/api.js';
 import { buildComponent } from '../utils/build';
-import fs from 'fs/promises';
-import { reportResults } from '../utils/report-results';
-import { fileExists } from '../utils/utils';
-import { selectLocalComponents } from '../utils/select-local-components.js';
 import { buildTailwindForComponents } from '../utils/build-tailwind.js';
+import {
+  createComponentPayload,
+  processComponentFiles,
+} from '../utils/process-component-files.js';
+import { reportResults } from '../utils/report-results';
+import { selectLocalComponents } from '../utils/select-local-components.js';
+import { fileExists } from '../utils/utils';
+
+import type { DataDependencies } from '@drupal-canvas/ui/types/CodeComponent';
+import type { Command } from 'commander';
+import type { ApiService } from '../services/api.js';
+import type { Result } from '../types/Result.js';
 
 interface UploadOptions {
   clientId?: string;
@@ -34,7 +42,7 @@ interface UploadOptions {
 export function uploadCommand(program: Command): void {
   program
     .command('upload')
-    .description('Upload components to Experience Builder')
+    .description('build and upload local components and global CSS assets')
     .option('--client-id <id>', 'Client ID')
     .option('--client-secret <secret>', 'Client Secret')
     .option('--site-url <url>', 'Site URL')
@@ -48,7 +56,7 @@ export function uploadCommand(program: Command): void {
       const skipTailwind = !options.tailwind;
 
       try {
-        p.intro('Experience Builder Component Upload');
+        p.intro('Drupal Canvas Component Upload');
 
         // Update config with CLI options
         if (options.clientId) setConfig({ clientId: options.clientId });
@@ -153,8 +161,11 @@ async function getBuildAndUploadResults(
     const message = 'All component builds failed.';
     p.note(chalk.red(message));
   }
-  let spinner: any;
-  spinner = p.spinner();
+  const spinner: {
+    start: (msg?: string) => void;
+    stop: (msg?: string, code?: number) => void;
+    message: (msg?: string) => void;
+  } = p.spinner();
   spinner.start('Uploading components');
 
   // Only upload the successfully built components.
@@ -174,17 +185,30 @@ async function getBuildAndUploadResults(
       // Process all component files
       const { sourceCodeJs, compiledJs, sourceCodeCss, compiledCss, metadata } =
         await processComponentFiles(dir);
+      if (!metadata) {
+        throw new Error('Invalid metadata file');
+      }
 
       const machineName =
         buildResult.itemName ||
         metadata.machineName ||
         componentName.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
 
-      // @todo: Add code from /ui to automatically detect first party imports
-      //   without relying on yml metadata.
-      const importedJsComponents = metadata.importedJsComponents || [];
-
-      const componentPayload = createComponentPayload({
+      let importedJsComponents = [] as string[];
+      let dataDependencies: DataDependencies = {};
+      // Collect first party and data dependency imports from source code.
+      try {
+        const ast = parse(sourceCodeJs, {
+          sourceType: 'module',
+          plugins: ['jsx'],
+        });
+        const scope = '@/components/';
+        importedJsComponents = getImportsFromAst(ast, scope);
+        dataDependencies = getDataDependenciesFromAst(ast);
+      } catch (error) {
+        p.note(chalk.red(`Error: ${error}`));
+      }
+      const componentPayloadArg = {
         metadata,
         machineName,
         componentName,
@@ -193,7 +217,9 @@ async function getBuildAndUploadResults(
         sourceCodeCss,
         compiledCss,
         importedJsComponents,
-      });
+        dataDependencies,
+      };
+      const componentPayload = createComponentPayload(componentPayloadArg);
 
       // Check if component exists already
       let componentExists = false;
@@ -201,16 +227,28 @@ async function getBuildAndUploadResults(
       try {
         await apiService.getComponent(machineName);
         componentExists = true;
-      } catch (error) {
+      } catch {
         // Component does not exist, will create new.
       }
 
-      // Create or update the component
-      if (componentExists) {
-        await apiService.updateComponent(machineName, componentPayload);
-      } else {
-        await apiService.createComponent(componentPayload);
+      try {
+        // Create or update the component
+        if (componentExists) {
+          await apiService.updateComponent(machineName, componentPayload);
+        } else {
+          await apiService.createComponent(componentPayload, true);
+        }
+      } catch {
+        // Make another attempt to create/update without the 2nd argument so
+        // the error is in the format expected by the catch statement that
+        // summarizes the success (or lack thereof) of this operation.
+        if (componentExists) {
+          await apiService.updateComponent(machineName, componentPayload);
+        } else {
+          await apiService.createComponent(componentPayload);
+        }
       }
+
       results.push({
         itemName: componentName,
         success: true,

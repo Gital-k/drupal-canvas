@@ -5,17 +5,20 @@
  */
 
 import { useEffect, useRef } from 'react';
-import { useAppSelector } from '@/app/hooks';
+
+import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import {
   selectCodeComponentProperty,
   selectGlobalAssetLibraryProperty,
   selectStatus,
+  setStatus,
 } from '@/features/code-editor/codeEditorSlice';
-import { useUpdateAutoSaveMutation as updateCodeComponentMutation } from '@/services/componentAndLayout';
+import {
+  serializeProps,
+  serializeSlots,
+} from '@/features/code-editor/utils/utils';
 import { useUpdateAutoSaveMutation as updateGlobalAssetLibraryMutation } from '@/services/assetLibrary';
-import { serializeProps, serializeSlots } from '@/features/code-editor/utils';
-import { setStatus } from '@/features/code-editor/codeEditorSlice';
-import { useAppDispatch } from '@/app/hooks';
+import { useUpdateAutoSaveMutation as updateCodeComponentMutation } from '@/services/componentAndLayout';
 
 const useAutoSave = (requestedComponentId: string): void => {
   const dispatch = useAppDispatch();
@@ -66,6 +69,9 @@ const useAutoSave = (requestedComponentId: string): void => {
   const props = useAppSelector(selectCodeComponentProperty('props'));
   const slots = useAppSelector(selectCodeComponentProperty('slots'));
   const required = useAppSelector(selectCodeComponentProperty('required'));
+  const dataDependencies = useAppSelector(
+    selectCodeComponentProperty('dataDependencies'),
+  );
 
   const globalSourceCodeCss = useAppSelector(
     selectGlobalAssetLibraryProperty(['css', 'original']),
@@ -129,14 +135,15 @@ const useAutoSave = (requestedComponentId: string): void => {
           status: componentStatusRef.current,
           name: componentNameRef.current,
           machineName: componentId,
-          sourceCodeJs: sourceCodeJs,
-          sourceCodeCss: sourceCodeCss,
-          compiledJs: compiledJs,
-          compiledCss: compiledCss,
+          sourceCodeJs,
+          sourceCodeCss,
+          compiledJs,
+          compiledCss,
           props: serializeProps(props),
           slots: serializeSlots(slots),
           required,
           importedJsComponents: importedJsComponentsRef.current,
+          dataDependencies,
         },
       });
     }, 1000);
@@ -155,6 +162,7 @@ const useAutoSave = (requestedComponentId: string): void => {
     slots,
     sourceCodeCss,
     sourceCodeJs,
+    dataDependencies,
     updateCodeComponent,
   ]);
 

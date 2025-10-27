@@ -1,12 +1,12 @@
-import type { PropsValues } from '@/types/Form';
+import type { PendingChanges } from '@/services/pendingChangesApi';
 import type {
-  SlotsMap,
+  BoundingRect,
   ComponentsMap,
   RegionsMap,
+  SlotsMap,
   StackDirection,
-  BoundingRect,
 } from '@/types/Annotations';
-import type { PendingChanges } from '@/services/pendingChangesApi';
+import type { PropsValues } from '@/types/Form';
 
 export function handleNonWorkingBtn(): void {
   alert('Not yet supported.');
@@ -109,18 +109,20 @@ export function getHalfwayScrollPosition(parent: HTMLElement | null) {
  * @param el1 - The first element or array of elements.
  * @param el2 - The second element or array of elements.
  * @returns An object containing the horizontal and vertical distances between the elements.
+ *          Can return null values for horizontal or vertical if elements are not found or are stale references to DOM
+ *          elements that have been removed from the document.
  */
 export function getDistanceBetweenElements(
   el1: HTMLElement | HTMLElement[],
   el2: HTMLElement | HTMLElement[],
-): { horizontalDistance: number; verticalDistance: number } {
+): { horizontalDistance: number | null; verticalDistance: number | null } {
   const rect1 = calculateBoundingRect(el1);
   const rect2 = calculateBoundingRect(el2);
 
   if (rect1 === null || rect2 === null) {
     return {
-      horizontalDistance: 0,
-      verticalDistance: 0,
+      horizontalDistance: null,
+      verticalDistance: null,
     };
   }
 
@@ -151,24 +153,56 @@ export function calculateBoundingRect(
   const elementsArray = Array.isArray(elements) ? elements : [elements];
   const expandedElements: HTMLElement[] = [];
 
-  elementsArray.forEach((el) => {
-    if (!el) {
+  elementsArray.forEach((element) => {
+    if (!element) {
       return;
     }
 
-    // elements that are display: contents; (e.g <astro-*> elements) take on the size of their children so in that case,
-    // we add the direct children to the array instead.
-    const style = window.getComputedStyle(el);
-    if (style.display === 'contents') {
-      expandedElements.push(
-        ...Array.from(el.children).filter(
-          (child): child is HTMLElement => child.nodeType === Node.ELEMENT_NODE,
-        ),
-      );
-    } else {
-      expandedElements.push(el);
+    function collectElementsWithCalculableSize(
+      el: HTMLElement,
+      expandedElements: HTMLElement[],
+    ) {
+      const isConnected = el.isConnected;
+      if (!isConnected) {
+        // el is not connected to the DOM, it was likely deleted during a real time update
+        return;
+      }
+      const style = window.getComputedStyle(el);
+      if (style.display !== 'contents') {
+        expandedElements.push(el);
+        return;
+      }
+      // If the element is display: contents; we need to look at its children to find the first child that has a calculable size.
+      // Recursively traverse down children looking for the first child that is not display: contents or until finding
+      // multiple children (which suggests we are not dealing with <astro-*> elements and have traversed into the component markup itself).
+      if (el.children.length === 1) {
+        const onlyChild = el.children[0];
+        if (onlyChild.nodeType === Node.ELEMENT_NODE) {
+          collectElementsWithCalculableSize(
+            onlyChild as HTMLElement,
+            expandedElements,
+          );
+          return;
+        }
+      } else if (el.children.length > 1) {
+        expandedElements.push(
+          ...Array.from(el.children).filter(
+            (child): child is HTMLElement =>
+              child.nodeType === Node.ELEMENT_NODE,
+          ),
+        );
+        return;
+      }
     }
+
+    // Elements that are display: contents; (e.g <astro-*> elements) take on the size of their children, so in that case,
+    // we add the first children we find that are not display: contents to the array instead.
+    collectElementsWithCalculableSize(element, expandedElements);
   });
+
+  if (!expandedElements.length) {
+    return null;
+  }
 
   const tops: number[] = [];
   const lefts: number[] = [];
@@ -231,7 +265,7 @@ export function mapSlots(document: Document): SlotsMap {
 
   while (currentNode) {
     // Adjust regex to capture UUID and slot name, ignoring whitespace
-    const slotMatch = /^\s*xb-slot-start-([\w-]+)\/([\w-]+)\s*$/.exec(
+    const slotMatch = /^\s*canvas-slot-start-([\w-]+)\/([\w-]+)\s*$/.exec(
       currentNode.nodeValue || '',
     );
 
@@ -243,7 +277,7 @@ export function mapSlots(document: Document): SlotsMap {
       // Ensure the parent element exists and is an HTMLElement
       const parentElement = currentNode.parentElement;
       if (parentElement) {
-        parentElement.dataset.xbSlotId = slotId;
+        parentElement.dataset.canvasSlotId = slotId;
         slotsMap[slotId] = {
           element: parentElement,
           componentUuid: uuid,
@@ -272,7 +306,7 @@ export function mapComponents(document: Document): ComponentsMap {
   const componentMap: ComponentsMap = {};
 
   while (currentNode) {
-    const startMatch = /^\s*xb-start-([\w-]+)\s*$/.exec(
+    const startMatch = /^\s*canvas-start-([\w-]+)\s*$/.exec(
       currentNode.nodeValue || '',
     );
 
@@ -289,11 +323,11 @@ export function mapComponents(document: Document): ComponentsMap {
         sibling &&
         !(
           sibling.nodeType === Node.COMMENT_NODE &&
-          sibling.nodeValue?.trim() === `xb-end-${uuid}`
+          sibling.nodeValue?.trim() === `canvas-end-${uuid}`
         )
       ) {
         if (sibling.nodeType === Node.ELEMENT_NODE) {
-          (sibling as HTMLElement).dataset.xbUuid = uuid;
+          (sibling as HTMLElement).dataset.canvasUuid = uuid;
           componentMap[uuid].elements.push(sibling as HTMLElement);
         }
         sibling = sibling.nextSibling;
@@ -318,7 +352,7 @@ export function mapRegions(document: Document): RegionsMap {
   );
   let currentNode = walker.nextNode();
   while (currentNode) {
-    const startMatch = /^\s*xb-region-start-([\w-]+)\s*$/.exec(
+    const startMatch = /^\s*canvas-region-start-([\w-]+)\s*$/.exec(
       currentNode.nodeValue || '',
     );
 
@@ -340,7 +374,7 @@ export function mapRegions(document: Document): RegionsMap {
           sibling &&
           !(
             sibling.nodeType === Node.COMMENT_NODE &&
-            sibling.nodeValue?.trim() === `xb-region-end-${regionId}`
+            sibling.nodeValue?.trim() === `canvas-region-end-${regionId}`
           )
         ) {
           if (sibling.nodeType === Node.ELEMENT_NODE) {
@@ -356,9 +390,9 @@ export function mapRegions(document: Document): RegionsMap {
   return regionMap;
 }
 
-// <!-- xb-start-4737d23d-fa9a-4670-9807-ebf61e049076 -->
+// <!-- canvas-start-4737d23d-fa9a-4670-9807-ebf61e049076 -->
 /**
- * Returns an array of all HTMLElements that are in between the xb-start-{uuid} and xb-end-{uuid} HTML comments.
+ * Returns an array of all HTMLElements that are in between the canvas-start-{uuid} and canvas-end-{uuid} HTML comments.
  * @param id
  * @param document
  */
@@ -366,8 +400,8 @@ export function getElementsByIdInHTMLComment(
   id: string,
   document: Document,
 ): HTMLElement[] {
-  const startMarker = `xb-start-${id}`;
-  const endMarker = `xb-end-${id}`;
+  const startMarker = `canvas-start-${id}`;
+  const endMarker = `canvas-end-${id}`;
   const iterator = document.createNodeIterator(
     document,
     NodeFilter.SHOW_COMMENT,
@@ -417,7 +451,7 @@ export function getElementsByIdInHTMLComment(
 }
 
 /**
- * Finds all the xb-slot-start-{any} HTML comments in the whole document and returns an array containing their immediate parent HTMLElements.
+ * Finds all the canvas-slot-start-{any} HTML comments in the whole document and returns an array containing their immediate parent HTMLElements.
  * @param document
  */
 export function getSlotParentsByHTMLComments(
@@ -426,7 +460,7 @@ export function getSlotParentsByHTMLComments(
   const slotParents: HTMLElement[] = [];
   const walker = document.createTreeWalker(document, NodeFilter.SHOW_COMMENT, {
     acceptNode(node) {
-      const commentPattern = /^\s*xb-slot-start-/;
+      const commentPattern = /^\s*canvas-slot-start-/;
       return commentPattern.test(node.nodeValue || '')
         ? NodeFilter.FILTER_ACCEPT
         : NodeFilter.FILTER_REJECT;
@@ -434,7 +468,7 @@ export function getSlotParentsByHTMLComments(
   });
   let currentNode = walker.nextNode();
 
-  // Each time an xb-slot-start comment is found, add the parent HTMLElement to the array
+  // Each time an canvas-slot-start comment is found, add the parent HTMLElement to the array
   while (currentNode) {
     if (currentNode.parentElement) {
       slotParents.push(currentNode.parentElement);
@@ -447,7 +481,7 @@ export function getSlotParentsByHTMLComments(
 
 /**
  * Find a given slot by ID using the HTML comment annotations - it will return the immediate parent HTMLElement that
- * contains the <!-- xb-slot-start-{slotId} --> comment.
+ * contains the <!-- canvas-slot-start-{slotId} --> comment.
  * @param slotId
  * @param document
  */
@@ -456,7 +490,7 @@ export function getSlotParentElementByIdInHTMLComment(
   document: Document,
 ): HTMLElement | null {
   // regular expression pattern to match comments with the given slot ID
-  const commentPattern = new RegExp(`^\\s*xb-slot-start-${slotId}\\b`);
+  const commentPattern = new RegExp(`^\\s*canvas-slot-start-${slotId}\\b`);
   const walker = document.createTreeWalker(document, NodeFilter.SHOW_COMMENT, {
     acceptNode(node) {
       return commentPattern.test(node.nodeValue || '')
@@ -480,9 +514,12 @@ export function getSlotParentElementByIdInHTMLComment(
 
 export function findInChanges(
   changeList: PendingChanges,
-  entityId: string,
-  entityType: string,
+  entityId: string | undefined,
+  entityType: string | undefined,
 ) {
+  if (!entityId || !entityType || !changeList) {
+    return false;
+  }
   for (const key in changeList) {
     if (Object.prototype.hasOwnProperty.call(changeList, key)) {
       const obj = changeList[key];

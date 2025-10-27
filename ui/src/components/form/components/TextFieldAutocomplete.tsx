@@ -1,9 +1,12 @@
-import clsx from 'clsx';
 import { useRef } from 'react';
-import type { Attributes } from '@/types/DrupalAttribute';
-import styles from './TextField.module.css';
-import { a2p } from '@/local_packages/utils';
+import clsx from 'clsx';
+
 import useMutationObserver from '@/hooks/useMutationObserver';
+import { a2p } from '@/local_packages/utils';
+
+import type { Attributes } from '@/types/DrupalAttribute';
+
+import styles from './TextField.module.css';
 
 const { jQuery } = window;
 
@@ -21,24 +24,24 @@ const TextFieldAutocomplete = ({
   // blurred.
   // @see InputBehaviorsCommon in inputBehaviors.tsx where attributes.onChange
   // is defined.
-  attributes['data-xb-no-update'] = '';
+  attributes['data-canvas-no-update'] = '';
 
   const inputRef = useRef<HTMLInputElement>(null);
 
   // This mutation observer responds to the addition of a
-  // 'data-xb-autocomplete-selected' attribute, which will have the value of the
+  // 'data-canvas-autocomplete-selected' attribute, which will have the value of the
   // chosen autocomplete suggestion.
   useMutationObserver(
     inputRef,
     (mutations) => {
       mutations.forEach((record: MutationRecord) => {
-        if (record?.attributeName === 'data-xb-autocomplete-selected') {
+        if (record?.attributeName === 'data-canvas-autocomplete-selected') {
           if (
             record.target instanceof HTMLInputElement &&
-            record.target.getAttribute('data-xb-autocomplete-selected')
+            record.target.getAttribute('data-canvas-autocomplete-selected')
           ) {
             const selection = record.target.getAttribute(
-              'data-xb-autocomplete-selected',
+              'data-canvas-autocomplete-selected',
             );
             if (selection) {
               record.target.value = selection;
@@ -46,7 +49,7 @@ const TextFieldAutocomplete = ({
 
             // Remove the attribute to prevent multiple attempts to update the
             // store with the same value.
-            record.target.removeAttribute('data-xb-autocomplete-selected');
+            record.target.removeAttribute('data-canvas-autocomplete-selected');
             const changeEvent = new Event('change');
             Object.defineProperty(changeEvent, 'target', {
               writable: false,
@@ -66,6 +69,7 @@ const TextFieldAutocomplete = ({
   return (
     <div className={clsx(styles.wrap, styles.autocompleteWrap)}>
       <input
+        autoComplete="off"
         {...a2p(attributes, {}, { skipAttributes: ['onBlur', 'onChange'] })}
         className={clsx(styles.root, styles.autocomplete, className)}
         ref={(node) => {
@@ -78,7 +82,7 @@ const TextFieldAutocomplete = ({
           // Default to setting the attribute that prevents preview and store
           // updates.
           if (inputRef.current) {
-            inputRef.current.setAttribute('data-xb-no-update', 'true');
+            inputRef.current.setAttribute('data-canvas-no-update', 'true');
           }
           // Call the onChange listener, which will update the UI but not the
           // store or preview, due to the attribute set above.
@@ -102,7 +106,7 @@ const TextFieldAutocomplete = ({
           setTimeout(() => {
             if (
               inputRef.current &&
-              !inputRef.current.hasAttribute('data-xb-no-update') &&
+              !inputRef.current.hasAttribute('data-canvas-no-update') &&
               typeof attributes.onChange === 'function'
             ) {
               attributes.onChange(e);
@@ -111,7 +115,7 @@ const TextFieldAutocomplete = ({
         }}
         onBlur={(e) => {
           if (inputRef.current) {
-            inputRef.current.removeAttribute('data-xb-no-update');
+            inputRef.current.removeAttribute('data-canvas-no-update');
           }
           // As an additional assurance the value is sent to the store, an
           // additional onChange is triggered immediately after the store

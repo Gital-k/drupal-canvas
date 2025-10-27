@@ -2,8 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Drupal\experience_builder\Plugin;
+namespace Drupal\canvas\Plugin;
 
+use Drupal\canvas\Entity\Component;
 use Drupal\Component\Plugin\CategorizingPluginManagerInterface;
 use Drupal\Core\Cache\CacheBackendInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
@@ -18,22 +19,32 @@ use Drupal\Core\Theme\Component\SchemaCompatibilityChecker;
 use Drupal\Core\Theme\ComponentNegotiator;
 use Drupal\Core\Theme\ComponentPluginManager as CoreComponentPluginManager;
 use Drupal\Core\Theme\ThemeManagerInterface;
-use Drupal\experience_builder\ComponentDoesNotMeetRequirementsException;
-use Drupal\experience_builder\ComponentIncompatibilityReasonRepository;
-use Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\SingleDirectoryComponent;
+use Drupal\canvas\ComponentDoesNotMeetRequirementsException;
+use Drupal\canvas\ComponentIncompatibilityReasonRepository;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent;
+use JsonSchema\Constraints\BaseConstraint;
+use JsonSchema\Exception\RuntimeException;
+use JsonSchema\SchemaStorage;
 
 /**
- * Decorator that auto-creates/updates an Experience Builder Component entity per SDC.
+ * Decorator that auto-creates/updates an Drupal Canvas Component entity per SDC.
  *
- * @see \Drupal\experience_builder\Entity\Component
+ * @see \Drupal\canvas\Entity\Component
  */
 class ComponentPluginManager extends CoreComponentPluginManager implements CategorizingPluginManagerInterface {
 
   use CategorizingPluginManagerTrait;
 
+  const MAXIMUM_RECURSION_LEVEL = 10;
+
   protected static bool $isRecursing = FALSE;
 
   protected array $reasons;
+
+  /**
+   * JSON schema storage utility used for resolving references.
+   */
+  protected SchemaStorage $schemaStorage;
 
   public function __construct(
     ModuleHandlerInterface $module_handler,
@@ -49,6 +60,7 @@ class ComponentPluginManager extends CoreComponentPluginManager implements Categ
     protected readonly EntityTypeManagerInterface $entityTypeManager,
     protected readonly ComponentIncompatibilityReasonRepository $reasonRepository,
   ) {
+    $this->schemaStorage = new SchemaStorage();
     parent::__construct($module_handler, $themeHandler, $cacheBackend, $configFactory, $themeManager, $componentNegotiator, $fileSystem, $compatibilityChecker, $componentValidator, $appRoot);
   }
 
@@ -58,8 +70,8 @@ class ComponentPluginManager extends CoreComponentPluginManager implements Categ
   protected function setCachedDefinitions($definitions): array {
     parent::setCachedDefinitions($definitions);
 
-    // Do not auto-create/update XB configuration when syncing config/deploying.
-    // @todo Introduce a "XB development mode" similar to Twig's: https://www.drupal.org/node/3359728
+    // Do not auto-create/update Canvas configuration when syncing config/deploying.
+    // @todo Introduce a "Canvas development mode" similar to Twig's: https://www.drupal.org/node/3359728
     // @phpstan-ignore-next-line
     if (\Drupal::isConfigSyncing()) {
       return $definitions;
@@ -73,7 +85,7 @@ class ComponentPluginManager extends CoreComponentPluginManager implements Categ
     }
     self::$isRecursing = TRUE;
 
-    $components = $this->entityTypeManager->getStorage('component')->loadMultiple();
+    $components = $this->entityTypeManager->getStorage(Component::ENTITY_TYPE_ID)->loadMultiple();
     $reasons = $this->reasonRepository->getReasons()[SingleDirectoryComponent::SOURCE_PLUGIN_ID] ?? [];
     $definition_ids = \array_map(static fn (string $plugin_id) => SingleDirectoryComponent::convertMachineNameToId($plugin_id), \array_keys($definitions));
     foreach ($definitions as $machine_name => $plugin_definition) {
@@ -87,10 +99,32 @@ class ComponentPluginManager extends CoreComponentPluginManager implements Categ
           $reasons[$component_id][] = 'Component has "obsolete" status';
           $component->disable();
         }
+        // An existing Component's SDC may be marked `noUi`.
+        if (isset($component_plugin->metadata->noUi) && $component_plugin->metadata->noUi === TRUE) {
+          $reasons[$component_id][] = 'Component flagged "noUi".';
+          $component->disable();
+        }
+        // The above only works on Drupal core >=11.3.
+        // @todo Remove in https://www.drupal.org/i/3537695
+        // @phpstan-ignore-next-line offsetAccess.nonOffsetAccessible
+        if ($component_plugin->getPluginDefinition()['noUi'] ?? FALSE) {
+          $reasons[$component_id][] = 'Component flagged "noUi".';
+          $component->disable();
+        }
       }
       else {
         try {
           $component_plugin = $this->createInstance($machine_name);
+          // Do not create `Component` config entities for SDCs marked `noUi`.
+          if (isset($component_plugin->metadata->noUi) && $component_plugin->metadata->noUi === TRUE) {
+            continue;
+          }
+          // The above only works on Drupal core >=11.3.
+          // @todo Remove in https://www.drupal.org/i/3537695
+          // @phpstan-ignore-next-line offsetAccess.nonOffsetAccessible
+          if ($component_plugin->getPluginDefinition()['noUi'] ?? FALSE) {
+            continue;
+          }
           SingleDirectoryComponent::componentMeetsRequirements($component_plugin);
           $component = SingleDirectoryComponent::createConfigEntity($component_plugin);
         }
@@ -103,7 +137,7 @@ class ComponentPluginManager extends CoreComponentPluginManager implements Categ
         $component->save();
       }
       catch (SchemaIncompleteException $exception) {
-        if (!str_starts_with($exception->getMessage(), 'Schema errors for experience_builder.component.sdc.sdc_test_all_props.all-props with the following errors:')) {
+        if (!str_starts_with($exception->getMessage(), 'Schema errors for canvas.component.sdc.sdc_test_all_props.all-props with the following errors:')) {
           throw $exception;
         }
       }
@@ -122,6 +156,9 @@ class ComponentPluginManager extends CoreComponentPluginManager implements Categ
    */
   public function processDefinition(&$definition, $plugin_id): void {
     parent::processDefinition($definition, $plugin_id);
+    if (isset($definition['props']['properties']) && is_array($definition['props']['properties']) && !empty($definition['props']['properties'])) {
+      $definition['props'] = $this->resolveJsonSchemaReferences($definition['props'], 0);
+    }
     $this->processDefinitionCategory($definition);
   }
 
@@ -132,6 +169,58 @@ class ComponentPluginManager extends CoreComponentPluginManager implements Categ
    */
   protected function processDefinitionCategory(&$definition): void {
     $definition['category'] = $definition['group'] ?? $this->t('Other');
+  }
+
+  /**
+   * Resolves schema references recursively.
+   *
+   * @param array $schema
+   *   JSON schema of a component.
+   * @param int $depth
+   *   Depth index to avoid infinite recursion.
+   *
+   * @return array
+   *   JSON schema of a component, with references resolved.
+   */
+  protected function resolveJsonSchemaReferences(array $schema, int $depth = 0): array {
+    if ($depth > self::MAXIMUM_RECURSION_LEVEL) {
+      return $schema;
+    }
+
+    $depth++;
+
+    try {
+      if (isset($schema['$ref']) && str_starts_with($schema['$ref'], 'json-schema-definitions://')) {
+        // @todo Remove in https://www.drupal.org/i/3515074
+        throw new RuntimeException('Canvas references are not supported yet');
+      }
+
+      $schema = BaseConstraint::arrayToObjectRecursive($schema);
+      $refSchema = (array) $this->schemaStorage->resolveRefSchema($schema);
+      $schema = (array) $schema;
+      unset($schema['$ref']);
+
+      // Merge referenced schema into the current schema.
+      $schema += $refSchema;
+    }
+    catch (RuntimeException) {
+      // @todo Remove this catch statement in https://www.drupal.org/i/3515074
+      $schema = (array) $schema;
+    }
+
+    // Recursively resolve nested objects.
+    foreach ($schema as $key => $value) {
+      if (is_object($value)) {
+        $schema[$key] = $this->resolveJsonSchemaReferences((array) $value, $depth);
+      }
+    }
+
+    // It looks heavy as a solution to convert objects to array recursively,
+    // but it is exactly the inverse of what
+    // BaseConstraint::arrayToObjectRecursive() is doing.
+    $json = json_encode($schema);
+    \assert(is_string($json));
+    return json_decode($json, TRUE);
   }
 
 }

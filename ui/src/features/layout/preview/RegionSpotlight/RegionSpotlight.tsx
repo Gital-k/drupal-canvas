@@ -1,20 +1,23 @@
 import { useEffect, useState } from 'react';
+import { useParams } from 'react-router';
+
+import { useAppDispatch, useAppSelector } from '@/app/hooks';
+import { Spotlight } from '@/components/spotlight/Spotlight';
 import { useDataToHtmlMapValue } from '@/features/layout/preview/DataToHtmlMapContext';
 import {
   clearSelection,
   DEFAULT_REGION,
   selectDragging,
 } from '@/features/ui/uiSlice';
-import { Spotlight } from '@/components/spotlight/Spotlight';
-import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import useSyncPreviewElementSize from '@/hooks/useSyncPreviewElementSize';
-import { useParams } from 'react-router';
 
 export const RegionSpotlight = () => {
   const { regionsMap } = useDataToHtmlMapValue();
   const { regionId: focusedRegion = DEFAULT_REGION } = useParams();
   const [spotlight, setSpotlight] = useState(false);
-  const rect = useSyncPreviewElementSize(regionsMap[focusedRegion]?.elements);
+  const { elementRect } = useSyncPreviewElementSize(
+    regionsMap[focusedRegion]?.elements,
+  );
   const { isDragging } = useAppSelector(selectDragging);
   const dispatch = useAppDispatch();
 
@@ -33,13 +36,13 @@ export const RegionSpotlight = () => {
     setSpotlight(false);
   }, [focusedRegion, regionsMap]);
 
-  if (spotlight && rect) {
+  if (spotlight && elementRect) {
     return (
       <Spotlight
-        top={rect.top}
-        left={rect.left}
-        width={rect.width}
-        height={rect.height}
+        top={elementRect.top}
+        left={elementRect.left}
+        width={elementRect.width}
+        height={elementRect.height}
         blocking={!isDragging}
       />
     );

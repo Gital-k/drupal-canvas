@@ -2,25 +2,24 @@
 
 declare(strict_types=1);
 
-namespace Drupal\Tests\experience_builder\Kernel\Config;
+namespace Drupal\Tests\canvas\Kernel\Config;
 
 use Drupal\Core\Entity\Entity\EntityViewMode;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
-use Drupal\experience_builder\Entity\Component;
-use Drupal\experience_builder\Entity\ContentTemplate;
+use Drupal\canvas\Entity\Component;
+use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
-use Drupal\Tests\experience_builder\Traits\BetterConfigDependencyManagerTrait;
-use Drupal\Tests\experience_builder\Traits\ContribStrictConfigSchemaTestTrait;
-use Drupal\Tests\experience_builder\Traits\CreateTestJsComponentTrait;
-use Drupal\Tests\experience_builder\Traits\GenerateComponentConfigTrait;
+use Drupal\Tests\canvas\Traits\BetterConfigDependencyManagerTrait;
+use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
+use Drupal\Tests\canvas\Traits\CreateTestJsComponentTrait;
+use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\node\Traits\ContentTypeCreationTrait;
 use Drupal\TestTools\Random;
-use Drupal\xb_test_validation\Plugin\ExperienceBuilder\ComponentSource\InvalidSlots;
+use Drupal\canvas_test_validation\Plugin\Canvas\ComponentSource\InvalidSlots;
 
 /**
- * @group experience_builder
- * @group #slow
+ * @group canvas
  */
 final class ContentTemplateValidationTest extends BetterConfigEntityValidationTestBase {
 
@@ -43,11 +42,11 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
     'system',
     'user',
     // The module being tested.
-    'experience_builder',
+    'canvas',
     // Modules providing used Components (and their ComponentSource plugins).
     'block',
-    'xb_test_sdc',
-    // XB's dependencies (modules providing field types + widgets).
+    'canvas_test_sdc',
+    // Canvas's dependencies (modules providing field types + widgets).
     'field',
     'file',
     'image',
@@ -56,17 +55,9 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
     'node',
     'options',
     'text',
-  ];
-
-  /**
-   * {@inheritdoc}
-   *
-   * @phpstan-ignore property.defaultValue
-   */
-  protected static array $propertiesWithRequiredKeys = [
-    'component_tree' => [
-      "The 'dynamic' prop source type must be present.",
-    ],
+    'filter',
+    'ckeditor5',
+    'editor',
   ];
 
   /**
@@ -76,7 +67,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
     // We need to create a component with invalid source-defined slot names in
     // order to test that those slot names are validated in other contexts.
     // @see ::testExposeInvalidSlotDefinedBySource()
-    'experience_builder.component.' . InvalidSlots::PLUGIN_ID . '.' . InvalidSlots::PLUGIN_ID,
+    'canvas.component.' . InvalidSlots::PLUGIN_ID . '.' . InvalidSlots::PLUGIN_ID,
   ];
 
   /**
@@ -85,7 +76,9 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
   protected function setUp(): void {
     parent::setUp();
 
+    $this->installEntitySchema('node');
     $this->installConfig('node');
+    $this->installConfig('canvas');
     $this->createContentType(['type' => 'alpha']);
     FieldStorageConfig::create([
       'field_name' => 'field_test',
@@ -109,8 +102,8 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
       'component_tree' => [
         [
           'uuid' => '435d1d20-a697-4d36-9892-9d61c825c99c',
-          'component_id' => 'sdc.xb_test_sdc.my-cta',
-          'component_version' => 'fa533ff8be5a1402',
+          'component_id' => 'sdc.canvas_test_sdc.my-cta',
+          'component_version' => '89881c04a0fde367',
           'inputs' => [
             'text' => [
               'sourceType' => 'static:field_item:string',
@@ -129,7 +122,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
         [
           'uuid' => '57afe4ed-c593-4457-a741-2ac5053be928',
           'component_id' => 'js.my-cta',
-          'component_version' => '58dd1b48256c3ff2',
+          'component_version' => '89881c04a0fde367',
           'inputs' => [
             'text' => [
               'sourceType' => 'dynamic',
@@ -140,8 +133,8 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
         // An SDC populated by a normal entity field.
         [
           'uuid' => '2d06782a-0f24-43ae-963c-b5aff807dd95',
-          'component_id' => 'sdc.xb_test_sdc.props-no-slots',
-          'component_version' => '95f4f1d5ee47663b',
+          'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+          'component_version' => 'b1e991f726a2a266',
           'inputs' => [
             'heading' => [
               'sourceType' => 'dynamic',
@@ -165,8 +158,8 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
         // An SDC with a slot that can be exposed.
         [
           'uuid' => 'b4937e35-ddc2-4f36-8d4c-b1cc14aaefef',
-          'component_id' => 'sdc.xb_test_sdc.props-slots',
-          'component_version' => 'ab4d3ddce315cf64',
+          'component_id' => 'sdc.canvas_test_sdc.props-slots',
+          'component_version' => '85a5c0c7dd53e0bb',
           'inputs' => [
             'heading' => [
               'sourceType' => 'static:field_item:string',
@@ -192,12 +185,12 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
     $this->assertSame(
       [
         'config' => [
+          'canvas.component.block.system_branding_block',
+          'canvas.component.js.my-cta',
+          'canvas.component.sdc.canvas_test_sdc.my-cta',
+          'canvas.component.sdc.canvas_test_sdc.props-no-slots',
+          'canvas.component.sdc.canvas_test_sdc.props-slots',
           'core.entity_view_mode.node.full',
-          'experience_builder.component.block.system_branding_block',
-          'experience_builder.component.js.my-cta',
-          'experience_builder.component.sdc.xb_test_sdc.my-cta',
-          'experience_builder.component.sdc.xb_test_sdc.props-no-slots',
-          'experience_builder.component.sdc.xb_test_sdc.props-slots',
           'field.field.node.alpha.field_test',
           'node.type.alpha',
         ],
@@ -209,25 +202,25 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
     );
     $this->assertSame([
       'config' => [
+        'canvas.component.block.system_branding_block',
+        'canvas.component.js.my-cta',
+        'canvas.component.sdc.canvas_test_sdc.my-cta',
+        'canvas.component.sdc.canvas_test_sdc.props-no-slots',
+        'canvas.component.sdc.canvas_test_sdc.props-slots',
         'core.entity_view_mode.node.full',
-        'experience_builder.component.block.system_branding_block',
-        'experience_builder.component.js.my-cta',
-        'experience_builder.component.sdc.xb_test_sdc.my-cta',
-        'experience_builder.component.sdc.xb_test_sdc.props-no-slots',
-        'experience_builder.component.sdc.xb_test_sdc.props-slots',
         'field.field.node.alpha.field_test',
         'node.type.alpha',
-        'experience_builder.js_component.my-cta',
+        'canvas.js_component.my-cta',
         'field.storage.node.field_test',
       ],
       'module' => [
         'node',
-        'experience_builder',
-        'core',
+        'canvas',
         'system',
         'link',
         'options',
-        'xb_test_sdc',
+        'canvas_test_sdc',
+        'core',
         'text',
         'field',
       ],
@@ -238,38 +231,35 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
    * @dataProvider providerInvalidComponentTree
    */
   public function testInvalidComponentTree(array $component_tree, array $expected_messages): void {
-    $this->entity->set('component_tree', $component_tree);
+    \assert($this->entity instanceof ContentTemplate);
+    $this->entity->setComponentTree($component_tree);
     $this->assertValidationErrors($expected_messages);
   }
 
   public static function providerInvalidComponentTree(): \Generator {
     yield "missing `component_tree` property" => [
       'component_tree' => [],
-      'expected_messages' => [
-        'component_tree' => 'The \'dynamic\' prop source type must be present.',
-      ],
+      'expected_messages' => [],
     ];
 
     yield "no DynamicPropSource, so no structured data from the content entity" => [
       'component_tree' => [
         [
           'uuid' => '19ff9a18-54a2-422a-bf68-49d65a5d53ac',
-          'component_id' => 'sdc.experience_builder.druplicon',
+          'component_id' => 'sdc.canvas_test_sdc.druplicon',
           'component_version' => '8fe3be948e0194e1',
           'inputs' => [],
         ],
       ],
-      'expected_messages' => [
-        'component_tree' => "The 'dynamic' prop source type must be present.",
-      ],
+      'expected_messages' => [],
     ];
 
     yield "using disallowed Block-sourced Components" => [
       'component_tree' => [
         [
           'uuid' => '19ff9a18-54a2-422a-bf68-49d65a5d53ac',
-          'component_id' => 'sdc.xb_test_sdc.props-no-slots',
-          'component_version' => '95f4f1d5ee47663b',
+          'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+          'component_version' => 'b1e991f726a2a266',
           'inputs' => [
             'heading' => [
               'sourceType' => 'dynamic',
@@ -320,8 +310,8 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
       'component_tree' => [
         [
           'uuid' => '90804335-d16d-4799-9e80-ddb11692530a',
-          'component_id' => 'sdc.xb_test_sdc.props-no-slots',
-          'component_version' => '95f4f1d5ee47663b',
+          'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+          'component_version' => 'b1e991f726a2a266',
           'inputs' => [
             'heading' => [
               'sourceType' => 'dynamic',
@@ -331,8 +321,8 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
         ],
         [
           'uuid' => '7240f848-ea70-4ad2-a9d6-3ab60cba4d78',
-          'component_id' => 'sdc.experience_builder.image',
-          'component_version' => 'a8c84fff36af8a5a',
+          'component_id' => 'sdc.canvas_test_sdc.image',
+          'component_version' => 'f4d1c916802ab8db',
           'inputs' => [
             'image' => [
               'sourceType' => 'adapter:image_apply_style',
@@ -360,8 +350,8 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
       'component_tree' => [
         [
           'uuid' => 'garry-sensible-jeans',
-          'component_id' => 'sdc.xb_test_sdc.props-slots',
-          'component_version' => 'ab4d3ddce315cf64',
+          'component_id' => 'sdc.canvas_test_sdc.props-slots',
+          'component_version' => '85a5c0c7dd53e0bb',
           'inputs' => [
             'heading' => [
               'sourceType' => 'dynamic',
@@ -371,8 +361,8 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
         ],
         [
           'uuid' => 'fa9ff0a8-e23a-492a-ab14-5460611fa2c1',
-          'component_id' => 'sdc.xb_test_sdc.props-slots',
-          'component_version' => 'ab4d3ddce315cf64',
+          'component_id' => 'sdc.canvas_test_sdc.props-slots',
+          'component_version' => '85a5c0c7dd53e0bb',
           'inputs' => [
             'heading' => [
               'sourceType' => 'dynamic',
@@ -390,8 +380,8 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
       'component_tree' => [
         [
           'uuid' => 'fa9ff0a8-e23a-492a-ab14-5460611fa2c1',
-          'component_id' => 'sdc.xb_test_sdc.props-slots',
-          'component_version' => 'ab4d3ddce315cf64',
+          'component_id' => 'sdc.canvas_test_sdc.props-slots',
+          'component_version' => '85a5c0c7dd53e0bb',
           'inputs' => [
             'heading' => [
               'sourceType' => 'dynamic',
@@ -403,8 +393,8 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
           'uuid' => 'e303dd88-9409-4dc7-8a8b-a31602884a94',
           'slot' => 'the_body',
           'parent_uuid' => '6381352f-5b0a-4ca1-960d-a5505b37b27c',
-          'component_id' => 'sdc.xb_test_sdc.props-slots',
-          'component_version' => 'ab4d3ddce315cf64',
+          'component_id' => 'sdc.canvas_test_sdc.props-slots',
+          'component_version' => '85a5c0c7dd53e0bb',
           'inputs' => [
             'heading' => [
               'sourceType' => 'dynamic',
@@ -422,8 +412,8 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
       'component_tree' => [
         [
           'uuid' => 'fa9ff0a8-e23a-492a-ab14-5460611fa2c1',
-          'component_id' => 'sdc.xb_test_sdc.props-slots',
-          'component_version' => 'ab4d3ddce315cf64',
+          'component_id' => 'sdc.canvas_test_sdc.props-slots',
+          'component_version' => '85a5c0c7dd53e0bb',
           'inputs' => [
             'heading' => [
               'sourceType' => 'dynamic',
@@ -435,8 +425,8 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
           'uuid' => 'e303dd88-9409-4dc7-8a8b-a31602884a94',
           'slot' => 'banana',
           'parent_uuid' => 'fa9ff0a8-e23a-492a-ab14-5460611fa2c1',
-          'component_id' => 'sdc.xb_test_sdc.props-slots',
-          'component_version' => 'ab4d3ddce315cf64',
+          'component_id' => 'sdc.canvas_test_sdc.props-slots',
+          'component_version' => '85a5c0c7dd53e0bb',
           'inputs' => [
             'heading' => [
               'sourceType' => 'dynamic',
@@ -446,7 +436,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
         ],
       ],
       'expected_messages' => [
-        'component_tree.1.slot' => 'Invalid component subtree. This component subtree contains an invalid slot name for component <em class="placeholder">sdc.xb_test_sdc.props-slots</em>: <em class="placeholder">banana</em>. Valid slot names are: <em class="placeholder">the_body, the_footer, the_colophon</em>.',
+        'component_tree.1.slot' => 'Invalid component subtree. This component subtree contains an invalid slot name for component <em class="placeholder">sdc.canvas_test_sdc.props-slots</em>: <em class="placeholder">banana</em>. Valid slot names are: <em class="placeholder">the_body, the_footer, the_colophon</em>.',
       ],
     ];
 
@@ -454,8 +444,8 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
       'component_tree' => [
         [
           'uuid' => 'e303dd88-9409-4dc7-8a8b-a31602884a94',
-          'component_id' => 'sdc.xb_test_sdc.props-slots',
-          'component_version' => 'ab4d3ddce315cf64',
+          'component_id' => 'sdc.canvas_test_sdc.props-slots',
+          'component_version' => '85a5c0c7dd53e0bb',
           'inputs' => [
             'heading' => [
               'sourceType' => 'dynamic',
@@ -474,20 +464,16 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
       'component_tree' => [
         [
           'uuid' => 'fa9ff0a8-e23a-492a-ab14-5460611fa2c1',
-          'component_id' => 'sdc.xb_test_sdc.props-slots',
+          'component_id' => 'sdc.canvas_test_sdc.props-slots',
           'component_version' => 'abc',
           'inputs' => [
-            'heading' => [
-              'sourceType' => 'static:field_item:string',
-              'value' => 'And we laugh like soft, mad children',
-              'expression' => 'ℹ︎string␟value',
-            ],
+            'heading' => 'And we laugh like soft, mad children',
           ],
         ],
         [
           'uuid' => '90804335-d16d-4799-9e80-ddb11692530a',
-          'component_id' => 'sdc.xb_test_sdc.props-no-slots',
-          'component_version' => '95f4f1d5ee47663b',
+          'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+          'component_version' => 'b1e991f726a2a266',
           'inputs' => [
             'heading' => [
               'sourceType' => 'dynamic',
@@ -497,7 +483,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
         ],
       ],
       'expected_messages' => [
-        'component_tree.0.component_version' => "'abc' is not a version that exists on component config entity 'sdc.xb_test_sdc.props-slots'. Available versions: 'ab4d3ddce315cf64'.",
+        'component_tree.0.component_version' => "'abc' is not a version that exists on component config entity 'sdc.canvas_test_sdc.props-slots'. Available versions: '85a5c0c7dd53e0bb'.",
       ],
     ];
   }
@@ -522,6 +508,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
       'id' => [],
       'content_entity_type_id' => [
         'content_entity_type_bundle' => "The 'alpha' bundle does not exist on the 'user' entity type.",
+        'content_entity_type_id' => 'The value you selected is not a valid choice.',
         'content_entity_type_view_mode' => "The 'core.entity_view_mode.user.full' config does not exist.",
       ],
       'content_entity_type_bundle' => [],
@@ -547,7 +534,10 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
     $this->entity->set('content_entity_type_id', 'nope');
     $this->assertValidationErrors([
       '' => "The 'content_entity_type_id' property cannot be changed.",
-      'content_entity_type_id' => "The 'nope' plugin does not exist.",
+      'content_entity_type_id' => [
+        "The 'nope' plugin does not exist.",
+        'The value you selected is not a valid choice.',
+      ],
       'content_entity_type_bundle' => "The 'alpha' bundle does not exist on the 'nope' entity type.",
       'content_entity_type_view_mode' => "The 'core.entity_view_mode.nope.full' config does not exist.",
     ]);
@@ -578,7 +568,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
       'uuid' => '91f6e215-49f4-47c1-a1ac-dcc151876842',
       'parent_uuid' => 'b4937e35-ddc2-4f36-8d4c-b1cc14aaefef',
       'slot' => 'the_footer',
-      'component_id' => 'sdc.xb_test_sdc.props-no-slots',
+      'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
       'inputs' => [
         'heading' => [
           'sourceType' => 'dynamic',
@@ -586,7 +576,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
         ],
       ],
     ]);
-    $this->entity->set('component_tree', $items->getValue());
+    $this->entity->setComponentTree($items->getValue());
 
     $this->entity->set('exposed_slots', [
       'filled_footer' => [
@@ -663,7 +653,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
   }
 
   public function testExposeInvalidSlotDefinedBySource(): void {
-    self::assertTrue($this->container->get('module_installer')->install(['xb_test_validation']));
+    self::assertTrue($this->container->get('module_installer')->install(['canvas_test_validation']));
     Component::create([
       'id' => InvalidSlots::PLUGIN_ID . '.' . InvalidSlots::PLUGIN_ID,
       'label' => 'Component with an invalid source-defined slot',
@@ -681,7 +671,8 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
       'component_version' => 'ccab0b28617f1f56',
       'inputs' => [],
     ];
-    $this->entity->set('component_tree', $tree)
+    \assert($this->entity instanceof ContentTemplate);
+    $this->entity->setComponentTree($tree)
       ->set('exposed_slots', [
         'valid_alias' => [
           'component_uuid' => '1870f74a-2611-4864-8fc0-639f0d125d7f',

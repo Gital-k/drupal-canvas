@@ -1,27 +1,32 @@
 <?php
 
-namespace Drupal\experience_builder\AutoSave;
+namespace Drupal\canvas\AutoSave;
 
+use Drupal\canvas\Entity\ComponentTreeEntityInterface;
 use Drupal\Core\Cache\CacheBackendInterface;
 use Drupal\Core\Cache\CacheTagsInvalidatorInterface;
 use Drupal\Core\Config\ConfigCrudEvent;
 use Drupal\Core\Config\ConfigEvents;
 use Drupal\Core\Config\ConfigManagerInterface;
+use Drupal\Core\Config\Entity\ConfigEntityInterface;
 use Drupal\Core\Config\Entity\ConfigEntityTypeInterface;
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\EntityChangedInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
+use Drupal\Core\Entity\RevisionableInterface;
 use Drupal\Core\Entity\TranslatableInterface;
 use Drupal\Core\Field\FieldItemInterface;
 use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\Core\TypedData\PrimitiveInterface;
 use Drupal\Core\TypedData\TypedDataInterface;
-use Drupal\experience_builder\AutoSaveEntity;
-use Drupal\experience_builder\Controller\ApiContentControllers;
-use Drupal\experience_builder\Entity\XbHttpApiEligibleConfigEntityInterface;
-use Drupal\experience_builder\Plugin\Field\FieldType\ComponentTreeItem;
+use Drupal\canvas\AutoSaveEntity;
+use Drupal\canvas\Controller\ApiContentControllers;
+use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\canvas\Entity\StagedConfigUpdate;
+use Drupal\canvas\Entity\CanvasHttpApiEligibleConfigEntityInterface;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\Validator\ConstraintViolationList;
@@ -32,7 +37,7 @@ use Symfony\Component\Validator\ConstraintViolationListInterface;
  */
 class AutoSaveManager implements EventSubscriberInterface {
 
-  public const CACHE_TAG = 'experience_builder__auto_save';
+  public const CACHE_TAG = 'canvas__auto_save';
   public const string PUBLISH_PERMISSION = 'publish auto-saves';
 
   const ENTITY_DUPLICATE_SUFFIX = ' (Copy)';
@@ -47,23 +52,31 @@ class AutoSaveManager implements EventSubscriberInterface {
   ) {
   }
 
-  protected function getTempStore(): AutoSaveTempStore {
+  protected function getTempStoreByCollection(string $collection): AutoSaveTempStore {
     // Store for 30 days.
     $expire = 86400 * 30;
     // We need to fetch a new shared temp store from the factory for each
     // usage because the current user can change in the lifetime of a request.
-    return $this->tempStoreFactory->get('experience_builder.auto_save', expire: $expire);
+    return $this->tempStoreFactory->get($collection, expire: $expire);
+  }
+
+  protected function getTempStore(): AutoSaveTempStore {
+    return $this->getTempStoreByCollection('canvas.auto_save');
   }
 
   /**
    * @todo Remove this in https://drupal.org/i/3505018.
    */
   protected function getFormViolationTempStore(): AutoSaveTempStore {
-    // Store for 30 days.
-    $expire = 86400 * 30;
-    // We need to fetch a new shared temp store from the factory for each
-    // usage because the current user can change in the lifetime of a request.
-    return $this->tempStoreFactory->get('experience_builder.auto_save.form_violations', expire: $expire);
+    return $this->getTempStoreByCollection('canvas.auto_save.form_violations');
+  }
+
+  /**
+   * @todo Remove this in https://drupal.org/i/3505018 and
+   *   https://drupal.org/i/3500795.
+   */
+  protected function getComponentInstanceFormViolationTempStore(): AutoSaveTempStore {
+    return $this->getTempStoreByCollection('canvas.auto_save.component_form_violations');
   }
 
   public function saveEntity(EntityInterface $entity, ?string $clientId = NULL): void {
@@ -127,8 +140,49 @@ class AutoSaveManager implements EventSubscriberInterface {
     return $this->getFormViolationTempStore()->get(self::getAutoSaveKey($entity)) ?? new ConstraintViolationList();
   }
 
+  /**
+   * Saves a component instance form violation.
+   *
+   * Some component source plugins need to submit Drupal forms to determine
+   * validation errors. This happens during conversion of the client model to
+   * input values, which is separate to validation. In order to store a record
+   * of any form violations, component source plugins can make use of this
+   * method.
+   *
+   * @see \Drupal\canvas\ComponentSource\ComponentSourceInterface::clientModelToInput
+   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent::clientModelToInput
+   * @see \Drupal\canvas\Form\ComponentInstanceForm
+   *
+   * @todo Remove this in https://drupal.org/i/3505018 and
+   *    https://drupal.org/i/3500795.
+   */
+  public function saveComponentInstanceFormViolations(string $component_uuid, ?ConstraintViolationListInterface $violations = NULL): self {
+    if ($violations === NULL) {
+      $this->getComponentInstanceFormViolationTempStore()->delete($component_uuid);
+      return $this;
+    }
+    $this->getComponentInstanceFormViolationTempStore()->set($component_uuid, $violations);
+    return $this;
+  }
+
+  /**
+   * @todo Remove this in https://drupal.org/i/3505018 and
+   *    https://drupal.org/i/3500795.
+   */
+  public function getComponentInstanceFormViolations(string $component_uuid): ConstraintViolationListInterface {
+    return $this->getComponentInstanceFormViolationTempStore()->get($component_uuid) ?? new ConstraintViolationList();
+  }
+
   private static function normalizeEntity(EntityInterface $entity): array {
     if (!$entity instanceof FieldableEntityInterface) {
+      if ($entity instanceof ComponentTreeEntityInterface && $entity instanceof ConfigEntityInterface) {
+        $tree = $entity->getComponentTree();
+        foreach ($tree as $component) {
+          assert($component instanceof ComponentTreeItem);
+          $component->optimizeInputs();
+        }
+        $entity->setComponentTree($tree->getValue());
+      }
       return $entity->toArray();
     }
     $normalized = [];
@@ -137,8 +191,15 @@ class AutoSaveManager implements EventSubscriberInterface {
       // If the entity has a 'changed' field, we don't want to include it in the
       // normalized data, as will be updated when we create an entity to
       // compare against the save version.
-      // @see \Drupal\experience_builder\AutoSave\AutoSaveManager::getAutoSaveEntity().
+      // @see \Drupal\canvas\AutoSave\AutoSaveManager::getAutoSaveEntity().
       $fields = \array_filter($fields, static fn (FieldItemListInterface $field) => $field->getFieldDefinition()->getType() !== 'changed');
+      // Similarly, we don't want to include the 'externalUpdates' field as it's
+      // not truly an entity field, but something used to track programmatic
+      // updates to the entity data in Redux.
+      // @todo We can probably remove this when we refactor the pageData slice
+      //   in https://drupal.org/i/3535569.
+      $fields = \array_filter($fields, static fn (FieldItemListInterface $field) => $field->getFieldDefinition()->getType() !== 'externalUpdates');
+
     }
     foreach (\array_keys($fields) as $name) {
       $items = $entity->get($name);
@@ -178,7 +239,36 @@ class AutoSaveManager implements EventSubscriberInterface {
     return $entity->getEntityTypeId() . ':' . $entity->id();
   }
 
+  /**
+   * @param \Drupal\Core\Entity\EntityInterface $entity
+   * @return array{autoSaveStartingPoint: int|string|null, hash: string|null}
+   */
+  public function getClientAutoSaveData(EntityInterface $entity): array {
+    $autoSaveEntity = $this->getAutoSaveEntity($entity);
+
+    // We need to load the stored entity to be able to construct the auto-save
+    // starting point.
+    \assert($entity->id() !== NULL);
+    $savedEntity = $this->entityTypeManager->getStorage($entity->getEntityTypeId())
+      ->loadUnchanged($entity->id());
+    assert($savedEntity instanceof EntityInterface);
+
+    // If available we must use the revision ID and the changed time because
+    // not all entity types will increment the revision ID on every change.
+    $autoSaveStartRevision = $savedEntity instanceof RevisionableInterface
+      ? $savedEntity->getRevisionId()
+      : \hash('xxh64', \json_encode($savedEntity->toArray(), JSON_THROW_ON_ERROR));
+    if ($savedEntity instanceof EntityChangedInterface) {
+      $autoSaveStartRevision .= '-' . $savedEntity->getChangedTime();
+    }
+    return [
+      'autoSaveStartingPoint' => $autoSaveStartRevision,
+      'hash' => $autoSaveEntity->hash,
+    ];
+  }
+
   private function getUnchangedHash(EntityInterface $entity): ?string {
+    assert(!is_null($entity->id()));
     $original = $this->entityTypeManager->getStorage($entity->getEntityTypeId())->loadUnchanged($entity->id());
     if ($original === NULL) {
       return NULL;
@@ -216,7 +306,7 @@ class AutoSaveManager implements EventSubscriberInterface {
   /**
    * Gets all auto-save data.
    *
-   * @return array<string, array{data: array, owner: int, updated: int, entity_type: string, entity_id: string|int, label: string, langcode: ?string, entity: ?EntityInterface}>
+   * @return array<string, array{data: array, owner: int, updated: int, entity_type: string, entity_id: string|int, label: string, data_hash: string, client_id: ?string, langcode: ?string, entity: ?EntityInterface}>
    *   All auto-save data entries.
    */
   public function getAllAutoSaveList(bool $with_entities = FALSE): array {
@@ -232,13 +322,28 @@ class AutoSaveManager implements EventSubscriberInterface {
   }
 
   /**
-   * @see ::onXbConfigEntitySave()
+   * @see ::onCanvasConfigEntitySave()
    */
   public function delete(EntityInterface $entity): void {
     $this->cacheTagsInvalidator->invalidateTags([self::CACHE_TAG]);
     $key = $this->getAutoSaveKey($entity);
     $this->getTempStore()->delete($key);
     $this->getFormViolationTempStore()->delete($key);
+    if ($entity instanceof ContentEntityInterface) {
+      $canvas_fields = \array_keys(
+        \array_filter(
+          $entity->getFields(),
+          static fn(FieldItemListInterface $field
+          ): bool => $field->getItemDefinition()->getClass(
+            ) === ComponentTreeItem::class
+        )
+      );
+      $component_uuids = \array_reduce($canvas_fields, static fn (array $carry, string $field_name): array => [
+        ...$carry,
+        ...\array_column($entity->get($field_name)->getValue(), 'uuid'),
+      ], []);
+      $this->getComponentInstanceFormViolationTempStore()->deleteMultiple(\array_unique($component_uuids));
+    }
   }
 
   public function deleteAll(): void {
@@ -271,9 +376,9 @@ class AutoSaveManager implements EventSubscriberInterface {
     }
   }
 
-  public function onXbConfigEntitySave(ConfigCrudEvent $event): void {
+  public function onCanvasConfigEntitySave(ConfigCrudEvent $event): void {
     [$module] = explode('.', $event->getConfig()->getName(), 2);
-    if ($module !== 'experience_builder') {
+    if ($module !== 'canvas') {
       return;
     }
 
@@ -281,8 +386,8 @@ class AutoSaveManager implements EventSubscriberInterface {
     if (!$entity) {
       return;
     }
-    // Auto-saves can only occur for XB config entities modified by the XB UI.
-    if (!$entity instanceof XbHttpApiEligibleConfigEntityInterface) {
+    // Auto-saves can only occur for Canvas config entities modified by the Canvas UI.
+    if (!$entity instanceof CanvasHttpApiEligibleConfigEntityInterface) {
       return;
     }
 
@@ -291,7 +396,7 @@ class AutoSaveManager implements EventSubscriberInterface {
       return;
     }
     $autoSaveEntity = $autoSaveData->entity;
-    assert($autoSaveEntity instanceof XbHttpApiEligibleConfigEntityInterface);
+    assert($autoSaveEntity instanceof CanvasHttpApiEligibleConfigEntityInterface);
 
     // Update the `label` and `status` keys of the config entity, if they've
     // changed.
@@ -326,15 +431,31 @@ class AutoSaveManager implements EventSubscriberInterface {
     }
   }
 
+  public function onCanvasConfigDelete(ConfigCrudEvent $event): void {
+    $autoSaveEntities = $this->getAllAutoSaveList(TRUE);
+    $autoSaveEntities = array_filter($autoSaveEntities, fn($entityData) => $entityData['entity'] instanceof StagedConfigUpdate);
+    foreach ($autoSaveEntities as $autoSaveEntity) {
+      $staged_config_update = $autoSaveEntity['entity'];
+      assert($staged_config_update instanceof StagedConfigUpdate);
+      if ($staged_config_update->getTarget() === $event->getConfig()->getName()) {
+        $this->delete($staged_config_update);
+      }
+    }
+  }
+
   /**
    * {@inheritdoc}
    */
   public static function getSubscribedEvents(): array {
-    $events[ConfigEvents::SAVE][] = ['onXbConfigEntitySave'];
+    $events[ConfigEvents::SAVE][] = ['onCanvasConfigEntitySave'];
+    $events[ConfigEvents::DELETE][] = ['onCanvasConfigDelete'];
     return $events;
   }
 
-  public static function contentEntityIsConsideredNew(ContentEntityInterface $entity): bool {
+  public static function entityIsConsideredNew(ContentEntityInterface|ContentTemplate $entity): bool {
+    if ($entity instanceof ContentTemplate) {
+      return !$entity->status();
+    }
     return (string) $entity->label() == ApiContentControllers::defaultTitle($entity->getEntityType()) || str_ends_with((string) $entity->label(), self::ENTITY_DUPLICATE_SUFFIX);
   }
 

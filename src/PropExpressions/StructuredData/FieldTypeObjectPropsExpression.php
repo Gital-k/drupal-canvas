@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Drupal\experience_builder\PropExpressions\StructuredData;
+namespace Drupal\canvas\PropExpressions\StructuredData;
 
 use Drupal\Component\Assertion\Inspector;
 use Drupal\Component\Utility\NestedArray;
@@ -23,7 +23,7 @@ final class FieldTypeObjectPropsExpression implements StructuredDataPropExpressi
    *
    * @param string $fieldType
    *   A field type.
-   * @param array<string, \Drupal\experience_builder\PropExpressions\StructuredData\FieldTypePropExpression|\Drupal\experience_builder\PropExpressions\StructuredData\ReferenceFieldTypePropExpression> $objectPropsToFieldTypeProps
+   * @param array<string, \Drupal\canvas\PropExpressions\StructuredData\FieldTypePropExpression|\Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression> $objectPropsToFieldTypeProps
    *   A mapping of SDC prop names to Field Type prop expressions.
    */
   public function __construct(
@@ -94,13 +94,12 @@ final class FieldTypeObjectPropsExpression implements StructuredDataPropExpressi
     return new static($field_type, $objectPropsToFieldTypeProps);
   }
 
-  public function isSupported(EntityInterface|FieldItemInterface|FieldItemListInterface $field): bool {
+  public function validateSupport(EntityInterface|FieldItemInterface|FieldItemListInterface $field): void {
     assert($field instanceof FieldItemInterface || $field instanceof FieldItemListInterface);
     $actual_field_type = $field->getFieldDefinition()->getType();
     if ($actual_field_type !== $this->fieldType) {
       throw new \DomainException(sprintf("`%s` is an expression for field type `%s`, but the provided field item (list) is of type `%s`.", (string) $this, $this->fieldType, $actual_field_type));
     }
-    return TRUE;
   }
 
 }

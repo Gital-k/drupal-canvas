@@ -1,14 +1,18 @@
+import PermissionCheck from '@/components/PermissionCheck';
+
 import AddCodeComponentDialog from './AddCodeComponentDialog';
-import RenameCodeComponentDialog from './RenameCodeComponentDialog';
-import DeleteCodeComponentDialog from './DeleteCodeComponentDialog';
 import AddToComponentsDialog from './AddToComponentsDialog';
-import RemoveFromComponentsDialog from './RemoveFromComponentsDialog';
 import ComponentInLayoutDialog from './ComponentInLayoutDialog';
+import DeleteCodeComponentDialog from './DeleteCodeComponentDialog';
+import RemoveFromComponentsDialog from './RemoveFromComponentsDialog';
+import RenameCodeComponentDialog from './RenameCodeComponentDialog';
 
 const CodeComponentDialogs = () => {
   return (
     <>
-      <AddCodeComponentDialog />
+      <PermissionCheck hasPermission="codeComponents">
+        <AddCodeComponentDialog />
+      </PermissionCheck>
       <RenameCodeComponentDialog />
       <DeleteCodeComponentDialog />
       <AddToComponentsDialog />

@@ -1,8 +1,9 @@
-import { a2p } from '@/local_packages/utils.js';
-import { useRef, useState, useContext } from 'react';
+import { createContext, useContext, useRef, useState } from 'react';
+
 import { RadioGroup, RadioItem } from '@/components/form/components/Radio';
 import InputBehaviors from '@/components/form/inputBehaviors';
-import { createContext } from 'react';
+import { a2p } from '@/local_packages/utils.js';
+
 import type { Attributes } from '@/types/DrupalAttribute';
 
 interface RadioContextType {
@@ -38,7 +39,7 @@ const DrupalRadioGroup = ({
     const syntheticEvent = {
       target: {
         value,
-        name: attributes['data-xb-name'],
+        name: attributes['data-canvas-name'],
       },
     } as unknown as React.ChangeEvent<HTMLInputElement>;
 
@@ -91,7 +92,7 @@ const DrupalRadioItem = ({ attributes = {} }: { attributes?: Attributes }) => {
         // input rendering as checked. This has no functional impact outside
         // of tests that are looking to confirm the input is set as checked, so
         // we add this attribute to make the checked status known via DOM query.
-        'data-drupal-xb-checked': `${selected}` === `${valueRef.current}`,
+        'data-drupal-canvas-checked': `${selected}` === `${valueRef.current}`,
       }}
       onChange={() => updateSelected(valueRef.current)}
     />

@@ -1,29 +1,20 @@
-import type React from 'react';
 import { useState } from 'react';
-import type {
-  DragEndEvent,
-  DragOverEvent,
-  DragStartEvent,
-} from '@dnd-kit/core';
+import clsx from 'clsx';
+import _ from 'lodash';
 import { DragOverlay, useDndMonitor } from '@dnd-kit/core';
 import {
   restrictToFirstScrollableAncestor,
   restrictToWindowEdges,
 } from '@dnd-kit/modifiers';
-import {
-  snapRightToCursor,
-  cleanupMouseTracking,
-  initMouseTracking,
-} from './snapRightToCursor';
-import { findNodePathByUuid } from '@/features/layout/layoutUtils';
+
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import {
-  addNewComponentToLayout,
-  addNewSectionToLayout,
+  _addNewComponentToLayout,
+  addNewPatternToLayout,
   moveNode,
   selectLayout,
 } from '@/features/layout/layoutModelSlice';
-import styles from './DragOverlay.module.css';
+import { findNodePathByUuid } from '@/features/layout/layoutUtils';
 import {
   setListDragging,
   setPreviewDragging,
@@ -32,10 +23,23 @@ import {
   setUpdatingComponent,
   unsetTargetSlot,
 } from '@/features/ui/uiSlice';
-import _ from 'lodash';
 import useComponentSelection from '@/hooks/useComponentSelection';
-import type { Section } from '@/types/Section';
-import clsx from 'clsx';
+
+import {
+  cleanupMouseTracking,
+  initMouseTracking,
+  snapRightToCursor,
+} from './snapRightToCursor';
+
+import type React from 'react';
+import type {
+  DragEndEvent,
+  DragOverEvent,
+  DragStartEvent,
+} from '@dnd-kit/core';
+import type { Pattern } from '@/types/Pattern';
+
+import styles from './DragOverlay.module.css';
 
 const DragEventsHandler: React.FC = () => {
   const layout = useAppSelector(selectLayout);
@@ -176,7 +180,7 @@ const DragEventsHandler: React.FC = () => {
       if (type === 'component' || type === 'dynamicComponent') {
         // @todo We should optimistically insert newItem.default_markup into to the new location in the iFrames dom.
         dispatch(
-          addNewComponentToLayout(
+          _addNewComponentToLayout(
             {
               to: dropPath,
               component: newItem,
@@ -184,12 +188,12 @@ const DragEventsHandler: React.FC = () => {
             setSelectedComponent,
           ),
         );
-      } else if (type === 'section') {
+      } else if (type === 'pattern') {
         dispatch(
-          addNewSectionToLayout(
+          addNewPatternToLayout(
             {
               to: dropPath,
-              layoutModel: (newItem as Section).layoutModel,
+              layoutModel: (newItem as Pattern).layoutModel,
             },
             setSelectedComponent,
           ),

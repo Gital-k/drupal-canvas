@@ -2,19 +2,18 @@
 
 declare(strict_types=1);
 
-namespace Drupal\Tests\experience_builder\Kernel\Config;
+namespace Drupal\Tests\canvas\Kernel\Config;
 
 use Drupal\Core\Extension\ThemeInstallerInterface;
-use Drupal\experience_builder\Entity\PageRegion;
-use Drupal\experience_builder\Exception\ConstraintViolationException;
-use Drupal\Tests\experience_builder\Traits\BetterConfigDependencyManagerTrait;
-use Drupal\Tests\experience_builder\Traits\ConstraintViolationsTestTrait;
-use Drupal\Tests\experience_builder\Traits\GenerateComponentConfigTrait;
+use Drupal\canvas\Entity\PageRegion;
+use Drupal\canvas\Exception\ConstraintViolationException;
+use Drupal\Tests\canvas\Traits\BetterConfigDependencyManagerTrait;
+use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
+use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\TestTools\Random;
 
 /**
- * @group experience_builder
- * @group #slow
+ * @group canvas
  */
 class PageRegionValidationTest extends BetterConfigEntityValidationTestBase {
 
@@ -32,9 +31,9 @@ class PageRegionValidationTest extends BetterConfigEntityValidationTestBase {
    */
   protected static $modules = [
     'block',
-    'experience_builder',
-    'xb_test_sdc',
-    // XB's dependencies (modules providing field types + widgets).
+    'canvas',
+    'canvas_test_sdc',
+    // Canvas's dependencies (modules providing field types + widgets).
     'datetime',
     'file',
     'image',
@@ -69,8 +68,8 @@ class PageRegionValidationTest extends BetterConfigEntityValidationTestBase {
       'component_tree' => [
         [
           'uuid' => '4f785025-9bd9-4752-9dd6-068b957b03ee',
-          'component_id' => 'sdc.xb_test_sdc.props-no-slots',
-          'component_version' => '95f4f1d5ee47663b',
+          'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+          'component_version' => 'b1e991f726a2a266',
           'inputs' => [
             'heading' => $generate_static_prop_source('world'),
           ],
@@ -78,8 +77,8 @@ class PageRegionValidationTest extends BetterConfigEntityValidationTestBase {
         ],
         [
           'uuid' => '3a76bf4f-9306-43e6-ba8f-cb4b5b6459df',
-          'component_id' => 'sdc.xb_test_sdc.props-no-slots',
-          'component_version' => '95f4f1d5ee47663b',
+          'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+          'component_version' => 'b1e991f726a2a266',
           'inputs' => [
             'heading' => $generate_static_prop_source('another world'),
           ],
@@ -119,9 +118,9 @@ class PageRegionValidationTest extends BetterConfigEntityValidationTestBase {
     $this->assertSame(
       [
         'config' => [
-          'experience_builder.component.block.page_title_block',
-          'experience_builder.component.block.system_messages_block',
-          'experience_builder.component.sdc.xb_test_sdc.props-no-slots',
+          'canvas.component.block.page_title_block',
+          'canvas.component.block.system_messages_block',
+          'canvas.component.sdc.canvas_test_sdc.props-no-slots',
         ],
         'theme' => ['stark'],
       ],
@@ -129,14 +128,14 @@ class PageRegionValidationTest extends BetterConfigEntityValidationTestBase {
     );
     $this->assertSame([
       'config' => [
-        'experience_builder.component.block.page_title_block',
-        'experience_builder.component.block.system_messages_block',
-        'experience_builder.component.sdc.xb_test_sdc.props-no-slots',
+        'canvas.component.block.page_title_block',
+        'canvas.component.block.system_messages_block',
+        'canvas.component.sdc.canvas_test_sdc.props-no-slots',
       ],
       'module' => [
-        'experience_builder',
+        'canvas',
         'system',
-        'xb_test_sdc',
+        'canvas_test_sdc',
       ],
       'theme' => ['stark'],
     ], $this->getAllDependencies($this->entity));
@@ -202,7 +201,8 @@ class PageRegionValidationTest extends BetterConfigEntityValidationTestBase {
    * @dataProvider providerInvalidComponentTree
    */
   public function testInvalidComponentTree(array $component_tree, array $expected_messages): void {
-    $this->entity->set('component_tree', $component_tree);
+    \assert($this->entity instanceof PageRegion);
+    $this->entity->setComponentTree($component_tree);
     $this->assertValidationErrors($expected_messages);
   }
 
@@ -211,8 +211,8 @@ class PageRegionValidationTest extends BetterConfigEntityValidationTestBase {
       'component_tree' => [
         [
           'uuid' => '4f785025-9bd9-4752-9dd6-068b957b03ee',
-          'component_id' => 'sdc.xb_test_sdc.props-no-slots',
-          'component_version' => '95f4f1d5ee47663b',
+          'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+          'component_version' => 'b1e991f726a2a266',
           'inputs' => [
             'heading' => [
               'sourceType' => 'dynamic',
@@ -230,26 +230,18 @@ class PageRegionValidationTest extends BetterConfigEntityValidationTestBase {
       'component_tree' => [
         [
           'uuid' => 'you-are-a-wizard-harry',
-          'component_id' => 'sdc.xb_test_sdc.props-slots',
-          'component_version' => 'ab4d3ddce315cf64',
+          'component_id' => 'sdc.canvas_test_sdc.props-slots',
+          'component_version' => '85a5c0c7dd53e0bb',
           'inputs' => [
-            'heading' => [
-              'sourceType' => 'static:field_item:string',
-              'value' => "Ghosts crowd the young child's",
-              'expression' => 'ℹ︎string␟value',
-            ],
+            'heading' => "Ghosts crowd the young child's",
           ],
         ],
         [
           'uuid' => 'fa9ff0a8-e23a-492a-ab14-5460611fa2c1',
-          'component_id' => 'sdc.xb_test_sdc.props-slots',
-          'component_version' => 'ab4d3ddce315cf64',
+          'component_id' => 'sdc.canvas_test_sdc.props-slots',
+          'component_version' => '85a5c0c7dd53e0bb',
           'inputs' => [
-            'heading' => [
-              'sourceType' => 'static:field_item:string',
-              'value' => 'Fragile eggshell mind',
-              'expression' => 'ℹ︎string␟value',
-            ],
+            'heading' => 'Fragile eggshell mind',
           ],
         ],
       ],
@@ -262,28 +254,20 @@ class PageRegionValidationTest extends BetterConfigEntityValidationTestBase {
       'component_tree' => [
         [
           'uuid' => 'fa9ff0a8-e23a-492a-ab14-5460611fa2c1',
-          'component_id' => 'sdc.xb_test_sdc.props-slots',
-          'component_version' => 'ab4d3ddce315cf64',
+          'component_id' => 'sdc.canvas_test_sdc.props-slots',
+          'component_version' => '85a5c0c7dd53e0bb',
           'inputs' => [
-            'heading' => [
-              'sourceType' => 'static:field_item:string',
-              'value' => 'And we laugh like soft, mad children',
-              'expression' => 'ℹ︎string␟value',
-            ],
+            'heading' => 'And we laugh like soft, mad children',
           ],
         ],
         [
           'uuid' => 'e303dd88-9409-4dc7-8a8b-a31602884a94',
           'slot' => 'the_body',
           'parent_uuid' => '6381352f-5b0a-4ca1-960d-a5505b37b27c',
-          'component_id' => 'sdc.xb_test_sdc.props-slots',
-          'component_version' => 'ab4d3ddce315cf64',
+          'component_id' => 'sdc.canvas_test_sdc.props-slots',
+          'component_version' => '85a5c0c7dd53e0bb',
           'inputs' => [
-            'heading' => [
-              'sourceType' => 'static:field_item:string',
-              'value' => ' Smug in the wooly cotton brains of infancy',
-              'expression' => 'ℹ︎string␟value',
-            ],
+            'heading' => ' Smug in the wooly cotton brains of infancy',
           ],
         ],
       ],
@@ -296,33 +280,25 @@ class PageRegionValidationTest extends BetterConfigEntityValidationTestBase {
       'component_tree' => [
         [
           'uuid' => 'fa9ff0a8-e23a-492a-ab14-5460611fa2c1',
-          'component_id' => 'sdc.xb_test_sdc.props-slots',
-          'component_version' => 'ab4d3ddce315cf64',
+          'component_id' => 'sdc.canvas_test_sdc.props-slots',
+          'component_version' => '85a5c0c7dd53e0bb',
           'inputs' => [
-            'heading' => [
-              'sourceType' => 'static:field_item:string',
-              'value' => 'And we laugh like soft, mad children',
-              'expression' => 'ℹ︎string␟value',
-            ],
+            'heading' => 'And we laugh like soft, mad children',
           ],
         ],
         [
           'uuid' => 'e303dd88-9409-4dc7-8a8b-a31602884a94',
           'slot' => 'banana',
           'parent_uuid' => 'fa9ff0a8-e23a-492a-ab14-5460611fa2c1',
-          'component_id' => 'sdc.xb_test_sdc.props-slots',
-          'component_version' => 'ab4d3ddce315cf64',
+          'component_id' => 'sdc.canvas_test_sdc.props-slots',
+          'component_version' => '85a5c0c7dd53e0bb',
           'inputs' => [
-            'heading' => [
-              'sourceType' => 'static:field_item:string',
-              'value' => ' Smug in the wooly cotton brains of infancy',
-              'expression' => 'ℹ︎string␟value',
-            ],
+            'heading' => ' Smug in the wooly cotton brains of infancy',
           ],
         ],
       ],
       'expected_messages' => [
-        'component_tree.1.slot' => 'Invalid component subtree. This component subtree contains an invalid slot name for component <em class="placeholder">sdc.xb_test_sdc.props-slots</em>: <em class="placeholder">banana</em>. Valid slot names are: <em class="placeholder">the_body, the_footer, the_colophon</em>.',
+        'component_tree.1.slot' => 'Invalid component subtree. This component subtree contains an invalid slot name for component <em class="placeholder">sdc.canvas_test_sdc.props-slots</em>: <em class="placeholder">banana</em>. Valid slot names are: <em class="placeholder">the_body, the_footer, the_colophon</em>.',
       ],
     ];
 
@@ -330,14 +306,10 @@ class PageRegionValidationTest extends BetterConfigEntityValidationTestBase {
       'component_tree' => [
         [
           'uuid' => 'e303dd88-9409-4dc7-8a8b-a31602884a94',
-          'component_id' => 'sdc.xb_test_sdc.props-slots',
-          'component_version' => 'ab4d3ddce315cf64',
+          'component_id' => 'sdc.canvas_test_sdc.props-slots',
+          'component_version' => '85a5c0c7dd53e0bb',
           'inputs' => [
-            'heading' => [
-              'sourceType' => 'static:field_item:string',
-              'value' => 'And we laugh like soft, mad children',
-              'expression' => 'ℹ︎string␟value',
-            ],
+            'heading' => 'And we laugh like soft, mad children',
           ],
           'label' => Random::string(256),
         ],
@@ -347,12 +319,12 @@ class PageRegionValidationTest extends BetterConfigEntityValidationTestBase {
       ],
     ];
 
-    yield "invalid version" => [
+    yield "not collapsed" => [
       'component_tree' => [
         [
-          'uuid' => 'fa9ff0a8-e23a-492a-ab14-5460611fa2c1',
-          'component_id' => 'sdc.xb_test_sdc.props-slots',
-          'component_version' => 'abc',
+          'uuid' => 'e303dd88-9409-4dc7-8a8b-a31602884a94',
+          'component_id' => 'sdc.canvas_test_sdc.props-slots',
+          'component_version' => '85a5c0c7dd53e0bb',
           'inputs' => [
             'heading' => [
               'sourceType' => 'static:field_item:string',
@@ -363,7 +335,23 @@ class PageRegionValidationTest extends BetterConfigEntityValidationTestBase {
         ],
       ],
       'expected_messages' => [
-        'component_tree.0.component_version' => "'abc' is not a version that exists on component config entity 'sdc.xb_test_sdc.props-slots'. Available versions: 'ab4d3ddce315cf64'.",
+        'component_tree.0.inputs.e303dd88-9409-4dc7-8a8b-a31602884a94' => 'When using the default static prop source for a component input, you must use the collapsed input syntax.',
+      ],
+    ];
+
+    yield "invalid version" => [
+      'component_tree' => [
+        [
+          'uuid' => 'fa9ff0a8-e23a-492a-ab14-5460611fa2c1',
+          'component_id' => 'sdc.canvas_test_sdc.props-slots',
+          'component_version' => 'abc',
+          'inputs' => [
+            'heading' => 'And we laugh like soft, mad children',
+          ],
+        ],
+      ],
+      'expected_messages' => [
+        'component_tree.0.component_version' => "'abc' is not a version that exists on component config entity 'sdc.canvas_test_sdc.props-slots'. Available versions: '85a5c0c7dd53e0bb'.",
       ],
     ];
   }

@@ -1,28 +1,30 @@
+import { useEffect, useState } from 'react';
 import { Box, Flex, Select } from '@radix-ui/themes';
-import {
-  FormElement,
-  Label,
-  Divider,
-} from '@/features/code-editor/component-data/FormElement';
+
 import { useAppDispatch } from '@/app/hooks';
 import { updateProp } from '@/features/code-editor/codeEditorSlice';
+import {
+  Divider,
+  FormElement,
+  Label,
+} from '@/features/code-editor/component-data/FormElement';
+
 import type {
   CodeComponentProp,
   CodeComponentPropImageExample,
 } from '@/types/CodeComponent';
-import { useState, useEffect } from 'react';
 
 const IMAGE_SERVICE_URL = 'https://placehold.co/';
 
 const NONE_VALUE = '_none_';
 const EXAMPLE_ASPECT_RATIO_VALUES = [
-  { value: '1:1', label: '1:1 (Square)', width: 800, height: 800 },
-  { value: '4:3', label: '4:3 (Standard)', width: 1200, height: 900 },
-  { value: '16:9', label: '16:9 (Widescreen)', width: 1920, height: 1080 },
-  { value: '3:2', label: '3:2 (Classic Photo)', width: 1200, height: 800 },
-  { value: '2:1', label: '2:1 (Panoramic)', width: 1600, height: 800 },
-  { value: '9:16', label: '9:16 (Vertical)', width: 1080, height: 1920 },
-  { value: '21:9', label: '21:9 (Ultrawide)', width: 2100, height: 900 },
+  { value: '1:1', label: '1:1 (Square)', width: 600, height: 600 },
+  { value: '4:3', label: '4:3 (Standard)', width: 800, height: 600 },
+  { value: '16:9', label: '16:9 (Widescreen)', width: 1280, height: 720 },
+  { value: '3:2', label: '3:2 (Classic Photo)', width: 900, height: 600 },
+  { value: '2:1', label: '2:1 (Panoramic)', width: 1000, height: 500 },
+  { value: '9:16', label: '9:16 (Vertical)', width: 720, height: 1280 },
+  { value: '21:9', label: '21:9 (Ultrawide)', width: 1400, height: 600 },
 ];
 const DEFAULT_ASPECT_RATIO = EXAMPLE_ASPECT_RATIO_VALUES[1].value;
 
@@ -122,12 +124,13 @@ export default function FormPropTypeImage({
         (ratio) => ratio.value === aspectRatio,
       ) || EXAMPLE_ASPECT_RATIO_VALUES[0];
 
+    const alternateWidths = `${IMAGE_SERVICE_URL}{width}x{height}${pixelDensitySuffix}.png`;
     dispatch(
       updateProp({
         id,
         updates: {
           example: {
-            src: `${IMAGE_SERVICE_URL}${aspectRatioData.width}x${aspectRatioData.height}${pixelDensitySuffix}.png`,
+            src: `${IMAGE_SERVICE_URL}${aspectRatioData.width}x${aspectRatioData.height}${pixelDensitySuffix}.png?alternateWidths=${encodeURIComponent(alternateWidths)}`,
             width: aspectRatioData.width,
             height: aspectRatioData.height,
             alt: 'Example image placeholder',

@@ -1,15 +1,13 @@
 import { useEffect, useRef } from 'react';
+import { useParams } from 'react-router';
+
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
-import {
-  selectCollapsedLayers,
-  setCollapsedLayers,
-  removeCollapsedLayers,
-} from '@/features/ui/uiSlice';
 import { selectModel } from '@/features/layout/layoutModelSlice';
 import {
-  selectEntityId,
-  selectEntityType,
-} from '@/features/configuration/configurationSlice';
+  removeCollapsedLayers,
+  selectCollapsedLayers,
+  setCollapsedLayers,
+} from '@/features/ui/uiSlice';
 
 /**
  * Hook to ensure that when the collapsed layers are updated, they are stored in localStorage. The allows the user's
@@ -17,13 +15,12 @@ import {
  */
 const useSyncCollapsedLayersLocalStorage = () => {
   const dispatch = useAppDispatch();
-  const entityId = useAppSelector(selectEntityId);
-  const entityType = useAppSelector(selectEntityType);
+  const { entityType, entityId } = useParams();
   const model = useAppSelector(selectModel);
   const collapsedLayers = useAppSelector(selectCollapsedLayers);
   const isInitialized = useRef(false);
   // Key the storage by edited entity
-  const key = `XB.collapsedLayers.${entityType}.${entityId}`;
+  const key = `Canvas.collapsedLayers.${entityType}.${entityId}`;
 
   // Initialize Redux state from local storage - run only once on component mount
   useEffect(() => {

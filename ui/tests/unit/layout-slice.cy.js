@@ -1,21 +1,22 @@
-import {
-  selectLayoutHistory,
-  deleteNode,
-  moveNode,
-  sortNode,
-  layoutModelSlice,
-  setLayoutModel,
-  initialState,
-  duplicateNode,
-  shiftNode,
-} from '@/features/layout/layoutModelSlice';
 import { makeStore } from '@/app/store';
 import {
-  selectUndoType,
-  UndoRedoActionCreators,
-  initialState as uiInitialState,
-} from '@/features/ui/uiSlice';
+  deleteNode,
+  duplicateNode,
+  initialState,
+  layoutModelSlice,
+  moveNode,
+  selectLayoutHistory,
+  setLayoutModel,
+  shiftNode,
+  sortNode,
+} from '@/features/layout/layoutModelSlice';
 import { setPageData } from '@/features/pageData/pageDataSlice';
+import {
+  selectUndoItem,
+  initialState as uiInitialState,
+  UndoRedoActionCreators,
+} from '@/features/ui/uiSlice';
+
 import layoutFixture from '../fixtures/layout-default.json';
 
 let layout;
@@ -257,8 +258,8 @@ describe('Undo/redo', () => {
     expect(state.past.length).to.eq(0);
     expect(state.future.length).to.eq(0);
     store.dispatch(setLayoutModel(layout));
-    const undoType = selectUndoType(store.getState());
-    expect(undoType).to.eq('layoutModel');
+    const undoItem = selectUndoItem(store.getState());
+    expect(undoItem.targetSlice).to.eq('layoutModel');
 
     state = selectLayoutHistory(store.getState());
     expect(state.present.layout).to.deep.equal(layout.layout);
@@ -291,8 +292,8 @@ describe('Undo/redo', () => {
     expect(state.future.length).to.eq(1);
 
     store.dispatch(setPageData({}));
-    const undoType = selectUndoType(store.getState());
-    expect(undoType).to.eq('pageData');
+    const undoItem = selectUndoItem(store.getState());
+    expect(undoItem.targetSlice).to.eq('pageData');
 
     state = selectLayoutHistory(store.getState());
     expect(state.present).to.deep.equal(initialState);

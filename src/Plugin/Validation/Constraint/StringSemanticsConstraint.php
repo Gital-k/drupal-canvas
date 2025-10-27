@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Drupal\experience_builder\Plugin\Validation\Constraint;
+namespace Drupal\canvas\Plugin\Validation\Constraint;
 
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\Validation\Attribute\Constraint;
@@ -73,7 +73,7 @@ final class StringSemanticsConstraint extends SymfonyConstraint {
   /**
    * {@inheritdoc}
    */
-  public function getDefaultOption() : ?string {
+  public function getDefaultOption() : string {
     return 'semantic';
   }
 

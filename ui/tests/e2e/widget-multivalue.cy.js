@@ -3,12 +3,12 @@ describe('Multivalue widget drag and drop', () => {
   // entity-form-field-types-test.cy.js and this test is only about drag and
   // drop support.
   before(() => {
-    cy.drupalXbInstall(['xb_test_article_fields']);
+    cy.drupalCanvasInstall(['canvas_test_article_fields']);
   });
 
   beforeEach(() => {
     cy.drupalSession();
-    cy.drupalLogin('xbUser', 'xbUser');
+    cy.drupalLogin('canvasUser', 'canvasUser');
   });
 
   after(() => {
@@ -16,10 +16,11 @@ describe('Multivalue widget drag and drop', () => {
   });
 
   it('can use a multivalue widget in the page data form', () => {
-    cy.loadURLandWaitForXBLoaded();
-    cy.findByTestId('xb-page-data-form').as('entityForm');
+    cy.loadURLandWaitForCanvasLoaded();
+    const entityFormSelector = '[data-testid="canvas-page-data-form"]';
+    cy.findByTestId('canvas-page-data-form').as('entityForm');
     cy.get('@entityForm').recordFormBuildId();
-    cy.findByRole('heading', { name: 'XB Unlimited Text' })
+    cy.findByRole('heading', { name: 'Canvas Unlimited Text' })
       .parents('.js-form-wrapper')
       .as('unlimited-text');
 
@@ -67,7 +68,7 @@ describe('Multivalue widget drag and drop', () => {
     // @todo Remove in https://drupal.org/i/3521641
     const waitForPreview = () => {
       cy.intercept({
-        url: '**/xb/api/v0/layout/node/1',
+        url: '**/canvas/api/v0/layout/node/1',
         times: 1,
         method: 'POST',
       }).as('updatePreview');
@@ -81,9 +82,9 @@ describe('Multivalue widget drag and drop', () => {
     cy.get('@unlimited-text')
       .findByRole('button', { name: 'Add another item' })
       .click();
-    cy.get('@entityForm').shouldHaveUpdatedFormBuildId();
+    cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
     // Wait for ajax behaviors to finish.
-    cy.get('body[data-xb-ajax-behaviors="true"]').should('not.exist');
+    cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
     cy.get('@unlimited-text').findAllByRole('textbox').should('have.length', 3);
 
     // Populate the new item.
@@ -118,7 +119,7 @@ describe('Multivalue widget drag and drop', () => {
       scrollBehavior: false,
     };
     cy.get(
-      '[data-drupal-selector="edit-field-xbt-unlimited-text"] tr.draggable:nth-child(3) [title="Change order"]',
+      '[data-drupal-selector="edit-field-cvt-unlimited-text"] tr.draggable:nth-child(3) [title="Change order"]',
     ).realDnd('input[value="Neutral Milk Hotel"]', dndDefaults);
 
     confirmTextInputs([
@@ -130,9 +131,9 @@ describe('Multivalue widget drag and drop', () => {
     cy.get('@unlimited-text')
       .findByRole('button', { name: 'Add another item' })
       .click();
-    cy.get('@entityForm').shouldHaveUpdatedFormBuildId();
+    cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
     // Wait for ajax behaviors to finish.
-    cy.get('body[data-xb-ajax-behaviors="true"]').should('not.exist');
+    cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
     cy.get('@unlimited-text').findAllByRole('textbox').should('have.length', 4);
 
     cy.log(
@@ -154,10 +155,22 @@ describe('Multivalue widget drag and drop', () => {
     ]);
     confirmWeightSelectCount(4);
 
+    // Reloading should re-instate the previous form values.
+    cy.reload();
+    cy.previewReady();
+    confirmTextInputs([
+      'Marshmallow Coast',
+      'The Olivia Tremor Control',
+      'Neutral Milk Hotel',
+      'The Music Tapes',
+      // Reloading should append a new empty item.
+      '',
+    ]);
+
     // Ensure the drop target is in the viewport.
     cy.get('@unlimited-text').findAllByRole('textbox').eq(0).scrollIntoView();
     cy.get(
-      '[data-drupal-selector="edit-field-xbt-unlimited-text"] tr.draggable:nth-child(4) [title="Change order"]',
+      '[data-drupal-selector="edit-field-cvt-unlimited-text"] tr.draggable:nth-child(4) [title="Change order"]',
     ).realDnd('input[value="Neutral Milk Hotel"]', dndDefaults);
     cy.get('@unlimited-text')
       .findAllByRole('textbox')
@@ -169,19 +182,20 @@ describe('Multivalue widget drag and drop', () => {
       'The Olivia Tremor Control',
       'The Music Tapes',
       'Neutral Milk Hotel',
+      '',
     ]);
-    confirmWeightSelectCount(4);
+    confirmWeightSelectCount(5);
 
     cy.findByText('Hide row weights').should('not.exist');
     cy.findByText('Show row weights').click();
     cy.findByText('Hide row weights').should('exist');
 
-    confirmWeightSelectCount(4, true);
+    confirmWeightSelectCount(5, true);
 
     cy.get('@unlimited-text')
       .get('[title="Change order"]')
       .should(($handles) => {
-        expect($handles).to.have.length(4);
+        expect($handles).to.have.length(5);
         $handles.each((index, handle) => {
           expect(
             Cypress.$(handle).is(':visible'),

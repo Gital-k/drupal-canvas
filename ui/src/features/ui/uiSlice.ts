@@ -1,6 +1,8 @@
-import { createAppSlice } from '@/app/createAppSlice';
-import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSelector } from '@reduxjs/toolkit';
+
+import { createAppSlice } from '@/app/createAppSlice';
+
+import type { Action, PayloadAction } from '@reduxjs/toolkit';
 
 export interface DraggingStatus {
   isDragging: boolean;
@@ -9,10 +11,15 @@ export interface DraggingStatus {
   previewDragging: boolean;
 }
 
-export interface CanvasViewPort {
+export interface EditorViewPort {
   x: number;
   y: number;
   scale: number;
+}
+
+export interface PreviouslyEdited {
+  name: string;
+  path: string;
 }
 
 export interface Selection {
@@ -22,12 +29,30 @@ export interface Selection {
 
 export const DEFAULT_REGION = 'content' as const;
 
-export enum CanvasMode {
+export enum EditorFrameMode {
   INTERACTIVE = 'interactive',
   EDIT = 'edit',
 }
 
+export enum EditorFrameContext {
+  ENTITY = 'entity',
+  TEMPLATE = 'template',
+  NONE = 'none',
+}
+
 export type UndoRedoType = 'layoutModel' | 'pageData';
+
+export interface RouteSnapshot {
+  pathname: string;
+  search: string;
+  hash: string;
+}
+
+export interface UndoRedoStackItem {
+  targetSlice: UndoRedoType;
+  routeSnapshot: RouteSnapshot;
+  debugInfoAction?: Action;
+}
 
 export interface uiSliceState {
   pending: boolean;
@@ -41,12 +66,15 @@ export interface uiSliceState {
   targetSlot: string | undefined; //uuid of slot being hovered when dragging
   viewportWidth: number;
   viewportMinHeight: number;
-  canvasViewport: CanvasViewPort;
+  editorViewPort: EditorViewPort;
   latestUndoRedoActionId: string;
   firstLoadComplete: boolean;
-  canvasMode: CanvasMode;
-  undoStack: Array<UndoRedoType>;
-  redoStack: Array<UndoRedoType>;
+  editorFrameMode: EditorFrameMode;
+  editorFrameContext: EditorFrameContext;
+  undoStack: Array<UndoRedoStackItem>;
+  redoStack: Array<UndoRedoStackItem>;
+  currentRoute: RouteSnapshot;
+  PreviouslyEdited: PreviouslyEdited;
 }
 
 type UpdateViewportPayload = {
@@ -70,21 +98,28 @@ export const initialState: uiSliceState = {
   targetSlot: undefined,
   viewportWidth: 0,
   viewportMinHeight: 0,
-  canvasViewport: {
+  editorViewPort: {
     x: 0,
     y: 0,
     scale: 1,
   },
   undoStack: [],
   redoStack: [],
+  currentRoute: {
+    pathname: '',
+    search: '',
+    hash: '',
+  },
   latestUndoRedoActionId: '',
   firstLoadComplete: false,
-  canvasMode: CanvasMode.EDIT,
+  editorFrameMode: EditorFrameMode.EDIT,
+  editorFrameContext: EditorFrameContext.NONE,
   selection: {
     consecutive: false,
     items: [],
   },
   collapsedLayers: [],
+  PreviouslyEdited: { name: '', path: '' },
 };
 
 export interface ScaleValue {
@@ -145,27 +180,40 @@ export const uiSlice = createAppSlice({
   initialState,
   // The `reducers` field lets us define reducers and generate associated actions
   reducers: (create) => ({
-    pushUndo: create.reducer((state, action: PayloadAction<UndoRedoType>) => {
-      state.undoStack.push(action.payload);
-      state.redoStack = [];
-    }),
+    pushUndo: create.reducer(
+      (state, action: PayloadAction<UndoRedoStackItem>) => {
+        state.undoStack.push(action.payload);
+        state.redoStack = [];
+      },
+    ),
     performUndoOrRedo: create.reducer(
-      // Take care of moving undo/redo types:
+      // Take care of moving undo/redo items:
       // * from the undo stack to the redo stack in the case of an UNDO action;
       // * from the redo stack to the undo stack in the case of a REDO action.
+      // Also restore the route from the stack item.
       (state, action: PayloadAction<boolean>) => {
         const isUndo = action.payload;
         const undoStack = [...state.undoStack];
         const redoStack = [...state.redoStack];
+        let routeToRestore: RouteSnapshot | null = null;
+
         if (isUndo && undoStack.length > 0) {
-          redoStack.unshift(undoStack.pop() as UndoRedoType);
-          return { ...state, undoStack, redoStack };
+          const undoItem = undoStack.pop() as UndoRedoStackItem;
+          redoStack.unshift(undoItem);
+          routeToRestore = undoItem.routeSnapshot;
+        } else if (redoStack.length > 0) {
+          // Move the last redo state into the undo stack.
+          const redoItem = redoStack.shift() as UndoRedoStackItem;
+          undoStack.push(redoItem);
+          routeToRestore = redoItem.routeSnapshot;
         }
-        // Move the last redo state into the undo stack.
-        if (redoStack.length > 0) {
-          undoStack.push(redoStack.shift() as UndoRedoType);
-        }
-        return { ...state, undoStack, redoStack };
+
+        return {
+          ...state,
+          undoStack,
+          redoStack,
+          currentRoute: routeToRestore || state.currentRoute,
+        };
       },
     ),
     setPending: create.reducer((state, action: PayloadAction<boolean>) => {
@@ -213,27 +261,27 @@ export const uiSlice = createAppSlice({
     unsetTargetSlot: create.reducer((state) => {
       state.targetSlot = undefined;
     }),
-    setCanvasViewPort: create.reducer(
+    setEditorFrameViewPort: create.reducer(
       (state, action: PayloadAction<UpdateViewportPayload>) => {
         if (action.payload.x !== undefined) {
-          state.canvasViewport.x = action.payload.x;
+          state.editorViewPort.x = action.payload.x;
         }
         if (action.payload.y !== undefined) {
-          state.canvasViewport.y = action.payload.y;
+          state.editorViewPort.y = action.payload.y;
         }
-        state.canvasViewport.scale =
-          action.payload.scale || state.canvasViewport.scale;
+        state.editorViewPort.scale =
+          action.payload.scale || state.editorViewPort.scale;
       },
     ),
-    canvasViewPortZoomIn: create.reducer((state, action) => {
-      const currentScale = state.canvasViewport.scale;
+    editorViewPortZoomIn: create.reducer((state, action) => {
+      const currentScale = state.editorViewPort.scale;
       const newIndex = getNewScaleIndex(currentScale, 'increment');
-      state.canvasViewport.scale = scaleValues[newIndex].scale;
+      state.editorViewPort.scale = scaleValues[newIndex].scale;
     }),
-    canvasViewPortZoomOut: create.reducer((state, action) => {
-      const currentScale = state.canvasViewport.scale;
+    editorViewPortZoomOut: create.reducer((state, action) => {
+      const currentScale = state.editorViewPort.scale;
       const newIndex = getNewScaleIndex(currentScale, 'decrement');
-      state.canvasViewport.scale = scaleValues[newIndex].scale;
+      state.editorViewPort.scale = scaleValues[newIndex].scale;
     }),
     setViewportWidth: create.reducer((state, action: PayloadAction<number>) => {
       state.viewportWidth = action.payload;
@@ -253,11 +301,19 @@ export const uiSlice = createAppSlice({
         state.firstLoadComplete = action.payload;
       },
     ),
-    setCanvasModeEditing: create.reducer((state) => {
-      state.canvasMode = CanvasMode.EDIT;
+    setEditorFrameModeEditing: create.reducer((state) => {
+      state.editorFrameMode = EditorFrameMode.EDIT;
     }),
-    setCanvasModeInteractive: create.reducer((state) => {
-      state.canvasMode = CanvasMode.INTERACTIVE;
+    setEditorFrameModeInteractive: create.reducer((state) => {
+      state.editorFrameMode = EditorFrameMode.INTERACTIVE;
+    }),
+    setEditorFrameContext: create.reducer(
+      (state, action: PayloadAction<EditorFrameContext>) => {
+        state.editorFrameContext = action.payload;
+      },
+    ),
+    unsetEditorFrameContext: create.reducer((state) => {
+      state.editorFrameContext = EditorFrameContext.NONE;
     }),
     clearSelection: create.reducer((state) => {
       state.selection.items.length = 0;
@@ -276,6 +332,14 @@ export const uiSlice = createAppSlice({
         }
       },
     ),
+    setPreviouslyEdited: create.reducer(
+      (state, action: PayloadAction<PreviouslyEdited>) => {
+        state.PreviouslyEdited = action.payload;
+      },
+    ),
+    unsetPreviouslyEdited: create.reducer((state) => {
+      state.PreviouslyEdited = { name: '', path: '' };
+    }),
     setCollapsedLayers: (state, action: PayloadAction<string[]>) => {
       state.collapsedLayers = action.payload;
     },
@@ -293,13 +357,18 @@ export const uiSlice = createAppSlice({
         (uuid) => !uuidsToRemove.has(uuid),
       );
     },
+    setCurrentRoute: create.reducer(
+      (state, action: PayloadAction<RouteSnapshot>) => {
+        state.currentRoute = action.payload;
+      },
+    ),
   }),
   // You can define your selectors here. These selectors receive the slice
   // state as their first argument.
   selectors: {
-    selectUndoType: (ui): UndoRedoType | undefined =>
+    selectUndoItem: (ui): UndoRedoStackItem | undefined =>
       ui.undoStack[ui.undoStack.length - 1] || undefined,
-    selectRedoType: (ui): UndoRedoType | undefined =>
+    selectRedoItem: (ui): UndoRedoStackItem | undefined =>
       ui.redoStack[0] || undefined,
     selectPanning: (ui): boolean => {
       return ui.panning;
@@ -322,11 +391,11 @@ export const uiSlice = createAppSlice({
     selectTargetSlot: (ui): string | undefined => {
       return ui.targetSlot;
     },
-    selectCanvasViewPort: (ui): CanvasViewPort => {
-      return ui.canvasViewport;
+    selectEditorViewPort: (ui): EditorViewPort => {
+      return ui.editorViewPort;
     },
-    selectCanvasViewPortScale: (ui): number => {
-      return ui.canvasViewport.scale;
+    selectEditorViewPortScale: (ui): number => {
+      return ui.editorViewPort.scale;
     },
     selectViewportWidth: (ui): number => {
       return ui.viewportWidth;
@@ -340,8 +409,11 @@ export const uiSlice = createAppSlice({
     selectFirstLoadComplete: (ui): boolean => {
       return ui.firstLoadComplete;
     },
-    selectCanvasMode: (ui): CanvasMode => {
-      return ui.canvasMode;
+    selectEditorFrameMode: (ui): EditorFrameMode => {
+      return ui.editorFrameMode;
+    },
+    selectEditorFrameContext: (ui): EditorFrameContext => {
+      return ui.editorFrameContext;
     },
     selectSelection: (ui): Selection => {
       return ui.selection;
@@ -364,6 +436,12 @@ export const uiSlice = createAppSlice({
     selectCollapsedLayers: (ui): string[] => {
       return ui.collapsedLayers;
     },
+    selectPreviouslyEdited: (ui): PreviouslyEdited => {
+      return ui.PreviouslyEdited;
+    },
+    selectCurrentRoute: (ui): RouteSnapshot => {
+      return ui.currentRoute;
+    },
   },
 });
 
@@ -381,22 +459,27 @@ export const {
   unsetHoveredComponent,
   unsetUpdatingComponent,
   unsetTargetSlot,
-  setCanvasViewPort,
-  canvasViewPortZoomIn,
-  canvasViewPortZoomOut,
+  setEditorFrameViewPort,
+  editorViewPortZoomIn,
+  editorViewPortZoomOut,
   setViewportWidth,
   setViewportMinHeight,
   setLatestUndoRedoActionId,
   setFirstLoadComplete,
-  setCanvasModeEditing,
-  setCanvasModeInteractive,
+  setEditorFrameModeEditing,
+  setEditorFrameModeInteractive,
+  setEditorFrameContext,
+  unsetEditorFrameContext,
   pushUndo,
   performUndoOrRedo,
   clearSelection,
   setSelection,
+  setPreviouslyEdited,
+  unsetPreviouslyEdited,
   setCollapsedLayers,
   toggleCollapsedLayer,
   removeCollapsedLayers,
+  setCurrentRoute,
 } = uiSlice.actions;
 
 export const {
@@ -406,18 +489,21 @@ export const {
   selectHoveredComponent,
   selectNoComponentIsHovered,
   selectTargetSlot,
-  selectCanvasViewPort,
-  selectCanvasViewPortScale,
+  selectEditorViewPort,
+  selectEditorViewPortScale,
   selectViewportWidth,
   selectViewportMinHeight,
   selectLatestUndoRedoActionId,
   selectFirstLoadComplete,
-  selectCanvasMode,
-  selectUndoType,
-  selectRedoType,
+  selectEditorFrameMode,
+  selectEditorFrameContext,
+  selectUndoItem,
+  selectRedoItem,
   selectSelection,
   selectIsMultiSelect,
   selectCollapsedLayers,
+  selectPreviouslyEdited,
+  selectCurrentRoute,
 } = uiSlice.selectors;
 
 // Memoized selectors using createSelector for better performance

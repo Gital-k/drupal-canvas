@@ -2,24 +2,19 @@
 
 declare(strict_types=1);
 
-namespace Drupal\experience_builder\Entity;
+namespace Drupal\canvas\Entity;
 
 use Drupal\Component\Utility\Random;
 use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
-use Drupal\Core\Config\Entity\ConfigEntityBase;
 use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Entity\Query\QueryInterface;
-use Drupal\experience_builder\ClientSideRepresentation;
-use Drupal\experience_builder\Controller\ClientServerConversionTrait;
+use Drupal\canvas\ClientSideRepresentation;
+use Drupal\canvas\Controller\ClientServerConversionTrait;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
-use Drupal\experience_builder\EntityHandlers\ContentCreatorVisibleXbConfigEntityAccessControlHandler;
-use Drupal\experience_builder\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
+use Drupal\canvas\EntityHandlers\ContentCreatorVisibleCanvasConfigEntityAccessControlHandler;
 use Drupal\Core\Entity\Attribute\ConfigEntityType;
-use Drupal\experience_builder\Plugin\Field\FieldType\ComponentTreeItemList;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 
-/**
- * @phpstan-import-type ComponentTreeItemArray from \Drupal\experience_builder\Plugin\Field\FieldType\ComponentTreeItemList
- */
 #[ConfigEntityType(
   id: self::ENTITY_TYPE_ID,
   label: new TranslatableMarkup('Pattern'),
@@ -28,7 +23,7 @@ use Drupal\experience_builder\Plugin\Field\FieldType\ComponentTreeItemList;
   label_collection: new TranslatableMarkup('Patterns'),
   admin_permission: self::ADMIN_PERMISSION,
   handlers: [
-    'access' => ContentCreatorVisibleXbConfigEntityAccessControlHandler::class,
+    'access' => ContentCreatorVisibleCanvasConfigEntityAccessControlHandler::class,
   ],
   entity_keys: [
     'id' => 'id',
@@ -42,13 +37,13 @@ use Drupal\experience_builder\Plugin\Field\FieldType\ComponentTreeItemList;
   ],
 )]
 
-final class Pattern extends ConfigEntityBase implements XbHttpApiEligibleConfigEntityInterface, ComponentTreeEntityInterface {
+final class Pattern extends ComponentTreeConfigEntityBase implements CanvasHttpApiEligibleConfigEntityInterface, FolderItemInterface {
 
   public const string ENTITY_TYPE_ID = 'pattern';
   public const string ADMIN_PERMISSION = 'administer patterns';
 
-  use ComponentTreeItemListInstantiatorTrait;
   use ClientServerConversionTrait;
+  use ConfigUpdaterAwareEntityTrait;
 
   /**
    * Pattern entity ID.
@@ -56,16 +51,9 @@ final class Pattern extends ConfigEntityBase implements XbHttpApiEligibleConfigE
   protected string $id;
 
   /**
-   * The human-readable label of the Experience Builder Pattern.
+   * The human-readable label of the Drupal Canvas Pattern.
    */
   protected ?string $label;
-
-  /**
-   * Component tree.
-   *
-   * @var ?array<string, ComponentTreeItemArray>
-   */
-  protected ?array $component_tree;
 
   /**
    * {@inheritdoc}
@@ -104,11 +92,9 @@ final class Pattern extends ConfigEntityBase implements XbHttpApiEligibleConfigE
     // beginning and end of the transliterated string.
     $id = preg_replace('@^([^a-z0-9]+)|([^a-z0-9]+)$@', '', $id);
     assert(is_string($id));
-    assert(is_string($id));
     if (strlen($id) > 23) {
       $id = substr($id, 0, 23);
     }
-    assert(is_string($id));
 
     $query = \Drupal::entityTypeManager()->getStorage('pattern')->getQuery()->accessCheck(FALSE);
     $ids = $query->execute();
@@ -168,7 +154,7 @@ final class Pattern extends ConfigEntityBase implements XbHttpApiEligibleConfigE
    */
   public function updateFromClientSide(array $data): void {
     if (isset($data['layout']) && isset($data['model'])) {
-      $this->set('component_tree', self::convertClientToServer($data['layout'], $data['model']));
+      $this->setComponentTree(self::convertClientToServer($data['layout'], $data['model']));
     }
 
     foreach (array_diff_key($data, array_flip(['layout', 'model'])) as $key => $value) {
@@ -195,6 +181,11 @@ final class Pattern extends ConfigEntityBase implements XbHttpApiEligibleConfigE
       $value = self::generateComponentTreeKeys($value);
     }
     return parent::set($property_name, $value);
+  }
+
+  public function preSave(EntityStorageInterface $storage): void {
+    parent::preSave($storage);
+    self::getConfigUpdater()->updateConfigEntityWithComponentTreeInputs($this);
   }
 
 }

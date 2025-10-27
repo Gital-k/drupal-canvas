@@ -2,33 +2,41 @@
 
 declare(strict_types=1);
 
-namespace Drupal\experience_builder\Plugin\DataType;
+namespace Drupal\canvas\Plugin\DataType;
 
-use Drupal\Component\Plugin\DependentPluginInterface;
+use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
+use Drupal\canvas\PropSource\AdaptedPropSource;
 use Drupal\Component\Serialization\Json;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Entity\FieldableEntityInterface;
+use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\TypedData\Attribute\DataType;
 use Drupal\Core\TypedData\TypedData;
-use Drupal\experience_builder\ComponentSource\ComponentSourceInterface;
-use Drupal\experience_builder\MissingComponentInputsException;
-use Drupal\experience_builder\Plugin\Field\FieldType\ComponentTreeItem;
-use Drupal\experience_builder\PropSource\PropSource;
-use Drupal\experience_builder\PropSource\StaticPropSource;
+use Drupal\canvas\MissingComponentInputsException;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
+use Drupal\canvas\PropSource\ContentAwareDependentInterface;
+use Drupal\canvas\PropSource\PropSource;
+use Drupal\canvas\PropSource\StaticPropSource;
 
 /**
- * @phpstan-import-type PropSourceArray from \Drupal\experience_builder\PropSource\PropSourceBase
- * @phpstan-import-type AdaptedPropSourceArray from \Drupal\experience_builder\PropSource\PropSourceBase
- * @phpstan-import-type DefaultRelativeUrlPropSourceArray from \Drupal\experience_builder\PropSource\PropSourceBase
+ * @phpstan-import-type PropSourceArray from \Drupal\canvas\PropSource\PropSourceBase
+ * @phpstan-import-type AdaptedPropSourceArray from \Drupal\canvas\PropSource\PropSourceBase
+ * @phpstan-import-type DefaultRelativeUrlPropSourceArray from \Drupal\canvas\PropSource\PropSourceBase
  * @phpstan-type SingleComponentInputArray array<string, PropSourceArray|AdaptedPropSourceArray|DefaultRelativeUrlPropSourceArray>
+ * @see \Drupal\canvas\ComponentSource\ComponentSourceInterface::optimizeExplicitInput()
+ * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::optimizeExplicitInput()
+ * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::collapse()
+ * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::uncollapse()
+ * @phpstan-type OptimizedExplicitInput bool|int|float|string|bool[]|int[]|float[]|string[]
+ * @phpstan-type OptimizedSingleComponentInputArray array<string, PropSourceArray|AdaptedPropSourceArray|DefaultRelativeUrlPropSourceArray|OptimizedExplicitInput>
  */
 #[DataType(
   id: "component_inputs",
   label: new TranslatableMarkup("Component inputs"),
   description: new TranslatableMarkup("The input values for the components in a component tree: without structure"),
 )]
-final class ComponentInputs extends TypedData implements DependentPluginInterface {
+final class ComponentInputs extends TypedData implements ContentAwareDependentInterface {
 
   /**
    * The data value.
@@ -42,14 +50,14 @@ final class ComponentInputs extends TypedData implements DependentPluginInterfac
   /**
    * The parsed data value.
    *
-   * @var SingleComponentInputArray
+   * @var OptimizedSingleComponentInputArray
    */
   protected array $inputs = [];
 
   /**
    * {@inheritdoc}
    */
-  public function calculateDependencies(?FieldableEntityInterface $host_entity = NULL) : array {
+  public function calculateDependencies(FieldableEntityInterface|FieldItemListInterface|null $host_entity = NULL): array {
     $dependencies = [];
     foreach ($this->getPropSources() as $prop_source) {
       $dependencies = NestedArray::mergeDeep($dependencies, $prop_source->calculateDependencies($host_entity));
@@ -64,7 +72,7 @@ final class ComponentInputs extends TypedData implements DependentPluginInterfac
     // @todo Uncomment next line and delete last line after https://www.drupal.org/project/drupal/issues/2232427
     // return $this->inputs;
     // Fall back to NULL if not yet initialized, to allow validation.
-    // @see \Drupal\experience_builder\Plugin\Validation\Constraint\ValidComponentTreeItemConstraintValidator
+    // @see \Drupal\canvas\Plugin\Validation\Constraint\ValidComponentTreeItemConstraintValidator
     return $this->value ?? NULL;
   }
 
@@ -125,7 +133,7 @@ final class ComponentInputs extends TypedData implements DependentPluginInterfac
    * @param \Drupal\Core\Entity\FieldableEntityInterface|null $host_entity
    *   (optional) The host entity of this set of inputs, if applicable.
    *
-   * @return iterable<string, \Drupal\experience_builder\PropSource\PropSourceBase>
+   * @return iterable<string, \Drupal\canvas\PropSource\PropSourceBase>
    *   An array of prop sources that have a dependency of the given type and
    *   name. The keys will be strings in the form of "INSTANCE_UUID:PROP_NAME".
    */
@@ -139,7 +147,29 @@ final class ComponentInputs extends TypedData implements DependentPluginInterfac
   }
 
   /**
-   * @return \Generator<string, \Drupal\experience_builder\PropSource\PropSourceBase>
+   * Gets all prop sources that use a particular expression class.
+   *
+   * @param string $expression_class
+   *   The expression class (e.g. `\Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression::class`).
+   *
+   * @return iterable<string, \Drupal\canvas\PropSource\PropSourceBase>
+   *   An array of prop sources that use a particular expression class.
+   *   The keys will be strings in the form of "INSTANCE_UUID:PROP_NAME".
+   */
+  public function getPropSourcesUsingExpressionClass(string $expression_class): iterable {
+    assert(is_a($expression_class, StructuredDataPropExpression::class, TRUE));
+    foreach ($this->getPropSources() as $key => $prop_source) {
+      if ($prop_source instanceof AdaptedPropSource) {
+        throw new \LogicException('@todo as soon as adapted prop sources are actually used');
+      }
+      if (isset($prop_source->expression) && is_a($prop_source->expression, $expression_class)) {
+        yield $key => $prop_source;
+      }
+    }
+  }
+
+  /**
+   * @return \Generator<string, \Drupal\canvas\PropSource\PropSourceBase>
    */
   private function getPropSources(): \Generator {
     $item = $this->getParent();
@@ -153,25 +183,33 @@ final class ComponentInputs extends TypedData implements DependentPluginInterfac
     foreach ($this->inputs as $name => $raw_prop_source) {
       if (!\is_array($raw_prop_source) || !\array_key_exists('sourceType', $raw_prop_source)) {
         // This is likely a *collapsed* StaticPropSource.
-        // @see \Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::collapse()
-        // @see \Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::uncollapse()
+        /** @var OptimizedExplicitInput $raw_prop_source */
+        // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::collapse()
+        // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::uncollapse()
         try {
-          $parsed_default_prop_source = array_key_exists($name, $default_prop_sources) && is_array($default_prop_sources[$name])
+          $parsed_default_prop_source = array_key_exists($name, $default_prop_sources) && is_array($default_prop_sources[$name]) && array_key_exists('sourceType', $default_prop_sources[$name])
             ? PropSource::parse($default_prop_sources[$name])
             : NULL;
           // If it indeed was a collapsed StaticPropSource, un-collapse it.
           if ($parsed_default_prop_source instanceof StaticPropSource) {
-            yield "name" => $parsed_default_prop_source->withValue($raw_prop_source);
+            // When looking at stored data, we must treat user data that we once
+            // accepted (or are in the process of validating) with the utmost
+            // respect.
+            // @see https://en.wikipedia.org/wiki/Robustness_principle
+            yield "name" => $parsed_default_prop_source->withValue($raw_prop_source, allow_empty: TRUE);
           }
         }
         catch (\LogicException) {
         }
 
-        // This isn't a component source using \Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase.
-        // @todo Move this logic into \Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase.
-        // @see https://www.drupal.org/project/experience_builder/issues/3467954
+        // This isn't a component source using \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase.
+        // @todo Move this logic into \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase.
+        // @see https://www.drupal.org/project/canvas/issues/3467954
         continue;
       }
+
+      // phpcs:ignore
+      /** @var PropSourceArray|AdaptedPropSourceArray|DefaultRelativeUrlPropSourceArray $raw_prop_source */
       try {
         yield "$name" => PropSource::parse($raw_prop_source);
       }
@@ -185,17 +223,19 @@ final class ComponentInputs extends TypedData implements DependentPluginInterfac
   /**
    * Gets the values for a given component instance.
    *
-   * @return array<string, array<string, array|string>>
+   * @return OptimizedSingleComponentInputArray
    *
    * @throws \Drupal\Core\TypedData\Exception\MissingDataException
-   * @throws \Drupal\experience_builder\MissingComponentInputsException
+   * @throws \Drupal\canvas\MissingComponentInputsException
    */
   public function getValues(): array {
     $item = $this->getParent();
     assert($item instanceof ComponentTreeItem);
     $component_instance_uuid = $item->getUuid();
     $source = $item->getComponent()?->getComponentSource();
-    \assert($source instanceof ComponentSourceInterface);
+    if ($source === NULL) {
+      throw new \UnexpectedValueException('Missing component source');
+    }
     // Still in default value state.
     // @see ::applyDefaultValue()
     if ($this->value === '{}') {

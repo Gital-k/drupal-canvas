@@ -1,23 +1,23 @@
+import { createSelector } from '@reduxjs/toolkit';
 import { createApi } from '@reduxjs/toolkit/query/react';
-import { baseQuery as sharedBaseQuery } from '@/services/baseQuery';
-import type { BaseQueryFn } from '@reduxjs/toolkit/query';
-import type { AutoSavesHash } from '@/types/AutoSaves';
-import {
-  setAutoSavesHash,
-  setPostPreviewCompleted,
-} from '@/components/review/PublishReview.slice';
+
+import { setPostPreviewCompleted } from '@/components/review/PublishReview.slice';
+import { setLayoutModel } from '@/features/layout/layoutModelSlice';
+import { setHtml } from '@/features/pagePreview/previewSlice';
+import { baseQueryWithAutoSaves } from '@/services/baseQuery';
+import { pendingChangesApi } from '@/services/pendingChangesApi';
+import { handleAutoSavesHashUpdate } from '@/utils/autoSaves';
+
+import type { RootState } from '@/app/store';
 import type {
   ComponentModel,
   EvaluatedComponentModel,
 } from '@/features/layout/layoutModelSlice';
-import { setLayoutModel } from '@/features/layout/layoutModelSlice';
-import { setHtml } from '@/features/pagePreview/previewSlice';
+import type { EditorFrameContext } from '@/features/ui/uiSlice';
 import type { ConflictError } from '@/services/pendingChangesApi';
-import { pendingChangesApi } from '@/services/pendingChangesApi';
-import { createSelector } from '@reduxjs/toolkit';
-import type { RootState } from '@/app/store';
+import type { AutoSavesHash } from '@/types/AutoSaves';
 
-type UpdateComponentResultType = {
+export type UpdateComponentResultType = {
   html: string;
   layout: any;
   model: any;
@@ -25,47 +25,28 @@ type UpdateComponentResultType = {
   errors?: Array<ConflictError>;
 };
 
-type UpdateComponentQueryArg = {
+export type UpdateComponentQueryArg = {
+  type: EditorFrameContext;
   componentInstanceUuid: string;
   componentType: string;
   model: Omit<ComponentModel, 'name'> | Omit<EvaluatedComponentModel, 'name'>;
 };
 
-const previewBaseQuery: BaseQueryFn = (args, api, extraOptions) => {
-  if (typeof args === 'object' && args.url?.startsWith('xb/api/v0/layout/')) {
-    const state = api.getState() as RootState;
-    const { publishReview } = state;
-    return sharedBaseQuery(
-      {
-        ...args,
-        body: {
-          ...args.body,
-          autoSaves: publishReview.autoSavesHash,
-          clientInstanceId: publishReview.clientInstanceId,
-        },
-      },
-      api,
-      extraOptions,
-    );
-  }
-  return sharedBaseQuery(args, api, extraOptions);
-};
-
 export const previewApi = createApi({
   reducerPath: 'previewApi',
-  baseQuery: previewBaseQuery,
+  baseQuery: baseQueryWithAutoSaves,
   endpoints: (builder) => ({
     postPreview: builder.mutation<
       { html: string; autoSaves: AutoSavesHash },
       { layout: any; model: any; entity_form_fields: any }
     >({
       query: (body) => ({
-        url: 'xb/api/v0/layout/{entity_type}/{entity_id}',
+        url: 'canvas/api/v0/layout/{entity_type}/{entity_id}',
         method: 'POST',
         body,
       }),
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
-        const { data } = await queryFulfilled;
+        const { data, meta } = await queryFulfilled;
         const { html, autoSaves } = data;
         dispatch(
           pendingChangesApi.util.invalidateTags([
@@ -74,7 +55,7 @@ export const previewApi = createApi({
         );
         // Update our preview slice.
         dispatch(setHtml(html));
-        dispatch(setAutoSavesHash(autoSaves));
+        handleAutoSavesHashUpdate(dispatch, autoSaves, meta);
         dispatch(setPostPreviewCompleted(true));
       },
     }),
@@ -82,13 +63,22 @@ export const previewApi = createApi({
       UpdateComponentResultType,
       UpdateComponentQueryArg
     >({
-      query: (body) => ({
-        url: 'xb/api/v0/layout/{entity_type}/{entity_id}',
-        method: 'PATCH',
-        body,
-      }),
+      query: ({ type, ...body }) => {
+        let url = '';
+        if (type === 'entity') {
+          url = 'canvas/api/v0/layout/{entity_type}/{entity_id}';
+        } else if (type === 'template') {
+          url =
+            'canvas/api/v0/layout-content-template/{entity_type}.{template_bundle}.{template_view_mode}/{entity_id}';
+        }
+        return {
+          url,
+          method: 'PATCH',
+          body,
+        };
+      },
       async onQueryStarted(body, { dispatch, queryFulfilled }) {
-        const { data } = await queryFulfilled;
+        const { data, meta } = await queryFulfilled;
         const { html, layout, model, autoSaves } = data;
         dispatch(
           pendingChangesApi.util.invalidateTags([
@@ -96,7 +86,7 @@ export const previewApi = createApi({
           ]),
         );
         dispatch(setHtml(html));
-        dispatch(setAutoSavesHash(autoSaves));
+        handleAutoSavesHashUpdate(dispatch, autoSaves, meta);
         // Pass update preview false to prevent a subsequent preview update,
         // we have the data here.
         dispatch(setLayoutModel({ layout, model, updatePreview: false }));

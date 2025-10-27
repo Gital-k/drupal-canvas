@@ -1,14 +1,17 @@
 // cspell:ignore uuidv
-import type { RootState, AppThunk } from '@/app/store';
-import type { XBComponent } from '@/types/Component';
-import { componentHasFieldData } from '@/types/Component';
-import type { UUID } from '@/types/UUID';
-import type { PayloadAction } from '@reduxjs/toolkit';
-import { createSelector } from '@reduxjs/toolkit';
-import { createSlice } from '@reduxjs/toolkit';
-import type { StateWithHistory } from 'redux-undo';
 import { v4 as uuidv4 } from 'uuid';
-import { setXbDrupalSetting } from '@/utils/drupal-globals';
+import { createSelector, createSlice } from '@reduxjs/toolkit';
+
+import { getPropsValues } from '@/components/form/formUtil';
+import { syncPropSourcesToResolvedValues } from '@/components/form/InputBehaviorsComponentPropsForm';
+import { selectEditorFrameContext } from '@/features/ui/uiSlice';
+import { previewApi } from '@/services/preview';
+import { componentHasFieldData } from '@/types/Component';
+import {
+  getCanvasSettings,
+  setCanvasDrupalSetting,
+} from '@/utils/drupal-globals';
+
 import {
   findComponentByUuid,
   findNodePathByUuid,
@@ -18,6 +21,15 @@ import {
   removeComponentByUuid,
   replaceUUIDsAndUpdateModel,
 } from './layoutUtils';
+
+import type { PayloadAction } from '@reduxjs/toolkit';
+import type { StateWithHistory } from 'redux-undo';
+import type { AppThunk, RootState } from '@/app/store';
+import type { CanvasComponent, ComponentsList } from '@/types/Component';
+import type { InputUIData } from '@/types/Form';
+import type { UUID } from '@/types/UUID';
+
+const canvasSettings = getCanvasSettings();
 
 export enum NodeType {
   Region = 'region',
@@ -59,7 +71,10 @@ export interface LayoutModelPiece {
   model: ComponentModels;
 }
 
-export type ComponentModels = Record<string, ComponentModel>;
+export type ComponentModels = Record<
+  string,
+  ComponentModel | EvaluatedComponentModel
+>;
 
 export interface LayoutModelSliceState extends RootLayoutModel {
   updatePreview: boolean;
@@ -112,10 +127,11 @@ type InsertMultipleNodesPayload = {
 
 type AddNewNodePayload = {
   to: number[];
-  component: XBComponent;
+  component: CanvasComponent;
+  withValues?: Record<string, any>;
 };
 
-type AddNewSectionPayload = {
+type AddNewPatternPayload = {
   to: number[] | undefined;
   layoutModel: LayoutModelPiece;
 };
@@ -127,17 +143,17 @@ type SortNodePayload = {
 
 type AnyValue = string | boolean | [] | number | {} | null;
 
-// @see \Drupal\experience_builder\PropSource\PropSource::parse()
+// @see \Drupal\canvas\PropSource\PropSource::parse()
 interface BasePropSource {
   sourceType: string;
   value?: any;
 }
-// @see \Drupal\experience_builder\PropSource\DynamicPropSource
+// @see \Drupal\canvas\PropSource\DynamicPropSource
 export interface DynamicPropSource extends BasePropSource {
   expression: string;
 }
 
-// @see \Drupal\experience_builder\PropSource\StaticPropSource
+// @see \Drupal\canvas\PropSource\StaticPropSource
 export interface StaticPropSource extends BasePropSource {
   expression: string;
   // This can be omitted if it duplicates the resolved value. There are some
@@ -148,7 +164,7 @@ export interface StaticPropSource extends BasePropSource {
   sourceTypeSettings: Record<string, AnyValue>;
 }
 
-// @see \Drupal\experience_builder\PropSource\AdaptedPropSource
+// @see \Drupal\canvas\PropSource\AdaptedPropSource
 export interface AdaptedPropSource extends BasePropSource {
   adapterInputs: Record<string, PropSource>;
 }
@@ -161,15 +177,39 @@ export type PropSource =
 export type ResolvedValues = Record<string, AnyValue>;
 
 export interface ComponentModel {
-  // The props that are used to render previews and will be used for client-side
-  // preview updates (when they're supported).
+  // The (resolved) explicit component inputs that are used to:
+  // - render previews
+  // - perform client-side preview updates (for ComponentSources that support this — impossible if server-rendered)
+  // - populate forms (unless EvaluatedComponentModel is used)
+  // TRICKY: any ComponentSource that wants to support client-side preview updates MUST ensure that `resolved` contains
+  // values that are considered valid by the component's logic; otherwise rendering will fail. IOW: they must meet the
+  // specified types/schema.
+  // @see \Drupal\canvas\ComponentSource\ComponentSourceBase::getExplicitInputDefinitions()
+  // TRICKY: conversely, this means that any ComponentSource that does not support client-side rendering is free to use
+  // whichever structure it likes, as long as its ::inputToClientModel() and ::clientModelToInput() methods are each
+  // others' inverses. This is why for example the `block` ComponentSource opted to transform the stored (server-side)
+  // explicit inputs to the form structure for its client-side `resolved` values.
+  // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent
+  // @see docs/components.md#3.2.1
+  // @todo Make this less confusing in https://www.drupal.org/project/canvas/issues/3521041
   resolved: ResolvedValues;
 }
 
 export type Sources = Record<string, PropSource>;
 
 export interface EvaluatedComponentModel extends ComponentModel {
-  // Source props/expressions needed by the server.
+  // The (source) explicit component inputs that are used to:
+  // - populate the component instance form
+  // - store the explicit inputs
+  // Note: The server evaluates `source` into `resolved`.
+  // (PropSources are used by ComponentSources without an explicit input UX, but only a schema — such as SDCs. The
+  // schema is mapped to PropSources that are able to meet the schema expectations, and to resolve the values stored in
+  // those PropSources, evaluation is needed.)
+  // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase
+  // @see docs/components.md#3.1.1
+  // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent
+  // @see docs/components.md#3.3.1
+  // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent
   source: Sources;
 }
 
@@ -270,7 +310,8 @@ export const layoutModelSlice = createSlice({
           return;
         }
 
-        state.layout = moveNodeToPath(state.layout, uuid, to);
+        // Create a mutable copy of the path array since action payloads are frozen.
+        state.layout = moveNodeToPath(state.layout, uuid, [...to]);
         // Flag a preview update.
         state.updatePreview = true;
       },
@@ -293,7 +334,10 @@ export const layoutModelSlice = createSlice({
         const components = layoutModel.layout;
         const model = layoutModel.model;
 
-        const rootIndex = to.shift();
+        // Create a mutable copy of the path array since action payloads
+        // are frozen.
+        const toPath = [...to];
+        const rootIndex = toPath.shift();
         if (rootIndex === undefined) {
           throw new Error(
             'Path should be at least two items long, starting from the root region',
@@ -312,7 +356,7 @@ export const layoutModelSlice = createSlice({
               specifyUUID ? useUUID : undefined,
             );
           updatedModel = { ...updatedModel, ...nodeUpdatedModel };
-          regionRoot = insertNodeAtPath(regionRoot, to, updatedNode);
+          regionRoot = insertNodeAtPath(regionRoot, toPath, updatedNode);
         }
 
         state.model = updatedModel;
@@ -393,6 +437,9 @@ export const layoutModelSlice = createSlice({
         }
       },
     ),
+    setInitialized: create.reducer((state, action: PayloadAction<boolean>) => {
+      state.isInitialized = action.payload;
+    }),
     setLayoutModel: create.reducer(
       (state, action: PayloadAction<LayoutModelSliceState>) => {
         const { layout, model, updatePreview } = action.payload;
@@ -420,12 +467,25 @@ export const layoutModelSlice = createSlice({
   }),
 });
 
-export const addNewComponentToLayout =
+// This underscore-prefixed function is used internally when the `to`
+// value (where it should be placed in the layout) is already known. For example
+// drag and drop operations are aware of the destination coordinates, so this
+// is the method called.
+// The non-underscored version of this function *can* specify a destination, but
+// has additional logic for determining the best destination if one is not provided.
+//
+// Payload properties:
+// - component: The component to add to the layout.
+// - to: Optional coordinates where the component should be added. If not
+//       provided, they are added after the current selection.
+// - withValues: Optional values to override the default values of the
+//   component.
+export const _addNewComponentToLayout =
   (payload: AddNewNodePayload, setSelectedComponent: Function): AppThunk =>
   (dispatch, getState) => {
-    const { to, component } = payload;
+    const { to, component, withValues } = payload;
     // Populate the model data with the default values
-    const buildInitialData = (component: XBComponent): ComponentModel => {
+    const buildInitialData = (component: CanvasComponent): ComponentModel => {
       if (componentHasFieldData(component)) {
         const initialData: EvaluatedComponentModel = {
           resolved: {},
@@ -452,6 +512,31 @@ export const addNewComponentToLayout =
       };
     };
 
+    // This is called if withValues is not null. The withValues object
+    // specifies values that should override the defaults for the newly inserted
+    // component.
+    const updateValues = (
+      component: CanvasComponent,
+      initialData: ComponentModel | EvaluatedComponentModel,
+      newValues: Record<string, any>,
+    ) => {
+      const resolved = {
+        ...initialData.resolved,
+        ...newValues,
+      };
+      if (!isEvaluatedComponentModel(initialData)) {
+        return { resolved };
+      }
+      return {
+        source: syncPropSourcesToResolvedValues(
+          initialData.source,
+          component,
+          resolved,
+        ),
+        resolved,
+      };
+    };
+
     const slots: SlotNode[] = [];
     const uuid = uuidv4();
 
@@ -467,7 +552,7 @@ export const addNewComponentToLayout =
         });
       });
     }
-
+    const initialData = buildInitialData(component);
     const layoutModel: LayoutModelPiece = {
       layout: [
         {
@@ -478,7 +563,9 @@ export const addNewComponentToLayout =
         },
       ],
       model: {
-        [uuid]: buildInitialData(component),
+        [uuid]: withValues
+          ? updateValues(component, initialData, withValues)
+          : initialData,
       },
     };
 
@@ -497,8 +584,237 @@ export const addNewComponentToLayout =
     setSelectedComponent(uuid, updatedLayout);
   };
 
-export const addNewSectionToLayout =
-  (payload: AddNewSectionPayload, setSelectedComponent: Function): AppThunk =>
+// This action eventually calls _addNewComponentToLayout, but first determines
+// where to insert the new component based on the current selection if there
+// isn't a `to` value in the payload specifying destination coordinates.
+//
+// Payload properties:
+// - component: The component to add to the layout.
+// - to: Optional coordinates where the component should be added. If not
+//       provided, they are added after the current selection.
+// - withValues: Optional values to override the default values of the
+//   component.
+export const addNewComponentToLayout =
+  (
+    payload: AddNewNodePayload,
+    setSelectedComponent: Function = () => {},
+  ): AppThunk =>
+  (dispatch, getState) => {
+    const state = getState();
+    let to: number[] = [0, 0];
+    const theLayout = selectLayout(state);
+    const selectionItems = state?.ui?.selection?.items;
+    // If destination coordinates are provided, use them.
+    if (payload.to) {
+      to = payload.to;
+    } else {
+      // If no destination coordinates are provided, insert the new component
+      // after the current selection.
+      const selectedComponent = selectionItems ? selectionItems.at(-1) : null;
+      if (selectedComponent) {
+        // The component should be inserted after the selected component,
+        // so increase the path value if the final item by 1.
+        const nodePath = findNodePathByUuid(theLayout, selectedComponent);
+        if (nodePath !== null) {
+          nodePath[nodePath.length - 1] += 1;
+          to = nodePath;
+        }
+      }
+    }
+
+    dispatch(
+      _addNewComponentToLayout({ ...payload, to }, setSelectedComponent),
+    );
+  };
+
+export const updateExistingComponentValues =
+  (payload: any): AppThunk =>
+  async (dispatch, getState) => {
+    const { componentSelectionUtils } = canvasSettings;
+    const state = getState();
+    const components: ComponentsList | undefined = state?.componentAndLayoutApi
+      ?.queries?.['getComponents(undefined)']?.data as
+      | ComponentsList
+      | undefined;
+    if (!components) {
+      console.warn('No components list found, cannot update component values.');
+      return;
+    }
+
+    let resetSelection: string | undefined = undefined;
+    const { values, componentToUpdateId, sources = {} } = payload;
+    const selectionItems = state?.ui?.selection?.items;
+
+    // If the component being updated is currently selected, it is temporarily
+    // deselected, then re-selected after the value update. This ensures the
+    // form re-renders with the updated values.
+    if (
+      Array.isArray(selectionItems) &&
+      selectionItems.includes(componentToUpdateId)
+    ) {
+      resetSelection = componentToUpdateId;
+      componentSelectionUtils.setSelectedComponent(null);
+    }
+
+    const layout = selectLayout(state);
+    const model = selectModel(state)[componentToUpdateId];
+    const node = findComponentByUuid(layout, componentToUpdateId);
+    const [selectedComponentType, version] = (
+      node ? (node.type as string) : 'noop'
+    ).split('@');
+
+    const componentMetadata = components[selectedComponentType];
+    // Exit early if attempting to update a prop that does not exist.
+    Object.keys(values).forEach((key) => {
+      if (!componentMetadata?.propSources?.[key]) {
+        console.warn(
+          `Component ${selectedComponentType} does not have a prop named ${key}. Update cancelled.`,
+        );
+        return;
+      }
+    });
+
+    // Resolved will be updated in all cases.
+    const resolved = {
+      ...model.resolved,
+      ...values,
+    };
+
+    const type = selectEditorFrameContext(state);
+    const valuePayload = {
+      type,
+      componentInstanceUuid: componentToUpdateId,
+      componentType: `${selectedComponentType}@${version}`,
+      model: {
+        ...model,
+        resolved,
+      },
+    };
+
+    // If the model includes source data, the model value needs to be processed
+    // to account for that.
+    if (isEvaluatedComponentModel(model) && componentMetadata) {
+      const updatedSource = {
+        ...model.source,
+        ...sources,
+      };
+
+      valuePayload.model = {
+        source: syncPropSourcesToResolvedValues(
+          updatedSource,
+          componentMetadata,
+          resolved,
+        ),
+        resolved,
+      };
+    }
+    await dispatch(
+      previewApi.endpoints.updateComponent.initiate(valuePayload, {
+        fixedCacheKey: componentToUpdateId,
+      }),
+    );
+
+    // If resetSelection is not undefined, it means a component was deselected
+    // before it's values were updated, and should be re-selected now that the
+    // update is complete.
+    if (resetSelection) {
+      componentSelectionUtils.setSelectedComponent(resetSelection);
+    }
+  };
+
+// @todo this is very similar to updateExistingComponentValues, but it
+// eliminates the step of temporarily clearing the selection while updates
+// occur.
+// Ideally, updateExistingComponentValues could use this approach as well, but
+// it does not fully work in non prop-linking scenarios.
+// @see https://drupal.org/i/3549318
+export const _updateExistingComponentValuesForLinking =
+  (payload: any): AppThunk =>
+  async (dispatch, getState) => {
+    const state = getState();
+    const components: ComponentsList | undefined = state?.componentAndLayoutApi
+      ?.queries?.['getComponents(undefined)']?.data as
+      | ComponentsList
+      | undefined;
+    if (!components) {
+      console.warn('No components list found, cannot update component values.');
+      return;
+    }
+
+    const { values, componentToUpdateId, sources = {} } = payload;
+
+    const layout = selectLayout(state);
+    const model = selectModel(state)[componentToUpdateId];
+    const node = findComponentByUuid(layout, componentToUpdateId);
+    const [selectedComponentType, version] = (
+      node ? (node.type as string) : 'noop'
+    ).split('@');
+    const componentMetadata = components[selectedComponentType];
+    // Exit early if attempting to update a prop that does not exist.
+    Object.keys(values).forEach((key) => {
+      if (!componentMetadata?.propSources?.[key]) {
+        console.warn(
+          `Component ${selectedComponentType} does not have a prop named ${key}. Update cancelled.`,
+        );
+        return;
+      }
+    });
+
+    const formValues = state.formState['component_instance_form'].values;
+    const { propsValues } = getPropsValues(
+      formValues,
+      {
+        selectedComponent: componentToUpdateId,
+        selectedComponentType,
+        model: { [componentToUpdateId]: model },
+        components,
+      } as InputUIData,
+      window._canvasTransforms[selectedComponentType],
+    );
+
+    // Resolved will be updated in all cases.
+    const resolved = {
+      ...model.resolved,
+      ...propsValues,
+      ...values,
+    };
+
+    const type = selectEditorFrameContext(state);
+    const valuePayload = {
+      type,
+      componentInstanceUuid: componentToUpdateId,
+      componentType: `${selectedComponentType}@${version}`,
+      model: {
+        ...model,
+        resolved,
+      },
+    };
+
+    // If the model includes source data, the model value needs to be processed
+    // to account for that.
+    if (isEvaluatedComponentModel(model) && componentMetadata) {
+      const updatedSource = {
+        ...model.source,
+        ...sources,
+      };
+      valuePayload.model = {
+        source: syncPropSourcesToResolvedValues(
+          updatedSource,
+          componentMetadata,
+          resolved,
+        ),
+        resolved,
+      };
+    }
+    await dispatch(
+      previewApi.endpoints.updateComponent.initiate(valuePayload, {
+        fixedCacheKey: componentToUpdateId,
+      }),
+    );
+  };
+
+export const addNewPatternToLayout =
+  (payload: AddNewPatternPayload, setSelectedComponent: Function): AppThunk =>
   (dispatch, getState) => {
     const uuid = uuidv4();
 
@@ -527,6 +843,7 @@ export const addNewSectionToLayout =
 export const {
   deleteNode,
   setLayoutModel,
+  setInitialized,
   setInitialLayoutModel,
   duplicateNode,
   moveNode,
@@ -569,7 +886,8 @@ export const selectLayoutForRegion = createSelector(
 // can use it.
 const layoutUtils = {
   addNewComponentToLayout,
-  addNewSectionToLayout,
+  addNewPatternToLayout,
   selectLayoutForRegion,
+  updateExistingComponentValues,
 };
-setXbDrupalSetting('layoutUtils', layoutUtils);
+setCanvasDrupalSetting('layoutUtils', layoutUtils);

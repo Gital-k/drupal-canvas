@@ -2,10 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Drupal\experience_builder\PropShape;
+namespace Drupal\canvas\PropShape;
 
-use Drupal\experience_builder\PropExpressions\StructuredData\FieldTypeObjectPropsExpression;
-use Drupal\experience_builder\PropExpressions\StructuredData\FieldTypePropExpression;
+use Drupal\canvas\PropExpressions\StructuredData\FieldTypeObjectPropsExpression;
+use Drupal\canvas\PropExpressions\StructuredData\FieldTypePropExpression;
+use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression;
 
 /**
  * A candidate storable prop shape: for hook_storage_prop_shape_alter().
@@ -14,13 +15,13 @@ use Drupal\experience_builder\PropExpressions\StructuredData\FieldTypePropExpres
  * - writable instead of read-only
  * - optional instead of required
  *
- * @see \Drupal\experience_builder\PropShape\StorablePropShape
+ * @see \Drupal\canvas\PropShape\StorablePropShape
  */
 final class CandidateStorablePropShape {
 
   public function __construct(
     public readonly PropShape $shape,
-    public FieldTypePropExpression|FieldTypeObjectPropsExpression|null $fieldTypeProp = NULL,
+    public FieldTypePropExpression|ReferenceFieldTypePropExpression|FieldTypeObjectPropsExpression|null $fieldTypeProp = NULL,
     public string|null $fieldWidget = NULL,
     public int|null $cardinality = NULL,
     public array|null $fieldStorageSettings = NULL,

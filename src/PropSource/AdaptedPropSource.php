@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Drupal\experience_builder\PropSource;
+namespace Drupal\canvas\PropSource;
 
 use Drupal\Component\Plugin\Definition\PluginDefinitionInterface;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Field\FieldItemListInterface;
-use Drupal\experience_builder\Plugin\AdapterManager;
-use Drupal\experience_builder\Plugin\Adapter\AdapterInterface;
+use Drupal\canvas\Plugin\AdapterManager;
+use Drupal\canvas\Plugin\Adapter\AdapterInterface;
 
 /**
  * @phpstan-import-type AdaptedPropSourceArray from PropSource
@@ -18,7 +18,7 @@ use Drupal\experience_builder\Plugin\Adapter\AdapterInterface;
 final class AdaptedPropSource extends PropSourceBase {
 
   /**
-   * @param \Drupal\experience_builder\Plugin\Adapter\AdapterInterface $adapter_instance
+   * @param \Drupal\canvas\Plugin\Adapter\AdapterInterface $adapter_instance
    * @param array<string, mixed> $adapter_inputs
    */
   public function __construct(
@@ -42,6 +42,8 @@ final class AdaptedPropSource extends PropSourceBase {
 
   /**
    * {@inheritdoc}
+   *
+   * @phpstan-return AdaptedPropSourceArray
    */
   public function toArray(): array {
     return [
@@ -81,10 +83,10 @@ final class AdaptedPropSource extends PropSourceBase {
   /**
    * {@inheritdoc}
    */
-  public function evaluate(?FieldableEntityInterface $host_entity): mixed {
+  public function evaluate(?FieldableEntityInterface $host_entity, bool $is_required): mixed {
     foreach ($this->adapter_inputs as $input_name => $input) {
       $value_object = $this->getInputPropSource($input_name);
-      $value = $value_object->evaluate($host_entity);
+      $value = $value_object->evaluate($host_entity, $is_required);
       $this->adapter_instance->addInput($input_name, $value);
     }
 

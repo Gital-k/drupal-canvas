@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace Drupal\experience_builder\PropSource;
+namespace Drupal\canvas\PropSource;
 
 use Drupal\Core\Config\Entity\ConfigEntityTypeInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Field\FieldItemListInterface;
-use Drupal\experience_builder\ComponentSource\UrlRewriteInterface;
-use Drupal\experience_builder\Entity\Component;
-use Drupal\experience_builder\JsonSchemaInterpreter\JsonSchemaStringFormat;
-use Drupal\experience_builder\PropShape\PropShape;
+use Drupal\canvas\ComponentSource\UrlRewriteInterface;
+use Drupal\canvas\Entity\Component;
+use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaStringFormat;
+use Drupal\canvas\PropShape\PropShape;
 
 /**
  * Prop source that is used to reference default relative URLs.
@@ -20,9 +20,11 @@ use Drupal\experience_builder\PropShape\PropShape;
  * are capable of taking a relative URL and expanding it to an absolute URL
  * that can be used as a default value.
  *
- * @see \Drupal\experience_builder\ComponentSource\UrlRewriteInterface
- * @see \Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::exampleValueRequiresEntity()
+ * @see \Drupal\canvas\ComponentSource\UrlRewriteInterface
+ * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::exampleValueRequiresEntity()
  * @internal
+ *
+ * @phpstan-import-type DefaultRelativeUrlPropSourceArray from PropSourceBase
  */
 final class DefaultRelativeUrlPropSource extends PropSourceBase {
 
@@ -56,6 +58,8 @@ final class DefaultRelativeUrlPropSource extends PropSourceBase {
 
   /**
    * {@inheritdoc}
+   *
+   * @return DefaultRelativeUrlPropSourceArray
    */
   public function toArray(): array {
     return [
@@ -107,7 +111,7 @@ final class DefaultRelativeUrlPropSource extends PropSourceBase {
   /**
    * {@inheritdoc}
    */
-  public function evaluate(?FieldableEntityInterface $host_entity): mixed {
+  public function evaluate(?FieldableEntityInterface $host_entity, bool $is_required): mixed {
     if (is_string($this->value)) {
       \assert(self::isUrlJsonSchema($this->jsonSchema));
       return $this->componentSource->rewriteExampleUrl($this->value);
@@ -146,10 +150,10 @@ final class DefaultRelativeUrlPropSource extends PropSourceBase {
       return FALSE;
     }
     return in_array($property_definition['format'] ?? '', [
-      JsonSchemaStringFormat::URI->value,
-      JsonSchemaStringFormat::URI_REFERENCE->value,
-      JsonSchemaStringFormat::IRI->value,
-      JsonSchemaStringFormat::IRI_REFERENCE->value,
+      JsonSchemaStringFormat::Uri->value,
+      JsonSchemaStringFormat::UriReference->value,
+      JsonSchemaStringFormat::Iri->value,
+      JsonSchemaStringFormat::IriReference->value,
     ]);
   }
 

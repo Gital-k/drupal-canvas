@@ -2,24 +2,27 @@
 
 declare(strict_types=1);
 
-namespace Drupal\experience_builder\Entity;
+namespace Drupal\canvas\Entity;
 
+use Drupal\canvas\CanvasUriDefinitions;
+use Drupal\canvas\Resource\CanvasResourceLink;
+use Drupal\canvas\Resource\CanvasResourceLinkCollection;
+use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
-use Drupal\Core\Entity\Attribute\ConfigEntityType;
 use Drupal\Core\Config\Entity\ConfigEntityBase;
 use Drupal\Core\Config\Entity\ConfigEntityTypeInterface;
+use Drupal\Core\Entity\Attribute\ConfigEntityType;
 use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Entity\Query\QueryInterface;
 use Drupal\Core\File\FileUrlGeneratorInterface;
-use Drupal\Core\Url;
-use Drupal\experience_builder\AutoSaveEntity;
-use Drupal\experience_builder\ClientSideRepresentation;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
-use Drupal\experience_builder\CodeComponentDataProvider;
-use Drupal\experience_builder\EntityHandlers\JavascriptComponentStorage;
-use Drupal\experience_builder\EntityHandlers\VisibleWhenDisabledXbConfigEntityAccessControlHandler;
-use Drupal\experience_builder\Exception\ConstraintViolationException;
+use Drupal\Core\Url;
+use Drupal\canvas\AutoSaveEntity;
+use Drupal\canvas\ClientSideRepresentation;
+use Drupal\canvas\EntityHandlers\JavascriptComponentStorage;
+use Drupal\canvas\EntityHandlers\VisibleWhenDisabledCanvasConfigEntityAccessControlHandler;
+use Drupal\canvas\Exception\ConstraintViolationException;
 use Symfony\Component\Validator\ConstraintViolation;
 
 #[ConfigEntityType(
@@ -31,7 +34,7 @@ use Symfony\Component\Validator\ConstraintViolation;
   admin_permission: self::ADMIN_PERMISSION,
   handlers: [
     'storage' => JavascriptComponentStorage::class,
-    'access' => VisibleWhenDisabledXbConfigEntityAccessControlHandler::class,
+    'access' => VisibleWhenDisabledCanvasConfigEntityAccessControlHandler::class,
   ],
   entity_keys: [
     'id' => 'machineName',
@@ -41,20 +44,21 @@ use Symfony\Component\Validator\ConstraintViolation;
   config_export: [
     'machineName',
     'name',
-    'block_override',
     'props',
     'required',
     'slots',
     'js',
     'css',
+    'dataDependencies',
   ],
   constraints: [
     'JsComponentHasValidAndSupportedSdcMetadata' => NULL,
   ],
 )]
-final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInterface {
+final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetInterface, FolderItemInterface {
 
-  use XbAssetLibraryTrait;
+  use CanvasAssetLibraryTrait;
+  use ConfigUpdaterAwareEntityTrait;
 
   public const string ENTITY_TYPE_ID = 'js_component';
   public const string ADMIN_PERMISSION = 'administer code components';
@@ -69,13 +73,6 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
    * The human-readable label of the component.
    */
   protected ?string $name;
-
-  /**
-   * NULL or a block base plugin ID.
-   *
-   * ⚠️ This is highly experimental and *will* be refactored.
-   */
-  protected ?string $block_override;
 
   /**
    * The props of the component.
@@ -95,10 +92,42 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
   protected ?array $slots = [];
 
   /**
+   * Data dependencies.
+   */
+  protected ?array $dataDependencies;
+
+  /**
    * {@inheritdoc}
    */
-  public function id() {
+  public function id(): string {
     return $this->machineName;
+  }
+
+  private function getEntityOperations(): CanvasResourceLinkCollection {
+    $links = new CanvasResourceLinkCollection([]);
+    // Link relation type => route name.
+    $possible_operations = [
+      CanvasUriDefinitions::LINK_REL_DELETE => ['route_name' => 'canvas.api.config.delete', 'op' => 'delete'],
+      // @todo Add a URL template using the CanvasUriDefinitions::LINK_REL_USAGE_DETAILS link relation type
+    ];
+    foreach ($possible_operations as $link_rel => ['route_name' => $route_name, 'op' => $entity_operation]) {
+      $access = $this->access(operation: $entity_operation, return_as_object: TRUE);
+      assert($access instanceof AccessResult);
+      if ($access->isAllowed()) {
+        $route_params = [
+          'canvas_config_entity_type_id' => self::ENTITY_TYPE_ID,
+          'canvas_config_entity' => $this->id(),
+        ];
+        $links = $links->withLink(
+          $link_rel,
+          new CanvasResourceLink($access, Url::fromRoute($route_name, $route_params), $link_rel)
+        );
+      }
+      else {
+        $links->addCacheableDependency($access);
+      }
+    }
+    return $links;
   }
 
   /**
@@ -114,12 +143,12 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
     // against config schema.
     assert(is_array($this->js));
     assert(is_array($this->css));
+    $linkCollection = $this->getEntityOperations();
     return ClientSideRepresentation::create(
       values: [
         'machineName' => $this->id(),
         'name' => (string) $this->label(),
         'status' => $this->status(),
-        'blockOverride' => $this->block_override,
         'props' => $this->props,
         'required' => $this->required,
         'slots' => $this->slots,
@@ -127,11 +156,15 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
         'sourceCodeCss' => $this->css['original'] ?? '',
         'compiledJs' => $this->js['compiled'] ?? '',
         'compiledCss' => $this->css['compiled'] ?? '',
+        'dataDependencies' => $this->dataDependencies,
+        // @see https://jsonapi.org/format/#document-links
+        'links' => $linkCollection->asArray(),
       ],
       preview: [
-        '#markup' => '@todo Make something 🆒 in https://www.drupal.org/project/experience_builder/issues/3498889',
+        '#markup' => '@todo Make something 🆒 in https://www.drupal.org/project/canvas/issues/3498889',
       ],
-    )->addCacheableDependency($this);
+    )->addCacheableDependency($this)
+      ->addCacheableDependency($linkCollection);
   }
 
   /**
@@ -155,7 +188,15 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
    * @see docs/adr/0005-Keep-the-front-end-simple.md
    */
   public function updateFromClientSide(array $data): void {
-    foreach (array_intersect_key($data, array_flip(['machineName', 'name', 'status', 'required', 'props', 'slots'])) as $key => $value) {
+    foreach (array_intersect_key($data, array_flip([
+      'machineName',
+      'name',
+      'status',
+      'required',
+      'props',
+      'slots',
+      'dataDependencies',
+    ])) as $key => $value) {
       $this->set($key, $value);
     }
 
@@ -204,11 +245,6 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
         'compiled' => $data['compiledJs'] ?? '',
       ]);
     }
-
-    // ⚠️ This is highly experimental and *will* be refactored.
-    if (array_key_exists('blockOverride', $data)) {
-      $this->set('block_override', $data['blockOverride']);
-    }
   }
 
   /**
@@ -236,8 +272,8 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
     $definition = [
       'machineName' => (string) $this->id(),
       'extension_type' => 'module',
-      'id' => 'experience_builder:' . $this->id(),
-      'provider' => 'experience_builder',
+      'id' => 'canvas:' . $this->id(),
+      'provider' => 'canvas',
       'name' => (string) $this->label(),
       'props' => [
         'type' => 'object',
@@ -251,7 +287,7 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
       'template' => 'phony',
     ];
     // Slots are optional. Setting the `slots` key to an empty array is invalid.
-    // @see \Drupal\experience_builder\Plugin\Validation\Constraint\JsComponentHasValidAndSupportedSdcMetadataConstraintValidator
+    // @see \Drupal\canvas\Plugin\Validation\Constraint\JsComponentHasValidAndSupportedSdcMetadataConstraintValidator
     if ($this->slots) {
       foreach ($this->slots as $slot_name => $slot) {
         // Force empty slots to be an object; ComponentValidator casts non-
@@ -266,7 +302,7 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
     }
     // Required properties are optional. Setting the `props.required` key to an
     // empty array is invalid.
-    // @see \Drupal\experience_builder\Plugin\Validation\Constraint\JsComponentHasValidAndSupportedSdcMetadataConstraintValidator
+    // @see \Drupal\canvas\Plugin\Validation\Constraint\JsComponentHasValidAndSupportedSdcMetadataConstraintValidator
     if ($this->required) {
       $definition['props']['required'] = $this->required;
     }
@@ -301,41 +337,15 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
    *   Component props.
    */
   public function getProps(): ?array {
-    if ($this->block_override) {
-      return self::getExperimentalHardcodedBlockProps($this->block_override);
-    }
     return $this->props;
   }
 
   /**
-   * ⚠️ This is highly experimental and *will* be refactored.
-   *
-   * This is here to satisfy the call from AstroIsland::preRenderIsland().
+   * {@inheritdoc}
    */
-  private function getExperimentalHardcodedBlockProps(string $override): ?array {
-    switch ($this->block_override) {
-      case 'system_branding_block':
-        return [
-          'homeUrl' => ['type' => 'string', 'format' => 'uri-reference'],
-          'logo' => ['type' => 'string', 'format' => 'uri-reference'],
-          'siteName' => ['type' => 'string'],
-        ];
-
-      case 'system_breadcrumb_block':
-        return [
-          'links' => ['type' => 'array'],
-        ];
-
-      case 'system_menu_block':
-        return [
-          'id' => ['type' => 'string'],
-          'links' => ['type' => 'array'],
-          'label' => ['type' => 'string'],
-        ];
-
-      default:
-        return $this->props;
-    }
+  public function preSave(EntityStorageInterface $storage): void {
+    parent::preSave($storage);
+    static::getConfigUpdater()->updateJavaScriptComponent($this);
   }
 
   /**
@@ -343,13 +353,13 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
    */
   public function postSave(EntityStorageInterface $storage, $update = TRUE): void {
     parent::postSave($storage, $update);
-    // The files generated in XbAssetStorage::doSave() have a content-dependent
+    // The files generated in CanvasAssetStorage::doSave() have a content-dependent
     // hash in their name. This has 2 consequences:
     // 1. Cached responses that referred to an older version, continue to work.
     // 2. New responses must use the newly generated files, which requires the
     //    asset library to point to those new files. Hence the library info must
     //    be recalculated.
-    // @see \experience_builder_library_info_build()
+    // @see \canvas_library_info_build()
     Cache::invalidateTags(['library_info']);
   }
 
@@ -361,7 +371,7 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
    * @param array<string> $imported_js_components
    *   The names of the JavaScript components to add as dependencies.
    *
-   * @throws \Drupal\experience_builder\Exception\ConstraintViolationException
+   * @throws \Drupal\canvas\Exception\ConstraintViolationException
    *   Thrown if any of the JavaScript components do not exist.
    *
    * @see \Drupal\Core\Config\Entity\ConfigEntityBase::calculateDependencies
@@ -416,9 +426,9 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
     if (!$isPreview) {
       return $generator->generateString($this->getJsPath());
     }
-    return Url::fromRoute('experience_builder.api.config.auto-save.get.js', [
-      'xb_config_entity_type_id' => self::ENTITY_TYPE_ID,
-      'xb_config_entity' => $this->id(),
+    return Url::fromRoute('canvas.api.config.auto-save.get.js', [
+      'canvas_config_entity_type_id' => self::ENTITY_TYPE_ID,
+      'canvas_config_entity' => $this->id(),
     ])->toString();
   }
 
@@ -426,14 +436,14 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
    * {@inheritdoc}
    */
   public function getAssetLibrary(bool $isPreview): string {
-    // Inside the XB UI, always load the draft even if there isn't one. Let the
+    // Inside the Canvas UI, always load the draft even if there isn't one. Let the
     // controller logic automatically serve the non-draft assets when a draft
     // disappears. This is necessary to allow for asset library dependencies,
     // and avoids race conditions.
-    // @see \Drupal\experience_builder\Hook\LibraryHooks::libraryInfoBuild()
-    // @see \Drupal\experience_builder\Controller\ApiConfigAutoSaveControllers::getCss()
-    // @see \Drupal\experience_builder\Controller\ApiConfigAutoSaveControllers::getJs()
-    return 'experience_builder/astro_island.' . $this->id() . ($isPreview ? '.draft' : '');
+    // @see \Drupal\canvas\Hook\LibraryHooks::libraryInfoBuild()
+    // @see \Drupal\canvas\Controller\ApiConfigAutoSaveControllers::getCss()
+    // @see \Drupal\canvas\Controller\ApiConfigAutoSaveControllers::getJs()
+    return 'canvas/astro_island.' . $this->id() . ($isPreview ? '.draft' : '');
   }
 
   private static function shouldLoadAssetFromAutoSave(AutoSaveEntity $autoSave, bool $isPreview) : bool {
@@ -460,16 +470,16 @@ final class JavaScriptComponent extends ConfigEntityBase implements XbAssetInter
     if ($dependencies = $this->getDependencies()) {
       $cache_tags = array_merge($cache_tags, array_map(fn($dependency) => "config:$dependency", $dependencies['config'] ?? []));
     }
-    return $cache_tags;
+    return \array_values($cache_tags);
   }
 
   /**
    * {@inheritdoc}
    *
-   * @see \Drupal\experience_builder\Hook\ComponentSourceHooks::jsSettingsAlter()
+   * @see \Drupal\canvas\Hook\ComponentSourceHooks::jsSettingsAlter()
    */
   public function getAssetLibraryDependencies(): array {
-    return CodeComponentDataProvider::getRequiredXbDataLibraries($this->getJs());
+    return \array_map(static fn (string $dependency): string => \sprintf('canvas/canvasData.%s', $dependency), $this->dataDependencies['drupalSettings'] ?? []);
   }
 
 }

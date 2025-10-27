@@ -1,15 +1,15 @@
 describe('states', () => {
   before(() => {
-    cy.drupalXbInstall(['xb_test_state_api']);
+    cy.drupalCanvasInstall(['canvas_test_state_api']);
   });
 
   beforeEach(() => {
     cy.drupalSession();
-    cy.drupalLogin('xbUser', 'xbUser');
-    cy.loadURLandWaitForXBLoaded({ url: 'xb/node/2' });
+    cy.drupalLogin('canvasUser', 'canvasUser');
+    cy.loadURLandWaitForCanvasLoaded({ url: 'canvas/editor/node/2' });
     cy.openLibraryPanel();
     cy.get('.primaryPanelContent').should('contain.text', 'Components');
-    cy.get('.primaryPanelContent').findByText('Heading').click();
+    cy.insertComponent({ name: 'Heading' });
     cy.waitForElementContentInIframe('div', 'A heading element');
   });
 

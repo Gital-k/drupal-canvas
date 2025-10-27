@@ -1,17 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
 import { Flex, TextField } from '@radix-ui/themes';
-import { useUpdateCodeComponentMutation } from '@/services/componentAndLayout';
+
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
+import Dialog, { DialogFieldLabel } from '@/components/Dialog';
+import {
+  selectCodeComponentProperty,
+  setCodeComponentProperty,
+  setForceRefresh,
+} from '@/features/code-editor/codeEditorSlice';
 import {
   closeAllDialogs,
   selectDialogStates,
   selectSelectedCodeComponent,
 } from '@/features/ui/codeComponentDialogSlice';
-import {
-  selectCodeComponentProperty,
-  setCodeComponentProperty,
-} from '@/features/code-editor/codeEditorSlice';
-import Dialog, { DialogFieldLabel } from '@/components/Dialog';
+import { useUpdateCodeComponentMutation } from '@/services/componentAndLayout';
 
 const RenameCodeComponentDialog = () => {
   const selectedComponent = useAppSelector(selectSelectedCodeComponent);
@@ -23,6 +26,7 @@ const RenameCodeComponentDialog = () => {
     useUpdateCodeComponentMutation();
   const dispatch = useAppDispatch();
   const { isRenameDialogOpen } = useAppSelector(selectDialogStates);
+  const { codeComponentId: codeComponentBeingEditedId } = useParams();
 
   useEffect(() => {
     if (selectedComponent) {
@@ -40,6 +44,12 @@ const RenameCodeComponentDialog = () => {
       },
     });
     if (codeEditorId === selectedComponent.machineName) {
+      if (codeEditorId === codeComponentBeingEditedId) {
+        // The code editor typically won't check auto-save updates if the
+        // component being edited is the same as the one being updated. Force a
+        // refresh to avoid auto-save mismatch errors.
+        dispatch(setForceRefresh(true));
+      }
       dispatch(setCodeComponentProperty(['name', componentName]));
     }
   };
@@ -96,6 +106,7 @@ const RenameCodeComponentDialog = () => {
           Component name
         </DialogFieldLabel>
         <TextField.Root
+          autoComplete="off"
           id={'componentName'}
           value={componentName}
           onChange={(e) => setComponentName(e.target.value)}

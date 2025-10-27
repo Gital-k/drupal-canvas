@@ -8,7 +8,9 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import initSwc, { transformSync } from '@swc/wasm-web';
-import { getXbSettings, getBaseUrl } from '@/utils/drupal-globals';
+
+import { getBaseUrl, getCanvasSettings } from '@/utils/drupal-globals';
+
 import type { Options as SwcOptions } from '@swc/wasm-web';
 
 const SWC_OPTIONS: SwcOptions = {
@@ -32,8 +34,8 @@ const SWC_OPTIONS: SwcOptions = {
   },
 } as const;
 
-const XB_MODULE_UI_PATH =
-  `${getBaseUrl()}${getXbSettings().xbModulePath}/ui` as const;
+const CANVAS_MODULE_UI_PATH =
+  `${getBaseUrl()}${getCanvasSettings().canvasModulePath}/ui` as const;
 
 const getFallbackCompiledJs = (fallbackContentMessage: string) =>
   `// @error
@@ -60,7 +62,7 @@ const useCompileJavaScript = (): {
         // When served in production, the WASM asset URLs need to be relative
         // to the Drupal web root, so we pass that in to the initSwc() function.
         if (import.meta.env.MODE === 'production') {
-          await initSwc(`${XB_MODULE_UI_PATH}/dist/assets/wasm_bg.wasm`);
+          await initSwc(`${CANVAS_MODULE_UI_PATH}/dist/assets/wasm_bg.wasm`);
         } else {
           await initSwc();
         }

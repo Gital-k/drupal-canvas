@@ -1,27 +1,29 @@
-import styles from './NameTag.module.css';
 import clsx from 'clsx';
+import { useParams } from 'react-router';
 import {
   BoxModelIcon,
   Component1Icon,
   CubeIcon,
-  FileIcon,
+  FileTextIcon,
 } from '@radix-ui/react-icons';
+
 import { useAppSelector } from '@/app/hooks';
 import {
   DEFAULT_REGION,
   selectDragging,
   selectIsComponentHovered,
   selectNoComponentIsHovered,
+  selectSelectedComponentUuid,
   selectTargetSlot,
 } from '@/features/ui/uiSlice';
-import { selectSelectedComponentUuid } from '@/features/ui/uiSlice';
-import { useParams } from 'react-router';
+
+import styles from './NameTag.module.css';
 
 const VARIANTS = {
   component: <Component1Icon width={10} height={10} />,
   region: <CubeIcon width={10} height={10} />,
   slot: <BoxModelIcon width={10} height={10} />,
-  page: <FileIcon width={10} height={10} />,
+  page: <FileTextIcon width={10} height={10} />,
 };
 
 interface NameTagProps {
@@ -35,7 +37,7 @@ const NameTag: React.FC<NameTagProps> = (props) => {
 
   return (
     <div
-      data-testid="xb-name-tag"
+      data-testid="canvas-name-tag"
       className={clsx(styles.nameTag, {
         [styles.slot]: nodeType === 'slot',
         [styles.region]: nodeType === 'region',

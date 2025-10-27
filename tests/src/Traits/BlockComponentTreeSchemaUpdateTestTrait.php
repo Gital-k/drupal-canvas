@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Drupal\Tests\experience_builder\Traits;
+namespace Drupal\Tests\canvas\Traits;
 
 /**
  * Provides data for testing simulated Block Component schema update.
@@ -22,35 +22,35 @@ trait BlockComponentTreeSchemaUpdateTestTrait {
    */
   public static function getValidTreesForASchemaUpdate(): \Generator {
     yield 'tree with no blocks with update' => [
-      'component tree' => [
+      [
         [
           'uuid' => self::UUID_INPUT_NONE,
-          'component_id' => 'block.xb_test_block_input_none',
-          'component_version' => '64ca25db5092fad7',
+          'component_id' => 'block.canvas_test_block_input_none',
+          'component_version' => 'f91f8d4aff4aba7c',
           'inputs' => [
             'label' => 'Test block with no settings.',
             'label_display' => '',
           ],
         ],
       ],
-      'pre-update markup' => [
-        self::UUID_INPUT_NONE => 'Hello bob, from XB!',
+      [
+        self::UUID_INPUT_NONE => 'Hello bob, from Canvas!',
       ],
-      'mid-update markup BC layer (post-update markup but before update path execution)' => [
-        self::UUID_INPUT_NONE => 'Hello bob, from XB!',
+      [
+        self::UUID_INPUT_NONE => 'Hello bob, from Canvas!',
       ],
-      'mid-update markup hard BC break (post-update markup but before update path execution)' => [
-        self::UUID_INPUT_NONE => 'Hello bob, from XB!',
+      [
+        self::UUID_INPUT_NONE => 'Hello bob, from Canvas!',
       ],
-      'post-update markup' => [
-        self::UUID_INPUT_NONE => 'Hello bob, from XB!',
+      [
+        self::UUID_INPUT_NONE => 'Hello bob, from Canvas!',
       ],
-      'expected post-update violations' => [],
-      'expected post-update component tree' => [
+      [],
+      [
         [
           'uuid' => self::UUID_INPUT_NONE,
-          'component_id' => 'block.xb_test_block_input_none',
-          'component_version' => '64ca25db5092fad7',
+          'component_id' => 'block.canvas_test_block_input_none',
+          'component_version' => 'f91f8d4aff4aba7c',
           'inputs' => [
             'label' => 'Test block with no settings.',
             'label_display' => '',
@@ -60,11 +60,11 @@ trait BlockComponentTreeSchemaUpdateTestTrait {
     ];
 
     yield 'tree with double block with update' => [
-      'component tree' => [
+      [
         [
           'uuid' => self::UUID_INPUT_SCHEMA_CHANGE_POSSIBLE_VALUE_ONE,
-          'component_id' => 'block.xb_test_block_input_schema_change_poc',
-          'component_version' => '1c0d0b93d0cdf9af',
+          'component_id' => 'block.canvas_test_block_input_schema_change_poc',
+          'component_version' => '7cc894b85e93a7d8',
           'inputs' => [
             'label' => 'Block schema change POC 1.',
             'label_display' => '',
@@ -73,8 +73,8 @@ trait BlockComponentTreeSchemaUpdateTestTrait {
         ],
         [
           'uuid' => self::UUID_INPUT_NONE,
-          'component_id' => 'block.xb_test_block_input_none',
-          'component_version' => '64ca25db5092fad7',
+          'component_id' => 'block.canvas_test_block_input_none',
+          'component_version' => 'f91f8d4aff4aba7c',
           'inputs' => [
             'label' => 'Test block with no settings.',
             'label_display' => '',
@@ -82,8 +82,8 @@ trait BlockComponentTreeSchemaUpdateTestTrait {
         ],
         [
           'uuid' => self::UUID_INPUT_SCHEMA_CHANGE_POSSIBLE_VALUE_TWO,
-          'component_id' => 'block.xb_test_block_input_schema_change_poc',
-          'component_version' => '1c0d0b93d0cdf9af',
+          'component_id' => 'block.canvas_test_block_input_schema_change_poc',
+          'component_version' => '7cc894b85e93a7d8',
           'inputs' => [
             'label' => 'Block schema change POC 2.',
             'label_display' => '',
@@ -91,27 +91,27 @@ trait BlockComponentTreeSchemaUpdateTestTrait {
           ],
         ],
       ],
-      'pre-update markup' => [
+      [
         self::UUID_INPUT_SCHEMA_CHANGE_POSSIBLE_VALUE_ONE => 'Current foo value: bar',
-        self::UUID_INPUT_NONE => 'Hello bob, from XB!',
+        self::UUID_INPUT_NONE => 'Hello bob, from Canvas!',
         self::UUID_INPUT_SCHEMA_CHANGE_POSSIBLE_VALUE_TWO => 'Current foo value: baz',
       ],
-      'mid-update markup BC layer (post-update markup but before update path execution)' => [
+      [
         self::UUID_INPUT_SCHEMA_CHANGE_POSSIBLE_VALUE_ONE => 'Modified block! Current foo value: bar. Change … is scary.',
-        self::UUID_INPUT_NONE => 'Hello bob, from XB!',
+        self::UUID_INPUT_NONE => 'Hello bob, from Canvas!',
         self::UUID_INPUT_SCHEMA_CHANGE_POSSIBLE_VALUE_TWO => 'Modified block! Current foo value: baz. Change … is scary.',
       ],
-      'mid-update markup hard BC break (post-update markup but before update path execution)' => [
+      [
         self::UUID_INPUT_SCHEMA_CHANGE_POSSIBLE_VALUE_ONE => 'Oops, something went wrong! Site admins have been notified.',
-        self::UUID_INPUT_NONE => 'Hello bob, from XB!',
+        self::UUID_INPUT_NONE => 'Hello bob, from Canvas!',
         self::UUID_INPUT_SCHEMA_CHANGE_POSSIBLE_VALUE_TWO => 'Oops, something went wrong! Site admins have been notified.',
       ],
-      'post-update markup' => [
+      [
         self::UUID_INPUT_SCHEMA_CHANGE_POSSIBLE_VALUE_ONE => 'Modified block! Current foo value: 2. Change … is necessary.',
-        self::UUID_INPUT_NONE => 'Hello bob, from XB!',
+        self::UUID_INPUT_NONE => 'Hello bob, from Canvas!',
         self::UUID_INPUT_SCHEMA_CHANGE_POSSIBLE_VALUE_TWO => 'Modified block! Current foo value: 1. Change … is necessary.',
       ],
-      'expected post-update violations' => [
+      [
         '0.inputs.' . self::UUID_INPUT_SCHEMA_CHANGE_POSSIBLE_VALUE_ONE . '.' => "'change' is a required key.",
         '0.inputs.' . self::UUID_INPUT_SCHEMA_CHANGE_POSSIBLE_VALUE_ONE . '.foo' => [
           'The value you selected is not a valid choice.',
@@ -123,23 +123,23 @@ trait BlockComponentTreeSchemaUpdateTestTrait {
           'This value should be of the correct primitive type.',
         ],
       ],
-      'expected post-update component tree' => [
+      [
         [
           'uuid' => self::UUID_INPUT_SCHEMA_CHANGE_POSSIBLE_VALUE_ONE,
-          'component_id' => 'block.xb_test_block_input_schema_change_poc',
-          'component_version' => '0b69de6df4584ecc',
+          'component_id' => 'block.canvas_test_block_input_schema_change_poc',
+          'component_version' => '88c370526c14d185',
           'inputs' => [
             'label' => 'Block schema change POC 1.',
             'label_display' => '',
-            // @see \Drupal\Tests\experience_builder\Kernel\Plugin\ExperienceBuilder\ComponentSource\ComponentInputsEvolutionTest::blockUpdatePathSampleForCoreIssue3521221()
+            // @see \Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource\ComponentInputsEvolutionTest::blockUpdatePathSampleForCoreIssue3521221()
             'foo' => 2,
             'change' => 'is necessary',
           ],
         ],
         [
           'uuid' => self::UUID_INPUT_NONE,
-          'component_id' => 'block.xb_test_block_input_none',
-          'component_version' => '64ca25db5092fad7',
+          'component_id' => 'block.canvas_test_block_input_none',
+          'component_version' => 'f91f8d4aff4aba7c',
           'inputs' => [
             'label' => 'Test block with no settings.',
             'label_display' => '',
@@ -147,12 +147,12 @@ trait BlockComponentTreeSchemaUpdateTestTrait {
         ],
         [
           'uuid' => self::UUID_INPUT_SCHEMA_CHANGE_POSSIBLE_VALUE_TWO,
-          'component_id' => 'block.xb_test_block_input_schema_change_poc',
-          'component_version' => '0b69de6df4584ecc',
+          'component_id' => 'block.canvas_test_block_input_schema_change_poc',
+          'component_version' => '88c370526c14d185',
           'inputs' => [
             'label' => 'Block schema change POC 2.',
             'label_display' => '',
-            // @see \Drupal\Tests\experience_builder\Kernel\Plugin\ExperienceBuilder\ComponentSource\ComponentInputsEvolutionTest::blockUpdatePathSampleForCoreIssue3521221()
+            // @see \Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource\ComponentInputsEvolutionTest::blockUpdatePathSampleForCoreIssue3521221()
             'foo' => 1,
             'change' => 'is necessary',
           ],

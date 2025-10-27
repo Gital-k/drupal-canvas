@@ -1,12 +1,14 @@
-import type { PayloadAction } from '@reduxjs/toolkit';
-import { createSlice, createSelector } from '@reduxjs/toolkit';
 import { v4 as uuidv4 } from 'uuid';
-import type { RootState } from '@/app/store';
+import { createSelector, createSlice } from '@reduxjs/toolkit';
+
 import {
   getPropMachineName,
   serializeProps,
   serializeSlots,
-} from '@/features/code-editor/utils';
+} from '@/features/code-editor/utils/utils';
+
+import type { PayloadAction } from '@reduxjs/toolkit';
+import type { RootState } from '@/app/store';
 import type {
   AssetLibrary,
   CodeComponent,
@@ -20,6 +22,7 @@ interface CodeEditorState {
   codeComponent: CodeComponent;
   globalAssetLibrary: AssetLibrary;
   previewCompiledJsForSlots: string;
+  forceRefresh: boolean;
 }
 
 interface CodeEditorStatusOptions {
@@ -44,7 +47,6 @@ export const initialState: CodeEditorState = {
     machineName: '',
     name: '',
     status: false,
-    blockOverride: null,
     props: [],
     required: [],
     slots: [],
@@ -54,6 +56,7 @@ export const initialState: CodeEditorState = {
     compiledCss: '',
     importedJsComponents: [],
     dataFetches: {},
+    dataDependencies: {},
   },
   globalAssetLibrary: {
     id: 'global',
@@ -68,6 +71,7 @@ export const initialState: CodeEditorState = {
     },
   },
   previewCompiledJsForSlots: '',
+  forceRefresh: false,
 };
 
 export const codeEditorSlice = createSlice({
@@ -182,6 +186,8 @@ export const codeEditorSlice = createSlice({
           ...currentProp,
           ...updates,
         } as CodeComponentProp;
+        // Set auto-save to true when updating a prop.
+        state.status.needsAutoSave = true;
       }
     },
 
@@ -202,6 +208,8 @@ export const codeEditorSlice = createSlice({
         state.codeComponent.required = state.codeComponent.required.filter(
           (name) => name !== getPropMachineName(propToRemove.name),
         );
+        // Set auto-save to true when removing a prop.
+        state.status.needsAutoSave = true;
       }
     },
 
@@ -216,6 +224,8 @@ export const codeEditorSlice = createSlice({
       const props = state.codeComponent.props;
       const [removed] = props.splice(oldIndex, 1);
       props.splice(newIndex, 0, removed);
+      // Set auto-save to true when reordering a prop.
+      state.status.needsAutoSave = true;
     },
 
     toggleRequired: (
@@ -236,6 +246,8 @@ export const codeEditorSlice = createSlice({
       } else {
         state.codeComponent.required.push(propName);
       }
+      // Set auto-save to true when toggling required.
+      state.status.needsAutoSave = true;
     },
 
     addSlot: (state) => {
@@ -261,6 +273,8 @@ export const codeEditorSlice = createSlice({
           ...currentSlot,
           ...updates,
         } as CodeComponentSlot;
+        // Set auto-save to true when updating a slot.
+        state.status.needsAutoSave = true;
       }
     },
 
@@ -274,6 +288,8 @@ export const codeEditorSlice = createSlice({
       state.codeComponent.slots = state.codeComponent.slots.filter(
         (slot) => slot.id !== slotId,
       );
+      // Set auto-save to true when removing a slot.
+      state.status.needsAutoSave = true;
     },
 
     reorderSlots: (
@@ -287,6 +303,8 @@ export const codeEditorSlice = createSlice({
       const slots = state.codeComponent.slots;
       const [removed] = slots.splice(oldIndex, 1);
       slots.splice(newIndex, 0, removed);
+      // Set auto-save to true when reordering a slot.
+      state.status.needsAutoSave = true;
     },
 
     /**
@@ -349,6 +367,12 @@ export const codeEditorSlice = createSlice({
     clearDataFetches: (state) => {
       state.codeComponent.dataFetches = {};
     },
+    setForceRefresh: (state, action: PayloadAction<boolean>) => {
+      return {
+        ...state,
+        forceRefresh: action.payload,
+      };
+    },
   }),
 });
 
@@ -383,7 +407,6 @@ export const selectCodeComponentSerialized = createSelector(
     machineName: codeComponent.machineName,
     name: codeComponent.name,
     status: codeComponent.status,
-    blockOverride: codeComponent.blockOverride,
     props: serializeProps(codeComponent.props),
     required: codeComponent.required,
     slots: serializeSlots(codeComponent.slots),
@@ -392,7 +415,7 @@ export const selectCodeComponentSerialized = createSelector(
     compiledJs: codeComponent.compiledJs,
     compiledCss: codeComponent.compiledCss,
     importedJsComponents: codeComponent.importedJsComponents,
-    dataFetches: codeComponent.dataFetches,
+    dataDependencies: codeComponent.dataDependencies,
   }),
 );
 
@@ -427,6 +450,9 @@ export const selectGlobalAssetLibraryProperty =
 export const selectPreviewCompiledJsForSlots = (state: RootState) =>
   state.codeEditor.previewCompiledJsForSlots;
 
+export const selectForceRefresh = (state: RootState) =>
+  state.codeEditor.forceRefresh;
+
 export const {
   initializeCodeEditor,
   resetCodeEditor,
@@ -445,6 +471,7 @@ export const {
   setPreviewCompiledJsForSlots,
   addDataFetch,
   clearDataFetches,
+  setForceRefresh,
 } = codeEditorSlice.actions;
 
 export default codeEditorSlice;

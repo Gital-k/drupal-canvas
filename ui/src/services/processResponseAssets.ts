@@ -1,14 +1,15 @@
-import type { PropsValues } from '@/types/Form';
 import { getDrupal } from '@/utils/drupal-globals';
+
+import type { PropsValues } from '@/types/Form';
 
 const Drupal = getDrupal();
 
 /**
- * Takes a response rendered by XBTemplateRenderer, identifies any attached
+ * Takes a response rendered by CanvasTemplateRenderer, identifies any attached
  * assets, then uses Drupal's AJAX API to add them to the page.
  *
  * This is designed to be used in `transformResponse` setting in endpoints
- * services by createApi such as the one in dummyPropsForm.ts.
+ * services by createApi such as the one in componentInstanceForm.ts.
  *
  * This is a factory and needs to be called in order to return the response
  * processor. The factory accepts an array of keys to be returned from the
@@ -17,12 +18,12 @@ const Drupal = getDrupal();
  * response, this might be a string or an object. If multiple keys are specified
  * it will return an object with only those keys.
  *
- * To use XBTemplateRenderer for a route set the  _wrapper_format option to
- * 'xb_template' in its route definition.
+ * To use CanvasTemplateRenderer for a route set the  _wrapper_format option to
+ * 'canvas_template' in its route definition.
  *
  * @see core/misc/ajax.js
- * @see \Drupal\experience_builder\Render\MainContent\XBTemplateRenderer
- * @see ui/src/services/dummyPropsForm.ts
+ * @see \Drupal\canvas\Render\MainContent\CanvasTemplateRenderer
+ * @see ui/src/services/componentInstanceForm.ts
  */
 // @see core/misc/ajax.js
 const processResponseAssets = (keys: Array<string> = ['html']) => {

@@ -1,24 +1,28 @@
-import { useAppDispatch, useAppSelector } from '@/app/hooks';
+import { useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+
+import { useAppDispatch, useAppSelector } from '@/app/hooks';
+import { selectDevMode } from '@/features/configuration/configurationSlice';
+import { selectLayout } from '@/features/layout/layoutModelSlice';
 import {
-  DEFAULT_REGION,
+  areConsecutiveSiblings,
+  findComponentByUuid,
+  isParentOf,
+} from '@/features/layout/layoutUtils';
+import {
   selectSelectedComponentUuid,
   selectSelection,
   setSelection,
 } from '@/features/ui/uiSlice';
-import { useCallback } from 'react';
+import { getCanvasSettings } from '@/utils/drupal-globals';
 import {
-  areConsecutiveSiblings,
-  findComponentByUuid,
-  findParentRegion,
-  isParentOf,
-} from '@/features/layout/layoutUtils';
-import type { RegionNode } from '@/features/layout/layoutModelSlice';
-import { selectLayout } from '@/features/layout/layoutModelSlice';
-import { selectDevMode } from '@/features/configuration/configurationSlice';
-import { getXbSettings } from '@/utils/drupal-globals';
+  removeComponentFromPathname,
+  setComponentInPathname,
+} from '@/utils/route-utils';
 
-const xbSettings = getXbSettings();
+import type { RegionNode } from '@/features/layout/layoutModelSlice';
+
+const canvasSettings = getCanvasSettings();
 
 /**
  * Filters out any components that are parents or children of components in the selection
@@ -73,7 +77,7 @@ function filterParentChildRelationships(
  * Hook for component selection functionality.
  * Handles selecting and deselecting components, managing multi-selection and ensuring the page URL is updated to
  * show the selectedComponent (when there is exactly one selected)
- * Also exposes functions to drupalSettings.xb.componentSelectionUtils for extensions to use.
+ * Also exposes functions to drupalSettings.canvas.componentSelectionUtils for extensions to use.
  */
 export function useComponentSelection() {
   const layout = useAppSelector(selectLayout);
@@ -87,13 +91,8 @@ export function useComponentSelection() {
 
   // Remove the /component/:componentId from the URL, keeping other parts intact
   const updateUrlToNoSelection = useCallback(() => {
-    // Use a regex to specifically remove the component URL segment
-    // This pattern will match /component/anyComponentId
-    // including when it's in the middle of the URL
-    const newPath = location.pathname.replace(/\/component\/[^/]+/, '');
-
-    // Handle potential double slashes that might result from removing the segment
-    const cleanPath = newPath.replace(/\/\/+/g, '/');
+    // Remove /component/:componentId
+    const cleanPath = removeComponentFromPathname(location.pathname);
 
     // If the path ends up exactly "/editor/", remove trailing slash for consistency
     const finalPath =
@@ -107,6 +106,21 @@ export function useComponentSelection() {
       hash: location.hash,
     });
   }, [navigate, location]);
+
+  // Robustly update the URL so /component/:componentId is always at the end, preserving everything before it
+  const updateUrlToSelectedComponent = useCallback(
+    (componentId?: string) => {
+      if (!componentId) return;
+      const { pathname, search, hash } = location;
+      const newPath = setComponentInPathname(pathname, componentId);
+      navigate({
+        pathname: newPath,
+        search,
+        hash,
+      });
+    },
+    [navigate, location],
+  );
 
   /**
    * Central function to update component selection in Redux and manage URL state
@@ -148,16 +162,7 @@ export function useComponentSelection() {
       if (selectionArray.length === 1) {
         // Single selection - update URL to include the component ID
         const componentUuid = selectionArray[0];
-        const baseUrl = '/editor';
-        let destinationUrl: string;
-        const parentRegion = findParentRegion(layoutToSearch, componentUuid);
-
-        if (parentRegion && parentRegion.id !== DEFAULT_REGION) {
-          destinationUrl = `${baseUrl}/region/${parentRegion.id}/component/${componentUuid}`;
-        } else {
-          destinationUrl = `${baseUrl}/component/${componentUuid}`;
-        }
-        navigate(destinationUrl);
+        updateUrlToSelectedComponent(componentUuid);
       } else if (selectionArray.length === 0) {
         // No selection - remove component from URL
         updateUrlToNoSelection();
@@ -166,7 +171,7 @@ export function useComponentSelection() {
         updateUrlToNoSelection();
       }
     },
-    [dispatch, layout, navigate, updateUrlToNoSelection],
+    [dispatch, layout, updateUrlToNoSelection, updateUrlToSelectedComponent],
   );
 
   const setSelectedComponent = useCallback(
@@ -256,13 +261,14 @@ export function useComponentSelection() {
     setSelectedComponent,
     unsetSelectedComponent,
     updateUrlToNoSelection,
+    updateUrlToSelectedComponent,
     handleComponentSelection,
     selectedComponent,
     updateSelectionInRedux,
   };
 
   // Add to Drupal settings for external access by extensions etc
-  xbSettings.componentSelectionUtils = componentSelectionUtils;
+  canvasSettings.componentSelectionUtils = componentSelectionUtils;
 
   return componentSelectionUtils;
 }

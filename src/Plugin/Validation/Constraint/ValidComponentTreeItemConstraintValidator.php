@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Drupal\experience_builder\Plugin\Validation\Constraint;
+namespace Drupal\canvas\Plugin\Validation\Constraint;
 
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
 use Drupal\Core\TypedData\TypedDataManagerInterface;
-use Drupal\experience_builder\MissingComponentInputsException;
-use Drupal\experience_builder\Plugin\Field\FieldType\ComponentTreeItem;
-use Drupal\experience_builder\Validation\ConstraintPropertyPathTranslatorTrait;
+use Drupal\canvas\MissingComponentInputsException;
+use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
+use Drupal\canvas\Validation\ConstraintPropertyPathTranslatorTrait;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\ConstraintValidator;
@@ -44,7 +44,7 @@ final class ValidComponentTreeItemConstraintValidator extends ConstraintValidato
     }
 
     // Validate the raw structure:
-    // - if this is a `experience_builder.component_tree`, that is the received value
+    // - if this is a `canvas.component_tree`, that is the received value
     // - if this is a `field_item:component_tree`, that is the array
     //   representation of the field item object
     if (!$this->validateRawStructure(is_array($value) ? $value : $value->toArray())) {
@@ -69,7 +69,6 @@ final class ValidComponentTreeItemConstraintValidator extends ConstraintValidato
     if ($component_tree_type === 'content' && $value->getParent()?->getParent() !== NULL) {
       $host_entity = $value->getEntity();
     }
-    \assert($value instanceof ComponentTreeItem);
 
     // Validate the prop source resolves into a value that is considered
     // valid by the source plugin.
@@ -77,7 +76,7 @@ final class ValidComponentTreeItemConstraintValidator extends ConstraintValidato
     if ($component_source === NULL) {
       // TRICKY: ignore missing Component config entities; that's the
       // responsibility of another validator.
-      // @see \Drupal\experience_builder\Plugin\Validation\Constraint\ComponentTreeStructureConstraintValidator::validateComponentInstance()
+      // @see \Drupal\canvas\Plugin\Validation\Constraint\ComponentTreeStructureConstraintValidator::validateComponentInstance()
       // @todo Refactor this away after https://www.drupal.org/project/drupal/issues/2820364 is fixed.
       return;
     }
@@ -88,6 +87,15 @@ final class ValidComponentTreeItemConstraintValidator extends ConstraintValidato
     // @see https://en.wikipedia.org/wiki/Robustness_principle
     try {
       $stored_explicit_input = $value->get('inputs')->getValues();
+      // We don't allow uncollapsed inputs.
+      $before_optimize = \hash('xxh64', \json_encode($stored_explicit_input, \JSON_THROW_ON_ERROR));
+      $value->optimizeInputs();
+      $after_optimize = \hash('xxh64', \json_encode($value->getInputs(), \JSON_THROW_ON_ERROR));
+      if ($after_optimize !== $before_optimize) {
+        $this->context->buildViolation('When using the default static prop source for a component input, you must use the collapsed input syntax.')
+          ->atPath(sprintf('inputs.%s', $value->getUuid()))
+          ->addViolation();
+      }
     }
     catch (MissingComponentInputsException $e) {
       if ($component_source->requiresExplicitInput()) {

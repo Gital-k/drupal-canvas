@@ -1,11 +1,12 @@
 // Need to use the React-specific entry point to import createApi
 import { createApi } from '@reduxjs/toolkit/query/react';
-import { baseQuery } from '@/services/baseQuery';
+
 import {
   setConflicts,
   setErrors,
   setPreviousPendingChanges,
 } from '@/components/review/PublishReview.slice';
+import { baseQuery } from '@/services/baseQuery';
 
 interface Owner {
   name: string;
@@ -67,7 +68,7 @@ export const pendingChangesApi = createApi({
   tagTypes: ['PendingChanges'],
   endpoints: (builder) => ({
     getAllPendingChanges: builder.query<PendingChanges, void>({
-      query: () => `/xb/api/v0/auto-saves/pending`,
+      query: () => `/canvas/api/v0/auto-saves/pending`,
       providesTags: () => [{ type: 'PendingChanges', id: 'LIST' }],
     }),
     publishAllPendingChanges: builder.mutation<
@@ -75,7 +76,7 @@ export const pendingChangesApi = createApi({
       PendingChanges
     >({
       query: (body) => ({
-        url: `/xb/api/v0/auto-saves/publish`,
+        url: `/canvas/api/v0/auto-saves/publish`,
         method: 'POST',
         body,
       }),
@@ -88,7 +89,11 @@ export const pendingChangesApi = createApi({
               'getAllPendingChanges',
               undefined,
               (draft) => {
-                return {};
+                // Remove only the changes that were successfully published
+                Object.keys(body).forEach((key) => {
+                  delete draft[key];
+                });
+                return draft;
               },
             ),
           );
@@ -108,6 +113,46 @@ export const pendingChangesApi = createApi({
         }
       },
     }),
+    discardPendingChange: builder.mutation<
+      SuccessResponse | ErrorResponse,
+      PendingChange
+    >({
+      query: (change: PendingChange) => ({
+        url: `/canvas/api/v0/auto-saves/${change.entity_type}/${change.entity_id}`,
+        method: 'DELETE',
+      }),
+      async onQueryStarted(change, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+
+          // Given the nature of the discard operation, we need to
+          // reload the page here to ensure that the UI reflects the discarded
+          // changes if the operation was successful.
+          // This is a temporary solution to ensure the UI is in sync with the
+          // server state after publishing changes.
+          // A better solution will be implemented in the future.
+          window.location.reload();
+
+          // Reset errors
+          dispatch(setErrors());
+        } catch (error: any) {
+          dispatch(
+            setErrors({
+              errors: [
+                {
+                  code: 0,
+                  detail:
+                    error?.error?.data?.message ??
+                    'Failed to discard pending change',
+                  source: { pointer: '' },
+                  meta: change,
+                },
+              ],
+            }),
+          );
+        }
+      },
+    }),
   }),
 });
 
@@ -116,4 +161,5 @@ export const pendingChangesApi = createApi({
 export const {
   useGetAllPendingChangesQuery,
   usePublishAllPendingChangesMutation,
+  useDiscardPendingChangeMutation,
 } = pendingChangesApi;

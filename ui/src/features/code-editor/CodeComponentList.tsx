@@ -1,161 +1,79 @@
-import type React from 'react';
 import { useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
 import { useErrorBoundary } from 'react-error-boundary';
-import { Callout, ContextMenu, Flex, Skeleton } from '@radix-ui/themes';
-import SidebarNode from '@/components/sidePanel/SidebarNode';
-import UnifiedMenu from '@/components/UnifiedMenu';
-import { useGetCodeComponentsQuery } from '@/services/componentAndLayout';
-import {
-  openDeleteDialog,
-  openRenameDialog,
-} from '@/features/ui/codeComponentDialogSlice';
-import { useAppDispatch } from '@/app/hooks';
-import type { CodeComponentSerialized } from '@/types/CodeComponent';
-import styles from './CodeComponentList.module.css';
-import { InfoCircledIcon } from '@radix-ui/react-icons';
 
-const CodeComponentList = ({
-  type = 'code',
-}: {
-  type?: 'code' | 'override';
-}) => {
+import CodeComponentItem from '@/components/list/CodeComponentItem';
+import LibraryItemList from '@/components/list/LibraryItemList';
+import UnifiedMenu from '@/components/UnifiedMenu';
+import { LayoutItemType } from '@/features/ui/primaryPanelSlice';
+import {
+  useGetCodeComponentsQuery,
+  useGetFoldersQuery,
+} from '@/services/componentAndLayout';
+
+import type { FolderData } from '@/components/list/FolderList';
+import type { CodeComponentSerialized } from '@/types/CodeComponent';
+
+const CodeComponentList = ({ searchTerm }: { searchTerm: string }) => {
   const {
     data: codeComponents,
     error,
     isLoading,
-  } = useGetCodeComponentsQuery(
-    type !== 'override'
-      ? { status: false } // Internal code components.
-      : {
-          override: true,
-          status: true, // Overrides need to be exposed to be taken into account.
-        },
-  );
-  const dispatch = useAppDispatch();
+  } = useGetCodeComponentsQuery({ status: false });
+  const {
+    data: folders,
+    error: foldersError,
+    isLoading: foldersLoading,
+  } = useGetFoldersQuery({ status: false });
   const { showBoundary } = useErrorBoundary();
-  const navigate = useNavigate();
-  const { codeComponentId: componentId } = useParams();
 
   useEffect(() => {
-    if (error) {
-      showBoundary(error);
+    if (error || foldersError) {
+      showBoundary(error || foldersError);
     }
-  }, [error, showBoundary]);
+  }, [error, showBoundary, foldersError]);
 
-  const handleComponentClick = (machineName: string) => {
-    navigate(`/code-editor/code/${machineName}`);
-  };
+  const menuTitleItems = (component: CodeComponentSerialized) => (
+    <>
+      <UnifiedMenu.Label>{component.name}</UnifiedMenu.Label>
+      <UnifiedMenu.Separator />
+    </>
+  );
 
-  const handleRenameClick = (component: CodeComponentSerialized) => {
-    dispatch(openRenameDialog(component));
-  };
+  const renderItem = (component: CodeComponentSerialized & { id: string }) => (
+    // @Todo: Can this return a <ListItem /> instead so it doesn't need to duplicate menuTitleItems prop and gets the thumbnail preview on hover?
+    <CodeComponentItem
+      component={component}
+      exposed={false}
+      menuTitleItems={menuTitleItems(component)}
+    />
+  );
 
-  const handleDeleteClick = (component: CodeComponentSerialized) => {
-    dispatch(openDeleteDialog(component));
-  };
-
-  if ((!codeComponents || !Object.keys(codeComponents).length) && !isLoading) {
-    return (
-      <Callout.Root size="1" variant="soft" color="gray" my="3">
-        <Flex align="center" gapX="2">
-          <Callout.Icon>
-            <InfoCircledIcon />
-          </Callout.Icon>
-          <Callout.Text size="1">
-            No items to show in{' '}
-            {type === 'code' ? 'Code components' : 'Overrides'}
-          </Callout.Text>
-        </Flex>
-      </Callout.Root>
-    );
-  }
+  // Map machineName to id for compatibility with LibraryItemList's generic
+  const codeComponentsWithId = codeComponents
+    ? Object.fromEntries(
+        Object.entries(codeComponents).map(([key, component]) => [
+          key,
+          { ...component, id: component.machineName },
+        ]),
+      )
+    : undefined;
 
   return (
-    <>
-      <Skeleton loading={isLoading} height="1.2rem" width="100%" my="3">
-        <Flex direction="column">
-          {codeComponents &&
-            Object.entries(codeComponents).map(([id, component]) => {
-              const menuItems = (
-                <>
-                  <UnifiedMenu.Item
-                    onClick={(e: React.MouseEvent<HTMLDivElement>) => {
-                      e.stopPropagation();
-                      handleComponentClick(component.machineName);
-                    }}
-                  >
-                    Edit
-                  </UnifiedMenu.Item>
-                  {type !== 'override' && (
-                    <>
-                      <UnifiedMenu.Item
-                        onClick={(e: React.MouseEvent<HTMLDivElement>) => {
-                          e.stopPropagation();
-                          handleRenameClick(component);
-                        }}
-                      >
-                        Rename
-                      </UnifiedMenu.Item>
-                      {/* @todo: Add this item back in https://drupal.org/i/3524274.}
-                      {/*<UnifiedMenu.Item*/}
-                      {/*  onClick={(e: React.MouseEvent<HTMLDivElement>) => {*/}
-                      {/*    e.stopPropagation();*/}
-                      {/*    handleAddToComponentsClick(component);*/}
-                      {/*  }}*/}
-                      {/*>*/}
-                      {/*  Add to components*/}
-                      {/*</UnifiedMenu.Item>*/}
-                      <UnifiedMenu.Separator />
-                      <UnifiedMenu.Item
-                        color="red"
-                        onClick={(e: React.MouseEvent<HTMLDivElement>) => {
-                          e.stopPropagation();
-                          handleDeleteClick(component);
-                        }}
-                      >
-                        Delete
-                      </UnifiedMenu.Item>
-                    </>
-                  )}
-                </>
-              );
-
-              return (
-                <ContextMenu.Root key={id}>
-                  <ContextMenu.Trigger>
-                    <SidebarNode
-                      title={component.name}
-                      variant="code"
-                      draggable={false}
-                      onClick={() =>
-                        handleComponentClick(component.machineName)
-                      }
-                      className={styles.listItem}
-                      selected={component.machineName === componentId}
-                      dropdownMenuContent={
-                        <UnifiedMenu.Content menuType="dropdown">
-                          {menuItems}
-                        </UnifiedMenu.Content>
-                      }
-                    />
-                  </ContextMenu.Trigger>
-                  <UnifiedMenu.Content
-                    onClick={(e) => e.stopPropagation()}
-                    menuType="context"
-                    align="start"
-                    side="right"
-                  >
-                    {menuItems}
-                  </UnifiedMenu.Content>
-                </ContextMenu.Root>
-              );
-            })}
-        </Flex>
-      </Skeleton>
-      <Skeleton loading={isLoading} height="1.2rem" width="100%" my="3" />
-      <Skeleton loading={isLoading} height="1.2rem" width="100%" my="3" />
-    </>
+    <LibraryItemList<CodeComponentSerialized & { id: string }>
+      items={
+        codeComponentsWithId as Record<
+          string,
+          CodeComponentSerialized & { id: string }
+        >
+      }
+      folders={folders as FolderData}
+      isLoading={isLoading || foldersLoading}
+      searchTerm={searchTerm}
+      layoutType={LayoutItemType.CODE}
+      topLevelLabel="Code"
+      itemType="js_component"
+      renderItem={renderItem}
+    />
   );
 };
 

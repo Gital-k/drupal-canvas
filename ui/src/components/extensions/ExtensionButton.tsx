@@ -1,15 +1,18 @@
+import { useCallback } from 'react';
 import clsx from 'clsx';
 import { Flex, Text, Tooltip } from '@radix-ui/themes';
-import styles from './ExtensionsList.module.css';
-import type React from 'react';
-import { useCallback } from 'react';
-import type { ExtensionDefinition } from '@/types/Extensions';
-import { useAppDispatch } from '@/app/hooks';
-import { setDialogOpen } from '@/features/ui/dialogSlice';
-import { setActiveExtension } from '@/features/extensions/extensionsSlice';
 
-const ExtensionButton: React.FC<ExtensionsPopoverProps> = ({ extension }) => {
-  const { name, imgSrc, description } = extension;
+import { useAppDispatch } from '@/app/hooks';
+import { setActiveExtension } from '@/features/extensions/extensionsSlice';
+import { setDialogOpen } from '@/features/ui/dialogSlice';
+
+import type React from 'react';
+import type { Extension } from '@/types/Extensions';
+
+import styles from './ExtensionsList.module.css';
+
+const ExtensionButton = ({ extension }: { extension: Extension }) => {
+  const { name, icon, description } = extension;
   const dispatch = useAppDispatch();
 
   const handleClick = useCallback(
@@ -30,7 +33,7 @@ const ExtensionButton: React.FC<ExtensionsPopoverProps> = ({ extension }) => {
     <Tooltip content={trimmedDescription}>
       <Flex justify="start" align="center" direction="column" asChild>
         <button className={clsx(styles.extensionIcon)} onClick={handleClick}>
-          <img alt={name} src={imgSrc} height="42" width="42" />
+          <img alt={name} src={icon} height="42" width="42" />
           <Text align="center" size="1">
             {name}
           </Text>
@@ -39,9 +42,5 @@ const ExtensionButton: React.FC<ExtensionsPopoverProps> = ({ extension }) => {
     </Tooltip>
   );
 };
-
-interface ExtensionsPopoverProps {
-  extension: ExtensionDefinition;
-}
 
 export default ExtensionButton;

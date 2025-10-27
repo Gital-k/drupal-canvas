@@ -54,17 +54,17 @@ describe('Prop types editing', () => {
   };
 
   before(() => {
-    cy.drupalXbInstall(['sdc_test_all_props']);
-    cy.drupalLogin('xbUser', 'xbUser');
+    cy.drupalCanvasInstall(['sdc_test_all_props']);
+    cy.drupalLogin('canvasUser', 'canvasUser');
   });
 
   beforeEach(() => {
-    cy.drupalLogin('xbUser', 'xbUser');
-    cy.loadURLandWaitForXBLoaded();
-    cy.get('.primaryPanelContent').findByText('Two Column').click();
-    cy.findByLabelText('Column Width').should('exist');
+    cy.drupalLogin('canvasUser', 'canvasUser');
+    cy.loadURLandWaitForCanvasLoaded();
     cy.openLibraryPanel();
-    cy.get('.primaryPanelContent').findByText('All props').click();
+    cy.insertComponent({ name: 'Two Column' });
+    cy.findByLabelText('Column Width').should('exist');
+    cy.insertComponent({ name: 'All props' });
     cy.openLayersPanel();
     cy.clickComponentInLayersView('All props');
     cy.findByLabelText('String — single line').should('exist');
@@ -122,9 +122,10 @@ describe('Prop types editing', () => {
     'Single textfields - valid input',
     { retries: { openMode: 0, runMode: 3 } },
     () => {
-      cy.intercept('PATCH', '**/xb/api/v0/form/component-instance/node/1*').as(
-        'patch',
-      );
+      cy.intercept(
+        'PATCH',
+        '**/canvas/api/v0/form/component-instance/node/1*',
+      ).as('patch');
       Object.entries(textFieldIterations).forEach(([testName, testData]) => {
         cy.log(`Test ${testName}`);
         cy.findByLabelText(testData.labelText).should(
@@ -163,21 +164,30 @@ describe('Prop types editing', () => {
       .as('select')
       .should('have.value', 'foo');
     cy.waitForElementContentInIframe('#test-string-enum', 'foo');
+    cy.get('@select').within(() => {
+      cy.get('option:selected').should('have.text', 'Foo');
+    });
     cy.get('@select').select(0, { force: true });
     cy.get('@select').should('have.value', '_none');
+    cy.get('@select').within(() => {
+      cy.get('option:selected').should('have.text', '- None -');
+    });
     cy.waitForElementContentNotInIframe('#test-string-enum', 'foo');
     cy.testInIframe('#test-string-enum code', (enumPreview) => {
       expect(enumPreview.textContent).to.eq('');
     });
     cy.get('@select').select(2, { force: true });
     cy.get('@select').should('have.value', 'bar');
+    cy.get('@select').within(() => {
+      cy.get('option:selected').should('have.text', 'Bar');
+    });
     cy.waitForElementContentInIframe('#test-string-enum', 'bar');
 
     // See if an empty value is maintained on reload.
     cy.get('@select').select(0, { force: true });
     cy.get('@select').should('have.value', '_none');
     cy.waitForElementContentNotInIframe('#test-string-enum', 'bar');
-    cy.loadURLandWaitForXBLoaded({ clearAutoSave: false });
+    cy.loadURLandWaitForCanvasLoaded({ clearAutoSave: false });
     cy.openLayersPanel();
     cy.clickComponentInLayersView('All props');
     cy.findByLabelText('String — single line').should('exist');
@@ -200,14 +210,23 @@ describe('Prop types editing', () => {
         .as('select')
         .should('have.value', '1');
       cy.waitForElementContentInIframe('#test-integer-enum', '1');
+      cy.get('@select').within(() => {
+        cy.get('option:selected').should('have.text', '1');
+      });
       cy.get('@select').select(0, { force: true });
       cy.get('@select').should('have.value', '_none');
+      cy.get('@select').within(() => {
+        cy.get('option:selected').should('have.text', '- None -');
+      });
       cy.waitForElementContentNotInIframe('#test-integer-enum', '1');
       cy.testInIframe('#test-integer-enum code', (enumPreview) => {
         expect(enumPreview.textContent).to.eq('');
       });
       cy.get('@select').select(2, { force: true });
       cy.get('@select').should('have.value', '2');
+      cy.get('@select').within(() => {
+        cy.get('option:selected').should('have.text', '2');
+      });
       cy.waitForElementContentInIframe('#test-integer-enum', '2');
     },
   );
@@ -587,7 +606,7 @@ describe('Prop types editing', () => {
     cy.findByLabelText(labelText).should('have.value', valuePre);
     cy.findByLabelText(labelText).clear({ force: true });
     cy.waitForElementContentNotInIframe(iframeSelector, valuePre);
-    cy.loadURLandWaitForXBLoaded({ clearAutoSave: false });
+    cy.loadURLandWaitForCanvasLoaded({ clearAutoSave: false });
     cy.openLayersPanel();
     cy.clickComponentInLayersView('All props');
     cy.findByLabelText('String — single line').should('exist');
@@ -602,11 +621,10 @@ describe('Prop types editing', () => {
     'HTML block formatting field uses CKEditor with appropriate configuration',
     { retries: { openMode: 0, runMode: 3 } },
     () => {
-      cy.loadURLandWaitForXBLoaded();
-      cy.loadURLandWaitForXBLoaded({ url: 'xb/node/2' });
-
+      cy.loadURLandWaitForCanvasLoaded();
+      cy.loadURLandWaitForCanvasLoaded({ url: 'canvas/editor/node/2' });
       cy.openLibraryPanel();
-      cy.get('.primaryPanelContent').findByText('All props').click();
+      cy.insertComponent({ name: 'All props' });
       cy.findByLabelText('String with HTML formatting (block)').should('exist');
 
       const selector = '#test-string-html-block';
@@ -652,7 +670,7 @@ describe('Prop types editing', () => {
       // Verify text format configuration
       cy.window().then((win) => {
         const editorConfig =
-          win.drupalSettings?.editor.formats.xb_html_block.editorSettings;
+          win.drupalSettings?.editor.formats.canvas_html_block.editorSettings;
         expect(editorConfig).to.exist;
         expect(editorConfig.toolbar.items).to.include(
           'bold',
@@ -682,12 +700,12 @@ describe('Prop types editing', () => {
   );
 
   it('Select prop with _none', () => {
-    cy.loadURLandWaitForXBLoaded();
+    cy.loadURLandWaitForCanvasLoaded();
     cy.openLibraryPanel();
-    cy.get('.primaryPanelContent').findByText('Heading').click();
+    cy.insertComponent({ name: 'Heading' });
     cy.findByLabelText('Style').should('have.value', 'primary');
     cy.findByLabelText('Style').within(() => {
-      cy.get('option:selected').should('have.text', 'primary');
+      cy.get('option:selected').should('have.text', 'Primary');
     });
     cy.findByLabelText('Style').select('_none');
     cy.findByLabelText('Style').should('have.value', '_none');
