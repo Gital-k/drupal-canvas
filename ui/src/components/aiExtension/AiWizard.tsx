@@ -899,8 +899,29 @@ const AiWizard = () => {
           onInput={handleTextInput}
           onComponentRender={() => {
             if (!isComponentRendered) {
-              chatElementRef.current.clearMessages();
-              historyStore.clearHistory();
+              // Chat history should be cleared only when panel is explicitly closed.
+              try {
+                const aiPanelState = localStorage.getItem(
+                  'canvas_ai_panel_state',
+                );
+                if (aiPanelState) {
+                  const state = JSON.parse(aiPanelState);
+                  if (state.shouldClearHistory) {
+                    chatElementRef.current.clearMessages();
+                    historyStore.clearHistory();
+                    // Reset the flag after clearing
+                    localStorage.setItem(
+                      'canvas_ai_panel_state',
+                      JSON.stringify({
+                        isOpen: true,
+                        shouldClearHistory: false,
+                      }),
+                    );
+                  }
+                }
+              } catch (e) {
+                console.warn('Failed to read AI panel state:', e);
+              }
               chatElementRef.current.disableSubmitButton();
               isComponentRendered = true;
             }

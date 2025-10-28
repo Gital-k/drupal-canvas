@@ -3,6 +3,7 @@ import { createAppSlice } from '@/app/createAppSlice';
 import type { PayloadAction } from '@reduxjs/toolkit';
 
 const PANEL_STATE_KEY = 'canvas_panel_state';
+const AI_PANEL_STATE_KEY = 'canvas_ai_panel_state';
 
 // Try to load initial state from localStorage.
 const loadSavedState = (): Partial<PrimaryPanelState> => {
@@ -15,6 +16,20 @@ const loadSavedState = (): Partial<PrimaryPanelState> => {
     console.warn('Failed to load panel state from localStorage:', e);
   }
   return {};
+};
+
+// Load AI panel state from localStorage.
+const loadAiPanelState = (): boolean => {
+  try {
+    const saved = localStorage.getItem(AI_PANEL_STATE_KEY);
+    if (saved) {
+      const state = JSON.parse(saved);
+      return state.isOpen || false;
+    }
+  } catch (e) {
+    console.warn('Failed to load AI panel state from localStorage:', e);
+  }
+  return false;
 };
 
 export interface PrimaryPanelState {
@@ -37,8 +52,8 @@ const savedState = loadSavedState();
 const initialState: PrimaryPanelState = {
   activePanel: savedState.activePanel || '',
   isHidden: false,
-  aiPanelOpen: false,
   manageLibraryTab: null,
+  aiPanelOpen: loadAiPanelState(),
 };
 
 // Temporary workaround to persist primary panel state when switching between entities until
@@ -73,9 +88,25 @@ export const primaryPanelSlice = createAppSlice({
     }),
     setAiPanelOpen: create.reducer((state) => {
       state.aiPanelOpen = true;
+      try {
+        localStorage.setItem(
+          AI_PANEL_STATE_KEY,
+          JSON.stringify({ isOpen: true, shouldClearHistory: false }),
+        );
+      } catch (e) {
+        console.warn('Failed to save AI panel state to localStorage:', e);
+      }
     }),
     setAiPanelClosed: create.reducer((state) => {
       state.aiPanelOpen = false;
+      try {
+        localStorage.setItem(
+          AI_PANEL_STATE_KEY,
+          JSON.stringify({ isOpen: false, shouldClearHistory: true }),
+        );
+      } catch (e) {
+        console.warn('Failed to save AI panel state to localStorage:', e);
+      }
     }),
     setManageLibraryTab: create.reducer(
       (state, action: PayloadAction<string>) => {
