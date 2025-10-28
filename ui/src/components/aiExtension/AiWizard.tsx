@@ -184,6 +184,27 @@ const metadataHandler = {
   },
 };
 
+// Filters out 'media' fields from a js component instance's fieldValues based on the
+// component definition's propSources, forcing the component to use the example
+// image from its definition.
+// @todo Refactor this after https://www.drupal.org/i/3552000 is fixed.
+function removeMediaFields(componentDef: CanvasComponent, componentInst: any) {
+  const newFieldValues = {} as any;
+  const fieldValues = componentInst.fieldValues || {};
+  for (const [key, value] of Object.entries(fieldValues)) {
+    const prop = (componentDef.propSources as any)[key];
+    const isMedia =
+      (prop?.sourceTypeSettings?.storage as any)?.target_type === 'media';
+    if (!isMedia) {
+      newFieldValues[key] = value;
+    }
+  }
+  return {
+    ...componentInst,
+    fieldValues: newFieldValues,
+  };
+}
+
 // Helper to delay the placement of components.
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -219,11 +240,15 @@ const operationsHandler = {
           if (component.id && availableComponents[component.id]) {
             const componentToUse: CanvasComponent =
               availableComponents[component.id];
+            const componentAfterFilteringImageProps = removeMediaFields(
+              componentToUse,
+              component,
+            );
             dispatch(
               layoutUtils.addNewComponentToLayout(
                 {
                   component: componentToUse,
-                  withValues: component.fieldValues,
+                  withValues: componentAfterFilteringImageProps.fieldValues,
                   to: component.nodePath,
                 },
                 componentSelectionUtils.setSelectedComponent,
@@ -329,6 +354,17 @@ const startPolling = (
     }
   };
 
+  const cleanupPollingMessageOnError = () => {
+    if (chatEl && pollingMessageIndex >= 0) {
+      try {
+        chatEl.updateMessage({ html: '' }, pollingMessageIndex);
+        pollingMessageIndex = -1;
+      } catch (error) {
+        console.warn('Failed to hide polling message on error:', error);
+      }
+    }
+  };
+
   const handlePollingComplete = () => {
     const finalContent = buildHtmlContent();
     if (finalContent) {
@@ -339,6 +375,7 @@ const startPolling = (
 
   const poll = async () => {
     if (stopSignal?.stopped) {
+      cleanupPollingMessageOnError();
       return;
     }
     try {
@@ -383,6 +420,7 @@ const startPolling = (
       }
     } catch (error) {
       console.error('Polling request failed:', error);
+      cleanupPollingMessageOnError();
       handlePollingComplete();
     }
   };
@@ -819,6 +857,13 @@ const AiWizard = () => {
                       throw new Error(`HTTP error. Status: ${response.status}`);
                     }
                     const data = await response.json();
+
+                    if (data.status === false) {
+                      throw new Error(
+                        data.message ||
+                          'An error occurred while processing your request. Please try again.',
+                      );
+                    }
                     // Store the response instead of processing it
                     pendingResponse = data;
                   })
@@ -826,7 +871,9 @@ const AiWizard = () => {
                     console.error('AI request failed:', error);
                     stopPolling.stopped = true;
                     signals.onResponse({
-                      text: 'An error occurred while processing your request. Please try again.',
+                      text: error.message
+                        ? error.message
+                        : 'An error occurred while processing your request. Please try again.',
                       role: 'error',
                     });
                     setTimeout(() => {

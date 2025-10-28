@@ -132,10 +132,12 @@ class PropShapeRepositoryTest extends KernelTestBase {
       new PropShape(['type' => 'array', 'items' => ['type' => 'integer'], 'maxItems' => 20, 'minItems' => 1]),
       new PropShape(['type' => 'array', 'items' => ['type' => 'integer'], 'minItems' => 1]),
       new PropShape(['type' => 'array', 'items' => ['type' => 'integer'], 'minItems' => 2]),
+      new PropShape(['type' => 'array', 'items' => ['type' => 'string']]),
       new PropShape(['type' => 'boolean']),
       new PropShape(['type' => 'integer']),
       new PropShape(['type' => 'integer', '$ref' => 'json-schema-definitions://canvas.module/column-width']),
       new PropShape(['type' => 'integer', 'enum' => [1, 2]]),
+      new PropShape(['type' => 'integer', 'enum' => [1, 2, 3, 4, 5, 6]]),
       new PropShape(['type' => 'integer', 'maximum' => 2147483648, 'minimum' => -2147483648]),
       new PropShape(['type' => 'integer', 'minimum' => 0]),
       new PropShape(['type' => 'integer', 'minimum' => 1]),
@@ -148,7 +150,6 @@ class PropShapeRepositoryTest extends KernelTestBase {
       new PropShape(['type' => 'string', '$ref' => 'json-schema-definitions://canvas.module/heading-element']),
       new PropShape(['type' => 'string', '$ref' => 'json-schema-definitions://canvas.module/image-uri']),
       new PropShape(['type' => 'string', '$ref' => 'json-schema-definitions://canvas.module/stream-wrapper-image-uri']),
-      new PropShape(['type' => 'string', '$ref' => 'json-schema-definitions://canvas.module/textarea']),
       new PropShape(['type' => 'string', 'contentMediaType' => 'image/*', 'format' => 'uri-reference', 'x-allowed-schemes' => ['http', 'https']]),
       new PropShape(['type' => 'string', 'contentMediaType' => 'text/html']),
       new PropShape(['type' => 'string', 'contentMediaType' => 'text/html', 'x-formatting-context' => 'block']),
@@ -199,6 +200,7 @@ class PropShapeRepositoryTest extends KernelTestBase {
       new PropShape(['type' => 'string', 'format' => JsonSchemaStringFormat::UriTemplate->value, 'x-required-variables' => ['width']]),
       new PropShape(['type' => 'string', 'format' => JsonSchemaStringFormat::Uuid->value]),
       new PropShape(['type' => 'string', 'minLength' => 2]),
+      new PropShape(['type' => 'string', 'pattern' => '(.|\r?\n)*']),
     ], $unique_prop_shapes);
 
     return $unique_prop_shapes;
@@ -534,14 +536,9 @@ class PropShapeRepositoryTest extends KernelTestBase {
         ],
         fieldWidget: 'link_default',
       ),
-      'type=string&$ref=json-schema-definitions://canvas.module/textarea' => new StorablePropShape(
-        shape: new PropShape(['type' => 'string', '$ref' => 'json-schema-definitions://canvas.module/textarea']),
-        fieldTypeProp: new FieldTypePropExpression('string_long', 'value'),
-        fieldWidget: 'string_textarea',
-      ),
       'type=string&contentMediaType=text/html' => new StorablePropShape(
         shape: new PropShape(['type' => 'string', 'contentMediaType' => 'text/html']),
-        fieldTypeProp: new FieldTypePropExpression('text_long', 'value'),
+        fieldTypeProp: new FieldTypePropExpression('text_long', 'processed'),
         fieldWidget: 'text_textarea',
         fieldInstanceSettings: [
           'allowed_formats' => [
@@ -551,7 +548,7 @@ class PropShapeRepositoryTest extends KernelTestBase {
       ),
       'type=string&contentMediaType=text/html&x-formatting-context=block' => new StorablePropShape(
         shape: new PropShape(['type' => 'string', 'contentMediaType' => 'text/html', 'x-formatting-context' => 'block']),
-        fieldTypeProp: new FieldTypePropExpression('text_long', 'value'),
+        fieldTypeProp: new FieldTypePropExpression('text_long', 'processed'),
         fieldWidget: 'text_textarea',
         fieldInstanceSettings: [
           'allowed_formats' => [
@@ -561,7 +558,7 @@ class PropShapeRepositoryTest extends KernelTestBase {
       ),
       'type=string&contentMediaType=text/html&x-formatting-context=inline' => new StorablePropShape(
         shape: new PropShape(['type' => 'string', 'contentMediaType' => 'text/html', 'x-formatting-context' => 'inline']),
-        fieldTypeProp: new FieldTypePropExpression('text', 'value'),
+        fieldTypeProp: new FieldTypePropExpression('text', 'processed'),
         fieldWidget: 'text_textfield',
         fieldInstanceSettings: [
           'allowed_formats' => [
@@ -573,6 +570,17 @@ class PropShapeRepositoryTest extends KernelTestBase {
         shape: new PropShape([
           'type' => 'integer',
           'enum' => [1, 2],
+        ]),
+        fieldTypeProp: new FieldTypePropExpression('list_integer', 'value'),
+        fieldWidget: 'options_select',
+        fieldStorageSettings: [
+          'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
+        ],
+      ),
+      'type=integer&enum[0]=1&enum[1]=2&enum[2]=3&enum[3]=4&enum[4]=5&enum[5]=6' => new StorablePropShape(
+        shape: new PropShape([
+          'type' => 'integer',
+          'enum' => [1, 2, 3, 4, 5, 6],
         ]),
         fieldTypeProp: new FieldTypePropExpression('list_integer', 'value'),
         fieldWidget: 'options_select',
@@ -625,6 +633,12 @@ class PropShapeRepositoryTest extends KernelTestBase {
           'max' => 100,
         ],
       ),
+      'type=array&items[type]=string' => new StorablePropShape(
+        shape: new PropShape(['type' => 'array', 'items' => ['type' => 'string']]),
+        fieldTypeProp: new FieldTypePropExpression('string', 'value'),
+        cardinality: FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
+        fieldWidget: 'string_textfield',
+      ),
       'type=string&enum[0]=7&enum[1]=3.14' => new StorablePropShape(
         shape: new PropShape(['type' => 'string', 'enum' => ['7', '3.14']]),
         fieldTypeProp: new FieldTypePropExpression('list_string', 'value'),
@@ -664,6 +678,11 @@ class PropShapeRepositoryTest extends KernelTestBase {
         fieldStorageSettings: [
           'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
         ],
+      ),
+      'type=string&pattern=(.|\r?\n)*' => new StorablePropShape(
+        shape: new PropShape(['type' => 'string', 'pattern' => '(.|\r?\n)*']),
+        fieldTypeProp: new FieldTypePropExpression('string_long', 'value'),
+        fieldWidget: 'string_textarea',
       ),
     ];
   }

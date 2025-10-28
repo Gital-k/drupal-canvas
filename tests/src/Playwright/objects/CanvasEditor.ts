@@ -120,33 +120,21 @@ export class CanvasEditor {
       .contentFrame();
   }
 
-  /**
-   * Opens the Library Panel by clicking the "Add" button in the side menu.
-   * Waits for the library loading indicator to disappear.
-   *
-   */
   async openLibraryPanel() {
-    const libraryPanel = this.page.getByRole('heading', { name: 'Library' });
-    // Check it's not already open.
-    if (!(await libraryPanel.isVisible())) {
-      await this.page.getByTestId('canvas-side-menu').getByLabel('Add').click();
-    }
-    await expect(libraryPanel).toBeVisible();
+    await this.page.getByTestId('canvas-side-menu').getByLabel('Add').click();
 
     await expect(
       this.page.getByTestId('canvas-components-library-loading'),
     ).not.toBeVisible();
-    await expect(
-      this.page.locator(
-        '[data-testid="canvas-primary-panel"] h4:has-text("Library")',
-      ),
-    ).toBeVisible();
-    const components = this.page.locator(
-      '[data-testid="canvas-primary-panel"] [data-canvas-type="component"]',
-    );
-    const count = await components.count();
-    if (count > 0) {
-      await components.nth(count - 1).waitFor({ state: 'visible' });
+    try {
+      await expect(
+        this.page.getByRole('heading', { name: 'Library' }),
+      ).toBeVisible();
+    } catch (error) {
+      throw new Error(
+        'openLibraryPanel: Library panel did not open - was it already open?\n' +
+          (error instanceof Error ? error.message : String(error)),
+      );
     }
 
     // Ensure we are on the Components tab.
@@ -156,30 +144,39 @@ export class CanvasEditor {
   }
 
   async openLayersPanel() {
-    const layersPanel = this.page.getByRole('heading', { name: 'Layers' });
-    // Check it's not already open.
-    if (!(await layersPanel.isVisible())) {
-      await this.page
-        .getByTestId('canvas-side-menu')
-        .getByLabel('Layers')
-        .click();
+    await this.page
+      .getByTestId('canvas-side-menu')
+      .getByLabel('Layers')
+      .click();
+
+    try {
+      await expect(
+        this.page.getByRole('heading', { name: 'Layers' }),
+      ).toBeVisible();
+    } catch (error) {
+      throw new Error(
+        'openLayersPanel: Layers panel did not open - was it already open?\n' +
+          (error instanceof Error ? error.message : String(error)),
+      );
     }
-    await expect(layersPanel).toBeVisible();
   }
 
   async openManageLibraryPanel() {
-    const manageLibraryPanel = this.page.getByRole('heading', {
-      name: 'Manage library',
-    });
-    // Check it's not already open.
-    if (!(await manageLibraryPanel.isVisible())) {
-      await this.page
-        .getByTestId('canvas-side-menu')
-        .getByLabel('Manage library')
-        .click();
-    }
-    await expect(manageLibraryPanel).toBeVisible();
+    await this.page
+      .getByTestId('canvas-side-menu')
+      .getByLabel('Manage library')
+      .click();
 
+    try {
+      await expect(
+        this.page.getByRole('heading', { name: 'Manage library' }),
+      ).toBeVisible();
+    } catch (error) {
+      throw new Error(
+        'openManageLibraryPanel: Manage library panel did not open - was it already open?\n' +
+          (error instanceof Error ? error.message : String(error)),
+      );
+    }
     // Ensure we are on the Components tab.
     await this.page
       .getByTestId('canvas-manage-library-components-tab-select')
@@ -214,8 +211,6 @@ export class CanvasEditor {
     const { id, name } = identifier;
     const { hasInputs = true } = options;
 
-    await this.openLibraryPanel();
-
     let selector, previewSelector;
 
     if (id) {
@@ -226,6 +221,17 @@ export class CanvasEditor {
       previewSelector = `#canvasPreviewOverlay [aria-label="${name}"]`;
     } else {
       throw new Error("Either 'id' or 'name' must be provided.");
+    }
+
+    try {
+      await expect(
+        this.page.getByRole('heading', { name: 'Library' }),
+      ).toBeVisible();
+    } catch (error) {
+      throw new Error(
+        'addComponent: Make sure you open the Library panel before calling addComponent.\n' +
+          (error instanceof Error ? error.message : String(error)),
+      );
     }
 
     const componentLocator = this.page
@@ -285,8 +291,8 @@ export class CanvasEditor {
           .locator(`${inputLocator}[type="file"]`)
           .setInputFiles(nodePath.join(__dirname, propValue));
         await expect(
-          this.page.locator(`${inputLocator}[type="file"]`),
-        ).not.toBeVisible();
+          this.page.getByRole('button', { name: 'remove' }),
+        ).toBeVisible();
         break;
       default:
         await this.page.locator(inputLocator).fill(propValue);
@@ -582,12 +588,16 @@ export class CanvasEditor {
       .locator('[data-testid="canvas-topbar"]')
       .getByRole('button', { name: 'Preview' })
       .click();
-    await this.page
-      .locator('iframe[class^="_PagePreviewIframe"]')
-      .contentFrame()
-      .locator('.layout-container')
-      .waitFor({ state: 'visible' });
-    await this.page.waitForLoadState('networkidle');
+    await this.page.waitForLoadState('domcontentloaded');
+    // Wait for no DOM mutations for a period.
+    await this.page.waitForFunction(() => {
+      const iframe = document.querySelector(
+        'iframe[class^="_PagePreviewIframe"]',
+      );
+      const iframeDocument =
+        iframe.contentDocument || iframe.contentWindow.document;
+      return iframeDocument.querySelector('main')?.children.length > 0;
+    });
     await this.page
       .locator('iframe[class^="_PagePreviewIframe"]')
       .contentFrame()

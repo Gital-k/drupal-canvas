@@ -255,15 +255,12 @@ enum JsonSchemaType: string {
         // Custom: `contentMediaType: text/html` + `x-formatting-context`.
         // @see docs/shape-matching-into-field-types.md#3.2.1
         array_key_exists('contentMediaType', $schema) && $schema['contentMediaType'] === 'text/html' => match(TRUE) {
-          !isset($schema['x-formatting-context']) || $schema['x-formatting-context'] === 'block' => new StorablePropShape(shape: $shape, fieldTypeProp: new FieldTypePropExpression('text_long', 'value'), fieldWidget: 'text_textarea', fieldInstanceSettings: ['allowed_formats' => ['canvas_html_block']]),
-          $schema['x-formatting-context'] === 'inline' => new StorablePropShape(shape: $shape, fieldTypeProp: new FieldTypePropExpression('text', 'value'), fieldWidget: 'text_textfield', fieldInstanceSettings: ['allowed_formats' => ['canvas_html_inline']]),
+          !isset($schema['x-formatting-context']) || $schema['x-formatting-context'] === 'block' => new StorablePropShape(shape: $shape, fieldTypeProp: new FieldTypePropExpression('text_long', 'processed'), fieldWidget: 'text_textarea', fieldInstanceSettings: ['allowed_formats' => ['canvas_html_block']]),
+          $schema['x-formatting-context'] === 'inline' => new StorablePropShape(shape: $shape, fieldTypeProp: new FieldTypePropExpression('text', 'processed'), fieldWidget: 'text_textfield', fieldInstanceSettings: ['allowed_formats' => ['canvas_html_inline']]),
           // Other `x-formatting-context` values do not make sense.
           default => NULL,
         },
-        array_key_exists('$ref', $schema) => match ($schema['$ref']) {
-          'json-schema-definitions://canvas.module/textarea' => new StorablePropShape(shape: $shape, fieldWidget: 'string_textarea', fieldTypeProp: new FieldTypePropExpression('string_long', 'value')),
-          default => NULL,
-        },
+        array_key_exists('$ref', $schema) => NULL,
         array_key_exists('enum', $schema) => match(in_array('', $schema['enum'], TRUE)) {
           // The empty string is not a sensible enum value. To indicate optionality, the prop should be made optional.
           TRUE => NULL,
@@ -279,7 +276,10 @@ enum JsonSchemaType: string {
         // @todo Add support for both `format` and `pattern` being present: the latter often just restricts the former.
         array_key_exists('format', $schema) => JsonSchemaStringFormat::from($schema['format'])->computeStorablePropShape($shape),
         // @todo subclass \Drupal\Core\Field\Plugin\Field\FieldType\StringItem to allow for a "pattern" setting + create subclass of \Drupal\Core\Field\Plugin\Field\FieldWidget\StringTextfieldWidget to pass on that pattern setting  ⚠️
-        array_key_exists('pattern', $schema) => NULL,
+        array_key_exists('pattern', $schema) => match ($schema['pattern']) {
+          '(.|\r?\n)*' => new StorablePropShape(shape: $shape, fieldWidget: 'string_textarea', fieldTypeProp: new FieldTypePropExpression('string_long', 'value')),
+          default => NULL,
+        },
         // @see \Drupal\Core\Field\Plugin\Field\FieldType\StringItem
         // @todo Support `minLength`.  ⚠️
         array_key_exists('maxLength', $schema) => new StorablePropShape(shape: $shape, fieldTypeProp: new FieldTypePropExpression('string', 'value'), fieldWidget: 'string_textfield', fieldStorageSettings: [
@@ -293,7 +293,8 @@ enum JsonSchemaType: string {
       // - `multipleOf`: https://json-schema.org/understanding-json-schema/reference/numeric#multiples
       // - `minimum`, `exclusiveMinimum`, `maximum` and `exclusiveMaximum`: https://json-schema.org/understanding-json-schema/reference/numeric#range
       JsonSchemaType::Integer => match (TRUE) {
-        array_key_exists('$ref', $schema) => NULL,
+        // @todo Refactor in https://www.drupal.org/i/3515074
+        array_key_exists('$ref', $schema) && str_starts_with($schema['$ref'], 'json-schema-definitions://') => NULL,
         array_key_exists('enum', $schema)=> new StorablePropShape(shape: $shape, fieldTypeProp: new FieldTypePropExpression('list_integer', 'value'), fieldWidget: 'options_select', fieldStorageSettings: [
           'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
         ]),
@@ -312,7 +313,8 @@ enum JsonSchemaType: string {
       // - `multipleOf`: https://json-schema.org/understanding-json-schema/reference/numeric#multiples
       // - `minimum`, `exclusiveMinimum`, `maximum` and `exclusiveMaximum`: https://json-schema.org/understanding-json-schema/reference/numeric#range
       JsonSchemaType::Number => match (TRUE) {
-        array_key_exists('$ref', $schema) => NULL,
+        // @todo Refactor in https://www.drupal.org/i/3515074
+        array_key_exists('$ref', $schema) && str_starts_with($schema['$ref'], 'json-schema-definitions://') => NULL,
         array_key_exists('enum', $schema) => new StorablePropShape(shape: $shape, fieldTypeProp: new FieldTypePropExpression('list_float', 'value'), fieldWidget: 'options_select', fieldStorageSettings: [
           'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
         ]),

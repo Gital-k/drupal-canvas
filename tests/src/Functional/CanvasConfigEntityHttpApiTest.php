@@ -170,6 +170,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
       'weight' => 0,
       'items' => [
         'sdc.canvas_broken_sdcs.invalid-filter',
+        'sdc.canvas_broken_sdcs.malformed-image',
         'sdc.canvas_test_sdc.my-cta',
         'sdc.canvas_test_sdc.component-no-meta-enum',
         'sdc.canvas_test_sdc.card',
@@ -186,6 +187,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
         'sdc.canvas_test_sdc.attributes',
         'sdc.canvas_test_sdc.image-optional-with-example-and-additional-prop',
         'sdc.canvas_test_sdc.sparkline',
+        'sdc.canvas_test_sdc.tags',
         'sdc.canvas_test_sdc.image-optional-without-example',
         'sdc.canvas_test_sdc.card-with-remote-image',
         'sdc.canvas_test_sdc.image-gallery',
@@ -198,6 +200,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
       'type' => 'component',
       'weight' => 0,
       'items' => [
+        'sdc.canvas_test_sdc.columns',
         'sdc.canvas_test_sdc.grid-container',
         'sdc.canvas_test_sdc.one_column',
         'sdc.canvas_test_sdc.two_column',
@@ -333,13 +336,13 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
       [
         'uuid' => 'a3ade070-dc70-4989-b078-85cfd8fc741e',
         'nodeType' => 'component',
-        'type' => 'sdc.canvas_test_sdc.props-no-slots@95f4f1d5ee47663b',
+        'type' => 'sdc.canvas_test_sdc.props-no-slots@b1e991f726a2a266',
         'slots' => [],
       ],
       [
         'uuid' => '67d6b081-a62f-463c-a5d8-42a145ec7243',
         'nodeType' => 'component',
-        'type' => 'sdc.canvas_test_sdc.props-no-slots@95f4f1d5ee47663b',
+        'type' => 'sdc.canvas_test_sdc.props-no-slots@b1e991f726a2a266',
         'slots' => [],
       ],
     ];
@@ -435,14 +438,14 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
           [
             'uuid' => 'a3ade070-dc70-4989-b078-85cfd8fc741e',
             'nodeType' => 'component',
-            'type' => 'sdc.canvas_test_sdc.props-no-slots@95f4f1d5ee47663b',
+            'type' => 'sdc.canvas_test_sdc.props-no-slots@b1e991f726a2a266',
             'name' => NULL,
             'slots' => [],
           ],
           [
             'uuid' => '67d6b081-a62f-463c-a5d8-42a145ec7243',
             'nodeType' => 'component',
-            'type' => 'sdc.canvas_test_sdc.props-no-slots@95f4f1d5ee47663b',
+            'type' => 'sdc.canvas_test_sdc.props-no-slots@b1e991f726a2a266',
             'name' => NULL,
             'slots' => [],
           ],
@@ -512,13 +515,13 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
               [
                 'uuid' => 'a3ade070-dc70-4989-b078-85cfd8fc741e',
                 'nodeType' => 'component',
-                'type' => 'sdc.canvas_test_sdc.props-no-slots@95f4f1d5ee47663b',
+                'type' => 'sdc.canvas_test_sdc.props-no-slots@b1e991f726a2a266',
                 'slots' => [],
               ],
               [
                 'uuid' => '67d6b081-a62f-463c-a5d8-42a145ec7243',
                 'nodeType' => 'component',
-                'type' => 'sdc.canvas_test_sdc.props-no-slots@95f4f1d5ee47663b',
+                'type' => 'sdc.canvas_test_sdc.props-no-slots@b1e991f726a2a266',
                 'slots' => [],
               ],
             ],
@@ -527,7 +530,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
             'nodeType' => 'slot',
           ],
         ],
-        'type' => 'sdc.canvas_test_sdc.one_column@0555ab081a3c8721',
+        'type' => 'sdc.canvas_test_sdc.one_column@80cc82f44d0a94f2',
         'uuid' => 'c4074d1f-149a-4662-aaf3-615151531cf6',
       ],
     ];
@@ -1720,6 +1723,16 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     self::assertStringNotContainsString('No content available.', $recent_content_preview);
     self::assertStringContainsString('Jack', $recent_content_preview);
     self::assertStringContainsString('seconds ago', $recent_content_preview);
+
+    // 4. Test that a failing SDC does not break the entire response and is
+    // marked broken.
+    $broken_sdcs = array_filter(
+      Json::decode($page->getContent()),
+      fn($component) => !empty($component['broken']));
+    $this->assertSame([
+      'sdc.canvas_broken_sdcs.invalid-filter',
+      'sdc.canvas_broken_sdcs.malformed-image',
+    ], array_keys($broken_sdcs));
   }
 
   private function assertDynamicPageCacheAccelerated(?string $maxAge = NULL): void {
