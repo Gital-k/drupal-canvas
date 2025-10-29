@@ -909,7 +909,6 @@ const AiWizard = () => {
                   if (state.shouldClearHistory) {
                     chatElementRef.current.clearMessages();
                     historyStore.clearHistory();
-                    // Reset the flag after clearing
                     localStorage.setItem(
                       'canvas_ai_panel_state',
                       JSON.stringify({

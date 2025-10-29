@@ -91,7 +91,7 @@ export const primaryPanelSlice = createAppSlice({
       try {
         localStorage.setItem(
           AI_PANEL_STATE_KEY,
-          JSON.stringify({ isOpen: true, shouldClearHistory: false }),
+          JSON.stringify({ isOpen: true, shouldClearHistory: true }),
         );
       } catch (e) {
         console.warn('Failed to save AI panel state to localStorage:', e);
