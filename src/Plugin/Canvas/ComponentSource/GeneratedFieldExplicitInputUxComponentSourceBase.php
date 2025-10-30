@@ -6,7 +6,7 @@ namespace Drupal\canvas\Plugin\Canvas\ComponentSource;
 
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\PropSource\DynamicPropSource;
-use Drupal\canvas\ShapeMatcher\FieldForComponentSuggester;
+use Drupal\canvas\ShapeMatcher\PropSourceSuggester;
 use Drupal\Component\Plugin\DependentPluginInterface;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Entity\EntityInterface;
@@ -100,7 +100,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     private readonly ComponentValidator $componentValidator,
     private readonly WidgetPluginManager $fieldWidgetPluginManager,
     protected readonly EntityTypeManagerInterface $entityTypeManager,
-    private readonly FieldForComponentSuggester $fieldForComponentSuggester,
+    private readonly PropSourceSuggester $propSourceSuggester,
     private readonly LoggerChannelInterface $logger,
   ) {
     assert(array_key_exists('local_source_id', $configuration));
@@ -119,7 +119,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       $container->get(ComponentValidator::class),
       $container->get('plugin.manager.field.widget'),
       $container->get(EntityTypeManagerInterface::class),
-      $container->get(FieldForComponentSuggester::class),
+      $container->get(PropSourceSuggester::class),
       $container->get('logger.channel.canvas'),
     );
   }
@@ -398,7 +398,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       // to in order to correctly render the component instance.
       // Also note that this will NOT run anymore for a given prop once the
       // Content Creator has specified a value in the generated field widget.
-      if ($model['source'][$prop_name]['sourceType'] === DefaultRelativeUrlPropSource::getSourceTypePrefix()) {
+      if (PropSource::tryFrom($model['source'][$prop_name]['sourceType']) === PropSource::DefaultRelativeUrl) {
         // TRICKY: use the default static prop source as-is, with its default
         // value, because:
         // - the server side can ONLY store a `StaticPropSource` if it actually
@@ -646,7 +646,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       $form[$sdc_prop_name]['#disabled'] = $disabled;
 
       if ($entity instanceof ContentTemplate) {
-        $suggestions = FieldForComponentSuggester::structureSuggestionsForHierarchicalResponse($this->fieldForComponentSuggester->suggest(
+        $suggestions = PropSourceSuggester::structureSuggestionsForHierarchicalResponse($this->propSourceSuggester->suggest(
           $this->getSourceSpecificComponentId(),
           $this->getMetadata(),
           $entity->getTargetEntityDataDefinition(),
@@ -1114,7 +1114,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
         // @see EvaluatedComponentModel type-script definition.
         // For static props undo what ::inputToClientModel() did: restore the
         // omitted `'value'` in cases where it is the same as the source value.
-        if (str_starts_with($prop_source['sourceType'] ?? '', StaticPropSource::getSourceTypePrefix()) && !\array_key_exists('value', $prop_source)) {
+        if (str_starts_with($prop_source['sourceType'] ?? '', PropSource::getTypePrefix(StaticPropSource::class)) && !\array_key_exists('value', $prop_source)) {
           $prop_source['value'] = $prop_value;
         }
         $source = PropSource::parse($prop_source);
