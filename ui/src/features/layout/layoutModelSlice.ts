@@ -80,8 +80,10 @@ export type ComponentModels = Record<
 export interface LayoutModelSliceState extends RootLayoutModel {
   updatePreview: boolean;
   isInitialized?: boolean;
-  transforms: Record<string, any>;
+  transforms: Record<string, TransformConfig>;
 }
+
+type LayoutModelPayload = Omit<LayoutModelSliceState, 'transforms'>;
 
 export const initialState: LayoutModelSliceState = {
   layout: [
@@ -449,7 +451,7 @@ export const layoutModelSlice = createSlice({
       state.isInitialized = action.payload;
     }),
     setLayoutModel: create.reducer(
-      (state, action: PayloadAction<LayoutModelSliceState>) => {
+      (state, action: PayloadAction<LayoutModelPayload>) => {
         const { layout, model, updatePreview } = action.payload;
         state.layout = layout;
         state.model = model;
@@ -459,7 +461,7 @@ export const layoutModelSlice = createSlice({
     // Identical to setLayoutModel but with a different type for ensuring this
     // doesn't trigger an undo/redo action.
     setInitialLayoutModel: create.reducer(
-      (state, action: PayloadAction<LayoutModelSliceState>) => {
+      (state, action: PayloadAction<LayoutModelPayload>) => {
         const {
           layout,
           model,
