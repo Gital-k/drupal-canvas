@@ -28,6 +28,7 @@ import type { AppThunk, RootState } from '@/app/store';
 import type { CanvasComponent, ComponentsList } from '@/types/Component';
 import type { InputUIData } from '@/types/Form';
 import type { UUID } from '@/types/UUID';
+import type { TransformConfig } from '@/utils/transforms';
 
 const canvasSettings = getCanvasSettings();
 
@@ -79,6 +80,7 @@ export type ComponentModels = Record<
 export interface LayoutModelSliceState extends RootLayoutModel {
   updatePreview: boolean;
   isInitialized?: boolean;
+  transforms: Record<string, any>;
 }
 
 export const initialState: LayoutModelSliceState = {
@@ -93,6 +95,7 @@ export const initialState: LayoutModelSliceState = {
   model: {},
   updatePreview: false,
   isInitialized: false,
+  transforms: {},
 };
 
 // This wrapper is necessary because when using slices with redux-undo,
@@ -139,6 +142,11 @@ type AddNewPatternPayload = {
 type SortNodePayload = {
   uuid: string | undefined;
   to: number | undefined;
+};
+
+type TransformsPayload = {
+  componentType: string;
+  transforms: TransformConfig;
 };
 
 type AnyValue = string | boolean | [] | number | {} | null;
@@ -464,6 +472,12 @@ export const layoutModelSlice = createSlice({
         state.isInitialized = isInitialized;
       },
     ),
+    setTransforms: create.reducer(
+      (state, action: PayloadAction<TransformsPayload>) => {
+        const { transforms, componentType } = action.payload;
+        state.transforms[componentType] = transforms;
+      },
+    ),
   }),
 });
 
@@ -769,7 +783,7 @@ export const _updateExistingComponentValuesForLinking =
         model: { [componentToUpdateId]: model },
         components,
       } as InputUIData,
-      window._canvasTransforms[selectedComponentType],
+      state.layoutModel.present.transforms[selectedComponentType],
     );
 
     // Resolved will be updated in all cases.
@@ -851,6 +865,7 @@ export const {
   sortNode,
   setUpdatePreview,
   insertNodes,
+  setTransforms,
 } = layoutModelSlice.actions;
 
 export const layoutModelReducer = layoutModelSlice.reducer;
@@ -868,6 +883,11 @@ export const selectUpdatePreview = (state: StateWithHistoryWrapper) =>
   state.layoutModel.present.updatePreview;
 export const selectIsInitialized = (state: StateWithHistoryWrapper) =>
   state.layoutModel.present.isInitialized;
+export const selectTransforms = (
+  state: StateWithHistoryWrapper,
+  selectedComponentType: string,
+) => state.layoutModel.present.transforms[selectedComponentType];
+
 const selectRegion = (state: RootState, regionName: string) => regionName;
 
 export const selectLayoutForRegion = createSelector(

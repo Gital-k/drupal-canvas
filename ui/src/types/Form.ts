@@ -21,4 +21,5 @@ export interface InputUIData {
   model?: ComponentModels;
   node?: LayoutNode | null;
   version: string;
+  transforms?: Record<string, any>;
 }

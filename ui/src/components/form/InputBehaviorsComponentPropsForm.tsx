@@ -2,7 +2,6 @@ import { useEffect, useRef } from 'react';
 import { debounce } from 'lodash';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
-import { useComponentTransforms } from '@/components/ComponentInstanceForm';
 import {
   ComponentPreviewUpdateEvent,
   getPropSchemas,
@@ -19,11 +18,13 @@ import {
 } from '@/components/form/inputBehaviors';
 import { FORM_TYPES } from '@/features/form/constants';
 import { selectFormValues } from '@/features/form/formStateSlice';
-import { isEvaluatedComponentModel } from '@/features/layout/layoutModelSlice';
+import {
+  isEvaluatedComponentModel,
+  selectTransforms,
+} from '@/features/layout/layoutModelSlice';
 import { setPreviewBackgroundUpdate } from '@/features/pagePreview/previewSlice';
 import { selectEditorFrameContext } from '@/features/ui/uiSlice';
 import useInputUIData from '@/hooks/useInputUIData';
-import { useGetComponentsQuery } from '@/services/componentAndLayout';
 import { useUpdateComponentMutation } from '@/services/preview';
 import { componentHasFieldData } from '@/types/Component';
 import { flaggedForRemoval, parseValue } from '@/utils/function-utils';
@@ -50,10 +51,12 @@ export const InputBehaviorsComponentPropsForm = (
   const dispatch = useAppDispatch();
   const polledBackgroundUpdate = useRef<number | null>(null);
   const { attributes } = props;
-  const { data: components } = useGetComponentsQuery();
-  const transforms = useComponentTransforms();
   const inputAndUiData = useInputUIData();
-  const { selectedComponentType, version, selectedComponent } = inputAndUiData;
+  const { selectedComponentType, version, selectedComponent, components } =
+    inputAndUiData;
+  const transforms = useAppSelector((state) =>
+    selectTransforms(state, selectedComponentType),
+  );
 
   const component = components?.[selectedComponentType];
 
@@ -76,12 +79,7 @@ export const InputBehaviorsComponentPropsForm = (
     const { propsValues: values, selectedModel } = getPropsValues(
       newFormState,
       newInputAndUiData,
-      // If transforms are not available (typically because TransformsContext is
-      // not available to the input), fall back to the transforms stored in the
-      // global window object.
-      Object.keys(transforms || {}).length > 0
-        ? transforms
-        : (window as any)._canvasTransforms[selectedComponentType],
+      transforms,
     );
 
     // And then send data to backend - this will:

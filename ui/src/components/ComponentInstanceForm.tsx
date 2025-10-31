@@ -1,10 +1,4 @@
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-} from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useErrorBoundary } from 'react-error-boundary';
 import { Spinner, Text } from '@radix-ui/themes';
 
@@ -21,6 +15,8 @@ import {
   isEvaluatedComponentModel,
   selectLayout,
   selectModel,
+  selectTransforms,
+  setTransforms,
 } from '@/features/layout/layoutModelSlice';
 import { findComponentByUuid } from '@/features/layout/layoutUtils';
 import {
@@ -50,13 +46,6 @@ import type {
 import type { AjaxUpdateFormStateEvent } from '@/types/Ajax';
 import type { CanvasComponent, FieldData } from '@/types/Component';
 import type { InputUIData } from '@/types/Form';
-import type { TransformConfig } from '@/utils/transforms';
-
-const TransformsContext = createContext<TransformConfig | undefined>(undefined);
-
-export const useComponentTransforms = () => {
-  return useContext(TransformsContext);
-};
 
 interface ComponentInstanceFormRendererProps {
   dynamicStaticCardQueryString: string;
@@ -66,13 +55,15 @@ interface ComponentInstanceFormProps {}
 const ComponentInstanceFormRenderer: React.FC<
   ComponentInstanceFormRendererProps
 > = (props) => {
+  const dispatch = useAppDispatch();
   const formState = useAppSelector((state) =>
     selectFormValues(state, FORM_TYPES.COMPONENT_INSTANCE_FORM),
   );
   const { dynamicStaticCardQueryString } = props;
   const { showBoundary } = useErrorBoundary();
   const inputAndUiData: InputUIData = useInputUIData();
-  const { selectedComponentType, version, selectedComponent } = inputAndUiData;
+  const { selectedComponentType, version, selectedComponent, components } =
+    inputAndUiData;
   const editorFrameContext = useAppSelector(selectEditorFrameContext);
 
   const [jsxFormContent, setJsxFormContent] =
@@ -92,7 +83,6 @@ const ComponentInstanceFormRenderer: React.FC<
         skip,
       },
     );
-  const { data: components } = useGetComponentsQuery();
 
   const [patchComponent] = useUpdateComponentMutation({
     fixedCacheKey: selectedComponentId,
@@ -109,23 +99,17 @@ const ComponentInstanceFormRenderer: React.FC<
     transforms: false as const,
   };
 
-  const persistentTransforms = useRef<undefined | TransformConfig>(undefined);
+  const persistentTransforms = useAppSelector((state) =>
+    selectTransforms(state, selectedComponentType),
+  );
 
   useEffect(() => {
     if (transforms !== false && !isFetching) {
-      persistentTransforms.current = transforms;
-
-      // We also store transforms in the global window object as a fallback.
-      // The persistent transforms are typically made available to other
-      // components via the TransformsContext, but in some cases such as AJAX
-      // rebuilds, the component might be active without access to that
-      // context.
-      if (!window._canvasTransforms) {
-        window._canvasTransforms = {};
-      }
-      window._canvasTransforms[selectedComponentType] = transforms;
+      dispatch(
+        setTransforms({ componentType: selectedComponentType, transforms }),
+      );
     }
-  }, [transforms, isFetching, selectedComponentType]);
+  }, [transforms, isFetching, selectedComponentType, dispatch]);
 
   useEffect(() => {
     if (!html) {
@@ -276,11 +260,8 @@ const ComponentInstanceFormRenderer: React.FC<
         }}
         ref={formRef}
       >
-        {persistentTransforms.current && (
-          <TransformsContext.Provider value={persistentTransforms.current}>
-            {jsxFormContent}
-          </TransformsContext.Provider>
-        )}
+        {/* Do not render the form until the transforms are available in Redux. */}
+        {!!persistentTransforms && jsxFormContent}
       </div>
     </Spinner>
   );
