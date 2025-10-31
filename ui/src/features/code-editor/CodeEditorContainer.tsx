@@ -84,7 +84,7 @@ const CodeEditorContainer = () => {
     }
 
     return (
-      <div className="mosaic-toggle-layout">
+      <div className="canvas-code-editor-toggle-layout">
         <Button
           onClick={toggleLayout}
           aria-label="Toggle button for code editor view"
@@ -101,14 +101,17 @@ const CodeEditorContainer = () => {
   return (
     <Flex
       flexGrow="1"
-      id="canvas-mosaic-container"
-      data-testid="canvas-mosaic-container"
+      id="canvas-code-editor-container"
+      data-testid="canvas-code-editor-container"
       style={{ overflow: 'hidden' }}
     >
       {/* Overflow is needed on the panel parent to stop the layout breaking when you have long lines of code in the editor.   */}
       <PanelGroup direction="horizontal">
         {/* Left Panel */}
-        <Panel className={styles.codeEditorPanel}>
+        <Panel
+          className={styles.codeEditorPanel}
+          data-testid="canvas-code-editor-main-panel"
+        >
           <Flex
             py="4"
             flexGrow="1"
@@ -147,7 +150,7 @@ const CodeEditorContainer = () => {
             <Panel>
               <PanelGroup direction="vertical">
                 {/* Top Right Panel */}
-                <Panel>
+                <Panel data-testid="canvas-code-editor-preview-panel">
                   <Flex
                     px="4"
                     pt="4"
@@ -183,7 +186,7 @@ const CodeEditorContainer = () => {
                   <DragHandleDots1Icon className={styles.resizeHandleThumb} />
                 </PanelResizeHandle>
                 {/* Bottom Right Panel */}
-                <Panel>
+                <Panel data-testid="canvas-code-editor-component-data-panel">
                   <Flex
                     px="4"
                     pt="4"
