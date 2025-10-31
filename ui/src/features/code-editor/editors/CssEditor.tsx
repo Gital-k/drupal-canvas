@@ -8,7 +8,7 @@ import {
   setCodeComponentProperty,
 } from '@/features/code-editor/codeEditorSlice';
 
-import styles from '@/features/code-editor/canvasCodeMirror.module.css';
+import styles from '@/features/code-editor/CanvasCodeMirror.module.css';
 
 const CssEditor = ({ isLoading }: { isLoading: boolean }) => {
   const dispatch = useAppDispatch();

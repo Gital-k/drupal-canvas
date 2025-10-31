@@ -26,7 +26,7 @@ import {
 import styles from './CodeEditorContainer.module.css';
 
 const CodeEditorContainer = () => {
-  const [maximisedEditorLayout, setMaximisedEditorLayout] = useState(false);
+  const [maximizedEditorLayout, setMaximizedEditorLayout] = useState(false);
   const [activeTab, setActiveTab] = useState('js');
   const dispatch = useAppDispatch();
   const selectedComponent = useAppSelector(selectCodeComponentSerialized);
@@ -80,7 +80,7 @@ const CodeEditorContainer = () => {
 
   const ToggleLayoutButton = () => {
     function toggleLayout() {
-      setMaximisedEditorLayout((prev) => !prev);
+      setMaximizedEditorLayout((prev) => !prev);
     }
 
     return (
@@ -115,7 +115,7 @@ const CodeEditorContainer = () => {
             direction="column"
             height="100%"
             width="100%"
-            pr={maximisedEditorLayout ? '2' : '0'}
+            pr={maximizedEditorLayout ? '2' : '0'}
           >
             <Flex pl="4">
               <Heading as="h5" size="2" weight="medium">
@@ -139,7 +139,7 @@ const CodeEditorContainer = () => {
             </Flex>
           </Flex>
         </Panel>
-        {maximisedEditorLayout ? null : (
+        {maximizedEditorLayout ? null : (
           <>
             <PanelResizeHandle className={styles.resizeHandle}>
               <DragHandleDots1Icon className={styles.resizeHandleThumb} />

@@ -8,7 +8,7 @@ import {
   setGlobalAssetLibraryProperty,
 } from '@/features/code-editor/codeEditorSlice';
 
-import styles from '../canvasCodeMirror.module.css';
+import styles from '../CanvasCodeMirror.module.css';
 
 const GlobalCssEditor = ({ isLoading }: { isLoading: boolean }) => {
   const dispatch = useAppDispatch();

@@ -9,7 +9,7 @@ import {
 } from '@/features/code-editor/codeEditorSlice';
 import ImportButton from '@/features/code-editor/ImportButton';
 
-import styles from '@/features/code-editor/canvasCodeMirror.module.css';
+import styles from '@/features/code-editor/CanvasCodeMirror.module.css';
 
 const JavaScriptEditor = ({ isLoading }: { isLoading: boolean }) => {
   const dispatch = useAppDispatch();
