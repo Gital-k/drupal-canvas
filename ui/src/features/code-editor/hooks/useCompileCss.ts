@@ -61,6 +61,7 @@ const useCompileCss = (): {
             // avoid unintended CSS precedence caused by the unlayered `.hidden`
             // class defined in the System module.
             // @see https://github.com/balintbrews/tailwindcss-in-browser/pull/20
+            // @ts-ignore
             unlayeredUtilities: [
               // `hidden is added here in case System module removes it, or it is
               // moved to a layer in the future, or by a library override.
