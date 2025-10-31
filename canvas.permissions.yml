@@ -37,7 +37,7 @@ edit canvas_page:
 # @see \Drupal\canvas\Entity\Page::DELETE_PERMISSION
 delete canvas_page:
   title: 'Delete Canvas Page'
-  description: 'Delete an Drupal Canvas page.'
+  description: 'Delete an Drupal Canvas page.`'
 
 publish auto-saves:
   title: 'Publish Drupal Canvas Content'

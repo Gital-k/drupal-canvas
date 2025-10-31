@@ -23,3 +23,8 @@ entity.canvas_page.edit_form:
   title: 'Edit'
   base_route: entity.canvas_page.canonical
   route_name: entity.canvas_page.edit_form
+
+canvas.canvas_pages_overview:
+  title: 'Pages'
+  route_name: canvas.canvas_pages_overview
+  base_route: system.admin_content
