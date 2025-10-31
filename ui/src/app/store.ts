@@ -1,4 +1,4 @@
-import undoable, { excludeAction } from 'redux-undo';
+import undoable from 'redux-undo';
 import { v4 as uuidv4 } from 'uuid';
 import { combineSlices, configureStore } from '@reduxjs/toolkit';
 import { setupListeners } from '@reduxjs/toolkit/query';
@@ -104,12 +104,12 @@ const rootReducer = combineSlices(
         undoType: '@@redux-undo/layoutModel_UNDO',
         redoType: '@@redux-undo/layoutModel_REDO',
         filter: (action, currentState, previousHistory) => {
-          excludeAction('layoutModel/setTransforms');
           const { present } = previousHistory;
           return (
             Object.keys(present.model).length > 0 &&
             action.type !== setInitialLayoutModel.type &&
-            action.type !== setUpdatePreview.type
+            action.type !== setUpdatePreview.type &&
+            action.type !== 'layoutModel/setTransforms'
           );
         },
       }),

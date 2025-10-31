@@ -104,12 +104,18 @@ const ComponentInstanceFormRenderer: React.FC<
   );
 
   useEffect(() => {
-    if (transforms !== false && !isFetching) {
+    if (!persistentTransforms && transforms !== false && !isFetching) {
       dispatch(
         setTransforms({ componentType: selectedComponentType, transforms }),
       );
     }
-  }, [transforms, isFetching, selectedComponentType, dispatch]);
+  }, [
+    transforms,
+    isFetching,
+    selectedComponentType,
+    dispatch,
+    persistentTransforms,
+  ]);
 
   useEffect(() => {
     if (!html) {
