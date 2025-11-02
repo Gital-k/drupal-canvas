@@ -4,18 +4,14 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Hook;
 
-use Drupal\Component\Serialization\Json;
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Access\AccessResultInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Entity\EntityInterface;
-use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
-use Drupal\Core\Field\BaseFieldDefinition;
 use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\Core\Session\AccountInterface;
-use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\canvas\Entity\Page;
 use Drupal\pathauto\PathautoItem;
 use Drupal\pathauto\PathautoState;
@@ -33,48 +29,6 @@ final class PageHooks {
     private readonly ModuleHandlerInterface $moduleHandler,
     private readonly ConfigFactoryInterface $configFactory,
   ) {
-  }
-
-  /**
-   * Implements hook_entity_base_field_info().
-   */
-  #[Hook('entity_base_field_info')]
-  public function entityBaseFieldInfo(EntityTypeInterface $entity_type): array {
-    $fields = [];
-    if ($entity_type->id() === Page::ENTITY_TYPE_ID) {
-      // Modules providing an entity type cannot add dynamic base fields based on
-      // other modules. The entity field manager determines if a field should be
-      // installed based on its "provider", which is the module providing the
-      // field definition. All fields from an entity's `baseFieldDefinitions` are
-      // always set to the provider of the entity type.
-      //
-      // To work around this limitation, we provide the base field definition in
-      // this hook, where we can specify the provider as the Metatag module.
-      //
-      // @see \Drupal\Core\Entity\EntityFieldManager::buildBaseFieldDefinitions()
-      // @see \Drupal\Core\Extension\ModuleInstaller::install()
-      if ($this->moduleHandler->moduleExists('metatag')) {
-        $fields['metatags'] = BaseFieldDefinition::create('metatag')
-          ->setLabel(new TranslatableMarkup('Metatags'))
-          ->setDescription(new TranslatableMarkup('The meta tags for the entity.'))
-          ->setTranslatable(\TRUE)
-          ->setDisplayOptions('form', [
-            'type' => 'metatag_firehose',
-            'settings' => ['sidebar' => \TRUE, 'use_details' => \TRUE],
-          ])
-          ->setDisplayConfigurable('form', \TRUE)
-          ->setDefaultValue(Json::encode([
-            'title' => '[canvas_page:title] | [site:name]',
-            'description' => '[canvas_page:description]',
-            'canonical_url' => '[canvas_page:url]',
-            // @see https://stackoverflow.com/a/19274942
-            'image_src' => '[canvas_page:image:entity:field_media_image:entity:url]',
-          ]))
-          ->setInternal(\TRUE)
-          ->setProvider('metatag');
-      }
-    }
-    return $fields;
   }
 
   /**
