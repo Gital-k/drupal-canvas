@@ -471,10 +471,10 @@ export class CanvasEditor {
       .getByText('Create')
       .click();
     await expect(
-      this.page.locator('[data-testid="canvas-mosaic-container"]'),
+      this.page.locator('[data-testid="canvas-code-editor-container"]'),
     ).toBeVisible();
     const codeEditor = this.page.locator(
-      '.canvas-mosaic-window-editor div[role="textbox"]',
+      '[data-testid="canvas-code-editor-main-panel"] div[role="textbox"]',
     );
     await codeEditor.waitFor({ state: 'visible' });
     await expect(codeEditor).toContainText(
@@ -492,15 +492,19 @@ export class CanvasEditor {
     required: boolean = false,
   ) {
     await this.page
-      .locator('.canvas-mosaic-window-component-data button:has-text("Props")')
+      .locator(
+        '[data-testid="canvas-code-editor-component-data-panel"] button:has-text("Props")',
+      )
       .click();
     await this.page
-      .locator('.canvas-mosaic-window-component-data')
+      .locator('[data-testid="canvas-code-editor-component-data-panel"]')
       .getByRole('button')
       .getByText('Add')
       .click();
     const propForm = this.page
-      .locator('.canvas-mosaic-window-component-data [data-testid^="prop-"]')
+      .locator(
+        '[data-testid="canvas-code-editor-component-data-panel"] [data-testid^="prop-"]',
+      )
       .last();
     await propForm.locator('[id^="prop-name-"]').fill(propName);
     await propForm.locator('[id^="prop-type-"]').click();
@@ -583,7 +587,7 @@ export class CanvasEditor {
 
   getCodePreviewFrame() {
     return this.page
-      .locator('.canvas-mosaic-window-preview iframe')
+      .locator('[data-testid="canvas-code-editor-preview-panel"] iframe')
       .contentFrame()
       .locator('#canvas-code-editor-preview-root');
   }
