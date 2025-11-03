@@ -37,6 +37,7 @@ export default [
     plugins: {
       '@typescript-eslint': typescriptEslint,
       mocha: mochaPlugin,
+      'react-hooks': reactHooks,
     },
     languageOptions: {
       globals: {
