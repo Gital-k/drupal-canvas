@@ -7,7 +7,7 @@ import type { Attributes } from '@/types/DrupalAttribute';
 
 interface DrupalContainerTextFormatFilterProps {
   attributes?: Attributes;
-  renderChildren?: JSX.Element | null;
+  renderChildren?: React.ReactNode | null;
   hasParent?: boolean;
 }
 

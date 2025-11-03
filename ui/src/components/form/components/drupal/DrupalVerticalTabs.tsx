@@ -8,7 +8,7 @@ const DrupalVerticalTabs = ({
   renderChildren = null,
 }: {
   attributes?: Attributes;
-  renderChildren?: JSX.Element | null;
+  renderChildren?: React.ReactNode | null;
 }) => {
   return (
     <AccordionRoot
