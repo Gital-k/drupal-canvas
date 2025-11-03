@@ -53,7 +53,7 @@ final class PropShape {
 
     // Recurse.
     if ($schema['type'] === 'object' && isset($schema['properties'])) {
-      $schema['properties'] = array_map([__CLASS__, 'resolveSchemaReferences'], $schema['properties']);
+      $schema['properties'] = array_map(__METHOD__, $schema['properties']);
     }
     elseif ($schema['type'] === 'array' && isset($schema['items'])) {
       $schema['items'] = self::resolveSchemaReferences($schema['items']);
@@ -106,7 +106,7 @@ final class PropShape {
     // those too.
     if ($normalized_prop_schema['type'] === JsonSchemaType::Object->value && array_key_exists('properties', $normalized_prop_schema)) {
       $normalized_prop_schema['properties'] = array_map(
-        fn (array $prop_schema) => self::normalizePropSchema($prop_schema),
+        __METHOD__,
         $normalized_prop_schema['properties'],
       );
     }
