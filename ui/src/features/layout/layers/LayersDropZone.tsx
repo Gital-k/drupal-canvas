@@ -30,7 +30,7 @@ const LayersDropZone: React.FC<LayersDropZoneProps> = (props) => {
   const id = 'uuid' in layer ? layer.uuid : layer.id;
 
   // Memoize the path calculation to prevent recalculating on every render
-  const dropPath = useMemo(() => {
+  const dropPath = (() => {
     const path = findNodePathByUuid(layout, id);
     if (!path) {
       return null;
@@ -45,7 +45,7 @@ const LayersDropZone: React.FC<LayersDropZoneProps> = (props) => {
     }
 
     return finalPath;
-  }, [layout, id, type, position]);
+  })();
 
   if (!dropPath) {
     throw new Error(`Unable to ascertain 'path' to component ${id}`);
@@ -86,5 +86,4 @@ const LayersDropZone: React.FC<LayersDropZoneProps> = (props) => {
   );
 };
 
-// Wrap the component with React.memo to prevent unnecessary re-renders
-export default React.memo(LayersDropZone);
+export default LayersDropZone;

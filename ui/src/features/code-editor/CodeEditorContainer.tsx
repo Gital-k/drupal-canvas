@@ -63,7 +63,7 @@ const CodeEditorContainer = () => {
         onValueChange={tabChangeHandler}
         value={activeTab}
       >
-        <Tabs.List size="1" className={styles.tabList} ml="4">
+        <Tabs.List size="1" className={styles.tabList} ml="2">
           <Tabs.Trigger value="js" className={styles.tabTrigger}>
             JavaScript
           </Tabs.Trigger>
