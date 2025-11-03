@@ -182,7 +182,7 @@ final class PropSourceSuggester {
    * @return array<HostEntityUrlPropSource>
    */
   private static function matchHostEntityUrlPropSources(PropShape $shape) : ?array {
-    if ($shape->getType() !== JsonSchemaType::String) {
+    if ($shape->type !== JsonSchemaType::String) {
       return NULL;
     }
 

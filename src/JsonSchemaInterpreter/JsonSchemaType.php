@@ -220,7 +220,7 @@ enum JsonSchemaType: string {
       if (!array_key_exists('items', $schema)) {
         return NULL;
       }
-      $array_item_prop_shape = PropShape::normalize($schema['items']);
+      $array_item_prop_shape = new PropShape($schema['items']);
 
       $item_storable_prop_shape = $array_item_prop_shape->getStorage();
       if ($item_storable_prop_shape === NULL) {

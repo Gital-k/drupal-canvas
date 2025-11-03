@@ -55,10 +55,10 @@ final class DefaultRelativeUrlPropSource extends PropSourceBase {
       // - resolved schema, to avoid $refs changing later having an effect
       // - normalized schema, to minimize storage consumption
       // @todo Make this far less clunky 🙈
-      'jsonSchema' => PropShape::normalize(
+      'jsonSchema' => (new PropShape(
         // First do basic normalization, and resolve.
-        PropShape::normalize($this->jsonSchema)->resolvedSchema
-      )->schema,
+        (new PropShape($this->jsonSchema))->resolvedSchema
+      ))->schema,
       'componentId' => $this->componentId,
     ];
   }
@@ -77,10 +77,10 @@ final class DefaultRelativeUrlPropSource extends PropSourceBase {
     assert(array_key_exists('componentId', $sdc_prop_source));
 
     // @todo Make this far less clunky 🙈
-    $minimal = PropShape::normalize(
+    $minimal = (new PropShape(
     // First do basic normalization, and resolve.
-      PropShape::normalize($sdc_prop_source['jsonSchema'])->resolvedSchema
-    )->schema;
+      (new PropShape($sdc_prop_source['jsonSchema']))->resolvedSchema
+    ))->schema;
     ksort($sdc_prop_source['jsonSchema']);
     ksort($minimal);
     if ($sdc_prop_source['jsonSchema'] !== $minimal) {

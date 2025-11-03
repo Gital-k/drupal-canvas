@@ -23,6 +23,8 @@ final class PropShape {
    */
   public readonly array $resolvedSchema;
 
+  public readonly JsonSchemaType $type;
+
   public function __construct(
     // The schema of the prop shape.
     public readonly array $schema,
@@ -32,14 +34,7 @@ final class PropShape {
       throw new \InvalidArgumentException(sprintf("The passed in schema (%s) should be normalized (%s).", print_r($schema, TRUE), print_r($normalized, TRUE)));
     }
     $this->resolvedSchema = self::resolveSchemaReferences($schema);
-  }
-
-  public static function normalize(array $raw_sdc_prop_schema): PropShape {
-    return new PropShape(self::normalizePropSchema($raw_sdc_prop_schema));
-  }
-
-  public function getType(): JsonSchemaType {
-    return JsonSchemaType::from($this->resolvedSchema['type']);
+    $this->type = JsonSchemaType::from($this->resolvedSchema['type']);
   }
 
   /**
@@ -130,7 +125,7 @@ final class PropShape {
     $json_schema_type = JsonSchemaType::from($this->schema['type']);
     $storable_prop_shape = JsonSchemaType::from($this->schema['type'])->computeStorablePropShape($this);
     if ($storable_prop_shape === NULL) {
-      $resolved_prop_shape = PropShape::normalize($this->resolvedSchema);
+      $resolved_prop_shape = new PropShape($this->resolvedSchema);
       $storable_prop_shape = $json_schema_type->computeStorablePropShape($resolved_prop_shape);
     }
 
