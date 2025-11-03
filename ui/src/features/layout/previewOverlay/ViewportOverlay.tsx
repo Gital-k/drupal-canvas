@@ -21,8 +21,8 @@ import type React from 'react';
 import styles from './PreviewOverlay.module.css';
 
 interface ViewportOverlayProps {
-  iframeRef: React.RefObject<HTMLIFrameElement>;
-  previewContainerRef: React.RefObject<HTMLDivElement>;
+  iframeRef: React.RefObject<HTMLIFrameElement | null>;
+  previewContainerRef: React.RefObject<HTMLDivElement | null>;
 }
 interface Rect {
   left: Number;

@@ -28,7 +28,7 @@ import styles from './PreviewOverlay.module.css';
 
 export interface SlotOverlayProps {
   slot: SlotNode;
-  iframeRef: React.RefObject<HTMLIFrameElement>;
+  iframeRef: React.RefObject<HTMLIFrameElement | null>;
   parentComponent: ComponentNode;
   disableDrop: boolean;
   forceRecalculate?: number; // Increment this prop to trigger a re-calculation of the slot overlay's border rect

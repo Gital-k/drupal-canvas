@@ -28,7 +28,7 @@ import type { RegionNode } from '@/features/layout/layoutModelSlice';
 import styles from './PreviewOverlay.module.css';
 
 interface RegionOverlayProps {
-  iframeRef: React.RefObject<HTMLIFrameElement>;
+  iframeRef: React.RefObject<HTMLIFrameElement | null>;
   regionId: string;
   regionName: string;
   region: RegionNode;

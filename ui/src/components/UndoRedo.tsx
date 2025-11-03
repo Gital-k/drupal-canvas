@@ -65,7 +65,7 @@ const UndoRedo = () => {
         disabled={!isUndoable}
         aria-label="Undo"
       >
-        <ResetIcon height="16" width="auto" />
+        <ResetIcon height="16" width="16" />
       </Button>
       <Button
         variant="ghost"
@@ -76,11 +76,7 @@ const UndoRedo = () => {
         disabled={!isRedoable}
         aria-label="Redo"
       >
-        <ResetIcon
-          height="16"
-          width="auto"
-          style={{ transform: 'scaleX(-1)' }}
-        />
+        <ResetIcon height="16" width="16" style={{ transform: 'scaleX(-1)' }} />
       </Button>
     </>
   );

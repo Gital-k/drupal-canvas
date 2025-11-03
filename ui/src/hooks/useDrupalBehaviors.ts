@@ -7,7 +7,7 @@ import type { RefObject } from 'react';
 const Drupal = getDrupal();
 
 export function useDrupalBehaviors(
-  ref: RefObject<HTMLElement>,
+  ref: RefObject<HTMLElement | null>,
   dependency: React.ReactNode | null | HTMLDivElement,
 ) {
   useEffect(() => {
