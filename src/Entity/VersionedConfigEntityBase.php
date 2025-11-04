@@ -60,7 +60,9 @@ abstract class VersionedConfigEntityBase extends ConfigEntityBase implements Ver
           )),
         ));
       }
-      $this->loadedVersion = $version;
+      $versioned = clone $this;
+      $versioned->loadedVersion = $version;
+      return $versioned;
     }
     return $this;
   }

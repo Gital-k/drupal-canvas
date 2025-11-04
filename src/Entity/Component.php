@@ -521,11 +521,10 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
   }
 
   /**
-   * {@inheritdoc}
+   * Resets source plugin collection whenever cloned to load another version.
    */
-  public function loadVersion(string $version): static {
+  public function __clone(): void {
     $this->sourcePluginCollection = NULL;
-    return parent::loadVersion($version);
   }
 
   /**
