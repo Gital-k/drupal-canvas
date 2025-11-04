@@ -15,6 +15,7 @@ import AiWelcome from '@assets/icons/ai-welcome.svg?react';
 import { Box, Flex, Text } from '@radix-ui/themes';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
+import { AI_PANEL_STATE_KEY } from '@/components/aiExtension/AiPanelState';
 import {
   selectCodeComponentProperty,
   setCodeComponentProperty,
@@ -901,16 +902,14 @@ const AiWizard = () => {
             if (!isComponentRendered) {
               // Chat history should be cleared only when panel is explicitly closed.
               try {
-                const aiPanelState = localStorage.getItem(
-                  'canvas_ai_panel_state',
-                );
+                const aiPanelState = localStorage.getItem(AI_PANEL_STATE_KEY);
                 if (aiPanelState) {
                   const state = JSON.parse(aiPanelState);
                   if (state.shouldClearHistory) {
                     chatElementRef.current.clearMessages();
                     historyStore.clearHistory();
                     localStorage.setItem(
-                      'canvas_ai_panel_state',
+                      AI_PANEL_STATE_KEY,
                       JSON.stringify({
                         isOpen: true,
                         shouldClearHistory: false,
