@@ -1,10 +1,4 @@
-import {
-  forwardRef,
-  useEffect,
-  useImperativeHandle,
-  useRef,
-  useState,
-} from 'react';
+import { useRef } from 'react';
 import clsx from 'clsx';
 
 import useMutationObserver from '@/hooks/useMutationObserver';
@@ -16,75 +10,27 @@ import styles from './TextField.module.css';
 
 const { jQuery } = window;
 
-export interface TextFieldAutocompleteHandle {
-  setValue: (newValue: string | number | readonly string[] | undefined) => void;
-}
-
-const TextFieldAutocomplete = forwardRef<
-  TextFieldAutocompleteHandle,
-  {
-    className?: string;
-    attributes?: Attributes;
-  }
->(({ className = '', attributes = {} }, ref) => {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [value, setValue] = useState<
-    string | number | readonly string[] | undefined
-  >(
-    typeof attributes.value === 'string' ||
-      typeof attributes.value === 'number' ||
-      Array.isArray(attributes.value)
-      ? attributes.value
-      : '',
-  );
-
-  // Keep local state in sync with external value prop
-  useEffect(() => {
-    if (
-      (typeof attributes.value === 'string' ||
-        typeof attributes.value === 'number' ||
-        Array.isArray(attributes.value)) &&
-      attributes.value !== value
-    ) {
-      setValue(attributes.value);
-    }
-  }, [attributes.value, value]);
-
-  // Expose imperative setValue for programmatic updates
-  useImperativeHandle(
-    ref,
-    () => ({
-      setValue: (newValue: string | number | readonly string[] | undefined) => {
-        if (
-          typeof newValue === 'string' ||
-          typeof newValue === 'number' ||
-          Array.isArray(newValue) ||
-          typeof newValue === 'undefined'
-        ) {
-          setValue(newValue);
-          if (inputRef.current && window.jQuery) {
-            const $input = window.jQuery(inputRef.current);
-            $input.val(newValue);
-            $input.trigger('change');
-          }
-          if (inputRef.current && typeof attributes.onChange === 'function') {
-            const event = new Event('change', { bubbles: true });
-            Object.defineProperty(event, 'target', {
-              writable: false,
-              value: inputRef.current,
-            });
-            attributes.onChange(event as any);
-          }
-        }
-      },
-    }),
-    [attributes],
-  );
-
+const TextFieldAutocomplete = ({
+  className = '',
+  attributes = {},
+}: {
+  className?: string;
+  attributes?: Attributes;
+}) => {
   // This attribute prevents the input from updating the store on change.
+  // Without this, autocomplete search results will disappear moments after
+  // they appear due to the component rerendering on value change.
+  // The attribute is removed when a suggestion is picked, or the input is
+  // blurred.
+  // @see InputBehaviorsCommon in inputBehaviors.tsx where attributes.onChange
+  // is defined.
   attributes['data-canvas-no-update'] = '';
 
-  // Mutation observer for autocomplete selection
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // This mutation observer responds to the addition of a
+  // 'data-canvas-autocomplete-selected' attribute, which will have the value of the
+  // chosen autocomplete suggestion.
   useMutationObserver(
     inputRef,
     (mutations) => {
@@ -98,19 +44,18 @@ const TextFieldAutocomplete = forwardRef<
               'data-canvas-autocomplete-selected',
             );
             if (selection) {
-              setValue(selection);
-              if (inputRef.current && window.jQuery) {
-                const $input = window.jQuery(inputRef.current);
-                $input.val(selection);
-                $input.trigger('change');
-              }
+              record.target.value = selection;
             }
+
+            // Remove the attribute to prevent multiple attempts to update the
+            // store with the same value.
             record.target.removeAttribute('data-canvas-autocomplete-selected');
             const changeEvent = new Event('change');
             Object.defineProperty(changeEvent, 'target', {
               writable: false,
               value: record.target,
             });
+
             if (typeof attributes.onChange === 'function') {
               attributes.onChange(changeEvent);
             }
@@ -127,16 +72,24 @@ const TextFieldAutocomplete = forwardRef<
         autoComplete="off"
         {...a2p(attributes, {}, { skipAttributes: ['onBlur', 'onChange'] })}
         className={clsx(styles.root, styles.autocomplete, className)}
-        ref={inputRef}
-        value={value}
+        ref={(node) => {
+          if (node) {
+            // @ts-ignore
+            inputRef.current = node;
+          }
+        }}
         onChange={(e) => {
-          setValue(e.target.value);
+          // Default to setting the attribute that prevents preview and store
+          // updates.
           if (inputRef.current) {
             inputRef.current.setAttribute('data-canvas-no-update', 'true');
           }
+          // Call the onChange listener, which will update the UI but not the
+          // store or preview, due to the attribute set above.
           if (typeof attributes.onChange === 'function') {
             attributes.onChange(e);
           }
+
           const autocompleteDelay =
             inputRef.current &&
             !!jQuery.data(inputRef.current, 'ui-autocomplete')
@@ -145,6 +98,11 @@ const TextFieldAutocomplete = forwardRef<
                   'autocompleteDelay',
                 )
               : 400;
+          // Include a delayed change event that will fire after the event
+          // listeners in autocomplete.extend.js have had a chance to
+          // determine if suggestions are available and prevent store/preview
+          // updates or if they aren't it updates the store/preview with what
+          // has been typed.
           setTimeout(() => {
             if (
               inputRef.current &&
@@ -159,6 +117,9 @@ const TextFieldAutocomplete = forwardRef<
           if (inputRef.current) {
             inputRef.current.removeAttribute('data-canvas-no-update');
           }
+          // As an additional assurance the value is sent to the store, an
+          // additional onChange is triggered immediately after the store
+          // preventing attribute is removed.
           if (typeof attributes.onChange === 'function') {
             attributes.onChange(e);
           }
@@ -169,6 +130,6 @@ const TextFieldAutocomplete = forwardRef<
       />
     </div>
   );
-});
+};
 
 export default TextFieldAutocomplete;
