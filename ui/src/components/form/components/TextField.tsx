@@ -1,4 +1,4 @@
-import React, {
+import {
   forwardRef,
   useEffect,
   useImperativeHandle,
@@ -43,7 +43,7 @@ const TextField = forwardRef<
     ) {
       setValue(attributes.value);
     }
-  }, [attributes.value]);
+  }, [attributes.value, value]);
 
   useImperativeHandle(
     ref,

@@ -32,7 +32,6 @@ export default [
     'plugin:react/jsx-runtime',
     'plugin:prettier/recommended',
   ),
-  reactHooks.configs['recommended-latest'],
   {
     plugins: {
       '@typescript-eslint': typescriptEslint,
@@ -101,6 +100,9 @@ export default [
         { args: 'none', caughtErrors: 'none' },
       ],
       'no-redeclare': ['error', { builtinGlobals: false }],
+      // Added react-hooks recommended rules manually
+      'react-hooks/rules-of-hooks': 'error',
+      'react-hooks/exhaustive-deps': 'warn',
     },
   },
   {

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import clsx from 'clsx';
 import { useDroppable } from '@dnd-kit/core';
 
@@ -6,6 +6,7 @@ import { useAppSelector } from '@/app/hooks';
 import { selectLayout } from '@/features/layout/layoutModelSlice';
 import { findNodePathByUuid } from '@/features/layout/layoutUtils';
 
+import type React from 'react';
 import type {
   ComponentNode,
   RegionNode,

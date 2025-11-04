@@ -1,4 +1,4 @@
-import React, {
+import {
   forwardRef,
   useEffect,
   useImperativeHandle,
@@ -48,7 +48,7 @@ const TextFieldAutocomplete = forwardRef<
     ) {
       setValue(attributes.value);
     }
-  }, [attributes.value]);
+  }, [attributes.value, value]);
 
   // Expose imperative setValue for programmatic updates
   useImperativeHandle(
