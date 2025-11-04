@@ -363,6 +363,35 @@ enum JsonSchemaType: string {
             ]),
             fieldInstanceSettings: ['file_extensions' => 'mp4'],
           ),
+          // @see \Drupal\file\Plugin\Field\FieldType\FileItem
+          // @see \Drupal\canvas\Hook\ShapeMatchingHooks::mediaLibraryStoragePropShapeAlter()
+          'json-schema-definitions://canvas.module/document' => new StorablePropShape(
+            shape: $shape,
+            fieldTypeProp: new FieldTypeObjectPropsExpression('file', [
+              'src' => new ReferenceFieldTypePropExpression(
+                new FieldTypePropExpression('file', 'entity'),
+                new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'uri', NULL, 'url'),
+              ),
+              'title' => new ReferenceFieldTypePropExpression(
+                new FieldTypePropExpression('file', 'entity'),
+                new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'filename', NULL, 'value'),
+              ),
+              'filename' => new ReferenceFieldTypePropExpression(
+                new FieldTypePropExpression('file', 'entity'),
+                new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'filename', NULL, 'value'),
+              ),
+              'filesize' => new ReferenceFieldTypePropExpression(
+                new FieldTypePropExpression('file', 'entity'),
+                new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'filesize', NULL, 'value'),
+              ),
+              'mimetype' => new ReferenceFieldTypePropExpression(
+                new FieldTypePropExpression('file', 'entity'),
+                new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'filemime', NULL, 'value'),
+              ),
+            ]),
+            fieldWidget: 'file_generic',
+            fieldInstanceSettings: ['file_extensions' => 'txt doc docx pdf'],
+          ),
           default => NULL,
         },
         default => NULL,

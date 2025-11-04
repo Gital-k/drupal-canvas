@@ -299,6 +299,30 @@ class ShapeMatchingHooks {
       }
     }
 
+
+    // @see json-schema-definitions://canvas.module/document
+    if ($storable_prop_shape->shape->schema['type'] === 'object' &&
+      (
+        isset($storable_prop_shape->shape->schema['$ref']) &&
+        $storable_prop_shape->shape->schema['$ref'] === 'json-schema-definitions://canvas.module/document'
+      )
+    ) {
+      // @todo This method uses `is_a`, resulting in `Image` and `VideoFile`
+      // being matched for `document`, because both inherit from `File` class.
+      // This is incorrect for `document`.
+      $media_types = self::getMediaTypesForSource(File::class);
+      // @todo Come up with better way of filtering out Media Source Plugins so
+      // that Video and Image based Media types would not match, but also any
+      // subclass of `File` that used as `document` would.
+      $media_types = \array_filter($media_types, fn (MediaType $type): bool => $type->getSource()->getPluginId() === 'file');
+      if (!empty($media_types)) {
+          $media_type_ids = array_keys($media_types);
+          $storable_prop_shape->fieldTypeProp = new FieldTypeObjectPropsExpression('entity_reference',
+          $this->getFieldTypeProps($media_types, $media_type_ids, $media_source_class)
+        );
+      }
+    }
+
     if (!empty($media_type_ids)) {
       $storable_prop_shape->fieldStorageSettings = ['target_type' => 'media'];
       $storable_prop_shape->fieldInstanceSettings = [

@@ -477,7 +477,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           'SDC props' => [
             '⿲canvas:document␟document',
           ],
-          'static prop source' => NULL,
+          'static prop source' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:press_releases␝field_media_file␞␟entity␜␜entity:file␝uri␞␟url,title↝entity␜␜entity:media:press_releases␝name␞␟value,filename↝entity␜␜entity:media:press_releases␝field_media_file␞␟entity␜␜entity:file␝filename␞␟value,filesize↝entity␜␜entity:media:press_releases␝field_media_file␞␟entity␜␜entity:file␝filesize␞␟value,mimetype↝entity␜␜entity:media:press_releases␝field_media_file␞␟entity␜␜entity:file␝filemime␞␟value}',
           'instances' => [],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
@@ -1222,7 +1222,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           'SDC props' => [
             '⿲sdc_test_all_props:all-props␟test_object_drupal_document',
           ],
-          'static prop source' => NULL,
+          'static prop source' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:press_releases␝field_media_file␞␟entity␜␜entity:file␝uri␞␟url,title↝entity␜␜entity:media:press_releases␝name␞␟value,filename↝entity␜␜entity:media:press_releases␝field_media_file␞␟entity␜␜entity:file␝filename␞␟value,filesize↝entity␜␜entity:media:press_releases␝field_media_file␞␟entity␜␜entity:file␝filesize␞␟value,mimetype↝entity␜␜entity:media:press_releases␝field_media_file␞␟entity␜␜entity:file␝filemime␞␟value}',
           'instances' => [],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],

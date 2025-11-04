@@ -328,7 +328,9 @@
       "title": "Document URL",
       "type": "string",
       "format": "uri-reference",
-      "pattern": "^(/|https?://).*\\.(txt|rtf|doc|docx|ppt|pptx|xls|xlsx|pdf|odf|odg|odp|ods|odt|fodt|fods|fodp|fodg|key|numbers|pages)(\\?.*)?(#.*)?$"
+      "contentMediaType": "application/*",
+      "pattern": ".*\\.(txt|rtf|doc|docx|ppt|pptx|xls|xlsx|pdf|odf|odg|odp|ods|odt|fodt|fods|fodp|fodg|key|numbers|pages)(\\?.*)?(#.*)?$",
+      "x-allowed-schemes": ["public"]
     },
     "config-entity-id": {
       "title": "config entity id",

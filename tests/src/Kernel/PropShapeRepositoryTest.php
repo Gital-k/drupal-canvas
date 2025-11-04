@@ -685,6 +685,33 @@ class PropShapeRepositoryTest extends KernelTestBase {
         fieldTypeProp: new FieldTypePropExpression('string_long', 'value'),
         fieldWidget: 'string_textarea',
       ),
+      'type=object&$ref=json-schema-definitions://canvas.module/document' => new StorablePropShape(
+            shape: new PropShape(['type' => 'object', '$ref' => 'json-schema-definitions://canvas.module/document']),
+            fieldTypeProp: new FieldTypeObjectPropsExpression('file', [
+              'src' => new ReferenceFieldTypePropExpression(
+                new FieldTypePropExpression('file', 'entity'),
+                new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'uri', NULL, 'url'),
+              ),
+              'title' => new ReferenceFieldTypePropExpression(
+                new FieldTypePropExpression('file', 'entity'),
+                new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'filename', NULL, 'value'),
+              ),
+              'filename' => new ReferenceFieldTypePropExpression(
+                new FieldTypePropExpression('file', 'entity'),
+                new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'filename', NULL, 'value'),
+              ),
+              'filesize' => new ReferenceFieldTypePropExpression(
+                new FieldTypePropExpression('file', 'entity'),
+                new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'filesize', NULL, 'value'),
+              ),
+              'mimetype' => new ReferenceFieldTypePropExpression(
+                new FieldTypePropExpression('file', 'entity'),
+                new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'filemime', NULL, 'value'),
+              ),
+            ]),
+            fieldWidget: 'file_generic',
+            fieldInstanceSettings: ['file_extensions' => 'txt doc docx pdf'],
+          ),
     ];
   }
 
@@ -697,10 +724,10 @@ class PropShapeRepositoryTest extends KernelTestBase {
       'type=array&items[type]=integer&minItems=1' => new PropShape(['type' => 'array', 'items' => ['type' => 'integer'], 'minItems' => 1]),
       'type=array&items[type]=integer&minItems=2' => new PropShape(['type' => 'array', 'items' => ['type' => 'integer'], 'minItems' => 2]),
       'type=object&$ref=json-schema-definitions://sdc_test_all_props.module/date-range' => new PropShape(['type' => 'object', '$ref' => 'json-schema-definitions://sdc_test_all_props.module/date-range']),
-      'type=string&$ref=json-schema-definitions://canvas.module/image-uri' => new PropShape(['type' => 'string', '$ref' => 'json-schema-definitions://canvas.module/image-uri']),
+      // @todo Why was image-uri and video unstorable in the first place?
+      //'type=string&$ref=json-schema-definitions://canvas.module/image-uri' => new PropShape(['type' => 'string', '$ref' => 'json-schema-definitions://canvas.module/image-uri']),
       'type=object&$ref=json-schema-definitions://canvas.module/shoe-icon' => new PropShape(['type' => 'object', '$ref' => 'json-schema-definitions://canvas.module/shoe-icon']),
-      'type=object&$ref=json-schema-definitions://canvas.module/document' => new PropShape(['type' => 'object', '$ref' => 'json-schema-definitions://canvas.module/document']),
-      'type=object&$ref=json-schema-definitions://canvas.module/video' => new PropShape(['type' => 'object', '$ref' => 'json-schema-definitions://canvas.module/video']),
+      //'type=object&$ref=json-schema-definitions://canvas.module/video' => new PropShape(['type' => 'object', '$ref' => 'json-schema-definitions://canvas.module/video']),
       'type=string&format=duration' => new PropShape(['type' => 'string', 'format' => JsonSchemaStringFormat::Duration->value]),
       'type=string&format=hostname' => new PropShape(['type' => 'string', 'format' => JsonSchemaStringFormat::Hostname->value]),
       'type=string&format=idn-hostname' => new PropShape(['type' => 'string', 'format' => JsonSchemaStringFormat::IdnHostname->value]),
