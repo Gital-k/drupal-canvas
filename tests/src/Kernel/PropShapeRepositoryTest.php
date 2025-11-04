@@ -296,8 +296,8 @@ class PropShapeRepositoryTest extends KernelTestBase {
             new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'uri', NULL, 'url'),
           ),
         ]),
-        fieldInstanceSettings: ['file_extensions' => 'mp4'],
         fieldWidget: 'file_generic',
+        fieldInstanceSettings: ['file_extensions' => 'mp4'],
       ),
       'type=string&$ref=json-schema-definitions://canvas.module/heading-element' => new StorablePropShape(
         shape: new PropShape(['type' => 'string', 'enum' => ['div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']]),
@@ -464,11 +464,11 @@ class PropShapeRepositoryTest extends KernelTestBase {
       'type=string&format=uri' => new StorablePropShape(
         shape: new PropShape(['type' => 'string', 'format' => 'uri']),
         fieldTypeProp: new FieldTypePropExpression('link', 'url'),
+        fieldWidget: 'link_default',
         fieldInstanceSettings: [
           'title' => DRUPAL_DISABLED,
           'link_type' => LinkItemInterface::LINK_EXTERNAL,
         ],
-        fieldWidget: 'link_default',
       ),
       'type=string&minLength=2' => new StorablePropShape(
         shape: new PropShape(['type' => 'string', 'minLength' => 2]),
@@ -504,38 +504,38 @@ class PropShapeRepositoryTest extends KernelTestBase {
       'type=string&format=iri' => new StorablePropShape(
         shape: new PropShape(['type' => 'string', 'format' => JsonSchemaStringFormat::Iri->value]),
         fieldTypeProp: new FieldTypePropExpression('link', 'url'),
+        fieldWidget: 'link_default',
         fieldInstanceSettings: [
           'title' => DRUPAL_DISABLED,
           'link_type' => LinkItemInterface::LINK_EXTERNAL,
         ],
-        fieldWidget: 'link_default',
       ),
       'type=string&format=iri-reference' => new StorablePropShape(
         shape: new PropShape(['type' => 'string', 'format' => JsonSchemaStringFormat::IriReference->value]),
         fieldTypeProp: new FieldTypePropExpression('link', 'url'),
+        fieldWidget: 'link_default',
         fieldInstanceSettings: [
           'title' => DRUPAL_DISABLED,
           'link_type' => LinkItemInterface::LINK_GENERIC,
         ],
-        fieldWidget: 'link_default',
       ),
       'type=string&format=uri-reference' => new StorablePropShape(
         shape: new PropShape(['type' => 'string', 'format' => JsonSchemaStringFormat::UriReference->value]),
         fieldTypeProp: new FieldTypePropExpression('link', 'url'),
+        fieldWidget: 'link_default',
         fieldInstanceSettings: [
           'title' => DRUPAL_DISABLED,
           'link_type' => LinkItemInterface::LINK_GENERIC,
         ],
-        fieldWidget: 'link_default',
       ),
       'type=string&format=uri-reference&x-allowed-schemes[0]=http&x-allowed-schemes[1]=https' => new StorablePropShape(
         shape: new PropShape(['type' => 'string', 'format' => JsonSchemaStringFormat::UriReference->value, CustomConstraintError::X_ALLOWED_SCHEMES => ['http', 'https']]),
         fieldTypeProp: new FieldTypePropExpression('link', 'url'),
+        fieldWidget: 'link_default',
         fieldInstanceSettings: [
           'title' => DRUPAL_DISABLED,
           'link_type' => LinkItemInterface::LINK_GENERIC,
         ],
-        fieldWidget: 'link_default',
       ),
       'type=string&contentMediaType=text/html' => new StorablePropShape(
         shape: new PropShape(['type' => 'string', 'contentMediaType' => 'text/html']),
@@ -592,14 +592,14 @@ class PropShapeRepositoryTest extends KernelTestBase {
       'type=array&items[type]=integer' => new StorablePropShape(
         shape: new PropShape(['type' => 'array', 'items' => ['type' => 'integer']]),
         fieldTypeProp: new FieldTypePropExpression('integer', 'value'),
-        cardinality: FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
         fieldWidget: 'number',
+        cardinality: FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
       ),
       'type=array&items[type]=integer&maxItems=2' => new StorablePropShape(
         shape: new PropShape(['type' => 'array', 'items' => ['type' => 'integer'], 'maxItems' => 2]),
         fieldTypeProp: new FieldTypePropExpression('integer', 'value'),
-        cardinality: 2,
         fieldWidget: 'number',
+        cardinality: 2,
       ),
       'type=array&items[$ref]=json-schema-definitions://canvas.module/image&items[type]=object&maxItems=2' => new StorablePropShape(
         shape: new PropShape(['type' => 'array', 'items' => ['type' => 'object', '$ref' => 'json-schema-definitions://canvas.module/image'], 'maxItems' => 2]),
@@ -609,8 +609,8 @@ class PropShapeRepositoryTest extends KernelTestBase {
           'width' => new FieldTypePropExpression('image', 'width'),
           'height' => new FieldTypePropExpression('image', 'height'),
         ]),
-        cardinality: 2,
         fieldWidget: 'image_image',
+        cardinality: 2,
       ),
       'type=array&items[$ref]=json-schema-definitions://canvas.module/image&items[type]=object' => new StorablePropShape(
         shape: new PropShape(['type' => 'array', 'items' => ['type' => 'object', '$ref' => 'json-schema-definitions://canvas.module/image']]),
@@ -620,14 +620,14 @@ class PropShapeRepositoryTest extends KernelTestBase {
           'width' => new FieldTypePropExpression('image', 'width'),
           'height' => new FieldTypePropExpression('image', 'height'),
         ]),
-        cardinality: FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
         fieldWidget: 'image_image',
+        cardinality: FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
       ),
       'type=array&items[type]=integer&items[minimum]=-100&items[maximum]=100&maxItems=100' => new StorablePropShape(
         shape: new PropShape(['type' => 'array', 'items' => ['type' => 'integer', 'maximum' => 100, 'minimum' => -100], 'maxItems' => 100]),
         fieldTypeProp: new FieldTypePropExpression('integer', 'value'),
-        cardinality: 100,
         fieldWidget: 'number',
+        cardinality: 100,
         fieldStorageSettings: NULL,
         fieldInstanceSettings: [
           'min' => -100,
@@ -637,8 +637,8 @@ class PropShapeRepositoryTest extends KernelTestBase {
       'type=array&items[type]=string' => new StorablePropShape(
         shape: new PropShape(['type' => 'array', 'items' => ['type' => 'string']]),
         fieldTypeProp: new FieldTypePropExpression('string', 'value'),
-        cardinality: FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
         fieldWidget: 'string_textfield',
+        cardinality: FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
       ),
       'type=string&enum[0]=7&enum[1]=3.14' => new StorablePropShape(
         shape: new PropShape(['type' => 'string', 'enum' => ['7', '3.14']]),
