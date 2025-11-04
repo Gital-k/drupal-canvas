@@ -57,6 +57,9 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
     // @see \Drupal\media\Plugin\media\Source\VideoFile
     $this->createMediaType('video_file', ['id' => 'baby_videos']);
     $this->createMediaType('video_file', ['id' => 'vacation_videos']);
+    // @see \Drupal\media\Plugin\media\Source\File
+    $this->createMediaType('file', ['id' => 'important_documents']);
+    $this->createMediaType('file', ['id' => 'vacation_documents']);
 
     // A sample value is generated during the test, which needs this table.
     $this->installSchema('file', ['file_usage']);
@@ -69,6 +72,7 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
     $unstorable_prop_shapes = parent::getExpectedUnstorablePropShapes();
     unset(
       $unstorable_prop_shapes['type=object&$ref=json-schema-definitions://canvas.module/video'],
+      $unstorable_prop_shapes['type=object&$ref=json-schema-definitions://canvas.module/document'],
     );
     return $unstorable_prop_shapes;
   }
@@ -89,10 +93,10 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
     foreach ($image_shapes as $k => $image_shape) {
       $storable_prop_shapes[$k] = new StorablePropShape(
         shape: $image_shape->shape,
-        cardinality: $image_shape->cardinality,
-        fieldWidget: 'media_library_widget',
         // @phpstan-ignore-next-line
         fieldTypeProp: StructuredDataPropExpression::fromString("ℹ︎entity_reference␟{src↝entity␜␜entity:media:baby_photos|vacation_photos␝field_media_image|field_media_image_1␞␟src_with_alternate_widths,alt↝entity␜␜entity:media:baby_photos|vacation_photos␝field_media_image|field_media_image_1␞␟alt,width↝entity␜␜entity:media:baby_photos|vacation_photos␝field_media_image|field_media_image_1␞␟width,height↝entity␜␜entity:media:baby_photos|vacation_photos␝field_media_image|field_media_image_1␞␟height}"),
+        fieldWidget: 'media_library_widget',
+        cardinality: $image_shape->cardinality,
         fieldStorageSettings: [
           'target_type' => 'media',
         ],
@@ -141,6 +145,25 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
           'target_bundles' => [
             'baby_photos' => 'baby_photos',
             'vacation_photos' => 'vacation_photos',
+          ],
+        ],
+      ],
+    );
+
+    $storable_prop_shapes['type=object&$ref=json-schema-definitions://canvas.module/document'] = new StorablePropShape(
+      shape: new PropShape(['type' => 'object', '$ref' => 'json-schema-definitions://canvas.module/document']),
+      // @phpstan-ignore-next-line
+      fieldTypeProp: StructuredDataPropExpression::fromString('ℹ︎entity_reference␟{src↝entity␜␜entity:media:important_documents|vacation_documents␝field_media_file|field_media_file_1␞␟entity␜␜entity:file␝uri␞␟url,title↝entity␜␜entity:media:important_documents|vacation_documents␝name␞␟value,filename↝entity␜␜entity:media:important_documents|vacation_documents␝field_media_file|field_media_file_1␞␟entity␜␜entity:file␝filename␞␟value,filesize↝entity␜␜entity:media:important_documents|vacation_documents␝field_media_file|field_media_file_1␞␟entity␜␜entity:file␝filesize␞␟value,mimetype↝entity␜␜entity:media:important_documents|vacation_documents␝field_media_file|field_media_file_1␞␟entity␜␜entity:file␝filemime␞␟value}'),
+      fieldWidget: 'media_library_widget',
+      fieldStorageSettings: [
+        'target_type' => 'media',
+      ],
+      fieldInstanceSettings: [
+        'handler' => 'default:media',
+        'handler_settings' => [
+          'target_bundles' => [
+            'important_documents' => 'important_documents',
+            'vacation_documents' => 'vacation_documents',
           ],
         ],
       ],

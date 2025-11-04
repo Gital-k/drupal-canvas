@@ -118,7 +118,7 @@ final class FieldInstanceSupportTest extends EcosystemSupportTestBase {
     ],
     'datetime' => [
       // 🐛 Core bug: this is the computed equivalent of `value`, should be marked internal.
-      // @see \Drupal\experience_builder\Plugin\Field\FieldTypeOverride\DateTimeItemOverride::propertyDefinitions()
+      // @see \Drupal\canvas\Plugin\Field\FieldTypeOverride\DateTimeItemOverride::propertyDefinitions()
       'date' => FALSE,
     ],
     'email' => [],
