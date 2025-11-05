@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from 'react';
-import _ from 'lodash';
 import { useErrorBoundary } from 'react-error-boundary';
 import { Spinner, Text } from '@radix-ui/themes';
 
@@ -38,9 +37,6 @@ import {
 import { AJAX_UPDATE_FORM_STATE_EVENT } from '@/types/Ajax';
 import { componentHasFieldData } from '@/types/Component';
 import parseHyperscriptifyTemplate from '@/utils/parse-hyperscriptify-template';
-import { TransformConfig } from '@/utils/transforms';
-
-import { classNameToList } from '../../../../ai/modules/ai_api_explorer/js/multiple-select/multiple-select';
 
 import type {
   ComponentModel,
