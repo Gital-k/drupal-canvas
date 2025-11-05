@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import _ from 'lodash';
 import { useErrorBoundary } from 'react-error-boundary';
 import { Spinner, Text } from '@radix-ui/themes';
 
@@ -37,6 +38,9 @@ import {
 import { AJAX_UPDATE_FORM_STATE_EVENT } from '@/types/Ajax';
 import { componentHasFieldData } from '@/types/Component';
 import parseHyperscriptifyTemplate from '@/utils/parse-hyperscriptify-template';
+import { TransformConfig } from '@/utils/transforms';
+
+import { classNameToList } from '../../../../ai/modules/ai_api_explorer/js/multiple-select/multiple-select';
 
 import type {
   ComponentModel,
@@ -71,6 +75,7 @@ const ComponentInstanceFormRenderer: React.FC<
     null,
   );
   const formRef = useRef(null);
+  const persistentTransforms = useRef<undefined | TransformConfig>(undefined);
   const selectedComponentId = selectedComponent || 'noop';
   const skip = useAppSelector((state) =>
     selectUpdateComponentLoadingState(state, selectedComponentId),
@@ -97,6 +102,14 @@ const ComponentInstanceFormRenderer: React.FC<
     html: false,
     transforms: false as const,
   };
+
+  // Keep transforms persistent even while new component data is being fetched to stop
+  // the form from disappearing while the user is editing it.
+  useEffect(() => {
+    if (transforms !== false && !isFetching) {
+      persistentTransforms.current = transforms;
+    }
+  }, [transforms, isFetching, selectedComponentType]);
 
   useEffect(() => {
     if (!html) {
@@ -248,7 +261,7 @@ const ComponentInstanceFormRenderer: React.FC<
         ref={formRef}
       >
         {/* Do not render the form until the transforms are available in Redux. */}
-        {!!transforms && jsxFormContent}
+        {!!persistentTransforms.current && jsxFormContent}
       </div>
     </Spinner>
   );
