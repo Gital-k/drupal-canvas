@@ -182,3 +182,9 @@ services:
     # We don't want any other module to display messages
     decoration_priority: -100
     arguments: ['@.inner']
+
+  # Theme engine.
+  Drupal\canvas\SemiCoupledEngine:
+    autowire: true
+    tags:
+      - { name: theme_engine, engine_name: semi_coupled }
