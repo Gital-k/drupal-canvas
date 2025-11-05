@@ -146,11 +146,6 @@ type SortNodePayload = {
   to: number | undefined;
 };
 
-type TransformsPayload = {
-  componentType: string;
-  transforms: TransformConfig;
-};
-
 type AnyValue = string | boolean | [] | number | {} | null;
 
 // @see \Drupal\canvas\PropSource\PropSource::parse()
@@ -472,12 +467,6 @@ export const layoutModelSlice = createSlice({
         state.model = model;
         state.updatePreview = updatePreview;
         state.isInitialized = isInitialized;
-      },
-    ),
-    setTransforms: create.reducer(
-      (state, action: PayloadAction<TransformsPayload>) => {
-        const { transforms, componentType } = action.payload;
-        state.transforms[componentType] = transforms;
       },
     ),
   }),
@@ -867,7 +856,6 @@ export const {
   sortNode,
   setUpdatePreview,
   insertNodes,
-  setTransforms,
 } = layoutModelSlice.actions;
 
 export const layoutModelReducer = layoutModelSlice.reducer;
@@ -885,10 +873,6 @@ export const selectUpdatePreview = (state: StateWithHistoryWrapper) =>
   state.layoutModel.present.updatePreview;
 export const selectIsInitialized = (state: StateWithHistoryWrapper) =>
   state.layoutModel.present.isInitialized;
-export const selectTransforms = (
-  state: StateWithHistoryWrapper,
-  selectedComponentType: string,
-) => state.layoutModel.present.transforms[selectedComponentType];
 
 const selectRegion = (state: RootState, regionName: string) => regionName;
 

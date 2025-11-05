@@ -18,6 +18,7 @@ export interface FormStateSliceFormsState {
 
 export interface FormStateSliceState extends FormStateSliceFormsState {
   currentComponent: string | undefined;
+  currentComponentQueryString: string;
 }
 
 const emptyFormState = {
@@ -27,6 +28,7 @@ const emptyFormState = {
 
 export const initialState: FormStateSliceState = {
   currentComponent: undefined,
+  currentComponentQueryString: '',
   [FORM_TYPES.COMPONENT_INSTANCE_FORM]: emptyFormState,
   [FORM_TYPES.ENTITY_FORM]: emptyFormState,
 };
@@ -64,6 +66,11 @@ export const formStateSlice = createSlice({
         currentComponent: action.payload,
         [FORM_TYPES.COMPONENT_INSTANCE_FORM]: { errors: {}, values: {} },
       }),
+    ),
+    setCurrentComponentQueryString: create.reducer(
+      (state, action: PayloadAction<string>) => {
+        state.currentComponentQueryString = action.payload;
+      },
     ),
     clearFieldValues: create.reducer(
       (state, action: PayloadAction<FormId>) => ({
@@ -131,6 +138,8 @@ export const formStateSlice = createSlice({
     ),
   }),
   selectors: {
+    selectCurrentComponentQueryString: (state) =>
+      state.currentComponentQueryString,
     selectCurrentComponent: (state) => state.currentComponent,
   },
 });
@@ -165,10 +174,12 @@ export const selectFieldError = createSelector(
     formState[identifiers.formId]?.errors[identifiers.fieldName] || null,
 );
 
-export const { selectCurrentComponent } = formStateSlice.selectors;
+export const { selectCurrentComponent, selectCurrentComponentQueryString } =
+  formStateSlice.selectors;
 
 export const {
   setCurrentComponent,
+  setCurrentComponentQueryString,
   setFieldError,
   setFieldValue,
   clearFieldError,

@@ -108,8 +108,7 @@ const rootReducer = combineSlices(
           return (
             Object.keys(present.model).length > 0 &&
             action.type !== setInitialLayoutModel.type &&
-            action.type !== setUpdatePreview.type &&
-            action.type !== 'layoutModel/setTransforms'
+            action.type !== setUpdatePreview.type
           );
         },
       }),

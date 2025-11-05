@@ -17,14 +17,15 @@ import {
   POLLED_BACKGROUND_TIMEOUT,
 } from '@/components/form/inputBehaviors';
 import { FORM_TYPES } from '@/features/form/constants';
-import { selectFormValues } from '@/features/form/formStateSlice';
 import {
-  isEvaluatedComponentModel,
-  selectTransforms,
-} from '@/features/layout/layoutModelSlice';
+  selectCurrentComponentQueryString,
+  selectFormValues,
+} from '@/features/form/formStateSlice';
+import { isEvaluatedComponentModel } from '@/features/layout/layoutModelSlice';
 import { setPreviewBackgroundUpdate } from '@/features/pagePreview/previewSlice';
 import { selectEditorFrameContext } from '@/features/ui/uiSlice';
 import useInputUIData from '@/hooks/useInputUIData';
+import { useGetComponentInstanceFormQuery } from '@/services/componentInstanceForm';
 import { useUpdateComponentMutation } from '@/services/preview';
 import { componentHasFieldData } from '@/types/Component';
 import { flaggedForRemoval, parseValue } from '@/utils/function-utils';
@@ -54,10 +55,18 @@ export const InputBehaviorsComponentPropsForm = (
   const inputAndUiData = useInputUIData();
   const { selectedComponentType, version, selectedComponent, components } =
     inputAndUiData;
-  const transforms = useAppSelector((state) =>
-    selectTransforms(state, selectedComponentType),
+
+  const currentComponentQueryString = useAppSelector(
+    selectCurrentComponentQueryString,
   );
 
+  // We can get transforms from RTK Query cache by making the same request again.
+  const { currentData: componentInstanceFormData } =
+    useGetComponentInstanceFormQuery(
+      { queryString: currentComponentQueryString, type: editorFrameContext },
+      { skip: !currentComponentQueryString },
+    );
+  const transforms = componentInstanceFormData?.transforms;
   const component = components?.[selectedComponentType];
 
   const [patchComponent] = useUpdateComponentMutation({

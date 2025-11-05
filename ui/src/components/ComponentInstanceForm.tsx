@@ -9,14 +9,14 @@ import twigToJSXComponentMap from '@/components/form/twig-to-jsx-component-map';
 import { FORM_TYPES } from '@/features/form/constants';
 import {
   clearFieldValues,
+  selectCurrentComponentQueryString,
   selectFormValues,
+  setCurrentComponentQueryString,
 } from '@/features/form/formStateSlice';
 import {
   isEvaluatedComponentModel,
   selectLayout,
   selectModel,
-  selectTransforms,
-  setTransforms,
 } from '@/features/layout/layoutModelSlice';
 import { findComponentByUuid } from '@/features/layout/layoutUtils';
 import {
@@ -48,18 +48,17 @@ import type { CanvasComponent, FieldData } from '@/types/Component';
 import type { InputUIData } from '@/types/Form';
 
 interface ComponentInstanceFormRendererProps {
-  dynamicStaticCardQueryString: string;
+  currentComponentQueryString: string;
 }
 interface ComponentInstanceFormProps {}
 
 const ComponentInstanceFormRenderer: React.FC<
   ComponentInstanceFormRendererProps
 > = (props) => {
-  const dispatch = useAppDispatch();
   const formState = useAppSelector((state) =>
     selectFormValues(state, FORM_TYPES.COMPONENT_INSTANCE_FORM),
   );
-  const { dynamicStaticCardQueryString } = props;
+  const { currentComponentQueryString } = props;
   const { showBoundary } = useErrorBoundary();
   const inputAndUiData: InputUIData = useInputUIData();
   const { selectedComponentType, version, selectedComponent, components } =
@@ -78,7 +77,7 @@ const ComponentInstanceFormRenderer: React.FC<
   );
   const { currentData, error, originalArgs, isFetching } =
     useGetComponentInstanceFormQuery(
-      { queryString: dynamicStaticCardQueryString, type: editorFrameContext },
+      { queryString: currentComponentQueryString, type: editorFrameContext },
       {
         skip,
       },
@@ -98,24 +97,6 @@ const ComponentInstanceFormRenderer: React.FC<
     html: false,
     transforms: false as const,
   };
-
-  const persistentTransforms = useAppSelector((state) =>
-    selectTransforms(state, selectedComponentType),
-  );
-
-  useEffect(() => {
-    if (!persistentTransforms && transforms !== false && !isFetching) {
-      dispatch(
-        setTransforms({ componentType: selectedComponentType, transforms }),
-      );
-    }
-  }, [
-    transforms,
-    isFetching,
-    selectedComponentType,
-    dispatch,
-    persistentTransforms,
-  ]);
 
   useEffect(() => {
     if (!html) {
@@ -267,7 +248,7 @@ const ComponentInstanceFormRenderer: React.FC<
         ref={formRef}
       >
         {/* Do not render the form until the transforms are available in Redux. */}
-        {!!persistentTransforms && jsxFormContent}
+        {!!transforms && jsxFormContent}
       </div>
     </Spinner>
   );
@@ -282,8 +263,6 @@ const ComponentInstanceForm: React.FC<ComponentInstanceFormProps> = () => {
   const selectedComponent = useAppSelector(selectSelectedComponentUuid);
   const latestUndoRedoActionId = useAppSelector(selectLatestUndoRedoActionId);
 
-  const [dynamicStaticCardQueryString, setDynamicStaticCardQueryString] =
-    useState('');
   const [emptyProp, setEmptyProp] = useState(false);
   const [componentSource, setComponentSource] = useState('');
 
@@ -348,7 +327,7 @@ const ComponentInstanceForm: React.FC<ComponentInstanceFormProps> = () => {
 
     // Check if this component has any props or not.
     if (Object.keys(selectedComponentFieldData).length === 0) {
-      setDynamicStaticCardQueryString('');
+      dispatch(setCurrentComponentQueryString(''));
       setEmptyProp(true);
     } else {
       setEmptyProp(false);
@@ -363,7 +342,7 @@ const ComponentInstanceForm: React.FC<ComponentInstanceFormProps> = () => {
       form_canvas_selected: selectedComponent,
       latestUndoRedoActionId,
     });
-    setDynamicStaticCardQueryString(`?${query.toString()}`);
+    dispatch(setCurrentComponentQueryString(`?${query.toString()}`));
     setComponentSource(components?.[selectedComponentType]?.source || '');
   }, [
     components,
@@ -373,13 +352,18 @@ const ComponentInstanceForm: React.FC<ComponentInstanceFormProps> = () => {
     latestUndoRedoActionId,
     layout,
     model,
+    dispatch,
   ]);
 
+  const currentComponentQueryString = useAppSelector(
+    selectCurrentComponentQueryString,
+  );
+
   return (
-    dynamicStaticCardQueryString && (
+    currentComponentQueryString && (
       <>
         <ComponentInstanceFormRenderer
-          dynamicStaticCardQueryString={dynamicStaticCardQueryString}
+          currentComponentQueryString={currentComponentQueryString}
         />
         {componentSource === 'Module component' && emptyProp ? (
           <Text size="4">This component has no props.</Text>
