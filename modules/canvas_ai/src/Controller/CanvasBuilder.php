@@ -8,6 +8,7 @@ use Drupal\ai_agents\Plugin\AiFunctionCall\AiAgentWrapper;
 use Drupal\ai\OperationType\Chat\ChatInput;
 use Drupal\ai\OperationType\Chat\ChatMessage;
 use Drupal\ai\OperationType\GenericType\ImageFile;
+use Drupal\ai_agents\PluginBase\AiAgentEntityWrapper;
 use Drupal\ai_agents\Service\AgentStatus\Interfaces\AiAgentStatusPollerServiceInterface;
 use Drupal\ai_agents\Service\AgentStatus\UpdateItems\TextGenerated;
 use Drupal\Component\Plugin\PluginManagerInterface;
@@ -77,16 +78,14 @@ final class CanvasBuilder extends ControllerBase {
       throw new AccessDeniedHttpException('Invalid CSRF token');
     }
 
-    /** @var \Drupal\ai_agents\PluginBase\AiAgentEntityWrapper $agent */
-    $agent = $this->agentManager->createInstance('canvas_ai_orchestrator');
     $contentType = $request->getContentTypeFormat();
-    $files = [];
     if ($contentType === 'json') {
       $prompt = Json::decode($request->getContent());
+      $image_files = [];
     }
     else {
       $prompt = $request->request->all();
-      $files = $request->files->all();
+      $image_files = $this->createImageFilesFromRequests($request);
       $prompt['derived_proptypes'] = Json::decode($prompt['derived_proptypes']);
     }
     // If $prompt['messages'] is missing or invalid, this code reconstructs it
@@ -114,39 +113,6 @@ final class CanvasBuilder extends ControllerBase {
         }
       }
     }
-    $image_files = [];
-    foreach ($files as $file) {
-      $allowed_image_types = ['image/jpeg', 'image/png'];
-      $mime_type = $file->getClientMimeType();
-
-      if (!in_array($mime_type, $allowed_image_types, TRUE)) {
-        return new JsonResponse([
-          'status' => FALSE,
-          'message' => 'Only image files are allowed (jpeg, png, jpg).',
-        ]);
-      }
-      // Copy the file to the temp directory.
-      $filename = $file->getClientOriginalName();
-      $tmp_name = 'temporary://' . $filename;
-      $this->fileSystem->copy($file->getPathname(), $tmp_name, FileExists::Replace);
-      // Create actual file entities.
-      $file = $this->entityTypeManager()->getStorage('file')->create([
-        'uid' => $this->currentUser()->id(),
-        'filename' => $filename,
-        'uri' => $tmp_name,
-        'status' => 0,
-      ]);
-      $file->save();
-      $binary = file_get_contents($tmp_name);
-      if ($binary === FALSE) {
-        return new JsonResponse([
-          'status' => FALSE,
-          'message' => 'An error occurred reading the uploaded file.',
-        ]);
-      }
-
-      $image_files[] = new ImageFile($binary, $mime_type, $filename);
-    }
 
     if (empty($prompt['messages'])) {
       return new JsonResponse([
@@ -155,6 +121,8 @@ final class CanvasBuilder extends ControllerBase {
       ]);
     }
     $task_message = array_pop($prompt['messages']);
+    $agent = $this->agentManager->createInstance('canvas_ai_orchestrator');
+    \assert($agent instanceof AiAgentEntityWrapper);
     $agent->setChatInput(new ChatInput([
       new ChatMessage($task_message['role'], $task_message['text'], $image_files),
     ]));
@@ -451,6 +419,39 @@ final class CanvasBuilder extends ControllerBase {
       'canvas_page_builder_agent' => $this->t('Building the page'),
     ];
     return $descriptions[$agent_id] ?? $this->t('@agentName working', ['@agentName' => $agent_name]);
+  }
+
+  private function createImageFilesFromRequests(Request $request): array {
+    $files = $request->files->all();
+    $image_files = [];
+    foreach ($files as $file) {
+      $allowed_image_types = ['image/jpeg', 'image/png'];
+      $mime_type = $file->getClientMimeType();
+
+      if (!in_array($mime_type, $allowed_image_types, TRUE)) {
+        throw new \UnexpectedValueException(sprintf('Only image files are allowed (jpeg, png, jpg), `%s` given.', $mime_type));
+
+      }
+      // Copy the file to the temp directory.
+      $filename = $file->getClientOriginalName();
+      $tmp_name = 'temporary://' . $filename;
+      $this->fileSystem->copy($file->getPathname(), $tmp_name, FileExists::Replace);
+      // Create actual file entities.
+      $file = $this->entityTypeManager()->getStorage('file')->create([
+        'uid' => $this->currentUser()->id(),
+        'filename' => $filename,
+        'uri' => $tmp_name,
+        'status' => 0,
+      ]);
+      $file->save();
+      $binary = file_get_contents($tmp_name);
+      if ($binary === FALSE) {
+        throw new \RuntimeException('Unable to open temporary file.');
+      }
+
+      $image_files[] = new ImageFile($binary, $mime_type, $filename);
+    }
+    return $image_files;
   }
 
 }
