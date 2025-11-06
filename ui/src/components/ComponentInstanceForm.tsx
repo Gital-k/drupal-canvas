@@ -46,6 +46,7 @@ import type {
 import type { AjaxUpdateFormStateEvent } from '@/types/Ajax';
 import type { CanvasComponent, FieldData } from '@/types/Component';
 import type { InputUIData } from '@/types/Form';
+import type { TransformConfig } from '@/utils/transforms';
 
 interface ComponentInstanceFormRendererProps {
   currentComponentQueryString: string;
