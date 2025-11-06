@@ -1,7 +1,7 @@
 import { IconButton, Tooltip } from '@radix-ui/themes';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
-import { AI_PANEL_STATE_KEY } from '@/components/aiExtension/AiPanelSlice';
+import { AI_PANEL_STATE_KEY } from '@/components/aiExtension/AiPanelState';
 import {
   selectAiPanelOpen,
   setAiPanelClosed,

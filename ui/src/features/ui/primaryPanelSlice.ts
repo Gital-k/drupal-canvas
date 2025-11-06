@@ -1,5 +1,5 @@
 import { createAppSlice } from '@/app/createAppSlice';
-import { loadAiPanelOpenState } from '@/components/aiExtension/AiPanelSlice';
+import { loadAiPanelOpenState } from '@/components/aiExtension/AiPanelState';
 
 import type { PayloadAction } from '@reduxjs/toolkit';
 
