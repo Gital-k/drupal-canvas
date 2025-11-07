@@ -12,8 +12,6 @@ use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\Core\File\FileExists;
 use Drupal\Core\File\FileSystemInterface;
-use Drupal\Core\Site\Settings;
-use Drupal\Core\StreamWrapper\PublicStream;
 use Drupal\Core\Theme\ComponentPluginManager;
 use Drupal\canvas\Entity\Component;
 use Drupal\Core\Plugin\Component as SdcPlugin;
@@ -87,12 +85,7 @@ final class SingleDirectoryComponentTest extends ComponentSourceTestBase {
     parent::setUp();
     // Fixate the private key & hash salt to get predictable `itok`.
     $this->container->get('state')->set('system.private_key', 'dynamic_image_style_private_key');
-    $settings_class = new \ReflectionClass(Settings::class);
-    $instance_property = $settings_class->getProperty('instance');
-    $settings = new Settings([
-      'hash_salt' => 'dynamic_image_style_hash_salt',
-    ]);
-    $instance_property->setValue(NULL, $settings);
+    $this->setSetting('hash_salt', 'dynamic_image_style_hash_salt');
 
     // We need to ensure the public://balloons.png image exists in the test
     // environment for the "Card with stream wrapper image" tests.
@@ -3051,7 +3044,7 @@ final class SingleDirectoryComponentTest extends ComponentSourceTestBase {
     $file_system = \Drupal::service('file_system');
     $file_uri = 'public://image-2.jpg';
     if (!\file_exists($file_uri)) {
-      $file_system->copy(\Drupal::root() . '/core/tests/fixtures/files/image-2.jpg', PublicStream::basePath(), FileExists::Replace);
+      $file_system->copy(\Drupal::root() . '/core/tests/fixtures/files/image-2.jpg', $file_uri, FileExists::Replace);
     }
     $file = File::create([
       'uri' => $file_uri,
