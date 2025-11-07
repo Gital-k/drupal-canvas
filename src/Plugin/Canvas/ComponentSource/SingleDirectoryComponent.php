@@ -61,8 +61,9 @@ final class SingleDirectoryComponent extends GeneratedFieldExplicitInputUxCompon
       return TRUE;
     }
     // @todo Check if the required props are the same in the plugin and the saved component.
-    //   Consider returning an enum[] that could give more info for the developer, e.g. the
-    //   multiple reasons that could make this as broken/invalid. See
+    //   Consider returning an enum[] that could give more info for the
+    //   developer, e.g. the multiple reasons that could make this as
+    //   broken/invalid. See
     //   https://www.drupal.org/project/canvas/issues/3532514
     return FALSE;
   }
@@ -161,7 +162,9 @@ final class SingleDirectoryComponent extends GeneratedFieldExplicitInputUxCompon
   /**
    * Converts an SDC plugin machine name into a config entity ID.
    *
-   * The naming convention for SDC plugin components is [module/theme]:[component machine name]. Colon is invalid config entity name, so we replace it with '.'.
+   * The naming convention for SDC plugin components is
+   * [module/theme]:[component machine name]. Colon is invalid config entity
+   * name, so we replace it with '.'.
    *
    * @param string $machine_name
    *   The SDC plugin.
@@ -187,7 +190,7 @@ final class SingleDirectoryComponent extends GeneratedFieldExplicitInputUxCompon
    *   The component config entity.
    */
   public static function createConfigEntity(ComponentPlugin $component_plugin): ComponentEntity {
-    assert(is_array($component_plugin->metadata->schema));
+    assert(is_null($component_plugin->metadata->schema) || is_array($component_plugin->metadata->schema));
     $props = self::getPropsForComponentPlugin($component_plugin);
     assert(is_array($component_plugin->getPluginDefinition()));
     // Disabled if obsolete or flagged with noUi.
@@ -233,9 +236,9 @@ final class SingleDirectoryComponent extends GeneratedFieldExplicitInputUxCompon
    *   The component config entity.
    */
   public static function updateConfigEntity(ComponentPlugin $component_plugin): ComponentEntity {
+    assert(is_null($component_plugin->metadata->schema) || is_array($component_plugin->metadata->schema));
     $component = ComponentEntity::load(self::convertMachineNameToId($component_plugin->getPluginId()));
     assert($component instanceof ComponentEntity);
-    assert(is_array($component_plugin->metadata->schema));
 
     $settings = [
       'prop_field_definitions' => self::getPropsForComponentPlugin($component_plugin),

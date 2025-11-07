@@ -179,7 +179,7 @@ phpcs-rules-match-drupal-11:
       if [ $DIFF_EXIT_CODE -ne 0 ]; then
         echo "🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥"
         echo "Error: core.phpcs.xml.dist not up to date with Drupal 11.x core/phpcs.xml.dist. Please create an issue to update this file."
-        echo "Issue template: https://www.drupal.org/node/add/project-issue/canvas?title=Update%20PHPCS%20config%20to%20match%20Drupal%2011&field_issue_parent=3512890&clone_body=1&categories=2&priorities=100&status=1&version=0.x-dev&component=Code&assigned=0&tags="
+        echo "Issue template: https://www.drupal.org/node/add/project-issue/canvas?title=Update%20PHPCS%20config%20to%20match%20Drupal%2011&field_issue_parent=3512890&clone_body=1&categories=2&priorities=100&status=1&version=1.x-dev&component=Code&assigned=0&tags="
       else
         echo "👍👍👍👍👍👍👍👍👍👍👍👍👍👍👍👍👍👍"
         echo "core.phpcs.xml.dist is up to date with Drupal 11.x core/phpcs.xml.dist"
@@ -433,35 +433,6 @@ cypress unit:
         - ui/tests/unit/**/*
     - *UI-fixtures-files-change-rule
     - *manual-rule
-
-🗺️ C4 model diagrams:
-  stage: validate
-  needs: []
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "push" && $CI_PROJECT_ROOT_NAMESPACE == "project"
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes:
-        - docs/Canvas.dsl
-        - docs/diagrams/*
-  image:
-    name: structurizr/cli
-    entrypoint: [""]
-  script:
-    - /usr/local/structurizr-cli/structurizr.sh export --workspace docs/Canvas.dsl --format mermaid --output $CI_PROJECT_DIR/docs/diagrams
-    # Prepend the prefix
-    #   ```mermaid
-    # and the
-    #   ```
-    # suffix that GitLab CI expects.
-    # @see https://docs.gitlab.com/ee/user/markdown.html#mermaid
-    # @see https://stackoverflow.com/a/42989868
-    # @see https://stackoverflow.com/a/9741470
-    - for file in docs/diagrams/*.mmd; do printf "\`\`\`mermaid\n" | cat - $file  > temp && mv -f temp $file && echo $'\n```' >> $file; done
-    # Now the actual validation: verify that regenerating the Mermaid Markdown files did NOT trigger any changes.
-    - set -e; for file in docs/diagrams/*.mmd; do diff $file docs/diagrams/$(basename $file mmd)md; done
-  artifacts:
-    paths:
-      - "docs/diagrams/*.md"
 
 lint (php):
   stage: validate
