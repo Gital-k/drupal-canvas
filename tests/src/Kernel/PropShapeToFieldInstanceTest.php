@@ -336,7 +336,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
         $adapter_matches_instance = [];
         foreach ($adapter_output_matches as $match) {
           foreach ($match->getInputs() as $input_name => $input_schema_ref) {
-            $storable_prop_shape_for_adapter_input = PropShape::normalize($input_schema_ref)->getStorage();
+            $storable_prop_shape_for_adapter_input = (new PropShape($input_schema_ref))->getStorage();
 
             $input_schema = $match->getInputSchema($input_name);
             $input_primitive_type = JsonSchemaType::from(

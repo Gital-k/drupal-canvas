@@ -225,7 +225,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     // @phpstan-ignore-next-line offsetAccess.notFound
       value: $this->getMetadata()->schema['properties'][$prop_name]['examples'][0],
       // @phpstan-ignore-next-line offsetAccess.notFound
-      jsonSchema: PropShape::normalize($this->getMetadata()->schema['properties'][$prop_name])->resolvedSchema,
+      jsonSchema: (new PropShape($this->getMetadata()->schema['properties'][$prop_name]))->resolvedSchema,
       componentId: $component_id,
     );
     $this->defaultRelativeUrlPropSources[$prop_name] = $default_relative_url_prop_source;
@@ -278,7 +278,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       }
 
       $component_prop_expression = new ComponentPropExpression($plugin_id, $prop_name);
-      $prop_shapes[(string) $component_prop_expression] = PropShape::normalize($prop_schema);
+      $prop_shapes[(string) $component_prop_expression] = new PropShape($prop_schema);
     }
 
     return $prop_shapes;
