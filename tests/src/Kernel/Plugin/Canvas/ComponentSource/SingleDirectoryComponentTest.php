@@ -11,7 +11,6 @@ use Drupal\Core\Extension\ModuleExtensionList;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\Core\File\FileExists;
-use Drupal\Core\File\FileSystemInterface;
 use Drupal\Core\Theme\ComponentPluginManager;
 use Drupal\canvas\Entity\Component;
 use Drupal\Core\Plugin\Component as SdcPlugin;
@@ -28,7 +27,6 @@ use Drupal\link\LinkItemInterface;
 use Drupal\media\Entity\Media;
 use Drupal\media\Entity\MediaType;
 use Drupal\node\Entity\Node;
-use Drupal\node\Entity\NodeType;
 use Drupal\Tests\canvas\Kernel\BrokenComponentManager;
 use Drupal\Tests\canvas\Kernel\BrokenPluginManagerInterface;
 use Drupal\Tests\canvas\Kernel\Traits\CiModulePathTrait;
@@ -79,9 +77,9 @@ final class SingleDirectoryComponentTest extends ComponentSourceTestBase {
   ];
 
   /**
-   * Setup tests.
+   * {@inheritdoc}
    */
-  public function setUp(): void {
+  protected function setUp(): void {
     parent::setUp();
     // Fixate the private key & hash salt to get predictable `itok`.
     $this->container->get('state')->set('system.private_key', 'dynamic_image_style_private_key');
@@ -95,7 +93,7 @@ final class SingleDirectoryComponentTest extends ComponentSourceTestBase {
     $source = $module_path . '/components/card/balloons.png';
     $destination = 'public://balloons.png';
     $directory = 'public://';
-    $file_system->prepareDirectory($directory, FileSystemInterface::CREATE_DIRECTORY);
+    $file_system->prepareDirectory($directory, $file_system::CREATE_DIRECTORY);
     $file_system->copy($source, $destination, FileExists::Replace);
 
     $this->container->get('theme_installer')->install(['sdc_theme_test']);
@@ -2809,8 +2807,9 @@ final class SingleDirectoryComponentTest extends ComponentSourceTestBase {
     self::assertInstanceOf(Component::class, $component);
 
     $this->installEntitySchema('node');
+    $this->installConfig('node');
     $this->installSchema('node', 'node_access');
-    NodeType::create([
+    $this->createContentType([
       'type' => 'page',
       'name' => 'Page',
     ])->save();
@@ -3034,9 +3033,7 @@ final class SingleDirectoryComponentTest extends ComponentSourceTestBase {
   }
 
   protected function deleteConfigAndTriggerComponentFallback(ComponentInterface $used_component, ComponentInterface $unused_component): void {
-    $type = MediaType::load('image');
-    \assert($type instanceof MediaType);
-    $type->delete();
+    MediaType::load('image')?->delete();
   }
 
   protected static function getPropsForComponentFallbackTesting(): array {
