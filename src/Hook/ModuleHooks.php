@@ -38,13 +38,20 @@ class ModuleHooks {
    * Implements hook_theme().
    */
   #[Hook('theme')]
-  public function theme() : array {
+  public function theme(): array {
     return [
       // We override this template, as it makes Canvas' preview in the "editor
       // frame" and the live version of the field inconsistent if the
       // field.html.twig template is applied.
       'field__component_tree' => [
         'base hook' => 'field',
+      ],
+      'serp_preview' => [
+        'variables' => [
+          'meta_title' => '',
+          'page_url' => '',
+          'meta_description' => '',
+        ],
       ],
     ];
   }

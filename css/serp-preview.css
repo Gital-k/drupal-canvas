@@ -1,0 +1,30 @@
+.serp-preview {
+  background-color: white;
+  max-width: 592px;
+  border: 1px solid #e6e4df;
+  padding: 15px 15px;
+  font-family: Arial, sans-serif;
+}
+
+.serp-preview .serp-preview__title {
+  color: #1a0dab;
+  font-size: 18px;
+  line-height: 1.33;
+  padding: 0;
+  margin: 0;
+}
+
+.serp-preview .serp-preview__url {
+  color: #006621;
+  font-size: 14px;
+  padding-top: 1px;
+  line-height: 1.43;
+}
+
+.serp-preview .serp-preview__description {
+  color: #545454;
+  line-height: 1.54;
+  word-wrap: break-word;
+  font-family: arial, sans-serif;
+  font-size: small;
+}

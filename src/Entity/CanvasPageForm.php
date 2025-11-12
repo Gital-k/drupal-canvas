@@ -7,6 +7,7 @@ namespace Drupal\canvas\Entity;
 use Drupal\Core\Entity\ContentEntityForm;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
+use Drupal\Core\Url;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -27,6 +28,7 @@ final class CanvasPageForm extends ContentEntityForm {
   public static function create(ContainerInterface $container): self {
     $instance = parent::create($container);
     $instance->languageManager = $container->get('language_manager');
+    $instance->configFactory = $container->get('config.factory');
     return $instance;
   }
 
@@ -78,6 +80,22 @@ final class CanvasPageForm extends ContentEntityForm {
     if (isset($form['metatags']['widget'][0]['basic']['title'])) {
       $form['metatags']['widget'][0]['basic']['title']['#group'] = $group;
     }
+
+    // Add the search result preview.
+    /** @var \Drupal\canvas\Entity\Page $page */
+    $page = $this->getEntity();
+    $site_config = $this->configFactory->get('system.site');
+    $site_name = $site_config->get('name') ?? FALSE;
+    $meta_title = $site_name ? $page->label() . " | $site_name" : $page->label();
+
+    $form[$group]['serp_preview'] = [
+      '#theme' => 'serp_preview',
+      '#meta_title' => $meta_title,
+      '#page_url' => Url::fromRoute('entity.canvas_page.canonical', ['canvas_page' => $page->id()], ['absolute' => TRUE])->toString(),
+      '#meta_description' => $page->get('description')->value,
+      '#attached' => ['library' => ['canvas/serp-preview']],
+      '#weight' => 10,
+    ];
 
     $this->addTransliterationSettings($form);
     $this->customizePathField($form);
