@@ -1297,6 +1297,11 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     unset($expected_auto_save['css'], $expected_auto_save['default_markup'], $expected_auto_save['js_footer'], $expected_auto_save['js_header']);
     $this->performAutoSave($auto_save_data, $expected_auto_save, JavaScriptComponent::ENTITY_TYPE_ID, 'test');
 
+    // Ensure the component is enabled.
+    Component::load('js.test')
+      ->enable()
+      ->save();
+
     $page = Page::create([
       'title' => 'Test page',
       'components' => [
@@ -1324,6 +1329,23 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
         [
           "This code component is in use in a default revision and cannot be deleted.",
         ],
+    ], $body);
+
+    // We can NOT disable the 'test' Code Component via the Canvas HTTP API because it is in use.
+    $code_component_to_send['status'] = FALSE;
+    $expected_component['status'] = FALSE;
+    // Links will be empty as they cannot be deleted either.
+    $expected_component['links'] = [];
+
+    $request_options[RequestOptions::JSON] = $code_component_to_send;
+    $body = $this->assertExpectedResponse('PATCH', Url::fromUri('base:/canvas/api/v0/config/js_component/test'), $request_options, 403, NULL, NULL, NULL, NULL);
+    $this->assertSame([
+      'errors' => [
+        [
+          'detail' => 'This code component is in use in a default revision and cannot be disabled.',
+          'source' => ['pointer' => 'status'],
+        ],
+      ],
     ], $body);
 
     $page->delete();
