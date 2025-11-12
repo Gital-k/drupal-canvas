@@ -20,6 +20,7 @@ import {
   setFieldValue,
 } from '@/features/form/formStateSlice';
 import { AJAX_UPDATE_FORM_BUILD_ID_EVENT } from '@/types/Ajax';
+import { getDrupal } from '@/utils/drupal-globals';
 
 import type { ErrorObject } from 'ajv/dist/types';
 import type { FormId } from '@/features/form/formStateSlice';
@@ -27,6 +28,7 @@ import type { AjaxUpdateFormBuildIdEvent } from '@/types/Ajax';
 import type { Attributes } from '@/types/DrupalAttribute';
 import type { PropsValues } from '@/types/Form';
 
+const Drupal = getDrupal();
 const ajv = new Ajv();
 
 export const POLLED_BACKGROUND_TIMEOUT = 1000;
@@ -236,7 +238,39 @@ export const InputBehaviorsCommon = ({
         }
       }
 
-      commitFormState({ ...formValues, [fieldName]: newValue });
+      // Checks if a Drupal AJAX operation is in progress.
+      const isAjaxing = () =>
+        Drupal.ajax.instances.some(
+          (instance: { ajaxing: boolean }) => instance && instance.ajaxing,
+        );
+
+      // If no AJAX operations are in progress, update the form state and store.
+      if (!isAjaxing()) {
+        commitFormState({ ...formValues, [fieldName]: newValue });
+      } else {
+        // This is only reached if AJAX operations are in progress. Set an
+        // interval that will run until no AJAX operations are in progress
+        // or a timeout is reached, then update the form state and store.
+        let attempts = 0;
+
+        // An intentionally short interval as many AJAX operations complete
+        // quite quickly and we don't want to introduce a noticeable delay.
+        // It is a slight boost from the default of 5ms to make it easier to do
+        // math in ones head.
+        const intervalDuration = 5;
+        const intervalId = setInterval(() => {
+          attempts += 1;
+          console.log('still ajaxing...', attempts, isAjaxing());
+          if (!isAjaxing() || attempts * intervalDuration > 600) {
+            clearInterval(intervalId);
+            console.log(
+              `Waiting  ${attempts * intervalDuration}ms for AJAX to complete before PATCH`,
+              isAjaxing(),
+            );
+            commitFormState({ ...formValues, [fieldName]: newValue });
+          }
+        }, intervalDuration);
+      }
     };
 
     attributes.onBlur = (e: React.FocusEvent) => {
