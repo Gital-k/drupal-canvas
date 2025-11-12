@@ -43,12 +43,12 @@ examples:
   - https://example.com
 ```
 
-**Note:** The format can be either `uri` or `uri-reference`.
+**Note:** The format can be either `uri` (accepts only absolute URLs) or `uri-reference` (accepts both absolute and relative URLs).
 
 ## Image
 
 Reference to an image object with metadata like alt text, dimensions, and file
-URL.
+URL. Only the file URL is required to exist, all other metadata is always optional.
 
 ```yaml
 type: object
@@ -63,7 +63,7 @@ examples:
 
 ## Video
 
-Reference to a video object with metadata like dimensions and file URL.
+Reference to a video object with metadata like dimensions and file URL. Only the file URL is required to exist, all other metadata is always optional.
 
 ```yaml
 type: object
