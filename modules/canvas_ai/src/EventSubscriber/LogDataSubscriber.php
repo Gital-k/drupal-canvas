@@ -1,47 +1,37 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Drupal\canvas_ai\EventSubscriber;
 
+use Drupal\canvas_ai\Event\CanvasAiLogEvents;
 use Drupal\canvas_ai\Event\LogAiPromptEvent;
+use Psr\Log\LoggerAwareTrait;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
-use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 
 /**
  * Subscribes to LogDataEvent and logs the data.
  */
 class LogDataSubscriber implements EventSubscriberInterface {
-  /**
-   * The logger channel.
-   *
-   * @var \Psr\Log\LoggerInterface
-   */
-  protected $logger;
-
-  /**
-   * Constructs the LogDataSubscriber.
-   */
-  public function __construct(LoggerChannelFactoryInterface $logger_factory) {
-    $this->logger = $logger_factory->get('canvas_ai');
-  }
+  use LoggerAwareTrait;
 
   /**
    * {@inheritdoc}
    */
-  public static function getSubscribedEvents() {
+  public static function getSubscribedEvents(): array {
     return [
-      LogAiPromptEvent::class => 'onLogData',
+      CanvasAiLogEvents::LOG => 'logData',
     ];
   }
 
   /**
-   * Logs the event data to Drupal logs.
+   * Logs the data from the event.
    *
    * @param \Drupal\canvas_ai\Event\LogAiPromptEvent $event
    *   The event object.
    */
-  public function onLogData(LogAiPromptEvent $event): void {
-    $log_data = $event->getLogData();
-    $this->logger->info('LogDataEvent: <pre>@data</pre>', ['@data' => print_r($log_data, TRUE)]);
+  public function logData(LogAiPromptEvent $event): void {
+    $this->logger?->info(print_r($event->getLogs(), TRUE));
   }
 
 }

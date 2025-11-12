@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Drupal\canvas_ai\Event;
 
 use Symfony\Contracts\EventDispatcher\Event;
@@ -10,30 +12,23 @@ use Symfony\Contracts\EventDispatcher\Event;
 class LogAiPromptEvent extends Event {
 
   /**
-   * The data to log.
-   *
-   * @var mixed
-   */
-  protected $logData;
-
-  /**
    * Constructs a new LogAiPromptEvent.
    *
-   * @param mixed $logData
+   * @param array $logs
    *   The data to log.
    */
-  public function __construct($logData) {
-    $this->logData = $logData;
-  }
+  public function __construct(
+    public readonly array $logs,
+  ) {}
 
   /**
    * Gets the log data.
    *
-   * @return mixed
+   * @return array
    *   The log data.
    */
-  public function getLogData() {
-    return $this->logData;
+  public function getLogs(): array {
+    return $this->logs;
   }
 
 }

@@ -1,136 +1,64 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Drupal\canvas_ai\Event;
 
+use Drupal\canvas_ai\AgentStatus\AiPromptStatusUpdateInterface;
 use Symfony\Contracts\EventDispatcher\Event;
 
 /**
- * Defines an event for AI request log data collection.
+ * Event dispatched to prepare canvas AI logs.
+ *
+ * Subscribers can inspect, add, or modify the log data before it is logged.
  */
-class PrepareAiLogEvent extends Event {
+final class PrepareAiLogEvent extends Event {
 
   /**
-   * The agent instance involved in the AI request.
-   *
-   * @var mixed
-   */
-  protected $agent;
-
-  /**
-   * The prompt array containing request details.
+   * The log data.
    *
    * @var array
    */
-  protected $prompt;
+  protected array $logs;
 
   /**
-   * The error message, if the request failed.
+   * Constructs a new AlterPromptDataEvent.
    *
-   * @var string|null
+   * @param \Drupal\canvas_ai\AgentStatus\AiPromptStatusUpdateInterface $aiPromptStatusUpdate
+   *   The AI prompt status data.
    */
-  protected $errorMessage;
+  public function __construct(
+    private readonly AiPromptStatusUpdateInterface $aiPromptStatusUpdate,
+  ) {}
 
   /**
-   * The current user making the AI request.
+   * Sets the log data.
    *
-   * @var \Drupal\Core\Session\AccountInterface
+   * @param array $logs
+   *   The log data.
    */
-  protected $currentUser;
-
-  /**
-   * The site configuration object for context (e.g., site UUID).
-   *
-   * @var \Drupal\Core\Config\ImmutableConfig
-   */
-  protected $siteConfig;
-
-  /**
-   * The log array built by the event subscriber.
-   *
-   * @var array
-   */
-  protected $logArray = [];
-
-  /**
-   * Constructs a new AiRequestLogEvent.
-   *
-   * @param mixed $agent
-   *   The agent instance for the request.
-   * @param array $prompt
-   *   The prompt array with request data.
-   * @param \Drupal\Core\Session\AccountInterface $currentUser
-   *   The user making the request.
-   * @param \Drupal\Core\Config\ImmutableConfig $siteConfig
-   *   The site configuration object.
-   * @param string|null $errorMessage
-   *   The error message, if any.
-   */
-  public function __construct($agent, array $prompt, $currentUser, $siteConfig, $errorMessage = NULL) {
-    $this->agent = $agent;
-    $this->prompt = $prompt;
-    $this->currentUser = $currentUser;
-    $this->siteConfig = $siteConfig;
-    $this->errorMessage = $errorMessage;
+  public function setLogs(array $logs): void{
+    $this->logs = $logs;
   }
 
   /**
-   * Gets the prompt array for the AI request.
+   * Gets the log data.
    *
    * @return array
-   *   The prompt array.
+   *   The log data.
    */
-  public function getPrompt() {
-    return $this->prompt;
+  public function getLogs(): array {
+    return $this->logs ?? [];
   }
 
   /**
-   * Gets the error message, if the request failed.
+   * Gets the AI prompt status data.
    *
-   * @return string|null
-   *   The error message, or NULL if none.
+   * @return \Drupal\canvas_ai\AgentStatus\AiPromptStatusUpdateInterface
+   *   The AI prompt status data.
    */
-  public function getErrorMessage() {
-    return $this->errorMessage;
-  }
-
-  /**
-   * Gets the user who made the AI request.
-   *
-   * @return \Drupal\Core\Session\AccountInterface
-   *   The user object.
-   */
-  public function getCurrentUser() {
-    return $this->currentUser;
-  }
-
-  /**
-   * Gets the site configuration object for the request.
-   *
-   * @return \Drupal\Core\Config\ImmutableConfig
-   *   The site configuration object.
-   */
-  public function getSiteConfig() {
-    return $this->siteConfig;
-  }
-
-  /**
-   * Sets the log array for the AI request.
-   *
-   * @param array $logArray
-   *   The log array to set.
-   */
-  public function setLogArray(array $logArray): void {
-    $this->logArray = $logArray;
-  }
-
-  /**
-   * Gets the build log array for the AI request.
-   *
-   * @return array
-   *   The log array containing all relevant log data.
-   */
-  public function getLogArray() {
-    return $this->logArray;
+  public function getPromptStatusUpdate(): AiPromptStatusUpdateInterface {
+    return $this->aiPromptStatusUpdate;
   }
 
 }
