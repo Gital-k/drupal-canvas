@@ -38,6 +38,13 @@ final class CanvasAiSettingsForm extends ConfigFormBase {
       '#min' => 1,
     ];
 
+    $form['enable_logging'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Enable Logging'),
+      '#default_value' => $this->config('canvas_ai.settings')->get('enable_logging'),
+      '#description' => $this->t('Enabling this will log all AI prompt interactions, including agent responses and agent success or failure message.'),
+    ];
+
     return parent::buildForm($form, $form_state);
   }
 
@@ -47,6 +54,7 @@ final class CanvasAiSettingsForm extends ConfigFormBase {
   public function submitForm(array &$form, FormStateInterface $form_state): void {
     $this->config('canvas_ai.settings')
       ->set('file_upload_size', $form_state->getValue('file_upload_size'))
+      ->set('enable_logging', $form_state->getValue('enable_logging'))
       ->save();
 
     parent::submitForm($form, $form_state);

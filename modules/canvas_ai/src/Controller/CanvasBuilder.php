@@ -25,6 +25,9 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use Drupal\canvas_ai\Event\PrepareAiLogEvent;
+use Drupal\canvas_ai\Event\LogAiPromptEvent;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 /**
  * Renders the Drupal Canvas AI calls.
@@ -227,13 +230,36 @@ final class CanvasBuilder extends ControllerBase {
       'json_api_module_status' => $this->moduleHandler()->moduleExists('jsonapi') ? 'enabled' : 'disabled',
       'verbose_context_for_orchestrator' => $this->canvasAiPageBuilderHelper->generateVerboseContextForOrchestrator($prompt),
     ]);
+    $solvability = NULL;
+    $error_message = NULL;
     try {
       $solvability = $agent->determineSolvability();
     }
     catch (\Exception $e) {
+      $error_message = $e->getMessage();
+    }
+
+    if ($config->get('enable_logging')) {
+      /** @var EventDispatcherInterface $event_dispatcher */
+      $event_dispatcher = \Drupal::service('event_dispatcher');
+      $event = new PrepareAiLogEvent(
+        $agent,
+        $prompt,
+        $this->currentUser(),
+        $this->config('system.site'),
+        $error_message
+      );
+      $event_dispatcher->dispatch($event, PrepareAiLogEvent::class);
+      $log_data = $event->getLogArray();
+      $log_data_event = new LogAiPromptEvent($log_data);
+      $event_dispatcher->dispatch($log_data_event, LogAiPromptEvent::class);
+    }
+
+    // Return error response if there was an exception.
+    if ($error_message) {
       return new JsonResponse([
         'status' => FALSE,
-        'message' => $e->getMessage(),
+        'message' => $error_message,
       ]);
     }
     $status = FALSE;
