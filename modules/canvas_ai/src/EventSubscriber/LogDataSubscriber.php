@@ -43,4 +43,5 @@ class LogDataSubscriber implements EventSubscriberInterface {
     $log_data = $event->getLogData();
     $this->logger->info('LogDataEvent: <pre>@data</pre>', ['@data' => print_r($log_data, TRUE)]);
   }
+
 }

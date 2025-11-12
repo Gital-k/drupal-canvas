@@ -45,6 +45,7 @@ final class CanvasBuilder extends ControllerBase {
     protected CanvasAiTempStore $canvasAiTempStore,
     protected FileSystemInterface $fileSystem,
     protected AiAgentStatusPollerServiceInterface $poller,
+    protected EventDispatcherInterface $event_dispatcher,
   ) {}
 
   /**
@@ -59,6 +60,7 @@ final class CanvasBuilder extends ControllerBase {
       $container->get('canvas_ai.tempstore'),
       $container->get('file_system'),
       $container->get('ai_agents.agent_status_poller'),
+      $container->get('event_dispatcher')
     );
   }
 
@@ -240,8 +242,7 @@ final class CanvasBuilder extends ControllerBase {
     }
 
     if ($config->get('enable_logging')) {
-      /** @var EventDispatcherInterface $event_dispatcher */
-      $event_dispatcher = \Drupal::service('event_dispatcher');
+      $this->event_dispatcher = \Drupal::service('event_dispatcher');
       $event = new PrepareAiLogEvent(
         $agent,
         $prompt,
@@ -249,10 +250,10 @@ final class CanvasBuilder extends ControllerBase {
         $this->config('system.site'),
         $error_message
       );
-      $event_dispatcher->dispatch($event, PrepareAiLogEvent::class);
+      $this->event_dispatcher->dispatch($event, PrepareAiLogEvent::class);
       $log_data = $event->getLogArray();
       $log_data_event = new LogAiPromptEvent($log_data);
-      $event_dispatcher->dispatch($log_data_event, LogAiPromptEvent::class);
+      $this->event_dispatcher->dispatch($log_data_event, LogAiPromptEvent::class);
     }
 
     // Return error response if there was an exception.

@@ -35,5 +35,6 @@ class LogAiPromptEvent extends Event {
   public function getLogData() {
     return $this->logData;
   }
+
 }
 

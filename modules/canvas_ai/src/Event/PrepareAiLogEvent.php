@@ -6,7 +6,6 @@ use Symfony\Contracts\EventDispatcher\Event;
 
 /**
  * Defines an event for AI request log data collection.
- *
  */
 class PrepareAiLogEvent extends Event {
 
@@ -66,7 +65,7 @@ class PrepareAiLogEvent extends Event {
    * @param string|null $errorMessage
    *   The error message, if any.
    */
-  public function __construct($agent, array $prompt, $currentUser, $siteConfig, $errorMessage = null) {
+  public function __construct($agent, array $prompt, $currentUser, $siteConfig, $errorMessage = NULL) {
     $this->agent = $agent;
     $this->prompt = $prompt;
     $this->currentUser = $currentUser;
@@ -133,4 +132,5 @@ class PrepareAiLogEvent extends Event {
   public function getLogArray() {
     return $this->logArray;
   }
+
 }

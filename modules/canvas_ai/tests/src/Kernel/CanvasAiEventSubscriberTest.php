@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Drupal\Tests\canvas_ai\Kernel;
 
 use Drupal\KernelTests\KernelTestBase;
@@ -8,7 +10,6 @@ use Drupal\canvas_ai\Event\LogAiPromptEvent;
 
 /**
  * Tests the event subscribers.
- *
  */
 class CanvasAiEventSubscriberTest extends KernelTestBase {
 

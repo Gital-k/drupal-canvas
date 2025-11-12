@@ -40,5 +40,6 @@ class AiRequestLogGeneratorSubscriber implements EventSubscriberInterface {
       PrepareAiLogEvent::class => 'onAiRequestLog',
     ];
   }
+
 }
 
