@@ -43,7 +43,8 @@ class AiRequestLogGeneratorSubscriber implements EventSubscriberInterface {
    *   The event object.
    */
   public function onAiRequestLog(PrepareAiLogEvent $event): void {
-    $agent_status = $this->statusStorage->loadStatusUpdate($event->getPrompt()['request_id']);
+    $agent_status = \Drupal::service('ai_agents.private_temp_status_storage')
+      ->loadStatusUpdate($event->getPrompt()['request_id']);
     $prompt_status = $agent_status ? $agent_status->toArray() : [];
     $log_data = [
       'user_id' => hash('sha256', (string) $event->getCurrentUser()->id()),
