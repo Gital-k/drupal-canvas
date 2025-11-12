@@ -113,9 +113,19 @@ enum:
   - option1
   - option2
   - option3
+meta:enum:
+  option1: Option 1
+  option2: Option 2
+  option3: Option 3
 examples:
   - option1
 ```
+
+The `meta:enum` property provides user-friendly labels for each enum value. The
+keys match the enum values, and the values are the display labels shown in the
+UI.
+
+**Note:** Enum values cannot contain dots.
 
 ## List: integer
 
@@ -127,6 +137,16 @@ enum:
   - 1
   - 2
   - 3
+meta:enum:
+  1: Option 1
+  2: Option 2
+  3: Option 3
 examples:
   - 1
 ```
+
+The `meta:enum` property provides user-friendly labels for each enum value. The
+keys match the enum values, and the values are the display labels shown in the
+UI.
+
+**Note:** Enum values cannot contain dots.
