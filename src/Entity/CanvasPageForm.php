@@ -97,6 +97,12 @@ final class CanvasPageForm extends ContentEntityForm {
       '#weight' => 10,
     ];
 
+    // Pass site name and base URL to JS.
+    $form['#attached']['drupalSettings']['canvas'] = [
+      'siteName' => $site_name,
+      'baseUrl' => \Drupal::request()->getSchemeAndHttpHost(),
+    ];
+
     $this->addTransliterationSettings($form);
     $this->customizePathField($form);
 
