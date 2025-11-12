@@ -37,4 +37,3 @@ class LogAiPromptEvent extends Event {
   }
 
 }
-

@@ -39,7 +39,7 @@ class LogDataSubscriber implements EventSubscriberInterface {
    * @param \Drupal\canvas_ai\Event\LogAiPromptEvent $event
    *   The event object.
    */
-  public function onLogData(LogAiPromptEvent $event) {
+  public function onLogData(LogAiPromptEvent $event): void {
     $log_data = $event->getLogData();
     $this->logger->info('LogDataEvent: <pre>@data</pre>', ['@data' => print_r($log_data, TRUE)]);
   }

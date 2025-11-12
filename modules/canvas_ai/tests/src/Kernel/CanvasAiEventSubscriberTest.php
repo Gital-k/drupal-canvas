@@ -39,7 +39,7 @@ class CanvasAiEventSubscriberTest extends KernelTestBase {
   /**
    * Tests event subscribers.
    */
-  public function testEventSubscribers() {
+  public function testEventSubscribers(): void {
     $expected_request_id = 'test-request-1';
     $agent = NULL;
     $prompt = ['request_id' => $expected_request_id];
@@ -56,19 +56,17 @@ class CanvasAiEventSubscriberTest extends KernelTestBase {
     $this->assertEquals($expected_request_id, $log_array['request_id']);
 
     $log_data_event = new LogAiPromptEvent($log_array);
-    $this->assertNotEmpty($log_data_event, 'Log array was set by LogAiPromptEvent.');
     $dispatcher->dispatch($log_data_event, LogAiPromptEvent::class);
 
     // Select the most recent log entry of type 'canvas_ai'.
-    $log_entry = $this->container->get('database')
+    $statement = $this->container->get('database')
       ->select('watchdog', 'w')
       ->fields('w', ['variables'])
       ->condition('w.type', 'canvas_ai')
       ->orderBy('wid', 'DESC')
       ->range(0, 1)
-      ->execute()
-      ->fetchAssoc();
-    $this->assertNotEmpty($log_entry, 'Log entry is not null.');
+      ->execute();
+    $log_entry = $statement ? $statement->fetchAssoc() : NULL;
 
     $this->assertNotEmpty($log_entry, 'A log entry of type "canvas_ai" was found in the watchdog table.');
   }

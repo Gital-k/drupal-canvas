@@ -28,6 +28,7 @@ use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Drupal\canvas_ai\Event\PrepareAiLogEvent;
 use Drupal\canvas_ai\Event\LogAiPromptEvent;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use Drupal\Core\Config\ConfigFactoryInterface;
 
 /**
  * Renders the Drupal Canvas AI calls.
@@ -242,12 +243,11 @@ final class CanvasBuilder extends ControllerBase {
     }
 
     if ($config->get('enable_logging')) {
-      $this->event_dispatcher = \Drupal::service('event_dispatcher');
       $event = new PrepareAiLogEvent(
         $agent,
         $prompt,
         $this->currentUser(),
-        $this->config('system.site'),
+        \Drupal::config('system.site'),
         $error_message
       );
       $this->event_dispatcher->dispatch($event, PrepareAiLogEvent::class);

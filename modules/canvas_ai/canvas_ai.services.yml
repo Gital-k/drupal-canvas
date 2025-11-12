@@ -15,6 +15,8 @@ services:
   Drupal\canvas_ai\CanvasAiTempStore: '@canvas_ai.tempstore'
   canvas_ai.ai_request_log_event_subscriber:
     class: 'Drupal\canvas_ai\EventSubscriber\AiRequestLogGeneratorSubscriber'
+    arguments:
+      - '@ai_agents.private_temp_status_storage'
     tags:
       - { name: event_subscriber }
   canvas_ai.log_data_event_subscriber:

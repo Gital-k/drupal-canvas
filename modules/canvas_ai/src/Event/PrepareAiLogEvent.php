@@ -119,7 +119,7 @@ class PrepareAiLogEvent extends Event {
    * @param array $logArray
    *   The log array to set.
    */
-  public function setLogArray(array $logArray) {
+  public function setLogArray(array $logArray): void {
     $this->logArray = $logArray;
   }
 
