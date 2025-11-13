@@ -14,6 +14,7 @@ import {
   removeProp,
   reorderProps,
   selectCodeComponentProperty,
+  selectUnsavedProps,
   toggleRequired,
   updateProp,
 } from '@/features/code-editor/codeEditorSlice';
@@ -43,6 +44,7 @@ export default function Props() {
   const props = useAppSelector(selectCodeComponentProperty('props'));
   const required = useAppSelector(selectCodeComponentProperty('required'));
   const componentStatus = useAppSelector(selectCodeComponentProperty('status'));
+  const unsavedProps = useAppSelector(selectUnsavedProps);
 
   const handleAddProp = () => {
     dispatch(addProp());
@@ -58,6 +60,7 @@ export default function Props() {
 
   const renderPropContent = (prop: CodeComponentProp) => {
     const propName = getPropMachineName(prop.name);
+    const propIsUnsaved = unsavedProps.includes(prop.id);
     return (
       <Flex direction="column" flexGrow="1">
         <Flex mb="4" gap="4" align="end" width="100%" wrap="wrap">
@@ -78,7 +81,7 @@ export default function Props() {
                     }),
                   )
                 }
-                disabled={componentStatus}
+                disabled={componentStatus && !propIsUnsaved}
               />
             </FormElement>
           </Box>
@@ -108,7 +111,7 @@ export default function Props() {
                     );
                   }
                 }}
-                disabled={componentStatus}
+                disabled={componentStatus && !propIsUnsaved}
               >
                 <Select.Trigger id={`prop-type-${prop.id}`} />
                 <Select.Content>
@@ -142,6 +145,7 @@ export default function Props() {
         </Flex>
 
         {(() => {
+          const disableInput = componentStatus && !propIsUnsaved;
           switch (prop.derivedType) {
             case 'text':
             case 'integer':
@@ -151,7 +155,7 @@ export default function Props() {
                   id={prop.id}
                   type={prop.type as 'string' | 'number' | 'integer'}
                   example={prop.example as string}
-                  isDisabled={componentStatus}
+                  isDisabled={disableInput}
                 />
               );
             case 'formattedText':
@@ -159,7 +163,7 @@ export default function Props() {
                 <FormPropTypeFormattedText
                   id={prop.id}
                   example={prop.example}
-                  isDisabled={componentStatus}
+                  isDisabled={disableInput}
                 />
               );
             case 'link':
@@ -167,7 +171,7 @@ export default function Props() {
                 <FormPropTypeLink
                   id={prop.id}
                   example={prop.example as string}
-                  isDisabled={componentStatus}
+                  isDisabled={disableInput}
                 />
               );
             case 'image':
@@ -175,7 +179,7 @@ export default function Props() {
                 <FormPropTypeImage
                   id={prop.id}
                   example={prop.example as CodeComponentPropImageExample}
-                  isDisabled={componentStatus}
+                  isDisabled={disableInput}
                   required={required.includes(propName)}
                 />
               );
@@ -184,7 +188,7 @@ export default function Props() {
                 <FormPropTypeVideo
                   id={prop.id}
                   example={prop.example as CodeComponentPropVideoExample}
-                  isDisabled={componentStatus}
+                  isDisabled={disableInput}
                   required={required.includes(propName)}
                 />
               );
@@ -193,7 +197,7 @@ export default function Props() {
                 <FormPropTypeBoolean
                   id={prop.id}
                   example={prop.example as string}
-                  isDisabled={componentStatus}
+                  isDisabled={disableInput}
                 />
               );
             case 'listText':
@@ -205,7 +209,7 @@ export default function Props() {
                   required={required.includes(propName)}
                   enum={prop.enum || []}
                   example={prop.example as string}
-                  isDisabled={componentStatus}
+                  isDisabled={disableInput}
                 />
               );
           }
@@ -224,12 +228,8 @@ export default function Props() {
               <InfoCircledIcon />
             </Callout.Icon>
             <Callout.Text>
-              Props and slots are locked when a component is added to{' '}
-              <b>Components</b>.
-              <br />
-              <br />
-              To modify props and slots, remove the component from{' '}
-              <b>Components</b>.
+              This component has been added to <b>Components</b>.<br />
+              Publishing changes to props and slots will create a new version.
             </Callout.Text>
           </Callout.Root>
         </Box>

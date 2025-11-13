@@ -5,6 +5,7 @@ import { makeStore } from '@/app/store';
 import {
   addProp,
   selectCodeComponentProperty,
+  selectUnsavedProps,
   toggleRequired,
   updateProp,
 } from '@/features/code-editor/codeEditorSlice';
@@ -61,6 +62,8 @@ describe('Component data / props in code editor', () => {
         },
         'Should have the correct default prop values',
       );
+      const newProps = selectUnsavedProps(store.getState());
+      expect(newProps).to.deep.equal([props[0].id]);
     });
 
     cy.findByLabelText('Prop name').type('Title');
