@@ -137,7 +137,7 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
   /**
    * {@inheritdoc}
    */
-  public function setUp(): void {
+  protected function setUp(): void {
     parent::setUp();
     $this->componentReasonRepository = $this->container->get(ComponentIncompatibilityReasonRepository::class);
     $this->componentStorage = $this->container->get(EntityTypeManagerInterface::class)->getStorage(Component::ENTITY_TYPE_ID);

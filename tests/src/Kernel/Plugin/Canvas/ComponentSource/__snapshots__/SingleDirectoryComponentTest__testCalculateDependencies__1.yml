@@ -1,0 +1,209 @@
+sdc.canvas_test_sdc.attributes:
+    module:
+        - core
+        - canvas_test_sdc
+sdc.canvas_test_sdc.banner:
+    config:
+        - filter.format.canvas_html_block
+        - image.style.canvas_parametrized_width
+    module:
+        - core
+        - file
+        - image
+        - text
+        - canvas_test_sdc
+sdc.canvas_test_sdc.card:
+    config:
+        - image.style.canvas_parametrized_width
+    module:
+        - core
+        - file
+        - image
+        - options
+        - canvas_test_sdc
+sdc.canvas_test_sdc.card-with-local-image:
+    config:
+        - image.style.canvas_parametrized_width
+    module:
+        - core
+        - file
+        - image
+        - options
+        - canvas_test_sdc
+sdc.canvas_test_sdc.card-with-remote-image:
+    config:
+        - image.style.canvas_parametrized_width
+    module:
+        - core
+        - file
+        - image
+        - options
+        - canvas_test_sdc
+sdc.canvas_test_sdc.card-with-stream-wrapper-image:
+    config:
+        - image.style.canvas_parametrized_width
+    content: {  }
+    module:
+        - core
+        - file
+        - image
+        - options
+        - canvas_test_sdc
+sdc.canvas_test_sdc.columns:
+    module:
+        - core
+        - options
+        - canvas_test_sdc
+sdc.canvas_test_sdc.component-no-meta-enum:
+    module:
+        - core
+        - options
+        - canvas_test_sdc
+sdc.canvas_test_sdc.crash:
+    module:
+        - core
+        - canvas_test_sdc
+sdc.canvas_test_sdc.deprecated:
+    module:
+        - core
+        - canvas_test_sdc
+sdc.canvas_test_sdc.druplicon:
+    module:
+        - canvas_test_sdc
+sdc.canvas_test_sdc.experimental:
+    module:
+        - core
+        - canvas_test_sdc
+sdc.canvas_test_sdc.grid-container:
+    module:
+        - core
+        - options
+        - canvas_test_sdc
+sdc.canvas_test_sdc.heading:
+    module:
+        - core
+        - options
+        - canvas_test_sdc
+sdc.canvas_test_sdc.image:
+    config:
+        - image.style.canvas_parametrized_width
+    module:
+        - file
+        - image
+        - canvas_test_sdc
+sdc.canvas_test_sdc.image-gallery:
+    config:
+        - image.style.canvas_parametrized_width
+    module:
+        - core
+        - file
+        - image
+        - canvas_test_sdc
+sdc.canvas_test_sdc.image-optional-with-example:
+    config:
+        - image.style.canvas_parametrized_width
+    module:
+        - file
+        - image
+        - canvas_test_sdc
+sdc.canvas_test_sdc.image-optional-with-example-and-additional-prop:
+    config:
+        - image.style.canvas_parametrized_width
+    module:
+        - core
+        - file
+        - image
+        - canvas_test_sdc
+sdc.canvas_test_sdc.image-optional-without-example:
+    config:
+        - image.style.canvas_parametrized_width
+    module:
+        - file
+        - image
+        - canvas_test_sdc
+sdc.canvas_test_sdc.image-required-with-example:
+    config:
+        - image.style.canvas_parametrized_width
+    module:
+        - file
+        - image
+        - canvas_test_sdc
+sdc.canvas_test_sdc.my-cta:
+    module:
+        - core
+        - link
+        - options
+        - canvas_test_sdc
+sdc.canvas_test_sdc.my-hero:
+    module:
+        - core
+        - link
+        - canvas_test_sdc
+sdc.canvas_test_sdc.my-section:
+    module:
+        - core
+        - canvas_test_sdc
+sdc.canvas_test_sdc.one_column:
+    module:
+        - core
+        - options
+        - canvas_test_sdc
+sdc.canvas_test_sdc.props-no-slots:
+    module:
+        - core
+        - canvas_test_sdc
+sdc.canvas_test_sdc.props-slots:
+    module:
+        - core
+        - canvas_test_sdc
+sdc.canvas_test_sdc.shoe_badge:
+    module:
+        - core
+        - options
+        - canvas_test_sdc
+sdc.canvas_test_sdc.shoe_tab:
+    module:
+        - core
+        - canvas_test_sdc
+sdc.canvas_test_sdc.shoe_tab_group:
+    module:
+        - core
+        - options
+        - canvas_test_sdc
+sdc.canvas_test_sdc.shoe_tab_panel:
+    module:
+        - core
+        - canvas_test_sdc
+sdc.canvas_test_sdc.sparkline:
+    module:
+        - core
+        - canvas_test_sdc
+sdc.canvas_test_sdc.tags:
+    module:
+        - core
+        - canvas_test_sdc
+sdc.canvas_test_sdc.two_column:
+    module:
+        - core
+        - options
+        - canvas_test_sdc
+sdc.canvas_test_sdc.video:
+    content: {  }
+    module:
+        - core
+        - file
+        - canvas_test_sdc
+sdc.sdc_theme_test.bar:
+    theme:
+        - sdc_theme_test
+sdc.sdc_theme_test.lib-overrides:
+    theme:
+        - sdc_theme_test
+sdc.sdc_theme_test.my-card:
+    module:
+        - core
+    theme:
+        - sdc_theme_test
+sdc.sdc_theme_test_base.my-card-no-schema:
+    theme:
+        - sdc_theme_test_base
