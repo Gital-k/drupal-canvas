@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useErrorBoundary } from 'react-error-boundary';
-import { Spinner, Text } from '@radix-ui/themes';
+import { InfoCircledIcon } from '@radix-ui/react-icons';
+import { Callout, Spinner, Text } from '@radix-ui/themes';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import { getPropsValues } from '@/components/form/formUtil';
@@ -72,7 +73,6 @@ const ComponentInstanceFormRenderer: React.FC<
     null,
   );
   const formRef = useRef(null);
-  const persistentTransforms = useRef<undefined | TransformConfig>(undefined);
   const selectedComponentId = selectedComponent || 'noop';
   const skip = useAppSelector((state) =>
     selectUpdateComponentLoadingState(state, selectedComponentId),
@@ -95,18 +95,9 @@ const ComponentInstanceFormRenderer: React.FC<
     }
   }, [error, showBoundary]);
 
-  const { html, transforms } = currentData || {
+  const { html } = currentData || {
     html: false,
-    transforms: false as const,
   };
-
-  // Keep transforms persistent even while new component data is being fetched to stop
-  // the form from disappearing while the user is editing it.
-  useEffect(() => {
-    if (transforms !== false && !isFetching) {
-      persistentTransforms.current = transforms;
-    }
-  }, [transforms, isFetching, selectedComponentType]);
 
   useEffect(() => {
     if (!html) {
@@ -258,7 +249,7 @@ const ComponentInstanceFormRenderer: React.FC<
         ref={formRef}
       >
         {/* Do not render the form until the transforms are available in Redux. */}
-        {!!persistentTransforms.current && jsxFormContent}
+        {jsxFormContent}
       </div>
     </Spinner>
   );
@@ -274,7 +265,6 @@ const ComponentInstanceForm: React.FC<ComponentInstanceFormProps> = () => {
   const latestUndoRedoActionId = useAppSelector(selectLatestUndoRedoActionId);
 
   const [emptyProp, setEmptyProp] = useState(false);
-  const [componentSource, setComponentSource] = useState('');
 
   const buildPreparedModel = (
     model: ComponentModel,
@@ -353,7 +343,6 @@ const ComponentInstanceForm: React.FC<ComponentInstanceFormProps> = () => {
       latestUndoRedoActionId,
     });
     dispatch(setCurrentComponentQueryString(`?${query.toString()}`));
-    setComponentSource(components?.[selectedComponentType]?.source || '');
   }, [
     components,
     error,
@@ -375,10 +364,15 @@ const ComponentInstanceForm: React.FC<ComponentInstanceFormProps> = () => {
         <ComponentInstanceFormRenderer
           currentComponentQueryString={currentComponentQueryString}
         />
-        {componentSource === 'Module component' && emptyProp ? (
-          <Text size="4">This component has no props.</Text>
-        ) : (
-          ''
+        {emptyProp && (
+          <Callout.Root>
+            <Callout.Icon>
+              <InfoCircledIcon />
+            </Callout.Icon>
+            <Callout.Text>
+              This component has no user editable settings.
+            </Callout.Text>
+          </Callout.Root>
         )}
       </>
     )
