@@ -205,6 +205,11 @@ final class CanvasBuilder extends ControllerBase {
       AiAgentStatusItemTypes::Started,
       AiAgentStatusItemTypes::TextGenerated,
       AiAgentStatusItemTypes::Finished,
+      AiAgentStatusItemTypes::Request,
+      AiAgentStatusItemTypes::Response,
+      AiAgentStatusItemTypes::ToolStarted,
+      AiAgentStatusItemTypes::ToolFinished,
+      AiAgentStatusItemTypes::ToolSelected,
     ]);
     $default = $this->providerService->getDefaultProviderForOperationType('chat');
     if (!is_array($default) || empty($default['provider_id']) || empty($default['model_id'])) {

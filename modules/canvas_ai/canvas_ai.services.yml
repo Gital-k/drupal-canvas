@@ -18,6 +18,7 @@ services:
     arguments: [ 'canvas_ai' ]
   canvas_ai.logs.prepare_data_subscriber:
     class: 'Drupal\canvas_ai\EventSubscriber\AiRequestLogGeneratorSubscriber'
+    arguments: ['@current_user', '@config.factory']
     tags:
       - { name: event_subscriber }
   canvas_ai.logs.log_data_subscriber:
