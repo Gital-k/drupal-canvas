@@ -53,7 +53,6 @@ class AiRequestLogGeneratorSubscriber implements EventSubscriberInterface {
   public function __construct(AccountProxyInterface $current_user, ConfigFactoryInterface $config_factory) {
     $this->currentUser = $current_user;
     $this->configFactory = $config_factory;
-    $this->siteUuid = (string) $this->configFactory->get('system.site')->get('uuid');
   }
 
   /**
@@ -96,9 +95,9 @@ class AiRequestLogGeneratorSubscriber implements EventSubscriberInterface {
       }
     }
     $log_data['user_id'] = hash('sha256', (string) $this->currentUser->id());
-    $log_data['site_id'] = hash('sha256', $this->siteUuid);
+    $log_data['site_id'] = hash('sha256', (string) $this->configFactory->get('system.site')->get('uuid'));
     // Unique ID for this log entry.
-    $log_data['id'] = hash('sha256', $this->siteUuid . $this->currentUser->id());
+    $log_data['id'] = hash('sha256', $this->configFactory->get('system.site')->get('uuid') . $this->currentUser->id());
     $event->setLogs($log_data);
   }
 
