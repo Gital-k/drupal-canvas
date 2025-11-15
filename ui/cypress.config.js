@@ -33,6 +33,10 @@ const getCoreDir = () => {
 
 export default defineConfig({
   chromeWebSecurity: false,
+  experimentalMemoryManagement: true,
+  numTestsKeptInMemory: 0,
+  // Disable video recording to save memory
+  video: false,
   defaultBrowser: process.env.DRUPAL_TEST_DEFAULT_BROWSER || 'chrome',
   watchForFileChanges: false,
   retries: { openMode: 0, runMode: 3 },
@@ -60,6 +64,11 @@ export default defineConfig({
             `--window-size=${viewportWidth},${viewportHeight}`,
           );
           launchOptions.args.push('--force-device-scale-factor=1');
+
+          // Add these flags for Chrome in Docker/headless environments
+          launchOptions.args.push('--disable-dev-shm-usage');
+          launchOptions.args.push('--no-sandbox');
+          launchOptions.args.push('--disable-gpu');
         }
 
         if (browser.name === 'electron' && browser.isHeadless) {

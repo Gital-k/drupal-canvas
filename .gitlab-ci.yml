@@ -433,9 +433,33 @@ cypress E2E:
     - CYPRESS_CACHE_FOLDER=./cycache node ./node_modules/.bin/cypress run --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml" --spec=`node ./tests/support/parallel.js`
 
 cypress unit:
-  extends: .cypress-base
+  stage: test
+  image: ghcr.io/drupal-xb/drupal-testing:1.0.0
+  needs: [
+    - UI
+  ]
+  variables:
+    GIT_DEPTH: 1
+    _TARGET_DB_TYPE: sqlite
+    DRUPAL_TEST_BASE_URL: http://localhost
+    DRUPAL_TEST_WEBSERVER_USER: www-data
+  before_script:
+    - !reference [ .drupal ]
+    - composer run install-dev-deps
+    - cd ui
+    - npm ci
+    - npx cypress install
   script:
-    - CYPRESS_CACHE_FOLDER=./cycache node ./node_modules/.bin/cypress run --component --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml"
+    - npx cypress run --component --browser electron --reporter junit --reporter-options "mochaFile=../junit-[hash].xml"
+  artifacts:
+    when: always
+    expire_in: 6 mos
+    paths:
+      - ui/tests/screenshots/**/*.png
+      - ui/junit-cypress-unit.xml
+    reports:
+      junit:
+        - ui/junit-cypress-unit.xml
   rules:
     - *is-push-rule
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
