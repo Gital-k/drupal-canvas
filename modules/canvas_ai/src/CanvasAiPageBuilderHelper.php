@@ -320,7 +320,7 @@ class CanvasAiPageBuilderHelper {
     }
 
     // Cache the result for subsequent calls within the same request.
-    $this->componentsCache = $output;
+    $this->fetchedComponents = $output;
 
     return $output;
   }
