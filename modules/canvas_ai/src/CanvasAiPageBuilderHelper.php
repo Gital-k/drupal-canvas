@@ -358,7 +358,7 @@ class CanvasAiPageBuilderHelper {
    * @param array $component_context
    *   The component context array loaded from the config.
    */
-  private function refreshComponentContext(array &$component_context): array {
+  private function refreshComponentContext(array &$component_context): void {
     // Update the config with the data of newly added/removed components.
     $latest_components = $this->getAllComponentsKeyedBySource();
     $resave_config = FALSE;
@@ -389,7 +389,6 @@ class CanvasAiPageBuilderHelper {
         ->set('component_context', $component_context)
         ->save();
     }
-    return $component_context;
   }
 
   /**
