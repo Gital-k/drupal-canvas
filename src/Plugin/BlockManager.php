@@ -105,6 +105,11 @@ class BlockManager extends CoreBlockManager {
           }
         }
       }
+      // If the block explicitly opts out of being a Canvas component, disable
+      // it by default.
+      if ($definition['no_canvas'] ?? FALSE) {
+        $status = FALSE;
+      }
 
       // @todo is this a not going to become performance bottle neck on BlockPlugin heavy sites?
       $block = $this->createInstance($id);
