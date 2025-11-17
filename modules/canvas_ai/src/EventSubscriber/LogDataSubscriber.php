@@ -32,7 +32,7 @@ class LogDataSubscriber implements EventSubscriberInterface {
    */
   public function logData(LogAiPromptEvent $event): void {
     $json_logs = json_encode($event->getLogs(), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-    $this->logger?->info('LogDataEvent: <pre>@data</pre>', ['@data' => $json_logs]);
+    $this->logger?->info($json_logs);
   }
 
 }
