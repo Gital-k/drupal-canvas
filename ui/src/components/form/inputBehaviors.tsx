@@ -147,7 +147,7 @@ export const InputBehaviorsCommon = ({
       dispatchFieldValue(formId, fieldName, value);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inputValue]);
+  }, []);
 
   useEffect(() => {
     // Special handling for the form_build_id which can be updated by an ajax
@@ -177,7 +177,6 @@ export const InputBehaviorsCommon = ({
 
   // Don't track the value of hidden fields except for form_build_id or ones
   // with the 'data-track-hidden-value' attribute set.
-  let setValue = false;
   if (
     ['hidden', 'submit'].includes(elementType as string) &&
     fieldName !== 'form_build_id' &&
@@ -187,7 +186,8 @@ export const InputBehaviorsCommon = ({
   } else if (!attributes['data-drupal-uncontrolled']) {
     // If the input is not explicitly set as uncontrolled, its state should
     // be managed by React.
-    setValue = true;
+    attributes.value = inputValue;
+
     attributes.onChange = (e: React.ChangeEvent) => {
       delete attributes['data-invalid-prop-value'];
 
@@ -274,18 +274,7 @@ export const InputBehaviorsCommon = ({
 
   return (
     <>
-      <OriginalInput
-        {...passProps}
-        attributes={
-          !setValue
-            ? attributes
-            : {
-                ...attributes,
-                value: inputValue,
-              }
-        }
-        options={options}
-      />
+      <OriginalInput {...passProps} attributes={attributes} options={options} />
       {fieldError && (
         <span data-prop-message>
           {`${fieldError.type === 'error' ? '❌ ' : ''}${fieldError.message}`}
