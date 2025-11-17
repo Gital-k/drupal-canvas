@@ -122,6 +122,9 @@ final class CanvasAiComponentDescriptionSettingsForm extends ConfigFormBase {
         ->save();
     }
     parent::submitForm($form, $form_state);
+    // Explicitly set redirect to prevent Drupal from being confused by the
+    // HTTP subrequest made in getAllComponentsKeyedBySource().
+    $form_state->setRedirect('canvas_ai.component_description_settings');
   }
 
   /**

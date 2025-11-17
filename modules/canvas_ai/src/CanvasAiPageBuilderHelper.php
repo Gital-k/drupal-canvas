@@ -26,6 +26,13 @@ class CanvasAiPageBuilderHelper {
   use StringTranslationTrait;
 
   /**
+   * The available components, fetched from the canvas.api.config.list route.
+   *
+   * @var array|null
+   */
+  private ?array $fetchedComponents = NULL;
+
+  /**
    * Constructor.
    *
    * @param \Drupal\Core\Theme\ComponentPluginManager $componentPluginManager
@@ -255,6 +262,11 @@ class CanvasAiPageBuilderHelper {
    *   The components keyed by source.
    */
   public function getAllComponentsKeyedBySource(): array {
+    // Return cached data if available to avoid multiple HTTP subrequests.
+    if ($this->fetchedComponents !== NULL) {
+      return $this->fetchedComponents;
+    }
+
     $output = [];
     $current_request = $this->requestStack->getCurrentRequest();
     $sub_request = Request::create(
@@ -306,6 +318,10 @@ class CanvasAiPageBuilderHelper {
         ];
       }
     }
+
+    // Cache the result for subsequent calls within the same request.
+    $this->componentsCache = $output;
+
     return $output;
   }
 
@@ -342,7 +358,7 @@ class CanvasAiPageBuilderHelper {
    * @param array $component_context
    *   The component context array loaded from the config.
    */
-  private function refreshComponentContext(array &$component_context): void {
+  private function refreshComponentContext(array &$component_context): array {
     // Update the config with the data of newly added/removed components.
     $latest_components = $this->getAllComponentsKeyedBySource();
     $resave_config = FALSE;
@@ -373,6 +389,7 @@ class CanvasAiPageBuilderHelper {
         ->set('component_context', $component_context)
         ->save();
     }
+    return $component_context;
   }
 
   /**
