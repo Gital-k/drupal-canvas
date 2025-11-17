@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useErrorBoundary } from 'react-error-boundary';
 import { InfoCircledIcon } from '@radix-ui/react-icons';
-import { Callout, Spinner, Text } from '@radix-ui/themes';
+import { Callout, Spinner } from '@radix-ui/themes';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import { getPropsValues } from '@/components/form/formUtil';
@@ -47,7 +47,6 @@ import type {
 import type { AjaxUpdateFormStateEvent } from '@/types/Ajax';
 import type { CanvasComponent, FieldData } from '@/types/Component';
 import type { InputUIData } from '@/types/Form';
-import type { TransformConfig } from '@/utils/transforms';
 
 interface ComponentInstanceFormRendererProps {
   currentComponentQueryString: string;
