@@ -6,6 +6,7 @@ namespace Drupal\canvas_ai\EventSubscriber;
 
 use Drupal\canvas_ai\Event\CanvasAiLogEvents;
 use Drupal\canvas_ai\Event\LogAiPromptEvent;
+use Drupal\Component\Serialization\Json;
 use Psr\Log\LoggerAwareTrait;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
@@ -31,8 +32,7 @@ class LogDataSubscriber implements EventSubscriberInterface {
    *   The event object.
    */
   public function logData(LogAiPromptEvent $event): void {
-    $json_logs = json_encode($event->getLogs(), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-    $this->logger?->info($json_logs);
+    $this->logger?->info(Json::encode($event->getLogs()));
   }
 
 }
