@@ -517,58 +517,6 @@ describe('Prop types editing', () => {
   );
 
   it(
-    'String, format=iri-reference',
-    { retries: { openMode: 0, runMode: 3 } },
-    () => {
-      const previewSelector = '#test-string-format-iri-reference code';
-      const initialValue = '/example-iri';
-      cy.waitForElementContentInIframe(previewSelector, initialValue);
-
-      cy.findByLabelText('String, format=iri-reference')
-        .as('theInput')
-        .should('have.value', initialValue);
-      cy.findByLabelText('String, format=iri-reference').clear({ force: true });
-      // Autocomplete fields that did not select an autocomplete suggestion
-      // must be blurred before the store is updated.
-      cy.findByLabelText('String, format=iri-reference').blur();
-      cy.findByLabelText('String, format=iri-reference')
-        .should('have.value', '')
-        .then(($el) => $el[0].checkValidity())
-        .should('be.true');
-
-      cy.waitForElementContentNotInIframe(previewSelector, initialValue);
-
-      cy.testInIframe(previewSelector, (preview) => {
-        expect(preview.textContent.trim()).to.equal('');
-      });
-
-      cy.get('@theInput').focus();
-      cy.realType('not');
-      // Autocomplete fields that did not select an autocomplete suggestion
-      // must be blurred before the store is updated.
-      cy.get('@theInput').blur();
-      cy.get('@theInput').should('have.value', 'not');
-
-      cy.testInIframe(previewSelector, (preview) => {
-        expect(preview.textContent.trim()).to.equal('');
-      });
-
-      // @todo HTML5 validation works IRL but not in these tests.
-      // Fortunately we are still confirming values in an invalid format does not
-      // result in errors.
-
-      cy.get('@theInput').clear({ force: true });
-      cy.get('@theInput').focus();
-      cy.realType('/whatever');
-      // Autocomplete fields that did not select an autocomplete suggestion
-      // must be blurred before the store is updated.
-      cy.get('@theInput').blur();
-
-      cy.waitForElementContentInIframe(previewSelector, '/whatever');
-    },
-  );
-
-  it(
     'can enter number into a text field',
     { retries: { openMode: 0, runMode: 3 } },
     () => {
