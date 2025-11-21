@@ -3,16 +3,14 @@
 namespace Drupal\canvas_ai;
 
 use Drupal\Component\Serialization\Json;
+use Drupal\Core\Cache\CacheBackendInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Theme\ComponentPluginManager;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
-use Drupal\Core\Url;
-use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\RequestStack;
-use Symfony\Component\HttpKernel\HttpKernelInterface;
 use Symfony\Component\Yaml\Yaml;
 use Drupal\Component\Utility\DiffArray;
 use Drupal\Component\Uuid\UuidInterface;
+use Drupal\canvas\Controller\ApiConfigControllers;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
@@ -26,11 +24,9 @@ class CanvasAiPageBuilderHelper {
   use StringTranslationTrait;
 
   /**
-   * The available components, fetched from the canvas.api.config.list route.
-   *
-   * @var array|null
+   * Cache key for storing all components keyed by source.
    */
-  private ?array $fetchedComponents = NULL;
+  private const CACHE_KEY_ALL_COMPONENTS_BY_SOURCE = 'canvas_ai:all_components_by_source';
 
   /**
    * Constructor.
@@ -41,23 +37,23 @@ class CanvasAiPageBuilderHelper {
    *   The entity type manager.
    * @param \Drupal\Core\Config\ConfigFactoryInterface $configFactory
    *   The config factory.
-   * @param \Symfony\Component\HttpKernel\HttpKernelInterface $httpKernel
-   *   The HTTP kernel.
-   * @param \Symfony\Component\HttpFoundation\RequestStack $requestStack
-   *   The stack of requests.
    * @param \Drupal\Component\Uuid\UuidInterface $uuidService
    *   The UUID service.
    * @param \Drupal\canvas_ai\CanvasAiTempStore $canvasAiTempstore
    *   The Canvas AI tempstore.
+   * @param \Drupal\Core\Cache\CacheBackendInterface $cacheBackend
+   *   The cache backend.
+   * @param \Drupal\canvas\Controller\ApiConfigControllers $apiConfigControllers
+   *   The API config controllers service.
    */
   public function __construct(
     private readonly ComponentPluginManager $componentPluginManager,
     private readonly EntityTypeManagerInterface $entityTypeManager,
     private readonly ConfigFactoryInterface $configFactory,
-    private readonly HttpKernelInterface $httpKernel,
-    private readonly RequestStack $requestStack,
     private readonly UuidInterface $uuidService,
     private readonly CanvasAiTempStore $canvasAiTempstore,
+    private readonly CacheBackendInterface $cacheBackend,
+    private readonly ApiConfigControllers $apiConfigControllers,
   ) {
   }
 
@@ -262,26 +258,19 @@ class CanvasAiPageBuilderHelper {
    *   The components keyed by source.
    */
   public function getAllComponentsKeyedBySource(): array {
-    // Return cached data if available to avoid multiple HTTP subrequests.
-    if ($this->fetchedComponents !== NULL) {
-      return $this->fetchedComponents;
+    // Check cache first.
+    $cache = $this->cacheBackend->get(self::CACHE_KEY_ALL_COMPONENTS_BY_SOURCE);
+    if ($cache && !empty($cache->data)) {
+      return $cache->data;
     }
 
     $output = [];
-    $current_request = $this->requestStack->getCurrentRequest();
-    $sub_request = Request::create(
-      Url::fromRoute('canvas.api.config.list', ['canvas_config_entity_type_id' => Component::ENTITY_TYPE_ID])->toString(),
-      'GET',
-      [],
-      $current_request?->cookies->all() ?? [],
-      [],
-      $current_request?->server->all() ?? []
-    );
-    $sub_request->attributes->set('_format', 'json');
+
+    // Call the controller method directly instead of making a subrequest.
+    // This avoids the subrequest overhead that was interfering with form rendering.
     try {
-      $available_components_response = $this->httpKernel->handle($sub_request, HttpKernelInterface::SUB_REQUEST);
-      $available_components = (string) $available_components_response->getContent();
-      $available_components = Json::decode($available_components);
+      $available_components_response = $this->apiConfigControllers->list(Component::ENTITY_TYPE_ID);
+      $available_components = Json::decode((string) $available_components_response->getContent());
     }
     catch (\Exception) {
       return [];
@@ -318,9 +307,14 @@ class CanvasAiPageBuilderHelper {
         ];
       }
     }
-
-    // Cache the result for subsequent calls within the same request.
-    $this->fetchedComponents = $output;
+    // Cache the output.
+    $component_entity_type = $this->entityTypeManager->getDefinition(Component::ENTITY_TYPE_ID);
+    $this->cacheBackend->set(
+      self::CACHE_KEY_ALL_COMPONENTS_BY_SOURCE,
+      $output,
+      CacheBackendInterface::CACHE_PERMANENT,
+      $component_entity_type->getListCacheTags()
+    );
 
     return $output;
   }
