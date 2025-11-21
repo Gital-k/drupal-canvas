@@ -56,9 +56,9 @@ use Symfony\Component\Validator\ConstraintViolationList;
   constraints: [
     'ValidComponentTreeItem' => [],
     'ComponentTreeMeetRequirements' => [
-      // Only StaticPropSources may be used, because using DynamicPropSources is
-      // a decision that should be made at the Content Type Template level by a
-      // Site Builder, not by each Content Creator.
+      // Only StaticPropSources may be used, because using DynamicPropSources or
+      // HostEntityUrlPropSources a decision that should be made at the Content
+      // Template level by a Site Builder, not by each Content Creator.
       // @see https://www.drupal.org/project/canvas/issues/3455629
       'inputs' => [
         'absence' => [
@@ -221,8 +221,10 @@ class ComponentTreeItem extends FieldItemBase {
           'length' => 36,
           // NULL represents either:
           // - the root of the tree
-          // - or the root of a bonsai tree (a tree in a content template's exposed slot)
-          // In the latter case, `slot` must match an exposed slot of the associated `ContentTemplate`.
+          // - or the root of a bonsai tree (a tree in a content template's
+          //   exposed slot)
+          // In the latter case, `slot` must match an exposed slot of the
+          // associated `ContentTemplate`.
           // @see \Drupal\canvas\Plugin\Validation\Constraint\ValidParentAndSlotConstraintValidator
           'not null' => FALSE,
         ],
@@ -324,8 +326,8 @@ class ComponentTreeItem extends FieldItemBase {
       ->setRequired(TRUE);
 
     $properties['component_id'] = DataReferenceTargetDefinition::create('string')
-      // Note we don't add a ConfigExists constraint here as that is validated by
-      // ComponentTreeStructure constraint on the item list.
+      // Note we don't add a ConfigExists constraint here as that is validated
+      // by ComponentTreeStructure constraint on the item list.
       // @see \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList::getConstraints
       ->setLabel(new TranslatableMarkup('Component ID'))
       ->setRequired(TRUE);
@@ -564,7 +566,7 @@ class ComponentTreeItem extends FieldItemBase {
       ));
       return;
     }
-    // Ensure that only ever valid inputs for component instances in an Canvas
+    // Ensure that only ever valid inputs for component instances in a Canvas
     // field are saved. When a field is saved that somehow was not validated,
     // this will catch that.
     // @see \Drupal\canvas\Plugin\Validation\Constraint\ValidComponentTreeItemConstraintValidator

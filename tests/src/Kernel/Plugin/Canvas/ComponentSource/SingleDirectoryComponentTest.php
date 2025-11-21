@@ -38,7 +38,6 @@ use Drupal\Tests\canvas\Kernel\Traits\CiModulePathTrait;
 use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
 use Drupal\Tests\canvas\Traits\SingleDirectoryComponentTreeTestTrait;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
-use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\canvas\Traits\CrawlerTrait;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
 use Drupal\Tests\node\Traits\ContentTypeCreationTrait;
@@ -53,12 +52,11 @@ use Twig\Error\SyntaxError;
  * @phpstan-import-type ComponentConfigEntityId from \Drupal\canvas\Entity\Component
  * @phpstan-import-type SingleComponentInputArray from \Drupal\canvas\Plugin\DataType\ComponentInputs
  */
-final class SingleDirectoryComponentTest extends ComponentSourceTestBase {
+final class SingleDirectoryComponentTest extends GeneratedFieldExplicitInputUxComponentSourceBaseTest {
 
   use ConstraintViolationsTestTrait;
   use ContribStrictConfigSchemaTestTrait;
   use SingleDirectoryComponentTreeTestTrait;
-  use GenerateComponentConfigTrait;
   use CiModulePathTrait;
   use CrawlerTrait;
   use MediaTypeCreationTrait;
@@ -78,6 +76,11 @@ final class SingleDirectoryComponentTest extends ComponentSourceTestBase {
     'field',
     'text',
   ];
+
+  /**
+   * @see ::testRenderSdcWithOptionalObjectShape())
+   */
+  protected string $componentWithOptionalImageProp = 'sdc.canvas_test_sdc.image-optional-with-example-and-additional-prop';
 
   /**
    * Setup tests.
@@ -103,6 +106,8 @@ final class SingleDirectoryComponentTest extends ComponentSourceTestBase {
     $directory = 'public://';
     $file_system->prepareDirectory($directory, FileSystemInterface::CREATE_DIRECTORY);
     $file_system->copy($source, $destination, FileExists::Replace);
+
+    $this->container->get('theme_installer')->install(['sdc_theme_test']);
   }
 
   /**
@@ -125,6 +130,9 @@ final class SingleDirectoryComponentTest extends ComponentSourceTestBase {
     // Nothing discovered initially.
     self::assertSame([], $this->findIneligibleComponents(SingleDirectoryComponent::SOURCE_PLUGIN_ID, 'canvas_test_sdc'));
     self::assertSame([], $this->findCreatedComponentConfigEntities(SingleDirectoryComponent::SOURCE_PLUGIN_ID, 'canvas_test_sdc'));
+
+    self::assertSame([], $this->findIneligibleComponents(SingleDirectoryComponent::SOURCE_PLUGIN_ID, 'sdc_theme_test'));
+    self::assertSame([], $this->findCreatedComponentConfigEntities(SingleDirectoryComponent::SOURCE_PLUGIN_ID, 'sdc_theme_test'));
 
     // Trigger component generation, as if the test module was just installed.
     // (Kernel tests don't trigger all hooks that are triggered in reality.)
@@ -153,8 +161,8 @@ final class SingleDirectoryComponentTest extends ComponentSourceTestBase {
         // because its purpose is to test the ability for components to opt in
         // to consuming additional computed properties on a field instance.
         // See the `the image-srcset-candidate-template-uri component` test case
-        // in FieldForComponentSuggesterTest.
-        // @see \Drupal\Tests\canvas\Kernel\FieldForComponentSuggesterTest
+        // in PropSourceSuggesterTest.
+        // @see \Drupal\Tests\canvas\Kernel\PropSourceSuggesterTest
         'Drupal Canvas does not know of a field type/widget to allow populating the <code>srcSetCandidateTemplate</code> prop, with the shape <code>{"type":"string","format":"uri-template","x-required-variables":["width"]}</code>.',
       ],
       'sdc.canvas_test_sdc.obsolete' => [
@@ -190,9 +198,17 @@ final class SingleDirectoryComponentTest extends ComponentSourceTestBase {
         'Drupal Canvas does not know of a field type/widget to allow populating the <code>data</code> prop, with the shape <code>{"type":"array","items":{"type":"integer","minimum":-100,"maximum":100},"maxItems":100,"minItems":2}</code>.',
       ],
     ], $this->findIneligibleComponents(SingleDirectoryComponent::SOURCE_PLUGIN_ID, 'canvas_test_sdc'));
-    $auto_created_components = $this->findCreatedComponentConfigEntities(SingleDirectoryComponent::SOURCE_PLUGIN_ID, 'canvas_test_sdc');
+    self::assertSame([
+      'sdc.sdc_theme_test.css-load-order' => ['Prop "dummy" must have title'],
+      'sdc.sdc_theme_test.foo' => ['Prop "prop1" must have title'],
+    ], $this->findIneligibleComponents(SingleDirectoryComponent::SOURCE_PLUGIN_ID, 'sdc_theme_test'));
+    $auto_created_components = [
+      ...$this->findCreatedComponentConfigEntities(SingleDirectoryComponent::SOURCE_PLUGIN_ID, 'canvas_test_sdc'),
+      ...$this->findCreatedComponentConfigEntities(SingleDirectoryComponent::SOURCE_PLUGIN_ID, 'sdc_theme_test'),
+    ];
     self::assertSame([
       'sdc.canvas_test_sdc.attributes',
+      'sdc.canvas_test_sdc.banner',
       'sdc.canvas_test_sdc.card',
       'sdc.canvas_test_sdc.card-with-local-image',
       'sdc.canvas_test_sdc.card-with-remote-image',
@@ -225,6 +241,10 @@ final class SingleDirectoryComponentTest extends ComponentSourceTestBase {
       'sdc.canvas_test_sdc.tags',
       'sdc.canvas_test_sdc.two_column',
       'sdc.canvas_test_sdc.video',
+      'sdc.sdc_theme_test.bar',
+      'sdc.sdc_theme_test.lib-overrides',
+      'sdc.sdc_theme_test.my-card',
+      'sdc.sdc_theme_test_base.my-card-no-schema',
     ], $auto_created_components);
 
     return array_combine($auto_created_components, $auto_created_components);
@@ -315,6 +335,40 @@ HTML,
           'library' => [
             'core/components.canvas_test_sdc--attributes',
             'core/components.canvas_test_sdc--attributes',
+          ],
+        ],
+      ],
+      'sdc.canvas_test_sdc.banner' => [
+        'html' => <<<HTML
+<article class="banner">
+  <header>
+    <h2>My banner title</h2>
+  </header>
+  <div class="container">
+          <div class="image">
+        <img
+   class="banner--image"
+   src="::CANVAS_MODULE_PATH::/tests/modules/canvas_test_sdc/components/banner/balloons.png"
+           alt="Hot air balloons"
+           width="640"
+           height="427"
+      loading="lazy"
+    data-testid="banner-component-image" data-component-id="canvas:image"
+/>
+      </div>
+        <div class="content">
+      <p><p>In a curious work, published in <em>Paris</em> in 1863 by <strong>Delaville Dedreux</strong>, there is a suggestion for reaching the North Pole by an aerostat.</p></p>
+    </div>
+  </div>
+</article>
+
+HTML,
+        'cacheability' => $default_cacheability,
+        'attachments' => [
+          'library' => [
+            'core/components.canvas_test_sdc--banner',
+            'core/components.canvas--image',
+            'core/components.canvas_test_sdc--banner',
           ],
         ],
       ],
@@ -873,6 +927,68 @@ activation="auto">
           ],
         ],
       ],
+      'sdc.sdc_theme_test.bar' => [
+        'html' => <<<'HTML'
+<h1>Bar</h1>
+
+HTML,
+        'cacheability' => $default_cacheability,
+        'attachments' => [
+          'library' => [
+            'core/components.sdc_theme_test--bar',
+            'core/components.sdc_theme_test--bar',
+          ],
+        ],
+      ],
+      'sdc.sdc_theme_test.lib-overrides' => [
+        'html' => 'It works
+',
+        'cacheability' => $default_cacheability,
+        'attachments' => [
+          'library' => [
+            'core/components.sdc_theme_test--lib-overrides',
+            'core/components.sdc_theme_test--lib-overrides',
+          ],
+        ],
+      ],
+      'sdc.sdc_theme_test.my-card' => [
+        'html' => <<<'HTML'
+<div  data-component-id="sdc_theme_test:my-card">
+  <h2 class="component--my-card__header">I am a header!</h2>
+  <div class="component--my-card__body">
+          Default contents for a card
+      </div>
+</div>
+
+HTML
+        ,
+        'cacheability' => $default_cacheability,
+        'attachments' => [
+          'library' => [
+            'core/components.sdc_theme_test--my-card',
+            'core/components.sdc_theme_test--my-card',
+          ],
+        ],
+      ],
+      'sdc.sdc_theme_test_base.my-card-no-schema' => [
+        'html' => <<<'HTML'
+<div  data-component-id="sdc_theme_test_base:my-card-no-schema">
+  <h2 class="component--my-card-no-schema__header"></h2>
+  <div class="component--my-card-no-schema__body">
+          Default contents for a card
+      </div>
+</div>
+
+HTML
+        ,
+        'cacheability' => $default_cacheability,
+        'attachments' => [
+          'library' => [
+            'core/components.sdc_theme_test_base--my-card-no-schema',
+            'core/components.sdc_theme_test_base--my-card-no-schema',
+          ],
+        ],
+      ],
     ], $rendered);
   }
 
@@ -1170,6 +1286,50 @@ activation="auto">
             'field_widget' => 'string_textfield',
             'default_value' => [0 => ['value' => 'The not-attributes SDC prop!']],
             'expression' => 'ℹ︎string␟value',
+          ],
+        ],
+      ],
+      'sdc.canvas_test_sdc.banner' => [
+        'prop_field_definitions' => [
+          'heading' => [
+            'required' => TRUE,
+            'field_type' => 'string',
+            'field_storage_settings' => [],
+            'field_instance_settings' => [],
+            'field_widget' => 'string_textfield',
+            'default_value' => [
+              0 => [
+                'value' => 'My banner title',
+              ],
+            ],
+            'expression' => 'ℹ︎string␟value',
+          ],
+          'image' => [
+            'required' => FALSE,
+            'field_type' => 'image',
+            'field_storage_settings' => [],
+            'field_instance_settings' => [],
+            'field_widget' => 'image_image',
+            'default_value' => [],
+            'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
+          ],
+          'text' => [
+            'required' => FALSE,
+            'field_type' => 'text_long',
+            'field_storage_settings' => [],
+            'field_instance_settings' => [
+              'allowed_formats' => [
+                'canvas_html_block',
+              ],
+            ],
+            'field_widget' => 'text_textarea',
+            'default_value' => [
+              0 => [
+                'value' => '<p>In a curious work, published in <em>Paris</em> in 1863 by <strong>Delaville Dedreux</strong>, there is a suggestion for reaching the North Pole by an aerostat.</p>',
+                'format' => 'canvas_html_block',
+              ],
+            ],
+            'expression' => 'ℹ︎text_long␟processed',
           ],
         ],
       ],
@@ -2206,6 +2366,32 @@ activation="auto">
           ],
         ],
       ],
+      'sdc.sdc_theme_test.bar' => [
+        'prop_field_definitions' => [],
+      ],
+      'sdc.sdc_theme_test.lib-overrides' => [
+        'prop_field_definitions' => [],
+      ],
+      'sdc.sdc_theme_test.my-card' => [
+        'prop_field_definitions' => [
+          'header' => [
+            'required' => TRUE,
+            'field_type' => 'string',
+            'field_storage_settings' => [],
+            'field_instance_settings' => [],
+            'field_widget' => 'string_textfield',
+            'default_value' => [
+              0 => [
+                'value' => 'I am a header!',
+              ],
+            ],
+            'expression' => 'ℹ︎string␟value',
+          ],
+        ],
+      ],
+      'sdc.sdc_theme_test_base.my-card-no-schema' => [
+        'prop_field_definitions' => [],
+      ],
     ];
   }
 
@@ -2218,6 +2404,19 @@ activation="auto">
       'sdc.canvas_test_sdc.attributes' => [
         'module' => [
           'core',
+          'canvas_test_sdc',
+        ],
+      ],
+      'sdc.canvas_test_sdc.banner' => [
+        'config' => [
+          'filter.format.canvas_html_block',
+          'image.style.canvas_parametrized_width',
+        ],
+        'module' => [
+          'core',
+          'file',
+          'image',
+          'text',
           'canvas_test_sdc',
         ],
       ],
@@ -2476,6 +2675,19 @@ activation="auto">
           2 => 'canvas_test_sdc',
         ],
       ],
+      'sdc.sdc_theme_test.bar' => [
+        'theme' => ['sdc_theme_test'],
+      ],
+      'sdc.sdc_theme_test.lib-overrides' => [
+        'theme' => ['sdc_theme_test'],
+      ],
+      'sdc.sdc_theme_test.my-card' => [
+        'module' => ['core'],
+        'theme' => ['sdc_theme_test'],
+      ],
+      'sdc.sdc_theme_test_base.my-card-no-schema' => [
+        'theme' => ['sdc_theme_test_base'],
+      ],
     ], $this->callSourceMethodForEach('calculateDependencies', $component_ids));
   }
 
@@ -2503,6 +2715,101 @@ activation="auto">
                 0 => ['value' => 'The not-attributes SDC prop!'],
               ],
               'resolved' => 'The not-attributes SDC prop!',
+            ],
+          ],
+        ],
+        'transforms' => [],
+      ],
+      'sdc.canvas_test_sdc.banner' => [
+        'expected_output_selectors' => [
+          'article.banner',
+          'article.banner img.banner--image',
+        ],
+        'source' => 'Module component',
+        'metadata' => ['slots' => []],
+        'propSources' => [
+          'heading' => [
+            'required' => TRUE,
+            'jsonSchema' => [
+              'type' => 'string',
+            ],
+            'sourceType' => 'static:field_item:string',
+            'expression' => 'ℹ︎string␟value',
+            'default_values' => [
+              'source' => [
+                0 => [
+                  'value' => 'My banner title',
+                ],
+              ],
+              'resolved' => 'My banner title',
+            ],
+          ],
+          'text' => [
+            'required' => FALSE,
+            'jsonSchema' => [
+              'type' => 'string',
+              'contentMediaType' => 'text/html',
+              'x-formatting-context' => 'block',
+            ],
+            'sourceType' => 'static:field_item:text_long',
+            'expression' => 'ℹ︎text_long␟processed',
+            'sourceTypeSettings' => [
+              'instance' => [
+                'allowed_formats' => [
+                  'canvas_html_block',
+                ],
+              ],
+            ],
+            'default_values' => [
+              'source' => [
+                0 => [
+                  'value' => '<p>In a curious work, published in <em>Paris</em> in 1863 by <strong>Delaville Dedreux</strong>, there is a suggestion for reaching the North Pole by an aerostat.</p>',
+                  'format' => 'canvas_html_block',
+                ],
+              ],
+              'resolved' => '<p>In a curious work, published in <em>Paris</em> in 1863 by <strong>Delaville Dedreux</strong>, there is a suggestion for reaching the North Pole by an aerostat.</p>',
+            ],
+          ],
+          'image' => [
+            'required' => FALSE,
+            'jsonSchema' => [
+              'title' => 'image',
+              'type' => 'object',
+              'required' => [
+                0 => 'src',
+              ],
+              'properties' => [
+                'src' => [
+                  'title' => 'Image URL',
+                  'type' => 'string',
+                  'format' => 'uri-reference',
+                  'contentMediaType' => 'image/*',
+                  'x-allowed-schemes' => ['http', 'https'],
+                ],
+                'alt' => [
+                  'title' => 'Alternative text',
+                  'type' => 'string',
+                ],
+                'width' => [
+                  'title' => 'Image width',
+                  'type' => 'integer',
+                ],
+                'height' => [
+                  'title' => 'Image height',
+                  'type' => 'integer',
+                ],
+              ],
+            ],
+            'sourceType' => 'static:field_item:image',
+            'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
+            'default_values' => [
+              'source' => [],
+              'resolved' => [
+                'src' => '/' . \Drupal::service(ExtensionPathResolver::class)->getPath('module', 'canvas_test_sdc') . '/components/banner/balloons.png',
+                'alt' => 'Hot air balloons',
+                'width' => 640,
+                'height' => 427,
+              ],
             ],
           ],
         ],
@@ -4484,6 +4791,67 @@ activation="auto">
             ],
           ],
         ],
+        'transforms' => [],
+      ],
+      'sdc.sdc_theme_test.bar' => [
+        'expected_output_selectors' => [
+          'h1',
+        ],
+        'source' => 'Theme component',
+        'metadata' => ['slots' => []],
+        'propSources' => [],
+        'transforms' => [],
+      ],
+      'sdc.sdc_theme_test.lib-overrides' => [
+        'expected_output_selectors' => [
+          ':root ',
+        ],
+        'source' => 'Theme component',
+        'metadata' => ['slots' => []],
+        'propSources' => [],
+        'transforms' => [],
+      ],
+      'sdc.sdc_theme_test.my-card' => [
+        'expected_output_selectors' => [
+          '[data-component-id="sdc_theme_test:my-card"]',
+        ],
+        'source' => 'Theme component',
+        'metadata' => [
+          'slots' => [
+            'card_body' => [
+              'title' => 'Body',
+              'description' => 'The contents of the card.',
+              'examples' => [
+                '<p>Foo is <strong>NOT</strong> bar.</p>',
+              ],
+            ],
+          ],
+        ],
+        'propSources' => [
+          'header' => [
+            'required' => TRUE,
+            'jsonSchema' => [
+              'type' => 'string',
+            ],
+            'sourceType' => 'static:field_item:string',
+            'expression' => 'ℹ︎string␟value',
+            'default_values' => [
+              'source' => [
+                0 => ['value' => 'I am a header!'],
+              ],
+              'resolved' => 'I am a header!',
+            ],
+          ],
+        ],
+        'transforms' => [],
+      ],
+      'sdc.sdc_theme_test_base.my-card-no-schema' => [
+        'expected_output_selectors' => [
+          '[data-component-id="sdc_theme_test_base:my-card-no-schema"]',
+        ],
+        'source' => 'Theme component',
+        'metadata' => ['slots' => []],
+        'propSources' => [],
         'transforms' => [],
       ],
     ];

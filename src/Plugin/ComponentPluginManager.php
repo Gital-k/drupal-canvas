@@ -27,7 +27,7 @@ use JsonSchema\Exception\RuntimeException;
 use JsonSchema\SchemaStorage;
 
 /**
- * Decorator that auto-creates/updates an Drupal Canvas Component entity per SDC.
+ * Decorator that auto-creates/updates a Drupal Canvas Component entity per SDC.
  *
  * @see \Drupal\canvas\Entity\Component
  */
@@ -70,7 +70,8 @@ class ComponentPluginManager extends CoreComponentPluginManager implements Categ
   protected function setCachedDefinitions($definitions): array {
     parent::setCachedDefinitions($definitions);
 
-    // Do not auto-create/update Canvas configuration when syncing config/deploying.
+    // Do not auto-create/update Canvas configuration when syncing
+    // config/deploying.
     // @todo Introduce a "Canvas development mode" similar to Twig's: https://www.drupal.org/node/3359728
     // @phpstan-ignore-next-line
     if (\Drupal::isConfigSyncing()) {

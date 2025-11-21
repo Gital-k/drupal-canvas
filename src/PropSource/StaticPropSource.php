@@ -63,13 +63,6 @@ final class StaticPropSource extends PropSourceBase {
   ) {}
 
   /**
-   * {@inheritdoc}
-   */
-  public static function getSourceTypePrefix(): string {
-    return 'static';
-  }
-
-  /**
    * Two StaticPropSources have the same shape if they have identical storage.
    *
    * @return bool
@@ -133,10 +126,12 @@ final class StaticPropSource extends PropSourceBase {
     // - field type
     // - cardinality
     // @see \Drupal\Core\Field\FieldStorageDefinitionInterface
-    // TRICKY: this does not work due to it using BaseFieldDefinition, and BaseFieldDefinition::getOptionsProvider() assuming it to exist on the host entity. Hence the use of Canvas's own \Drupal\canvas\PropSource\FieldStorageDefinition.
+    // TRICKY: this does not work due to it using BaseFieldDefinition, and
+    // BaseFieldDefinition::getOptionsProvider() assuming it to exist on the
+    // host entity. Hence the use of Canvas's own
+    // \Drupal\canvas\PropSource\FieldStorageDefinition.
     // @see \Drupal\Core\Field\TypedData\FieldItemDataDefinition::createFromDataType()
     // @todo Refactor this after https://www.drupal.org/node/2280639 is fixed.
-    // $field_item_definition = $typed_data_manager->createDataDefinition($data_type);
     $storage_definition = FieldStorageDefinition::create($field_type);
     // @see \Drupal\Core\Field\BaseFieldDefinition::getCardinality()
     if ($cardinality) {
@@ -399,7 +394,7 @@ final class StaticPropSource extends PropSourceBase {
   }
 
   public function getSourceType(): string {
-    return self::getSourceTypePrefix() . self::SOURCE_TYPE_PREFIX_SEPARATOR . $this->fieldItemList->getItemDefinition()->getDataType();
+    return parent::getSourceType() . self::SOURCE_TYPE_PREFIX_SEPARATOR . $this->fieldItemList->getItemDefinition()->getDataType();
   }
 
   public function getValue(): mixed {

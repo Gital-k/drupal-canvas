@@ -129,6 +129,22 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
   protected ?VersionedConfigurationSubsetSingleLazyPluginCollection $sourcePluginCollection = NULL;
 
   /**
+   * Tracks the new versions created during its lifetime, until saving.
+   *
+   * @see ::preSave()
+   */
+  protected array $newVersionsDuringLifeTime = [];
+
+  /**
+   * {@inheritdoc}
+   */
+  public function __sleep(): array {
+    // @see \Drupal\Core\Database\Connection::__sleep()
+    // @see \Drupal\Core\Site\Settings::__sleep()
+    throw new \LogicException('The Canvas Component config entity type should never be serialized; it should always be loaded when needed.');
+  }
+
+  /**
    * {@inheritdoc}
    */
   public function id(): string {
@@ -190,10 +206,10 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
    *   The corresponding list of PHP FQCNs. Depending on the component type,
    *   this may be one unique class per Component config entity (ID), or the
    *   same class for all.
-   *   For example: all SDC-sourced Canvas Components use the same (plugin) class
-   *   (and even interface) interface, but every Block plugin-sourced Canvas
-   *   Components has a unique (plugin) class, and often even a unique (plugin)
-   *   interface.
+   *   For example: all SDC-sourced Canvas Components use the same (plugin)
+   *   class (and even interface) interface, but every Block plugin-sourced
+   *   Canvas Components has a unique (plugin) class, and often even a unique
+   *   (plugin) interface.
    *   @see \Drupal\Core\Theme\ComponentPluginManager::$defaults
    */
   public static function getClasses(array $ids): array {
@@ -305,8 +321,8 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
       $build = [
         '#type' => RenderSafeComponentContainer::PLUGIN_ID,
         '#component' => $build + [
-          // Wrap each rendered component instance in HTML comments that allow the
-          // client side to identify it.
+          // Wrap each rendered component instance in HTML comments that allow
+          // the client side to identify it.
           // @see \Drupal\canvas\Plugin\DataType\ComponentTreeHydrated::renderify()
           '#prefix' => Markup::create("<!-- canvas-start-$component_config_entity_uuid -->"),
           '#suffix' => Markup::create("<!-- canvas-end-$component_config_entity_uuid -->"),
@@ -369,8 +385,8 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
   /**
    * Uses heuristics to compute the appropriate "library" in the Canvas UI.
    *
-   * Each Component appears in a well-defined "library" in the Canvas UI. This is a
-   * set of heuristics with a particular decision tree.
+   * Each Component appears in a well-defined "library" in the Canvas UI. This
+   * is a set of heuristics with a particular decision tree.
    *
    * @see https://www.drupal.org/project/canvas/issues/3498419#comment-15997505
    */
@@ -529,16 +545,17 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
       return parent::onDependencyRemoval($dependencies);
     }
 
-    // When it is affected, then if there's 0 component instances using it, still
-    // there is nothing to do, because none of Drupal Canvas's config
+    // When it is affected, then if there's 0 component instances using it,
+    // still there is nothing to do, because none of Drupal Canvas's config
     // entities are affected, nor are any Canvas fields on content entities.
     if (!\Drupal::service(ComponentAudit::class)->hasUsages($this, RevisionAuditEnum::All) && !\Drupal::service(ComponentAudit::class)->hasUsages($this, RevisionAuditEnum::AutoSave)) {
       return parent::onDependencyRemoval($dependencies);
     }
 
     // However, if there's >=1 component instance for it, make this Component
-    // use the `fallback` component source plugin to avoid deleting dependent Canvas
-    // config entities and breaking Canvas component trees in content entities.
+    // use the `fallback` component source plugin to avoid deleting dependent
+    // Canvas config entities and breaking Canvas component trees in content
+    // entities.
     $last_active_version = $this->getActiveVersion();
     $this->createVersion(ComponentInterface::FALLBACK_VERSION)
       ->setSettings([
@@ -554,23 +571,62 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
     return \Drupal::service(CanvasConfigUpdater::class);
   }
 
-  public function preSave(EntityStorageInterface $storage): void {
-    if (!$this->isSyncing()) {
-      $this->getConfigUpdater()->updatePropFieldDefinitionsWithRequiredFlag($this);
-    }
-    parent::preSave($storage);
+  /**
+   * Computes the `fallback_metadata` except when using the `fallback` source.
+   *
+   * @return void
+   */
+  private function populateFallbackMetadata(): void {
     assert($this->isLoadedVersionActiveVersion());
     $source = $this->getComponentSource();
-    // Compute the appropriate `fallback_metadata` upon saving, except for the fallback plugin.
+
     if ($source instanceof Fallback) {
       return;
     }
-    elseif ($source instanceof ComponentSourceWithSlotsInterface) {
-      $this->versioned_properties[VersionedConfigEntityBase::ACTIVE_VERSION]['fallback_metadata']['slot_definitions'] = \array_map(self::cleanSlotDefinition(...), $source->getSlotDefinitions());
+
+    $this->versioned_properties[VersionedConfigEntityBase::ACTIVE_VERSION]['fallback_metadata']['slot_definitions'] = NULL;
+    if ($source instanceof ComponentSourceWithSlotsInterface) {
+      $this->versioned_properties[VersionedConfigEntityBase::ACTIVE_VERSION]['fallback_metadata']['slot_definitions'] = \array_map(
+        self::cleanSlotDefinition(...),
+        $source->getSlotDefinitions(),
+      );
     }
-    else {
-      $this->versioned_properties[VersionedConfigEntityBase::ACTIVE_VERSION]['fallback_metadata']['slot_definitions'] = NULL;
+  }
+
+  public function preSave(EntityStorageInterface $storage): void {
+    if (!$this->isSyncing()) {
+      $this->getConfigUpdater()->updatePropFieldDefinitionsWithRequiredFlag($this);
+      $this->getConfigUpdater()->updatePropFieldDefinitionsUsingTextValue($this);
     }
+    parent::preSave($storage);
+
+    // Populates the fallback metadata for the active version.
+    $this->populateFallbackMetadata();
+    // If multiple versions were created, they must all have been for the same
+    // implementation of that component: that cannot change mid-request! Hence
+    // use the same fallback metadata for all those versions.
+    // all the versions that were created during this .
+    foreach ($this->newVersionsDuringLifeTime as $new_version) {
+      if ($new_version === $this->getActiveVersion()) {
+        continue;
+      }
+      // If a version was created and immediately deleted, it doesn't need any
+      // fallback metadata.
+      if (!in_array($new_version, $this->getVersions())) {
+        continue;
+      }
+      $this->versioned_properties[$new_version]['fallback_metadata'] = $this->versioned_properties[VersionedConfigEntityBase::ACTIVE_VERSION]['fallback_metadata'];
+    }
+    $this->newVersionsDuringLifeTime = [];
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function createVersion(string $version): static {
+    parent::createVersion($version);
+    $this->newVersionsDuringLifeTime[] = $version;
+    return $this;
   }
 
   public function postSave(EntityStorageInterface $storage, $update = TRUE): void {

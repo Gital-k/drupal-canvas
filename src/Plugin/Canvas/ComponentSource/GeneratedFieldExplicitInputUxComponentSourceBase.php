@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace Drupal\canvas\Plugin\Canvas\ComponentSource;
 
 use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\canvas\PropSource\DynamicPropSource;
-use Drupal\canvas\ShapeMatcher\FieldForComponentSuggester;
+use Drupal\canvas\ShapeMatcher\PropSourceSuggester;
 use Drupal\Component\Plugin\DependentPluginInterface;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Entity\EntityInterface;
@@ -100,7 +101,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     private readonly ComponentValidator $componentValidator,
     private readonly WidgetPluginManager $fieldWidgetPluginManager,
     protected readonly EntityTypeManagerInterface $entityTypeManager,
-    private readonly FieldForComponentSuggester $fieldForComponentSuggester,
+    private readonly PropSourceSuggester $propSourceSuggester,
     private readonly LoggerChannelInterface $logger,
   ) {
     assert(array_key_exists('local_source_id', $configuration));
@@ -119,7 +120,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       $container->get(ComponentValidator::class),
       $container->get('plugin.manager.field.widget'),
       $container->get(EntityTypeManagerInterface::class),
-      $container->get(FieldForComponentSuggester::class),
+      $container->get(PropSourceSuggester::class),
       $container->get('logger.channel.canvas'),
     );
   }
@@ -266,9 +267,9 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     /** @var array<string, mixed> $component_schema */
     $component_schema = $metadata->schema;
     foreach ($component_schema['properties'] ?? [] as $prop_name => $prop_schema) {
-      // TRICKY: `Attribute`-typed props are a special case that we need to ignore.
-      // Even more TRICKY, `attributes` named prop is even a more special case —
-      // as it's initialized by default.
+      // TRICKY: `Attribute`-typed props are a special case that we need to
+      // ignore. Even more TRICKY, `attributes` named prop is even a more
+      // special case — as it's initialized by default.
       // @see \Drupal\sdc\Twig\TwigExtension::mergeAdditionalRenderContext()
       // @see https://www.drupal.org/project/drupal/issues/3352063#comment-15277820
       // @see `canvas_test_sdc:attributes` component template as an example for
@@ -368,6 +369,32 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
   public function hydrateComponent(array $explicit_input, array $slot_definitions): array {
     $hydrated[self::EXPLICIT_INPUT_NAME] = $explicit_input['resolved'];
 
+    // Omit optional props whose value evaluated to NULL. Otherwise, an SDC
+    // validation error is triggered.
+    // @see \Drupal\Core\Theme\Component\ComponentValidator::validateProps()
+    $prop_field_definitions = $this->configuration['prop_field_definitions'];
+    foreach ($hydrated[self::EXPLICIT_INPUT_NAME] as $prop => $resolved_value) {
+      // The stored inputs SHOULD match the live schema, but mid-development or
+      // due to a botched release, that is impossible to guarantee.
+      // @see https://en.wikipedia.org/wiki/Robustness_principle
+      if (!array_key_exists($prop, $prop_field_definitions)) {
+        continue;
+      }
+      $is_required = $prop_field_definitions[$prop]['required'];
+      if (!$is_required && $resolved_value === NULL) {
+        unset($hydrated[self::EXPLICIT_INPUT_NAME][$prop]);
+        continue;
+      }
+      // Special case: optional `type: object`-shaped props if all key-value
+      // pairs evaluated to NULL (which is only possible/allowed because the
+      // entire object is optional).
+      $prop_expression = StructuredDataPropExpression::fromString($prop_field_definitions[$prop]['expression']);
+      $is_object_prop_shape = $prop_expression instanceof FieldTypeObjectPropsExpression;
+      if (!$is_required && $is_object_prop_shape && empty(array_filter($resolved_value))) {
+        unset($hydrated[self::EXPLICIT_INPUT_NAME][$prop]);
+      }
+    }
+
     if (!empty($slot_definitions)) {
       // Use the first example defined in SDC metadata, if it exists. Otherwise,
       // fall back to `"#plain_text => ''`, which is accepted by SDC's rendering
@@ -398,7 +425,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       // to in order to correctly render the component instance.
       // Also note that this will NOT run anymore for a given prop once the
       // Content Creator has specified a value in the generated field widget.
-      if ($model['source'][$prop_name]['sourceType'] === DefaultRelativeUrlPropSource::getSourceTypePrefix()) {
+      if (PropSource::tryFrom($model['source'][$prop_name]['sourceType']) === PropSource::DefaultRelativeUrl) {
         // TRICKY: use the default static prop source as-is, with its default
         // value, because:
         // - the server side can ONLY store a `StaticPropSource` if it actually
@@ -531,11 +558,13 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       $errors = explode("\n", $e->getMessage());
       foreach ($errors as $error) {
         // An example error:
+        // phpcs:disable Drupal.Files.LineLength.TooLong
         // @code
         // [style] Does not have a value in the enumeration ["primary","secondary"]
         // @endcode
-        // In that string, `[style]` is the bracket-enclosed SDC prop name
-        // for which an error occurred. This string must be parsed.
+        // phpcs:enable
+        // In that string, `[style]` is the bracket-enclosed SDC prop name for
+        // which an error occurred. This string must be parsed.
         $sdc_prop_name_closing_bracket_pos = strpos($error, ']', 1);
         assert($sdc_prop_name_closing_bracket_pos !== FALSE);
         // This extracts `style` and the subsequent error message from the
@@ -578,8 +607,9 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
 
     // @todo Uncomment this once it is guaranteed that the POST request to add
     // the component instance happens first.
+    // phpcs:disable Drupal.Files.LineLength.TooLong
     // assert(!is_null(\Drupal::service(ComponentTreeLoader::class)->load($entity)->getComponentTreeItemByUuid($component_instance_uuid)), 'The passed $entity does not contain the component instance being edited.');
-
+    // phpcs:enable
     // Some field widgets need an entity object. Provide such a "parent" entity.
     // @see \Drupal\Core\Field\FieldItemListInterface::getEntity()
     // @see \Drupal\canvas\PropSource\StaticPropSource::formTemporaryRemoveThisExclamationExclamationExclamation()
@@ -589,8 +619,8 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       default => throw new \LogicException(),
     };
 
-    // Allow form alterations specific to Canvas component instance forms (currently
-    // only "static prop sources").
+    // Allow form alterations specific to Canvas component instance forms
+    // (currently only "static prop sources").
     $form_state->set('is_canvas_static_prop_source', TRUE);
 
     $prop_field_definitions = $settings['prop_field_definitions'];
@@ -623,7 +653,8 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       if (!$source instanceof StaticPropSource) {
         // @todo Build DynamicPropSource UX in https://www.drupal.org/i/3541037. Related: https://www.drupal.org/project/canvas/issues/3459234
         // @todo Design is undefined for the AdaptedPropSource UX.
-        // Fall back to the static version, disabled for now where the design is undefined.
+        // Fall back to the static version, disabled for now where the design is
+        // undefined.
         $disabled = !$source instanceof DefaultRelativeUrlPropSource;
         $source = $this->getDefaultStaticPropSource($sdc_prop_name, FALSE);
       }
@@ -640,13 +671,14 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       $label = $component_schema['properties'][$sdc_prop_name]['title'];
       assert($component instanceof Component);
       $widget = $source->getWidget($component->id(), $component->getLoadedVersion(), $sdc_prop_name, $label, $field_widget_plugin_id);
-      // This allows us to know that a prop that no longer exists used to be required.
+      // This allows us to know that a prop that no longer exists used to be
+      // required.
       $is_required = $prop_field_definitions[$sdc_prop_name]['required'];
       $form[$sdc_prop_name] = $source->formTemporaryRemoveThisExclamationExclamationExclamation($widget, $sdc_prop_name, $is_required, $entity_object_for_field_widget, $form, $form_state);
       $form[$sdc_prop_name]['#disabled'] = $disabled;
 
       if ($entity instanceof ContentTemplate) {
-        $suggestions = FieldForComponentSuggester::structureSuggestionsForHierarchicalResponse($this->fieldForComponentSuggester->suggest(
+        $suggestions = PropSourceSuggester::structureSuggestionsForHierarchicalResponse($this->propSourceSuggester->suggest(
           $this->getSourceSpecificComponentId(),
           $this->getMetadata(),
           $entity->getTargetEntityDataDefinition(),
@@ -911,7 +943,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
         continue;
       }
 
-      $schema = $component_plugin->metadata->schema;
+      $schema = $component_plugin->metadata->schema ?? [];
       $props[$cpe->propName] = [
         'required' => isset($schema['required']) && in_array($cpe->propName, $schema['required'], TRUE),
         'field_type' => $storable_prop_shape->fieldTypeProp instanceof ReferenceFieldTypePropExpression
@@ -1071,10 +1103,10 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
         // `StaticPropSource`. This is true for any example values that must be
         // transformed into browser-resolvable URLs, rather than component
         // -relative URLs: links, image URLs, video URLs, etc.
-        // These example values are used both in Canvas's preview and when rendering
-        // the live site. The Content Author must be given the opportunity to
-        // specify a value different from the example. But both are powered by
-        // different prop sources:
+        // These example values are used both in Canvas's preview and when
+        // rendering the live site. The Content Author must be given the
+        // opportunity to specify a value different from the example. But both
+        // are powered by different prop sources:
         // - actual values specified by the Content Creator are represented in
         //   `StaticPropSource`s
         // - example values (of this very specific nature that a URL rewrite is
@@ -1114,7 +1146,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
         // @see EvaluatedComponentModel type-script definition.
         // For static props undo what ::inputToClientModel() did: restore the
         // omitted `'value'` in cases where it is the same as the source value.
-        if (str_starts_with($prop_source['sourceType'] ?? '', StaticPropSource::getSourceTypePrefix()) && !\array_key_exists('value', $prop_source)) {
+        if (str_starts_with($prop_source['sourceType'] ?? '', PropSource::getTypePrefix(StaticPropSource::class)) && !\array_key_exists('value', $prop_source)) {
           $prop_source['value'] = $prop_value;
         }
         $source = PropSource::parse($prop_source);
@@ -1138,10 +1170,10 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
         // Required string component props that are completely free-form (so:
         // without a non-zero `minLength`, without a `format` or `pattern`) that
         // evaluate to '' must be retained: while the empty string is NOT
-        // considered a valid value, this is the fallback behavior Canvas opts for
-        // to enhance the user experience: it allows a component to render even
-        // at the point in time where a Content Author has *emptied* the string
-        // input, as they're thinking about what string they do want.
+        // considered a valid value, this is the fallback behavior Canvas opts
+        // for to enhance the user experience: it allows a component to render
+        // even at the point in time where a Content Author has *emptied* the
+        // string input, as they're thinking about what string they do want.
         // ⚠️ This won't work for components whose logic specifically checks for
         // an empty string and refuses to render then.
         // @todo Expand to support multiple-cardinality.
@@ -1153,9 +1185,9 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
           assert(!$source instanceof StaticPropSource || ($source->fieldItemList->count() > 0 && $source->fieldItemList->isEmpty()));
         }
         // 💡 Automatically inform developers of missing client-side transforms,
-        // which is the most likely explanation for a value sent by the Canvas UI
-        // not being accepted by the field type. However, gracefully degrade and
-        // log a deprecation error.
+        // which is the most likely explanation for a value sent by the Canvas
+        // UI not being accepted by the field type. However, gracefully degrade
+        // and log a deprecation error.
         // @see https://en.wikipedia.org/wiki/Robustness_principle
         elseif ($source instanceof StaticPropSource && $source->fieldItemList->count() > 0 && $source->fieldItemList->isEmpty()) {
           // @todo Investigate in https://www.drupal.org/project/canvas/issues/3535024, and preferably add extra guardrails and convert this to an exception

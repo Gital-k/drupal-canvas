@@ -342,7 +342,7 @@ class CanvasAiPageBuilderHelper {
    * @param array $component_context
    *   The component context array loaded from the config.
    */
-  private function refreshComponentContext(array &$component_context): array {
+  private function refreshComponentContext(array &$component_context): void {
     // Update the config with the data of newly added/removed components.
     $latest_components = $this->getAllComponentsKeyedBySource();
     $resave_config = FALSE;
@@ -373,7 +373,6 @@ class CanvasAiPageBuilderHelper {
         ->set('component_context', $component_context)
         ->save();
     }
-    return $component_context;
   }
 
   /**
@@ -797,7 +796,6 @@ class CanvasAiPageBuilderHelper {
 
     foreach ($operations['operations'] as $operation) {
       $target = $operation['target'];
-      $reference_uuid = $operation['reference_uuid'];
       $placement = $operation['placement'];
       $components = $operation['components'];
 
@@ -814,6 +812,7 @@ class CanvasAiPageBuilderHelper {
       elseif ($placement === 'below' || $placement === 'above') {
         // Placement above or below is for adding components above or below
         // an existing component in the current layout.
+        $reference_uuid = $operation['reference_uuid'];
         $modified_layout = $this->placeComponentsAboveOrBelow($modified_layout, $reference_uuid, $placement, $component_tree);
       }
     }
@@ -1190,6 +1189,67 @@ class CanvasAiPageBuilderHelper {
     }
 
     return !empty($node[$slot_name]);
+  }
+
+  /**
+   * Generate verbose context for Orchestrator.
+   *
+   * @param array $prompt
+   *   Array containing context details.
+   *
+   * @return string
+   *   Verbose context string.
+   */
+  public function generateVerboseContextForOrchestrator(array $prompt) : string {
+    // Check if selected_component exists.
+    if (!empty($prompt['selected_component'])) {
+      return 'User is now in the code component editor, viewing a code component with id ' . $prompt['selected_component'];
+    }
+
+    if (empty($prompt['entity_type'])) {
+      return 'User has not created any entities';
+    }
+
+    // If entity_type is node.
+    if ($prompt['entity_type'] === 'node') {
+      return 'The user is currently working on a \'node\' entity';
+    }
+
+    // If entity_type is canvas_page.
+    if ($prompt['entity_type'] === 'canvas_page') {
+      $has_active_component = !empty($prompt['active_component_uuid']) &&
+        $prompt['active_component_uuid'] !== 'None';
+
+      $base_message = 'The user is currently working on a canvas_page entity. ';
+
+      if ($has_active_component) {
+        $base_message .= 'User has selected a component in the page with uuid ' . $prompt['active_component_uuid'] . '. ';
+      }
+      else {
+        $base_message .= 'User has not selected any particular component from the page. ';
+      }
+
+      // Add page title.
+      if (empty($prompt['page_title']) || $prompt['page_title'] === 'Untitled page') {
+        $base_message .= 'Page title is empty. GENERATE THE TITLE FOR THE PAGE. ';
+      }
+      else {
+        $base_message .= 'Page title: ' . $prompt['page_title'] . '. ';
+      }
+
+      // Add page description.
+      if (!empty($prompt['page_description'])) {
+        $base_message .= 'Page description: ' . $prompt['page_description'];
+      }
+      else {
+        $base_message .= 'Page description is empty. GENERATE THE DESCRIPTION FOR THE PAGE.';
+      }
+
+      return $base_message;
+    }
+
+    // For any other entity_type.
+    return 'User has not created any entities';
   }
 
 }

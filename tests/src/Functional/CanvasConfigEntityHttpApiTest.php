@@ -173,6 +173,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
         'sdc.canvas_broken_sdcs.malformed-image',
         'sdc.canvas_test_sdc.my-cta',
         'sdc.canvas_test_sdc.component-no-meta-enum',
+        'sdc.canvas_test_sdc.banner',
         'sdc.canvas_test_sdc.card',
         'sdc.canvas_test_sdc.props-no-slots',
         'sdc.canvas_test_sdc.image-required-with-example',
@@ -1497,7 +1498,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     $body = $this->assertExpectedResponse('GET', $list_url, [], 403, ['user.permissions'], ['4xx-response', 'http_response'], 'UNCACHEABLE (request policy)', NULL);
     $this->assertSame([
       'errors' => [
-        'Requires >=1 content entity type with an Canvas field that can be created or edited.',
+        'Requires >=1 content entity type with a Canvas field that can be created or edited.',
       ],
     ], $body);
 

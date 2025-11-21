@@ -8,6 +8,7 @@ namespace Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource;
 
 use Drupal\canvas\Controller\ApiConfigControllers;
 use Drupal\canvas\Form\ComponentInstanceForm;
+use Drupal\Component\Render\MarkupInterface;
 use Drupal\Component\Utility\Html;
 use Drupal\Component\Uuid\UuidInterface;
 use Drupal\Core\Cache\CacheableMetadata;
@@ -119,6 +120,7 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
     'image',
     'link',
     'options',
+    'text',
     'system',
     'media',
     'path',
@@ -215,7 +217,7 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
     return $return_values;
   }
 
-  public function findCreatedComponentConfigEntities(string $component_source_plugin_id, string $test_module): array {
+  public function findCreatedComponentConfigEntities(string $component_source_plugin_id, string $extension): array {
     // @phpstan-ignore-next-line
     $component_config_entity_type_prefix = $this->componentStorage->getEntityType()->getConfigPrefix();
 
@@ -225,7 +227,7 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
       '%s.%s.%s',
       $component_config_entity_type_prefix,
       $component_source_plugin_id,
-      $test_module,
+      $extension,
     );
 
     // Transform from `canvas.component.<ID>` to just `<ID>`.
@@ -235,16 +237,16 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
       $discovered_component_config_names
     );
 
-    ksort($discovered_component_entity_ids);
+    sort($discovered_component_entity_ids);
     return $discovered_component_entity_ids;
   }
 
-  public function findIneligibleComponents(string $component_source_plugin_id, string $test_module): array {
+  public function findIneligibleComponents(string $component_source_plugin_id, string $extension): array {
     $ineligible_components = $this->componentReasonRepository->getReasons()[$component_source_plugin_id] ?? [];
     ksort($ineligible_components);
     return array_filter(
       $ineligible_components,
-      fn (string $id) => str_starts_with($id, $component_source_plugin_id . '.' . $test_module),
+      fn (string $id) => str_starts_with($id, $component_source_plugin_id . '.' . $extension),
       ARRAY_FILTER_USE_KEY,
     );
   }
@@ -513,7 +515,19 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
     }
 
     // Test all other expected client-side info.
-    self::assertSame($expected_client_side_info, $actual_client_side_info);
+    // As we cannot compare FilteredMarkup objects, let's cast those to strings.
+    $filteredMarkupAsString = function (array &$values) use (&$filteredMarkupAsString): array {
+      foreach ($values as &$value) {
+        if ($value instanceof MarkupInterface) {
+          $value = (string) $value;
+        }
+        if (is_array($value)) {
+          $filteredMarkupAsString($value);
+        }
+      }
+      return $values;
+    };
+    self::assertSame($filteredMarkupAsString($expected_client_side_info), $filteredMarkupAsString($actual_client_side_info));
   }
 
   /**

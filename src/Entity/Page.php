@@ -27,9 +27,10 @@ use Drupal\Core\Entity\Routing\RevisionHtmlRouteProvider;
  * Defines the page entity class.
  *
  * @todo change add-form and edit-form links to use `page` instead of `canvas_page`.
- *    This requires updating the UI to use the values from `drupalSettings.canvas`
- *    without them matching the URL path. If they don't routing in the UI is
- *    broken and the UI never renders. See `empty-canvas.cy.js`.
+ *    This requires updating the UI to use the values from
+ *    `drupalSettings.canvas` without them matching the URL path. If they don't
+ *    routing in the UI is broken and the UI never renders.
+ *    See `empty-canvas.cy.js`.
  *    Fix after https://www.drupal.org/project/canvas/issues/3489775
  */
 #[ContentEntityType(
@@ -56,6 +57,7 @@ use Drupal\Core\Entity\Routing\RevisionHtmlRouteProvider;
         "revision" => RevisionHtmlRouteProvider::class,
       ],
     ],
+    collection_permission: self::EDIT_PERMISSION,
     base_table: "canvas_page",
     revision_table: "canvas_page_revision",
     data_table: "canvas_page_field_data",
@@ -68,6 +70,7 @@ use Drupal\Core\Entity\Routing\RevisionHtmlRouteProvider;
       "revision-delete-form" => "/page/{canvas_page}/revisions/{canvas_page_revision}/delete",
       "revision-revert-form" => "/page/{canvas_page}/revisions/{canvas_page_revision}/revert",
       "version-history" => "/page/{canvas_page}/revisions",
+      "collection" => "/admin/content/pages",
     ],
     translatable: TRUE,
     entity_keys: [

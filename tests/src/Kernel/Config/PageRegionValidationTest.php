@@ -40,6 +40,8 @@ class PageRegionValidationTest extends BetterConfigEntityValidationTestBase {
     'options',
     'path',
     'link',
+    'text',
+    'filter',
   ];
 
   /**
@@ -223,6 +225,27 @@ class PageRegionValidationTest extends BetterConfigEntityValidationTestBase {
       ],
       'expected_messages' => [
         'component_tree' => "The 'dynamic' prop source type must be absent.",
+      ],
+    ];
+
+    yield 'using HostEntityUrlPropSource' => [
+      'component_tree' => [
+        [
+          'uuid' => '15616c29-72c6-417a-a7d9-aff329467cc4',
+          'component_id' => 'sdc.canvas_test_sdc.my-cta',
+          'component_version' => '89881c04a0fde367',
+          'inputs' => [
+            'text' => [
+              'value' => 'Visit sunny Vienna',
+            ],
+            'href' => [
+              'sourceType' => 'host-entity-url',
+            ],
+          ],
+        ],
+      ],
+      'expected_messages' => [
+        'component_tree' => "The 'host-entity-url' prop source type must be absent.",
       ],
     ];
 
