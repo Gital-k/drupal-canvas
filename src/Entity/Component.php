@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Entity;
 
-use Drupal\canvas\Audit\RevisionAuditEnum;
 use Drupal\canvas\CanvasConfigUpdater;
 use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
 use Drupal\Core\Config\Schema\Mapping;
@@ -18,7 +17,6 @@ use Drupal\Core\Render\RendererInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\Entity\Routing\AdminHtmlRouteProvider;
 use Drupal\Core\Theme\ThemeInitializationInterface;
-use Drupal\canvas\Audit\ComponentAudit;
 use Drupal\canvas\ClientSideRepresentation;
 use Drupal\canvas\ComponentSource\ComponentSourceInterface;
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
@@ -28,7 +26,6 @@ use Drupal\canvas\Form\ComponentListBuilder;
 use Drupal\canvas\ComponentSource\ComponentSourceWithSlotsInterface;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\Fallback;
 use Drupal\canvas\Plugin\VersionedConfigurationSubsetSingleLazyPluginCollection;
-use Drupal\canvas\ComponentIncompatibilityReasonRepository;
 use Symfony\Component\Validator\Context\ExecutionContextInterface;
 
 /**

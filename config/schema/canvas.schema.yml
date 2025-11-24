@@ -96,6 +96,10 @@ canvas.component.*:
         # 3. any non-active version: Component Source-specific settings (not validatable because the implementation may have changed) + fallback metadata → `type: canvas.component.versioned.*.*`
         type: canvas.component.versioned.[%key].[%parent.%parent.active_version]
 
+    incompatibility_reason:
+      type: string
+      label: 'Incompatibility reason'
+
 # Special case: when the active version is the special `fallback` version: it uses the Fallback source plugin.
 # @see \Drupal\canvas\Plugin\Canvas\ComponentSource\Fallback
 # @see \Drupal\canvas\Entity\Component::onDependencyRemoval()
