@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Entity;
 
+use Drupal\canvas\Audit\RevisionAuditEnum;
 use Drupal\canvas\CanvasConfigUpdater;
 use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
 use Drupal\Core\Config\Schema\Mapping;
@@ -16,6 +17,7 @@ use Drupal\Core\Render\Markup;
 use Drupal\Core\Render\RendererInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\Entity\Routing\AdminHtmlRouteProvider;
+use Drupal\canvas\Audit\ComponentAudit;
 use Drupal\Core\Theme\ThemeInitializationInterface;
 use Drupal\canvas\ClientSideRepresentation;
 use Drupal\canvas\ComponentSource\ComponentSourceInterface;
