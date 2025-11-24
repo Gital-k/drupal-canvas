@@ -294,7 +294,7 @@ final class ApiAutoSaveController extends ApiControllerBase {
             );
           }
         }
-        $use_existing_revision_id = AutoSaveManager::entityIsConsideredNew($entity);
+        $use_existing_revision_id = $this->autoSaveManager->entityIsDraft($entity);
 
         // For draft pages (new entities that have never been published),
         // automatically publish them when publishing changes. Check both the

@@ -471,18 +471,8 @@ class AutoSaveManager implements EventSubscriberInterface {
     return $events;
   }
 
-  public static function entityIsConsideredNew(ContentEntityInterface|ContentTemplate $entity): bool {
-    if ($entity instanceof ContentTemplate) {
-      return !$entity->status();
-    }
-    return (string) $entity->label() == ApiContentControllers::defaultTitle($entity->getEntityType()) || str_ends_with((string) $entity->label(), self::ENTITY_DUPLICATE_SUFFIX);
-  }
-
   /**
    * Determines if an entity is a draft (new and never published).
-   *
-   * This is more accurate than entityIsConsideredNew() as it also checks
-   * if the entity has ever been published, not just the title.
    *
    * @param \Drupal\Core\Entity\ContentEntityInterface|\Drupal\canvas\Entity\ContentTemplate $entity
    *   The entity to check.
@@ -501,7 +491,7 @@ class AutoSaveManager implements EventSubscriberInterface {
     }
 
     // First check if it matches the "new" criteria (title-based heuristic).
-    $matches_new_criteria = self::entityIsConsideredNew($entity);
+    $matches_new_criteria = (string) $entity->label() == ApiContentControllers::defaultTitle($entity->getEntityType()) || str_ends_with((string) $entity->label(), self::ENTITY_DUPLICATE_SUFFIX);
     if (!$matches_new_criteria) {
       return FALSE;
     }
