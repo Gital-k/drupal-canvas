@@ -89,123 +89,73 @@ export const contentApi = createApi({
       ],
       async onQueryStarted(arg, { dispatch, queryFulfilled, getState }) {
         const { entityType, entityId, status } = arg;
+        if (status === undefined) {
+          return;
+        }
+
         const archiveLinkRel =
           'https://drupal.org/project/canvas#link-rel-archive';
         const publishLinkRel =
           'https://drupal.org/project/canvas#link-rel-publish';
 
-        // Update function to apply to each matching query
+        // Update function to apply to matching queries
         const updatePageData = (draft: ContentStub[]) => {
           const page = draft.find(
             (item) => String(item.id) === String(entityId),
           );
-          if (page && status !== undefined) {
-            // Update the status to reflect the autosaved state
-            page.status = status;
+          if (!page) {
+            return;
+          }
 
-            // Swap the links: archive and publish both use the same endpoint,
-            // so we can reuse the existing URL structure
-            if (status === false) {
-              // Archiving: remove archive link, add publish link
-              // Both use the same PATCH endpoint, so reuse the archive URL if it exists
-              const existingUrl = page.links[archiveLinkRel];
-              delete page.links[archiveLinkRel];
-              if (existingUrl) {
-                page.links[publishLinkRel] = existingUrl;
-              }
-            } else if (status === true) {
-              // Publishing: remove publish link, add archive link
-              // Both use the same PATCH endpoint, so reuse the publish URL if it exists
-              const existingUrl = page.links[publishLinkRel];
-              delete page.links[publishLinkRel];
-              if (existingUrl) {
-                page.links[archiveLinkRel] = existingUrl;
-              }
-            }
+          page.status = status;
+
+          // Swap links: both archive and publish use the same PATCH endpoint
+          const fromLink = status === false ? archiveLinkRel : publishLinkRel;
+          const toLink = status === false ? publishLinkRel : archiveLinkRel;
+          const existingUrl = page.links[fromLink];
+          delete page.links[fromLink];
+          if (existingUrl) {
+            page.links[toLink] = existingUrl;
           }
         };
 
-        // Optimistically update all content list queries for this entity type
-        // (regardless of search parameter) to immediately change menu options and badge
+        // Optimistically update all cached queries for this entity type
         const patchResults: Array<{ undo: () => void }> = [];
+        const state = getState() as any;
+        const queryCache = state[contentApi.reducerPath]?.queries;
 
-        // Update queries with different search parameter combinations
-        // RTK Query caches queries by exact parameters, so we need to update all variants
-        const queryVariants = [
-          { entityType }, // No search
-          { entityType, search: undefined }, // Explicit undefined
-          { entityType, search: '' }, // Empty string
-        ];
-
-        // Try to update each variant
-        queryVariants.forEach((args) => {
-          try {
-            const patchResult = dispatch(
-              contentApi.util.updateQueryData(
-                'getContentList',
-                args,
-                updatePageData,
-              ),
-            );
-            patchResults.push(patchResult);
-          } catch (error) {
-            // Query might not exist in cache, which is fine
-          }
-        });
-
-        // Also try to find and update all other queries for this entity type
-        // by accessing the query cache to catch any search terms we might have missed
-        try {
-          const state = getState() as any;
-          const queryCache = state[contentApi.reducerPath]?.queries;
-
-          if (queryCache) {
-            // Find all queries for getContentList with matching entityType
-            Object.keys(queryCache).forEach((queryKey) => {
-              const query = queryCache[queryKey];
-              if (
-                query?.endpointName === 'getContentList' &&
-                query?.originalArgs?.entityType === entityType
-              ) {
-                const args = query.originalArgs;
-                // Check if we've already updated this query variant
-                const alreadyUpdated = queryVariants.some(
-                  (variant) =>
-                    variant.entityType === args?.entityType &&
-                    variant.search === args?.search,
+        if (queryCache) {
+          Object.keys(queryCache).forEach((queryKey) => {
+            const query = queryCache[queryKey];
+            if (
+              query?.endpointName === 'getContentList' &&
+              query?.originalArgs?.entityType === entityType
+            ) {
+              try {
+                const patchResult = dispatch(
+                  contentApi.util.updateQueryData(
+                    'getContentList',
+                    query.originalArgs,
+                    updatePageData,
+                  ),
                 );
-
-                if (args && !alreadyUpdated) {
-                  try {
-                    const patchResult = dispatch(
-                      contentApi.util.updateQueryData(
-                        'getContentList',
-                        args,
-                        updatePageData,
-                      ),
-                    );
-                    patchResults.push(patchResult);
-                  } catch (error) {
-                    // Query might not exist or already updated, which is fine
-                  }
-                }
+                patchResults.push(patchResult);
+              } catch {
+                // Query might not exist in cache, which is fine
               }
-            });
-          }
-        } catch (error) {
-          // If query cache access fails, the variant updates above should still work
+            }
+          });
         }
 
         try {
           await queryFulfilled;
-          // Immediately refetch pending changes to update the "Review {} change" text
           dispatch(
             pendingChangesApi.util.invalidateTags([
               { type: 'PendingChanges', id: 'LIST' },
             ]),
           );
         } catch {
-          // On error, revert all optimistic updates
+          // Revert optimistic updates on error
           patchResults.forEach((result) => result.undo());
         }
       },

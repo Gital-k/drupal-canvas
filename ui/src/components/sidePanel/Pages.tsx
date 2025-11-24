@@ -71,8 +71,7 @@ const Pages = () => {
 
   const [deleteContent, { error: deleteContentError }] =
     useDeleteContentMutation();
-  const [updateContent, { error: updateContentError }] =
-    useUpdateContentMutation();
+  const [updateContent] = useUpdateContentMutation();
   const [setHomepage, { error: setHomepageError }] =
     useSetStagedConfigMutation();
 
