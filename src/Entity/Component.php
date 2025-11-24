@@ -28,6 +28,7 @@ use Drupal\canvas\Form\ComponentListBuilder;
 use Drupal\canvas\ComponentSource\ComponentSourceWithSlotsInterface;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\Fallback;
 use Drupal\canvas\Plugin\VersionedConfigurationSubsetSingleLazyPluginCollection;
+use Drupal\canvas\ComponentIncompatibilityReasonRepository;
 use Symfony\Component\Validator\Context\ExecutionContextInterface;
 
 /**
@@ -77,6 +78,7 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
     'category',
     'active_version',
     'versioned_properties',
+    'incompatibility_reason',
   ],
   constraints: [
     'ImmutableProperties' => ['id', 'source', 'source_local_id'],
@@ -532,42 +534,39 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
    * @see \Drupal\canvas\EntityHandlers\CanvasConfigEntityAccessControlHandler
    */
   public function onDependencyRemoval(array $dependencies): bool {
-    // If only module dependencies are being removed, there's nothing to do:
-    // this Component cannot work any longer. So rely on the default
-    // behavior of the config system: allow this to be deleted.
-    // Note: The removal of module dependencies is prevented by an
-    // uninstall validator. So this should only be possible by using force.
-    // @see \Drupal\canvas\ComponentDependencyUninstallValidator
-    // For themes, no uninstall validators exist in core,
-    // so we need to avoid new instances and rely on fallbacks
-    // by disabling the component entities instead of removing them.
-    // @todo Write an uninstall validator instead when Drupal Core's issue
-    //   https://www.drupal.org/i/3550019 is fixed and remove the check for
-    //   theme dependencies.
-    if (empty($dependencies['config'] ?? []) && empty($dependencies['theme'] ?? []) && empty($dependencies['content'] ?? [])) {
-      return parent::onDependencyRemoval($dependencies);
+    // Check if any of the dependencies of this component are being removed.
+    $config_dependencies = $this->getDependencies();
+    $found_dependency_removal = FALSE;
+
+    foreach ($dependencies as $group => $dependency_list) {
+      if (isset($config_dependencies[$group])) {
+        $intersect = array_intersect($config_dependencies[$group], $dependency_list);
+        if (!empty($intersect)) {
+          $found_dependency_removal = TRUE;
+          break;
+        }
+      }
     }
 
-    // When it is affected, then if there's 0 component instances using it,
-    // still there is nothing to do, because none of Drupal Canvas's config
-    // entities are affected, nor are any Canvas fields on content entities.
-    if (!\Drupal::service(ComponentAudit::class)->hasUsages($this, RevisionAuditEnum::All) && !\Drupal::service(ComponentAudit::class)->hasUsages($this, RevisionAuditEnum::AutoSave)) {
-      return parent::onDependencyRemoval($dependencies);
+    // If a dependency is removed, disable the component instead of deleting it.
+    if ($found_dependency_removal) {
+      // Store the incompatibility reason so the UI can explain why it is disabled.
+      $this->set('incompatibility_reason', 'dependency_removed');
+
+      // Switch to the fallback plugin and disable the component.
+      $last_active_version = $this->getActiveVersion();
+      $this->createVersion(ComponentInterface::FALLBACK_VERSION)
+        ->setSettings([
+          'last_active_version' => $last_active_version,
+        ])
+        ->disable();
+
+      // Return TRUE to prevent the config entity from being deleted.
+      return TRUE;
     }
 
-    // However, if there's >=1 component instance for it, make this Component
-    // use the `fallback` component source plugin to avoid deleting dependent
-    // Canvas config entities and breaking Canvas component trees in content
-    // entities.
-    $last_active_version = $this->getActiveVersion();
-    $this->createVersion(ComponentInterface::FALLBACK_VERSION)
-      ->setSettings([
-        'last_active_version' => $last_active_version,
-      ])
-      // Disable this Component: prevent more instances getting created.
-      ->disable();
-    parent::onDependencyRemoval($dependencies);
-    return TRUE;
+    // Rely on the default behavior for other cases.
+    return parent::onDependencyRemoval($dependencies);
   }
 
   protected static function getConfigUpdater(): CanvasConfigUpdater {
