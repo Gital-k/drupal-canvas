@@ -42,6 +42,7 @@ const SidebarNode = React.forwardRef<
     title: string;
     variant: SideBarNodeVariant;
     leadingContent?: React.ReactNode;
+    trailingContent?: React.ReactNode;
     hovered?: boolean;
     draggable?: boolean;
     selected?: boolean;
@@ -64,6 +65,7 @@ const SidebarNode = React.forwardRef<
       title,
       variant = 'component',
       leadingContent,
+      trailingContent,
       hovered = false,
       selected = false,
       draggable = false,
@@ -124,6 +126,11 @@ const SidebarNode = React.forwardRef<
             </Text>
           </Flex>
         </Flex>
+        {trailingContent && (
+          <Flex align="center" flexShrink="0" mr="2">
+            {trailingContent}
+          </Flex>
+        )}
         {dropdownMenuContent && (
           <DropdownMenu.Root onOpenChange={onMenuOpenChange}>
             <DropdownMenu.Trigger>

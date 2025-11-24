@@ -13,12 +13,14 @@ import {
 import useDebounce from '@/hooks/useDebounce';
 import useEditorNavigation from '@/hooks/useEditorNavigation';
 import { useSmartRedirect } from '@/hooks/useSmartRedirect';
+import { componentAndLayoutApi } from '@/services/componentAndLayout';
 import {
   useCreateContentMutation,
   useDeleteContentMutation,
   useGetContentListQuery,
   useGetStagedConfigQuery,
   useSetStagedConfigMutation,
+  useUpdateContentMutation,
 } from '@/services/content';
 import { getCanvasSettings } from '@/utils/drupal-globals';
 
@@ -69,6 +71,8 @@ const Pages = () => {
 
   const [deleteContent, { error: deleteContentError }] =
     useDeleteContentMutation();
+  const [updateContent, { error: updateContentError }] =
+    useUpdateContentMutation();
   const [setHomepage, { error: setHomepageError }] =
     useSetStagedConfigMutation();
 
@@ -105,6 +109,54 @@ const Pages = () => {
 
   function handleOnSelect(item: ContentStub) {
     setEditorEntity('canvas_page', String(item.id));
+  }
+
+  async function handleArchivePage(item: ContentStub) {
+    const pageToArchiveId = String(item.id);
+    await updateContent({
+      entityType: 'canvas_page',
+      entityId: pageToArchiveId,
+      status: false,
+    });
+
+    // If the current page is being archived, update the layout cache immediately
+    if (entityType === 'canvas_page' && entityId === pageToArchiveId) {
+      dispatch(
+        componentAndLayoutApi.util.updateQueryData(
+          'getPageLayout',
+          undefined,
+          (draft) => {
+            draft.isPublished = false;
+          },
+        ),
+      );
+      // Invalidate the layout query cache to ensure it refetches the latest data
+      dispatch(componentAndLayoutApi.util.invalidateTags([{ type: 'Layout' }]));
+    }
+  }
+
+  async function handlePublishPage(item: ContentStub) {
+    const pageToPublishId = String(item.id);
+    await updateContent({
+      entityType: 'canvas_page',
+      entityId: pageToPublishId,
+      status: true,
+    });
+
+    // If the current page is being published, update the layout cache immediately
+    if (entityType === 'canvas_page' && entityId === pageToPublishId) {
+      dispatch(
+        componentAndLayoutApi.util.updateQueryData(
+          'getPageLayout',
+          undefined,
+          (draft) => {
+            draft.isPublished = true;
+          },
+        ),
+      );
+      // Invalidate the layout query cache to ensure it refetches the latest data
+      dispatch(componentAndLayoutApi.util.invalidateTags([{ type: 'Layout' }]));
+    }
   }
 
   function handleSetHomepage(item: ContentStub) {
@@ -179,6 +231,8 @@ const Pages = () => {
       onDuplicatePage={handleDuplication}
       onSelectPage={handleOnSelect}
       onSetHomepage={handleSetHomepage}
+      onArchivePage={handleArchivePage}
+      onPublishPage={handlePublishPage}
       onSearch={setSearchTerm}
     />
   );

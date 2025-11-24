@@ -2,6 +2,7 @@ import { useCallback, useMemo } from 'react';
 import { DotsVerticalIcon } from '@radix-ui/react-icons';
 import {
   Avatar,
+  Badge,
   Box,
   Checkbox,
   DropdownMenu,
@@ -25,6 +26,7 @@ interface ChangeRowProps {
   setSelectedChanges: (changes: UnpublishedChange[]) => void;
   onDiscardClick: (change: UnpublishedChange) => void;
   onViewClick?: (change: UnpublishedChange) => void;
+  pageStatusMap?: Record<string, { status: boolean; isNew?: boolean }>;
 }
 
 const ChangeRow = ({
@@ -34,6 +36,7 @@ const ChangeRow = ({
   setSelectedChanges,
   onDiscardClick,
   onViewClick,
+  pageStatusMap,
 }: ChangeRowProps) => {
   const initial = change.owner.name.trim().charAt(0).toUpperCase();
   const avatarColor = getAvatarInitialColor(change.owner.id);
@@ -44,6 +47,19 @@ const ChangeRow = ({
   const isSelected = useMemo(() => {
     return selectedChanges.some((c) => c.pointer === change.pointer);
   }, [change.pointer, selectedChanges]);
+
+  // Check if this page is archived
+  const isArchived = useMemo(() => {
+    if (change.entity_type !== 'canvas_page' || !pageStatusMap) {
+      return false;
+    }
+    const pageStatus = pageStatusMap[String(change.entity_id)];
+    if (!pageStatus) {
+      return false;
+    }
+    // Archived = unpublished and not new (draft)
+    return !pageStatus.status && !pageStatus.isNew;
+  }, [change.entity_type, change.entity_id, pageStatusMap]);
 
   const handleChangeSelection = useCallback(
     (checked: boolean) => {
@@ -87,11 +103,27 @@ const ChangeRow = ({
           className={styles.changeRowRight}
         >
           <Box pt="1">
-            <Tooltip content={date.toLocaleString()}>
-              <Text className={styles.time} size="1" wrap="nowrap">
-                {getTimeAgo(change.updated)}
-              </Text>
-            </Tooltip>
+            {isArchived ? (
+              <Badge
+                size="1"
+                variant="solid"
+                color="gray"
+                style={{
+                  fontSize: '11px',
+                  height: '16px',
+                  lineHeight: '16px',
+                  padding: '0 4px',
+                }}
+              >
+                Archived
+              </Badge>
+            ) : (
+              <Tooltip content={date.toLocaleString()}>
+                <Text className={styles.time} size="1" wrap="nowrap">
+                  {getTimeAgo(change.updated)}
+                </Text>
+              </Tooltip>
+            )}
           </Box>
           <Tooltip content={`By ${change.owner.name}`}>
             <Avatar

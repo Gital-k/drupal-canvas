@@ -20,10 +20,20 @@ export const PageStatusBadge: React.FC<PageStatusBadgeProps> = ({
   hasAutoSave,
   isPublished,
 }) => {
-  if (isNew) {
+  // Show "Draft" only if the page is new (draft) AND unpublished
+  if (isNew && !isPublished) {
     return (
       <Badge size="1" variant="solid" color="blue">
         Draft
+      </Badge>
+    );
+  }
+
+  // Show "Archived" if the page is unpublished (but not a new draft)
+  if (!isPublished) {
+    return (
+      <Badge size="1" variant="solid" color="gray">
+        Archived
       </Badge>
     );
   }
@@ -36,17 +46,9 @@ export const PageStatusBadge: React.FC<PageStatusBadgeProps> = ({
     );
   }
 
-  if (isPublished) {
-    return (
-      <Badge size="1" variant="solid" color="green">
-        Published
-      </Badge>
-    );
-  }
-
   return (
-    <Badge size="1" variant="solid" color="gray">
-      Archived
+    <Badge size="1" variant="solid" color="green">
+      Published
     </Badge>
   );
 };

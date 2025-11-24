@@ -14,6 +14,7 @@ interface ChangeListProps {
   setSelectedChanges: (changes: UnpublishedChange[]) => void;
   onDiscardClick: (change: UnpublishedChange) => void;
   onViewClick?: (change: UnpublishedChange) => void;
+  pageStatusMap?: Record<string, { status: boolean; isNew?: boolean }>;
 }
 
 const ChangeList = ({
@@ -23,6 +24,7 @@ const ChangeList = ({
   setSelectedChanges,
   onDiscardClick,
   onViewClick,
+  pageStatusMap,
 }: ChangeListProps) => {
   return (
     groups && (
@@ -38,6 +40,7 @@ const ChangeList = ({
               setSelectedChanges={setSelectedChanges}
               onDiscardClick={onDiscardClick}
               onViewClick={onViewClick}
+              pageStatusMap={pageStatusMap}
             />
           );
         })}

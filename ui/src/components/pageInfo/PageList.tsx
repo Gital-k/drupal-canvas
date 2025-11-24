@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ChevronDownIcon,
   FileTextIcon,
@@ -8,6 +8,7 @@ import {
 } from '@radix-ui/react-icons';
 import {
   AlertDialog,
+  Badge,
   Box,
   Button,
   Callout,
@@ -26,7 +27,13 @@ import type { FormEvent } from 'react';
 import type { ContentStub } from '@/types/Content';
 
 const hasPermission = (
-  permission: 'edit' | 'duplicate' | 'homepage' | 'delete',
+  permission:
+    | 'edit'
+    | 'duplicate'
+    | 'homepage'
+    | 'delete'
+    | 'archive'
+    | 'publish',
   item: ContentStub,
 ) => {
   const links = item.links || {};
@@ -41,6 +48,10 @@ const hasPermission = (
       ];
     case 'delete':
       return !!links['delete-form'];
+    case 'archive':
+      return !!links['https://drupal.org/project/canvas#link-rel-archive'];
+    case 'publish':
+      return !!links['https://drupal.org/project/canvas#link-rel-publish'];
     default:
       return false;
   }
@@ -51,16 +62,26 @@ const createPageMenuContent = (
   item: ContentStub,
   onDuplicate?: (page: ContentStub) => void,
   onSetHomepage?: (page: ContentStub) => void,
+  onArchive?: (page: ContentStub) => void,
+  onPublish?: (page: ContentStub) => void,
   onDelete?: (page: ContentStub) => void,
   homepagePath?: string,
 ) => {
   const hasDuplicate = hasPermission('duplicate', item);
   const hasHomepage =
     hasPermission('homepage', item) && item.internalPath !== homepagePath;
+  const hasArchive = hasPermission('archive', item);
+  const hasPublish = hasPermission('publish', item);
   const hasDelete = hasPermission('delete', item);
 
   // If no permissions, don't render dropdown
-  if (!hasDuplicate && !hasHomepage && !hasDelete) {
+  if (
+    !hasDuplicate &&
+    !hasHomepage &&
+    !hasArchive &&
+    !hasPublish &&
+    !hasDelete
+  ) {
     return null;
   }
 
@@ -87,9 +108,35 @@ const createPageMenuContent = (
           </UnifiedMenu.Item>
         </>
       )}
-      {hasDelete && (
+      {hasArchive && (
         <>
           {(hasDuplicate || hasHomepage) && <UnifiedMenu.Separator />}
+          <UnifiedMenu.Item
+            onClick={(event) => event.stopPropagation()}
+            onSelect={onArchive ? () => onArchive(item) : undefined}
+          >
+            Archive page
+          </UnifiedMenu.Item>
+        </>
+      )}
+      {hasPublish && (
+        <>
+          {(hasDuplicate || hasHomepage || hasArchive) && (
+            <UnifiedMenu.Separator />
+          )}
+          <UnifiedMenu.Item
+            onClick={(event) => event.stopPropagation()}
+            onSelect={onPublish ? () => onPublish(item) : undefined}
+          >
+            Publish page
+          </UnifiedMenu.Item>
+        </>
+      )}
+      {hasDelete && (
+        <>
+          {(hasDuplicate || hasHomepage || hasArchive || hasPublish) && (
+            <UnifiedMenu.Separator />
+          )}
           <AlertDialog.Root>
             <AlertDialog.Trigger>
               <UnifiedMenu.Item
@@ -130,6 +177,92 @@ const createPageMenuContent = (
   );
 };
 
+// Component for individual page item to manage menu state
+const PageListItem = ({
+  item,
+  isSelected,
+  isHomepage,
+  homepagePath,
+  onSelect,
+  onDuplicate,
+  onSetHomepage,
+  onArchive,
+  onPublish,
+  onDelete,
+}: {
+  item: ContentStub;
+  isSelected: boolean;
+  isHomepage: boolean;
+  homepagePath?: string;
+  onSelect?: (value: ContentStub) => void;
+  onDuplicate?: (page: ContentStub) => void;
+  onSetHomepage?: (page: ContentStub) => void;
+  onArchive?: (page: ContentStub) => void;
+  onPublish?: (page: ContentStub) => void;
+  onDelete?: (page: ContentStub) => void;
+}) => {
+  const [isHovered, setIsHovered] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const title = `${item.autoSaveLabel || item.title} ${item.autoSavePath || item.path}`;
+  const dropdownMenuContent = createPageMenuContent(
+    item,
+    onDuplicate,
+    onSetHomepage,
+    onArchive,
+    onPublish,
+    onDelete,
+    homepagePath,
+  );
+
+  // Hide badge when menu button is visible (hovered or menu open)
+  const shouldHideBadge = isHovered || isMenuOpen;
+
+  // Only show archived badge for pages that were previously published (unpublished but not new/draft)
+  // Draft pages (never published) should not show the archived badge
+  const isArchived = !item.status && !item.isNew;
+
+  return (
+    <ContextMenu.Root>
+      <ContextMenu.Trigger>
+        <div
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+        >
+          <SidebarNode
+            title={title}
+            variant={isHomepage ? 'homepage' : 'page'}
+            selected={isSelected}
+            trailingContent={
+              isArchived && !shouldHideBadge ? (
+                <Badge
+                  size="1"
+                  variant="solid"
+                  color={isSelected ? 'blue' : 'gray'}
+                >
+                  Archived
+                </Badge>
+              ) : undefined
+            }
+            dropdownMenuContent={
+              dropdownMenuContent ? (
+                <UnifiedMenu.Content menuType="dropdown">
+                  {dropdownMenuContent}
+                </UnifiedMenu.Content>
+              ) : null
+            }
+            onMenuOpenChange={setIsMenuOpen}
+            onClick={onSelect ? () => onSelect(item) : undefined}
+            data-canvas-page-id={item.id}
+          />
+        </div>
+      </ContextMenu.Trigger>
+      <UnifiedMenu.Content menuType="context" align="start" side="right">
+        {dropdownMenuContent}
+      </UnifiedMenu.Content>
+    </ContextMenu.Root>
+  );
+};
+
 const ContentGroup = ({
   items,
   homepagePath,
@@ -137,6 +270,8 @@ const ContentGroup = ({
   onSelect,
   onDuplicate,
   onSetHomepage,
+  onArchive,
+  onPublish,
   onDelete,
 }: {
   items: ContentStub[];
@@ -145,6 +280,8 @@ const ContentGroup = ({
   onSelect?: (value: ContentStub) => void;
   onDuplicate?: (page: ContentStub) => void;
   onSetHomepage?: (page: ContentStub) => void;
+  onArchive?: (page: ContentStub) => void;
+  onPublish?: (page: ContentStub) => void;
   onDelete?: (page: ContentStub) => void;
 }) => {
   if (items.length === 0) {
@@ -164,39 +301,22 @@ const ContentGroup = ({
         const isSelected =
           selectedPageId !== undefined &&
           String(selectedPageId) === String(item.id);
-
-        const title = `${item.autoSaveLabel || item.title} ${item.autoSavePath || item.path}`;
         const isHomepage = item.internalPath === homepagePath;
-        const dropdownMenuContent = createPageMenuContent(
-          item,
-          onDuplicate,
-          onSetHomepage,
-          onDelete,
-          homepagePath,
-        );
 
         return (
-          <ContextMenu.Root key={item.id}>
-            <ContextMenu.Trigger>
-              <SidebarNode
-                title={title}
-                variant={isHomepage ? 'homepage' : 'page'}
-                selected={isSelected}
-                dropdownMenuContent={
-                  dropdownMenuContent ? (
-                    <UnifiedMenu.Content menuType="dropdown">
-                      {dropdownMenuContent}
-                    </UnifiedMenu.Content>
-                  ) : null
-                }
-                onClick={onSelect ? () => onSelect(item) : undefined}
-                data-canvas-page-id={item.id}
-              />
-            </ContextMenu.Trigger>
-            <UnifiedMenu.Content menuType="context" align="start" side="right">
-              {dropdownMenuContent}
-            </UnifiedMenu.Content>
-          </ContextMenu.Root>
+          <PageListItem
+            key={`${item.id}-${item.status}`}
+            item={item}
+            isSelected={isSelected}
+            isHomepage={isHomepage}
+            homepagePath={homepagePath}
+            onSelect={onSelect}
+            onDuplicate={onDuplicate}
+            onSetHomepage={onSetHomepage}
+            onArchive={onArchive}
+            onPublish={onPublish}
+            onDelete={onDelete}
+          />
         );
       })}
     </Flex>
@@ -218,6 +338,8 @@ interface PageListProps {
   onDuplicatePage?: (item: ContentStub) => void;
   onSelectPage?: (item: ContentStub) => void;
   onSetHomepage?: (item: ContentStub) => void;
+  onArchivePage?: (item: ContentStub) => void;
+  onPublishPage?: (item: ContentStub) => void;
   onSearch?: (value: string) => void;
 }
 
@@ -233,6 +355,8 @@ const PageList = ({
   onDuplicatePage,
   onSelectPage,
   onSetHomepage,
+  onArchivePage,
+  onPublishPage,
   onSearch,
 }: PageListProps) => {
   // Reset search when the component unmounts
@@ -314,6 +438,8 @@ const PageList = ({
               onSelect={onSelectPage}
               onDuplicate={onDuplicatePage}
               onSetHomepage={onSetHomepage}
+              onArchive={onArchivePage}
+              onPublish={onPublishPage}
               onDelete={onDeletePage}
             />
           )}

@@ -92,7 +92,7 @@ final class ApiLayoutController {
     $tree = $this->componentTreeLoader->load($entity);
     $content_layout = $this->buildRegion(CanvasPageVariant::MAIN_CONTENT_REGION, $tree, $model, $preview_entity);
     $layout = [$content_layout];
-    $is_new = AutoSaveManager::entityIsConsideredNew($entity);
+    $is_new = $this->autoSaveManager->entityIsDraft($entity);
 
     if ($regions) {
       \assert($model !== NULL);
