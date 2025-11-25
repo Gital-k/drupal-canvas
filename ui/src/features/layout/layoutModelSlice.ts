@@ -149,7 +149,7 @@ type SortNodePayload = {
 type AnyValue = string | boolean | [] | number | {} | null;
 
 // @see \Drupal\canvas\PropSource\PropSource::parse()
-interface BasePropSource {
+export interface BasePropSource {
   sourceType: string;
   value?: any;
 }

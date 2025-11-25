@@ -187,6 +187,12 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
   public function renderComponent(array $inputs, array $slot_definitions, string $componentUuid, bool $isPreview = FALSE): array {
     $block = $this->getBlockPlugin();
 
+    // Avoid the fallback rendering of the Block system; instead use Canvas'
+    // own.
+    // @see \Drupal\Core\Block\Plugin\Block\Broken::build()
+    if ($block instanceof Broken) {
+      throw new \OutOfBoundsException('This block is broken or missing.');
+    }
     // @todo Refine to reflect the edited entity route in https://www.drupal.org/i/3509500
     if ($isPreview && $block instanceof SystemBreadcrumbBlock) {
       $block = new SystemBreadcrumbBlock(
@@ -242,12 +248,6 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
     }
 
     $build['content'] = $block->build();
-    // Avoid the fallback rendering of the Block system; instead use Canvas'
-    // own.
-    // @see \Drupal\Core\Block\Plugin\Block\Broken::build()
-    if ($block instanceof Broken) {
-      $build['#pre_render'][] = [self::class, 'bubbleBrokenBlock'];
-    }
     if (Element::isEmpty($build['content'])) {
       return $build;
     }
@@ -627,11 +627,14 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
           foreach ($errors as $element_path => $error) {
             $parents = \explode('][', $element_path);
             $element = NestedArray::getValue($form, $parents);
+            // If validation changed the user's input but still resulted in an
+            // error, revert back to the user-provided value so that is stored
+            // in the temp store.
             // Check for #required errors.
+            $form_state->setValue($parents, NestedArray::getValue($input, $parents));
             if (($error instanceof TranslatableMarkup && $error->getUntranslatedString() === '@name field is required.') ||
               ((string) $error === ($element['#required_error'] ?? NULL))) {
-              // Fall-back to the default value and ignore the error.
-              $form_state->setValue($parents, NestedArray::getValue($input, $parents));
+              // Ignore the error.
               continue;
             }
             // Remove the 'settings' key added in the ::buildForm method.
@@ -682,15 +685,6 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
       }
 
     };
-  }
-
-  /**
-   * Used to avoid the fallback rendering of the Block system.
-   *
-   * @see \Drupal\Core\Block\Plugin\Block\Broken::build()
-   */
-  public static function bubbleBrokenBlock(): never {
-    throw new \OutOfBoundsException('This block is broken or missing.');
   }
 
 }
