@@ -62,17 +62,18 @@ const ComponentInstanceFormRenderer: React.FC<
   const { currentComponentQueryString } = props;
   const { showBoundary } = useErrorBoundary();
   const inputAndUiData: InputUIData = useInputUIData();
-  const { selectedComponentType, version, selectedComponent, components } =
-    inputAndUiData;
+  const {
+    selectedComponentType,
+    version,
+    selectedComponent: selectedComponentId,
+    components,
+  } = inputAndUiData;
   const editorFrameContext = useAppSelector(selectEditorFrameContext);
 
   const [jsxFormContent, setJsxFormContent] =
     useState<React.ReactElement | null>(null);
-  const [currentComponentId, setCurrentComponentId] = useState<string | null>(
-    null,
-  );
+
   const formRef = useRef(null);
-  const selectedComponentId = selectedComponent || 'noop';
   const skip = useAppSelector((state) =>
     selectUpdateComponentLoadingState(state, selectedComponentId),
   );
@@ -120,7 +121,6 @@ const ComponentInstanceFormRenderer: React.FC<
     const latestUndoRedoActionId = originalUrlSearchParams.get(
       'latestUndoRedoActionId',
     );
-    setCurrentComponentId(componentId);
 
     setJsxFormContent(
       // Wrapping the constructed `ReactElement` for the form so we can add a
@@ -235,7 +235,7 @@ const ComponentInstanceFormRenderer: React.FC<
     <Spinner
       size="3"
       // Display the spinner only when a new component is being fetched.
-      loading={isFetching && currentComponentId !== selectedComponent}
+      loading={isFetching && !!selectedComponentId}
     >
       {/* Wrap the JSX form in a ref, so we can send it as a stable DOM element
           argument to Drupal.attachBehaviors() anytime jsxFormContent changes.
