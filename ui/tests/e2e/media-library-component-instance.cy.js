@@ -77,7 +77,8 @@ const testMediaLibraryInComponentInstanceForm = (
     );
 
     // The default image should appear because the prop is required.
-    cy.waitForElementInIframe(defaultPlaceholder);
+    // Avoid flaky tests by giving the preview some extra time to update.
+    cy.waitForElementInIframe(defaultPlaceholder, undefined, 9000);
 
     // Waiting for the build id does not work - it does not update.
     // Waiting for the preview (the last request after clicking remove) does not
