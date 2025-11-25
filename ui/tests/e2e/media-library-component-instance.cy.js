@@ -71,14 +71,16 @@ const testMediaLibraryInComponentInstanceForm = (
 
     cy.get(removeIt).realClick({ force: true });
     cy.waitForAjax();
+    cy.previewReady();
+    // eslint-disable-next-line cypress/no-unnecessary-waiting
+    cy.wait(1000);
 
     cy.log(
       `Confirm removing a required image in step ${index + 1} results in the example appearing in the preview.`,
     );
 
     // The default image should appear because the prop is required.
-    // Avoid flaky tests by giving the preview some extra time to update.
-    cy.waitForElementInIframe(defaultPlaceholder, undefined, 9000);
+    cy.waitForElementInIframe(defaultPlaceholder);
 
     // Waiting for the build id does not work - it does not update.
     // Waiting for the preview (the last request after clicking remove) does not
