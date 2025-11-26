@@ -484,17 +484,18 @@ Cypress.Commands.add(
       const found = !!frameContent;
       const elapsed = Date.now() - startTime;
 
-      // On first and last retry, log what's actually in the iframe
-      if (retryCount === 1 || elapsed > timeout - 200) {
+      // On last retry, include iframe body in error message so it shows in logs
+      let debugInfo = '';
+      if (!found && elapsed > timeout - 200) {
         const iframeBody = doc.querySelector(iframeSelector)?.contentWindow?.document?.body;
         const bodyHTML = iframeBody?.innerHTML?.substring(0, 500) || 'NO IFRAME BODY';
-        console.log(`[Retry ${retryCount}] Iframe body preview:`, bodyHTML);
+        debugInfo = ` | IFRAME BODY: ${bodyHTML}`;
       }
 
-      // Put retry count AND elapsed time in the error message
+      // Put retry count, elapsed time, and iframe body in the error message
       expect(
         found,
-        `[RETRY COUNT: ${retryCount}, ELAPSED: ${elapsed}ms] '${selector}' was found in iframe '${iframeSelector}'`,
+        `[RETRY COUNT: ${retryCount}, ELAPSED: ${elapsed}ms] '${selector}' was found in iframe '${iframeSelector}'${debugInfo}`,
       ).to.equal(true);
     }).then(() => {
       // Log on success - this will show if it passes

@@ -288,12 +288,37 @@ const ComponentInstanceFormRenderer: React.FC<
         }}
         ref={formRef}
       >
-        {persistentTransforms.current &&
-          currentComponentId === selectedComponent && (
+        {(() => {
+          const strictCheckPasses = currentComponentId === selectedComponent;
+          const relaxedCheckPasses = !jsxFormContent || currentComponentId === selectedComponent;
+
+          const logData = {
+            hasPersistentTransforms: !!persistentTransforms.current,
+            hasJsxFormContent: !!jsxFormContent,
+            currentComponentId,
+            selectedComponent,
+            strictCheckPasses,
+            relaxedCheckPasses,
+            difference: relaxedCheckPasses && !strictCheckPasses ? 'RELAXED_WOULD_ALLOW' : 'SAME',
+          };
+
+          console.log('[ComponentInstanceForm] RENDER JSX:', logData);
+
+          // Also log to Cypress if available (for CI logs)
+          if (window.Cypress) {
+            window.Cypress.log({
+              name: 'FormRender',
+              message: JSON.stringify(logData),
+              consoleProps: () => logData,
+            });
+          }
+
+          return persistentTransforms.current && strictCheckPasses && (
             <TransformsContext.Provider value={persistentTransforms.current}>
               {jsxFormContent}
             </TransformsContext.Provider>
-          )}
+          );
+        })()}
       </div>
     </Spinner>
   );
