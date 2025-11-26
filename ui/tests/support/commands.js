@@ -470,7 +470,7 @@ Cypress.Commands.add(
     customTimeout,
   ) => {
     cy.document().then((doc) => {
-      cy.get(true, {
+      cy.wrap(null, {
         timeout: customTimeout || Cypress.config('defaultCommandTimeout'),
       }).should(() => {
         const frameContent = doc
@@ -504,7 +504,7 @@ Cypress.Commands.add(
     customTimeout,
   ) => {
     cy.document().then((doc) => {
-      cy.get(true, {
+      cy.wrap(null, {
         timeout: customTimeout || Cypress.config('defaultCommandTimeout'),
       }).should(() => {
         const frameContent = doc
@@ -528,7 +528,7 @@ Cypress.Commands.add(
     customTimeout,
   ) => {
     cy.document().then((doc) => {
-      cy.get(true, {
+      cy.wrap(null, {
         timeout: customTimeout || Cypress.config('defaultCommandTimeout'),
       }).should(() => {
         const frameContent = doc
@@ -558,7 +558,7 @@ Cypress.Commands.add(
     customTimeout,
   ) => {
     cy.document().then((doc) => {
-      cy.get(true, {
+      cy.wrap(null, {
         timeout: customTimeout || Cypress.config('defaultCommandTimeout'),
       }).should(() => {
         const frameContent = doc
@@ -586,7 +586,7 @@ Cypress.Commands.add(
     customTimeout,
   ) => {
     cy.document().then((doc) => {
-      cy.get(true, {
+      cy.wrap(null, {
         timeout: customTimeout || Cypress.config('defaultCommandTimeout'),
       }).should(() => {
         const frameContent = doc
@@ -853,7 +853,7 @@ Cypress.Commands.add(
     customTimeout,
   ) => {
     cy.document().then((doc) => {
-      cy.get(true, {
+      cy.wrap(null, {
         timeout: customTimeout || Cypress.config('defaultCommandTimeout'),
       }).should(() => {
         const frameContent = doc

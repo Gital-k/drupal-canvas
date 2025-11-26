@@ -72,8 +72,6 @@ const testMediaLibraryInComponentInstanceForm = (
     cy.get(removeIt).realClick({ force: true });
     cy.waitForAjax();
     cy.previewReady();
-    // eslint-disable-next-line cypress/no-unnecessary-waiting
-    cy.wait(1000);
 
     cy.log(
       `Confirm removing a required image in step ${index + 1} results in the example appearing in the preview.`,
