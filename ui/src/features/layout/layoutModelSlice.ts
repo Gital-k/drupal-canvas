@@ -28,6 +28,7 @@ import type { AppThunk, RootState } from '@/app/store';
 import type { CanvasComponent, ComponentsList } from '@/types/Component';
 import type { InputUIData } from '@/types/Form';
 import type { UUID } from '@/types/UUID';
+import type { TransformConfig } from '@/utils/transforms';
 
 const canvasSettings = getCanvasSettings();
 
@@ -79,7 +80,10 @@ export type ComponentModels = Record<
 export interface LayoutModelSliceState extends RootLayoutModel {
   updatePreview: boolean;
   isInitialized?: boolean;
+  transforms: Record<string, TransformConfig>;
 }
+
+type LayoutModelPayload = Omit<LayoutModelSliceState, 'transforms'>;
 
 export const initialState: LayoutModelSliceState = {
   layout: [
@@ -93,6 +97,7 @@ export const initialState: LayoutModelSliceState = {
   model: {},
   updatePreview: false,
   isInitialized: false,
+  transforms: {},
 };
 
 // This wrapper is necessary because when using slices with redux-undo,
@@ -441,7 +446,7 @@ export const layoutModelSlice = createSlice({
       state.isInitialized = action.payload;
     }),
     setLayoutModel: create.reducer(
-      (state, action: PayloadAction<LayoutModelSliceState>) => {
+      (state, action: PayloadAction<LayoutModelPayload>) => {
         const { layout, model, updatePreview } = action.payload;
         state.layout = layout;
         state.model = model;
@@ -451,7 +456,7 @@ export const layoutModelSlice = createSlice({
     // Identical to setLayoutModel but with a different type for ensuring this
     // doesn't trigger an undo/redo action.
     setInitialLayoutModel: create.reducer(
-      (state, action: PayloadAction<LayoutModelSliceState>) => {
+      (state, action: PayloadAction<LayoutModelPayload>) => {
         const {
           layout,
           model,
@@ -769,7 +774,7 @@ export const _updateExistingComponentValuesForLinking =
         model: { [componentToUpdateId]: model },
         components,
       } as InputUIData,
-      window._canvasTransforms[selectedComponentType],
+      state.layoutModel.present.transforms[selectedComponentType],
     );
 
     // Resolved will be updated in all cases.
@@ -868,6 +873,7 @@ export const selectUpdatePreview = (state: StateWithHistoryWrapper) =>
   state.layoutModel.present.updatePreview;
 export const selectIsInitialized = (state: StateWithHistoryWrapper) =>
   state.layoutModel.present.isInitialized;
+
 const selectRegion = (state: RootState, regionName: string) => regionName;
 
 export const selectLayoutForRegion = createSelector(

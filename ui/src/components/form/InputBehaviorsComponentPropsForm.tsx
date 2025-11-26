@@ -2,7 +2,6 @@ import { useEffect, useRef } from 'react';
 import { debounce } from 'lodash';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
-import { useComponentTransforms } from '@/components/ComponentInstanceForm';
 import {
   ComponentPreviewUpdateEvent,
   getPropSchemas,
@@ -19,18 +18,14 @@ import {
 } from '@/components/form/inputBehaviors';
 import { FORM_TYPES } from '@/features/form/constants';
 import {
-  selectCurrentComponent,
+  selectCurrentComponentQueryString,
   selectFormValues,
 } from '@/features/form/formStateSlice';
-import {
-  isEvaluatedComponentModel,
-  selectLayout,
-  selectModel,
-} from '@/features/layout/layoutModelSlice';
-import { findComponentByUuid } from '@/features/layout/layoutUtils';
+import { isEvaluatedComponentModel } from '@/features/layout/layoutModelSlice';
 import { setPreviewBackgroundUpdate } from '@/features/pagePreview/previewSlice';
 import { selectEditorFrameContext } from '@/features/ui/uiSlice';
-import { useGetComponentsQuery } from '@/services/componentAndLayout';
+import useInputUIData from '@/hooks/useInputUIData';
+import { useGetComponentInstanceFormQuery } from '@/services/componentInstanceForm';
 import { useUpdateComponentMutation } from '@/services/preview';
 import { componentHasFieldData } from '@/types/Component';
 import { flaggedForRemoval, parseValue } from '@/utils/function-utils';
@@ -53,29 +48,25 @@ export const InputBehaviorsComponentPropsForm = (
    * rendering in the correct React Router context so we can't get the selected component ID from the url in inputBehaviors.tsx.
    * We already have a workaround for this for the Redux provider, could we do the same for the React Router context?
    */
-  const currentComponent = useAppSelector(selectCurrentComponent);
   const editorFrameContext = useAppSelector(selectEditorFrameContext);
   const dispatch = useAppDispatch();
-  const selectedComponent = currentComponent || 'noop';
   const polledBackgroundUpdate = useRef<number | null>(null);
-  const model = useAppSelector(selectModel);
   const { attributes } = props;
-  const { data: components } = useGetComponentsQuery();
-  const transforms = useComponentTransforms();
-  const layout = useAppSelector(selectLayout);
-  const node = findComponentByUuid(layout, selectedComponent);
-  const [selectedComponentType, version] = (
-    node ? (node.type as string) : 'noop'
-  ).split('@');
-  const inputAndUiData: InputUIData = {
-    selectedComponent,
-    components,
-    selectedComponentType,
-    layout,
-    node,
-    version,
-    model,
-  };
+  const inputAndUiData = useInputUIData();
+  const { selectedComponentType, version, selectedComponent, components } =
+    inputAndUiData;
+
+  const currentComponentQueryString = useAppSelector(
+    selectCurrentComponentQueryString,
+  );
+
+  // We can get transforms from RTK Query cache by making the same request again.
+  const { currentData: componentInstanceFormData } =
+    useGetComponentInstanceFormQuery(
+      { queryString: currentComponentQueryString, type: editorFrameContext },
+      { skip: !currentComponentQueryString },
+    );
+  const transforms = componentInstanceFormData?.transforms;
   const component = components?.[selectedComponentType];
 
   const [patchComponent] = useUpdateComponentMutation({
@@ -97,12 +88,7 @@ export const InputBehaviorsComponentPropsForm = (
     const { propsValues: values, selectedModel } = getPropsValues(
       newFormState,
       newInputAndUiData,
-      // If transforms are not available (typically because TransformsContext is
-      // not available to the input), fall back to the transforms stored in the
-      // global window object.
-      Object.keys(transforms || {}).length > 0
-        ? transforms
-        : (window as any)._canvasTransforms[selectedComponentType],
+      transforms,
     );
 
     // And then send data to backend - this will:
@@ -274,7 +260,7 @@ export const InputBehaviorsComponentPropsForm = (
     // form, hence it being located here.
     if (
       props.options.some((option: PropsValues) => option.value === '_none') &&
-      !inputAndUiData?.model?.[currentComponent as keyof ComponentModels]
+      !inputAndUiData?.model?.[selectedComponent as keyof ComponentModels]
         .resolved[propName]
     ) {
       propsOverrides.options = props.options.map((option: PropsValues) =>

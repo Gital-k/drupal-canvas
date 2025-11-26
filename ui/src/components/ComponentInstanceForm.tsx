@@ -1,12 +1,7 @@
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-} from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useErrorBoundary } from 'react-error-boundary';
-import { Spinner, Text } from '@radix-ui/themes';
+import { InfoCircledIcon } from '@radix-ui/react-icons';
+import { Callout, Spinner } from '@radix-ui/themes';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import { getPropsValues } from '@/components/form/formUtil';
@@ -15,7 +10,9 @@ import twigToJSXComponentMap from '@/components/form/twig-to-jsx-component-map';
 import { FORM_TYPES } from '@/features/form/constants';
 import {
   clearFieldValues,
+  selectCurrentComponentQueryString,
   selectFormValues,
+  setCurrentComponentQueryString,
 } from '@/features/form/formStateSlice';
 import {
   isEvaluatedComponentModel,
@@ -29,6 +26,7 @@ import {
   selectSelectedComponentUuid,
 } from '@/features/ui/uiSlice';
 import { useDrupalBehaviors } from '@/hooks/useDrupalBehaviors';
+import useInputUIData from '@/hooks/useInputUIData';
 import hyperscriptify from '@/local_packages/hyperscriptify';
 import propsify from '@/local_packages/hyperscriptify/propsify/standard/index.js';
 import { useGetComponentsQuery } from '@/services/componentAndLayout';
@@ -49,16 +47,9 @@ import type {
 import type { AjaxUpdateFormStateEvent } from '@/types/Ajax';
 import type { CanvasComponent, FieldData } from '@/types/Component';
 import type { InputUIData } from '@/types/Form';
-import type { TransformConfig } from '@/utils/transforms';
-
-const TransformsContext = createContext<TransformConfig | undefined>(undefined);
-
-export const useComponentTransforms = () => {
-  return useContext(TransformsContext);
-};
 
 interface ComponentInstanceFormRendererProps {
-  dynamicStaticCardQueryString: string;
+  currentComponentQueryString: string;
 }
 interface ComponentInstanceFormProps {}
 
@@ -68,44 +59,32 @@ const ComponentInstanceFormRenderer: React.FC<
   const formState = useAppSelector((state) =>
     selectFormValues(state, FORM_TYPES.COMPONENT_INSTANCE_FORM),
   );
-  const { dynamicStaticCardQueryString } = props;
+  const { currentComponentQueryString } = props;
   const { showBoundary } = useErrorBoundary();
-  const selectedComponent = useAppSelector(selectSelectedComponentUuid);
+  const inputAndUiData: InputUIData = useInputUIData();
+  const {
+    selectedComponentType,
+    version,
+    selectedComponent: selectedComponentId,
+    components,
+  } = inputAndUiData;
   const editorFrameContext = useAppSelector(selectEditorFrameContext);
 
   const [jsxFormContent, setJsxFormContent] =
     useState<React.ReactElement | null>(null);
-  const [currentComponentId, setCurrentComponentId] = useState<string | null>(
-    null,
-  );
+
   const formRef = useRef(null);
-  const selectedComponentId = selectedComponent || 'noop';
   const skip = useAppSelector((state) =>
     selectUpdateComponentLoadingState(state, selectedComponentId),
   );
   const { currentData, error, originalArgs, isFetching } =
     useGetComponentInstanceFormQuery(
-      { queryString: dynamicStaticCardQueryString, type: editorFrameContext },
+      { queryString: currentComponentQueryString, type: editorFrameContext },
       {
         skip,
       },
     );
-  const model = useAppSelector(selectModel);
-  const { data: components } = useGetComponentsQuery();
-  const layout = useAppSelector(selectLayout);
-  const node = findComponentByUuid(layout, selectedComponentId);
-  const [selectedComponentType, version] = (
-    node ? (node.type as string) : 'noop'
-  ).split('@');
-  const inputAndUiData: InputUIData = {
-    selectedComponent: selectedComponentId,
-    components,
-    selectedComponentType,
-    layout,
-    node,
-    model,
-    version,
-  };
+
   const [patchComponent] = useUpdateComponentMutation({
     fixedCacheKey: selectedComponentId,
   });
@@ -116,28 +95,9 @@ const ComponentInstanceFormRenderer: React.FC<
     }
   }, [error, showBoundary]);
 
-  const { html, transforms } = currentData || {
+  const { html } = currentData || {
     html: false,
-    transforms: false as const,
   };
-
-  const persistentTransforms = useRef<undefined | TransformConfig>(undefined);
-
-  useEffect(() => {
-    if (transforms !== false && !isFetching) {
-      persistentTransforms.current = transforms;
-
-      // We also store transforms in the global window object as a fallback.
-      // The persistent transforms are typically made available to other
-      // components via the TransformsContext, but in some cases such as AJAX
-      // rebuilds, the component might be active without access to that
-      // context.
-      if (!window._canvasTransforms) {
-        window._canvasTransforms = {};
-      }
-      window._canvasTransforms[selectedComponentType] = transforms;
-    }
-  }, [transforms, isFetching, selectedComponentType]);
 
   useEffect(() => {
     if (!html) {
@@ -161,7 +121,6 @@ const ComponentInstanceFormRenderer: React.FC<
     const latestUndoRedoActionId = originalUrlSearchParams.get(
       'latestUndoRedoActionId',
     );
-    setCurrentComponentId(componentId);
 
     setJsxFormContent(
       // Wrapping the constructed `ReactElement` for the form so we can add a
@@ -276,7 +235,7 @@ const ComponentInstanceFormRenderer: React.FC<
     <Spinner
       size="3"
       // Display the spinner only when a new component is being fetched.
-      loading={isFetching && currentComponentId !== selectedComponent}
+      loading={isFetching && !!selectedComponentId}
     >
       {/* Wrap the JSX form in a ref, so we can send it as a stable DOM element
           argument to Drupal.attachBehaviors() anytime jsxFormContent changes.
@@ -288,11 +247,8 @@ const ComponentInstanceFormRenderer: React.FC<
         }}
         ref={formRef}
       >
-        {persistentTransforms.current && (
-          <TransformsContext.Provider value={persistentTransforms.current}>
-            {jsxFormContent}
-          </TransformsContext.Provider>
-        )}
+        {/* Do not render the form until the transforms are available in Redux. */}
+        {jsxFormContent}
       </div>
     </Spinner>
   );
@@ -307,10 +263,7 @@ const ComponentInstanceForm: React.FC<ComponentInstanceFormProps> = () => {
   const selectedComponent = useAppSelector(selectSelectedComponentUuid);
   const latestUndoRedoActionId = useAppSelector(selectLatestUndoRedoActionId);
 
-  const [dynamicStaticCardQueryString, setDynamicStaticCardQueryString] =
-    useState('');
   const [emptyProp, setEmptyProp] = useState(false);
-  const [componentSource, setComponentSource] = useState('');
 
   const buildPreparedModel = (
     model: ComponentModel,
@@ -373,7 +326,7 @@ const ComponentInstanceForm: React.FC<ComponentInstanceFormProps> = () => {
 
     // Check if this component has any props or not.
     if (Object.keys(selectedComponentFieldData).length === 0) {
-      setDynamicStaticCardQueryString('');
+      dispatch(setCurrentComponentQueryString(''));
       setEmptyProp(true);
     } else {
       setEmptyProp(false);
@@ -388,8 +341,7 @@ const ComponentInstanceForm: React.FC<ComponentInstanceFormProps> = () => {
       form_canvas_selected: selectedComponent,
       latestUndoRedoActionId,
     });
-    setDynamicStaticCardQueryString(`?${query.toString()}`);
-    setComponentSource(components?.[selectedComponentType]?.source || '');
+    dispatch(setCurrentComponentQueryString(`?${query.toString()}`));
   }, [
     components,
     error,
@@ -398,18 +350,28 @@ const ComponentInstanceForm: React.FC<ComponentInstanceFormProps> = () => {
     latestUndoRedoActionId,
     layout,
     model,
+    dispatch,
   ]);
 
+  const currentComponentQueryString = useAppSelector(
+    selectCurrentComponentQueryString,
+  );
+
   return (
-    dynamicStaticCardQueryString && (
+    currentComponentQueryString && (
       <>
         <ComponentInstanceFormRenderer
-          dynamicStaticCardQueryString={dynamicStaticCardQueryString}
+          currentComponentQueryString={currentComponentQueryString}
         />
-        {componentSource === 'Module component' && emptyProp ? (
-          <Text size="4">This component has no props.</Text>
-        ) : (
-          ''
+        {emptyProp && (
+          <Callout.Root>
+            <Callout.Icon>
+              <InfoCircledIcon />
+            </Callout.Icon>
+            <Callout.Text>
+              This component has no user editable settings.
+            </Callout.Text>
+          </Callout.Root>
         )}
       </>
     )

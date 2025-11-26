@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import { getDefaultValue } from '@/components/form/formUtil';
@@ -103,16 +103,46 @@ export const InputBehaviorsCommon = ({
   const fieldName = (attributes.name ||
     attributes['data-canvas-name']) as string;
 
-  const fieldIdentifier = {
-    formId,
-    fieldName,
-  };
+  useEffect(() => {
+    setInputValue(defaultValue || '');
+  }, [defaultValue]);
+
   const fieldError = useAppSelector((state) =>
-    selectFieldError(state, fieldIdentifier),
+    selectFieldError(state, { formId, fieldName }),
   );
   // Include the input's default value in the form state on init - including
   // when an element is added via AJAX.
   const elementType = attributes.type || attributes['data-canvas-type'];
+
+  const dispatchFieldValue = useCallback(
+    (formId: FormId, fieldName: string, value: any) => {
+      dispatch(
+        setFieldValue({
+          formId,
+          fieldName,
+          value,
+        }),
+      );
+    },
+    [dispatch],
+  );
+
+  const dispatchFieldError = useCallback(
+    (formId: FormId, fieldName: string, validationResult: ValidationResult) => {
+      dispatch(
+        setFieldError({
+          type: 'error',
+          message:
+            validationResult.errorMessage ||
+            ajv.errorsText(validationResult.errors),
+          formId,
+          fieldName,
+        }),
+      );
+    },
+    [dispatch],
+  );
+
   useEffect(() => {
     if (
       // Ignore radios in indeterminate (initial unset) state.
@@ -126,13 +156,8 @@ export const InputBehaviorsCommon = ({
       return;
     }
     if (fieldName && formId) {
-      dispatch(
-        setFieldValue({
-          formId,
-          fieldName,
-          value: elementType === 'checkbox' ? !!inputValue : inputValue,
-        }),
-      );
+      const value = elementType === 'checkbox' ? !!inputValue : inputValue;
+      dispatchFieldValue(formId, fieldName, value);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -147,13 +172,7 @@ export const InputBehaviorsCommon = ({
     // our form state and value.
     const formBuildIdListener = (e: AjaxUpdateFormBuildIdEvent) => {
       if (e.detail.formId === formId) {
-        dispatch(
-          setFieldValue({
-            formId,
-            fieldName,
-            value: e.detail.newFormBuildId,
-          }),
-        );
+        dispatchFieldValue(formId, fieldName, e.detail.newFormBuildId);
         setInputValue(e.detail.newFormBuildId);
       }
     };
@@ -167,7 +186,7 @@ export const InputBehaviorsCommon = ({
         formBuildIdListener as unknown as EventListener,
       );
     };
-  }, [dispatch, fieldName, formId, setInputValue]);
+  }, [dispatchFieldValue, dispatch, fieldName, formId, setInputValue]);
 
   // Don't track the value of hidden fields except for form_build_id or ones
   // with the 'data-track-hidden-value' attribute set.
@@ -209,13 +228,7 @@ export const InputBehaviorsCommon = ({
       }
       // Update the value of the input in the Redux store.
       if (formId) {
-        dispatch(
-          setFieldValue({
-            formId,
-            fieldName,
-            value: newValue,
-          }),
-        );
+        dispatchFieldValue(formId, fieldName, newValue);
       }
 
       // Check the current value against the JSON Schema definition for the
@@ -229,16 +242,7 @@ export const InputBehaviorsCommon = ({
       ) {
         const validationResult = validateNewValue(e, newValue);
         if (!validationResult.valid && formId) {
-          dispatch(
-            setFieldError({
-              type: 'error',
-              message:
-                validationResult.errorMessage ||
-                ajv.errorsText(validationResult.errors),
-              formId,
-              fieldName,
-            }),
-          );
+          dispatchFieldError(formId, fieldName, validationResult);
           if (!validationResult?.skipEarlyReturn) {
             return;
           }
@@ -263,16 +267,7 @@ export const InputBehaviorsCommon = ({
       if (!validationResult.valid) {
         if (formId) {
           attributes['data-invalid-prop-value'] = 'true';
-          dispatch(
-            setFieldError({
-              type: 'error',
-              message:
-                validationResult.errorMessage ||
-                ajv.errorsText(validationResult.errors),
-              formId,
-              fieldName,
-            }),
-          );
+          dispatchFieldError(formId, fieldName, validationResult);
         }
       }
     };
