@@ -313,7 +313,7 @@ const ComponentInstanceFormRenderer: React.FC<
             });
           }
 
-          return persistentTransforms.current && strictCheckPasses && (
+          return persistentTransforms.current && relaxedCheckPasses && (
             <TransformsContext.Provider value={persistentTransforms.current}>
               {jsxFormContent}
             </TransformsContext.Provider>
