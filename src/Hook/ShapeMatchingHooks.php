@@ -8,6 +8,8 @@ use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaStringFormat;
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
+use Drupal\Core\Field\FieldDefinitionInterface;
+use Drupal\Core\Field\TypedData\FieldItemDataDefinition;
 use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\datetime\Plugin\Field\FieldType\DateTimeItem;
@@ -21,6 +23,7 @@ use Drupal\canvas\Plugin\Field\FieldTypeOverride\FloatItemOverride;
 use Drupal\canvas\Plugin\Field\FieldTypeOverride\ImageItemOverride;
 use Drupal\canvas\Plugin\Field\FieldTypeOverride\LinkItemOverride;
 use Drupal\canvas\Plugin\Field\FieldTypeOverride\ListIntegerItemOverride;
+use Drupal\canvas\Plugin\Field\FieldTypeOverride\OembedStringItemOverride;
 use Drupal\canvas\Plugin\Field\FieldTypeOverride\StringItemOverride;
 use Drupal\canvas\Plugin\Field\FieldTypeOverride\StringLongItemOverride;
 use Drupal\canvas\Plugin\Field\FieldTypeOverride\TextItemOverride;
@@ -39,7 +42,9 @@ use Drupal\canvas\TypedData\BetterEntityDataDefinition;
 use Drupal\filter\FilterFormatInterface;
 use Drupal\media\Entity\MediaType;
 use Drupal\media\MediaTypeInterface;
+use Drupal\media\Plugin\media\Source\File;
 use Drupal\media\Plugin\media\Source\Image;
+use Drupal\media\Plugin\media\Source\OEmbed;
 use Drupal\media\Plugin\media\Source\VideoFile;
 use Symfony\Component\Validator\Constraints\Hostname;
 use Symfony\Component\Validator\Constraints\Ip;
@@ -58,6 +63,12 @@ class ShapeMatchingHooks {
     'json-schema-definitions://canvas.module/image' => Image::class,
     // @see \Drupal\media\Plugin\media\Source\VideoFile
     'json-schema-definitions://canvas.module/video' => VideoFile::class,
+    // @see \Drupal\media\Plugin\media\Source\OEmbed
+    // @see \Drupal\media\Plugin\media\Source\OEmbedDeriver
+    // @todo Restrict to just the `oembed:video` derivative
+    'json-schema-definitions://canvas.module/oembed_video' => OEmbed::class,
+    // @see \Drupal\media\Plugin\media\Source\File
+    'json-schema-definitions://canvas.module/document' => File::class,
   ];
 
   /**
@@ -148,6 +159,25 @@ class ShapeMatchingHooks {
       $fields['filename']->addPropertyConstraints('value', ['StringSemantics' => StringSemanticsConstraint::STRUCTURED]);
       $fields['filemime']->addPropertyConstraints('value', ['StringSemantics' => StringSemanticsConstraint::STRUCTURED]);
       $fields['uri']->setRequired(\TRUE);
+    }
+  }
+
+  /**
+   * Implements hook_entity_bundle_field_info_alter().
+   */
+  #[Hook('entity_bundle_field_info_alter')]
+  public function entityBundleFieldInfoAlter(array &$fields, EntityTypeInterface $entity_type, string $bundle): void {
+    if ($entity_type->id() !== 'media') {
+      return;
+    }
+    $media_type = MediaType::load($bundle);
+    assert($media_type instanceof MediaTypeInterface);
+    if ($media_type->getSource()->getPluginId() === 'oembed:video') {
+      foreach ($fields as $field) {
+        assert($field instanceof FieldDefinitionInterface);
+        assert($field->getItemDefinition() instanceof FieldItemDataDefinition);
+        $field->getItemDefinition()->setClass(OembedStringItemOverride::class);
+      }
     }
   }
 
@@ -389,6 +419,46 @@ class ShapeMatchingHooks {
           new ReferenceFieldPropExpression(
             new FieldPropExpression(BetterEntityDataDefinition::create('media', $media_type_ids), $source_field_names, \NULL, 'entity'),
             new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'uri', \NULL, 'url')
+          )
+        ),
+      ],
+      OEmbed::class => [
+        'url' => new ReferenceFieldTypePropExpression(
+          new FieldTypePropExpression('entity_reference', 'entity'),
+          new FieldPropExpression(BetterEntityDataDefinition::create('media', $media_type_ids), $source_field_names, \NULL, 'value'),
+        ),
+      ],
+      File::class => [
+        'src' => new ReferenceFieldTypePropExpression(
+          new FieldTypePropExpression('entity_reference', 'entity'),
+          new ReferenceFieldPropExpression(
+            new FieldPropExpression(BetterEntityDataDefinition::create('media', $media_type_ids), $source_field_names, \NULL, 'entity'),
+            new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'uri', \NULL, 'url')
+          )
+        ),
+        'title' => new ReferenceFieldTypePropExpression(
+          new FieldTypePropExpression('entity_reference', 'entity'),
+          new FieldPropExpression(BetterEntityDataDefinition::create('media', $media_type_ids), 'name', \NULL, 'value'),
+        ),
+        'filename' => new ReferenceFieldTypePropExpression(
+          new FieldTypePropExpression('entity_reference', 'entity'),
+          new ReferenceFieldPropExpression(
+            new FieldPropExpression(BetterEntityDataDefinition::create('media', $media_type_ids), $source_field_names, \NULL, 'entity'),
+            new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'filename', \NULL, 'value')
+          )
+        ),
+        'filesize' => new ReferenceFieldTypePropExpression(
+          new FieldTypePropExpression('entity_reference', 'entity'),
+          new ReferenceFieldPropExpression(
+            new FieldPropExpression(BetterEntityDataDefinition::create('media', $media_type_ids), $source_field_names, \NULL, 'entity'),
+            new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'filesize', \NULL, 'value')
+          )
+        ),
+        'mimetype' => new ReferenceFieldTypePropExpression(
+          new FieldTypePropExpression('entity_reference', 'entity'),
+          new ReferenceFieldPropExpression(
+            new FieldPropExpression(BetterEntityDataDefinition::create('media', $media_type_ids), $source_field_names, \NULL, 'entity'),
+            new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'filemime', \NULL, 'value')
           )
         ),
       ],

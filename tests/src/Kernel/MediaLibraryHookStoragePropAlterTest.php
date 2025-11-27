@@ -7,7 +7,9 @@ namespace Drupal\Tests\canvas\Kernel;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\canvas\PropShape\PropShape;
 use Drupal\canvas\PropShape\StorablePropShape;
+use Drupal\media\OEmbed\UrlResolverInterface;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
+use Prophecy\Argument;
 
 /**
  * @covers \Drupal\canvas\Hook\ShapeMatchingHooks::mediaLibraryStoragePropShapeAlter()
@@ -57,18 +59,34 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
     // @see \Drupal\media\Plugin\media\Source\VideoFile
     $this->createMediaType('video_file', ['id' => 'baby_videos']);
     $this->createMediaType('video_file', ['id' => 'vacation_videos']);
+    // @see \Drupal\media\Plugin\media\Source\OEmbed
+    // @see \Drupal\media\Plugin\media\Source\OEmbedDeriver::getDerivativeDefinitions()
+    $this->createMediaType('oembed:video', ['id' => 'remote_vimeo_videos']);
+    $this->createMediaType('oembed:video', ['id' => 'remote_youtube_videos']);
+    // @see \Drupal\media\Plugin\media\Source\File
+    $this->createMediaType('file', ['id' => 'important_documents']);
+    $this->createMediaType('file', ['id' => 'vacation_documents']);
 
     // A sample value is generated during the test, which needs this table.
     $this->installSchema('file', ['file_usage']);
 
     // @see \Drupal\media_library\MediaLibraryEditorOpener::__construct()
     $this->installEntitySchema('filter_format');
+
+    // Mock the resource fetcher so that it will return our fake resource url.
+    $resource_url_resolver = $this->prophesize(UrlResolverInterface::class);
+    $resource_url_resolver->getResourceUrl(Argument::any())
+      ->willReturn('https://vimeo.com/api/oembed.json?url=https%3A//vimeo.com/7073899');
+    $this->container->set('media.oembed.url_resolver', $resource_url_resolver->reveal());
+
   }
 
   public static function getExpectedUnstorablePropShapes(): array {
     $unstorable_prop_shapes = parent::getExpectedUnstorablePropShapes();
     unset(
       $unstorable_prop_shapes['type=object&$ref=json-schema-definitions://canvas.module/video'],
+      $unstorable_prop_shapes['type=object&$ref=json-schema-definitions://canvas.module/oembed_video'],
+      $unstorable_prop_shapes['type=object&$ref=json-schema-definitions://canvas.module/document'],
     );
     return $unstorable_prop_shapes;
   }
@@ -141,6 +159,44 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
           'target_bundles' => [
             'baby_photos' => 'baby_photos',
             'vacation_photos' => 'vacation_photos',
+          ],
+        ],
+      ],
+    );
+
+    $storable_prop_shapes['type=object&$ref=json-schema-definitions://canvas.module/oembed_video'] = new StorablePropShape(
+      shape: new PropShape(['type' => 'object', '$ref' => 'json-schema-definitions://canvas.module/oembed_video']),
+      // @phpstan-ignore-next-line
+      fieldTypeProp: StructuredDataPropExpression::fromString('ℹ︎entity_reference␟{url↝entity␜␜entity:media:remote_vimeo_videos|remote_youtube_videos␝field_media_oembed_video|field_media_oembed_video_1␞␟value}'),
+      fieldWidget: 'media_library_widget',
+      fieldStorageSettings: [
+        'target_type' => 'media',
+      ],
+      fieldInstanceSettings: [
+        'handler' => 'default:media',
+        'handler_settings' => [
+          'target_bundles' => [
+            'remote_vimeo_videos' => 'remote_vimeo_videos',
+            'remote_youtube_videos' => 'remote_youtube_videos',
+          ],
+        ],
+      ],
+    );
+
+    $storable_prop_shapes['type=object&$ref=json-schema-definitions://canvas.module/document'] = new StorablePropShape(
+      shape: new PropShape(['type' => 'object', '$ref' => 'json-schema-definitions://canvas.module/document']),
+      // @phpstan-ignore-next-line
+      fieldTypeProp: StructuredDataPropExpression::fromString('ℹ︎entity_reference␟{src↝entity␜␜entity:media:important_documents|vacation_documents␝field_media_file|field_media_file_1␞␟entity␜␜entity:file␝uri␞␟url,title↝entity␜␜entity:media:important_documents|vacation_documents␝name␞␟value,filename↝entity␜␜entity:media:important_documents|vacation_documents␝field_media_file|field_media_file_1␞␟entity␜␜entity:file␝filename␞␟value,filesize↝entity␜␜entity:media:important_documents|vacation_documents␝field_media_file|field_media_file_1␞␟entity␜␜entity:file␝filesize␞␟value,mimetype↝entity␜␜entity:media:important_documents|vacation_documents␝field_media_file|field_media_file_1␞␟entity␜␜entity:file␝filemime␞␟value}'),
+      fieldWidget: 'media_library_widget',
+      fieldStorageSettings: [
+        'target_type' => 'media',
+      ],
+      fieldInstanceSettings: [
+        'handler' => 'default:media',
+        'handler_settings' => [
+          'target_bundles' => [
+            'important_documents' => 'important_documents',
+            'vacation_documents' => 'vacation_documents',
           ],
         ],
       ],

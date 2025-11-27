@@ -229,6 +229,7 @@ canvas.json_schema.prop.object:
           choices:
             - 'json-schema-definitions://canvas.module/image'
             - 'json-schema-definitions://canvas.module/video'
+            - 'json-schema-definitions://canvas.module/oembed_video'
 
 canvas.json_schema.object:
   class: '\Drupal\canvas\Config\Schema\JsonSchemaObject'

@@ -1,0 +1,28 @@
+'$schema': 'https://git.drupalcode.org/project/drupal/-/raw/HEAD/core/assets/schemas/v1/metadata.schema.json'
+name: Video (oEmbed)
+status: stable
+group: Atom/Media
+description: A video element using Youtube or Vimeo as providers
+props:
+  type: object
+  required:
+    - video
+  properties:
+    video:
+      title: Video via oEmbed
+      type: object
+      $ref: json-schema-definitions://canvas.module/oembed_video
+      description: The video object.
+      examples:
+        - url: https://www.youtube.com/watch?v=PWjcqE3QKBg
+          title: Example oEmbed video title
+    max_width:
+      title: Max width
+      type: integer
+      examples:
+        - 640
+    max_height:
+      title: Max height
+      type: integer
+      examples:
+        - 480

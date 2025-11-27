@@ -1,0 +1,30 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Drupal\canvas\Plugin\Field\FieldTypeOverride;
+
+use Drupal\Core\Field\FieldDefinitionInterface;
+use Drupal\Core\Field\Plugin\Field\FieldType\StringItem;
+use Drupal\media\Entity\MediaType;
+
+/**
+ * @todo Fix upstream.
+ * @see \Drupal\media\Plugin\media\Source\OEmbedDeriver::getDerivativeDefinitions()
+ * @see \Drupal\canvas\Hook\ShapeMatchingHooks::entityBaseFieldInfoAlter()
+ * @internal
+ */
+final class OembedStringItemOverride extends StringItem {
+
+  public static function generateSampleValue(FieldDefinitionInterface $field_definition) {
+    // Media using oembed:video source should generate URI as a sample.
+    if ($field_definition->getTargetEntityTypeId() === 'media' && !empty($field_definition->getTargetBundle()) && MediaType::load($field_definition->getTargetBundle())->getSource()->getPluginId() === 'oembed:video') {
+      return [
+        'value' => 'https://vimeo.com/7073899',
+      ];
+    }
+
+    return parent::generateSampleValue($field_definition);
+  }
+
+}

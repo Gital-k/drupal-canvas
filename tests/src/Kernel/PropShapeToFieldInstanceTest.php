@@ -486,6 +486,15 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
         ],
+        'REQUIRED, type=object&$ref=json-schema-definitions://canvas.module/document' => [
+          'SDC props' => [
+            '⿲canvas:document␟document',
+          ],
+          'static prop source' => NULL,
+          'instances' => [],
+          'adapter_matches_field_type' => [],
+          'adapter_matches_instance' => [],
+        ],
         'REQUIRED, type=integer&enum[0]=1&enum[1]=2&enum[2]=3&enum[3]=4&enum[4]=5&enum[5]=6' => [
           'SDC props' => [
             0 => '⿲canvas_test_sdc:columns␟columns',
@@ -524,6 +533,15 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
               'image' => ['ℹ︎␜entity:node:foo␝field_silly_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}'],
             ],
           ],
+        ],
+        'REQUIRED, type=object&$ref=json-schema-definitions://canvas.module/oembed_video' => [
+          'SDC props' => [
+            '⿲canvas:oembed_video␟video',
+          ],
+          'static prop source' => NULL,
+          'instances' => [],
+          'adapter_matches_field_type' => [],
+          'adapter_matches_instance' => [],
         ],
         'REQUIRED, type=object&$ref=json-schema-definitions://canvas.module/video' => [
           'SDC props' => [
@@ -950,6 +968,8 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
         ],
         'optional, type=integer' => [
           'SDC props' => [
+            '⿲canvas:oembed_video␟max_width',
+            '⿲canvas:oembed_video␟max_height',
             '⿲sdc_test_all_props:all-props␟test_integer',
           ],
           'static prop source' => 'ℹ︎integer␟value',
@@ -1249,6 +1269,15 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
         ],
+        'optional, type=object&$ref=json-schema-definitions://canvas.module/document' => [
+          'SDC props' => [
+            '⿲sdc_test_all_props:all-props␟test_object_drupal_document',
+          ],
+          'static prop source' => NULL,
+          'instances' => [],
+          'adapter_matches_field_type' => [],
+          'adapter_matches_instance' => [],
+        ],
         'optional, type=object&$ref=json-schema-definitions://canvas.module/image' => [
           'SDC props' => [
             '⿲canvas_test_sdc:banner␟image',
@@ -1287,6 +1316,15 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
               'image' => ['ℹ︎␜entity:node:foo␝field_silly_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}'],
             ],
           ],
+        ],
+        'optional, type=object&$ref=json-schema-definitions://canvas.module/oembed_video' => [
+          'SDC props' => [
+            '⿲sdc_test_all_props:all-props␟test_object_drupal_oembed_video',
+          ],
+          'static prop source' => NULL,
+          'instances' => [],
+          'adapter_matches_field_type' => [],
+          'adapter_matches_instance' => [],
         ],
         'optional, type=object&$ref=json-schema-definitions://canvas.module/shoe-icon' => [
           'SDC props' => [

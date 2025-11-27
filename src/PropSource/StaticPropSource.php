@@ -26,6 +26,7 @@ use Drupal\canvas\PropExpressions\StructuredData\FieldTypePropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpressionInterface;
+use Drupal\media\MediaInterface;
 
 /**
  * Contains unstructured data for 1 explicit input of a component instance.
@@ -211,6 +212,16 @@ final class StaticPropSource extends PropSourceBase {
         assert($field_item instanceof EntityReferenceItem);
         if ($field_item->get('target_id')->getValue() === NULL && $field_item->get('entity')->getValue()->isNew()) {
           $entity = $field_item->get('entity')->getValue();
+          if ($entity instanceof MediaInterface && $entity->getSource()->getPluginId() === 'oembed:video') {
+            // Saving Media entity with `oembed:video` source fails during an
+            // attempt to fetch thumbnail uri from metadata. This prevents
+            // thumbnail uri fetching via metadata and forces Media entity to
+            // use Media::getDefaultThumbnailUri() for thumbnail uri.
+            // @see \Drupal\media\Entity\Media::getThumbnailUri()
+            // @todo Fix upstream in https://www.drupal.org/project/drupal/issues/2976875 and/or https://www.drupal.org/project/drupal/issues/2962751
+            // @phpstan-ignore-next-line
+            $entity->bundle->entity->setQueueThumbnailDownloadsStatus(TRUE);
+          }
           $entity->save();
           $field_item->setValue(['entity' => $entity]);
         }

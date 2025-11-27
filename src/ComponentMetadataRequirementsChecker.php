@@ -7,6 +7,7 @@ namespace Drupal\canvas;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase;
 use Drupal\Core\Template\Attribute;
 use Drupal\Core\Theme\Component\ComponentMetadata;
+use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaStringFormat;
 use Drupal\canvas\PropExpressions\Component\ComponentPropExpression;
 use Drupal\canvas\PropShape\StorablePropShape;
 use JsonSchema\Validator;
@@ -93,6 +94,12 @@ final class ComponentMetadataRequirementsChecker {
       if (array_key_exists('contentMediaType', $prop) && $prop['contentMediaType'] === 'text/html' && isset($prop['x-formatting-context'])) {
         if (!in_array($prop['x-formatting-context'], ['inline', 'block'], TRUE)) {
           $messages[] = \sprintf('Invalid value "%s" for "x-formatting-context". Valid values are "inline" and "block".', $prop['x-formatting-context']);
+          continue;
+        }
+      }
+      if (array_key_exists('format', $prop) && $prop['format'] === JsonSchemaStringFormat::Uri && array_key_exists('contentMediaType', $prop) && $prop['contentMediaType'] === 'application/oembed+json' && isset($prop['x-oembed-type'])) {
+        if ($prop['x-oembed-type'] !== 'video') {
+          $messages[] = \sprintf('Invalid value "%s" for "x-oembed-type". For now, only "video" is allowed.', $prop['x-oembed-type']);
           continue;
         }
       }

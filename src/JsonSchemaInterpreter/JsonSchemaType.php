@@ -145,6 +145,20 @@ enum JsonSchemaType: string {
           // Other `x-formatting-context` values do not make sense.
           default => throw new \LogicException('Invalid `x-formatting-context` value; this component should never have been eligible.'),
         },
+        // Custom: `contentMediaType: application/oembed+json` + `x-oembed-type`.
+        array_key_exists('contentMediaType', $schema) && $schema['contentMediaType'] === 'application/oembed+json' => match(TRUE) {
+          !isset($schema['x-oembed-type']) => throw new \LogicException('Missing `x-oembed-type` value.'),
+          $schema['x-oembed-type'] === 'video' =>  new DataTypeShapeRequirements([
+            JsonSchemaStringFormat::from($schema['format'])->toDataTypeShapeRequirements(),
+            // @see \Drupal\media\Plugin\media\Source\OEmbed::getSourceFieldConstraints()
+            // @see \Drupal\media\Plugin\Validation\Constraint\OEmbedResourceConstraint
+            // @see \Drupal\media\Plugin\Validation\Constraint\OEmbedResourceConstraintValidator
+            // @todo OEmbedResourceConstraintValidator operates at the field item list level, XB needs information at the property level. Extract a property-level equivalent validation constraint and add it using `hook_entity_bundle_field_info_alter()`. Alternatively, do it in `JsonSchemaFieldInstanceMatcher::matchEntityPropsForScalar()` like it does for FileExtension.
+            new DataTypeShapeRequirement('oembed_resource', []),
+          ]),
+          // Other `x-oembed-type` values are not yet supported.
+          default => throw new \LogicException('Invalid `x-oembed-type` value; this component should never have been eligible.'),
+        },
         array_key_exists('enum', $schema) => new DataTypeShapeRequirement('Choice', [
           'choices' => $schema['enum'],
         ], NULL),
