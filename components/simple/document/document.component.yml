@@ -1,0 +1,22 @@
+'$schema': 'https://git.drupalcode.org/project/drupal/-/raw/HEAD/core/assets/schemas/v1/metadata.schema.json'
+name: Document
+status: stable
+group: Atom/Media
+description: A document link element
+props:
+  type: object
+  required:
+    - document
+  properties:
+    document:
+      title: Document
+      type: object
+      $ref: json-schema-definitions://canvas.module/document
+      description: The document object.
+      examples:
+        - src: https://example.com/file.txt
+          title: 'Example document title'
+          description: 'Example document description'
+          filename: file.txt
+          filesize: 1048576
+          mimetype: text/plain

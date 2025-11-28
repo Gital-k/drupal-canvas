@@ -781,6 +781,12 @@ class PropSourceSuggesterTest extends KernelTestBase {
           'adapters' => [],
           'host_entity_urls' => [],
         ],
+        '⿲sdc_test_all_props:all-props␟test_object_drupal_document' => [
+          'required' => FALSE,
+          'instances' => [],
+          'adapters' => [],
+          'host_entity_urls' => [],
+        ],
         '⿲sdc_test_all_props:all-props␟test_object_drupal_date_range' => [
           'required' => FALSE,
           'instances' => [

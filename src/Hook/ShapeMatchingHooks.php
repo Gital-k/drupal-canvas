@@ -39,6 +39,7 @@ use Drupal\canvas\TypedData\BetterEntityDataDefinition;
 use Drupal\filter\FilterFormatInterface;
 use Drupal\media\Entity\MediaType;
 use Drupal\media\MediaTypeInterface;
+use Drupal\media\Plugin\media\Source\File;
 use Drupal\media\Plugin\media\Source\Image;
 use Drupal\media\Plugin\media\Source\VideoFile;
 use Symfony\Component\Validator\Constraints\Hostname;
@@ -58,6 +59,8 @@ class ShapeMatchingHooks {
     'json-schema-definitions://canvas.module/image' => Image::class,
     // @see \Drupal\media\Plugin\media\Source\VideoFile
     'json-schema-definitions://canvas.module/video' => VideoFile::class,
+    // @see \Drupal\media\Plugin\media\Source\File
+    'json-schema-definitions://canvas.module/document' => File::class,
   ];
 
   /**
@@ -297,6 +300,30 @@ class ShapeMatchingHooks {
       }
     }
 
+
+    // @see json-schema-definitions://canvas.module/document
+    if ($storable_prop_shape->shape->schema['type'] === 'object' &&
+      (
+        isset($storable_prop_shape->shape->schema['$ref']) &&
+        $storable_prop_shape->shape->schema['$ref'] === 'json-schema-definitions://canvas.module/document'
+      )
+    ) {
+      // @todo This method uses `is_a`, resulting in `Image` and `VideoFile`
+      // being matched for `document`, because both inherit from `File` class.
+      // This is incorrect for `document`.
+      $media_types = self::getMediaTypesForSource(File::class);
+      // @todo Come up with better way of filtering out Media Source Plugins so
+      // that Video and Image based Media types would not match, but also any
+      // subclass of `File` that used as `document` would.
+      $media_types = \array_filter($media_types, fn (MediaType $type): bool => $type->getSource()->getPluginId() === 'file');
+      if (!empty($media_types)) {
+          $media_type_ids = array_keys($media_types);
+          $storable_prop_shape->fieldTypeProp = new FieldTypeObjectPropsExpression('entity_reference',
+          $this->getFieldTypeProps($media_types, $media_type_ids, $media_source_class)
+        );
+      }
+    }
+
     if (!empty($media_type_ids)) {
       $storable_prop_shape->fieldStorageSettings = ['target_type' => 'media'];
       $storable_prop_shape->fieldInstanceSettings = [
@@ -389,6 +416,40 @@ class ShapeMatchingHooks {
           new ReferenceFieldPropExpression(
             new FieldPropExpression(BetterEntityDataDefinition::create('media', $media_type_ids), $source_field_names, \NULL, 'entity'),
             new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'uri', \NULL, 'url')
+          )
+        ),
+      ],
+      File::class => [
+        'src' => new ReferenceFieldTypePropExpression(
+          new FieldTypePropExpression('entity_reference', 'entity'),
+          new ReferenceFieldPropExpression(
+            new FieldPropExpression(BetterEntityDataDefinition::create('media', $media_type_ids), $source_field_names, \NULL, 'entity'),
+            new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'uri', \NULL, 'url')
+          )
+        ),
+        'title' => new ReferenceFieldTypePropExpression(
+          new FieldTypePropExpression('entity_reference', 'entity'),
+          new FieldPropExpression(BetterEntityDataDefinition::create('media', $media_type_ids), 'name', \NULL, 'value'),
+        ),
+        'filename' => new ReferenceFieldTypePropExpression(
+          new FieldTypePropExpression('entity_reference', 'entity'),
+          new ReferenceFieldPropExpression(
+            new FieldPropExpression(BetterEntityDataDefinition::create('media', $media_type_ids), $source_field_names, \NULL, 'entity'),
+            new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'filename', \NULL, 'value')
+          )
+        ),
+        'filesize' => new ReferenceFieldTypePropExpression(
+          new FieldTypePropExpression('entity_reference', 'entity'),
+          new ReferenceFieldPropExpression(
+            new FieldPropExpression(BetterEntityDataDefinition::create('media', $media_type_ids), $source_field_names, \NULL, 'entity'),
+            new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'filesize', \NULL, 'value')
+          )
+        ),
+        'mimetype' => new ReferenceFieldTypePropExpression(
+          new FieldTypePropExpression('entity_reference', 'entity'),
+          new ReferenceFieldPropExpression(
+            new FieldPropExpression(BetterEntityDataDefinition::create('media', $media_type_ids), $source_field_names, \NULL, 'entity'),
+            new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'filemime', \NULL, 'value')
           )
         ),
       ],

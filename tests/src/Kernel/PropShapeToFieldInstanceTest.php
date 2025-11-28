@@ -495,6 +495,15 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
         ],
+        'REQUIRED, type=object&$ref=json-schema-definitions://canvas.module/document' => [
+          'SDC props' => [
+            '⿲canvas:document␟document',
+          ],
+          'static prop source' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:press_releases␝field_media_file␞␟entity␜␜entity:file␝uri␞␟url,title↝entity␜␜entity:media:press_releases␝name␞␟value,filename↝entity␜␜entity:media:press_releases␝field_media_file␞␟entity␜␜entity:file␝filename␞␟value,filesize↝entity␜␜entity:media:press_releases␝field_media_file␞␟entity␜␜entity:file␝filesize␞␟value,mimetype↝entity␜␜entity:media:press_releases␝field_media_file␞␟entity␜␜entity:file␝filemime␞␟value}',
+          'instances' => [],
+          'adapter_matches_field_type' => [],
+          'adapter_matches_instance' => [],
+        ],
         'REQUIRED, type=object&$ref=json-schema-definitions://canvas.module/image' => [
           'SDC props' => [
             '⿲canvas_test_sdc:card␟image',
@@ -1246,6 +1255,15 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
             'ℹ︎␜entity:user␝created␞␟value',
             'ℹ︎␜entity:user␝login␞␟value',
           ],
+          'adapter_matches_field_type' => [],
+          'adapter_matches_instance' => [],
+        ],
+        'optional, type=object&$ref=json-schema-definitions://canvas.module/document' => [
+          'SDC props' => [
+            '⿲sdc_test_all_props:all-props␟test_object_drupal_document',
+          ],
+          'static prop source' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:press_releases␝field_media_file␞␟entity␜␜entity:file␝uri␞␟url,title↝entity␜␜entity:media:press_releases␝name␞␟value,filename↝entity␜␜entity:media:press_releases␝field_media_file␞␟entity␜␜entity:file␝filename␞␟value,filesize↝entity␜␜entity:media:press_releases␝field_media_file␞␟entity␜␜entity:file␝filesize␞␟value,mimetype↝entity␜␜entity:media:press_releases␝field_media_file␞␟entity␜␜entity:file␝filemime␞␟value}',
+          'instances' => [],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
         ],
