@@ -201,7 +201,7 @@ test.describe('Responsive Image', () => {
       );
       expect(cardStreamWrapperSrcset).toContain(` ${width}w`);
     });
-    await expect(cardStreamWrapper).toHaveAttribute('sizes', 'auto 100vw');
+      await expect(cardStreamWrapper).toHaveAttribute('sizes', 'auto, 100vw');
     await expect(cardStreamWrapper).toHaveAttribute('alt', 'Hot air balloons');
     await expect(cardStreamWrapper).toHaveAttribute('width', '640');
     await expect(cardStreamWrapper).toHaveAttribute('height', '427');

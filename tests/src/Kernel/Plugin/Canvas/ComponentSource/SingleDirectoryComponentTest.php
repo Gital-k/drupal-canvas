@@ -487,7 +487,7 @@ HTML,
    class="card--image"
    src="::SITE_DIR_BASE_URL::/files/balloons.png"
         srcset="::SITE_DIR_BASE_URL::/files/styles/canvas_parametrized_width--16/public/balloons.png.webp?itok=uQqtnjV1 16w, ::SITE_DIR_BASE_URL::/files/styles/canvas_parametrized_width--32/public/balloons.png.webp?itok=uQqtnjV1 32w, ::SITE_DIR_BASE_URL::/files/styles/canvas_parametrized_width--48/public/balloons.png.webp?itok=uQqtnjV1 48w, ::SITE_DIR_BASE_URL::/files/styles/canvas_parametrized_width--64/public/balloons.png.webp?itok=uQqtnjV1 64w, ::SITE_DIR_BASE_URL::/files/styles/canvas_parametrized_width--96/public/balloons.png.webp?itok=uQqtnjV1 96w, ::SITE_DIR_BASE_URL::/files/styles/canvas_parametrized_width--128/public/balloons.png.webp?itok=uQqtnjV1 128w, ::SITE_DIR_BASE_URL::/files/styles/canvas_parametrized_width--256/public/balloons.png.webp?itok=uQqtnjV1 256w, ::SITE_DIR_BASE_URL::/files/styles/canvas_parametrized_width--384/public/balloons.png.webp?itok=uQqtnjV1 384w, ::SITE_DIR_BASE_URL::/files/styles/canvas_parametrized_width--640/public/balloons.png.webp?itok=uQqtnjV1 640w"
-     sizes="auto 100vw"
+     sizes="auto, 100vw"
            alt="Hot air balloons"
            width="640"
            height="427"

@@ -38,7 +38,7 @@ props:
       title: Sizes
       type: string
       examples:
-        - auto 100vw
+        - auto, 100vw
     loading:
       title: Loading
       type: string

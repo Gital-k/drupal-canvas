@@ -64,11 +64,11 @@ export default function Image(
       <NextImage
         {...props}
         loader={defaultLoader}
-        sizes={props.sizes || 'auto 100vw'}
+        sizes={props.sizes || 'auto, 100vw'}
       />
     );
   }
   return (
-    <NextImage {...props} loader={loader} sizes={props.sizes || 'auto 100vw'} />
+    <NextImage {...props} loader={loader} sizes={props.sizes || 'auto, 100vw'} />
   );
 }
