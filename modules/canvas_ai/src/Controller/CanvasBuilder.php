@@ -233,7 +233,7 @@ final class CanvasBuilder extends ControllerBase {
       'menu_fetch_source' => $this->getMenuFetchSource(),
       'json_api_module_status' => $this->moduleHandler()->moduleExists('jsonapi') ? 'enabled' : 'disabled',
       'verbose_context_for_orchestrator' => $this->canvasAiPageBuilderHelper->generateVerboseContextForOrchestrator($prompt),
-      'custom_libraries' => JSON::encode($libraries) ?? NULL
+      'custom_libraries' => JSON::encode($libraries) ?? NULL,
     ]);
     try {
       $solvability = $agent->determineSolvability();
