@@ -48,6 +48,23 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
     $this->setUpCurrentUser(permissions: ['edit any article content', 'administer themes', Page::EDIT_PERMISSION]);
   }
 
+  public function testDescription(): void {
+    $node = $this->createNode(['type' => 'article', 'title' => 'Test node']);
+    self::assertCount(0, $node->validate());
+    $node->save();
+
+    $component_id = 'sdc.canvas_test_sdc.my-cta';
+    $form_canvas_props = $this->getFormCanvasPropsForComponent($component_id);
+    $component_entity = Component::load($component_id);
+    \assert($component_entity instanceof ComponentInterface);
+    $crawler = $this->getCrawlerForFormRequest(
+      '/canvas/api/v0/form/component-instance/node/1',
+      $component_entity,
+      $form_canvas_props
+    );
+    self::assertStringContainsString('The title for the cta', $crawler->text());
+  }
+
   #[DataProvider('providerOptionalImages')]
   public function testOptionalImageAndHeading(string $component, array $values_to_set, array $expected_form_canvas_props): void {
     $actual_form_canvas_props = $this->getFormCanvasPropsForComponent($component);
@@ -350,10 +367,10 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
     // - `subheading` CAN be NULL, and currently evaluates to NULL
     // @phpstan-ignore-next-line method.nonObject
     self::assertTrue($node->getFieldDefinition('title')->isRequired());
-    self::assertSame('Test node', Evaluator::evaluate($node, expr: StructuredDataPropExpression::fromString($form_canvas_props['source']['heading']['expression']), is_required: FALSE));
+    self::assertSame('Test node', Evaluator::evaluate($node, expr: StructuredDataPropExpression::fromString($form_canvas_props['source']['heading']['expression']), is_required: FALSE)->value);
     // @phpstan-ignore-next-line method.nonObject
     self::assertFalse($node->getFieldDefinition('media_image_field')->isRequired());
-    self::assertNull(Evaluator::evaluate($node, expr: StructuredDataPropExpression::fromString($form_canvas_props['source']['subheading']['expression']), is_required: FALSE));
+    self::assertNull(Evaluator::evaluate($node, expr: StructuredDataPropExpression::fromString($form_canvas_props['source']['subheading']['expression']), is_required: FALSE)->value);
     $crawler = $this->getCrawlerForFormRequest($form_url, $component_entity, $form_canvas_props);
     // Confirm the linked prop fields are rendered.
     self::assertCount(2, $crawler->filter('.canvas-linked-prop-wrapper[data-drupal-selector*="-heading-"]'));
@@ -387,7 +404,7 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
   #[TestWith([
     'canvas_test_block_input_validatable',
     'Name Enter a name to display in the block.',
-    'Previously stored input {"id":"canvas_test_block_input_validatable","label":"Test Block with settings","label_display":"0","provider":"canvas_test_block","name":"Canvas"}',
+    'Previously stored input {"id":"canvas_test_block_input_validatable","label":"Test Block with settings","label_display":"0","name":"Canvas","provider":"canvas_test_block"}',
   ])]
   public function testBlockComponentThatHasGoneAway(string $block_plugin_id, string $expected_form_when_not_broken, string $fyi): void {
     $page = Page::create(['title' => $this->randomMachineName()]);

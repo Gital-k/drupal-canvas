@@ -9,6 +9,7 @@ use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Config\Entity\ConfigEntityStorageInterface;
 use Drupal\Core\Extension\ExtensionPathResolver;
 use Drupal\Core\File\FileUrlGeneratorInterface;
+use Drupal\Core\GeneratedUrl;
 use Drupal\Core\Plugin\Component as ComponentPlugin;
 use Drupal\Core\Render\Component\Exception\ComponentNotFoundException;
 use Drupal\Core\Render\Component\Exception\InvalidComponentException;
@@ -37,6 +38,8 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
   id: self::SOURCE_PLUGIN_ID,
   label: new TranslatableMarkup('Code Components'),
   supportsImplicitInputs: FALSE,
+  // @see \Drupal\canvas\EntityHandlers\JavascriptComponentStorage::doPostSave()
+  discoveryCacheTags: ['config:js_component_list'],
 )]
 final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase implements UrlRewriteInterface {
 
@@ -159,7 +162,13 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
     $build['#attached']['library'][] = $component->getAssetLibrary($isPreview);
 
     $canvas_path = $this->extensionPathResolver->getPath('module', 'canvas');
-    // Build base import map
+    // Build base import map.
+    // Whenever updating this import map, also update
+    // `src/features/code-editor/Preview.tsx`,
+    // as well as the list of supported imports in
+    // `packages/eslint-config/src/rules/component-imports.ts`.
+    // @see https://drupal.org/i/3552914
+    // @see https://drupal.org/i/3560197
     $import_maps[ImportMapResponseAttachmentsProcessor::GLOBAL_IMPORTS] = [
       'preact' => \sprintf('%s%s/ui/lib/astro-hydration/dist/preact.module.js', $base_path, $canvas_path),
       'preact/hooks' => \sprintf('%s%s/ui/lib/astro-hydration/dist/hooks.module.js', $base_path, $canvas_path),
@@ -234,8 +243,10 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
 
     $valid_props = $component->getProps() ?? [];
 
+    [$props, $props_cacheability] = self::getResolvedPropsAndCacheability(\array_intersect_key($inputs[self::EXPLICIT_INPUT_NAME] ?? [], $valid_props));
     CacheableMetadata::createFromRenderArray($build)
       ->addCacheableDependency($component)
+      ->addCacheableDependency($props_cacheability)
       ->applyTo($build);
 
     return $build + [
@@ -244,7 +255,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
       '#import_maps' => $import_maps,
       '#name' => $component->label(),
       '#component_url' => $component_url,
-      '#props' => (\array_intersect_key($inputs[self::EXPLICIT_INPUT_NAME] ?? [], $valid_props)) + [
+      '#props' => $props + [
         'canvas_uuid' => $componentUuid,
         'canvas_slot_ids' => \array_keys($slot_definitions),
         'canvas_is_preview' => $isPreview,
@@ -290,7 +301,13 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
     catch (InvalidComponentException $e) {
       throw new ComponentDoesNotMeetRequirementsException([$e->getMessage()]);
     }
-    ComponentMetadataRequirementsChecker::check((string) $js_component->id(), $ephemeral_sdc_component->metadata, $js_component->getRequiredProps());
+    ComponentMetadataRequirementsChecker::check(
+      (string) $js_component->id(),
+      $ephemeral_sdc_component->metadata,
+      $js_component->getRequiredProps(),
+      // @see \Drupal\Core\Config\ConfigBase::validateKeys()
+      forbidden_key_characters: ['.' => '_'],
+    );
     $props = self::getPropsForComponentPlugin($ephemeral_sdc_component);
     $settings = [
       'prop_field_definitions' => $props,
@@ -345,7 +362,13 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
     catch (InvalidComponentException $e) {
       throw new ComponentDoesNotMeetRequirementsException([$e->getMessage()]);
     }
-    ComponentMetadataRequirementsChecker::check((string) $js_component->id(), $ephemeral_sdc_component->metadata, $js_component->getRequiredProps());
+    ComponentMetadataRequirementsChecker::check(
+      (string) $js_component->id(),
+      $ephemeral_sdc_component->metadata,
+      $js_component->getRequiredProps(),
+      // @see \Drupal\Core\Config\ConfigBase::validateKeys()
+      forbidden_key_characters: ['.' => '_'],
+    );
     $settings = [
       'prop_field_definitions' => self::getPropsForComponentPlugin($ephemeral_sdc_component),
     ];
@@ -388,7 +411,13 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
     catch (InvalidComponentException $e) {
       throw new ComponentDoesNotMeetRequirementsException([$e->getMessage()]);
     }
-    ComponentMetadataRequirementsChecker::check((string) $js_component->id(), $ephemeral_sdc_component->metadata, $js_component->getRequiredProps());
+    ComponentMetadataRequirementsChecker::check(
+      (string) $js_component->id(),
+      $ephemeral_sdc_component->metadata,
+      $js_component->getRequiredProps(),
+      // @see \Drupal\Core\Config\ConfigBase::validateKeys()
+      forbidden_key_characters: ['.' => '_'],
+    );
   }
 
   /**
@@ -415,12 +444,12 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
   /**
    * {@inheritdoc}
    */
-  public function rewriteExampleUrl(string $url): string {
+  public function rewriteExampleUrl(string $url): GeneratedUrl {
     // Allow any fully qualified URL.
     $parsed_url = parse_url($url);
     \assert(\is_array($parsed_url));
     if (array_intersect_key($parsed_url, array_flip(['scheme', 'host']))) {
-      return $url;
+      return (new GeneratedUrl())->setGeneratedUrl($url);
     }
 
     // Allow the example URL to be one of the hardcoded relative URLs, and
@@ -432,7 +461,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
     ];
     if (in_array($url, $example_videos, TRUE)) {
       $file_path = $this->extensionPathResolver->getPath('module', 'canvas') . $url;
-      return Url::fromUri('base:/' . $file_path)->toString();
+      return Url::fromUri('base:/' . $file_path)->toString(TRUE);
     }
 
     throw new \InvalidArgumentException('Default images for Javascript Components must be a fully-qualified URL with both scheme and host.');

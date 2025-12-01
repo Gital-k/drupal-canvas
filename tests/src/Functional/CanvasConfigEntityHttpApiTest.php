@@ -172,6 +172,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
         'sdc.canvas_broken_sdcs.invalid-filter',
         'sdc.canvas_broken_sdcs.malformed-image',
         'sdc.canvas_test_sdc.my-cta',
+        'sdc.canvas_test_sdc.component-mismatch-meta-enum',
         'sdc.canvas_test_sdc.component-no-meta-enum',
         'sdc.canvas_test_sdc.banner',
         'sdc.canvas_test_sdc.card',
@@ -193,6 +194,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
         'sdc.canvas_test_sdc.card-with-remote-image',
         'sdc.canvas_test_sdc.image-gallery',
         'sdc.canvas_test_sdc.druplicon',
+        'sdc.canvas_test_sdc.image-without-ref',
       ],
     ],
     'd0ba87b2-79b4-4622-98e1-cf82dc3655a0' => [
@@ -1599,6 +1601,8 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
       'config:system.site',
       'config:system.theme',
       'http_response',
+      // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent::rewriteExampleUrl()
+      'component_plugins',
     ];
     // If expected adds new components, those components add additional cache tags. If those cache tags are not
     // present, the test will fail. This array is used to add those additional expected cache tags.
@@ -1648,6 +1652,8 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
       'node_list',
       'user_list',
       AutoSaveManager::CACHE_TAG,
+      // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent::rewriteExampleUrl()
+      'component_plugins',
     ];
 
     $expected_contexts = [

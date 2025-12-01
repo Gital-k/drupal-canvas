@@ -145,6 +145,36 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
     ]);
   }
 
+  #[Hook('field_widget_single_element_link_default_form_alter')]
+  public function fieldWidgetSingleElementLinkDefaultWidgetFormAlter(array &$form, FormStateInterface $form_state, array $context): void {
+    if ($this->themeManager->getActiveTheme()->getName() === 'canvas_stark') {
+      // We want the link widget to have less information, so we need to revert
+      // the description mangling happening at
+      // \Drupal\link\Plugin\Field\FieldWidget\LinkWidget::formElement.
+      if (!empty($form['#description'])) {
+        $form['uri']['#description'] = $form['#description'];
+      }
+      else {
+        unset($form['uri']['#description']);
+      }
+    }
+  }
+
+  #[Hook('field_widget_single_element_path_form_alter')]
+  public function fieldWidgetSingleElementPathFormAlter(array &$form, FormStateInterface $form_state, array $context): void {
+    $current_route = new CurrentRouteMatch($this->requestStack);
+    $route_name = $current_route->getRouteName();
+    $is_entity_form = $route_name === 'canvas.api.form.content_entity';
+
+    if ($this->themeManager->getActiveTheme()->getName() === 'canvas_stark' && $is_entity_form) {
+      // Remove the description from the path alias field to have less
+      // information.
+      if (isset($form['alias']['#description'])) {
+        unset($form['alias']['#description']);
+      }
+    }
+  }
+
   /**
    * Implements hook_field_widget_info_alter().
    */

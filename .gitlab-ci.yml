@@ -235,6 +235,9 @@ phpunit:
   variables:
     # Note: Canvas uses `@group #slow` to start slow tests early. The threshold is (at the time of writing) ~60 seconds.
     _PHPUNIT_CONCURRENT: 1
+    # 💡To run a single PHPUnit test, e.g. PropSourceTest, comment the above and uncomment the below.
+    # _PHPUNIT_CONCURRENT: 0
+    # _PHPUNIT_EXTRA: '--filter PropSourceTest'
   needs:
     - composer
     - UI
@@ -445,7 +448,7 @@ vitest:
     #
     # 👆
     #
-    - cd modules/custom/$CI_PROJECT_NAME
+    - cd $DRUPAL_PROJECT_FOLDER
     - echo -e "\e[0Ksection_start:`date +%s`:Cypress-install[collapsed=true]\r\e[0KInstall Cypress."
     - cp ./ui/.env.example ./ui/.env
     - echo "BASE_URL='${SIMPLETEST_BASE_URL}'" >> ./ui/.env

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource;
 
 use Drupal\canvas\Plugin\ComponentPluginManager as CanvasComponentPluginManager;
+use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
+use Drupal\Core\Cache\Cache;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
 use Drupal\Core\Extension\ExtensionPathResolver;
@@ -13,6 +15,7 @@ use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\Core\File\FileExists;
 use Drupal\Core\File\FileSystemInterface;
+use Drupal\Core\GeneratedUrl;
 use Drupal\Core\Site\Settings;
 use Drupal\Core\StreamWrapper\PublicStream;
 use Drupal\Core\Theme\ComponentPluginManager;
@@ -139,11 +142,6 @@ final class SingleDirectoryComponentTest extends GeneratedFieldExplicitInputUxCo
     $this->generateComponentConfig();
 
     self::assertSame([
-      'sdc.canvas_test_sdc.component-mismatch-meta-enum' => [
-        'The "meta:enum" keys for the "style" prop enum cannot contain a dot. Offending key: "contains.dots"',
-        'The "meta:enum" keys for the "numbers" prop enum cannot contain a dot. Offending key: "3.14"',
-        'The values for the "numbers" prop enum must be defined in "meta:enum". Missing keys: "3_14"',
-      ],
       'sdc.canvas_test_sdc.empty-enum' => [
         'Prop "pets" has an empty enum value.',
       ],
@@ -169,7 +167,7 @@ final class SingleDirectoryComponentTest extends GeneratedFieldExplicitInputUxCo
         'Component has "obsolete" status',
       ],
       'sdc.canvas_test_sdc.props-invalid-shapes' => [
-        'Prop "invalid_shape" is of type "object" without a $ref, which is not supported',
+        'Drupal Canvas does not know of a field type/widget to allow populating the <code>invalid_shape</code> prop, with the shape <code>{"type":"object"}</code>.',
       ],
       'sdc.canvas_test_sdc.props-no-examples' => [
         'Prop "heading" is required, but does not have example value',
@@ -214,6 +212,7 @@ final class SingleDirectoryComponentTest extends GeneratedFieldExplicitInputUxCo
       'sdc.canvas_test_sdc.card-with-remote-image',
       'sdc.canvas_test_sdc.card-with-stream-wrapper-image',
       'sdc.canvas_test_sdc.columns',
+      'sdc.canvas_test_sdc.component-mismatch-meta-enum',
       'sdc.canvas_test_sdc.component-no-meta-enum',
       'sdc.canvas_test_sdc.crash',
       'sdc.canvas_test_sdc.deprecated',
@@ -227,6 +226,7 @@ final class SingleDirectoryComponentTest extends GeneratedFieldExplicitInputUxCo
       'sdc.canvas_test_sdc.image-optional-with-example-and-additional-prop',
       'sdc.canvas_test_sdc.image-optional-without-example',
       'sdc.canvas_test_sdc.image-required-with-example',
+      'sdc.canvas_test_sdc.image-without-ref',
       'sdc.canvas_test_sdc.my-cta',
       'sdc.canvas_test_sdc.my-hero',
       'sdc.canvas_test_sdc.my-section',
@@ -714,6 +714,17 @@ HTML,
           ],
         ],
       ],
+      'sdc.canvas_test_sdc.component-mismatch-meta-enum' => [
+        'cacheability' => $default_cacheability,
+        'html' => 'small!
+',
+        'attachments' => [
+          'library' => [
+            'core/components.canvas_test_sdc--component-mismatch-meta-enum',
+            'core/components.canvas_test_sdc--component-mismatch-meta-enum',
+          ],
+        ],
+      ],
       'sdc.canvas_test_sdc.component-no-meta-enum' => [
         'cacheability' => $default_cacheability,
         'html' => '<span  data-component-id="canvas_test_sdc:component-no-meta-enum">
@@ -989,6 +1000,23 @@ HTML
           ],
         ],
       ],
+
+      'sdc.canvas_test_sdc.image-without-ref' => [
+        'html' => '<div class="inline-image-test">
+  <img src="https://example.com/image.png"
+       alt="Alternative text"
+       width="800"
+       height="600">
+</div>
+',
+        'cacheability' => $default_cacheability,
+        'attachments' => [
+          'library' => [
+            'core/components.canvas_test_sdc--image-without-ref',
+            'core/components.canvas_test_sdc--image-without-ref',
+          ],
+        ],
+      ],
     ], $rendered);
   }
 
@@ -1003,23 +1031,49 @@ HTML
     // Assert that existing files are rewritten to include the module path.
     $canvas_test_sdc_module_path = \Drupal::service(ModuleExtensionList::class)->getPath('canvas_test_sdc');
 
-    self::assertStringEndsWith($canvas_test_sdc_module_path . '/components/image/600x400.png', $source->rewriteExampleUrl('600x400.png'));
-    self::assertStringEndsWith($canvas_test_sdc_module_path . '/components/image/600x400.png', $source->rewriteExampleUrl('/600x400.png'));
-    self::assertStringEndsWith('/tests/fixtures/600x400.png', $source->rewriteExampleUrl('../../tests/fixtures/600x400.png'));
+    $assert_cacheability = function (GeneratedUrl $g, $cache_tags = []) {
+      self::assertEqualsCanonicalizing($cache_tags, $g->getCacheTags());
+      self::assertEqualsCanonicalizing([], $g->getCacheContexts());
+      self::assertSame(Cache::PERMANENT, $g->getCacheMaxAge());
+    };
+
+    // Assert that relative URL to a file inside the SDC DOES get the
+    // `component_plugins` cache tag.
+    $cases = [
+      '600x400.png' => $canvas_test_sdc_module_path . '/components/image/600x400.png',
+      '/600x400.png' => $canvas_test_sdc_module_path . '/components/image/600x400.png',
+    ];
+    foreach ($cases as $case => $expectation) {
+      $generated_url = $source->rewriteExampleUrl($case);
+      self::assertStringEndsWith($expectation, $generated_url->getGeneratedUrl());
+      $assert_cacheability($generated_url, cache_tags: ['component_plugins']);
+    }
+
+    // Assert that relative URL to a file outside the SDC does NOT get the
+    // `component_plugins` cache tag.
+    $generated_url = $source->rewriteExampleUrl('../../tests/fixtures/600x400.png');
+    self::assertStringEndsWith('/tests/fixtures/600x400.png', $generated_url->getGeneratedUrl());
+    $assert_cacheability($generated_url);
 
     // Assert that non-existing links have a leading slash but do not include the module nor SDC path.
-    $url = $source->rewriteExampleUrl('test/path');
+    $generated_url = $source->rewriteExampleUrl('test/path');
+    $url = $generated_url->getGeneratedUrl();
     self::assertStringEndsWith('/test/path', $url);
     self::assertStringNotContainsString($canvas_test_sdc_module_path, $url);
     self::assertStringNotContainsString('components', $url);
+    $assert_cacheability($generated_url);
 
     // Assert that non-existing links with a leading slash are not doubled.
-    $url = $source->rewriteExampleUrl('/test/path');
+    $generated_url = $source->rewriteExampleUrl('/test/path');
+    $url = $generated_url->getGeneratedUrl();
     self::assertStringEndsWith('/test/path', $url);
     self::assertStringNotContainsString('//', $url);
+    $assert_cacheability($generated_url);
 
     // Assert that full URLs are left alone.
-    self::assertSame('https://www.example.com/', $source->rewriteExampleUrl('https://www.example.com/'));
+    $generated_url = $source->rewriteExampleUrl('https://www.example.com/');
+    self::assertSame('https://www.example.com/', $generated_url->getGeneratedUrl());
+    $assert_cacheability($generated_url);
   }
 
   /**
@@ -1055,7 +1109,7 @@ HTML
         array_keys($expected_props_for_uuids)
       )
     );
-    $this->assertSame($expected_props_for_uuids, $actual_props);
+    self::assertEquals($expected_props_for_uuids, $actual_props);
   }
 
   public static function providerComponentResolving(): array {
@@ -1068,7 +1122,7 @@ HTML
     $test_cases['invalid UUID, missing component_id key'][] = [];
     $test_cases['valid values using static inputs'][] = [
       'dynamic-static-card2df' => [
-        'heading' => 'They say I am static, but I want to believe I can change!',
+        'heading' => new EvaluationResult('They say I am static, but I want to believe I can change!'),
       ],
     ];
     $test_cases['valid values for propless component'][] = [
@@ -1076,13 +1130,16 @@ HTML
     ];
     $test_cases['valid value for optional explicit input using an URL prop shape, with default value'][] = [
       'optional-url-with-default-value' => [
-        'heading' => 'Gracie says hi!',
-        'image' => [
-          'src' => self::getCiModulePath() . '/tests/modules/canvas_test_sdc/components/image-optional-with-example-and-additional-prop/gracie.jpg',
-          'alt' => 'A good dog',
-          'width' => 601,
-          'height' => 402,
-        ],
+        'heading' => new EvaluationResult('Gracie says hi!'),
+        'image' => new EvaluationResult(
+          [
+            'src' => self::getCiModulePath() . '/tests/modules/canvas_test_sdc/components/image-optional-with-example-and-additional-prop/gracie.jpg',
+            'alt' => 'A good dog',
+            'width' => 601,
+            'height' => 402,
+          ],
+          (new CacheableMetadata())->setCacheTags(['component_plugins']),
+        ),
       ],
     ];
     $hero_with_dynamic_sources = [
@@ -1116,10 +1173,26 @@ HTML
       ],
       [
         'partly-dynamic-hero' => [
-          'heading' => 'hello, world!',
-          'subheading' => 'Test node',
-          'cta1href' => 'https://drupal.org',
-          'cta1' => 'Test node',
+          // Permanent cacheability because populated by StaticPropSource
+          // without references.
+          'heading' => new EvaluationResult('hello, world!'),
+          // Node 1 and access-dependent cacheability because DynamicPropSource.
+          'subheading' => new EvaluationResult(
+            'Test node',
+            (new CacheableMetadata())
+              ->setCacheTags(['node:1'])
+              ->setCacheContexts(['user.permissions'])
+          ),
+          // Permanent cacheability because populated by StaticPropSource
+          // without references.
+          'cta1href' => new EvaluationResult('https://drupal.org'),
+          // Node 1 and access-dependent cacheability because DynamicPropSource.
+          'cta1' => new EvaluationResult(
+            'Test node',
+            (new CacheableMetadata())
+              ->setCacheTags(['node:1'])
+              ->setCacheContexts(['user.permissions'])
+          ),
         ],
       ],
       ['access content'],
@@ -1130,10 +1203,18 @@ HTML
       ],
       [
         'partly-dynamic-hero' => [
-          'heading' => 'hello, world!',
-          'subheading' => NULL,
-          'cta1href' => 'https://drupal.org',
-          'cta1' => NULL,
+          'heading' => new EvaluationResult('hello, world!'),
+          // Node access-dependent cacheability because DynamicPropSource.
+          'subheading' => new EvaluationResult(
+            NULL,
+            (new CacheableMetadata())->setCacheContexts(['user.permissions'])
+          ),
+          'cta1href' => new EvaluationResult('https://drupal.org'),
+          // Node access-dependent cacheability because DynamicPropSource.
+          'cta1' => new EvaluationResult(
+            NULL,
+            (new CacheableMetadata())->setCacheContexts(['user.permissions'])
+          ),
         ],
       ],
       [],
@@ -1694,6 +1775,32 @@ HTML
           ],
         ],
       ],
+      'sdc.canvas_test_sdc.component-mismatch-meta-enum' => [
+        'prop_field_definitions' => [
+          'style' => [
+            'required' => FALSE,
+            'field_type' => 'list_string',
+            'field_storage_settings' => [
+              'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
+            ],
+            'field_instance_settings' => [],
+            'field_widget' => 'options_select',
+            'default_value' => [0 => ['value' => 'small']],
+            'expression' => 'ℹ︎list_string␟value',
+          ],
+          'numbers' => [
+            'required' => FALSE,
+            'field_type' => 'list_string',
+            'field_storage_settings' => [
+              'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
+            ],
+            'field_instance_settings' => [],
+            'field_widget' => 'options_select',
+            'default_value' => [0 => ['value' => '3.14']],
+            'expression' => 'ℹ︎list_string␟value',
+          ],
+        ],
+      ],
       'sdc.canvas_test_sdc.component-no-meta-enum' => [
         'prop_field_definitions' => [
           'style' => [
@@ -1915,6 +2022,19 @@ HTML
             'field_widget' => 'image_image',
             // ⚠️ Empty default value.
             // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::exampleValueRequiresEntity()
+            'default_value' => [],
+            'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
+          ],
+        ],
+      ],
+      'sdc.canvas_test_sdc.image-without-ref' => [
+        'prop_field_definitions' => [
+          'image' => [
+            'required' => TRUE,
+            'field_type' => 'image',
+            'field_storage_settings' => [],
+            'field_instance_settings' => [],
+            'field_widget' => 'image_image',
             'default_value' => [],
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
           ],
@@ -2476,6 +2596,13 @@ HTML
           'canvas_test_sdc',
         ],
       ],
+      'sdc.canvas_test_sdc.component-mismatch-meta-enum' => [
+        'module' => [
+          'core',
+          'options',
+          'canvas_test_sdc',
+        ],
+      ],
       'sdc.canvas_test_sdc.component-no-meta-enum' => [
         'module' => [
           'core',
@@ -2573,6 +2700,16 @@ HTML
         ],
       ],
       'sdc.canvas_test_sdc.image-required-with-example' => [
+        'config' => [
+          'image.style.canvas_parametrized_width',
+        ],
+        'module' => [
+          'file',
+          'image',
+          'canvas_test_sdc',
+        ],
+      ],
+      'sdc.canvas_test_sdc.image-without-ref' => [
         'config' => [
           'image.style.canvas_parametrized_width',
         ],
@@ -2773,8 +2910,8 @@ HTML
           'image' => [
             'required' => FALSE,
             'jsonSchema' => [
-              'title' => 'image',
               'type' => 'object',
+              'title' => 'image',
               'required' => [
                 0 => 'src',
               ],
@@ -2785,6 +2922,7 @@ HTML
                   'format' => 'uri-reference',
                   'contentMediaType' => 'image/*',
                   'x-allowed-schemes' => ['http', 'https'],
+                  'id' => 'json-schema-definitions://canvas.module/image-uri',
                 ],
                 'alt' => [
                   'title' => 'Alternative text',
@@ -2799,6 +2937,7 @@ HTML
                   'type' => 'integer',
                 ],
               ],
+              'id' => 'json-schema-definitions://canvas.module/image',
             ],
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
@@ -2874,8 +3013,8 @@ HTML
           'image' => [
             'required' => TRUE,
             'jsonSchema' => [
-              'title' => 'image',
               'type' => 'object',
+              'title' => 'image',
               'required' => [
                 0 => 'src',
               ],
@@ -2886,6 +3025,7 @@ HTML
                   'format' => 'uri-reference',
                   'contentMediaType' => 'image/*',
                   'x-allowed-schemes' => ['http', 'https'],
+                  'id' => 'json-schema-definitions://canvas.module/image-uri',
                 ],
                 'alt' => [
                   'title' => 'Alternative text',
@@ -2900,6 +3040,7 @@ HTML
                   'type' => 'integer',
                 ],
               ],
+              'id' => 'json-schema-definitions://canvas.module/image',
             ],
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
@@ -3016,11 +3157,12 @@ HTML
           'src' => [
             'required' => TRUE,
             'jsonSchema' => [
-              'title' => 'Image URL',
               'type' => 'string',
+              'title' => 'Image URL',
               'format' => 'uri-reference',
               'contentMediaType' => 'image/*',
               'x-allowed-schemes' => ['http', 'https'],
+              'id' => 'json-schema-definitions://canvas.module/image-uri',
             ],
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟src_with_alternate_widths',
@@ -3132,11 +3274,12 @@ HTML
           'src' => [
             'required' => TRUE,
             'jsonSchema' => [
-              'title' => 'Image URL',
               'type' => 'string',
+              'title' => 'Image URL',
               'format' => 'uri-reference',
               'contentMediaType' => 'image/*',
               'x-allowed-schemes' => ['http', 'https'],
+              'id' => 'json-schema-definitions://canvas.module/image-uri',
             ],
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟src_with_alternate_widths',
@@ -3280,11 +3423,12 @@ HTML
           'src' => [
             'required' => TRUE,
             'jsonSchema' => [
-              'title' => 'Stream wrapper image URI',
               'type' => 'string',
+              'title' => 'Stream wrapper image URI',
               'format' => 'uri',
               'contentMediaType' => 'image/*',
               'x-allowed-schemes' => ['public'],
+              'id' => 'json-schema-definitions://canvas.module/stream-wrapper-image-uri',
             ],
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟entity␜␜entity:file␝uri␞␟value',
@@ -3397,6 +3541,65 @@ HTML
                 0 => ['value' => 2],
               ],
               'resolved' => 2,
+            ],
+          ],
+        ],
+        'transforms' => [],
+      ],
+      'sdc.canvas_test_sdc.component-mismatch-meta-enum' => [
+        'expected_output_selectors' => [
+          ':contains("small")',
+        ],
+        'source' => 'Module component',
+        'metadata' => ['slots' => []],
+        'propSources' => [
+          'style' => [
+            'required' => FALSE,
+            'jsonSchema' => [
+              'type' => 'string',
+              'enum' => [
+                'small',
+                'big',
+                'huge',
+                // @see \Drupal\Tests\canvas\Kernel\Config\ComponentValidationTest::testUnmatchedEnumAndMetaEnum()
+                'contains.dots',
+              ],
+            ],
+            'sourceType' => 'static:field_item:list_string',
+            'expression' => 'ℹ︎list_string␟value',
+            'sourceTypeSettings' => [
+              'storage' => [
+                'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
+              ],
+            ],
+            'default_values' => [
+              'source' => [
+                0 => ['value' => 'small'],
+              ],
+              'resolved' => 'small',
+            ],
+          ],
+          'numbers' => [
+            'required' => FALSE,
+            'jsonSchema' => [
+              'type' => 'string',
+              'enum' => [
+                '7',
+                '3.14',
+              ],
+            ],
+            'sourceType' => 'static:field_item:list_string',
+            'expression' => 'ℹ︎list_string␟value',
+            'sourceTypeSettings' => [
+              'storage' => [
+                'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
+              ],
+            ],
+            'default_values' => [
+              'source' => [
+                0 => ['value' => '3.14'],
+              ],
+              'resolved' => '3.14',
             ],
           ],
         ],
@@ -3615,8 +3818,8 @@ HTML
           'element' => [
             'required' => TRUE,
             'jsonSchema' => [
-              'title' => 'Heading element',
               'type' => 'string',
+              'title' => 'Heading element',
               'enum' => [
                 0 => 'div',
                 1 => 'h1',
@@ -3626,6 +3829,7 @@ HTML
                 5 => 'h5',
                 6 => 'h6',
               ],
+              'id' => 'json-schema-definitions://canvas.module/heading-element',
             ],
             'sourceType' => 'static:field_item:list_string',
             'expression' => 'ℹ︎list_string␟value',
@@ -3658,8 +3862,8 @@ HTML
           'image' => [
             'required' => TRUE,
             'jsonSchema' => [
-              'title' => 'image',
               'type' => 'object',
+              'title' => 'image',
               'required' => [
                 0 => 'src',
               ],
@@ -3670,6 +3874,7 @@ HTML
                   'format' => 'uri-reference',
                   'contentMediaType' => 'image/*',
                   'x-allowed-schemes' => ['http', 'https'],
+                  'id' => 'json-schema-definitions://canvas.module/image-uri',
                 ],
                 'alt' => [
                   'title' => 'Alternative text',
@@ -3684,6 +3889,7 @@ HTML
                   'type' => 'integer',
                 ],
               ],
+              'id' => 'json-schema-definitions://canvas.module/image',
             ],
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
@@ -3722,8 +3928,8 @@ HTML
             'jsonSchema' => [
               'type' => 'array',
               'items' => [
-                'title' => 'image',
                 'type' => 'object',
+                'title' => 'image',
                 'required' => [
                   'src',
                 ],
@@ -3734,6 +3940,7 @@ HTML
                     'format' => 'uri-reference',
                     'contentMediaType' => 'image/*',
                     'x-allowed-schemes' => ['http', 'https'],
+                    'id' => 'json-schema-definitions://canvas.module/image-uri',
                   ],
                   'alt' => [
                     'title' => 'Alternative text',
@@ -3748,6 +3955,7 @@ HTML
                     'type' => 'integer',
                   ],
                 ],
+                'id' => 'json-schema-definitions://canvas.module/image',
               ],
             ],
             'sourceType' => 'static:field_item:image',
@@ -3792,8 +4000,8 @@ HTML
           'image' => [
             'required' => FALSE,
             'jsonSchema' => [
-              'title' => 'image',
               'type' => 'object',
+              'title' => 'image',
               'required' => [
                 'src',
               ],
@@ -3804,6 +4012,7 @@ HTML
                   'format' => 'uri-reference',
                   'contentMediaType' => 'image/*',
                   'x-allowed-schemes' => ['http', 'https'],
+                  'id' => 'json-schema-definitions://canvas.module/image-uri',
                 ],
                 'alt' => [
                   'title' => 'Alternative text',
@@ -3818,6 +4027,7 @@ HTML
                   'type' => 'integer',
                 ],
               ],
+              'id' => 'json-schema-definitions://canvas.module/image',
             ],
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
@@ -3852,8 +4062,8 @@ HTML
           'image' => [
             'required' => FALSE,
             'jsonSchema' => [
-              'title' => 'image',
               'type' => 'object',
+              'title' => 'image',
               'required' => [
                 'src',
               ],
@@ -3864,6 +4074,7 @@ HTML
                   'format' => 'uri-reference',
                   'contentMediaType' => 'image/*',
                   'x-allowed-schemes' => ['http', 'https'],
+                  'id' => 'json-schema-definitions://canvas.module/image-uri',
                 ],
                 'alt' => [
                   'title' => 'Alternative text',
@@ -3878,6 +4089,7 @@ HTML
                   'type' => 'integer',
                 ],
               ],
+              'id' => 'json-schema-definitions://canvas.module/image',
             ],
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
@@ -3902,8 +4114,8 @@ HTML
           'image' => [
             'required' => FALSE,
             'jsonSchema' => [
-              'title' => 'image',
               'type' => 'object',
+              'title' => 'image',
               'required' => [
                 'src',
               ],
@@ -3914,6 +4126,7 @@ HTML
                   'format' => 'uri-reference',
                   'contentMediaType' => 'image/*',
                   'x-allowed-schemes' => ['http', 'https'],
+                  'id' => 'json-schema-definitions://canvas.module/image-uri',
                 ],
                 'alt' => [
                   'title' => 'Alternative text',
@@ -3928,6 +4141,7 @@ HTML
                   'type' => 'integer',
                 ],
               ],
+              'id' => 'json-schema-definitions://canvas.module/image',
             ],
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
@@ -3945,8 +4159,8 @@ HTML
           'image' => [
             'required' => TRUE,
             'jsonSchema' => [
-              'title' => 'image',
               'type' => 'object',
+              'title' => 'image',
               'required' => [
                 'src',
               ],
@@ -3957,6 +4171,7 @@ HTML
                   'format' => 'uri-reference',
                   'contentMediaType' => 'image/*',
                   'x-allowed-schemes' => ['http', 'https'],
+                  'id' => 'json-schema-definitions://canvas.module/image-uri',
                 ],
                 'alt' => [
                   'title' => 'Alternative text',
@@ -3971,6 +4186,7 @@ HTML
                   'type' => 'integer',
                 ],
               ],
+              'id' => 'json-schema-definitions://canvas.module/image',
             ],
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
@@ -3981,6 +4197,60 @@ HTML
                 'alt' => 'Boring placeholder',
                 'width' => 600,
                 'height' => 400,
+              ],
+            ],
+          ],
+        ],
+        'transforms' => [],
+      ],
+      'sdc.canvas_test_sdc.image-without-ref' => [
+        'expected_output_selectors' => [
+          'div.inline-image-test',
+        ],
+        'source' => 'Module component',
+        'metadata' => ['slots' => []],
+        'propSources' => [
+          'image' => [
+            'required' => TRUE,
+            'jsonSchema' => [
+              'type' => 'object',
+              'title' => 'image',
+              'required' => [
+                'src',
+              ],
+              'properties' => [
+                'src' => [
+                  'title' => 'Image URL',
+                  'type' => 'string',
+                  'format' => 'uri-reference',
+                  'contentMediaType' => 'image/*',
+                  'x-allowed-schemes' => ['http', 'https'],
+                  'id' => 'json-schema-definitions://canvas.module/image-uri',
+                ],
+                'alt' => [
+                  'title' => 'Alternative text',
+                  'type' => 'string',
+                ],
+                'width' => [
+                  'title' => 'Image width',
+                  'type' => 'integer',
+                ],
+                'height' => [
+                  'title' => 'Image height',
+                  'type' => 'integer',
+                ],
+              ],
+              'id' => 'json-schema-definitions://canvas.module/image',
+            ],
+            'sourceType' => 'static:field_item:image',
+            'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
+            'default_values' => [
+              'source' => [],
+              'resolved' => [
+                'src' => 'https://example.com/image.png',
+                'alt' => 'Alternative text',
+                'width' => 800,
+                'height' => 600,
               ],
             ],
           ],
@@ -4668,7 +4938,6 @@ HTML
         ],
         'transforms' => [],
       ],
-
       'sdc.canvas_test_sdc.two_column' => [
         'expected_output_selectors' => [
           'div[data-component-id="canvas_test_sdc:two_column"]',
@@ -4696,8 +4965,8 @@ HTML
           'width' => [
             'required' => TRUE,
             'jsonSchema' => [
-              'title' => 'Column Width',
               'type' => 'integer',
+              'title' => 'Column Width',
               'enum' => [
                 0 => 25,
                 1 => 33,
@@ -4705,6 +4974,7 @@ HTML
                 3 => 66,
                 4 => 75,
               ],
+              'id' => 'json-schema-definitions://canvas.module/column-width',
             ],
             'sourceType' => 'static:field_item:list_integer',
             'expression' => 'ℹ︎list_integer␟value',
@@ -4738,8 +5008,8 @@ HTML
           'video' => [
             'required' => TRUE,
             'jsonSchema' => [
-              'title' => 'video',
               'type' => 'object',
+              'title' => 'video',
               'required' => [
                 0 => 'src',
               ],
@@ -4752,13 +5022,15 @@ HTML
                   'x-allowed-schemes' => ['http', 'https'],
                 ],
                 'poster' => [
-                  'title' => 'Image URL',
+                  'title' => 'Poster image URL',
                   'type' => 'string',
                   'format' => 'uri-reference',
                   'contentMediaType' => 'image/*',
                   'x-allowed-schemes' => ['http', 'https'],
+                  'id' => 'json-schema-definitions://canvas.module/image-uri',
                 ],
               ],
+              'id' => 'json-schema-definitions://canvas.module/video',
             ],
             'sourceType' => 'static:field_item:file',
             'expression' => 'ℹ︎file␟{src↝entity␜␜entity:file␝uri␞␟url}',
@@ -4868,7 +5140,7 @@ HTML
     // could lead to misleading test results.
     foreach ($explicit_input['source'] as $prop_name => $prop_source_array) {
       $resolved_source = PropSource::parse($prop_source_array)->evaluate(NULL, is_required: TRUE);
-      self::assertSame($resolved_source, $explicit_input['resolved'][$prop_name]);
+      self::assertEquals($resolved_source, $explicit_input['resolved'][$prop_name]);
     }
 
     $component = Component::load($component_id);
@@ -5043,7 +5315,7 @@ HTML
           'image' => [
             'sourceType' => 'default-relative-url',
             'value' => [
-              'src' => '/modules/contrib/canvas_test_sdc/components/image/600x400.png',
+              'src' => '/600x400.png',
               'alt' => 'Boring placeholder',
               'width' => 600,
               'height' => 400,
@@ -5075,12 +5347,15 @@ HTML
           ],
         ],
         'resolved' => [
-          'image' => [
-            'src' => '/modules/contrib/canvas_test_sdc/components/image/600x400.png',
-            'alt' => 'Boring placeholder',
-            'width' => 600,
-            'height' => 400,
-          ],
+          'image' => new EvaluationResult(
+            [
+              'src' => static::getCiModulePath() . '/tests/modules/canvas_test_sdc/components/image/600x400.png',
+              'alt' => 'Boring placeholder',
+              'width' => 600,
+              'height' => 400,
+            ],
+            (new CacheableMetadata())->setCacheTags(['component_plugins']),
+          ),
         ],
       ],
       [
@@ -5093,7 +5368,7 @@ HTML
         ],
         'resolved' => [
           'image' => [
-            'src' => '/modules/contrib/canvas_test_sdc/components/image/600x400.png',
+            'src' => static::getCiModulePath() . '/tests/modules/canvas_test_sdc/components/image/600x400.png',
             'alt' => 'Boring placeholder',
             'width' => 600,
             'height' => 400,

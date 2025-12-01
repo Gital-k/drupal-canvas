@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\PropSource;
 
+use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Datetime\DrupalDateTime;
 use Drupal\Core\Entity\FieldableEntityInterface;
@@ -381,7 +382,7 @@ final class StaticPropSource extends PropSourceBase {
   /**
    * {@inheritdoc}
    */
-  public function evaluate(?FieldableEntityInterface $host_entity, bool $is_required): mixed {
+  public function evaluate(?FieldableEntityInterface $host_entity, bool $is_required): EvaluationResult {
     return match ($this->getCardinality()) {
       // @phpstan-ignore-next-line
       1 => Evaluator::evaluate($this->fieldItemList->first(), $this->expression, $is_required),
@@ -440,7 +441,7 @@ final class StaticPropSource extends PropSourceBase {
     };
   }
 
-  public function getWidget(string $component_config_entity_id, ?string $component_config_entity_version, string $prop_name, string $sdc_prop_label, ?string $field_widget_plugin_id): WidgetInterface {
+  public function getWidget(string $component_config_entity_id, ?string $component_config_entity_version, string $prop_name, string $sdc_prop_label, ?string $field_widget_plugin_id, ?string $sdc_prop_description = NULL): WidgetInterface {
     // @phpstan-ignore-next-line
     $field_widget_plugin_manager = \Drupal::service('plugin.manager.field.widget');
     assert($field_widget_plugin_manager instanceof WidgetPluginManager);
@@ -470,7 +471,8 @@ final class StaticPropSource extends PropSourceBase {
             ],
           ],
         ])
-        ->setLabel($sdc_prop_label),
+        ->setLabel($sdc_prop_label)
+        ->setDescription($sdc_prop_description ?? ''),
       'configuration' => $configuration,
       'prepare' => TRUE,
     ]);
