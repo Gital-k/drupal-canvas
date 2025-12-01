@@ -184,3 +184,7 @@ services:
     # We don't want any other module to display messages
     decoration_priority: -100
     arguments: ['@.inner']
+  canvas.route_subscriber:
+    class: Drupal\canvas\Routing\CanvasRouteSubscriber
+    tags:
+      - { name: event_subscriber }
