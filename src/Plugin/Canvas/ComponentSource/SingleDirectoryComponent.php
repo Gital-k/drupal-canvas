@@ -5,15 +5,12 @@ declare(strict_types=1);
 namespace Drupal\canvas\Plugin\Canvas\ComponentSource;
 
 use Drupal\Component\Plugin\Exception\PluginNotFoundException;
-use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Extension\ThemeHandlerInterface;
-use Drupal\Core\Field\WidgetPluginManager;
-use Drupal\Core\Logger\LoggerChannelInterface;
+use Drupal\Core\GeneratedUrl;
 use Drupal\Core\Plugin\Component as ComponentPlugin;
 use Drupal\Core\Render\Component\Exception\ComponentNotFoundException;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
-use Drupal\Core\Theme\Component\ComponentValidator;
 use Drupal\Core\Theme\ComponentPluginManager;
 use Drupal\Core\Theme\ExtensionType;
 use Drupal\canvas\Attribute\ComponentSource;
@@ -24,7 +21,7 @@ use Drupal\canvas\ComponentSource\UrlRewriteInterface;
 use Drupal\canvas\Entity\Component as ComponentEntity;
 use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\canvas\Entity\VersionedConfigEntityBase;
-use Drupal\canvas\ShapeMatcher\FieldForComponentSuggester;
+use Drupal\Core\Url;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Filesystem\Path;
 
@@ -35,55 +32,26 @@ use Symfony\Component\Filesystem\Path;
   id: self::SOURCE_PLUGIN_ID,
   label: new TranslatableMarkup('Single-Directory Components'),
   supportsImplicitInputs: FALSE,
+  // @see \Drupal\Core\Theme\ComponentPluginManager::__construct()
+  discoveryCacheTags: ['component_plugins'],
 )]
 final class SingleDirectoryComponent extends GeneratedFieldExplicitInputUxComponentSourceBase implements UrlRewriteInterface {
 
   public const SOURCE_PLUGIN_ID = 'sdc';
 
-  public function __construct(
-    array $configuration,
-    string $plugin_id,
-    array $plugin_definition,
-    ComponentValidator $componentValidator,
-    WidgetPluginManager $fieldWidgetPluginManager,
-    EntityTypeManagerInterface $entityTypeManager,
-    private readonly ComponentPluginManager $componentPluginManager,
-    private readonly ModuleHandlerInterface $moduleHandler,
-    private readonly ThemeHandlerInterface $themeHandler,
-    // @phpstan-ignore-next-line property.onlyWritten
-    private readonly FieldForComponentSuggester $fieldForComponentSuggester,
-    LoggerChannelInterface $logger,
-  ) {
-    assert(array_key_exists('local_source_id', $configuration));
-    parent::__construct(
-      $configuration,
-      $plugin_id,
-      $plugin_definition,
-      $componentValidator,
-      $fieldWidgetPluginManager,
-      $entityTypeManager,
-      $fieldForComponentSuggester,
-      $logger,
-    );
-  }
+  protected ComponentPluginManager $componentPluginManager;
+  protected ModuleHandlerInterface $moduleHandler;
+  protected ThemeHandlerInterface $themeHandler;
 
   /**
    * {@inheritdoc}
    */
   public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
-    return new static(
-      $configuration,
-      $plugin_id,
-      $plugin_definition,
-      $container->get(ComponentValidator::class),
-      $container->get('plugin.manager.field.widget'),
-      $container->get(EntityTypeManagerInterface::class),
-      $container->get(ComponentPluginManager::class),
-      $container->get(ModuleHandlerInterface::class),
-      $container->get(ThemeHandlerInterface::class),
-      $container->get('Drupal\canvas\ShapeMatcher\FieldForComponentSuggester'),
-      $container->get('logger.channel.canvas'),
-    );
+    $instance = parent::create($container, $configuration, $plugin_id, $plugin_definition);
+    $instance->componentPluginManager = $container->get(ComponentPluginManager::class);
+    $instance->moduleHandler = $container->get(ModuleHandlerInterface::class);
+    $instance->themeHandler = $container->get(ThemeHandlerInterface::class);
+    return $instance;
   }
 
   /**
@@ -97,8 +65,9 @@ final class SingleDirectoryComponent extends GeneratedFieldExplicitInputUxCompon
       return TRUE;
     }
     // @todo Check if the required props are the same in the plugin and the saved component.
-    //   Consider returning an enum[] that could give more info for the developer, e.g. the
-    //   multiple reasons that could make this as broken/invalid. See
+    //   Consider returning an enum[] that could give more info for the
+    //   developer, e.g. the multiple reasons that could make this as
+    //   broken/invalid. See
     //   https://www.drupal.org/project/canvas/issues/3532514
     return FALSE;
   }
@@ -171,10 +140,11 @@ final class SingleDirectoryComponent extends GeneratedFieldExplicitInputUxCompon
    * {@inheritdoc}
    */
   public function renderComponent(array $inputs, array $slot_definitions, string $componentUuid, bool $isPreview = FALSE): array {
-    return [
+    [$props, $props_cacheability] = self::getResolvedPropsAndCacheability($inputs[self::EXPLICIT_INPUT_NAME] ?? []);
+    $build = [
       '#type' => 'component',
       '#component' => $this->getSourceSpecificComponentId(),
-      '#props' => ($inputs[self::EXPLICIT_INPUT_NAME] ?? []) + [
+      '#props' => $props + [
         'canvas_uuid' => $componentUuid,
         'canvas_slot_ids' => \array_keys($slot_definitions),
         'canvas_is_preview' => $isPreview,
@@ -185,6 +155,8 @@ final class SingleDirectoryComponent extends GeneratedFieldExplicitInputUxCompon
         ],
       ],
     ];
+    $props_cacheability->applyTo($build);
+    return $build;
   }
 
   /**
@@ -197,7 +169,9 @@ final class SingleDirectoryComponent extends GeneratedFieldExplicitInputUxCompon
   /**
    * Converts an SDC plugin machine name into a config entity ID.
    *
-   * The naming convention for SDC plugin components is [module/theme]:[component machine name]. Colon is invalid config entity name, so we replace it with '.'.
+   * The naming convention for SDC plugin components is
+   * [module/theme]:[component machine name]. Colon is invalid config entity
+   * name, so we replace it with '.'.
    *
    * @param string $machine_name
    *   The SDC plugin.
@@ -223,7 +197,7 @@ final class SingleDirectoryComponent extends GeneratedFieldExplicitInputUxCompon
    *   The component config entity.
    */
   public static function createConfigEntity(ComponentPlugin $component_plugin): ComponentEntity {
-    assert(is_array($component_plugin->metadata->schema));
+    assert(is_null($component_plugin->metadata->schema) || is_array($component_plugin->metadata->schema));
     $props = self::getPropsForComponentPlugin($component_plugin);
     assert(is_array($component_plugin->getPluginDefinition()));
     // Disabled if obsolete or flagged with noUi.
@@ -269,9 +243,9 @@ final class SingleDirectoryComponent extends GeneratedFieldExplicitInputUxCompon
    *   The component config entity.
    */
   public static function updateConfigEntity(ComponentPlugin $component_plugin): ComponentEntity {
+    assert(is_null($component_plugin->metadata->schema) || is_array($component_plugin->metadata->schema));
     $component = ComponentEntity::load(self::convertMachineNameToId($component_plugin->getPluginId()));
     assert($component instanceof ComponentEntity);
-    assert(is_array($component_plugin->metadata->schema));
 
     $settings = [
       'prop_field_definitions' => self::getPropsForComponentPlugin($component_plugin),
@@ -335,17 +309,22 @@ final class SingleDirectoryComponent extends GeneratedFieldExplicitInputUxCompon
     }
 
     $required = $definition['props']['required'] ?? [];
-    ComponentMetadataRequirementsChecker::check($definition['id'], $component_plugin->metadata, $required);
+    ComponentMetadataRequirementsChecker::check(
+      $definition['id'],
+      $component_plugin->metadata,
+      $required,
+      forbidden_key_characters: [],
+    );
   }
 
   /**
    * {@inheritdoc}
    */
-  public function rewriteExampleUrl(string $url): string {
+  public function rewriteExampleUrl(string $url): GeneratedUrl {
     $parsed_url = parse_url($url);
     \assert(\is_array($parsed_url));
     if (array_intersect_key($parsed_url, array_flip(['scheme', 'host']))) {
-      return $url;
+      return (new GeneratedUrl())->setGeneratedUrl($url);
     }
 
     \assert(isset($parsed_url['path']));
@@ -360,7 +339,10 @@ final class SingleDirectoryComponent extends GeneratedFieldExplicitInputUxCompon
       // - the SDC contains a file called `avatar.png`
       // - this returns `/path/to/drupal/path/to/sdc/avatar.png`, resulting in a
       //   working preview.
-      return \base_path() . $referenced_asset_path;
+      return Url::fromUri('base:/' . $referenced_asset_path)
+        ->toString(TRUE)
+        // When the SDC is moved, the generated URL must be updated.
+        ->addCacheTags($this->getPluginDefinition()['discoveryCacheTags']);
     }
 
     // SDC example values pointing to sample locations, not actual assets.
@@ -369,7 +351,7 @@ final class SingleDirectoryComponent extends GeneratedFieldExplicitInputUxCompon
     // - this returns `/path/to/drupal/adopt-a-llama`, resulting in a
     //   reasonable preview, even though there is unlikely to be a page on the
     //   site with the `adapt-a-llama` path.
-    return \base_path() . $path;
+    return Url::fromUri('base:/' . $path)->toString(TRUE);
   }
 
 }

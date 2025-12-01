@@ -42,9 +42,9 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
   #[Hook('library_info_alter')]
   public function transformsLibraryInfoAlter(array &$libraries, string $extension): void {
     if ($extension === 'canvas') {
-      // We need to dynamically create a 'transforms' library by compiling a list
-      // of all module defined transforms - which are libraries prefixed with
-      // canvas.transform.
+      // We need to dynamically create a 'transforms' library by compiling a
+      // list of all module defined transforms - which are libraries prefixed
+      // with `canvas.transform`.
       $dependencies = [];
       foreach (\array_keys($this->moduleHandler->getModuleList()) as $module) {
         if ($module === 'canvas') {
@@ -62,13 +62,13 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
       ];
     }
     if ($extension === 'media_library') {
-      // Typically, it's safe to assume the base libraries of a theme are present,
-      // but we can't do this in Drupal Canvas. Here, the Media Library
+      // Typically, it's safe to assume the base libraries of a theme are
+      // present, but we can't do this in Drupal Canvas. Here, the Media Library
       // dialog renders with the Admin Theme, but is triggered from a page
       // rendered by the canvas_stark theme.
       // @see \Drupal\canvas\Theme\CanvasThemeNegotiator
-      // This is mitigated by attaching a dynamically built library that contains
-      // the default CSS of the admin theme.
+      // This is mitigated by attaching a dynamically built library that
+      // contains the default CSS of the admin theme.
       // @see \Drupal\canvas\Hook\LibraryHooks::customizeDialogLibrary()
       $libraries['ui']['dependencies'][] = 'canvas/canvas.scoped.admin.css';
     }
@@ -82,8 +82,8 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
   #[Hook('field_widget_single_element_media_library_widget_form_alter')]
   public function fieldWidgetSingleElementMediaLibraryWidgetFormAlter(array &$form, FormStateInterface $form_state, array $context): void {
     if ($this->themeManager->getActiveTheme()->getName() === 'canvas_stark') {
-      // The following configures the open button to trigger a dialog rendered by
-      // the admin theme.
+      // The following configures the open button to trigger a dialog rendered
+      // by the admin theme.
       $request_stack = $this->requestStack;
       $current_route = new CurrentRouteMatch($request_stack);
       $parameters = $current_route->getRawParameters();
@@ -93,8 +93,8 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
       $query['ajax_form'] = \TRUE;
       $query['use_admin_theme'] = \TRUE;
       // This is the existing AJAX URL with the additional use_admin_theme query
-      // argument that is used by CanvasAdminThemeNegotiator to determine if the admin
-      // theme should be used for rendering
+      // argument that is used by CanvasAdminThemeNegotiator to determine if the
+      // admin theme should be used for rendering
       $url = Url::fromRoute($route_name, [
         ...$parameters->all(),
         ...$query,
@@ -102,8 +102,8 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
       $form['open_button']['#ajax']['url'] = $url;
       $form['open_button']['#attributes']['data-canvas-media-library-open-button'] = 'true';
       // Add a property to be used by the AjaxCommands.add_css override in
-      // ajax.hyperscriptify.js that will identify the CSS as something that should
-      // be scoped inside the dialog only.
+      // ajax.hyperscriptify.js that will identify the CSS as something that
+      // should be scoped inside the dialog only.
       $form['open_button']['#ajax']['useAdminTheme'] = \TRUE;
       $form['open_button']['#ajax']['scopeSelector'] = '.media-library-widget-modal';
       $form['open_button']['#ajax']['selectorsToSkip'] = Json::encode([
@@ -124,9 +124,10 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
       }
 
     }
-    // Use an Canvas-specific media library opener, because the default opener assumes
-    // the media library is opened for a field widget of a field instance on the
-    // host entity type. That is not true for Canvas's "static prop sources".
+    // Use a Canvas-specific media library opener, because the default opener
+    // assumes the media library is opened for a field widget of a field
+    // instance on the host entity type. That is not true for Canvas's "static
+    // prop sources".
     // @see \Drupal\canvas\PropSource\StaticPropSource
     // @see \Drupal\canvas\Form\ComponentInstanceForm::buildForm()
     if ($form_state->get('is_canvas_static_prop_source') !== \TRUE) {
@@ -142,6 +143,36 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
       // @see \Drupal\canvas\MediaLibraryCanvasPropOpener::getSelectionResponse()
       'field_widget_id' => $old->getOpenerParameters()['field_widget_id'],
     ]);
+  }
+
+  #[Hook('field_widget_single_element_link_default_form_alter')]
+  public function fieldWidgetSingleElementLinkDefaultWidgetFormAlter(array &$form, FormStateInterface $form_state, array $context): void {
+    if ($this->themeManager->getActiveTheme()->getName() === 'canvas_stark') {
+      // We want the link widget to have less information, so we need to revert
+      // the description mangling happening at
+      // \Drupal\link\Plugin\Field\FieldWidget\LinkWidget::formElement.
+      if (!empty($form['#description'])) {
+        $form['uri']['#description'] = $form['#description'];
+      }
+      else {
+        unset($form['uri']['#description']);
+      }
+    }
+  }
+
+  #[Hook('field_widget_single_element_path_form_alter')]
+  public function fieldWidgetSingleElementPathFormAlter(array &$form, FormStateInterface $form_state, array $context): void {
+    $current_route = new CurrentRouteMatch($this->requestStack);
+    $route_name = $current_route->getRouteName();
+    $is_entity_form = $route_name === 'canvas.api.form.content_entity';
+
+    if ($this->themeManager->getActiveTheme()->getName() === 'canvas_stark' && $is_entity_form) {
+      // Remove the description from the path alias field to have less
+      // information.
+      if (isset($form['alias']['#description'])) {
+        unset($form['alias']['#description']);
+      }
+    }
   }
 
   /**
@@ -199,7 +230,9 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
   }
 
   /**
-   * Further processes a text format element (after TextFormat::processFormat()).
+   * Further processes a text format element.
+   *
+   * Runs after TextFormat::processFormat().
    *
    * @see \Drupal\filter\Element\TextFormat::processFormat()
    */
@@ -219,7 +252,7 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
   }
 
   public static function preRenderTextFormat(array $element): array {
-    // Only proceed if this is an Canvas page data or component instance form.
+    // Only proceed if this is a Canvas page data or component instance form.
     // This restructures the render array to simplify integration of the
     // CKEditor5 React component.
     if (isset($element['#attributes']['data-form-id']) && in_array($element['#attributes']['data-form-id'], [ComponentInstanceForm::FORM_ID, ModuleHooks::PAGE_DATA_FORM_ID])) {

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\PropSource;
 
+use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
+use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Config\Entity\ConfigEntityTypeInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Field\FieldItemListInterface;
@@ -44,20 +46,6 @@ final class DefaultRelativeUrlPropSource extends PropSourceBase {
 
   /**
    * {@inheritdoc}
-   */
-  public static function getSourceTypePrefix(): string {
-    return 'default-relative-url';
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getSourceType(): string {
-    return self::getSourceTypePrefix();
-  }
-
-  /**
-   * {@inheritdoc}
    *
    * @return DefaultRelativeUrlPropSourceArray
    */
@@ -81,7 +69,8 @@ final class DefaultRelativeUrlPropSource extends PropSourceBase {
    * {@inheritdoc}
    */
   public static function parse(array $sdc_prop_source): static {
-    // `sourceType = default-relative-url` requires a value and schema to be specified.
+    // `sourceType = default-relative-url` requires a value and schema to be
+    // specified.
     $missing = array_diff(['value', 'jsonSchema', 'componentId'], array_keys($sdc_prop_source));
     if (!empty($missing)) {
       throw new \LogicException(sprintf('Missing the keys %s.', implode(',', $missing)));
@@ -95,10 +84,13 @@ final class DefaultRelativeUrlPropSource extends PropSourceBase {
     // First do basic normalization, and resolve.
       PropShape::normalize($sdc_prop_source['jsonSchema'])->resolvedSchema
     )->schema;
-    ksort($sdc_prop_source['jsonSchema']);
-    ksort($minimal);
-    if ($sdc_prop_source['jsonSchema'] !== $minimal) {
-      throw new \LogicException(sprintf('Extraneous JSON Schema information detected: %s should have been just %s.', json_encode($sdc_prop_source['jsonSchema'], JSON_PRETTY_PRINT), json_encode($minimal, JSON_PRETTY_PRINT)));
+
+    $sdc_prop_source_json_schema = $sdc_prop_source['jsonSchema'];
+    self::recursiveKsort($sdc_prop_source_json_schema);
+    self::recursiveKsort($minimal);
+
+    if ($sdc_prop_source_json_schema !== $minimal) {
+      throw new \LogicException(sprintf('Extraneous JSON Schema information detected: %s should have been just %s.', json_encode($sdc_prop_source_json_schema, JSON_PRETTY_PRINT), json_encode($minimal, JSON_PRETTY_PRINT)));
     }
 
     return new self(
@@ -109,15 +101,35 @@ final class DefaultRelativeUrlPropSource extends PropSourceBase {
   }
 
   /**
+   * @todo Remove this once Canvas requires Drupal 11.3, which added this to Drupal core: https://www.drupal.org/project/drupal/issues/3556987
+   */
+  private static function recursiveKsort(array &$array): void {
+    ksort($array);
+    foreach ($array as &$value) {
+      if (is_array($value)) {
+        self::recursiveKsort($value);
+      }
+    }
+  }
+
+  /**
    * {@inheritdoc}
    */
-  public function evaluate(?FieldableEntityInterface $host_entity, bool $is_required): mixed {
+  public function evaluate(?FieldableEntityInterface $host_entity, bool $is_required): EvaluationResult {
     if (is_string($this->value)) {
       \assert(self::isUrlJsonSchema($this->jsonSchema));
-      return $this->componentSource->rewriteExampleUrl($this->value);
+      $generated_url = $this->componentSource->rewriteExampleUrl($this->value);
+      return new EvaluationResult(
+        $generated_url->getGeneratedUrl(),
+        (new CacheableMetadata())
+          ->setCacheTags($this->componentSource->getPluginDefinition()['discoveryCacheTags'])
+          ->addCacheableDependency($generated_url),
+      );
     }
 
-    return self::recurse($this->jsonSchema, $this->value, $this->componentSource);
+    return new EvaluationResult(
+      self::recurse($this->jsonSchema, $this->value, $this->componentSource),
+    );
   }
 
   private static function recurse(array $json_schema, mixed $value, UrlRewriteInterface $component_source): mixed {
@@ -138,7 +150,13 @@ final class DefaultRelativeUrlPropSource extends PropSourceBase {
       return $evaluated;
     }
     elseif (is_string($value) && self::isUrlJsonSchema($json_schema)) {
-      return $component_source->rewriteExampleUrl($value);
+      $generated_url = $component_source->rewriteExampleUrl($value);
+      return new EvaluationResult(
+        $generated_url->getGeneratedUrl(),
+        (new CacheableMetadata())
+          ->setCacheTags($component_source->getPluginDefinition()['discoveryCacheTags'])
+          ->addCacheableDependency($generated_url),
+      );
     }
     else {
       return $value;

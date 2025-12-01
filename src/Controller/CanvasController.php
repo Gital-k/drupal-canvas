@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Controller;
 
+use Drupal\canvas\CanvasUriDefinitions;
 use Drupal\canvas\Entity\ComponentTreeEntityInterface;
 use Drupal\canvas\Extension\CanvasExtensionPluginManager;
+use Drupal\canvas\Resource\CanvasResourceLink;
+use Drupal\canvas\Resource\CanvasResourceLinkCollection;
 use Drupal\Component\Utility\Html;
+use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Asset\AttachedAssets;
 use Drupal\Core\Asset\LibraryDiscoveryInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
@@ -129,18 +133,29 @@ HTML;
     }
     $extensions = $this->extensionPluginManager->getDefinitions();
 
+    $all_content_entity_create_links = $this->getAllContentEntityCreateLinks();
+    // From the "content entity create" link collection, construct a nested
+    // representation that makes things simple for the Canvas UI: entity type
+    // IDs as top-level keys, bundles as second level keys, labels as values.
+    $content_entity_create_operations = [];
+    foreach ($all_content_entity_create_links->getIterator() as $entity_type_id_and_bundle => $create_link) {
+      [$entity_type_id, $bundle] = explode(':', $entity_type_id_and_bundle);
+      \assert($create_link instanceof CanvasResourceLink);
+      $content_entity_create_operations[$entity_type_id][$bundle] = $create_link->getTargetAttributes()['label'];
+    }
     return (new HtmlResponse($this->buildHtml()))
       ->addCacheableDependency($extensions)
       ->addCacheableDependency($system_site_config)
+      ->addCacheableDependency($all_content_entity_create_links)
       ->setAttachments([
         'library' => [
           'canvas/canvas-ui',
           'canvas/extensions',
           ...$this->getTransformAssetLibraries(),
-        // `drupalSettings.canvasData.v0` must be unconditionally present: in case
-        // the user starts creating/editing code components.
-        // This is also how draft/auto-save code components ensure all "canvas data"
-        // is always available.
+        // `drupalSettings.canvasData.v0` must be unconditionally present: in
+        // case the user starts creating/editing code components.
+        // This is also how draft/auto-save code components ensure all
+        // "canvas data" is always available.
         // @see \Drupal\canvas\Hook\LibraryHooks::libraryInfoBuild()
           'canvas/canvasData.v0',
         ],
@@ -174,12 +189,12 @@ HTML;
               'contentTemplates' => $this->currentUser->hasPermission(ContentTemplate::ADMIN_PERMISSION),
               'publishChanges' => $this->currentUser->hasPermission(AutoSaveManager::PUBLISH_PERMISSION),
             ],
-            'contentEntityCreateOperations' => $this->getContentEntityCreateOperations(),
+            'contentEntityCreateOperations' => $content_entity_create_operations,
             'homepagePath' => $system_site_config->get('page.front'),
             'loginUrl' => $this->urlGenerator->generateFromRoute('user.login'),
           ],
-          // Override actual `canvasData` with dummy data for code component editor
-          // development purposes.
+          // Override actual `canvasData` with dummy data for code component
+          // editor development purposes.
           'canvasData' => [
             'v0' => [
               'pageTitle' => 'This is a page title for testing purposes',
@@ -291,7 +306,7 @@ HTML;
   }
 
   /**
-   * Ensures Canvas informs developers when using missing client-side transforms.
+   * Ensures developers are informed when using missing client-side transforms.
    */
   private function validateTransformAssetLibraries(): true {
     // Find all used client-side transforms.
@@ -318,17 +333,22 @@ HTML;
   }
 
   /**
-   * Returns the content entity create operations permissions.
+   * Returns the content entity create links, respecting access control.
    *
-   * @return array
-   *   Returns an array keyed by entity type IDs, containing a nested array with
-   *   the bundle IDs as key, and the value being FALSE if the user doesn't
-   *   access to the create operation, or the singular label for the bundle if
-   *   they do.
+   * @return \Drupal\canvas\Resource\CanvasResourceLinkCollection
+   *   Returns a link collection with links keyed by `entity type ID:bundle`.
    */
-  private function getContentEntityCreateOperations(): array {
-    $operations = [];
+  private function getAllContentEntityCreateLinks(): CanvasResourceLinkCollection {
+    $links = new CanvasResourceLinkCollection([]);
     $field_map = $this->entityFieldManager->getFieldMapByFieldType(ComponentTreeItem::PLUGIN_ID);
+    $links->addCacheTags([
+      // Invalidate whenever field definitions are modified.
+      'entity_field_info',
+      // Invalidate whenever the set of bundles changes.
+      'entity_bundles',
+      // Invalidate whenever the set of entity types changes.
+      'entity_types',
+    ]);
     foreach ($field_map as $entity_type_id => $detail) {
       $bundleInfo = $this->entityTypeBundleInfo->getBundleInfo($entity_type_id);
       $field_names = \array_keys($detail);
@@ -338,13 +358,29 @@ HTML;
       foreach ($field_names as $field_name) {
         $bundles = $detail[$field_name]['bundles'];
         foreach ($bundles as $bundle) {
-          if ($this->entityTypeManager->getAccessControlHandler($entity_type_id)->createAccess($bundle)) {
-            $operations[$entity_type_id][$bundle] = $bundleInfo[$bundle]['label'];
+          $access = $this->entityTypeManager->getAccessControlHandler($entity_type_id)->createAccess($bundle, return_as_object: TRUE);
+          \assert($access instanceof AccessResult);
+          if ($access->isAllowed()) {
+            $links = $links->withLink(
+              "$entity_type_id:$bundle",
+              new CanvasResourceLink(
+                $access,
+                Url::fromRoute('canvas.api.content.create', [
+                  // @todo Add bundle support in https://www.drupal.org/i/3513566
+                  'entity_type' => $entity_type_id,
+                ]),
+                CanvasUriDefinitions::LINK_REL_CREATE,
+                ['label' => (string) $bundleInfo[$bundle]['label']],
+              )
+            );
+          }
+          else {
+            $links->addCacheableDependency($access);
           }
         }
       }
     }
-    return $operations;
+    return $links;
   }
 
 }

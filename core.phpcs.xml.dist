@@ -38,6 +38,7 @@
     <include-pattern>core/*/Functional/*</include-pattern>
     <include-pattern>core/lib/*</include-pattern>
     <include-pattern>core/modules/*/tests/modules/*</include-pattern>
+    <include-pattern>core/modules/*/Plugin/*</include-pattern>
   </rule>
   <rule ref="Drupal.Classes.ClassCreateInstance"/>
   <rule ref="Drupal.Classes.ClassDeclaration"/>
@@ -59,6 +60,7 @@
     <exclude name="Drupal.Commenting.DocComment.LongFullStop"/>
   </rule>
   <rule  ref="Drupal.Commenting.DocComment.MissingShort">
+    <include-pattern>core/*/KernelTests/*</include-pattern>
     <include-pattern>core/*/Unit/*</include-pattern>
     <include-pattern>core/*/FunctionalJavascript/*</include-pattern>
   </rule>
@@ -75,6 +77,8 @@
     <include-pattern>*/KernelTests/*</include-pattern>
     <include-pattern>*/Functional/*</include-pattern>
     <include-pattern>*/Unit/*</include-pattern>
+    <include-pattern>core/lib/*</include-pattern>
+    <include-pattern>core/modules/system/tests/modules/HookOrder/*</include-pattern>
   </rule>
   <rule ref="Drupal.Commenting.FunctionComment.MissingParamType"/>
   <rule ref="Drupal.Commenting.FunctionComment.MissingReturnComment"/>
@@ -95,14 +99,7 @@
   <rule ref="Drupal.Files.EndFileNewline"/>
   <rule ref="Drupal.Files.FileEncoding"/>
   <rule ref="Drupal.Files.LineLength">
-    <include-pattern>*/core/lib/*</include-pattern>
-    <exclude-pattern>*/core/lib/*/*Trait</exclude-pattern>
-    <include-pattern>*/core/includes/*</include-pattern>
-    <include-pattern>*/core/profiles/*</include-pattern>
-    <include-pattern>*/core/recipes/*</include-pattern>
-    <include-pattern>*/core/themes/*</include-pattern>
-    <include-pattern>*/core/modules/*</include-pattern>
-    <exclude-pattern>*/core/modules/*/tests</exclude-pattern>
+    <exclude-pattern>*/tests/*</exclude-pattern>
   </rule>
   <rule ref="Drupal.Files.TxtFileLineLength"/>
   <rule ref="Drupal.Formatting.MultiLineAssignment"/>
@@ -259,6 +256,7 @@
   <rule ref="SlevomatCodingStandard.Commenting.ForbiddenAnnotations">
     <properties>
       <property name="forbiddenAnnotations" type="array">
+        <element value="@encode"/>
         <element value="@inheritDoc"/>
         <element value="@inheritdoc"/>
         <element value="@returns"/>
@@ -269,6 +267,7 @@
     <properties>
        <property name="forbiddenCommentPatterns" type="array">
          <element value="/@inheritDoc/"/>
+         <element value="/(?&lt;!\.)\.\.(?!\.)$/"/>
        </property>
     </properties>
   </rule>

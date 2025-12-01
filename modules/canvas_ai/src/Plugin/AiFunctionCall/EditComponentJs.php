@@ -49,7 +49,7 @@ use Symfony\Component\Yaml\Yaml;
     ),
   ],
 )]
-final class EditComponentJs extends FunctionCallBase implements ExecutableFunctionCallInterface, AiAgentContextInterface {
+final class EditComponentJs extends FunctionCallBase implements ExecutableFunctionCallInterface, AiAgentContextInterface, BuilderResponseFunctionCallInterface {
 
   use ConstraintPropertyPathTranslatorTrait;
 
@@ -78,27 +78,14 @@ final class EditComponentJs extends FunctionCallBase implements ExecutableFuncti
   }
 
   /**
-   * The js.
-   *
-   * @var string
-   */
-  protected string $js = "";
-  /**
-   * The props.
-   *
-   * @var string
-   */
-  protected string $props = "";
-
-  /**
    * {@inheritdoc}
    */
   public function execute(): void {
     try {
       $machine_name = $this->getContextValue('component_machine_name');
-      $this->js = $this->getContextValue('javascript');
-      $this->props = $this->getContextValue('props_metadata');
-      $props_array = Json::decode($this->props);
+      $js = $this->getContextValue('javascript');
+      $props = $this->getContextValue('props_metadata');
+      $props_array = Json::decode($props);
       // Check if the component exists.
       /** @var \Drupal\canvas\Entity\JavaScriptComponent $component */
       $component = $this->entityTypeManager->getStorage('js_component')->load($machine_name);
@@ -131,7 +118,7 @@ final class EditComponentJs extends FunctionCallBase implements ExecutableFuncti
         // Mark this code component as "internal": do not make it available to Content Creators yet.
         // @see docs/config-management.md, section 3.2.1
         'status' => FALSE,
-        'sourceCodeJs' => $this->js,
+        'sourceCodeJs' => $js,
         'sourceCodeCss' => '',
         'compiledJs' => '',
         'compiledCss' => '',
@@ -159,14 +146,10 @@ final class EditComponentJs extends FunctionCallBase implements ExecutableFuncti
       $this->setOutput(Yaml::dump(['error' => sprintf('Failed to process Javascript component data: %s', $e->getMessage())], 10, 2));
       return;
     }
-    // \Drupal\canvas_ai\Controller\CanvasBuilder::render() expects a YAML parsable
-    // string.
-    // @see \Drupal\canvas_ai\Controller\CanvasBuilder::render()
-    $this->setOutput(Yaml::dump([
-      'js_structure' => $this->js,
-      'props_metadata' => $this->props,
-    ], 10, 2)
-    );
+    $this->setStructuredOutput([
+      'js_structure' => $js,
+      'props_metadata' => $props,
+    ]);
   }
 
 }

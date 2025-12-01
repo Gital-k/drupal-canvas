@@ -2,8 +2,8 @@
 
 namespace Drupal\canvas\Element;
 
-use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\canvas\PropSource\DynamicPropSource;
+use Drupal\canvas\PropSource\HostEntityUrlPropSource;
 use Drupal\Core\Render\Attribute\RenderElement;
 use Drupal\Core\Render\Element\RenderElementBase;
 
@@ -21,9 +21,9 @@ class LinkedPropSource extends RenderElementBase {
    * Properties:
    * - #sdc_prop_name: The name of the prop in the component.
    * - #sdc_prop_label: The label of the prop in the component.
-   * - #linked_prop_source: The dynamic prop source object.
+   * - #linked_prop_source: The dynamic prop source object or
+   *   HostEntityUrlPropSource object.
    * - #field_link_suggestions: An array of field name suggestions for linking.
-   * - #component: The component with props being linked.
    * - #is_required: Whether the prop is required.
    *
    * @see \Drupal\canvas\PropSource\DynamicPropSource
@@ -38,7 +38,6 @@ class LinkedPropSource extends RenderElementBase {
       '#sdc_prop_name' => NULL,
       '#linked_prop_source' => NULL,
       '#field_link_suggestions' => [],
-      '#component' => NULL,
       '#is_required' => FALSE,
       '#attributes' => [
         'class' => ['canvas-linked-prop-wrapper'],
@@ -55,11 +54,9 @@ class LinkedPropSource extends RenderElementBase {
     $sdc_prop_label = $element['#sdc_prop_label'];
     assert(is_string($sdc_prop_label));
     $linked_prop_source = $element['#linked_prop_source'];
-    assert($linked_prop_source instanceof DynamicPropSource);
+    assert($linked_prop_source instanceof DynamicPropSource || $linked_prop_source instanceof HostEntityUrlPropSource);
     $field_link_suggestions = $element['#field_link_suggestions'] ?? [];
     assert(is_array($field_link_suggestions));
-    $component = $element['#component'];
-    assert($component instanceof ComponentInterface);
     $is_required = $element['#is_required'] ?? FALSE;
 
     $element['label_wrap'] = [
@@ -92,6 +89,8 @@ class LinkedPropSource extends RenderElementBase {
       '#theme' => 'linked_field_box',
       '#title' => $linked_prop_source->label(),
       '#prop_name' => $sdc_prop_name,
+      '#description' => $element['#description'],
+      '#description_display' => $element['#description_display'],
     ];
 
     return $element;

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupal\Tests\canvas\Kernel\EcosystemSupport;
 
 use Drupal\canvas\PropExpressions\StructuredData\Labeler;
+use Drupal\canvas\PropSource\DynamicPropSource;
 use Drupal\Core\Entity\TypedData\EntityDataDefinition;
 use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Field\TypedData\FieldItemDataDefinitionInterface;
@@ -15,8 +16,7 @@ use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression;
 use Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression;
-use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpressionInterface;
-use Drupal\canvas\ShapeMatcher\FieldForComponentSuggester;
+use Drupal\canvas\ShapeMatcher\PropSourceSuggester;
 use Drupal\canvas\ShapeMatcher\JsonSchemaFieldInstanceMatcher;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
@@ -42,11 +42,11 @@ use Drupal\field\Entity\FieldStorageConfig;
  *
  * @todo Also test non-default FieldStorageConfig setting in https://www.drupal.org/project/canvas/issues/3512848
  *
- * @covers \Drupal\canvas\ShapeMatcher\FieldForComponentSuggester
- * @see \Drupal\Tests\canvas\Kernel\FieldForComponentSuggesterTest
+ * @covers \Drupal\canvas\ShapeMatcher\PropSourceSuggester
+ * @see \Drupal\Tests\canvas\Kernel\PropSourceSuggesterTest
  * @covers \Drupal\canvas\ShapeMatcher\JsonSchemaFieldInstanceMatcher
  * @see \Drupal\Tests\canvas\Kernel\PropShapeToFieldInstanceTest
- * @see docs/shape-matching-into-field-types.md#3.1.2.a
+ * @see docs/shape-matching.md#3.1.2.a
  * @group canvas
  */
 final class FieldInstanceSupportTest extends EcosystemSupportTestBase {
@@ -79,7 +79,7 @@ final class FieldInstanceSupportTest extends EcosystemSupportTestBase {
    *
    * (For example: the `password` field type never makes sense to match.)
    */
-  public const MATCHING_ALL_FIELD_TYPE_PROPERTIES = 0.78;
+  public const MATCHING_ALL_FIELD_TYPE_PROPERTIES = 0.7843137254901961;
 
   /**
    * Supported field types (keys), with explicitly unsupported props (values).
@@ -266,7 +266,7 @@ final class FieldInstanceSupportTest extends EcosystemSupportTestBase {
         }
         // All known-to-be-supported field types are expected to have all props
         // supported, except the ones known to not yet work, either due to a
-        // core bug, or due to an Canvas bug.
+        // core bug, or due to a Canvas bug.
         if (array_key_exists($field_type, self::SUPPORTED) && !array_key_exists($field_prop_name, self::SUPPORTED[$field_type])) {
           $expected_supported_field_props[] = "$field_name.$field_prop_name";
         }
@@ -294,7 +294,7 @@ final class FieldInstanceSupportTest extends EcosystemSupportTestBase {
     // test-only `all-props` SDC, which contains EVERY possible SDC prop shape.
     $component = \Drupal::service(ComponentPluginManager::class)->find('sdc_test_all_props:all-props');
     assert($component instanceof Component);
-    $suggestions = $this->container->get(FieldForComponentSuggester::class)
+    $suggestions = $this->container->get(PropSourceSuggester::class)
       ->suggest(
         $component->getPluginId(),
         $component->metadata,
@@ -307,8 +307,9 @@ final class FieldInstanceSupportTest extends EcosystemSupportTestBase {
     $compatible_sdc_prop_shapes_per_field = [];
     $compatible_sdc_prop_shapes_per_field_prop = [];
     foreach ($suggestions as $cpe => ['instances' => $suggested_instances]) {
-      foreach ($suggested_instances as $expr) {
-        assert($expr instanceof StructuredDataPropExpressionInterface);
+      foreach ($suggested_instances as $dynamic_prop_source) {
+        \assert($dynamic_prop_source instanceof DynamicPropSource);
+        $expr = $dynamic_prop_source->expression;
         $field_name = match (get_class($expr)) {
           FieldPropExpression::class, FieldObjectPropsExpression::class => $expr->fieldName,
           ReferenceFieldPropExpression::class => $expr->referencer->fieldName,

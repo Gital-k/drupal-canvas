@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\PropSource;
 
+use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
 use Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression;
 use Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression;
@@ -17,30 +18,22 @@ use Drupal\Core\StringTranslation\TranslatableMarkup;
 /**
  * Describes structured data to map to 1 explicit input of a component instance.
  *
+ * Conceptual sibling of HostEntityUrlPropSource, but:
+ * - HostEntityUrlPropSource generates a URL to the host entity
+ * - this retrieves information from structured data in the host entity (aka a
+ *   field on the host entity)
+ *
+ * @see \Drupal\canvas\PropSource\HostEntityUrlPropSource
  * @see \Drupal\canvas\ShapeMatcher\JsonSchemaFieldInstanceMatcher
- * @internal
  *
  * @phpstan-import-type PropSourceArray from PropSourceBase
+ * @internal
  */
 final class DynamicPropSource extends PropSourceBase {
 
   public function __construct(
     public readonly FieldPropExpression|ReferenceFieldPropExpression|FieldObjectPropsExpression $expression,
   ) {}
-
-  /**
-   * {@inheritdoc}
-   */
-  public static function getSourceTypePrefix(): string {
-    return 'dynamic';
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getSourceType(): string {
-    return self::getSourceTypePrefix();
-  }
 
   /**
    * {@inheritdoc}
@@ -72,7 +65,7 @@ final class DynamicPropSource extends PropSourceBase {
   /**
    * {@inheritdoc}
    */
-  public function evaluate(?FieldableEntityInterface $host_entity, bool $is_required): mixed {
+  public function evaluate(?FieldableEntityInterface $host_entity, bool $is_required): EvaluationResult {
     if ($host_entity === NULL) {
       throw new MissingHostEntityException();
     }

@@ -9,7 +9,9 @@ use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Config\Entity\ConfigEntityStorageInterface;
 use Drupal\Core\Extension\ExtensionPathResolver;
 use Drupal\Core\File\FileUrlGeneratorInterface;
+use Drupal\Core\GeneratedUrl;
 use Drupal\Core\Plugin\Component as ComponentPlugin;
+use Drupal\Core\Render\Component\Exception\ComponentNotFoundException;
 use Drupal\Core\Render\Component\Exception\InvalidComponentException;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\Url;
@@ -30,12 +32,14 @@ use Drupal\canvas\Version;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
- * Defines a component source based on Canvas JavaScript Component config entities.
+ * Component source based on Canvas JavaScript Component config entities.
  */
 #[ComponentSource(
   id: self::SOURCE_PLUGIN_ID,
   label: new TranslatableMarkup('Code Components'),
   supportsImplicitInputs: FALSE,
+  // @see \Drupal\canvas\EntityHandlers\JavascriptComponentStorage::doPostSave()
+  discoveryCacheTags: ['config:js_component_list'],
 )]
 final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase implements UrlRewriteInterface {
 
@@ -109,8 +113,11 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
     if ($this->jsComponent === NULL) {
       $js_component_storage = $this->entityTypeManager->getStorage(JavaScriptComponent::ENTITY_TYPE_ID);
       assert($js_component_storage instanceof ConfigEntityStorageInterface);
-      $js_component = $js_component_storage->load($this->getSourceSpecificComponentId());
-      assert($js_component instanceof JavaScriptComponent);
+      $id = $this->getSourceSpecificComponentId();
+      $js_component = $js_component_storage->load($id);
+      if (!$js_component instanceof JavaScriptComponent) {
+        throw new ComponentNotFoundException(sprintf('The JavaScript Component with ID `%s` does not exist.', $id));
+      }
       $this->jsComponent = $js_component;
     }
     return $this->jsComponent;
@@ -230,8 +237,10 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
 
     $valid_props = $component->getProps() ?? [];
 
+    [$props, $props_cacheability] = self::getResolvedPropsAndCacheability(\array_intersect_key($inputs[self::EXPLICIT_INPUT_NAME] ?? [], $valid_props));
     CacheableMetadata::createFromRenderArray($build)
       ->addCacheableDependency($component)
+      ->addCacheableDependency($props_cacheability)
       ->applyTo($build);
 
     return $build + [
@@ -240,7 +249,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
       '#import_maps' => $import_maps,
       '#name' => $component->label(),
       '#component_url' => $component_url,
-      '#props' => (\array_intersect_key($inputs[self::EXPLICIT_INPUT_NAME] ?? [], $valid_props)) + [
+      '#props' => $props + [
         'canvas_uuid' => $componentUuid,
         'canvas_slot_ids' => \array_keys($slot_definitions),
         'canvas_is_preview' => $isPreview,
@@ -269,7 +278,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
    * Creates the Component config entity for a "code component" config entity.
    *
    * @param \Drupal\canvas\Entity\JavaScriptComponent $js_component
-   *   An Canvas "code component" config entity.
+   *   A Canvas "code component" config entity.
    *
    * @return \Drupal\canvas\Entity\ComponentInterface
    *   The component config entity.
@@ -286,7 +295,13 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
     catch (InvalidComponentException $e) {
       throw new ComponentDoesNotMeetRequirementsException([$e->getMessage()]);
     }
-    ComponentMetadataRequirementsChecker::check((string) $js_component->id(), $ephemeral_sdc_component->metadata, $js_component->getRequiredProps());
+    ComponentMetadataRequirementsChecker::check(
+      (string) $js_component->id(),
+      $ephemeral_sdc_component->metadata,
+      $js_component->getRequiredProps(),
+      // @see \Drupal\Core\Config\ConfigBase::validateKeys()
+      forbidden_key_characters: ['.' => '_'],
+    );
     $props = self::getPropsForComponentPlugin($ephemeral_sdc_component);
     $settings = [
       'prop_field_definitions' => $props,
@@ -320,7 +335,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
    * Updates the Component config entity for a "code component" config entity.
    *
    * @param \Drupal\canvas\Entity\JavaScriptComponent $js_component
-   *   An Canvas "code component" config entity.
+   *   A Canvas "code component" config entity.
    *
    * @return \Drupal\canvas\Entity\ComponentInterface
    *   The component config entity.
@@ -341,7 +356,13 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
     catch (InvalidComponentException $e) {
       throw new ComponentDoesNotMeetRequirementsException([$e->getMessage()]);
     }
-    ComponentMetadataRequirementsChecker::check((string) $js_component->id(), $ephemeral_sdc_component->metadata, $js_component->getRequiredProps());
+    ComponentMetadataRequirementsChecker::check(
+      (string) $js_component->id(),
+      $ephemeral_sdc_component->metadata,
+      $js_component->getRequiredProps(),
+      // @see \Drupal\Core\Config\ConfigBase::validateKeys()
+      forbidden_key_characters: ['.' => '_'],
+    );
     $settings = [
       'prop_field_definitions' => self::getPropsForComponentPlugin($ephemeral_sdc_component),
     ];
@@ -384,7 +405,13 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
     catch (InvalidComponentException $e) {
       throw new ComponentDoesNotMeetRequirementsException([$e->getMessage()]);
     }
-    ComponentMetadataRequirementsChecker::check((string) $js_component->id(), $ephemeral_sdc_component->metadata, $js_component->getRequiredProps());
+    ComponentMetadataRequirementsChecker::check(
+      (string) $js_component->id(),
+      $ephemeral_sdc_component->metadata,
+      $js_component->getRequiredProps(),
+      // @see \Drupal\Core\Config\ConfigBase::validateKeys()
+      forbidden_key_characters: ['.' => '_'],
+    );
   }
 
   /**
@@ -411,12 +438,12 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
   /**
    * {@inheritdoc}
    */
-  public function rewriteExampleUrl(string $url): string {
+  public function rewriteExampleUrl(string $url): GeneratedUrl {
     // Allow any fully qualified URL.
     $parsed_url = parse_url($url);
     \assert(\is_array($parsed_url));
     if (array_intersect_key($parsed_url, array_flip(['scheme', 'host']))) {
-      return $url;
+      return (new GeneratedUrl())->setGeneratedUrl($url);
     }
 
     // Allow the example URL to be one of the hardcoded relative URLs, and
@@ -428,7 +455,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
     ];
     if (in_array($url, $example_videos, TRUE)) {
       $file_path = $this->extensionPathResolver->getPath('module', 'canvas') . $url;
-      return Url::fromUri('base:/' . $file_path)->toString();
+      return Url::fromUri('base:/' . $file_path)->toString(TRUE);
     }
 
     throw new \InvalidArgumentException('Default images for Javascript Components must be a fully-qualified URL with both scheme and host.');
@@ -449,7 +476,8 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
       $scoped_dependencies[$component_url]["@/components/{$js_component_dependency_name}"] = $js_component_dependency->getComponentUrl($this->fileUrlGenerator, $isPreview);
       $scoped_dependencies = array_merge($scoped_dependencies, $this->getScopedDependencies($js_component_dependency, $dependencyAutoSave, $isPreview, $seen));
       if (isset($scoped_dependencies[$dependency_component_url])) {
-        // The dependencies of my dependencies are also my dependencies, so says the logic.
+        // The dependencies of my dependencies are also my dependencies, so says
+        // the logic.
         $scoped_dependencies[$component_url] = array_merge($scoped_dependencies[$component_url], $scoped_dependencies[$dependency_component_url]);
       }
     }

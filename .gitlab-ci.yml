@@ -82,6 +82,13 @@ variables:
   PHPUNIT_FAIL_ON_PHPUNIT_DEPRECATION: 0
   _CONCURRENCY_THREADS: '12'
 
+  # Enable testing against next minor version of Drupal core
+  OPT_IN_TEST_NEXT_MINOR: '1'
+
+  # Enable Canvas contributors to change this from `true` to `false` to disable E2E (end-to-end) tests.
+  # (Useful when early in an MR and/or developing low-level functionality that is unlikely to affect E2E tests.)
+  _CANVAS_E2E_TESTS: true
+
 # @todo Remove when https://www.drupal.org/project/gitlab_templates/issues/3452183 lands.
 .is-push-rule: &is-push-rule
   if: $CI_PIPELINE_SOURCE == "push" && $CI_PROJECT_ROOT_NAMESPACE == "project"
@@ -137,6 +144,9 @@ variables:
       - ui/tests/fixtures/**/*
     when: on_success
 
+.e2e-tests-are-enabled-rule: &e2e-tests-are-enabled-rule
+  - if: $_CANVAS_E2E_TESTS == "true"
+
 # Disable jobs from the upstream template.
 phpcs:
   rules:
@@ -151,6 +161,14 @@ cspell:
     - when: never
 
 composer-lint:
+  rules:
+    - when: never
+
+phpstan (next minor):
+  rules:
+    - when: never
+
+phpunit (next minor):
   rules:
     - when: never
 
@@ -179,7 +197,7 @@ phpcs-rules-match-drupal-11:
       if [ $DIFF_EXIT_CODE -ne 0 ]; then
         echo "🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥"
         echo "Error: core.phpcs.xml.dist not up to date with Drupal 11.x core/phpcs.xml.dist. Please create an issue to update this file."
-        echo "Issue template: https://www.drupal.org/node/add/project-issue/canvas?title=Update%20PHPCS%20config%20to%20match%20Drupal%2011&field_issue_parent=3512890&clone_body=1&categories=2&priorities=100&status=1&version=0.x-dev&component=Code&assigned=0&tags="
+        echo "Issue template: https://www.drupal.org/node/add/project-issue/canvas?title=Update%20PHPCS%20config%20to%20match%20Drupal%2011&field_issue_parent=3512890&clone_body=1&categories=2&priorities=100&status=1&version=1.x-dev&component=Code&assigned=0&tags="
       else
         echo "👍👍👍👍👍👍👍👍👍👍👍👍👍👍👍👍👍👍"
         echo "core.phpcs.xml.dist is up to date with Drupal 11.x core/phpcs.xml.dist"
@@ -217,6 +235,9 @@ phpunit:
   variables:
     # Note: Canvas uses `@group #slow` to start slow tests early. The threshold is (at the time of writing) ~60 seconds.
     _PHPUNIT_CONCURRENT: 1
+    # 💡To run a single PHPUnit test, e.g. PropSourceTest, comment the above and uncomment the below.
+    # _PHPUNIT_CONCURRENT: 0
+    # _PHPUNIT_EXTRA: '--filter PropSourceTest'
   needs:
     - composer
     - UI
@@ -256,6 +277,40 @@ phpunit:
     - *UI-fixtures-files-change-rule
     - *manual-rule
 
+# Canvas requires 11.2, but may provide >11.2-only features.
+phpunit (>11.2-only features):
+  extends: phpunit
+  needs:
+    - composer (next minor)
+    - UI
+  variables:
+    _PHPUNIT_TESTGROUPS: ''
+    _PHPUNIT_CONCURRENT: 0
+    _PHPUNIT_EXTRA: '--filter DefaultContentExportImportTest'
+  parallel:
+    matrix:
+      - _TARGET_DB_TYPE: sqlite
+        _TARGET_DB_VERSION: '3'
+        _TARGET_PHP: '8.3-ubuntu'
+        _FOR_EVERY_MR_COMMIT: 'true'
+      - _TARGET_DB_TYPE: 'mariadb'
+        _TARGET_DB_VERSION: '10.6'
+        _FOR_EVERY_MR_COMMIT: 'false'
+      - _TARGET_DB_TYPE: 'mysql'
+        _TARGET_DB_VERSION: '8'
+        _FOR_EVERY_MR_COMMIT: 'false'
+      - _TARGET_DB_TYPE: 'pgsql'
+        _TARGET_DB_VERSION: '16'
+        _FOR_EVERY_MR_COMMIT: 'false'
+  rules:
+    - *is-push-rule
+    - *php-files-change-rule
+    - *module-metadata-files-change-rule
+    - *module-config-files-change-rule
+    - *SDC-files-change-rule
+    - *UI-fixtures-files-change-rule
+    - *manual-rule
+
 eslint:
   # This module wants to strictly comply with eslint.
   allow_failure: false
@@ -274,6 +329,9 @@ eslint:
     - ln -sf $CI_PROJECT_DIR/$_WEB_ROOT/core/.prettierrc.json .
   rules:
     - *is-push-rule
+    - changes:
+        - ".gitlab-ci.yml"
+      when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
         - .prettier*
@@ -365,6 +423,9 @@ vitest:
   needs:
     - composer
     - UI
+  rules:
+    - *e2e-tests-are-enabled-rule
+    - *manual-rule
   extends:
     - .test-variables
   before_script:
@@ -387,7 +448,7 @@ vitest:
     #
     # 👆
     #
-    - cd modules/custom/$CI_PROJECT_NAME
+    - cd $DRUPAL_PROJECT_FOLDER
     - echo -e "\e[0Ksection_start:`date +%s`:Cypress-install[collapsed=true]\r\e[0KInstall Cypress."
     - cp ./ui/.env.example ./ui/.env
     - echo "BASE_URL='${SIMPLETEST_BASE_URL}'" >> ./ui/.env
@@ -433,35 +494,6 @@ cypress unit:
         - ui/tests/unit/**/*
     - *UI-fixtures-files-change-rule
     - *manual-rule
-
-🗺️ C4 model diagrams:
-  stage: validate
-  needs: []
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "push" && $CI_PROJECT_ROOT_NAMESPACE == "project"
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes:
-        - docs/Canvas.dsl
-        - docs/diagrams/*
-  image:
-    name: structurizr/cli
-    entrypoint: [""]
-  script:
-    - /usr/local/structurizr-cli/structurizr.sh export --workspace docs/Canvas.dsl --format mermaid --output $CI_PROJECT_DIR/docs/diagrams
-    # Prepend the prefix
-    #   ```mermaid
-    # and the
-    #   ```
-    # suffix that GitLab CI expects.
-    # @see https://docs.gitlab.com/ee/user/markdown.html#mermaid
-    # @see https://stackoverflow.com/a/42989868
-    # @see https://stackoverflow.com/a/9741470
-    - for file in docs/diagrams/*.mmd; do printf "\`\`\`mermaid\n" | cat - $file  > temp && mv -f temp $file && echo $'\n```' >> $file; done
-    # Now the actual validation: verify that regenerating the Mermaid Markdown files did NOT trigger any changes.
-    - set -e; for file in docs/diagrams/*.mmd; do diff $file docs/diagrams/$(basename $file mmd)md; done
-  artifacts:
-    paths:
-      - "docs/diagrams/*.md"
 
 lint (php):
   stage: validate
@@ -522,6 +554,9 @@ lint (OpenAPI):
 playwright:
   stage: test
   needs: []
+  rules:
+    - *e2e-tests-are-enabled-rule
+    - *manual-rule
   interruptible: true
   image: ghcr.io/drupal-xb/drupal-testing:1.0.0
   extends:
@@ -569,7 +604,7 @@ playwright:
 
 CLI Test:
   stage: test
-  image: node:20-alpine
+  image: ghcr.io/drupal-xb/drupal-testing:1.0.1
   needs: []
   rules:
     - changes:
@@ -579,10 +614,21 @@ CLI Test:
         - openapi.yml
         - src/Entity/JavaScriptComponent.php
         - src/Controller/ApiConfigControllers.php
-        - .gitlab-ci.yml
     - if: '$CI_COMMIT_TAG =~ /^cli-\d+\.\d+\.\d+(-\w+\d*)?$/'
+    - *manual-rule
+  variables:
+    GIT_DEPTH: 1
+    _TARGET_DB_TYPE: sqlite
+    # Right now CORE_STABLE is 11.2.5, we need #3553664 in 11.2.6.
+    DRUPAL_CORE: 11.2.7
+    TEST_CANVAS_CLIENT_ID: cli
+    TEST_CANVAS_CLIENT_SECRET: secret
+    DRUPAL_TEST_WEBSERVER_USER: www-data
+    DRUPAL_TEST_BASE_URL: http://localhost
   before_script:
-    mkdir -p test-results
+    - !reference [ .drupal ]
+    - composer run install-dev-deps
+    - mkdir -p test-results
   # This job must pass, but must also not disrupt Canvas's CI if dependencies have a security vulnerability.
   allow_failure:
     exit_codes:

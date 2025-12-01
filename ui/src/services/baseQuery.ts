@@ -1,5 +1,7 @@
 import { fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
+import { getCanvasSettings } from '@/utils/drupal-globals';
+
 import type {
   BaseQueryApi,
   BaseQueryFn,
@@ -17,12 +19,39 @@ export const baseQuery: BaseQueryFn<
   const state = api.getState() as RootState;
   return rawBaseQuery(state.configuration)(args, api, extraOptions);
 };
+
+export const pushCanvasLayoutRequest = () => {
+  // Some requests that update components or their form should not occur at the
+  // same time as a Drupal AJAX request. Those requests are identified here,
+  // then a variable in canvasSettings is used to track such a request being in
+  // progress. AJAX events will wait until these requests are complete.
+  // @see the override of Drupal.Ajax.prototype.eventResponse in
+  //   ajax.command.customizations.js
+  const canvasSettings = getCanvasSettings();
+  if (typeof canvasSettings?.canvasLayoutRequestInProgress === 'undefined') {
+    canvasSettings.canvasLayoutRequestInProgress = [];
+  }
+  canvasSettings.canvasLayoutRequestInProgress.push(true);
+};
+
+export const popCanvasLayoutRequest = () => {
+  const canvasSettings = getCanvasSettings();
+  canvasSettings.canvasLayoutRequestInProgress.pop();
+  if (canvasSettings.canvasLayoutRequestInProgress.length === 0) {
+    // Notify the application that the layout request has completed.
+    const event = new CustomEvent('canvasLayoutRequestComplete');
+    document.dispatchEvent(event);
+  }
+};
+
 /**
  * Extracts entityType and entityId from a URL
  * @param url - The URL string to parse.
  * @returns An object with entityType and entityId, or undefined values if not found.
  */
-const extractEntityParams = (url: string) => {
+export const extractEntityParams = (url: string) => {
+  // Remove query parameters and hash fragments
+  url = url.split('?')[0].split('#')[0];
   // Match /canvas/(editor||preview)/:entityType/:entityId/
   const matchPageEditor = url.match(
     /\/canvas\/(editor|preview)\/([^/]+)\/([^/]+)\/?/,
@@ -49,7 +78,7 @@ const extractEntityParams = (url: string) => {
  * Replaces {entity_type} and {entity_id} in a URL string with extracted values.
  * Throws an error if a required value is missing.
  */
-const replaceEntityParamsInUrl = (
+export const replaceEntityParamsInUrl = (
   url: string,
   entityType?: string,
   entityId?: string,
