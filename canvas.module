@@ -10,6 +10,7 @@
 // @todo Re-evaluate this when A) tagging a stable release, B) https://www.drupal.org/project/drupal/issues/3398033 is fixed in Drupal core.
 ini_set('assert.active', 1);
 
+use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\Core\Entity\Display\EntityViewDisplayInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
@@ -112,18 +113,22 @@ function canvas_preprocess_html(array &$variables): void {
 function canvas_contextual_links_alter(array &$links, $group, array $route_parameters) {
   if ($group == 'node') {
     $node = \Drupal::entityTypeManager()->getStorage('node')->load($route_parameters['node']);
-    if ($node) {
-      // Add a contextual link to edit the content template.
-      $links['canvas_edit_template'] = [
-        'title' => t('Edit content template'),
-        'route_name' => 'canvas.content_template.edit',
-        'route_parameters' => [
-          'node_type' => $node->bundle(),
-          'node_id' => $node->id(),
-          'view_mode' => 'full',
-        ],
-        'weight' => 11,
-      ];
+    if ($node instanceof FieldableEntityInterface) {
+      $view_mode = \Drupal::request()->attributes->get('view_mode', 'full');
+      // Checking if a content template exists and is enabled for this node before adding the link.
+      $template = ContentTemplate::loadForEntity($node, $view_mode);
+      if ($template) {
+        $links['canvas_edit_template'] = [
+          'title' => t('Edit content template'),
+          'route_name' => 'canvas.content_template.edit',
+          'route_parameters' => [
+            'node_type' => $node->bundle(),
+            'node_id' => $node->id(),
+            'view_mode' => $view_mode,
+          ],
+          'weight' => 11,
+        ];
+      }
     }
   }
 }
@@ -131,15 +136,23 @@ function canvas_contextual_links_alter(array &$links, $group, array $route_param
 /**
  * Implements hook_node_view_alter().
  *
- * Ensures contextual links are always available on node views, even when they
- * would normally be suppressed. This allows the canvas_edit_template contextual
- * link to appear consistently across all node view modes.
+ * Adds contextual links to nodes that have an enabled Canvas content template.
+ *
+ * This hook checks if a node has an associated content template and ensures
+ * that contextual links are properly attached to the node's render array.
+ * The contextual links allow editors to quickly access template editing
+ * functionality directly from the rendered node view.
  */
 function canvas_node_view_alter(array &$build, EntityInterface $entity, EntityViewDisplayInterface $display) {
-  // Force contextual links to be added to node views
-  if ($entity->getEntityTypeId() === 'node') {
-    $build['#contextual_links']['node'] = [
-      'route_parameters' => ['node' => $entity->id()],
-    ];
+  // Contextual links to be added to node only if a template exists and is enabled.
+  if ($entity->getEntityTypeId() === 'node' && $entity instanceof FieldableEntityInterface) {
+    // Check if a content template exists and is enabled for this node
+    $template = ContentTemplate::loadForEntity($entity, $display->getMode());
+    if ($template) {
+      $build['#contextual_links']['node'] = [
+        'route_parameters' => ['node' => $entity->id()],
+        'metadata' => ['view_mode' => $display->getMode()],
+      ];
+    }
   }
 }
