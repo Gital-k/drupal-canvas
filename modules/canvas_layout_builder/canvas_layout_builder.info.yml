@@ -1,0 +1,7 @@
+type: module
+name: Canvas Layout builder integration
+description: ""
+core_version_requirement: ^10 || ^11
+dependencies:
+  - canvas:canvas
+  - drupal:layout_builder

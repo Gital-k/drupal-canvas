@@ -75,6 +75,8 @@ canvas.component.*:
           - js
           # @see \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent
           - block
+          # @todo dynamically add this in canvas_layout_builder
+          - layout
     source_local_id:
       type: canvas.component_source_local_id.[%parent.source]
     # Determines which Folder this Component will be placed in.

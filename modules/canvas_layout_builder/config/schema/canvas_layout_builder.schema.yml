@@ -1,0 +1,16 @@
+canvas.component_source_settings.layout:
+  label: 'Layout settings'
+  type: canvas.component_source_settings.*
+  mapping:
+    default_settings:
+      type: layout_plugin.settings.[%parent.%parent.%parent.%parent.source_local_id]
+    label:
+      type: string
+      label: 'Label'
+      description: 'The label of the layout.'
+    column_widths:
+      type: ignore
+    slots:
+      type: ignore
+
+
