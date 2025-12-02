@@ -1252,4 +1252,161 @@ class CanvasAiPageBuilderHelper {
     return 'User has not created any entities';
   }
 
+  /**
+   * Converts markdown content of code components/packages into plain structured array.
+   *
+   * Keeps only package name keys, type, description, and code blocks. This
+   * version uses robust snake_case conversion for keys, filters out packages
+   * that lack both a description and a code block, and preserves the mark-down
+   * code fences (```js, ```jsx) in the 'code' output.
+   *
+   * @param string $md
+   *   The markdown content.
+   *
+   * @return array
+   *   Extracted info indexed by package/library name keys.
+   */
+  public function mdToPlainText(string $md): array {
+    $type_map = [
+      'Importing packages' => 'External npm package',
+      'Built-in custom packages' => 'Built-in custom package',
+      'Bundled npm packages' => 'Bundled npm package',
+    ];
+
+    // Split markdown by ## section headers, capturing the header text.
+    $sections = preg_split('/^##\s+(.*)$/m', $md, -1, PREG_SPLIT_DELIM_CAPTURE);
+    $result = [];
+    if (!is_array($sections)) {
+      return [];
+    }
+
+    // Helper function for robust snake_case conversion
+    $to_snake_case = function (string $input): string {
+      // 1. Insert underscore before uppercase letters (e.g., FormattedText -> Formatted_Text)
+      $key = (string) preg_replace('/(?<!^)([A-Z])/', '_$1', $input);
+      // 2. Convert to lowercase
+      $key = strtolower($key);
+      // 3. Replace all remaining non-alphanumeric characters (including symbols and multiple underscores) with a single underscore
+      $key = (string) preg_replace('/[^a-z0-9]+/', '_', $key);
+      // 4. Remove leading/trailing underscores
+      return trim($key, '_');
+    };
+
+    // The split returns an initial empty string at index 0,
+    for ($i = 1; $i < count($sections); $i += 2) {
+      $section_title = trim($sections[$i]);
+      $section_body = $sections[$i + 1] ?? '';
+      $type = $type_map[$section_title] ?? NULL;
+
+      if (!$type || !$section_body) {
+        continue;
+      }
+
+      // --- Special handling for the 'Importing packages' section ---
+      if ($section_title === 'Importing packages') {
+        // MODIFIED: Capture the full code block, including fences and language tag.
+        if (preg_match('/(```[a-z]*\s*[\s\S]+?```)/', $section_body, $code_match)) {
+          $code = trim($code_match[1]);
+        }
+        else {
+          $code = '';
+        }
+
+        $parts = preg_split('/```[a-z]*\s*[\s\S]+?```/', $section_body, 2);
+        $desc_text = $parts[0] ?? '';
+
+        $desc_text = (string) preg_replace('/import\s+[^\n]+/', '', $desc_text);
+        // Explicitly cast to string for strip_tags.
+        $desc_text = trim(strip_tags((string) $desc_text));
+        $desc_text = (string) preg_replace('/\s+/', ' ', $desc_text);
+
+        if (!empty($desc_text) || !empty($code)) {
+          $result['importing_packages'] = [
+            'type' => $type,
+            'description' => $desc_text,
+            'code' => $code,
+          ];
+        }
+        continue;
+      }
+
+      // Find package names (titles) only from ### headers.
+      // This defines the start and end boundaries of package content.
+      preg_match_all(
+        '/^###\s+([^\n]+)/m',
+        $section_body,
+        $matches_headers,
+        PREG_SET_ORDER | PREG_OFFSET_CAPTURE
+      );
+
+      foreach ($matches_headers as $index => $match_data) {
+        // Group 1 is the package name text
+        $pkg_name = trim($match_data[1][0]);
+        // Group 0 is the full match, offset is at index 1 of group 0
+        $pos = $match_data[0][1];
+
+        if (!$pkg_name) {
+          continue;
+        }
+
+        // Determine the start of the next package block or end of section
+        $next_pos = NULL;
+        // Look at the next match in the PREG_SET_ORDER array
+        if (isset($matches_headers[$index + 1])) {
+          // The offset of the next full match
+          $next_pos = $matches_headers[$index + 1][0][1];
+        }
+
+        // Isolate the block of content for the current package
+        $pkg_block = $next_pos === NULL
+          ? substr($section_body, $pos)
+          : substr($section_body, $pos, $next_pos - $pos);
+
+        // --- Extract Description ---
+        // We still use the package name to remove the title and any LinkButton with the same text
+        $title_pattern = preg_quote($pkg_name, '/');
+        // Explicitly cast result to string.
+        $desc = (string) preg_replace(
+          '/^###\s+' . $title_pattern . '\s*|' .
+          '<LinkButton[^>]*>' . $title_pattern . '<\/LinkButton>\s*/s',
+          '',
+          $pkg_block,
+          1
+        );
+
+        // Remove any remaining <LinkButton> tags and code blocks from the text.
+        // Explicitly cast subjects/results to string.
+        $desc = (string) preg_replace('/<LinkButton[^>]*>[\s\S]*?<\/LinkButton>/', '', (string) $desc);
+        $desc = (string) preg_replace('/```[a-z]*\s*[\s\S]*?```/', '', (string) $desc);
+
+        // Explicitly cast to string for strip_tags.
+        $desc = trim(strip_tags((string) $desc));
+        $desc = (string) preg_replace('/\s+/', ' ', $desc);
+
+        // --- Extract Code Block ---
+        $code = '';
+        // MODIFIED: Capture the full code block, including fences and language tag.
+        if (preg_match('/(```[a-z]*\s*[\s\S]+?```)/', $pkg_block, $code_match)) {
+          $code = trim($code_match[1]);
+        }
+
+        // --- FILTER: Skip if BOTH description AND code are empty ---
+        if (empty($desc) && empty($code)) {
+          continue;
+        }
+
+        // --- Key Generation (using the robust helper) ---
+        $key = $to_snake_case($pkg_name);
+
+        $result[$key] = [
+          'type' => $type,
+          'description' => $desc,
+          'code' => $code,
+        ];
+      }
+    }
+
+    return $result;
+  }
+
 }

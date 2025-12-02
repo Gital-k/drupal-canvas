@@ -82,7 +82,14 @@ final class CanvasBuilder extends ControllerBase {
       $prompt = $request->request->all();
       $files = $request->files->all();
       $prompt['derived_proptypes'] = Json::decode($prompt['derived_proptypes']);
+      $prompt['custom_libraries'] = Json::decode($prompt['custom_libraries']);
     }
+    $mdFilePath = __DIR__ . '/../../../../docs/user/src/content/docs/code-components/packages.mdx';
+    $markdown = file_get_contents($mdFilePath);
+    if ($markdown === FALSE) {
+      $markdown = '';
+    }
+    $libraries = $this->canvasAiPageBuilderHelper->mdToPlainText($markdown);
     // If $prompt['messages'] is missing or invalid, this code reconstructs it
     // by scanning for keys named 'message <number>', and
     // assembling them into an ordered 'messages' array, while cleaning up old keys
@@ -226,6 +233,7 @@ final class CanvasBuilder extends ControllerBase {
       'menu_fetch_source' => $this->getMenuFetchSource(),
       'json_api_module_status' => $this->moduleHandler()->moduleExists('jsonapi') ? 'enabled' : 'disabled',
       'verbose_context_for_orchestrator' => $this->canvasAiPageBuilderHelper->generateVerboseContextForOrchestrator($prompt),
+      'custom_libraries' => JSON::encode($libraries) ?? NULL,
     ]);
     try {
       $solvability = $agent->determineSolvability();
