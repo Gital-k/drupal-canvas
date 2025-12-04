@@ -1,1 +1,1 @@
-export * from 'drupal-canvas'
+export * from 'drupal-canvas';

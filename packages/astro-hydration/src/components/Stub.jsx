@@ -19,7 +19,7 @@ const useSwr = await import('@/lib/swr');
 const { ...drupalCanvas } = await import('drupal-canvas');
 // For backward compatibility import separately elements that were moved to the drupal-canvas package
 // so they have separate files in dist that can be used in backward compatible import map entries.
-const FormattedText = await import("drupal-canvas/FormattedText");
+const FormattedText = await import('drupal-canvas/FormattedText');
 const {
   sortMenu: sortLinksetMenu,
   getPageData,
@@ -32,4 +32,4 @@ const { getNodePath, sortMenu } = await import('drupal-canvas/jsonapi-utils');
 
 await import('@/lib/canvas-island.js');
 
-export default function () { }
+export default function () {}
