@@ -12,7 +12,9 @@ export default defineConfig({
     'src/utils.ts',
   ],
   sourcemap: process.env.NODE_ENV === 'development',
-  unbundle: true,
   platform: 'browser',
   external: ['react/jsx-runtime'],
+  dts: {
+    sourcemap: true,
+  },
 });
