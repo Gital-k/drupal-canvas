@@ -8,10 +8,12 @@
     "test": "tests"
   },
   "workspaces": [
+    "packages/*",
     "cli",
     "docs/user",
-    "packages/*",
-    "tests/modules/canvas_test_extension"
+    "tests/modules/canvas_test_extension",
+    "ui",
+    "ui/lib/astro-hydration"
   ],
   "scripts": {
     "test:playwright": "playwright install && playwright test",
@@ -21,7 +23,8 @@
     "lint:yaml": "yamllint '**/*.(yaml|yml)' --ignore='.gitlab/**' --ignore='.gitlab-ci.yml'",
     "fix": "npm run lint:prettier -- --write && npm run lint:eslint -- --fix",
     "test": "npx npm-run-all --parallel --continue-on-error test:*",
-    "lint": "npx npm-run-all --parallel --continue-on-error lint:*"
+    "lint": "npx npm-run-all --parallel --continue-on-error lint:*",
+    "build": "npm run build --workspaces --if-present"
   },
   "repository": {
     "type": "git",
