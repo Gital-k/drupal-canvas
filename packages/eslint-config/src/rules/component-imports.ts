@@ -40,6 +40,7 @@ function checkImportSource(
       '@/lib/jsonapi-utils',
       '@/lib/drupal-utils',
       'swr',
+      'drupal-canvas',
     ].includes(source)
   ) {
     return;
