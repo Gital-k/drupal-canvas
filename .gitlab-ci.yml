@@ -378,7 +378,7 @@ UI eslint:
     - *manual-rule
   script:
     - cd ui
-    - node_modules/.bin/eslint . --format=junit --output-file=$CI_PROJECT_DIR/ui-eslint-junit.xml --max-warnings=0
+    - ../node_modules/.bin/eslint . --format=junit --output-file=$CI_PROJECT_DIR/ui-eslint-junit.xml --max-warnings=0
   artifacts:
     expose_as: junit
     expire_in: 6 mos
