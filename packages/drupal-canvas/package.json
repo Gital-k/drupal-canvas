@@ -1,0 +1,35 @@
+{
+  "name": "drupal-canvas",
+  "version": "0.0.1",
+  "description": "Utilities and base components for building Drupal Canvas code components",
+  "license": "GPL-2.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "https://git.drupalcode.org/project/canvas.git",
+    "directory": "packages/drupal-canvas"
+  },
+  "bugs": "https://www.drupal.org/project/issues/canvas",
+  "main": "dist/index.js",
+  "type": "module",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "keywords": [
+    "canvas",
+    "drupal"
+  ],
+  "dependencies": {
+  },
+  "devDependencies": {
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.3"
+  },
+  "scripts": {
+    "build": "NODE_ENV=production tsup",
+    "dev": "NODE_ENV=development tsup --watch",
+    "type-check": "tsc --noEmit --pretty",
+    "test": "vitest run"
+  }
+}
