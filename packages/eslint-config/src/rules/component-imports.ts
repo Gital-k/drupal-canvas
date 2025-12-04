@@ -45,9 +45,9 @@ function checkImportSource(
       node,
       message: `Drupal utilities were moved into 'drupal-canvas' package.`,
       fix(fixer) {
-        return fixer.replaceText(node.source, '\'drupal-canvas\'');
-      }
-    })
+        return fixer.replaceText(node.source, "'drupal-canvas'");
+      },
+    });
     return;
   }
 
@@ -56,9 +56,9 @@ function checkImportSource(
       node,
       message: `Utilities were moved into 'drupal-canvas' package.`,
       fix(fixer) {
-        return fixer.replaceText(node.source, '\'drupal-canvas\'');
-      }
-    })
+        return fixer.replaceText(node.source, "'drupal-canvas'");
+      },
+    });
     return;
   }
 
@@ -67,9 +67,9 @@ function checkImportSource(
       node,
       message: `JSON:API utilities were moved into 'drupal-canvas' package.`,
       fix(fixer) {
-        return fixer.replaceText(node.source, '\'drupal-canvas\'');
-      }
-    })
+        return fixer.replaceText(node.source, "'drupal-canvas'");
+      },
+    });
     return;
   }
 
@@ -79,15 +79,18 @@ function checkImportSource(
       message: `Using next-image-standalone directly is deprecated. Use 'Image' component from 'drupal-canvas' package instead.`,
       fix(fixer) {
         if (
-          node.type === 'ImportDeclaration'
-          && node.specifiers.length === 1
-          && node.specifiers[0].local.name === 'Image'
+          node.type === 'ImportDeclaration' &&
+          node.specifiers.length === 1 &&
+          node.specifiers[0].local.name === 'Image'
         ) {
-          return fixer.replaceText(node, 'import { Image } from \'drupal-canvas\';');
+          return fixer.replaceText(
+            node,
+            "import { Image } from 'drupal-canvas';",
+          );
         }
         return null;
-      }
-    })
+      },
+    });
     return;
   }
 
@@ -99,9 +102,9 @@ function checkImportSource(
             node: specifier.local,
             message: `Preconfigured JsonApiClient was moved into 'drupal-canvas' package.`,
             fix(fixer) {
-              return fixer.replaceText(node.source, '\'drupal-canvas\'');
-            }
-          })
+              return fixer.replaceText(node.source, "'drupal-canvas'");
+            },
+          });
           return;
         }
       }
@@ -115,15 +118,18 @@ function checkImportSource(
       message: `FormattedText component was moved into 'drupal-canvas' package.`,
       fix(fixer) {
         if (
-          node.type === 'ImportDeclaration'
-          && node.specifiers.length === 1
-          && node.specifiers[0].local.name === 'FormattedText'
+          node.type === 'ImportDeclaration' &&
+          node.specifiers.length === 1 &&
+          node.specifiers[0].local.name === 'FormattedText'
         ) {
-          return fixer.replaceText(node, 'import { FormattedText } from \'drupal-canvas\';');
+          return fixer.replaceText(
+            node,
+            "import { FormattedText } from 'drupal-canvas';",
+          );
         }
         return null;
-      }
-    })
+      },
+    });
     return;
   }
 
