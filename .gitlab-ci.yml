@@ -345,9 +345,8 @@ UI:
   needs: []
   script:
     - npm ci -w ui -w drupal-canvas -w packages/astro-hydration
-    - cd ui
     # Verify building the entire app succeeds — this first runs the TypeScript Compiler.
-    - npm run build
+    - npm run build -w ui
     # @todo In the future, when `ui/dist` and `ui/lib/astro-hydration/dist` are
     # committed, verify here that they match.
   artifacts:
