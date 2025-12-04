@@ -68,8 +68,10 @@
   - cd $CI_PROJECT_DIR/_drupal/web/modules/contrib/$CI_PARENT_PROJECT_NAME
   # Install the UI
   # @todo consolidate this with the UI job?
-  - npm ci -w ui -w drupal-canvas -w packages/astro-hydration
-  - npm run build -w ui
+  - cd ui
+  - npm ci
+  - npm run build
+  - cd ../
 
 .drupal: &drupal
   - !reference [ .drupal-files ]

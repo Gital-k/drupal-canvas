@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import useSwr from 'swr';
 
 export default function canvasUseSwr(key: any, fetcher: any, options: any) {

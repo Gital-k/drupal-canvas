@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 // @cspell:ignore vnode
 import type { VNode } from 'preact';
 

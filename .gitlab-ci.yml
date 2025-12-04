@@ -244,7 +244,7 @@ phpunit:
   before_script:
     # ⚠️ Since Drupal 11.2 this is necessary to avoid PHPUnit tests taking painfully long.
     # @see https://www.drupal.org/project/drupal/issues/3249443
-    - rm -rf node_modules && echo "🧹 clean up node modules"
+    - rm -rf ui/node_modules && echo "🧹 clean up node modules"
   parallel:
     # @see https://www.drupal.org/node/3444548
     matrix:
@@ -344,9 +344,10 @@ UI:
   image: node:20-alpine
   needs: []
   script:
-    - npm ci -w ui -w drupal-canvas -w packages/astro-hydration
+    - cd ui
+    - npm ci
     # Verify building the entire app succeeds — this first runs the TypeScript Compiler.
-    - npm run build -w ui
+    - npm run build
     # @todo In the future, when `ui/dist` and `ui/lib/astro-hydration/dist` are
     # committed, verify here that they match.
   artifacts:
@@ -354,7 +355,7 @@ UI:
       - ui/dist
       - ui/lib/astro-hydration/dist
       # TRICKY: necessary for the `Cypress` job to be able to run `cypress install`.
-      - node_modules
+      - ui/node_modules
 
 UI eslint:
   stage: validate
@@ -377,7 +378,7 @@ UI eslint:
     - *manual-rule
   script:
     - cd ui
-    - ../node_modules/.bin/eslint . --format=junit --output-file=$CI_PROJECT_DIR/ui-eslint-junit.xml --max-warnings=0
+    - node_modules/.bin/eslint . --format=junit --output-file=$CI_PROJECT_DIR/ui-eslint-junit.xml --max-warnings=0
   artifacts:
     expose_as: junit
     expire_in: 6 mos

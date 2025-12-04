@@ -10,7 +10,6 @@ const gitignorePath = fileURLToPath(new URL('.gitignore', import.meta.url));
 
 export default defineConfig([
   includeIgnoreFile(gitignorePath, 'Imported .gitignore patterns'),
-  { ignores: ['./**/.astro/'] },
   {
     files: ['**/*.{js,mjs,cjs,ts}'],
     plugins: { js },
