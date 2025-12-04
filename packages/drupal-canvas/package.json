@@ -10,6 +10,10 @@
   },
   "bugs": "https://www.drupal.org/project/issues/canvas",
   "main": "dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./FormattedText": "./dist/FormattedText.js"
+  },
   "type": "module",
   "files": [
     "dist",
@@ -20,6 +24,7 @@
     "drupal"
   ],
   "dependencies": {
+    "preact": "^10.25.4"
   },
   "devDependencies": {
     "tsup": "^8.5.1",
