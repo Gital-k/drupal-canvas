@@ -24,7 +24,9 @@
     "drupal"
   ],
   "dependencies": {
-    "preact": "^10.25.4"
+    "clsx": "^2.1.1",
+    "preact": "^10.25.4",
+    "tailwind-merge": "^3.0.2"
   },
   "devDependencies": {
     "tsup": "^8.5.1",
