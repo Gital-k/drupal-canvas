@@ -344,8 +344,8 @@ UI:
   image: node:20-alpine
   needs: []
   script:
-    - cd ui
     - npm ci
+    - cd ui
     # Verify building the entire app succeeds — this first runs the TypeScript Compiler.
     - npm run build
     # @todo In the future, when `ui/dist` and `ui/lib/astro-hydration/dist` are
