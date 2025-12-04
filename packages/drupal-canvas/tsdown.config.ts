@@ -14,7 +14,5 @@ export default defineConfig({
   sourcemap: process.env.NODE_ENV === 'development',
   platform: 'browser',
   external: ['react/jsx-runtime'],
-  dts: {
-    sourcemap: true,
-  },
+  dts: true,
 });
