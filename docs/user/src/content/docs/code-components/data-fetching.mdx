@@ -35,14 +35,14 @@ utility. Results can be viewed in the Data Fetch pane below the component
 preview.
 
 ```js
-import { getPageData } from '@/lib/drupal-utils';
+import { getPageData } from 'drupal-canvas';
 const { pageTitle, breadcrumbs } = getPageData();
 ```
 
 You can also access site information with the `getSiteData` utility
 
 ```js
-import { getSiteData } from '@/lib/drupal-utils';
+import { getSiteData } from 'drupal-canvas';
 const { siteName } = getSiteData().branding;
 ```
 
@@ -51,17 +51,20 @@ and site data](../../../assets/images/data-fetch-2.webp)
 
 ### JSON:API
 
-[`@drupal-api-client/json-api-client`](https://project.pages.drupalcode.org/api_client/) and the
-associated [parameter helper package](https://project.pages.drupalcode.org/api_client/jsonapi-tutorial/parameters/#generating-query-strings-with-drupal-jsonapi-params)
-are also provided as native packages. [JSON:API module](https://www.drupal.org/docs/core-modules-and-themes/core-modules/jsonapi-module)
+[drupal-canvas](https://www.npmjs.com/package/drupal-canvas) provides
+[JSON:API client](https://www.npmjs.com/package/@drupal-api-client/json-api-client)
+automatically configured with a baseUrl as well as
+[deserialization](https://project.pages.drupalcode.org/api_client/jsonapi-tutorial/deserializing-data/).
+[JSON:API module](https://www.drupal.org/docs/core-modules-and-themes/core-modules/jsonapi-module)
 must be enabled to interface with this client.
 
-You do not need to provide a baseUrl for the client, it will be
-configured automatically, as well as [deserialization](https://project.pages.drupalcode.org/api_client/jsonapi-tutorial/deserializing-data/).
+The associated
+[parameter helper package](https://project.pages.drupalcode.org/api_client/jsonapi-tutorial/parameters/#generating-query-strings-with-drupal-jsonapi-params)
+is also provided as native package. 
 
 ```jsx
 import useSWR from 'swr';
-import { JsonApiClient } from '@drupal-api-client/json-api-client';
+import { JsonApiClient } from 'drupal-canvas';
 import { DrupalJsonApiParams } from 'drupal-jsonapi-params';
 const client = new JsonApiClient();
 
@@ -102,7 +105,7 @@ const client = new JsonApiClient('https://drupal-api-demo.party', {
 ### Helper utilities
 
 Utility functions for working with JSON:API and core APIs are also provided in
-the `@/lib/jsonapi-utils` and `@/lib/drupal-utils` packages respectively.
+the `drupal-canvas` package.
 
 ### Examples
 
@@ -110,7 +113,7 @@ Given a node returned from `JSON:API`, return either the path alias or fall back
 to /node/x path:
 
 ```jsx
-import { getNodePath } from '@/lib/jsonapi-utils';
+import { getNodePath } from 'drupal-canvas';
 const articles = data.map((article) => ({
   ...article,
   _path: getNodePath(article),
@@ -118,7 +121,7 @@ const articles = data.map((article) => ({
 
 // Sort menu items from jsonapi_menu_items module into a tree with additional
 // _children and _hasSubmenu properties.
-import { sortMenu } from '@/lib/jsonapi-utils';
+import { sortMenu } from 'drupal-canvas';
 const { data } = useSWR(['menu_items', 'main'], ([type, resourceId]) =>
   client.getResource(type, resourceId),
 );
@@ -128,10 +131,10 @@ const menu = sortMenu(data);
 Using the [core linkset endpoint](https://www.drupal.org/docs/develop/decoupled-drupal/decoupled-menus/decoupled-menus-overview):
 
 ```jsx
-import { sortMenu } from '@/lib/drupal-utils';
+import { sortLinksetMenu } from 'drupal-canvas';
 const { data } = useSWR('/system/menu/main/linkset', async (url) => {
   const response = await fetch(url);
   return response.json();
 });
-const menu = sortMenu(data);
+const menu = sortLinksetMenu(data);
 ```
