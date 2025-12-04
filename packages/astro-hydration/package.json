@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "license": "GPL-2.0-or-later",
   "scripts": {
-    "build": "astro build && node extract-hydration-script.js"
+    "build": "npm run build -w drupal-canvas && astro build && node extract-hydration-script.js"
   },
   "dependencies": {
     "@astrojs/preact": "^4.0.3",
@@ -13,6 +13,6 @@
     "drupal-canvas": "^0.0.1",
     "drupal-jsonapi-params": "^2.3.2",
     "preact": "^10.25.4",
-    "swr": "^2.3.3"
+    "swr": "^2.3.7"
   }
 }

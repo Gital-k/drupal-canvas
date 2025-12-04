@@ -12,8 +12,7 @@
     "cli",
     "docs/user",
     "tests/modules/canvas_test_extension",
-    "ui",
-    "ui/lib/astro-hydration"
+    "ui"
   ],
   "scripts": {
     "test:playwright": "playwright install && playwright test",
