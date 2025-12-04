@@ -177,7 +177,8 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
       'swr' => \sprintf('%s%s/ui/lib/astro-hydration/dist/swr.js', $base_path, $canvas_path),
 
       'drupal-canvas' => \sprintf('%s%s/ui/lib/astro-hydration/dist/drupal-canvas.js', $base_path, $canvas_path),
-      // Backward compatibility entries for elements that were moved into drupal-canvas package.
+      // Backward compatibility entries for elements that were moved
+      // into drupal-canvas package.
       '@/lib/FormattedText' => \sprintf('%s%s/ui/lib/astro-hydration/dist/FormattedText.js', $base_path, $canvas_path),
       'next-image-standalone' => \sprintf('%s%s/ui/lib/astro-hydration/dist/next-image-standalone.js', $base_path, $canvas_path),
       '@/lib/utils' => \sprintf('%s%s/ui/lib/astro-hydration/dist/utils.js', $base_path, $canvas_path),
