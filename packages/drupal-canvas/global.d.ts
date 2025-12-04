@@ -1,4 +1,4 @@
-import type { DrupalSettings } from '../../src/types/DrupalSettings';
+import type { DrupalSettings } from '../../ui/src/types/DrupalSettings';
 
 declare global {
   interface Window {
