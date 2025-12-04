@@ -244,7 +244,7 @@ phpunit:
   before_script:
     # ⚠️ Since Drupal 11.2 this is necessary to avoid PHPUnit tests taking painfully long.
     # @see https://www.drupal.org/project/drupal/issues/3249443
-    - rm -rf ui/node_modules && echo "🧹 clean up node modules"
+    - rm -rf node_modules && echo "🧹 clean up node modules"
   parallel:
     # @see https://www.drupal.org/node/3444548
     matrix:
@@ -355,7 +355,7 @@ UI:
       - ui/dist
       - ui/lib/astro-hydration/dist
       # TRICKY: necessary for the `Cypress` job to be able to run `cypress install`.
-      - ui/node_modules
+      - node_modules
 
 UI eslint:
   stage: validate
