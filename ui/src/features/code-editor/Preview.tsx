@@ -127,22 +127,22 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
         </script>
         <style>${previewGlobalCss}</style>
         ${
-      // Add CSS for all code components except the current one.
-      // @todo Make this more efficient by introducing better backend support.
-      // @see https://drupal.org/i/3520867
-      codeComponents
-        ? Object.keys(codeComponents)
-          .filter(
-            (componentName) =>
-              codeComponents[componentName].machineName !== componentId,
-          )
-          .map(
-            (componentName) =>
-              `<link rel="stylesheet" href="${Drupal.url(`canvas/api/v0/auto-saves/css/js_component/${componentName}`)}" />`,
-          )
-          .join('\n')
-        : ''
-      }
+          // Add CSS for all code components except the current one.
+          // @todo Make this more efficient by introducing better backend support.
+          // @see https://drupal.org/i/3520867
+          codeComponents
+            ? Object.keys(codeComponents)
+                .filter(
+                  (componentName) =>
+                    codeComponents[componentName].machineName !== componentId,
+                )
+                .map(
+                  (componentName) =>
+                    `<link rel="stylesheet" href="${Drupal.url(`canvas/api/v0/auto-saves/css/js_component/${componentName}`)}" />`,
+                )
+                .join('\n')
+            : ''
+        }
         <style>${previewCss}</style>
         <script id="canvas-code-editor-preview-data" type="application/json">
           ${previewJsData}
