@@ -9,6 +9,7 @@ use Drupal\Core\Url;
 use Drupal\canvas\ComponentDoesNotMeetRequirementsException;
 use Drupal\canvas\ComponentIncompatibilityReasonRepository;
 use Drupal\canvas\Entity\Component;
+use Drupal\canvas\ComponentSource\ComponentCandidatesDiscoveryInterface;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 
 /**
@@ -88,7 +89,13 @@ final class ComponentStatusController {
     }
     elseif ($op === 'enable') {
       try {
-        $source->checkRequirements();
+        $definition = $source->getPluginDefinition();
+        $discovery_class = $definition['discovery'];
+        // @phpstan-ignore globalDrupalDependencyInjection.useDependencyInjection
+        $discovery = \Drupal::classResolver($discovery_class);
+        assert($discovery instanceof ComponentCandidatesDiscoveryInterface);
+
+        $discovery->checkRequirements($source->getSourceSpecificComponentId());
         $component->enable()->save();
         $this->reasonRepository->removeReason($source_plugin_id, $component_id);
       }

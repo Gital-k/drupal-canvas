@@ -8,6 +8,7 @@ use Drupal\Component\Plugin\Exception\PluginNotFoundException;
 use Drupal\canvas\ComponentDoesNotMeetRequirementsException;
 use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\ConstraintValidator;
+use Drupal\canvas\ComponentSource\ComponentCandidatesDiscoveryInterface;
 
 /**
  * Validates the ComponentStatus constraint.
@@ -48,7 +49,13 @@ final class ComponentStatusConstraintValidator extends ConstraintValidator {
       return;
     }
     try {
-      $component->getComponentSource()->checkRequirements();
+      $definition = $source->getPluginDefinition();
+      $discovery_class = $definition['discovery'];
+      // @phpstan-ignore globalDrupalDependencyInjection.useDependencyInjection
+      $discovery = \Drupal::classResolver($discovery_class);
+      assert($discovery instanceof ComponentCandidatesDiscoveryInterface);
+
+      $discovery->checkRequirements($source->getSourceSpecificComponentId());
     }
     catch (ComponentDoesNotMeetRequirementsException $exception) {
       $this->context->buildViolation($constraint->message, ['%component' => $component->id()])->addViolation();
