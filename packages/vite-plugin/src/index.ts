@@ -16,7 +16,7 @@ export default function (options: Options = {}): Plugin[] {
     {
       name: 'drupal-canvas',
 
-      // Configure Canvas specific alias resolving.
+      // Configure Drupal Canvas specific alias resolving.
       config(config, { mode }) {
         const root = config.root ?? process.cwd();
         env = loadEnv(mode, process.cwd(), 'CANVAS_');
@@ -35,7 +35,7 @@ export default function (options: Options = {}): Plugin[] {
       // Inject drupalSettings.canvasData with options needed for JsonApiClient configuration.
       transformIndexHtml(html) {
         const canvasData = {
-          baseUrl: env.CANVAS_SITE_URL ?? options.siteUrl,
+          baseUrl: options.siteUrl ?? env.CANVAS_SITE_URL,
           jsonapiSettings: {
             apiPrefix: options.jsonapiPrefix ?? env.CANVAS_JSONAPI_PREFIX,
           },

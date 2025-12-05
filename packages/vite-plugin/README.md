@@ -7,6 +7,7 @@ Vite plugin for Drupal Canvas code components development.
 ```sh
 npm install -D @drupal-canvas/vite-plugin
 ```
+
 ```js
 // vite.config.js
 import { defineConfig } from 'vite'
@@ -24,5 +25,5 @@ export default defineConfig({
 | Option          | Environment variable    | Description                                                   |
 | --------------- | ----------------------- | ------------------------------------------------------------- |
 | `componentDir`  | `CANVAS_COMPONENT_DIR`  | Directory where code components are stored in the filesystem. |
-| `siteUrl `      | `CANVAS_SITE_URL`       | Base URL of your Drupal site.                                 |
+| `siteUrl`       | `CANVAS_SITE_URL`       | Base URL of your Drupal site.                                 |
 | `jsonapiPrefix` | `CANVAS_JSONAPI_PREFIX` | Custom prefix for JSON:API requests.                          |
