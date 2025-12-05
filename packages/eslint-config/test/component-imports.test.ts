@@ -186,15 +186,13 @@ testRunner.run('component-imports rule', rule, {
           line: 7,
         },
         {
-          message:
-            'Utilities were moved into "drupal-canvas" package.',
+          message: 'Utilities were moved into "drupal-canvas" package.',
           line: 8,
         },
         {
-          message:
-            'Drupal utilities were moved into "drupal-canvas" package.',
+          message: 'Drupal utilities were moved into "drupal-canvas" package.',
           line: 9,
-        }
+        },
       ],
       output: `
         import { FormattedText } from 'drupal-canvas';
@@ -208,7 +206,7 @@ testRunner.run('component-imports rule', rule, {
         export default ({ title }) => {
           return <button>{title}</button>;
         };
-      `
+      `,
     },
     {
       name: 'should not automatically change @/lib/drupal-utils to drupal-canvas if sortMenu is imported',
@@ -222,15 +220,13 @@ testRunner.run('component-imports rule', rule, {
       filename: '/components/button/index.jsx',
       errors: [
         {
-          message:
-            'Drupal utilities were moved into "drupal-canvas" package.',
+          message: 'Drupal utilities were moved into "drupal-canvas" package.',
           line: 2,
         },
         {
-          message:
-            'Drupal utilities were moved into "drupal-canvas" package.',
+          message: 'Drupal utilities were moved into "drupal-canvas" package.',
           line: 3,
-        }
+        },
       ],
     },
   ],
