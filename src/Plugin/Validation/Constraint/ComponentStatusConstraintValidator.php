@@ -53,7 +53,9 @@ final class ComponentStatusConstraintValidator extends ConstraintValidator {
       $discovery_class = $definition['discovery'];
       // @phpstan-ignore globalDrupalDependencyInjection.useDependencyInjection
       $discovery = \Drupal::classResolver($discovery_class);
-      assert($discovery instanceof ComponentCandidatesDiscoveryInterface);
+      if (!$discovery instanceof ComponentCandidatesDiscoveryInterface) {
+        return;
+      }
 
       $discovery->checkRequirements($source->getSourceSpecificComponentId());
     }

@@ -93,7 +93,12 @@ final class ComponentStatusController {
         $discovery_class = $definition['discovery'];
         // @phpstan-ignore globalDrupalDependencyInjection.useDependencyInjection
         $discovery = \Drupal::classResolver($discovery_class);
-        assert($discovery instanceof ComponentCandidatesDiscoveryInterface);
+        if (!$discovery instanceof ComponentCandidatesDiscoveryInterface) {
+          $this->messenger->addError($this->t('The component %component cannot be enabled due to a configuration error.', [
+            "%component" => $component_id,
+          ]));
+          return new RedirectResponse(Url::fromRoute('entity.component.collection')->toString());
+        }
 
         $discovery->checkRequirements($source->getSourceSpecificComponentId());
         $component->enable()->save();
