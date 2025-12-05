@@ -45,7 +45,12 @@ function checkImportSource(
       node,
       message: `Drupal utilities were moved into "drupal-canvas" package.`,
       fix(fixer) {
-        return fixer.replaceText(node.source, "'drupal-canvas'");
+        // 'sortMenu' exported from drupal-canvas is named 'sortLinksetMenu'
+        // to avoid conflict with sortMenu from jsonapi-utils,
+        // so automatic fix should not apply if sortMenu is imported.
+        if (node.type === 'ImportDeclaration' && !node.specifiers.some(specifier => specifier.imported.name === 'sortMenu')) {
+          return fixer.replaceText(node.source, "'drupal-canvas'");
+        }
       },
     });
     return;
