@@ -637,9 +637,21 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
 
   public function postSave(EntityStorageInterface $storage, $update = TRUE): void {
     parent::postSave($storage, $update);
+    
+    $is_syncing = \Drupal::isConfigSyncing();
+    // @todo Fix upstream core bug in Recipes: it inconsistently claims to be
+    // syncing when installing modules, but not when installing configuration.
+    // Even though it is listed under `import`, and that should hence match the
+    // behavior of the /admin/config/development/configuration/single/import UI.
+    if (in_array('installRecipeConfig', array_column(debug_backtrace(), 'function'), TRUE)) {
+      // Assert the bug is still present. This will start failing as soon as the
+      // upstream bug is fixed.
+      assert(!\Drupal::isConfigSyncing());
+      $is_syncing = TRUE;
+    }
 
     // For new Components, auto-create Folders based on their category.
-    if (!$update) {
+    if (!$update && !$is_syncing) {
       $category = $this->getCategory();
 
       // If no category is set, there's no Folder to auto-create.
