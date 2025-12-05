@@ -43,7 +43,7 @@ function checkImportSource(
   if (source === '@/lib/drupal-utils') {
     context.report({
       node,
-      message: `Drupal utilities were moved into 'drupal-canvas' package.`,
+      message: `Drupal utilities were moved into "drupal-canvas" package.`,
       fix(fixer) {
         return fixer.replaceText(node.source, "'drupal-canvas'");
       },
@@ -54,7 +54,7 @@ function checkImportSource(
   if (source === '@/lib/utils') {
     context.report({
       node,
-      message: `Utilities were moved into 'drupal-canvas' package.`,
+      message: `Utilities were moved into "drupal-canvas" package.`,
       fix(fixer) {
         return fixer.replaceText(node.source, "'drupal-canvas'");
       },
@@ -65,7 +65,7 @@ function checkImportSource(
   if (source === '@/lib/jsonapi-utils') {
     context.report({
       node,
-      message: `JSON:API utilities were moved into 'drupal-canvas' package.`,
+      message: `JSON:API utilities were moved into "drupal-canvas" package.`,
       fix(fixer) {
         return fixer.replaceText(node.source, "'drupal-canvas'");
       },
@@ -76,7 +76,7 @@ function checkImportSource(
   if (source === 'next-image-standalone') {
     context.report({
       node,
-      message: `Using next-image-standalone directly is deprecated. Use 'Image' component from 'drupal-canvas' package instead.`,
+      message: `Using next-image-standalone directly is deprecated. Use "Image" component from "drupal-canvas" package instead.`,
       fix(fixer) {
         if (
           node.type === 'ImportDeclaration' &&
@@ -100,7 +100,7 @@ function checkImportSource(
         if (specifier.local.name === 'JsonApiClient') {
           context.report({
             node: specifier.local,
-            message: `Preconfigured JsonApiClient was moved into 'drupal-canvas' package.`,
+            message: `Preconfigured JsonApiClient was moved into "drupal-canvas" package.`,
             fix(fixer) {
               return fixer.replaceText(node.source, "'drupal-canvas'");
             },
@@ -115,7 +115,7 @@ function checkImportSource(
   if (source === '@/lib/FormattedText') {
     context.report({
       node,
-      message: `FormattedText component was moved into 'drupal-canvas' package.`,
+      message: `FormattedText component was moved into "drupal-canvas" package.`,
       fix(fixer) {
         if (
           node.type === 'ImportDeclaration' &&
