@@ -2,6 +2,8 @@
 title: Code components - Data fetching
 ---
 
+import { Aside } from '@astrojs/starlight/components';
+
 ## SWR
 
 [SWR](https://swr.vercel.app/) is provided as a native package and can be
@@ -102,10 +104,22 @@ const client = new JsonApiClient('https://drupal-api-demo.party', {
 });
 ```
 
+<Aside type="tip">
+  For local development outside Drupal Canvas, use
+  [`@drupal-canvas/vite-plugin`](https://www.npmjs.com/package/@drupal-canvas/vite-plugin)
+  to automatically provide necessary configuration based on environment variables.
+</Aside>
+
+<Aside>
+  When working with code components outside Drupal Canvas you may need
+  to configure CORS headers on your Drupal site to allow requests to JSON:API
+  from your development environment.
+</Aside>
+
 ### Helper utilities
 
 Utility functions for working with JSON:API and core APIs are also provided in
-the `drupal-canvas` package.
+the [`drupal-canvas`](https://www.npmjs.com/package/drupal-canvas) package.
 
 ### Examples
 
