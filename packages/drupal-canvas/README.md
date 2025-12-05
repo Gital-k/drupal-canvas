@@ -135,6 +135,8 @@ const client = new JsonApiClient('https://drupal-api-demo.party', {
 });
 ```
 
+If working outside of a Drupal Canvas, you must explicitly provide a base URL. For local development, use [`@drupal-canvas/vite-plugin`](https://www.npmjs.com/package/@drupal-api-client/json-api-client) to automatically provide necessary configuration based on environment variables.
+
 ## Base Components
 
 ### FormattedText

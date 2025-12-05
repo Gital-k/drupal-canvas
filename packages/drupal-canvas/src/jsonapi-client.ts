@@ -19,7 +19,7 @@ class CanvasJsonApiClient extends JsonApiClient {
 
     if (!baseUrl && !clientBaseUrl) {
       throw new Error(
-        'Could not determine client base URL. For local development, use @drupal-canvas/vite-plugin to provide necessary configuration.',
+        'Could not determine client base URL. If working outside of a Drupal Canvas, you must explicitly provide a base URL. For local development, use @drupal-canvas/vite-plugin to automatically provide necessary configuration.',
       );
     }
 
