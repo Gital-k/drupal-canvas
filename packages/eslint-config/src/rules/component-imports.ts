@@ -48,9 +48,18 @@ function checkImportSource(
         // 'sortMenu' exported from drupal-canvas is named 'sortLinksetMenu'
         // to avoid conflict with sortMenu from jsonapi-utils,
         // so automatic fix should not apply if sortMenu is imported.
-        if (node.type === 'ImportDeclaration' && !node.specifiers.some(specifier => specifier.imported.name === 'sortMenu')) {
+        const importsSortMenu = node.type === 'ImportDeclaration' && node.specifiers.some(specifier =>
+          specifier.local.name === 'sortMenu'
+          || (
+            specifier.type === 'ImportSpecifier'
+            && specifier.imported.type === 'Identifier'
+            && specifier.imported.name === 'sortMenu'
+          )
+        );
+        if (!importsSortMenu) {
           return fixer.replaceText(node.source, "'drupal-canvas'");
         }
+        return null;
       },
     });
     return;
