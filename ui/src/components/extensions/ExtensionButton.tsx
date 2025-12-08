@@ -12,7 +12,7 @@ import type { Extension } from '@/types/Extensions';
 import styles from './ExtensionsList.module.css';
 
 const ExtensionButton = ({ extension }: { extension: Extension }) => {
-  const { name, icon, description } = extension;
+  const { name, icon, description, showNotification } = extension;
   const dispatch = useAppDispatch();
 
   const handleClick = useCallback(
@@ -33,7 +33,12 @@ const ExtensionButton = ({ extension }: { extension: Extension }) => {
     <Tooltip content={trimmedDescription}>
       <Flex justify="start" align="center" direction="column" asChild>
         <button className={clsx(styles.extensionIcon)} onClick={handleClick}>
-          <img alt={name} src={icon} height="42" width="42" />
+          <div className={styles.extensionIconWrapper}>
+            <img alt={name} src={icon} height="42" width="42" />
+            {showNotification && (
+              <span className={styles.notificationDot} aria-label="Notification"></span>
+            )}
+          </div>
           <Text align="center" size="1">
             {name}
           </Text>

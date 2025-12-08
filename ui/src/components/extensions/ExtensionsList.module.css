@@ -17,3 +17,19 @@
     background: var(--gray-2);
   }
 }
+
+.extensionIconWrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.notificationDot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 10px;
+  height: 10px;
+  background-color: #E5484D;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
+}

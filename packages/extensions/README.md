@@ -7,6 +7,7 @@ Drupal Canvas app in real-time.
 
 - [Installation](#installation)
 - [Getting started](#getting-started)
+- [Notification badge](#notification-badge)
 - [Example](#example)
 - [API](#api)
   - [`getPreviewHtml()`](#getpreviewhtml)
@@ -35,6 +36,35 @@ canvas_test_extension: # ID of your extension. You can specify multiple extensio
   url: index.html # Path to local HTML file shipped in your module's codebase, or a remote URL.
   icon: icon.svg # Path to local SVG file shipped in your module's codebase.
   api_version: 1.0
+  show_notification: false # Optional. If true, displays a red dot notification badge on the extension icon.
+```
+
+## Notification badge
+
+Extensions can display a red dot notification badge on their icon to draw user
+attention. This is useful for indicating new features, updates, or important
+information.
+
+To enable the notification badge, set `show_notification: true` in your
+extension's YAML definition file.
+
+For extensions using the legacy JavaScript API (via `drupalSettings`), the
+notification badge can be controlled dynamically:
+
+```javascript
+window.drupalSettings.canvasExtension.your_extension_id.showNotification = true;
+```
+
+The notification badge can also be controlled programmatically in PHP by
+implementing `hook_js_settings_alter()`:
+
+```php
+function mymodule_js_settings_alter(array &$settings, AttachedAssetsInterface $assets): void {
+  if (isset($settings['canvasExtension']['your_extension_id'])) {
+    // Show notification based on custom logic
+    $settings['canvasExtension']['your_extension_id']['showNotification'] = TRUE;
+  }
+}
 ```
 
 ## Example

@@ -28,7 +28,7 @@ const ExtensionsList: React.FC<ExtensionsPopoverProps> = () => {
       ...Object.values(
         drupalSettings.canvasExtension as Record<string, LegacyExtension>,
       ).map((legacyExtensionDefinition) => {
-        const { id, name, description, imgSrc } = legacyExtensionDefinition;
+        const { id, name, description, imgSrc, showNotification } = legacyExtensionDefinition;
         // Convert metadata: LegacyExtension → Extension.
         const extension: Extension = {
           id,
@@ -39,6 +39,7 @@ const ExtensionsList: React.FC<ExtensionsPopoverProps> = () => {
             `${baseUrl}${canvasSettings.canvasModulePath}/ui/assets/icons/extension-default.svg`,
           url: '',
           api_version: '1.0',
+          showNotification,
         };
         return extension;
       }),
