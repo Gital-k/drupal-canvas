@@ -50,7 +50,8 @@ class ComputedEntityCanonicalRelativeUrl extends Uri implements DependentPluginI
     $entity_reference_property = $field_item->get('entity');
     \assert($entity_reference_property instanceof EntityReference);
     $referenced_entity_adapter = $entity_reference_property->getTarget();
-    // If the referenced entity failed to load for some reason, this is unset.
+    // The referenced entity may failed to load for some reason — typically
+    // because it was deleted.
     if (!isset($referenced_entity_adapter)) {
       return NULL;
     }
