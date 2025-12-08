@@ -267,7 +267,7 @@ final class ApiAutoSaveController extends ApiControllerBase {
         \assert($entity_definition instanceof ContentEntityTypeInterface);
         \assert(!is_null($entity->id()));
         $original_entity = $this->entityTypeManager->getStorage($entity->getEntityTypeId())->loadUnchanged($entity->id());
-        \assert($original_entity instanceof FieldableEntityInterface);
+        \assert($original_entity instanceof ContentEntityInterface);
         foreach ($fields as $field_name => $field) {
           $field_access = $entity->get($field_name)->access(operation: 'edit', return_as_object: TRUE);
           $original_field = $original_entity->get($field_name);
@@ -294,7 +294,7 @@ final class ApiAutoSaveController extends ApiControllerBase {
             );
           }
         }
-        $use_existing_revision_id = $this->autoSaveManager->entityIsDraft($entity);
+        $use_existing_revision_id = $this->autoSaveManager->entityIsDraft($original_entity);
 
         // For draft pages (new entities that have never been published),
         // automatically publish them when publishing changes. Check both the
