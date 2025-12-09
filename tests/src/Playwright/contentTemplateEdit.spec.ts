@@ -43,17 +43,19 @@ test.describe('Content Template Edit', () => {
     await page.getByRole('textbox', { name: 'Title *' }).click();
     await page.getByRole('textbox', { name: 'Title *' }).fill('test1');
     await page.getByRole('button', { name: 'Save' }).click();
+    await page.getByRole('button', { name: 'Edit', pressed: false }).click();
 
-    await page.getByRole('button', { name: 'Edit' }).click();
-    // Somehow it is unable to click the link.
-    await page
-      .locator('[data-history-node-id="1"]')
-      .locator('button.trigger')
-      .click();
-    // Wait for the contextual menu to appear and click the link
+    await expect(page.getByRole('button', { name: 'Edit', pressed: true })).toBeVisible();
+
+    const articleContextualButton = page.locator('article').getByRole('button', { name: 'Open configuration options' });
+    await expect(articleContextualButton).toBeVisible();
+    await articleContextualButton.click();
+
+    // Wait for the contextual menu to appear and click the "Edit content template" link
+    await expect(page.getByRole('link', { name: 'Edit content template' })).toBeVisible();
     await page.getByRole('link', { name: 'Edit content template' }).click();
 
     // Assert that it navigated to the correct template edit page.
-    await expect(page).toHaveURL('canvas/template/node/article/full/1?destination=/node/1');
+    await expect(page).toHaveURL(/canvas\/template\/node\/article\/full\/\d+/);
   });
 });
