@@ -57,5 +57,23 @@ test.describe('Content Template Edit', () => {
 
     // Assert that it navigated to the correct template edit page.
     await expect(page).toHaveURL(/canvas\/template\/node\/article\/full\/\d+/);
+
+    // Delete the content template for article.
+    await page.goto('/canvas');
+    await page.getByRole('link', { name: 'Full content template Open' }).getByLabel('Open contextual menu').click();
+    await page.getByRole('menuitem', { name: 'Delete template' }).click();
+    await page.getByRole('dialog', { name: 'Delete template' }).click();
+    await page.getByRole('button', { name: 'Delete' }).click();
+    // Navigate to content page and create a basic page to verify the template is applied.
+    await page.goto('/admin/content');
+    await page.getByRole('link', { name: 'test1', exact: true }).click();
+    await page.getByRole('button', { name: 'Open Add new comment' }).click();
+
+    await articleContextualButton.click();
+    // Wait for the contextual menu to appear very that edit content template
+    // link is not visible anymore.
+    await expect(page.getByRole('link', { name: 'Edit content template' })).not.toBeVisible();
+
+
   });
 });
