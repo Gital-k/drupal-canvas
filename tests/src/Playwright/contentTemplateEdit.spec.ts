@@ -16,6 +16,23 @@ test.describe('Content Template Edit', () => {
   );
   test('Create Article and verify Content Template contextual link', async ({ page, drupal }) => {
     await drupal.loginAsAdmin();
+    // Navigate to the content page and create a basic article.
+    await page.goto('/admin/content');
+    await page.getByRole('link', { name: '+Add content' }).click();
+    await page.getByRole('link', { name: 'Article' }).click();
+    await page.getByRole('textbox', { name: 'Title *' }).click();
+    await page.getByRole('textbox', { name: 'Title *' }).fill('test1');
+    await page.getByRole('button', { name: 'Save' }).click();
+    await page.getByRole('button', { name: 'Edit', pressed: false }).click();
+
+    await expect(page.getByRole('button', { name: 'Edit', pressed: true })).toBeVisible();
+    const articleContextualButton = page.locator('article').getByRole('button', { name: 'Open configuration options' });
+    await expect(articleContextualButton).toBeVisible();
+
+    await articleContextualButton.click();
+    // Wait for the contextual menu to appear very that edit content template
+    // link is not visible anymore.
+    await expect(page.getByRole('link', { name: 'Edit content template' })).not.toBeVisible();
     await page.goto('/canvas');
 
     await page.getByRole('button', { name: 'Templates' }).click();
@@ -36,18 +53,12 @@ test.describe('Content Template Edit', () => {
     await page.getByLabel('Full content', { exact: true }).getByText('Full content').click();
     await modal.getByRole('button', { name: 'Add new template' }).click();
 
-    // Navigate to the content page and see if the contextual link is present.
     await page.goto('/admin/content');
-    await page.getByRole('link', { name: '+Add content' }).click();
-    await page.getByRole('link', { name: 'Article' }).click();
-    await page.getByRole('textbox', { name: 'Title *' }).click();
-    await page.getByRole('textbox', { name: 'Title *' }).fill('test1');
-    await page.getByRole('button', { name: 'Save' }).click();
-    await page.getByRole('button', { name: 'Edit', pressed: false }).click();
+    await page.getByRole('link', { name: 'test1', exact: true }).click();
 
     await expect(page.getByRole('button', { name: 'Edit', pressed: true })).toBeVisible();
 
-    const articleContextualButton = page.locator('article').getByRole('button', { name: 'Open configuration options' });
+
     await expect(articleContextualButton).toBeVisible();
     await articleContextualButton.click();
 
@@ -57,22 +68,6 @@ test.describe('Content Template Edit', () => {
 
     // Assert that it navigated to the correct template edit page.
     await expect(page).toHaveURL(/canvas\/template\/node\/article\/full\/\d+/);
-
-    // Delete the content template for article.
-    await page.goto('/canvas');
-    await page.getByRole('link', { name: 'Full content template Open' }).getByLabel('Open contextual menu').click();
-    await page.getByRole('menuitem', { name: 'Delete template' }).click();
-    await page.getByRole('dialog', { name: 'Delete template' }).click();
-    await page.getByRole('button', { name: 'Delete' }).click();
-    // Navigate to content page and create a basic page to verify the template is applied.
-    await page.goto('/admin/content');
-    await page.getByRole('link', { name: 'test1', exact: true }).click();
-    await page.getByRole('button', { name: 'Open Add new comment' }).click();
-
-    await articleContextualButton.click();
-    // Wait for the contextual menu to appear very that edit content template
-    // link is not visible anymore.
-    await expect(page.getByRole('link', { name: 'Edit content template' })).not.toBeVisible();
 
   });
 });
