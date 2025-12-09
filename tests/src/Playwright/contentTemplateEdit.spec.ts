@@ -77,6 +77,7 @@ test.describe('Content Template Edit', () => {
         .getByLabel('Full content', { exact: true })
         .getByText('Full content'),
     ).toBeVisible();
+
     await page
       .getByLabel('Full content', { exact: true })
       .getByText('Full content')
