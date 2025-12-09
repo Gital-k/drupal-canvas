@@ -74,6 +74,5 @@ test.describe('Content Template Edit', () => {
     // link is not visible anymore.
     await expect(page.getByRole('link', { name: 'Edit content template' })).not.toBeVisible();
 
-
   });
 });
