@@ -342,7 +342,7 @@ class CanvasAiPageBuilderHelper {
    * @param array $component_context
    *   The component context array loaded from the config.
    */
-  private function refreshComponentContext(array &$component_context): array {
+  private function refreshComponentContext(array &$component_context): void {
     // Update the config with the data of newly added/removed components.
     $latest_components = $this->getAllComponentsKeyedBySource();
     $resave_config = FALSE;
@@ -373,7 +373,6 @@ class CanvasAiPageBuilderHelper {
         ->set('component_context', $component_context)
         ->save();
     }
-    return $component_context;
   }
 
   /**
@@ -797,7 +796,6 @@ class CanvasAiPageBuilderHelper {
 
     foreach ($operations['operations'] as $operation) {
       $target = $operation['target'];
-      $reference_uuid = $operation['reference_uuid'];
       $placement = $operation['placement'];
       $components = $operation['components'];
 
@@ -814,6 +812,7 @@ class CanvasAiPageBuilderHelper {
       elseif ($placement === 'below' || $placement === 'above') {
         // Placement above or below is for adding components above or below
         // an existing component in the current layout.
+        $reference_uuid = $operation['reference_uuid'];
         $modified_layout = $this->placeComponentsAboveOrBelow($modified_layout, $reference_uuid, $placement, $component_tree);
       }
     }

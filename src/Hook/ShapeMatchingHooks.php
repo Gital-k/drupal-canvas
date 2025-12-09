@@ -201,7 +201,8 @@ class ShapeMatchingHooks {
   /**
    * Implements hook_entity_operation_alter().
    *
-   * Removes all operations for Drupal Canvas's text formats and editors from list builders.
+   * Removes all operations for Drupal Canvas's text formats and editors from
+   * list builders.
    */
   #[Hook('entity_operation_alter')]
   public function entityOperationAlter(array &$operations, EntityInterface $entity): void {
@@ -239,8 +240,8 @@ class ShapeMatchingHooks {
    *
    * Overrides the default: the "image" field type + widget. Note that this used
    * to run only for sites that install the Media Library module, but to achieve
-   * the intended authoring experience, Canvas depends on the Media Library module
-   * since https://www.drupal.org/i/3474226.
+   * the intended authoring experience, Canvas depends on the Media Library
+   * module since https://www.drupal.org/i/3474226.
    *
    * @see \Drupal\canvas\JsonSchemaInterpreter\JsonSchemaType::computeStorablePropShape()
    * @todo Move to Media Library module, eventually.
@@ -320,11 +321,11 @@ class ShapeMatchingHooks {
   public function datetimeRangeStoragePropShapeAlter(CandidateStorablePropShape $storable_prop_shape): void {
     if ($storable_prop_shape->shape->schema == [
       'type' => 'object',
-      '$ref' => 'json-schema-definitions://sdc_test_all_props.module/date-range',
+      '$ref' => 'json-schema-definitions://canvas.module/date-range',
     ]) {
       $storable_prop_shape->fieldTypeProp = new FieldTypeObjectPropsExpression('daterange', [
-        'from' => new FieldTypePropExpression('daterange', 'end_value'),
-        'to' => new FieldTypePropExpression('daterange', 'value'),
+        'from' => new FieldTypePropExpression('daterange', 'value'),
+        'to' => new FieldTypePropExpression('daterange', 'end_value'),
       ]);
       $storable_prop_shape->fieldStorageSettings = ['datetime_type' => DateTimeItem::DATETIME_TYPE_DATE];
       // @todo Make this actually work in component instance forms in https://www.drupal.org/project/canvas/issues/3523379
@@ -373,7 +374,8 @@ class ShapeMatchingHooks {
       Image::class => [
         'src' => new ReferenceFieldTypePropExpression(
           new FieldTypePropExpression('entity_reference', 'entity'),
-          // TRICKY: Additional computed property on image fields added by Drupal Canvas.
+          // TRICKY: Additional computed property on image fields added by
+          // Drupal Canvas.
           // @see \Drupal\canvas\Plugin\Field\FieldTypeOverride\ImageItemOverride
           new FieldPropExpression(BetterEntityDataDefinition::create('media', $media_type_ids), $source_field_names, \NULL, 'src_with_alternate_widths'),
         ),

@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Drupal\canvas;
 
-use Drupal\canvas\Validation\JsonSchema\UriSchemeAwareFormatConstraint;
+use Drupal\canvas\Plugin\ComponentPluginManager;
+use Drupal\Core\DefaultContent\Exporter;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
 use Drupal\Core\DependencyInjection\ServiceProviderBase;
 use Drupal\canvas\Access\CanvasUiAccessCheck;
+use Drupal\canvas\EventSubscriber\DefaultContentSubscriber;
+use Drupal\canvas\Validation\JsonSchema\UriSchemeAwareFormatConstraint;
 use Drupal\Core\Theme\Component\ComponentValidator;
 use JsonSchema\Constraints\Factory;
 use JsonSchema\Validator;
@@ -27,6 +30,14 @@ class CanvasServiceProvider extends ServiceProviderBase {
         ->addArgument(new Reference(CanvasUiAccessCheck::class))
         ->addTag('media_library.opener');
     }
+
+    // The ability to export default content was added in Drupal 11.3.
+    if (class_exists(Exporter::class)) {
+      $container->register(DefaultContentSubscriber::class)
+        ->setClass(DefaultContentSubscriber::class)
+        ->setAutowired(TRUE)
+        ->addTag('event_subscriber');
+    }
   }
 
   /**
@@ -45,6 +56,13 @@ class CanvasServiceProvider extends ServiceProviderBase {
       'setValidator',
       [new Reference(Validator::class)]
     );
+
+    // @todo Remove this once Canvas relies on a Drupal core version that includes https://www.drupal.org/i/3352063.
+    $container->getDefinition('plugin.manager.sdc')
+      ->setClass(ComponentPluginManager::class);
+    // @todo Remove in clean-up follow-up; minimize non-essential changes.
+    $container->setAlias(ComponentPluginManager::class, 'plugin.manager.sdc');
+
     parent::alter($container);
   }
 

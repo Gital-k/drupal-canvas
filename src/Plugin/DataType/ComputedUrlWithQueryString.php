@@ -1,12 +1,17 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Drupal\canvas\Plugin\DataType;
 
 use Drupal\Component\Plugin\DependentPluginInterface;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Component\Utility\UrlHelper;
+use Drupal\Core\Cache\CacheableDependencyInterface;
+use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Field\FieldItemInterface;
 use Drupal\Core\Field\FieldItemListInterface;
+use Drupal\Core\GeneratedUrl;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\TypedData\Attribute\DataType;
 use Drupal\Core\TypedData\Plugin\DataType\Uri;
@@ -18,14 +23,36 @@ use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
   id: self::PLUGIN_ID,
   label: new TranslatableMarkup("URI template")
 )]
-class ComputedUrlWithQueryString extends Uri implements DependentPluginInterface {
+class ComputedUrlWithQueryString extends Uri implements DependentPluginInterface, CacheableDependencyInterface {
+
+  use ComputedDataTypeWithCacheabilityTrait {
+    getValue as private traitGetValue;
+  }
 
   public const string PLUGIN_ID = 'computed_url_with_query_string';
+
+  private GeneratedUrl $computedValue;
 
   /**
    * {@inheritdoc}
    */
-  public function getValue() {
+  public function getValue(): GeneratedUrl {
+    return $this->traitGetValue();
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getString() {
+    return $this->getValue()->getGeneratedUrl();
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  private function computeValue(): GeneratedUrl {
+    \assert($this->isComputed === FALSE);
+
     $field_item = $this->getParent();
     if (!$field_item instanceof FieldItemInterface) {
       throw new \LogicException('This data type must be used as a computed field property.');
@@ -41,15 +68,22 @@ class ComputedUrlWithQueryString extends Uri implements DependentPluginInterface
     }
     $url_prop_expression = StructuredDataPropExpression::fromString($instructions['url']);
 
-    // Compute the URL from the provided instructions.
+    $url_with_query_string = new GeneratedUrl();
+
+    // Compute the URL and query string from the provided instructions.
+    $this->cacheability = new CacheableMetadata();
     $url = Evaluator::evaluate($field_item, $url_prop_expression, is_required: TRUE);
-    $url_components = UrlHelper::parse($url);
+    $url_with_query_string->addCacheableDependency($url);
+    \assert(is_string($url->value));
+    $url_components = UrlHelper::parse($url->value);
     foreach ($instructions['query_parameters'] as $query_parameter_name => $query_parameter_instruction) {
-      $url_components['query'][$query_parameter_name] = Evaluator::evaluate(
+      $query_parameter = Evaluator::evaluate(
         $field_item,
         StructuredDataPropExpression::fromString($query_parameter_instruction),
         is_required: TRUE,
       );
+      $url_with_query_string->addCacheableDependency($query_parameter);
+      $url_components['query'][$query_parameter_name] = $query_parameter->value;
     }
 
     // Assemble it.
@@ -60,8 +94,9 @@ class ComputedUrlWithQueryString extends Uri implements DependentPluginInterface
     if ($url_components['fragment'] !== '') {
       $computed_url .= '#' . $url_components['fragment'];
     }
+    $url_with_query_string->setGeneratedUrl($computed_url);
 
-    return $computed_url;
+    return $url_with_query_string;
   }
 
   /**
@@ -82,7 +117,6 @@ class ComputedUrlWithQueryString extends Uri implements DependentPluginInterface
     // calculating the dependencies of all structured data prop expressions this
     // (see ::getValue()) uses.
     $url_prop_expression = StructuredDataPropExpression::fromString($instructions['url']);
-    assert($url_prop_expression instanceof ReferenceFieldTypePropExpression);
     $dependencies = $url_prop_expression->calculateDependencies($field_item_list);
     foreach ($instructions['query_parameters'] as $query_parameter_instruction) {
       $dependencies = NestedArray::mergeDeep($dependencies, StructuredDataPropExpression::fromString($query_parameter_instruction)->calculateDependencies($field_item_list));
@@ -94,7 +128,7 @@ class ComputedUrlWithQueryString extends Uri implements DependentPluginInterface
     // For example, otherwise the `image` module would become an explicit
     // dependency, instead of just relying on the config dependency on
     // `field.field.media.image.field_media_image`.
-    if ($field_item_list->getParent() !== NULL) {
+    if ($field_item_list->getParent() !== NULL && $url_prop_expression instanceof ReferenceFieldTypePropExpression) {
       $referencer_dependencies = $url_prop_expression->referencer->calculateDependencies();
       $module_dependencies_to_omit = $referencer_dependencies['module'] ?? [];
       $dependencies['module'] = array_values(array_diff($dependencies['module'] ?? [], $module_dependencies_to_omit));

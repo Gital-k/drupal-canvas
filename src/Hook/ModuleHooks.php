@@ -9,9 +9,12 @@ use Drupal\Core\EventSubscriber\AjaxResponseSubscriber;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\Core\Hook\Order\Order;
+use Drupal\Core\Hook\Order\OrderAfter;
 use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\canvas\Form\FormIdPreRender;
+use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\Core\StringTranslation\TranslationInterface;
 use Drupal\Core\Url;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\Validator\Constraints\NotEqualTo;
@@ -19,12 +22,16 @@ use Symfony\Component\Validator\Constraints\Unique;
 
 class ModuleHooks {
 
+  use StringTranslationTrait;
+
   const PAGE_DATA_FORM_ID = 'page_data_form';
 
   public function __construct(
     private readonly RouteMatchInterface $routeMatch,
     private readonly RequestStack $requestStack,
+    TranslationInterface $string_translation,
   ) {
+    $this->setStringTranslation($string_translation);
   }
 
   /**
@@ -77,7 +84,8 @@ class ModuleHooks {
    */
   #[Hook('page_attachments')]
   public function pageAttachments(array &$page): void {
-    // Adds `track_navigation` library to all pages, to allow Canvas's "Back" link to know which URL to go back to.
+    // Adds `track_navigation` library to all pages, to allow Canvas's "Back"
+    // link to know which URL to go back to.
     $page['#attached']['library'][] = 'canvas/track_navigation';
   }
 
@@ -101,8 +109,8 @@ class ModuleHooks {
       if ($this->requestStack->getCurrentRequest()
           ?->get(AjaxResponseSubscriber::AJAX_REQUEST_PARAMETER) !== \NULL) {
         // Add the data-ajax flag and manually add the form ID as pre render
-        // callbacks aren't fired during AJAX rendering because the whole form is
-        // not rendered, just the returned elements.
+        // callbacks aren't fired during AJAX rendering because the whole form
+        // is not rendered, just the returned elements.
         FormIdPreRender::addAjaxAttribute($form, self::PAGE_DATA_FORM_ID);
       }
 
@@ -134,6 +142,17 @@ class ModuleHooks {
       '#weight' => 5,
     ];
     return $items;
+  }
+
+  /**
+   * Implements hook_menu_links_discovered_alter().
+   */
+  #[Hook('menu_links_discovered_alter', order: new OrderAfter(['navigation']))]
+  public function menuLinksDiscoveredAlter(array &$links): void {
+    if (isset($links['navigation.content'])) {
+      $links['navigation.content']['title'] = $this->t('CMS');
+      $links['navigation.content']['options']['icon']['icon_id'] = 'database';
+    }
   }
 
 }

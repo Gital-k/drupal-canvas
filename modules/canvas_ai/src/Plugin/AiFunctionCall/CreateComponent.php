@@ -55,7 +55,7 @@ use Symfony\Component\Yaml\Yaml;
     ),
   ],
 )]
-final class CreateComponent extends FunctionCallBase implements ExecutableFunctionCallInterface, AiAgentContextInterface {
+final class CreateComponent extends FunctionCallBase implements ExecutableFunctionCallInterface, AiAgentContextInterface, BuilderResponseFunctionCallInterface {
 
   use ConstraintPropertyPathTranslatorTrait;
 
@@ -110,6 +110,7 @@ final class CreateComponent extends FunctionCallBase implements ExecutableFuncti
       }
       $props_array = Json::decode($props);
       $transformed_props = [];
+      $required_props = [];
       if (is_array($props_array)) {
         foreach ($props_array as $prop) {
           if (!empty($prop['id']) && !empty($prop['name']) && !empty($prop['type']) && !empty($prop['example'])) {
@@ -124,6 +125,10 @@ final class CreateComponent extends FunctionCallBase implements ExecutableFuncti
               }
             }
             $transformed_props[$prop['id']] = $transformed;
+
+            if (!empty($prop['required']) && $prop['required'] === TRUE) {
+              $required_props[] = $prop['id'];
+            }
           }
         }
       }
@@ -139,6 +144,7 @@ final class CreateComponent extends FunctionCallBase implements ExecutableFuncti
         'compiledCss' => '',
         'importedJsComponents' => [],
         'props' => $transformed_props,
+        'required' => $required_props,
         'dataDependencies' => [],
       ];
       $violations = JavaScriptComponent::createFromClientSide($output)->getTypedData()->validate();
@@ -160,14 +166,7 @@ final class CreateComponent extends FunctionCallBase implements ExecutableFuncti
       $this->setOutput(Yaml::dump(['error' => sprintf('Failed to process Javascript component data: %s', $e->getMessage())], 10, 2));
       return;
     }
-
-    // \Drupal\canvas_ai\Controller\CanvasBuilder::render() expects a YAML parsable
-    // string.
-    // @see \Drupal\canvas_ai\Controller\CanvasBuilder::render()
-    $this->setOutput(Yaml::dump([
-      'component_structure' => $output,
-    ], 10, 2)
-    );
+    $this->setStructuredOutput(['component_structure' => $output]);
   }
 
 }

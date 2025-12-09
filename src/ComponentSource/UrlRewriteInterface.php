@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\ComponentSource;
 
+use Drupal\Core\GeneratedUrl;
+
 /**
+ * @internal
+ *
  * Defines an interface for component source plugins that support URL rewrites.
  */
 interface UrlRewriteInterface extends ComponentSourceInterface {
@@ -19,9 +23,9 @@ interface UrlRewriteInterface extends ComponentSourceInterface {
    * @param string $url
    *   The example URL.
    *
-   * @return string
+   * @return \Drupal\Core\GeneratedUrl
    *   A resolvable URL.
    */
-  public function rewriteExampleUrl(string $url): string;
+  public function rewriteExampleUrl(string $url): GeneratedUrl;
 
 }

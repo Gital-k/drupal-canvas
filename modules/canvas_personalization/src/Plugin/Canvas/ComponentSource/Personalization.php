@@ -41,11 +41,14 @@ use Symfony\Component\Validator\ConstraintViolationListInterface;
  * @phpstan-type PersonalizationSwitchInputArray array{variants: array<int, string>}
  * @phpstan-type PersonalizationCaseInputArray array{variant_id: string, segments: array<int, string>}
  * @phpstan-type PersonalizationInputArray PersonalizationSwitchInputArray|PersonalizationCaseInputArray
+ *
+ * @phpstan-ignore classExtendsInternalClass.classExtendsInternalClass
  */
 #[ComponentSource(
   id: self::SOURCE_PLUGIN_ID,
   label: new TranslatableMarkup('Personalization'),
   supportsImplicitInputs: FALSE,
+  discovery: FALSE,
 )]
 final class Personalization extends ComponentSourceBase implements
   ComponentSourceWithSlotsInterface,
@@ -200,8 +203,9 @@ final class Personalization extends ComponentSourceBase implements
 
   public function getClientSideInfo(Component $component): array {
     // @todo Uncomment the next line and delete everything else once a React UI exists for this: you would never drag these components onto the editor frame. Remove in https://www.drupal.org/project/canvas/issues/3525797
+    // phpcs:disable
     // throw new \RuntimeException('This should not be called because this source implements ComponentSourceWithSwitchCasesInterface.');
-
+    // phpcs:enable
     $client_side_info = [
       'build' => match($this->getType()) {
         self::SWITCH => ['#markup' => '<h1>Switch!</h1'],
@@ -326,15 +330,17 @@ final class Personalization extends ComponentSourceBase implements
   public function buildComponentInstanceForm(
     array $form,
     FormStateInterface $form_state,
-    ?Component $component = NULL,
+    Component $component,
     string $component_instance_uuid = '',
     array $inputValues = [],
     ?EntityInterface $entity = NULL,
     array $settings = [],
   ): array {
     // @todo Uncomment one of the next 2 lines and delete everything else once a React UI exists for this.
+    // phpcs:disable
     // throw new \RuntimeException('This should not be called because this source implements ComponentSourceWithSwitchCasesInterface.');
     // return [];
+    // phpcs:enable
 
     // We won't use a Drupal generated form, but something specific in the
     // client for these components.

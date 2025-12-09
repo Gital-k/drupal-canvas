@@ -4,8 +4,14 @@ import chalk from 'chalk';
 import yaml from 'js-yaml';
 import * as p from '@clack/prompts';
 
-import { ensureConfig, getConfig, setConfig } from '../config';
+import { ensureConfig, getConfig } from '../config';
 import { createApiService } from '../services/api';
+import {
+  pluralizeComponent,
+  updateConfigFromOptions,
+  validateComponentOptions,
+} from '../utils/command-helpers';
+import { selectRemoteComponents } from '../utils/component-selector';
 import { reportResults } from '../utils/report-results';
 import { directoryExists } from '../utils/utils';
 
@@ -20,12 +26,15 @@ interface DownloadOptions {
   siteUrl?: string;
   scope?: string;
   dir?: string;
-  component?: string;
+  components?: string;
   all?: boolean; // Download all components
+  yes?: boolean; // Skip all confirmation prompts
+  skipOverwrite?: boolean; // Skip downloading components that already exist locally
+  skipCss?: boolean;
+  cssOnly?: boolean;
   verbose?: boolean;
 }
 
-// @todo: Support non-interactive download if user passes all necessary args in.
 export function downloadCommand(program: Command): void {
   program
     .command('download')
@@ -35,22 +44,36 @@ export function downloadCommand(program: Command): void {
     .option('--site-url <url>', 'Site URL')
     .option('--scope <scope>', 'Scope')
     .option('-d, --dir <directory>', 'Component directory')
-    .option('-c, --component <name>', 'Specific component to download')
+    .option(
+      '-c, --components <names>',
+      'Specific component(s) to download (comma-separated)',
+    )
     .option('--all', 'Download all components')
+    .option('-y, --yes', 'Skip all confirmation prompts')
+    .option(
+      '--skip-overwrite',
+      'Skip downloading components that already exist locally',
+    )
+    .option('--skip-css', 'Skip downloading global CSS')
+    .option('--css-only', 'Download only global CSS (skip components)')
     .option('--verbose', 'Enable verbose output')
     .action(async (options: DownloadOptions) => {
-      p.intro('Drupal Canvas Component Download');
+      p.intro(chalk.bold('Drupal Canvas CLI: download'));
 
       try {
+        // Validate options
+        validateComponentOptions(options);
+
+        // Validate CSS-related options
+        if (options.skipCss && options.cssOnly) {
+          throw new Error(
+            'Cannot use both --skip-css and --css-only flags together',
+          );
+        }
+
         // Update config with CLI options
-        if (options.clientId) setConfig({ clientId: options.clientId });
-        if (options.clientSecret)
-          setConfig({ clientSecret: options.clientSecret });
-        if (options.siteUrl) setConfig({ siteUrl: options.siteUrl });
-        if (options.dir) setConfig({ componentDir: options.dir });
-        if (options.all) setConfig({ all: options.all });
-        if (options.scope) setConfig({ scope: options.scope });
-        if (options.verbose) setConfig({ verbose: true });
+        updateConfigFromOptions(options);
+
         // Ensure all required config is present
         await ensureConfig([
           'siteUrl',
@@ -63,96 +86,73 @@ export function downloadCommand(program: Command): void {
         const config = getConfig();
         const apiService = await createApiService();
 
-        // Get components
+        let components: Record<string, Component> = {};
+        let globalCss: string;
+
         const s = p.spinner();
-        s.start('Fetching components');
 
-        const components = await apiService.listComponents();
-        const {
-          css: { original: globalCss },
-        } = await apiService.getGlobalAssetLibrary();
+        // Handle --css-only case differently to skip component fetching
+        if (options.cssOnly) {
+          s.start('Fetching global CSS');
+          const {
+            css: { original },
+          } = await apiService.getGlobalAssetLibrary();
+          globalCss = original;
+          s.stop('Global CSS fetched');
+        } else {
+          // Regular flow: fetch both components and global CSS
+          s.start('Fetching components and global CSS');
 
-        if (Object.keys(components).length === 0) {
-          s.stop('No components found');
-          p.outro('Download cancelled - no components were found');
-          return;
-        }
+          const [fetchedComponents, globalAssetLibrary] = await Promise.all([
+            apiService.listComponents(),
+            apiService.getGlobalAssetLibrary(),
+          ]);
 
-        s.stop(`Found ${Object.keys(components).length} components`);
+          components = fetchedComponents;
+          globalCss = globalAssetLibrary.css.original;
 
-        // If a specific component was requested, filter for it
-        let componentsToDownload: Record<string, Component> = {};
-
-        // If --all option is used, download all components.
-        if (options.all) {
-          // Download all components
-          componentsToDownload = components;
-        } else if (options.component) {
-          const component = Object.values(components).find(
-            (c) =>
-              c.machineName === options.component ||
-              c.name === options.component,
-          );
-          if (!component) {
-            p.note(chalk.red(`Component "${options.component}" not found`));
-            p.outro('Download cancelled');
+          if (Object.keys(components).length === 0) {
+            s.stop('No components found');
+            p.outro('Download cancelled - no components were found');
             return;
           }
-          componentsToDownload = { component };
-        } else {
-          // Choose components to download
-          const selectedComponents = await p.multiselect({
-            message: 'Select components to download',
-            options: [
-              {
-                value: '_allComponents',
-                label: 'All components',
-              },
-              ...Object.keys(components).map((key) => ({
-                value: components[key].machineName,
-                label: `${components[key].name} (${components[key].machineName})`,
-              })),
-            ],
-            required: true,
+
+          s.stop(`Found ${Object.keys(components).length} components`);
+        }
+
+        // Default to --all when --yes is used without --components
+        const allFlag =
+          options.all || (options.yes && !options.components) || false;
+
+        // Select components to download
+        const { components: componentsToDownload, includeGlobalCss } =
+          await selectRemoteComponents(components, {
+            all: allFlag,
+            components: options.components,
+            skipConfirmation: options.yes,
+            skipCss: options.skipCss,
+            cssOnly: options.cssOnly,
+            includeGlobalCss: !options.skipCss,
+            globalCssDefault: true,
+            selectMessage: 'Select items to download',
+            confirmMessage: `Download to ${config.componentDir}?`,
           });
 
-          if (p.isCancel(selectedComponents)) {
-            p.cancel('Operation cancelled');
-            return;
-          }
-
-          // Check if "all" option is selected
-          if (selectedComponents.includes('_allComponents')) {
-            componentsToDownload = components;
-          } else {
-            componentsToDownload = Object.fromEntries(
-              Object.entries(components).filter(([, component]) =>
-                (selectedComponents as string[]).includes(
-                  component.machineName,
-                ),
-              ),
-            );
-          }
-        }
-
         // Handle singular/plural cases for console messages.
-        const componentPluralized = `component${Object.keys(componentsToDownload).length > 1 ? 's' : ''}`;
-
-        // Confirm download
-        const confirmDownload = await p.confirm({
-          message: `Download ${Object.keys(componentsToDownload).length} ${componentPluralized} to ${config.componentDir}?`,
-          initialValue: true,
-        });
-
-        if (p.isCancel(confirmDownload) || !confirmDownload) {
-          p.cancel('Operation cancelled');
-          return;
-        }
+        const componentCount = Object.keys(componentsToDownload).length;
+        const componentPluralized = pluralizeComponent(componentCount);
 
         // Download components
         const results: Result[] = [];
 
-        s.start(`Downloading ${componentPluralized}`);
+        // Update spinner message based on what's being downloaded
+        const downloadMessage = options.cssOnly
+          ? 'Downloading global CSS'
+          : componentCount > 0
+            ? `Downloading ${componentPluralized}`
+            : 'Processing request';
+
+        s.start(downloadMessage);
 
         for (const key in componentsToDownload) {
           const component = componentsToDownload[key];
@@ -162,18 +162,35 @@ export function downloadCommand(program: Command): void {
               config.componentDir,
               component.machineName,
             );
-            // Check if the directory exists and is non-empty to confirm deletion.
+            // Check if the directory exists and is non-empty
             const dirExists = await directoryExists(componentDir);
             if (dirExists) {
               const files = await fs.readdir(componentDir);
               if (files.length > 0) {
-                const confirmDelete = await p.confirm({
-                  message: `The "${componentDir}" directory is not empty. Are you sure you want to delete and overwrite this directory?`,
-                  initialValue: true,
-                });
-                if (p.isCancel(confirmDelete) || !confirmDelete) {
-                  p.cancel('Operation cancelled');
-                  process.exit(0);
+                // Skip downloading if --skip-overwrite is set
+                if (options.skipOverwrite) {
+                  results.push({
+                    itemName: component.machineName,
+                    success: true,
+                    details: [
+                      {
+                        content: 'Skipped (already exists)',
+                      },
+                    ],
+                  });
+                  continue;
+                }
+
+                // Prompt for confirmation if --yes is not set
+                if (!options.yes) {
+                  const confirmDelete = await p.confirm({
+                    message: `The "${componentDir}" directory is not empty. Are you sure you want to delete and overwrite this directory?`,
+                    initialValue: true,
+                  });
+                  if (p.isCancel(confirmDelete) || !confirmDelete) {
+                    p.cancel('Operation cancelled');
+                    process.exit(0);
+                  }
                 }
               }
             }
@@ -234,16 +251,19 @@ export function downloadCommand(program: Command): void {
             });
           }
         }
-        s.stop(
-          chalk.green(
-            `Processed ${Object.keys(componentsToDownload).length} ${componentPluralized}`,
-          ),
-        );
+        const successMessage =
+          options.cssOnly && componentCount === 0
+            ? 'Global CSS download completed'
+            : `Processed ${componentCount} ${componentPluralized}`;
 
-        reportResults(results, 'Downloaded components', 'Component');
+        s.stop(chalk.green(successMessage));
 
-        // Create global.css file if it exists.
-        if (globalCss) {
+        if (componentCount > 0) {
+          reportResults(results, 'Downloaded components', 'Component');
+        }
+
+        // Create global.css file if selected for download (even if empty).
+        if (includeGlobalCss && typeof globalCss === 'string') {
           let globalCssResult: Result;
           try {
             const globalCssPath = path.join(config.componentDir, 'global.css');
@@ -268,7 +288,17 @@ export function downloadCommand(program: Command): void {
           reportResults([globalCssResult], 'Downloaded assets', 'Asset');
         }
 
-        p.outro(`⬇️ Download command completed`);
+        // Display appropriate outro message
+        const outroMessage =
+          options.cssOnly && componentCount === 0
+            ? '⬇️ Global CSS downloaded successfully'
+            : includeGlobalCss && componentCount > 0
+              ? '⬇️ Components and global CSS downloaded successfully'
+              : componentCount > 0
+                ? '⬇️ Components downloaded successfully'
+                : '⬇️ Download command completed';
+
+        p.outro(outroMessage);
       } catch (error) {
         if (error instanceof Error) {
           p.note(chalk.red(`Error: ${error.message}`));

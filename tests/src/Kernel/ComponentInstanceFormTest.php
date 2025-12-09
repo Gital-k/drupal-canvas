@@ -5,6 +5,12 @@ declare(strict_types=1);
 namespace Drupal\Tests\canvas\Kernel;
 
 use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\canvas\Entity\JavaScriptComponent;
+use Drupal\canvas\Entity\Page;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
+use Drupal\canvas\PropExpressions\StructuredData\Evaluator;
+use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ComponentInterface;
@@ -14,6 +20,7 @@ use Drupal\Tests\canvas\TestSite\CanvasTestSetup;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\node\Traits\NodeCreationTrait;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\TestWith;
 use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\HttpFoundation\Request;
 
@@ -34,11 +41,28 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
   protected function setUp(): void {
     parent::setUp();
     $this->container->get('theme_installer')->install(['stark']);
-    $this->container->get('module_installer')->install(['system', 'canvas_test_sdc']);
+    $this->container->get('module_installer')->install(['system', 'canvas_test_sdc', 'canvas_test_block']);
     $this->container->get('config.factory')->getEditable('system.theme')->set('default', 'stark')->save();
 
     (new CanvasTestSetup())->setup();
-    $this->setUpCurrentUser(permissions: ['edit any article content', 'administer themes']);
+    $this->setUpCurrentUser(permissions: ['edit any article content', 'administer themes', Page::EDIT_PERMISSION]);
+  }
+
+  public function testDescription(): void {
+    $node = $this->createNode(['type' => 'article', 'title' => 'Test node']);
+    self::assertCount(0, $node->validate());
+    $node->save();
+
+    $component_id = 'sdc.canvas_test_sdc.my-cta';
+    $form_canvas_props = $this->getFormCanvasPropsForComponent($component_id);
+    $component_entity = Component::load($component_id);
+    \assert($component_entity instanceof ComponentInterface);
+    $crawler = $this->getCrawlerForFormRequest(
+      '/canvas/api/v0/form/component-instance/node/1',
+      $component_entity,
+      $form_canvas_props
+    );
+    self::assertStringContainsString('The title for the cta', $crawler->text());
   }
 
   #[DataProvider('providerOptionalImages')]
@@ -271,11 +295,31 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
     ];
   }
 
+  private static function findSuggestionByLabel(string|array $label, string $prop, array $suggestions): array {
+    $is_final_level = is_string($label) || count($label) === 1;
+    $needle = is_array($label) ? reset($label) : $label;
+    // When recursing, the $prop key won't exist.
+    $haystack = array_key_exists($prop, $suggestions) ? $suggestions[$prop] : $suggestions;
+    assert(array_is_list($haystack));
+    foreach ($haystack as $suggestion) {
+      if ($suggestion['label'] === $needle) {
+        if ($is_final_level) {
+          assert(array_key_exists('id', $suggestion));
+          assert(array_key_exists('source', $suggestion));
+          assert(array_key_exists('label', $suggestion));
+          return $suggestion;
+        }
+        return self::findSuggestionByLabel(array_slice($label, 1), $prop, $suggestion['items']);
+      }
+    }
+    throw new \LogicException(sprintf('No suggestion found for prop %s with label %s', $prop, $needle));
+  }
+
   public function testDynamicProps(): void {
     $node = $this->createNode(['type' => 'article', 'title' => 'Test node']);
     self::assertCount(0, $node->validate());
     $node->save();
-    self::assertNull($node->getRevisionLogMessage());
+    self::assertEmpty($node->get('media_image_field'));
     $template = ContentTemplate::create([
       'content_entity_type_id' => 'node',
       'content_entity_type_bundle' => 'article',
@@ -287,14 +331,6 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
     $component_id = 'sdc.canvas_test_sdc.my-hero';
     $this->setUpCurrentUser(permissions: ['administer content templates', 'edit any article content']);
     $fieldSuggestions = self::decodeResponse($this->parentRequest(Request::create("canvas/api/v0/ui/content_template/suggestions/prop-sources/node/article/$component_id")));
-    $getFieldSuggestionByLabel = function (string $label, string $prop) use ($fieldSuggestions) {
-      foreach ($fieldSuggestions[$prop] as $suggestion) {
-        if ($suggestion['label'] === $label) {
-          return $suggestion;
-        }
-      }
-      throw new \LogicException(sprintf('No suggestion found for prop %s with label %s', $prop, $label));
-    };
 
     $form_canvas_props = $this->getFormCanvasPropsForComponent($component_id);
     $component_entity = Component::load($component_id);
@@ -324,8 +360,17 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
     // Second request: with a valid expression in DynamicPropSource.
     // 💡 These are the ones provided by the API response at the start of the
     // test (…/suggestions/prop-sources/…).
-    $form_canvas_props['source']['heading'] = $getFieldSuggestionByLabel('Title', 'heading')['source'];
-    $form_canvas_props['source']['subheading'] = $getFieldSuggestionByLabel('Revision log message', 'subheading')['source'];
+    $form_canvas_props['source']['heading'] = self::findSuggestionByLabel('Title', 'heading', $fieldSuggestions)['source'];
+    $form_canvas_props['source']['subheading'] = self::findSuggestionByLabel(['A Media Image Field', 'Media', 'Name'], 'subheading', $fieldSuggestions)['source'];
+    // Confirm:
+    // - `heading` can NOT be NULL, and currently evaluates to a not-NULL value
+    // - `subheading` CAN be NULL, and currently evaluates to NULL
+    // @phpstan-ignore-next-line method.nonObject
+    self::assertTrue($node->getFieldDefinition('title')->isRequired());
+    self::assertSame('Test node', Evaluator::evaluate($node, expr: StructuredDataPropExpression::fromString($form_canvas_props['source']['heading']['expression']), is_required: FALSE)->value);
+    // @phpstan-ignore-next-line method.nonObject
+    self::assertFalse($node->getFieldDefinition('media_image_field')->isRequired());
+    self::assertNull(Evaluator::evaluate($node, expr: StructuredDataPropExpression::fromString($form_canvas_props['source']['subheading']['expression']), is_required: FALSE)->value);
     $crawler = $this->getCrawlerForFormRequest($form_url, $component_entity, $form_canvas_props);
     // Confirm the linked prop fields are rendered.
     self::assertCount(2, $crawler->filter('.canvas-linked-prop-wrapper[data-drupal-selector*="-heading-"]'));
@@ -342,11 +387,123 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
       $this->fail('Expected DomainException not thrown.');
     }
     catch (\DomainException $e) {
-      self::assertSame('`ℹ︎␜entity:node:page␝revision_log␞␟value` is an expression for entity type `node`, bundle(s) `page`, but the provided entity is of the bundle `article`.', $e->getMessage());
+      self::assertSame('`ℹ︎␜entity:node:page␝media_image_field␞␟entity␜␜entity:media␝name␞␟value` is an expression for entity type `node`, bundle(s) `page`, but the provided entity is of the bundle `article`.', $e->getMessage());
     }
   }
 
-  private function getCrawlerForFormRequest(string $form_url, ComponentInterface $component_entity, array $form_canvas_props): Crawler {
+  /**
+   * Tests additional edge cases of the impact of broken components.
+   *
+   * @see \Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource\JsComponentTest::testIsBroken())
+   */
+  #[TestWith([
+    'canvas_test_block_input_none',
+    '',
+    'Previously stored input {"id":"canvas_test_block_input_none","label":"Test block with no settings.","label_display":"0","provider":"canvas_test_block"}',
+  ])]
+  #[TestWith([
+    'canvas_test_block_input_validatable',
+    'Name Enter a name to display in the block.',
+    'Previously stored input {"id":"canvas_test_block_input_validatable","label":"Test Block with settings","label_display":"0","name":"Canvas","provider":"canvas_test_block"}',
+  ])]
+  public function testBlockComponentThatHasGoneAway(string $block_plugin_id, string $expected_form_when_not_broken, string $fyi): void {
+    $page = Page::create(['title' => $this->randomMachineName()]);
+    self::assertSame(SAVED_NEW, $page->save());
+
+    // Loading the component instance form initially should be possible.
+    $component = Component::load(BlockComponent::SOURCE_PLUGIN_ID . ".$block_plugin_id");
+    self::assertInstanceOf(Component::class, $component);
+    self::assertCount(0, $component->getTypedData()->validate());
+    $response = $this->getCrawlerForFormRequest('/canvas/api/v0/form/component-instance/canvas_page/' . $page->id(), $component, []);
+    self::assertSame($expected_form_when_not_broken, $response->text());
+
+    // Create a component instance with the block plugin's default settings.
+    $page->setComponentTree([
+      [
+        'uuid' => '5f18db31-fa2f-4f4e-a377-dc0c6a0b7dc4',
+        'component_id' => $component->id(),
+        'inputs' => $component->getSettings()['default_settings'],
+      ],
+    ]);
+    self::assertCount(0, $page->validate());
+    self::assertSame(SAVED_UPDATED, $page->save());
+
+    // Simulate the tested block plugin being broken.
+    // @see \Drupal\Tests\canvas\Kernel\BrokenBlockManager
+    // @see \Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource\BlockComponentTest::triggerBrokenComponent()
+    $this->container->get('state')->set('canvas_test_block.remove_definitions', [$block_plugin_id]);
+    $this->container->get('plugin.manager.block')->clearCachedDefinitions();
+
+    // Despite the tested block plugin being broken:
+    self::assertTrue($component->getComponentSource()->isBroken());
+    // - The stored component tree is still valid: it references the Component.
+    self::assertCount(0, $page->validate());
+    // - The Component became invalid though.
+    self::assertGreaterThan(0, $component->getTypedData()->validate()->count());
+
+    $response = $this->getCrawlerForFormRequest('/canvas/api/v0/form/component-instance/canvas_page/' . $page->id(), $component, json_decode('undefined'));
+    self::assertSame("Component is missing. Fix the component or copy values to a new component. $fyi", $response->text());
+  }
+
+  /**
+   * Tests additional edge cases of the impact of broken components.
+   *
+   * @see \Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource\JsComponentTest::testIsBroken())
+   */
+  public function testCodeComponentNoPropsThatHasGoneAway(): void {
+    $page = Page::create(['title' => $this->randomMachineName()]);
+    self::assertSame(SAVED_NEW, $page->save());
+
+    $code_component = JavaScriptComponent::create([
+      'machineName' => 'no-props-component',
+      'name' => 'No Props Component',
+      'status' => TRUE,
+      'props' => [],
+      'slots' => [],
+      'js' => [
+        'original' => '',
+        'compiled' => '',
+      ],
+      'css' => [
+        'original' => '',
+        'compiled' => '',
+      ],
+      'dataDependencies' => [],
+    ]);
+    self::assertCount(0, $code_component->getTypedData()->validate());
+    $code_component->save();
+
+    $component = Component::load(JsComponent::componentIdFromJavascriptComponentId($code_component->id()));
+    self::assertInstanceOf(Component::class, $component);
+    $response = $this->getCrawlerForFormRequest('/canvas/api/v0/form/component-instance/canvas_page/' . $page->id(), $component, []);
+    self::assertSame('', $response->text());
+
+    // Create an instance of the no-props code component.
+    $page->setComponentTree([
+      [
+        'uuid' => '5f18db31-fa2f-4f4e-a377-dc0c6a0b7dc4',
+        'component_id' => $component->id(),
+        'inputs' => [],
+      ],
+    ]);
+    self::assertCount(0, $page->validate());
+    self::assertSame(SAVED_UPDATED, $page->save());
+
+    // Delete the code component through the config factory to avoid normal
+    // dependency cleanup that would also remove the Component entity.
+    $this->container->get('config.factory')
+      ->getEditable($code_component->getConfigDependencyName())
+      ->delete();
+
+    $response = $this->getCrawlerForFormRequest('/canvas/api/v0/form/component-instance/canvas_page/' . $page->id(), $component, json_decode('undefined'));
+    self::assertSame('Component is missing. Fix the component or copy values to a new component. Previously stored input []', $response->text());
+  }
+
+  private function getCrawlerForFormRequest(string $form_url, ComponentInterface $component_entity, ?array $form_canvas_props): Crawler {
+    // `$form_canvas_props` is nullable, so we can simulate the request having
+    // `undefined` as value, which happens when the inputs are empty on a
+    // missing component.
+    // @todo Make it not nullable in https://www.drupal.org/i/3558721
     $json = self::decodeResponse($this->request(Request::create($form_url, 'PATCH', [
       'form_canvas_tree' => json_encode([
         'nodeType' => 'component',
@@ -395,4 +552,3 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
   }
 
 }
-

@@ -10,7 +10,6 @@ use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Access\AccessResultInterface;
 use Drupal\Core\Block\BlockManagerInterface;
 use Drupal\Core\Block\BlockPluginInterface;
-use Drupal\Core\Block\MainContentBlockPluginInterface;
 use Drupal\Core\Block\MessagesBlockPluginInterface;
 use Drupal\Core\Block\Plugin\Block\Broken;
 use Drupal\Core\Block\TitleBlockPluginInterface;
@@ -27,7 +26,6 @@ use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Form\SubformState;
 use Drupal\Core\Link;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
-use Drupal\Core\Plugin\Context\ContextDefinitionInterface;
 use Drupal\Core\Plugin\PluginDependencyTrait;
 use Drupal\Core\Plugin\PluginFormFactoryInterface;
 use Drupal\Core\Plugin\PluginFormInterface;
@@ -39,10 +37,8 @@ use Drupal\Core\Routing\RouteProviderInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
-use Drupal\Core\Validation\Plugin\Validation\Constraint\FullyValidatableConstraint;
 use Drupal\canvas\Attribute\ComponentSource;
 use Drupal\canvas\AutoSave\AutoSaveManager;
-use Drupal\canvas\ComponentDoesNotMeetRequirementsException;
 use Drupal\canvas\ComponentSource\ComponentSourceBase;
 use Drupal\canvas\Entity\Component as ComponentEntity;
 use Drupal\canvas\Form\ClientFormSubmissionHelper;
@@ -66,6 +62,9 @@ use Symfony\Component\Validator\ConstraintViolationListInterface;
   // While Canvas does not support context mappings yet, Block plugins also can
   // contain logic and perform e.g. database queries that fetch data to present.
   supportsImplicitInputs: TRUE,
+  discovery: BlockComponentDiscovery::class,
+  // @see \Drupal\Core\Block\BlockManager::__construct()
+  discoveryCacheTags: [],
 )]
 final class BlockComponent extends ComponentSourceBase implements ContainerFactoryPluginInterface {
 
@@ -129,16 +128,10 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
   }
 
   /**
-   * Generate a component ID given a block plugin ID.
-   *
-   * @param string $pluginId
-   *   Block plugin ID.
-   *
-   * @return string
-   *   Generated component ID.
+   * @todo Remove in https://www.drupal.org/project/canvas/issues/3561267.
    */
   public static function componentIdFromBlockPluginId(string $pluginId): string {
-    return 'block.' . \str_replace(':', '.', $pluginId);
+    return BlockComponentDiscovery::getComponentConfigEntityId($pluginId);
   }
 
   /**
@@ -187,6 +180,12 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
   public function renderComponent(array $inputs, array $slot_definitions, string $componentUuid, bool $isPreview = FALSE): array {
     $block = $this->getBlockPlugin();
 
+    // Avoid the fallback rendering of the Block system; instead use Canvas'
+    // own.
+    // @see \Drupal\Core\Block\Plugin\Block\Broken::build()
+    if ($block instanceof Broken) {
+      throw new \OutOfBoundsException('This block is broken or missing.');
+    }
     // @todo Refine to reflect the edited entity route in https://www.drupal.org/i/3509500
     if ($isPreview && $block instanceof SystemBreadcrumbBlock) {
       $block = new SystemBreadcrumbBlock(
@@ -242,11 +241,6 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
     }
 
     $build['content'] = $block->build();
-    // Avoid the fallback rendering of the Block system; instead use Canvas' own.
-    // @see \Drupal\Core\Block\Plugin\Block\Broken::build()
-    if ($block instanceof Broken) {
-      $build['#pre_render'][] = [self::class, 'bubbleBrokenBlock'];
-    }
     if (Element::isEmpty($build['content'])) {
       return $build;
     }
@@ -373,7 +367,7 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
   public function buildComponentInstanceForm(
     array $form,
     FormStateInterface $form_state,
-    ?ComponentEntity $component = NULL,
+    ComponentEntity $component,
     string $component_instance_uuid = '',
     array $inputValues = [],
     ?EntityInterface $entity = NULL,
@@ -484,48 +478,6 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
     return $this->translateConstraintPropertyPathsAndRoot(['' => \sprintf('inputs.%s.', $component_instance_uuid)], $violations);
   }
 
-  /**
-   * {@inheritdoc}
-   */
-  public function checkRequirements(): void {
-    $block = $this->getBlockPlugin();
-    // The main content is rendered in a fixed position.
-    // @see \Drupal\canvas\Plugin\DisplayVariant\CanvasPageVariant::build()
-    if ($block instanceof MainContentBlockPluginInterface) {
-      return;
-    }
-    $settings = $block->defaultConfiguration();
-    $data_definition = $this->typedConfigManager->createFromNameAndData('block.settings.' . $block->getPluginId(), $settings);
-    // We currently support only block plugins with no settings, or if they do
-    // have settings, they must be fully validatable.
-    $fullyValidatable = FALSE;
-    foreach ($data_definition->getConstraints() as $constraint) {
-      if ($constraint instanceof FullyValidatableConstraint) {
-        $fullyValidatable = TRUE;
-        break;
-      }
-    }
-
-    $reasons = [];
-    if (!empty($settings) && !$fullyValidatable) {
-      $reasons[] = 'Block plugin settings must opt into strict validation. Use the FullyValidatable constraint. See https://www.drupal.org/node/3404425';
-    }
-
-    $plugin_definition = $block->getPluginDefinition();
-    assert(is_array($plugin_definition));
-    $required_contexts = array_filter(
-      $plugin_definition['context_definitions'],
-      fn (ContextDefinitionInterface $definition): bool => $definition->isRequired(),
-    );
-    if ($required_contexts) {
-      $reasons[] = 'Block plugins that require context values are not supported.';
-    }
-
-    if ($reasons) {
-      throw new ComponentDoesNotMeetRequirementsException($reasons);
-    }
-  }
-
   protected function submitBlockConfigurationForm(
     BlockPluginInterface $block_plugin,
     string $component_instance_uuid,
@@ -626,11 +578,14 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
           foreach ($errors as $element_path => $error) {
             $parents = \explode('][', $element_path);
             $element = NestedArray::getValue($form, $parents);
+            // If validation changed the user's input but still resulted in an
+            // error, revert back to the user-provided value so that is stored
+            // in the temp store.
             // Check for #required errors.
+            $form_state->setValue($parents, NestedArray::getValue($input, $parents));
             if (($error instanceof TranslatableMarkup && $error->getUntranslatedString() === '@name field is required.') ||
               ((string) $error === ($element['#required_error'] ?? NULL))) {
-              // Fall-back to the default value and ignore the error.
-              $form_state->setValue($parents, NestedArray::getValue($input, $parents));
+              // Ignore the error.
               continue;
             }
             // Remove the 'settings' key added in the ::buildForm method.
@@ -681,15 +636,6 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
       }
 
     };
-  }
-
-  /**
-   * Used to avoid the fallback rendering of the Block system.
-   *
-   * @see \Drupal\Core\Block\Plugin\Block\Broken::build()
-   */
-  public static function bubbleBrokenBlock(): never {
-    throw new \OutOfBoundsException('This block is broken or missing.');
   }
 
 }
