@@ -9,6 +9,7 @@ use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Cache\CacheableJsonResponse;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
+use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Entity\ContentEntityTypeInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityPublishedInterface;
@@ -30,6 +31,7 @@ use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\Url;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Entity\Page;
+use Drupal\canvas\Entity\StagedConfigUpdate;
 use Drupal\canvas\Resource\CanvasResourceLink;
 use Drupal\canvas\Resource\CanvasResourceLinkCollection;
 use Drupal\canvas\CanvasUriDefinitions;
@@ -64,6 +66,7 @@ final class ApiContentControllers {
     private readonly AccountProxyInterface $currentUser,
     #[Autowire(service: 'transliteration')]
     private readonly TransliterationInterface $transliteration,
+    private readonly ConfigFactoryInterface $configFactory,
   ) {}
 
   public function post(Request $request, string $entity_type): JsonResponse {
@@ -150,6 +153,13 @@ final class ApiContentControllers {
 
       // Set the entity status based on the request.
       if ($body['status'] === FALSE) {
+        // Prevent archiving the homepage.
+        if ($canvas_page->isPublished() && $this->isHomepage($canvas_page)) {
+          return new JsonResponse(
+            data: ['error' => 'Cannot archive the homepage. Please set a different page as the homepage first.'],
+            status: Response::HTTP_FORBIDDEN
+          );
+        }
         // Archive: set as unpublished.
         $entity_to_update->setUnpublished();
       }
@@ -530,9 +540,31 @@ final class ApiContentControllers {
       }
     }
 
+    // Don't show archive link if this page is the homepage (current or staged).
+    if ($should_show_archive && $content_entity instanceof FieldableEntityInterface) {
+      if ($this->isHomepage($content_entity)) {
+        $should_show_archive = FALSE;
+      }
+    }
+
     foreach ($possible_operations as $link_rel => ['route_name' => $route_name, 'op' => $entity_operation]) {
+      // Special handling for set as homepage operation: don't show for
+      // unpublished pages.
+      if ($link_rel === CanvasUriDefinitions::LINK_REL_SET_AS_HOMEPAGE) {
+        if (!$effective_is_published) {
+          $access = AccessResult::forbidden(
+            'Set as homepage action not available for unpublished pages.'
+          )->addCacheableDependency($content_entity);
+          if ($autoSaveEntity) {
+            $access->addCacheableDependency($autoSaveEntity);
+          }
+        }
+        else {
+          $access = $content_entity->access(operation: $entity_operation, return_as_object: TRUE);
+        }
+      }
       // Special handling for archive operation: only show if determined above
-      if ($link_rel === CanvasUriDefinitions::LINK_REL_ARCHIVE) {
+      elseif ($link_rel === CanvasUriDefinitions::LINK_REL_ARCHIVE) {
         if (!$should_show_archive) {
           $access = AccessResult::forbidden(
             'Archive action not available for this page state.'
@@ -590,6 +622,56 @@ final class ApiContentControllers {
       }
     }
     return $links;
+  }
+
+  /**
+   * Checks if the given entity's path is set as the homepage.
+   *
+   * Checks both the current homepage configuration and any staged homepage
+   * configuration changes to prevent archiving the current or pending homepage.
+   *
+   * @param \Drupal\Core\Entity\FieldableEntityInterface $entity
+   *   The entity to check.
+   *
+   * @return bool
+   *   TRUE if the entity's path is the homepage (current or staged), FALSE
+   *   otherwise.
+   */
+  private function isHomepage(FieldableEntityInterface $entity): bool {
+    try {
+      $url = $entity->toUrl('canonical');
+      $path_alias = $url->toString();
+      $internal_path = '/' . $url->getInternalPath();
+      $paths = array_unique([$path_alias, $internal_path]);
+    }
+    catch (\Exception) {
+      return FALSE;
+    }
+
+    // Check current homepage configuration.
+    $system_config = $this->configFactory->get('system.site');
+    $current_homepage = $system_config->get('page.front');
+    if (in_array($current_homepage, $paths, TRUE)) {
+      return TRUE;
+    }
+
+    // Check staged homepage configuration.
+    $staged_homepage_config = $this->entityTypeManager
+      ->getStorage('staged_config_update')
+      ->load('canvas_set_homepage');
+    if ($staged_homepage_config instanceof StagedConfigUpdate) {
+      $actions = $staged_homepage_config->getActions();
+      foreach ($actions as $action) {
+        if (isset($action['input']['page.front'])) {
+          $staged_homepage = $action['input']['page.front'];
+          if (in_array($staged_homepage, $paths, TRUE)) {
+            return TRUE;
+          }
+        }
+      }
+    }
+
+    return FALSE;
   }
 
   /**
