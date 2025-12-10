@@ -113,26 +113,23 @@ function canvas_contextual_links_alter(array &$links, string $group, array $rout
   if ($group == 'node') {
     $node = \Drupal::entityTypeManager()->getStorage('node')->load($route_parameters['node']);
     if ($node instanceof FieldableEntityInterface) {
-      // Get all available view modes for the node entity type.
-      $entity_display_repository = \Drupal::service('entity_display.repository');
-      $view_modes = $entity_display_repository->getViewModes('node');
+      // This is set in canvas_node_view_alter() and represents the view mode
+      // currently being displayed.
+      $view_mode = $route_parameters['view_mode'];
 
-      // Find the first enabled content template for this node.
-      foreach ($view_modes as $view_mode_id => $view_mode_info) {
-        $template = ContentTemplate::loadForEntity($node, $view_mode_id);
-        if ($template) {
-          $links['canvas_edit_template'] = [
-            'title' => t('Edit content template'),
-            'route_name' => 'canvas.content_template.edit',
-            'route_parameters' => [
-              'node_type' => $node->bundle(),
-              'node_id' => $node->id(),
-              'view_mode' => $view_mode_id,
-            ],
-            'weight' => 11,
-          ];
-          break;
-        }
+      // Check if a content template exists for the current view mode.
+      $template = ContentTemplate::loadForEntity($node, $view_mode);
+      if ($template) {
+        $links['canvas_edit_template'] = [
+          'title' => t('Edit content template'),
+          'route_name' => 'canvas.content_template.edit',
+          'route_parameters' => [
+            'node_type' => $node->bundle(),
+            'node_id' => $node->id(),
+            'view_mode' => $view_mode,
+          ],
+          'weight' => 11,
+        ];
       }
     }
   }
@@ -156,8 +153,7 @@ function canvas_node_view_alter(array &$build, EntityInterface $entity, EntityVi
     $template = ContentTemplate::loadForEntity($entity, $display->getMode());
     if ($template) {
       $build['#contextual_links']['node'] = [
-        'route_parameters' => ['node' => $entity->id()],
-        'metadata' => ['view_mode' => $display->getMode()],
+        'route_parameters' => ['node' => $entity->id(),'view_mode' => $display->getMode() ],
       ];
     }
   }
