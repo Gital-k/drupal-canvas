@@ -110,7 +110,8 @@ function canvas_preprocess_html(array &$variables): void {
  * Implements hook_contextual_links_alter().
  */
 function canvas_contextual_links_alter(array &$links, string $group, array $route_parameters): void {
-  if ($group == 'node') {
+  if ($group == 'node' && isset($route_parameters['node'],
+      $route_parameters['view_mode'])) {
     $node = \Drupal::entityTypeManager()->getStorage('node')->load($route_parameters['node']);
     if ($node instanceof FieldableEntityInterface) {
       // This is set in canvas_node_view_alter() and represents the view mode
@@ -119,7 +120,7 @@ function canvas_contextual_links_alter(array &$links, string $group, array $rout
 
       // Check if a content template exists for the current view mode.
       $template = ContentTemplate::loadForEntity($node, $view_mode);
-      if ($template) {
+      if ($template && \Drupal::currentUser()->hasPermission(ContentTemplate::ADMIN_PERMISSION)) {
         $links['canvas_edit_template'] = [
           'title' => t('Edit content template'),
           'route_name' => 'canvas.content_template.edit',
@@ -152,9 +153,8 @@ function canvas_node_view_alter(array &$build, EntityInterface $entity, EntityVi
     // Check if a content template exists and is enabled for this node
     $template = ContentTemplate::loadForEntity($entity, $display->getMode());
     if ($template) {
-      $build['#contextual_links']['node'] = [
-        'route_parameters' => ['node' => $entity->id(), 'view_mode' => $display->getMode()],
-      ];
+      $build['#contextual_links']['node']['route_parameters']['node'] = $entity->id();
+      $build['#contextual_links']['node']['route_parameters']['view_mode'] = $display->getMode();
     }
   }
 }
