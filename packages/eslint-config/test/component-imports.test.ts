@@ -157,40 +157,40 @@ testRunner.run('component-imports rule', rule, {
       errors: [
         {
           message:
-            'FormattedText component was moved into "drupal-canvas" package.',
+            'The `FormattedText` component was moved into the `drupal-canvas` package.',
           line: 2,
         },
         {
           message:
-            'FormattedText component was moved into "drupal-canvas" package.',
+            'The `FormattedText` component was moved into the `drupal-canvas` package.',
           line: 3,
         },
         {
           message:
-            'Preconfigured JsonApiClient was moved into "drupal-canvas" package.',
+            'The preconfigured `JsonApiClient` was moved into the `drupal-canvas` package.',
           line: 4,
         },
         {
           message:
-            'Using next-image-standalone directly is deprecated. Use "Image" component from "drupal-canvas" package instead.',
+            'Using `next-image-standalone` directly is deprecated. Use the `Image` component from the `drupal-canvas` package instead.',
           line: 5,
         },
         {
           message:
-            'Using next-image-standalone directly is deprecated. Use "Image" component from "drupal-canvas" package instead.',
+            'Using `next-image-standalone` directly is deprecated. Use the `Image` component from the `drupal-canvas` package instead.',
           line: 6,
         },
         {
           message:
-            'JSON:API utilities were moved into "drupal-canvas" package.',
+            'JSON:API utilities were moved into the `drupal-canvas` package.',
           line: 7,
         },
         {
-          message: 'Utilities were moved into "drupal-canvas" package.',
+          message: 'Utilities were moved into the `drupal-canvas` package.',
           line: 8,
         },
         {
-          message: 'Drupal utilities were moved into "drupal-canvas" package.',
+          message: 'Drupal utilities were moved into the `drupal-canvas` package.',
           line: 9,
         },
       ],
@@ -220,11 +220,11 @@ testRunner.run('component-imports rule', rule, {
       filename: '/components/button/index.jsx',
       errors: [
         {
-          message: 'Drupal utilities were moved into "drupal-canvas" package.',
+          message: 'Drupal utilities were moved into the `drupal-canvas` package.',
           line: 2,
         },
         {
-          message: 'Drupal utilities were moved into "drupal-canvas" package.',
+          message: 'Drupal utilities were moved into the `drupal-canvas` package.',
           line: 3,
         },
       ],
