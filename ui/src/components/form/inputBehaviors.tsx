@@ -31,6 +31,41 @@ import type { PropsValues } from '@/types/Form';
 
 const ajv = new Ajv();
 
+// Helper function to dispatch field value updates
+const dispatchFieldValue = (
+  dispatch: ReturnType<typeof useAppDispatch>,
+  formId: FormId,
+  fieldName: string,
+  value: any,
+) => {
+  dispatch(
+    setFieldValue({
+      formId,
+      fieldName,
+      value,
+    }),
+  );
+};
+
+// Helper function to dispatch field error updates
+const dispatchFieldError = (
+  dispatch: ReturnType<typeof useAppDispatch>,
+  formId: FormId,
+  fieldName: string,
+  validationResult: ValidationResult,
+) => {
+  dispatch(
+    setFieldError({
+      type: 'error',
+      message:
+        validationResult.errorMessage ||
+        ajv.errorsText(validationResult.errors),
+      formId,
+      fieldName,
+    }),
+  );
+};
+
 export const POLLED_BACKGROUND_TIMEOUT = 1000;
 export const DEBOUNCE_TIMEOUT = 400;
 export const IMMEDIATE_TIMEOUT = 0;
@@ -126,12 +161,11 @@ export const InputBehaviorsCommon = ({
       return;
     }
     if (fieldName && formId) {
-      dispatch(
-        setFieldValue({
-          formId,
-          fieldName,
-          value: elementType === 'checkbox' ? !!inputValue : inputValue,
-        }),
+      dispatchFieldValue(
+        dispatch,
+        formId,
+        fieldName,
+        elementType === 'checkbox' ? !!inputValue : inputValue,
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -147,12 +181,11 @@ export const InputBehaviorsCommon = ({
     // our form state and value.
     const formBuildIdListener = (e: AjaxUpdateFormBuildIdEvent) => {
       if (e.detail.formId === formId) {
-        dispatch(
-          setFieldValue({
-            formId,
-            fieldName,
-            value: e.detail.newFormBuildId,
-          }),
+        dispatchFieldValue(
+          dispatch,
+          formId,
+          fieldName,
+          e.detail.newFormBuildId,
         );
         setInputValue(e.detail.newFormBuildId);
       }
@@ -209,13 +242,7 @@ export const InputBehaviorsCommon = ({
       }
       // Update the value of the input in the Redux store.
       if (formId) {
-        dispatch(
-          setFieldValue({
-            formId,
-            fieldName,
-            value: newValue,
-          }),
-        );
+        dispatchFieldValue(dispatch, formId, fieldName, newValue);
       }
 
       // Check the current value against the JSON Schema definition for the
@@ -229,16 +256,7 @@ export const InputBehaviorsCommon = ({
       ) {
         const validationResult = validateNewValue(e, newValue);
         if (!validationResult.valid && formId) {
-          dispatch(
-            setFieldError({
-              type: 'error',
-              message:
-                validationResult.errorMessage ||
-                ajv.errorsText(validationResult.errors),
-              formId,
-              fieldName,
-            }),
-          );
+          dispatchFieldError(dispatch, formId, fieldName, validationResult);
           if (!validationResult?.skipEarlyReturn) {
             return;
           }
@@ -263,16 +281,7 @@ export const InputBehaviorsCommon = ({
       if (!validationResult.valid) {
         if (formId) {
           attributes['data-invalid-prop-value'] = 'true';
-          dispatch(
-            setFieldError({
-              type: 'error',
-              message:
-                validationResult.errorMessage ||
-                ajv.errorsText(validationResult.errors),
-              formId,
-              fieldName,
-            }),
-          );
+          dispatchFieldError(dispatch, formId, fieldName, validationResult);
         }
       }
     };
