@@ -74,6 +74,10 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
   const [iframeSrcDoc, setIframeSrcDoc] = useState('');
 
   // @see JsComponent.php
+  // Whenever updating this import map, also update the list of supported imports
+  // in packages/eslint-config/src/rules/component-imports.ts.
+  // @see https://drupal.org/i/3552914
+  // @see https://drupal.org/i/3560197
   const importMap = useMemo(
     () => ({
       imports: {
@@ -267,31 +271,6 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
     props,
     slots,
   ]);
-
-  // Add an invisible overlay to the iframe when the Mosaic window is being resized.
-  // This prevents the iframe from intercepting mouse events from the parent Mosaic window.
-  // This is necessary because when a user is resizing their preview window, and their mouse enters the iframe,
-  // the parent window stops receiving mouse events so the resizing stops.
-  useEffect(() => {
-    const handleOnChange = () => {
-      if (parentRef.current) {
-        parentRef.current.classList.add('iframe-overlay');
-      }
-    };
-    const handleOnRelease = () => {
-      if (parentRef.current) {
-        parentRef.current.classList.remove('iframe-overlay');
-      }
-    };
-
-    window.addEventListener('mosaicOnChange', handleOnChange);
-    window.addEventListener('mosaicOnRelease', handleOnRelease);
-
-    return () => {
-      window.removeEventListener('mosaicOnChange', handleOnChange);
-      window.removeEventListener('mosaicOnRelease', handleOnRelease);
-    };
-  }, []);
 
   const renderCompileError = () => (
     <ErrorCard

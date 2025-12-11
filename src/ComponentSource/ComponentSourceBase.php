@@ -12,6 +12,8 @@ use Drupal\Core\Plugin\ContextAwarePluginTrait;
 use Drupal\Core\Plugin\PluginBase;
 
 /**
+ * @internal
+ *
  * Defines a base class for component source plugins.
  *
  * @see \Drupal\canvas\Attribute\ComponentSource
@@ -179,6 +181,18 @@ abstract class ComponentSourceBase extends PluginBase implements ComponentSource
   public function optimizeExplicitInput(array $values): array {
     // Nil-op.
     return $values;
+  }
+
+  /**
+   * @todo Remove in clean-up follow-up; minimize non-essential changes.
+   */
+  public function checkRequirements(): void {
+    $discovery_class = $this->getPluginDefinition()['discovery'];
+    // @phpstan-ignore globalDrupalDependencyInjection.useDependencyInjection
+    $discovery = \Drupal::classResolver($discovery_class);
+    \assert($discovery instanceof ComponentCandidatesDiscoveryInterface);
+
+    $discovery->checkRequirements($this->getSourceSpecificComponentId());
   }
 
 }

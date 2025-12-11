@@ -54,6 +54,7 @@ to one of us! 😊 🙏
   - TBD: `remote prop source`: a `prop source` powered by a remote source ("external data"), i.e. data stored outside Drupal
 - `structured data`: the data model defined by a Site Builder in a `content type`, and whose smallest units are `field props` — queryable by Views
 - `unstructured data`: the ad-hoc data used to populate `component input`s that are not populated using `unstructured data` — NOT queryable by Views, this should be minimized/discouraged
+- `well-known prop shape`: a `prop shape` that is _named_: one that is defined in a module's or theme's `/schema.json` file and is then referenced (`$ref`) from the JSON schema for that `component input`.
 
 ## 2. Product requirements
 
@@ -71,7 +72,7 @@ This adds to the product requirements listed in [`Canvas Components` doc](compon
 
 This uses the terms defined above.
 
-### 3.1 Data Model: from Front-End Developer to an Canvas data model that empowers the Content Creator
+### 3.1 Data Model: from Front-End Developer to a Canvas data model that empowers the Content Creator
 
 ⚠️ This only applies to `component`s originating from a `Component Source Plugin` that DO NOT have an input UX (such as
 `SDC`), for others the UX and storage are both simply the existing one, and NOTHING in this document applies! ⚠️
@@ -138,7 +139,9 @@ value that fits in the `prop shape`.
 See `\Drupal\canvas\PropSource\DynamicPropSource`.
 
 ⚠️ **Multiple** bits of `structured data` may be able to fit into a given `prop shape`. All viable choices are
-suggested by `\Drupal\canvas\ShapeMatcher\PropSourceSuggester`. The Content Creator or Site Builder will choose one.
+suggested by `\Drupal\canvas\ShapeMatcher\PropSourceSuggester`, with irrelevant choices omitted (such as the
+"Default translation" boolean, or the "Revision log message" prose string). The Content Creator or Site Builder will
+choose one.
 
 ℹ️ The completeness of this is tested by `\Drupal\Tests\canvas\Kernel\EcosystemSupport\FieldTypeSupportTest`.
 
@@ -147,6 +150,7 @@ suggested by `\Drupal\canvas\ShapeMatcher\PropSourceSuggester`. The Content Crea
 See:
 - `\Drupal\canvas\JsonSchemaInterpreter\JsonSchemaType::computeStorablePropShape()`
 - `\Drupal\canvas\PropShape\StorablePropShape`
+- `\Drupal\canvas\PropShape\PropShape::standardize()`
 - `hook_storage_prop_shape_alter()`
 
 For any `unstructured data`, no field settings exist yet, so the appropriate settings for a `prop shape` must be
@@ -155,6 +159,11 @@ available in Drupal core. Unlike for `structured data`, no additional complexity
 optional `component input`s.
 
 Contributed modules can implement `hook_storage_prop_shape_alter()` to make different choices.
+
+Any `component input` whose `prop shape` corresponds to a `well-known prop shape` may cause _two_ invocations of that
+alter hook:
+1. once for the `well-known prop shape` (so: `"type": "string|object|…", "$ref": "json-schema-definitions://…"`), if any
+2. once for the resolved equivalent (with `$ref` resolved) — unless the above already found a result
 
 The computed `\Drupal\canvas\PropShape\StorablePropShape` can be used to create a `static prop source`
 (which contains all information for the `conjured field` that powers it), that can be _evaluated_ to retrieve the stored

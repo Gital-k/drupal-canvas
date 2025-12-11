@@ -7,8 +7,8 @@ namespace Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\canvas\Entity\Page;
-use Drupal\canvas\Plugin\BlockManager;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponentDiscovery;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas_test_block\Plugin\Block\CanvasTestBlockInputNone;
 use Drupal\canvas_test_block\Plugin\Block\CanvasTestBlockInputSchemaChangePoc;
@@ -16,6 +16,7 @@ use Drupal\canvas_test_block\Plugin\Block\CanvasTestBlockInputValidatable;
 use Drupal\canvas_test_block\Plugin\Block\CanvasTestBlockInputValidatableCrash;
 use Drupal\canvas_test_block\Plugin\Block\CanvasTestBlockOptionalContexts;
 use Drupal\canvas_test_block_form\Plugin\Block\CanvasTestBlockForm;
+use Drupal\Core\Block\BlockManagerInterface;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Config\TypedConfigManagerInterface;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
@@ -33,7 +34,9 @@ use Symfony\Component\Validator\ConstraintViolationInterface;
 
 /**
  * @coversDefaultClass \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent
+ * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponentDiscovery
  * @group canvas
+ * @group canvas_component_sources
  * @phpstan-import-type ComponentConfigEntityId from \Drupal\canvas\Entity\Component
  */
 final class BlockComponentTest extends ComponentSourceTestBase {
@@ -65,14 +68,14 @@ final class BlockComponentTest extends ComponentSourceTestBase {
   /**
    * All test module blocks must either have a Component or a reason why not.
    *
-   * @covers ::checkRequirements()
-   * @covers \Drupal\canvas\Plugin\BlockManager::setCachedDefinitions()
+   * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponentDiscovery::discover()
+   * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponentDiscovery::checkRequirements()
    */
   public function testDiscovery(): array {
     $components = Component::loadMultiple();
     foreach ($components as $component) {
       if ($component->getComponentSource() instanceof BlockComponent) {
-        self::assertSame(in_array($component->get('source_local_id'), BlockManager::BLOCKS_TO_KEEP_ENABLED, TRUE), $component->status());
+        self::assertSame(in_array($component->get('source_local_id'), BlockComponentDiscovery::BLOCKS_TO_KEEP_ENABLED, TRUE), $component->status());
       }
     }
 
@@ -195,12 +198,12 @@ final class BlockComponentTest extends ComponentSourceTestBase {
   }
 
   /**
-   * @covers ::componentIdFromBlockPluginId()
+   * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponentDiscovery::getComponentConfigEntityId
    * @testWith ["foo", "block.foo"]
    *           ["system_menu_block:footer", "block.system_menu_block.footer"]
    */
   public function testComponentIdFromBlockPluginId(string $input, string $expected_output): void {
-    self::assertSame($expected_output, BlockComponent::componentIdFromBlockPluginId($input));
+    self::assertSame($expected_output, BlockComponentDiscovery::getComponentConfigEntityId($input));
   }
 
   /**
@@ -436,7 +439,7 @@ HTML,
   }
 
   /**
-   * @covers \Drupal\canvas\Plugin\BlockManager::setCachedDefinitions()
+   * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponentDiscovery::computeCurrentComponentMetadata()
    */
   public function testDependencyUpdate(): void {
     // Install the default menus provided by system.module.
@@ -555,23 +558,65 @@ HTML,
       ],
     ], NULL);
     $violations = $source->validateComponentInput($input, $uuid, NULL);
-    self::assertCount(1, $violations);
-    $first = $violations[0];
-    \assert($first instanceof ConstraintViolationInterface);
-    self::assertEquals('You better call me on the phone', $first->getMessage());
-    self::assertEquals(\sprintf('inputs.%s.canvas_page', $uuid), $first->getPropertyPath());
+    $violationMap = \array_map(static fn(ConstraintViolationInterface $violation) => \sprintf('%s:%s', $violation->getPropertyPath(), $violation->getMessage()), \iterator_to_array($violations));
+    self::assertCount(2, $violations, \implode(', ', $violationMap));
+    self::assertEquals([
+      \sprintf('inputs.%s.canvas_page:This value should be of the correct primitive type.', $uuid),
+      \sprintf('inputs.%s.canvas_page:You better call me on the phone', $uuid),
+    ], $violationMap);
+
+    // Test that the violation error bubbles to a parent entity.
+    $page3 = Page::create(['title' => 'Glitter shot']);
+    $page3->set('components', [
+      [
+        'uuid' => '922b4cbd-4b99-46ce-a253-ff80f8560e9d',
+        'component_id' => 'block.' . CanvasTestBlockForm::PLUGIN_ID,
+        'inputs' => [
+          'label' => 'Page',
+          'label_display' => '0',
+          'multiplier' => 0,
+          'canvas_page' => 0,
+        ],
+      ],
+    ]);
+    $item = $page3->get('components')->first();
+    \assert($item instanceof ComponentTreeItem);
+    $component = $item->getComponent();
+    \assert($component instanceof Component);
+    $source = $component->getComponentSource();
+    \assert($source instanceof BlockComponent);
+    // Simulate submitting invalid input.
+    $item->setInput(
+      // @phpstan-ignore-next-line
+      $source->clientModelToInput('922b4cbd-4b99-46ce-a253-ff80f8560e9d', $component, [
+        'resolved' => [
+          'canvas_page' => 'There is no such place',
+        ],
+      ], $page3)
+    );
+    $violations = $page3->validate();
+    $violationMap = \array_map(static fn(ConstraintViolationInterface $violation) => \sprintf('%s:%s', $violation->getPropertyPath(), $violation->getMessage()), \iterator_to_array($violations));
+    self::assertCount(2, $violations, \implode(', ', $violationMap));
+    self::assertEquals([
+      "components.0.inputs.922b4cbd-4b99-46ce-a253-ff80f8560e9d.canvas_page:This value should be of the correct primitive type.",
+      'components.0.inputs.922b4cbd-4b99-46ce-a253-ff80f8560e9d.canvas_page:There are no pages matching "There is no such place".',
+    ], $violationMap);
   }
 
   protected function triggerBrokenComponent(ComponentInterface $component): BrokenPluginManagerInterface {
     /** @var \Drupal\Tests\canvas\Kernel\BrokenPluginManagerInterface */
-    return \Drupal::service(BlockManager::class);
+    return \Drupal::service(BlockManagerInterface::class);
   }
 
   public function alter(ContainerBuilder $container): void {
     // Swap in the broken version of this class.
     // @see ::triggerBrokenComponent()
     // @see ::testIsBroken()
-    $container->getDefinition(BlockManager::class)->setClass(BrokenBlockManager::class);
+    $container->getDefinition('plugin.manager.block')->setClass(BrokenBlockManager::class);
+  }
+
+  protected function getExpectedVerboseErrorMessage(): string {
+    return 'This block is broken or missing.';
   }
 
 }

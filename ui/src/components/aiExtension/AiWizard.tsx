@@ -19,6 +19,7 @@ import {
   selectCodeComponentProperty,
   setCodeComponentProperty,
 } from '@/features/code-editor/codeEditorSlice';
+import { deserializeProps } from '@/features/code-editor/utils/utils';
 import {
   selectModel,
   setUpdatePreview,
@@ -31,7 +32,7 @@ import {
   useCreateCodeComponentMutation,
   useGetComponentsQuery,
 } from '@/services/componentAndLayout';
-import { getDrupalSettings } from '@/utils/drupal-globals';
+import { getBaseUrl, getDrupalSettings } from '@/utils/drupal-globals';
 
 import fixtureProps from '../../../../modules/canvas_ai/src/PropsSchema.json';
 
@@ -40,7 +41,7 @@ import type {
   LayoutModelSliceState,
 } from '@/features/layout/layoutModelSlice';
 import type { CodeComponent } from '@/types/CodeComponent';
-import type { CanvasComponent } from '@/types/Component';
+import type { CanvasComponent, PropSourceComponent } from '@/types/Component';
 
 import styles from './AiWizard.module.css';
 
@@ -150,7 +151,17 @@ const propsMetadataHandler = {
   canHandle: (msg: any) => 'props_metadata' in msg && msg.props_metadata,
   handle: async ({ message, dispatch }: { message: any; dispatch: any }) => {
     const parsedProps = JSON.parse(message.props_metadata);
-    dispatch(setCodeComponentProperty(['props', parsedProps]));
+    // Deserialize from Record format to Array format.
+    const deserializedProps = deserializeProps(parsedProps);
+    dispatch(setCodeComponentProperty(['props', deserializedProps]));
+  },
+};
+
+const requiredPropsHandler = {
+  canHandle: (msg: any) =>
+    'required_props' in msg && Array.isArray(msg.required_props),
+  handle: async ({ message, dispatch }: { message: any; dispatch: any }) => {
+    dispatch(setCodeComponentProperty(['required', message.required_props]));
   },
 };
 
@@ -192,7 +203,7 @@ function removeMediaFields(componentDef: CanvasComponent, componentInst: any) {
   const newFieldValues = {} as any;
   const fieldValues = componentInst.fieldValues || {};
   for (const [key, value] of Object.entries(fieldValues)) {
-    const prop = (componentDef.propSources as any)[key];
+    const prop = (componentDef as PropSourceComponent).propSources[key];
     const isMedia =
       (prop?.sourceTypeSettings?.storage as any)?.target_type === 'media';
     if (!isMedia) {
@@ -273,6 +284,7 @@ const messageHandlers = [
   jsStructureHandler,
   componentStructureHandler,
   propsMetadataHandler,
+  requiredPropsHandler,
   metadataHandler,
   operationsHandler,
 ];
@@ -443,6 +455,9 @@ const AiWizard = () => {
   const codeComponentName = useAppSelector(
     selectCodeComponentProperty('machineName'),
   );
+  const codeComponentRequiredProps = useAppSelector(
+    selectCodeComponentProperty('required'),
+  );
   const model = useAppSelector(selectModel);
   const textPropsMap = Object.fromEntries(
     Object.entries(model).map(([uuid, comp]) => [uuid, comp.resolved]),
@@ -454,6 +469,9 @@ const AiWizard = () => {
   );
   let isComponentRendered = false;
   const welcomeTextRef = useRef<HTMLSpanElement>(null);
+  // AbortController to cancel ongoing requests when component unmounts
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const pollingStopSignalRef = useRef<{ stopped: boolean }>({ stopped: false });
   // Get the current layout, selected component, and available components from Redux state
   const theLayoutModel = useAppSelector(
     (state) => state?.layoutModel?.present as LayoutModelSliceState,
@@ -473,6 +491,7 @@ const AiWizard = () => {
     params,
     theLayoutModel,
     selectedComponent,
+    codeComponentRequiredProps,
   });
 
   // Update the ref whenever tracked values change.
@@ -484,6 +503,7 @@ const AiWizard = () => {
       params,
       theLayoutModel,
       selectedComponent,
+      codeComponentRequiredProps,
     };
   }, [
     codeComponentName,
@@ -492,6 +512,7 @@ const AiWizard = () => {
     params,
     selectedComponent,
     theLayoutModel,
+    codeComponentRequiredProps,
   ]);
   // Access layoutUtils and componentSelectionUtils from drupalSettings.canvas
   const layoutUtils = drupalSettings.canvas?.layoutUtils as any;
@@ -561,11 +582,26 @@ const AiWizard = () => {
     });
   };
 
+  // Cleanup effect to abort requests when component unmounts
+  useEffect(() => {
+    return () => {
+      // Abort any ongoing requests.
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      // Stop polling also if request is aborted.
+      if (pollingStopSignalRef.current) {
+        pollingStopSignalRef.current.stopped = true;
+      }
+    };
+  }, []);
+
   // Fetch CSRF token on mount.
   useEffect(() => {
     const fetchToken = async () => {
       try {
-        const response = await fetch('/admin/api/canvas/token', {
+        const baseUrl = getBaseUrl();
+        const response = await fetch(`${baseUrl}admin/api/canvas/token`, {
           credentials: 'same-origin',
         });
         if (!response.ok) {
@@ -788,6 +824,12 @@ const AiWizard = () => {
                     currentValuesRef.current.codeComponentName,
                   );
                   requestBody.append(
+                    'selected_component_required_props',
+                    JSON.stringify(
+                      currentValuesRef.current.codeComponentRequiredProps || [],
+                    ),
+                  );
+                  requestBody.append(
                     'layout',
                     currentValuesRef.current.textPropsMapString,
                   );
@@ -802,6 +844,8 @@ const AiWizard = () => {
                     entity_id: currentValuesRef.current.params.entityId,
                     selected_component:
                       currentValuesRef.current.codeComponentName,
+                    selected_component_required_props:
+                      currentValuesRef.current.codeComponentRequiredProps || [],
                     layout: currentValuesRef.current.textPropsMapString,
                     active_component_uuid:
                       currentValuesRef.current.selectedComponent ?? '',
@@ -826,6 +870,10 @@ const AiWizard = () => {
                   requestBody = JSON.stringify(parsedBody);
                 }
 
+                // Create a new AbortController for this request.
+                const abortController = new AbortController();
+                abortControllerRef.current = abortController;
+                pollingStopSignalRef.current = stopPolling;
                 // Start polling first
                 const chatEl = chatElementRef.current;
                 if (chatEl) {
@@ -851,6 +899,7 @@ const AiWizard = () => {
                   method: 'POST',
                   headers,
                   body: requestBody,
+                  signal: abortController.signal,
                 })
                   .then(async (response) => {
                     if (!response.ok) {
@@ -868,6 +917,11 @@ const AiWizard = () => {
                     pendingResponse = data;
                   })
                   .catch((error) => {
+                    // Don't show error if request was aborted intentionally
+                    if (error.name === 'AbortError') {
+                      console.log('AI request was aborted');
+                      return;
+                    }
                     console.error('AI request failed:', error);
                     stopPolling.stopped = true;
                     signals.onResponse({
@@ -880,7 +934,12 @@ const AiWizard = () => {
                       chatElementRef.current?.disableSubmitButton();
                     }, 0);
                   });
-              } catch (error) {
+              } catch (error: any) {
+                // Don't show error if request was aborted intentionally
+                if (error.name === 'AbortError') {
+                  console.log('AI request was aborted');
+                  return;
+                }
                 console.error('AI request failed:', error);
                 stopPolling.stopped = true;
                 await signals.onResponse({
@@ -1032,7 +1091,7 @@ const AiWizard = () => {
           #chat-view:has(#messages:empty) {
             display: block;
           }
-          #input:has(#file-attachment-container[style*='display: block']) {
+          #chat-view:has(#messages:empty) #input:has(#file-attachment-container[style*='display: block']) {
             margin-top: 40px;
           }
           .text-message h1 {

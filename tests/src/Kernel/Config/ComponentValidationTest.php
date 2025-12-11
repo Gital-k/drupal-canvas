@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Config;
 
+use Drupal\canvas\ComponentDoesNotMeetRequirementsException;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponentDiscovery;
 use Drupal\Core\Config\Schema\SchemaIncompleteException;
-use Drupal\Core\Theme\ComponentPluginManager as CoreComponentPluginManager;
 use Drupal\canvas\ComponentSource\ComponentSourceInterface;
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\canvas\Entity\Component;
@@ -14,10 +15,10 @@ use Drupal\canvas\Entity\Folder;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Entity\VersionedConfigEntityBase;
 use Drupal\canvas\Entity\VersionedConfigEntityInterface;
-use Drupal\canvas\Plugin\ComponentPluginManager;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent;
+use Drupal\Core\Theme\ComponentPluginManager;
 use Drupal\Tests\canvas\Kernel\Traits\CiModulePathTrait;
 use Drupal\Tests\canvas\Traits\BetterConfigDependencyManagerTrait;
 use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
@@ -29,6 +30,7 @@ use Symfony\Component\Yaml\Yaml;
  * Tests validation of component entities.
  *
  * @group canvas
+ * @group canvas_component_sources
  */
 class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
 
@@ -37,8 +39,6 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
   use ContribStrictConfigSchemaTestTrait;
   use GenerateComponentConfigTrait;
   use CiModulePathTrait;
-
-  protected CoreComponentPluginManager $componentPluginManager;
 
   /**
    * {@inheritdoc}
@@ -54,6 +54,7 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
     'options',
     'path',
     'link',
+    'text',
     'filter',
     'ckeditor5',
     'editor',
@@ -166,7 +167,6 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
       'label' => 'Test',
     ]);
     $this->entity->save();
-    $this->componentPluginManager = $this->container->get(ComponentPluginManager::class);
   }
 
   /**
@@ -285,13 +285,10 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
     $props['target']['examples'][] = '_blank';
     // @todo Consider supporting this in https://www.drupal.org/i/3514672
     unset($props['target']['default']);
-    // @todo Remove these 2 in https://www.drupal.org/i/3516602
-    unset($props['target']['meta:enum']);
-    unset($props['target']['x-translation-context']);
     JavaScriptComponent::create([
       'machineName' => 'my-cta',
       'name' => $this->getRandomGenerator()->sentences(5),
-      'status' => FALSE,
+      'status' => TRUE,
       'props' => $props,
       'required' => $sdc_yaml['props']['required'],
       'js' => ['original' => '', 'compiled' => ''],
@@ -465,10 +462,38 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
     yield 'null' => [NULL, []];
   }
 
+  /**
+   * @covers \Drupal\canvas\Plugin\Validation\Constraint\ComponentStatusConstraintValidator
+   * @todo Consider moving this (and its sibling ::testStatusWithBlock()) to
+   *   \Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource\ComponentSourceTestBase in https://www.drupal.org/project/canvas/issues/3561271.
+   * @see \Drupal\canvas\ComponentSource\ComponentSourceManager::generateComponentsForSource())
+   */
   public function testStatusWithSdc(): void {
-    $component = Component::load('sdc.canvas_test_sdc.image-required-without-example');
-    $this->assertNull($component);
-    $component = SingleDirectoryComponent::createConfigEntity($this->componentPluginManager->find('canvas_test_sdc:image-required-without-example'));
+    $source_specific_component_id = 'canvas_test_sdc:image-required-without-example';
+    // Manually create a Component config entity that this source's discovery
+    // would not have created because it does not meet requirements. This is
+    // considered valid as long as the Component is disabled (`status=FALSE`).
+    $discovery = new SingleDirectoryComponentDiscovery($this->container->get(ComponentPluginManager::class));
+    try {
+      $discovery->checkRequirements($source_specific_component_id);
+      $this->fail("$source_specific_component_id should not meet requirements for the purposes of this test.");
+    }
+    catch (ComponentDoesNotMeetRequirementsException) {
+      // No-op.
+    }
+    $component = Component::create([
+      'id' => SingleDirectoryComponentDiscovery::getComponentConfigEntityId($source_specific_component_id),
+      'label' => 'Test',
+      'category' => 'test',
+      'source' => SingleDirectoryComponent::SOURCE_PLUGIN_ID,
+      'source_local_id' => $source_specific_component_id,
+      'active_version' => 'f4d1c916802ab8db',
+      'versioned_properties' => [
+        VersionedConfigEntityBase::ACTIVE_VERSION => [
+          'settings' => $discovery->computeComponentSettings($source_specific_component_id),
+        ],
+      ],
+    ]);
     $component->setStatus(FALSE);
     $this->assertEquals(SAVED_NEW, $component->save());
     $component->setStatus(TRUE);
@@ -481,10 +506,15 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
     ]);
   }
 
+  /**
+   * @covers \Drupal\canvas\Plugin\Validation\Constraint\ComponentStatusConstraintValidator
+   */
   public function testStatusWithBlock(): void {
     $this->enableModules(['node', 'block']);
-    $this->generateComponentConfig();
 
+    // Manually create a Component config entity that this source's discovery
+    // would not have created because it does not meet requirements. This is
+    // considered valid as long as the Component is disabled (`status=FALSE`).
     $component = Component::create([
       'id' => 'block.node_syndicate_block',
       'status' => FALSE,
@@ -547,7 +577,7 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
    *   ["newline\nnot_allowed", true, "c413270ad235c44c"]
    *   ["rm -rf /", true, "d4b25a8c7fa2617c"]
    *   ["slot_\u03E2eird", true, "c33062b3a4641476"]
-   *   ["children", true, "1cea66d0113298ef"]
+   *   ["children", false, "1cea66d0113298ef"]
    */
   public function testSlotNameValidation(string $slot_name, bool $is_invalid, string $expected_version): void {
     // For every "code component" (JavaScriptComponent) with `status: true`, a
@@ -632,24 +662,51 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
   }
 
   /**
-   * @see \Drupal\canvas\ComponentMetadataRequirementsChecker::check()
+   * @covers \Drupal\canvas\ComponentMetadataRequirementsChecker::check()
    */
   public function testUnmatchedEnumAndMetaEnum(): void {
-    $component = Component::load('sdc.canvas_test_sdc:component-mismatch-meta-enum');
-    $this->assertNull($component);
-    $component = SingleDirectoryComponent::createConfigEntity($this->componentPluginManager->find('canvas_test_sdc:component-mismatch-meta-enum'));
-    $component->setStatus(FALSE);
-    $this->assertEquals(SAVED_NEW, $component->save());
-    $component->setStatus(TRUE);
+    // In an SDC, periods are valid `meta:enum` keys.
+    $component = Component::load('sdc.canvas_test_sdc.component-mismatch-meta-enum');
+    self::assertNotNull($component);
     $this->entity = $component;
-    $this->assertValidationErrors([
-      'status' => [
-        'The component \'<em class="placeholder">sdc.canvas_test_sdc.component-mismatch-meta-enum</em>\' cannot be enabled because it does not meet the requirements of Drupal Canvas.',
-        'The "meta:enum" keys for the "style" prop enum cannot contain a dot. Offending key: "contains.dots"',
-        'The "meta:enum" keys for the "numbers" prop enum cannot contain a dot. Offending key: "3.14"',
-        'The values for the "numbers" prop enum must be defined in "meta:enum". Missing keys: "3_14"',
-      ],
+    $this->assertValidationErrors([]);
+
+    // Create a code component" that has the same schema, where this is NOT
+    // allowed, due to config (schema) limitations.
+    $sdc_yaml = Yaml::parseFile($this->root . self::getCiModulePath() . '/tests/modules/canvas_test_sdc/components/component-mismatch-meta-enum/component-mismatch-meta-enum.component.yml');
+    $component = Component::load('js.component-mismatch-meta-enum');
+    self::assertNull($component);
+    $code_component = JavaScriptComponent::create([
+      'machineName' => 'component-mismatch-meta-enum',
+      'name' => $this->getRandomGenerator()->sentences(5),
+      'status' => FALSE,
+      'props' => $sdc_yaml['props']['properties'],
+      'required' => $sdc_yaml['props']['required'] ?? [],
+      'js' => ['original' => '', 'compiled' => ''],
+      'css' => ['original' => '', 'compiled' => ''],
+      'dataDependencies' => [],
     ]);
+    $this->entity = $code_component;
+    try {
+      $this->assertValidationErrors([
+        '' => [
+          'The "meta:enum" keys for the "style" prop enum cannot contain a dot. Offending key: "contains.dots"',
+          'The values for the "style" prop enum must be defined in "meta:enum". Missing keys: "contains_dots"',
+          'The "meta:enum" keys for the "numbers" prop enum cannot contain a dot. Offending key: "3.14"',
+          'The values for the "numbers" prop enum must be defined in "meta:enum". Missing keys: "3_14"',
+        ],
+      ]);
+    }
+    catch (\InvalidArgumentException $e) {
+      // The ::assertValidationErrors() call above did in fact confirm that the
+      // listed validation errors occurred. However, it then checks whether the
+      // config schema checker finds additional problems. And in this case, it
+      // does, precisely because it is using dots in keys, which is not allowed
+      // by the config (schema) system.
+      // In other words: this demonstrates exactly why we need to special-case
+      // code components' metadata!
+      self::assertSame("The configuration property contains doesn't exist.", $e->getMessage());
+    }
   }
 
   public function testInvalidWidgetSettings(): void {

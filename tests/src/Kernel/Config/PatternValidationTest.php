@@ -33,6 +33,8 @@ class PatternValidationTest extends BetterConfigEntityValidationTestBase {
     'options',
     'path',
     'link',
+    'text',
+    'filter',
   ];
 
   /**
@@ -214,6 +216,7 @@ class PatternValidationTest extends BetterConfigEntityValidationTestBase {
             ],
             'href' => [
               'sourceType' => 'host-entity-url',
+              'absolute' => TRUE,
             ],
           ],
         ],

@@ -16,10 +16,14 @@ use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Symfony\Component\Validator\ConstraintViolationList;
 use Symfony\Component\Validator\ConstraintViolationListInterface;
 
+/**
+ * @phpstan-ignore classExtendsInternalClass.classExtendsInternalClass
+ */
 #[ComponentSource(
   id: self:: PLUGIN_ID,
   label: new TranslatableMarkup('Component source with invalid slots'),
   supportsImplicitInputs: TRUE,
+  discovery: FALSE,
 )]
 final class InvalidSlots extends ComponentSourceBase implements ComponentSourceWithSlotsInterface {
 
@@ -109,7 +113,7 @@ final class InvalidSlots extends ComponentSourceBase implements ComponentSourceW
   /**
    * {@inheritdoc}
    */
-  public function buildComponentInstanceForm(array $form, FormStateInterface $form_state, ?Component $component = NULL, string $component_instance_uuid = '', array $inputValues = [], ?EntityInterface $entity = NULL, array $settings = []): array {
+  public function buildComponentInstanceForm(array $form, FormStateInterface $form_state, Component $component, string $component_instance_uuid = '', array $inputValues = [], ?EntityInterface $entity = NULL, array $settings = []): array {
     return $form;
   }
 

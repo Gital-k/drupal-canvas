@@ -7,6 +7,8 @@ namespace Drupal\canvas\Entity;
 use Drupal\Core\Config\Entity\ConfigEntityInterface;
 
 /**
+ * @internal
+ *
  * @phpstan-type ConfigDependenciesArray array{content?: array<int, string>, config?: array<int, string>, module?: array<int, string>}
  */
 interface VersionedConfigEntityInterface extends ConfigEntityInterface {
@@ -46,5 +48,16 @@ interface VersionedConfigEntityInterface extends ConfigEntityInterface {
    * @see \Drupal\Core\Config\Entity\ConfigDependencyManager
    */
   public function getVersionSpecificDependencies(string $version): array;
+
+  /**
+   * Whether the given config entity property is versioned or not.
+   *
+   * @param string $property_name
+   *
+   * @return bool
+   *
+   * @see \Drupal\Core\Config\Entity\ConfigEntityInterface::get())
+   */
+  public function isVersionedProperty(string $property_name): bool;
 
 }

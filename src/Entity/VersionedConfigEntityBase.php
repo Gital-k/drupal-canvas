@@ -13,6 +13,8 @@ use Drupal\canvas\Plugin\DataType\ConfigEntityVersionAdapter;
 use Drupal\canvas\Plugin\VersionedConfigurationSubsetSingleLazyPluginCollection;
 
 /**
+ * @internal
+ *
  * @property ?\Drupal\canvas\Plugin\DataType\ConfigEntityVersionAdapter $typedData
  * @phpstan-import-type ConfigDependenciesArray from \Drupal\canvas\Entity\VersionedConfigEntityInterface
  */
@@ -243,6 +245,13 @@ abstract class VersionedConfigEntityBase extends ConfigEntityBase implements Ver
 
     /** @var ConfigDependenciesArray */
     return $dependencies;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function isVersionedProperty(string $property_name): bool {
+    return array_key_exists($property_name, $this->versioned_properties);
   }
 
 }

@@ -24,6 +24,7 @@ use Symfony\Component\Validator\ConstraintViolationListInterface;
   id: self::PLUGIN_ID,
   label: new TranslatableMarkup('Fallback'),
   supportsImplicitInputs: FALSE,
+  discovery: FALSE,
 )]
 final class Fallback extends ComponentSourceBase implements ComponentSourceWithSlotsInterface {
   public const string PLUGIN_ID = 'fallback';
@@ -115,7 +116,7 @@ final class Fallback extends ComponentSourceBase implements ComponentSourceWithS
     ];
   }
 
-  public function buildComponentInstanceForm(array $form, FormStateInterface $form_state, ?Component $component = NULL, string $component_instance_uuid = '', array $inputValues = [], ?EntityInterface $entity = NULL, array $settings = []): array {
+  public function buildComponentInstanceForm(array $form, FormStateInterface $form_state, Component $component, string $component_instance_uuid = '', array $inputValues = [], ?EntityInterface $entity = NULL, array $settings = []): array {
     // @todo Improve this in https://drupal.org/i/3524299.
     $form['warning'] = [
       '#type' => 'html_tag',
@@ -124,6 +125,7 @@ final class Fallback extends ComponentSourceBase implements ComponentSourceWithS
       $this->configuration['fallback_reason'] ??
       $this->t('Component has been deleted. Copy values to new component.'),
     ];
+    ksort($inputValues);
     $form['input'] = [
       '#type' => 'textarea',
       '#value' => \json_encode($inputValues, \JSON_PRETTY_PRINT & \JSON_THROW_ON_ERROR),

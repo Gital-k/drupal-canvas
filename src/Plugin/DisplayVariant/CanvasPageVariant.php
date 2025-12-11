@@ -18,14 +18,15 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * Provides a page display variant decorating the main content with components.
  *
  * Uses the theme's `page.html.twig` and populates each region in that Twig
- * template with an Drupal Canvas component tree, which are defined in the
+ * template with a Drupal Canvas component tree, which are defined in the
  * Drupal Canvas PageRegion config entities for that theme's regions.
  *
  * The `content` region is a special case: it is the only theme region required
  * to exist. To keep the Drupal Canvas UX simple and consistent, it:
  * - is not possible to customize what appears in the `content `region: it is
  *   always, and only, the main content. This guarantees that the result of the
- *   matched route's controller is always available when Canvas renders the page.
+ *   matched route's controller is always available when Canvas renders the
+ *   page.
  * - falls back to displaying the "messages" in the `content` region, if and
  *   only if it does not appear in any other region. (Because that can also be
  *   essential information.)
@@ -176,8 +177,9 @@ final class CanvasPageVariant extends VariantBase implements PageVariantInterfac
             $messages_block_displayed = TRUE;
             return $fiber->resume();
           })(),
-          // No other page-level information exists in Drupal at this time.
-          default => new \LogicException(),
+          // If fiber was suspended in some other context (e.g. while loading
+          // entities) resume it to continue component tree rendering.
+          default => $fiber->resume(),
         };
       }
       assert($fiber->isTerminated());

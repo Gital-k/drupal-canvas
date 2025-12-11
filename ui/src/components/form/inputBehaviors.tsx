@@ -9,6 +9,7 @@ import './InputBehaviors.css';
 
 import Ajv from 'ajv';
 
+import InputDescription from '@/components/form/components/drupal/InputDescription';
 import { InputBehaviorsComponentPropsForm } from '@/components/form/InputBehaviorsComponentPropsForm';
 import { InputBehaviorsEntityForm } from '@/components/form/InputBehaviorsEntityForm';
 import { FORM_TYPES } from '@/features/form/constants';
@@ -20,6 +21,7 @@ import {
   setFieldValue,
 } from '@/features/form/formStateSlice';
 import { AJAX_UPDATE_FORM_BUILD_ID_EVENT } from '@/types/Ajax';
+import { isAjaxing } from '@/utils/isAjaxing';
 
 import type { ErrorObject } from 'ajv/dist/types';
 import type { FormId } from '@/features/form/formStateSlice';
@@ -68,6 +70,11 @@ export const InputBehaviorsCommon = ({
       onChange: (e: React.ChangeEvent) => void;
       onBlur: (e: React.FocusEvent) => void;
     };
+    description?: {
+      content: string;
+      attributes: Attributes;
+    };
+    descriptionDisplay?: 'before' | 'after' | 'invisible';
   };
   callbacks: {
     commitFormState: (newFormState: PropsValues) => void;
@@ -75,7 +82,14 @@ export const InputBehaviorsCommon = ({
     validateNewValue: (e: React.ChangeEvent, newValue: any) => ValidationResult;
   };
 }) => {
-  const { attributes, options, value, ...passProps } = props;
+  const {
+    attributes,
+    options,
+    value,
+    descriptionDisplay = 'before',
+    description = false,
+    ...passProps
+  } = props;
   const { commitFormState, parseNewValue, validateNewValue } = callbacks;
   const dispatch = useAppDispatch();
   const defaultValue = getDefaultValue(options, attributes, value);
@@ -231,7 +245,17 @@ export const InputBehaviorsCommon = ({
         }
       }
 
-      commitFormState({ ...formValues, [fieldName]: newValue });
+      // If no AJAX operations are in progress, update the form state and store.
+      if (!isAjaxing()) {
+        commitFormState({ ...formValues, [fieldName]: newValue });
+        return;
+      }
+      // This is only reached if AJAX operations are in progress. Add an event
+      // listener to update the form state once ajax is complete.
+      const stopListener = () => {
+        commitFormState({ ...formValues, [fieldName]: newValue });
+      };
+      document.addEventListener('drupalAjaxStop', stopListener, { once: true });
     };
 
     attributes.onBlur = (e: React.FocusEvent) => {
@@ -268,12 +292,21 @@ export const InputBehaviorsCommon = ({
 
   return (
     <>
-      <OriginalInput {...passProps} attributes={attributes} options={options} />
-      {fieldError && (
-        <span data-prop-message>
-          {`${fieldError.type === 'error' ? '❌ ' : ''}${fieldError.message}`}
-        </span>
-      )}
+      <InputDescription
+        description={description}
+        descriptionDisplay={descriptionDisplay}
+      >
+        <OriginalInput
+          {...passProps}
+          attributes={attributes}
+          options={options}
+        />
+        {fieldError && (
+          <span data-prop-message>
+            {`${fieldError.type === 'error' ? '❌ ' : ''}${fieldError.message}`}
+          </span>
+        )}
+      </InputDescription>
     </>
   );
 };

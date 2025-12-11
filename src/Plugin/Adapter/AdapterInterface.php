@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Plugin\Adapter;
 
+use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
 use Drupal\Component\Plugin\PluginInspectionInterface;
 
 /**
+ * @internal
+ *
  * @phpstan-import-type JsonSchema from \Drupal\canvas\JsonSchemaInterpreter\JsonSchemaType
  */
 interface AdapterInterface extends PluginInspectionInterface {
@@ -20,9 +23,9 @@ interface AdapterInterface extends PluginInspectionInterface {
   public function addInput(string $input, mixed $value): self;
 
   /**
-   * @return mixed
+   * @return \Drupal\canvas\PropExpressions\StructuredData\EvaluationResult
    */
-  public function adapt(): mixed;
+  public function adapt(): EvaluationResult;
 
   /**
    * @param JsonSchema $schema

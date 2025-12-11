@@ -42,7 +42,7 @@ export function reportResults(
                     ? `${chalk.underline(d.heading)}:\n${d.content}`
                     : d.content,
                 )
-                .join('\n\n'),
+                .join('\n\n') ?? '',
             ]
           : [
               r.itemName,
@@ -67,6 +67,10 @@ export function reportResults(
             alignment: hasDetails ? 'right' : 'left',
           },
         ],
+        columns: {
+          // Limit the width of the details column for improved readability of long details.
+          2: { width: 100, wrapWord: true },
+        },
       }),
     );
   }

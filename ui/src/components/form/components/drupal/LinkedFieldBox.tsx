@@ -1,8 +1,9 @@
 import clsx from 'clsx';
 import { Cross2Icon, TextIcon } from '@radix-ui/react-icons';
-import { Flex, Text } from '@radix-ui/themes';
+import { Box, Flex, Text } from '@radix-ui/themes';
 
 import { useAppSelector } from '@/app/hooks';
+import InputDescription from '@/components/form/components/drupal/InputDescription';
 import {
   isEvaluatedComponentModel,
   selectLayout,
@@ -24,6 +25,7 @@ import type {
   CanvasComponent,
   DefaultValues,
   FieldDataItem,
+  PropSourceComponent,
 } from '@/types/Component';
 
 import styles from './LinkedFieldBox.module.css';
@@ -31,9 +33,13 @@ import styles from './LinkedFieldBox.module.css';
 const LinkedFieldBox = ({
   title,
   propName,
+  description,
+  descriptionDisplay,
 }: {
   title: string;
   propName: string;
+  description: string;
+  descriptionDisplay?: 'before' | 'after' | 'invisible';
 }) => {
   const { data: components } = useGetComponentsQuery();
   const model = useAppSelector(selectModel);
@@ -56,8 +62,9 @@ const LinkedFieldBox = ({
       return;
     }
 
-    const propData: FieldDataItem | undefined =
-      component.propSources?.[propName];
+    const propData: FieldDataItem | undefined = (
+      component as PropSourceComponent
+    ).propSources?.[propName];
     if (!propData) {
       return;
     }
@@ -73,6 +80,7 @@ const LinkedFieldBox = ({
             [propName]: {
               expression: propData.expression,
               sourceType: propData.sourceType,
+              sourceTypeSettings: propData.sourceTypeSettings,
             },
           },
           resolved: {
@@ -85,18 +93,25 @@ const LinkedFieldBox = ({
   };
 
   return (
-    <Flex className={styles.wrapper} mb="4">
-      <Text className={clsx(styles.linkIcon, styles.iconBox)}>
-        <TextIcon />
-      </Text>
-      <Text className={styles.text}>{title}</Text>
-      <button
-        className={clsx(styles.iconBox, styles.closeIcon)}
-        onClick={unlinkField}
+    <Box mb="4">
+      <InputDescription
+        description={description}
+        descriptionDisplay={descriptionDisplay}
       >
-        <Cross2Icon />
-      </button>
-    </Flex>
+        <Flex className={styles.wrapper} mb="2">
+          <Text className={clsx(styles.linkIcon, styles.iconBox)}>
+            <TextIcon />
+          </Text>
+          <Text className={styles.text}>{title}</Text>
+          <button
+            className={clsx(styles.iconBox, styles.closeIcon)}
+            onClick={unlinkField}
+          >
+            <Cross2Icon />
+          </button>
+        </Flex>
+      </InputDescription>
+    </Box>
   );
 };
 

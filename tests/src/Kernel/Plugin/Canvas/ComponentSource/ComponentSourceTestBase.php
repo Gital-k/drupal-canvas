@@ -8,6 +8,8 @@ namespace Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource;
 
 use Drupal\canvas\Controller\ApiConfigControllers;
 use Drupal\canvas\Form\ComponentInstanceForm;
+use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
+use Drupal\Component\Render\MarkupInterface;
 use Drupal\Component\Utility\Html;
 use Drupal\Component\Uuid\UuidInterface;
 use Drupal\Core\Cache\CacheableMetadata;
@@ -119,6 +121,7 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
     'image',
     'link',
     'options',
+    'text',
     'system',
     'media',
     'path',
@@ -215,7 +218,7 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
     return $return_values;
   }
 
-  public function findCreatedComponentConfigEntities(string $component_source_plugin_id, string $test_module): array {
+  public function findCreatedComponentConfigEntities(string $component_source_plugin_id, string $extension): array {
     // @phpstan-ignore-next-line
     $component_config_entity_type_prefix = $this->componentStorage->getEntityType()->getConfigPrefix();
 
@@ -225,7 +228,7 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
       '%s.%s.%s',
       $component_config_entity_type_prefix,
       $component_source_plugin_id,
-      $test_module,
+      $extension,
     );
 
     // Transform from `canvas.component.<ID>` to just `<ID>`.
@@ -235,16 +238,16 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
       $discovered_component_config_names
     );
 
-    ksort($discovered_component_entity_ids);
+    sort($discovered_component_entity_ids);
     return $discovered_component_entity_ids;
   }
 
-  public function findIneligibleComponents(string $component_source_plugin_id, string $test_module): array {
+  public function findIneligibleComponents(string $component_source_plugin_id, string $extension): array {
     $ineligible_components = $this->componentReasonRepository->getReasons()[$component_source_plugin_id] ?? [];
     ksort($ineligible_components);
     return array_filter(
       $ineligible_components,
-      fn (string $id) => str_starts_with($id, $component_source_plugin_id . '.' . $test_module),
+      fn (string $id) => str_starts_with($id, $component_source_plugin_id . '.' . $extension),
       ARRAY_FILTER_USE_KEY,
     );
   }
@@ -334,7 +337,7 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
           continue;
         }
 
-        $explicit_inputs[$sdc_prop_name] = $client_side_info_for_prop['default_values']['resolved'];
+        $explicit_inputs[$sdc_prop_name] = new EvaluationResult($client_side_info_for_prop['default_values']['resolved']);
         continue;
       }
 
@@ -513,7 +516,19 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
     }
 
     // Test all other expected client-side info.
-    self::assertSame($expected_client_side_info, $actual_client_side_info);
+    // As we cannot compare FilteredMarkup objects, let's cast those to strings.
+    $filteredMarkupAsString = function (array &$values) use (&$filteredMarkupAsString): array {
+      foreach ($values as &$value) {
+        if ($value instanceof MarkupInterface) {
+          $value = (string) $value;
+        }
+        if (is_array($value)) {
+          $filteredMarkupAsString($value);
+        }
+      }
+      return $values;
+    };
+    self::assertSame($filteredMarkupAsString($expected_client_side_info), $filteredMarkupAsString($actual_client_side_info));
   }
 
   /**
@@ -742,8 +757,8 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
 
   public function alter(ContainerBuilder $container): void {
     // Swap in the broken versions of the Component source plugin manager, e.g.
-    // \Drupal\canvas\Plugin\ComponentPluginManager or
-    // \Drupal\canvas\Plugin\BlockManager.
+    // \Drupal\Tests\canvas\Kernel\BrokenComponentManager or
+    // \Drupal\Tests\canvas\Kernel\BrokenBlockManager.
     // We provide an empty implementation so those that don't need this aren't
     // forced to implement it.
     // @see ::testIsBroken()
@@ -810,6 +825,25 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
     // And contain the failed to render message.
     self::assertStringContainsString('Component failed to render', $list[$component->id()]['default_markup']);
 
+    // Page view should output verbose error, if 'error_level' is set to 'verbose'.
+    // @see \Drupal\canvas\Element\RenderSafeComponentContainer::handleComponentException()
+    \Drupal::configFactory()->getEditable('system.logging')->set('error_level', ERROR_REPORTING_DISPLAY_VERBOSE)->save();
+    $entityView = \Drupal::entityTypeManager()->getViewBuilder(Page::ENTITY_TYPE_ID)->view($entity);
+    $pageCrawler = $this->crawlerForRenderArray($entityView);
+    $componentOutput = $pageCrawler->filter(\sprintf('[data-component-uuid="%s"]', self::UUID_FALLBACK_ROOT));
+    self::assertEquals(1, $componentOutput->count());
+    // Should contain "verbose" error message.
+    self::assertStringContainsString($this->getExpectedVerboseErrorMessage(), $componentOutput->text());
+
+    // Component list's preview should also output verbose error.
+    $listOutput = \Drupal::classResolver(ApiConfigControllers::class)->list(Component::ENTITY_TYPE_ID);
+    $list = \json_decode($listOutput->getContent() ?: '[]', TRUE, \JSON_THROW_ON_ERROR);
+    self::assertArrayHasKey($component->id(), $list);
+    // Component should be flagged as broken.
+    self::assertTrue($list[$component->id()]['broken']);
+    // And contain the "verbose" failed to render message.
+    self::assertStringContainsString($this->getExpectedVerboseErrorMessage(), $list[$component->id()]['default_markup']);
+
     // Set the current request to enable the form to be built.
     $request = Request::create('/', 'PATCH', [
       'form_canvas_tree' => json_encode([
@@ -828,9 +862,14 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
     $builtForm = \Drupal::formBuilder()->getForm(ComponentInstanceForm::class, $entity);
     $formOut = $this->crawlerForRenderArray($builtForm);
     // Output should show the props and allow user to copy them.
+    // TRICKY: for edge cases around this, additional test coverage exists.
+    // @see \Drupal\Tests\canvas\Kernel\ComponentInstanceFormTest::testBlockComponentThatHasGoneAway()
+    // @see \Drupal\Tests\canvas\Kernel\ComponentInstanceFormTest::testCodeComponentNoPropsThatHasGoneAway()
     self::assertStringContainsString('Fix the component or copy values to a new component', $formOut->text());
   }
 
   abstract protected function triggerBrokenComponent(ComponentInterface $component): ?BrokenPluginManagerInterface;
+
+  abstract protected function getExpectedVerboseErrorMessage(): string;
 
 }

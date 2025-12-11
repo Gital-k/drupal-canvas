@@ -36,7 +36,8 @@ final class FieldObjectPropsExpression implements StructuredDataPropExpressionIn
     }, $this->objectPropsToFieldProps));
     array_walk($objectPropsToFieldProps, function (StructuredDataPropExpressionInterface $expr) {
       // Each of the expressions in $objectPropsToFieldProps MUST target the
-      // same field item; otherwise it'd be nonsense. IOW: the following MUST match `entityType`, `fieldName` and `delta`.
+      // same field item; otherwise it'd be nonsense. IOW: the following MUST
+      // match `entityType`, `fieldName` and `delta`.
       $targets_same_field_item = $expr instanceof ReferenceFieldPropExpression
         ? $expr->referencer->entityType == $this->entityType && $expr->referencer->fieldName === $this->fieldName && $expr->referencer->delta === $this->delta
         : $expr->entityType == $this->entityType && $expr->fieldName === $this->fieldName && $expr->delta === $this->delta;
@@ -160,18 +161,23 @@ final class FieldObjectPropsExpression implements StructuredDataPropExpressionIn
   public function validateSupport(EntityInterface|FieldItemInterface|FieldItemListInterface $entity): void {
     assert($entity instanceof EntityInterface);
     $expected_entity_type_id = $this->entityType->getEntityTypeId();
-    $expected_bundle = $this->entityType->getBundles()[0] ?? $expected_entity_type_id;
     if ($entity->getEntityTypeId() !== $expected_entity_type_id) {
       throw new \DomainException(sprintf("`%s` is an expression for entity type `%s`, but the provided entity is of type `%s`.", (string) $this, $expected_entity_type_id, $entity->getEntityTypeId()));
     }
-    if ($entity->bundle() !== $expected_bundle) {
-      throw new \DomainException(sprintf("`%s` is an expression for entity type `%s`, bundle `%s`, but the provided entity is of the bundle `%s`.", (string) $this, $expected_entity_type_id, $expected_bundle, $entity->bundle()));
+    $expected_bundles = $this->entityType->getBundles();
+    \assert($expected_bundles === NULL || count($expected_bundles) === 1);
+    if ($expected_bundles !== NULL && $entity->bundle() !== $expected_bundles[0]) {
+      throw new \DomainException(sprintf("`%s` is an expression for entity type `%s`, bundle `%s`, but the provided entity is of the bundle `%s`.", (string) $this, $expected_entity_type_id, $expected_bundles[0], $entity->bundle()));
     }
     // @todo validate that the field exists?
   }
 
   public function getHostEntityDataDefinition(): EntityDataDefinitionInterface {
     return $this->entityType;
+  }
+
+  public function isMultiBundle(): bool {
+    return FALSE;
   }
 
 }

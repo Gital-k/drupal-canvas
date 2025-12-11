@@ -5,10 +5,15 @@ declare(strict_types=1);
 namespace Drupal\canvas\ShapeMatcher;
 
 use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaStringFormat;
+use Drupal\canvas\Plugin\ComponentPluginManager;
 use Drupal\canvas\Plugin\Validation\Constraint\UriConstraint;
+use Drupal\canvas\TypedData\BetterEntityDataDefinition;
+use Drupal\Component\Assertion\Inspector;
 use Drupal\Component\Plugin\DependentPluginInterface;
+use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Cache\CacheBackendInterface;
 use Drupal\Core\Entity\EntityFieldManagerInterface;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\Plugin\DataType\ConfigEntityAdapter;
 use Drupal\Core\Entity\Plugin\DataType\EntityAdapter;
 use Drupal\Core\Entity\Plugin\DataType\EntityReference;
@@ -85,6 +90,8 @@ use Symfony\Component\Validator\Constraint;
  * @see \Drupal\canvas\PropSource\StaticPropSource
  *
  * @phpstan-import-type JsonSchema from \Drupal\canvas\JsonSchemaInterpreter\JsonSchemaType
+ * @phpstan-type ScalarMatches array<int, \Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression|\Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression>
+ * @phpstan-type ObjectMatches array<int, \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression|\Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression>
  *
  * @internal
  */
@@ -155,12 +162,12 @@ final class JsonSchemaFieldInstanceMatcher {
   public function __construct(
     private readonly TypedDataManagerInterface $typedDataManager,
     private readonly ConstraintManager $constraintManager,
+    private readonly EntityTypeManagerInterface $entityTypeManager,
     private readonly EntityFieldManagerInterface $entityFieldManager,
     private readonly AdapterManager $adapterManager,
     private readonly CacheBackendInterface $cache,
     private readonly ExtensionMimeTypeGuesser|LazyExtensionMimeTypeGuesser $extensionMimeTypeGuesser,
-  ) {
-  }
+  ) {}
 
   /**
    * @see https://json-schema.org/understanding-json-schema/reference/type
@@ -170,29 +177,13 @@ final class JsonSchemaFieldInstanceMatcher {
    * - \Drupal\Core\TypedData\Plugin\DataType\TimeSpan, which is an integer
    * - \Drupal\Core\TypedData\Plugin\DataType\DurationIso8601, which is a string
    *
-   * @param JsonSchema $sub_schema
-   *
-   * @return array<int, \Drupal\canvas\PropExpressions\StructuredData\FieldTypePropExpression|\Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression|\Drupal\canvas\PropExpressions\StructuredData\FieldTypeObjectPropsExpression>
-   */
-
-  /**
    * @param JsonSchema $schema
    *
-   * @return array<int, \Drupal\canvas\PropExpressions\StructuredData\FieldTypePropExpression|\Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression|\Drupal\canvas\PropExpressions\StructuredData\FieldTypeObjectPropsExpression>
+   * @return \Generator<string, array{'required': boolean, schema: JsonSchema}>
    */
-
-  /**
-   * @param JsonSchema $schema
-   */
-  public function iterateObjectJsonSchema(array $schema): \Generator {
+  public static function iterateObjectJsonSchema(array $schema): \Generator {
     $schema = self::resolveSchemaReferences($schema);
-    $primitive_type = JsonSchemaType::from(
-    // TRICKY: SDC always allowed `object` for Twig integration reasons.
-    // @see \Drupal\sdc\Component\ComponentMetadata::parseSchemaInfo()
-      is_array($schema['type']) ? $schema['type'][0] : $schema['type']
-    );
-
-    if ($primitive_type !== JsonSchemaType::Object) {
+    if (JsonSchemaType::fromSdcPropJsonSchema($schema) !== JsonSchemaType::Object) {
       throw new \LogicException();
     }
 
@@ -207,21 +198,11 @@ final class JsonSchemaFieldInstanceMatcher {
   }
 
   /**
-   * @todo Make *recursive* references work in justinrainbow/schema, see https://git.drupalcode.org/project/ui_patterns/-/blob/28cf60dd776fb349d9520377afa510b0d85f3334/src/SchemaManager/ReferencesResolver.php
-   *
    * @param JsonSchema $schema
    * @return JsonSchema
-   *
-   * @see \Drupal\canvas\Plugin\Adapter\AdapterBase::resolveSchemaReferences
    */
   private static function resolveSchemaReferences(array $schema): array {
-    // @todo Refactor in https://www.drupal.org/i/3515074
-    if (isset($schema['$ref']) && str_starts_with($schema['$ref'], 'json-schema-definitions://')) {
-      // Perform the same schema resolving as `justinrainbow/json-schema`.
-      // @todo Delete this method, actually use `justinrainbow/json-schema`.
-      $schema = json_decode(file_get_contents($schema['$ref']) ?: '{}', TRUE);
-    }
-    return $schema;
+    return self::componentPluginManager()->resolveJsonSchemaReferences($schema);
   }
 
   /**
@@ -264,42 +245,73 @@ final class JsonSchemaFieldInstanceMatcher {
   /**
    * @param JsonSchema $schema
    * @param \Drupal\Core\Field\FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED|int<1, max> $cardinality_in_json_schema
-   * @return array<int, \Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression|\Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression|\Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression>
+   * @return ObjectMatches
+   *   A list of object matches, which are either:
+   *   - a FieldObjectPropsExpression, if the data is available directly in a
+   *     field of the given entity type + bundle
+   *   - a ReferenceFieldPropExpression that points to a
+   *     FieldObjectPropsExpression, if the data is available in a referenced
+   *     entity
    */
   private function matchEntityPropsForObject(EntityDataDefinitionInterface $entity_data_definition, int $levels_to_recurse, bool $is_required_in_json_schema, array $schema, int $cardinality_in_json_schema): array {
-    $required_object_props = [];
-    $all_object_props = [];
-    $object_prop_matches = [];
-    foreach ($this->iterateObjectJsonSchema($schema) as $name => ['required' => $sub_required, 'schema' => $sub_schema]) {
-      $all_object_props[] = $name;
-      if ($sub_required) {
-        $required_object_props[] = $name;
+    // First, naïvely match using the scalars inside the `type: object`.
+    $per_object_prop_scalar_matches = self::matchEntityPropsForObjectUsingScalars($entity_data_definition, $levels_to_recurse, $is_required_in_json_schema, $schema, $cardinality_in_json_schema);
+    $all_object_props = array_keys($per_object_prop_scalar_matches);
+    $required_object_props = self::getRequiredObjectProps($schema);
+
+    // The scalar matches traversed the entire Typed Data tree (up to a depth of
+    // $levels_to_recurse) starting in the given $entity_data_definition, for
+    // every property in this object prop shape.
+    // Use the scalar matches to find which reference expressions are able to
+    // populate the required key-value pairs in the object prop shape.
+    $matches_references = [];
+    $scalar_match_prefixes_to_avoid = [];
+    if ($levels_to_recurse > 1) {
+      $references_worth_following = self::determineReferencesWorthFollowingForObjectFromScalarMatches($required_object_props, $per_object_prop_scalar_matches);
+      foreach ($references_worth_following as $referencer => $target_data_type) {
+        $nested_matches = $this->matchEntityPropsForObject(
+          BetterEntityDataDefinition::createFromDataType($target_data_type),
+          $levels_to_recurse - 1,
+          $is_required_in_json_schema,
+          $schema,
+          $cardinality_in_json_schema,
+        );
+        $referencer = StructuredDataPropExpression::fromString($referencer);
+        \assert($referencer instanceof FieldPropExpression);
+        foreach ($nested_matches as $nested_match) {
+          \assert($nested_match->getHostEntityDataDefinition()->getDataType() === $target_data_type);
+          $reference_match = new ReferenceFieldPropExpression($referencer, $nested_match);
+          // Key reference matches by field name to enable efficient
+          // cross-referencing. This works because scalar matches are performed
+          // against the given $entity_data_definition, and hence the fields on
+          // that entity type + bundle.
+          $referenced_leaf = $reference_match->getLeaf();
+          $leaf_field_name = self::getFieldNameForSingleBundleExpression($referenced_leaf);
+          $reference_key = $reference_match->getFullReferenceChain() . ':' . $leaf_field_name;
+          $matches_references[self::getFieldNameForSingleBundleExpression($reference_match)][$reference_key] = $reference_match;
+          // Ensure that when the naïve scalar matches are processed, all that
+          // contain a prefix of the reference matches are skipped.
+          $scalar_match_prefixes_to_avoid = [
+            ...$scalar_match_prefixes_to_avoid,
+            ...$reference_match->getReferenceChainPrefixes(),
+          ];
+        }
       }
-      // ⚠️ This does not support nested objects, so it's okay to directly
-      // call ::matchEntityPropsForScalar(). If support for nested objects is
-      // ever needed, this will need to call ::matchEntityProps() instead.
-      $object_prop_matches[$name] = $this->matchEntityPropsForScalar($entity_data_definition, $levels_to_recurse, JsonSchemaType::from($sub_schema['type']), $sub_required, $sub_schema, $cardinality_in_json_schema);
     }
 
-    // Invert $object_prop_matches to determine different match types.
+    // Assemble from the (often VERY many) $per_object_prop_scalar_matches the
+    // best possible way to populate a `type: object` prop.
+    // @todo These heuristics very likely need tweaking; it's not hard to find odd results in PropShapeToFieldInstanceTest…
     $inverted = [];
-    foreach (array_keys($object_prop_matches) as $object_prop_name) {
-      foreach ($object_prop_matches[$object_prop_name] as $field_prop_expr) {
-        $field_name = match (get_class($field_prop_expr)) {
-          FieldPropExpression::class => $field_prop_expr->fieldName,
-          ReferenceFieldPropExpression::class => $field_prop_expr->referencer->fieldName,
-          default => throw new \LogicException('Unhandled.'),
-        };
-        // Even though FieldPropExpression's `fieldName` can be an array at the
-        // data structure level, it can only be a string here: because the logic
-        // in ::matchEntityPropsForScalar() asses one entity type + bundle at a
-        // time.
-        assert(is_string($field_name));
+    foreach (array_keys($per_object_prop_scalar_matches) as $object_prop_name) {
+      foreach ($per_object_prop_scalar_matches[$object_prop_name] as $field_prop_expr) {
+        $field_name = self::getFieldNameForSingleBundleExpression($field_prop_expr);
         // The same field name prop should never be used multiple times; best
         // match is selected in object prop order.
         if (in_array($field_prop_expr, $inverted[$field_name] ?? [], FALSE)) {
           continue;
         }
+
         // Pick the first match, except:
         if (isset($inverted[$field_name][$object_prop_name])) {
           // 1. prefer non-reference matches on the field.
@@ -320,6 +332,51 @@ final class JsonSchemaFieldInstanceMatcher {
         }
       }
     }
+
+    // Scan the selected scalar matches that will populate the object: detect
+    // which ones have prefixes that should be avoided (because they overlap
+    // with reference matches).
+    $flagged_for_omission = [];
+    foreach ($inverted as $field_name => $per_object_prop_pick) {
+      foreach ($per_object_prop_pick as $field_prop_expr) {
+        if (
+          $field_prop_expr instanceof ReferenceFieldPropExpression
+          && !empty(array_intersect($field_prop_expr->getReferenceChainPrefixes(), $scalar_match_prefixes_to_avoid))
+        ) {
+          $flagged_for_omission[$field_name] = TRUE;
+        }
+      }
+    }
+    // A scalar match needs to be omitted if it is inferior, which is when both:
+    // - it was flagged for omission because it contains the same reference
+    //   prefix chain
+    // - it only populates as many key-value pairs as the reference match
+    // In other words: even an object populated by an overlapping scalar match
+    // may be relevant, if it populates MORE object props.
+    // @see ::determineReferencesWorthFollowingForObjectFromScalarMatches()
+    foreach (array_keys($flagged_for_omission) as $field_name) {
+      // How many object props does the possibly inferior scalar match populate?
+      \assert(array_key_exists($field_name, $matches_references));
+      $scalar_match_object_props_populated = count(array_keys($inverted[$field_name]));
+
+      // How many object props do the possibly superior object matches populate?
+      foreach ($matches_references[$field_name] as $reference_match) {
+        $reference_leaf = $reference_match->getLeaf();
+        \assert($reference_leaf instanceof FieldObjectPropsExpression);
+        $reference_match_object_props_populated = count(array_keys($reference_leaf->objectPropsToFieldProps));
+
+        // If the reference match is superior, omit the scalar match.
+        if ($scalar_match_object_props_populated <= $reference_match_object_props_populated) {
+          unset($inverted[$field_name]);
+          // And move on to the next scalar match.
+          continue 2;
+        }
+      }
+    }
+    // Flatten: $matches_references is still keyed by field name first, then by
+    // a unique key, to ensure multiple reference matches per field on this
+    // entity type + bundle can be found.
+    $matches_references = array_values(NestedArray::mergeDeepArray($matches_references));
 
     // The minimal match: all required object props are present.
     $matches_minimal = array_filter(
@@ -343,13 +400,112 @@ final class JsonSchemaFieldInstanceMatcher {
       /** @var array<string, \Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression|\Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression> $mapping */
       $matches[] = new FieldObjectPropsExpression($entity_data_definition, $field_name, NULL, $mapping);
     }
-    return $matches;
+    \assert(Inspector::assertAll(fn ($expr) => $expr instanceof FieldObjectPropsExpression, $matches));
+    \assert(Inspector::assertAll(fn ($expr) => $expr instanceof ReferenceFieldPropExpression, $matches_references));
+    return [...$matches_references, ...$matches];
+  }
+
+  /**
+   * Determines from scalar reference matches how to reference an object.
+   *
+   * Used by ::matchEntityPropsForObject() to determine which reference(s) to
+   * follow to populate the given `type: object` shape.
+   *
+   * Goal: keep the expressions for each key-value pair within the object shape
+   * (i.e. in the FieldObjectPropsExpression) as simple as possible: minimize
+   * references to populate the props in the `type: object`, and instead favor
+   * following a chain of references FIRST, and THEN populate the object shape.
+   *
+   * In other words: avoid shallow references (e.g. node -> reference field)
+   * from there then branching out to deeper levels to populate all object
+   * key-value pairs (e.g. reference field -> entity -> reference field
+   * -> entity -> actual value). Instead, prefer to traverse at the top level,
+   * and *then* constructing an object.
+   *
+   * @param string[] $required_object_props
+   * @param array<string, ScalarMatches> $object_prop_scalar_matches
+   *   Object prop match results from ::matchEntityPropsForObjectUsingScalars().
+   *
+   * @return array<string, string>
+   *   All references worth following based on the scalar matches given, with
+   *   keys referencer expression string representations, and values the target
+   *   data type type (entity type ID + bundle).
+   */
+  private static function determineReferencesWorthFollowingForObjectFromScalarMatches(array $required_object_props, array $object_prop_scalar_matches) {
+    $required_object_props_fulfilled_by_references = [];
+    foreach ($required_object_props as $required_object_prop) {
+      foreach ($object_prop_scalar_matches[$required_object_prop] as $expr) {
+        if (!$expr instanceof ReferenceFieldPropExpression) {
+          continue;
+        }
+        $referencer_key = (string) $expr->referencer;
+        $target_entity_type_and_bundle = $expr->referenced
+          ->getHostEntityDataDefinition()
+          ->getDataType();
+        $required_object_props_fulfilled_by_references[$referencer_key]['props'][$required_object_prop] = TRUE;
+        $required_object_props_fulfilled_by_references[$referencer_key]['target_data_type'] = $target_entity_type_and_bundle;
+      }
+    }
+
+    // The only references worth following are those that populate ALL required
+    // object props.
+    $references_worth_following = array_filter(
+      $required_object_props_fulfilled_by_references,
+      fn (array $info) => array_keys($info['props']) == $required_object_props,
+    );
+
+    return array_map(
+      fn (array $info) => $info['target_data_type'],
+      $references_worth_following
+    );
   }
 
   /**
    * @param JsonSchema $schema
    * @param \Drupal\Core\Field\FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED|int<1, max> $cardinality_in_json_schema
-   * @return array<int, \Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression|\Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression>
+   * @return array<string, ScalarMatches>
+   */
+  private function matchEntityPropsForObjectUsingScalars(EntityDataDefinitionInterface $entity_data_definition, int $levels_to_recurse, bool $is_required_in_json_schema, array $schema, int $cardinality_in_json_schema): array {
+    $object_prop_matches = [];
+    foreach (self::iterateObjectJsonSchema($schema) as $name => ['required' => $sub_required, 'schema' => $sub_schema]) {
+      $object_prop_matches[$name] = $this->matchEntityPropsForScalar(
+        $entity_data_definition,
+        $levels_to_recurse,
+        JsonSchemaType::from($sub_schema['type']),
+        // TRICKY: even if a key-value pair in a `type: object` is required, it
+        // may very well be optional: if the `type: object` itself is optional.
+        $is_required_in_json_schema && $sub_required,
+        $sub_schema,
+        $cardinality_in_json_schema,
+      );
+    }
+    \assert(array_keys($schema['properties'] ?? []) === array_keys($object_prop_matches));
+    return $object_prop_matches;
+  }
+
+  /**
+   * @param JsonSchema $schema
+   *
+   * @return string[]
+   */
+  private static function getRequiredObjectProps(array $schema) : array {
+    if (JsonSchemaType::fromSdcPropJsonSchema($schema) !== JsonSchemaType::Object) {
+      throw new \LogicException();
+    }
+    $required_object_props = [];
+    foreach (self::iterateObjectJsonSchema($schema) as $name => ['required' => $sub_required]) {
+      $all_object_props[] = $name;
+      if ($sub_required) {
+        $required_object_props[] = $name;
+      }
+    }
+    return $required_object_props;
+  }
+
+  /**
+   * @param JsonSchema $schema
+   * @param \Drupal\Core\Field\FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED|int<1, max> $cardinality_in_json_schema
+   * @return ScalarMatches
    */
   private function matchEntityPropsForScalar(EntityDataDefinitionInterface $entity_data_definition, int $levels_to_recurse, JsonSchemaType $primitive_type, bool $is_required_in_json_schema, ?array $schema, int $cardinality_in_json_schema): array {
     if (!$primitive_type->isScalar()) {
@@ -385,8 +541,13 @@ final class JsonSchemaFieldInstanceMatcher {
         // would not make sense, because it's no longer an array.
         // All other cases would result in problematic UX.
         // @todo consider allowing/supporting (but needs UX to be designed first to disambiguate the cardinality mismatch) in https://www.drupal.org/i/3522718:
-        // 1. JSON schema cardinality `unlimited`, field cardinality 1–N => would mean only partially populating an array
-        // 2. JSON schema cardinality `1-N`, field cardinality `unlimited` => would mean some structured data values would not be visible; the content author would need to either be informed only the first N would be visible, or they'd need to be able to pick specific values
+        // 1. JSON schema cardinality `unlimited`, field cardinality 1–N =>
+        //    would mean only partially populating an array;
+        // 2. JSON schema cardinality `1-N`, field cardinality `unlimited` =>
+        //    would mean some structured data values would not be visible; the
+        //    content author would need to either be informed only the first N
+        //    would be visible, or they'd need to be able to pick specific
+        //    values.
         if (!($field_cardinality > 1 && $cardinality_in_json_schema > $field_cardinality)) {
           continue;
         }
@@ -400,9 +561,9 @@ final class JsonSchemaFieldInstanceMatcher {
         // 2. explicitly marked as internal (which means ::isInternal() cannot
         //    be used, due to its fallback to ::isComputed())
         // 3. sources for a computed property, even if they're not internal.
-        // 4. on read-only non-computed base fields: these store non-user data such as the
-        //    monotonically increasing integer entity ID, bundle name, entity
-        //    UUID and so on.
+        // 4. on read-only non-computed base fields: these store non-user data
+        //    such as the monotonically increasing integer entity ID, bundle
+        //    name, entity UUID and so on.
         //    For now, the "uuid" field, to allow testing that prop shape.
         // @phpstan-ignore-next-line
         if ($property_definition instanceof DataReferenceTargetDefinition || $property_definition['internal'] === TRUE) {
@@ -444,22 +605,25 @@ final class JsonSchemaFieldInstanceMatcher {
           if ($property_definition instanceof DataReferenceDefinitionInterface && is_a($property_definition->getClass(), EntityReference::class, TRUE)) {
             $target = $this->getConstrainedTargetDefinition($field_definition, $property_definition);
 
-            // Matches in $target:
-            // - both base + bundle fields if <=1 bundle is specified
-            // - only base fields if >1 bundle is specified
+            // TRICKY: due to a bug in EntityReferenceItem in Drupal core, the
+            // `entity` property is NEVER constrained to a bundle. Therefore the
+            // resulting target definition also never specifies a bundle. Hence
+            // matches in $target only ever target base fields!
+            // @see \Drupal\Core\Field\Plugin\Field\FieldType\EntityReferenceItem::propertyDefinitions()
             // @see \Drupal\Core\Entity\TypedData\EntityDataDefinition::getPropertyDefinitions()
+            // @see https://www.drupal.org/project/canvas/issues/3541361#comment-16344739
             $referenced_matches = $this->matchEntityProps($target, $levels_to_recurse - 1, $primitive_type, $is_required_in_json_schema, $schema);
             foreach ($referenced_matches as $referenced_match) {
               $matches[] = new ReferenceFieldPropExpression($current_entity_field_prop, $referenced_match);
             }
 
-            // When >1 bundle is specified, the above only matched base fields.
+            // As explained, the above only matched base fields.
             // Iterate over all possible target bundles, set each on a clone of
             // $target, and hence repeat the same process as above — but exclude
             // base fields that are re-matched.
             // @see \Drupal\Core\Entity\TypedData\EntityDataDefinition::getPropertyDefinitions()
             $target_bundles = $field_definition->getItemDefinition()->getSettings()['handler_settings']['target_bundles'] ?? [];
-            if (count($target_bundles) > 1) {
+            if (count($target_bundles) > 0) {
               $base_field_names = array_keys($target->getPropertyDefinitions());
               foreach ($target_bundles as $target_bundle) {
                 assert($target->getBundles() === NULL);
@@ -469,9 +633,7 @@ final class JsonSchemaFieldInstanceMatcher {
                 // Ignore base field matches; those are already handled by the
                 // logic just before this ">1 target bundles" conditional.
                 foreach ($referenced_matches as $referenced_match) {
-                  $field_name = $referenced_match instanceof ReferenceFieldPropExpression
-                    ? $referenced_match->referencer->fieldName
-                    : $referenced_match->fieldName;
+                  $field_name = self::getFieldNameForSingleBundleExpression($referenced_match);
                   if (!in_array($field_name, $base_field_names, TRUE)) {
                     $matches[] = new ReferenceFieldPropExpression($current_entity_field_prop, $referenced_match);
                   }
@@ -527,7 +689,9 @@ final class JsonSchemaFieldInstanceMatcher {
               $property_definition = $transformed_property_data_definition;
             }
           }
-          // TRICKY: treat TextProcessed as a primitive, because it must retain its FilteredMarkup encapsulation to avoid Twig escaping the processed text.
+          // TRICKY: treat TextProcessed as a primitive, because it must retain
+          // its FilteredMarkup encapsulation to avoid Twig escaping the
+          // processed text.
           // @see \Drupal\filter\Render\FilteredMarkup
           assert(is_a($property_definition->getClass(), PrimitiveInterface::class, TRUE) || is_a($property_definition->getClass(), TextProcessed::class, TRUE));
           $field_item = $this->typedDataManager->createInstance("field_item:" . $field_definition->getType(), [
@@ -544,9 +708,11 @@ final class JsonSchemaFieldInstanceMatcher {
           // 💡 Debugging tip: put a conditional breakpoint here when figuring
           // out why a particular field instance prop is not being matched, use
           // a condition like
+          // @phpcs:disable Drupal.Files.LineLength.TooLong
           // @code
           // (string) $current_entity_field_prop == 'ℹ︎␜entity:node:foo␝field_silly_image␞␟src_with_alternate_widths'
           // @endcode
+          // phpcs:enable
           // And add a test case to PropSourceSuggesterTest::provider(),
           // that will allow hitting this point in seconds.
           if ($this->dataLeafMatchesFormat($property, $primitive_type, $is_required_in_json_schema, $schema)) {
@@ -671,7 +837,9 @@ final class JsonSchemaFieldInstanceMatcher {
       is_a($data_type_class, FloatData::class, TRUE) => [JsonSchemaType::Number],
       is_a($data_type_class, BooleanData::class, TRUE) => [JsonSchemaType::Boolean],
       // @todo object + array
-      // - for object: initially support only a single level of nesting, then we can expect HERE a ComplexDataInterface with only primitives underneath (hence all leaves)
+      // - for object: initially support only a single level of nesting, then
+      //   we can expect HERE a ComplexDataInterface with only primitives
+      //   underneath (hence all leaves)
       // - for array: ListDefinitionInterface
       TRUE => [],
     };
@@ -698,9 +866,11 @@ final class JsonSchemaFieldInstanceMatcher {
     // phpcs:disable Drupal.Commenting.InlineComment.NotCapital
     // 💡 Debugging tip: put a conditional breakpoint here when figuring out why
     // a particular field instance property is not being matched, use
+    // phpcs:disable Drupal.Files.LineLength.TooLong
     // @code
     // $schema['type'] == 'string' && isset($schema['contentMediaType']) && $data->getRoot()->getDataDefinition()->getDataType() == 'field_item:file_uri'
     // @endcode
+    // phpcs:enable Drupal.Files.LineLength.TooLong
     // to check:
     // - either the SDC prop for which no match is being found (by checking
     //   information in $schema)
@@ -853,10 +1023,15 @@ final class JsonSchemaFieldInstanceMatcher {
         $entity_type_id = $dd->getEntityTypeId();
         assert(is_string($entity_type_id));
         // If no bundles or multiple bundles are specified, inspect the base
-        // fields. Otherwise (if a single bundle is specified), inspect all
-        // fields.
-        if ($dd->getBundles() !== NULL && count($dd->getBundles()) === 1) {
-          return $this->entityFieldManager->getFieldDefinitions($entity_type_id, $dd->getBundles()[0]);
+        // fields. Otherwise (if a single bundle is specified, or if it is a
+        // bundleless entity type), inspect all fields.
+        $bundles = $dd->getBundles();
+        $specific_bundle = (is_array($bundles) && count($bundles) == 1) ? reset($bundles) : NULL;
+        if ($specific_bundle === NULL && !$this->entityTypeManager->getDefinition($dd->getEntityTypeId())->hasKey('bundle')) {
+          $specific_bundle = $entity_type_id;
+        }
+        if ($specific_bundle !== NULL) {
+          return $this->entityFieldManager->getFieldDefinitions($entity_type_id, $specific_bundle);
         }
         return $this->entityFieldManager->getBaseFieldDefinitions($entity_type_id);
       })($dd),
@@ -923,7 +1098,10 @@ final class JsonSchemaFieldInstanceMatcher {
     assert(is_a($property_definition->getClass(), EntityReference::class, TRUE));
 
     $target = $property_definition->getTargetDefinition();
-    assert($target instanceof EntityDataDefinitionInterface);
+    assert($target instanceof EntityDataDefinition);
+    // @todo Remove this once https://www.drupal.org/project/drupal/issues/2169813 is fixed.
+    $target = BetterEntityDataDefinition::createFromBuggyInCoreEntityDataDefinition($target);
+
     // When referencing an entity, enrich the EntityDataDefinition with
     // constraints that are imposed by the entity reference field, to
     // narrow the matching.
@@ -969,6 +1147,24 @@ final class JsonSchemaFieldInstanceMatcher {
     }
 
     return NULL;
+  }
+
+  private static function getFieldNameForSingleBundleExpression(FieldPropExpression|FieldObjectPropsExpression|ReferenceFieldPropExpression $leaf_expr): string {
+    $field_name = match (get_class($leaf_expr)) {
+      FieldPropExpression::class, FieldObjectPropsExpression::class => $leaf_expr->fieldName,
+      ReferenceFieldPropExpression::class => $leaf_expr->referencer->fieldName,
+      default => throw new \LogicException('Unhandled.'),
+    };
+    // Even though FieldPropExpression's `fieldName` can be an array at the
+    // data structure level, it can only be a string here: because the logic
+    // in ::matchEntityPropsForScalar() asses one entity type + bundle at a
+    // time.
+    assert(!$leaf_expr->isMultiBundle() && is_string($field_name));
+    return $field_name;
+  }
+
+  private static function componentPluginManager(): ComponentPluginManager {
+    return \Drupal::service(ComponentPluginManager::class);
   }
 
 }

@@ -12,7 +12,6 @@ use Drupal\ai_agents\PluginInterfaces\AiAgentContextInterface;
 use Drupal\canvas_ai\AiResponseValidator;
 use Drupal\canvas_ai\CanvasAiPageBuilderHelper;
 use Drupal\canvas_ai\CanvasAiPermissions;
-use Drupal\Component\Serialization\Json;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 use Drupal\Core\Session\AccountProxyInterface;
@@ -36,7 +35,7 @@ use Symfony\Component\Yaml\Yaml;
     ),
   ],
 )]
-final class SetAIGeneratedComponentStructure extends FunctionCallBase implements ExecutableFunctionCallInterface, AiAgentContextInterface {
+final class SetAIGeneratedComponentStructure extends FunctionCallBase implements ExecutableFunctionCallInterface, AiAgentContextInterface, BuilderResponseFunctionCallInterface {
 
   /**
    * The Canvas page builder helper service.
@@ -110,8 +109,9 @@ final class SetAIGeneratedComponentStructure extends FunctionCallBase implements
 
       // Once validated, convert this yml to JSON that will be processed by
       // the Canvas UI.
-      $output = $this->pageBuilderHelper->customYamlToArrayMapper($component_structure);
-      $this->setOutput(Json::encode($output));
+      $custom_yaml = $this->pageBuilderHelper->customYamlToArrayMapper($component_structure);
+      \assert(array_keys($custom_yaml) === ['operations']);
+      $this->setStructuredOutput($custom_yaml);
     }
     catch (\Exception $e) {
       $this->loggerFactory->get('canvas_ai')->error($e->getMessage());
@@ -121,33 +121,33 @@ final class SetAIGeneratedComponentStructure extends FunctionCallBase implements
 
   private function validatePlacementParams(array $operation, int $index): array {
     $errors = [];
-    $index = 'Operation ' . $index;
+    $errorKey = 'Operation ' . $index;
 
     if (!isset($operation['placement']) || !in_array($operation['placement'], ['above', 'below', 'inside'], TRUE)) {
-      $errors[$index][] = 'The placement key is missing or invalid in the operation.';
+      $errors[$errorKey][] = 'The placement key is missing or invalid in the operation.';
       return $errors;
     }
 
     $placement = $operation['placement'];
     // If placement is 'above' or 'below', `reference_uuid` must be provided.
     if (in_array($placement, ['above', 'below'], TRUE) && empty($operation['reference_uuid'])) {
-      $errors[$index][] = 'The reference_uuid must be provided for above/below placement.';
+      $errors[$errorKey][] = 'The reference_uuid must be provided for above/below placement.';
     }
 
     // If placement is 'inside', `reference_uuid` is not needed.
     if ($placement === 'inside') {
       if (!empty($operation['reference_uuid'])) {
-        $errors[$index][] = 'The reference_uuid is not required for inside placement.';
+        $errors[$errorKey][] = 'The reference_uuid is not required for inside placement.';
       }
       // If placement is 'inside', the target must not contain child components.
       if ($this->pageBuilderHelper->hasChildComponents($operation['target'])) {
-        $errors[$index][] = 'The target ' . $operation['target'] . ' has "inside" placement specified, but it contains child components. Select any child component in the target and use "above" or "below" placement instead.';
+        $errors[$errorKey][] = 'The target ' . $operation['target'] . ' has "inside" placement specified, but it contains child components. Select any child component in the target and use "above" or "below" placement instead.';
       }
     }
 
     // Operation must contain components.
     if (empty($operation['components'])) {
-      $errors[$index][] = 'The operation must contain components.';
+      $errors[$errorKey][] = 'The operation must contain components.';
     }
 
     return $errors;

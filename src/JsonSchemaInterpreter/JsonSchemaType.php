@@ -93,6 +93,24 @@ enum JsonSchemaType: string {
   }
 
   /**
+   * Constructs a JsonSchemaType from a typical SDC prop JSON schema.
+   *
+   * TRICKY: SDC always allowed `object` for Twig integration reasons.
+   *
+   * @param JsonSchema $schema
+   *
+   * @return static
+   *
+   * @see \Drupal\Core\Theme\Component\ComponentMetadata::parseSchemaInfo
+   */
+  public static function fromSdcPropJsonSchema(array $schema) : static {
+    $type = is_array($schema['type'])
+      ? $schema['type'][0]
+      : $schema['type'];
+    return JsonSchemaType::from($type);
+  }
+
+  /**
    * Maps the given schema to data type shape requirements.
    *
    * Used for matching against existing field instances, to find candidate
@@ -110,10 +128,12 @@ enum JsonSchemaType: string {
       JsonSchemaType::Boolean => FALSE,
 
       // The `string` JSON schema type
+      // phpcs:disable Drupal.Files.LineLength.TooLong
       // - `enum`: https://json-schema.org/understanding-json-schema/reference/enum
       // - `minLength` and `maxLength`: https://json-schema.org/understanding-json-schema/reference/string#length
       // - `pattern`: https://json-schema.org/understanding-json-schema/reference/string#regexp
       // - `format`: https://json-schema.org/understanding-json-schema/reference/string#format and https://json-schema.org/understanding-json-schema/reference/string#built-in-formats
+      // phpcs:enable
       JsonSchemaType::String => match (TRUE) {
         // Custom: `contentMediaType: text/html` + `x-formatting-context`.
         // @see docs/shape-matching-into-field-types.md#3.2.1
@@ -247,10 +267,12 @@ enum JsonSchemaType: string {
       JsonSchemaType::Boolean => new StorablePropShape(shape: $shape, fieldTypeProp: new FieldTypePropExpression('boolean', 'value'), fieldWidget: 'boolean_checkbox'),
 
       // The `string` JSON schema type
+      // phpcs:disable Drupal.Files.LineLength.TooLong
       // - `enum`: https://json-schema.org/understanding-json-schema/reference/enum
       // - `minLength` and `maxLength`: https://json-schema.org/understanding-json-schema/reference/string#length
       // - `pattern`: https://json-schema.org/understanding-json-schema/reference/string#regexp
       // - `format`: https://json-schema.org/understanding-json-schema/reference/string#format and https://json-schema.org/understanding-json-schema/reference/string#built-in-formats
+      // phpcs:enable
       JsonSchemaType::String => match (TRUE) {
         // Custom: `contentMediaType: text/html` + `x-formatting-context`.
         // @see docs/shape-matching-into-field-types.md#3.2.1
@@ -260,9 +282,12 @@ enum JsonSchemaType: string {
           // Other `x-formatting-context` values do not make sense.
           default => NULL,
         },
+        // Require $ref to be resolved, because that might add some of the other
+        // keywords.
         array_key_exists('$ref', $schema) => NULL,
         array_key_exists('enum', $schema) => match(in_array('', $schema['enum'], TRUE)) {
-          // The empty string is not a sensible enum value. To indicate optionality, the prop should be made optional.
+          // The empty string is not a sensible enum value. To indicate
+          // optionality, the prop should be made optional.
           TRUE => NULL,
           FALSE => new StorablePropShape(
             shape: $shape,
@@ -289,12 +314,18 @@ enum JsonSchemaType: string {
       },
 
       // The `integer` JSON schema types.
+      // phpcs:disable Drupal.Files.LineLength.TooLong
       // - `enum`: https://json-schema.org/understanding-json-schema/reference/enum
       // - `multipleOf`: https://json-schema.org/understanding-json-schema/reference/numeric#multiples
       // - `minimum`, `exclusiveMinimum`, `maximum` and `exclusiveMaximum`: https://json-schema.org/understanding-json-schema/reference/numeric#range
+      // phpcs:enable
       JsonSchemaType::Integer => match (TRUE) {
-        // @todo Refactor in https://www.drupal.org/i/3515074
-        array_key_exists('$ref', $schema) && str_starts_with($schema['$ref'], 'json-schema-definitions://') => NULL,
+        // Require $ref to be resolved, because that might add some of the other
+        // keywords.
+        array_key_exists('$ref', $schema) => NULL,
+        // `multipleOf` has no equivalent field type in Drupal core, so leave it
+        // to contrib.
+        array_key_exists('multipleOf', $schema) => NULL,
         array_key_exists('enum', $schema)=> new StorablePropShape(shape: $shape, fieldTypeProp: new FieldTypePropExpression('list_integer', 'value'), fieldWidget: 'options_select', fieldStorageSettings: [
           'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
         ]),
@@ -304,17 +335,19 @@ enum JsonSchemaType: string {
           'max' => $schema['maximum'] ?? (array_key_exists('exclusiveMaximum', $schema) ? $schema['exclusiveMaximum'] - 1 : NULL),
         ]),
         // Otherwise, it's an unrestricted integer.
-        // @todo `multipleOf` ⚠️
         TRUE => new StorablePropShape(shape: $shape, fieldTypeProp: new FieldTypePropExpression('integer', 'value'), fieldWidget: 'number'),
       },
 
       // The `number` JSON schema types.
+      // phpcs:disable Drupal.Files.LineLength.TooLong
       // - `enum`: https://json-schema.org/understanding-json-schema/reference/enum
       // - `multipleOf`: https://json-schema.org/understanding-json-schema/reference/numeric#multiples
       // - `minimum`, `exclusiveMinimum`, `maximum` and `exclusiveMaximum`: https://json-schema.org/understanding-json-schema/reference/numeric#range
+      // phpcs:enable
       JsonSchemaType::Number => match (TRUE) {
-        // @todo Refactor in https://www.drupal.org/i/3515074
-        array_key_exists('$ref', $schema) && str_starts_with($schema['$ref'], 'json-schema-definitions://') => NULL,
+        // Require $ref to be resolved, because that might add some of the other
+        // keywords.
+        array_key_exists('$ref', $schema) => NULL,
         array_key_exists('enum', $schema) => new StorablePropShape(shape: $shape, fieldTypeProp: new FieldTypePropExpression('list_float', 'value'), fieldWidget: 'options_select', fieldStorageSettings: [
           'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
         ]),
@@ -329,12 +362,15 @@ enum JsonSchemaType: string {
       },
 
       JsonSchemaType::Object => match (TRUE) {
+        // For object shapes, it's far simpler to match on the `$ref` than on
+        // minutiae.
         array_key_exists('$ref', $schema) => match ($schema['$ref']) {
           // @see \Drupal\image\Plugin\Field\FieldType\ImageItem
           // @see \Drupal\canvas\Hook\ShapeMatchingHooks::mediaLibraryStoragePropShapeAlter()
           // @todo Try decorating with adapter in https://www.drupal.org/project/canvas/issues/3536115.
           'json-schema-definitions://canvas.module/image' => new StorablePropShape(shape: $shape, fieldWidget: 'image_image', fieldTypeProp: new FieldTypeObjectPropsExpression('image', [
-            // TRICKY: Additional computed property on image fields added by Drupal Canvas.
+            // TRICKY: Additional computed property on image fields added by
+            // Drupal Canvas.
             // @see \Drupal\canvas\Plugin\Field\FieldTypeOverride\ImageItemOverride
             // @todo Remove the next line in favor of the commented out lines in https://www.drupal.org/project/canvas/issues/3536115.
             'src' => new FieldTypePropExpression('image', 'src_with_alternate_widths'),

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\PropSource;
 
+use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Datetime\DrupalDateTime;
 use Drupal\Core\Entity\FieldableEntityInterface;
@@ -126,10 +127,12 @@ final class StaticPropSource extends PropSourceBase {
     // - field type
     // - cardinality
     // @see \Drupal\Core\Field\FieldStorageDefinitionInterface
-    // TRICKY: this does not work due to it using BaseFieldDefinition, and BaseFieldDefinition::getOptionsProvider() assuming it to exist on the host entity. Hence the use of Canvas's own \Drupal\canvas\PropSource\FieldStorageDefinition.
+    // TRICKY: this does not work due to it using BaseFieldDefinition, and
+    // BaseFieldDefinition::getOptionsProvider() assuming it to exist on the
+    // host entity. Hence the use of Canvas's own
+    // \Drupal\canvas\PropSource\FieldStorageDefinition.
     // @see \Drupal\Core\Field\TypedData\FieldItemDataDefinition::createFromDataType()
     // @todo Refactor this after https://www.drupal.org/node/2280639 is fixed.
-    // $field_item_definition = $typed_data_manager->createDataDefinition($data_type);
     $storage_definition = FieldStorageDefinition::create($field_type);
     // @see \Drupal\Core\Field\BaseFieldDefinition::getCardinality()
     if ($cardinality) {
@@ -379,7 +382,7 @@ final class StaticPropSource extends PropSourceBase {
   /**
    * {@inheritdoc}
    */
-  public function evaluate(?FieldableEntityInterface $host_entity, bool $is_required): mixed {
+  public function evaluate(?FieldableEntityInterface $host_entity, bool $is_required): EvaluationResult {
     return match ($this->getCardinality()) {
       // @phpstan-ignore-next-line
       1 => Evaluator::evaluate($this->fieldItemList->first(), $this->expression, $is_required),
@@ -438,7 +441,7 @@ final class StaticPropSource extends PropSourceBase {
     };
   }
 
-  public function getWidget(string $component_config_entity_id, ?string $component_config_entity_version, string $prop_name, string $sdc_prop_label, ?string $field_widget_plugin_id): WidgetInterface {
+  public function getWidget(string $component_config_entity_id, ?string $component_config_entity_version, string $prop_name, string $sdc_prop_label, ?string $field_widget_plugin_id, ?string $sdc_prop_description = NULL): WidgetInterface {
     // @phpstan-ignore-next-line
     $field_widget_plugin_manager = \Drupal::service('plugin.manager.field.widget');
     assert($field_widget_plugin_manager instanceof WidgetPluginManager);
@@ -468,7 +471,8 @@ final class StaticPropSource extends PropSourceBase {
             ],
           ],
         ])
-        ->setLabel($sdc_prop_label),
+        ->setLabel($sdc_prop_label)
+        ->setDescription($sdc_prop_description ?? ''),
       'configuration' => $configuration,
       'prepare' => TRUE,
     ]);
