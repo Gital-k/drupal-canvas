@@ -1,5 +1,5 @@
 import Select from '@/components/form/components/Select';
-import InputBehaviors from '@/components/form/inputBehaviors';
+import { withFormRegistration } from '@/components/form/withFormRegistration';
 
 import type { Attributes } from '@/types/DrupalAttribute';
 
@@ -20,4 +20,4 @@ const DrupalSelect: React.FC<DrupalSelectProps> = ({
   return <Select options={options} attributes={attributes} />;
 };
 
-export default InputBehaviors(DrupalSelect);
+export default withFormRegistration(DrupalSelect);

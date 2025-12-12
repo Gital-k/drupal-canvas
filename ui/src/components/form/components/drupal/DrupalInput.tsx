@@ -5,7 +5,7 @@ import { DrupalRadioItem } from '@/components/form/components/drupal/DrupalRadio
 import Hidden from '@/components/form/components/Hidden';
 import TextField from '@/components/form/components/TextField';
 import TextFieldAutocomplete from '@/components/form/components/TextFieldAutocomplete';
-import InputBehaviors from '@/components/form/inputBehaviors';
+import { withFormRegistration } from '@/components/form/withFormRegistration';
 import { a2p } from '@/local_packages/utils.js';
 
 import type { Attributes } from '@/types/DrupalAttribute';
@@ -65,4 +65,4 @@ const DrupalInput = ({
   }
 };
 
-export default InputBehaviors(DrupalInput);
+export default withFormRegistration(DrupalInput);
