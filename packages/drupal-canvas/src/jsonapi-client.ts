@@ -19,8 +19,8 @@ class CanvasJsonApiClient extends JsonApiClient {
 
     if (!baseUrl && !clientBaseUrl) {
       throw new Error(
-        "Could not determine your site's base URL for the JSON:API client." +
-          'If working outside of Drupal Canvas, you can use the @drupal-canvas/vite-plugin to automatically configure it for you.' +
+        "Could not determine your site's base URL for the JSON:API client. " +
+          'If working outside of Drupal Canvas, you can use the @drupal-canvas/vite-plugin to automatically configure it for you. ' +
           'Otherwise you must explicitly provide a base URL, i.e. `const client = new JsonApiClient("https://...")`',
       );
     }
