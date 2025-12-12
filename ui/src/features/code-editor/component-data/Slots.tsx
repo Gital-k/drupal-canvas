@@ -21,7 +21,6 @@ import type { CodeComponentSlot } from '@/types/CodeComponent';
 export default function Slots() {
   const dispatch = useAppDispatch();
   const slots = useAppSelector(selectCodeComponentProperty('slots'));
-  const componentStatus = useAppSelector(selectCodeComponentProperty('status'));
 
   const handleAddSlot = () => {
     dispatch(addSlot());
@@ -54,15 +53,10 @@ export default function Slots() {
                 }),
               )
             }
-            disabled={componentStatus}
           />
         </FormElement>
       </Box>
-      <FormPropTypeSlot
-        id={slot.id}
-        example={slot.example}
-        isDisabled={componentStatus}
-      />
+      <FormPropTypeSlot id={slot.id} example={slot.example} />
     </Flex>
   );
 
@@ -88,7 +82,6 @@ export default function Slots() {
         data-testid="slot"
         moveAriaLabel="Move slot"
         removeAriaLabel="Remove slot"
-        isDisabled={componentStatus}
       />
     </>
   );
