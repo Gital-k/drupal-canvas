@@ -15,11 +15,7 @@ const DrupalForm = ({
   attributes: Attributes;
   renderChildren: ReactNode;
 }) => {
-  // attributes['data-form-id'] can be used to identify the form in Drupal.
-  // data-form-id : component_instance_form.
-  // data-form-id: page_data_form
   const formId = attributes['data-form-id'] as FormId;
-  // console.log('ATTRIBUGTES', attributes);
 
   // If no formId, render without FormProvider (e.g., external forms)
   if (!formId) {

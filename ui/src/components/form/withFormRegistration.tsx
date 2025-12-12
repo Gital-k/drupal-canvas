@@ -3,49 +3,38 @@ import Ajv from 'ajv';
 import { debounce } from 'lodash';
 import { Controller } from 'react-hook-form';
 
-import { useAppSelector } from '@/app/hooks';
-import {
-  ComponentPreviewUpdateEvent,
-  getPropSchemas,
-  getPropsValues,
-  propInputData,
-  shouldSkipPropValidation,
-  toPropName,
-  validateProp,
-} from '@/components/form/formUtil';
-import {
-  DEBOUNCE_TIMEOUT,
-  POLLED_BACKGROUND_TIMEOUT,
-} from '@/components/form/inputBehaviors';
+
+
+import { useAppDispatch, useAppSelector } from '@/app/hooks';
+import { ComponentPreviewUpdateEvent, getPropSchemas, getPropsValues, propInputData, shouldSkipPropValidation, toPropName, validateProp } from '@/components/form/formUtil';
+import { DEBOUNCE_TIMEOUT, POLLED_BACKGROUND_TIMEOUT } from '@/components/form/inputBehaviors';
 import { syncPropSourcesToResolvedValues } from '@/components/form/InputBehaviorsComponentPropsForm';
 import { useSafeFormContext, useSafeRHFContext } from '@/contexts/FormContext';
 import { FORM_TYPES } from '@/features/form/constants';
-import {
-  selectFormValues,
-  setFieldError,
-  setFieldValue,
-} from '@/features/form/formStateSlice';
-import {
-  isEvaluatedComponentModel,
-  setUpdatePreview,
-} from '@/features/layout/layoutModelSlice';
-import {
-  externalUpdateComplete,
-  setPageData,
-} from '@/features/pageData/pageDataSlice';
+import { selectFormValues, setFieldError, setFieldValue } from '@/features/form/formStateSlice';
+import { isEvaluatedComponentModel, setUpdatePreview } from '@/features/layout/layoutModelSlice';
+import { externalUpdateComplete, setPageData } from '@/features/pageData/pageDataSlice';
 import { setPreviewBackgroundUpdate } from '@/features/pagePreview/previewSlice';
 import { useComponentFormInputInfo } from '@/hooks/useComponentFormInputInfo';
 import { usePageDataFormInputInfo } from '@/hooks/usePageDataFormInputInfo';
+import { AJAX_UPDATE_FORM_BUILD_ID_EVENT, AJAX_UPDATE_FORM_STATE_EVENT } from '@/types/Ajax';
 import { flaggedForRemoval, parseValue } from '@/utils/function-utils';
 import { isAjaxing } from '@/utils/isAjaxing';
+
+
 
 import type { ComponentType } from 'react';
 import type * as React from 'react';
 import type { ErrorObject } from 'ajv/dist/types';
-import type { useAppDispatch } from '@/app/hooks';
 import type { FormId } from '@/features/form/formStateSlice';
 import type { ComponentModels } from '@/features/layout/layoutModelSlice';
+import type { AjaxUpdateFormStateEvent } from '@/types/Ajax';
+import type { AjaxUpdateFormBuildIdEvent } from '@/types/Ajax';
 import type { InputUIData, PropsValues } from '@/types/Form';
+
+
+
+
 
 const ajv = new Ajv();
 
@@ -148,6 +137,8 @@ const ComponentFormField = <P extends Record<string, any>>({
     propName,
     isScalarProp,
   } = useComponentFormInputInfo(fieldName);
+
+
   const formStateToStore = (
     newFormState: PropsValues,
     newInputAndUiData: InputUIData,
@@ -163,7 +154,6 @@ const ComponentFormField = <P extends Record<string, any>>({
         ? transforms
         : (window as any)._canvasTransforms[selectedComponentType],
     );
-
     // And then send data to backend - this will:
     // a) Trigger server-side validation/transformation (massaging of widget values)
     // b) Update both the preview and the model - see the pessimistic update
@@ -210,10 +200,10 @@ const ComponentFormField = <P extends Record<string, any>>({
       );
       backgroundPreviewUpdate = PreviewUpdateEvent.getPreviewBackgroundUpdate();
     }
-
+    console.log('resolved to send', resolved);
     if (isEvaluatedComponentModel(selectedModel) && component) {
       const updateBackend = () => {
-        patchComponent({
+        const patchPayload = {
           type: editorFrameContext,
           componentInstanceUuid: selectedComponent,
           componentType: `${selectedComponentType}@${version}`,
@@ -225,7 +215,9 @@ const ComponentFormField = <P extends Record<string, any>>({
             ),
             resolved,
           },
-        });
+        };
+        console.log('PATCH PAYLOAD:', patchPayload);
+        patchComponent(patchPayload);
       };
       if (backgroundPreviewUpdate) {
         if (polledBackgroundUpdate.current !== null) {
@@ -366,15 +358,15 @@ const ComponentFormField = <P extends Record<string, any>>({
   // Component form specific hooks
   useEffect(() => {
     const currentValue = getCurrentValue();
-    console.log('[ComponentForm] Field registered:', {
-      fieldName,
-      propName,
-      initialValue: currentValue,
-      formId: formContext?.formId,
-      componentType: WrappedComponent.displayName || WrappedComponent.name,
-      isScalarProp,
-      selectedComponent,
-    });
+    // console.log('[ComponentForm] Field registered:', {
+    //   fieldName,
+    //   propName,
+    //   initialValue: currentValue,
+    //   formId: formContext?.formId,
+    //   componentType: WrappedComponent.displayName || WrappedComponent.name,
+    //   isScalarProp,
+    //   selectedComponent,
+    // });
   }, [
     fieldName,
     propName,
@@ -472,12 +464,12 @@ const PageDataFormField = <P extends Record<string, any>>({
   // Page data form specific hooks
   useEffect(() => {
     const currentValue = getCurrentValue();
-    console.log('[PageDataForm] Field registered:', {
-      fieldName,
-      initialValue: currentValue,
-      formId: formContext?.formId,
-      componentType: WrappedComponent.displayName || WrappedComponent.name,
-    });
+    // console.log('[PageDataForm] Field registered:', {
+    //   fieldName,
+    //   initialValue: currentValue,
+    //   formId: formContext?.formId,
+    //   componentType: WrappedComponent.displayName || WrappedComponent.name,
+    // });
   }, [fieldName, formContext?.formId, getCurrentValue, WrappedComponent]);
 
   const formStateToStore = (newFormState: PropsValues) => {
@@ -669,6 +661,7 @@ export const withFormRegistration = <P extends Record<string, any>>(
 ): ComponentType<P> => {
   const WithFormRegistration = (props: P) => {
     // Get form contexts - they may be null for external forms
+    const dispatch = useAppDispatch();
     const formContext = useSafeFormContext();
     const rhfContext = useSafeRHFContext();
 
@@ -693,6 +686,38 @@ export const withFormRegistration = <P extends Record<string, any>>(
         return props.element['#default_value'];
       return undefined;
     };
+
+    // Special handling for the form_build_id which can be updated by an ajax
+    // callback without using hyperscriptify to render a new React component.
+    useEffect(() => {
+      if (fieldName !== 'form_build_id' || !rhfContext || !formContext) {
+        return;
+      }
+      // Listen for changes to the form build ID so we can update that in
+      // our form state and value.
+      const formBuildIdListener = (e: AjaxUpdateFormBuildIdEvent) => {
+        if (e.detail.formId === formContext?.formId) {
+          dispatchFieldValue(
+            dispatch,
+            formContext.formId,
+            fieldName,
+            e.detail.newFormBuildId,
+          );
+          // Update react-hook-form value
+          rhfContext.setValue(fieldName, e.detail.newFormBuildId);
+        }
+      };
+      document.addEventListener(
+        AJAX_UPDATE_FORM_BUILD_ID_EVENT,
+        formBuildIdListener as unknown as EventListener,
+      );
+      return () => {
+        document.removeEventListener(
+          AJAX_UPDATE_FORM_BUILD_ID_EVENT,
+          formBuildIdListener as unknown as EventListener,
+        );
+      };
+    }, [dispatch, fieldName, formContext, rhfContext]);
 
     // If no react-hook-form context or no field name, render without enhancement
     if (!rhfContext || !fieldName) {
