@@ -126,7 +126,7 @@ function canvas_contextual_links_alter(array &$links, string $group, array $rout
           'route_name' => 'canvas.content_template.edit',
           'route_parameters' => [
             'node_type' => $node->bundle(),
-            'node_id' => $node->id(),
+            'node' => $node->id(),
             'view_mode' => $view_mode,
           ],
           'weight' => 11,

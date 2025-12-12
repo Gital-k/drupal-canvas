@@ -7,9 +7,10 @@ namespace Drupal\canvas\Controller;
 use Drupal\Core\Controller\ControllerBase;
 use Drupal\Core\Entity\EntityRepositoryInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
-use Drupal\Core\Render\RendererInterface;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\node\NodeInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
  * Controller for Canvas template editor.
@@ -24,13 +25,6 @@ class CanvasTemplateEditorController extends ControllerBase {
   protected $entityTypeManager;
 
   /**
-   * The renderer service.
-   *
-   * @var \Drupal\Core\Render\RendererInterface
-   */
-  protected $renderer;
-
-  /**
    * The entity repository service.
    *
    * @var \Drupal\Core\Entity\EntityRepositoryInterface
@@ -42,14 +36,12 @@ class CanvasTemplateEditorController extends ControllerBase {
    *
    * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entity_type_manager
    *   The entity type manager.
-   * @param \Drupal\Core\Render\RendererInterface $renderer
-   *   The renderer service.
+   *
    * @param \Drupal\Core\Entity\EntityRepositoryInterface $entity_repository
    *   The entity repository.
    */
-  public function __construct(EntityTypeManagerInterface $entity_type_manager, RendererInterface $renderer, EntityRepositoryInterface $entity_repository) {
+  public function __construct(EntityTypeManagerInterface $entity_type_manager, EntityRepositoryInterface $entity_repository) {
     $this->entityTypeManager = $entity_type_manager;
-    $this->renderer = $renderer;
     $this->entityRepository = $entity_repository;
   }
 
@@ -59,7 +51,6 @@ class CanvasTemplateEditorController extends ControllerBase {
   public static function create(ContainerInterface $container) {
     return new static(
       $container->get('entity_type.manager'),
-      $container->get('renderer'),
       $container->get('entity.repository')
     );
   }
@@ -79,6 +70,9 @@ class CanvasTemplateEditorController extends ControllerBase {
    */
   public function view(string $node_type, string $view_mode, NodeInterface $node): array {
     $view_builder = $this->entityTypeManager->getViewBuilder('node');
+    if ($node->bundle() !== $node_type) {
+      throw new NotFoundHttpException();
+    }
     $build = $view_builder->view($node, $view_mode);
 
     return $build;
@@ -89,16 +83,18 @@ class CanvasTemplateEditorController extends ControllerBase {
    *
    * @param string $node_type
    *   The node type.
-   * @param string $view_mode
-   *   The view mode.
+   *
    * @param \Drupal\node\NodeInterface $node
    *   The node entity.
    *
    * @return \Drupal\Core\StringTranslation\TranslatableMarkup
    *   The page title.
    */
-  public function title(string $node_type, string $view_mode, NodeInterface $node) {
+  public function title(string $node_type, NodeInterface $node): TranslatableMarkup {
     $translated_node = $this->entityRepository->getTranslationFromContext($node);
+    if ($node->bundle() !== $node_type) {
+      throw new NotFoundHttpException();
+    }
     return $this->t('Edit Content Template: @title', ['@title' => $translated_node->label()]);
   }
 
