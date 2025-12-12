@@ -1,5 +1,7 @@
 import { vi } from 'vitest';
 
+import '@testing-library/jest-dom/vitest';
+
 const mockDrupalSettings = {
   path: {
     baseUrl: '/',
@@ -45,3 +47,25 @@ vi.mock('tailwindcss-in-browser', () => ({
   compilePartialCss: vi.fn().mockImplementation(() => Promise.resolve('')),
   transformCss: vi.fn().mockReturnValue(Promise.resolve('')),
 }));
+
+vi.stubGlobal(
+  'ResizeObserver',
+  vi.fn(() => ({
+    observe: vi.fn(),
+    unobserve: vi.fn(),
+    disconnect: vi.fn(),
+  })),
+);
+
+class MockPointerEvent extends Event {
+  constructor(type, props) {
+    super(type, props);
+    this.button = props.button || 0;
+    this.ctrlKey = props.ctrlKey || false;
+    this.pointerType = props.pointerType || 'mouse';
+  }
+}
+window.PointerEvent = MockPointerEvent;
+window.HTMLElement.prototype.scrollIntoView = vi.fn();
+window.HTMLElement.prototype.releasePointerCapture = vi.fn();
+window.HTMLElement.prototype.hasPointerCapture = vi.fn();
