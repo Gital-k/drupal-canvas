@@ -24,8 +24,8 @@ import type { viewportSize } from '@/types/Preview';
 import styles from './ViewportToolbar.module.css';
 
 interface ViewportToolbarProps {
-  editorPaneRef: RefObject<HTMLElement>;
-  scalingContainerRef: RefObject<HTMLElement>;
+  editorPaneRef: RefObject<HTMLDivElement | null>;
+  scalingContainerRef: RefObject<HTMLDivElement | null>;
 }
 
 const findClosestScaleValue = (desiredScale: number): ScaleValue => {

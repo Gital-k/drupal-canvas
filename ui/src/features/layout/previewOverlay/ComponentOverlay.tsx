@@ -34,7 +34,7 @@ import styles from './PreviewOverlay.module.css';
 
 export interface ComponentOverlayProps {
   component: ComponentNode;
-  iframeRef: React.RefObject<HTMLIFrameElement>;
+  iframeRef: React.RefObject<HTMLIFrameElement | null>;
   parentSlot?: SlotNode;
   parentRegion?: RegionNode;
   index: number;

@@ -27,9 +27,9 @@ const Viewport: React.FC<ViewportProps> = (props) => {
   const { frameSrcDoc, isFetching } = props;
   const [isReloading, setIsReloading] = useState(true);
   const [showProgressIndicator, setShowProgressIndicator] = useState(false);
-  const progressTimerRef = useRef<number | null>();
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-  const previewContainerRef = useRef<HTMLDivElement>(null);
+  const progressTimerRef = useRef<number | null>(null);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const previewContainerRef = useRef<HTMLDivElement | null>(null);
   const dispatch = useAppDispatch();
   const editorFrameMode = useAppSelector(selectEditorFrameMode);
   const viewportWidth = useAppSelector(selectViewportWidth);
@@ -98,15 +98,17 @@ const Viewport: React.FC<ViewportProps> = (props) => {
         setIsReloading={setIsReloading}
         interactive={editorFrameMode === EditorFrameMode.INTERACTIVE}
       />
-      {editorFrameMode === EditorFrameMode.EDIT && (
-        <>
-          <ViewportOverlay
-            iframeRef={iframeRef}
-            previewContainerRef={previewContainerRef}
-          />
-          <RegionSpotlight />
-        </>
-      )}
+      {editorFrameMode === EditorFrameMode.EDIT &&
+        iframeRef.current &&
+        previewContainerRef.current && (
+          <>
+            <ViewportOverlay
+              iframeRef={iframeRef}
+              previewContainerRef={previewContainerRef}
+            />
+            <RegionSpotlight />
+          </>
+        )}
     </div>
   );
 };

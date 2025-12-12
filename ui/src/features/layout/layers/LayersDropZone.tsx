@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import clsx from 'clsx';
 import { useDroppable } from '@dnd-kit/core';
 
@@ -6,6 +6,7 @@ import { useAppSelector } from '@/app/hooks';
 import { selectLayout } from '@/features/layout/layoutModelSlice';
 import { findNodePathByUuid } from '@/features/layout/layoutUtils';
 
+import type React from 'react';
 import type {
   ComponentNode,
   RegionNode,
@@ -30,7 +31,7 @@ const LayersDropZone: React.FC<LayersDropZoneProps> = (props) => {
   const id = 'uuid' in layer ? layer.uuid : layer.id;
 
   // Memoize the path calculation to prevent recalculating on every render
-  const dropPath = useMemo(() => {
+  const dropPath = (() => {
     const path = findNodePathByUuid(layout, id);
     if (!path) {
       return null;
@@ -45,7 +46,7 @@ const LayersDropZone: React.FC<LayersDropZoneProps> = (props) => {
     }
 
     return finalPath;
-  }, [layout, id, type, position]);
+  })();
 
   if (!dropPath) {
     throw new Error(`Unable to ascertain 'path' to component ${id}`);
@@ -87,5 +88,4 @@ const LayersDropZone: React.FC<LayersDropZoneProps> = (props) => {
   );
 };
 
-// Wrap the component with React.memo to prevent unnecessary re-renders
-export default React.memo(LayersDropZone);
+export default LayersDropZone;

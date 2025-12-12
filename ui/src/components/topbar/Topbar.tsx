@@ -107,7 +107,7 @@ const Topbar = () => {
                 <DropIcon
                   className={styles.drupalLogo}
                   height="24"
-                  width="auto"
+                  width="24"
                 />
               </a>
             </Tooltip>
