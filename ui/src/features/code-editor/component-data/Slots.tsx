@@ -67,7 +67,7 @@ export default function Slots() {
           <Callout.Icon>
             <QuestionMarkCircledIcon />
           </Callout.Icon>
-          <Callout.Text>
+          <Callout.Text m="0">
             Slots allow you to place other components inside of your component.
           </Callout.Text>
         </Callout.Root>
