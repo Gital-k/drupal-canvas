@@ -8,7 +8,7 @@
     "esModuleInterop": true,
     "skipLibCheck": false,
     "jsx": "react-jsx",
-    "jsxImportSource": "preact",
+    "jsxImportSource": "react",
   },
   "exclude": ["dist"],
   "include": ["**/*"]
