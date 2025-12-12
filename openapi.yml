@@ -1408,7 +1408,7 @@ paths:
                     $ref: '#/components/schemas/Model'
                   isNew:
                     type: boolean
-                    # @see \Drupal\canvas\Controller\ApiLayoutController::contentEntityIsConsideredNew()
+                    # @see \Drupal\canvas\Controller\ApiLayoutController::entityIsDraft()
                     # @see https://www.drupal.org/project/canvas/issues/3505118#comment-15982801
                     description: Whether the edited content entity is considered new.
         '401':
@@ -1627,7 +1627,7 @@ paths:
                     description: Entity field values that the user has edit access to.
                   isNew:
                     type: boolean
-                    # @see \Drupal\canvas\Controller\ApiLayoutController::contentEntityIsConsideredNew()
+                    # @see \Drupal\canvas\Controller\ApiLayoutController::entityIsDraft()
                     # @see https://www.drupal.org/project/canvas/issues/3505118#comment-15982801
                     description: Whether the edited content entity is considered new.
                   isPublished:

@@ -294,7 +294,7 @@ final class ApiAutoSaveController extends ApiControllerBase {
             );
           }
         }
-        $use_existing_revision_id = $this->autoSaveManager->entityIsDraft($original_entity);
+        $is_draft = $this->autoSaveManager->entityIsDraft($original_entity);
 
         // For draft pages (new entities that have never been published),
         // automatically publish them when publishing changes. Check both the
@@ -303,7 +303,7 @@ final class ApiAutoSaveController extends ApiControllerBase {
         // For archived pages (not new), preserve the published status from
         // the autosaved entity to allow archiving (unpublishing) to work
         // correctly.
-        if ($use_existing_revision_id
+        if ($is_draft
           && $entity instanceof EntityPublishedInterface) {
           assert($original_entity instanceof EntityPublishedInterface);
           // Only auto-publish if both the original and autosaved entities are
@@ -318,7 +318,7 @@ final class ApiAutoSaveController extends ApiControllerBase {
         // If the entity is new, the autosaved data is considered to be part
         // of the first revision. Therefore, do not create a new revision
         // for new entities.
-        if ($use_existing_revision_id) {
+        if ($is_draft) {
           $entity->setNewRevision(FALSE);
           // Ensure this is the default revision so status updates the
           // field_data table.
@@ -338,7 +338,7 @@ final class ApiAutoSaveController extends ApiControllerBase {
         // might not be creating a new revision, this would only be in the
         // case where this entity should be considered new, which means it has
         // never published before in Drupal Canvas.
-        // @see \Drupal\canvas\AutoSave\AutoSaveManager::contentEntityIsConsideredNew()
+        // @see \Drupal\canvas\AutoSave\AutoSaveManager::entityIsDraft()
         if ($revision_user = $entity_definition->getRevisionMetadataKey('revision_user')) {
           \assert(is_string($revision_user));
           $entity->set($revision_user, $this->currentUser->id());
