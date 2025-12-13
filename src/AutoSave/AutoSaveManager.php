@@ -24,6 +24,7 @@ use Drupal\Core\TypedData\TypedDataInterface;
 use Drupal\canvas\AutoSaveEntity;
 use Drupal\canvas\Controller\ApiContentControllers;
 use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Entity\StagedConfigUpdate;
 use Drupal\canvas\Entity\CanvasHttpApiEligibleConfigEntityInterface;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
@@ -117,6 +118,59 @@ class AutoSaveManager implements EventSubscriberInterface {
     $this->getTempStore()->set($key, $auto_save_data);
     $this->cache->delete($key);
     $this->cacheTagsInvalidator->invalidateTags([self::CACHE_TAG]);
+
+    // Update the real Page entity's title and changed fields for draft pages.
+    // This ensures draft pages show meaningful titles in admin views instead
+    // of all showing "Untitled page".
+    // @see https://drupal.org/i/3563001
+    if ($entity instanceof Page && !$entity->isNew()) {
+      $this->updatePageTitleAndChanged($entity);
+    }
+  }
+
+  /**
+   * Updates the stored Page entity's title and changed timestamp.
+   *
+   * This ensures draft pages display meaningful titles in admin views instead
+   * of all showing "Untitled page". Only the title and changed fields are
+   * updated; other fields remain unchanged.
+   *
+   * @param \Drupal\canvas\Entity\Page $entity
+   *   The page entity with updated title (from auto-save).
+   *
+   * @see https://drupal.org/i/3563001
+   */
+  private function updatePageTitleAndChanged(Page $entity): void {
+    $entity_id = $entity->id();
+    if ($entity_id === NULL) {
+      return;
+    }
+
+    // Load the unchanged version from storage.
+    $storage = $this->entityTypeManager->getStorage($entity->getEntityTypeId());
+    /** @var \Drupal\canvas\Entity\Page|null $stored_entity */
+    $stored_entity = $storage->loadUnchanged($entity_id);
+
+    if (!$stored_entity) {
+      return;
+    }
+
+    // Only update if title has actually changed.
+    $new_title = $entity->label();
+    if ($stored_entity->label() === $new_title) {
+      return;
+    }
+
+    // Update title and changed timestamp.
+    $stored_entity->set('title', $new_title);
+    // The changed field will be automatically updated by EntityChangedTrait
+    // when we save.
+    // @phpstan-ignore-next-line (Using global service call for simplicity in private method)
+    $stored_entity->setChangedTime(\Drupal::time()->getRequestTime());
+
+    // Save without creating a new revision - we're just updating metadata.
+    $stored_entity->setNewRevision(FALSE);
+    $stored_entity->save();
   }
 
   /**
