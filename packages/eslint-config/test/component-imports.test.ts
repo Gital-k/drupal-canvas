@@ -190,7 +190,8 @@ testRunner.run('component-imports rule', rule, {
           line: 8,
         },
         {
-          message: 'Drupal utilities were moved into the `drupal-canvas` package.',
+          message:
+            'Drupal utilities were moved into the `drupal-canvas` package.',
           line: 9,
         },
       ],
@@ -220,11 +221,13 @@ testRunner.run('component-imports rule', rule, {
       filename: '/components/button/index.jsx',
       errors: [
         {
-          message: 'Drupal utilities were moved into the `drupal-canvas` package.',
+          message:
+            'Drupal utilities were moved into the `drupal-canvas` package.',
           line: 2,
         },
         {
-          message: 'Drupal utilities were moved into the `drupal-canvas` package.',
+          message:
+            'Drupal utilities were moved into the `drupal-canvas` package.',
           line: 3,
         },
       ],
