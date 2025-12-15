@@ -7,12 +7,13 @@ import { useGetComponentsQuery } from '@/services/componentAndLayout';
 import type { CanvasComponent, ComponentsList, PropSourceComponent } from '@/types/Component';
 
 /**
- * Hook to get the allowedComponents for the current target slot.
+ * Hook to get the expected/allowedComponents for the current target slot.
+ * Supports both Drupal core 'expected' and legacy 'allowedComponents' properties.
  *
  * Returns undefined if:
  * - No slot is being targeted (not dragging over a slot)
- * - The target slot doesn't have allowedComponents restrictions
- * - The parent component doesn't have metadata with allowedComponents
+ * - The target slot doesn't have expected/allowedComponents restrictions
+ * - The parent component doesn't have metadata with slot restrictions
  */
 export function useTargetSlotAllowedComponents(): string[] | undefined {
   const targetSlotInfo = useAppSelector(selectTargetSlotInfo);
@@ -33,10 +34,11 @@ export function useTargetSlotAllowedComponents(): string[] | undefined {
       return undefined;
     }
 
-    // Get the slot definition with allowedComponents
+    // Get the slot definition with expected/allowedComponents
     const slotDefinition = parentComponent.metadata.slots[targetSlotInfo.slotId];
 
-    return slotDefinition?.allowedComponents;
+    // Support both Drupal core 'expected' and legacy 'allowedComponents'
+    return slotDefinition?.expected || slotDefinition?.allowedComponents;
   }, [targetSlotInfo, components]);
 }
 

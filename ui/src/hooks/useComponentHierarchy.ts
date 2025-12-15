@@ -45,7 +45,8 @@ export function useComponentHierarchy(
         const children: CanvasComponent[] = [];
 
         Object.values(slots).forEach((slot) => {
-          const allowedComponents = slot.allowedComponents;
+          // Support both Drupal core 'expected' and legacy 'allowedComponents'
+          const allowedComponents = slot.expected || slot.allowedComponents;
           if (allowedComponents && Array.isArray(allowedComponents)) {
             allowedComponents.forEach((allowedId) => {
               // allowedId format: "sdc.y_canvas.y-accordion-item"

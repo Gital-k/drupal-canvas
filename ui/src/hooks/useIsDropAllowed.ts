@@ -14,13 +14,15 @@ function isRestrictedComponent(
 ): boolean {
   if (!components) return false;
 
-  // Check if any component has this item in their slot's allowedComponents
+  // Check if any component has this item in their slot's expected/allowedComponents
   for (const component of Object.values(components)) {
     const propSource = component as PropSourceComponent;
     const slots = propSource?.metadata?.slots;
     if (slots) {
       for (const slot of Object.values(slots)) {
-        if (slot.allowedComponents?.includes(componentId)) {
+        // Support both Drupal core 'expected' and legacy 'allowedComponents'
+        const allowed = slot.expected || slot.allowedComponents;
+        if (allowed?.includes(componentId)) {
           return true;
         }
       }
@@ -96,20 +98,23 @@ export function useIsDropAllowed(
   const slotName = parentSlot.name || parentSlot.id;
   const slotDefinition = parentComponent.metadata.slots[slotName];
 
+  // Support both Drupal core 'expected' and legacy 'allowedComponents'
+  const allowedInSlot = slotDefinition?.expected || slotDefinition?.allowedComponents;
+
   console.log('[useIsDropAllowed] Slot definition:', {
     slotName,
     slotDefinition,
-    allowedComponents: slotDefinition?.allowedComponents,
-    includes: slotDefinition?.allowedComponents?.includes(draggedItemId),
+    allowedComponents: allowedInSlot,
+    includes: allowedInSlot?.includes(draggedItemId),
   });
 
-  if (!slotDefinition?.allowedComponents) {
-    // No allowedComponents restriction on this slot, restricted items cannot drop here
+  if (!allowedInSlot) {
+    // No expected/allowedComponents restriction on this slot, restricted items cannot drop here
     return false;
   }
 
-  // Check if the dragged item is in the allowedComponents list
-  return slotDefinition.allowedComponents.includes(draggedItemId);
+  // Check if the dragged item is in the expected/allowedComponents list
+  return allowedInSlot.includes(draggedItemId);
 }
 
 /**
@@ -137,14 +142,16 @@ export function useDraggedItemInfo(): {
     return { draggedItemId, hasSlotRestrictions: false, allowedParentTypes: [] };
   }
 
-  // Find which parent components have this item in their allowedComponents
+  // Find which parent components have this item in their expected/allowedComponents
   const allowedParentTypes: string[] = [];
   Object.entries(components).forEach(([componentId, component]) => {
     const propSource = component as PropSourceComponent;
     const slots = propSource?.metadata?.slots;
     if (slots) {
       Object.values(slots).forEach((slot) => {
-        if (slot.allowedComponents?.includes(draggedItemId)) {
+        // Support both Drupal core 'expected' and legacy 'allowedComponents'
+        const allowed = slot.expected || slot.allowedComponents;
+        if (allowed?.includes(draggedItemId)) {
           allowedParentTypes.push(componentId);
         }
       });
