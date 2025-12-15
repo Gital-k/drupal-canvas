@@ -573,7 +573,7 @@ final class ApiContentControllers {
           $access = $content_entity->access(operation: $entity_operation, return_as_object: TRUE);
         }
       }
-      // Special handling for archive operation: only show if determined above
+      // Special handling for archive operation: only show if determined above.
       elseif ($link_rel === CanvasUriDefinitions::LINK_REL_ARCHIVE) {
         if (!$should_show_archive) {
           $access = AccessResult::forbidden(

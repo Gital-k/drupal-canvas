@@ -35,7 +35,7 @@ class PublicationState extends FieldPluginBase {
     // We need to check:
     // 1. If status = 1, then 'published'
     // 2. If status = 0 AND exists published revision, then 'archived'
-    // 3. If status = 0 AND no published revision, then 'draft'
+    // 3. If status = 0 AND no published revision, then 'draft'.
     $status_field = $this->tableAlias . '.status';
     $page_id_field = $this->tableAlias . '.id';
 
