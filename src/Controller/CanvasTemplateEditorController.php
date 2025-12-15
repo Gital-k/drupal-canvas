@@ -47,6 +47,8 @@ class CanvasTemplateEditorController extends ControllerBase {
 
   /**
    * {@inheritdoc}
+   *
+   * @return static
    */
   public static function create(ContainerInterface $container) {
     return new self(
