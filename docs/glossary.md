@@ -13,7 +13,7 @@ code component
 : TODO
 
 component
-: A piece of a Canvas layout. There are different types of components. Components may (but don't have to) have props and slots.
+: A piece of a Canvas layout. There are different types of components (see _component source_). Components may have props and slots, but don't have to.
 
 component (entity)
 : TODO
@@ -34,7 +34,7 @@ component tree
 : TODO
 
 dynamic prop source
-: A prop source that gets its value from an entity; specifically, from an entity (a node, for example) being rendered through Canvas. This is only really used when using Canvas to render an entity's fields by inserting the field values into specific component props. Usually referred to in Canvas's code as a `DynamicPropSources`.
+: A prop source that gets its value from an entity; specifically, from an entity (a node, for example) being rendered through Canvas. This is only really used when using Canvas is rendering an entity's fields, and needs to map field values into specific component props. Usually referred to in Canvas's code as `DynamicPropSources`.
 
 folder
 : TODO
@@ -43,10 +43,13 @@ host entity URL prop source
 : TODO
 
 hyperscriptify
-: TODO
+: A small JavaScript library, written for Canvas, which allows React components to be output by Drupal as JSX, which are then converted to fully functional, "live" React components on the front end. Used by Canvas's user interface to display Drupal field widgets, which do not natively support React. See https://github.com/effulgentsia/hyperscriptify for the code.
+
+JavaScript component
+: See _code component_.
 
 JS component
-: TODO
+: See _code component_.
 
 JSON schema
 : TODO
@@ -75,14 +78,14 @@ prop source
 schema
 : TODO
 
-single-directory component
-: TODO
+single-directory component (SDC)
+: A kind of component (i.e., a component source) that integrates with Drupal's single-directory component system so that SDCs may be used in Canvas. See https://www.drupal.org/docs/develop/theming-drupal/using-single-directory-components for more information about SDCs in general.
 
 slot
 : An area of a component into which other components may be placed. Components may have any number of slots, or none at all.
 
 static prop source
-: A prop source that holds a single, specific, unchanging value. The value will be automatically wired into the prop which is using the prop source. Usually referred to in Canvas's code as a `StaticPropSources`.
+: A prop source that holds a single, specific, unchanging value. The value will be automatically wired into the prop which is using the prop source. Usually referred to in Canvas's code as `StaticPropSources`.
 
 versioned configuration entity
 : TODO
