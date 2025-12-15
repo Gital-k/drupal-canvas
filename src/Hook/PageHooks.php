@@ -112,11 +112,11 @@ final class PageHooks {
             ->setReason('This entity cannot be deleted because its path is set as the homepage.');
         }
         // For update operations, check if it's an unpublish attempt via
-        // autosave.
+        // auto-save.
         if ($operation === 'update' && $entity instanceof EntityPublishedInterface) {
           $autoSaveData = $this->autoSaveManager->getAutoSaveEntity($entity);
           if (!$autoSaveData->isEmpty() && $autoSaveData->entity instanceof EntityPublishedInterface) {
-            // Check if autosave is trying to unpublish a currently published
+            // Check if auto-save is trying to unpublish a currently published
             // homepage.
             if ($entity->isPublished() && !$autoSaveData->entity->isPublished()) {
               return AccessResult::forbidden()

@@ -123,7 +123,7 @@ final class ApiContentControllers {
   }
 
   /**
-   * Archives (unpublishes) or publishes entity through autosave.
+   * Archives (unpublishes) or publishes entity through auto-save.
    *
    * @param \Drupal\Core\Entity\ContentEntityInterface $canvas_page
    *   Entity to archive or publish.
@@ -168,7 +168,7 @@ final class ApiContentControllers {
         $entity_to_update->setPublished();
       }
 
-      // Save through autosave instead of directly saving.
+      // Save through auto-save instead of directly saving.
       $clientInstanceId = $body['clientInstanceId'] ?? NULL;
       $this->autoSaveManager->saveEntity($entity_to_update, $clientInstanceId);
     }
@@ -259,12 +259,12 @@ final class ApiContentControllers {
     $autoSaveData = $this->autoSaveManager->getAutoSaveEntity($content_entity);
     $autoSaveEntity = $autoSaveData->isEmpty() ? NULL : $autoSaveData->entity;
 
-    // Expose available entity operations. Pass both original and autosave
-    // entities to allow reverting archive/publish actions when autosave has
+    // Expose available entity operations. Pass both original and auto-save
+    // entities to allow reverting archive/publish actions when auto-save has
     // opposite status.
     $linkCollection = $this->getEntityOperations($content_entity, $autoSaveEntity);
 
-    // Determine the effective published status: use autosave status if
+    // Determine the effective published status: use auto-save status if
     // available, otherwise use original.
     $effective_status = ($autoSaveEntity instanceof EntityPublishedInterface)
       ? $autoSaveEntity->isPublished()
@@ -466,8 +466,8 @@ final class ApiContentControllers {
   public function getEntityOperations(EntityPublishedInterface $content_entity, ?EntityPublishedInterface $autoSaveEntity = NULL): CanvasResourceLinkCollection {
     $links = new CanvasResourceLinkCollection([]);
 
-    // Add autosave entity as cache dependency if it exists, so cache
-    // invalidates when autosave changes.
+    // Add auto-save entity as cache dependency if it exists, so cache
+    // invalidates when auto-save changes.
     if ($autoSaveEntity) {
       $links->addCacheableDependency($autoSaveEntity);
     }
@@ -499,16 +499,16 @@ final class ApiContentControllers {
     // Only one should be shown at a time, based on the effective status
     // and revert capability.
     $original_is_published = $content_entity->isPublished();
-    $autosave_is_published = $autoSaveEntity?->isPublished() ?? NULL;
+    $auto_save_is_published = $autoSaveEntity?->isPublished() ?? NULL;
 
-    // Determine effective status: use autosave if it exists,
+    // Determine effective status: use auto-save if it exists,
     // otherwise use original.
-    $effective_is_published = ($autosave_is_published !== NULL)
-      ? $autosave_is_published
+    $effective_is_published = ($auto_save_is_published !== NULL)
+      ? $auto_save_is_published
       : $original_is_published;
 
     // Determine which action to show:
-    // - If autosave exists and has opposite status to original: show revert
+    // - If auto-save exists and has opposite status to original: show revert
     //   action.
     // - Otherwise: show normal action based on effective status.
     // - BUT: Never show archive for draft pages (pages that have never been
@@ -522,23 +522,23 @@ final class ApiContentControllers {
       $is_draft = $this->autoSaveManager->entityIsDraft($content_entity);
     }
 
-    if ($autosave_is_published !== NULL
-      && $autosave_is_published !== $original_is_published) {
-      // Autosave has opposite status: show revert action.
-      if ($autosave_is_published && !$is_draft) {
-        // Autosave is published, original is unpublished, and NOT a draft:
+    if ($auto_save_is_published !== NULL
+      && $auto_save_is_published !== $original_is_published) {
+      // Auto-save has opposite status: show revert action.
+      if ($auto_save_is_published && !$is_draft) {
+        // Auto-save is published, original is unpublished, and NOT a draft:
         // show archive to revert.
         $should_show_archive = TRUE;
       }
-      elseif (!$autosave_is_published) {
-        // Autosave is unpublished, original is published: show publish to revert.
+      elseif (!$auto_save_is_published) {
+        // Auto-save is unpublished, original is published: show publish to revert.
         $should_show_publish = TRUE;
       }
-      // Note: If it's a draft with autosave published, show neither action.
+      // Note: If it's a draft with auto-saved published status, show neither action.
       // The draft must be truly published via the main Publish button first.
     }
     else {
-      // No autosave or autosave matches original: show normal action based on
+      // No auto-save or auto-save matches original: show normal action based on
       // effective status.
       if ($effective_is_published && !$is_draft) {
         // Only show archive for truly published pages (not drafts).
