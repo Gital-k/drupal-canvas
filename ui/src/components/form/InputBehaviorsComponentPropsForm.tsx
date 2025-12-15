@@ -18,21 +18,14 @@ import {
   POLLED_BACKGROUND_TIMEOUT,
 } from '@/components/form/inputBehaviors';
 import { FORM_TYPES } from '@/features/form/constants';
-import {
-  selectCurrentComponent,
-  selectFormValues,
-} from '@/features/form/formStateSlice';
-import {
-  isEvaluatedComponentModel,
-  selectLayout,
-  selectModel,
-} from '@/features/layout/layoutModelSlice';
-import { findComponentByUuid } from '@/features/layout/layoutUtils';
+import { selectFormValues } from '@/features/form/formStateSlice';
+import { isEvaluatedComponentModel } from '@/features/layout/layoutModelSlice';
 import { setPreviewBackgroundUpdate } from '@/features/pagePreview/previewSlice';
 import { selectEditorFrameContext } from '@/features/ui/uiSlice';
+import useInputUIData from '@/hooks/useInputUIData';
 import { useGetComponentsQuery } from '@/services/componentAndLayout';
 import { useUpdateComponentMutation } from '@/services/preview';
-import { componentHasFieldData } from '@/types/Component';
+import { isPropSourceComponent } from '@/types/Component';
 import { flaggedForRemoval, parseValue } from '@/utils/function-utils';
 
 import type {
@@ -40,7 +33,7 @@ import type {
   ResolvedValues,
   Sources,
 } from '@/features/layout/layoutModelSlice';
-import type { CanvasComponent } from '@/types/Component';
+import type { CanvasComponent, PropSourceComponent } from '@/types/Component';
 import type { InputUIData, PropsValues } from '@/types/Form';
 
 export const InputBehaviorsComponentPropsForm = (
@@ -53,31 +46,15 @@ export const InputBehaviorsComponentPropsForm = (
    * rendering in the correct React Router context so we can't get the selected component ID from the url in inputBehaviors.tsx.
    * We already have a workaround for this for the Redux provider, could we do the same for the React Router context?
    */
-  const currentComponent = useAppSelector(selectCurrentComponent);
   const editorFrameContext = useAppSelector(selectEditorFrameContext);
   const dispatch = useAppDispatch();
-  const selectedComponent = currentComponent || 'noop';
   const polledBackgroundUpdate = useRef<number | null>(null);
-  const model = useAppSelector(selectModel);
   const { attributes } = props;
   const { data: components } = useGetComponentsQuery();
   const transforms = useComponentTransforms();
-  const layout = useAppSelector(selectLayout);
-  const node = findComponentByUuid(layout, selectedComponent);
-  const [selectedComponentType, version] = (
-    node ? (node.type as string) : 'noop'
-  ).split('@');
-  const inputAndUiData: InputUIData = {
-    selectedComponent,
-    components,
-    selectedComponentType,
-    layout,
-    node,
-    version,
-    model,
-  };
-  const component = components?.[selectedComponentType];
-
+  const inputAndUiData = useInputUIData();
+  const { selectedComponentType, version, selectedComponent } = inputAndUiData;
+  const component = components?.[selectedComponentType] as PropSourceComponent;
   const [patchComponent] = useUpdateComponentMutation({
     fixedCacheKey: selectedComponent,
   });
@@ -274,7 +251,7 @@ export const InputBehaviorsComponentPropsForm = (
     // form, hence it being located here.
     if (
       props.options.some((option: PropsValues) => option.value === '_none') &&
-      !inputAndUiData?.model?.[currentComponent as keyof ComponentModels]
+      !inputAndUiData?.model?.[selectedComponent as keyof ComponentModels]
         ?.resolved?.[propName]
     ) {
       propsOverrides.options = props.options.map((option: PropsValues) =>
@@ -320,7 +297,7 @@ export const syncPropSourcesToResolvedValues = (
   component: CanvasComponent,
   resolvedValues: ResolvedValues,
 ): Sources => {
-  if (!componentHasFieldData(component)) {
+  if (!isPropSourceComponent(component)) {
     return sources;
   }
   const fieldData = component.propSources;

@@ -11,7 +11,10 @@ import {
 import { ensureConfig, getConfig } from '../config.js';
 import { createApiService } from '../services/api.js';
 import { buildComponent } from '../utils/build';
-import { buildTailwindForComponents } from '../utils/build-tailwind.js';
+import {
+  buildTailwindForComponents,
+  getGlobalCss,
+} from '../utils/build-tailwind.js';
 import {
   pluralizeComponent,
   updateConfigFromOptions,
@@ -184,11 +187,12 @@ interface UploadOptions {
   siteUrl?: string;
   scope?: string;
   dir?: string;
-  verbose?: boolean;
   all?: boolean;
   components?: string;
   tailwind?: boolean;
   yes?: boolean;
+  skipCss?: boolean;
+  cssOnly?: boolean;
 }
 
 /**
@@ -209,8 +213,9 @@ export function uploadCommand(program: Command): void {
     )
     .option('--all', 'Upload all components')
     .option('-y, --yes', 'Skip confirmation prompts')
-    .option('--verbose', 'Verbose output')
     .option('--no-tailwind', 'Skip Tailwind CSS building')
+    .option('--skip-css', 'Skip global CSS upload')
+    .option('--css-only', 'Upload only global CSS (skip components)')
     .action(async (options: UploadOptions) => {
       // Default to --all when --yes is used without --components
       const allFlag =
@@ -222,6 +227,13 @@ export function uploadCommand(program: Command): void {
 
         // Validate options
         validateComponentOptions(options);
+
+        // Validate CSS-related options
+        if (options.skipCss && options.cssOnly) {
+          throw new Error(
+            'Cannot use both --skip-css and --css-only flags together',
+          );
+        }
 
         // Update config with CLI options
         updateConfigFromOptions(options);
@@ -236,41 +248,55 @@ export function uploadCommand(program: Command): void {
         ]);
         const config = getConfig();
 
-        // Select components to upload
-        const { directories: componentsToUpload } = await selectLocalComponents(
-          {
+        // Select components and global CSS to upload
+        const { directories: componentsToUpload, includeGlobalCss } =
+          await selectLocalComponents({
             all: allFlag,
             components: options.components,
             skipConfirmation: options.yes,
-            selectMessage: 'Select components to upload',
-          },
-        );
+            skipCss: options.skipCss,
+            cssOnly: options.cssOnly,
+            includeGlobalCss: !options.skipCss,
+            globalCssDefault: true,
+            selectMessage: 'Select items to upload',
+          });
 
         // Create API service
         const apiService = await createApiService();
 
-        // Build and upload components
-        const componentResults = await getBuildAndUploadResults(
-          componentsToUpload as string[],
-          apiService,
-        );
+        // Verify API connection and authentication before proceeding
+        // This will throw auth/network errors early before processing components
+        await apiService.listComponents();
 
-        // Display component upload results
-        reportResults(componentResults, 'Uploaded components', 'Component');
+        let componentResults: Result[] = [];
 
-        // Exit with error if any component failed
-        if (componentResults.some((result) => !result.success)) {
-          process.exit(1);
+        // Handle component uploads (skip if --css-only)
+        if (!options.cssOnly && componentsToUpload.length > 0) {
+          // Build and upload components
+          componentResults = await getBuildAndUploadResults(
+            componentsToUpload as string[],
+            apiService,
+            includeGlobalCss ?? false,
+          );
+
+          // Display component upload results
+          reportResults(componentResults, 'Uploaded components', 'Component');
+
+          // Exit with error if any component failed
+          if (componentResults.some((result) => !result.success)) {
+            process.exit(1);
+          }
         }
 
         if (skipTailwind) {
           p.log.info('Skipping Tailwind CSS build');
         } else {
-          // Build Tailwind CSS and upload global CSS
+          // Build Tailwind CSS with appropriate global CSS source
           const s2 = p.spinner();
           s2.start('Building Tailwind CSS');
           const tailwindResult = await buildTailwindForComponents(
             componentsToUpload as string[],
+            includeGlobalCss, // Use local CSS if includeGlobalCss is true
           );
           const componentLabelPluralized = pluralizeComponent(
             componentsToUpload.length,
@@ -289,15 +315,30 @@ export function uploadCommand(program: Command): void {
               chalk.red(`Tailwind build failed, global assets upload aborted.`),
             );
           } else {
-            // If the Tailwind build was successful, proceed with uploading the global CSS.
-            const globalCssResult = await uploadGlobalAssetLibrary(
-              apiService,
-              config.componentDir,
-            );
-            reportResults([globalCssResult], 'Uploaded assets', 'Asset');
+            // If the Tailwind build was successful, proceed with uploading the global CSS if selected.
+            if (includeGlobalCss) {
+              const globalCssResult = await uploadGlobalAssetLibrary(
+                apiService,
+                config.componentDir,
+              );
+              reportResults([globalCssResult], 'Uploaded assets', 'Asset');
+            } else {
+              p.log.info('Skipping global CSS upload');
+            }
           }
         }
-        p.outro('⬆️ Upload command completed');
+        // Display appropriate outro message
+        const componentCount = componentsToUpload.length;
+        const outroMessage =
+          options.cssOnly && componentCount === 0
+            ? '⬆️ Global CSS uploaded successfully'
+            : includeGlobalCss && componentCount > 0
+              ? '⬆️ Components and global CSS uploaded successfully'
+              : componentCount > 0
+                ? '⬆️ Components uploaded successfully'
+                : '⬆️ Upload command completed';
+
+        p.outro(outroMessage);
       } catch (error) {
         if (error instanceof Error) {
           p.note(chalk.red(`Error: ${error.message}`));
@@ -404,12 +445,16 @@ async function prepareComponentsForUpload(
 async function getBuildAndUploadResults(
   componentsToUpload: string[],
   apiService: ApiService,
+  includeGlobalCss: boolean,
 ): Promise<Result[]> {
   const results: Result[] = [];
   const spinner = p.spinner();
 
   spinner.start('Building components');
-  const buildResults = await buildSelectedComponents(componentsToUpload);
+  const buildResults = await buildSelectedComponents(
+    componentsToUpload,
+    includeGlobalCss,
+  );
 
   const successfulBuilds = buildResults.filter((build) => build.success);
   const failedBuilds = buildResults.filter((build) => !build.success);
@@ -480,12 +525,14 @@ async function getBuildAndUploadResults(
         ],
       });
     } else {
+      const errorMessage =
+        uploadResult.error?.message || 'Unknown upload error';
       results.push({
         itemName: component.componentName,
         success: false,
         details: [
           {
-            content: uploadResult.error?.message || 'Unknown upload error',
+            content: errorMessage.trim() || 'Unknown upload error',
           },
         ],
       });
@@ -506,10 +553,11 @@ async function getBuildAndUploadResults(
  */
 async function buildSelectedComponents(
   componentDirs: string[],
+  useLocalGlobalCss: boolean = true,
 ): Promise<Result[]> {
   const buildResults: Result[] = [];
   for (const dir of componentDirs) {
-    buildResults.push(await buildComponent(dir));
+    buildResults.push(await buildComponent(dir, useLocalGlobalCss));
   }
   return buildResults;
 }
@@ -534,11 +582,8 @@ async function uploadGlobalAssetLibrary(
         path.join(distDir, 'index.js'),
         'utf-8',
       );
-      // @todo: It doesn't make sense to have to fetch the current.css.original
-      // from the API, but we need to do this because otherwise, the existing
-      // css.original gets overwritten if we don't pass anything.
-      const current = await apiService.getGlobalAssetLibrary();
-      const originalCss = current.css.original;
+      // Get original CSS - local-first approach
+      const originalCss = await getGlobalCss();
 
       // Upload the global CSS
       await apiService.updateGlobalAssetLibrary({
