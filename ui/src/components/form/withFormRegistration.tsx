@@ -482,14 +482,26 @@ const PageDataFormField = <P extends Record<string, any>>({
 
   // Page data form specific hooks
   useEffect(() => {
-    // const currentValue = getCurrentValue();
-    // console.log('[PageDataForm] Field registered:', {
-    //   fieldName,
-    //   initialValue: currentValue,
-    //   formId: formContext?.formId,
-    //   componentType: WrappedComponent.displayName || WrappedComponent.name,
-    // });
-  }, [fieldName, formContext?.formId, getCurrentValue, WrappedComponent]);
+    if (!formContext?.formId) return;
+
+    const currentValue = getCurrentValue();
+
+    // Update Redux store with initial field value
+    dispatchFieldValue(dispatch, formContext.formId, fieldName, currentValue);
+
+    console.log('[PageDataForm] Field registered:', {
+      fieldName,
+      initialValue: currentValue,
+      formId: formContext?.formId,
+      componentType: WrappedComponent.displayName || WrappedComponent.name,
+    });
+  }, [
+    dispatch,
+    fieldName,
+    formContext?.formId,
+    getCurrentValue,
+    WrappedComponent,
+  ]);
 
   const formStateToStore = (newFormState: PropsValues) => {
     const values = Object.keys(newFormState).reduce(
@@ -621,6 +633,16 @@ const PageDataFormField = <P extends Record<string, any>>({
 
           // Update react-hook-form state
           field.onChange(newValue);
+
+          // Update Redux store
+          if (formContext?.formId) {
+            dispatchFieldValue(
+              dispatch,
+              formContext.formId,
+              fieldName,
+              newValue,
+            );
+          }
 
           // Call original onChange
           const originalOnChange = props.attributes?.onChange || props.onChange;
