@@ -8,6 +8,7 @@ use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Entity\Pattern;
+use Drupal\Component\Serialization\Yaml;
 use Drupal\Core\Config\Entity\ConfigEntityUpdater;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\image\Entity\ImageStyle;
@@ -264,5 +265,25 @@ function canvas_post_update_0012_canvas_image_style_avif(array &$sandbox): void 
     $effects_data[$effect_id]['id'] = 'image_convert_avif';
     $image_style->set('effects', $effects_data);
     $image_style->save();
+  }
+}
+
+/**
+ * Update canvas_pages view to use publication state computed field.
+ */
+function canvas_post_update_0013_update_pages_view(): void {
+  $config_factory = \Drupal::configFactory();
+  $view_config = $config_factory->getEditable('views.view.canvas_pages');
+
+  if ($view_config->isNew()) {
+    return;
+  }
+
+  // Update the view configuration to use the new publication_state_computed field.
+  // This replaces the old status field with the new computed field.
+  $config_path = \Drupal::service('extension.list.module')->getPath('canvas') . '/config/optional/views.view.canvas_pages.yml';
+  if (file_exists($config_path)) {
+    $new_config = Yaml::decode(file_get_contents($config_path));
+    $view_config->setData($new_config)->save();
   }
 }
