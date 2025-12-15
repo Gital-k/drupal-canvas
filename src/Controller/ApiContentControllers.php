@@ -511,27 +511,37 @@ final class ApiContentControllers {
     // - If autosave exists and has opposite status to original: show revert
     //   action.
     // - Otherwise: show normal action based on effective status.
+    // - BUT: Never show archive for draft pages (pages that have never been
+    //   truly published).
     $should_show_archive = FALSE;
     $should_show_publish = FALSE;
+
+    // Check if this is a draft (never been published).
+    $is_draft = FALSE;
+    if ($content_entity instanceof ContentEntityInterface) {
+      $is_draft = $this->autoSaveManager->entityIsDraft($content_entity);
+    }
 
     if ($autosave_is_published !== NULL
       && $autosave_is_published !== $original_is_published) {
       // Autosave has opposite status: show revert action.
-      if ($autosave_is_published) {
-        // Autosave is published, original is unpublished: show archive to
-        // revert.
+      if ($autosave_is_published && !$is_draft) {
+        // Autosave is published, original is unpublished, and NOT a draft:
+        // show archive to revert.
         $should_show_archive = TRUE;
       }
-      else {
-        // Autosave is unpublished, original is published: show publish to
-        // revert.
+      elseif (!$autosave_is_published) {
+        // Autosave is unpublished, original is published: show publish to revert.
         $should_show_publish = TRUE;
       }
+      // Note: If it's a draft with autosave published, show neither action.
+      // The draft must be truly published via the main Publish button first.
     }
     else {
       // No autosave or autosave matches original: show normal action based on
       // effective status.
-      if ($effective_is_published) {
+      if ($effective_is_published && !$is_draft) {
+        // Only show archive for truly published pages (not drafts).
         $should_show_archive = TRUE;
       }
       else {
