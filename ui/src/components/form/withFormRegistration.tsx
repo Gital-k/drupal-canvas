@@ -34,6 +34,7 @@ import {
   setPageData,
 } from '@/features/pageData/pageDataSlice';
 import { setPreviewBackgroundUpdate } from '@/features/pagePreview/previewSlice';
+import { selectLatestUndoRedoActionId } from '@/features/ui/uiSlice';
 import { useComponentFormInputInfo } from '@/hooks/useComponentFormInputInfo';
 import { usePageDataFormInputInfo } from '@/hooks/usePageDataFormInputInfo';
 import { AJAX_UPDATE_FORM_BUILD_ID_EVENT } from '@/types/Ajax';
@@ -164,6 +165,32 @@ const ComponentFormField = <P extends Record<string, any>>({
   const formState = useAppSelector((state) =>
     selectFormValues(state, FORM_TYPES.COMPONENT_INSTANCE_FORM),
   );
+
+  // Watch for undo/redo actions and sync react-hook-form
+  const latestUndoRedoActionId = useAppSelector(selectLatestUndoRedoActionId);
+  const previousUndoRedoIdRef = useRef<string>('');
+
+  useEffect(() => {
+    // Skip on initial mount
+    if (!previousUndoRedoIdRef.current) {
+      previousUndoRedoIdRef.current = latestUndoRedoActionId;
+      return;
+    }
+
+    // If undo/redo occurred, sync react-hook-form with current Redux state
+    if (
+      latestUndoRedoActionId !== previousUndoRedoIdRef.current &&
+      rhfContext
+    ) {
+      const currentValue = getCurrentValue();
+      rhfContext.setValue(fieldName, currentValue, {
+        shouldValidate: false,
+        shouldDirty: false,
+        shouldTouch: false,
+      });
+      previousUndoRedoIdRef.current = latestUndoRedoActionId;
+    }
+  }, [latestUndoRedoActionId, fieldName, getCurrentValue, rhfContext]);
 
   const formStateToStore = (
     newFormState: PropsValues,
@@ -501,7 +528,7 @@ const PageDataFormField = <P extends Record<string, any>>({
 }: FormFieldProps<P>) => {
   const formContext = useSafeFormContext();
   const rhfContext = useSafeRHFContext();
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
   const { dispatch, pageData, latestUndoRedoActionId, formState } =
     usePageDataFormInputInfo();
 
@@ -509,21 +536,53 @@ const PageDataFormField = <P extends Record<string, any>>({
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const formId = 'page_data_form';
 
+  // Override getCurrentValue to use pageData from Redux instead of props
+  // This ensures undo/redo updates are properly reflected
+  const getCurrentValueFromRedux = () => {
+    // For page data forms, get value from Redux pageData state
+    if (pageData && fieldName in pageData) {
+      return pageData[fieldName];
+    }
+    // Fallback to the original getCurrentValue if not in pageData
+    return getCurrentValue();
+  };
+
+  // Watch for undo/redo actions and sync react-hook-form
+  const previousUndoRedoIdRef = useRef<string>('');
+
+  useEffect(() => {
+    // Skip on initial mount
+    if (!previousUndoRedoIdRef.current) {
+      previousUndoRedoIdRef.current = latestUndoRedoActionId;
+      return;
+    }
+
+    // If undo/redo occurred, sync react-hook-form with current Redux state
+    if (
+      latestUndoRedoActionId !== previousUndoRedoIdRef.current &&
+      rhfContext
+    ) {
+      const currentValue = getCurrentValueFromRedux();
+      rhfContext.setValue(fieldName, currentValue, {
+        shouldValidate: false,
+        shouldDirty: false,
+        shouldTouch: false,
+      });
+      previousUndoRedoIdRef.current = latestUndoRedoActionId;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [latestUndoRedoActionId, fieldName, rhfContext, pageData]);
+
   // Page data form specific hooks
   useEffect(() => {
     if (!formContext?.formId) return;
 
-    const currentValue = getCurrentValue();
+    const currentValue = getCurrentValueFromRedux();
 
     // Update Redux store with initial field value
     dispatchFieldValue(dispatch, formContext.formId, fieldName, currentValue);
-  }, [
-    dispatch,
-    fieldName,
-    formContext?.formId,
-    getCurrentValue,
-    WrappedComponent,
-  ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dispatch, fieldName, formContext?.formId, WrappedComponent]);
 
   const formStateToStore = (newFormState: PropsValues) => {
     const values = Object.keys(newFormState).reduce(
@@ -641,7 +700,7 @@ const PageDataFormField = <P extends Record<string, any>>({
     <Controller
       name={fieldName}
       control={rhfContext.control}
-      defaultValue={getCurrentValue()}
+      defaultValue={getCurrentValueFromRedux()}
       render={({ field }) => {
         const enhancedOnChange = (e: any) => {
           const newValue = extractValue(e);
