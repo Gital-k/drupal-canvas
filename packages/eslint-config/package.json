@@ -1,6 +1,6 @@
 {
   "name": "@drupal-canvas/eslint-config",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "ESLint config for validating Drupal Canvas Code Components",
   "license": "GPL-2.0-or-later",
   "repository": {

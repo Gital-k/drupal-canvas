@@ -10,7 +10,7 @@
     "@astrojs/preact": "^4.0.3",
     "astro": "^5.2.2",
     "class-variance-authority": "^0.7.1",
-    "drupal-canvas": "^0.0.1",
+    "drupal-canvas": "^0.1.0",
     "drupal-jsonapi-params": "^2.3.2",
     "preact": "^10.25.4",
     "swr": "^2.3.7"

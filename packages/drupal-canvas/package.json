@@ -1,7 +1,7 @@
 {
   "name": "drupal-canvas",
-  "version": "0.0.1",
-  "description": "Utilities and base components for building Drupal Canvas code components",
+  "version": "0.1.0",
+  "description": "Utilities and base components for building Drupal Canvas Code Components",
   "license": "GPL-2.0-or-later",
   "repository": {
     "type": "git",
