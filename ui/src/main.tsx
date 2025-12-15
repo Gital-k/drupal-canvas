@@ -232,6 +232,7 @@ if (container) {
    */
   Drupal.HyperscriptifyUpdateStore = (updatedInputs: Array<HTMLElement>) => {
     let formId: string | null = null;
+    console.log('Updating store from AJAX-updated inputs', updatedInputs);
     const updates = updatedInputs
       .map((el) => {
         // For each element, parse out its attributes. These are JSON sent by

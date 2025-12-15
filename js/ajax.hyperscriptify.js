@@ -97,8 +97,16 @@
       }
 
       const updatedInputElements = allJSXComponentInstances.filter((el) =>
-        el.tagName.startsWith('drupal-') && el.tagName !== 'drupal-html-fragment' && !el.hasAttribute('data-drupal-scriptified'),
+        el.hasAttribute('attributes'),
       );
+      //   const updatedInputElements = allJSXComponentInstances.filter((el) =>
+      //         el.tagName.startsWith('drupal-') && el.tagName !== 'drupal-html-fragment' && !el.hasAttribute('data-drupal-scriptified'),
+      //       );
+      // console.group()
+      // console.log('AJAX hyperscriptify context:', context);
+      // console.log('Top-level components to hyperscriptify:', topLevelComponents);
+      // console.log('Updated input elements:', updatedInputElements);
+      // console.groupEnd()
 
       // Keeps track of if behaviors have been attached.
       let attachBehaviorsCalled = false;

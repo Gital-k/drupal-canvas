@@ -372,6 +372,7 @@ export function getPropsValues(
     Drupal: { canvasTransforms: transforms },
   };
   const transformsList: Transforms = Drupal?.canvasTransforms || transforms;
+  console.log('traansformsConfig', transformConfig);
   const propsValues = Object.entries(
     formStateToObject(formState, selectedComponent),
   ).reduce((carry: PropsValues, [key, value]) => {

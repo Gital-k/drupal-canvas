@@ -200,7 +200,7 @@ const ComponentFormField = <P extends Record<string, any>>({
       );
       backgroundPreviewUpdate = PreviewUpdateEvent.getPreviewBackgroundUpdate();
     }
-    console.log('resolved to send', resolved);
+
     if (isEvaluatedComponentModel(selectedModel) && component) {
       const updateBackend = () => {
         const patchPayload = {
