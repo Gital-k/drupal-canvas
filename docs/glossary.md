@@ -7,13 +7,13 @@ asset library
 : TODO
 
 block
-: A Drupal block. Just a regular block. Canvas has a _component source_ that allows blocks to be used as component in layouts, although blocks don't have slots.
+: A regular Drupal block. Canvas has a _component source_ that allows blocks to be used as component in layouts, although they don't support _slots_.
 
 code component
 : A kind of component (i.e., a _component source_) that is written in JSX and stored as a Drupal configuration entity, but rendered entirely on the client side using React and Tailwind CSS. Synonymous with _JS component_ and _JavaScript component_.
 
 component
-: A piece of a Canvas layout. There are different types of components (see _component source_). Components may have props and slots, but don't have to.
+: A piece of a Canvas layout. There are different types of components (see _component source_). Components may have _props_ and _slots_, but don't have to.
 
 component (entity)
 : TODO
@@ -22,22 +22,22 @@ component inputs
 : TODO
 
 component instance
-: A single item in a _component tree_. A component instance contains all of the information needed to render a specific component in a specific place in a layout, including which _component source_ it uses, what prop sources it has, and what components (if any) are placed into its slots.
+: A single item in a _component tree_. A component instance contains all of the information needed to render a specific component in a specific place in a layout, including which _component source_ it uses, what _prop sources_ it has, and what components (if any) are placed into its _slots_.
 
 component metadata
 : TODO
 
 component source
-: A type of Drupal plugin which handles a particular kind of component. Component sources are responsible for rendering components and validating _component inputs_. Often referred to in Canvas's code as `ComponentSources`.
+: A type of Drupal plugin which handles a particular kind of _component_. Component sources are responsible for rendering components and validating _component inputs_. Often referred to in Canvas's code as `ComponentSources`.
 
 content template
-: A configuration entity that contains a component tree, which is used to render entities of a specific type and bundle, in a specific view mode. Conceptually similar to core's entity view displays. Content templates are the only kind of Canvas layout that allow you to use dynamic prop sources. Often referred to in Canvas's code as `ContentTemplates`.
+: A configuration entity that contains a component tree, which is used to render entities of a specific type and bundle, in a specific view mode. Similar to core's entity view displays, except for Canvas. Content templates are the only kind of Canvas layout that allow you to use dynamic prop sources. Often referred to in Canvas's code as `ContentTemplates`.
 
 component tree
-: A data structure that is a list of _component instances_. Usually stored in a Drupal field of the `component_tree` type, or in configuration with the `canvas.component_tree` config schema type. Component trees may be any size, and contain all of the information needed to render the layout with everything its right place.
+: A data structure that is a list of _component instances_. Usually stored in a Drupal field of the `component_tree` type, or in configuration with the `canvas.component_tree` config schema type. Component trees may contain any number of components, and contain all of the information needed to render the layout with everything its right place.
 
 dynamic prop source
-: A prop source that gets its value from an entity; specifically, from an entity (a node, for example) being rendered through Canvas. This is only really used when using Canvas is rendering an entity's fields, and needs to map field values into specific component props. Often referred to in Canvas's code as `DynamicPropSources`.
+: A _prop source_ that gets its value from an entity (a node, for example) that is being rendered by Canvas. This is only really used when using Canvas is rendering an entity using a _content template_ and needs to map field values into specific component _props_. Often referred to in Canvas's code as `DynamicPropSources`.
 
 folder
 : A simple configuration entity which allows components to be organized into arbitrary groups in the Canvas UI.
@@ -64,10 +64,10 @@ page region
 : A configuration entity that contains a component tree, used to render a specific region of a specific theme. This allows Canvas to be used to lay out parts of the page which are normally managed by the theme.
 
 pattern
-: A configuration entity that contains a component tree, which can be cloned into any Canvas layout as many times as you want. Useful for small pieces of a design -- like a testimonial, for example -- that can be reused in various places, but is not meant to be a component of its own.
+: A configuration entity that contains a component tree, which can be cloned into any Canvas layout as many times as you want. Useful for small pieces of a design — a testimonial, for example — that can be reused in various places, but is not meant to be a component of its own.
 
 prop
-: A property of a component. For example, a button component might have a prop for a link, or a prop for the text of the button. Components may have any number of props, or none at all.
+: A property of a _component_. For example, a button component might have a prop for a link, or a prop for the text of the button. Components may have any number of props, or none at all.
 
 prop expression
 : TODO
@@ -76,7 +76,7 @@ prop shape
 : The full definition of a _prop_, including what type of data it expects (string, integer, etc.), and what that data needs to look like in order to be usable by the prop. The Canvas UI uses prop shapes to match a component's props to relevant Drupal fields.
 
 prop source
-: Information that tells Canvas how to put a value into a prop. There are different kinds of prop sources. Despite the name, totally unrelated to _component sources_.
+: Information that tells Canvas how to put a value into a _prop_. There are different kinds of prop sources. Despite the name, totally unrelated to _component sources_.
 
 schema
 : TODO
@@ -88,10 +88,10 @@ single-directory component (SDC)
 : A kind of component (i.e., a _component source_) that integrates with Drupal's single-directory component system so that SDCs may be used in Canvas. See https://www.drupal.org/docs/develop/theming-drupal/using-single-directory-components for more information about SDCs in general.
 
 slot
-: An area of a component into which other components may be placed. Components may have any number of slots, or none at all.
+: An area of a _component_ into which other components may be placed. Components may have any number of slots, or none at all.
 
 static prop source
-: A prop source that holds a single, specific, unchanging value. The value will be automatically wired into the prop which is using the prop source. Often referred to in Canvas's code as `StaticPropSources`.
+: A _prop source_ that holds a single, specific, unchanging value. The value will be automatically wired into the prop which is using the prop source. Often referred to in Canvas's code as `StaticPropSources`.
 
 versioned configuration entity
 : TODO
