@@ -289,7 +289,7 @@ class CanvasConfigUpdater {
         // The active version has already been updated above.
         continue;
       }
-      $component->loadVersion($version);
+      $component = $component->loadVersion($version);
       \assert(!$component->isLoadedVersionActiveVersion());
       $settings = $component->getSettings();
       assert(\array_key_exists('prop_field_definitions', $settings));
