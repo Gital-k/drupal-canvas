@@ -230,7 +230,7 @@ const ComponentFormField = <P extends Record<string, any>>({
 
     if (isEvaluatedComponentModel(selectedModel) && component) {
       const updateBackend = () => {
-        const patchPayload = {
+        patchComponent({
           type: editorFrameContext,
           componentInstanceUuid: selectedComponent,
           componentType: `${selectedComponentType}@${version}`,
@@ -242,9 +242,7 @@ const ComponentFormField = <P extends Record<string, any>>({
             ),
             resolved,
           },
-        };
-        console.log('PATCH PAYLOAD:', patchPayload);
-        patchComponent(patchPayload);
+        });
       };
       if (backgroundPreviewUpdate) {
         if (polledBackgroundUpdate.current !== null) {
@@ -300,7 +298,6 @@ const ComponentFormField = <P extends Record<string, any>>({
       schemas?.[propName],
     );
     const fieldName = (e.target as HTMLInputElement | HTMLSelectElement).name;
-    console.log('TRANSFORMS:', { transforms, propName, rawValue });
     if (
       // If there are no transforms, we cannot use them, just return the raw
       // value. Note that the 'undefined' check here is technically not required
@@ -385,16 +382,6 @@ const ComponentFormField = <P extends Record<string, any>>({
 
     // Update Redux store with initial field value
     dispatchFieldValue(dispatch, formContext.formId, fieldName, currentValue);
-
-    console.log('[ComponentForm] Field registered:', {
-      fieldName,
-      propName,
-      initialValue: currentValue,
-      formId: formContext?.formId,
-      componentType: WrappedComponent.displayName || WrappedComponent.name,
-      isScalarProp,
-      selectedComponent,
-    });
   }, [
     dispatch,
     fieldName,
@@ -418,12 +405,6 @@ const ComponentFormField = <P extends Record<string, any>>({
       render={({ field }) => {
         const enhancedOnChange = (e: any) => {
           const newValue = parseNewValue(e);
-
-          console.log('[ComponentForm] onChange:', {
-            fieldName,
-            newValue,
-            formId: formContext?.formId,
-          });
 
           // Update react-hook-form state
           field.onChange(newValue);
@@ -536,13 +517,6 @@ const PageDataFormField = <P extends Record<string, any>>({
 
     // Update Redux store with initial field value
     dispatchFieldValue(dispatch, formContext.formId, fieldName, currentValue);
-
-    console.log('[PageDataForm] Field registered:', {
-      fieldName,
-      initialValue: currentValue,
-      formId: formContext?.formId,
-      componentType: WrappedComponent.displayName || WrappedComponent.name,
-    });
   }, [
     dispatch,
     fieldName,
@@ -671,12 +645,6 @@ const PageDataFormField = <P extends Record<string, any>>({
       render={({ field }) => {
         const enhancedOnChange = (e: any) => {
           const newValue = extractValue(e);
-
-          console.log('[PageDataForm] onChange:', {
-            fieldName,
-            newValue,
-            formId: formContext?.formId,
-          });
 
           // Update react-hook-form state
           field.onChange(newValue);
