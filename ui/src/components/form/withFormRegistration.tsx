@@ -73,7 +73,6 @@ const dispatchFieldValue = (
 };
 
 // Helper function to dispatch field error updates
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const dispatchFieldError = (
   dispatch: ReturnType<typeof useAppDispatch>,
   formId: FormId,
@@ -150,6 +149,18 @@ const ComponentFormField = <P extends Record<string, any>>({
     isScalarProp,
   } = useComponentFormInputInfo(fieldName);
 
+  const shouldUpdateFormState = (
+    e: React.ChangeEvent,
+    validationResult: ValidationResult,
+  ) => {
+    if (
+      typeof e?.target?.hasAttribute === 'function' &&
+      e.target.hasAttribute('data-canvas-no-update')
+    ) {
+      return false;
+    }
+    return validationResult.valid || validationResult.skipEarlyReturn;
+  };
   const formState = useAppSelector((state) =>
     selectFormValues(state, FORM_TYPES.COMPONENT_INSTANCE_FORM),
   );
@@ -313,7 +324,6 @@ const ComponentFormField = <P extends Record<string, any>>({
     return propName in values ? values[propName] : rawValue;
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const validateNewValue = (e: React.ChangeEvent, newValue: any) => {
     const target = e.target as HTMLInputElement;
     if (
@@ -424,6 +434,14 @@ const ComponentFormField = <P extends Record<string, any>>({
           if (originalOnChange) {
             originalOnChange(e);
           }
+
+          const validationResult = validateNewValue(e, newValue);
+          if (!shouldUpdateFormState(e, validationResult)) {
+            if (formId) {
+              dispatchFieldError(dispatch, formId, fieldName, validationResult);
+            }
+            return;
+          }
           // If no AJAX operations are in progress, update the form state and store.
           if (!isAjaxing()) {
             commitFormState({ ...formState, [fieldName]: newValue });
@@ -439,19 +457,49 @@ const ComponentFormField = <P extends Record<string, any>>({
           });
         };
 
+        const enhancedOnBlur = async (e: React.FocusEvent) => {
+          // Call react-hook-form's onBlur to mark field as touched
+          field.onBlur();
+
+          // Call original onBlur if it exists
+          const originalOnBlur = props.attributes?.onBlur;
+          if (originalOnBlur) {
+            originalOnBlur(e);
+          }
+
+          // Perform validation on blur
+          const validationResult = validateNewValue(e as any, field.value);
+          if (!validationResult.valid) {
+            if (formContext?.formId) {
+              if (props.attributes) {
+                props.attributes['data-invalid-prop-value'] = 'true';
+              }
+              dispatchFieldError(
+                dispatch,
+                formContext.formId,
+                fieldName,
+                validationResult,
+              );
+            }
+          }
+        };
+
         // Apply enhanced props
         const enhancedProps = { ...props };
         if (enhancedProps.attributes) {
           (enhancedProps as any).attributes = {
             ...enhancedProps.attributes,
             onChange: enhancedOnChange,
+            onBlur: enhancedOnBlur,
             value: field.value,
           };
         } else if ((props as any).onCheckedChange) {
           (enhancedProps as any).onCheckedChange = enhancedOnChange;
+          (enhancedProps as any).onBlur = enhancedOnBlur;
           (enhancedProps as any).checked = field.value;
         } else {
           (enhancedProps as any).onChange = enhancedOnChange;
+          (enhancedProps as any).onBlur = enhancedOnBlur;
           (enhancedProps as any).value = field.value;
         }
 
@@ -549,7 +597,6 @@ const PageDataFormField = <P extends Record<string, any>>({
     return null;
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const validateNewValue = (e: React.ChangeEvent, newValue: any) => {
     if (!(e.target instanceof HTMLInputElement)) {
       return { valid: true, errors: null };
@@ -663,19 +710,49 @@ const PageDataFormField = <P extends Record<string, any>>({
           });
         };
 
+        const enhancedOnBlur = async (e: React.FocusEvent) => {
+          // Call react-hook-form's onBlur to mark field as touched
+          field.onBlur();
+
+          // Call original onBlur if it exists
+          const originalOnBlur = props.attributes?.onBlur;
+          if (originalOnBlur) {
+            originalOnBlur(e);
+          }
+
+          // Perform validation on blur
+          const validationResult = validateNewValue(e as any, field.value);
+          if (!validationResult.valid) {
+            if (formContext?.formId) {
+              if (props.attributes) {
+                props.attributes['data-invalid-prop-value'] = 'true';
+              }
+              dispatchFieldError(
+                dispatch,
+                formContext.formId,
+                fieldName,
+                validationResult,
+              );
+            }
+          }
+        };
+
         // Apply enhanced props
         const enhancedProps = { ...props };
         if (enhancedProps.attributes) {
           (enhancedProps as any).attributes = {
             ...enhancedProps.attributes,
             onChange: enhancedOnChange,
+            onBlur: enhancedOnBlur,
             value: field.value,
           };
         } else if ((props as any).onCheckedChange) {
           (enhancedProps as any).onCheckedChange = enhancedOnChange;
+          (enhancedProps as any).onBlur = enhancedOnBlur;
           (enhancedProps as any).checked = field.value;
         } else {
           (enhancedProps as any).onChange = enhancedOnChange;
+          (enhancedProps as any).onBlur = enhancedOnBlur;
           (enhancedProps as any).value = field.value;
         }
 
