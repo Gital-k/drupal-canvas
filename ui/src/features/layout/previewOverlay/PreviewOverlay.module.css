@@ -226,6 +226,21 @@
 
 .emptySlotDropZone {
   border: 1px dashed var(--purple-9);
+  font-size: 10px;
+  container-type: inline-size;
+
+  > div {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: calc(100% - 20px);
+  }
+
+  /* Hide text when slot is very narrow, show only icon */
+  @container (max-width: 80px) {
+    > div {
+      display: none;
+    }
+  }
 
   &.isOver {
     color: #fff;
