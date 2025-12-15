@@ -3,38 +3,50 @@ import Ajv from 'ajv';
 import { debounce } from 'lodash';
 import { Controller } from 'react-hook-form';
 
-
-
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
-import { ComponentPreviewUpdateEvent, getPropSchemas, getPropsValues, propInputData, shouldSkipPropValidation, toPropName, validateProp } from '@/components/form/formUtil';
-import { DEBOUNCE_TIMEOUT, POLLED_BACKGROUND_TIMEOUT } from '@/components/form/inputBehaviors';
+import {
+  ComponentPreviewUpdateEvent,
+  getPropSchemas,
+  getPropsValues,
+  propInputData,
+  shouldSkipPropValidation,
+  toPropName,
+  validateProp,
+} from '@/components/form/formUtil';
+import {
+  DEBOUNCE_TIMEOUT,
+  POLLED_BACKGROUND_TIMEOUT,
+} from '@/components/form/inputBehaviors';
 import { syncPropSourcesToResolvedValues } from '@/components/form/InputBehaviorsComponentPropsForm';
 import { useSafeFormContext, useSafeRHFContext } from '@/contexts/FormContext';
 import { FORM_TYPES } from '@/features/form/constants';
-import { selectFormValues, setFieldError, setFieldValue } from '@/features/form/formStateSlice';
-import { isEvaluatedComponentModel, setUpdatePreview } from '@/features/layout/layoutModelSlice';
-import { externalUpdateComplete, setPageData } from '@/features/pageData/pageDataSlice';
+import {
+  selectFormValues,
+  setFieldError,
+  setFieldValue,
+} from '@/features/form/formStateSlice';
+import {
+  isEvaluatedComponentModel,
+  setUpdatePreview,
+} from '@/features/layout/layoutModelSlice';
+import {
+  externalUpdateComplete,
+  setPageData,
+} from '@/features/pageData/pageDataSlice';
 import { setPreviewBackgroundUpdate } from '@/features/pagePreview/previewSlice';
 import { useComponentFormInputInfo } from '@/hooks/useComponentFormInputInfo';
 import { usePageDataFormInputInfo } from '@/hooks/usePageDataFormInputInfo';
-import { AJAX_UPDATE_FORM_BUILD_ID_EVENT, AJAX_UPDATE_FORM_STATE_EVENT } from '@/types/Ajax';
+import { AJAX_UPDATE_FORM_BUILD_ID_EVENT } from '@/types/Ajax';
 import { flaggedForRemoval, parseValue } from '@/utils/function-utils';
 import { isAjaxing } from '@/utils/isAjaxing';
-
-
 
 import type { ComponentType } from 'react';
 import type * as React from 'react';
 import type { ErrorObject } from 'ajv/dist/types';
 import type { FormId } from '@/features/form/formStateSlice';
 import type { ComponentModels } from '@/features/layout/layoutModelSlice';
-import type { AjaxUpdateFormStateEvent } from '@/types/Ajax';
 import type { AjaxUpdateFormBuildIdEvent } from '@/types/Ajax';
 import type { InputUIData, PropsValues } from '@/types/Form';
-
-
-
-
 
 const ajv = new Ajv();
 
@@ -138,14 +150,18 @@ const ComponentFormField = <P extends Record<string, any>>({
     isScalarProp,
   } = useComponentFormInputInfo(fieldName);
 
+  const formState = useAppSelector((state) =>
+    selectFormValues(state, FORM_TYPES.COMPONENT_INSTANCE_FORM),
+  );
 
   const formStateToStore = (
     newFormState: PropsValues,
     newInputAndUiData: InputUIData,
+    currFormState: PropsValues,
   ) => {
     // Apply (client-side) transforms for form state.
     const { propsValues: values, selectedModel } = getPropsValues(
-      newFormState,
+      { ...currFormState, ...newFormState },
       newInputAndUiData,
       // If transforms are not available (typically because TransformsContext is
       // not available to the input), fall back to the transforms stored in the
@@ -258,10 +274,6 @@ const ComponentFormField = <P extends Record<string, any>>({
     };
   }, [debounceFormStateToStore]);
 
-  const formState = useAppSelector((state) =>
-    selectFormValues(state, FORM_TYPES.COMPONENT_INSTANCE_FORM),
-  );
-
   const propsOverrides: { options?: Object[] } = {};
 
   const { multipleInputsSingleValue } = propInputData(
@@ -269,7 +281,6 @@ const ComponentFormField = <P extends Record<string, any>>({
     inputAndUiData,
   );
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const parseNewValue = (e: React.ChangeEvent) => {
     const schemas = getPropSchemas(inputAndUiData);
     const rawValue = parseValue(
@@ -278,6 +289,7 @@ const ComponentFormField = <P extends Record<string, any>>({
       schemas?.[propName],
     );
     const fieldName = (e.target as HTMLInputElement | HTMLSelectElement).name;
+    console.log('TRANSFORMS:', { transforms, propName, rawValue });
     if (
       // If there are no transforms, we cannot use them, just return the raw
       // value. Note that the 'undefined' check here is technically not required
@@ -349,25 +361,32 @@ const ComponentFormField = <P extends Record<string, any>>({
       components?.[selectedComponentType]?.source !== 'Code component' ||
       !['checkbox', 'radio'].includes(elementType as string);
     if (shouldDebounce) {
-      debounceFormStateToStore(newFormState, inputAndUiData);
+      debounceFormStateToStore(newFormState, inputAndUiData, formState);
     } else {
-      formStateToStore(newFormState, inputAndUiData);
+      formStateToStore(newFormState, inputAndUiData, formState);
     }
   };
 
   // Component form specific hooks
   useEffect(() => {
+    if (!formContext?.formId) return;
+
     const currentValue = getCurrentValue();
-    // console.log('[ComponentForm] Field registered:', {
-    //   fieldName,
-    //   propName,
-    //   initialValue: currentValue,
-    //   formId: formContext?.formId,
-    //   componentType: WrappedComponent.displayName || WrappedComponent.name,
-    //   isScalarProp,
-    //   selectedComponent,
-    // });
+
+    // Update Redux store with initial field value
+    dispatchFieldValue(dispatch, formContext.formId, fieldName, currentValue);
+
+    console.log('[ComponentForm] Field registered:', {
+      fieldName,
+      propName,
+      initialValue: currentValue,
+      formId: formContext?.formId,
+      componentType: WrappedComponent.displayName || WrappedComponent.name,
+      isScalarProp,
+      selectedComponent,
+    });
   }, [
+    dispatch,
     fieldName,
     propName,
     formContext?.formId,
@@ -388,7 +407,7 @@ const ComponentFormField = <P extends Record<string, any>>({
       defaultValue={getCurrentValue()}
       render={({ field }) => {
         const enhancedOnChange = (e: any) => {
-          const newValue = extractValue(e);
+          const newValue = parseNewValue(e);
 
           console.log('[ComponentForm] onChange:', {
             fieldName,
@@ -463,7 +482,7 @@ const PageDataFormField = <P extends Record<string, any>>({
 
   // Page data form specific hooks
   useEffect(() => {
-    const currentValue = getCurrentValue();
+    // const currentValue = getCurrentValue();
     // console.log('[PageDataForm] Field registered:', {
     //   fieldName,
     //   initialValue: currentValue,

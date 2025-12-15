@@ -373,6 +373,7 @@ export function getPropsValues(
   };
   const transformsList: Transforms = Drupal?.canvasTransforms || transforms;
   console.log('traansformsConfig', transformConfig);
+  console.log('model', model);
   const propsValues = Object.entries(
     formStateToObject(formState, selectedComponent),
   ).reduce((carry: PropsValues, [key, value]) => {
@@ -467,7 +468,7 @@ export function getPropsValues(
       ).propSources[fieldName as keyof PropsValues].default_values.resolved;
     }
   });
-
+  console.log('getPropsValues', { propsValues, selectedModel });
   return { propsValues, selectedModel };
 }
 

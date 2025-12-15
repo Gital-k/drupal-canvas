@@ -229,7 +229,7 @@ const ComponentInstanceFormRenderer: React.FC<
               ),
               resolved,
             },
-          }
+          };
           console.log('ajax patch payload', patchPayload);
           patchComponent(patchPayload);
           return;
