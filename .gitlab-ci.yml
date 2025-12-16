@@ -89,6 +89,9 @@ variables:
   # (Useful when early in an MR and/or developing low-level functionality that is unlikely to affect E2E tests.)
   _CANVAS_E2E_TESTS: true
 
+  # Set a fallback for this as CI_PAGES_DOMAIN is not set in forks.
+  PAGES_DOMAIN: ${CI_PAGES_DOMAIN:-pages.drupalcode.org}
+
 # @todo Remove when https://www.drupal.org/project/gitlab_templates/issues/3452183 lands.
 .is-push-rule: &is-push-rule
   if: $CI_PIPELINE_SOURCE == "push" && $CI_PROJECT_ROOT_NAMESPACE == "project"
@@ -584,7 +587,7 @@ playwright:
           {
             "external_link": {
               "label": "Playwright test report",
-              "url": "https://${CI_PROJECT_NAMESPACE}.${CI_PAGES_DOMAIN}/-/${CI_PROJECT_NAME}/-/jobs/${CI_JOB_ID}/artifacts/playwright-report/index.html"
+              "url": "https://${CI_PROJECT_NAMESPACE}.${PAGES_DOMAIN}/-/${CI_PROJECT_NAME}/-/jobs/${CI_JOB_ID}/artifacts/playwright-report/index.html"
             }
           }
         ]
