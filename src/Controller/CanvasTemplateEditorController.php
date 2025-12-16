@@ -15,7 +15,7 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 /**
  * Controller for Canvas template editor.
  */
-class CanvasTemplateEditorController extends ControllerBase {
+final class CanvasTemplateEditorController extends ControllerBase {
 
   /**
    * The entity type manager.
