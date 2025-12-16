@@ -439,7 +439,7 @@ display:
           entity_type: canvas_page
           plugin_id: canvas_publication_state_filter
           operator: in
-          value: {  }
+          value: []
           group: 1
           exposed: true
           expose:
@@ -456,7 +456,6 @@ display:
             multiple: false
             remember_roles:
               authenticated: authenticated
-            reduce: 0
           is_grouped: false
           group_info:
             label: ''
