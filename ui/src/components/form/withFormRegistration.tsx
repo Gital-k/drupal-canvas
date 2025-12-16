@@ -401,6 +401,26 @@ const ComponentFormField = <P extends Record<string, any>>({
     }
   };
 
+  // Listen for custom events from nested components (like Hidden) that need to update form state
+  useEffect(() => {
+    const handleFieldUpdate = (e: CustomEvent) => {
+      if (e.detail.fieldName === fieldName) {
+        commitFormState({ ...formState, [fieldName]: e.detail.value });
+      }
+    };
+    document.addEventListener(
+      'canvas:fieldUpdate',
+      handleFieldUpdate as EventListener,
+    );
+    return () => {
+      document.removeEventListener(
+        'canvas:fieldUpdate',
+        handleFieldUpdate as EventListener,
+      );
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fieldName, formState]);
+
   // Component form specific hooks
   useEffect(() => {
     if (!formContext?.formId) return;

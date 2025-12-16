@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
+import { useSafeRHFContext } from '@/contexts/FormContext';
 import useMutationObserver from '@/hooks/useMutationObserver';
 import { a2p } from '@/local_packages/utils';
 import { VALUE_THAT_MEANS_REMOVE } from '@/utils/function-utils';
@@ -9,6 +10,10 @@ import type { Attributes } from '@/types/DrupalAttribute';
 const Hidden = ({ attributes }: { attributes?: Attributes }) => {
   const [value, setValue] = useState(attributes?.value || '');
   const ref = useRef<HTMLInputElement | null>(null);
+
+  // Get react-hook-form context to update form state
+  const rhfMethods = useSafeRHFContext();
+  const fieldName = attributes?.name || attributes?.['data-canvas-name'];
 
   useEffect(() => {
     // Add a mutation observer to the form element this input belongs to. This
@@ -32,7 +37,30 @@ const Hidden = ({ attributes }: { attributes?: Attributes }) => {
             ref.current
           ) {
             ref.current.value = '';
-            // Call the onChange listener so the Redux store is updated.
+
+            // Dispatch custom event to trigger form state update in withFormRegistration
+            // This triggers the full commitFormState -> formStateToStore flow
+            if (fieldName) {
+              const fieldUpdateEvent = new CustomEvent('canvas:fieldUpdate', {
+                detail: {
+                  fieldName: String(fieldName),
+                  value: VALUE_THAT_MEANS_REMOVE,
+                },
+                bubbles: true,
+              });
+              document.dispatchEvent(fieldUpdateEvent);
+            }
+
+            // Also update react-hook-form state if context is available
+            if (rhfMethods && fieldName) {
+              rhfMethods.setValue(String(fieldName), VALUE_THAT_MEANS_REMOVE, {
+                shouldValidate: true,
+                shouldDirty: true,
+                shouldTouch: true,
+              });
+            }
+
+            // Also call onChange if it exists (backward compatibility)
             if (
               attributes?.onChange &&
               typeof attributes.onChange === 'function'
@@ -66,8 +94,7 @@ const Hidden = ({ attributes }: { attributes?: Attributes }) => {
         observer.disconnect();
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [rhfMethods, fieldName, attributes]);
 
   // Hidden field values might be updated by AJAX requests and those value
   // changes should persist on rerender instead of falling back to the initial
