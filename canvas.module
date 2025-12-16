@@ -113,8 +113,9 @@ function canvas_contextual_links_alter(array &$links, string $group, array $rout
   if ($group == 'node' && isset($route_parameters['node'])) {
     $node = \Drupal::entityTypeManager()->getStorage('node')->load($route_parameters['node']);
     if ($node instanceof FieldableEntityInterface) {
-      // The view_mode is set in canvas_node_view_alter() and should be in route_parameters.
-      // If it's not available, default to 'full' which is the standard view mode for node pages.
+      // The view_mode is set in canvas_node_view_alter()
+      // and should be in route_parameters.If it's not available,
+      // default to 'full' which is the standard view mode for node pages.
       $view_mode = $route_parameters['view_mode'] ?? 'full';
 
       // Check if a content template exists for the current view mode.

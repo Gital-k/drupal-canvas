@@ -36,7 +36,6 @@ class CanvasTemplateEditorController extends ControllerBase {
    *
    * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entity_type_manager
    *   The entity type manager.
-   *
    * @param \Drupal\Core\Entity\EntityRepositoryInterface $entity_repository
    *   The entity repository.
    */
@@ -47,8 +46,6 @@ class CanvasTemplateEditorController extends ControllerBase {
 
   /**
    * {@inheritdoc}
-   *
-   * @return static
    */
   public static function create(ContainerInterface $container) {
     return new static(
@@ -85,7 +82,6 @@ class CanvasTemplateEditorController extends ControllerBase {
    *
    * @param string $node_type
    *   The node type.
-   *
    * @param \Drupal\node\NodeInterface $node
    *   The node entity.
    *
@@ -101,4 +97,3 @@ class CanvasTemplateEditorController extends ControllerBase {
   }
 
 }
-
