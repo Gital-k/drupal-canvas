@@ -18,7 +18,8 @@ use Drupal\views\ResultRow;
  *
  * @deprecated in canvas:1.0.0 and is removed from canvas:2.0.0. Use
  *   moderation_state field from Content Moderation module instead.
- * @see \Drupal\content_moderation\Plugin\Field\ModerationStateFieldItemList
+ *
+ * @see https://www.drupal.org/node/3563404
  *
  * @ingroup views_field_handlers
  */

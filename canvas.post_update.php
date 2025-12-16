@@ -279,11 +279,14 @@ function canvas_post_update_0013_update_pages_view(): void {
     return;
   }
 
-  // Update the view configuration to use the new publication_state_computed field.
+  // Update view to use the new publication_state_computed field.
   // This replaces the old status field with the new computed field.
   $config_path = \Drupal::service('extension.list.module')->getPath('canvas') . '/config/optional/views.view.canvas_pages.yml';
   if (file_exists($config_path)) {
-    $new_config = Yaml::decode(file_get_contents($config_path));
-    $view_config->setData($new_config)->save();
+    $file_contents = @file_get_contents($config_path);
+    if (is_string($file_contents)) {
+      $new_config = Yaml::decode($file_contents);
+      $view_config->setData($new_config)->save();
+    }
   }
 }

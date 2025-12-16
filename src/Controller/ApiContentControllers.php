@@ -259,10 +259,13 @@ final class ApiContentControllers {
     $autoSaveData = $this->autoSaveManager->getAutoSaveEntity($content_entity);
     $autoSaveEntity = $autoSaveData->isEmpty() ? NULL : $autoSaveData->entity;
 
+    $validAutoSaveEntity = ($autoSaveEntity instanceof EntityPublishedInterface)
+      ? $autoSaveEntity
+      : NULL;
     // Expose available entity operations. Pass both original and auto-save
     // entities to allow reverting archive/publish actions when auto-save has
     // opposite status.
-    $linkCollection = $this->getEntityOperations($content_entity, $autoSaveEntity);
+    $linkCollection = $this->getEntityOperations($content_entity, $validAutoSaveEntity);
 
     // Determine the effective published status: use auto-save status if
     // available, otherwise use original.
@@ -531,10 +534,11 @@ final class ApiContentControllers {
         $should_show_archive = TRUE;
       }
       elseif (!$auto_save_is_published) {
-        // Auto-save is unpublished, original is published: show publish to revert.
+        // Auto-save is unpublished, original is published,
+        // show publish to revert.
         $should_show_publish = TRUE;
       }
-      // Note: If it's a draft with auto-saved published status, show neither action.
+      // If it's a draft with auto-saved published status, show neither action.
       // The draft must be truly published via the main Publish button first.
     }
     else {
