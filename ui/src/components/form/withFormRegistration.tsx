@@ -21,6 +21,7 @@ import { syncPropSourcesToResolvedValues } from '@/components/form/InputBehavior
 import { useSafeFormContext, useSafeRHFContext } from '@/contexts/FormContext';
 import { FORM_TYPES } from '@/features/form/constants';
 import {
+  selectFieldError,
   selectFormValues,
   setFieldError,
   setFieldValue,
@@ -80,6 +81,10 @@ const dispatchFieldError = (
   fieldName: string,
   validationResult: ValidationResult,
 ) => {
+  console.log(
+    `dispatching field error ${formId}, ${fieldName}`,
+    validationResult.errorMessage || ajv.errorsText(validationResult.errors),
+  );
   dispatch(
     setFieldError({
       type: 'error',
@@ -464,6 +469,10 @@ const ComponentFormField = <P extends Record<string, any>>({
           }
 
           const validationResult = validateNewValue(e, newValue);
+          console.log(
+            `CHANGE ${newValue} | validation result: shouldUpdate ${shouldUpdateFormState(e, validationResult)}`,
+            validationResult,
+          );
           if (!shouldUpdateFormState(e, validationResult)) {
             if (formId) {
               dispatchFieldError(dispatch, formId, fieldName, validationResult);
@@ -488,7 +497,7 @@ const ComponentFormField = <P extends Record<string, any>>({
         const enhancedOnBlur = async (e: React.FocusEvent) => {
           // Call react-hook-form's onBlur to mark field as touched
           field.onBlur();
-
+          console.log('BLUR!');
           // Call original onBlur if it exists
           const originalOnBlur = props.attributes?.onBlur;
           if (originalOnBlur) {
@@ -497,6 +506,11 @@ const ComponentFormField = <P extends Record<string, any>>({
 
           // Perform validation on blur
           const validationResult = validateNewValue(e as any, field.value);
+          console.log(
+            `CBLUR ${field.value} | validation result: shouldUpdate ${!!shouldUpdateFormState(e, validationResult)}`,
+            validationResult,
+          );
+
           if (!validationResult.valid) {
             if (formContext?.formId) {
               if (props.attributes) {
@@ -838,8 +852,17 @@ export const withFormRegistration = <P extends Record<string, any>>(
       props.name ||
       props.attributes?.id;
 
+    const fieldError = useAppSelector((state) =>
+      selectFieldError(state, {
+        formId: formContext?.formId as FormId,
+        fieldName,
+      }),
+    );
     // Get the current value from various possible sources
     const getCurrentValue = () => {
+      if (props.options && props.options.some((opt: any) => opt.selected)) {
+        return props.options.find((opt: any) => opt.selected).value;
+      }
       if (props.checked !== undefined) return props.checked;
       if (props.value !== undefined) return props.value;
       if (props.attributes?.checked !== undefined)
@@ -896,13 +919,22 @@ export const withFormRegistration = <P extends Record<string, any>>(
       fieldName,
       getCurrentValue,
     };
-
-    if (formContext?.formId === 'page_data_form') {
-      return <PageDataFormField {...sharedProps} />;
-    }
-
-    // Default to component form (for component_instance_form and any other forms)
-    return <ComponentFormField {...sharedProps} />;
+    console.log(`fieldError ${formContext?.formId}`, fieldError);
+    return (
+      <>
+        {formContext?.formId === 'page_data_form' && (
+          <PageDataFormField {...sharedProps} />
+        )}
+        {formContext?.formId === 'component_instance_form' && (
+          <ComponentFormField {...sharedProps} />
+        )}
+        {fieldError && (
+          <span data-prop-message>
+            {`${fieldError.type === 'error' ? '❌ ' : ''}${fieldError.message}`}
+          </span>
+        )}
+      </>
+    );
   };
 
   WithFormRegistration.displayName = `withFormRegistration(${WrappedComponent.displayName || WrappedComponent.name || 'Component'})`;

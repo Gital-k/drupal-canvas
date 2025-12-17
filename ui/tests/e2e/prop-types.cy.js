@@ -432,7 +432,6 @@ describe('Prop types editing', () => {
       .should('have.value', '')
       .then(($el) => $el[0].checkValidity())
       .should('be.true');
-
     cy.waitForElementContentNotInIframe(previewSelector, initialValue);
 
     cy.testInIframe(previewSelector, (preview) => {
