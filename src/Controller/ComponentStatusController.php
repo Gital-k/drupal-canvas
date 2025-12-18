@@ -2,6 +2,7 @@
 
 namespace Drupal\canvas\Controller;
 
+use Drupal\Core\DependencyInjection\ClassResolverInterface;
 use Drupal\Core\Messenger\MessengerInterface;
 use Drupal\Core\Render\Markup;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
@@ -27,6 +28,7 @@ final class ComponentStatusController {
   public function __construct(
     private readonly ComponentIncompatibilityReasonRepository $reasonRepository,
     private readonly MessengerInterface $messenger,
+    private readonly ClassResolverInterface $classResolver,
   ) {}
 
   public function __invoke(): array {
@@ -88,18 +90,18 @@ final class ComponentStatusController {
       $this->reasonRepository->storeReasons($source_plugin_id, $component_id, ['Manually disabled']);
     }
     elseif ($op === 'enable') {
-      try {
-        $definition = $source->getPluginDefinition();
-        $discovery_class = $definition['discovery'];
-        // @phpstan-ignore globalDrupalDependencyInjection.useDependencyInjection
-        $discovery = \Drupal::classResolver($discovery_class);
-        if (!$discovery instanceof ComponentCandidatesDiscoveryInterface) {
-          $this->messenger->addError($this->t('The component %component cannot be enabled due to a configuration error.', [
-            "%component" => $component_id,
-          ]));
-          return new RedirectResponse(Url::fromRoute('entity.component.collection')->toString());
-        }
+      $definition = $source->getPluginDefinition();
+      $discovery_class = $definition['discovery'];
+      if ($discovery_class === FALSE) {
+        $this->messenger->addError($this->t('The component %component cannot be enabled due to a configuration error.', [
+          "%component" => $component_id,
+        ]));
+        return new RedirectResponse(Url::fromRoute('entity.component.collection')->toString());
+      }
 
+      try {
+        $discovery = $this->classResolver->getInstanceFromDefinition($discovery_class);
+        assert($discovery instanceof ComponentCandidatesDiscoveryInterface);
         $discovery->checkRequirements($source->getSourceSpecificComponentId());
         $component->enable()->save();
         $this->reasonRepository->removeReason($source_plugin_id, $component_id);

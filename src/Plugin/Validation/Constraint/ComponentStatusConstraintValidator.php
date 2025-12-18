@@ -6,6 +6,7 @@ namespace Drupal\canvas\Plugin\Validation\Constraint;
 
 use Drupal\Component\Plugin\Exception\PluginNotFoundException;
 use Drupal\canvas\ComponentDoesNotMeetRequirementsException;
+use Drupal\Core\DependencyInjection\ClassResolverInterface;
 use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\ConstraintValidator;
 use Drupal\canvas\ComponentSource\ComponentCandidatesDiscoveryInterface;
@@ -16,6 +17,10 @@ use Drupal\canvas\ComponentSource\ComponentCandidatesDiscoveryInterface;
 final class ComponentStatusConstraintValidator extends ConstraintValidator {
 
   use ComponentConfigEntityDependentValidatorTrait;
+
+  public function __construct(
+    private readonly ClassResolverInterface $classResolver,
+  ) {}
 
   /**
    * {@inheritdoc}
@@ -48,15 +53,16 @@ final class ComponentStatusConstraintValidator extends ConstraintValidator {
       //   receives valid values.
       return;
     }
-    try {
-      $definition = $source->getPluginDefinition();
-      $discovery_class = $definition['discovery'];
-      // @phpstan-ignore globalDrupalDependencyInjection.useDependencyInjection
-      $discovery = \Drupal::classResolver($discovery_class);
-      if (!$discovery instanceof ComponentCandidatesDiscoveryInterface) {
-        return;
-      }
+    
+    $definition = $source->getPluginDefinition();
+    $discovery_class = $definition['discovery'];
+    if ($discovery_class === FALSE) {
+      return;
+    }
 
+    try {
+      $discovery = $this->classResolver->getInstanceFromDefinition($discovery_class);
+      assert($discovery instanceof ComponentCandidatesDiscoveryInterface);
       $discovery->checkRequirements($source->getSourceSpecificComponentId());
     }
     catch (ComponentDoesNotMeetRequirementsException $exception) {
