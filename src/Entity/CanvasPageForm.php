@@ -88,10 +88,26 @@ final class CanvasPageForm extends ContentEntityForm {
     $site_name = $site_config->get('name') ?? FALSE;
     $meta_title = $site_name ? $page->label() . " | $site_name" : $page->label();
 
+    // Get path alias from user input (for autosaved values) or entity
+    $user_input = $form_state->getUserInput();
+    $path_alias = '';
+    if (!empty($user_input['path'][0]['alias'])) {
+      $path_alias = trim($user_input['path'][0]['alias']);
+    }
+    elseif ($page->hasField('path') && !$page->get('path')->isEmpty()) {
+      $path_alias = trim($page->get('path')->first()?->get('alias')->getValue() ?? '');
+    }
+
+    // Build page URL
+    $base_url = \Drupal::request()->getSchemeAndHttpHost();
+    $page_url = $path_alias
+      ? $base_url . ($path_alias[0] === '/' ? $path_alias : '/' . $path_alias)
+      : Url::fromRoute('entity.canvas_page.canonical', ['canvas_page' => $page->id()], ['absolute' => TRUE])->toString();
+
     $form[$group]['serp_preview'] = [
       '#theme' => 'serp_preview',
       '#meta_title' => $meta_title,
-      '#page_url' => Url::fromRoute('entity.canvas_page.canonical', ['canvas_page' => $page->id()], ['absolute' => TRUE])->toString(),
+      '#page_url' => $page_url,
       '#meta_description' => $page->get('description')->value,
       '#attached' => ['library' => ['canvas/serp-preview']],
       '#weight' => -20,

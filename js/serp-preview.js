@@ -1,9 +1,16 @@
 (function (Drupal) {
   Drupal.behaviors.seoPreview = {
     attach: function (context, settings) {
+      // Only process if we haven't already attached to these elements
+      const wrapper = context.querySelector('.serp-preview-wrapper');
+      if (!wrapper || wrapper.dataset.seoPreviewAttached) {
+        return;
+      }
+      wrapper.dataset.seoPreviewAttached = 'true';
+
       // Get site name and base URL from Drupal settings
-      const siteName = settings.canvas.siteName || '';
-      const baseUrl = settings.canvas.baseUrl || '';
+      const siteName = settings.canvas?.siteName || '';
+      const baseUrl = settings.canvas?.baseUrl || '';
 
       // Select fields and preview elements
       const titleField = context.querySelector('input[name="title[0][value]"]');
@@ -14,6 +21,20 @@
       const previewUrl = context.querySelector('.serp-preview__url');
       const previewDescription = context.querySelector('.serp-preview__description');
 
+      // Update preview URL helper function
+      const updatePreviewUrl = (field) => {
+        if (field && previewUrl) {
+          const alias = field.value.trim();
+          if (alias) {
+            const formattedAlias = alias.startsWith('/') ? alias : `/${alias}`;
+            previewUrl.textContent = `${baseUrl}${formattedAlias}`;
+          } else {
+            // Fallback to default URL if alias is empty
+            previewUrl.textContent = baseUrl;
+          }
+        }
+      };
+
       if (titleField && previewTitle) {
         titleField.addEventListener('input', () => {
           const title = titleField.value.trim();
@@ -23,9 +44,12 @@
 
       if (aliasField && previewUrl) {
         aliasField.addEventListener('input', () => {
-          const alias = aliasField.value.trim();
-          const formattedAlias = alias.startsWith('/') ? alias : `/${alias}`;
-          previewUrl.textContent = `${baseUrl}${formattedAlias}`;
+          updatePreviewUrl(aliasField);
+        });
+
+        // Also listen for change event (for programmatic updates)
+        aliasField.addEventListener('change', () => {
+          updatePreviewUrl(aliasField);
         });
       }
 
