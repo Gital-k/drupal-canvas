@@ -53,7 +53,7 @@ final class CanvasPageForm extends ContentEntityForm {
 
     // Move SEO related base fields to this group.
     $form[$group]['image'] = $form['image'];
-    $form[$group]['image']['#weight'] = -10;
+    $form[$group]['image']['#weight'] = 20;
     // TRICKY: it seems there's a Drupal core bug wrt #group, long-term fix TBD.
     // @see https://git.drupalcode.org/project/canvas/-/merge_requests/501#note_448716
     unset($form['image']);
@@ -94,7 +94,7 @@ final class CanvasPageForm extends ContentEntityForm {
       '#page_url' => Url::fromRoute('entity.canvas_page.canonical', ['canvas_page' => $page->id()], ['absolute' => TRUE])->toString(),
       '#meta_description' => $page->get('description')->value,
       '#attached' => ['library' => ['canvas/serp-preview']],
-      '#weight' => 10,
+      '#weight' => -20,
     ];
 
     // Pass site name and base URL to JS.
