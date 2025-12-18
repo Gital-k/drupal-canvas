@@ -53,7 +53,7 @@ final class ComponentStatusConstraintValidator extends ConstraintValidator {
       //   receives valid values.
       return;
     }
-    
+
     $definition = $source->getPluginDefinition();
     $discovery_class = $definition['discovery'];
     if ($discovery_class === FALSE) {
