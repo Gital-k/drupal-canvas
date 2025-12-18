@@ -344,10 +344,9 @@ UI:
   image: node:20-alpine
   needs: []
   script:
-    - cd ui
     - npm ci
     # Verify building the entire app succeeds — this first runs the TypeScript Compiler.
-    - npm run build
+    - npm run build --workspace=@drupal-canvas/ui
     # @todo In the future, when `ui/dist` and `packages/astro-hydration/dist` are
     # committed, verify here that they match.
   artifacts:
