@@ -348,12 +348,12 @@ UI:
     - npm ci
     # Verify building the entire app succeeds — this first runs the TypeScript Compiler.
     - npm run build
-    # @todo In the future, when `ui/dist` and `ui/lib/astro-hydration/dist` are
+    # @todo In the future, when `ui/dist` and `packages/astro-hydration/dist` are
     # committed, verify here that they match.
   artifacts:
     paths:
       - ui/dist
-      - ui/lib/astro-hydration/dist
+      - packages/astro-hydration/dist
       # TRICKY: necessary for the `Cypress` job to be able to run `cypress install`.
       - ui/node_modules
 

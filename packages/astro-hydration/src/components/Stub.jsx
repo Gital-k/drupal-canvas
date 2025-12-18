@@ -9,14 +9,14 @@
 const { ...preact } = await import('preact');
 const { ...preactCompat } = await import('preact/compat');
 const { ...preactHooks } = await import('preact/hooks');
-const { ...jsxRuntime } = await import('@/lib/jsx-runtime-default');
+const { ...jsxRuntime } = await import('../lib/jsx-runtime-default');
 const { default: clsx } = await import('clsx');
 const { ...tailwindMerge } = await import('tailwind-merge');
 const { cva } = await import('class-variance-authority');
-const { DrupalJsonApiParams } = await import('@/lib/jsonapi-params');
-const useSwr = await import('@/lib/swr');
+const { DrupalJsonApiParams } = await import('../lib/jsonapi-params');
+const useSwr = await import('../lib/swr');
 
-const { ...drupalCanvas } = await import('@/lib/drupal-canvas');
+const { ...drupalCanvas } = await import('../lib/drupal-canvas');
 // For backward compatibility import separately elements that were moved to the drupal-canvas package
 // so they have separate files in dist that can be used in backward compatible import map entries.
 const FormattedText = await import('drupal-canvas/FormattedText');
@@ -30,6 +30,6 @@ const { cn } = await import('drupal-canvas/utils');
 const { JsonApiClient } = await import('drupal-canvas/jsonapi-client');
 const { getNodePath, sortMenu } = await import('drupal-canvas/jsonapi-utils');
 
-await import('@/lib/canvas-island.js');
+await import('../lib/canvas-island.ts');
 
 export default function () {}
