@@ -100,6 +100,7 @@ final class ComponentStatusController {
       }
 
       try {
+        assert($this->classResolver instanceof ClassResolverInterface);
         $discovery = $this->classResolver->getInstanceFromDefinition($discovery_class);
         assert($discovery instanceof ComponentCandidatesDiscoveryInterface);
         $discovery->checkRequirements($source->getSourceSpecificComponentId());
