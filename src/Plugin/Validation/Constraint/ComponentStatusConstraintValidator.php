@@ -19,7 +19,7 @@ final class ComponentStatusConstraintValidator extends ConstraintValidator {
   use ComponentConfigEntityDependentValidatorTrait;
 
   public function __construct(
-    private readonly ClassResolverInterface $classResolver,
+    private readonly ?ClassResolverInterface $classResolver = NULL,
   ) {}
 
   /**

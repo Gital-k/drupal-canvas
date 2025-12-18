@@ -28,7 +28,7 @@ final class ComponentStatusController {
   public function __construct(
     private readonly ComponentIncompatibilityReasonRepository $reasonRepository,
     private readonly MessengerInterface $messenger,
-    private readonly ClassResolverInterface $classResolver,
+    private readonly ?ClassResolverInterface $classResolver = NULL,
   ) {}
 
   public function __invoke(): array {
