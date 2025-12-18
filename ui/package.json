@@ -12,7 +12,7 @@
     "drupaldev": "VITE_DRUPAL=true vite",
     "start": "vite",
     "build": "npm run type-check && vite build && npm run build:astro",
-    "build:astro": "cd ../packages/astro-hydration && npm ci -w @drupal-canvas/astro-hydration -w drupal-canvas && npm run build",
+    "build:astro": "npm run build --workspace=@drupal-canvas/astro-hydration",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest watch",

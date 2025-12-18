@@ -9,6 +9,7 @@
   },
   "workspaces": [
     "packages/*",
+    "ui",
     "docs/user",
     "tests/modules/canvas_test_extension"
   ],
