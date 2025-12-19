@@ -928,3 +928,16 @@ plugin.plugin_configuration.search_api_processor.canvas_component_tree_inputs:
       sequence:
         type: string
         label: 'Prop name'
+
+# Views plugins schema definitions.
+views.filter.canvas_publication_state_filter:
+  type: views.filter.in_operator
+  label: 'Canvas publication state filter'
+
+views.field.canvas_publication_state:
+  type: views_field
+  label: 'Canvas publication state field'
+
+views.sort.canvas_publication_state_sort:
+  type: views_sort
+  label: 'Canvas publication state sort'

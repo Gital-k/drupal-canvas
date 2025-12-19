@@ -548,8 +548,9 @@ final class ApiContentControllers {
         // Only show archive for truly published pages (not drafts).
         $should_show_archive = TRUE;
       }
-      else {
-        // Show publish for all unpublished pages (including drafts).
+      elseif (!$effective_is_published && !$is_draft) {
+        // Only show publish for archived pages (previously published, now unpublished).
+        // Do NOT show for draft pages (never published).
         $should_show_publish = TRUE;
       }
     }
@@ -568,7 +569,7 @@ final class ApiContentControllers {
         if (!$effective_is_published) {
           $access = AccessResult::forbidden(
             'Set as homepage action not available for unpublished pages.'
-          )->addCacheableDependency($content_entity);
+          );
           if ($autoSaveEntity) {
             $access->addCacheableDependency($autoSaveEntity);
           }
@@ -582,7 +583,7 @@ final class ApiContentControllers {
         if (!$should_show_archive) {
           $access = AccessResult::forbidden(
             'Archive action not available for this page state.'
-          )->addCacheableDependency($content_entity);
+          );
           if ($autoSaveEntity) {
             $access->addCacheableDependency($autoSaveEntity);
           }
@@ -602,7 +603,7 @@ final class ApiContentControllers {
         if (!$should_show_publish) {
           $access = AccessResult::forbidden(
             'Publish action not available for this page state.'
-          )->addCacheableDependency($content_entity);
+          );
           if ($autoSaveEntity) {
             $access->addCacheableDependency($autoSaveEntity);
           }

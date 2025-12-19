@@ -1075,7 +1075,7 @@ paths:
         '204':
           description: Deleted individual Personalization Segment
   '/canvas/api/v0/content/canvas_page/{entityId}':
-    description: Endpoint for deleting content entities.
+    description: Endpoint for managing content entities.
     delete:
       summary: Deletes a content entity.
       parameters:
@@ -1083,6 +1083,23 @@ paths:
       responses:
         '204':
           description: Content deleted successfully
+    patch:
+      summary: Updates a content entity.
+      parameters:
+        - $ref: '#/components/parameters/entityId'
+      requestBody:
+        description: Updates a content entity.
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Content updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
   '/canvas/api/v0/content/{entity_type}':
     get:
       summary: Provides api for page listing.
