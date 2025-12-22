@@ -553,7 +553,8 @@ class ComponentTreeItem extends FieldItemBase {
   public function preSave(): void {
     $entity = $this->getRoot() === $this ? NULL : $this->getEntity();
     $violations = new ConstraintViolationList();
-    $source = $this->getComponent()?->getComponentSource();
+    $component = $this->getComponent();
+    $source = $component?->getComponentSource();
     $component_instance_uuid = $this->getUuid();
     if ($source === NULL) {
       $violations->add(new ConstraintViolation(
@@ -571,7 +572,7 @@ class ComponentTreeItem extends FieldItemBase {
     // this will catch that.
     // @see \Drupal\canvas\Plugin\Validation\Constraint\ValidComponentTreeItemConstraintValidator
     $input_values = $this->getInputs();
-    $component_violations = $source->validateComponentInput($input_values ?? [], $component_instance_uuid, $entity);
+    $component_violations = $source->validateComponentInput($input_values ?? [], $component_instance_uuid, $entity, $component->isLoadedVersionActiveVersion() ?? TRUE);
     if ($component_violations->count() > 0) {
       // @todo Remove the foreach and use ::addAll once
       // https://www.drupal.org/project/drupal/issues/3490588 has been resolved.

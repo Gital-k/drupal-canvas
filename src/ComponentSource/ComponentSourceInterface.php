@@ -278,11 +278,14 @@ interface ComponentSourceInterface extends PluginInspectionInterface, Derivative
    *   Component instance UUID.
    * @param \Drupal\Core\Entity\FieldableEntityInterface|null $entity
    *   Host entity.
+   * @param bool $isActiveVersion
+   *   TRUE if the component being validated is the current version. Some source
+   *   plugins may chose to validate inactive versions differently.
    *
    * @return \Symfony\Component\Validator\ConstraintViolationListInterface
    *   Any violations.
    */
-  public function validateComponentInput(array $inputValues, string $component_instance_uuid, ?FieldableEntityInterface $entity): ConstraintViolationListInterface;
+  public function validateComponentInput(array $inputValues, string $component_instance_uuid, ?FieldableEntityInterface $entity, bool $isActiveVersion = TRUE): ConstraintViolationListInterface;
 
   /**
    * Checks if component meets requirements.
