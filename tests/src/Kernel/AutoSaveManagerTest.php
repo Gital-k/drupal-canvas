@@ -525,6 +525,81 @@ class AutoSaveManagerTest extends KernelTestBase {
     self::assertEquals('Updated title', $list[$auto_save_key]['label']);
   }
 
+  /**
+   * Tests entityIsDraft() method distinguishes drafts from archived pages.
+   *
+   * @covers ::entityIsDraft
+   */
+  public function testEntityIsDraft(): void {
+    $this->installEntitySchema('user');
+    $this->installEntitySchema(Page::ENTITY_TYPE_ID);
+
+    $autoSaveManager = $this->container->get(AutoSaveManager::class);
+    assert($autoSaveManager instanceof AutoSaveManager);
+
+    // A newly created unpublished page is a draft.
+    $draft_page = Page::create([
+      'title' => 'Draft Page',
+      'status' => FALSE,
+    ]);
+    $draft_page->save();
+    $this->assertTrue(
+      $autoSaveManager->entityIsDraft($draft_page),
+      'Unpublished page that has never been published should be considered a draft.'
+    );
+
+    // A published page is not a draft.
+    $published_page = Page::create([
+      'title' => 'Published Page',
+      'status' => TRUE,
+    ]);
+    $published_page->save();
+    $this->assertFalse(
+      $autoSaveManager->entityIsDraft($published_page),
+      'Published page should not be considered a draft.'
+    );
+
+    // A page that was published then unpublished is archived, not a draft.
+    $archived_page = Page::create([
+      'title' => 'Archived Page',
+      'status' => TRUE,
+    ]);
+    $archived_page->save();
+    $archived_page->setNewRevision(TRUE);
+    $archived_page->setUnpublished();
+    $archived_page->save();
+    $this->assertFalse(
+      $autoSaveManager->entityIsDraft($archived_page),
+      'Page that was published then unpublished should not be considered a draft (it is archived).'
+    );
+
+    // Any unpublished page that was never published is a draft.
+    $custom_unpublished_page = Page::create([
+      'title' => 'Custom Title',
+      'status' => FALSE,
+    ]);
+    $custom_unpublished_page->save();
+    $this->assertTrue(
+      $autoSaveManager->entityIsDraft($custom_unpublished_page),
+      'Unpublished page that was never published should be considered a draft.'
+    );
+
+    // Draft page that gets published is no longer a draft.
+    $draft_to_published = Page::create([
+      'title' => 'Draft to Published',
+      'status' => FALSE,
+    ]);
+    $draft_to_published->save();
+    $this->assertTrue($autoSaveManager->entityIsDraft($draft_to_published));
+
+    $draft_to_published->setPublished();
+    $draft_to_published->save();
+    $this->assertFalse(
+      $autoSaveManager->entityIsDraft($draft_to_published),
+      'Draft page that gets published should no longer be a draft.'
+    );
+  }
+
 }
 
 /**

@@ -490,14 +490,8 @@ class AutoSaveManager implements EventSubscriberInterface {
       return FALSE;
     }
 
-    // First check if it matches the "new" criteria (title-based heuristic).
-    $matches_new_criteria = (string) $entity->label() == ApiContentControllers::defaultTitle($entity->getEntityType()) || str_ends_with((string) $entity->label(), self::ENTITY_DUPLICATE_SUFFIX);
-    if (!$matches_new_criteria) {
-      return FALSE;
-    }
-
-    // If it matches the "new" criteria, verify it has never been published.
     // Check if there's a published revision in the entity's history.
+    // If the entity has ever been published, it's not a draft (it's archived).
     $entity_type = $entity->getEntityType();
     if ($entity_type->isRevisionable()) {
       $storage = $this->entityTypeManager->getStorage($entity->getEntityTypeId());
@@ -513,10 +507,13 @@ class AutoSaveManager implements EventSubscriberInterface {
         ->range(0, 1);
       $published_revision_ids = $query->execute();
       // If there's a published revision, it's not a draft (it's archived).
-      return empty($published_revision_ids);
+      if (!empty($published_revision_ids)) {
+        return FALSE;
+      }
     }
 
-    // If not revisionable, fall back to title-based check.
+    // At this point, the entity is unpublished and has never been published.
+    // It's a draft.
     return TRUE;
   }
 

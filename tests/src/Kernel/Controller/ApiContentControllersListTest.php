@@ -438,4 +438,106 @@ class ApiContentControllersListTest extends KernelTestBase {
     ];
   }
 
+  /**
+   * Tests that archived pages are correctly identified in list.
+   *
+   * @covers ::list
+   * @covers \Drupal\canvas\AutoSave\AutoSaveManager::entityIsDraft
+   */
+  public function testArchivedPageInList(): void {
+    // Create a published page, then unpublish it (archive it).
+    $archived_page = Page::create([
+      'title' => 'Archived Canvas Page',
+      'status' => TRUE,
+      'path' => ['alias' => '/archived-page'],
+    ]);
+    $archived_page->save();
+
+    // Now unpublish it to create an archived page.
+    $archived_page->setNewRevision(TRUE);
+    $archived_page->setUnpublished();
+    $archived_page->save();
+
+    $data = $this->executeListRequest();
+
+    $archived_page_id = (int) $archived_page->id();
+    self::assertArrayHasKey($archived_page_id, $data, 'Archived page should be in the list');
+
+    // Verify that isNew is FALSE for archived page.
+    self::assertArrayHasKey('isNew', $data[$archived_page_id], 'isNew field should be present');
+    self::assertFalse($data[$archived_page_id]['isNew'], 'Archived page should have isNew=false');
+    self::assertFalse($data[$archived_page_id]['status'], 'Archived page should have status=false');
+  }
+
+  /**
+   * Tests that draft pages are correctly identified in list.
+   *
+   * @covers ::list
+   * @covers \Drupal\canvas\AutoSave\AutoSaveManager::entityIsDraft
+   */
+  public function testDraftPageInList(): void {
+    // Create an unpublished page with default title (draft).
+    $draft_page = Page::create([
+      'title' => 'Untitled page',
+      'status' => FALSE,
+    ]);
+    $draft_page->save();
+
+    $data = $this->executeListRequest();
+
+    $draft_page_id = (int) $draft_page->id();
+    self::assertArrayHasKey($draft_page_id, $data, 'Draft page should be in the list');
+
+    // Verify that isNew is TRUE for draft page.
+    self::assertArrayHasKey('isNew', $data[$draft_page_id], 'isNew field should be present');
+    self::assertTrue($data[$draft_page_id]['isNew'], 'Draft page should have isNew=true');
+    self::assertFalse($data[$draft_page_id]['status'], 'Draft page should have status=false');
+  }
+
+  /**
+   * Tests archive/publish operations with auto-save.
+   *
+   * @covers ::list
+   */
+  public function testArchivePublishWithAutoSave(): void {
+    // Use the published page from setup.
+    $page = $this->pages['published'];
+
+    // Create auto-save data that unpublishes the page.
+    $page->setUnpublished();
+    $this->autoSaveManager->saveEntity($page);
+
+    $data = $this->executeListRequest();
+
+    $page_id = (int) $page->id();
+    self::assertArrayHasKey($page_id, $data);
+
+    // The list should show the auto-saved status (unpublished).
+    self::assertFalse($data[$page_id]['status'], 'Page should show auto-saved unpublished status');
+    self::assertFalse($data[$page_id]['isNew'], 'Page should not be marked as new (it was published before)');
+
+    // Create auto-save data that publishes an archived page.
+    $archived_page = Page::create([
+      'title' => 'Test Archived',
+      'status' => TRUE,
+    ]);
+    $archived_page->save();
+    $archived_page->setNewRevision(TRUE);
+    $archived_page->setUnpublished();
+    $archived_page->save();
+
+    // Now create auto-save that publishes it.
+    $archived_page->setPublished();
+    $this->autoSaveManager->saveEntity($archived_page);
+
+    $data = $this->executeListRequest();
+
+    $archived_page_id = (int) $archived_page->id();
+    self::assertArrayHasKey($archived_page_id, $data);
+
+    // The list should show the auto-saved status (published).
+    self::assertTrue($data[$archived_page_id]['status'], 'Archived page should show auto-saved published status');
+    self::assertFalse($data[$archived_page_id]['isNew'], 'Page should not be marked as new');
+  }
+
 }

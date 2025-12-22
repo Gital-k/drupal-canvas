@@ -549,7 +549,7 @@ final class ApiContentControllers {
         $should_show_archive = TRUE;
       }
       elseif (!$effective_is_published && !$is_draft) {
-        // Only show publish for archived pages (previously published, now unpublished).
+        // Show publish only for archived pages.
         // Do NOT show for draft pages (never published).
         $should_show_publish = TRUE;
       }
