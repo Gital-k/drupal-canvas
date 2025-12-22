@@ -5,3 +5,5 @@ declare global {
     drupalSettings: DrupalSettings;
   }
 }
+
+declare module '*.module.css';

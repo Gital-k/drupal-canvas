@@ -31,3 +31,5 @@ declare global {
     _canvasTransforms: Record<string, TransformConfig>;
   }
 }
+
+declare module '*.css';

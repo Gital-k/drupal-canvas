@@ -1,18 +1,7 @@
-// @see https://docs.astro.build/en/guides/typescript/#setup
 {
-  "extends": "astro/tsconfigs/strict",
+  "extends": "../../tsconfig.json",
   "include": [
     ".astro/types.d.ts",
     "**/*"
   ],
-  "exclude": [
-    "dist"
-  ],
-  "compilerOptions": {
-    "jsx": "react-jsx",
-    "jsxImportSource": "preact",
-    "paths": {
-      "@/*": ["src/*"],
-    }
-  }
 }
