@@ -135,7 +135,7 @@ final class ValidComponentTreeItemConstraintValidator extends ConstraintValidato
         inputValues: $stored_explicit_input,
         component_instance_uuid: $value->getUuid(),
         entity: $host_entity,
-        isActiveVersion: $component->isLoadedVersionActiveVersion() ?? TRUE,
+        isActiveVersion: $component->isLoadedVersionActiveVersion(),
       ),
       // We need to ensure the validation root context is transferred over.
       $this->context->getRoot()

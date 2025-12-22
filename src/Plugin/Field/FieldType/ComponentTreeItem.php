@@ -572,7 +572,7 @@ class ComponentTreeItem extends FieldItemBase {
     // this will catch that.
     // @see \Drupal\canvas\Plugin\Validation\Constraint\ValidComponentTreeItemConstraintValidator
     $input_values = $this->getInputs();
-    $component_violations = $source->validateComponentInput($input_values ?? [], $component_instance_uuid, $entity, $component->isLoadedVersionActiveVersion() ?? TRUE);
+    $component_violations = $source->validateComponentInput($input_values ?? [], $component_instance_uuid, $entity, $component->isLoadedVersionActiveVersion());
     if ($component_violations->count() > 0) {
       // @todo Remove the foreach and use ::addAll once
       // https://www.drupal.org/project/drupal/issues/3490588 has been resolved.
