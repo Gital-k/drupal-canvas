@@ -507,7 +507,9 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
     $this->assertStatusFlags($entity, TRUE, FALSE);
 
     $entity->set('title', 'Here we go')->save();
-    $this->assertStatusFlags($entity, FALSE, FALSE);
+    // Entity is still a draft (isNew=TRUE) because it's unpublished and has
+    // never been published, regardless of having a custom title.
+    $this->assertStatusFlags($entity, TRUE, FALSE);
 
     $entity->setPublished()->save();
     $this->assertStatusFlags($entity, FALSE, TRUE);

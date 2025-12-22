@@ -7,6 +7,7 @@ namespace Drupal\Tests\canvas\Functional;
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Entity\EntityPublishedInterface;
 use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\Url;
 use Drupal\canvas\AutoSave\AutoSaveManager;
@@ -408,6 +409,12 @@ final class CanvasContentEntityHttpApiTest extends HttpApiTestBase {
     // Authenticated, authorized, with CSRF token: 204.
     $request_options['headers']['X-CSRF-Token'] = $this->drupalGet('session/token');
     Role::load('authenticated')?->grantPermission(Page::CREATE_PERMISSION)->save();
+    // Grant 'access content' permission so the user can view published pages
+    // to duplicate them.
+    Role::load('authenticated')?->grantPermission('access content')->save();
+    // Grant 'edit canvas_page' permission so the user can view unpublished
+    // pages (needed when duplicating a duplicate, which is unpublished).
+    Role::load('authenticated')?->grantPermission(Page::EDIT_PERMISSION)->save();
 
     // Try to duplicate a non-existent entity.
     $response = $this->makeApiRequest('POST', $url, $request_options);
@@ -506,6 +513,7 @@ final class CanvasContentEntityHttpApiTest extends HttpApiTestBase {
     $autoSaveManager = $this->container->get(AutoSaveManager::class);
     $autoSaveData = $autoSaveManager->getAutoSaveEntity($page_1);
     $this->assertFalse($autoSaveData->isEmpty(), 'Auto-save data should exist.');
+    assert($autoSaveData->entity instanceof EntityPublishedInterface);
     $this->assertFalse($autoSaveData->entity->isPublished(), 'Auto-saved page should be unpublished.');
 
     // Test publishing an archived page.
@@ -545,6 +553,7 @@ final class CanvasContentEntityHttpApiTest extends HttpApiTestBase {
     assert($page_3 instanceof Page);
     $autoSaveData = $autoSaveManager->getAutoSaveEntity($page_3);
     $this->assertFalse($autoSaveData->isEmpty());
+    assert($autoSaveData->entity instanceof EntityPublishedInterface);
     $this->assertFalse($autoSaveData->entity->isPublished());
   }
 

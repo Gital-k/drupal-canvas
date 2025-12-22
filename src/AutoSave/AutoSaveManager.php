@@ -28,7 +28,6 @@ use Drupal\Core\TypedData\PrimitiveInterface;
 use Drupal\Core\TypedData\TypedDataInterface;
 use Drupal\Component\Datetime\TimeInterface;
 use Drupal\canvas\AutoSaveEntity;
-use Drupal\canvas\Controller\ApiContentControllers;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\StagedConfigUpdate;
 use Drupal\canvas\Entity\CanvasHttpApiEligibleConfigEntityInterface;
