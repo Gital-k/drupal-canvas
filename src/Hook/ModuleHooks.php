@@ -47,11 +47,7 @@ class ModuleHooks {
         'base hook' => 'field',
       ],
       'serp_preview' => [
-        'variables' => [
-          'meta_title' => '',
-          'page_url' => '',
-          'meta_description' => '',
-        ],
+        'variables' => [],
       ],
     ];
   }

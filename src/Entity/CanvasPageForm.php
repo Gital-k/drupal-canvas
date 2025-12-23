@@ -7,7 +7,6 @@ namespace Drupal\canvas\Entity;
 use Drupal\Core\Entity\ContentEntityForm;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
-use Drupal\Core\Url;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -82,38 +81,17 @@ final class CanvasPageForm extends ContentEntityForm {
     }
 
     // Add the search result preview.
+    // SERP preview is now handled entirely client-side via React component.
+    $form[$group]['serp_preview'] = [
+      '#theme' => 'serp_preview',
+      '#weight' => -20,
+    ];
+
+    // Pass site name and base URL to client-side for SERP preview.
     /** @var \Drupal\canvas\Entity\Page $page */
     $page = $this->getEntity();
     $site_config = $this->configFactory->get('system.site');
     $site_name = $site_config->get('name') ?? FALSE;
-    $meta_title = $site_name ? $page->label() . " | $site_name" : $page->label();
-
-    // Get path alias from user input (for autosaved values) or entity
-    $user_input = $form_state->getUserInput();
-    $path_alias = '';
-    if (!empty($user_input['path'][0]['alias'])) {
-      $path_alias = trim($user_input['path'][0]['alias']);
-    }
-    elseif ($page->hasField('path') && !$page->get('path')->isEmpty()) {
-      $path_alias = trim($page->get('path')->first()?->get('alias')->getValue() ?? '');
-    }
-
-    // Build page URL
-    $base_url = \Drupal::request()->getSchemeAndHttpHost();
-    $page_url = $path_alias
-      ? $base_url . ($path_alias[0] === '/' ? $path_alias : '/' . $path_alias)
-      : Url::fromRoute('entity.canvas_page.canonical', ['canvas_page' => $page->id()], ['absolute' => TRUE])->toString();
-
-    $form[$group]['serp_preview'] = [
-      '#theme' => 'serp_preview',
-      '#meta_title' => $meta_title,
-      '#page_url' => $page_url,
-      '#meta_description' => $page->get('description')->value,
-      '#attached' => ['library' => ['canvas/serp-preview']],
-      '#weight' => -20,
-    ];
-
-    // Pass site name and base URL to JS.
     $form['#attached']['drupalSettings']['canvas'] = [
       'siteName' => $site_name,
       'baseUrl' => \Drupal::request()->getSchemeAndHttpHost(),

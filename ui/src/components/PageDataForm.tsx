@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useErrorBoundary } from 'react-error-boundary';
 import { Box, Spinner } from '@radix-ui/themes';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
+import SerpPreview from '@/components/form/components/SerpPreview';
 import twigToJSXComponentMap from '@/components/form/twig-to-jsx-component-map';
 import { FORM_TYPES } from '@/features/form/constants';
 import { selectFormValues } from '@/features/form/formStateSlice';
@@ -29,7 +31,33 @@ const PageDataFormRenderer = () => {
   );
 
   const formRef = useRef<HTMLDivElement>(null);
+  const serpPreviewContainerRef = useRef<HTMLDivElement | null>(null);
   useDrupalBehaviors(formRef, jsxFormContent);
+
+  // Find placeholder div and prepare as portal container for SERP preview.
+  useEffect(() => {
+    if (!formRef.current || !jsxFormContent) {
+      return;
+    }
+
+    const placeholder = formRef.current.querySelector(
+      '.serp-preview-wrapper:not([data-react-portal])',
+    );
+
+    if (placeholder) {
+      placeholder.setAttribute('data-react-portal', 'true');
+      placeholder.innerHTML = '';
+      serpPreviewContainerRef.current = placeholder as HTMLDivElement;
+    } else if (serpPreviewContainerRef.current) {
+      // Container may have been removed by AJAX - reset ref to allow re-discovery.
+      const stillExists = formRef.current.contains(
+        serpPreviewContainerRef.current,
+      );
+      if (!stillExists) {
+        serpPreviewContainerRef.current = null;
+      }
+    }
+  }, [jsxFormContent]);
 
   const pageDataExists = !!Object.keys(pageData).length;
 
@@ -105,6 +133,8 @@ const PageDataFormRenderer = () => {
           argument to Drupal.attachBehaviors() anytime jsxFormContent changes.
           See the useEffect just above this. */}
       <div ref={formRef}>{jsxFormContent}</div>
+      {serpPreviewContainerRef.current &&
+        createPortal(<SerpPreview />, serpPreviewContainerRef.current)}
     </Spinner>
   );
 };

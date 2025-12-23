@@ -204,9 +204,3 @@ canvasData.v0.jsonapiSettings:
       v0:
         jsonapiSettings: null
 
-serp-preview:
-  css:
-    theme:
-      css/serp-preview.css: {}
-  js:
-    js/serp-preview.js: {}
