@@ -549,6 +549,7 @@ type-check:
     - . /root/.nvm/nvm.sh && nvm install 24 && nvm alias default 24
   script:
     - npm ci
+    - npm run build --workspace=drupal-canvas
     - npm run type-check --workspaces
 
 lint (OpenAPI):

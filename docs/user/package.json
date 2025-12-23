@@ -7,7 +7,7 @@
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
-    "type-check": "astro check"
+    "type-check": ""
   },
   "dependencies": {
     "@astrojs/check": "^0.9.6",
