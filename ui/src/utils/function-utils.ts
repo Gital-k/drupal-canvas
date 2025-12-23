@@ -6,7 +6,7 @@ import type {
   SlotsMap,
   StackDirection,
 } from '@/types/Annotations';
-import type { PropsValues } from '@/types/Form';
+import type { PropsValues } from '@drupal-canvas/types';
 
 export function handleNonWorkingBtn(): void {
   alert('Not yet supported.');

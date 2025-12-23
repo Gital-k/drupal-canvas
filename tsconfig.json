@@ -17,6 +17,7 @@
     "inlineSources": false,
     "lib": ["DOM", "DOM.Iterable", "ESNext"],
     "paths": {
+      "@drupal-canvas/types": ["./packages/types/src"],
       "@drupal-canvas/ui/*": ["./ui/src/*"],
         "@drupal-canvas/eslint-config": ["./packages/eslint-config/src/index.ts"],
       "@/*": ["./ui/src/*"],

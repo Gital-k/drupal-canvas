@@ -27,7 +27,7 @@ import type { ErrorObject } from 'ajv/dist/types';
 import type { FormId } from '@/features/form/formStateSlice';
 import type { AjaxUpdateFormBuildIdEvent } from '@/types/Ajax';
 import type { Attributes } from '@/types/DrupalAttribute';
-import type { PropsValues } from '@/types/Form';
+import type { PropsValues } from '@drupal-canvas/types';
 
 const ajv = new Ajv();
 

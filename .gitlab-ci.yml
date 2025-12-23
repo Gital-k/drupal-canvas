@@ -541,6 +541,16 @@ lint (node):
     - npm ci
     - npm run lint
 
+type-check:
+  stage: validate
+  needs: []
+  image: ghcr.io/drupal-xb/drupal-testing:1.0.0
+  before_script:
+    - . /root/.nvm/nvm.sh && nvm install 24 && nvm alias default 24
+  script:
+    - npm ci
+    - npm run type-check --workspaces
+
 lint (OpenAPI):
   stage: validate
   needs: []
@@ -635,7 +645,6 @@ CLI Test:
       - 100
   script:
     - npm ci
-    - npm run type-check --workspace=cli
     - npm run test --workspace=cli
     - npm run build --workspace=cli
     - npm version 0.0.1 --workspace=cli

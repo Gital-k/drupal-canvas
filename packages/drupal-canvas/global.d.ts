@@ -1,9 +1,7 @@
-import type { DrupalSettings } from '../../ui/src/types/DrupalSettings.ts';
+import type { DrupalSettings } from '@drupal-canvas/types';
 
 declare global {
   interface Window {
     drupalSettings: DrupalSettings;
   }
 }
-
-declare module '*.module.css';

@@ -1,5 +1,5 @@
-import type { PropsValues } from '@/types/Form';
-import type { FormatType } from '@/types/FormatType';
+import type { PropsValues } from './PropsValues';
+import type { FormatType } from './FormatType';
 
 export interface DrupalSettings {
   canvas: {

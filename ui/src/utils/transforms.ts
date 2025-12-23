@@ -2,7 +2,7 @@ import type {
   PropSource,
   StaticPropSource,
 } from '@/features/layout/layoutModelSlice';
-import type { PropsValues } from '@/types/Form';
+import type { PropsValues } from '@drupal-canvas/types';
 
 export interface TransformOptions {
   [key: string]: any;
