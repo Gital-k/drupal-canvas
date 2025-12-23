@@ -27,6 +27,7 @@ final class CanvasPageForm extends ContentEntityForm {
   public static function create(ContainerInterface $container): self {
     $instance = parent::create($container);
     $instance->languageManager = $container->get('language_manager');
+    $instance->configFactory = $container->get('config.factory');
     return $instance;
   }
 
@@ -51,7 +52,7 @@ final class CanvasPageForm extends ContentEntityForm {
 
     // Move SEO related base fields to this group.
     $form[$group]['image'] = $form['image'];
-    $form[$group]['image']['#weight'] = -10;
+    $form[$group]['image']['#weight'] = 20;
     // TRICKY: it seems there's a Drupal core bug wrt #group, long-term fix TBD.
     // @see https://git.drupalcode.org/project/canvas/-/merge_requests/501#note_448716
     unset($form['image']);
@@ -78,6 +79,23 @@ final class CanvasPageForm extends ContentEntityForm {
     if (isset($form['metatags']['widget'][0]['basic']['title'])) {
       $form['metatags']['widget'][0]['basic']['title']['#group'] = $group;
     }
+
+    // Add the search result preview.
+    // SERP preview is now handled entirely client-side via React component.
+    $form[$group]['serp_preview'] = [
+      '#theme' => 'serp_preview',
+      '#weight' => -20,
+    ];
+
+    // Pass site name and base URL to client-side for SERP preview.
+    /** @var \Drupal\canvas\Entity\Page $page */
+    $page = $this->getEntity();
+    $site_config = $this->configFactory->get('system.site');
+    $site_name = $site_config->get('name') ?? FALSE;
+    $form['#attached']['drupalSettings']['canvas'] = [
+      'siteName' => $site_name,
+      'baseUrl' => \Drupal::request()->getSchemeAndHttpHost(),
+    ];
 
     $this->addTransliterationSettings($form);
     $this->customizePathField($form);
