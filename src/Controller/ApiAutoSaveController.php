@@ -320,9 +320,6 @@ final class ApiAutoSaveController extends ApiControllerBase {
         // for new entities.
         if ($is_draft) {
           $entity->setNewRevision(FALSE);
-          // Ensure this is the default revision so status updates the
-          // field_data table.
-          $entity->isDefaultRevision(TRUE);
         }
         else {
           // Reset the revision ID.
@@ -330,10 +327,8 @@ final class ApiAutoSaveController extends ApiControllerBase {
           $revision_id_key = $entity_definition->getKey('revision');
           \assert(\is_string($revision_id_key));
           $entity->set($revision_id_key, NULL);
-          // Ensure this is the default revision so status updates the
-          // field_data table.
-          $entity->isDefaultRevision(TRUE);
         }
+        $entity->isDefaultRevision(TRUE);
         // Always set the revision user to the current user. Even though we
         // might not be creating a new revision, this would only be in the
         // case where this entity should be considered new, which means it has

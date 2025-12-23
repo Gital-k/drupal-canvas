@@ -500,6 +500,15 @@ final class CanvasContentEntityHttpApiTest extends HttpApiTestBase {
     $request_options['headers']['X-CSRF-Token'] = $this->drupalGet('session/token');
     Role::load('authenticated')?->grantPermission(Page::EDIT_PERMISSION)->save();
 
+    // Test that missing 'status' field returns an error.
+    $request_options[RequestOptions::JSON] = [];
+    $response = $this->makeApiRequest('PATCH', $url, $request_options);
+    $this->assertSame(400, $response->getStatusCode());
+    $this->assertSame(
+      ['error' => 'Missing required field: status'],
+      json_decode((string) $response->getBody(), TRUE)
+    );
+
     // Archive page 1 (published -> unpublished).
     $request_options[RequestOptions::JSON] = ['status' => FALSE];
     $response = $this->makeApiRequest('PATCH', $url, $request_options);

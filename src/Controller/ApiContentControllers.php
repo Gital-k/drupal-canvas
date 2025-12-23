@@ -140,38 +140,43 @@ final class ApiContentControllers {
     $body = json_decode($content, TRUE);
 
     // Check if this is an archive operation (unpublish) or publish operation.
-    if (isset($body['status'])) {
-      assert($canvas_page instanceof EntityPublishedInterface);
-
-      // Get the auto-saved version if available, otherwise use the original
-      // entity.
-      $autoSaveData = $this->autoSaveManager->getAutoSaveEntity($canvas_page);
-      $entity_to_update = $autoSaveData->isEmpty()
-        ? $canvas_page
-        : $autoSaveData->entity;
-      assert($entity_to_update instanceof EntityPublishedInterface);
-
-      // Set the entity status based on the request.
-      if ($body['status'] === FALSE) {
-        // Prevent archiving the homepage.
-        if ($canvas_page->isPublished() && $this->isHomepage($canvas_page)) {
-          return new JsonResponse(
-            data: ['error' => 'Cannot archive the homepage. Please set a different page as the homepage first.'],
-            status: Response::HTTP_FORBIDDEN
-          );
-        }
-        // Archive: set as unpublished.
-        $entity_to_update->setUnpublished();
-      }
-      elseif ($body['status'] === TRUE) {
-        // Publish: set as published.
-        $entity_to_update->setPublished();
-      }
-
-      // Save through auto-save instead of directly saving.
-      $clientInstanceId = $body['clientInstanceId'] ?? NULL;
-      $this->autoSaveManager->saveEntity($entity_to_update, $clientInstanceId);
+    if (!isset($body['status'])) {
+      return new JsonResponse(
+        data: ['error' => 'Missing required field: status'],
+        status: Response::HTTP_BAD_REQUEST
+      );
     }
+
+    assert($canvas_page instanceof EntityPublishedInterface);
+
+    // Get the auto-saved version if available, otherwise use the original
+    // entity.
+    $autoSaveData = $this->autoSaveManager->getAutoSaveEntity($canvas_page);
+    $entity_to_update = $autoSaveData->isEmpty()
+      ? $canvas_page
+      : $autoSaveData->entity;
+    assert($entity_to_update instanceof EntityPublishedInterface);
+
+    // Set the entity status based on the request.
+    if ($body['status'] === FALSE) {
+      // Prevent archiving the homepage.
+      if ($canvas_page->isPublished() && $this->isHomepage($canvas_page)) {
+        return new JsonResponse(
+          data: ['error' => 'Cannot archive the homepage. Please set a different page as the homepage first.'],
+          status: Response::HTTP_FORBIDDEN
+        );
+      }
+      // Archive: set as unpublished.
+      $entity_to_update->setUnpublished();
+    }
+    elseif ($body['status'] === TRUE) {
+      // Publish: set as published.
+      $entity_to_update->setPublished();
+    }
+
+    // Save through auto-save instead of directly saving.
+    $clientInstanceId = $body['clientInstanceId'] ?? NULL;
+    $this->autoSaveManager->saveEntity($entity_to_update, $clientInstanceId);
 
     return new JsonResponse(status: Response::HTTP_NO_CONTENT);
   }
