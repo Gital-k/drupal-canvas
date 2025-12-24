@@ -56,9 +56,5 @@
   },
   "overrides": {
     "glob": "^11.1.0"
-  },
-  "dependencies": {
-    "react": "^19.2.3",
-    "react-dom": "^19.2.3"
   }
 }
