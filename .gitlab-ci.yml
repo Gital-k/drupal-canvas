@@ -396,8 +396,7 @@ vitest:
     - *UI-fixtures-files-change-rule
     - *manual-rule
   script:
-    - cd ui
-    - npm test -- --reporter=junit --outputFile=$CI_PROJECT_DIR/ui-vitest-junit.xml
+    - npm run test --workspace=ui -- --reporter=junit --outputFile=$CI_PROJECT_DIR/ui-vitest-junit.xml
   artifacts:
     expose_as: junit
     expire_in: 6 mos
@@ -609,7 +608,7 @@ CLI Test:
   needs: []
   rules:
     - changes:
-        - "cli/**/*"
+        - "packages/cli/**/*"
         - package.json
         - package-lock.json
         - openapi.yml
