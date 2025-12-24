@@ -316,7 +316,6 @@ export class CanvasEditor {
     // Force a layout recalculation in headless mode, this is only needed for
     // webkit.
     await this.page.evaluate(() => {
-      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
       document.body.offsetHeight; // Forces reflow
     });
     await dropzone.hover({ force: true });
@@ -325,7 +324,6 @@ export class CanvasEditor {
       // Again, only needed for webkit.
       const dropzone = document.querySelector(locator);
       if (dropzone) {
-        // eslint-disable-next-line @typescript-eslint/no-unused-expressions
         dropzone.offsetHeight; // Forces reflow on the drop zone
       }
     }, dropzoneLocator);
