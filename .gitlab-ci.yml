@@ -316,6 +316,7 @@ prettier:
   stage: validate
   image: node:20-alpine
   allow_failure: false
+  needs: []
   # @todo Refine when https://www.drupal.org/project/gitlab_templates/issues/3452183 lands.
   rules:
     - *is-push-rule
@@ -353,6 +354,7 @@ eslint:
   stage: validate
   image: node:20-alpine
   allow_failure: false
+  needs: []
   # @todo Refine when https://www.drupal.org/project/gitlab_templates/issues/3452183 lands.
   rules:
     - *is-push-rule
