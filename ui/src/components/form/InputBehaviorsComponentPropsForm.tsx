@@ -189,7 +189,7 @@ export const InputBehaviorsComponentPropsForm = (
     selectFormValues(state, FORM_TYPES.COMPONENT_INSTANCE_FORM),
   );
 
-  const propsOverrides: { options?: Object[] } = {};
+  const propsOverrides: { options?: object[] } = {};
 
   const { multipleInputsSingleValue } = propInputData(
     formState,

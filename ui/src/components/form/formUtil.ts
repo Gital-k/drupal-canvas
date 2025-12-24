@@ -8,9 +8,9 @@ import { getDrupal } from '@/utils/drupal-globals';
 import transforms from '@/utils/transforms';
 
 import type * as React from 'react';
+import type { PropsValues } from '@drupal-canvas/types';
 import type { SchemaObject, ValidateFunction } from 'ajv';
 import type { ParsedQs } from 'qs';
-import type { PropsValues } from '@drupal-canvas/types';
 import type {
   ComponentModel,
   EvaluatedComponentModel,

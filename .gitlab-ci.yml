@@ -207,6 +207,7 @@ phpcs-rules-match-drupal-11:
       exit $DIFF_EXIT_CODE
   # Allow this to fail, to avoid disrupting Canvas's CI when upstream changes.
   allow_failure: true
+
 stylelint:
   allow_failure: false
   # @todo Remove when https://www.drupal.org/project/gitlab_templates/issues/3452183 lands.
