@@ -637,10 +637,10 @@ CLI Test:
       - 100
   script:
     - npm ci
-    - npm run test --workspace=cli
-    - npm run build --workspace=cli
-    - npm version 0.0.1 --workspace=cli
-    - npm pack --pack-destination=test-results --workspace=cli
+    - npm run test --workspace=@drupal-canvas/cli
+    - npm run build --workspace=@drupal-canvas/cli
+    - npm version 0.0.1 --workspace=@drupal-canvas/cli
+    - npm pack --pack-destination=test-results --workspace=@drupal-canvas/cli
     - npm audit --audit-level=moderate --production || exit 100
   artifacts:
     expose_as: 'CLI package'
