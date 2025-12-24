@@ -312,33 +312,25 @@ phpunit (>11.2-only features):
     - *UI-fixtures-files-change-rule
     - *manual-rule
 
-eslint:
-  # This module wants to strictly comply with eslint.
+prettier:
+  stage: validate
+  image: node:20-alpine
   allow_failure: false
-  before_script:
-    # 🤷‍.eslintignore already instructs eslint to ignore this, but it does not seem to work. This is validated by the `UI eslint` job below.
-    # @todo Remove when https://www.drupal.org/project/gitlab_templates/issues/3452183 lands.
-    - rm -rf ui
-    - rm -rf tests/src/Playwright playwright.config.ts eslint.config.mjs
-    # This job runs ESLint and Prettier checks using what's installed in Drupal core.
-    # Delete our custom .prettierrc.json, and use the one from Drupal core instead. This avoids problems with Prettier
-    # plugins that are not installed in Drupal core, e.g., @ianvs/prettier-plugin-sort-imports.
-    - rm -rf .prettierrc.json
-    # The eslint job in gitlab_templates creates a symlink if a Prettier config file is not found.
-    # However, some misterious race condition recreates the file before the symlink is created, so we create the symlink
-    # here with the -f (force) option.
-    - ln -sf $CI_PROJECT_DIR/$_WEB_ROOT/core/.prettierrc.json .
+  # @todo Refine when https://www.drupal.org/project/gitlab_templates/issues/3452183 lands.
   rules:
     - *is-push-rule
-    - changes:
-        - ".gitlab-ci.yml"
-      when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
-        - .prettier*
         - "**/*.js"
+        - "**/*.jsx"
+        - "**/*.ts"
+        - "**/*.tsx"
+        - "**/*.json"
         - "**/*.yml"
     - *manual-rule
+  script:
+    - npm ci
+    - npm run lint:prettier
 
 UI:
   stage: build
@@ -357,28 +349,24 @@ UI:
       # TRICKY: necessary for the `Cypress` job to be able to run `cypress install`.
       - ui/node_modules
 
-UI eslint:
+eslint:
   stage: validate
   image: node:20-alpine
   allow_failure: false
-  needs:
-    - UI
   # @todo Refine when https://www.drupal.org/project/gitlab_templates/issues/3452183 lands.
   rules:
     - *is-push-rule
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
-        - ui/package.json
-        - ui/package-lock.json
-        - ui/**/*.js
-        - ui/**/*.ts
-        - ui/**/*.tsx
-        - ui/tsconfig.json
-        - ui/tsconfig.node.json
+        - "**/*.js"
+        - "**/*.jsx"
+        - "**/*.ts"
+        - "**/*.tsx"
+        - "**/*.json"
     - *manual-rule
   script:
-    - cd ui
-    - node_modules/.bin/eslint . --format=junit --output-file=$CI_PROJECT_DIR/ui-eslint-junit.xml --max-warnings=0
+    - npm ci
+    - npm run lint:eslint -- --format=junit --output-file=$CI_PROJECT_DIR/ui-eslint-junit.xml --max-warnings=0
   artifacts:
     expose_as: junit
     expire_in: 6 mos

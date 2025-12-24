@@ -16,7 +16,7 @@
   "scripts": {
     "test:playwright": "playwright install && playwright test",
     "lint:eslint": "eslint",
-    "lint:prettier": "prettier tests/src/Playwright playwright.config.ts packages eslint.config.mjs --check",
+    "lint:prettier": "prettier tests/src/Playwright playwright.config.ts packages ui eslint.config.mjs --check",
     "lint:cspell": "cspell . --no-progress",
     "lint:yaml": "yamllint '**/*.(yaml|yml)' --ignore='.gitlab/**' --ignore='.gitlab-ci.yml'",
     "fix": "npm run lint:prettier -- --write && npm run lint:eslint -- --fix",
