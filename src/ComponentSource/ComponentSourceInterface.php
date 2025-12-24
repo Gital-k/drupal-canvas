@@ -61,6 +61,8 @@ interface ComponentSourceInterface extends PluginInspectionInterface, Derivative
    */
   public function isBroken(): bool;
 
+  public function determineDefaultFolder(): string;
+
   /**
    * Gets referenced plugin classes for this instance.
    *
@@ -303,6 +305,8 @@ interface ComponentSourceInterface extends PluginInspectionInterface, Derivative
    *
    * @return OptimizedSingleComponentInputArray
    *   Optimized values.
+   *
+   * @throws \Drupal\canvas\InvalidComponentInputsPropSourceException
    */
   public function optimizeExplicitInput(array $values): array;
 
