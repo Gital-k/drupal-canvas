@@ -12,8 +12,8 @@ use Drupal\views\Plugin\views\filter\InOperator;
  *
  * Allows filtering by Draft/Published/Archived without storing data.
  *
- * @deprecated in canvas:1.0.0 and is removed from canvas:2.0.0. Use
- *   moderation_state field from Content Moderation module instead.
+ * @deprecated in canvas:1.0.0 and is removed from canvas:2.0.0. There is no
+ *   replacement.
  *
  * @see https://www.drupal.org/node/3563404
  *

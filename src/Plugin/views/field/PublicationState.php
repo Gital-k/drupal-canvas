@@ -16,8 +16,8 @@ use Drupal\views\ResultRow;
  * - Published: Currently published (status=1)
  * - Archived: Previously published (status=0, has published revisions)
  *
- * @deprecated in canvas:1.0.0 and is removed from canvas:2.0.0. Use
- *   moderation_state field from Content Moderation module instead.
+ * @deprecated in canvas:1.0.0 and is removed from canvas:2.0.0. There is no
+ *   replacement.
  *
  * @see https://www.drupal.org/node/3563404
  *
