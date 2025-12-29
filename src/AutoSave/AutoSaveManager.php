@@ -497,12 +497,14 @@ class AutoSaveManager implements EventSubscriberInterface {
       assert($storage instanceof RevisionableStorageInterface);
       $id_key = $entity_type->getKey('id');
       assert(is_string($id_key), 'Entity type must have an ID key');
+      $published_key = $entity_type->getKey('published');
+      assert(is_string($published_key), 'Entity type must have an `published` key');
       // Query for any published revision of this entity.
       $query = $storage->getQuery()
         ->accessCheck(FALSE)
         ->allRevisions()
         ->condition($id_key, $entity->id())
-        ->condition('status', 1)
+        ->condition($published_key, 1)
         ->range(0, 1);
       $published_revision_ids = $query->execute();
       // If there's a published revision, it's not a draft (it's archived).
