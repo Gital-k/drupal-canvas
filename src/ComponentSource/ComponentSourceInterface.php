@@ -285,16 +285,6 @@ interface ComponentSourceInterface extends PluginInspectionInterface, Derivative
   public function validateComponentInput(array $inputValues, string $component_instance_uuid, ?FieldableEntityInterface $entity): ConstraintViolationListInterface;
 
   /**
-   * Checks if component meets requirements.
-   *
-   * @throws \Drupal\canvas\ComponentDoesNotMeetRequirementsException
-   *   When the component does not meet requirements.
-   *
-   * @todo 🚨 Remove in https://www.drupal.org/project/canvas/issues/3561265.
-   */
-  public function checkRequirements(): void;
-
-  /**
    * Optimize component inputs prior to saving.
    *
    * For example a component source plugin may with to store a normalized
