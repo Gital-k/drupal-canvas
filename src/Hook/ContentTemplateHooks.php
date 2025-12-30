@@ -17,6 +17,8 @@ use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\Core\Routing\RouteMatchInterface;
+use Drupal\Core\Url;
+use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\EntityHandlers\ContentTemplateAwareViewBuilder;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
@@ -96,6 +98,45 @@ final class ContentTemplateHooks {
       }
     }
   }
+  #[Hook('contextual_links_view_alter')]
+  public function linksAlter(&$element, $items): void {
+    // Check if this is a node contextual link group and node ID is available.
+    if (!array_key_exists('entity.node.edit_form', $items)) {
+      return;
+    }
+
+    // Extract node ID from the route parameters.
+    $route_parameters = $items['entity.node.edit_form']['route_parameters'] ?? [];
+    if (!isset($route_parameters['node'])) {
+      return;
+    }
+
+    // Load the node entity.
+    $node = $this->entityTypeManager->getStorage('node')->load($route_parameters['node']);
+    if (!$node instanceof FieldableEntityInterface) {
+      return;
+    }
+
+    // The view_mode is set in canvas_node_view_alter()
+    // and should be in route_parameters. If it's not available,
+    // default to 'full' which is the standard view mode for node pages.
+    $view_mode = $route_parameters['view_mode'] ?? 'full';
+
+    // Check if a content template exists for the current view mode.
+    $template = ContentTemplate::loadForEntity($node, $view_mode);
+    if (!$template || !\Drupal::currentUser()->hasPermission(ContentTemplate::ADMIN_PERMISSION)) {
+      return;
+    }
+
+    $bundle = $node->bundle();
+    $node_id = $node->id();
+    $element['#links']['node_canvas_template_editor'] = [
+      'title' => t('Edit content template'),
+      'url' => Url::fromUri("base:canvas/template/node/$bundle/$view_mode/$node_id"),
+      'weight' => 11,
+    ];
+  }
+
 
   /**
    * Alters menu local tasks to add cache invalidation for content templates.
