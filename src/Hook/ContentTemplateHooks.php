@@ -17,6 +17,8 @@ use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\Core\Routing\RouteMatchInterface;
+use Drupal\Core\Session\AccountProxyInterface;
+use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\Url;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\Page;
@@ -30,10 +32,13 @@ use Drupal\Core\Url;
  */
 final class ContentTemplateHooks {
 
+  use StringTranslationTrait;
+
   public function __construct(
     private readonly RouteMatchInterface $routeMatch,
     private readonly EntityTypeManagerInterface $entityTypeManager,
     private readonly EntityFieldManagerInterface $entityFieldManager,
+    private readonly AccountProxyInterface $currentUser,
   ) {
   }
 
@@ -98,8 +103,9 @@ final class ContentTemplateHooks {
       }
     }
   }
+
   #[Hook('contextual_links_view_alter')]
-  public function linksAlter(&$element, $items): void {
+  public function linksAlter(array &$element, array $items): void {
     // Check if this is a node contextual link group and node ID is available.
     if (!array_key_exists('entity.node.edit_form', $items)) {
       return;
@@ -124,14 +130,14 @@ final class ContentTemplateHooks {
 
     // Check if a content template exists for the current view mode.
     $template = ContentTemplate::loadForEntity($node, $view_mode);
-    if (!$template || !\Drupal::currentUser()->hasPermission(ContentTemplate::ADMIN_PERMISSION)) {
+    if (!$template || !$this->currentUser->hasPermission(ContentTemplate::ADMIN_PERMISSION)) {
       return;
     }
 
     $bundle = $node->bundle();
     $node_id = $node->id();
     $element['#links']['node_canvas_template_editor'] = [
-      'title' => t('Edit content template'),
+      'title' => $this->t('Edit content template'),
       'url' => Url::fromUri("base:canvas/template/node/$bundle/$view_mode/$node_id"),
       'weight' => 11,
     ];
