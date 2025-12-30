@@ -458,15 +458,35 @@ class ApiContentControllersListTest extends KernelTestBase {
     $archived_page->setUnpublished();
     $archived_page->save();
 
-    $data = $this->executeListRequest();
+    $response = $this->apiContentController->list('canvas_page', Request::create(self::API_BASE_PATH, 'GET'));
+    $content = $response->getContent();
+    self::assertNotEmpty($content);
+    $data = json_decode($content, TRUE);
 
     $archived_page_id = (int) $archived_page->id();
     self::assertArrayHasKey($archived_page_id, $data, 'Archived page should be in the list');
 
-    // Verify that isNew is FALSE for archived page.
-    self::assertArrayHasKey('isNew', $data[$archived_page_id], 'isNew field should be present');
-    self::assertFalse($data[$archived_page_id]['isNew'], 'Archived page should have isNew=false');
-    self::assertFalse($data[$archived_page_id]['status'], 'Archived page should have status=false');
+    $expected_data = $this->getEntityData($archived_page);
+    $expected_data['isNew'] = FALSE;
+    $this->assertValidResultData($data[$archived_page_id], $expected_data);
+
+    // Verify cache metadata.
+    $cache_metadata = $response->getCacheableMetadata();
+    $expected_cache_contexts = [
+      'url.query_args:search',
+      'user.permissions',
+    ];
+    $actual_cache_contexts = $cache_metadata->getCacheContexts();
+    self::assertEquals($expected_cache_contexts, $actual_cache_contexts, 'Cache contexts should match');
+
+    $expected_cache_tags = [
+      'canvas_page_list',
+      'config:system.site',
+      'test_create_access_cache_tag',
+      AutoSaveManager::CACHE_TAG,
+    ];
+    $actual_cache_tags = $cache_metadata->getCacheTags();
+    self::assertEquals($expected_cache_tags, $actual_cache_tags, 'Cache tags should match');
   }
 
   /**
@@ -483,15 +503,35 @@ class ApiContentControllersListTest extends KernelTestBase {
     ]);
     $draft_page->save();
 
-    $data = $this->executeListRequest();
+    $response = $this->apiContentController->list('canvas_page', Request::create(self::API_BASE_PATH, 'GET'));
+    $content = $response->getContent();
+    self::assertNotEmpty($content);
+    $data = json_decode($content, TRUE);
 
     $draft_page_id = (int) $draft_page->id();
     self::assertArrayHasKey($draft_page_id, $data, 'Draft page should be in the list');
 
-    // Verify that isNew is TRUE for draft page.
-    self::assertArrayHasKey('isNew', $data[$draft_page_id], 'isNew field should be present');
-    self::assertTrue($data[$draft_page_id]['isNew'], 'Draft page should have isNew=true');
-    self::assertFalse($data[$draft_page_id]['status'], 'Draft page should have status=false');
+    $expected_data = $this->getEntityData($draft_page);
+    $expected_data['isNew'] = TRUE;
+    $this->assertValidResultData($data[$draft_page_id], $expected_data);
+
+    // Verify cache metadata.
+    $cache_metadata = $response->getCacheableMetadata();
+    $expected_cache_contexts = [
+      'url.query_args:search',
+      'user.permissions',
+    ];
+    $actual_cache_contexts = $cache_metadata->getCacheContexts();
+    self::assertEquals($expected_cache_contexts, $actual_cache_contexts, 'Cache contexts should match');
+
+    $expected_cache_tags = [
+      'canvas_page_list',
+      'config:system.site',
+      'test_create_access_cache_tag',
+      AutoSaveManager::CACHE_TAG,
+    ];
+    $actual_cache_tags = $cache_metadata->getCacheTags();
+    self::assertEquals($expected_cache_tags, $actual_cache_tags, 'Cache tags should match');
   }
 
   /**
@@ -507,7 +547,10 @@ class ApiContentControllersListTest extends KernelTestBase {
     $page->setUnpublished();
     $this->autoSaveManager->saveEntity($page);
 
-    $data = $this->executeListRequest();
+    $response = $this->apiContentController->list('canvas_page', Request::create(self::API_BASE_PATH, 'GET'));
+    $content = $response->getContent();
+    self::assertNotEmpty($content);
+    $data = json_decode($content, TRUE);
 
     $page_id = (int) $page->id();
     self::assertArrayHasKey($page_id, $data);
@@ -530,7 +573,10 @@ class ApiContentControllersListTest extends KernelTestBase {
     $archived_page->setPublished();
     $this->autoSaveManager->saveEntity($archived_page);
 
-    $data = $this->executeListRequest();
+    $response = $this->apiContentController->list('canvas_page', Request::create(self::API_BASE_PATH, 'GET'));
+    $content = $response->getContent();
+    self::assertNotEmpty($content);
+    $data = json_decode($content, TRUE);
 
     $archived_page_id = (int) $archived_page->id();
     self::assertArrayHasKey($archived_page_id, $data);
@@ -538,6 +584,24 @@ class ApiContentControllersListTest extends KernelTestBase {
     // The list should show the auto-saved status (published).
     self::assertTrue($data[$archived_page_id]['status'], 'Archived page should show auto-saved published status');
     self::assertFalse($data[$archived_page_id]['isNew'], 'Page should not be marked as new');
+
+    // Verify cache metadata.
+    $cache_metadata = $response->getCacheableMetadata();
+    $expected_cache_contexts = [
+      'url.query_args:search',
+      'user.permissions',
+    ];
+    $actual_cache_contexts = $cache_metadata->getCacheContexts();
+    self::assertEquals($expected_cache_contexts, $actual_cache_contexts, 'Cache contexts should match');
+
+    $expected_cache_tags = [
+      'canvas_page_list',
+      'config:system.site',
+      'test_create_access_cache_tag',
+      AutoSaveManager::CACHE_TAG,
+    ];
+    $actual_cache_tags = $cache_metadata->getCacheTags();
+    self::assertEquals($expected_cache_tags, $actual_cache_tags, 'Cache tags should match');
   }
 
 }

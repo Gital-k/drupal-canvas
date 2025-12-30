@@ -500,6 +500,14 @@ final class CanvasContentEntityHttpApiTest extends HttpApiTestBase {
     $request_options['headers']['X-CSRF-Token'] = $this->drupalGet('session/token');
     Role::load('authenticated')?->grantPermission(Page::EDIT_PERMISSION)->save();
 
+    // Test that unexpected fields in request body return an error.
+    $request_options[RequestOptions::JSON] = ['status' => FALSE, 'unexpected_field' => 'value'];
+    $response = $this->makeApiRequest('PATCH', $url, $request_options);
+    $this->assertSame(400, $response->getStatusCode());
+    $response_data = json_decode((string) $response->getBody(), TRUE);
+    $this->assertStringContainsString('Unexpected fields in request body:', $response_data['error']);
+    $this->assertStringContainsString('unexpected_field', $response_data['error']);
+
     // Test that missing 'status' field returns an error.
     $request_options[RequestOptions::JSON] = [];
     $response = $this->makeApiRequest('PATCH', $url, $request_options);

@@ -139,15 +139,28 @@ final class ApiContentControllers {
     $content = $request->getContent();
     $body = json_decode($content, TRUE);
 
-    // Check if this is an archive operation (unpublish) or publish operation.
-    if (!isset($body['status'])) {
+    assert($canvas_page instanceof EntityPublishedInterface);
+    $entity_type = $canvas_page->getEntityType();
+    $published_key = $entity_type->getKey('published');
+    assert(is_string($published_key), 'Entity type must have a `published` key');
+
+    // Validate that only supported fields are present in the request body.
+    $allowed_fields = [$published_key, 'clientInstanceId'];
+    $unexpected_fields = array_diff(array_keys($body), $allowed_fields);
+    if (!empty($unexpected_fields)) {
       return new JsonResponse(
-        data: ['error' => 'Missing required field: status'],
+        data: ['error' => 'Unexpected fields in request body: ' . implode(', ', $unexpected_fields)],
         status: Response::HTTP_BAD_REQUEST
       );
     }
 
-    assert($canvas_page instanceof EntityPublishedInterface);
+    // Check if this is an archive operation (unpublish) or publish operation.
+    if (!isset($body[$published_key])) {
+      return new JsonResponse(
+        data: ['error' => "Missing required field: {$published_key}"],
+        status: Response::HTTP_BAD_REQUEST
+      );
+    }
 
     // Get the auto-saved version if available, otherwise use the original
     // entity.
@@ -158,7 +171,8 @@ final class ApiContentControllers {
     assert($entity_to_update instanceof EntityPublishedInterface);
 
     // Set the entity status based on the request.
-    if ($body['status'] === FALSE) {
+    assert(is_bool($body[$published_key]));
+    if ($body[$published_key] === FALSE) {
       // Prevent archiving the homepage.
       if ($canvas_page->isPublished() && $this->isHomepage($canvas_page)) {
         return new JsonResponse(
@@ -169,7 +183,7 @@ final class ApiContentControllers {
       // Archive: set as unpublished.
       $entity_to_update->setUnpublished();
     }
-    elseif ($body['status'] === TRUE) {
+    elseif ($body[$published_key] === TRUE) {
       // Publish: set as published.
       $entity_to_update->setPublished();
     }
@@ -264,13 +278,13 @@ final class ApiContentControllers {
     $autoSaveData = $this->autoSaveManager->getAutoSaveEntity($content_entity);
     $autoSaveEntity = $autoSaveData->isEmpty() ? NULL : $autoSaveData->entity;
 
-    $validAutoSaveEntity = ($autoSaveEntity instanceof EntityPublishedInterface)
+    $publishableAutoSaveEntity = ($autoSaveEntity instanceof EntityPublishedInterface)
       ? $autoSaveEntity
       : NULL;
     // Expose available entity operations. Pass both original and auto-save
     // entities to allow reverting archive/publish actions when auto-save has
     // opposite status.
-    $linkCollection = $this->getEntityOperations($content_entity, $validAutoSaveEntity);
+    $linkCollection = $this->getEntityOperations($content_entity, $publishableAutoSaveEntity);
 
     // Determine the effective published status: use auto-save status if
     // available, otherwise use original.
@@ -281,13 +295,8 @@ final class ApiContentControllers {
     // @todo Dynamically use the entity 'path' key to determine which field is
     //   the path in https://drupal.org/i/3503446.
     $autoSavePath = NULL;
-    if ($autoSaveEntity instanceof FieldableEntityInterface
-      && $autoSaveEntity->hasField('path')) {
-      $autoSavePath = $autoSaveEntity->get('path')->first()?->getValue()['alias']
-        ?? \sprintf(
-          '/%s',
-          \ltrim($autoSaveEntity->toUrl()->getInternalPath(), '/')
-        );
+    if ($autoSaveEntity instanceof FieldableEntityInterface && $autoSaveEntity->hasField('path')) {
+      $autoSavePath = $autoSaveEntity->get('path')->first()?->getValue()['alias'] ?? \sprintf('/%s', \ltrim($autoSaveEntity->toUrl()->getInternalPath(), '/'));
     }
 
     // Determine if the entity is considered new (draft).
