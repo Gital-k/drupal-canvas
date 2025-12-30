@@ -1368,10 +1368,11 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     self::assertSame(SAVED_NEW, $published_node->save());
     self::assertTrue($published_node->isPublished());
     $published_node_id = $published_node->id();
+    self::assertNotNull($published_node_id);
     // Verify it's not a draft since it was published.
     self::assertFalse($autoSave->entityIsDraft($published_node));
 
-    // Make changes via autosave, keeping it published.
+    // Make changes via auto-save, keeping it published.
     $published_node->set('title', 'Updated Published Article');
     $published_node->set('status', TRUE);
     $autoSave->saveEntity($published_node);
@@ -1394,7 +1395,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
 
     // Test Case 2: Published page that will be archived (unpublished).
     // This tests the ability to archive (unpublish) a published page by
-    // setting status to FALSE in autosave and then publishing.
+    // setting status to FALSE in auto-save and then publishing.
     $to_be_archived_node = Node::create([
       'type' => 'article',
       'title' => 'Article To Archive',
@@ -1403,10 +1404,11 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     self::assertSame(SAVED_NEW, $to_be_archived_node->save());
     self::assertTrue($to_be_archived_node->isPublished());
     $to_be_archived_node_id = $to_be_archived_node->id();
+    self::assertNotNull($to_be_archived_node_id);
     // Verify it's not a draft since it was published.
     self::assertFalse($autoSave->entityIsDraft($to_be_archived_node));
 
-    // Make changes via autosave, setting status to FALSE (archiving).
+    // Make changes via auto-save, setting status to FALSE (archiving).
     $to_be_archived_node->set('title', 'Archived Article');
     $to_be_archived_node->set('status', FALSE);
     $autoSave->saveEntity($to_be_archived_node);
@@ -1430,7 +1432,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     // Test Case 3: Archived page that will be published.
     // This tests the ability to republish an archived page (one that was
     // previously published but is now unpublished) by setting status to TRUE
-    // in autosave and then publishing.
+    // in auto-save and then publishing.
     // Create a node, publish it, then archive it (so it's not a draft).
     $to_be_republished_node = Node::create([
       'type' => 'article',
@@ -1440,6 +1442,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     self::assertSame(SAVED_NEW, $to_be_republished_node->save());
     self::assertTrue($to_be_republished_node->isPublished());
     $to_be_republished_node_id = $to_be_republished_node->id();
+    self::assertNotNull($to_be_republished_node_id);
 
     // Now archive it by creating a new revision.
     $to_be_republished_node = $node_storage->loadUnchanged($to_be_republished_node_id);
@@ -1455,7 +1458,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     // Verify it's not a draft (has been published before).
     self::assertFalse($autoSave->entityIsDraft($to_be_republished_node));
 
-    // Make changes via autosave, setting status back to TRUE (republishing).
+    // Make changes via auto-save, setting status back to TRUE (republishing).
     $to_be_republished_node->set('title', 'Republished Article');
     $to_be_republished_node->set('status', TRUE);
     $autoSave->saveEntity($to_be_republished_node);
@@ -1488,10 +1491,11 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     self::assertSame(SAVED_NEW, $draft_node->save());
     self::assertFalse($draft_node->isPublished());
     $draft_node_id = $draft_node->id();
+    self::assertNotNull($draft_node_id);
     // Verify it's a draft.
     self::assertTrue($autoSave->entityIsDraft($draft_node));
 
-    // Make changes via autosave, keeping status FALSE.
+    // Make changes via auto-save, keeping status FALSE.
     $draft_node->set('title', 'Updated Draft Article');
     $draft_node->set('status', FALSE);
     $autoSave->saveEntity($draft_node);
