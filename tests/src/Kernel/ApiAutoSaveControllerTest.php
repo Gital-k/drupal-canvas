@@ -1378,7 +1378,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     $autoSave->saveEntity($published_node);
 
     $auto_save_data = $this->getAutoSaveStatesFromServer();
-    $published_node_key = 'node:' . $published_node_id . ':en';
+    $published_node_key = AutoSaveManager::getAutoSaveKey($published_node);
     self::assertArrayHasKey($published_node_key, $auto_save_data);
 
     // Publish the changes.
@@ -1414,7 +1414,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     $autoSave->saveEntity($to_be_archived_node);
 
     $auto_save_data = $this->getAutoSaveStatesFromServer();
-    $to_be_archived_node_key = 'node:' . $to_be_archived_node_id . ':en';
+    $to_be_archived_node_key = AutoSaveManager::getAutoSaveKey($to_be_archived_node);
     self::assertArrayHasKey($to_be_archived_node_key, $auto_save_data);
 
     // Publish the changes.
@@ -1428,6 +1428,8 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     assert($to_be_archived_node instanceof NodeInterface);
     self::assertFalse($to_be_archived_node->isPublished());
     self::assertSame('Archived Article', $to_be_archived_node->getTitle());
+    // Verify it's not a draft since it was published previously.
+    self::assertFalse($autoSave->entityIsDraft($to_be_archived_node));
 
     // Test Case 3: Archived page that will be published.
     // This tests the ability to republish an archived page (one that was
@@ -1448,7 +1450,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     $to_be_republished_node = $node_storage->loadUnchanged($to_be_republished_node_id);
     assert($to_be_republished_node instanceof NodeInterface);
     $to_be_republished_node->set('status', FALSE);
-    $to_be_republished_node->setNewRevision(TRUE);
+    $to_be_republished_node->setNewRevision();
     $to_be_republished_node->save();
 
     // Reload to verify it's archived.
@@ -1464,7 +1466,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     $autoSave->saveEntity($to_be_republished_node);
 
     $auto_save_data = $this->getAutoSaveStatesFromServer();
-    $to_be_republished_node_key = 'node:' . $to_be_republished_node_id . ':en';
+    $to_be_republished_node_key = AutoSaveManager::getAutoSaveKey($to_be_republished_node);
     self::assertArrayHasKey($to_be_republished_node_key, $auto_save_data);
 
     // Publish the changes.
@@ -1479,10 +1481,10 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     self::assertTrue($to_be_republished_node->isPublished());
     self::assertSame('Republished Article', $to_be_republished_node->getTitle());
 
-    // Test Case 4: Draft page auto-publishes (existing behavior verification).
-    // This verifies the existing behavior where draft pages (never published)
-    // are automatically published when publishing changes, even if the
-    // autosaved entity has status FALSE.
+    // Test Case 4: Draft page auto-publishes.
+    // This verifies that draft pages (never published) are automatically
+    // published when publishing changes, even if the autosaved entity has
+    // status FALSE.
     $draft_node = Node::create([
       'type' => 'article',
       'title' => 'Draft Article',
@@ -1501,7 +1503,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     $autoSave->saveEntity($draft_node);
 
     $auto_save_data = $this->getAutoSaveStatesFromServer();
-    $draft_node_key = 'node:' . $draft_node_id . ':en';
+    $draft_node_key = AutoSaveManager::getAutoSaveKey($draft_node);
     self::assertArrayHasKey($draft_node_key, $auto_save_data);
 
     // Publish the changes.
