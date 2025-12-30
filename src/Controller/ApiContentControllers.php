@@ -183,7 +183,7 @@ final class ApiContentControllers {
       // Archive: set as unpublished.
       $entity_to_update->setUnpublished();
     }
-    elseif ($body[$published_key] === TRUE) {
+    else {
       // Publish: set as published.
       $entity_to_update->setPublished();
     }
