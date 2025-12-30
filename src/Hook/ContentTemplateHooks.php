@@ -106,12 +106,12 @@ final class ContentTemplateHooks {
 
   #[Hook('contextual_links_view_alter')]
   public function linksAlter(array &$element, array $items): void {
-    // Check if this is a node contextual link group and node ID is available.
+    // Only proceed if this is a node contextual link group.
     if (!array_key_exists('entity.node.edit_form', $items)) {
       return;
     }
 
-    // Extract node ID from the route parameters.
+    // Extract and validate the node ID from route parameters.
     $route_parameters = $items['entity.node.edit_form']['route_parameters'] ?? [];
     if (!isset($route_parameters['node'])) {
       return;
@@ -122,13 +122,9 @@ final class ContentTemplateHooks {
     if (!$node instanceof FieldableEntityInterface) {
       return;
     }
-
-    // The view_mode is set in canvas_node_view_alter()
-    // and should be in route_parameters. If it's not available,
-    // default to 'full' which is the standard view mode for node pages.
     $view_mode = $route_parameters['view_mode'] ?? 'full';
 
-    // Check if a content template exists for the current view mode.
+    // Load the content template for the current view mode.
     $template = ContentTemplate::loadForEntity($node, $view_mode);
     if (!$template || !$this->currentUser->hasPermission(ContentTemplate::ADMIN_PERMISSION)) {
       return;
