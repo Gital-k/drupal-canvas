@@ -10,9 +10,13 @@
 // @todo Re-evaluate this when A) tagging a stable release, B) https://www.drupal.org/project/drupal/issues/3398033 is fixed in Drupal core.
 ini_set('assert.active', 1);
 
+use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\Core\Entity\Display\EntityViewDisplayInterface;
+use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Render\Markup;
+use Drupal\Core\Url;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase;
 use Drupal\canvas\PropSource\FieldStorageDefinition;
@@ -100,5 +104,27 @@ function canvas_preprocess_html(array &$variables): void {
   $current_route = \Drupal::routeMatch()->getRouteName();
   if ($current_route === 'entity.canvas_page.canonical') {
     $variables['attributes']['class'][] = 'canvas-page';
+  }
+}
+
+/**
+ * Implements hook_node_view_alter().
+ *
+ * Adds contextual links to nodes that have an enabled Canvas content template.
+ *
+ * This hook checks if a node has an associated content template and ensures
+ * that contextual links are properly attached to the node's render array.
+ * The contextual links allow editors to quickly access template editing
+ * functionality directly from the rendered node view.
+ */
+function canvas_node_view_alter(array &$build, FieldableEntityInterface $entity, EntityViewDisplayInterface $display): void {
+  // Contextual links to be added to node only if a
+  // template exists and is enabled.
+  if ($entity->getEntityTypeId() === 'node' && $entity instanceof FieldableEntityInterface) {
+    // Check if a content template exists and is enabled for this node
+    $template = ContentTemplate::loadForEntity($entity, $display->getMode());
+    if ($template) {
+      $build['#contextual_links']['node']['route_parameters']['view_mode'] = $display->getMode();
+    }
   }
 }
