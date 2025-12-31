@@ -132,8 +132,6 @@ final class ApiContentControllers {
    *
    * @return \Symfony\Component\HttpFoundation\JsonResponse
    *   Response.
-   *
-   * @throws \Drupal\Core\Entity\EntityStorageException
    */
   public function patch(ContentEntityInterface $canvas_page, Request $request): JsonResponse {
     $content = $request->getContent();
