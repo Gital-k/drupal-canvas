@@ -69,6 +69,8 @@ test.describe('Canvas Page Archive/Publish', () => {
 
     // Verify an archived page can be published.
     await page.getByTestId('canvas-navigation-button').click();
+    await page.waitForTimeout(100);
+    await page.getByTestId('canvas-navigation-button').click();
     await expect(page.locator('#canvas-navigation-search')).toBeVisible();
 
     dropdownButton = page.getByLabel('Page options for Archive Test Page');
@@ -79,11 +81,20 @@ test.describe('Canvas Page Archive/Publish', () => {
     });
     await expect(contextMenu).toBeVisible();
 
-    await expect(contextMenu.getByText('Publish page')).toBeVisible();
-    await contextMenu.getByText('Publish page').click({ force: true });
+    const publishButton = contextMenu.getByText('Publish page');
+    await publishButton.waitFor({ state: 'visible' });
+    await publishButton.click();
 
-    await page.waitForTimeout(500);
+    // Close the navigation menu
+    await page.getByTestId('canvas-navigation-button').click();
+    await page.waitForTimeout(100);
 
+    // Wait for the change to be registered and review button to appear
+    await expect(
+      page.getByRole('button', { name: 'Review 1 change' }),
+    ).toBeVisible();
+
+    // Reopen navigation to verify the page state
     await page.getByTestId('canvas-navigation-button').click();
 
     pageListItem = page
@@ -92,6 +103,9 @@ test.describe('Canvas Page Archive/Publish', () => {
     await expect(pageListItem).toBeVisible();
     await expect(pageListItem.getByText('Archive*')).not.toBeVisible();
     await expect(pageListItem.getByText('Archived')).not.toBeVisible();
+
+    // Close navigation menu before interacting with Review button
+    await page.getByTestId('canvas-navigation-button').click();
 
     await page.getByRole('button', { name: 'Review 1 change' }).click();
     await expect(
@@ -162,6 +176,12 @@ test.describe('Canvas Page Archive/Publish', () => {
 
     await expect(contextMenu.getByText('Set as homepage')).toBeVisible();
     await contextMenu.getByText('Set as homepage').click();
+
+    // Close the navigation menu to allow the "Review 1 change" button to appear
+    await page.getByTestId('canvas-navigation-button').click();
+
+    // Wait longer for the auto-save to be triggered and the review button to appear
+    await page.waitForTimeout(1000);
 
     await expect(
       page.getByRole('button', { name: 'Review 1 change' }),
