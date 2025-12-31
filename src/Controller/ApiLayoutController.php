@@ -94,8 +94,9 @@ final class ApiLayoutController {
     $tree = $this->componentTreeLoader->load($entity);
     $content_layout = $this->buildRegion(CanvasPageVariant::MAIN_CONTENT_REGION, $tree, $model, $preview_entity);
     $layout = [$content_layout];
-    // Determine if entity is a draft based on the original entity, not auto-save,
-    // because draft status is an intrinsic property of the stored entity.
+    // Determine if entity is a draft based on the original entity,
+    // not auto-save, because draft status is an intrinsic property
+    // of the stored entity.
     $is_new = $this->autoSaveManager->entityIsDraft($original_entity);
 
     if ($regions) {
