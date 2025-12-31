@@ -306,8 +306,8 @@ final class ApiContentControllers {
     }
 
     // Determine if there's an unsaved status change.
-    // This happens when autosave exists with a different published status than
-    // the original entity.
+    // This happens when auto-save exists with a different published status
+    // than the original entity.
     $has_unsaved_status_change = FALSE;
     if ($autoSaveEntity instanceof EntityPublishedInterface) {
       $has_unsaved_status_change = $autoSaveEntity->isPublished() !== $content_entity->isPublished();
@@ -324,7 +324,8 @@ final class ApiContentControllers {
       'status' => $effective_status,
       // Indicates if this is a new (draft) page that has never been published.
       'isNew' => $is_new,
-      // Indicates if there's an unsaved status change (archive/publish in autosave).
+      // Indicates if there's an unsaved status change
+      // (archive/publish in auto-save).
       'hasUnsavedStatusChange' => $has_unsaved_status_change,
       // The processed path, which has gone through outbound path processors. It
       // may not be the same as the entity's canonical link template.
