@@ -526,55 +526,90 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
 
   /**
    * Tests hasUnsavedStatusChange flag for archive/publish operations.
-   *
-   * @covers ::get
    */
   public function testHasUnsavedStatusChange(): void {
     $this->setUpCurrentUser(permissions: [Page::CREATE_PERMISSION, Page::EDIT_PERMISSION]);
+    $autoSaveManager = $this->container->get(AutoSaveManager::class);
+    \assert($autoSaveManager instanceof AutoSaveManager);
 
-    // Create a published page.
-    $page = Page::create([
+    // Published page archived via auto-save.
+    $published_page = Page::create([
       'title' => 'Published Page',
       'status' => TRUE,
     ]);
-    $page->save();
+    $published_page->save();
+    $this->assertStatusFlags($published_page, FALSE, TRUE, FALSE);
 
-    // Initially, no unsaved status change.
-    $this->assertStatusFlags($page, FALSE, TRUE, FALSE);
+    // Archive the published page via auto-save.
+    $published_page->setUnpublished();
+    $autoSaveManager->saveEntity($published_page);
+    // isNew=FALSE (not a draft), isPublished=FALSE (auto-saved unpublished),
+    // hasUnsavedStatusChange=TRUE (auto-save has different status than original).
+    $this->assertStatusFlags($published_page, FALSE, FALSE, TRUE);
 
-    // Archive the page via auto-save (unpublish).
-    $autoSaveManager = $this->container->get(AutoSaveManager::class);
-    assert($autoSaveManager instanceof AutoSaveManager);
-    $page->setUnpublished();
-    $autoSaveManager->saveEntity($page);
+    // Reverting archive operation.
+    $published_page->setPublished();
+    $autoSaveManager->saveEntity($published_page);
+    // hasUnsavedStatusChange should be FALSE when auto-save matches original.
+    $this->assertStatusFlags($published_page, FALSE, TRUE, FALSE);
 
-    // Should show hasUnsavedStatusChange=TRUE because original is published
-    // but auto-save is unpublished.
-    $this->assertStatusFlags($page, FALSE, FALSE, TRUE);
+    // Archived page (published then unpublished).
+    $archived_page = Page::create([
+      'title' => 'Archived Page',
+      'status' => TRUE,
+    ]);
+    $archived_page->save();
+    $archived_page->setNewRevision(TRUE);
+    $archived_page->setUnpublished();
+    $archived_page->save();
+    // Archived page without auto-save should not have unsaved status change.
+    $this->assertStatusFlags($archived_page, FALSE, FALSE, FALSE);
 
-    // Now publish the auto-saved changes.
-    $page = Page::load($page->id());
-    assert($page instanceof Page);
-    $page->setUnpublished()->save();
+    // Publishing archived page via auto-save.
+    $archived_page->setPublished();
+    $autoSaveManager->saveEntity($archived_page);
+    // isNew=FALSE (not a draft, was published before),
+    // isPublished=TRUE (auto-saved published),
+    // hasUnsavedStatusChange=TRUE (auto-save has different status than original).
+    $this->assertStatusFlags($archived_page, FALSE, TRUE, TRUE);
 
-    // After saving, hasUnsavedStatusChange should be FALSE.
-    $this->assertStatusFlags($page, FALSE, FALSE, FALSE);
+    // Non-status field changes don't trigger hasUnsavedStatusChange.
+    $test_page = Page::create([
+      'title' => 'Test Page',
+      'status' => TRUE,
+    ]);
+    $test_page->save();
+    $this->assertStatusFlags($test_page, FALSE, TRUE, FALSE);
 
-    // Test the reverse: publish an archived page via auto-save.
-    $page->setPublished();
-    $autoSaveManager->saveEntity($page);
+    // Change only the title via auto-save (no status change).
+    $test_page->set('title', 'Updated Title');
+    $autoSaveManager->saveEntity($test_page);
+    // hasUnsavedStatusChange should still be FALSE.
+    $this->assertStatusFlags($test_page, FALSE, TRUE, FALSE);
 
-    // Should show hasUnsavedStatusChange=TRUE because original is unpublished
-    // but auto-save is published.
-    $this->assertStatusFlags($page, FALSE, TRUE, TRUE);
+    // Clearing auto-save resets hasUnsavedStatusChange.
+    $test_page->setUnpublished();
+    $autoSaveManager->saveEntity($test_page);
+    $this->assertStatusFlags($test_page, FALSE, FALSE, TRUE);
 
-    // Publish the changes.
-    $page = Page::load($page->id());
-    assert($page instanceof Page);
-    $page->setPublished()->save();
+    $autoSaveManager->delete($test_page);
+    $this->assertStatusFlags($test_page, FALSE, TRUE, FALSE);
 
-    // After saving, hasUnsavedStatusChange should be FALSE.
-    $this->assertStatusFlags($page, FALSE, TRUE, FALSE);
+    // Draft page with auto-saved published status.
+    $draft_page = Page::create([
+      'title' => 'Draft Page',
+      'status' => FALSE,
+    ]);
+    $draft_page->save();
+    $this->assertStatusFlags($draft_page, TRUE, FALSE, FALSE);
+
+    // Set published status in auto-save for draft.
+    $draft_page->setPublished();
+    $autoSaveManager->saveEntity($draft_page);
+    // isNew=TRUE (still a draft, never truly published),
+    // isPublished=TRUE (auto-saved published),
+    // hasUnsavedStatusChange=TRUE (auto-save has different status than original).
+    $this->assertStatusFlags($draft_page, TRUE, TRUE, TRUE);
   }
 
   private function assertStatusFlags(EntityInterface $entity, bool $isNew, ?bool $isPublished, ?bool $hasUnsavedStatusChange = NULL): void {
