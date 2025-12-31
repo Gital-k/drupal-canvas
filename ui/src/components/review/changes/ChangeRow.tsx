@@ -26,7 +26,10 @@ interface ChangeRowProps {
   setSelectedChanges: (changes: UnpublishedChange[]) => void;
   onDiscardClick: (change: UnpublishedChange) => void;
   onViewClick?: (change: UnpublishedChange) => void;
-  pageStatusMap?: Record<string, { status: boolean; isNew?: boolean }>;
+  pageStatusMap?: Record<
+    string,
+    { status: boolean; isNew?: boolean; hasUnsavedStatusChange?: boolean }
+  >;
 }
 
 const ChangeRow = ({
@@ -49,16 +52,26 @@ const ChangeRow = ({
   }, [change.pointer, selectedChanges]);
 
   // Check if this page is archived
-  const isArchived = useMemo(() => {
+  const { isArchived, willBeArchived } = useMemo(() => {
     if (change.entity_type !== 'canvas_page' || !pageStatusMap) {
-      return false;
+      return { isArchived: false, willBeArchived: false };
     }
     const pageStatus = pageStatusMap[String(change.entity_id)];
     if (!pageStatus) {
-      return false;
+      return { isArchived: false, willBeArchived: false };
     }
-    // Archived = unpublished and not new (draft)
-    return !pageStatus.status && !pageStatus.isNew;
+    // Determine archive status:
+    // - Archive: unpublished with unsaved status change
+    // - Archived: unpublished and not new (draft) and no unsaved changes
+    const isArchived =
+      !pageStatus.status &&
+      !pageStatus.isNew &&
+      !pageStatus.hasUnsavedStatusChange;
+    const willBeArchived =
+      !pageStatus.status &&
+      !pageStatus.isNew &&
+      pageStatus.hasUnsavedStatusChange;
+    return { isArchived, willBeArchived };
   }, [change.entity_type, change.entity_id, pageStatusMap]);
 
   const handleChangeSelection = useCallback(
@@ -103,7 +116,7 @@ const ChangeRow = ({
           className={styles.changeRowRight}
         >
           <Box pt="1">
-            {isArchived ? (
+            {isArchived || willBeArchived ? (
               <Badge
                 size="1"
                 variant="solid"
@@ -115,7 +128,7 @@ const ChangeRow = ({
                   padding: '0 4px',
                 }}
               >
-                Archived
+                {willBeArchived ? 'Archive*' : 'Archived'}
               </Badge>
             ) : (
               <Tooltip content={date.toLocaleString()}>

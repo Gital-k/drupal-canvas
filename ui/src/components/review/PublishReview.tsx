@@ -41,7 +41,10 @@ interface PublishReviewProps {
   isDiscarding: boolean;
   isFetching: boolean; // indicates if the list of autosaved changes is being fetched
   isUpdating: boolean; // indicates if the preview is being updated
-  pageStatusMap?: Record<string, { status: boolean; isNew?: boolean }>;
+  pageStatusMap?: Record<
+    string,
+    { status: boolean; isNew?: boolean; hasUnsavedStatusChange?: boolean }
+  >;
 }
 
 const PublishReview: React.FC<PublishReviewProps> = ({

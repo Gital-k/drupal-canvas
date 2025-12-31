@@ -5,6 +5,7 @@ export interface ContentStub {
   id: number | string;
   status: boolean;
   isNew?: boolean;
+  hasUnsavedStatusChange?: boolean;
   autoSaveLabel: string | null;
   autoSavePath: string;
   links: {

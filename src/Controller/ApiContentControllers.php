@@ -305,6 +305,14 @@ final class ApiContentControllers {
       $is_new = $this->autoSaveManager->entityIsDraft($content_entity);
     }
 
+    // Determine if there's an unsaved status change.
+    // This happens when autosave exists with a different published status than
+    // the original entity.
+    $has_unsaved_status_change = FALSE;
+    if ($autoSaveEntity instanceof EntityPublishedInterface) {
+      $has_unsaved_status_change = $autoSaveEntity->isPublished() !== $content_entity->isPublished();
+    }
+
     $url_cacheability->addCacheableDependency($generated_url)
       ->addCacheableDependency($linkCollection)
       ->addCacheableDependency($autoSaveData);
@@ -316,6 +324,8 @@ final class ApiContentControllers {
       'status' => $effective_status,
       // Indicates if this is a new (draft) page that has never been published.
       'isNew' => $is_new,
+      // Indicates if there's an unsaved status change (archive/publish in autosave).
+      'hasUnsavedStatusChange' => $has_unsaved_status_change,
       // The processed path, which has gone through outbound path processors. It
       // may not be the same as the entity's canonical link template.
       'path' => $generated_url->getGeneratedUrl(),

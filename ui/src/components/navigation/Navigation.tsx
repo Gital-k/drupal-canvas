@@ -212,9 +212,14 @@ const NavigationItem = ({
   // Hide badge only when menu is open
   const shouldHideBadge = isMenuOpen;
 
-  // Only show archived badge for pages that were previously published (unpublished but not new/draft)
-  // Draft pages (never published) should not show the archived badge
-  const isArchived = !item.status && !item.isNew;
+  // Determine archive status:
+  // - Show "Archive*" if there's an unsaved status change to unpublished
+  // - Show "Archived" if page is unpublished (but not a new draft) and no unsaved changes
+  // - Draft pages (never published) should not show any archived badge
+  const isArchived =
+    !item.status && !item.isNew && !item.hasUnsavedStatusChange;
+  const willBeArchived =
+    !item.status && !item.isNew && item.hasUnsavedStatusChange;
 
   return (
     <Flex
@@ -245,10 +250,10 @@ const NavigationItem = ({
           </Text>
         </Flex>
       </Flex>
-      {isArchived && !shouldHideBadge && (
+      {!shouldHideBadge && (isArchived || willBeArchived) && (
         <Flex align="center" mr="2">
           <Badge size="1" variant="solid" color="gray">
-            Archived
+            {willBeArchived ? 'Archive*' : 'Archived'}
           </Badge>
         </Flex>
       )}

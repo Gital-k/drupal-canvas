@@ -17,7 +17,10 @@ interface ChangeGroupProps {
   setSelectedChanges: (changes: UnpublishedChange[]) => void;
   onDiscardClick: (change: UnpublishedChange) => void;
   onViewClick?: (change: UnpublishedChange) => void;
-  pageStatusMap?: Record<string, { status: boolean; isNew?: boolean }>;
+  pageStatusMap?: Record<
+    string,
+    { status: boolean; isNew?: boolean; hasUnsavedStatusChange?: boolean }
+  >;
 }
 
 const ChangeGroup = ({

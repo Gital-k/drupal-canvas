@@ -39,7 +39,7 @@ test.describe('Canvas Page Archive/Publish', () => {
     await expect(contextMenu.getByText('Archive page')).toBeVisible();
     await contextMenu.getByText('Archive page').click();
 
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(500);
 
     await page.getByTestId('canvas-navigation-button').click();
 
@@ -47,7 +47,25 @@ test.describe('Canvas Page Archive/Publish', () => {
       .getByTestId('canvas-navigation-results')
       .filter({ hasText: 'Archive Test Page' });
     await expect(pageListItem).toBeVisible();
+    await expect(pageListItem.getByText('Archive*')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Review 1 change' }).click();
+    await expect(
+      page.getByTestId('canvas-publish-review-select-all'),
+    ).toBeVisible();
+    await page.getByTestId('canvas-publish-review-select-all').check();
+    await page.getByRole('button', { name: 'Publish 1 selected' }).click();
+
+    await page.waitForTimeout(1000);
+
+    await page.getByTestId('canvas-navigation-button').click();
+
+    pageListItem = page
+      .getByTestId('canvas-navigation-results')
+      .filter({ hasText: 'Archive Test Page' });
+    await expect(pageListItem).toBeVisible();
     await expect(pageListItem.getByText('Archived')).toBeVisible();
+    await expect(pageListItem.getByText('Archive*')).not.toBeVisible();
 
     // Verify an archived page can be published.
     await page.getByTestId('canvas-navigation-button').click();
@@ -64,6 +82,24 @@ test.describe('Canvas Page Archive/Publish', () => {
     await expect(contextMenu.getByText('Publish page')).toBeVisible();
     await contextMenu.getByText('Publish page').click({ force: true });
 
+    await page.waitForTimeout(500);
+
+    await page.getByTestId('canvas-navigation-button').click();
+
+    pageListItem = page
+      .getByTestId('canvas-navigation-results')
+      .filter({ hasText: 'Archive Test Page' });
+    await expect(pageListItem).toBeVisible();
+    await expect(pageListItem.getByText('Archive*')).not.toBeVisible();
+    await expect(pageListItem.getByText('Archived')).not.toBeVisible();
+
+    await page.getByRole('button', { name: 'Review 1 change' }).click();
+    await expect(
+      page.getByTestId('canvas-publish-review-select-all'),
+    ).toBeVisible();
+    await page.getByTestId('canvas-publish-review-select-all').check();
+    await page.getByRole('button', { name: 'Publish 1 selected' }).click();
+
     await page.waitForTimeout(1000);
 
     await page.getByTestId('canvas-navigation-button').click();
@@ -76,6 +112,7 @@ test.describe('Canvas Page Archive/Publish', () => {
       .filter({ hasText: 'Archive Test Page' });
     await expect(pageListItem).toBeVisible();
     await expect(pageListItem.getByText('Archived')).not.toBeVisible();
+    await expect(pageListItem.getByText('Archive*')).not.toBeVisible();
 
     await page.getByTestId('canvas-navigation-button').click();
 

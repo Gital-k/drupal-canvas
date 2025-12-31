@@ -211,18 +211,8 @@ const PageInfo = () => {
       status: false,
     });
 
-    // If the current page is being archived, update the layout cache immediately
+    // If the current page is being archived, invalidate the layout cache to refetch with updated hasUnsavedStatusChange
     if (entityType === 'canvas_page' && entityId === pageToArchiveId) {
-      dispatch(
-        componentAndLayoutApi.util.updateQueryData(
-          'getPageLayout',
-          undefined,
-          (draft) => {
-            draft.isPublished = false;
-          },
-        ),
-      );
-      // Invalidate the layout query cache to ensure it refetches the latest data
       dispatch(componentAndLayoutApi.util.invalidateTags([{ type: 'Layout' }]));
     }
   }
@@ -235,18 +225,8 @@ const PageInfo = () => {
       status: true,
     });
 
-    // If the current page is being published, update the layout cache immediately
+    // If the current page is being published, invalidate the layout cache to refetch with updated hasUnsavedStatusChange
     if (entityType === 'canvas_page' && entityId === pageToPublishId) {
-      dispatch(
-        componentAndLayoutApi.util.updateQueryData(
-          'getPageLayout',
-          undefined,
-          (draft) => {
-            draft.isPublished = true;
-          },
-        ),
-      );
-      // Invalidate the layout query cache to ensure it refetches the latest data
       dispatch(componentAndLayoutApi.util.invalidateTags([{ type: 'Layout' }]));
     }
   }

@@ -470,6 +470,9 @@ class ApiContentControllersListTest extends KernelTestBase {
     $expected_data['isNew'] = FALSE;
     $this->assertValidResultData($data[$archived_page_id], $expected_data);
 
+    // Verify that hasUnsavedStatusChange is false for a saved archived page.
+    self::assertFalse($data[$archived_page_id]['hasUnsavedStatusChange'], 'Saved archived page should not have unsaved status change');
+
     // Verify cache metadata.
     $cache_metadata = $response->getCacheableMetadata();
     $expected_cache_contexts = [
@@ -558,6 +561,7 @@ class ApiContentControllersListTest extends KernelTestBase {
     // The list should show the auto-saved status (unpublished).
     self::assertFalse($data[$page_id]['status'], 'Page should show auto-saved unpublished status');
     self::assertFalse($data[$page_id]['isNew'], 'Page should not be marked as new (it was published before)');
+    self::assertTrue($data[$page_id]['hasUnsavedStatusChange'], 'Page should have unsaved status change (will be archived)');
 
     // Create auto-save data that publishes an archived page.
     $archived_page = Page::create([
@@ -584,6 +588,7 @@ class ApiContentControllersListTest extends KernelTestBase {
     // The list should show the auto-saved status (published).
     self::assertTrue($data[$archived_page_id]['status'], 'Archived page should show auto-saved published status');
     self::assertFalse($data[$archived_page_id]['isNew'], 'Page should not be marked as new');
+    self::assertTrue($data[$archived_page_id]['hasUnsavedStatusChange'], 'Page should have unsaved status change (will be published)');
 
     // Verify cache metadata.
     $cache_metadata = $response->getCacheableMetadata();

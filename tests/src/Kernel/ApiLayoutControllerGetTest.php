@@ -504,32 +504,88 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
     $entity_id = (int) json_decode($content, TRUE)['entity_id'];
     $entity = Page::load($entity_id);
     self::assertInstanceOf(Page::class, $entity);
-    $this->assertStatusFlags($entity, TRUE, FALSE);
+    $this->assertStatusFlags($entity, TRUE, FALSE, FALSE);
 
     $entity->set('title', 'Here we go')->save();
     // Entity is still a draft (isNew=TRUE) because it's unpublished and has
     // never been published, regardless of having a custom title.
-    $this->assertStatusFlags($entity, TRUE, FALSE);
+    $this->assertStatusFlags($entity, TRUE, FALSE, FALSE);
 
     $entity->setPublished()->save();
-    $this->assertStatusFlags($entity, FALSE, TRUE);
+    $this->assertStatusFlags($entity, FALSE, TRUE, FALSE);
 
     $contentTemplate = $this->getTestEntity(ContentTemplate::ENTITY_TYPE_ID);
     \assert($contentTemplate instanceof ContentTemplate);
     self::assertFalse($contentTemplate->status());
     $this->setUpCurrentUser([], [self::getAdminPermission($contentTemplate)]);
-    $this->assertStatusFlags($contentTemplate, TRUE, NULL);
+    $this->assertStatusFlags($contentTemplate, TRUE, NULL, NULL);
 
     $contentTemplate->setStatus(TRUE)->save();
-    $this->assertStatusFlags($contentTemplate, FALSE, NULL);
+    $this->assertStatusFlags($contentTemplate, FALSE, NULL, NULL);
   }
 
-  private function assertStatusFlags(EntityInterface $entity, bool $isNew, ?bool $isPublished): void {
+  /**
+   * Tests hasUnsavedStatusChange flag for archive/publish operations.
+   *
+   * @covers ::get
+   */
+  public function testHasUnsavedStatusChange(): void {
+    $this->setUpCurrentUser(permissions: [Page::CREATE_PERMISSION, Page::EDIT_PERMISSION]);
+
+    // Create a published page.
+    $page = Page::create([
+      'title' => 'Published Page',
+      'status' => TRUE,
+    ]);
+    $page->save();
+
+    // Initially, no unsaved status change.
+    $this->assertStatusFlags($page, FALSE, TRUE, FALSE);
+
+    // Archive the page via auto-save (unpublish).
+    $autoSaveManager = $this->container->get(AutoSaveManager::class);
+    assert($autoSaveManager instanceof AutoSaveManager);
+    $page->setUnpublished();
+    $autoSaveManager->saveEntity($page);
+
+    // Should show hasUnsavedStatusChange=TRUE because original is published
+    // but auto-save is unpublished.
+    $this->assertStatusFlags($page, FALSE, FALSE, TRUE);
+
+    // Now publish the auto-saved changes.
+    $page = Page::load($page->id());
+    assert($page instanceof Page);
+    $page->setUnpublished()->save();
+
+    // After saving, hasUnsavedStatusChange should be FALSE.
+    $this->assertStatusFlags($page, FALSE, FALSE, FALSE);
+
+    // Test the reverse: publish an archived page via auto-save.
+    $page->setPublished();
+    $autoSaveManager->saveEntity($page);
+
+    // Should show hasUnsavedStatusChange=TRUE because original is unpublished
+    // but auto-save is published.
+    $this->assertStatusFlags($page, FALSE, TRUE, TRUE);
+
+    // Publish the changes.
+    $page = Page::load($page->id());
+    assert($page instanceof Page);
+    $page->setPublished()->save();
+
+    // After saving, hasUnsavedStatusChange should be FALSE.
+    $this->assertStatusFlags($page, FALSE, TRUE, FALSE);
+  }
+
+  private function assertStatusFlags(EntityInterface $entity, bool $isNew, ?bool $isPublished, ?bool $hasUnsavedStatusChange = NULL): void {
     $content = $this->parentRequest(Request::create($this->getLayoutUrl($entity)->toString()))->getContent();
     self::assertIsString($content);
     $json = json_decode($content, TRUE);
     self::assertSame($isNew, $json['isNew']);
     self::assertSame($isPublished, $json['isPublished'] ?? NULL);
+    if ($hasUnsavedStatusChange !== NULL) {
+      self::assertSame($hasUnsavedStatusChange, $json['hasUnsavedStatusChange'] ?? FALSE);
+    }
   }
 
   /**

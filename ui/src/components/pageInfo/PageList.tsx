@@ -217,9 +217,14 @@ const PageListItem = ({
   // Hide badge when menu button is visible (hovered or menu open)
   const shouldHideBadge = isHovered || isMenuOpen;
 
-  // Only show archived badge for pages that were previously published (unpublished but not new/draft)
-  // Draft pages (never published) should not show the archived badge
-  const isArchived = !item.status && !item.isNew;
+  // Determine archive status:
+  // - Show "Archive*" if there's an unsaved status change to unpublished
+  // - Show "Archived" if page is unpublished (but not a new draft) and no unsaved changes
+  // - Draft pages (never published) should not show any archived badge
+  const isArchived =
+    !item.status && !item.isNew && !item.hasUnsavedStatusChange;
+  const willBeArchived =
+    !item.status && !item.isNew && item.hasUnsavedStatusChange;
 
   return (
     <ContextMenu.Root>
@@ -233,13 +238,13 @@ const PageListItem = ({
             variant={isHomepage ? 'homepage' : 'page'}
             selected={isSelected}
             trailingContent={
-              isArchived && !shouldHideBadge ? (
+              !shouldHideBadge && (isArchived || willBeArchived) ? (
                 <Badge
                   size="1"
                   variant="solid"
                   color={isSelected ? 'blue' : 'gray'}
                 >
-                  Archived
+                  {willBeArchived ? 'Archive*' : 'Archived'}
                 </Badge>
               ) : undefined
             }

@@ -108,6 +108,7 @@ export const contentApi = createApi({
           }
 
           page.status = status;
+          page.hasUnsavedStatusChange = true;
 
           // Swap links: both archive and publish use the same PATCH endpoint
           const fromLink = status === false ? archiveLinkRel : publishLinkRel;

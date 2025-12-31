@@ -245,14 +245,18 @@ const UnpublishedChanges = () => {
     }, 100);
   }
 
-  // Create a map of entity_id -> { status, isNew } for quick lookup
+  // Create a map of entity_id -> { status, isNew, hasUnsavedStatusChange } for quick lookup
   const pageStatusMap = useMemo(() => {
     if (!pageItems) return {};
-    const map: Record<string, { status: boolean; isNew?: boolean }> = {};
+    const map: Record<
+      string,
+      { status: boolean; isNew?: boolean; hasUnsavedStatusChange?: boolean }
+    > = {};
     pageItems.forEach((page) => {
       map[String(page.id)] = {
         status: page.status,
         isNew: page.isNew,
+        hasUnsavedStatusChange: page.hasUnsavedStatusChange,
       };
     });
     return map;
