@@ -106,25 +106,3 @@ function canvas_preprocess_html(array &$variables): void {
     $variables['attributes']['class'][] = 'canvas-page';
   }
 }
-
-/**
- * Implements hook_node_view_alter().
- *
- * Adds contextual links to nodes that have an enabled Canvas content template.
- *
- * This hook checks if a node has an associated content template and ensures
- * that contextual links are properly attached to the node's render array.
- * The contextual links allow editors to quickly access template editing
- * functionality directly from the rendered node view.
- */
-function canvas_node_view_alter(array &$build, FieldableEntityInterface $entity, EntityViewDisplayInterface $display): void {
-  // Contextual links to be added to node only if a
-  // template exists and is enabled.
-  if ($entity->getEntityTypeId() === 'node' && $entity instanceof FieldableEntityInterface) {
-    // Check if a content template exists and is enabled for this node
-    $template = ContentTemplate::loadForEntity($entity, $display->getMode());
-    if ($template) {
-      $build['#contextual_links']['node']['route_parameters']['view_mode'] = $display->getMode();
-    }
-  }
-}

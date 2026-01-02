@@ -9,6 +9,7 @@ use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
 use Drupal\Core\Config\Entity\ConfigEntityInterface;
 use Drupal\Core\Entity\Display\EntityFormDisplayInterface;
+use Drupal\Core\Entity\Display\EntityViewDisplayInterface;
 use Drupal\Core\Entity\EntityFieldManagerInterface;
 use Drupal\Core\Entity\EntityPublishedInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
@@ -123,14 +124,17 @@ final class ContentTemplateHooks {
       return;
     }
     $view_mode = $route_parameters['view_mode'] ?? 'full';
+    $bundle = $node->bundle();
 
     // Load the content template for the current view mode.
-    $template = ContentTemplate::loadForEntity($node, $view_mode);
+    $template = $this->entityTypeManager
+      ->getStorage(ContentTemplate::ENTITY_TYPE_ID)
+      ->load("node.$bundle.$view_mode");
+
     if (!$template || !$this->currentUser->hasPermission(ContentTemplate::ADMIN_PERMISSION)) {
       return;
     }
 
-    $bundle = $node->bundle();
     $node_id = $node->id();
     $element['#links']['node_canvas_template_editor'] = [
       'title' => $this->t('Edit content template'),
@@ -222,6 +226,29 @@ final class ContentTemplateHooks {
 
     // Attach library for menu icon styling.
     $variables['link']['#attached']['library'][] = 'canvas/menu-icons';
+  }
+
+  /**
+   * Implements hook_node_view_alter().
+   *
+   * Adds contextual links to nodes that have an enabled Canvas content template.
+   *
+   * This hook checks if a node has an associated content template and ensures
+   * that contextual links are properly attached to the node's render array.
+   * The contextual links allow editors to quickly access template editing
+   * functionality directly from the rendered node view.
+   */
+  #[Hook('node_view_alter')]
+  public function nodeViewAlter(array &$build, FieldableEntityInterface $entity, EntityViewDisplayInterface $display): void {
+    // Contextual links to be added to node only if a
+    // template exists and is enabled.
+    if ($entity->getEntityTypeId() === 'node' && $entity instanceof FieldableEntityInterface) {
+      // Check if a content template exists and is enabled for this node.
+      $template = ContentTemplate::loadForEntity($entity, $display->getMode());
+      if ($template) {
+        $build['#contextual_links']['node']['route_parameters']['view_mode'] = $display->getMode();
+      }
+    }
   }
 
 }
