@@ -438,7 +438,7 @@ vitest:
     - echo "DB_URL='${DRUPAL_TEST_DB_URL}'" >> ./ui/.env
     - echo "DRUPAL_TEST_WEBSERVER_USER=www-data" >> ./ui/.env
     - echo "DRUPAL_ROOT_CORE='${CI_PROJECT_DIR}/${_WEB_ROOT}/core'" >> ./ui/.env
-    - cat ./ui/env
+    - cat ./ui/.env
     - mkdir -p ./ui/cycache /var/www/.npm /home/apache/.cache/fontconfig ~/.cache /usr/share/fonts/ /var/cache/fontconfig
     - chown -R www-data:www-data ./ui/cycache /var/www/.npm /usr/bin/npm /usr/bin/npx /home/apache/.cache/fontconfig ~/.cache /usr/share/fonts/ /var/cache/fontconfig
     - chmod -R 755 ./ui/cycache
