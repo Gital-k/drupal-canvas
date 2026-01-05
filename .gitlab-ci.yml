@@ -347,8 +347,6 @@ UI:
     paths:
       - ui/dist
       - packages/astro-hydration/dist
-      # TRICKY: necessary for the `Cypress` job to be able to run `cypress install`.
-      - ui/node_modules
 
 eslint:
   stage: validate
@@ -439,6 +437,7 @@ vitest:
     #
     - cd $DRUPAL_PROJECT_FOLDER
     - echo -e "\e[0Ksection_start:`date +%s`:Cypress-install[collapsed=true]\r\e[0KInstall Cypress."
+    - npm ci
     - cp ./ui/.env.example ./ui/.env
     - echo "BASE_URL='${SIMPLETEST_BASE_URL}'" >> ./ui/.env
     - echo "DB_URL='${DRUPAL_TEST_DB_URL}'" >> ./ui/.env
