@@ -142,6 +142,10 @@ class CanvasAiPageBuilderHelper {
         $component_data_to_append['id'] = $id;
         $component_data_to_append['nodePath'] = $node_path;
         $component_data_to_append['fieldValues'] = $component_data['props'] ?? [];
+        // Add map if present.
+        if (!empty($component_data['maps'])) {
+          $component_data_to_append['map'] = $component_data['maps'];
+        }
         $result_components[] = $component_data_to_append;
 
         // Recursively process any components in slots.
@@ -1204,6 +1208,21 @@ class CanvasAiPageBuilderHelper {
     // Check if selected_component exists.
     if (!empty($prompt['selected_component'])) {
       return 'User is now in the code component editor, viewing a code component with id ' . $prompt['selected_component'];
+    }
+
+    // Check if user is building a content template.
+    if (!empty($prompt['view_mode']) && !empty($prompt['entity_type']) && !empty($prompt['bundle'])) {
+      $context = "User is building content template for '" . $prompt['bundle'] . "' content type and '" . $prompt['view_mode'] . "' view mode. ";
+
+      // Check if preview entity ID exists.
+      if (empty($prompt['preview_entity_id'])) {
+        $context .= "Requirements not met. No '" . $prompt['bundle'] . "' content has been created.";
+      }
+      else {
+        $context .= "Requirements met. Use Canvas content template builder agent to generate the template";
+      }
+
+      return $context;
     }
 
     if (empty($prompt['entity_type'])) {

@@ -28,7 +28,7 @@ system_prompt: |-
   *   `canvas_page_builder_agent(prompt: str)`: Adds components to a page by using *existing* components (blocks, SDCs, etc.). This agent assembles the page.
   *   `canvas_title_generation_agent(prompt: str)`: Generates an SEO-friendly title for the current `canvas_page` entity based on the context you provide or the page content.
   *   `canvas_metadata_generation_agent(prompt: str)`: Generates an SEO-friendly meta description for the current `canvas_page` entity based on the context you provide or the page content.
-
+  *   `canvas_content_template_builder_agent(prompt: str)`: Creates content templates for Drupal canvas.
   ---
 
   #### **3. Tool Guidance and Decision-Making Logic**
@@ -36,11 +36,11 @@ system_prompt: |-
   Follow these rules meticulously to decide which tool to use and how to use it.
 
   **Rule #1: Critical Entity Type Validation**
-  This is your first and most important check for any page modification task.
+  This is your first and most important check for any page modification task, except requests to create content templates.
   *   **Condition:** Before invoking `canvas_page_builder_agent`, `canvas_title_generation_agent`, or `canvas_metadata_generation_agent`, you MUST check the `entity type` of the current page.
   *   **Action if `entity type` is 'node'**: Immediately stop and respond with: "This operation is only supported on canvas_page entities."
   *   **Action if `User has not created any entities`**: This means the user is not on a page. Immediately stop and respond with: "Looks like you have not created a page. Create a new 'Canvas Page' from the UI and try again."
-  *   **Exemption:** The `canvas_component_agent` is exempt from this check.
+  *   **Exemption:** The `canvas_component_agent` and  `drupal_canvas_content_template_builder_agent` are exempt from this check.
 
   **Rule #2: Disambiguating Page Builder vs. Component Agent**
   *   **Invoke `canvas_component_agent` ONLY when:**
@@ -84,7 +84,12 @@ system_prompt: |-
 
   * **Purpose:** Ensures title/description generation wasn't skipped.
 
-  **Rule #7: Other Common Rules**
+  **Rule #7: Content templates**
+  * IMPORTANT: When working with content templates, if all requirements are satisfied, use the ‘canvas_content_template_builder_agent’ with the argument ‘Create a content template’. The agent will generate the content template automatically.
+  * If the text “User is building content template” is not part of the Entity context, a content template can't be created. Reply with: “To create content templates, please navigate to the Content Template Editor in Canvas and ask me again.”
+  * If the user is in the Content Template Editor but the requirements are not met, reply with an explanation of which requirement is not met and why.
+
+  **Rule #8: Other Common Rules**
   *  Do not ask the user whether they have created a Canvas Page entity. If the entity type information is not available, assume that they have not created one.
   *  If the user's request requires the page_builder tool, DO NOT suggest components in the prompt. The agent can design sections, choose the right components, and handle the request using the provided context.
   *  Do not generate a title or metadata description when `canvas_component_agent` is used under any circumstances.
@@ -181,6 +186,17 @@ system_prompt: |-
   *   **Orchestrator Analysis:** This is the first message from the user
   *   **Orchestrator Action:** `canvas_metadata_generation_agent(prompt="Generate a description for the page based on its content.")`, `canvas_title_generation_agent(prompt="Generate a title for the page based on its content")`
 
+  **Example 14: Content template creation**
+  *   **Context:** "The user is currently working on a canvas_page entity. User has not selected any particular component from the page. Page title: My first page. Page description: My first page".
+  *   **User:** "Create a content template for the article content type."
+  *   **Orchestrator Analysis:** This text 'User is building content template' is not part of context
+  *   **Orchestrator Action:** To create content templates, please navigate to the Content Template Editor in Canvas and ask me again.
+
+  **Example 15: Content template creation**
+  *   **Context:** "User is building content template for 'article' content type and 'full' view mode. Requirements not met. No 'article' page has been created.".
+  *   **User:** "Create a content template for the article content type."
+  *   **Orchestrator Action:** Requirements not met. No 'article' page has been created.
+
   ------------------------------------------------
   ## Entity Context
   [canvas_ai:verbose_context_for_orchestrator]
@@ -190,6 +206,7 @@ tools:
   'ai_agents::ai_agent::canvas_metadata_generation_agent': true
   'ai_agents::ai_agent::canvas_page_builder_agent': true
   'ai_agents::ai_agent::canvas_title_generation_agent': true
+  'ai_agents::ai_agent::drupal_canvas_content_template_builder_agent': true
   'ai_agent:verify_task_completion': true
 tool_settings:
   'ai_agents::ai_agent::canvas_component_agent':
@@ -211,6 +228,12 @@ tool_settings:
     progress_message: ''
     use_artifacts: 0
   'ai_agents::ai_agent::canvas_title_generation_agent':
+    return_directly: 0
+    require_usage: 0
+    description_override: ''
+    progress_message: ''
+    use_artifacts: 0
+  'ai_agents::ai_agent::drupal_canvas_content_template_builder_agent':
     return_directly: 0
     require_usage: 0
     description_override: ''
@@ -255,6 +278,15 @@ tool_usage_limits:
       hide_property: 0
       values: ''
   'ai_agents::ai_agent::canvas_title_generation_agent':
+    prompt:
+      action: ''
+      hide_property: 0
+      values: ''
+    files:
+      action: ''
+      hide_property: 0
+      values: ''
+  'ai_agents::ai_agent::drupal_canvas_content_template_builder_agent':
     prompt:
       action: ''
       hide_property: 0

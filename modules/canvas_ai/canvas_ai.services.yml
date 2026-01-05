@@ -6,10 +6,17 @@ services:
     class: Drupal\canvas_ai\CanvasAiPageBuilderHelper
   canvas_ai.tempstore:
     class: Drupal\canvas_ai\CanvasAiTempStore
+  canvas_ai.content_template_helper:
+    class: Drupal\canvas_ai\CanvasAiContentTemplateHelper
+    arguments:
+      - '@Drupal\canvas\ShapeMatcher\PropSourceSuggester'
+      - '@canvas_ai.page_builder_helper'
   Drupal\Core\Cache\CacheBackendInterface: '@cache.default'
   canvas_ai.response_validator:
     class: Drupal\canvas_ai\AiResponseValidator
     arguments:
       - '@Drupal\Core\Validation\BasicRecursiveValidatorFactory'
       - '@uuid'
+      - '@canvas_ai.content_template_helper'
+      - '@canvas_ai.page_builder_helper'
   Drupal\canvas_ai\CanvasAiTempStore: '@canvas_ai.tempstore'
