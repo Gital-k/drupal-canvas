@@ -587,11 +587,11 @@ final class ApiContentControllers {
 
     foreach ($possible_operations as $link_rel => ['route_name' => $route_name, 'op' => $entity_operation]) {
       // Special handling for set as homepage operation: don't show for
-      // unpublished pages.
+      // archived pages (but allow for draft pages).
       if ($link_rel === CanvasUriDefinitions::LINK_REL_SET_AS_HOMEPAGE) {
-        if (!$effective_is_published) {
+        if (!$effective_is_published && !$is_draft) {
           $access = AccessResult::forbidden(
-            'Set as homepage action not available for unpublished pages.'
+            'Set as homepage action not available for archived pages.'
           );
           if ($autoSaveEntity) {
             $access->addCacheableDependency($autoSaveEntity);

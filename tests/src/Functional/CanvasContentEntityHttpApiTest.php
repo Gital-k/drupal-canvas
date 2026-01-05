@@ -134,6 +134,7 @@ final class CanvasContentEntityHttpApiTest extends HttpApiTestBase {
         'links' => [
           // @todo https://www.drupal.org/i/3498525 should standardize arguments.
           CanvasUriDefinitions::LINK_REL_EDIT => Url::fromUri('base:/canvas/editor/canvas_page/2')->toString(),
+          CanvasUriDefinitions::LINK_REL_SET_AS_HOMEPAGE => Url::fromUri('base:/canvas/editor/canvas_page/2')->toString(),
         ],
         'internalPath' => '/page/2',
       ],
@@ -370,9 +371,10 @@ final class CanvasContentEntityHttpApiTest extends HttpApiTestBase {
     $this->assertEquals(
       [
         CanvasUriDefinitions::LINK_REL_EDIT => Url::fromUri('base:/canvas/editor/canvas_page/2')->toString(),
+        CanvasUriDefinitions::LINK_REL_SET_AS_HOMEPAGE => Url::fromUri('base:/canvas/editor/canvas_page/2')->toString(),
       ],
       $body['2']['links'],
-      'Links for page 2 should only include edit, as it is the homepage (no delete, archive, or publish for homepage; no publish or archive for drafts).'
+      'Links for page 2 should not include delete operation, as it is set as homepage.'
     );
     // Assert links for page 1.
     \assert(\array_key_exists('1', $body) && \array_key_exists('links', $body['1']));
@@ -599,11 +601,11 @@ final class CanvasContentEntityHttpApiTest extends HttpApiTestBase {
     $this->assertArrayHasKey(CanvasUriDefinitions::LINK_REL_SET_AS_HOMEPAGE, $body['1']['links'], 'Published page should have set-as-homepage link.');
     $this->assertFalse($body['1']['isNew'], 'Published page should not be marked as new.');
 
-    // Page 2 is unpublished draft (never published), should have neither archive nor publish nor set-as-homepage link.
+    // Page 2 is unpublished draft (never published), should have set-as-homepage link but not archive or publish link.
     assert(\array_key_exists('2', $body) && \array_key_exists('links', $body['2']));
     $this->assertArrayNotHasKey(CanvasUriDefinitions::LINK_REL_ARCHIVE, $body['2']['links'], 'Draft page should not have archive link.');
     $this->assertArrayNotHasKey(CanvasUriDefinitions::LINK_REL_PUBLISH, $body['2']['links'], 'Draft page should not have publish link.');
-    $this->assertArrayNotHasKey(CanvasUriDefinitions::LINK_REL_SET_AS_HOMEPAGE, $body['2']['links'], 'Draft page should not have set-as-homepage link.');
+    $this->assertArrayHasKey(CanvasUriDefinitions::LINK_REL_SET_AS_HOMEPAGE, $body['2']['links'], 'Draft page should have set-as-homepage link.');
     $this->assertTrue($body['2']['isNew'], 'Draft page should be marked as new.');
 
     // Create an archived page (published then unpublished).
