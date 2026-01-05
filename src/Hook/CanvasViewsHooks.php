@@ -33,6 +33,7 @@ class CanvasViewsHooks {
 
     $data['canvas_page_field_data']['publication_state_computed'] = [
       'title' => $this->t('(Deprecated) Publication State'),
+      'group' => $this->t('Canvas (Internal)'),
       'help' => $this->t('Shows whether a page is Draft (never published), Published (currently published), or Archived (previously published but now unpublished). It will be replaced by Workspaces in a future version.'),
       'field' => [
         'id' => 'canvas_publication_state',
