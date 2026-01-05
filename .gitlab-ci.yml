@@ -242,10 +242,6 @@ phpunit:
   needs:
     - composer
     - UI
-  before_script:
-    # ⚠️ Since Drupal 11.2 this is necessary to avoid PHPUnit tests taking painfully long.
-    # @see https://www.drupal.org/project/drupal/issues/3249443
-    - rm -rf ui/node_modules && echo "🧹 clean up node modules"
   parallel:
     # @see https://www.drupal.org/node/3444548
     matrix:
@@ -347,8 +343,6 @@ UI:
     paths:
       - ui/dist
       - packages/astro-hydration/dist
-      # TRICKY: necessary for the `Cypress` job to be able to run `cypress install`.
-      - node_modules
 
 eslint:
   stage: validate
@@ -444,14 +438,15 @@ vitest:
     - echo "DB_URL='${DRUPAL_TEST_DB_URL}'" >> ./ui/.env
     - echo "DRUPAL_TEST_WEBSERVER_USER=www-data" >> ./ui/.env
     - echo "DRUPAL_ROOT_CORE='${CI_PROJECT_DIR}/${_WEB_ROOT}/core'" >> ./ui/.env
-    - cd ./ui/
-    - cat .env
-    - mkdir -p ./cycache /var/www/.npm /home/apache/.cache/fontconfig ~/.cache /usr/share/fonts/ /var/cache/fontconfig
-    - chown -R www-data:www-data ./cycache /var/www/.npm /usr/bin/npm /home/apache/.cache/fontconfig ~/.cache /usr/share/fonts/ /var/cache/fontconfig
-    - chmod -R 755 ./cycache
-    - sudo -u www-data CYPRESS_CACHE_FOLDER=./cycache npx cypress install
+    - cat ./ui/env
+    - mkdir -p ./ui/cycache /var/www/.npm /home/apache/.cache/fontconfig ~/.cache /usr/share/fonts/ /var/cache/fontconfig
+    - chown -R www-data:www-data ./ui/cycache /var/www/.npm /usr/bin/npm /usr/bin/npx /home/apache/.cache/fontconfig ~/.cache /usr/share/fonts/ /var/cache/fontconfig
+    - chmod -R 755 ./ui/cycache
+    - /usr/bin/npm ci
+    - cd ./ui
+    - sudo -u www-data CYPRESS_CACHE_FOLDER=./cycache /usr/bin/npx cypress install
     - echo -e "\e[0Ksection_end:`date +%s`:Cypress-install\r\e[0K"
-    - sudo -u www-data CYPRESS_CACHE_FOLDER=./cycache npx cypress --version
+    - sudo -u www-data CYPRESS_CACHE_FOLDER=./cycache /usr/bin/npx cypress --version
   variables:
     _TARGET_DB_TYPE: sqlite
   artifacts:
@@ -467,12 +462,12 @@ cypress E2E:
   extends: .cypress-base
   parallel: 4
   script:
-    - CYPRESS_CACHE_FOLDER=./cycache npx cypress run --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml" --spec=`node ./tests/support/parallel.js`
+    - CYPRESS_CACHE_FOLDER=./cycache /usr/bin/npx cypress run --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml" --spec=`node ./tests/support/parallel.js`
 
 cypress unit:
   extends: .cypress-base
   script:
-    - CYPRESS_CACHE_FOLDER=./cycache npx cypress run --component --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml"
+    - CYPRESS_CACHE_FOLDER=./cycache /usr/bin/npx cypress run --component --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml"
   rules:
     - *is-push-rule
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
