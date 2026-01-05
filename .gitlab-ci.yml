@@ -440,9 +440,10 @@ vitest:
     - echo "DRUPAL_ROOT_CORE='${CI_PROJECT_DIR}/${_WEB_ROOT}/core'" >> ./ui/.env
     - cat ./ui/.env
     - mkdir -p ./ui/cycache /var/www/.npm /home/apache/.cache/fontconfig ~/.cache /usr/share/fonts/ /var/cache/fontconfig
-    - chown -R www-data:www-data ./ui/cycache /var/www/.npm /usr/bin/npm /usr/bin/npx /home/apache/.cache/fontconfig ~/.cache /usr/share/fonts/ /var/cache/fontconfig
+    - chown -R www-data:www-data ./ui/cycache /var/www/.npm /usr/bin/npm /home/apache/.cache/fontconfig ~/.cache /usr/share/fonts/ /var/cache/fontconfig
     - chmod -R 755 ./ui/cycache
     - /usr/bin/npm ci
+    - ls ./node_modules/.bin/cypress
     - cd ./ui
     - sudo -u www-data CYPRESS_CACHE_FOLDER=./cycache ../node_modules/.bin/cypress install
     - echo -e "\e[0Ksection_end:`date +%s`:Cypress-install\r\e[0K"
