@@ -137,7 +137,7 @@ final class ContentTemplateHooks {
 
     $node_id = $node->id();
     $element['#links']['node_canvas_template_editor'] = [
-      'title' => $this->t('Edit content template'),
+      'title' => $this->t('Edit Content Template'),
       'url' => Url::fromUri("base:canvas/template/node/$bundle/$view_mode/$node_id"),
       'weight' => 11,
     ];
@@ -231,7 +231,7 @@ final class ContentTemplateHooks {
   /**
    * Implements hook_node_view_alter().
    *
-   * Adds contextual links to nodes that have an enabled Canvas content template.
+   * Adds contextual links to node types that have an enabled Canvas content template.
    *
    * This hook checks if a node has an associated content template and ensures
    * that contextual links are properly attached to the node's render array.
@@ -242,11 +242,15 @@ final class ContentTemplateHooks {
   public function nodeViewAlter(array &$build, FieldableEntityInterface $entity, EntityViewDisplayInterface $display): void {
     // Contextual links to be added to node only if a
     // template exists and is enabled.
-    if ($entity->getEntityTypeId() === 'node' && $entity instanceof FieldableEntityInterface) {
-      // Check if a content template exists and is enabled for this node.
+    if ($entity->getEntityTypeId() === 'node') {
+      // Check if a content template exists for this entity and view mode.
+      // If it exists, then only add contextual links to the render array.
       $template = ContentTemplate::loadForEntity($entity, $display->getMode());
       if ($template) {
         $build['#contextual_links']['node']['route_parameters']['view_mode'] = $display->getMode();
+        // Add cache metadata so the contextual link is invalidated when the
+        // template changes.
+        \Drupal::service('renderer')->addCacheableDependency($build, $template);
       }
     }
   }
