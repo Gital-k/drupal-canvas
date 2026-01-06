@@ -5,15 +5,17 @@ declare(strict_types=1);
 namespace Drupal\Tests\canvas_ai\Traits;
 
 use Drupal\canvas_ai\CanvasAiPermissions;
+use Drupal\Component\Plugin\PluginManagerInterface;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\user\Entity\User;
 
 trait CanvasAiContentTemplateAgentToolsTestTrait {
 
-  protected $functionCallManager;
+  protected PluginManagerInterface $functionCallManager;
 
-  protected $entityTypeManager;
+  protected EntityTypeManagerInterface $entityTypeManager;
 
   protected AccountInterface $privilegedUser;
 
