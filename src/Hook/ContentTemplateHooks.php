@@ -233,7 +233,8 @@ final class ContentTemplateHooks {
   /**
    * Implements hook_node_view_alter().
    *
-   * Adds contextual links to node types that have an enabled Canvas content template.
+   * Adds contextual links to node types that have an enabled Canvas content
+   * template.
    *
    * This hook checks if a node has an associated content template and ensures
    * that contextual links are properly attached to the node's render array.
