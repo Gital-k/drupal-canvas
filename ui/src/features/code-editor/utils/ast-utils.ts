@@ -39,7 +39,7 @@ export const getDataDependenciesFromAst = (ast: File): DataDependencies =>
       const map = {
         JsonApiClient: ['v0.baseUrl', 'v0.jsonapiSettings'],
         getSiteData: ['v0.baseUrl', 'v0.branding'],
-        getPageData: ['v0.breadcrumbs', 'v0.pageTitle'],
+        getPageData: ['v0.breadcrumbs', 'v0.entityUuid', 'v0.pageTitle'],
       };
       const drupalSettingsDependencies = carry.drupalSettings || [];
       const computedSettings = drupalSettingsDependencies

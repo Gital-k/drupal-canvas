@@ -155,6 +155,7 @@ canvasData.v0:
     - canvas/canvasData.v0.baseUrl
     - canvas/canvasData.v0.branding
     - canvas/canvasData.v0.breadcrumbs
+    - canvas/canvasData.v0.entityUuid
     - canvas/canvasData.v0.pageTitle
     - canvas/canvasData.v0.jsonapiSettings
   drupalSettings:
@@ -187,6 +188,14 @@ canvasData.v0.breadcrumbs:
     canvasData:
       v0:
         breadcrumbs: null
+
+canvasData.v0.entityUuid:
+  dependencies:
+    - core/drupalSettings
+  drupalSettings:
+    canvasData:
+      v0:
+        entityUuid: null
 
 canvasData.v0.pageTitle:
   dependencies:

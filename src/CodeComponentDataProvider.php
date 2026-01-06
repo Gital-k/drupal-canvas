@@ -102,9 +102,16 @@ readonly final class CodeComponentDataProvider {
    */
   public function getCanvasDataPageTitleV0(): array {
     $request = $this->requestStack->getCurrentRequest();
+    if ($request && $request->attributes->has('node')) {
+      $node = $request->attributes->get('node');
+      if ($node instanceof \Drupal\node\NodeInterface) {
+        $id = $node->id();
+      }
+    }
     \assert($request instanceof Request);
     $route = $this->routeMatch->getRouteObject();
     \assert($route instanceof Route);
+
     return [
       self::V0 => [
         // @todo improve title in https://www.drupal.org/i/3502371
@@ -154,6 +161,27 @@ readonly final class CodeComponentDataProvider {
   public static function getRequiredCanvasDataLibraries(string $jsCode): array {
     @trigger_error('Calling ' . __METHOD__ . '() is deprecated in canvas:0.7.3-alpha1 and will be removed from canvas:1.0.0. There is no replacement. See https://www.drupal.org/node/3538276', E_USER_DEPRECATED);
     return [];
+  }
+
+  /**
+   * Returns the Entity UUID for V0 of drupalSettings.canvasData.
+   *
+   * @return array[]
+   */
+  public function getCanvasDataEntityUuidV0(): array {
+      $node = $this->routeMatch->getParameter('node');
+      if ($node instanceof \Drupal\node\NodeInterface) {
+        $uuid = $node->uuid() . 'node route';
+      } else {
+        // Fallback to preview_entity for entity preview routes.
+        $uuid = $this->routeMatch->getParameter('preview_entity')->uuid() . 'preview_entity route';
+      }
+
+    return [
+      self::V0 => [
+        'entityUuid' => $uuid,
+      ],
+    ];
   }
 
 }
