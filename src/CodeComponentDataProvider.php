@@ -17,7 +17,7 @@ use Symfony\Component\Routing\Route;
 /**
  * Service to expose site metadata to drupalSettings for JS components.
  *
- * This includes site branding, breadcrumbs, page title and base URL.
+ * This includes site branding, breadcrumbs, page title, entity UUID of the current route, and base URL.
  * Intended for use with dynamic JavaScript components such as those in Drupal
  * Canvas.
  */
@@ -102,16 +102,9 @@ readonly final class CodeComponentDataProvider {
    */
   public function getCanvasDataPageTitleV0(): array {
     $request = $this->requestStack->getCurrentRequest();
-    if ($request && $request->attributes->has('node')) {
-      $node = $request->attributes->get('node');
-      if ($node instanceof \Drupal\node\NodeInterface) {
-        $id = $node->id();
-      }
-    }
     \assert($request instanceof Request);
     $route = $this->routeMatch->getRouteObject();
     \assert($route instanceof Route);
-
     return [
       self::V0 => [
         // @todo improve title in https://www.drupal.org/i/3502371
@@ -164,25 +157,25 @@ readonly final class CodeComponentDataProvider {
   }
 
   /**
-   * Returns the Entity UUID of the currently viewed node for V0 of drupalSettings.canvasData.
+   * Returns the entity UUID for V0 of drupalSettings.canvasData.
    *
    * @return array[]
    */
   public function getCanvasDataEntityUuidV0(): array {
-      $node = $this->routeMatch->getParameter('node');
-      if ($node instanceof \Drupal\node\NodeInterface) {
-        $uuid = $node->uuid();
-      } else {
-        // If the route is not a node, then check for a preview_entity parameter since it may
-        // be a Canvas content template route that uses the node as a preview entity.
-        $uuid = $this->routeMatch->getParameter('preview_entity')->uuid();g
-      }
+    $entity = $this->routeMatch->getParameter('preview_entity');
+    // Check if the user is previewing an entity through a content template.
+    if ($entity instanceof \Drupal\Core\Entity\EntityInterface) {
+      return [self::V0 => ['entityUuid' => $entity->uuid()]];
+    }
 
-    return [
-      self::V0 => [
-        'entityUuid' => $uuid,
-      ],
-    ];
+    // Check if the user is viewing a node.
+    $entity = $this->routeMatch->getParameter('node');
+    if ($entity instanceof \Drupal\Core\Entity\EntityInterface) {
+      return [self::V0 => ['entityUuid' => $entity->uuid()]];
+    }
+
+    // Fallback to null if there is no entity associated with the current route.
+    return [self::V0 => ['entityUuid' => NULL]];
   }
 
 }
