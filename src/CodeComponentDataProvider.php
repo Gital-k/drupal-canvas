@@ -164,17 +164,18 @@ readonly final class CodeComponentDataProvider {
   }
 
   /**
-   * Returns the Entity UUID for V0 of drupalSettings.canvasData.
+   * Returns the Entity UUID of the currently viewed node for V0 of drupalSettings.canvasData.
    *
    * @return array[]
    */
   public function getCanvasDataEntityUuidV0(): array {
       $node = $this->routeMatch->getParameter('node');
       if ($node instanceof \Drupal\node\NodeInterface) {
-        $uuid = $node->uuid() . 'node route';
+        $uuid = $node->uuid();
       } else {
-        // Fallback to preview_entity for entity preview routes.
-        $uuid = $this->routeMatch->getParameter('preview_entity')->uuid() . 'preview_entity route';
+        // If the route is not a node, then check for a preview_entity parameter since it may
+        // be a Canvas content template route that uses the node as a preview entity.
+        $uuid = $this->routeMatch->getParameter('preview_entity')->uuid();g
       }
 
     return [
