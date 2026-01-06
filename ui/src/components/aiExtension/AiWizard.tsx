@@ -11,20 +11,19 @@ import {
 import { DeepChat } from 'deep-chat-react';
 import { useParams } from 'react-router';
 import { useNavigate } from 'react-router-dom';
-import { useStore } from 'react-redux';
 import AiWelcome from '@assets/icons/ai-welcome.svg?react';
 import { Box, Flex, Text } from '@radix-ui/themes';
 
-import { useAppDispatch, useAppSelector } from '@/app/hooks';
+import { useAppDispatch, useAppSelector, useAppStore } from '@/app/hooks';
 import {
   selectCodeComponentProperty,
   setCodeComponentProperty,
 } from '@/features/code-editor/codeEditorSlice';
 import { deserializeProps } from '@/features/code-editor/utils/utils';
 import {
+  _updateExistingComponentValuesForLinking,
   selectModel,
   setUpdatePreview,
-  _updateExistingComponentValuesForLinking,
 } from '@/features/layout/layoutModelSlice';
 import {
   selectPageData,
@@ -117,7 +116,14 @@ const simplePropertyHandler = (
   propKey: keyof CodeComponent,
 ) => ({
   canHandle: (msg: any) => property in msg && msg[property],
-  handle: async ({ message, dispatch }: { message: any; dispatch: any; getState?: () => any }) => {
+  handle: async ({
+    message,
+    dispatch,
+  }: {
+    message: any;
+    dispatch: any;
+    getState?: () => any;
+  }) => {
     dispatch(setCodeComponentProperty([propKey, message[property]]));
   },
 });
@@ -152,7 +158,14 @@ const componentStructureHandler = {
 
 const propsMetadataHandler = {
   canHandle: (msg: any) => 'props_metadata' in msg && msg.props_metadata,
-  handle: async ({ message, dispatch }: { message: any; dispatch: any; getState?: () => any }) => {
+  handle: async ({
+    message,
+    dispatch,
+  }: {
+    message: any;
+    dispatch: any;
+    getState?: () => any;
+  }) => {
     const parsedProps = JSON.parse(message.props_metadata);
     // Deserialize from Record format to Array format.
     const deserializedProps = deserializeProps(parsedProps);
@@ -163,14 +176,28 @@ const propsMetadataHandler = {
 const requiredPropsHandler = {
   canHandle: (msg: any) =>
     'required_props' in msg && Array.isArray(msg.required_props),
-  handle: async ({ message, dispatch }: { message: any; dispatch: any; getState?: () => any }) => {
+  handle: async ({
+    message,
+    dispatch,
+  }: {
+    message: any;
+    dispatch: any;
+    getState?: () => any;
+  }) => {
     dispatch(setCodeComponentProperty(['required', message.required_props]));
   },
 };
 
 const createdContentHandler = {
   canHandle: (msg: any) => 'created_content' in msg && msg.created_content,
-  handle: async ({ message, dispatch }: { message: any; dispatch: any; getState?: () => any }) => {
+  handle: async ({
+    message,
+    dispatch,
+  }: {
+    message: any;
+    dispatch: any;
+    getState?: () => any;
+  }) => {
     const value = message.created_content;
     dispatch(setUpdatePreview(true));
     dispatch(updatePageDataExternally({ 'title[0][value]': value }));
@@ -179,7 +206,14 @@ const createdContentHandler = {
 
 const editContentHandler = {
   canHandle: (msg: any) => 'refined_text' in msg && msg.refined_text,
-  handle: async ({ message, dispatch }: { message: any; dispatch: any; getState?: () => any }) => {
+  handle: async ({
+    message,
+    dispatch,
+  }: {
+    message: any;
+    dispatch: any;
+    getState?: () => any;
+  }) => {
     const value = message.refined_text;
     dispatch(setUpdatePreview(true));
     dispatch(updatePageDataExternally({ 'title[0][value]': value }));
@@ -188,7 +222,14 @@ const editContentHandler = {
 
 const metadataHandler = {
   canHandle: (msg: any) => 'metadata' in msg && msg.metadata,
-  handle: async ({ message, dispatch }: { message: any; dispatch: any; getState?: () => any }) => {
+  handle: async ({
+    message,
+    dispatch,
+  }: {
+    message: any;
+    dispatch: any;
+    getState?: () => any;
+  }) => {
     const value = message.metadata;
     dispatch(setUpdatePreview(true));
     dispatch(
@@ -286,14 +327,16 @@ const operationsHandler = {
                 const sources: Record<string, any> = {};
                 const values: Record<string, any> = {};
 
-                Object.entries(component.map).forEach(([propName, expression]) => {
-                  sources[propName] = {
-                    sourceType: 'dynamic',
-                    expression: expression,
-                  };
-                  // Set a placeholder value for dynamic props
-                  values[propName] = 'noop';
-                });
+                Object.entries(component.map).forEach(
+                  ([propName, expression]) => {
+                    sources[propName] = {
+                      sourceType: 'dynamic',
+                      expression: expression,
+                    };
+                    // Set a placeholder value for dynamic props
+                    values[propName] = 'noop';
+                  },
+                );
 
                 // Dispatch the linking action and wait for it to complete
                 await dispatch(
@@ -301,7 +344,7 @@ const operationsHandler = {
                     componentToUpdateId: placedComponentUuid,
                     values: values,
                     sources: sources,
-                  })
+                  }),
                 );
               }
             }
@@ -312,7 +355,9 @@ const operationsHandler = {
     const { entityId, entityType, bundle, viewMode, previewEntityId } = params;
     // Redirect based on available params.
     if (viewMode && previewEntityId) {
-      navigate(`/template/${entityType}/${bundle}/${viewMode}/${previewEntityId}`);
+      navigate(
+        `/template/${entityType}/${bundle}/${viewMode}/${previewEntityId}`,
+      );
     } else {
       navigate(`/editor/${entityType}/${entityId}`);
     }
@@ -488,7 +533,7 @@ function getHandlersForMessage(message: any) {
 const AiWizard = () => {
   const pageData = useAppSelector(selectPageData);
   const dispatch = useAppDispatch();
-  const store = useStore();
+  const store = useAppStore();
   const drupalSettings = getDrupalSettings();
   const chatElementRef = useRef<any>(null);
   const [csrfToken, setCsrfToken] = useState<string | null>(null);
@@ -898,7 +943,8 @@ const AiWizard = () => {
                     bundle: currentValuesRef.current.params.bundle,
                     entity_id: currentValuesRef.current.params.entityId,
                     view_mode: currentValuesRef.current.params.viewMode,
-                    preview_entity_id: currentValuesRef.current.params.previewEntityId,
+                    preview_entity_id:
+                      currentValuesRef.current.params.previewEntityId,
                     selected_component:
                       currentValuesRef.current.codeComponentName,
                     selected_component_required_props:

@@ -101,7 +101,8 @@ final class GetPropSourceSuggestions extends FunctionCallBase implements Executa
       $suggestions = $this->contentTemplateHelper->getFieldSuggestions(
         $component_id,
         $entity_type,
-        $bundle
+        $bundle,
+        TRUE
       );
 
       // Convert to YAML and output.
