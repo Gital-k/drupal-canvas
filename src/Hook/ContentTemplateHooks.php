@@ -17,6 +17,7 @@ use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Hook\Attribute\Hook;
+use Drupal\Core\Render\RendererInterface;
 use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
@@ -40,6 +41,7 @@ final class ContentTemplateHooks {
     private readonly EntityTypeManagerInterface $entityTypeManager,
     private readonly EntityFieldManagerInterface $entityFieldManager,
     private readonly AccountProxyInterface $currentUser,
+    private readonly RendererInterface $renderer,
   ) {
   }
 
@@ -250,7 +252,7 @@ final class ContentTemplateHooks {
         $build['#contextual_links']['node']['route_parameters']['view_mode'] = $display->getMode();
         // Add cache metadata so the contextual link is invalidated when the
         // template changes.
-        \Drupal::service('renderer')->addCacheableDependency($build, $template);
+        $this->renderer->addCacheableDependency($build, $template);
       }
     }
   }
