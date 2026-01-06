@@ -7,10 +7,7 @@ namespace Drupal\canvas_ai;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase;
 use Drupal\canvas\PropExpressions\Component\ComponentPropExpression;
-use Drupal\canvas\PropExpressions\StructuredData\Labeler;
-use Drupal\canvas\ShapeMatcher\JsonSchemaFieldInstanceMatcher;
 use Drupal\canvas\ShapeMatcher\PropSourceSuggester;
-use Drupal\Core\Entity\EntityFieldManagerInterface;
 use Drupal\Core\Entity\TypedData\EntityDataDefinition;
 use Symfony\Component\Yaml\Yaml;
 
@@ -87,7 +84,7 @@ class CanvasAiContentTemplateHelper {
     foreach ($suggestions as $prop_name => $prop_data) {
       $prop_suggestions = [];
 
-      // Get all dynamic prop sources (field linkings).
+      // Get all dynamic prop sources.
       if (!empty($prop_data['instances'])) {
         foreach ($prop_data['instances'] as $field_in_target_entity => $dynamic_prop_source) {
           $expression_string = (string) $dynamic_prop_source->expression;
@@ -156,7 +153,8 @@ class CanvasAiContentTemplateHelper {
         foreach ($suggestions as $prop_suggestions) {
           if (is_array($prop_suggestions)) {
             foreach ($prop_suggestions as $suggestion) {
-              if (isset($suggestion['label']) && isset($suggestion['expression'])) {
+              // Explicity skip revision-related fields.
+              if (isset($suggestion['label']) && isset($suggestion['expression']) && !str_contains(strtolower($suggestion['label']), 'revision')) {
                 $label = $suggestion['label'];
                 $expression = $suggestion['expression'];
                 // Store the expression for this label.
@@ -194,9 +192,8 @@ class CanvasAiContentTemplateHelper {
    */
   public function getLinkableFields(string $entity_type, string $bundle): array {
     $fields_with_expressions = $this->getLinkableContentTypeFieldsWithExpressions($entity_type, $bundle);
-    $labels = array_keys($fields_with_expressions);
-    sort($labels);
-    return $labels;
+    ksort($fields_with_expressions);
+    return $fields_with_expressions;
   }
 
   /**

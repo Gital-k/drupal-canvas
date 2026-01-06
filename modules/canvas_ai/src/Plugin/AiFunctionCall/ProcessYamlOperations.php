@@ -1,7 +1,5 @@
 <?php
 
-
-
 namespace Drupal\canvas_ai\Plugin\AiFunctionCall;
 
 use Drupal\ai\Attribute\FunctionCall;
