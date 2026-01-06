@@ -93,10 +93,8 @@ export const contentApi = createApi({
           return;
         }
 
-        const archiveLinkRel =
-          'https://drupal.org/project/canvas#link-rel-archive';
-        const publishLinkRel =
-          'https://drupal.org/project/canvas#link-rel-publish';
+        const archiveLinkRel = 'disable';
+        const publishLinkRel = 'enable';
 
         // Update function to apply to matching queries
         const updatePageData = (draft: ContentStub[]) => {

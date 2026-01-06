@@ -49,9 +49,9 @@ const hasPermission = (
     case 'delete':
       return !!links['delete-form'];
     case 'archive':
-      return !!links['https://drupal.org/project/canvas#link-rel-archive'];
+      return !!links['disable'];
     case 'publish':
-      return !!links['https://drupal.org/project/canvas#link-rel-publish'];
+      return !!links['enable'];
     default:
       return false;
   }

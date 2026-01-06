@@ -13,7 +13,7 @@ export interface ContentStub {
     'edit-form'?: string;
     'https://drupal.org/project/canvas#link-rel-duplicate'?: string;
     'https://drupal.org/project/canvas#link-rel-set-as-homepage'?: string;
-    'https://drupal.org/project/canvas#link-rel-archive'?: string;
-    'https://drupal.org/project/canvas#link-rel-publish'?: string;
+    'disable'?: string;
+    'enable'?: string;
   };
 }
