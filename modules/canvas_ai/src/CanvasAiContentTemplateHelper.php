@@ -87,6 +87,10 @@ class CanvasAiContentTemplateHelper {
       // Get all dynamic prop sources.
       if (!empty($prop_data['instances'])) {
         foreach ($prop_data['instances'] as $field_in_target_entity => $dynamic_prop_source) {
+          // Explicity skip revision-related fields.
+          if (str_contains(strtolower($field_in_target_entity), 'revision')) {
+            continue;
+          }
           $expression_string = (string) $dynamic_prop_source->expression;
           if ($filter_expressions) {
             $prop_suggestions = array_merge($prop_suggestions, [$field_in_target_entity]);
@@ -153,8 +157,7 @@ class CanvasAiContentTemplateHelper {
         foreach ($suggestions as $prop_suggestions) {
           if (is_array($prop_suggestions)) {
             foreach ($prop_suggestions as $suggestion) {
-              // Explicity skip revision-related fields.
-              if (isset($suggestion['label']) && isset($suggestion['expression']) && !str_contains(strtolower($suggestion['label']), 'revision')) {
+              if (isset($suggestion['label']) && isset($suggestion['expression'])) {
                 $label = $suggestion['label'];
                 $expression = $suggestion['expression'];
                 // Store the expression for this label.
