@@ -124,8 +124,6 @@ final class JsComponentDiscovery implements ComponentCandidatesDiscoveryInterfac
     $js_component = $this->discover()[$source_specific_id];
     return [
       'label' => (string) $js_component->label(),
-      // @todo Update in https://www.drupal.org/project/canvas/issues/3541364.
-      'category' => NULL,
       'status' => $js_component->status(),
     ];
   }
@@ -142,7 +140,7 @@ final class JsComponentDiscovery implements ComponentCandidatesDiscoveryInterfac
    */
   public static function getSourceSpecificComponentId(string $component_id): string {
     $prefix = JsComponent::SOURCE_PLUGIN_ID . '.';
-    \assert(str_starts_with($prefix, $component_id));
+    \assert(str_starts_with($component_id, $prefix));
     return substr($component_id, strlen($prefix));
   }
 
