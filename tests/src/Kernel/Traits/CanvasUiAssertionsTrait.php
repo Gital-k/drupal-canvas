@@ -23,6 +23,7 @@ trait CanvasUiAssertionsTrait {
       'baseUrl',
       'branding',
       'breadcrumbs',
+      'currentEntity',
       'jsonapiSettings',
       'pageTitle',
     ], array_keys($this->drupalSettings[CodeComponentDataProvider::CANVAS_DATA_KEY][CodeComponentDataProvider::V0]));

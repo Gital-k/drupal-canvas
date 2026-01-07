@@ -375,6 +375,7 @@ describe('getDataDependenciesFromAst', () => {
         'v0.baseUrl',
         'v0.branding',
         'v0.breadcrumbs',
+        'v0.currentEntity',
         'v0.pageTitle',
       ],
     });
