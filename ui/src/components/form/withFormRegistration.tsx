@@ -434,15 +434,14 @@ const ComponentFormField = <P extends Record<string, any>>({
 
     // Update Redux store with initial field value
     dispatchFieldValue(dispatch, formContext.formId, fieldName, currentValue);
+    // This intentionally has fewer dependencies - the useEffect exists to populate
+    // the initial value after mounting, after which the value is managed by
+    // react-hook-form.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     dispatch,
     fieldName,
     propName,
-    formContext?.formId,
-    getCurrentValue,
-    WrappedComponent,
-    isScalarProp,
-    selectedComponent,
   ]);
 
   if (!rhfContext) {
@@ -506,10 +505,6 @@ const ComponentFormField = <P extends Record<string, any>>({
 
           // Perform validation on blur
           const validationResult = validateNewValue(e as any, field.value);
-          console.log(
-            `CBLUR ${field.value} | validation result: shouldUpdate ${!!shouldUpdateFormState(e, validationResult)}`,
-            validationResult,
-          );
 
           if (!validationResult.valid) {
             if (formContext?.formId) {
@@ -707,17 +702,15 @@ const PageDataFormField = <P extends Record<string, any>>({
 
   const forceUpdateInputValue = (fieldName: string, theNewValue: string) => {
     dispatch(externalUpdateComplete(fieldName));
-    const syntheticEvent = {
-      target: {
-        name: fieldName,
-        value: theNewValue,
-      },
-    } as unknown as React.ChangeEvent<HTMLInputElement>;
 
-    // Ignore TS to avoid adding several properties that are not needed for the
-    // way that the onChange handler is used.
-    // @ts-ignore
-    attributes?.onChange?.(syntheticEvent);
+    // Update react-hook-form context if available
+    if (rhfContext) {
+      rhfContext.setValue(fieldName, theNewValue, {
+        shouldValidate: false,
+        shouldDirty: true,
+        shouldTouch: false,
+      });
+    }
   };
 
   if (
@@ -955,6 +948,39 @@ export const withFormRegistration = <P extends Record<string, any>>(
       };
     }, [dispatch, fieldName, formContext, rhfContext]);
 
+    // For AJAX-added inputs, register them dynamically with react-hook-form
+    // This ensures they become controlled inputs like all other form inputs
+    useEffect(() => {
+      if (!rhfContext || !fieldName) return;
+
+      const currentValue = getCurrentValue();
+
+      // Check if field is already registered
+      const fieldState = rhfContext.getFieldState(fieldName);
+
+      // console.log('🔵 AJAX Input Registration Check:', {
+      //   fieldName,
+      //   formId: formContext?.formId,
+      //   isRegistered: !!(fieldState && fieldState.invalid !== undefined),
+      //   fieldState,
+      //   currentValue,
+      //   inputType: props.attributes?.type,
+      // });
+
+      // If field is not yet registered (AJAX-added), register it now
+      if (!fieldState || fieldState.invalid === undefined) {
+        console.log('🟢 Registering AJAX-added input:', fieldName);
+        rhfContext.register(fieldName);
+        // Set initial value
+        rhfContext.setValue(fieldName, currentValue, {
+          shouldValidate: false,
+          shouldDirty: false,
+          shouldTouch: false,
+        });
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [rhfContext, fieldName]);
+
     // If no react-hook-form context, the form isn't using RHF - render without enhancement
     // If no field name, we can't register it - render without enhancement
     if (!rhfContext || !fieldName) {
@@ -1002,7 +1028,12 @@ export const withFormRegistration = <P extends Record<string, any>>(
 
             // Dispatch to Redux so the value is tracked
             if (formContext?.formId) {
-              dispatchFieldValue(dispatch, formContext.formId, fieldName, newValue);
+              dispatchFieldValue(
+                dispatch,
+                formContext.formId,
+                fieldName,
+                newValue,
+              );
             }
 
             // Call original onChange if it exists
@@ -1020,11 +1051,14 @@ export const withFormRegistration = <P extends Record<string, any>>(
             },
           };
 
-          console.log('🔶 Converting to uncontrolled input (with Redux sync):', {
-            fieldName,
-            inputType,
-            originalValue: value,
-          });
+          console.log(
+            '🔶 Converting to uncontrolled input (with Redux sync):',
+            {
+              fieldName,
+              inputType,
+              originalValue: value,
+            },
+          );
 
           return <WrappedComponent {...uncontrolledProps} />;
         }
@@ -1032,39 +1066,6 @@ export const withFormRegistration = <P extends Record<string, any>>(
 
       return <WrappedComponent {...props} />;
     }
-
-    // For AJAX-added inputs, register them dynamically with react-hook-form
-    // This ensures they become controlled inputs like all other form inputs
-    useEffect(() => {
-      if (!rhfContext || !fieldName) return;
-
-      const currentValue = getCurrentValue();
-
-      // Check if field is already registered
-      const fieldState = rhfContext.getFieldState(fieldName);
-
-      console.log('🔵 AJAX Input Registration Check:', {
-        fieldName,
-        formId: formContext?.formId,
-        isRegistered: !!(fieldState && fieldState.invalid !== undefined),
-        fieldState,
-        currentValue,
-        inputType: props.attributes?.type,
-      });
-
-      // If field is not yet registered (AJAX-added), register it now
-      if (!fieldState || fieldState.invalid === undefined) {
-        console.log('🟢 Registering AJAX-added input:', fieldName);
-        rhfContext.register(fieldName);
-        // Set initial value
-        rhfContext.setValue(fieldName, currentValue, {
-          shouldValidate: false,
-          shouldDirty: false,
-          shouldTouch: false,
-        });
-      }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [rhfContext, fieldName]);
 
     // Route to appropriate sub-component based on form type
     const sharedProps = {
