@@ -448,7 +448,7 @@ vitest:
     - echo -e "\e[0Ksection_end:`date +%s`:Cypress-install\r\e[0K"
   variables:
     _TARGET_DB_TYPE: sqlite
-    CYPRESS_CACHE_FOLDER: /tmp/cycache
+    CYPRESS_CACHE_FOLDER: $DRUPAL_PROJECT_FOLDER/ui/cycache
   artifacts:
     when: always
     expire_in: 6 mos
