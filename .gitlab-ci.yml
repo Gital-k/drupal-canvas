@@ -414,7 +414,7 @@ vitest:
   before_script:
     - echo -e "\e[0Ksection_start:`date +%s`:Cypress-deps[collapsed=true]\r\e[0KInstall Cypress dependencies."
     - sudo apt-get -y update
-    - sudo apt-get -y install libgtk2.0-0t64 libgtk-3-0t64 libgbm-dev libnotify-dev libnss3 libxss1 libasound2t64 libxtst6 xauth xvfb alsa-utils pulseaudio
+    - sudo apt-get -y install libgtk2.0-0t64 libgtk-3-0t64 libgbm libgbm-dev libnotify-dev libnss3 libxss1 libasound2t64 libxtst6 xauth xvfb alsa-utils pulseaudio
     - sudo service dbus start
     - echo "pcm.!default { type pulse }" > ~/.asoundrc
     - echo "ctl.!default { type pulse }" >> ~/.asoundrc
@@ -445,6 +445,7 @@ vitest:
     - sudo -u www-data env CYPRESS_CACHE_FOLDER=$CYPRESS_CACHE_FOLDER /usr/bin/npm install
     - sudo -u www-data /usr/bin/npm ls cypress --workspace=@drupal-canvas/ui
     - sudo -u www-data env CYPRESS_CACHE_FOLDER=$CYPRESS_CACHE_FOLDER /usr/bin/npm exec --workspace=@drupal-canvas/ui cypress --version
+    - ldd $CYPRESS_CACHE_FOLDER/13.17.0/Cypress/Cypress | grep "not found"
     - echo -e "\e[0Ksection_end:`date +%s`:Cypress-install\r\e[0K"
   variables:
     _TARGET_DB_TYPE: sqlite
