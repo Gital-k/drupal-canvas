@@ -442,8 +442,9 @@ vitest:
     - mkdir -p $CYPRESS_CACHE_FOLDER /var/www/.npm /home/apache/.cache/fontconfig ~/.cache /usr/share/fonts/ /var/cache/fontconfig
     - chown -R www-data:www-data $CYPRESS_CACHE_FOLDER /var/www/.npm /usr/bin/npm /home/apache/.cache/fontconfig ~/.cache /usr/share/fonts/ /var/cache/fontconfig
     - sudo -u www-data /usr/bin/npm -v
+    - cat package-lock.json | grep '"workspaces"' -n
     - sudo -u www-data env CYPRESS_CACHE_FOLDER=$CYPRESS_CACHE_FOLDER /usr/bin/npm ci
-    - sudo -u www-data env CYPRESS_CACHE_FOLDER=$CYPRESS_CACHE_FOLDER /usr/bin/npm ls --parseable --workspaces
+    - sudo -u www-data env CYPRESS_CACHE_FOLDER=$CYPRESS_CACHE_FOLDER /usr/bin/npm ls --workspaces
     - sudo -u www-data /usr/bin/npm ls cypress --workspace=@drupal-canvas/ui
     - sudo -u www-data env CYPRESS_CACHE_FOLDER=$CYPRESS_CACHE_FOLDER /usr/bin/npm exec --workspace=@drupal-canvas/ui cypress --version
     - sudo -u www-data env CYPRESS_CACHE_FOLDER=$CYPRESS_CACHE_FOLDER ls -la $CYPRESS_CACHE_FOLDER/13.17.0 || true
