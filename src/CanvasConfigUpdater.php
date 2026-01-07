@@ -61,7 +61,7 @@ class CanvasConfigUpdater {
       ],
       'getPageData' => [
         'v0.breadcrumbs',
-        'v0.entityUuid',
+        'v0.currentEntity',
         'v0.pageTitle',
       ],
       '@drupal-api-client/json-api-client' => [

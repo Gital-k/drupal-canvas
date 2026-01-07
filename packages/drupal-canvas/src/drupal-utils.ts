@@ -68,10 +68,14 @@ interface BreadcrumbLink {
   url: string;
 }
 
+interface EntityData {
+  uuid: string;
+}
+
 interface PageData {
   pageTitle: string;
   breadcrumbs: Array<BreadcrumbLink>;
-  entityUuid: string;
+  currentEntity: EntityData;
 }
 
 interface SiteData {
@@ -87,7 +91,7 @@ export const getPageData = (): PageData => {
   const pageData = {
     pageTitle: window.drupalSettings?.canvasData?.v0?.pageTitle || '',
     breadcrumbs: window.drupalSettings?.canvasData?.v0?.breadcrumbs || [],
-    entityUuid: window.drupalSettings?.canvasData?.v0?.entityUuid || '',
+    currentEntity: window.drupalSettings?.canvasData?.v0?.currentEntity || {},
   };
   window.parent.postMessage({
     type: '_canvas_useswr_data_fetch',
