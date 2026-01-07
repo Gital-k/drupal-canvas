@@ -218,12 +218,12 @@ stylelint:
   # @todo Remove when https://www.drupal.org/project/gitlab_templates/issues/3492697 lands.
   script:
     - cd $_WEB_ROOT/core && corepack enable && yarn add @gitlab-formatters/stylelint-formatter-gitlab
-    - cd $CI_PROJECT_DIR/$_WEB_ROOT/modules/custom/$CI_PROJECT_NAME
+    - cd $_WEB_ROOT/$DRUPAL_PROJECT_FOLDER
     # Install packages in the Canvas module's root directory.
     # When stylelint runs Prettier, plugins are resolved relative to .prettierrc.json location, not the Prettier binary
     # (which is in the Drupal core folder).
     - npm ci
-    - echo "Stylelint version $(${CI_PROJECT_DIR}/${_WEB_ROOT}/core/node_modules/.bin/stylelint --version)"
+    - echo "Stylelint version $(${_WEB_ROOT}/core/node_modules/.bin/stylelint --version)"
     - $CI_PROJECT_DIR/$_WEB_ROOT/core/node_modules/.bin/stylelint --ignore-path ./.stylelintignore --config $CI_PROJECT_DIR/$_WEB_ROOT/core/.stylelintrc.json ./**/*.css --formatter verbose --color $_STYLELINT_EXTRA || true
     - $CI_PROJECT_DIR/$_WEB_ROOT/core/node_modules/.bin/stylelint --ignore-path ./.stylelintignore --config $CI_PROJECT_DIR/$_WEB_ROOT/core/.stylelintrc.json ./**/*.css --custom-formatter=@gitlab-formatters/stylelint-formatter-gitlab --output-file=$CI_PROJECT_DIR/gl-codequality.json $_STYLELINT_EXTRA
   artifacts:
