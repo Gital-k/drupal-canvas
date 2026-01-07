@@ -438,11 +438,7 @@ const ComponentFormField = <P extends Record<string, any>>({
     // the initial value after mounting, after which the value is managed by
     // react-hook-form.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    dispatch,
-    fieldName,
-    propName,
-  ]);
+  }, [dispatch, fieldName, propName]);
 
   if (!rhfContext) {
     return <WrappedComponent {...props} />;
@@ -468,10 +464,7 @@ const ComponentFormField = <P extends Record<string, any>>({
           }
 
           const validationResult = validateNewValue(e, newValue);
-          console.log(
-            `CHANGE ${newValue} | validation result: shouldUpdate ${shouldUpdateFormState(e, validationResult)}`,
-            validationResult,
-          );
+
           if (!shouldUpdateFormState(e, validationResult)) {
             if (formId) {
               dispatchFieldError(dispatch, formId, fieldName, validationResult);
@@ -496,7 +489,7 @@ const ComponentFormField = <P extends Record<string, any>>({
         const enhancedOnBlur = async (e: React.FocusEvent) => {
           // Call react-hook-form's onBlur to mark field as touched
           field.onBlur();
-          console.log('BLUR!');
+
           // Call original onBlur if it exists
           const originalOnBlur = props.attributes?.onBlur;
           if (originalOnBlur) {
@@ -743,13 +736,13 @@ const PageDataFormField = <P extends Record<string, any>>({
       control={rhfContext.control}
       defaultValue={getCurrentValueFromRedux()}
       render={({ field }) => {
-        console.log('🟡 PageDataFormField Render:', {
-          fieldName,
-          fieldValue: field.value,
-          inputType: props.attributes?.type,
-          propsHasOnChange: !!props.attributes?.onChange,
-          propsValue: props.attributes?.value,
-        });
+        // console.log('🟡 PageDataFormField Render:', {
+        //   fieldName,
+        //   fieldValue: field.value,
+        //   inputType: props.attributes?.type,
+        //   propsHasOnChange: !!props.attributes?.onChange,
+        //   propsValue: props.attributes?.value,
+        // });
 
         const enhancedOnChange = (e: any) => {
           const newValue = extractValue(e);
@@ -846,17 +839,17 @@ const PageDataFormField = <P extends Record<string, any>>({
           (enhancedProps as any).value = field.value;
         }
 
-        console.log('🟣 Final enhanced props for PageDataFormField:', {
-          fieldName,
-          'enhancedProps.attributes': enhancedProps.attributes
-            ? {
-                value: enhancedProps.attributes.value,
-                hasOnChange: !!enhancedProps.attributes.onChange,
-                type: enhancedProps.attributes.type,
-              }
-            : null,
-          isRadioElement,
-        });
+        // console.log('🟣 Final enhanced props for PageDataFormField:', {
+        //   fieldName,
+        //   'enhancedProps.attributes': enhancedProps.attributes
+        //     ? {
+        //         value: enhancedProps.attributes.value,
+        //         hasOnChange: !!enhancedProps.attributes.onChange,
+        //         type: enhancedProps.attributes.type,
+        //       }
+        //     : null,
+        //   isRadioElement,
+        // });
 
         return <WrappedComponent {...enhancedProps} />;
       }}
@@ -969,7 +962,7 @@ export const withFormRegistration = <P extends Record<string, any>>(
 
       // If field is not yet registered (AJAX-added), register it now
       if (!fieldState || fieldState.invalid === undefined) {
-        console.log('🟢 Registering AJAX-added input:', fieldName);
+        // console.log('🟢 Registering AJAX-added input:', fieldName);
         rhfContext.register(fieldName);
         // Set initial value
         rhfContext.setValue(fieldName, currentValue, {
@@ -984,15 +977,15 @@ export const withFormRegistration = <P extends Record<string, any>>(
     // If no react-hook-form context, the form isn't using RHF - render without enhancement
     // If no field name, we can't register it - render without enhancement
     if (!rhfContext || !fieldName) {
-      console.log('🔴 AJAX Input - No RHF context or fieldName:', {
-        hasRhfContext: !!rhfContext,
-        fieldName,
-        formId: formContext?.formId,
-        inputType: props.attributes?.type,
-        hasValue: 'value' in (props.attributes || {}),
-        value: props.attributes?.value,
-        hasOnChange: !!props.attributes?.onChange,
-      });
+      // console.log('🔴 AJAX Input - No RHF context or fieldName:', {
+      //   hasRhfContext: !!rhfContext,
+      //   fieldName,
+      //   formId: formContext?.formId,
+      //   inputType: props.attributes?.type,
+      //   hasValue: 'value' in (props.attributes || {}),
+      //   value: props.attributes?.value,
+      //   hasOnChange: !!props.attributes?.onChange,
+      // });
 
       // For inputs that have lost RHF context (e.g., tabledrag rebuild), convert to uncontrolled
       // This prevents React warnings about controlled inputs without onChange handlers
@@ -1051,14 +1044,14 @@ export const withFormRegistration = <P extends Record<string, any>>(
             },
           };
 
-          console.log(
-            '🔶 Converting to uncontrolled input (with Redux sync):',
-            {
-              fieldName,
-              inputType,
-              originalValue: value,
-            },
-          );
+          // console.log(
+          //   '🔶 Converting to uncontrolled input (with Redux sync):',
+          //   {
+          //     fieldName,
+          //     inputType,
+          //     originalValue: value,
+          //   },
+          // );
 
           return <WrappedComponent {...uncontrolledProps} />;
         }
