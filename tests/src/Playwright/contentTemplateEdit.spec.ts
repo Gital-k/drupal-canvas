@@ -1,3 +1,4 @@
+import { getModuleDir } from '@drupal-canvas/test-utils';
 import { expect } from '@playwright/test';
 
 import { test } from './fixtures/DrupalSite';
@@ -51,38 +52,12 @@ test.describe('Content Template Edit', () => {
     await drupal.loginAsAdmin();
     await page.goto('/canvas');
 
-    await page.getByRole('button', { name: 'Templates' }).click();
-    await page.getByTestId('big-add-template-button').click();
-    const modal = page.getByRole('dialog');
-    await expect(modal).toBeVisible();
-    await expect(modal.getByText('Creates a new template for')).toBeVisible();
-
-    const contentTypeCombobox = modal.getByRole('combobox', {
-      name: 'Content type',
-    });
-    await expect(contentTypeCombobox).toBeVisible();
-    await expect(contentTypeCombobox).toBeEnabled();
-    await contentTypeCombobox.click();
-    // Dropdown options render outside the modal, use page context
-    await expect(
-      page.getByLabel('Article', { exact: true }).getByText('Article'),
-    ).toBeVisible();
-    await page
-      .getByLabel('Article', { exact: true })
-      .getByText('Article')
-      .click();
-    await modal.getByRole('combobox', { name: 'Template' }).click();
-    await expect(
-      page
-        .getByLabel('Full content', { exact: true })
-        .getByText('Full content'),
-    ).toBeVisible();
-
-    await page
-      .getByLabel('Full content', { exact: true })
-      .getByText('Full content')
-      .click();
-    await modal.getByRole('button', { name: 'Add new template' }).click();
+    // Apply the article template recipe to set up the content template
+    const moduleDir = await getModuleDir();
+    await drupal.applyRecipe(
+      `${moduleDir}/canvas/tests/fixtures/recipes/article_template`,
+    );
+    await drupal.drush('cr');
 
     // Navigate to the content page and see if the contextual link is present.
     await page.goto('/admin/content');
