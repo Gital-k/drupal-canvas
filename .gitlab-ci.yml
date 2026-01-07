@@ -218,7 +218,7 @@ stylelint:
   # @todo Remove when https://www.drupal.org/project/gitlab_templates/issues/3492697 lands.
   script:
     - cd $_WEB_ROOT/core && corepack enable && yarn add @gitlab-formatters/stylelint-formatter-gitlab
-    - cd $_WEB_ROOT/$DRUPAL_PROJECT_FOLDER
+    - cd $DRUPAL_PROJECT_FOLDER
     # Install packages in the Canvas module's root directory.
     # When stylelint runs Prettier, plugins are resolved relative to .prettierrc.json location, not the Prettier binary
     # (which is in the Drupal core folder).
