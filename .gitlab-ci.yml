@@ -443,6 +443,7 @@ vitest:
     - chown -R www-data:www-data $CYPRESS_CACHE_FOLDER /var/www/.npm /usr/bin/npm /home/apache/.cache/fontconfig ~/.cache /usr/share/fonts/ /var/cache/fontconfig
     - sudo -u www-data /usr/bin/npm -v
     - sudo -u www-data node -v
+    - sudo -u www-data env CYPRESS_CACHE_FOLDER=$CYPRESS_CACHE_FOLDER /usr/bin/npm config ls -l
     - sudo -u www-data env CYPRESS_CACHE_FOLDER=$CYPRESS_CACHE_FOLDER /usr/bin/npm install
     - sudo -u www-data env CYPRESS_CACHE_FOLDER=$CYPRESS_CACHE_FOLDER /usr/bin/npm ls --workspaces
     - sudo -u www-data /usr/bin/npm ls cypress --workspace=@drupal-canvas/ui
