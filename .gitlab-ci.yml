@@ -442,6 +442,8 @@ vitest:
     - mkdir -p $CYPRESS_CACHE_FOLDER /var/www/.npm /home/apache/.cache/fontconfig ~/.cache /usr/share/fonts/ /var/cache/fontconfig
     - chown -R www-data:www-data $CYPRESS_CACHE_FOLDER /var/www/.npm /usr/bin/npm /home/apache/.cache/fontconfig ~/.cache /usr/share/fonts/ /var/cache/fontconfig
     - sudo -u www-data /usr/bin/npm -v
+    - pwd
+    - cat package.json | sed -n '1,120p'
     - sudo -u www-data env CYPRESS_CACHE_FOLDER=$CYPRESS_CACHE_FOLDER /usr/bin/npm ci
     - sudo -u www-data /usr/bin/npm ls cypress --workspace=ui
     - sudo -u www-data env CYPRESS_CACHE_FOLDER=$CYPRESS_CACHE_FOLDER /usr/bin/npm exec --workspace=ui cypress --version
