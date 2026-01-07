@@ -16,10 +16,9 @@ use Drupal\views\ResultRow;
  * - Published: Currently published (status=1)
  * - Archived: Previously published (status=0, has published revisions)
  *
- * @deprecated in canvas:1.0.0 and is removed from canvas:2.0.0. There is no
- *   replacement.
- *
- * @see https://www.drupal.org/node/3563404
+ * @internal
+ *   This views integration is internal and will be replaced by Workspaces in a
+ *   future version.
  *
  * @ingroup views_field_handlers
  */

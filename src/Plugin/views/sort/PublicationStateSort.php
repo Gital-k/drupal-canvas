@@ -12,10 +12,9 @@ use Drupal\views\Plugin\views\sort\SortPluginBase;
  *
  * Allows sorting by Draft/Published/Archived without storing data.
  *
- * @deprecated in canvas:1.0.0 and is removed from canvas:2.0.0. There is no
- * replacement.
- *
- * @see https://www.drupal.org/node/3563404
+ * @internal
+ *   This views integration is internal and will be replaced by Workspaces in a
+ *   future version.
  *
  * @ingroup views_sort_handlers
  */
