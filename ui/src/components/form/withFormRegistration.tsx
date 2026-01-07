@@ -390,6 +390,7 @@ const ComponentFormField = <P extends Record<string, any>>({
   }
 
   const commitFormState = (newFormState: PropsValues) => {
+    console.log('OMG COMMIT FOR STATE');
     const elementType = attributes.type || attributes['data-canvas-type'];
 
     // We don't debounce updates for code components where the prop is scalar -
@@ -466,7 +467,7 @@ const ComponentFormField = <P extends Record<string, any>>({
           const validationResult = validateNewValue(e, newValue);
 
           if (!shouldUpdateFormState(e, validationResult)) {
-            if (formId) {
+            if (formId && validationResult?.valid !== true) {
               dispatchFieldError(dispatch, formId, fieldName, validationResult);
             }
             return;

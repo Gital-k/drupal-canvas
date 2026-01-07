@@ -82,6 +82,7 @@ describe('Page data form', () => {
     cy.get('@heroTitle').blur();
     cy.realPress(['Meta', 'Z']);
     cy.get('@heroTitle').should('have.value', 'hello, world!');
+    cy.pause();
     cy.get('button[aria-label="Undo"]').should('be.disabled');
     cy.get('@layersTree').findByText('Two Column').should('exist');
     cy.get('button[aria-label="Redo"]').should('be.enabled');

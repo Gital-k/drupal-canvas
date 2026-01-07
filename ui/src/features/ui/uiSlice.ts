@@ -197,8 +197,8 @@ export const uiSlice = createAppSlice({
         const isUndo = action.payload;
         const undoStack = [...state.undoStack];
         const redoStack = [...state.redoStack];
-        let routeToRestore: RouteSnapshot | null = null;
 
+        let routeToRestore: RouteSnapshot | null = null;
         if (isUndo && undoStack.length > 0) {
           const undoItem = undoStack.pop() as UndoRedoStackItem;
           redoStack.unshift(undoItem);
