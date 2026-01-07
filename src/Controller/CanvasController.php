@@ -213,10 +213,10 @@ HTML;
                 ],
               ],
               'currentEntity' => [
-                // Set to NULL since there is no associated entity when a code component is open
-                // in the code editor.
+                // Set to NULL since there is no associated entity when a code
+                // component is open in the code editor.
                 'uuid' => NULL,
-              ]
+              ],
             ],
           ],
         ],

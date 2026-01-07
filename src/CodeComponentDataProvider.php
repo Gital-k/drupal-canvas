@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\canvas;
 
+use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Breadcrumb\ChainBreadcrumbBuilderInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Controller\TitleResolverInterface;
@@ -17,9 +18,9 @@ use Symfony\Component\Routing\Route;
 /**
  * Service to expose site metadata to drupalSettings for JS components.
  *
- * This includes site branding, breadcrumbs, page title, entity data, and base URL.
- * Intended for use with dynamic JavaScript components such as those in Drupal
- * Canvas.
+ * This includes site branding, breadcrumbs, page title, entity data,
+ * and base URL. Intended for use with dynamic JavaScript components
+ * such as those in Drupal Canvas.
  */
 readonly final class CodeComponentDataProvider {
 
@@ -164,7 +165,7 @@ readonly final class CodeComponentDataProvider {
   public function getCanvasDataCurrentEntityV0(): array {
     $entity = $this->routeMatch->getParameter('preview_entity');
     // Check if the user is previewing an entity through a content template.
-    if ($entity instanceof \Drupal\Core\Entity\EntityInterface) {
+    if ($entity instanceof EntityInterface) {
       return [
         self::V0 => [
           'currentEntity' => [
@@ -176,7 +177,7 @@ readonly final class CodeComponentDataProvider {
 
     // Check if the user is viewing a node.
     $entity = $this->routeMatch->getParameter('node');
-    if ($entity instanceof \Drupal\Core\Entity\EntityInterface) {
+    if ($entity instanceof EntityInterface) {
       return [
         self::V0 => [
           'currentEntity' => [
