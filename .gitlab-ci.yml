@@ -462,12 +462,12 @@ cypress E2E:
   extends: .cypress-base
   parallel: 4
   script:
-    - sudo -u www-data env CYPRESS_CACHE_FOLDER=$CYPRESS_CACHE_FOLDER /usr/bin/npm exec --workspace=@drupal-canvas/ui cypress run --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml" --spec=`node ./ui/tests/support/parallel.js`
+    - sudo -u www-data env CYPRESS_CACHE_FOLDER=$CYPRESS_CACHE_FOLDER /usr/bin/npm exec --workspace=@drupal-canvas/ui cypress run --browser chrome --reporter junit --reporter-options "mochaFile=junit-[hash].xml" --spec=`node ./ui/tests/support/parallel.js`
 
 cypress unit:
   extends: .cypress-base
   script:
-    - sudo -u www-data env CYPRESS_CACHE_FOLDER=$CYPRESS_CACHE_FOLDER /usr/bin/npm exec --workspace=@drupal-canvas/ui cypress run --component --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml"
+    - sudo -u www-data env CYPRESS_CACHE_FOLDER=$CYPRESS_CACHE_FOLDER /usr/bin/npm exec --workspace=@drupal-canvas/ui cypress run --component --browser chrome --reporter junit --reporter-options "mochaFile=junit-[hash].xml"
   rules:
     - *is-push-rule
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
