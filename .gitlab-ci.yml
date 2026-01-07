@@ -415,6 +415,7 @@ vitest:
     - echo -e "\e[0Ksection_start:`date +%s`:Cypress-deps[collapsed=true]\r\e[0KInstall Cypress dependencies."
     - sudo apt-get -y update
     - sudo apt-get -y install libgtk2.0-0t64 libgtk-3-0t64 libgbm-dev libnotify-dev libnss3 libxss1 libasound2t64 libxtst6 xauth xvfb alsa-utils pulseaudio
+    - sudo service dbus start
     - echo "pcm.!default { type pulse }" > ~/.asoundrc
     - echo "ctl.!default { type pulse }" >> ~/.asoundrc
     - pulseaudio --system --disallow-exit --disallow-module-loading &
@@ -441,14 +442,9 @@ vitest:
     - cat ./ui/.env
     - mkdir -p $CYPRESS_CACHE_FOLDER /var/www/.npm /home/apache/.cache/fontconfig ~/.cache /usr/share/fonts/ /var/cache/fontconfig
     - chown -R www-data:www-data $CYPRESS_CACHE_FOLDER /var/www/.npm /usr/bin/npm /home/apache/.cache/fontconfig ~/.cache /usr/share/fonts/ /var/cache/fontconfig
-    - sudo -u www-data /usr/bin/npm -v
-    - sudo -u www-data node -v
-    - sudo -u www-data env CYPRESS_CACHE_FOLDER=$CYPRESS_CACHE_FOLDER /usr/bin/npm config ls -l
     - sudo -u www-data env CYPRESS_CACHE_FOLDER=$CYPRESS_CACHE_FOLDER /usr/bin/npm install
-    - sudo -u www-data env CYPRESS_CACHE_FOLDER=$CYPRESS_CACHE_FOLDER /usr/bin/npm ls --workspaces
     - sudo -u www-data /usr/bin/npm ls cypress --workspace=@drupal-canvas/ui
     - sudo -u www-data env CYPRESS_CACHE_FOLDER=$CYPRESS_CACHE_FOLDER /usr/bin/npm exec --workspace=@drupal-canvas/ui cypress --version
-    - sudo -u www-data env CYPRESS_CACHE_FOLDER=$CYPRESS_CACHE_FOLDER ls -la $CYPRESS_CACHE_FOLDER/13.17.0 || true
     - echo -e "\e[0Ksection_end:`date +%s`:Cypress-install\r\e[0K"
   variables:
     _TARGET_DB_TYPE: sqlite
