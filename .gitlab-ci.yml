@@ -434,6 +434,9 @@ vitest:
     #
     - cd $DRUPAL_PROJECT_FOLDER
     - echo -e "\e[0Ksection_start:`date +%s`:Cypress-install[collapsed=true]\r\e[0KInstall Cypress."
+    - mkdir -p $CYPRESS_CACHE_FOLDER /var/www/.npm /home/apache/.cache/fontconfig ~/.cache /usr/share/fonts/ /var/cache/fontconfig
+    - chown -R www-data:www-data $CYPRESS_CACHE_FOLDER /var/www/.npm /usr/bin/npm /home/apache/.cache/fontconfig ~/.cache /usr/share/fonts/ /var/cache/fontconfig
+    - chmod -R 755 $CYPRESS_CACHE_FOLDER
     - sudo -u www-data CYPRESS_CACHE_FOLDER=$CYPRESS_CACHE_FOLDER /usr/bin/npm ci
     - cd ui
     - cp .env.example .env
@@ -442,9 +445,6 @@ vitest:
     - echo "DRUPAL_TEST_WEBSERVER_USER=www-data" >> .env
     - echo "DRUPAL_ROOT_CORE='${CI_PROJECT_DIR}/${_WEB_ROOT}/core'" >> .env
     - cat .env
-    - mkdir -p $CYPRESS_CACHE_FOLDER /var/www/.npm /home/apache/.cache/fontconfig ~/.cache /usr/share/fonts/ /var/cache/fontconfig
-    - chown -R www-data:www-data $CYPRESS_CACHE_FOLDER /var/www/.npm /usr/bin/npm /home/apache/.cache/fontconfig ~/.cache /usr/share/fonts/ /var/cache/fontconfig
-    - chmod -R 755 $CYPRESS_CACHE_FOLDER
     - sudo -u www-data CYPRESS_CACHE_FOLDER=$CYPRESS_CACHE_FOLDER node $DRUPAL_PROJECT_FOLDER/node_modules/.bin/cypress install
     - sudo -u www-data CYPRESS_CACHE_FOLDER=$CYPRESS_CACHE_FOLDER node $DRUPAL_PROJECT_FOLDER/node_modules/.bin/cypress --version
     - echo -e "\e[0Ksection_end:`date +%s`:Cypress-install\r\e[0K"
