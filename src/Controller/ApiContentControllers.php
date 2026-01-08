@@ -496,6 +496,15 @@ final class ApiContentControllers {
       $links->addCacheableDependency($autoSaveEntity);
     }
 
+    // Helper to create forbidden access result with auto-save cache dependency.
+    $createForbiddenAccess = function (string $reason) use ($autoSaveEntity): AccessResult {
+      $access = AccessResult::forbidden($reason);
+      if ($autoSaveEntity) {
+        $access->addCacheableDependency($autoSaveEntity);
+      }
+      return $access;
+    };
+
     // Link relation type => route name.
     $possible_operations = [
       CanvasUriDefinitions::LINK_REL_DELETE => ['route_name' => 'canvas.api.content.delete', 'op' => 'delete'],
@@ -556,51 +565,21 @@ final class ApiContentControllers {
       // Special handling for set as homepage operation: don't show for
       // archived pages (but allow for draft pages).
       if ($link_rel === CanvasUriDefinitions::LINK_REL_SET_AS_HOMEPAGE) {
-        if (!$effective_is_published && !$is_draft) {
-          $access = $this->createForbiddenAccessWithAutoSaveDependency(
-            'Set as homepage action not available for archived pages.',
-            $autoSaveEntity
-          );
-        }
-        else {
-          $access = $content_entity->access(operation: $entity_operation, return_as_object: TRUE);
-        }
+        $access = (!$effective_is_published && !$is_draft)
+          ? $createForbiddenAccess('Set as homepage action not available for archived pages.')
+          : $content_entity->access(operation: $entity_operation, return_as_object: TRUE);
       }
       // Special handling for archive operation: only show if determined above.
       elseif ($link_rel === CanvasUriDefinitions::LINK_REL_ARCHIVE) {
-        if (!$should_show_archive) {
-          $access = $this->createForbiddenAccessWithAutoSaveDependency(
-            'Archive action not available for this page state.',
-            $autoSaveEntity
-          );
-        }
-        else {
-          // Check if user has update access to the entity (which includes
-          // edit permission).
-          $access = $content_entity->access(
-            operation: 'update',
-            account: $this->currentUser,
-            return_as_object: TRUE
-          );
-        }
+        $access = !$should_show_archive
+          ? $createForbiddenAccess('Archive action not available for this page state.')
+          : $content_entity->access(operation: 'update', account: $this->currentUser, return_as_object: TRUE);
       }
       // Special handling for publish operation: only show if determined above.
       elseif ($link_rel === CanvasUriDefinitions::LINK_REL_PUBLISH) {
-        if (!$should_show_publish) {
-          $access = $this->createForbiddenAccessWithAutoSaveDependency(
-            'Publish action not available for this page state.',
-            $autoSaveEntity
-          );
-        }
-        else {
-          // Check if user has update access to the entity (which includes
-          // edit permission).
-          $access = $content_entity->access(
-            operation: 'update',
-            account: $this->currentUser,
-            return_as_object: TRUE
-          );
-        }
+        $access = !$should_show_publish
+          ? $createForbiddenAccess('Publish action not available for this page state.')
+          : $content_entity->access(operation: 'update', account: $this->currentUser, return_as_object: TRUE);
       }
       else {
         $access = $content_entity->access(operation: $entity_operation, return_as_object: TRUE);
@@ -671,25 +650,6 @@ final class ApiContentControllers {
     }
 
     return FALSE;
-  }
-
-  /**
-   * Creates a forbidden access result with auto-save entity cache dependency.
-   *
-   * @param string $reason
-   *   The reason for the forbidden access.
-   * @param \Drupal\Core\Entity\EntityPublishedInterface|null $autoSaveEntity
-   *   The auto-save entity to add as a cache dependency, if it exists.
-   *
-   * @return \Drupal\Core\Access\AccessResult
-   *   The forbidden access result with cache dependency.
-   */
-  private function createForbiddenAccessWithAutoSaveDependency(string $reason, ?EntityPublishedInterface $autoSaveEntity): AccessResult {
-    $access = AccessResult::forbidden($reason);
-    if ($autoSaveEntity) {
-      $access->addCacheableDependency($autoSaveEntity);
-    }
-    return $access;
   }
 
   /**
