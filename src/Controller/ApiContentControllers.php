@@ -534,7 +534,8 @@ final class ApiContentControllers {
     $original_is_published = $content_entity->isPublished();
     $auto_save_is_published = $autoSaveEntity?->isPublished() ?? NULL;
 
-    // Determine effective status: use auto-save if it exists, otherwise use original.
+    // Determine effective status: use auto-save if it exists,
+    // otherwise use original.
     $effective_is_published = $auto_save_is_published ?? $original_is_published;
 
     // Check if this is a draft (never been published).
@@ -542,12 +543,12 @@ final class ApiContentControllers {
     $is_draft = $this->autoSaveManager->entityIsDraft($content_entity);
 
     // Determine which actions to show based on state.
-    // Drafts never show archive/publish - they must use the main Publish button.
+    // Drafts use the main Publish button, not archive/publish actions.
     if ($is_draft) {
       $should_show_archive = FALSE;
       $should_show_publish = FALSE;
     }
-    // Auto-save with opposite status: show revert action (opposite of auto-save).
+    // Auto-save has opposite status: show revert action.
     elseif ($auto_save_is_published !== NULL && $auto_save_is_published !== $original_is_published) {
       $should_show_archive = $auto_save_is_published;
       $should_show_publish = !$auto_save_is_published;
