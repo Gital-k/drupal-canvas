@@ -87,12 +87,7 @@ const historyEraser = <T>(
     // For actions in this slice we want to force a certain undo/redo state.
     return {
       ...newState,
-      past: newState.past
-        .map((i: T) => ({ ...i, ...forceStateOnUndoRedo }))
-        // HEY SELF! This filter addresses the test problem in page-data-form where undo history exists that shouldn't, but
-        // creates other problems. It's here FN to provide a way to know how to resume, but this probably
-        // isn't the right direction.
-        .filter((item: any) => item.isInitialized),
+      past: newState.past.map((i: T) => ({ ...i, ...forceStateOnUndoRedo })),
       future: newState.future.map((i: T) => ({
         ...i,
         ...forceStateOnUndoRedo,
