@@ -109,11 +109,6 @@ final class ContentTemplateHooks {
 
   #[Hook('contextual_links_view_alter')]
   public function linksAlter(array &$element, array $items): void {
-    // Only proceed if this is a node contextual link group.
-    if (!array_key_exists('entity.node.edit_form', $items)) {
-      return;
-    }
-
     // Extract and validate the node ID from route parameters.
     $route_parameters = $items['entity.node.edit_form']['route_parameters'] ?? [];
     if (!isset($route_parameters['node'])) {
