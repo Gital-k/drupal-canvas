@@ -296,22 +296,22 @@ final class ApiAutoSaveController extends ApiControllerBase {
         }
         $is_draft = $this->autoSaveManager->entityIsDraft($original_entity);
 
-        // For draft pages (new entities that have never been published),
+        // For draft entities (new entities that have never been published),
         // automatically publish them when publishing changes. Check both the
-        // original and autosaved entity status to ensure the page was never
+        // original and autosaved entity status to ensure the entity was never
         // published before.
-        // For archived pages (not new), preserve the published status from
+        // For archived entities (not new), preserve the published status from
         // the autosaved entity to allow archiving (unpublishing) to work
         // correctly.
         if ($is_draft
           && $entity instanceof EntityPublishedInterface) {
           assert($original_entity instanceof EntityPublishedInterface);
           // Only auto-publish if both the original and autosaved entities are
-          // unpublished. This ensures we're publishing a draft page, not
+          // unpublished. This ensures we're publishing a draft entity, not
           // overriding an explicit archive action.
           if (!$original_entity->isPublished()
             && !$entity->isPublished()) {
-            // Draft page: automatically publish when publishing changes.
+            // Draft entity: automatically publish when publishing changes.
             $entity->setPublished();
           }
         }
