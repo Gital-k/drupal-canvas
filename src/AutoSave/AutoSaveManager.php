@@ -484,7 +484,7 @@ class AutoSaveManager implements EventSubscriberInterface {
       return !$entity->status();
     }
     $entity_type = $entity->getEntityType();
-    assert($entity instanceof EntityPublishedInterface && $entity instanceof RevisionableInterface && $entity_type->isRevisionable());
+    assert($entity instanceof EntityPublishedInterface && $entity_type->isRevisionable());
 
     // If the entity is published, it's definitely not a draft.
     if ($entity->isPublished()) {
