@@ -177,8 +177,7 @@ const ComponentFormField = <P extends Record<string, any>>({
 
   useEffect(() => {
     // Skip on initial mount
-    if (!previousUndoRedoIdRef.current) {
-      previousUndoRedoIdRef.current = latestUndoRedoActionId;
+    if (!latestUndoRedoActionId) {
       return;
     }
 
@@ -589,8 +588,7 @@ const PageDataFormField = <P extends Record<string, any>>({
 
   useEffect(() => {
     // Skip on initial mount
-    if (!previousUndoRedoIdRef.current) {
-      previousUndoRedoIdRef.current = latestUndoRedoActionId;
+    if (!latestUndoRedoActionId) {
       return;
     }
 
