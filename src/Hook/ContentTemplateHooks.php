@@ -246,10 +246,10 @@ final class ContentTemplateHooks {
       $template = ContentTemplate::loadForEntity($entity, $display->getMode());
       if ($template) {
         $build['#contextual_links']['node']['route_parameters']['view_mode'] = $display->getMode();
+        // Add cache metadata so the contextual link is invalidated when the
+        // template changes.
+        $this->renderer->addCacheableDependency($build, $template);
       }
-      // Add cache metadata so the contextual link is invalidated when the
-      // template changes.
-      $this->renderer->addCacheableDependency($build, $template);
     }
   }
 
