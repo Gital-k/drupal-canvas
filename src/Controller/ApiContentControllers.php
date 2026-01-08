@@ -550,11 +550,7 @@ final class ApiContentControllers {
     }
 
     // Don't show archive link if this page is the homepage (current or staged).
-    if ($should_show_archive && $content_entity instanceof FieldableEntityInterface) {
-      if ($this->isHomepage($content_entity)) {
-        $should_show_archive = FALSE;
-      }
-    }
+    $should_show_archive = $should_show_archive && !$this->isHomepage($content_entity);
 
     foreach ($possible_operations as $link_rel => ['route_name' => $route_name, 'op' => $entity_operation]) {
       // Special handling for set as homepage operation: don't show for
