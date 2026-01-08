@@ -483,34 +483,33 @@ class AutoSaveManager implements EventSubscriberInterface {
     if ($entity instanceof ContentTemplate) {
       return !$entity->status();
     }
+    $entity_type = $entity->getEntityType();
+    assert($entity instanceof EntityPublishedInterface && $entity instanceof RevisionableInterface && $entity_type->isRevisionable());
 
     // If the entity is published, it's definitely not a draft.
-    if ($entity instanceof EntityPublishedInterface && $entity->isPublished()) {
+    if ($entity->isPublished()) {
       return FALSE;
     }
 
     // Check if there's a published revision in the entity's history.
     // If the entity has ever been published, it's not a draft (it's archived).
-    $entity_type = $entity->getEntityType();
-    if ($entity_type->isRevisionable()) {
-      $storage = $this->entityTypeManager->getStorage($entity->getEntityTypeId());
-      assert($storage instanceof RevisionableStorageInterface);
-      $id_key = $entity_type->getKey('id');
-      assert(is_string($id_key), 'Entity type must have an ID key');
-      $published_key = $entity_type->getKey('published');
-      assert(is_string($published_key), 'Entity type must have an `published` key');
-      // Query for any published revision of this entity.
-      $query = $storage->getQuery()
-        ->accessCheck(FALSE)
-        ->allRevisions()
-        ->condition($id_key, $entity->id())
-        ->condition($published_key, 1)
-        ->range(0, 1);
-      $published_revision_ids = $query->execute();
-      // If there's a published revision, it's not a draft (it's archived).
-      if (!empty($published_revision_ids)) {
-        return FALSE;
-      }
+    $storage = $this->entityTypeManager->getStorage($entity_type->id());
+    assert($storage instanceof RevisionableStorageInterface);
+    $id_key = $entity_type->getKey('id');
+    assert(is_string($id_key), 'Entity type must have an ID key');
+    $published_key = $entity_type->getKey('published');
+    assert(is_string($published_key), 'Entity type must have an `published` key');
+    // Query for any published revision of this entity.
+    $query = $storage->getQuery()
+      ->accessCheck(FALSE)
+      ->allRevisions()
+      ->condition($id_key, $entity->id())
+      ->condition($published_key, 1)
+      ->range(0, 1);
+    $published_revision_ids = $query->execute();
+    // If there's a published revision, it's not a draft (it's archived).
+    if (!empty($published_revision_ids)) {
+      return FALSE;
     }
 
     // At this point, the entity is unpublished and has never been published.
