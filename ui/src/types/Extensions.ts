@@ -4,6 +4,7 @@ export interface LegacyExtension {
   description: string;
   imgSrc: string;
   component?: any;
+  showNotification?: boolean;
 }
 
 export interface Extension {
@@ -15,6 +16,7 @@ export interface Extension {
   type?: 'canvas' | 'code-editor';
   api_version: string;
   permissions?: string[];
+  showNotification?: boolean;
 }
 
 export type ActiveExtension = Extension | null;
