@@ -125,7 +125,7 @@ final class ApiContentControllers {
   /**
    * Archives (unpublishes) or publishes entity through auto-save.
    *
-   * @param \Drupal\Core\Entity\ContentEntityInterface $canvas_page
+   * @param \Drupal\Core\Entity\ContentEntityInterface $entity
    *   Entity to archive or publish.
    * @param \Symfony\Component\HttpFoundation\Request $request
    *   The request object.
@@ -133,13 +133,12 @@ final class ApiContentControllers {
    * @return \Symfony\Component\HttpFoundation\JsonResponse
    *   Response.
    */
-  public function patch(ContentEntityInterface $canvas_page, Request $request): JsonResponse {
+  public function patch(ContentEntityInterface $entity, Request $request): JsonResponse {
     $content = $request->getContent();
     $body = json_decode($content, TRUE);
 
-    assert($canvas_page instanceof EntityPublishedInterface);
-    $entity_type = $canvas_page->getEntityType();
-    $published_key = $entity_type->getKey('published');
+    assert($entity instanceof EntityPublishedInterface);
+      $published_key = $entity->getEntityType()->getKey('published');
     assert(is_string($published_key), 'Entity type must have a `published` key');
 
     // Validate that only supported fields are present in the request body.
@@ -162,9 +161,9 @@ final class ApiContentControllers {
 
     // Get the auto-saved version if available, otherwise use the original
     // entity.
-    $autoSaveData = $this->autoSaveManager->getAutoSaveEntity($canvas_page);
+    $autoSaveData = $this->autoSaveManager->getAutoSaveEntity($entity);
     $entity_to_update = $autoSaveData->isEmpty()
-      ? $canvas_page
+      ? $entity
       : $autoSaveData->entity;
     assert($entity_to_update instanceof EntityPublishedInterface);
 
@@ -172,7 +171,7 @@ final class ApiContentControllers {
     assert(is_bool($body[$published_key]));
     if ($body[$published_key] === FALSE) {
       // Prevent archiving the homepage.
-      if ($canvas_page->isPublished() && $this->isHomepage($canvas_page)) {
+      if ($entity->isPublished() && $this->isHomepage($entity)) {
         return new JsonResponse(
           data: ['error' => 'Cannot archive the homepage. Please set a different page as the homepage first.'],
           status: Response::HTTP_FORBIDDEN
