@@ -527,20 +527,8 @@ final class ApiContentControllers {
     $original_is_published = $content_entity->isPublished();
     $auto_save_is_published = $autoSaveEntity?->isPublished() ?? NULL;
 
-    // Determine effective status: use auto-save if it exists,
-    // otherwise use original.
-    $effective_is_published = ($auto_save_is_published !== NULL)
-      ? $auto_save_is_published
-      : $original_is_published;
-
-    // Determine which action to show:
-    // - If auto-save exists and has opposite status to original: show revert
-    //   action.
-    // - Otherwise: show normal action based on effective status.
-    // - BUT: Never show archive for draft pages (pages that have never been
-    //   truly published).
-    $should_show_archive = FALSE;
-    $should_show_publish = FALSE;
+    // Determine effective status: use auto-save if it exists, otherwise use original.
+    $effective_is_published = $auto_save_is_published ?? $original_is_published;
 
     // Check if this is a draft (never been published).
     $is_draft = FALSE;
@@ -548,34 +536,21 @@ final class ApiContentControllers {
       $is_draft = $this->autoSaveManager->entityIsDraft($content_entity);
     }
 
-    if ($auto_save_is_published !== NULL
-      && $auto_save_is_published !== $original_is_published) {
-      // Auto-save has opposite status: show revert action.
-      if ($auto_save_is_published && !$is_draft) {
-        // Auto-save is published, original is unpublished, and NOT a draft:
-        // show archive to revert.
-        $should_show_archive = TRUE;
-      }
-      elseif (!$auto_save_is_published) {
-        // Auto-save is unpublished, original is published,
-        // show publish to revert.
-        $should_show_publish = TRUE;
-      }
-      // If it's a draft with auto-saved published status, show neither action.
-      // The draft must be truly published via the main Publish button first.
+    // Determine which actions to show based on state.
+    // Drafts never show archive/publish - they must use the main Publish button.
+    if ($is_draft) {
+      $should_show_archive = FALSE;
+      $should_show_publish = FALSE;
     }
+    // Auto-save with opposite status: show revert action (opposite of auto-save).
+    elseif ($auto_save_is_published !== NULL && $auto_save_is_published !== $original_is_published) {
+      $should_show_archive = $auto_save_is_published;
+      $should_show_publish = !$auto_save_is_published;
+    }
+    // No auto-save or auto-save matches original: show normal action.
     else {
-      // No auto-save or auto-save matches original: show normal action based on
-      // effective status.
-      if ($effective_is_published && !$is_draft) {
-        // Only show archive for truly published pages (not drafts).
-        $should_show_archive = TRUE;
-      }
-      elseif (!$effective_is_published && !$is_draft) {
-        // Show publish only for archived pages.
-        // Do NOT show for draft pages (never published).
-        $should_show_publish = TRUE;
-      }
+      $should_show_archive = $effective_is_published;
+      $should_show_publish = !$effective_is_published;
     }
 
     // Don't show archive link if this page is the homepage (current or staged).
@@ -590,12 +565,10 @@ final class ApiContentControllers {
       // archived pages (but allow for draft pages).
       if ($link_rel === CanvasUriDefinitions::LINK_REL_SET_AS_HOMEPAGE) {
         if (!$effective_is_published && !$is_draft) {
-          $access = AccessResult::forbidden(
-            'Set as homepage action not available for archived pages.'
+          $access = $this->createForbiddenAccessWithAutoSaveDependency(
+            'Set as homepage action not available for archived pages.',
+            $autoSaveEntity
           );
-          if ($autoSaveEntity) {
-            $access->addCacheableDependency($autoSaveEntity);
-          }
         }
         else {
           $access = $content_entity->access(operation: $entity_operation, return_as_object: TRUE);
@@ -604,12 +577,10 @@ final class ApiContentControllers {
       // Special handling for archive operation: only show if determined above.
       elseif ($link_rel === CanvasUriDefinitions::LINK_REL_ARCHIVE) {
         if (!$should_show_archive) {
-          $access = AccessResult::forbidden(
-            'Archive action not available for this page state.'
+          $access = $this->createForbiddenAccessWithAutoSaveDependency(
+            'Archive action not available for this page state.',
+            $autoSaveEntity
           );
-          if ($autoSaveEntity) {
-            $access->addCacheableDependency($autoSaveEntity);
-          }
         }
         else {
           // Check if user has update access to the entity (which includes
@@ -624,12 +595,10 @@ final class ApiContentControllers {
       // Special handling for publish operation: only show if determined above.
       elseif ($link_rel === CanvasUriDefinitions::LINK_REL_PUBLISH) {
         if (!$should_show_publish) {
-          $access = AccessResult::forbidden(
-            'Publish action not available for this page state.'
+          $access = $this->createForbiddenAccessWithAutoSaveDependency(
+            'Publish action not available for this page state.',
+            $autoSaveEntity
           );
-          if ($autoSaveEntity) {
-            $access->addCacheableDependency($autoSaveEntity);
-          }
         }
         else {
           // Check if user has update access to the entity (which includes
@@ -710,6 +679,25 @@ final class ApiContentControllers {
     }
 
     return FALSE;
+  }
+
+  /**
+   * Creates a forbidden access result with auto-save entity cache dependency.
+   *
+   * @param string $reason
+   *   The reason for the forbidden access.
+   * @param \Drupal\Core\Entity\EntityPublishedInterface|null $autoSaveEntity
+   *   The auto-save entity to add as a cache dependency, if it exists.
+   *
+   * @return \Drupal\Core\Access\AccessResult
+   *   The forbidden access result with cache dependency.
+   */
+  private function createForbiddenAccessWithAutoSaveDependency(string $reason, ?EntityPublishedInterface $autoSaveEntity): AccessResult {
+    $access = AccessResult::forbidden($reason);
+    if ($autoSaveEntity) {
+      $access->addCacheableDependency($autoSaveEntity);
+    }
+    return $access;
   }
 
   /**
