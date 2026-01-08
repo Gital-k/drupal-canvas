@@ -89,7 +89,7 @@ final class PageHooks {
    * @todo Move to non-Page-specific hooks in https://www.drupal.org/i/3498525
    */
   #[Hook('entity_access')]
-  public function preventHomepageDeletion(EntityInterface $entity, string $operation, AccountInterface $account): AccessResultInterface {
+  public function preventHomepageModification(EntityInterface $entity, string $operation, AccountInterface $account): AccessResultInterface {
     if (($operation === 'delete' || $operation === 'update') && $entity instanceof FieldableEntityInterface) {
       $system_config = $this->configFactory->get('system.site');
       $homepage = $system_config->get('page.front');
