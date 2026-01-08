@@ -300,10 +300,8 @@ final class ApiContentControllers {
     // Determine if the entity is considered new (draft).
     // A page is only a draft if it matches the "new" criteria AND has never
     // been published.
-    $is_new = FALSE;
-    if ($content_entity instanceof ContentEntityInterface) {
-      $is_new = $this->autoSaveManager->entityIsDraft($content_entity);
-    }
+    assert($content_entity instanceof ContentEntityInterface);
+    $is_new = $this->autoSaveManager->entityIsDraft($content_entity);
 
     // Determine if there's an unsaved status change.
     // This happens when auto-save exists with a different published status
@@ -531,10 +529,8 @@ final class ApiContentControllers {
     $effective_is_published = $auto_save_is_published ?? $original_is_published;
 
     // Check if this is a draft (never been published).
-    $is_draft = FALSE;
-    if ($content_entity instanceof ContentEntityInterface) {
-      $is_draft = $this->autoSaveManager->entityIsDraft($content_entity);
-    }
+    assert($content_entity instanceof ContentEntityInterface);
+    $is_draft = $this->autoSaveManager->entityIsDraft($content_entity);
 
     // Determine which actions to show based on state.
     // Drafts never show archive/publish - they must use the main Publish button.
