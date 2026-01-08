@@ -434,8 +434,8 @@ vitest:
     #
     - cd $DRUPAL_PROJECT_FOLDER
     - echo -e "\e[0Ksection_start:`date +%s`:Cypress-install[collapsed=true]\r\e[0KInstall Cypress."
-    - sudo -u www-data env /usr/bin/npm ci
     - cd ui
+    - sudo -u www-data env /usr/bin/npm install
     - cp .env.example .env
     - echo "BASE_URL='${SIMPLETEST_BASE_URL}'" >> .env
     - echo "DB_URL='${DRUPAL_TEST_DB_URL}'" >> .env
