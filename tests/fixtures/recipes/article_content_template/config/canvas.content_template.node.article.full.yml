@@ -3,6 +3,7 @@ status: false
 dependencies:
   config:
     - core.entity_view_mode.node.full
+    - node.type.article
 id: node.article.full
 content_entity_type_id: node
 content_entity_type_bundle: article
