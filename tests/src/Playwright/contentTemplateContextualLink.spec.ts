@@ -55,7 +55,6 @@ test.describe('Content Template Contextual Link', () => {
     page,
     drupal,
   }) => {
-    await drupal.loginAsAdmin();
     const moduleDir = await getModuleDir();
     await drupal.applyRecipe(
       `${moduleDir}/canvas/tests/fixtures/recipes/article_content_template`,
@@ -78,7 +77,6 @@ test.describe('Content Template Contextual Link', () => {
       email: 'test@example.com',
       roles: ['content_editor'],
     });
-    await drupal.logout();
     await drupal.login({
       username: 'test_user',
       password: 'test_pass',
@@ -106,12 +104,10 @@ test.describe('Content Template Contextual Link', () => {
 
     // Now add the 'administer content templates' permission to the same role.
     await drupal.logout();
-    await drupal.loginAsAdmin();
     await drupal.addPermissions({
       role: 'content_editor',
       permissions: ['administer content templates'],
     });
-    await drupal.logout();
     await drupal.login({
       username: 'test_user',
       password: 'test_pass',
