@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupal\canvas\Plugin\DataType;
 
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
+use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpressionInterface;
 use Drupal\canvas\PropSource\AdaptedPropSource;
 use Drupal\Component\Serialization\Json;
 use Drupal\Component\Utility\NestedArray;
@@ -164,7 +165,7 @@ final class ComponentInputs extends TypedData implements ContentAwareDependentIn
    *   The keys will be strings in the form of "INSTANCE_UUID:PROP_NAME".
    */
   public function getPropSourcesUsingExpressionClass(string $expression_class): iterable {
-    assert(is_a($expression_class, StructuredDataPropExpression::class, TRUE));
+    assert(is_a($expression_class, StructuredDataPropExpressionInterface::class, TRUE));
     foreach ($this->getPropSources() as $key => $prop_source) {
       if ($prop_source instanceof AdaptedPropSource) {
         throw new \LogicException('@todo as soon as adapted prop sources are actually used');

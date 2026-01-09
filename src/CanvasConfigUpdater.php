@@ -184,9 +184,9 @@ class CanvasConfigUpdater {
     $has_reference_expression = function (ComponentTreeItem $item): bool {
       $inputs = $item->get('inputs');
       \assert($inputs instanceof ComponentInputs);
-      return !empty($inputs->getPropSourcesUsingExpressionClass(ReferenceFieldPropExpression::class))
+      return !empty(iterator_to_array($inputs->getPropSourcesUsingExpressionClass(ReferenceFieldPropExpression::class)))
         ||
-        !empty($inputs->getPropSourcesUsingExpressionClass(ReferenceFieldTypePropExpression::class));
+        !empty(iterator_to_array($inputs->getPropSourcesUsingExpressionClass(ReferenceFieldTypePropExpression::class)));
     };
     return !empty($component_tree->componentTreeItemsIterator($has_reference_expression));
   }
