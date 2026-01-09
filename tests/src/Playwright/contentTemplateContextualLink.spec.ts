@@ -3,6 +3,7 @@ import { expect } from '@playwright/test';
 
 import { test } from './fixtures/DrupalSite';
 import { Drupal } from './objects/Drupal';
+
 test.describe('Content Template Contextual Link', () => {
   test.beforeAll(
     'Setup test site with Drupal Canvas',
