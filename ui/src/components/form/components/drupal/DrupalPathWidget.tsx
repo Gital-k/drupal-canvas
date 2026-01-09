@@ -89,6 +89,9 @@ const DrupalPathWidget = ({
     }
 
     const newValue = getPathAlias(titleInput ?? '');
+    if (newValue === pathValue) {
+      return;
+    }
     const syntheticEvent = {
       target: {
         value: newValue,

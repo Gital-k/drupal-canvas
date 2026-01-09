@@ -53,6 +53,7 @@ const DrupalTextArea = ({
       )}
       {format?.editor !== 'ckeditor5' && (
         <div {...a2p(wrapperAttributes)}>
+          <b>GID</b>
           <TextArea
             value={attributes.value?.toString() ?? ''}
             attributes={a2p(attributes, {}, { skipAttributes: ['value'] })}

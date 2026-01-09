@@ -47,7 +47,7 @@ const TextField = ({
                 });
 
                 if (typeof attributes.onChange === 'function') {
-                  attributes.onChange(changeEvent);
+                  // attributes.onChange(changeEvent);
                   if (window.jQuery) {
                     const $target = window.jQuery(this);
                     if ($target.length) {

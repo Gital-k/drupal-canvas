@@ -35,7 +35,10 @@ import {
   setPageData,
 } from '@/features/pageData/pageDataSlice';
 import { setPreviewBackgroundUpdate } from '@/features/pagePreview/previewSlice';
-import { selectLatestUndoRedoActionId } from '@/features/ui/uiSlice';
+import {
+  selectLatestUndoRedoActionId,
+  selectUndoRedoMetadata,
+} from '@/features/ui/uiSlice';
 import { useComponentFormInputInfo } from '@/hooks/useComponentFormInputInfo';
 import { usePageDataFormInputInfo } from '@/hooks/usePageDataFormInputInfo';
 import { AJAX_UPDATE_FORM_BUILD_ID_EVENT } from '@/types/Ajax';
@@ -173,11 +176,17 @@ const ComponentFormField = <P extends Record<string, any>>({
 
   // Watch for undo/redo actions and sync react-hook-form
   const latestUndoRedoActionId = useAppSelector(selectLatestUndoRedoActionId);
+  const undoRedoMetadata = useAppSelector(selectUndoRedoMetadata);
   const previousUndoRedoIdRef = useRef<string>('');
 
   useEffect(() => {
     // Skip on initial mount
     if (!latestUndoRedoActionId) {
+      return;
+    }
+
+    // Skip if this undo/redo is not for layoutModel
+    if (undoRedoMetadata.targetSlice !== 'layoutModel') {
       return;
     }
 
@@ -194,7 +203,13 @@ const ComponentFormField = <P extends Record<string, any>>({
       });
       previousUndoRedoIdRef.current = latestUndoRedoActionId;
     }
-  }, [latestUndoRedoActionId, fieldName, getCurrentValue, rhfContext]);
+  }, [
+    latestUndoRedoActionId,
+    undoRedoMetadata,
+    fieldName,
+    getCurrentValue,
+    rhfContext,
+  ]);
 
   const formStateToStore = (
     newFormState: PropsValues,
@@ -389,7 +404,6 @@ const ComponentFormField = <P extends Record<string, any>>({
   }
 
   const commitFormState = (newFormState: PropsValues) => {
-    console.log('OMG COMMIT FOR STATE');
     const elementType = attributes.type || attributes['data-canvas-type'];
 
     // We don't debounce updates for code components where the prop is scalar -
@@ -455,6 +469,9 @@ const ComponentFormField = <P extends Record<string, any>>({
 
           // Update react-hook-form state
           field.onChange(newValue);
+          console.log(
+            `'dispatch field value comp ${newValue !== formState[fieldName]}`,
+          );
           dispatchFieldValue(dispatch, formId, fieldName, newValue);
 
           // Call original onChange
@@ -473,12 +490,14 @@ const ComponentFormField = <P extends Record<string, any>>({
           }
           // If no AJAX operations are in progress, update the form state and store.
           if (!isAjaxing()) {
+            // console.log(`'commit f 477 ${fieldName} | ${newValue} || ${formState[fieldName]} >> ${newValue !== formState[fieldName]}`);
             commitFormState({ ...formState, [fieldName]: newValue });
             return;
           }
           // This is only reached if AJAX operations are in progress. Add an event
           // listener to update the form state once ajax is complete.
           const stopListener = () => {
+            console.log(`'commit f 484 ${newValue !== formState[fieldName]}`);
             commitFormState({ ...formState, [fieldName]: newValue });
           };
           document.addEventListener('drupalAjaxStop', stopListener, {
@@ -568,6 +587,8 @@ const PageDataFormField = <P extends Record<string, any>>({
   const { dispatch, pageData, latestUndoRedoActionId, formState } =
     usePageDataFormInputInfo();
 
+  const undoRedoMetadata = useAppSelector(selectUndoRedoMetadata);
+
   const { attributes } = props;
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const formId = 'page_data_form';
@@ -592,6 +613,11 @@ const PageDataFormField = <P extends Record<string, any>>({
       return;
     }
 
+    // Skip if this undo/redo is not for pageData
+    if (undoRedoMetadata.targetSlice !== 'pageData') {
+      return;
+    }
+
     // If undo/redo occurred, sync react-hook-form with current Redux state
     if (
       latestUndoRedoActionId !== previousUndoRedoIdRef.current &&
@@ -606,7 +632,13 @@ const PageDataFormField = <P extends Record<string, any>>({
       previousUndoRedoIdRef.current = latestUndoRedoActionId;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [latestUndoRedoActionId, fieldName, rhfContext, pageData]);
+  }, [
+    latestUndoRedoActionId,
+    undoRedoMetadata,
+    fieldName,
+    rhfContext,
+    pageData,
+  ]);
 
   // Page data form specific hooks
   useEffect(() => {
@@ -620,6 +652,7 @@ const PageDataFormField = <P extends Record<string, any>>({
   }, [dispatch, fieldName, formContext?.formId, WrappedComponent]);
 
   const formStateToStore = (newFormState: PropsValues) => {
+    console.log('PAGE form state to store', newFormState);
     const values = Object.keys(newFormState).reduce(
       (acc: Record<string, any>, key) => {
         if (
@@ -751,6 +784,7 @@ const PageDataFormField = <P extends Record<string, any>>({
 
           // Update Redux store
           if (formContext?.formId) {
+            // console.log('page form field dispatch 754');
             dispatchFieldValue(
               dispatch,
               formContext.formId,
@@ -765,12 +799,14 @@ const PageDataFormField = <P extends Record<string, any>>({
             originalOnChange(e);
           }
           if (!isAjaxing()) {
+            // console.log('page form field commit line 769');
             commitFormState({ ...formState, [fieldName]: newValue });
             return;
           }
           // This is only reached if AJAX operations are in progress. Add an event
           // listener to update the form state once ajax is complete.
           const stopListener = () => {
+            console.log('page form field commit line 776');
             commitFormState({ ...formState, [fieldName]: newValue });
           };
           document.addEventListener('drupalAjaxStop', stopListener, {

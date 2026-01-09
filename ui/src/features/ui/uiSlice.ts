@@ -55,6 +55,11 @@ export interface UndoRedoStackItem {
   debugInfoAction?: Action;
 }
 
+export interface UndoRedoMetadata {
+  operation: 'undo' | 'redo' | null;
+  targetSlice: UndoRedoType | null;
+}
+
 export interface uiSliceState {
   pending: boolean;
   zooming: boolean;
@@ -69,6 +74,7 @@ export interface uiSliceState {
   viewportMinHeight: number;
   editorViewPort: EditorViewPort;
   latestUndoRedoActionId: string;
+  undoRedoMetadata: UndoRedoMetadata;
   firstLoadComplete: boolean;
   editorFrameMode: EditorFrameMode;
   editorFrameContext: EditorFrameContext;
@@ -113,6 +119,10 @@ export const initialState: uiSliceState = {
     hash: '',
   },
   latestUndoRedoActionId: '',
+  undoRedoMetadata: {
+    operation: null,
+    targetSlice: null,
+  },
   firstLoadComplete: false,
   editorFrameMode: EditorFrameMode.EDIT,
   editorFrameContext: EditorFrameContext.NONE,
@@ -184,8 +194,14 @@ export const uiSlice = createAppSlice({
   reducers: (create) => ({
     pushUndo: create.reducer(
       (state, action: PayloadAction<UndoRedoStackItem>) => {
+        console.log('ui undo gets', action.payload.targetSlice);
         state.undoStack.push(action.payload);
         state.redoStack = [];
+        // Reset metadata when a new action is pushed (not an undo/redo)
+        state.undoRedoMetadata = {
+          operation: null,
+          targetSlice: null,
+        };
       },
     ),
     performUndoOrRedo: create.reducer(
@@ -197,24 +213,50 @@ export const uiSlice = createAppSlice({
         const isUndo = action.payload;
         const undoStack = [...state.undoStack];
         const redoStack = [...state.redoStack];
-
+        console.group();
+        if (!isUndo) {
+          console.log(
+            `performing REDO rstack: ${redoStack.map((r) => r.targetSlice).join(',')} ustack ${undoStack.map((r) => r.targetSlice).join(',')}`,
+          );
+        } else {
+          console.log(
+            `performing UNDO rstack: ${redoStack.map((r) => r.targetSlice).join(',')} ustack ${undoStack.map((r) => r.targetSlice).join(',')}`,
+          );
+        }
         let routeToRestore: RouteSnapshot | null = null;
+        let targetSlice: UndoRedoType | null = null;
+
         if (isUndo && undoStack.length > 0) {
           const undoItem = undoStack.pop() as UndoRedoStackItem;
+          console.log('push the stinker to the redo');
           redoStack.unshift(undoItem);
           routeToRestore = undoItem.routeSnapshot;
+          targetSlice = undoItem.targetSlice;
         } else if (redoStack.length > 0) {
           // Move the last redo state into the undo stack.
           const redoItem = redoStack.shift() as UndoRedoStackItem;
+          console.log('moved the redo to the undo');
           undoStack.push(redoItem);
           routeToRestore = redoItem.routeSnapshot;
+          targetSlice = redoItem.targetSlice;
+        } else {
+          console.log(
+            `${isUndo ? 'Undo' : 'Redo'} UNDO# ${undoStack.length} REDO# ${redoStack.length}.`,
+          );
         }
-
+        console.log(
+          `final stacks: ${redoStack.map((r) => r.targetSlice).join(',')} ustack ${undoStack.map((r) => r.targetSlice).join(',')}`,
+        );
+        console.groupEnd();
         return {
           ...state,
           undoStack,
           redoStack,
           currentRoute: routeToRestore || state.currentRoute,
+          undoRedoMetadata: {
+            operation: isUndo ? 'undo' : 'redo',
+            targetSlice,
+          },
         };
       },
     ),
@@ -412,6 +454,9 @@ export const uiSlice = createAppSlice({
     selectLatestUndoRedoActionId: (ui): string => {
       return ui.latestUndoRedoActionId;
     },
+    selectUndoRedoMetadata: (ui): UndoRedoMetadata => {
+      return ui.undoRedoMetadata;
+    },
     selectFirstLoadComplete: (ui): boolean => {
       return ui.firstLoadComplete;
     },
@@ -501,6 +546,7 @@ export const {
   selectViewportWidth,
   selectViewportMinHeight,
   selectLatestUndoRedoActionId,
+  selectUndoRedoMetadata,
   selectFirstLoadComplete,
   selectEditorFrameMode,
   selectEditorFrameContext,

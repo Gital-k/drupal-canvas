@@ -440,7 +440,6 @@ export const layoutModelSlice = createSlice({
     setLayoutModel: create.reducer(
       (state, action: PayloadAction<LayoutModelSliceState>) => {
         const { layout, model, updatePreview } = action.payload;
-        console.log('Setting layout and model', action.payload);
         state.layout = layout;
         state.model = model;
         state.updatePreview = updatePreview;

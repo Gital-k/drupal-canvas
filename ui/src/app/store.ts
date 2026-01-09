@@ -75,7 +75,6 @@ const historyEraser = <T>(
       // for this slice is no longer valid.
       // Without this historyEraser, slices would retain their future state when
       // they are not needed or reachable.
-
       return { ...newState, future: [] };
     }
     if (
@@ -106,7 +105,17 @@ const rootReducer = combineSlices(
         redoType: '@@redux-undo/layoutModel_REDO',
         filter: (action, currentState, previousHistory) => {
           const { present } = previousHistory;
+          console.log(
+            `FILTER LM ${
+              typeof action.payload === 'object' &&
+              Object.keys(present.model).length > 0 &&
+              action.type !== setInitialLayoutModel.type &&
+              action.type !== setUpdatePreview.type
+            }`,
+            action.payload,
+          );
           return (
+            typeof action.payload === 'object' &&
             Object.keys(present.model).length > 0 &&
             action.type !== setInitialLayoutModel.type &&
             action.type !== setUpdatePreview.type
@@ -124,7 +133,17 @@ const rootReducer = combineSlices(
         redoType: '@@redux-undo/pageData_REDO',
         filter: (action, currentState, previousHistory) => {
           const { present } = previousHistory;
+          if (
+            typeof action.payload === 'object' &&
+            Object.keys(present).length > 0 &&
+            action.type !== setInitialPageData.type
+          ) {
+            console.log(`filter keep`, { currentState, action });
+          } else {
+            console.log(`filter reject`, { currentState, action });
+          }
           return (
+            typeof action.payload === 'object' &&
             Object.keys(present).length > 0 &&
             action.type !== setInitialPageData.type
           );
@@ -186,25 +205,97 @@ const undoRedoActionIdMiddleware: Middleware<{}, RootState> =
       // Ignore initial actions that set the state of the model or page data
       // from the return of API responses. The user should not be able to undo
       // or redo these actions.
+      console.log('Ignoring action for undo/redo', action);
       return next(action);
     }
     const [slice] = type.split('/');
     if (slice === 'layoutModel' || slice === 'pageData') {
       // Get current route from state and push undo with route snapshot.
+      console.group(`UndoRedo Middleware for ${slice}`);
       const state = store.getState();
       const currentRoute = state.ui.currentRoute;
-      store.dispatch(
-        pushUndo({
-          targetSlice: slice as UndoRedoType,
-          routeSnapshot: currentRoute,
-          ...(import.meta.env.DEV &&
-            import.meta.env.TEST === false && {
-              // Add debug info for the action that triggered the undo/redo,
-              // only in development mode.
-              debugInfoAction: action as Action,
-            }),
-        }),
-      );
+      // Log pageData changes before pushing to undo stack
+      if (slice === 'pageData') {
+        const currentPageData = state.pageData.present;
+        const pastPageData = state.pageData.past;
+
+        if (pastPageData && pastPageData.length > 0) {
+          const lastPageData = pastPageData[pastPageData.length - 1];
+
+          // Skip logging if comparing against uninitialized state
+          if (lastPageData?.isInitialized === false) {
+            console.log(
+              'PageData: Comparing against uninitialized state (skipping change log)',
+            );
+          } else {
+            const changes: string[] = [];
+
+            // Compare all properties in current vs last pageData
+            const allKeys = new Set([
+              ...Object.keys(currentPageData || {}),
+              ...Object.keys(lastPageData || {}),
+            ]);
+
+            allKeys.forEach((key) => {
+              const currentValue = currentPageData?.[key];
+              const lastValue = lastPageData?.[key];
+
+              if (currentValue !== lastValue) {
+                // Stringify values for comparison and logging
+                const currentStr = JSON.stringify(currentValue);
+                const lastStr = JSON.stringify(lastValue);
+
+                if (currentStr !== lastStr) {
+                  changes.push(
+                    `${key}: ${lastStr || 'undefined'} -> ${currentStr || 'undefined'}`,
+                  );
+                }
+              }
+            });
+
+            if (changes.length > 0) {
+              console.log(
+                `PageData changes: ${changes.join('; ')} lastTYPE = ${typeof lastPageData} } last len ${typeof lastPageData === 'object' ? Object.keys(lastPageData).length : 'N/A'}`,
+              );
+            } else {
+              console.log('PageData: No changes detected');
+            }
+          }
+        } else {
+          console.log('PageData: First undo item (no previous state)');
+        }
+      }
+
+      // console.log(
+      //   `${slice} >> the state ${state.ui.undoStack.length}`,
+      //   state[slice],
+      // );
+      // Log the item being added and current stack size
+      const itemToAdd = {
+        targetSlice: slice as UndoRedoType,
+        routeSnapshot: currentRoute,
+        // @ts-ignore
+        at: action.type,
+        // ...(import.meta.env.DEV &&
+        //   import.meta.env.TEST === false && {
+        //     debugInfoAction: action as Action,
+        //   }),
+        // ...{
+        //   debugInfoAction: action as Action,
+        //   },
+      };
+      // @ts-ignore
+      store.dispatch(pushUndo(itemToAdd));
+
+      // if (canUndo) {
+      //   // @ts-ignore
+      //   console.log(`Pushing undo for ${slice} ${action.type}`, action.payload);
+      //   store.dispatch(pushUndo(itemToAdd));
+      // } else {
+      //   // @ts-ignore
+      //   console.log(`Skip init undo for ${slice} ${action.type}`, action.payload);
+      // }
+      console.groupEnd();
     }
     return next(action);
   };

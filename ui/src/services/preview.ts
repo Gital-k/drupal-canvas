@@ -97,6 +97,7 @@ export const previewApi = createApi({
         handleAutoSavesHashUpdate(dispatch, autoSaves, meta);
         // Pass update preview false to prevent a subsequent preview update,
         // we have the data here.
+        console.log('We will set layout model', model);
         dispatch(setLayoutModel({ layout, model, updatePreview: false }));
       },
     }),
