@@ -110,7 +110,7 @@ final class ContentTemplateHooks {
   #[Hook('contextual_links_view_alter')]
   public function linksAlter(array &$element, array $items): void {
     // Extract and validate the node ID from route parameters.
-    $route_parameters = $items['entity.node.edit_form']['route_parameters'] ?? [];
+    $route_parameters = isset($items['entity.node.edit_form']) ? $items['entity.node.edit_form']['route_parameters'] ?? [] : [];
     if (!isset($route_parameters['node'])) {
       return;
     }
