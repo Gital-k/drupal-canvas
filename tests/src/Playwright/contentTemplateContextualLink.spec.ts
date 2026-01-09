@@ -1,3 +1,13 @@
+/**
+ * @file
+ * Playwright test for Content Template contextual link functionality.
+ *
+ * This test uses Playwright instead of a functional test because contextual
+ * links are not part of the DOM when JavaScript is disabled. Functional tests
+ * run without JavaScript, making it impossible to test contextual link
+ * behavior in that environment.
+ */
+
 import { getModuleDir } from '@drupal-canvas/test-utils';
 import { expect } from '@playwright/test';
 
