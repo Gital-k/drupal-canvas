@@ -102,8 +102,8 @@ test.describe('Content Template Contextual Link', () => {
       page.getByRole('link', { name: 'Edit content template' }),
     ).not.toBeVisible();
 
-    // Now add the 'administer content templates' permission to the same role.
     await drupal.logout();
+    // Now add the 'administer content templates' permission to the same role.
     await drupal.addPermissions({
       role: 'content_editor',
       permissions: ['administer content templates'],
