@@ -15,7 +15,8 @@ test.describe('Content Template Contextual Link', () => {
       await page.close();
     },
   );
-  test('Create Article and verify Content Template contextual link is not available', async ({
+
+  test('Verify Content Template contextual link is not available without template', async ({
     page,
     drupal,
   }) => {
@@ -39,44 +40,8 @@ test.describe('Content Template Contextual Link', () => {
       page.getByRole('link', { name: 'Edit content template' }),
     ).not.toBeVisible();
   });
-  test('Create Article and verify Content Template contextual link', async ({
-    page,
-    drupal,
-  }) => {
-    await drupal.loginAsAdmin();
-    await page.goto('/canvas');
 
-    // Apply the article template recipe to set up the content template
-    const moduleDir = await getModuleDir();
-    await drupal.applyRecipe(
-      `${moduleDir}/canvas/tests/fixtures/recipes/article_content_template`,
-    );
-
-    await page.goto('/i-am-an-empty-node');
-    await page.getByRole('button', { name: 'Edit', pressed: false }).click();
-
-    await expect(
-      page.getByRole('button', { name: 'Edit', pressed: true }),
-    ).toBeVisible();
-
-    const articleContextualButton = page
-      .locator('article')
-      .getByRole('button', { name: 'Open configuration options' })
-      .first();
-    await expect(articleContextualButton).toBeVisible();
-    await articleContextualButton.click();
-
-    // Wait for the contextual menu to appear and click the "Edit content template" link
-    await expect(
-      page.getByRole('link', { name: 'Edit content template' }),
-    ).toBeVisible();
-    await page.getByRole('link', { name: 'Edit content template' }).click();
-
-    // Assert that it navigated to the correct template edit page.
-    await expect(page).toHaveURL(/canvas\/template\/node\/article\/full\/\d+/);
-  });
-
-  test('Verify users without administer content templates permission cannot see Edit content template link', async ({
+  test('Verify Content Template contextual link visibility based on permissions', async ({
     page,
     drupal,
   }) => {
@@ -86,10 +51,10 @@ test.describe('Content Template Contextual Link', () => {
       `${moduleDir}/canvas/tests/fixtures/recipes/article_content_template`,
     );
 
-    // Create a role without 'administer content templates' permission
-    await drupal.createRole({ name: 'limited_editor' });
+    // Create a role without 'administer content templates' permission.
+    await drupal.createRole({ name: 'content_editor' });
     await drupal.addPermissions({
-      role: 'limited_editor',
+      role: 'content_editor',
       permissions: [
         'access content',
         'access contextual links',
@@ -98,15 +63,15 @@ test.describe('Content Template Contextual Link', () => {
       ],
     });
     await drupal.createUser({
-      username: 'limited_user',
-      password: 'limited_pass',
-      email: 'limited@example.com',
-      roles: ['limited_editor'],
+      username: 'test_user',
+      password: 'test_pass',
+      email: 'test@example.com',
+      roles: ['content_editor'],
     });
     await drupal.logout();
     await drupal.login({
-      username: 'limited_user',
-      password: 'limited_pass',
+      username: 'test_user',
+      password: 'test_pass',
     });
 
     await page.goto('/i-am-an-empty-node');
@@ -116,7 +81,7 @@ test.describe('Content Template Contextual Link', () => {
       page.getByRole('button', { name: 'Edit', pressed: true }),
     ).toBeVisible();
 
-    const articleContextualButton = page
+    let articleContextualButton = page
       .locator('article')
       .getByRole('button', { name: 'Open configuration options' })
       .first();
@@ -124,9 +89,45 @@ test.describe('Content Template Contextual Link', () => {
     await articleContextualButton.click();
 
     // Verify that the "Edit content template" link is not visible for users
-    // without 'administer content templates' permission
+    // without 'administer content templates' permission.
     await expect(
       page.getByRole('link', { name: 'Edit content template' }),
     ).not.toBeVisible();
+
+    // Now add the 'administer content templates' permission to the same role.
+    await drupal.logout();
+    await drupal.loginAsAdmin();
+    await drupal.addPermissions({
+      role: 'content_editor',
+      permissions: ['administer content templates'],
+    });
+    await drupal.logout();
+    await drupal.login({
+      username: 'test_user',
+      password: 'test_pass',
+    });
+
+    await page.goto('/i-am-an-empty-node');
+
+    await expect(
+      page.getByRole('button', { name: 'Edit', pressed: true }),
+    ).toBeVisible();
+
+    articleContextualButton = page
+      .locator('article')
+      .getByRole('button', { name: 'Open configuration options' })
+      .first();
+    await expect(articleContextualButton).toBeVisible();
+    await articleContextualButton.click();
+
+    // Verify that the "Edit content template" link is now visible after
+    // adding 'administer content templates' permission.
+    await expect(
+      page.getByRole('link', { name: 'Edit content template' }),
+    ).toBeVisible();
+    await page.getByRole('link', { name: 'Edit content template' }).click();
+
+    // Assert that it navigated to the correct template edit page
+    await expect(page).toHaveURL(/canvas\/template\/node\/article\/full\/\d+/);
   });
 });

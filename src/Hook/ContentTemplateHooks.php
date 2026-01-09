@@ -107,15 +107,16 @@ final class ContentTemplateHooks {
     }
   }
 
+  /**
+   * Implements hook_contextual_links_view_alter().
+   */
   #[Hook('contextual_links_view_alter')]
   public function linksAlter(array &$element, array $items): void {
     // Extract and validate the node ID from route parameters.
-    $route_parameters = isset($items['entity.node.edit_form']) ? $items['entity.node.edit_form']['route_parameters'] ?? [] : [];
+    $route_parameters = $items['entity.node.edit_form']['route_parameters'] ?? [];
     if (!isset($route_parameters['node'])) {
       return;
     }
-
-    // Load the node entity.
     $node = $this->entityTypeManager->getStorage('node')->load($route_parameters['node']);
     if (!$node instanceof FieldableEntityInterface) {
       return;
@@ -123,7 +124,6 @@ final class ContentTemplateHooks {
     $view_mode = $route_parameters['view_mode'] ?? 'full';
     $bundle = $node->bundle();
 
-    // Load the content template for the current view mode.
     $template = $this->entityTypeManager
       ->getStorage(ContentTemplate::ENTITY_TYPE_ID)
       ->load("node.$bundle.$view_mode");
@@ -246,8 +246,6 @@ final class ContentTemplateHooks {
       $template = ContentTemplate::loadForEntity($entity, $display->getMode());
       if ($template) {
         $build['#contextual_links']['node']['route_parameters']['view_mode'] = $display->getMode();
-        // Add cache metadata so the contextual link is invalidated when the
-        // template changes.
         $this->renderer->addCacheableDependency($build, $template);
       }
     }
