@@ -238,7 +238,7 @@ final class ContentTemplateHooks {
    */
   #[Hook('node_view_alter')]
   public function nodeViewAlter(array &$build, FieldableEntityInterface $entity, EntityViewDisplayInterface $display): void {
-    // Contextual links to be added to node only if a
+    // Contextual links are added to node only if a
     // template exists and is enabled.
     if ($entity->getEntityTypeId() === 'node') {
       // Check if a content template exists for this entity and view mode.
