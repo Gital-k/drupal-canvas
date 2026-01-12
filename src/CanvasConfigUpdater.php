@@ -188,7 +188,7 @@ class CanvasConfigUpdater {
         ||
         !empty(iterator_to_array($inputs->getPropSourcesUsingExpressionClass(ReferenceFieldTypePropExpression::class)));
     };
-    return !empty($component_tree->componentTreeItemsIterator($has_reference_expression));
+    return !empty(iterator_to_array($component_tree->componentTreeItemsIterator($has_reference_expression)));
   }
 
   public function needsTrackingPropsRequiredFlag(Component $component): bool {
