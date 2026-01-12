@@ -158,39 +158,36 @@ readonly final class CodeComponentDataProvider {
   }
 
   /**
-   * Returns current entity data for V0 of drupalSettings.canvasData.
+   * Returns main entity data for V0 of drupalSettings.canvasData.
    *
    * @return array[]
    */
-  public function getCanvasDataCurrentEntityV0(): array {
-    $entity = $this->routeMatch->getParameter('preview_entity');
-    // Check if the user is previewing an entity through a content template.
-    if ($entity instanceof EntityInterface) {
-      return [
-        self::V0 => [
-          'currentEntity' => [
-            'uuid' => $entity->uuid(),
+  public function getCanvasDataMainEntityV0(): array {
+    // List of potential route parameters to check for the entity.
+    $entityIdentifiers = ['preview_entity', 'node', 'entity', 'canvas_page'];
+
+    foreach ($entityIdentifiers as $identifier) {
+      $entity = $this->routeMatch->getParameter($identifier);
+
+      if ($entity instanceof EntityInterface) {
+        return [
+          self::V0 => [
+            'mainEntity' => [
+              'bundle' => $entity->bundle(),
+              'entityTypeId' => $entity->getEntityTypeId(),
+              'uuid' => $entity->uuid(),
+            ],
           ],
-        ],
-      ];
+        ];
+      }
     }
 
-    // Check if the user is viewing a node.
-    $entity = $this->routeMatch->getParameter('node');
-    if ($entity instanceof EntityInterface) {
-      return [
-        self::V0 => [
-          'currentEntity' => [
-            'uuid' => $entity->uuid(),
-          ],
-        ],
-      ];
-    }
-
-    // Fallback to null if there is no entity associated with the current route.
+    // Fallback to return NULL values if no entity is found.
     return [
       self::V0 => [
-        'currentEntity' => [
+        'mainEntity' => [
+          'bundle' => NULL,
+          'entityTypeId' => NULL,
           'uuid' => NULL,
         ],
       ],

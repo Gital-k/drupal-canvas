@@ -212,9 +212,11 @@ HTML;
                   'url' => \base_path() . 'user',
                 ],
               ],
-              'currentEntity' => [
+              'mainEntity' => [
                 // Set to NULL since there is no associated entity when a code
                 // component is open in the code editor.
+                'bundle' => NULL,
+                'entityTypeId' => NULL,
                 'uuid' => NULL,
               ],
             ],

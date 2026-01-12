@@ -69,13 +69,14 @@ interface BreadcrumbLink {
 }
 
 interface EntityData {
+  bundle: string;
+  entityTypeId: string;
   uuid: string;
 }
 
 interface PageData {
   pageTitle: string;
   breadcrumbs: Array<BreadcrumbLink>;
-  currentEntity: EntityData;
 }
 
 interface SiteData {
@@ -91,7 +92,6 @@ export const getPageData = (): PageData => {
   const pageData = {
     pageTitle: window.drupalSettings?.canvasData?.v0?.pageTitle || '',
     breadcrumbs: window.drupalSettings?.canvasData?.v0?.breadcrumbs || [],
-    currentEntity: window.drupalSettings?.canvasData?.v0?.currentEntity || {},
   };
   window.parent.postMessage({
     type: '_canvas_useswr_data_fetch',
@@ -116,4 +116,14 @@ export const getSiteData = (): SiteData => {
     data: siteData,
   });
   return siteData;
+};
+
+export const getEntityRouteData = (): EntityData => {
+  const entityData = window.drupalSettings?.canvasData?.v0?.mainEntity || {};
+  window.parent.postMessage({
+    type: '_canvas_useswr_data_fetch',
+    id: 'geEntityRouteData()',
+    data: entityData,
+  });
+  return entityData;
 };
