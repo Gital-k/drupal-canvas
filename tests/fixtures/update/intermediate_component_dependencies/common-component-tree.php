@@ -53,3 +53,24 @@ const COMPONENT_TREE_INCLUDING_REFERENCE_FIELD_TYPE_PROP_EXPRESSION_DEPENDENCIES
     'media',
   ],
 ];
+
+// Component tree WITHOUT reference field expressions (uses static values).
+const COMPONENT_TREE_WITHOUT_REFERENCE_FIELD_PROP_EXPRESSION = [
+  [
+    "uuid" => "ba123456-7890-4bcd-aef1-23456789abcd",
+    "component_id" => "sdc.canvas_test_sdc.heading",
+    "component_version" => "8dd7b865998f53b0",
+    "inputs" => [
+      "text" => "Static heading text",
+      "style" => 'secondary',
+      "element" => 'h2',
+    ],
+  ],
+];
+
+const COMPONENT_TREE_WITHOUT_REFERENCE_FIELD_PROP_EXPRESSION_DEPENDENCIES = [
+  'config' => [
+    'canvas.component.sdc.canvas_test_sdc.heading',
+  ],
+  'module' => [],
+];
