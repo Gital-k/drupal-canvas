@@ -6,6 +6,7 @@ namespace Drupal\canvas\EntityHandlers;
 
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Cache\CacheableMetadata;
+use Drupal\Core\Entity\Display\EntityViewDisplayInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
@@ -83,8 +84,10 @@ final class ContentTemplateAwareViewBuilder extends EntityViewBuilder {
         $keys[] = 'with-canvas';
         // We don't want to use the default theme template (such as
         // `node.html.twig`) because any content entity type that uses Canvas'
-        // ContentTemplates is opting in to full control via Canvas.
-        unset($defaults['#theme']);
+        // ContentTemplates is opting in to full control via Canvas. Instead, use
+        // a minimal Canvas-specific theme that allows preprocess functions
+        // (including contextual links) to run while Canvas controls rendering.
+        $defaults['#theme'] = 'canvas_entity_with_content_template';
       }
       else {
         $keys[] = 'without-canvas';

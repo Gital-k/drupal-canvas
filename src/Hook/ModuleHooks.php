@@ -51,6 +51,13 @@ class ModuleHooks {
       'field__component_tree' => [
         'base hook' => 'field',
       ],
+      // Minimal theme hook for entities rendered with Canvas Content Templates.
+      // This allows preprocess functions (including contextual links) to run
+      // while Canvas maintains full control over entity rendering.
+      // @see \Drupal\canvas\EntityHandlers\ContentTemplateAwareViewBuilder
+      'canvas_entity_with_content_template' => [
+        'render element' => 'elements',
+      ],
     ];
   }
 

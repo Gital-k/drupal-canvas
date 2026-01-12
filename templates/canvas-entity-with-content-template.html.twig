@@ -1,0 +1,26 @@
+{#
+/**
+ * @file
+ * Theme implementation for entities rendered with Canvas Content Templates.
+ *
+ * This minimal template ensures preprocess functions (including contextual
+ * links) run while allowing Canvas to fully control entity rendering.
+ *
+ * Available variables:
+ * - elements: The render array for the entity.
+ * - attributes: HTML attributes for the wrapper element, including
+ *   the 'contextual-region' class added by contextual_preprocess().
+ * - title_prefix: Additional output before the title (if any).
+ * - title_suffix: Additional output after the title, including the
+ *   contextual links placeholder.
+ *
+ * @see \Drupal\canvas\EntityHandlers\ContentTemplateAwareViewBuilder
+ * @see \Drupal\canvas\Hook\ModuleHooks::theme()
+ * @see \Drupal\contextual\Hook\ContextualThemeHooks::preprocess()
+ */
+#}
+<div{{ attributes }}>
+  {{ title_prefix }}
+  {{ title_suffix }}
+  {{ elements|without('#theme', '#weight', '#pre_render', '#cache', '#contextual_links') }}
+</div>
