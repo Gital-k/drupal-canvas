@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Functional;
 
+use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\canvas\CodeComponentDataProvider;
 use Drupal\canvas\Entity\Page;
+use Drupal\node\Entity\Node;
 use Drupal\Tests\canvas\TestSite\CanvasTestSetup;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
+use Drupal\TestTools\Random;
 
 /**
  * @group canvas
@@ -86,5 +89,120 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
     $drupalSettings = $this->getDrupalSettings();
     $this->assertArrayNotHasKey(CodeComponentDataProvider::CANVAS_DATA_KEY, $drupalSettings);
   }
+
+  /**
+   * @covers \Drupal\canvas\CodeComponentDataProvider::getCanvasDataMainEntityV0
+   */
+  public function testGetCanvasDataMainEntityV0OnCanvasPageRoute(): void {
+    // Create a Canvas Page entity and visit its canonical route.
+    $page = Page::create([
+      'title' => 'Test canvas page',
+      'type' => 'page',
+      'components' => [
+        [
+          'uuid' => CanvasTestSetup::UUID_COMPONENT_SDC,
+          'component_id' => 'js.canvas_test_code_components_using_get_entity_route_data',
+        ],
+      ],
+    ]);
+    $page->save();
+
+    $regular_user = $this->drupalCreateUser(['access content']);
+    $this->assertInstanceOf(AccountInterface::class, $regular_user);
+    $this->drupalLogin($regular_user);
+
+    $this->drupalGet($page->toUrl());
+
+    $drupalSettings = $this->getDrupalSettings();
+    $this->assertArrayHasKey(CodeComponentDataProvider::CANVAS_DATA_KEY, $drupalSettings);
+
+    self::assertSame([
+      'bundle' => 'canvas_page',
+      'entityTypeId' => 'canvas_page',
+      'uuid' => $page->uuid(),
+    ], $drupalSettings[CodeComponentDataProvider::CANVAS_DATA_KEY][CodeComponentDataProvider::V0]['mainEntity']);
+  }
+
+  /**
+   * @covers \Drupal\canvas\CodeComponentDataProvider::getCanvasDataMainEntityV0
+   */
+  public function testGetCanvasDataMainEntityV0OnPreviewEntityRoute(): void {
+    // Preview route should use 'preview_entity' when present.
+    $this->container->get('module_installer')->install(['node']);
+    $this->drupalCreateContentType(['type' => 'article', 'name' => 'Article']);
+    self::assertTrue($this->container->get('module_handler')->moduleExists('canvas'));
+
+    $node = Node::create([
+      'title' => 'Some article',
+      'type' => 'article',
+    ]);
+    $node->save();
+    $admin_user = $this->drupalCreateUser([
+      'access content',
+      'administer nodes',
+      'administer content templates',
+    ]);
+    $this->assertInstanceOf(AccountInterface::class, $admin_user);
+    $this->drupalLogin($admin_user);
+    $template_tree = ([
+      [
+        'uuid' => CanvasTestSetup::UUID_COMPONENT_SDC,
+        'component_id' => 'js.canvas_test_code_components_using_get_entity_route_data',
+        'component_version' => '8fe3be948e0194e1',
+        'inputs' => [],
+      ],
+    ]);
+    $template = ContentTemplate::create([
+      'content_entity_type_id' => 'node',
+      'content_entity_type_bundle' => 'article',
+      'content_entity_type_view_mode' => 'full',
+      'component_tree' => $template_tree,
+    ]);
+
+    $template->save();
+
+    // Visit the Canvas preview route which sets the 'preview_entity' param.
+    $this->drupalGet("/canvas/template/node/article/full/{$node->id()}");
+    $this->assertSession()->statusCodeEquals(200);
+    $this->assertSession()->addressEquals('/canvas/template/node/article/full/1');
+//    print_r($this->getSession()->getPage()->getContent());
+
+    $drupalSettings = $this->getDrupalSettings();
+//    print_r($drupalSettings);
+    $this->assertArrayHasKey(CodeComponentDataProvider::CANVAS_DATA_KEY, $drupalSettings);
+
+    self::assertSame([
+      'bundle' => 'article',
+      'entityTypeId' => 'node',
+      'uuid' => $node->uuid(),
+    ], $drupalSettings[CodeComponentDataProvider::CANVAS_DATA_KEY][CodeComponentDataProvider::V0]['mainEntity']);
+  }
+//
+//  /**
+//   * @covers \Drupal\canvas\CodeComponentDataProvider::getCanvasDataMainEntityV0
+//   */
+//  public function testGetCanvasDataMainEntityV0On404Route(): void {
+//    // Navigate to a guaranteed-non-existent route to trigger a 404.
+//    $regular_user = $this->drupalCreateUser(['access content']);
+//    $this->assertInstanceOf(AccountInterface::class, $regular_user);
+//    $this->drupalLogin($regular_user);
+//
+//    $this->drupalGet('/definitely-not-a-real-route-404');
+//
+//    // Sanity check: status is 404.
+//    $this->assertSession()->statusCodeEquals(404);
+//
+//    /** @var \Drupal\canvas\CodeComponentDataProvider $provider */
+//    $provider = $this->container->get(CodeComponentDataProvider::class);
+//    $data = $provider->getCanvasDataMainEntityV0();
+//
+//    self::assertArrayHasKey(CodeComponentDataProvider::V0, $data);
+//    self::assertArrayHasKey('mainEntity', $data[CodeComponentDataProvider::V0]);
+//    self::assertSame([
+//      'bundle' => NULL,
+//      'entityTypeId' => NULL,
+//      'uuid' => NULL,
+//    ], $data[CodeComponentDataProvider::V0]['mainEntity']);
+//  }
 
 }
