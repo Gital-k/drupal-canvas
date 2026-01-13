@@ -2,6 +2,7 @@ import {
   getPageData,
   getSiteData,
   sortMenu as sortLinksetMenu,
+  getEntityRouteData,
 } from './drupal-utils.js';
 import FormattedText from './FormattedText.js';
 import { JsonApiClient } from './jsonapi-client.js';
@@ -20,6 +21,7 @@ export {
   getPageData,
   getSiteData,
   sortLinksetMenu,
+  getEntityRouteData,
 
   // jsonapi-utils
   getNodePath,
