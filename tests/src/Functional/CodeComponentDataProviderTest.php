@@ -177,32 +177,29 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
       'uuid' => $node->uuid(),
     ], $drupalSettings[CodeComponentDataProvider::CANVAS_DATA_KEY][CodeComponentDataProvider::V0]['mainEntity']);
   }
-//
-//  /**
-//   * @covers \Drupal\canvas\CodeComponentDataProvider::getCanvasDataMainEntityV0
-//   */
-//  public function testGetCanvasDataMainEntityV0On404Route(): void {
-//    // Navigate to a guaranteed-non-existent route to trigger a 404.
-//    $regular_user = $this->drupalCreateUser(['access content']);
-//    $this->assertInstanceOf(AccountInterface::class, $regular_user);
-//    $this->drupalLogin($regular_user);
-//
-//    $this->drupalGet('/definitely-not-a-real-route-404');
-//
-//    // Sanity check: status is 404.
-//    $this->assertSession()->statusCodeEquals(404);
-//
-//    /** @var \Drupal\canvas\CodeComponentDataProvider $provider */
-//    $provider = $this->container->get(CodeComponentDataProvider::class);
-//    $data = $provider->getCanvasDataMainEntityV0();
-//
-//    self::assertArrayHasKey(CodeComponentDataProvider::V0, $data);
-//    self::assertArrayHasKey('mainEntity', $data[CodeComponentDataProvider::V0]);
-//    self::assertSame([
-//      'bundle' => NULL,
-//      'entityTypeId' => NULL,
-//      'uuid' => NULL,
-//    ], $data[CodeComponentDataProvider::V0]['mainEntity']);
-//  }
+
+  /**
+   * @covers \Drupal\canvas\CodeComponentDataProvider::getCanvasDataMainEntityV0
+   */
+  public function testGetCanvasDataMainEntityV0OnInvalidCanvasRoute(): void {
+    $this->container->get('module_installer')->install(['node']);
+
+    $regular_user = $this->drupalCreateUser(['administer content templates', 'access content', 'administer nodes']);
+    $this->assertInstanceOf(AccountInterface::class, $regular_user);
+    $this->drupalLogin($regular_user);
+
+    $this->drupalGet('canvas/not-a-real-route');
+
+    $drupalSettings = $this->getDrupalSettings();
+    $this->assertArrayHasKey(CodeComponentDataProvider::CANVAS_DATA_KEY, $drupalSettings);
+    print_r($drupalSettings);
+
+    self::assertSame([
+      'bundle' => NULL,
+      'entityTypeId' => NULL,
+      'uuid' => NULL,
+    ], $drupalSettings[CodeComponentDataProvider::CANVAS_DATA_KEY][CodeComponentDataProvider::V0]['mainEntity']);
+
+  }
 
 }
