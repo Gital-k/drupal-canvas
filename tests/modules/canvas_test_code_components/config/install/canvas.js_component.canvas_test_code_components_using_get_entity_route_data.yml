@@ -1,0 +1,46 @@
+uuid: a7b8c9d0-1234-5678-9abc-def012345678
+langcode: en
+status: true
+dependencies:
+  enforced: {  }
+machineName: canvas_test_code_components_using_get_entity_route_data
+name: 'Using drupalSettings getEntityRouteData'
+required: {  }
+props: {  }
+slots: {  }
+js:
+  original: |-
+    import { getEntityRouteData } from '@/lib/drupal-utils';
+
+    const WithEntityRouteData = () => {
+     const {entityTypeId, bundle, uuid} = getEntityRouteData();
+     return (
+      <div>
+        {entityTypeId} - {bundle} - {uuid}
+      </div>
+     );
+    };
+
+    export default WithEntityRouteData;
+  compiled: |
+    import { jsxs as _jsxs } from "react/jsx-runtime";
+    import { getEntityRouteData } from '@/lib/drupal-utils';
+    const WithEntityRouteData = ()=>{
+      const { entityTypeId, bundle, uuid } = getEntityRouteData();
+      return /*#__PURE__*/ _jsxs("div", {
+        children: [
+          entityTypeId,
+          " - ",
+          bundle,
+          " - ",
+          uuid
+        ]
+    });
+    };
+    export default WithEntityRouteData;
+css:
+  original: ''
+  compiled: ''
+dataDependencies:
+  drupalSettings:
+    - v0.mainEntity
