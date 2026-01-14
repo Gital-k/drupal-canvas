@@ -6,6 +6,8 @@
  * links are not part of the DOM when JavaScript is disabled. Functional tests
  * run without JavaScript, making it impossible to test contextual link
  * behavior in that environment.
+ *
+ * @see \Drupal\Tests\contextual\FunctionalJavascript\ContextualLinksTest
  */
 
 import { getModuleDir } from '@drupal-canvas/test-utils';
