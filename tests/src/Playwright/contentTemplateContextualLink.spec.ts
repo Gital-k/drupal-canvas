@@ -137,5 +137,9 @@ test.describe('Content Template Contextual Link', () => {
 
     // Assert that it navigated to the correct template edit page
     await expect(page).toHaveURL(/canvas\/template\/node\/article\/full\/\d+/);
+
+    // Verify the preview node title appears on the ContentTemplate page,
+    // confirming the page loaded successfully.
+    await expect(page.getByText('I am an empty node')).toBeVisible();
   });
 });
