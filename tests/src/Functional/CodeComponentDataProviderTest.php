@@ -160,7 +160,6 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
       'content_entity_type_view_mode' => 'full',
       'component_tree' => $template_tree,
     ]);
-
     $template->save();
 
     // Request the Canvas internal API preview route.
@@ -199,14 +198,12 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
 
     $drupalSettings = $this->getDrupalSettings();
     $this->assertArrayHasKey(CodeComponentDataProvider::CANVAS_DATA_KEY, $drupalSettings);
-    print_r($drupalSettings);
 
     self::assertSame([
       'bundle' => NULL,
       'entityTypeId' => NULL,
       'uuid' => NULL,
     ], $drupalSettings[CodeComponentDataProvider::CANVAS_DATA_KEY][CodeComponentDataProvider::V0]['mainEntity']);
-
   }
 
   /**
