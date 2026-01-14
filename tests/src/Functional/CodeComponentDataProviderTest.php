@@ -5,13 +5,15 @@ declare(strict_types=1);
 namespace Drupal\Tests\canvas\Functional;
 
 use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\Component\Serialization\Json;
+use Drupal\Component\Utility\UrlHelper;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\canvas\CodeComponentDataProvider;
 use Drupal\canvas\Entity\Page;
 use Drupal\node\Entity\Node;
 use Drupal\Tests\canvas\TestSite\CanvasTestSetup;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
-use Drupal\TestTools\Random;
+use Symfony\Component\DomCrawler\Crawler;
 
 /**
  * @group canvas
@@ -161,14 +163,19 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
 
     $template->save();
 
-    // Visit the Canvas preview route which sets the 'preview_entity' param.
-    $this->drupalGet("/canvas/template/node/article/full/{$node->id()}");
+    // Request the Canvas internal API preview route.
+    // We cannot use this as usually, as this returns a JSON including the HTML
+    // output, which we need to parse instead of the entire request response.
+    $this->drupalGet("/canvas/api/v0/layout-content-template/{$template->id()}/{$node->id()}");
     $this->assertSession()->statusCodeEquals(200);
-    $this->assertSession()->addressEquals('/canvas/template/node/article/full/1');
-//    print_r($this->getSession()->getPage()->getContent());
+    $this->assertSame('application/json', $this->getSession()->getResponseHeader('Content-Type'));
+    $parsed_response = Json::decode($this->getSession()->getPage()->getContent());
+    $this->assertArrayHasKey('html', $parsed_response);
 
-    $drupalSettings = $this->getDrupalSettings();
-//    print_r($drupalSettings);
+    // We cannot use getDrupalSettings(), as that requires the html to exist in
+    // the actual request, but we have a json value from our internal API.
+    $html = $parsed_response['html'];
+    $drupalSettings = $this->getLayoutPreviewDrupalSettings($html);
     $this->assertArrayHasKey(CodeComponentDataProvider::CANVAS_DATA_KEY, $drupalSettings);
 
     self::assertSame([
@@ -200,6 +207,23 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
       'uuid' => NULL,
     ], $drupalSettings[CodeComponentDataProvider::CANVAS_DATA_KEY][CodeComponentDataProvider::V0]['mainEntity']);
 
+  }
+
+  /**
+   * This allows to parse Drupal settings from output html, which is not
+   * the actual html from the current page after drupalGet, but a separate HTML.
+   */
+  private function getLayoutPreviewDrupalSettings(string $html): array {
+    $crawler = new Crawler($html);
+    $elements = $crawler->filterXPath('//script[@type="application/json" and @data-drupal-selector="drupal-settings-json"]');
+    if (count($elements) === 1) {
+      $settings = Json::decode($elements->html());
+      if (isset($settings['ajaxPageState']['libraries'])) {
+        $settings['ajaxPageState']['libraries'] = UrlHelper::uncompressQueryParameter($settings['ajaxPageState']['libraries']);
+      }
+      return $settings;
+    }
+    return [];
   }
 
 }
