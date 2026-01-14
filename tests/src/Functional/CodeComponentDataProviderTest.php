@@ -107,6 +107,7 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
         ],
       ],
     ]);
+    self::assertCount(0, $page->validate());
     $page->save();
 
     $regular_user = $this->drupalCreateUser(['access content']);
@@ -138,6 +139,7 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
       'title' => 'Some article',
       'type' => 'article',
     ]);
+    self::assertCount(0, $page->validate());
     $node->save();
     $admin_user = $this->drupalCreateUser([
       'access content',
