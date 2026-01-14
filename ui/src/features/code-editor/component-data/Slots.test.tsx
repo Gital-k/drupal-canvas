@@ -1,5 +1,3 @@
-// @todo: Port tests from code-editor-component-data-slots.cy.jsx to this file since we want to move away from
-//    Cypress unit tests toward vitest. https://www.drupal.org/i/3523490.
 import { describe, expect, it } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
