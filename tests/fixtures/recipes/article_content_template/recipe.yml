@@ -1,0 +1,6 @@
+name: 'Article Content Template'
+description: 'Provides a content template for Article content type in full view mode.'
+type: 'Canvas'
+install:
+  - canvas
+  - node
