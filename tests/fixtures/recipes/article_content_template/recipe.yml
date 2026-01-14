@@ -4,4 +4,3 @@ type: 'Canvas'
 install:
   - canvas
   - node
-
