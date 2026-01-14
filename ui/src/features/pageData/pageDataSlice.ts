@@ -20,7 +20,6 @@ export const pageDataSlice = createSlice({
   initialState,
   reducers: (create) => ({
     setPageData: create.reducer((state, action: PayloadAction<Values>) => {
-      console.log('SET PAGE DATA APPARENTLY');
       return {
         ...state,
         ...action.payload,
@@ -30,7 +29,6 @@ export const pageDataSlice = createSlice({
     // doesn't trigger an undo/redo action.
     setInitialPageData: create.reducer(
       (state, action: PayloadAction<Values>) => {
-        console.log('SET INITIAL PAGE DATA APPARENTLY');
         return {
           ...state,
           ...action.payload,

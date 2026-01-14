@@ -948,11 +948,15 @@ export const withFormRegistration = <P extends Record<string, any>>(
     // callback without using hyperscriptify to render a new React component.
     useEffect(() => {
       if (fieldName !== 'form_build_id' || !rhfContext || !formContext) {
+        if (fieldName === 'form_build_id') {
+          console.log("DISCARD BUILD ID", {rhfContext, formContext})
+        }
         return;
       }
       // Listen for changes to the form build ID so we can update that in
       // our form state and value.
       const formBuildIdListener = (e: AjaxUpdateFormBuildIdEvent) => {
+        console.log(`BUILD ID EVENT ${formContext.formId} ${fieldName}, new: ${e.detail.newFormBuildId}`);
         if (e.detail.formId === formContext?.formId) {
           dispatchFieldValue(
             dispatch,
@@ -974,13 +978,21 @@ export const withFormRegistration = <P extends Record<string, any>>(
           formBuildIdListener as unknown as EventListener,
         );
       };
+      console.log('USUALLY A BUILD ID IS UPDATED...')
     }, [dispatch, fieldName, formContext, rhfContext]);
 
     // For AJAX-added inputs, register them dynamically with react-hook-form
     // This ensures they become controlled inputs like all other form inputs
     useEffect(() => {
-      if (!rhfContext || !fieldName) return;
+      if (!rhfContext || !fieldName) {
+        console.log('🔴 AJAX Input Registration Skipped:', {rhfContext, fieldName})
+        setTimeout(() => {
+          console.log('🔴 500 ms later:', {rhfContext, fieldName})
 
+        }, 500);
+        return;
+      }
+      // console.log(`Try again! ${fieldName}`);
       const currentValue = getCurrentValue();
 
       // Check if field is already registered
@@ -997,7 +1009,7 @@ export const withFormRegistration = <P extends Record<string, any>>(
 
       // If field is not yet registered (AJAX-added), register it now
       if (!fieldState || fieldState.invalid === undefined) {
-        // console.log('🟢 Registering AJAX-added input:', fieldName);
+        console.log('🟢 Registering AJAX-added input:', fieldName);
         rhfContext.register(fieldName);
         // Set initial value
         rhfContext.setValue(fieldName, currentValue, {

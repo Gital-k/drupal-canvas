@@ -29,6 +29,8 @@ import * as field_cvt_uri from './field_cvt_uri.js';
 // submitted.
 // @see canvas_test_article_fields_install for where the fields are created.
 export default {
+  field_cvt_textfield_multi,
+  field_cvt_boolean_checkbox,
   field_cvt_comment,
   field_cvt_moderation_state,
   field_cvt_language,
@@ -44,7 +46,5 @@ export default {
   field_cvt_daterange_datelist,
   field_cvt_datetime_datelist,
   field_cvt_entity_ref_tags,
-  field_cvt_boolean_checkbox,
-  field_cvt_textfield_multi,
   field_cvt_int,
 };

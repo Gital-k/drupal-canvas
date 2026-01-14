@@ -105,17 +105,8 @@ const rootReducer = combineSlices(
         redoType: '@@redux-undo/layoutModel_REDO',
         filter: (action, currentState, previousHistory) => {
           const { present } = previousHistory;
-          console.log(
-            `FILTER LM ${
-              typeof action.payload === 'object' &&
-              Object.keys(present.model).length > 0 &&
-              action.type !== setInitialLayoutModel.type &&
-              action.type !== setUpdatePreview.type
-            }`,
-            action.payload,
-          );
           return (
-            typeof action.payload === 'object' &&
+            // typeof action.payload === 'object' &&
             Object.keys(present.model).length > 0 &&
             action.type !== setInitialLayoutModel.type &&
             action.type !== setUpdatePreview.type
@@ -133,17 +124,8 @@ const rootReducer = combineSlices(
         redoType: '@@redux-undo/pageData_REDO',
         filter: (action, currentState, previousHistory) => {
           const { present } = previousHistory;
-          if (
-            typeof action.payload === 'object' &&
-            Object.keys(present).length > 0 &&
-            action.type !== setInitialPageData.type
-          ) {
-            console.log(`filter keep`, { currentState, action });
-          } else {
-            console.log(`filter reject`, { currentState, action });
-          }
           return (
-            typeof action.payload === 'object' &&
+            // typeof action.payload === 'object' &&
             Object.keys(present).length > 0 &&
             action.type !== setInitialPageData.type
           );
@@ -205,13 +187,12 @@ const undoRedoActionIdMiddleware: Middleware<{}, RootState> =
       // Ignore initial actions that set the state of the model or page data
       // from the return of API responses. The user should not be able to undo
       // or redo these actions.
-      console.log('Ignoring action for undo/redo', action);
       return next(action);
     }
     const [slice] = type.split('/');
     if (slice === 'layoutModel' || slice === 'pageData') {
       // Get current route from state and push undo with route snapshot.
-      console.group(`UndoRedo Middleware for ${slice}`);
+      // console.group(`UndoRedo Middleware for ${slice}`);
       const state = store.getState();
       const currentRoute = state.ui.currentRoute;
       // Log pageData changes before pushing to undo stack
@@ -254,15 +235,15 @@ const undoRedoActionIdMiddleware: Middleware<{}, RootState> =
             });
 
             if (changes.length > 0) {
-              console.log(
-                `PageData changes: ${changes.join('; ')} lastTYPE = ${typeof lastPageData} } last len ${typeof lastPageData === 'object' ? Object.keys(lastPageData).length : 'N/A'}`,
-              );
+              // console.log(
+              //   `PageData changes: ${changes.join('; ')} lastTYPE = ${typeof lastPageData} } last len ${typeof lastPageData === 'object' ? Object.keys(lastPageData).length : 'N/A'}`,
+              // );
             } else {
-              console.log('PageData: No changes detected');
+              // console.log('PageData: No changes detected');
             }
           }
         } else {
-          console.log('PageData: First undo item (no previous state)');
+          // console.log('PageData: First undo item (no previous state)');
         }
       }
 
@@ -295,7 +276,7 @@ const undoRedoActionIdMiddleware: Middleware<{}, RootState> =
       //   // @ts-ignore
       //   console.log(`Skip init undo for ${slice} ${action.type}`, action.payload);
       // }
-      console.groupEnd();
+      // console.groupEnd();
     }
     return next(action);
   };

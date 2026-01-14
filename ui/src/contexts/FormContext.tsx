@@ -26,6 +26,10 @@ export const useFormContext = () => {
 
 // Safe version that returns null instead of throwing
 export const useSafeFormContext = () => {
+  const context = useContext(FormContext);
+  if (!context) {
+    console.warn('useFormContext must be used within a FormProvider');
+  }
   return useContext(FormContext);
 };
 

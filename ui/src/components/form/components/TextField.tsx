@@ -11,6 +11,9 @@ const TextField = ({
   className?: string;
   attributes?: Attributes;
 }) => {
+  if (attributes.type === 'hidden') {
+    console.log(`hidden ${attributes.name} !!`);
+  }
   return (
     <div className={styles.wrap}>
       <input

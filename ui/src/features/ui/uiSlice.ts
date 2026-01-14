@@ -194,7 +194,6 @@ export const uiSlice = createAppSlice({
   reducers: (create) => ({
     pushUndo: create.reducer(
       (state, action: PayloadAction<UndoRedoStackItem>) => {
-        console.log('ui undo gets', action.payload.targetSlice);
         state.undoStack.push(action.payload);
         state.redoStack = [];
         // Reset metadata when a new action is pushed (not an undo/redo)
@@ -216,11 +215,11 @@ export const uiSlice = createAppSlice({
         console.group();
         if (!isUndo) {
           console.log(
-            `performing REDO rstack: ${redoStack.map((r) => r.targetSlice).join(',')} ustack ${undoStack.map((r) => r.targetSlice).join(',')}`,
+            `performing REDO redo-stack: ${redoStack.map((r) => r.targetSlice).join(',')} undo-stack ${undoStack.map((r) => r.targetSlice).join(',')}`,
           );
         } else {
           console.log(
-            `performing UNDO rstack: ${redoStack.map((r) => r.targetSlice).join(',')} ustack ${undoStack.map((r) => r.targetSlice).join(',')}`,
+            `performing UNDO redo-stack: ${redoStack.map((r) => r.targetSlice).join(',')} undo-stack ${undoStack.map((r) => r.targetSlice).join(',')}`,
           );
         }
         let routeToRestore: RouteSnapshot | null = null;
@@ -245,7 +244,7 @@ export const uiSlice = createAppSlice({
           );
         }
         console.log(
-          `final stacks: ${redoStack.map((r) => r.targetSlice).join(',')} ustack ${undoStack.map((r) => r.targetSlice).join(',')}`,
+          `final stacks: ${redoStack.map((r) => r.targetSlice).join(',')} undo-stack ${undoStack.map((r) => r.targetSlice).join(',')}`,
         );
         console.groupEnd();
         return {

@@ -547,6 +547,7 @@
         if (oldInput) {
           // We found an existing input with the old form ID. We can retrieve
           // the formId from the data-form-id attribute.
+          console.log(`Found form ID from existing input element. ${oldInput.dataset.formId}`);
           return oldInput.dataset.formId;
         }
         // We may have encountered this form build ID before and have a record
@@ -561,8 +562,10 @@
         const [, response] = args;
         const formId = getFormId(response.old);
         if (!formId) {
+          console.log('Could not determine form ID for build ID update.');
           return;
         }
+        console.log(`we had a request to change ${response.old} to ${response.new}`)
         // Keep a record of the association between these form build IDs and the
         // form ID they relate to.
         formBuildIdMap[response.old] = formId;
@@ -576,6 +579,7 @@
             formId,
           },
         });
+        console.log('DISPATCH THE NEW FORM ID', response.new);
         document.dispatchEvent(event);
       };
     },
