@@ -54,6 +54,31 @@ const { baseUrl, branding } = getSiteData();
 const { homeUrl, siteName, siteSlogan } = branding;
 ```
 
+### `getEntityRouteData`
+
+Access information about the main entity you are viewing with the `getEntityRouteData` utility.
+This can be used to construct JSON:API parameters for requests.
+
+For example, if you want to fetch a list of articles but exclude the current article being viewed,
+you can do the following:
+
+```js
+import { getEntityRouteData } from 'drupal-canvas';
+
+const { bundle, entityTypeId, uuid } = getEntityRouteData();
+const { data, error, isLoading } = useSWR(
+[
+  'node--article',
+  {
+    queryString: new DrupalJsonApiParams()
+      .addFilter('id', uuid, '<>')
+      .getQueryString(),
+  },
+],
+([type, options]) => client.getCollection(type, options),
+);
+```
+
 ### `sortLinksetMenu`
 
 Sort a menu linkset returned by

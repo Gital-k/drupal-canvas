@@ -68,6 +68,12 @@ interface BreadcrumbLink {
   url: string;
 }
 
+interface EntityData {
+  bundle: string;
+  entityTypeId: string;
+  uuid: string;
+}
+
 interface PageData {
   pageTitle: string;
   breadcrumbs: Array<BreadcrumbLink>;
@@ -110,4 +116,14 @@ export const getSiteData = (): SiteData => {
     data: siteData,
   });
   return siteData;
+};
+
+export const getEntityRouteData = (): EntityData => {
+  const entityData = window.drupalSettings?.canvasData?.v0?.mainEntity || {};
+  window.parent.postMessage({
+    type: '_canvas_useswr_data_fetch',
+    id: 'geEntityRouteData()',
+    data: entityData,
+  });
+  return entityData;
 };
