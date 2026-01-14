@@ -1,7 +1,7 @@
 // @todo: Port tests from code-editor-component-data-props.cy.jsx to this file since we want to move away from
 //    Cypress unit tests toward vitest. https://www.drupal.org/i/3523490.
 import { describe, expect, it } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import AppWrapper from '@tests/vitest/components/AppWrapper';
 
@@ -24,7 +24,7 @@ const Wrapper = () => (
 );
 
 describe('Props', () => {
-  it('renders empty', () => {
+  it('renders empty', async () => {
     render(<Wrapper />);
     expect(
       screen.queryByRole('textbox', { name: 'Prop name' }),
@@ -34,75 +34,69 @@ describe('Props', () => {
 
   it('add new prop form', async () => {
     render(<Wrapper />);
-    userEvent.click(screen.getByRole('button', { name: 'Add' }));
-    await waitFor(() => {
-      expect(
-        screen.getByRole('textbox', { name: 'Prop name' }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole('textbox', { name: 'Example value' }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole('combobox', { name: 'Type' }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole('switch', { name: 'Required' }),
-      ).toBeInTheDocument();
-    });
-    await waitFor(() =>
-      expect(
-        selectCodeComponentProperty('props')(store.getState()).length,
-      ).toEqual(1),
-    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+    expect(
+      screen.getByRole('textbox', { name: 'Prop name' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('textbox', { name: 'Example value' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Type' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('switch', { name: 'Required' }),
+    ).toBeInTheDocument();
+
+    expect(
+      selectCodeComponentProperty('props')(store.getState()).length,
+    ).toEqual(1);
   });
 
   it('remove prop form', async () => {
     render(<Wrapper />);
-    userEvent.click(screen.getByRole('button', { name: /Remove prop/ }));
-    await waitFor(() => {
-      expect(
-        screen.queryByRole('textbox', { name: 'Prop name' }),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.queryByRole('textbox', { name: 'Example value' }),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.queryByRole('combobox', { name: 'Type' }),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.queryByRole('switch', { name: 'Required' }),
-      ).not.toBeInTheDocument();
-    });
-    await waitFor(() =>
-      expect(
-        selectCodeComponentProperty('slots')(store.getState()).length,
-      ).toEqual(0),
-    );
+
+    await userEvent.click(screen.getByRole('button', { name: /Remove prop/ }));
+    expect(
+      screen.queryByRole('textbox', { name: 'Prop name' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('textbox', { name: 'Example value' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('combobox', { name: 'Type' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('switch', { name: 'Required' }),
+    ).not.toBeInTheDocument();
+
+    expect(
+      selectCodeComponentProperty('props')(store.getState()).length,
+    ).toEqual(0);
   });
 
   it('saves prop data', async () => {
     render(<Wrapper />);
-    userEvent.click(screen.getByRole('button', { name: 'Add' }));
-    await waitFor(() => {
-      expect(
-        screen.getByRole('textbox', { name: 'Prop name' }),
-      ).toBeInTheDocument();
-    });
-    userEvent.type(screen.getByRole('textbox', { name: 'Prop name' }), 'Alpha');
-    await waitFor(() => {
-      expect(
-        selectCodeComponentProperty('props')(store.getState())[0].name,
-      ).toEqual('Alpha');
-    });
-    userEvent.type(
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+
+    expect(
+      screen.getByRole('textbox', { name: 'Prop name' }),
+    ).toBeInTheDocument();
+
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'Prop name' }),
+      'Alpha',
+    );
+    expect(
+      selectCodeComponentProperty('props')(store.getState())[0].name,
+    ).toEqual('Alpha');
+
+    await userEvent.type(
       screen.getByRole('textbox', { name: 'Example value' }),
       'Alpha value',
     );
-    await waitFor(() => {
-      expect(
-        selectCodeComponentProperty('props')(store.getState())[0].example,
-      ).toEqual('Alpha value');
-    });
+    expect(
+      selectCodeComponentProperty('props')(store.getState())[0].example,
+    ).toEqual('Alpha value');
   });
 
   it('sets required', async () => {
@@ -112,15 +106,15 @@ describe('Props', () => {
         screen.getByRole('textbox', { name: 'Prop name' }),
       ).toBeInTheDocument();
     });
+
     const propName = selectCodeComponentProperty('props')(store.getState())[0]
       .name;
-    userEvent.click(screen.getByRole('switch', { name: 'Required' }));
-    await waitFor(() => {
-      expect(screen.getByRole('switch', { name: 'Required' })).toBeChecked();
-      expect(
-        selectCodeComponentProperty('required')(store.getState())[0],
-      ).toEqual(getPropMachineName(propName));
-    });
+
+    await userEvent.click(screen.getByRole('switch', { name: 'Required' }));
+    expect(screen.getByRole('switch', { name: 'Required' })).toBeChecked();
+    expect(
+      selectCodeComponentProperty('required')(store.getState())[0],
+    ).toEqual(getPropMachineName(propName));
   });
 
   describe.each([
@@ -142,16 +136,48 @@ describe('Props', () => {
           screen.getByRole('textbox', { name: 'Prop name' }),
         ).toBeInTheDocument();
       });
-      userEvent.click(screen.getByRole('combobox', { name: 'Type' }));
-      await waitFor(() =>
-        expect(screen.getByRole('option', { name })).toBeInTheDocument(),
-      );
-      userEvent.click(screen.getByRole('option', { name }));
-      await waitFor(() => {
-        expect(
-          selectCodeComponentProperty('props')(store.getState())[0].type,
-        ).toEqual(type);
-      });
+
+      await userEvent.click(screen.getByRole('combobox', { name: 'Type' }));
+      expect(screen.getByRole('option', { name })).toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole('option', { name }));
+      expect(
+        selectCodeComponentProperty('props')(store.getState())[0].type,
+      ).toEqual(type);
     });
+  });
+
+  it('reorders props', async () => {
+    render(<Wrapper />);
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+    expect(screen.getByTestId('prop-0')).toBeInTheDocument();
+    expect(screen.getByTestId('prop-1')).toBeInTheDocument();
+
+    const prop2 = screen.getByTestId('prop-1');
+
+    await userEvent.type(
+      within(prop2).getByRole('textbox', { name: 'Prop name' }),
+      'Beta',
+    );
+
+    expect(
+      selectCodeComponentProperty('props')(store.getState())[0].name,
+    ).toEqual('Alpha');
+    expect(
+      selectCodeComponentProperty('props')(store.getState())[1].name,
+    ).toEqual('Beta');
+
+    await userEvent.click(
+      within(prop2).getByRole('button', { name: /Move prop/ }),
+    );
+    await userEvent.keyboard('[Space]');
+    await userEvent.keyboard('[ArrowUp]');
+
+    expect(
+      selectCodeComponentProperty('props')(store.getState())[0].name,
+    ).toEqual('Beta');
+    expect(
+      selectCodeComponentProperty('props')(store.getState())[1].name,
+    ).toEqual('Alpha');
   });
 });
