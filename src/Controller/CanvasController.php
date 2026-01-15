@@ -98,6 +98,7 @@ HTML;
 
   public function __invoke(?string $entity_type, ?EntityInterface $entity) : HtmlResponse {
     $route = \Drupal::routeMatch()->getRouteName();
+    \Drupal::messenger()->addMessage(sprintf('Debug: CanvasController invoked on route "%s" with entity type "%s" and entity "%s".', $route, $entity_type, $entity?->id()), 'status', TRUE);
     if ($route === 'canvas.boot.entity' || $entity_type !== NULL || $entity !== NULL) {
       throw new \Exception(sprintf('unexpected route "%s" with entity type "%s" and entity "%s" called CanvasController::__invoke().', $route, $entity_type, $entity?->id()));
     }
