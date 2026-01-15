@@ -139,7 +139,7 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
       'title' => 'Some article',
       'type' => 'article',
     ]);
-    self::assertCount(0, $page->validate());
+    self::assertCount(0, $node->validate());
     $node->save();
     $admin_user = $this->drupalCreateUser([
       'access content',
@@ -192,7 +192,7 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
   public function testGetCanvasDataMainEntityV0OnInvalidCanvasRoute(): void {
     $this->container->get('module_installer')->install(['node']);
 
-    $regular_user = $this->drupalCreateUser(['administer content templates', 'access content', 'administer nodes']);
+    $regular_user = $this->drupalCreateUser([ContentTemplate::ADMIN_PERMISSION, 'access content', 'administer nodes']);
     $this->assertInstanceOf(AccountInterface::class, $regular_user);
     $this->drupalLogin($regular_user);
 
@@ -209,8 +209,12 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
   }
 
   /**
-   * This allows to parse Drupal settings from output html, which is not
-   * the actual html from the current page after drupalGet, but a separate HTML.
+   * This allows parsing Drupal settings from an HTML string, which is not
+   * the actual HTML from the current page.
+   * The logic is the same as \Drupal\Tests\BrowserTestBase::getDrupalSettings(),
+   * but using a crawler parsing the passed HTML instead of the current mink session raw HTML.
+   *
+   * @see \Drupal\Tests\BrowserTestBase::getDrupalSettings
    */
   private function getLayoutPreviewDrupalSettings(string $html): array {
     $crawler = new Crawler($html);
