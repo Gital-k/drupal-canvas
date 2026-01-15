@@ -355,7 +355,7 @@ describe('getImportsFromAst', () => {
 });
 
 describe('getDataDependenciesFromAst', () => {
-  it('should detect needed drupalSettings when using getSiteData, getPageData, getEntityRouteData', () => {
+  it('should detect needed drupalSettings when using getSiteData, getPageData', () => {
     const code = `
       // Random import.
       import useSWR from 'swr';
@@ -366,7 +366,6 @@ describe('getDataDependenciesFromAst', () => {
       // With different local identifier.
         getSiteData as iCanHazSiteData,
         getPageData,
-        getEntityRouteData,
       } from '@/lib/drupal-utils';
     `;
     const ast = parse(code, { sourceType: 'module' });

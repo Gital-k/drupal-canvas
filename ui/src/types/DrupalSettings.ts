@@ -52,7 +52,7 @@ export interface DrupalSettings {
         text: string;
         url: string;
       }>;
-      mainEntity: {
+      mainEntity?: {
         bundle: string;
         entityTypeId: string;
         uuid: string;

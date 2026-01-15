@@ -24,7 +24,6 @@ const {
   sortMenu: sortLinksetMenu,
   getPageData,
   getSiteData,
-  getEntityRouteData,
 } = await import('drupal-canvas/drupal-utils');
 const Image = await import('drupal-canvas/next-image-standalone');
 const { cn } = await import('drupal-canvas/utils');
