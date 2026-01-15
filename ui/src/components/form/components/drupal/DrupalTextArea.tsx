@@ -13,9 +13,9 @@ import { getDrupalSettings } from '@/utils/drupal-globals';
 
 import DrupalFormattedTextArea from './DrupalFormattedTextArea';
 
+import type { FormId } from '@/features/form/formStateSlice';
 import type { Attributes } from '@/types/DrupalAttribute';
 import type { FormatType } from '@/types/FormatType';
-import type { FormId } from '@/features/form/formStateSlice';
 
 const drupalSettings = getDrupalSettings();
 

@@ -734,7 +734,7 @@ let formBuildId = {};
 
 Cypress.Commands.add('recordFormBuildId', { prevSubject: true }, (subject) => {
   let subjectId = subject.attr('id');
-  if(!subjectId) {
+  if (!subjectId) {
     const form = subject.find('form');
     expect(form).to.exist;
     subjectId = form[0].id;
@@ -744,9 +744,7 @@ Cypress.Commands.add('recordFormBuildId', { prevSubject: true }, (subject) => {
       'recordFormBuildId: Unable to determine form ID to record form_build_id against.',
     );
   }
-  formBuildId[subjectId] = subject
-    .find('input[name="form_build_id"]')
-    .val();
+  formBuildId[subjectId] = subject.find('input[name="form_build_id"]').val();
 });
 
 Cypress.Commands.add(
@@ -761,9 +759,7 @@ Cypress.Commands.add(
       expect(form).to.exist;
       const formKey = form[0].id;
       const newFormBuildId = subject.find('input[name="form_build_id"]').val();
-      console.log(`TRY! newBuildid: ${newFormBuildId} subject ${formKey} kez ${Object.keys(formBuildId).join('|')}`);
       expect(newFormBuildId).not.to.equal(formBuildId[formKey]);
-      console.log(`BUILD IS GOOD, pop ${newFormBuildId} into ${formKey}`);
       formBuildId[formKey] = newFormBuildId;
     });
   },

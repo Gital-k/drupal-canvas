@@ -21,5 +21,4 @@ const Form = forwardRef<
   );
 });
 
-
 export default Form;

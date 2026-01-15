@@ -195,88 +195,19 @@ const undoRedoActionIdMiddleware: Middleware<{}, RootState> =
       // console.group(`UndoRedo Middleware for ${slice}`);
       const state = store.getState();
       const currentRoute = state.ui.currentRoute;
-      // Log pageData changes before pushing to undo stack
-      if (slice === 'pageData') {
-        const currentPageData = state.pageData.present;
-        const pastPageData = state.pageData.past;
 
-        if (pastPageData && pastPageData.length > 0) {
-          const lastPageData = pastPageData[pastPageData.length - 1];
-
-          // Skip logging if comparing against uninitialized state
-          if (lastPageData?.isInitialized === false) {
-            console.log(
-              'PageData: Comparing against uninitialized state (skipping change log)',
-            );
-          } else {
-            const changes: string[] = [];
-
-            // Compare all properties in current vs last pageData
-            const allKeys = new Set([
-              ...Object.keys(currentPageData || {}),
-              ...Object.keys(lastPageData || {}),
-            ]);
-
-            allKeys.forEach((key) => {
-              const currentValue = currentPageData?.[key];
-              const lastValue = lastPageData?.[key];
-
-              if (currentValue !== lastValue) {
-                // Stringify values for comparison and logging
-                const currentStr = JSON.stringify(currentValue);
-                const lastStr = JSON.stringify(lastValue);
-
-                if (currentStr !== lastStr) {
-                  changes.push(
-                    `${key}: ${lastStr || 'undefined'} -> ${currentStr || 'undefined'}`,
-                  );
-                }
-              }
-            });
-
-            if (changes.length > 0) {
-              // console.log(
-              //   `PageData changes: ${changes.join('; ')} lastTYPE = ${typeof lastPageData} } last len ${typeof lastPageData === 'object' ? Object.keys(lastPageData).length : 'N/A'}`,
-              // );
-            } else {
-              // console.log('PageData: No changes detected');
-            }
-          }
-        } else {
-          // console.log('PageData: First undo item (no previous state)');
-        }
-      }
-
-      // console.log(
-      //   `${slice} >> the state ${state.ui.undoStack.length}`,
-      //   state[slice],
-      // );
-      // Log the item being added and current stack size
       const itemToAdd = {
         targetSlice: slice as UndoRedoType,
         routeSnapshot: currentRoute,
-        // @ts-ignore
-        at: action.type,
-        // ...(import.meta.env.DEV &&
-        //   import.meta.env.TEST === false && {
-        //     debugInfoAction: action as Action,
-        //   }),
-        // ...{
-        //   debugInfoAction: action as Action,
-        //   },
+        ...(import.meta.env.DEV &&
+          import.meta.env.TEST === false && {
+            debugInfoAction: action as Action,
+          }),
+        ...{
+          debugInfoAction: action as Action,
+        },
       };
-      // @ts-ignore
       store.dispatch(pushUndo(itemToAdd));
-
-      // if (canUndo) {
-      //   // @ts-ignore
-      //   console.log(`Pushing undo for ${slice} ${action.type}`, action.payload);
-      //   store.dispatch(pushUndo(itemToAdd));
-      // } else {
-      //   // @ts-ignore
-      //   console.log(`Skip init undo for ${slice} ${action.type}`, action.payload);
-      // }
-      // console.groupEnd();
     }
     return next(action);
   };

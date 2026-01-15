@@ -16,7 +16,6 @@ export const edit = (cy) => {
     'Marshmallow Coast',
   );
   items.forEach((item, ix) => {
-    cy.wait(1000);
     cy.findByLabelText(`Canvas Unlimited Text (value ${ix + 2})`).type(item);
     cy.findByLabelText(`Canvas Unlimited Text (value ${ix + 2})`).should(
       'have.value',

@@ -212,41 +212,22 @@ export const uiSlice = createAppSlice({
         const isUndo = action.payload;
         const undoStack = [...state.undoStack];
         const redoStack = [...state.redoStack];
-        console.group();
-        if (!isUndo) {
-          console.log(
-            `performing REDO redo-stack: ${redoStack.map((r) => r.targetSlice).join(',')} undo-stack ${undoStack.map((r) => r.targetSlice).join(',')}`,
-          );
-        } else {
-          console.log(
-            `performing UNDO redo-stack: ${redoStack.map((r) => r.targetSlice).join(',')} undo-stack ${undoStack.map((r) => r.targetSlice).join(',')}`,
-          );
-        }
         let routeToRestore: RouteSnapshot | null = null;
         let targetSlice: UndoRedoType | null = null;
 
         if (isUndo && undoStack.length > 0) {
           const undoItem = undoStack.pop() as UndoRedoStackItem;
-          console.log('push the stinker to the redo');
           redoStack.unshift(undoItem);
           routeToRestore = undoItem.routeSnapshot;
           targetSlice = undoItem.targetSlice;
         } else if (redoStack.length > 0) {
           // Move the last redo state into the undo stack.
           const redoItem = redoStack.shift() as UndoRedoStackItem;
-          console.log('moved the redo to the undo');
           undoStack.push(redoItem);
           routeToRestore = redoItem.routeSnapshot;
           targetSlice = redoItem.targetSlice;
-        } else {
-          console.log(
-            `${isUndo ? 'Undo' : 'Redo'} UNDO# ${undoStack.length} REDO# ${redoStack.length}.`,
-          );
         }
-        console.log(
-          `final stacks: ${redoStack.map((r) => r.targetSlice).join(',')} undo-stack ${undoStack.map((r) => r.targetSlice).join(',')}`,
-        );
-        console.groupEnd();
+
         return {
           ...state,
           undoStack,

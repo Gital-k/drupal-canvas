@@ -34,11 +34,6 @@ const DrupalForm = ({
 
   // Log when AJAX contents change and handle cleanup
   useEffect(() => {
-    console.log('DrupalForm: ajaxContents updated', {
-      count: ajaxContents.length,
-      formId,
-    });
-
     // After ajaxContents updates and portals are created, clean up context elements
     if (ajaxContents.length > 0) {
       // Use requestAnimationFrame to ensure React has completed the render
@@ -46,7 +41,6 @@ const DrupalForm = ({
         ajaxContents.forEach((ajaxContent) => {
           // Only process each piece of content once
           if (!processedIdsRef.current.has(ajaxContent.id)) {
-            console.log('DrupalForm: Cleaning up context for', ajaxContent.id);
             processedIdsRef.current.add(ajaxContent.id);
             ajaxContent.context.remove();
 
@@ -57,26 +51,21 @@ const DrupalForm = ({
             ) as HTMLElement;
 
             // If not found inside, check if container itself is the wrapper
-            if (!wrapper && ajaxContent.container.id?.includes('-add-more-wrapper')) {
+            if (
+              !wrapper &&
+              ajaxContent.container.id?.includes('-add-more-wrapper')
+            ) {
               wrapper = ajaxContent.container;
             }
 
             // If still not found, check parent
             if (!wrapper) {
-              wrapper = ajaxContent.container.closest('[id*="-add-more-wrapper"]') as HTMLElement;
+              wrapper = ajaxContent.container.closest(
+                '[id*="-add-more-wrapper"]',
+              ) as HTMLElement;
             }
 
             const targetElement = wrapper || ajaxContent.container;
-
-            console.log('DrupalForm: Attaching behaviors to', {
-              containerElement: ajaxContent.container,
-              containerTagName: ajaxContent.container.tagName,
-              containerId: ajaxContent.container.id,
-              wrapperElement: wrapper,
-              wrapperId: wrapper?.id,
-              targetElement,
-              targetId: targetElement?.id,
-            });
 
             // Attach Drupal behaviors to the wrapper (or container as fallback)
             if (window.Drupal?.attachBehaviors) {
@@ -105,14 +94,6 @@ const DrupalForm = ({
       }>;
       const { container, application, context, settings } = customEvent.detail;
 
-      console.log('DrupalForm: Received AJAX content event', {
-        container,
-        application,
-        formId,
-        containerParent: container.parentElement,
-        contextHTML: context.outerHTML.substring(0, 200),
-      });
-
       // Find the closest wrapper div (has id ending with -add-more-wrapper)
       // This wrapper gets completely replaced by Drupal's InsertCommand
       const wrapper = context.closest('[id*="-add-more-wrapper"]');
@@ -120,49 +101,25 @@ const DrupalForm = ({
 
       // Extract field name from wrapper ID (before the unique suffix)
       // e.g., "field-cvt-unlimited-text-add-more-wrapper--5TDIhF-vAfQ" -> "field-cvt-unlimited-text"
-      const fieldNameFromWrapper = wrapperId?.match(/^(.*?)-add-more-wrapper/)?.[1];
-
-      console.log('DrupalForm: Wrapper info', {
-        wrapperId,
-        fieldNameFromWrapper,
-        wrapper,
-        contextId: context.id,
-      });
+      const fieldNameFromWrapper = wrapperId?.match(
+        /^(.*?)-add-more-wrapper/,
+      )?.[1];
 
       setAjaxContents((prev) => {
         // Drupal regenerates wrapper IDs with unique suffixes on each rebuild,
         // so we need to match by field name (the stable part) instead of exact ID
         let filtered = prev;
         if (fieldNameFromWrapper) {
-          // Remove all previous portals for this field, since the wrapper is being replaced
-          // console.log('DrupalForm: Clearing previous portals for field:', fieldNameFromWrapper);
-          // console.log('DrupalForm: Previous portals:', prev.map(p => ({
-          //   id: p.id,
-          //   fieldName: p.fieldName,
-          //   wrapperId: p.wrapperId,
-          // })));
-
           filtered = prev.filter((content) => {
             const contentWrapper = content.container.closest(
               '[id*="-add-more-wrapper"]',
             );
-            const contentFieldName = contentWrapper?.id.match(/^(.*?)-add-more-wrapper/)?.[1];
-            const keep = contentFieldName !== fieldNameFromWrapper;
-            if (!keep) {
-              // console.log('DrupalForm: Removing stale portal', {
-              //   portalId: content.id,
-              //   oldWrapperId: content.wrapperId,
-              //   oldFieldName: content.fieldName,
-              //   contentFieldName,
-              // });
-            }
-            return keep;
+            const contentFieldName = contentWrapper?.id.match(
+              /^(.*?)-add-more-wrapper/,
+            )?.[1];
+            // Portal remains if true.
+            return contentFieldName !== fieldNameFromWrapper;
           });
-
-          // console.log('DrupalForm: After filtering:', filtered.map(p => ({
-          //   id: p.id,
-          //   fieldName: p.fieldName,
-          // })));
         }
 
         const newContent = {
@@ -175,16 +132,7 @@ const DrupalForm = ({
           fieldName: fieldNameFromWrapper,
         };
 
-        // console.log('DrupalForm: Updating ajaxContents', {
-        //   previousCount: prev.length,
-        //   filteredCount: filtered.length,
-        //   newWrapperId: wrapperId,
-        //   fieldName: fieldNameFromWrapper,
-        //   newContentId: newContent.id,
-        // });
-
         const result = [...filtered, newContent];
-        console.log('DrupalForm: Final ajaxContents count:', result.length);
         return result;
       });
     };
@@ -208,25 +156,6 @@ const DrupalForm = ({
       {/* Render AJAX content using portals so it appears in the correct DOM location
           but maintains access to FormProvider context */}
       {ajaxContents.map((ajaxContent) => {
-        const containerInDOM = document.body.contains(ajaxContent.container);
-        const containerHasContent = ajaxContent.container.children.length > 0;
-        // console.log('DrupalForm: Creating portal', {
-        //   id: ajaxContent.id,
-        //   container: ajaxContent.container,
-        //   containerId: ajaxContent.container.id,
-        //   containerInDOM,
-        //   containerHasContent,
-        //   containerChildCount: ajaxContent.container.children.length,
-        //   application: ajaxContent.application,
-        // });
-
-        if (!containerInDOM) {
-          console.warn('DrupalForm: Container not in DOM!', {
-            id: ajaxContent.id,
-            container: ajaxContent.container,
-          });
-        }
-
         return createPortal(
           ajaxContent.application,
           ajaxContent.container,

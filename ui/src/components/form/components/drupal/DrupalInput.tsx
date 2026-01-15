@@ -43,7 +43,7 @@ const DrupalInput = ({
       // The a2p() process converts 'value to 'defaultValue', which is typically
       // what React wants. Explicitly set the value on submit inputs since that
       // is the text it displays.
-      return <input data-stuff {...a2p(attributes)} value={attributes.value || ''} />;
+      return <input {...a2p(attributes)} value={attributes.value || ''} />;
     default:
       if (
         attributes?.class instanceof Array &&

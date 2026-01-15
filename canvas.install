@@ -104,136 +104,136 @@ function canvas_requirements(string $phase): array {
   return $requirements;
 }
 
-function canvas_update_11101(): void {
-  $module_installer = \Drupal::service('module_installer');
-  $module_installer->install(['node', 'media', 'block', 'file']);
-
-  // Install themes used by tests (optional).
-  /** @var ThemeInstallerInterface $theme_installer */
-  $theme_installer = \Drupal::service('theme_installer');
-  foreach (['stark', 'claro'] as $theme) {
-    if (!\Drupal::service('theme_handler')->themeExists($theme)) {
-      $theme_installer->install([$theme]);
-    }
-  }
-  \Drupal::service('config.factory')->getEditable('system.theme')
-    ->set('default', 'stark')
-    ->set('admin', 'claro')
-    ->save();
-
-  // Place key blocks.
-//    /** @var BlockManagerInterface $block_manager */
-  $block_manager = \Drupal::service('plugin.manager.block');
-//  _canvas_place_block($block_manager, 'page_title_block', 'highlighted');
-//  _canvas_place_block($block_manager, 'system_messages_block', NULL);
-//  _canvas_place_block($block_manager, 'system_main_block', NULL);
-
-  // Content type `article`.
-  if (!NodeType::load('article')) {
-    $type = NodeType::create(['type' => 'article', 'name' => 'Article']);
-    $type->save();
-  }
-
-  // Image field `field_hero` with required storage settings.
-  if (!FieldStorageConfig::loadByName('node', 'field_hero')) {
-    FieldStorageConfig::create([
-      'field_name' => 'field_hero',
-      'entity_type' => 'node',
-      'type' => 'image',
-      'settings' => [
-        // Mirrors override used in tests.
-        'display_default' => TRUE,
-      ],
-    ])->save();
-  }
-  if (!FieldConfig::load('node', 'article', 'field_hero')) {
-    FieldConfig::create([
-      'label' => 'Hero',
-      'field_name' => 'field_hero',
-      'entity_type' => 'node',
-      'bundle' => 'article',
-      'required' => FALSE,
-      'settings' => [],
-    ])->save();
-  }
-
-  // Media bundle `image`.
-  if (!MediaType::load('image')) {
-    MediaType::create([
-      'id' => 'image',
-      'label' => 'Image',
-      'source' => 'image',
-      'new_revision' => FALSE,
-    ])->save();
-  }
-
-  // Seed two image files and media items if assets exist.
-  $seed_media_ids = _canvas_seed_images_and_media();
-
-  // Create the component tree field on article.
-  if (!FieldStorageConfig::loadByName('node', 'field_canvas_demo')) {
-    FieldStorageConfig::create([
-      'field_name' => 'field_canvas_demo',
-      'entity_type' => 'node',
-      'type' => 'canvas_component_tree',
-      'settings' => [],
-    ])->save();
-  }
-  if (!FieldConfig::load('node', 'article', 'field_canvas_demo')) {
-    FieldConfig::create([
-      'label' => 'Canvas Demo',
-      'field_name' => 'field_canvas_demo',
-      'entity_type' => 'node',
-      'bundle' => 'article',
-      'required' => FALSE,
-      'settings' => [],
-    ])->save();
-  }
-
-  // View display config for the component field.
-  \Drupal::service('entity_display.repository')
-    ->getViewDisplay('node', 'article')
-    ->setComponent('field_canvas_demo', [
-      'label' => 'hidden',
-      'type' => 'canvas_naive_render_sdc_tree',
-      'weight' => -2,
-    ])
-    ->save();
-
-  // Ensure canvas and test modules are enabled.
-  $module_installer->install([
-    'canvas',
-    'canvas_oauth',
-    'canvas_test_sdc',
-    'canvas_e2e_support',
-    'system',
-  ]);
-
-  // Build component tree items (mirrors the test setup, simplified).
-  $use_uri = \Drupal::moduleHandler()->moduleExists('canvas_test_storable_prop_shape_alter');
-  $static_image_prop_source = StaticPropSource::parse([
-    'sourceType' => 'static:field_item:entity_reference',
-    'value' => ['target_id' => $seed_media_ids['first_media_id'] ?? 1],
-    'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:image␝field_media_image␞␟src_with_alternate_widths,alt↝entity␜␜entity:media:image␝field_media_image␞␟alt,width↝entity␜␜entity:media:image␝field_media_image␞␟width,height↝entity␜␜entity:media:image␝field_media_image␞␟height}',
-    'sourceTypeSettings' => [
-      'storage' => ['target_type' => 'media'],
-      'instance' => [
-        'handler' => 'default:media',
-        'handler_settings' => [
-          'target_bundles' => ['image' => 'image'],
-        ],
-      ],
-    ],
-  ])->toArray();
-
-  $items = _canvas_build_component_tree_items($static_image_prop_source, $use_uri);
-
-  // Create seeded nodes and pages.
-  _canvas_seed_nodes_and_pages($items, $seed_media_ids);
-
-  // Create role and user with required permissions.
-  _canvas_seed_role_and_user();
-}
+//function canvas_update_11101(): void {
+//  $module_installer = \Drupal::service('module_installer');
+//  $module_installer->install(['node', 'media', 'block', 'file']);
+//
+//  // Install themes used by tests (optional).
+//  /** @var ThemeInstallerInterface $theme_installer */
+//  $theme_installer = \Drupal::service('theme_installer');
+//  foreach (['stark', 'claro'] as $theme) {
+//    if (!\Drupal::service('theme_handler')->themeExists($theme)) {
+//      $theme_installer->install([$theme]);
+//    }
+//  }
+//  \Drupal::service('config.factory')->getEditable('system.theme')
+//    ->set('default', 'stark')
+//    ->set('admin', 'claro')
+//    ->save();
+//
+//  // Place key blocks.
+////    /** @var BlockManagerInterface $block_manager */
+//  $block_manager = \Drupal::service('plugin.manager.block');
+////  _canvas_place_block($block_manager, 'page_title_block', 'highlighted');
+////  _canvas_place_block($block_manager, 'system_messages_block', NULL);
+////  _canvas_place_block($block_manager, 'system_main_block', NULL);
+//
+//  // Content type `article`.
+//  if (!NodeType::load('article')) {
+//    $type = NodeType::create(['type' => 'article', 'name' => 'Article']);
+//    $type->save();
+//  }
+//
+//  // Image field `field_hero` with required storage settings.
+//  if (!FieldStorageConfig::loadByName('node', 'field_hero')) {
+//    FieldStorageConfig::create([
+//      'field_name' => 'field_hero',
+//      'entity_type' => 'node',
+//      'type' => 'image',
+//      'settings' => [
+//        // Mirrors override used in tests.
+//        'display_default' => TRUE,
+//      ],
+//    ])->save();
+//  }
+//  if (!FieldConfig::load('node', 'article', 'field_hero')) {
+//    FieldConfig::create([
+//      'label' => 'Hero',
+//      'field_name' => 'field_hero',
+//      'entity_type' => 'node',
+//      'bundle' => 'article',
+//      'required' => FALSE,
+//      'settings' => [],
+//    ])->save();
+//  }
+//
+//  // Media bundle `image`.
+//  if (!MediaType::load('image')) {
+//    MediaType::create([
+//      'id' => 'image',
+//      'label' => 'Image',
+//      'source' => 'image',
+//      'new_revision' => FALSE,
+//    ])->save();
+//  }
+//
+//  // Seed two image files and media items if assets exist.
+//  $seed_media_ids = _canvas_seed_images_and_media();
+//
+//  // Create the component tree field on article.
+//  if (!FieldStorageConfig::loadByName('node', 'field_canvas_demo')) {
+//    FieldStorageConfig::create([
+//      'field_name' => 'field_canvas_demo',
+//      'entity_type' => 'node',
+//      'type' => 'canvas_component_tree',
+//      'settings' => [],
+//    ])->save();
+//  }
+//  if (!FieldConfig::load('node', 'article', 'field_canvas_demo')) {
+//    FieldConfig::create([
+//      'label' => 'Canvas Demo',
+//      'field_name' => 'field_canvas_demo',
+//      'entity_type' => 'node',
+//      'bundle' => 'article',
+//      'required' => FALSE,
+//      'settings' => [],
+//    ])->save();
+//  }
+//
+//  // View display config for the component field.
+//  \Drupal::service('entity_display.repository')
+//    ->getViewDisplay('node', 'article')
+//    ->setComponent('field_canvas_demo', [
+//      'label' => 'hidden',
+//      'type' => 'canvas_naive_render_sdc_tree',
+//      'weight' => -2,
+//    ])
+//    ->save();
+//
+//  // Ensure canvas and test modules are enabled.
+//  $module_installer->install([
+//    'canvas',
+//    'canvas_oauth',
+//    'canvas_test_sdc',
+//    'canvas_e2e_support',
+//    'system',
+//  ]);
+//
+//  // Build component tree items (mirrors the test setup, simplified).
+//  $use_uri = \Drupal::moduleHandler()->moduleExists('canvas_test_storable_prop_shape_alter');
+//  $static_image_prop_source = StaticPropSource::parse([
+//    'sourceType' => 'static:field_item:entity_reference',
+//    'value' => ['target_id' => $seed_media_ids['first_media_id'] ?? 1],
+//    'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:image␝field_media_image␞␟src_with_alternate_widths,alt↝entity␜␜entity:media:image␝field_media_image␞␟alt,width↝entity␜␜entity:media:image␝field_media_image␞␟width,height↝entity␜␜entity:media:image␝field_media_image␞␟height}',
+//    'sourceTypeSettings' => [
+//      'storage' => ['target_type' => 'media'],
+//      'instance' => [
+//        'handler' => 'default:media',
+//        'handler_settings' => [
+//          'target_bundles' => ['image' => 'image'],
+//        ],
+//      ],
+//    ],
+//  ])->toArray();
+//
+//  $items = _canvas_build_component_tree_items($static_image_prop_source, $use_uri);
+//
+//  // Create seeded nodes and pages.
+//  _canvas_seed_nodes_and_pages($items, $seed_media_ids);
+//
+//  // Create role and user with required permissions.
+//  _canvas_seed_role_and_user();
+//}
 
 /**
  * Place a block instance of a given plugin id.
