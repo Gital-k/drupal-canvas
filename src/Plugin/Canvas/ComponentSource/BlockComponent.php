@@ -459,7 +459,7 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
   /**
    * {@inheritdoc}
    */
-  public function validateComponentInput(array $inputValues, string $component_instance_uuid, ?FieldableEntityInterface $entity, bool $isActiveVersion = TRUE): ConstraintViolationListInterface {
+  public function validateComponentInput(array $inputValues, string $component_instance_uuid, bool $is_active_component_version, ?FieldableEntityInterface $entity): ConstraintViolationListInterface {
     if (!$this->requiresExplicitInput()) {
       return new ConstraintViolationList();
     }

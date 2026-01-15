@@ -223,7 +223,7 @@ final class Personalization extends ComponentSourceBase implements
     return $client_model['resolved'] ?? [];
   }
 
-  public function validateComponentInput(array $inputValues, string $component_instance_uuid, ?FieldableEntityInterface $entity, bool $isActiveVersion = TRUE): ConstraintViolationListInterface {
+  public function validateComponentInput(array $inputValues, string $component_instance_uuid, bool $is_active_component_version, ?FieldableEntityInterface $entity): ConstraintViolationListInterface {
     $variant_id_constraints = new Sequentially([
       new Type('string'),
       new NotBlank(),

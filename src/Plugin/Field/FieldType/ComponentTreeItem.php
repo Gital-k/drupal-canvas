@@ -567,12 +567,14 @@ class ComponentTreeItem extends FieldItemBase {
       ));
       return;
     }
+    // $component cannot be null here since we have a valid component source.
+    assert($component !== NULL);
     // Ensure that only ever valid inputs for component instances in a Canvas
     // field are saved. When a field is saved that somehow was not validated,
     // this will catch that.
     // @see \Drupal\canvas\Plugin\Validation\Constraint\ValidComponentTreeItemConstraintValidator
     $input_values = $this->getInputs();
-    $component_violations = $source->validateComponentInput($input_values ?? [], $component_instance_uuid, $entity, $component->isLoadedVersionActiveVersion());
+    $component_violations = $source->validateComponentInput($input_values ?? [], $component_instance_uuid, $component->isLoadedVersionActiveVersion(), $entity);
     if ($component_violations->count() > 0) {
       // @todo Remove the foreach and use ::addAll once
       // https://www.drupal.org/project/drupal/issues/3490588 has been resolved.
