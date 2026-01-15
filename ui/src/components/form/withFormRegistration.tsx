@@ -84,10 +84,6 @@ const dispatchFieldError = (
   fieldName: string,
   validationResult: ValidationResult,
 ) => {
-  console.log(
-    `dispatching field error ${formId}, ${fieldName}`,
-    validationResult.errorMessage || ajv.errorsText(validationResult.errors),
-  );
   dispatch(
     setFieldError({
       type: 'error',
@@ -469,9 +465,6 @@ const ComponentFormField = <P extends Record<string, any>>({
 
           // Update react-hook-form state
           field.onChange(newValue);
-          console.log(
-            `'dispatch field value comp ${newValue !== formState[fieldName]}`,
-          );
           dispatchFieldValue(dispatch, formId, fieldName, newValue);
 
           // Call original onChange
@@ -490,14 +483,12 @@ const ComponentFormField = <P extends Record<string, any>>({
           }
           // If no AJAX operations are in progress, update the form state and store.
           if (!isAjaxing()) {
-            // console.log(`'commit f 477 ${fieldName} | ${newValue} || ${formState[fieldName]} >> ${newValue !== formState[fieldName]}`);
             commitFormState({ ...formState, [fieldName]: newValue });
             return;
           }
           // This is only reached if AJAX operations are in progress. Add an event
           // listener to update the form state once ajax is complete.
           const stopListener = () => {
-            console.log(`'commit f 484 ${newValue !== formState[fieldName]}`);
             commitFormState({ ...formState, [fieldName]: newValue });
           };
           document.addEventListener('drupalAjaxStop', stopListener, {
@@ -652,7 +643,6 @@ const PageDataFormField = <P extends Record<string, any>>({
   }, [dispatch, fieldName, formContext?.formId, WrappedComponent]);
 
   const formStateToStore = (newFormState: PropsValues) => {
-    console.log('PAGE form state to store', newFormState);
     const values = Object.keys(newFormState).reduce(
       (acc: Record<string, any>, key) => {
         if (
@@ -768,14 +758,6 @@ const PageDataFormField = <P extends Record<string, any>>({
       control={rhfContext.control}
       defaultValue={getCurrentValueFromRedux()}
       render={({ field }) => {
-        // console.log('🟡 PageDataFormField Render:', {
-        //   fieldName,
-        //   fieldValue: field.value,
-        //   inputType: props.attributes?.type,
-        //   propsHasOnChange: !!props.attributes?.onChange,
-        //   propsValue: props.attributes?.value,
-        // });
-
         const enhancedOnChange = (e: any) => {
           const newValue = extractValue(e);
 
@@ -784,7 +766,6 @@ const PageDataFormField = <P extends Record<string, any>>({
 
           // Update Redux store
           if (formContext?.formId) {
-            // console.log('page form field dispatch 754');
             dispatchFieldValue(
               dispatch,
               formContext.formId,
@@ -799,14 +780,12 @@ const PageDataFormField = <P extends Record<string, any>>({
             originalOnChange(e);
           }
           if (!isAjaxing()) {
-            // console.log('page form field commit line 769');
             commitFormState({ ...formState, [fieldName]: newValue });
             return;
           }
           // This is only reached if AJAX operations are in progress. Add an event
           // listener to update the form state once ajax is complete.
           const stopListener = () => {
-            console.log('page form field commit line 776');
             commitFormState({ ...formState, [fieldName]: newValue });
           };
           document.addEventListener('drupalAjaxStop', stopListener, {
@@ -874,18 +853,6 @@ const PageDataFormField = <P extends Record<string, any>>({
           (enhancedProps as any).value = field.value;
         }
 
-        // console.log('🟣 Final enhanced props for PageDataFormField:', {
-        //   fieldName,
-        //   'enhancedProps.attributes': enhancedProps.attributes
-        //     ? {
-        //         value: enhancedProps.attributes.value,
-        //         hasOnChange: !!enhancedProps.attributes.onChange,
-        //         type: enhancedProps.attributes.type,
-        //       }
-        //     : null,
-        //   isRadioElement,
-        // });
-
         return <WrappedComponent {...enhancedProps} />;
       }}
     />
@@ -948,17 +915,11 @@ export const withFormRegistration = <P extends Record<string, any>>(
     // callback without using hyperscriptify to render a new React component.
     useEffect(() => {
       if (fieldName !== 'form_build_id' || !rhfContext || !formContext) {
-        if (fieldName === 'form_build_id') {
-          console.log('DISCARD BUILD ID', { rhfContext, formContext });
-        }
         return;
       }
       // Listen for changes to the form build ID so we can update that in
       // our form state and value.
       const formBuildIdListener = (e: AjaxUpdateFormBuildIdEvent) => {
-        console.log(
-          `BUILD ID EVENT ${formContext.formId} ${fieldName}, new: ${e.detail.newFormBuildId}`,
-        );
         if (e.detail.formId === formContext?.formId) {
           dispatchFieldValue(
             dispatch,
@@ -986,33 +947,15 @@ export const withFormRegistration = <P extends Record<string, any>>(
     // This ensures they become controlled inputs like all other form inputs
     useEffect(() => {
       if (!rhfContext || !fieldName) {
-        console.log('🔴 AJAX Input Registration Skipped:', {
-          rhfContext,
-          fieldName,
-        });
-        setTimeout(() => {
-          console.log('🔴 500 ms later:', { rhfContext, fieldName });
-        }, 500);
         return;
       }
-      // console.log(`Try again! ${fieldName}`);
       const currentValue = getCurrentValue();
 
       // Check if field is already registered
       const fieldState = rhfContext.getFieldState(fieldName);
 
-      // console.log('🔵 AJAX Input Registration Check:', {
-      //   fieldName,
-      //   formId: formContext?.formId,
-      //   isRegistered: !!(fieldState && fieldState.invalid !== undefined),
-      //   fieldState,
-      //   currentValue,
-      //   inputType: props.attributes?.type,
-      // });
-
       // If field is not yet registered (AJAX-added), register it now
       if (!fieldState || fieldState.invalid === undefined) {
-        console.log('🟢 Registering AJAX-added input:', fieldName);
         rhfContext.register(fieldName);
         // Set initial value
         rhfContext.setValue(fieldName, currentValue, {
@@ -1027,16 +970,6 @@ export const withFormRegistration = <P extends Record<string, any>>(
     // If no react-hook-form context, the form isn't using RHF - render without enhancement
     // If no field name, we can't register it - render without enhancement
     if (!rhfContext || !fieldName) {
-      // console.log('🔴 AJAX Input - No RHF context or fieldName:', {
-      //   hasRhfContext: !!rhfContext,
-      //   fieldName,
-      //   formId: formContext?.formId,
-      //   inputType: props.attributes?.type,
-      //   hasValue: 'value' in (props.attributes || {}),
-      //   value: props.attributes?.value,
-      //   hasOnChange: !!props.attributes?.onChange,
-      // });
-
       // For inputs that have lost RHF context (e.g., tabledrag rebuild), convert to uncontrolled
       // This prevents React warnings about controlled inputs without onChange handlers
       if (props.attributes && 'value' in props.attributes) {
@@ -1093,15 +1026,6 @@ export const withFormRegistration = <P extends Record<string, any>>(
               onChange: enhancedOnChange,
             },
           };
-
-          // console.log(
-          //   '🔶 Converting to uncontrolled input (with Redux sync):',
-          //   {
-          //     fieldName,
-          //     inputType,
-          //     originalValue: value,
-          //   },
-          // );
 
           return <WrappedComponent {...uncontrolledProps} />;
         }

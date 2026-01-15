@@ -203,9 +203,6 @@ const undoRedoActionIdMiddleware: Middleware<{}, RootState> =
           import.meta.env.TEST === false && {
             debugInfoAction: action as Action,
           }),
-        ...{
-          debugInfoAction: action as Action,
-        },
       };
       store.dispatch(pushUndo(itemToAdd));
     }

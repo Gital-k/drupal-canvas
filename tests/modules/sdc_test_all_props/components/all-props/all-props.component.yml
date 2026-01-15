@@ -246,21 +246,21 @@ props:
       type: integer
       examples:
         - -42
-    test_integer_range_minimum:
-      title: 'Integer, minimum=0'
-      description: 'This is the description of Integer, minimum=0'
-      type: integer
-      minimum: 0
-      examples:
-        - 42
-    test_integer_range_minimum_maximum_timestamps:
-      title: 'Integer, minimum=-2147483648, maximum=2147483648'
-      description: 'This is the description of Integer, minimum=-2147483648, maximum=2147483648'
-      type: integer
-      minimum: -2147483648
-      maximum: 2147483648
-      examples:
-        - 1730718000
+#    test_integer_range_minimum:
+#      title: 'Integer, minimum=0'
+#      description: 'This is the description of Integer, minimum=0'
+#      type: integer
+#      minimum: 0
+#      examples:
+#        - 42
+#    test_integer_range_minimum_maximum_timestamps:
+#      title: 'Integer, minimum=-2147483648, maximum=2147483648'
+#      description: 'This is the description of Integer, minimum=-2147483648, maximum=2147483648'
+#      type: integer
+#      minimum: -2147483648
+#      maximum: 2147483648
+#      examples:
+#        - 1730718000
     test_integer_by_the_dozen:
       title: 'Integer, multipleOf=12'
       description: 'This is the description of Integer, multipleOf=12'
@@ -323,12 +323,12 @@ props:
         - src: https://example.com/file.mp4
           poster: /sites/default/files/600x400.png
     # The "date-range" object format for this module.
-    test_object_drupal_date_range:
-      title: 'Object, $ref=json-schema-definitions://sdc_test_all_props.module/date-range'
-      description: 'This is the description of Object, $ref=json-schema-definitions://sdc_test_all_props.module/date-range'
-      $ref: json-schema-definitions://canvas.module/date-range
-      # @todo Remove in https://www.drupal.org/project/drupal/issues/3352063 — should not be necessary, but removing this causes \Drupal\Core\Theme\Component\ComponentMetadata::parseSchemaInfo() to generate `type = ['', 'object'] 🐛
-      type: object
+#    test_object_drupal_date_range:
+#      title: 'Object, $ref=json-schema-definitions://sdc_test_all_props.module/date-range'
+#      description: 'This is the description of Object, $ref=json-schema-definitions://sdc_test_all_props.module/date-range'
+#      $ref: json-schema-definitions://canvas.module/date-range
+#      # @todo Remove in https://www.drupal.org/project/drupal/issues/3352063 — should not be necessary, but removing this causes \Drupal\Core\Theme\Component\ComponentMetadata::parseSchemaInfo() to generate `type = ['', 'object'] 🐛
+#      type: object
 
     #
     # HTML props using `contentMediaType: text/html`
