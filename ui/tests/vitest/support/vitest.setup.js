@@ -69,3 +69,34 @@ window.PointerEvent = MockPointerEvent;
 window.HTMLElement.prototype.scrollIntoView = vi.fn();
 window.HTMLElement.prototype.releasePointerCapture = vi.fn();
 window.HTMLElement.prototype.hasPointerCapture = vi.fn();
+
+/**
+ * Mock getBoundingClientRect() for @uiw/react-codemirror
+ * https://github.com/jsdom/jsdom/issues/3729
+ */
+
+function getBoundingClientRect() {
+  const rec = {
+    x: 0,
+    y: 0,
+    bottom: 0,
+    height: 0,
+    left: 0,
+    right: 0,
+    top: 0,
+    width: 0,
+  };
+  return { ...rec, toJSON: () => rec };
+}
+
+class FakeDOMRectList extends Array {
+  item(index) {
+    return this[index];
+  }
+}
+
+document.elementFromPoint = () => null;
+window.HTMLElement.prototype.getBoundingClientRect = getBoundingClientRect;
+window.HTMLElement.prototype.getClientRects = () => new FakeDOMRectList();
+window.Range.prototype.getBoundingClientRect = getBoundingClientRect;
+window.Range.prototype.getClientRects = () => new FakeDOMRectList();

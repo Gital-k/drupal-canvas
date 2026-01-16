@@ -67,8 +67,15 @@ describe('Slots', () => {
       screen.getByRole('textbox', { name: 'Slot name' }),
       'Alpha',
     );
+    await userEvent.type(
+      screen.getByRole('textbox', { name: /Example/ }),
+      'Alpha example',
+    );
     const values = selectCodeComponentProperty('slots')(store.getState());
-    expect(values[0].name).toEqual('Alpha');
+    expect(values[0]).toMatchObject({
+      name: 'Alpha',
+      example: 'Alpha example',
+    });
   });
 
   it('reorders slots', async () => {
