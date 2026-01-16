@@ -4,4 +4,3 @@ export {
   extractValue,
 } from './formFieldHelpers';
 export { shouldUpdateFormState } from './validationHelpers';
-
