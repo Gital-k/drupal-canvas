@@ -346,9 +346,6 @@ export const ComponentFormField = <P extends Record<string, any>>({
 
           // Update react-hook-form state
           field.onChange(newValue);
-          console.log(
-            `'dispatch field value comp ${newValue !== formState[fieldName]}`,
-          );
           dispatchFieldValue(dispatch, formId, fieldName, newValue);
 
           // Call original onChange
@@ -373,7 +370,6 @@ export const ComponentFormField = <P extends Record<string, any>>({
           // This is only reached if AJAX operations are in progress. Add an event
           // listener to update the form state once ajax is complete.
           const stopListener = () => {
-            console.log(`'commit f 484 ${newValue !== formState[fieldName]}`);
             commitFormState({ ...formState, [fieldName]: newValue });
           };
           document.addEventListener('drupalAjaxStop', stopListener, {

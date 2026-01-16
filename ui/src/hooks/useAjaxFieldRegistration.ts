@@ -19,15 +19,6 @@ export const useAjaxFieldRegistration = (
 ) => {
   useEffect(() => {
     if (!rhfContext || !fieldName) {
-      if (!rhfContext || !fieldName) {
-        console.log('🔴 AJAX Input Registration Skipped:', {
-          rhfContext,
-          fieldName,
-        });
-        setTimeout(() => {
-          console.log('🔴 500 ms later:', { rhfContext, fieldName });
-        }, 500);
-      }
       return;
     }
 

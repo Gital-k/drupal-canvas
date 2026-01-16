@@ -35,10 +35,6 @@ export function dispatchFieldError(
   fieldName: string,
   validationResult: ValidationResult,
 ): void {
-  console.log(
-    `dispatching field error ${formId}, ${fieldName}`,
-    validationResult.errorMessage || ajv.errorsText(validationResult.errors),
-  );
   dispatch(
     setFieldError({
       type: 'error',

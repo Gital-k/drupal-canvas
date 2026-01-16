@@ -3,6 +3,11 @@ import { debounce } from 'lodash';
 import { Controller } from 'react-hook-form';
 
 import { DEBOUNCE_TIMEOUT } from '@/components/form/inputBehaviors';
+import {
+  dispatchFieldError,
+  dispatchFieldValue,
+  extractValue,
+} from '@/components/form/utils';
 import { useSafeFormContext, useSafeRHFContext } from '@/contexts/FormContext';
 import { setUpdatePreview } from '@/features/layout/layoutModelSlice';
 import {
@@ -12,12 +17,6 @@ import {
 import { usePageDataFormInputInfo } from '@/hooks/usePageDataFormInputInfo';
 import { useUndoRedoSync } from '@/hooks/useUndoRedoSync';
 import { isAjaxing } from '@/utils/isAjaxing';
-
-import {
-  dispatchFieldError,
-  dispatchFieldValue,
-  extractValue,
-} from '../utils/formFieldHelpers';
 
 import type * as React from 'react';
 import type { PropsValues } from '@/types/Form';
@@ -75,7 +74,6 @@ export const PageDataFormField = <P extends Record<string, any>>({
   }, [dispatch, fieldName, formContext?.formId, WrappedComponent]);
 
   const formStateToStore = (newFormState: PropsValues) => {
-    console.log('PAGE form state to store', newFormState);
     const values = Object.keys(newFormState).reduce(
       (acc: Record<string, any>, key) => {
         if (
@@ -223,7 +221,6 @@ export const PageDataFormField = <P extends Record<string, any>>({
           // This is only reached if AJAX operations are in progress. Add an event
           // listener to update the form state once ajax is complete.
           const stopListener = () => {
-            console.log('page form field commit line 776');
             commitFormState({ ...formState, [fieldName]: newValue });
           };
           document.addEventListener('drupalAjaxStop', stopListener, {
