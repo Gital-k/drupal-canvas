@@ -10,10 +10,10 @@ props: {  }
 slots: {  }
 js:
   original: |-
-    import { getEntityRouteData } from '@/lib/drupal-utils';
+    import { getPageData } from '@/lib/drupal-utils';
 
     const WithEntityRouteData = () => {
-     const {entityTypeId, bundle, uuid} = getEntityRouteData();
+     const {entityTypeId, bundle, uuid} = getPageData().mainEntity;
      return (
       <div>
         {entityTypeId} - {bundle} - {uuid}

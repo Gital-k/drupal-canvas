@@ -162,16 +162,18 @@ readonly final class CodeComponentDataProvider {
    *
    * @return array|null
    */
-  public function getCanvasDataMainEntityV0(): ?array  {
+  public function getCanvasDataMainEntityV0(): array  {
     // List of likely route parameters to check for the entity.
     $likelyEntityIdentifiers = ['preview_entity', 'node', 'entity', 'canvas_page'];
     $currentRouteParams = $this->routeMatch->getParameters()->keys();
+
 
     // Remove any identifiers from $currentRouteParams that are already in $likelyEntityIdentifiers.
     $remainingParams = array_diff($currentRouteParams, $likelyEntityIdentifiers);
     $identifiers = array_merge($likelyEntityIdentifiers, $remainingParams);
 
-    foreach ($identifiers as $identifier) {
+    foreach ($likelyEntityIdentifiers as $identifier) {
+
       $entity = $this->routeMatch->getParameter($identifier);
 
       if ($entity instanceof EntityInterface) {
@@ -186,7 +188,7 @@ readonly final class CodeComponentDataProvider {
         ];
       }
     }
-    return NULL;
+    return [];
   }
 
 }
