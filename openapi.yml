@@ -1093,9 +1093,58 @@ paths:
           application/json:
             schema:
               type: object
+              required:
+                - status
+              properties:
+                status:
+                  type: boolean
+                  description: The published status of the entity
+                clientInstanceId:
+                  type: string
+                  description: Client instance ID for concurrency control
+            examples:
+              publishPage:
+                summary: Publish a page
+                value:
+                  status: true
+                  clientInstanceId: "client-123"
+              archivePage:
+                summary: Archive (unpublish) a page
+                value:
+                  status: false
+                  clientInstanceId: "client-456"
       responses:
         '204':
           description: Content updated successfully
+        '400':
+          description: Bad request - unexpected fields or missing required field
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+              examples:
+                unexpectedFields:
+                  value:
+                    error: "Unexpected fields in request body: title, body"
+                missingStatus:
+                  value:
+                    error: "Missing required field: status"
+        '403':
+          description: Forbidden - cannot archive the homepage
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+              examples:
+                cannotArchiveHomepage:
+                  value:
+                    error: "Cannot archive the homepage. Please set a different page as the homepage first."
   '/canvas/api/v0/content/{entity_type}':
     get:
       summary: Provides api for page listing.

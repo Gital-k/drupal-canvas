@@ -12,6 +12,7 @@ use Drupal\Component\Serialization\Yaml;
 use Drupal\Core\Config\Entity\ConfigEntityUpdater;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\image\Entity\ImageStyle;
+use Drupal\views\Entity\View;
 
 /**
  * Track that props have the required flag in component config entities.
@@ -272,10 +273,8 @@ function canvas_post_update_0012_canvas_image_style_avif(array &$sandbox): void 
  * Update canvas_pages view to use publication state computed field.
  */
 function canvas_post_update_0013_update_pages_view(): void {
-  $config_factory = \Drupal::configFactory();
-  $view_config = $config_factory->getEditable('views.view.canvas_pages');
-
-  if ($view_config->isNew()) {
+  $view = View::load('canvas_pages');
+  if (!$view) {
     return;
   }
 
@@ -286,6 +285,7 @@ function canvas_post_update_0013_update_pages_view(): void {
     $file_contents = @file_get_contents($config_path);
     if (is_string($file_contents)) {
       $new_config = Yaml::decode($file_contents);
+      $view_config = \Drupal::configFactory()->getEditable('views.view.canvas_pages');
       $view_config->setData($new_config)->save();
     }
   }
