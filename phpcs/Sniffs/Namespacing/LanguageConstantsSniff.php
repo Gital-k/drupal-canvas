@@ -1,6 +1,6 @@
 <?php
 
-namespace Drupal\canvas\Sniffs\Namespacing;
+namespace CanvasCodingStandard\Sniffs\Namespacing;
 
 use PHP_CodeSniffer\Files\File;
 use PHP_CodeSniffer\Sniffs\Sniff;
