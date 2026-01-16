@@ -103,7 +103,7 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
       'components' => [
         [
           'uuid' => CanvasTestSetup::UUID_COMPONENT_SDC,
-          'component_id' => 'js.canvas_test_code_components_using_get_entity_route_data',
+          'component_id' => 'js.canvas_test_code_components_using_get_page_data',
         ],
       ],
     ]);
@@ -151,7 +151,7 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
     $template_tree = ([
       [
         'uuid' => CanvasTestSetup::UUID_COMPONENT_SDC,
-        'component_id' => 'js.canvas_test_code_components_using_get_entity_route_data',
+        'component_id' => 'js.canvas_test_code_components_using_get_page_data',
         'component_version' => '8fe3be948e0194e1',
         'inputs' => [],
       ],
