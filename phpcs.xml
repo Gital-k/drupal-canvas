@@ -40,5 +40,5 @@ core.phpcs.xml.dist -> /PATH/TO/DRUPAL/ROOT/core/phpcs.xml.dist
   </rule>
 
   <!-- Canvas' additional coding standards. -->
-  <rule ref="./phpcs/Sniffs/Namespacing/LanguageConstantsSniff.php"/>
+  <rule ref="./src/Sniffs/Namespacing/LanguageConstantsSniff.php"/>
 </ruleset>
