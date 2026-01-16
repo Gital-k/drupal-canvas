@@ -52,10 +52,10 @@ export interface DrupalSettings {
         text: string;
         url: string;
       }>;
-      mainEntity?: {
-        bundle: string;
-        entityTypeId: string;
-        uuid: string;
+      mainEntity: {
+        bundle: string | null;
+        entityTypeId: string | null;
+        uuid: string | null;
       };
       jsonapiSettings: null | {
         apiPrefix: string;
