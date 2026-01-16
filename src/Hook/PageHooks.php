@@ -113,18 +113,16 @@ final class PageHooks {
         }
         // For update operations, check if it's an unpublish attempt via
         // auto-save.
-        elseif ($entity instanceof EntityPublishedInterface) {
-          $autoSaveData = $this->autoSaveManager->getAutoSaveEntity($entity);
-          if (!$autoSaveData->isEmpty() && $autoSaveData->entity instanceof EntityPublishedInterface) {
-            // Check if auto-save is trying to unpublish a currently published
-            // homepage.
-            if ($entity->isPublished() && !$autoSaveData->entity->isPublished()) {
-              return AccessResult::forbidden()
-                ->addCacheableDependency($system_config)
-                ->addCacheableDependency($entity)
-                ->addCacheableDependency($autoSaveData)
-                ->setReason('This entity cannot be archived because its path is set as the homepage.');
-            }
+        $autoSaveData = $this->autoSaveManager->getAutoSaveEntity($entity);
+        if (!$autoSaveData->isEmpty() && $autoSaveData->entity instanceof EntityPublishedInterface) {
+          // Check if auto-save is trying to unpublish a currently published
+          // homepage.
+          if ($entity->isPublished() && !$autoSaveData->entity->isPublished()) {
+            return AccessResult::forbidden()
+              ->addCacheableDependency($system_config)
+              ->addCacheableDependency($entity)
+              ->addCacheableDependency($autoSaveData)
+              ->setReason('This entity cannot be archived because its path is set as the homepage.');
           }
         }
       }
