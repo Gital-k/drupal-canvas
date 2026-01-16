@@ -38,4 +38,7 @@ core.phpcs.xml.dist -> /PATH/TO/DRUPAL/ROOT/core/phpcs.xml.dist
   <rule ref="Drupal.Files.LineLength.TooLong">
     <exclude-pattern>*/canvas_ai/*</exclude-pattern>
   </rule>
+
+  <!-- Canvas' additional coding standards. -->
+  <rule ref="./phpcs/Sniffs/Namespacing/LanguageConstantsSniff.php"/>
 </ruleset>
