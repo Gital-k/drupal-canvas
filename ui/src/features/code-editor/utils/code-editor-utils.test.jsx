@@ -355,7 +355,7 @@ describe('getImportsFromAst', () => {
 });
 
 describe('getDataDependenciesFromAst', () => {
-  it('should detect needed drupalSettings when using getSiteData and getPageData', () => {
+  it('should detect needed drupalSettings when using getSiteData, getPageData', () => {
     const code = `
       // Random import.
       import useSWR from 'swr';
@@ -365,7 +365,7 @@ describe('getDataDependenciesFromAst', () => {
       import {
       // With different local identifier.
         getSiteData as iCanHazSiteData,
-        getPageData
+        getPageData,
       } from '@/lib/drupal-utils';
     `;
     const ast = parse(code, { sourceType: 'module' });
@@ -376,6 +376,7 @@ describe('getDataDependenciesFromAst', () => {
         'v0.branding',
         'v0.breadcrumbs',
         'v0.pageTitle',
+        'v0.mainEntity',
       ],
     });
   });
