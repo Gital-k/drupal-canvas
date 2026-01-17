@@ -19,6 +19,9 @@
    {% if height %}
      height="{{ height }}"
    {% endif %}
-   loading="{{ loading ?? 'lazy' }}"
+   {% if loading == lazy %}
+     {{ loading }}
+     loading="lazy"
+   {% endif %}
    {{ attributes }}
 />
