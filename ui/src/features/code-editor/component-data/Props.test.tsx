@@ -8,9 +8,9 @@ import AppWrapper from '@tests/vitest/components/AppWrapper';
 import { makeStore } from '@/app/store';
 import { selectCodeComponentProperty } from '@/features/code-editor/codeEditorSlice';
 import { getPropMachineName } from '@/features/code-editor/utils/utils';
+import { type CodeComponentPropImageExample } from '@/types/CodeComponent';
 
 import Props from './Props';
-import { CodeComponentPropImageExample } from '@/types/CodeComponent';
 
 const store = makeStore({});
 
@@ -360,13 +360,10 @@ describe('Props', () => {
         screen.getByRole('combobox', { name: 'Example aspect ratio' }),
       );
       await userEvent.click(screen.getByRole('option', { name: size }));
-      let example = selectCodeComponentProperty('props')(store.getState())[0].example as CodeComponentPropImageExample;
-      expect(
-        example,
-      ).toMatchObject(expectedSize);
-      expect(
-        example.src,
-      ).toMatch(
+      let example = selectCodeComponentProperty('props')(store.getState())[0]
+        .example as CodeComponentPropImageExample;
+      expect(example).toMatchObject(expectedSize);
+      expect(example.src).toMatch(
         new RegExp(`${expectedSize.width}x${expectedSize.height}@2x\\.png`),
       );
 
@@ -374,20 +371,20 @@ describe('Props', () => {
         screen.getByRole('combobox', { name: 'Pixel density' }),
       );
       await userEvent.click(screen.getByRole('option', { name: /1x/ }));
-      example = selectCodeComponentProperty('props')(store.getState())[0].example as CodeComponentPropImageExample;
-      expect(
-        example.src,
-      ).toMatch(new RegExp(`${expectedSize.width}x${expectedSize.height}?`));
+      example = selectCodeComponentProperty('props')(store.getState())[0]
+        .example as CodeComponentPropImageExample;
+      expect(example.src).toMatch(
+        new RegExp(`${expectedSize.width}x${expectedSize.height}?`),
+      );
 
       await userEvent.click(
         screen.getByRole('combobox', { name: 'Pixel density' }),
       );
       expect(screen.getByRole('option', { name: /3x/ })).toBeInTheDocument();
       await userEvent.click(screen.getByRole('option', { name: /3x/ }));
-      example = selectCodeComponentProperty('props')(store.getState())[0].example as CodeComponentPropImageExample;
-      expect(
-        example.src,
-      ).toMatch(
+      example = selectCodeComponentProperty('props')(store.getState())[0]
+        .example as CodeComponentPropImageExample;
+      expect(example.src).toMatch(
         new RegExp(`${expectedSize.width}x${expectedSize.height}@3x\\.png`),
       );
     });
