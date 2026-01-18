@@ -10,6 +10,7 @@ import { selectCodeComponentProperty } from '@/features/code-editor/codeEditorSl
 import { getPropMachineName } from '@/features/code-editor/utils/utils';
 
 import Props from './Props';
+import { CodeComponentPropImageExample } from '@/types/CodeComponent';
 
 const store = makeStore({});
 
@@ -359,11 +360,12 @@ describe('Props', () => {
         screen.getByRole('combobox', { name: 'Example aspect ratio' }),
       );
       await userEvent.click(screen.getByRole('option', { name: size }));
+      let example = selectCodeComponentProperty('props')(store.getState())[0].example as CodeComponentPropImageExample;
       expect(
-        selectCodeComponentProperty('props')(store.getState())[0].example,
+        example,
       ).toMatchObject(expectedSize);
       expect(
-        selectCodeComponentProperty('props')(store.getState())[0].example.src,
+        example.src,
       ).toMatch(
         new RegExp(`${expectedSize.width}x${expectedSize.height}@2x\\.png`),
       );
@@ -372,8 +374,9 @@ describe('Props', () => {
         screen.getByRole('combobox', { name: 'Pixel density' }),
       );
       await userEvent.click(screen.getByRole('option', { name: /1x/ }));
+      example = selectCodeComponentProperty('props')(store.getState())[0].example as CodeComponentPropImageExample;
       expect(
-        selectCodeComponentProperty('props')(store.getState())[0].example.src,
+        example.src,
       ).toMatch(new RegExp(`${expectedSize.width}x${expectedSize.height}?`));
 
       await userEvent.click(
@@ -381,8 +384,9 @@ describe('Props', () => {
       );
       expect(screen.getByRole('option', { name: /3x/ })).toBeInTheDocument();
       await userEvent.click(screen.getByRole('option', { name: /3x/ }));
+      example = selectCodeComponentProperty('props')(store.getState())[0].example as CodeComponentPropImageExample;
       expect(
-        selectCodeComponentProperty('props')(store.getState())[0].example.src,
+        example.src,
       ).toMatch(
         new RegExp(`${expectedSize.width}x${expectedSize.height}@3x\\.png`),
       );
