@@ -6,7 +6,6 @@ namespace Drupal\canvas\Hook;
 
 use Drupal\canvas\ContentTemplateRoutes;
 use Drupal\canvas\Entity\ContentTemplate;
-use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
 use Drupal\Core\Config\Entity\ConfigEntityInterface;
 use Drupal\Core\Entity\Display\EntityFormDisplayInterface;
 use Drupal\Core\Entity\EntityFieldManagerInterface;
@@ -98,40 +97,6 @@ final class ContentTemplateHooks {
   }
 
   /**
-   * Alters menu local tasks to add cache invalidation for content templates.
-   *
-   * This ensures that when a ContentTemplate entity is created or deleted,
-   * the menu local tasks cache is invalidated and rebuilt. This is necessary
-   * because menu local tasks conditionally link to different routes
-   * depending on whether a template exists.
-   *
-   * @param array $data
-   *   The local tasks data structure.
-   * @param string $route_name
-   *   The route name of the current page.
-   * @param \Drupal\Core\Cache\RefinableCacheableDependencyInterface $cacheability
-   *   The cacheability metadata for the local tasks.
-   */
-  #[Hook('menu_local_tasks_alter')]
-  public function menuLocalTasksAlter(array &$data, string $route_name, RefinableCacheableDependencyInterface &$cacheability): void {
-    // Add content template cacheability for routes where content templates
-    // apply, otherwise the content template links in the local tasks will not
-    // update when templates are created or deleted.
-    // Also apply to the main "Manage display" page
-    // (entity.entity_view_display.node.default) so tabs update correctly when
-    // templates are created/deleted.
-    // @todo Remove the hardcoded node "entity_view_display" route check after
-    //   https://www.drupal.org/project/canvas/issues/3498525 is resolved.
-    if (ContentTemplateRoutes::applies($route_name) || $route_name === 'entity.entity_view_display.node.default') {
-      // Add list cache tags to invalidate when entity ContentTemplate is
-      // created/deleted. This ensures menu local tasks rebuild when template
-      // availability changes.
-      $storage = $this->entityTypeManager->getStorage(ContentTemplate::ENTITY_TYPE_ID);
-      $cacheability->addCacheableDependency($storage);
-    }
-  }
-
-  /**
    * Preprocesses menu local task variables to modify links conditionally.
    *
    * When a ContentTemplate exists for a specific entity type and view mode,
@@ -171,6 +136,8 @@ final class ContentTemplateHooks {
     }
 
     // Redirect to Canvas template editor instead of standard view mode page.
+    // @todo Use Canvas content template route path after
+    //   https://www.drupal.org/i/3568238 is fixed.
     $variables['link']['#url'] = Url::fromUri("base:canvas/template/$entity_type_id/$bundle/$view_mode_id");
 
     // Add visual indicators that this link opens in a new window.
