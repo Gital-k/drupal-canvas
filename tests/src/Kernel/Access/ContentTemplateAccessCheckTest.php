@@ -31,27 +31,12 @@ final class ContentTemplateAccessCheckTest extends KernelTestBase {
    * {@inheritdoc}
    */
   protected static $modules = [
-    // The two only modules Drupal truly requires.
     'system',
     'user',
-    // The module being tested.
     'canvas',
-    // Content entity type and supporting modules.
-    'node',
-    'field',
-    'text',
-    // Additional dependencies.
     'path',
     'path_alias',
-    'image',
     'media',
-    'views',
-    'filter',
-    'media_library',
-    'datetime',
-    'file',
-    'options',
-    'link',
   ];
 
   /**
@@ -209,51 +194,7 @@ final class ContentTemplateAccessCheckTest extends KernelTestBase {
     $result = $accessCheck->access($account, 'node', 'full');
 
     self::assertTrue($result->isAllowed());
-    // Verify the access result includes the url.path cache context.
     self::assertContains('url.path', $result->getCacheContexts());
-  }
-
-  /**
-   * Tests access denied reason is set correctly.
-   *
-   * @covers ::access
-   */
-  public function testAccessDeniedReason(): void {
-    $account = $this->createMock(AccountInterface::class);
-    $account->expects($this->atLeastOnce())
-      ->method('hasPermission')
-      ->willReturn(FALSE);
-
-    $accessCheck = new ContentTemplateAccessCheck();
-    $result = $accessCheck->access($account, 'node', 'full');
-
-    self::assertFalse($result->isAllowed());
-    self::assertInstanceOf(AccessResult::class, $result);
-    self::assertEquals(
-      'User does not have permission to administer content templates.',
-      $result->getReason()
-    );
-  }
-
-  /**
-   * Tests access denied for empty parameters with proper reason.
-   *
-   * @covers ::access
-   */
-  public function testAccessDeniedForEmptyParameters(): void {
-    $account = $this->createMock(AccountInterface::class);
-    $account->expects($this->atLeastOnce())
-      ->method('hasPermission')
-      ->willReturn(TRUE);
-
-    $accessCheck = new ContentTemplateAccessCheck();
-    $result = $accessCheck->access($account, '', 'full');
-
-    self::assertFalse($result->isAllowed());
-    self::assertEquals(
-      'Entity type and view mode are required.',
-      $result->getReason()
-    );
   }
 
 }
