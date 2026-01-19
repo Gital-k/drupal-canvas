@@ -553,6 +553,14 @@ canvas.boot.entity:
         type: entity:{entity_type}
     _format: 'json'
 
+canvas.template.entity:
+  path: '/canvas/template/{entity_type}/{bundle}/{view_mode}'
+  defaults:
+    _controller: 'Drupal\canvas\Controller\CanvasController'
+    _title: 'Content Template'
+  requirements:
+    _canvas_content_template_access: TRUE
+
 canvas.component.status:
   path: '/admin/appearance/component/status'
   defaults:
