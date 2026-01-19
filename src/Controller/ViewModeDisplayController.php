@@ -9,7 +9,6 @@ use Drupal\Core\Cache\CacheableResponseInterface;
 use Drupal\Core\Config\Entity\ConfigEntityInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\HtmlEntityFormController;
-use Drupal\Core\Form\FormBuilderInterface;
 use Drupal\Core\Routing\LocalRedirectResponse;
 use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\Core\Url;
@@ -55,7 +54,7 @@ final class ViewModeDisplayController {
       $response->addCacheableDependency($template);
       return $response;
     }
-
+    // Fallback to the standard view mode display form.
     return $this->entityFormController->getContentResult($request, $route_match);
   }
 
