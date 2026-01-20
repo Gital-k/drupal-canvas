@@ -201,11 +201,7 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
     $drupalSettings = $this->getDrupalSettings();
     $this->assertArrayHasKey(CodeComponentDataProvider::CANVAS_DATA_KEY, $drupalSettings);
 
-    self::assertSame([
-      'bundle' => NULL,
-      'entityTypeId' => NULL,
-      'uuid' => NULL,
-    ], $drupalSettings[CodeComponentDataProvider::CANVAS_DATA_KEY][CodeComponentDataProvider::V0]['mainEntity']);
+    self::assertSame(NULL, $drupalSettings[CodeComponentDataProvider::CANVAS_DATA_KEY][CodeComponentDataProvider::V0]['mainEntity']);
   }
 
   /**
