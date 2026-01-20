@@ -31,16 +31,16 @@ final class ContentTemplateAccessCheck implements AccessInterface {
    *   The entity type ID (e.g., 'node').
    * @param string $bundle
    *   The bundle of the entity (e.g., 'article').
-   * @param string $view_mode
-   *   The view mode (e.g., 'full').
+   * @param string $view_mode_name
+   *   The view mode name (e.g., 'full').
    *
    * @return \Drupal\Core\Access\AccessResultInterface
    *   The access result.
    */
-  public function access(AccountInterface $account, string $bundle, string $entity_type, string $view_mode): AccessResultInterface {
+  public function access(AccountInterface $account, string $bundle, string $entity_type, string $view_mode_name): AccessResultInterface {
     $access = AccessResult::neutral();
     $storage = $this->entityTypeManager->getStorage(ContentTemplate::ENTITY_TYPE_ID);
-    $template = $storage->load("$entity_type.$bundle.$view_mode");
+    $template = $storage->load("$entity_type.$bundle.$view_mode_name");
     if ($template instanceof ContentTemplate) {
       // Add the ContentTemplate entity cacheability. As the access check
       // needs to rebuild when content templates are updated or deleted.
