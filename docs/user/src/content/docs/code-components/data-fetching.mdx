@@ -42,12 +42,20 @@ import { getPageData } from 'drupal-canvas';
 const { pageTitle, breadcrumbs, mainEntity } = getPageData();
 ```
 
+You can also access site information with the `getSiteData` utility
+
+```js
+import { getSiteData } from 'drupal-canvas';
+
+const { siteName } = getSiteData().branding;
+```
+
 ### Main entity metadata
 Main entity is the primary Drupal entity (e.g. article, canvas_page, blog) associated with the current page.
 
-Access main entity metadata of the page you are on from `getPageData`.
+Access main entity metadata of the page you are on with `getPageData`.
 This can be used to construct JSON:API parameters for requests. Note that not every route
-has a main entity in that case `mainEntity` will be null (e.g. front page, /user/login).
+has a main entity, in that case `mainEntity` will be null (e.g. front page, /user/login).
 
 If the code component is added to a region that may appear on all pages (including pages without a main entity),
 ensure to check for the existence of `mainEntity` before trying to access the metadata to avoid JS errors.
@@ -90,14 +98,6 @@ const { data, error, isLoading } = useSWR(
 
  return (...);
 }
-```
-
-You can also access site information with the `getSiteData` utility
-
-```js
-import { getSiteData } from 'drupal-canvas';
-
-const { siteName } = getSiteData().branding;
 ```
 
 ![Drupal's Drupal Canvas data fetch pane showing the results of access page
