@@ -201,12 +201,13 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
     $drupalSettings = $this->getDrupalSettings();
     $this->assertArrayHasKey(CodeComponentDataProvider::CANVAS_DATA_KEY, $drupalSettings);
 
-    self::assertSame(NULL, $drupalSettings[CodeComponentDataProvider::CANVAS_DATA_KEY][CodeComponentDataProvider::V0]['mainEntity']);
+    self::assertNull($drupalSettings[CodeComponentDataProvider::CANVAS_DATA_KEY][CodeComponentDataProvider::V0]['mainEntity']);
   }
 
   /**
-   * This allows parsing Drupal settings from an HTML string, which is not
-   * the actual HTML from the current page.
+   * Allow parsing Drupal settings from an HTML string.
+   * 
+   * This is not the actual HTML from the current page.
    * The logic is the same as \Drupal\Tests\BrowserTestBase::getDrupalSettings(),
    * but using a crawler parsing the passed HTML instead of the current mink session raw HTML.
    *

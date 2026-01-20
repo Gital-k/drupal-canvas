@@ -18,9 +18,9 @@ use Symfony\Component\Routing\Route;
 /**
  * Service to expose site metadata to drupalSettings for JS components.
  *
- * This includes site branding, breadcrumbs, page title, main entity identifiers,
- * and base URL. Intended for use with dynamic JavaScript components
- * such as those in Drupal Canvas.
+ * This includes site branding, breadcrumbs, page title, main entity
+ * identifiers, and base URL. Intended for use with dynamic
+ * JavaScript components such as those in Drupal Canvas.
  */
 readonly final class CodeComponentDataProvider {
 
@@ -160,18 +160,19 @@ readonly final class CodeComponentDataProvider {
   /**
    * Returns main entity data for V0 of drupalSettings.canvasData.
    *
-   * @return array|null
+   * @return array
    */
   public function getCanvasDataMainEntityV0(): array {
     // List of likely route parameters to check for the entity.
     $likelyEntityIdentifiers = ['preview_entity', 'node', 'entity', 'canvas_page'];
     $currentRouteParams = $this->routeMatch->getParameters()->keys();
 
-    // Remove any identifiers from $currentRouteParams that are already in $likelyEntityIdentifiers.
+    // Remove any identifiers from $currentRouteParams that are already in
+    // $likelyEntityIdentifiers.
     $remainingParams = array_diff($currentRouteParams, $likelyEntityIdentifiers);
-    $identifiers = array_merge($likelyEntityIdentifiers, $remainingParams);
+    $mergedIdentifiers = array_merge($likelyEntityIdentifiers, $remainingParams);
 
-    foreach ($likelyEntityIdentifiers as $identifier) {
+    foreach ($mergedIdentifiers as $identifier) {
 
       $entity = $this->routeMatch->getParameter($identifier);
 
