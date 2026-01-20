@@ -669,7 +669,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
               [
                 'rel' => 'modulepreload',
                 'fetchpriority' => 'high',
-                'href' => \sprintf('/%s/files/astro-island/_YYcQfGM6HOBDeCSYxk9yPDfXsnNrPcQ_cDzd5guK2U.js', $site_path),
+                'href' => \sprintf('/%s/files/astro-island/xQS78lbNqAghM9-MAQpdZmGt_tTf-fB2CQJMVvxqLek.js', $site_path),
               ],
             ],
           ],
