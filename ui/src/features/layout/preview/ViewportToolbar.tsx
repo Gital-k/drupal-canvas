@@ -1,4 +1,4 @@
-import { useLayoutEffect } from 'react';
+import { useLayoutEffect, useMemo } from 'react';
 import clsx from 'clsx';
 import ScaleToFitIcon from '@assets/icons/justify-stretch.svg?react';
 import { Button, DropdownMenu, Flex, Tooltip } from '@radix-ui/themes';
@@ -13,7 +13,7 @@ import {
   setViewportMinHeight,
   setViewportWidth,
 } from '@/features/ui/uiSlice';
-import { viewportSizes } from '@/types/Preview';
+import { getViewportSizes } from '@/types/Preview';
 import { getHalfwayScrollPosition } from '@/utils/function-utils';
 
 import type React from 'react';
@@ -50,6 +50,8 @@ const ViewportToolbar: React.FC<ViewportToolbarProps> = (props) => {
   const { editorPaneRef, scalingContainerRef } = props;
   const dispatch = useAppDispatch();
   const currentWidth = useAppSelector(selectViewportWidth);
+  // Get viewport sizes (supports theme-level customization).
+  const viewportSizes = useMemo(() => getViewportSizes(), []);
   const handleWidthClick = (viewportSize: viewportSize) => {
     dispatch(setViewportWidth(viewportSize.width));
     dispatch(setViewportMinHeight(viewportSize.height));
