@@ -206,7 +206,7 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
 
   /**
    * Allow parsing Drupal settings from an HTML string.
-   * 
+   *
    * This is not the actual HTML from the current page.
    * The logic is the same as \Drupal\Tests\BrowserTestBase::getDrupalSettings(),
    * but using a crawler parsing the passed HTML instead of the current mink session raw HTML.
