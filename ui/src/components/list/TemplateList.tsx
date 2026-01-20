@@ -10,15 +10,9 @@ import UnifiedMenu from '@/components/UnifiedMenu';
 import useEditorNavigation from '@/hooks/useEditorNavigation';
 import { useGetEditedTemplateId } from '@/hooks/useGetEditedTemplateId';
 import { useSmartRedirect } from '@/hooks/useSmartRedirect';
-import {
-  useDeleteContentTemplateMutation,
-  useGetContentTemplatesQuery,
-} from '@/services/componentAndLayout';
+import { useDeleteContentTemplateMutation, useGetContentTemplatesQuery } from '@/services/componentAndLayout';
+import type { TemplateInBundle, TemplateViewMode } from '@/services/componentAndLayout';
 
-import type {
-  TemplateInBundle,
-  TemplateViewMode,
-} from '@/services/componentAndLayout';
 
 import nodeStyles from '@/components/sidePanel/SidebarNode.module.css';
 
@@ -208,6 +202,7 @@ const TemplateListItem = ({ viewMode }: { viewMode: TemplateViewMode }) => {
         <ContextMenu.Trigger>
           <SidebarNode
             key={viewMode.id}
+            href={viewMode.editUrl}
             title={`${viewMode.viewModeLabel} template`}
             variant="template"
             dropdownMenuContent={

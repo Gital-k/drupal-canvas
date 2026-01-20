@@ -23,6 +23,7 @@ use Drupal\Core\Entity\Query\QueryInterface;
 use Drupal\Core\Entity\TypedData\EntityDataDefinition;
 use Drupal\Core\Entity\TypedData\EntityDataDefinitionInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\Core\Url;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Storage\ComponentTreeLoader;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
@@ -455,6 +456,16 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
       }
     }
 
+    // Generate the edit URL for this content template.
+    $edit_url = Url::fromRoute('canvas.boot.content_template', [
+      'entity_type' => $this->content_entity_type_id,
+      'bundle' => $this->content_entity_type_bundle,
+      'view_mode' => $this->content_entity_type_view_mode,
+    ])->toString();
+    if ($preview_entity) {
+      $edit_url .= '/' . $preview_entity->id();
+    }
+
     return ClientSideRepresentation::create(
       values: [
         'entityType' => $this->content_entity_type_id,
@@ -465,6 +476,7 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
         'status' => $this->status,
         'id' => $this->id(),
         'suggestedPreviewEntityId' => $preview_entity ? (int) $preview_entity->id() : NULL,
+        'editUrl' => $edit_url,
       ],
       preview: NULL,
     )

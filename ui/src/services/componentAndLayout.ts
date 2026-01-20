@@ -42,6 +42,7 @@ export type TemplateViewMode = {
   status: boolean;
   id: string;
   suggestedPreviewEntityId?: number;
+  editUrl: string;
 };
 
 export type TemplateInBundle = {
