@@ -50,7 +50,6 @@ use Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
-use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpressionInterface;
 use Drupal\file\Plugin\Field\FieldType\FileItem;
 use Drupal\file\Plugin\Field\FieldType\FileUriItem;
 use Drupal\options\Plugin\Field\FieldType\ListFloatItem;
@@ -308,6 +307,11 @@ final class JsonSchemaFieldInstanceMatcher {
         $field_name = self::getFieldNameForSingleBundleExpression($field_prop_expr);
         // The same field name prop should never be used multiple times; best
         // match is selected in object prop order.
+        // TRICKY: cannot use strict comparison here, because the prop
+        // expression instances differ due to different instantiation (even if
+        // their values are identical). Storing them as strings would solve that
+        // but would prevent the instanceof checks below.
+        // @phpstan-ignore function.strict
         if (in_array($field_prop_expr, $inverted[$field_name] ?? [], FALSE)) {
           continue;
         }
@@ -845,7 +849,7 @@ final class JsonSchemaFieldInstanceMatcher {
     };
 
     // If the primitive type does not match, this is not a candidate.
-    if (!in_array($json_schema_primitive_type, $field_primitive_types)) {
+    if (!in_array($json_schema_primitive_type, $field_primitive_types, TRUE)) {
       return FALSE;
     }
 
@@ -988,10 +992,12 @@ final class JsonSchemaFieldInstanceMatcher {
     // Is the data shape requirement met?
     // 1. Constraint.
     $required_constraint = $this->constraintManager->create($required_shape->constraint, $required_shape->constraintOptions);
-    $constraint_found = in_array(
-      $required_constraint,
-      $constraints
-    );
+    // TRICKY: cannot use strict comparison here, because the constraint
+    // instances may differ due to different instantiation (even if their
+    // configuration is identical). Until upstream Symfony adds a mechanism to
+    // compare constraints by value, we must ignore strictness here.
+    // @phpstan-ignore function.strict
+    $constraint_found = in_array($required_constraint, $constraints, FALSE);
     // 1.b Some constraints target a subset. For example: `uri-reference` also
     // allows absolute URLs.
     // @todo Generalize this ::isSupersetOf(). Find more needs first.
@@ -1133,7 +1139,7 @@ final class JsonSchemaFieldInstanceMatcher {
     $settings = $data_definition->getSettings();
     $found_expressions = [];
     array_walk_recursive($settings, function ($current) use (&$found_expressions) {
-      if (is_string($current) && str_starts_with($current, StructuredDataPropExpressionInterface::PREFIX)) {
+      if (is_string($current) && StructuredDataPropExpression::isA($current)) {
         $found_expressions[] = $current;
       }
     });
