@@ -45,8 +45,6 @@ class CanvasServiceProvider extends ServiceProviderBase {
     $container->register(ThemeSettingsDiscovery::class)
       ->setArguments([
         new Reference('theme_handler'),
-        new Reference('theme.manager'),
-        new Reference('theme.initialization'),
         '%app.root%',
         new Reference('cache.discovery'),
       ]);

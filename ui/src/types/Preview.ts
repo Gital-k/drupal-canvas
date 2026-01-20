@@ -88,7 +88,12 @@ function createViewportSize(id: string, width: number): viewportSize {
 export function getViewportSizes(): viewportSize[] {
   const canvasSettings = getCanvasSettings();
   const customViewports = canvasSettings?.viewports;
-  const viewportIds: string[] = ['mobile', 'tablet', 'desktop', 'large_desktop'];
+  const viewportIds: string[] = [
+    'mobile',
+    'tablet',
+    'desktop',
+    'large_desktop',
+  ];
 
   // Fall back to default widths if width is not customized.
   return viewportIds.map((id) => {
@@ -99,7 +104,9 @@ export function getViewportSizes(): viewportSize[] {
     if (customWidth !== undefined) {
       // Accept both numbers and numeric strings for robustness.
       const numericWidth =
-        typeof customWidth === 'string' ? parseInt(customWidth, 10) : customWidth;
+        typeof customWidth === 'string'
+          ? parseInt(customWidth, 10)
+          : customWidth;
       // Use custom width if it's a valid positive integer.
       if (
         typeof numericWidth === 'number' &&

@@ -8,8 +8,6 @@ use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Cache\CacheBackendInterface;
 use Drupal\Core\Discovery\YamlDiscovery;
 use Drupal\Core\Extension\ThemeHandlerInterface;
-use Drupal\Core\Theme\ThemeInitializationInterface;
-use Drupal\Core\Theme\ThemeManagerInterface;
 
 /**
  * Discovers and loads Canvas theme configuration from YAML files.
@@ -32,8 +30,6 @@ final class ThemeSettingsDiscovery {
    */
   public function __construct(
     private readonly ThemeHandlerInterface $themeHandler,
-    private readonly ThemeManagerInterface $themeManager,
-    private readonly ThemeInitializationInterface $themeInitialization,
     private readonly string $appRoot,
     private readonly CacheBackendInterface $cacheBackend,
   ) {
@@ -85,6 +81,8 @@ final class ThemeSettingsDiscovery {
     $current_theme = $theme_name;
     while ($current_theme && isset($themes[$current_theme])) {
       array_unshift($theme_chain, $current_theme);
+      // Access base_theme property (set by ThemeHandler).
+      // @phpstan-ignore-next-line
       $current_theme = $themes[$current_theme]->base_theme ?? NULL;
     }
 
@@ -95,7 +93,8 @@ final class ThemeSettingsDiscovery {
       if (isset($themes[$theme])) {
         $theme_path = $themes[$theme]->getPath();
         // Normalize path to avoid double slashes.
-        $theme_directories[$theme] = rtrim($this->appRoot, '/') . '/' . ltrim($theme_path, '/');
+        $theme_directories[$theme] = rtrim($this->appRoot, '/') . '/' .
+          ltrim($theme_path, '/');
       }
     }
 
@@ -108,7 +107,8 @@ final class ThemeSettingsDiscovery {
     $yaml_discovery = new YamlDiscovery('canvas', $theme_directories);
     $definitions = $yaml_discovery->findAll();
 
-    // Merge configurations in inheritance order (base themes first, then child).
+    // Merge configurations in inheritance order (base themes first, then
+    // child).
     $merged_settings = [];
     foreach ($theme_chain as $theme) {
       if (isset($definitions[$theme])) {
@@ -124,9 +124,11 @@ final class ThemeSettingsDiscovery {
       }
     }
 
-    // Ensure viewports key exists if it was set (even if empty after validation).
-    // This allows the Controller to always access $theme_settings['viewports'].
-    if (isset($merged_settings['viewports']) && empty($merged_settings['viewports'])) {
+    // Ensure viewports key exists if it was set (even if empty after
+    // validation). This allows the Controller to always access
+    // $theme_settings['viewports'].
+    if (isset($merged_settings['viewports']) &&
+      empty($merged_settings['viewports'])) {
       // Remove empty viewports array to fall back to defaults on client side.
       unset($merged_settings['viewports']);
     }

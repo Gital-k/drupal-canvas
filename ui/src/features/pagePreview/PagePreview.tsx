@@ -66,7 +66,7 @@ const PagePreview = () => {
         }
       });
     }
-  }, [width]);
+  }, [width, viewportSizes]);
 
   useEffect(() => {
     function handlePreviewLinkClick(event: MessageEvent) {

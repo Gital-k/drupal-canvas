@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo } from 'react';
+import { useCallback, useLayoutEffect, useMemo } from 'react';
 import clsx from 'clsx';
 import ScaleToFitIcon from '@assets/icons/justify-stretch.svg?react';
 import { Button, DropdownMenu, Flex, Tooltip } from '@radix-ui/themes';
@@ -59,21 +59,27 @@ const ViewportToolbar: React.FC<ViewportToolbarProps> = (props) => {
     localStorage.setItem('Canvas.editorFrame.viewportSize', viewportSize.id);
   };
 
-  const getViewportByWidth = (width: number): viewportSize => {
-    const viewportSize = viewportSizes.find((vw) => vw.width === width);
-    if (!viewportSize) {
-      throw new Error(`No viewport found with width: ${width}`);
-    }
-    return viewportSize;
-  };
+  const getViewportByWidth = useCallback(
+    (width: number): viewportSize => {
+      const viewportSize = viewportSizes.find((vw) => vw.width === width);
+      if (!viewportSize) {
+        throw new Error(`No viewport found with width: ${width}`);
+      }
+      return viewportSize;
+    },
+    [viewportSizes],
+  );
 
-  const getViewportById = (id: string): viewportSize => {
-    const viewportSize = viewportSizes.find((vw) => vw.id === id);
-    if (!viewportSize) {
-      throw new Error(`No viewport found with id: ${id}`);
-    }
-    return viewportSize;
-  };
+  const getViewportById = useCallback(
+    (id: string): viewportSize => {
+      const viewportSize = viewportSizes.find((vw) => vw.id === id);
+      if (!viewportSize) {
+        throw new Error(`No viewport found with id: ${id}`);
+      }
+      return viewportSize;
+    },
+    [viewportSizes],
+  );
 
   const handleScaleToFit = () => {
     if (editorPaneRef.current) {
@@ -122,7 +128,7 @@ const ViewportToolbar: React.FC<ViewportToolbarProps> = (props) => {
     }
     dispatch(setViewportWidth(vs.width));
     dispatch(setViewportMinHeight(vs.height));
-  }, [currentWidth, dispatch]);
+  }, [currentWidth, dispatch, getViewportByWidth, getViewportById]);
 
   return (
     <Flex
