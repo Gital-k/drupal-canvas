@@ -39,27 +39,43 @@ preview.
 ```js
 import { getPageData } from 'drupal-canvas';
 
-const { pageTitle, breadcrumbs } = getPageData();
+const { pageTitle, breadcrumbs, mainEntity } = getPageData();
 ```
 
-You can also access site information with the `getSiteData` utility
+### Main entity metadata
+Main entity is the primary Drupal entity (e.g. article, canvas_page, blog) associated with the current page.
 
-```js
-import { getSiteData } from 'drupal-canvas';
+Access main entity metadata of the page you are on from `getPageData`.
+This can be used to construct JSON:API parameters for requests. Note that not every route
+has a main entity in that case `mainEntity` will be null (e.g. front page, /user/login).
 
-const { siteName } = getSiteData().branding;
-```
-
-Access information about the main entity you are viewing with the `getEntityRouteData` utility.
-This can be used to construct JSON:API parameters for requests.
+If the code component is added to a region that may appear on all pages (including pages without a main entity),
+ensure to check for the existence of `mainEntity` before trying to access the metadata to avoid JS errors.
 
 For example, if you want to fetch a list of articles but exclude the current article being viewed,
 you can do the following:
 
 ```js
-import { getEntityRouteData } from 'drupal-canvas';
+import { getPageData } from 'drupal-canvas';
+import { JsonApiClient } from 'drupal-canvas';
+import { DrupalJsonApiParams } from 'drupal-jsonapi-params';
+import useSWR from 'swr'
 
-const { bundle, entityTypeId, uuid } = getEntityRouteData();
+const client = new JsonApiClient();
+
+export default function RelatedArticles() {
+const { mainEntity } = getPageData();
+
+// Check that mainEntity exists.
+if (!mainEntity) {
+  return;
+}
+const { bundle, entityTypeId, uuid } = mainEntity;
+
+// Check the uuid is associated with an article node type.
+if (bundle !== 'article') {
+  return;
+}
 const { data, error, isLoading } = useSWR(
 [
   'node--article',
@@ -71,6 +87,17 @@ const { data, error, isLoading } = useSWR(
 ],
 ([type, options]) => client.getCollection(type, options),
 );
+
+ return (...);
+}
+```
+
+You can also access site information with the `getSiteData` utility
+
+```js
+import { getSiteData } from 'drupal-canvas';
+
+const { siteName } = getSiteData().branding;
 ```
 
 ![Drupal's Drupal Canvas data fetch pane showing the results of access page
