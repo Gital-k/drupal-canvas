@@ -148,7 +148,7 @@ readonly final class ComponentSourceHooks {
     }
     if ($all || in_array('canvas/canvasData.v0.mainEntity', $all_attached_asset_libraries, TRUE)) {
       // Allow overrides: only set if still NULL.
-      if (NestedArray::getValue($settings, [...$path, 'mainEntity', 'uuid']) === NULL) {
+      if (NestedArray::getValue($settings, [...$path, 'mainEntity']) === NULL) {
         $canvasData = array_replace_recursive($canvasData, $this->memoize($request, 'canvas/canvasData.v0.mainEntity'));
       }
     }
