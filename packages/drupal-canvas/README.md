@@ -37,10 +37,12 @@ const ControlDots = ({ className }) => (
 
 Access information about the current page.
 
+[See here for documentation.](https://project.pages.drupalcode.org/canvas/code-components/data-fetching#drupal-data)
+
 ```js
 import { getPageData } from 'drupal-canvas';
 
-const { pageTitle, breadcrumbs } = getPageData();
+const { pageTitle, breadcrumbs, mainEntity } = getPageData();
 ```
 
 ### `getSiteData`
