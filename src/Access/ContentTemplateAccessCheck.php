@@ -7,18 +7,20 @@ namespace Drupal\canvas\Access;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Access\AccessResultInterface;
+use Drupal\Core\Cache\CacheableMetadata;
+use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Routing\Access\AccessInterface;
 use Drupal\Core\Session\AccountInterface;
 
 /**
- * Checks access for viewing/editing content templates.
- *
- * Verifies that the user has access to content templates and validates
- * the entity_type and view_mode parameters.
- *
- * @internal
+ * Access check for content template routes.
  */
 final class ContentTemplateAccessCheck implements AccessInterface {
+
+  public function __construct(
+    private readonly EntityTypeManagerInterface $entityTypeManager,
+  ) {}
 
   /**
    * Checks access for content template routes.
@@ -27,30 +29,52 @@ final class ContentTemplateAccessCheck implements AccessInterface {
    *   The account being checked.
    * @param string $entity_type
    *   The entity type ID (e.g., 'node').
+   * @param string $bundle
+   *   The bundle of the entity (e.g., 'article').
    * @param string $view_mode
    *   The view mode (e.g., 'full').
    *
    * @return \Drupal\Core\Access\AccessResultInterface
    *   The access result.
    */
-  public function access(AccountInterface $account, string $entity_type, string $view_mode): AccessResultInterface {
-    //This method still needs refactoring. I just added basic checks to get it working for now.
-    // We might need to add the check related to status of the content template.
-
-
-    // Check if the user has the admin permission for content templates.
-    $permission_access = AccessResult::allowedIfHasPermission($account, ContentTemplate::ADMIN_PERMISSION);
-
-    if (!$permission_access->isAllowed()) {
-      return $permission_access->setReason('User does not have permission to administer content templates.');
+  public function access(AccountInterface $account, string $bundle, string $entity_type, string $view_mode): AccessResultInterface {
+    $access = AccessResult::neutral();
+    $storage = $this->entityTypeManager->getStorage(ContentTemplate::ENTITY_TYPE_ID);
+    $template = $storage->load("$entity_type.$bundle.$view_mode");
+    if ($template instanceof ContentTemplate) {
+      // Add the ContentTemplate entity cacheability. As the access check
+      // needs to rebuild when content templates are updated or deleted.
+      $access->addCacheableDependency($this->getContentTemplateCacheability($template));
+      if ($template->status()) {
+        return $access->orIf(AccessResult::allowedIfHasPermission($account, ContentTemplate::ADMIN_PERMISSION));
+      }
     }
+    // Add the ContentTemplate entity storage cacheability. As the access check
+    // needs to rebuild when content templates are created.
+    $access->addCacheableDependency($this->getContentTemplateCacheability());
+    return $access;
+  }
 
-    // Validate that entity_type and view_mode are provided.
-    if (empty($entity_type) || empty($view_mode)) {
-      return AccessResult::forbidden('Entity type and view mode are required.')->addCacheContexts(['url.path']);
+  /**
+   * Gets cache metadata for content template.
+   *
+   * @param \Drupal\canvas\Entity\ContentTemplate|null $template
+   *   (optional) A content template entity to get bundle-specific cache tags
+   *   for. If NULL, only general list cache tags will be included.
+   *
+   * @return \Drupal\Core\Cache\RefinableCacheableDependencyInterface
+   *   The cacheable dependency.
+   */
+  private function getContentTemplateCacheability(?ContentTemplate $template = NULL): RefinableCacheableDependencyInterface {
+    $storage = $this->entityTypeManager->getStorage(ContentTemplate::ENTITY_TYPE_ID);
+    $dependency = (new CacheableMetadata())
+      ->addCacheContexts($storage->getEntityType()->getListCacheContexts())
+      ->addCacheTags($storage->getEntityType()->getListCacheTags());
+    if ($template) {
+      $dependency
+        ->addCacheTags($storage->getEntityType()->getBundleListCacheTags($template->getTargetBundle()));
     }
-
-    return $permission_access->addCacheContexts(['url.path']);
+    return $dependency;
   }
 
 }

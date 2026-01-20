@@ -553,7 +553,7 @@ canvas.boot.entity:
         type: entity:{entity_type}
     _format: 'json'
 
-canvas.template.entity:
+canvas.boot.content_template:
   path: '/canvas/template/{entity_type}/{bundle}/{view_mode}'
   defaults:
     _controller: 'Drupal\canvas\Controller\CanvasController'
