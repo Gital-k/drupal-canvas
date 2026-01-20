@@ -200,10 +200,7 @@ canvasData.v0.mainEntity:
   drupalSettings:
     canvasData:
       v0:
-        mainEntity:
-          bundle: null
-          entityTypeId: null
-          uuid: null
+        mainEntity: null
 
 canvasData.v0.pageTitle:
   dependencies:
