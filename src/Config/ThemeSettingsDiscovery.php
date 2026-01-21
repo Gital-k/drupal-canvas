@@ -65,7 +65,7 @@ final class ThemeSettingsDiscovery {
     try {
       $active_theme = $this->themeInitialization->getActiveThemeByName($theme_name);
     }
-    catch (\Exception $e) {
+    catch (\Exception) {
       // Theme doesn't exist or has missing dependencies.
       $empty_result = [];
       self::$cache[$theme_name] = $empty_result;
@@ -104,7 +104,7 @@ final class ThemeSettingsDiscovery {
         ltrim($theme_path, '/');
     }
 
-    if (empty($theme_directories)) {
+    if (count($theme_directories) === 0) {
       self::$cache[$theme_name] = [];
       return [];
     }
