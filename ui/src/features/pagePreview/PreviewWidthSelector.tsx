@@ -5,7 +5,7 @@ import { WidthIcon } from '@radix-ui/react-icons';
 import { Button, DropdownMenu } from '@radix-ui/themes';
 
 import BreakpointIcon from '@/components/BreakpointIcon';
-import { getViewportSizes } from '@/types/Preview';
+import { getViewportSizes } from '@/utils/viewports';
 
 import type React from 'react';
 import type { viewportSize } from '@/types/Preview';

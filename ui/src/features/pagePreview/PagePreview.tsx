@@ -12,7 +12,7 @@ import {
 import { selectPageData } from '@/features/pageData/pageDataSlice';
 import { selectPreviewHtml } from '@/features/pagePreview/previewSlice';
 import { usePostPreviewMutation } from '@/services/preview';
-import { getViewportSizes } from '@/types/Preview';
+import { getViewportSizes } from '@/utils/viewports';
 
 import styles from './PagePreview.module.css';
 

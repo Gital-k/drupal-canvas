@@ -13,8 +13,8 @@ import {
   setViewportMinHeight,
   setViewportWidth,
 } from '@/features/ui/uiSlice';
-import { getViewportSizes } from '@/types/Preview';
 import { getHalfwayScrollPosition } from '@/utils/function-utils';
+import { getViewportSizes } from '@/utils/viewports';
 
 import type React from 'react';
 import type { RefObject } from 'react';
