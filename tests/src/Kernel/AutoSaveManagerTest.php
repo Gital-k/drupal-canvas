@@ -526,11 +526,11 @@ class AutoSaveManagerTest extends KernelTestBase {
   }
 
   /**
-   * Tests entityIsDraft() method distinguishes drafts from archived pages.
+   * Tests entityIsConsideredNew() method distinguishes drafts from archived pages.
    *
-   * @covers ::entityIsDraft
+   * @covers ::entityIsConsideredNew
    */
-  public function testEntityIsDraft(): void {
+  public function testEntityIsConsideredNew(): void {
     $this->installEntitySchema('user');
     $this->installEntitySchema(Page::ENTITY_TYPE_ID);
 
@@ -544,7 +544,7 @@ class AutoSaveManagerTest extends KernelTestBase {
     ]);
     $draft_page->save();
     $this->assertTrue(
-      $autoSaveManager->entityIsDraft($draft_page),
+      $autoSaveManager->entityIsConsideredNew($draft_page),
       'Unpublished page that has never been published should be considered a draft.'
     );
 
@@ -555,7 +555,7 @@ class AutoSaveManagerTest extends KernelTestBase {
     ]);
     $published_page->save();
     $this->assertFalse(
-      $autoSaveManager->entityIsDraft($published_page),
+      $autoSaveManager->entityIsConsideredNew($published_page),
       'Published page should not be considered a draft.'
     );
 
@@ -569,7 +569,7 @@ class AutoSaveManagerTest extends KernelTestBase {
     $archived_page->setUnpublished();
     $archived_page->save();
     $this->assertFalse(
-      $autoSaveManager->entityIsDraft($archived_page),
+      $autoSaveManager->entityIsConsideredNew($archived_page),
       'Page that was published then unpublished should not be considered a draft (it is archived).'
     );
 
@@ -580,7 +580,7 @@ class AutoSaveManagerTest extends KernelTestBase {
     ]);
     $custom_unpublished_page->save();
     $this->assertTrue(
-      $autoSaveManager->entityIsDraft($custom_unpublished_page),
+      $autoSaveManager->entityIsConsideredNew($custom_unpublished_page),
       'Unpublished page that was never published should be considered a draft.'
     );
 
@@ -590,12 +590,12 @@ class AutoSaveManagerTest extends KernelTestBase {
       'status' => FALSE,
     ]);
     $draft_to_published->save();
-    $this->assertTrue($autoSaveManager->entityIsDraft($draft_to_published));
+    $this->assertTrue($autoSaveManager->entityIsConsideredNew($draft_to_published));
 
     $draft_to_published->setPublished();
     $draft_to_published->save();
     $this->assertFalse(
-      $autoSaveManager->entityIsDraft($draft_to_published),
+      $autoSaveManager->entityIsConsideredNew($draft_to_published),
       'Draft page that gets published should no longer be a draft.'
     );
   }

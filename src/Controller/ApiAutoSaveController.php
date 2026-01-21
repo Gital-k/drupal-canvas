@@ -333,7 +333,7 @@ final class ApiAutoSaveController extends ApiControllerBase {
         // might not be creating a new revision, this would only be in the
         // case where this entity should be considered new, which means it has
         // never published before in Drupal Canvas.
-        // @see \Drupal\canvas\AutoSave\AutoSaveManager::entityIsDraft()
+        // @see \Drupal\canvas\AutoSave\AutoSaveManager::entityIsConsideredNew()
         if ($revision_user = $entity_definition->getRevisionMetadataKey('revision_user')) {
           \assert(is_string($revision_user));
           $entity->set($revision_user, $this->currentUser->id());

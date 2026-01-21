@@ -1468,8 +1468,8 @@ paths:
                     $ref: '#/components/schemas/Model'
                   isNew:
                     type: boolean
-                    # @see \Drupal\canvas\Controller\ApiLayoutController::entityIsDraft()
-                    # @see https://www.drupal.org/project/canvas/issues/3505118#comment-15982801
+                    # @see \Drupal\canvas\AutoSave\AutoSaveManager::entityIsConsideredNew()
+                    # @see https://www.drupal.org/node/3505118#comment-15982801
                     description: Whether the edited content entity is considered new.
         '401':
           description: Unauthorized (unauthenticated) response.
@@ -1687,13 +1687,13 @@ paths:
                     description: Entity field values that the user has edit access to.
                   isNew:
                     type: boolean
-                    # @see \Drupal\canvas\Controller\ApiLayoutController::entityIsDraft()
-                    # @see https://www.drupal.org/project/canvas/issues/3505118#comment-15982801
+                    # @see \Drupal\canvas\AutoSave\AutoSaveManager::entityIsConsideredNew()
+                    # @see https://www.drupal.org/node/3505118#comment-15982801
                     description: Whether the edited content entity is considered new.
                   isPublished:
                     type: boolean
                     # @see \Drupal\Core\Entity\EntityPublishedInterface
-                    # @see https://www.drupal.org/project/canvas/issues/3505118#comment-15982801
+                    # @see https://www.drupal.org/node/3505118#comment-15982801
                     description: Whether the edited content entity is marked as published.
         '401':
           description: Unauthorized (unauthenticated) response.

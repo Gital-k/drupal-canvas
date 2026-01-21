@@ -1370,7 +1370,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     $published_node_id = $published_node->id();
     self::assertNotNull($published_node_id);
     // Verify it's not a draft since it was published.
-    self::assertFalse($autoSave->entityIsDraft($published_node));
+    self::assertFalse($autoSave->entityIsConsideredNew($published_node));
 
     // Make changes via auto-save, keeping it published.
     $published_node->set('title', 'Updated Published Article');
@@ -1406,7 +1406,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     $to_be_archived_node_id = $to_be_archived_node->id();
     self::assertNotNull($to_be_archived_node_id);
     // Verify it's not a draft since it was published.
-    self::assertFalse($autoSave->entityIsDraft($to_be_archived_node));
+    self::assertFalse($autoSave->entityIsConsideredNew($to_be_archived_node));
 
     // Make changes via auto-save, setting status to FALSE (archiving).
     $to_be_archived_node->set('title', 'Archived Article');
@@ -1429,7 +1429,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     self::assertFalse($to_be_archived_node->isPublished());
     self::assertSame('Archived Article', $to_be_archived_node->getTitle());
     // Verify it's not a draft since it was published previously.
-    self::assertFalse($autoSave->entityIsDraft($to_be_archived_node));
+    self::assertFalse($autoSave->entityIsConsideredNew($to_be_archived_node));
 
     // Test Case 3: Archived page that will be published.
     // This tests the ability to republish an archived page (one that was
@@ -1458,7 +1458,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     assert($to_be_republished_node instanceof NodeInterface);
     self::assertFalse($to_be_republished_node->isPublished());
     // Verify it's not a draft (has been published before).
-    self::assertFalse($autoSave->entityIsDraft($to_be_republished_node));
+    self::assertFalse($autoSave->entityIsConsideredNew($to_be_republished_node));
 
     // Make changes via auto-save, setting status back to TRUE (republishing).
     $to_be_republished_node->set('title', 'Republished Article');
@@ -1495,7 +1495,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     $draft_node_id = $draft_node->id();
     self::assertNotNull($draft_node_id);
     // Verify it's a draft.
-    self::assertTrue($autoSave->entityIsDraft($draft_node));
+    self::assertTrue($autoSave->entityIsConsideredNew($draft_node));
 
     // Make changes via auto-save, keeping status FALSE.
     $draft_node->set('title', 'Updated Draft Article');

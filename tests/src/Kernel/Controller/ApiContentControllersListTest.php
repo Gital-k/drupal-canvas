@@ -442,7 +442,7 @@ class ApiContentControllersListTest extends KernelTestBase {
    * Tests that archived pages are correctly identified in list.
    *
    * @covers ::list
-   * @covers \Drupal\canvas\AutoSave\AutoSaveManager::entityIsDraft
+   * @covers \Drupal\canvas\AutoSave\AutoSaveManager::entityIsConsideredNew
    */
   public function testArchivedPageInList(): void {
     // Create a published page, then unpublish it (archive it).
@@ -496,7 +496,7 @@ class ApiContentControllersListTest extends KernelTestBase {
    * Tests that draft pages are correctly identified in list.
    *
    * @covers ::list
-   * @covers \Drupal\canvas\AutoSave\AutoSaveManager::entityIsDraft
+   * @covers \Drupal\canvas\AutoSave\AutoSaveManager::entityIsConsideredNew
    */
   public function testDraftPageInList(): void {
     // Create an unpublished page with default title (draft).
