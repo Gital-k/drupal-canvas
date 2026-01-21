@@ -526,6 +526,14 @@ canvas.api.usage.component.list:
     _format: 'json'
   methods: [GET]
 
+canvas.boot.content_template:
+  path: '/canvas/template/{entity_type}/{bundle}/{view_mode}'
+  defaults:
+    _controller: 'Drupal\canvas\Controller\CanvasController'
+    _title: 'Content Template'
+  requirements:
+    _canvas_content_template_access: TRUE
+
 canvas.boot.empty:
   path: '/canvas'
   defaults:
@@ -552,14 +560,6 @@ canvas.boot.entity:
       entity:
         type: entity:{entity_type}
     _format: 'json'
-
-canvas.boot.content_template:
-  path: '/canvas/template/{entity_type}/{bundle}/{view_mode_name}'
-  defaults:
-    _controller: 'Drupal\canvas\Controller\CanvasController'
-    _title: 'Content Template'
-  requirements:
-    _canvas_content_template_access: TRUE
 
 canvas.component.status:
   path: '/admin/appearance/component/status'
