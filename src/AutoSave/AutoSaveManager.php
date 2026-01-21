@@ -471,7 +471,7 @@ class AutoSaveManager implements EventSubscriberInterface {
   }
 
   /**
-   * Determines if an entity is a draft (new and never published).
+   * Determines if an entity should be considered new.
    *
    * @param \Drupal\Core\Entity\ContentEntityInterface|\Drupal\canvas\Entity\ContentTemplate $entity
    *   The entity to check.

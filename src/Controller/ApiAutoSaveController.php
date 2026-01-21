@@ -294,7 +294,7 @@ final class ApiAutoSaveController extends ApiControllerBase {
             );
           }
         }
-        $is_draft = $this->autoSaveManager->entityIsDraft($original_entity);
+        $is_draft = $this->autoSaveManager->entityIsConsideredNew($original_entity);
 
         // For draft entities (new entities that have never been published),
         // automatically publish them when publishing changes. Check both the
