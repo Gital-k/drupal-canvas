@@ -29,7 +29,7 @@ final class ContentTemplateAccessCheckTest extends KernelTestBase {
   /**
    * Modules required for the test.
    *
-   * @var array<int, string>
+   * @var array<string>
    */
   protected static $modules = [
     // Modules required for testing.

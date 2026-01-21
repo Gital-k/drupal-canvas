@@ -27,10 +27,10 @@ final class ContentTemplateAccessCheck implements AccessInterface {
    *
    * @param \Drupal\Core\Session\AccountInterface $account
    *   The account being checked.
-   * @param string $entity_type
-   *   The entity type ID (e.g., 'node').
    * @param string $bundle
    *   The bundle of the entity (e.g., 'article').
+   * @param string $entity_type
+   *   The entity type ID (e.g., 'node').
    * @param string $view_mode_name
    *   The view mode name (e.g., 'full').
    *
