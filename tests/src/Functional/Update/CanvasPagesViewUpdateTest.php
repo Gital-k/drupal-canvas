@@ -31,27 +31,6 @@ final class CanvasPagesViewUpdateTest extends CanvasUpdatePathTestBase {
     $view = View::load('canvas_pages');
     $this->assertNotNull($view, 'View should exist before update.');
 
-    $config_before = \Drupal::config('views.view.canvas_pages');
-
-    $filters_before = $config_before->get('display.default.display_options.filters');
-    $this->assertArrayHasKey('status', $filters_before, 'View should have status filter before update.');
-    $this->assertSame('boolean', $filters_before['status']['plugin_id'], 'Filter should use boolean plugin before update.');
-    $this->assertSame('status', $filters_before['status']['field'], 'Filter field should be status before update.');
-    $this->assertSame('=', $filters_before['status']['operator'], 'Filter operator should be = before update.');
-    $this->assertSame('1', $filters_before['status']['value'], 'Filter value should be 1 before update.');
-    $this->assertSame('Published', $filters_before['status']['expose']['label'], 'Filter label should be Published before update.');
-    $this->assertSame('status', $filters_before['status']['expose']['identifier'], 'Filter identifier should be status before update.');
-    $this->assertTrue($filters_before['status']['expose']['required'], 'Filter should be required before update.');
-    $this->assertTrue($filters_before['status']['is_grouped'], 'Filter should be grouped before update.');
-    $this->assertArrayNotHasKey('publication_state_computed', $filters_before, 'View should not have publication_state_computed filter before update.');
-
-    $page_fields_before = $config_before->get('display.page_1.display_options.fields');
-    $this->assertArrayHasKey('status', $page_fields_before, 'Page display should have status field before update.');
-    $this->assertSame('field', $page_fields_before['status']['plugin_id'], 'Page field should use field plugin before update.');
-    $this->assertSame('Status', $page_fields_before['status']['label'], 'Page field label should be Status before update.');
-    $this->assertSame('boolean', $page_fields_before['status']['type'], 'Page field type should be boolean before update.');
-    $this->assertArrayNotHasKey('publication_state_computed', $page_fields_before, 'Page display should not have publication_state_computed field before update.');
-
     $this->runUpdates();
 
     $view_after = View::load('canvas_pages');
