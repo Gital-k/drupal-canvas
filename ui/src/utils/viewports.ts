@@ -3,40 +3,40 @@ import { getCanvasSettings } from '@/utils/drupal-globals';
 import type { viewportSize } from '@/types/Preview';
 
 /**
- * Aspect ratios (height/width) for calculating viewport heights from widths.
+ * Each viewport defines its ID, display name, default width, and aspect ratio.
  *
- * These ratios are derived from the original default viewport sizes:
+ * Aspect ratios (height/width) are used to calculate viewport heights:
  * - mobile: 800/468 ≈ 1.71 (portrait orientation)
  * - tablet: 768/1024 = 0.75 (landscape orientation, 4:3)
  * - desktop: 1080/1920 = 0.5625 (landscape orientation, 16:9)
  * - large_desktop: 1440/2560 = 0.5625 (landscape orientation, 16:9)
  */
-const aspectRatios: Record<string, number> = {
-  mobile: 800 / 468, // ~1.71 (portrait)
-  tablet: 768 / 1024, // 0.75 (4:3 landscape)
-  desktop: 1080 / 1920, // 0.5625 (16:9 landscape)
-  large_desktop: 1440 / 2560, // 0.5625 (16:9 landscape)
-};
-
-/**
- * Name mappings for viewport IDs.
- */
-const viewportNames: Record<string, string> = {
-  mobile: 'Mobile',
-  tablet: 'Tablet',
-  desktop: 'Desktop',
-  large_desktop: 'Large Desktop',
-};
-
-/**
- * Default viewport widths used when no theme configuration is provided.
- */
-const defaultViewportWidths: Record<string, number> = {
-  mobile: 468,
-  tablet: 1024,
-  desktop: 1920,
-  large_desktop: 2560,
-};
+const VIEWPORTS = {
+  mobile: {
+    id: 'mobile',
+    name: 'Mobile',
+    defaultWidth: 468,
+    aspectRatio: 800 / 468, // ~1.71 (portrait)
+  },
+  tablet: {
+    id: 'tablet',
+    name: 'Tablet',
+    defaultWidth: 1024,
+    aspectRatio: 768 / 1024, // 0.75 (4:3 landscape)
+  },
+  desktop: {
+    id: 'desktop',
+    name: 'Desktop',
+    defaultWidth: 1920,
+    aspectRatio: 1080 / 1920, // 0.5625 (16:9 landscape)
+  },
+  large_desktop: {
+    id: 'large_desktop',
+    name: 'Large Desktop',
+    defaultWidth: 2560,
+    aspectRatio: 1440 / 2560, // 0.5625 (16:9 landscape)
+  },
+} as const;
 
 /**
  * Creates a viewport size object from a width and viewport ID.
@@ -51,12 +51,15 @@ const defaultViewportWidths: Record<string, number> = {
  * @return {viewportSize}
  *   A viewport size object with calculated height.
  */
-function createViewportSize(id: string, width: number): viewportSize {
-  const aspectRatio = aspectRatios[id] ?? aspectRatios.desktop;
-  const height = Math.round(width * aspectRatio);
+function createViewportSize(
+  id: keyof typeof VIEWPORTS,
+  width: number,
+): viewportSize {
+  const viewport = VIEWPORTS[id];
+  const height = Math.round(width * viewport.aspectRatio);
   return {
-    name: viewportNames[id] || id,
-    id,
+    name: viewport.name,
+    id: viewport.id,
     width,
     height,
   };
@@ -74,52 +77,41 @@ function createViewportSize(id: string, width: number): viewportSize {
  *   large_desktop: 2560
  * @endcode
  *
- * If theme configuration is provided, it will be used. Otherwise, the default
- * viewport sizes are returned.
+ * Custom widths override the default widths for existing viewport types.
+ * Additional viewport keys in the configuration are ignored - only the four
+ * standard viewports (mobile, tablet, desktop, large_desktop) are used.
  *
  * @return {viewportSize[]}
  *   Array of viewport size objects.
  */
 export function getViewportSizes(): viewportSize[] {
-  const canvasSettings = getCanvasSettings();
-  const customViewports = canvasSettings?.viewports;
-  const viewportIds: string[] = [
-    'mobile',
-    'tablet',
-    'desktop',
-    'large_desktop',
-  ];
+  const customViewports = getCanvasSettings()?.viewports;
 
-  // Fall back to default widths if width is not customized.
-  return viewportIds.map((id) => {
-    const customWidth = customViewports?.[id];
-    let width: number;
-
-    // Check if custom width is provided and valid.
-    if (customWidth !== undefined) {
-      // Accept both numbers and numeric strings for robustness.
-      const numericWidth =
-        typeof customWidth === 'string'
-          ? parseInt(customWidth, 10)
-          : customWidth;
-      // Use custom width if it's a valid positive integer.
-      if (
-        typeof numericWidth === 'number' &&
-        !isNaN(numericWidth) &&
-        isFinite(numericWidth) &&
-        numericWidth > 0 &&
-        Number.isInteger(numericWidth)
-      ) {
-        width = numericWidth;
-      } else {
-        // Invalid custom width, fall back to default.
-        width = defaultViewportWidths[id];
-      }
-    } else {
-      // No custom width provided, use default.
-      width = defaultViewportWidths[id];
-    }
-
-    return createViewportSize(id, width);
+  return Object.keys(VIEWPORTS).map((id) => {
+    const viewportId = id as keyof typeof VIEWPORTS;
+    const width = getValidWidth(customViewports?.[viewportId], viewportId);
+    return createViewportSize(viewportId, width);
   });
+}
+
+/**
+ * Validates and returns a viewport width, falling back to default if invalid.
+ */
+function getValidWidth(
+  customWidth: unknown,
+  id: keyof typeof VIEWPORTS,
+): number {
+  if (customWidth === undefined) {
+    return VIEWPORTS[id].defaultWidth;
+  }
+
+  const numericWidth =
+    typeof customWidth === 'string' ? parseInt(customWidth, 10) : customWidth;
+
+  const isValid =
+    typeof numericWidth === 'number' &&
+    Number.isInteger(numericWidth) &&
+    numericWidth > 0;
+
+  return isValid ? numericWidth : VIEWPORTS[id].defaultWidth;
 }
