@@ -1,3 +1,9 @@
+# These schemas are not marked as FullyValidatable because the base Views types
+# they extend (views.filter.in_operator, views_field, views_sort) are not marked
+# as FullyValidatable.
+#
+# @todo Mark as FullyValidatable once https://www.drupal.org/project/drupal/issues/2869792 is resolved.
+
 views.filter.canvas_publication_state_filter:
   type: views.filter.in_operator
   label: 'Canvas publication state filter'
