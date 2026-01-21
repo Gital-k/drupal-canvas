@@ -2105,7 +2105,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
       'status' => FALSE,
       'id' => 'node.bunny.full',
       'suggestedPreviewEntityId' => NULL,
-      'editUrl' => '/canvas/template/node/bunny/full',
+      'editUrl' => $base . '/canvas/template/node/bunny/full',
     ];
 
     // The list response MUST contain unpublished ContentTemplates.
@@ -2190,7 +2190,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
       'status' => FALSE,
       'id' => 'node.llama.full',
       'suggestedPreviewEntityId' => NULL,
-      'editUrl' => '/canvas/template/node/llama/full',
+      'editUrl' => $base . '/canvas/template/node/llama/full',
     ];
     $this->assertSame($expected_full_llama_normalization, $body);
     // The same normalization should be present when GETting the `Location`.
@@ -2238,7 +2238,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
       'status' => FALSE,
       'id' => 'node.llama.full',
       'suggestedPreviewEntityId' => NULL,
-      'editUrl' => '/canvas/template/node/llama/full/1',
+      'editUrl' => $base . '/canvas/template/node/llama/full/1',
     ];
     $this->assertSame($expected_full_llama_normalization_with_entity_id, $body);
 
