@@ -7,7 +7,7 @@ namespace Drupal\canvas\Config;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Cache\CacheBackendInterface;
 use Drupal\Core\Discovery\YamlDiscovery;
-use Drupal\Core\Extension\ThemeHandlerInterface;
+use Drupal\Core\Theme\ThemeInitializationInterface;
 
 /**
  * Discovers and loads Canvas theme configuration from YAML files.
@@ -29,7 +29,7 @@ final class ThemeSettingsDiscovery {
    * Constructs a ThemeSettingsDiscovery object.
    */
   public function __construct(
-    private readonly ThemeHandlerInterface $themeHandler,
+    private readonly ThemeInitializationInterface $themeInitialization,
     private readonly string $appRoot,
     private readonly CacheBackendInterface $cacheBackend,
   ) {
@@ -62,8 +62,11 @@ final class ThemeSettingsDiscovery {
       return $cached->data;
     }
 
-    $themes = $this->themeHandler->listInfo();
-    if (!isset($themes[$theme_name])) {
+    try {
+      $active_theme = $this->themeInitialization->getActiveThemeByName($theme_name);
+    }
+    catch (\Exception $e) {
+      // Theme doesn't exist or has missing dependencies.
       $empty_result = [];
       self::$cache[$theme_name] = $empty_result;
       // Cache empty result to avoid re-checking on every request.
@@ -71,31 +74,34 @@ final class ThemeSettingsDiscovery {
         $cache_key,
         $empty_result,
         CacheBackendInterface::CACHE_PERMANENT,
-        ['config', 'canvas:theme_settings']
+        ['config:core.extension']
       );
       return $empty_result;
     }
 
-    // Build the theme inheritance chain (base themes first, then active theme).
+    // Build theme chain from base themes (first) to active theme (last).
     $theme_chain = [];
-    $current_theme = $theme_name;
-    while ($current_theme && isset($themes[$current_theme])) {
-      array_unshift($theme_chain, $current_theme);
-      // Access base_theme property (set by ThemeHandler).
-      // @phpstan-ignore-next-line
-      $current_theme = $themes[$current_theme]->base_theme ?? NULL;
+    $theme_extensions = [];
+
+    // Add base themes first (in order from root to parent).
+    foreach ($active_theme->getBaseThemeExtensions() as $base_theme_extension) {
+      $theme_chain[] = $base_theme_extension->getName();
+      $theme_extensions[$base_theme_extension->getName()] = $base_theme_extension;
     }
+
+    // Add the active theme last.
+    $main_theme_extension = $active_theme->getExtension();
+    $theme_chain[] = $main_theme_extension->getName();
+    $theme_extensions[$main_theme_extension->getName()] = $main_theme_extension;
 
     // Get theme directories for discovery.
     // Prepend Drupal root to make paths absolute for file_exists().
     $theme_directories = [];
-    foreach ($theme_chain as $theme) {
-      if (isset($themes[$theme])) {
-        $theme_path = $themes[$theme]->getPath();
-        // Normalize path to avoid double slashes.
-        $theme_directories[$theme] = rtrim($this->appRoot, '/') . '/' .
-          ltrim($theme_path, '/');
-      }
+    foreach ($theme_extensions as $theme_name_key => $extension) {
+      $theme_path = $extension->getPath();
+      // Normalize path to avoid double slashes.
+      $theme_directories[$theme_name_key] = rtrim($this->appRoot, '/') . '/' .
+        ltrim($theme_path, '/');
     }
 
     if (empty($theme_directories)) {
@@ -136,13 +142,11 @@ final class ThemeSettingsDiscovery {
     // Store in static cache for this request.
     self::$cache[$theme_name] = $merged_settings;
 
-    // Store in persistent cache with tags for invalidation.
-    // Use 'config' tag so it's cleared when configuration cache is cleared.
     $this->cacheBackend->set(
       $cache_key,
       $merged_settings,
       CacheBackendInterface::CACHE_PERMANENT,
-      ['config', 'canvas:theme_settings']
+      ['config:core.extension']
     );
 
     return $merged_settings;
@@ -173,23 +177,6 @@ final class ThemeSettingsDiscovery {
       }
     }
     return $validated;
-  }
-
-  /**
-   * Gets all discovered Canvas settings, keyed by theme name.
-   *
-   * @return array<string, array>
-   *   An array of settings keyed by theme name.
-   */
-  public function getAllSettings(): array {
-    $all_settings = [];
-    $themes = $this->themeHandler->listInfo();
-
-    foreach (array_keys($themes) as $theme_name) {
-      $all_settings[$theme_name] = $this->getSettings($theme_name);
-    }
-
-    return $all_settings;
   }
 
 }

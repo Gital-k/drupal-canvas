@@ -44,7 +44,7 @@ class CanvasServiceProvider extends ServiceProviderBase {
     // Register the theme settings discovery service.
     $container->register(ThemeSettingsDiscovery::class)
       ->setArguments([
-        new Reference('theme_handler'),
+        new Reference('theme.initialization'),
         '%app.root%',
         new Reference('cache.discovery'),
       ]);
