@@ -478,6 +478,8 @@ class AutoSaveManager implements EventSubscriberInterface {
    *
    * @return bool
    *   TRUE if the entity is a draft (new and never published), FALSE otherwise.
+   *   For ContentTemplate entities, this checks the status property since they
+   *   do not support revisions.
    */
   public function entityIsConsideredNew(ContentEntityInterface|ContentTemplate $entity): bool {
     if ($entity instanceof ContentTemplate) {
