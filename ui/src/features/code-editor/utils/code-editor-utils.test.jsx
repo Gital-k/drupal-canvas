@@ -5,15 +5,17 @@ import fixtureProps from '@tests/fixtures/code-component-props.json';
 import fixtureSlots from '@tests/fixtures/code-component-slots.json';
 
 import {
+  getDataDependenciesFromAst,
+  getImportsFromAst,
+} from '@/features/code-editor/utils/ast-utils';
+import {
   deserializeProps,
   deserializeSlots,
   formatToValidImportName,
-  getDataDependenciesFromAst,
-  getImportsFromAst,
   getPropValuesForPreview,
   serializeProps,
   serializeSlots,
-} from '@/features/code-editor/utils';
+} from '@/features/code-editor/utils/utils';
 
 const {
   deserialized: deserializedPropsFixture,
@@ -233,16 +235,6 @@ describe('Code editor utilities', () => {
       ]);
       matchDeserializedProps(result, [16, 17, 18, 19]);
     });
-
-    // Backwards compatibility
-    // @see https://www.drupal.org/i/3520843
-    it('of type deprecated text area - backwards compatibility', () => {
-      const result = deserializeProps([
-        serializedPropsFixture.deprecatedTextAreaWithNoExampleValue,
-        serializedPropsFixture.deprecatedTextAreaWithExampleValue,
-      ]);
-      matchDeserializedProps(result, [20, 21]);
-    });
   });
 
   it('serialize slots', () => {
@@ -416,6 +408,17 @@ describe('getDataDependenciesFromAst', () => {
     expect(result).to.deep.equal({
       drupalSettings: ['v0.baseUrl', 'v0.jsonapiSettings', 'v0.branding'],
     });
+  });
+
+  it('should not include drupalSettings property when it stays empty', () => {
+    const code = `
+      import useSWR from 'swr';
+      // Irrelevant import from drupal-utils, no drupalSettings needed.
+      import { sortMenu } from '@/lib/drupal-utils';
+    `;
+    const ast = parse(code, { sourceType: 'module' });
+    const result = getDataDependenciesFromAst(ast);
+    expect(result).to.deep.equal({});
   });
 
   it('should handle an empty AST gracefully', () => {

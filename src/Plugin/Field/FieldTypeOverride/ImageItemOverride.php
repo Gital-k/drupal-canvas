@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Plugin\Field\FieldTypeOverride;
 
+use Drupal\canvas\Plugin\Validation\Constraint\UriConstraint;
+use Drupal\canvas\Plugin\Validation\Constraint\UriSchemeConstraint;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
@@ -55,7 +57,8 @@ class ImageItemOverride extends ImageItem {
     // @see https://tools.ietf.org/html/rfc6570
     // @see \Drupal\canvas\TypedData\ImageDerivativeWithParametrizedWidth::getAllowedWidths()
     // @todo It's not sustainable nor ecosystem-friendly to add computed field properties to field types. Remove in favor of adapters in https://www.drupal.org/project/canvas/issues/3464003.
-    // ⚠️ TRICKY: switching to adapters will require an update path for ALL component trees where this field property is being consumed.
+    // ⚠️ TRICKY: switching to adapters will require an update path for ALL
+    // component trees where this field property is being consumed.
     $properties['srcset_candidate_uri_template'] = DataDefinition::create(UriTemplate::PLUGIN_ID)
       ->setLabel(new TranslatableMarkup('srcset template'))
       ->setDescription(new TranslatableMarkup('Image candidate string URL template.'))
@@ -71,7 +74,8 @@ class ImageItemOverride extends ImageItem {
     // parameter that contains an (encoded) URI template for a front-end
     // developer to use if they choose to do so.
     // @todo It's not sustainable nor ecosystem-friendly to add computed field properties to field types. Remove in favor of adapters in https://www.drupal.org/project/canvas/issues/3464003.
-    // ⚠️ TRICKY: switching to adapters will require an update path for ALL component trees where this field property is being consumed.
+    // ⚠️ TRICKY: switching to adapters will require an update path for ALL
+    // component trees where this field property is being consumed.
     $properties['src_with_alternate_widths'] = DataDefinition::create('uri')
       ->setLabel(new TranslatableMarkup('Resolved image URL with ?alternateWidths query parameter'))
       ->setDescription(new TranslatableMarkup('Combines the referenced image file URL with the computed srcset template'))
@@ -90,8 +94,8 @@ class ImageItemOverride extends ImageItem {
       ->addConstraint(UriTargetMediaTypeConstraint::PLUGIN_ID, ['mimeType' => 'image/*'])
       // The ComputedFileUrl data type generates a browser-accessible URL (root-
       // relative, absolute using HTTP, absolute using HTTPs or relative).
-      // @see \Drupal\Tests\canvas\Unit\SchemaJsonPatternsTest::testImageUriPattern()
-      ->addConstraint('Regex', ['pattern' => "/^(\/|https?:\/\/)?(?!.*\:\/\/)[^\s]+$/"])
+      ->addConstraint(UriConstraint::PLUGIN_ID, ['allowReferences' => TRUE])
+      ->addConstraint(UriSchemeConstraint::PLUGIN_ID, ['http', 'https'])
       ->setClass(ComputedUrlWithQueryString::class);
 
     return $properties;

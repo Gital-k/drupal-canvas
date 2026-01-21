@@ -4,6 +4,9 @@ import { expect } from '@playwright/test';
 
 import type { Page } from '@playwright/test';
 
+const initializedReadyPreviewIframeSelector =
+  '[data-test-canvas-content-initialized="true"][data-canvas-swap-active="true"]';
+
 export class CanvasEditor {
   readonly page: Page;
 
@@ -28,98 +31,72 @@ export class CanvasEditor {
     }
   }
 
+  async waitForCanvasUi() {
+    await expect(this.page.getByTestId('canvas-side-menu')).toBeAttached();
+    await expect(this.page.getByTestId('canvas-topbar')).toBeAttached();
+  }
+
   async waitForEditorUi() {
-    await this.page
-      .getByTestId('canvas-contextual-panel')
-      .locator('form')
-      .first()
-      .waitFor({ state: 'attached', timeout: 30_000 });
-    const forms = this.page
-      .getByTestId('canvas-contextual-panel')
-      .locator('form');
-    const count = await forms.count();
-    await Promise.race(
-      Array.from({ length: count }, (_, i) =>
-        forms.nth(i).waitFor({ state: 'visible', timeout: 30_000 }),
-      ),
-    );
+    await this.waitForCanvasUi();
+    await this.waitForContextualPanel();
+    await this.waitForEditorFrame();
+  }
 
-    await expect(this.page.getByTestId('canvas-primary-panel')).toContainText(
-      /Layers|Library/,
-      {
-        timeout: 15000,
-      },
-    );
+  async waitForPrimaryPanel() {
+    await expect(this.page.getByTestId('canvas-primary-panel')).toBeAttached();
 
-    await this.page.evaluate(() => {
-      return new Promise<void>((resolve) => {
-        const framesStable = () => {
-          // When a change happens data-test-canvas-content-initialized is set to
-          // false on the active iframe.
-          // Then, when the inactive iframe is ready to be swapped to active,
-          // data-test-canvas-content-initialized is set true, and the value of
-          // data-canvas-swap-active is swapped.
-          const frameAInitialized = document.querySelector(
-            '[data-canvas-iframe="A"][data-test-canvas-content-initialized="true"]',
-          );
-          const frameBInitialized = document.querySelector(
-            '[data-canvas-iframe="B"][data-test-canvas-content-initialized="true"]',
-          );
-          const frameAActive = document.querySelector(
-            '[data-canvas-iframe="A"][data-canvas-swap-active="true"]',
-          );
-          const frameBActive = document.querySelector(
-            '[data-canvas-iframe="B"][data-canvas-swap-active="true"]',
-          );
-          const xor = (a, b) => {
-            return a ? !b : b;
-          };
-          // Only one frame is uninitialized.
-          // and
-          // only one frame is initialized and stable.
-          return (
-            xor(frameAInitialized, frameBInitialized) &&
-            ((frameAInitialized && frameAActive) ||
-              (frameBInitialized && frameBActive))
-          );
-        };
-        let mutated = false;
+    // Check for an H4 tag with any text inside canvas-primary-panel (the Panel title)
+    const h4Text = await this.page
+      .getByTestId('canvas-primary-panel')
+      .locator('h4')
+      .textContent();
+    expect(h4Text && h4Text.trim().length > 0).toBe(true);
 
-        const targetNode = document.querySelector(
-          '[data-testid="canvas-editor-frame-scaling"]',
-        );
-        const observer = new MutationObserver(() => {
-          // Reset the mutated state as something has changed.
-          mutated = true;
-        });
-        observer.observe(targetNode, {
-          attributes: true,
-          childList: true,
-          subtree: true,
-        });
+    // Check that the primary panel is visible and has children
+    const primaryPanelContent = this.page
+      .getByTestId('canvas-primary-panel')
+      .locator('.primaryPanelContent');
+    await expect(primaryPanelContent).toBeVisible();
+    const childCount = await primaryPanelContent.locator(':scope > *').count();
+    expect(childCount).toBeGreaterThan(0);
+  }
 
-        const intervalId = setInterval(() => {
-          if (!mutated && framesStable()) {
-            clearInterval(intervalId); // Stop the interval
-            observer.disconnect();
-            resolve();
-          } else {
-            mutated = false;
-          }
-        }, 1000);
-      });
-    });
-
+  async waitForContextualPanel() {
     await expect(
-      this.page.locator(
-        '[data-testid="canvas-editor-frame-scaling"] iframe[data-test-canvas-content-initialized="true"]',
-      ),
+      this.page.getByTestId('canvas-contextual-panel'),
+    ).toBeAttached();
+    await expect(
+      this.page.getByTestId('canvas-contextual-panel').locator('form').first(),
+    ).toBeAttached();
+  }
+
+  async waitForEditorFrame() {
+    await expect(
+      this.page.locator('.canvasEditorFrameScalingContainer'),
     ).toHaveCSS('opacity', '1');
+
     await expect(
-      this.page.locator(
-        '[data-testid="canvas-editor-frame-scaling"] iframe[data-canvas-swap-active="false"]',
-      ),
-    ).toHaveCSS('opacity', '0');
+      this.page.locator(initializedReadyPreviewIframeSelector),
+    ).toBeAttached();
+
+    const iframeElement = await this.page.$(
+      initializedReadyPreviewIframeSelector,
+    );
+    const contentDocumentExists = await iframeElement?.evaluate((el) => {
+      return !!(el as HTMLIFrameElement).contentDocument;
+    });
+    expect(contentDocumentExists).toBe(true);
+  }
+
+  async goToCanvasRoot() {
+    const response = await this.page.goto('/canvas');
+    if (!response || response.status() !== 200) {
+      console.error(response);
+      console.error('status', response?.status);
+      throw new Error("Canvas didn't load");
+    }
+
+    await this.waitForCanvasUi();
   }
 
   async goToEditor() {
@@ -143,53 +120,64 @@ export class CanvasEditor {
       .contentFrame();
   }
 
-  /**
-   * Opens the Library Panel by clicking the "Add" button in the side menu.
-   * Waits for the library loading indicator to disappear.
-   *
-   */
   async openLibraryPanel() {
-    // Click the layers panel first so it doesn't matter if the layers panel
-    // is already open or not.
     await this.page
       .getByTestId('canvas-side-menu')
-      .getByLabel('Layers')
+      .getByLabel('Library')
       .click();
-    await this.page.getByTestId('canvas-side-menu').getByLabel('Add').click();
+
     await expect(
       this.page.getByTestId('canvas-components-library-loading'),
     ).not.toBeVisible();
-    await expect(
-      this.page.locator(
-        '[data-testid="canvas-primary-panel"] h4:has-text("Library")',
-      ),
-    ).toBeVisible();
-    const components = this.page.locator(
-      '[data-testid="canvas-primary-panel"] [data-canvas-type="component"]',
-    );
-    const count = await components.count();
-    for (let i = 0; i < count; i++) {
-      await components.nth(i).waitFor({ state: 'visible' });
+    try {
+      await expect(
+        this.page.getByRole('heading', { name: 'Library' }),
+      ).toBeVisible();
+    } catch (error) {
+      throw new Error(
+        'openLibraryPanel: Library panel did not open - was it already open?\n' +
+          (error instanceof Error ? error.message : String(error)),
+      );
     }
 
-    await this.page
-      .getByTestId('canvas-manage-library-components-tab-select')
-      .click();
+    // Ensure we are on the Components tab.
+    await this.page.getByTestId('canvas-library-components-tab-select').click();
   }
 
   async openLayersPanel() {
-    // Click the library panel first so it doesn't matter if the layers panel
-    // is already open or not.
-    await this.page.getByTestId('canvas-side-menu').getByLabel('Add').click();
     await this.page
       .getByTestId('canvas-side-menu')
       .getByLabel('Layers')
       .click();
-    await expect(
-      this.page.locator(
-        '[data-testid="canvas-primary-panel"] h4:has-text("Layers")',
-      ),
-    ).toBeVisible();
+
+    try {
+      await expect(
+        this.page.getByRole('heading', { name: 'Layers' }),
+      ).toBeVisible();
+    } catch (error) {
+      throw new Error(
+        'openLayersPanel: Layers panel did not open - was it already open?\n' +
+          (error instanceof Error ? error.message : String(error)),
+      );
+    }
+  }
+
+  async openCodePanel() {
+    await this.page.getByTestId('canvas-side-menu').getByLabel('Code').click();
+
+    try {
+      await expect(
+        this.page.getByRole('heading', { name: 'Code' }),
+      ).toBeVisible();
+      await expect(
+        this.page.locator('[data-testid="canvas-code-panel-content"]'),
+      ).toBeVisible();
+    } catch (error) {
+      throw new Error(
+        'openCodePanel: Code panel did not open - was it already open?\n' +
+          (error instanceof Error ? error.message : String(error)),
+      );
+    }
   }
 
   async openComponent(title: string) {
@@ -220,8 +208,6 @@ export class CanvasEditor {
     const { id, name } = identifier;
     const { hasInputs = true } = options;
 
-    await this.openLibraryPanel();
-
     let selector, previewSelector;
 
     if (id) {
@@ -234,13 +220,26 @@ export class CanvasEditor {
       throw new Error("Either 'id' or 'name' must be provided.");
     }
 
+    try {
+      await expect(
+        this.page.getByRole('heading', { name: 'Library' }),
+      ).toBeVisible();
+    } catch (error) {
+      throw new Error(
+        'addComponent: Make sure you open the Library panel before calling addComponent.\n' +
+          (error instanceof Error ? error.message : String(error)),
+      );
+    }
+
     const componentLocator = this.page
       .getByTestId('canvas-primary-panel')
       .locator(selector);
 
     const existingInstances = this.page.locator(previewSelector);
     const initialCount = await existingInstances.count();
-    await componentLocator.click();
+    await componentLocator.hover();
+    await componentLocator.getByLabel('Open contextual menu').click();
+    await this.page.getByText('Insert').click();
 
     expect(await this.page.locator(previewSelector).count()).toBe(
       initialCount + 1,
@@ -289,8 +288,8 @@ export class CanvasEditor {
           .locator(`${inputLocator}[type="file"]`)
           .setInputFiles(nodePath.join(__dirname, propValue));
         await expect(
-          this.page.locator(`${inputLocator}[type="file"]`),
-        ).not.toBeVisible();
+          this.page.getByRole('button', { name: 'remove' }),
+        ).toBeVisible();
         break;
       default:
         await this.page.locator(inputLocator).fill(propValue);
@@ -451,21 +450,23 @@ export class CanvasEditor {
   }
 
   async createCodeComponent(componentName: string, code: string) {
-    await this.openLibraryPanel();
+    await this.openCodePanel();
+    await this.page.getByTestId('canvas-page-list-new-button').click();
+
     await this.page
-      .locator('[data-testid="canvas-primary-panel"]')
-      .getByText('Create code component')
+      .getByTestId('canvas-library-new-code-component-button')
       .click();
+
     await this.page.fill('#componentName', componentName);
     await this.page
       .locator('.rt-BaseDialogContent button')
-      .getByText('Add')
+      .getByText('Create')
       .click();
     await expect(
-      this.page.locator('[data-testid="canvas-mosaic-container"]'),
+      this.page.locator('[data-testid="canvas-code-editor-container"]'),
     ).toBeVisible();
     const codeEditor = this.page.locator(
-      '.canvas-mosaic-window-editor div[role="textbox"]',
+      '[data-testid="canvas-code-editor-main-panel"] div[role="textbox"]',
     );
     await codeEditor.waitFor({ state: 'visible' });
     await expect(codeEditor).toContainText(
@@ -483,15 +484,19 @@ export class CanvasEditor {
     required: boolean = false,
   ) {
     await this.page
-      .locator('.canvas-mosaic-window-component-data button:has-text("Props")')
+      .locator(
+        '[data-testid="canvas-code-editor-component-data-panel"] button:has-text("Props")',
+      )
       .click();
     await this.page
-      .locator('.canvas-mosaic-window-component-data')
+      .locator('[data-testid="canvas-code-editor-component-data-panel"]')
       .getByRole('button')
       .getByText('Add')
       .click();
     const propForm = this.page
-      .locator('.canvas-mosaic-window-component-data [data-testid^="prop-"]')
+      .locator(
+        '[data-testid="canvas-code-editor-component-data-panel"] [data-testid^="prop-"]',
+      )
       .last();
     await propForm.locator('[id^="prop-name-"]').fill(propName);
     await propForm.locator('[id^="prop-type-"]').click();
@@ -564,6 +569,7 @@ export class CanvasEditor {
     await this.page.getByRole('button', { name: 'Add to components' }).click();
     await this.page.getByRole('button', { name: 'Add' }).click();
     await this.waitForEditorUi();
+    await this.openLibraryPanel();
     await expect(
       this.page.locator(
         `[data-canvas-type="component"][data-canvas-component-id="${componentName}"]`,
@@ -573,7 +579,7 @@ export class CanvasEditor {
 
   getCodePreviewFrame() {
     return this.page
-      .locator('.canvas-mosaic-window-preview iframe')
+      .locator('[data-testid="canvas-code-editor-preview-panel"] iframe')
       .contentFrame()
       .locator('#canvas-code-editor-preview-root');
   }
@@ -583,12 +589,16 @@ export class CanvasEditor {
       .locator('[data-testid="canvas-topbar"]')
       .getByRole('button', { name: 'Preview' })
       .click();
-    await this.page
-      .locator('iframe[class^="_PagePreviewIframe"]')
-      .contentFrame()
-      .locator('.layout-container')
-      .waitFor({ state: 'visible' });
-    await this.page.waitForLoadState('networkidle');
+    await this.page.waitForLoadState('domcontentloaded');
+    // Wait for no DOM mutations for a period.
+    await this.page.waitForFunction(() => {
+      const iframe = document.querySelector(
+        'iframe[class^="_PagePreviewIframe"]',
+      );
+      const iframeDocument =
+        iframe.contentDocument || iframe.contentWindow.document;
+      return iframeDocument.querySelector('main')?.children.length > 0;
+    });
     await this.page
       .locator('iframe[class^="_PagePreviewIframe"]')
       .contentFrame()

@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Entity;
 
+use Drupal\canvas\Audit\RevisionAuditEnum;
+use Drupal\canvas\CanvasConfigUpdater;
+use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
 use Drupal\Core\Config\Schema\Mapping;
 use Drupal\Core\Entity\Attribute\ConfigEntityType;
@@ -12,6 +15,7 @@ use Drupal\Core\Entity\Query\QueryInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Extension\ThemeHandlerInterface;
 use Drupal\Core\Render\Markup;
+use Drupal\Core\Render\RendererInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\Entity\Routing\AdminHtmlRouteProvider;
 use Drupal\Core\Theme\ThemeInitializationInterface;
@@ -71,7 +75,6 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
     'source',
     'source_local_id',
     'provider',
-    'category',
     'active_version',
     'versioned_properties',
   ],
@@ -116,32 +119,31 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
   protected ?string $provider;
 
   /**
-   * The human-readable category of the component.
-   */
-  protected string|TranslatableMarkup|null $category;
-
-  /**
    * Holds the plugin collection for the source plugin.
    */
   protected ?VersionedConfigurationSubsetSingleLazyPluginCollection $sourcePluginCollection = NULL;
+
+  /**
+   * Tracks the new versions created during its lifetime, until saving.
+   *
+   * @see ::preSave()
+   */
+  protected array $newVersionsDuringLifeTime = [];
+
+  /**
+   * {@inheritdoc}
+   */
+  public function __sleep(): array {
+    // @see \Drupal\Core\Database\Connection::__sleep()
+    // @see \Drupal\Core\Site\Settings::__sleep()
+    throw new \LogicException('The Canvas Component config entity type should never be serialized; it should always be loaded when needed.');
+  }
 
   /**
    * {@inheritdoc}
    */
   public function id(): string {
     return $this->id;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getCategory(): string|TranslatableMarkup {
-    // TRICKY: this PHP class allows this value to be `NULL` to avoid
-    // \Drupal\Core\Config\Entity\ConfigEntityBase::set() triggering a PHP Type
-    // error. Fortunately, all Canvas config entities have strict config schema
-    // validation. Thanks to validation, NULL is absent from the return type.
-    assert($this->category !== NULL);
-    return $this->category;
   }
 
   /**
@@ -192,10 +194,10 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
    *   The corresponding list of PHP FQCNs. Depending on the component type,
    *   this may be one unique class per Component config entity (ID), or the
    *   same class for all.
-   *   For example: all SDC-sourced Canvas Components use the same (plugin) class
-   *   (and even interface) interface, but every Block plugin-sourced Canvas
-   *   Components has a unique (plugin) class, and often even a unique (plugin)
-   *   interface.
+   *   For example: all SDC-sourced Canvas Components use the same (plugin)
+   *   class (and even interface) interface, but every Block plugin-sourced
+   *   Canvas Components has a unique (plugin) class, and often even a unique
+   *   (plugin) interface.
    *   @see \Drupal\Core\Theme\ComponentPluginManager::$defaults
    */
   public static function getClasses(array $ids): array {
@@ -292,33 +294,79 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
    * @see docs/adr/0005-Keep-the-front-end-simple.md
    */
   public function normalizeForClientSide(): ClientSideRepresentation {
-    $info = $this->getComponentSource()->getClientSideInfo($this);
-
-    $build = $info['build'];
-    unset($info['build']);
-
     $component_config_entity_uuid = $this->uuid();
-    // Wrap in a render-safe container.
-    // @todo Remove all the wrapping-in-RenderSafeComponentContainer complexity and make ComponentSourceInterface::renderComponent() for that instead in https://www.drupal.org/i/3521041
-    $build = [
-      '#type' => RenderSafeComponentContainer::PLUGIN_ID,
-      '#component' => $build + [
-        // Wrap each rendered component instance in HTML comments that allow the
-        // client side to identify it.
-        // @see \Drupal\canvas\Plugin\DataType\ComponentTreeHydrated::renderify()
-        '#prefix' => Markup::create("<!-- canvas-start-$component_config_entity_uuid -->"),
-        '#suffix' => Markup::create("<!-- canvas-end-$component_config_entity_uuid -->"),
-      ],
-      '#component_context' => \sprintf('Preview rendering component %s.', $this->label()),
-      '#component_uuid' => $component_config_entity_uuid,
-      '#is_preview' => TRUE,
-    ];
+
+    $source = $this->getComponentSource();
+    if (!$source->isBroken()) {
+      $info = $this->getComponentSource()->getClientSideInfo($this);
+      $build = $info['build'];
+      unset($info['build']);
+      // Inform the UI this is safe to instantiate.
+      $info['broken'] = FALSE;
+
+      // Wrap in a render-safe container.
+      // @todo Remove all the wrapping-in-RenderSafeComponentContainer complexity and make ComponentSourceInterface::renderComponent() for that instead in https://www.drupal.org/i/3521041
+      $build = [
+        '#type' => RenderSafeComponentContainer::PLUGIN_ID,
+        '#component' => $build + [
+          // Wrap each rendered component instance in HTML comments that allow
+          // the client side to identify it.
+          // @see \Drupal\canvas\Plugin\DataType\ComponentTreeHydrated::renderify()
+          '#prefix' => Markup::create("<!-- canvas-start-$component_config_entity_uuid -->"),
+          '#suffix' => Markup::create("<!-- canvas-end-$component_config_entity_uuid -->"),
+        ],
+        '#component_context' => \sprintf('Preview rendering component %s.', $this->label()),
+        '#component_uuid' => $component_config_entity_uuid,
+        '#is_preview' => TRUE,
+      ];
+
+      // Despite the Component being available in its ComponentSource, it may
+      // crash during rendering. The preview of a Component config entity should
+      // be as rich and precise as possible, so rather than letting
+      // \Drupal\canvas\ClientSideRepresentation::renderPreviewIfAny() do the
+      // rendering, already render it early here.
+      \Drupal::service(RendererInterface::class)->renderInIsolation($build);
+
+      // It is possible that despite ComponentSourceInterface::isBroken() saying
+      // the Component is not broken, it still crashes during rendering.
+      // Consider this another form of brokenness.
+      $info['broken'] = array_key_exists('#render_crashed', $build);
+    }
+    // Ensure a broken Component cannot break the Canvas HTTP API.
+    else {
+      try {
+        // Wrap in a render-safe container.
+        // If ::renderComponent() fails, it falls into "catch" block.
+        $build = [
+          '#type' => RenderSafeComponentContainer::PLUGIN_ID,
+          '#component' => $this->getComponentSource()->renderComponent([], [], $component_config_entity_uuid, TRUE),
+          '#component_context' => 'API',
+          '#component_uuid' => $component_config_entity_uuid,
+          '#is_preview' => TRUE,
+        ];
+      }
+      catch (\Throwable $e) {
+        // … but some ComponentSources might even fail while calling
+        // ::renderComponent(), handle this too!
+        $build = RenderSafeComponentContainer::handleComponentException(
+          $e,
+          componentContext: 'API',
+          isPreview: TRUE,
+          componentUuid: $component_config_entity_uuid,
+          component_exception_cacheability: CacheableMetadata::createFromObject($this),
+        );
+      }
+      // Inform the UI this is IMPOSSIBLE to instantiate. The UI should render
+      // this Component differently, and disallow the user from
+      // instantiating it.
+      $info = ['broken' => TRUE];
+    }
+
     return ClientSideRepresentation::create(
       values: $info + [
         'id' => $this->id(),
         'name' => (string) $this->label(),
         'library' => $this->computeUiLibrary()->value,
-        'category' => (string) $this->getCategory(),
         'source' => (string) $this->getComponentSource()->getPluginDefinition()['label'],
         'version' => $this->getActiveVersion(),
       ],
@@ -329,8 +377,8 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
   /**
    * Uses heuristics to compute the appropriate "library" in the Canvas UI.
    *
-   * Each Component appears in a well-defined "library" in the Canvas UI. This is a
-   * set of heuristics with a particular decision tree.
+   * Each Component appears in a well-defined "library" in the Canvas UI. This
+   * is a set of heuristics with a particular decision tree.
    *
    * @see https://www.drupal.org/project/canvas/issues/3498419#comment-15997505
    */
@@ -446,6 +494,10 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
     return $this->get('settings') ?? [];
   }
 
+  public function getSlotDefinitions(): array {
+    return $this->get('fallback_metadata')['slot_definitions'] ?? [];
+  }
+
   /**
    * {@inheritdoc}
    */
@@ -469,26 +521,33 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
    * @see \Drupal\canvas\EntityHandlers\CanvasConfigEntityAccessControlHandler
    */
   public function onDependencyRemoval(array $dependencies): bool {
-    // If only module and theme dependencies are being removed, there's nothing
-    // to do: this Component cannot work any longer. So rely on the default
+    // If only module dependencies are being removed, there's nothing to do:
+    // this Component cannot work any longer. So rely on the default
     // behavior of the config system: allow this to be deleted.
-    // Note: The removal of module/theme dependencies is prevented by an
+    // Note: The removal of module dependencies is prevented by an
     // uninstall validator. So this should only be possible by using force.
     // @see \Drupal\canvas\ComponentDependencyUninstallValidator
-    if (empty($dependencies['config'] ?? []) && empty($dependencies['content'] ?? [])) {
+    // For themes, no uninstall validators exist in core,
+    // so we need to avoid new instances and rely on fallbacks
+    // by disabling the component entities instead of removing them.
+    // @todo Write an uninstall validator instead when Drupal Core's issue
+    //   https://www.drupal.org/i/3550019 is fixed and remove the check for
+    //   theme dependencies.
+    if (empty($dependencies['config'] ?? []) && empty($dependencies['theme'] ?? []) && empty($dependencies['content'] ?? [])) {
       return parent::onDependencyRemoval($dependencies);
     }
 
-    // When it is affected, then if there's 0 component instances using it, still
-    // there is nothing to do, because none of Drupal Canvas's config
+    // When it is affected, then if there's 0 component instances using it,
+    // still there is nothing to do, because none of Drupal Canvas's config
     // entities are affected, nor are any Canvas fields on content entities.
-    if (!\Drupal::service(ComponentAudit::class)->hasUsages($this)) {
+    if (!\Drupal::service(ComponentAudit::class)->hasUsages($this, RevisionAuditEnum::All) && !\Drupal::service(ComponentAudit::class)->hasUsages($this, RevisionAuditEnum::AutoSave)) {
       return parent::onDependencyRemoval($dependencies);
     }
 
     // However, if there's >=1 component instance for it, make this Component
-    // use the `fallback` component source plugin to avoid deleting dependent Canvas
-    // config entities and breaking Canvas component trees in content entities.
+    // use the `fallback` component source plugin to avoid deleting dependent
+    // Canvas config entities and breaking Canvas component trees in content
+    // entities.
     $last_active_version = $this->getActiveVersion();
     $this->createVersion(ComponentInterface::FALLBACK_VERSION)
       ->setSettings([
@@ -500,20 +559,68 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
     return TRUE;
   }
 
-  public function preSave(EntityStorageInterface $storage): void {
-    parent::preSave($storage);
+  protected static function getConfigUpdater(): CanvasConfigUpdater {
+    return \Drupal::service(CanvasConfigUpdater::class);
+  }
+
+  /**
+   * Computes the `fallback_metadata` except when using the `fallback` source.
+   *
+   * @return void
+   */
+  private function populateFallbackMetadata(): void {
     assert($this->isLoadedVersionActiveVersion());
     $source = $this->getComponentSource();
-    // Compute the appropriate `fallback_metadata` upon saving, except for the fallback plugin.
+
     if ($source instanceof Fallback) {
       return;
     }
-    elseif ($source instanceof ComponentSourceWithSlotsInterface) {
-      $this->versioned_properties[VersionedConfigEntityBase::ACTIVE_VERSION]['fallback_metadata']['slot_definitions'] = \array_map(self::cleanSlotDefinition(...), $source->getSlotDefinitions());
+
+    $this->versioned_properties[VersionedConfigEntityBase::ACTIVE_VERSION]['fallback_metadata']['slot_definitions'] = NULL;
+    if ($source instanceof ComponentSourceWithSlotsInterface) {
+      $this->versioned_properties[VersionedConfigEntityBase::ACTIVE_VERSION]['fallback_metadata']['slot_definitions'] = \array_map(
+        self::cleanSlotDefinition(...),
+        $source->getSlotDefinitions(),
+      );
     }
-    else {
-      $this->versioned_properties[VersionedConfigEntityBase::ACTIVE_VERSION]['fallback_metadata']['slot_definitions'] = NULL;
+  }
+
+  public function preSave(EntityStorageInterface $storage): void {
+    if (!$this->isSyncing()) {
+      $this->getConfigUpdater()->updatePropFieldDefinitionsWithRequiredFlag($this);
+      $this->getConfigUpdater()->updatePropFieldDefinitionsUsingTextValue($this);
+      $this->getConfigUpdater()->updatePropOrder($this);
+      $this->getConfigUpdater()->unsetComponentCategoryProperty($this);
     }
+    parent::preSave($storage);
+
+    // Populates the fallback metadata for the active version.
+    $this->populateFallbackMetadata();
+    // If multiple versions were created, they must all have been for the same
+    // implementation of that component: that cannot change mid-request! Hence
+    // use the same fallback metadata for all those versions.
+    // all the versions that were created during this .
+    foreach ($this->newVersionsDuringLifeTime as $new_version) {
+      if ($new_version === $this->getActiveVersion()) {
+        continue;
+      }
+      // If a version was created and immediately deleted, it doesn't need any
+      // fallback metadata.
+      if (!in_array($new_version, $this->getVersions(), TRUE)) {
+        continue;
+      }
+      $this->versioned_properties[$new_version]['fallback_metadata'] = $this->versioned_properties[VersionedConfigEntityBase::ACTIVE_VERSION]['fallback_metadata'];
+    }
+    $this->newVersionsDuringLifeTime = [];
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function createVersion(string $version): static {
+    parent::createVersion($version);
+    $this->newVersionsDuringLifeTime[] = $version;
+    return $this;
   }
 
   public function postSave(EntityStorageInterface $storage, $update = TRUE): void {
@@ -521,12 +628,8 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
 
     // For new Components, auto-create Folders based on their category.
     if (!$update) {
-      $category = $this->getCategory();
+      $category = $this->getComponentSource()->determineDefaultFolder();
 
-      // If no category is set, there's no Folder to auto-create.
-      if (empty($category)) {
-        return;
-      }
       $folder = Folder::loadByNameAndConfigEntityTypeId((string) $category, self::ENTITY_TYPE_ID);
       if (empty($folder)) {
         $folder = Folder::create([
@@ -544,10 +647,7 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
     // If the Component is deleted, remove it from the Folder it was in.
     foreach ($entities as $entity) {
       /** @var \Drupal\canvas\Entity\Component $entity */
-      $category = $entity->getCategory();
-      if (!empty($category)) {
-        Folder::loadByNameAndConfigEntityTypeId((string) $category, self::ENTITY_TYPE_ID)?->removeItem($entity->id())?->save();
-      }
+      Folder::loadByItemAndConfigEntityTypeId((string) $entity->id(), self::ENTITY_TYPE_ID)?->removeItem($entity->id())?->save();
     }
     parent::preDelete($storage, $entities);
   }

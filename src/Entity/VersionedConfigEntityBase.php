@@ -13,6 +13,8 @@ use Drupal\canvas\Plugin\DataType\ConfigEntityVersionAdapter;
 use Drupal\canvas\Plugin\VersionedConfigurationSubsetSingleLazyPluginCollection;
 
 /**
+ * @internal
+ *
  * @property ?\Drupal\canvas\Plugin\DataType\ConfigEntityVersionAdapter $typedData
  * @phpstan-import-type ConfigDependenciesArray from \Drupal\canvas\Entity\VersionedConfigEntityInterface
  */
@@ -56,7 +58,7 @@ abstract class VersionedConfigEntityBase extends ConfigEntityBase implements Ver
           (string) $version,
           implode(', ', array_map(
             fn (string $v): string => sprintf('`%s`', (string) $v),
-            array_keys($this->versioned_properties),
+            $this->getVersions(),
           )),
         ));
       }
@@ -192,7 +194,12 @@ abstract class VersionedConfigEntityBase extends ConfigEntityBase implements Ver
         }
       }
     }
-    $this->versioned_properties[VersionedConfigEntityBase::ACTIVE_VERSION][$property_name] = $value;
+    // When syncing, modifying any version is possible, so ensure the loaded
+    // version is targeted.
+    $version = $this->isLoadedVersionActiveVersion()
+      ? self::ACTIVE_VERSION
+      : $this->getLoadedVersion();
+    $this->versioned_properties[$version][$property_name] = $value;
 
     return $this;
   }
@@ -238,6 +245,13 @@ abstract class VersionedConfigEntityBase extends ConfigEntityBase implements Ver
 
     /** @var ConfigDependenciesArray */
     return $dependencies;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function isVersionedProperty(string $property_name): bool {
+    return array_key_exists($property_name, $this->versioned_properties);
   }
 
 }

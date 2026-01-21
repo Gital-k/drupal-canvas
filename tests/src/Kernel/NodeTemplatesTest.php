@@ -5,19 +5,23 @@ declare(strict_types=1);
 namespace Drupal\Tests\canvas\Kernel;
 
 use ColinODell\PsrTestLogger\TestLogger;
+use Drupal\Core\Cache\Cache;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\EntityHandlers\ContentTemplateAwareViewBuilder;
-use Drupal\canvas\Plugin\ComponentPluginManager;
 use Drupal\filter\Entity\FilterFormat;
 use Drupal\KernelTests\KernelTestBase;
 use Drupal\node\NodeInterface;
+use Drupal\Tests\canvas\Traits\CanvasFieldCreationTrait;
+use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\canvas\Traits\SingleDirectoryComponentTreeTestTrait;
 use Drupal\Tests\canvas\Traits\CrawlerTrait;
 use Drupal\Tests\node\Traits\ContentTypeCreationTrait;
 use Drupal\Tests\node\Traits\NodeCreationTrait;
+use Drupal\Tests\user\Traits\UserCreationTrait;
+use PHPUnit\Framework\Attributes\TestWith;
 
 /**
  * @covers \Drupal\canvas\EntityHandlers\ContentTemplateAwareViewBuilder
@@ -25,11 +29,23 @@ use Drupal\Tests\node\Traits\NodeCreationTrait;
  */
 final class NodeTemplatesTest extends KernelTestBase {
 
+  use ContribStrictConfigSchemaTestTrait;
   use SingleDirectoryComponentTreeTestTrait;
   use GenerateComponentConfigTrait;
   use ContentTypeCreationTrait;
+  use CanvasFieldCreationTrait;
   use NodeCreationTrait;
   use CrawlerTrait;
+  use UserCreationTrait;
+
+  /**
+   * @see core.services.yml
+   */
+  private const REQUIRED_CACHE_CONTEXTS = [
+    'languages:language_interface',
+    'theme',
+    'user.permissions',
+  ];
 
   /**
    * {@inheritdoc}
@@ -37,6 +53,8 @@ final class NodeTemplatesTest extends KernelTestBase {
   protected static $modules = [
     'canvas',
     'system',
+    'ckeditor5',
+    'editor',
     'filter',
     'options',
     'text',
@@ -45,6 +63,7 @@ final class NodeTemplatesTest extends KernelTestBase {
     'file',
     'user',
     'node',
+    'datetime',
     'canvas_test_rendering',
     'canvas_test_sdc',
     'media',
@@ -56,13 +75,14 @@ final class NodeTemplatesTest extends KernelTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
+    $this->container->get('theme_installer')->install(['stark']);
     $this->installEntitySchema('user');
     $this->installEntitySchema('media');
     $this->installEntitySchema('node');
     $this->installConfig(['node', 'system', 'filter']);
+    $this->installConfig(['canvas']);
     $this->createContentType(['type' => 'article']);
-    // Create config entities for components.
-    $this->container->get(ComponentPluginManager::class)->getDefinitions();
+    $this->generateComponentConfig();
     FilterFormat::create([
       'format' => 'basic_html',
       'name' => 'Basic HTML',
@@ -77,24 +97,70 @@ final class NodeTemplatesTest extends KernelTestBase {
         ],
       ],
     ])->save();
+    $this->setUpCurrentUser(permissions: ['access content']);
   }
 
-  public function testOptContentTypeIntoCanvas(): void {
+  #[TestWith([
+    TRUE,
+    TRUE,
+    [
+      // Components in the component tree.
+      'config:canvas.component.sdc.canvas_test_sdc.my-hero',
+      'config:canvas.component.sdc.canvas_test_sdc.props-no-slots',
+      // Cacheability of resolved props.
+      'node:1',
+      'config:filter.format.basic_html',
+    ],
+  ])]
+  #[TestWith([
+    FALSE,
+    FALSE,
+    [
+      // Components in the component tree — minus the ones whose props failed to
+      // resolve because they were inaccessible: DynamicPropSources populated by
+      // the host entity.
+      'config:canvas.component.sdc.canvas_test_sdc.my-hero',
+      // @todo Stop expecting this cache tag in https://www.drupal.org/i/3559820
+      'config:canvas.component.sdc.canvas_test_sdc.props-no-slots',
+      // @see \Drupal\node\NodeAccessControlHandler::checkViewAccess()
+      'node:1',
+    ],
+  ])]
+  public function testOptContentTypeIntoCanvas(bool $node_is_published, bool $expected_entity_data_is_accessible, array $expected_node_component_tree_cache_tags): void {
     ContentTemplate::create([
       'id' => 'node.article.full',
       'content_entity_type_id' => 'node',
       'content_entity_type_bundle' => 'article',
       'content_entity_type_view_mode' => 'full',
       'component_tree' => [
-        // A static marker so we can easily tell if we're rendering with Canvas.
+        // A static marker so we can easily tell if we're rendering with Canvas,
+        // but simultaneously tests all currently supported dynamic ways of
+        // populating props.
         [
           'uuid' => 'e1f6fbca-e331-4506-9dba-5734194c1e59',
-          'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+          'component_id' => 'sdc.canvas_test_sdc.my-hero',
+          'component_version' => 'a681ae184a8f6b7f',
           'inputs' => [
-            'heading' => [
-              'sourceType' => 'static:field_item:string',
-              'value' => 'Canvas is large and in charge!',
-              'expression' => 'ℹ︎string␟value',
+            // Tests static prop source end-to-end.
+            // @see \Drupal\canvas\PropSource\StaticPropSource
+            'heading' => 'Canvas is large and in charge!',
+            // Tests adapted dynamic prop source end-to-end.
+            // @see \Drupal\canvas\PropSource\DynamicPropSource::__construct(adapter)
+            'subheading' => [
+              'sourceType' => 'dynamic',
+              'expression' => 'ℹ︎␜entity:node:article␝created␞␟value',
+              'adapter' => 'unix_to_date',
+            ],
+            // Tests dynamic prop source end-to-end.
+            // @see \Drupal\canvas\PropSource\DynamicPropSource
+            'cta1' => [
+              'sourceType' => 'dynamic',
+              'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
+            ],
+            // Tests host entity URL prop source end-to-end.
+            // @see \Drupal\canvas\PropSource\HostEntityUrlPropSource
+            'cta1href' => [
+              'sourceType' => 'host-entity-url',
             ],
           ],
         ],
@@ -120,31 +186,58 @@ HTML;
 
     $node = $this->createNode([
       'type' => 'article',
+      'title' => 'This is a node whose structured data is rendered using a Canvas content template!',
+      'created' => 1764872657,
       'body' => [
         'value' => $body,
         'format' => 'basic_html',
       ],
+      'status' => $node_is_published,
+      'uid' => 1,
     ]);
+    self::assertSame($node_is_published, $node->isPublished());
+    self::assertFalse($node->isNew());
     $viewBuilder = $this->container->get(EntityTypeManagerInterface::class)->getViewBuilder('node');
     self::assertInstanceOf(ContentTemplateAwareViewBuilder::class, $viewBuilder);
-    $output = $viewBuilder->view($node);
-    $crawler = $this->crawlerForRenderArray($output);
+    $build = $viewBuilder->view($node);
+    $crawler = $this->crawlerForRenderArray($build);
     // The content type has not been opted into Canvas, so it should not be using
     // Canvas for rendering.
-    $html = $crawler->html();
-    self::assertStringNotContainsString('Canvas is large and in charge!', $html);
+    self::assertCount(0, $crawler->filter('h1.my-hero__heading:contains("Canvas is large and in charge!")'));
+    self::assertCount(0, $crawler->filter('div.my-hero__container > p.my-hero__subheading:contains("2025-12-04")'));
+    self::assertCount(0, $crawler->filter(sprintf('div.my-hero__container > div.my-hero__actions > a[href="%s/node/1"]:contains("%s")', $GLOBALS['base_url'], $node->getTitle())));
     self::assertCount(1, $crawler->filter('p:contains("Hey this is allowed")'));
     self::assertCount(0, $crawler->filter('script'));
-
-    // Opt the content type into Canvas by creating a component tree field.
-    $this->createComponentTreeField('node', 'article');
+    self::assertEqualsCanonicalizing([
+      'config:filter.format.basic_html',
+      'user:1',
+      'user_view',
+      // TRICKY: this cache tag is present because the config entity does exist,
+      // but is disabled. It was assessed whether it should be used, hence its
+      // cache tag is present.
+      'config:canvas.content_template.node.article.full',
+    ], $build['#cache']['tags']);
+    self::assertEqualsCanonicalizing([
+      ...self::REQUIRED_CACHE_CONTEXTS,
+      'timezone',
+    ], $build['#cache']['contexts']);
+    self::assertSame(Cache::PERMANENT, $build['#cache']['max-age']);
+    self::assertSame([
+      'entity_view',
+      'node',
+      (string) $node->id(),
+      'full',
+      'without-canvas',
+    ], $build['#cache']['keys']);
 
     // Confirm although we've opted in the status of the template is false so
     // will not be used.
     $template = ContentTemplate::load('node.article.full');
     assert($template instanceof ContentTemplate);
     self::assertFalse($template->status());
-    self::assertStringNotContainsString('Canvas is large and in charge!', $html);
+    self::assertCount(0, $crawler->filter('h1.my-hero__heading:contains("Canvas is large and in charge!")'));
+    self::assertCount(0, $crawler->filter('div.my-hero__container > p.my-hero__subheading:contains("2025-12-04")'));
+    self::assertCount(0, $crawler->filter(sprintf('div.my-hero__container > div.my-hero__actions > a[href="%s/node/1"]:contains("%s")', $GLOBALS['base_url'], $node->getTitle())));
     self::assertCount(1, $crawler->filter('p:contains("Hey this is allowed")'));
     self::assertCount(0, $crawler->filter('script'));
 
@@ -161,14 +254,33 @@ HTML;
     $this->container->get(LoggerChannelFactoryInterface::class)
       ->get('canvas_test')
       ->addLogger($logger);
-    $output = $viewBuilder->view($node);
-    $crawler = $this->crawlerForRenderArray($output);
+    $build = $viewBuilder->view($node);
+    $crawler = $this->crawlerForRenderArray($build);
     $html = $crawler->html();
 
     self::assertTrue($template->status());
     self::assertStringContainsString('Canvas is large and in charge!', $html);
-    self::assertCount(1, $crawler->filter('p:contains("Hey this is allowed")'));
+    self::assertCount(1, $crawler->filter('h1.my-hero__heading:contains("Canvas is large and in charge!")'));
+    self::assertCount($expected_entity_data_is_accessible ? 1 : 0, $crawler->filter('div.my-hero__container > p.my-hero__subheading:contains("2025-12-04")'));
+    self::assertCount($expected_entity_data_is_accessible ? 1 : 0, $crawler->filter(sprintf('div.my-hero__container > div.my-hero__actions > a[href="%s/node/1"]:contains("%s")', $GLOBALS['base_url'], $node->getTitle())));
+    self::assertCount($expected_entity_data_is_accessible ? 1 : 0, $crawler->filter('p:contains("Hey this is allowed")'));
     self::assertCount(0, $crawler->filter('script'));
+    self::assertEqualsCanonicalizing([
+      'config:canvas.content_template.node.article.full',
+      ...$expected_node_component_tree_cache_tags,
+    ], $build['#cache']['tags']);
+    self::assertEqualsCanonicalizing([
+      ...self::REQUIRED_CACHE_CONTEXTS,
+      'url.site',
+    ], $build['#cache']['contexts']);
+    self::assertSame(Cache::PERMANENT, $build['#cache']['max-age']);
+    self::assertSame([
+      'entity_view',
+      'node',
+      (string) $node->id(),
+      'full',
+      'with-canvas',
+    ], $build['#cache']['keys']);
 
     // Confirm that hook_entity_display_build_alter() was not invoked.
     // @see canvas_test_rendering_entity_display_build_alter()
@@ -176,10 +288,14 @@ HTML;
 
     $output = $viewBuilder->view($node, 'teaser');
     $crawler = $this->crawlerForRenderArray($output);
-    $html = $crawler->html();
     // Confirm that the template is NOT used when viewing the node as a teaser,
     // even though the content type is opted into Canvas.
-    self::assertStringNotContainsString('Canvas is large and in charge!', $html);
+    self::assertCount(0, $crawler->filter(sprintf('a[href="%s/node/1"]:contains("Canvas is large and in charge!")', $GLOBALS['base_url'])));
+    // TRICKY: note that entity access is NOT checked by the EntityViewBuilder,
+    // that is up to the caller! The above is specifically testing Canvas
+    // ContentTemplates' render arrays. Those are populated by field properties
+    // on the host entity, which is why for ContentTemplates, this test can
+    // expect access to be denied when needed.
     self::assertCount(1, $crawler->filter('p:contains("Hey this is allowed")'));
     self::assertCount(0, $crawler->filter('script'));
     $this->assertTrue($logger->hasRecordThatContains("hook_entity_display_build_alter for node {$node->id()} in teaser view mode"));
@@ -190,8 +306,7 @@ HTML;
    * @covers \Drupal\canvas\Plugin\Validation\Constraint\ComponentTreeStructureConstraintValidator
    */
   public function testExposedSlotsAreFilledByEntity(): void {
-    $this->createComponentTreeField('node', 'article');
-    $this->generateComponentConfig();
+    $this->createComponentTreeField('node', 'article', 'field_component_tree');
 
     ContentTemplate::create([
       'content_entity_type_id' => 'node',
@@ -203,6 +318,7 @@ HTML;
         [
           'uuid' => '2842cc6f-9e2b-42a5-8400-e7d6363e08bf',
           'component_id' => 'sdc.canvas_test_sdc.props-slots',
+          'component_version' => '85a5c0c7dd53e0bb',
           'inputs' => [
             'heading' => [
               'sourceType' => 'dynamic',
@@ -259,11 +375,29 @@ HTML;
     ]);
     $viewBuilder = $this->container->get(EntityTypeManagerInterface::class)->getViewBuilder('node');
     self::assertInstanceOf(ContentTemplateAwareViewBuilder::class, $viewBuilder);
-    $output = $viewBuilder->view($node);
-    $crawler = $this->crawlerForRenderArray($output);
+    $build = $viewBuilder->view($node);
+    $crawler = $this->crawlerForRenderArray($build);
     self::assertCount(1, $crawler->filter('h1:contains("The Real Deal")'));
     self::assertCount(1, $crawler->filter('h1:contains("Now we\'re cooking with gas!")'));
     self::assertStringNotContainsString("This won't show up.", $crawler->text());
+    self::assertEqualsCanonicalizing([
+      'config:canvas.content_template.node.article.full',
+      // Components in the component tree.
+      'config:canvas.component.sdc.canvas_test_sdc.props-slots',
+      'config:canvas.component.sdc.canvas_test_sdc.props-no-slots',
+      // Dynamic prop sources that pulled data from the entity should propagate the entity's
+      // cache tags.
+      'node:1',
+    ], $build['#cache']['tags']);
+    self::assertEqualsCanonicalizing(self::REQUIRED_CACHE_CONTEXTS, $build['#cache']['contexts']);
+    self::assertSame(Cache::PERMANENT, $build['#cache']['max-age']);
+    self::assertSame([
+      'entity_view',
+      'node',
+      '1',
+      'full',
+      'with-canvas',
+    ], $build['#cache']['keys']);
 
     // Although the node targeting a nonexistent slot doesn't break rendering,
     // it DOES mean the entity isn't valid.

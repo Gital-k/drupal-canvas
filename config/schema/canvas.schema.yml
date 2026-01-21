@@ -66,11 +66,17 @@ canvas.component.*:
         NotEqualTo:
           value: 'fallback'
           message: 'The "fallback" plugin does not provide any components; it only serves as a fallback.'
+        # @todo Remove this constraint after https://www.drupal.org/i/3520484#stable is done.
+        # 💡When developing or testing ComponentSource plugins ahead of this being a public API, install the `canvas_dev_mode` module. Thanks for helping make Drupal Canvas awesome! 😊
+        Choice:
+          # @see \Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent
+          - sdc
+          # @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent
+          - js
+          # @see \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent
+          - block
     source_local_id:
       type: canvas.component_source_local_id.[%parent.source]
-    category:
-      type: required_label
-      label: 'Category'
     versioned_properties:
       sequence:
         # There are 3 possible shapes for each sequence element:
@@ -290,6 +296,7 @@ canvas.component_tree:
           # content entity. A config entity typically is not associated with any content entity, so require its absence
           # by default.
           - dynamic
+          - host-entity-url
           # Not yet supported by the Canvas UI.
           - adapter
         presence: ~
@@ -406,7 +413,6 @@ canvas.component_source_settings.sdc:
     prop_field_definitions:
       constraints:
         KeyForEverySdcProp: "%parent.%parent.%parent.%parent.source_local_id"
-        NotNullValueForEveryRequiredSdcProp: '%parent.%parent.%parent.%parent.source_local_id'
 
 # Every ComponentSource plugin MUST define two config schema types:
 # 1. One for the ComponentSource-specific per-Component config entity local/intra-source ID: typically a plugin ID or a
@@ -446,10 +452,21 @@ canvas.generated_field_explicit_input_ux:
   mapping:
     prop_field_definitions:
       type: sequence
-      orderby: key
+      # Respect the order of the props in the JSON Schema for this component, this allows the component developer to
+      # control which order the props appear in the auto-generated form.
+      # Note: simply reordering the props in the schema without other changes (such as changing the example value) will
+      # result in an identical component version hash. That means all existing component instances are automatically
+      # "upgraded" to the updated prop order.
+      # @see \Drupal\experience_builder\Plugin\ExperienceBuilder\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::buildConfigurationForm()
+      orderby: ~
       sequence:
         type: mapping
         mapping:
+          required:
+            type: boolean
+            label: 'Required prop'
+            constraints:
+              MatchesComponentPropRequiredness: ~
           field_type:
             type: string
             label: 'Default field type'
@@ -502,8 +519,10 @@ canvas.generated_field_explicit_input_ux:
             label: 'Default values'
             sequence:
               type: field.value.[%parent.%parent.field_type]
-            # @todo Add validation constraint because this is only *conditionally* nullable: if the SDC prop is optional
+            # TRICKY: this is *conditionally* nullable: if the component prop itself is optional.
             nullable: true
+            constraints:
+              NotNullIfRequiredComponentProp: ~
           # The default value must be retrievable
           expression:
             type: string
@@ -596,6 +615,7 @@ field.value.component_tree:
       inputs:
         absence:
           - dynamic
+          - host-entity-url
           - adapter
         presence: ~
       tree:
@@ -632,6 +652,7 @@ canvas.pattern.*:
           inputs:
             absence:
               - dynamic
+              - host-entity-url
               - adapter
             presence: ~
           tree:
@@ -746,10 +767,10 @@ canvas.content_template.*.*.*:
           inputs:
             absence:
               - adapter
+            # The only Canvas component tree that allows `dynamic` and `host-entity-url`!
+            # @see \Drupal\canvas\PropSource\DynamicPropSource
+            # @see \Drupal\canvas\PropSource\HostEntityUrlPropSource
             presence: ~
-            # @todo For now we removed the `dynamic` requirement to allow
-            #   publishing before we add UI for mapping dynamic props. This will
-            #   be re-added in https://drupal.org/i/3541057.
           tree:
             absence:
               # Components implementing either of these 2 interfaces are only allowed to live at
@@ -888,3 +909,18 @@ canvas.folder.*:
             configEntityTypeId: '%parent.%parent.configEntityTypeId'
       constraints:
         Unique: ~
+
+# Search API processor configuration
+plugin.plugin_configuration.search_api_processor.canvas_component_tree_inputs:
+  type: search_api.default_processor_configuration
+  label: 'Component Tree Hydrated processor configuration'
+  constraints:
+    FullyValidatable: ~
+  mapping:
+    ignored_prop_names:
+      type: sequence
+      label: 'Prop names to ignore during extraction'
+      orderby: value
+      sequence:
+        type: string
+        label: 'Prop name'

@@ -9,6 +9,7 @@ use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\EntityHandlers\ContentTemplateAwareViewBuilder;
 use Drupal\KernelTests\KernelTestBase;
+use Drupal\node\Entity\Node;
 use Drupal\node\Entity\NodeType;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
@@ -50,6 +51,7 @@ final class ContentTemplateTest extends KernelTestBase {
     'filter',
     'ckeditor5',
     'editor',
+    'datetime',
   ];
 
   /**
@@ -115,7 +117,7 @@ final class ContentTemplateTest extends KernelTestBase {
       [
         'uuid' => 'b7e2cf39-d62f-4ee8-99b2-27a89f1ac196',
         'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
-        'component_version' => '95f4f1d5ee47663b',
+        'component_version' => 'b1e991f726a2a266',
         'parent_uuid' => '3a76bf4f-9306-43e6-ba8f-cb4b5b6459df',
         'slot' => 'the_body',
         'inputs' => [
@@ -125,7 +127,7 @@ final class ContentTemplateTest extends KernelTestBase {
       [
         'uuid' => '4f785025-9bd9-4752-9dd6-068b957b03ee',
         'component_id' => 'sdc.canvas_test_sdc.props-slots',
-        'component_version' => 'ab4d3ddce315cf64',
+        'component_version' => '85a5c0c7dd53e0bb',
         'inputs' => [
           'heading' => 'Hello, world!',
         ],
@@ -144,7 +146,7 @@ final class ContentTemplateTest extends KernelTestBase {
       [
         'uuid' => '3a76bf4f-9306-43e6-ba8f-cb4b5b6459df',
         'component_id' => 'sdc.canvas_test_sdc.props-slots',
-        'component_version' => 'ab4d3ddce315cf64',
+        'component_version' => '85a5c0c7dd53e0bb',
         'parent_uuid' => '4f785025-9bd9-4752-9dd6-068b957b03ee',
         'slot' => 'the_body',
         'inputs' => [
@@ -154,7 +156,7 @@ final class ContentTemplateTest extends KernelTestBase {
       [
         'uuid' => '5f71027b-d9d3-4f3d-8990-a6502c0ba676',
         'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
-        'component_version' => '95f4f1d5ee47663b',
+        'component_version' => 'b1e991f726a2a266',
         'inputs' => [
           'heading' => [
             'sourceType' => 'dynamic',
@@ -182,7 +184,7 @@ final class ContentTemplateTest extends KernelTestBase {
         '0' => [
           'uuid' => '4f785025-9bd9-4752-9dd6-068b957b03ee',
           'component_id' => 'sdc.canvas_test_sdc.props-slots',
-          'component_version' => 'ab4d3ddce315cf64',
+          'component_version' => '85a5c0c7dd53e0bb',
           'inputs' => [
             'heading' => 'Hello, world!',
           ],
@@ -190,7 +192,7 @@ final class ContentTemplateTest extends KernelTestBase {
         '0:the_body:0' => [
           'uuid' => '3a76bf4f-9306-43e6-ba8f-cb4b5b6459df',
           'component_id' => 'sdc.canvas_test_sdc.props-slots',
-          'component_version' => 'ab4d3ddce315cf64',
+          'component_version' => '85a5c0c7dd53e0bb',
           'parent_uuid' => '4f785025-9bd9-4752-9dd6-068b957b03ee',
           'slot' => 'the_body',
           'inputs' => [
@@ -200,7 +202,7 @@ final class ContentTemplateTest extends KernelTestBase {
         '0:the_body:0:the_body:0' => [
           'uuid' => 'b7e2cf39-d62f-4ee8-99b2-27a89f1ac196',
           'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
-          'component_version' => '95f4f1d5ee47663b',
+          'component_version' => 'b1e991f726a2a266',
           'parent_uuid' => '3a76bf4f-9306-43e6-ba8f-cb4b5b6459df',
           'slot' => 'the_body',
           'inputs' => [
@@ -235,7 +237,7 @@ final class ContentTemplateTest extends KernelTestBase {
         '1' => [
           'uuid' => '5f71027b-d9d3-4f3d-8990-a6502c0ba676',
           'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
-          'component_version' => '95f4f1d5ee47663b',
+          'component_version' => 'b1e991f726a2a266',
           'inputs' => [
             'heading' => [
               'sourceType' => 'dynamic',
@@ -248,6 +250,29 @@ final class ContentTemplateTest extends KernelTestBase {
     // Sanity-check that the test template is valid.
     $violations = $template->getTypedData()->validate();
     self::assertCount(0, $violations, \implode(', ', \array_map(static fn (ConstraintViolationInterface $violation) => $violation->getMessage(), \iterator_to_array($violations))));
+  }
+
+  public function testAbsentContentTemplateKeepsCacheMetadata(): void {
+    $this->installEntitySchema('user');
+    $this->installEntitySchema('node');
+
+    $node = Node::create([
+      'title' => 'Some node',
+      'type' => 'helpful',
+    ]);
+    $node->save();
+    $view_builder = \Drupal::entityTypeManager()->getViewBuilder('node');
+    // Canvas' view builder is not used because there is no ContentTemplate yet.
+    $this->assertSame(ContentTemplateAwareViewBuilder::class, $view_builder::class);
+    $build = $view_builder->view($node);
+
+    // Assert the right cacheability.
+    $this->assertContains('without-canvas', $build['#cache']['keys']);
+    $this->assertEqualsCanonicalizing([
+      'node_view',
+      'node:1',
+      'config:content_template_list',
+    ], $build['#cache']['tags']);
   }
 
 }

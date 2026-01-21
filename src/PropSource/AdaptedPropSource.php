@@ -4,14 +4,28 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\PropSource;
 
+use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
 use Drupal\Component\Plugin\Definition\PluginDefinitionInterface;
 use Drupal\Component\Utility\NestedArray;
+use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\canvas\Plugin\AdapterManager;
 use Drupal\canvas\Plugin\Adapter\AdapterInterface;
 
 /**
+ * Adapted prop sources allow combining multiple prop sources, and chaining.
+ *
+ * Computes a single evaluation result from:
+ * - Multiple prop sources, of any kind (see the PropSource enum)
+ * - Potentially even chained AdaptedPropSources
+ *
+ * This comes with incredible potential, but also with significant risks:
+ * - UX could easily be overwhelmingly complex
+ * - ensuring sufficient guardrails to guarantee validity is extremely difficult
+ *
+ * @see \Drupal\canvas\PropSource\PropSource
+ *
  * @phpstan-import-type AdaptedPropSourceArray from PropSource
  * @internal
  */
@@ -29,15 +43,8 @@ final class AdaptedPropSource extends PropSourceBase {
   /**
    * {@inheritdoc}
    */
-  public static function getSourceTypePrefix(): string {
-    return 'adapter';
-  }
-
-  /**
-   * {@inheritdoc}
-   */
   public function getSourceType(): string {
-    return $this->getSourceTypePrefix() . self::SOURCE_TYPE_PREFIX_SEPARATOR . $this->adapter_instance->getPluginId();
+    return parent::getSourceType() . self::SOURCE_TYPE_PREFIX_SEPARATOR . $this->adapter_instance->getPluginId();
   }
 
   /**
@@ -64,6 +71,7 @@ final class AdaptedPropSource extends PropSourceBase {
   /**
    * @param AdaptedPropSourceArray $sdc_prop_source
    */
+  // @phpstan-ignore-next-line method.childParameterType
   public static function parse(array $sdc_prop_source): static {
     $adapter_manager = \Drupal::service(AdapterManager::class);
     assert($adapter_manager instanceof AdapterManager);
@@ -83,14 +91,22 @@ final class AdaptedPropSource extends PropSourceBase {
   /**
    * {@inheritdoc}
    */
-  public function evaluate(?FieldableEntityInterface $host_entity, bool $is_required): mixed {
+  public function evaluate(?FieldableEntityInterface $host_entity, bool $is_required): EvaluationResult {
+    $inputs_cacheability = new CacheableMetadata();
+    if ($host_entity !== NULL) {
+      $inputs_cacheability->addCacheableDependency($host_entity);
+    }
     foreach ($this->adapter_inputs as $input_name => $input) {
       $value_object = $this->getInputPropSource($input_name);
-      $value = $value_object->evaluate($host_entity, $is_required);
-      $this->adapter_instance->addInput($input_name, $value);
+      $input = $value_object->evaluate($host_entity, $is_required);
+      $inputs_cacheability->addCacheableDependency($input);
+      $this->adapter_instance->addInput($input_name, $input->value);
     }
 
-    return $this->adapter_instance->adapt();
+    return new EvaluationResult(
+      $this->adapter_instance->adapt(),
+      $inputs_cacheability,
+    );
   }
 
   public function asChoice(): string {

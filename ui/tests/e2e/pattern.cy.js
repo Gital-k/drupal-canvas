@@ -20,6 +20,7 @@ describe('Can save and load patterns', () => {
     () => {
       cy.viewport(2000, 1320);
       cy.loadURLandWaitForCanvasLoaded();
+      cy.openLayersPanel();
       cy.get('.canvas--viewport-overlay')
         .findByLabelText('Two Column')
         .realClick({ position: 'bottomRight' });
@@ -80,10 +81,7 @@ describe('Can save and load patterns', () => {
         'exist',
       );
 
-      cy.get(
-        '[data-canvas-component-id="sdc.canvas_test_sdc.my-hero"]',
-      ).realClick();
-      cy.waitForElementContentInIframe('div', 'There goes my hero');
+      cy.insertComponent({ name: 'Hero' });
 
       // There should be one Hero added.
       cy.get(
@@ -95,8 +93,9 @@ describe('Can save and load patterns', () => {
 
       cy.get('.primaryPanelContent').within(() => {
         cy.findByText(patternName).should('exist');
-        cy.findByText(patternName).click();
+        cy.findByText(patternName).trigger('contextmenu');
       });
+      cy.findByText('Insert').click();
 
       // After adding the pattern, there should be four Hero components.
       cy.get(

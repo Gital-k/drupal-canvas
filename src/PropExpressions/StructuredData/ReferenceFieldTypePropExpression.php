@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\PropExpressions\StructuredData;
 
+use Drupal\Component\Assertion\Inspector;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
@@ -24,10 +25,10 @@ final class ReferenceFieldTypePropExpression implements StructuredDataPropExpres
   ) {}
 
   public function __toString(): string {
-    return static::PREFIX
-      . self::withoutPrefix((string) $this->referencer)
+    return static::PREFIX_EXPRESSION_TYPE
+      . self::withoutExpressionTypePrefix((string) $this->referencer)
       . self::PREFIX_ENTITY_LEVEL
-      . self::withoutPrefix((string) $this->referenced);
+      . self::withoutExpressionTypePrefix((string) $this->referenced);
   }
 
   /**
@@ -35,11 +36,14 @@ final class ReferenceFieldTypePropExpression implements StructuredDataPropExpres
    */
   public function calculateDependencies(FieldableEntityInterface|FieldItemListInterface|null $field_item_list = NULL): array {
     assert($field_item_list === NULL || $field_item_list instanceof FieldItemListInterface);
-    $dependencies = $this->referencer->calculateDependencies();
-    if ($field_item_list !== NULL) {
+    $dependencies = $this->referencer->calculateDependencies($field_item_list);
+    if ($field_item_list === NULL) {
+      $dependencies = NestedArray::mergeDeep($dependencies, $this->referenced->calculateDependencies());
+    }
+    else {
       // ⚠️ Do not require values while calculating dependencies: this MUST not
       // fail.
-      $referenced_content_entities = Evaluator::evaluate($field_item_list, $this->referencer, is_required: FALSE);
+      $referenced_content_entities = Evaluator::evaluate($field_item_list, $this->referencer, is_required: FALSE)->value;
       $referenced_content_entities = match (gettype($referenced_content_entities)) {
         // Reference field containing nothing.
         'null' => [],
@@ -48,6 +52,7 @@ final class ReferenceFieldTypePropExpression implements StructuredDataPropExpres
         // Reference field containing a single reference.
         default => [$referenced_content_entities],
       };
+      \assert(Inspector::assertAllObjects($referenced_content_entities, FieldableEntityInterface::class));
       $dependencies['content'] = [
         ...$dependencies['content'] ?? [],
         ...array_map(
@@ -55,25 +60,33 @@ final class ReferenceFieldTypePropExpression implements StructuredDataPropExpres
           $referenced_content_entities,
         ),
       ];
+      // The referenced content entity is the starting point for the
+      // `referenced` expression, so pass it as the host entity. This is
+      // necessary to ensure content dependencies in references are identified.
+      foreach ($referenced_content_entities as $referenced_content_entity) {
+        $dependencies = NestedArray::mergeDeep($dependencies, $this->referenced->calculateDependencies($referenced_content_entity));
+      }
+      if (empty($referenced_content_entities)) {
+        $dependencies = NestedArray::mergeDeep($dependencies, $this->referenced->calculateDependencies());
+      }
     }
-    return NestedArray::mergeDeep($dependencies, $this->referenced->calculateDependencies());
+    return $dependencies;
   }
 
   public static function fromString(string $representation): static {
     $parts = explode(self::PREFIX_ENTITY_LEVEL . self::PREFIX_ENTITY_LEVEL, $representation, 2);
     $referencer = FieldTypePropExpression::fromString($parts[0]);
-    $referenced = StructuredDataPropExpression::fromString(static::PREFIX . static::PREFIX_ENTITY_LEVEL . $parts[1]);
+    $referenced = StructuredDataPropExpression::fromString(static::PREFIX_EXPRESSION_TYPE . static::PREFIX_ENTITY_LEVEL . $parts[1]);
     assert($referenced instanceof FieldPropExpression || $referenced instanceof ReferenceFieldPropExpression || $referenced instanceof FieldObjectPropsExpression);
     return new static($referencer, $referenced);
   }
 
-  public function isSupported(EntityInterface|FieldItemInterface|FieldItemListInterface $field): bool {
+  public function validateSupport(EntityInterface|FieldItemInterface|FieldItemListInterface $field): void {
     assert($field instanceof FieldItemInterface || $field instanceof FieldItemListInterface);
     $actual_field_type = $field->getFieldDefinition()->getType();
     if ($actual_field_type !== $this->referencer->fieldType) {
       throw new \DomainException(sprintf("`%s` is an expression for field type `%s`, but the provided field item (list) is of type `%s`.", (string) $this, $this->referencer->fieldType, $actual_field_type));
     }
-    return TRUE;
   }
 
   /**

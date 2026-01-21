@@ -9,7 +9,6 @@ use Drupal\ai\Base\FunctionCallBase;
 use Drupal\ai\Service\FunctionCalling\ExecutableFunctionCallInterface;
 use Drupal\ai_agents\PluginInterfaces\AiAgentContextInterface;
 use Symfony\Component\Yaml\Yaml;
-use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 
 /**
  * Plugin implementation to get entity information.
@@ -26,13 +25,13 @@ use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
       data_type: 'string',
       label: new TranslatableMarkup("Entity Type"),
       description: new TranslatableMarkup("The entity type for which you want to perform operations."),
-      required: TRUE
+      required: FALSE
     ),
     'entity_id' => new ContextDefinition(
       data_type: 'integer',
       label: new TranslatableMarkup("Entity Id"),
       description: new TranslatableMarkup("The entity id for which you want to perform operations."),
-      required: TRUE,
+      required: FALSE,
     ),
     'selected_component' => new ContextDefinition(
       data_type: 'string',
@@ -48,21 +47,21 @@ use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
     ),
   ],
 )]
-final class GetEntityInformation extends FunctionCallBase implements ExecutableFunctionCallInterface, AiAgentContextInterface, ContainerFactoryPluginInterface {
+final class GetEntityInformation extends FunctionCallBase implements ExecutableFunctionCallInterface, AiAgentContextInterface {
 
   /**
    * The entity type.
    *
-   * @var string
+   * @var string|null
    */
-  protected string $entityType;
+  protected string|null $entityType;
 
   /**
    * The entity ID.
    *
-   * @var int
+   * @var int|null
    */
-  protected int $entityId;
+  protected int|null $entityId;
 
   /**
    * The selected component value.

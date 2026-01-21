@@ -18,6 +18,8 @@ use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Symfony\Component\Validator\ConstraintViolationListInterface;
 
 /**
+ * @internal
+ *
  * Defines an interface for component source plugins.
  *
  * A Component is a config entity created by a site builder that allows
@@ -35,6 +37,8 @@ use Symfony\Component\Validator\ConstraintViolationListInterface;
  *
  * @phpstan-import-type PropSourceArray from \Drupal\canvas\PropSource\PropSourceBase
  * @phpstan-import-type SingleComponentInputArray from \Drupal\canvas\Plugin\DataType\ComponentInputs
+ * @phpstan-import-type OptimizedExplicitInput from \Drupal\canvas\Plugin\DataType\ComponentInputs
+ * @phpstan-import-type OptimizedSingleComponentInputArray from \Drupal\canvas\Plugin\DataType\ComponentInputs
  *
  * @see \Drupal\canvas\Attribute\ComponentSource
  * @see \Drupal\canvas\ComponentSource\ComponentSourceBase
@@ -42,6 +46,22 @@ use Symfony\Component\Validator\ConstraintViolationListInterface;
  * @see \Drupal\canvas\ComponentSource\ComponentSourceWithSlotsInterface
  */
 interface ComponentSourceInterface extends PluginInspectionInterface, DerivativeInspectionInterface, ConfigurableInterface, DependentPluginInterface, ContextAwarePluginInterface {
+
+  /**
+   * Whether the logic powering this component is broken.
+   *
+   * Typical example: a developer is developing an SDC, and while developing is
+   * testing it in Canvas. They're even renaming the SDC. It'd be a terrible DX
+   * if this caused the associated Component config entity to switch to the
+   * fallback version.
+   *
+   * @see \Drupal\canvas\Entity\Component::getComponentSourcePluginId()
+   *
+   * @return bool
+   */
+  public function isBroken(): bool;
+
+  public function determineDefaultFolder(): string;
 
   /**
    * Gets referenced plugin classes for this instance.
@@ -56,6 +76,23 @@ interface ComponentSourceInterface extends PluginInspectionInterface, Derivative
    *   referencing here.
    */
   public function getReferencedPluginClass(): ?string;
+
+  /**
+   * Gets the ID that this source knows to interpret.
+   *
+   * ⚠️ This is NOT to be confused with the Component config entity's ID!
+   *
+   * For example:
+   * - `sdc.olivero.teaser` is the ID of a Component config entity
+   * - that Component config entity uses the `sdc` ComponentSource plugin
+   * - that Component config entity has its `source_local_id` property set to
+   *   `olivero:teaser`
+   * - `olivero:teaser` is the source-specific ID: only that ComponentSource
+   *   plugin knows how to load it.
+   *
+   * @return string
+   */
+  public function getSourceSpecificComponentId(): string;
 
   /**
    * Gets a description of the component.
@@ -78,7 +115,7 @@ interface ComponentSourceInterface extends PluginInspectionInterface, Derivative
    * @return array
    *   Render array.
    */
-  public function renderComponent(array $inputs, string $componentUuid, bool $isPreview): array;
+  public function renderComponent(array $inputs, array $slot_definitions, string $componentUuid, bool $isPreview): array;
 
   public function generateVersionHash(): string;
 
@@ -121,7 +158,7 @@ interface ComponentSourceInterface extends PluginInspectionInterface, Derivative
    *
    * @see \Drupal\canvas\ComponentSource\ComponentSourceWithSlotsInterface::setSlots()
    */
-  public function hydrateComponent(array $explicit_input): array;
+  public function hydrateComponent(array $explicit_input, array $slot_definitions): array;
 
   /**
    * Converts (stored) explicit inputs to the data model expected by the client.
@@ -169,12 +206,13 @@ interface ComponentSourceInterface extends PluginInspectionInterface, Derivative
    *   An associative array containing the initial structure of the plugin form.
    * @param \Drupal\Core\Form\FormStateInterface $form_state
    *   The current state of the form.
-   * @param \Drupal\canvas\Entity\Component|null $component
+   * @param \Drupal\canvas\Entity\Component $component
    *   The component configuration entity.
    * @param string $component_instance_uuid
    *   The component instance UUID.
-   * @param array $client_model
-   *   Current client model values for the component from the incoming request.
+   * @param array $inputValues
+   *   Current client model values for the component from the incoming request,
+   *   as returned by ::clientModelToInput().
    * @param \Drupal\Core\Entity\EntityInterface|null $entity
    *   The host entity (for evaluated input).
    * @param array $settings
@@ -190,9 +228,9 @@ interface ComponentSourceInterface extends PluginInspectionInterface, Derivative
   public function buildComponentInstanceForm(
     array $form,
     FormStateInterface $form_state,
-    ?Component $component = NULL,
+    Component $component,
     string $component_instance_uuid = '',
-    array $client_model = [],
+    array $inputValues = [],
     ?EntityInterface $entity = NULL,
     array $settings = [],
   ): array;
@@ -218,10 +256,11 @@ interface ComponentSourceInterface extends PluginInspectionInterface, Derivative
    *   DynamicPropSources.
    * @param \Symfony\Component\Validator\ConstraintViolationListInterface|null $violations
    *   If validation should be performed, a violation constraint list, or NULL
-   *   otherwise. Use ::addViolation to add violations detected during conversion.
+   *   otherwise. Use ::addViolation to add violations detected during
+   *   conversion.
    *
    * @phpcs:ignore
-   * @return SingleComponentInputArray
+   * @return OptimizedSingleComponentInputArray
    *
    * @see ::inputToClientModel()
    * @see \Drupal\canvas\AutoSave\AutoSaveManager::saveComponentInstanceFormViolations
@@ -250,6 +289,8 @@ interface ComponentSourceInterface extends PluginInspectionInterface, Derivative
    *
    * @throws \Drupal\canvas\ComponentDoesNotMeetRequirementsException
    *   When the component does not meet requirements.
+   *
+   * @todo 🚨 Remove in https://www.drupal.org/project/canvas/issues/3561265.
    */
   public function checkRequirements(): void;
 
@@ -259,11 +300,13 @@ interface ComponentSourceInterface extends PluginInspectionInterface, Derivative
    * For example a component source plugin may with to store a normalized
    * representation of its data.
    *
-   * @param array $values
+   * @param SingleComponentInputArray|OptimizedSingleComponentInputArray $values
    *   Input values to optimize.
    *
-   * @return array
+   * @return OptimizedSingleComponentInputArray
    *   Optimized values.
+   *
+   * @throws \Drupal\canvas\InvalidComponentInputsPropSourceException
    */
   public function optimizeExplicitInput(array $values): array;
 

@@ -14,6 +14,7 @@ use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Entity\Pattern;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
+use Drupal\canvas\Entity\Folder;
 use Drupal\KernelTests\KernelTestBase;
 use Drupal\node\Entity\NodeType;
 use Drupal\Tests\canvas\Kernel\Traits\PageTrait;
@@ -39,12 +40,13 @@ final class CanvasControllerTest extends KernelTestBase {
    */
   protected static $modules = [
     'canvas',
+    'canvas_test_page',
     'entity_test',
+    'canvas_entity_test',
     ...self::PAGE_TEST_MODULES,
     'block',
     'node',
     // Canvas's dependencies (modules providing field types + widgets).
-    'text',
     'datetime',
     'file',
     'image',
@@ -52,6 +54,7 @@ final class CanvasControllerTest extends KernelTestBase {
     'options',
     'path',
     'link',
+    'text',
     'system',
     'user',
   ];
@@ -125,6 +128,10 @@ final class CanvasControllerTest extends KernelTestBase {
     ], $response->getCacheableMetadata()->getCacheContexts());
     self::assertSame([
       'config:system.site',
+      'test_create_access_cache_tag',
+      'entity_field_info',
+      'entity_bundles',
+      'entity_types',
       'http_response',
     ], $response->getCacheableMetadata()->getCacheTags());
 
@@ -148,7 +155,7 @@ final class CanvasControllerTest extends KernelTestBase {
         [
           'name' => 'Test entity',
         ],
-        'Requires >=1 content entity type with an Canvas field that can be created or edited.',
+        'Requires >=1 content entity type with a Canvas field that can be created or edited.',
       ],
     ];
   }
@@ -185,6 +192,10 @@ final class CanvasControllerTest extends KernelTestBase {
     ], $response->getCacheableMetadata()->getCacheContexts());
     self::assertSame([
       'config:system.site',
+      'test_create_access_cache_tag',
+      'entity_field_info',
+      'entity_bundles',
+      'entity_types',
       'http_response',
     ], $response->getCacheableMetadata()->getCacheTags());
   }
@@ -209,6 +220,7 @@ final class CanvasControllerTest extends KernelTestBase {
           'codeComponents' => FALSE,
           'contentTemplates' => FALSE,
           'publishChanges' => FALSE,
+          'folders' => FALSE,
         ],
       ],
       [
@@ -223,6 +235,7 @@ final class CanvasControllerTest extends KernelTestBase {
           'codeComponents' => TRUE,
           'contentTemplates' => FALSE,
           'publishChanges' => TRUE,
+          'folders' => FALSE,
         ],
       ],
       [
@@ -237,6 +250,7 @@ final class CanvasControllerTest extends KernelTestBase {
           'codeComponents' => FALSE,
           'contentTemplates' => FALSE,
           'publishChanges' => FALSE,
+          'folders' => FALSE,
         ],
       ],
       [
@@ -252,6 +266,7 @@ final class CanvasControllerTest extends KernelTestBase {
           'codeComponents' => TRUE,
           'contentTemplates' => FALSE,
           'publishChanges' => FALSE,
+          'folders' => FALSE,
         ],
       ],
       [
@@ -262,6 +277,7 @@ final class CanvasControllerTest extends KernelTestBase {
           JavaScriptComponent::ADMIN_PERMISSION,
           ContentTemplate::ADMIN_PERMISSION,
           AutoSaveManager::PUBLISH_PERMISSION,
+          Folder::ADMIN_PERMISSION,
         ],
         [
           'globalRegions' => TRUE,
@@ -269,6 +285,7 @@ final class CanvasControllerTest extends KernelTestBase {
           'codeComponents' => TRUE,
           'contentTemplates' => TRUE,
           'publishChanges' => TRUE,
+          'folders' => TRUE,
         ],
       ],
     ];
@@ -306,6 +323,10 @@ final class CanvasControllerTest extends KernelTestBase {
     ], $response->getCacheableMetadata()->getCacheContexts());
     self::assertSame([
       'config:system.site',
+      'test_create_access_cache_tag',
+      'entity_field_info',
+      'entity_bundles',
+      'entity_types',
       'http_response',
     ], $response->getCacheableMetadata()->getCacheTags());
   }
@@ -385,6 +406,10 @@ final class CanvasControllerTest extends KernelTestBase {
     ], $response->getCacheableMetadata()->getCacheContexts());
     self::assertSame([
       'config:system.site',
+      'test_create_access_cache_tag',
+      'entity_field_info',
+      'entity_bundles',
+      'entity_types',
       'http_response',
     ], $response->getCacheableMetadata()->getCacheTags());
 
@@ -394,6 +419,7 @@ final class CanvasControllerTest extends KernelTestBase {
     yield 'none' => [
       [],
       [
+        'extensionsAvailable' => FALSE,
         'aiExtensionAvailable' => FALSE,
         'personalizationExtensionAvailable' => FALSE,
       ],
@@ -408,8 +434,15 @@ final class CanvasControllerTest extends KernelTestBase {
     yield 'personalization' => [
       ['canvas_personalization'],
       [
+        'extensionsAvailable' => FALSE,
         'aiExtensionAvailable' => FALSE,
         'personalizationExtensionAvailable' => TRUE,
+      ],
+    ];
+    yield 'extensions available' => [
+      ['canvas_test_extension'],
+      [
+        'extensionsAvailable' => TRUE,
       ],
     ];
     yield 'all' => [

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Hook;
 
+use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaStringFormat;
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
@@ -12,6 +13,7 @@ use Drupal\Core\Session\AccountInterface;
 use Drupal\datetime\Plugin\Field\FieldType\DateTimeItem;
 use Drupal\editor\EditorInterface;
 use Drupal\canvas\Plugin\Field\FieldTypeOverride\DateRangeItemOverride;
+use Drupal\canvas\Plugin\Field\FieldTypeOverride\DateTimeItemOverride;
 use Drupal\canvas\Plugin\Field\FieldTypeOverride\EntityReferenceItemOverride;
 use Drupal\canvas\Plugin\Field\FieldTypeOverride\FileItemOverride;
 use Drupal\canvas\Plugin\Field\FieldTypeOverride\FileUriItemOverride;
@@ -97,6 +99,7 @@ class ShapeMatchingHooks {
   public function fieldInfoAlter(array &$info): void {
     $overrides = [
       'daterange' => DateRangeItemOverride::class,
+      'datetime' => DateTimeItemOverride::class,
       'file' => FileItemOverride::class,
       'file_uri' => FileUriItemOverride::class,
       'float' => FloatItemOverride::class,
@@ -117,6 +120,9 @@ class ShapeMatchingHooks {
         $info[$plugin_id]['class'] = $class;
       }
     }
+
+    // @todo Remove this forward port of https://www.drupal.org/project/drupal/issues/3521088 once Canvas requires Drupal >=11.3
+    $info['changed']['constraints'] = $info['created']['constraints'] = $info['timestamp']['constraints'];
   }
 
   /**
@@ -124,6 +130,17 @@ class ShapeMatchingHooks {
    */
   #[Hook('entity_base_field_info_alter')]
   public function entityBaseFieldInfoAlter(array &$fields, EntityTypeInterface $entity_type): void {
+    // The User entity type uses the "string" field type but then overrides its
+    // item class with a custom one, causing the `value` property string
+    // semantics to be lost. Explicitly set them again.
+    // @see \Drupal\canvas\Plugin\Field\FieldType\StringItemOverride
+    // @see \Drupal\user\UserNameItem
+    // @see \Drupal\user\Entity\User::baseFieldDefinitions()
+    // @todo Remove when \Drupal\canvas\Plugin\Field\FieldTypeOverride\StringItemOverride is merged into core.
+    if ($entity_type->id() === 'user') {
+      $fields['name']->addPropertyConstraints('value', ['StringSemantics' => StringSemanticsConstraint::PROSE]);
+    }
+
     // The File entity type's `filename` and `filemime` base fields use the
     // `string` field type but are NOT prose (which is the default semantic for
     // that field type).
@@ -134,9 +151,6 @@ class ShapeMatchingHooks {
       $fields['filename']->addPropertyConstraints('value', ['StringSemantics' => StringSemanticsConstraint::STRUCTURED]);
       $fields['filemime']->addPropertyConstraints('value', ['StringSemantics' => StringSemanticsConstraint::STRUCTURED]);
       $fields['uri']->setRequired(\TRUE);
-    }
-    if ($entity_type->id() === 'taxonomy_term') {
-      $fields['name']->addPropertyConstraints('value', ['StringSemantics' => StringSemanticsConstraint::PROSE]);
     }
   }
 
@@ -190,7 +204,8 @@ class ShapeMatchingHooks {
   /**
    * Implements hook_entity_operation_alter().
    *
-   * Removes all operations for Drupal Canvas's text formats and editors from list builders.
+   * Removes all operations for Drupal Canvas's text formats and editors from
+   * list builders.
    */
   #[Hook('entity_operation_alter')]
   public function entityOperationAlter(array &$operations, EntityInterface $entity): void {
@@ -222,20 +237,20 @@ class ShapeMatchingHooks {
   }
 
   /**
-   * Implements hook_storage_prop_shape_alter().
+   * Implements hook_canvas_storable_prop_shape_alter().
    *
    * (On behalf of the Media Library module.)
    *
    * Overrides the default: the "image" field type + widget. Note that this used
    * to run only for sites that install the Media Library module, but to achieve
-   * the intended authoring experience, Canvas depends on the Media Library module
-   * since https://www.drupal.org/i/3474226.
+   * the intended authoring experience, Canvas depends on the Media Library
+   * module since https://www.drupal.org/i/3474226.
    *
    * @see \Drupal\canvas\JsonSchemaInterpreter\JsonSchemaType::computeStorablePropShape()
    * @todo Move to Media Library module, eventually.
    */
-  #[Hook('storage_prop_shape_alter', module: 'media_library')]
-  public function mediaLibraryStoragePropShapeAlter(CandidateStorablePropShape $storable_prop_shape): void {
+  #[Hook('canvas_storable_prop_shape_alter', module: 'media_library')]
+  public function mediaLibraryStorablePropShapeAlter(CandidateStorablePropShape $storable_prop_shape): void {
     $media_type_ids = NULL;
 
     // @see json-schema-definitions://canvas.module/stream-wrapper-image-uri
@@ -247,11 +262,17 @@ class ShapeMatchingHooks {
       || (
         isset($storable_prop_shape->shape->schema['contentMediaType'])
         && $storable_prop_shape->shape->schema['contentMediaType'] === 'image/*'
+        // Stream wrapper URIs can only be `format: uri|iri`.
+        && in_array($storable_prop_shape->shape->schema['format'], [JsonSchemaStringFormat::Uri->value, JsonSchemaStringFormat::Iri->value], TRUE)
         // @see json-schema-definitions://canvas.module/stream-wrapper-image-uri
-        // @todo Update in https://www.drupal.org/project/canvas/issues/3542895  to only do this if `format==uri` — right now this also is used for `format=uri-reference`. Theoretical problem though, because using `format=uri-reference` does not make sense for stream wrapper URIs.
-        && ($storable_prop_shape->shape->schema['pattern'] ?? '') === '^(?!https?://)[\w\-]+://'
+        && ($storable_prop_shape->shape->schema['x-allowed-schemes'] ?? []) === ['public']
       )
     ) {
+      // This alter hook won't have any effect unless MediaTypes exist that use
+      // a particular MediaSource plugin. So, whenever the list of MediaTypes
+      // changes, this hook should be called again (for this shape).
+      $storable_prop_shape->addCacheTags(['config:media_type_list']);
+
       $media_types = self::getMediaTypesForSource(Image::class);
       if (!empty($media_types)) {
         $media_type_ids = array_keys($media_types);
@@ -263,7 +284,7 @@ class ShapeMatchingHooks {
         $storable_prop_shape->fieldTypeProp = new ReferenceFieldTypePropExpression(
           new FieldTypePropExpression('entity_reference', 'entity'),
           new ReferenceFieldPropExpression(
-            new FieldPropExpression(BetterEntityDataDefinition::create('media', $media_type_ids), $source_field_names, \NULL, 'entity'),
+            new FieldPropExpression(BetterEntityDataDefinition::create('media', $media_type_ids), $source_field_names, NULL, 'entity'),
             new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'uri', NULL, 'value'),
           ),
         );
@@ -274,6 +295,11 @@ class ShapeMatchingHooks {
       isset($storable_prop_shape->shape->schema['$ref']) &&
       array_key_exists($storable_prop_shape->shape->schema['$ref'], self::SCHEMA_TO_MEDIA_SOURCE)
     ) {
+      // This alter hook won't have any effect unless MediaTypes exist that use
+      // a particular MediaSource plugin. So, whenever the list of MediaTypes
+      // changes, this hook should be called again (for this shape).
+      $storable_prop_shape->addCacheTags(['config:media_type_list']);
+
       $media_source_class = self::SCHEMA_TO_MEDIA_SOURCE[$storable_prop_shape->shape->schema['$ref']];
       $media_types = self::getMediaTypesForSource($media_source_class);
       if (!empty($media_types)) {
@@ -297,22 +323,22 @@ class ShapeMatchingHooks {
   }
 
   /**
-   * Implements hook_storage_prop_shape_alter().
+   * Implements hook_canvas_storable_prop_shape_alter().
    *
    * (On behalf of the Date Range module.)
    *
    * @see \Drupal\canvas\JsonSchemaInterpreter\JsonSchemaType::computeStorablePropShape()
    * @see \Drupal\datetime_range\Plugin\Field\FieldType\DateRangeItem
    */
-  #[Hook('storage_prop_shape_alter', module: 'datetime_range')]
-  public function datetimeRangeStoragePropShapeAlter(CandidateStorablePropShape $storable_prop_shape): void {
+  #[Hook('canvas_storable_prop_shape_alter', module: 'datetime_range')]
+  public function datetimeRangeStorablePropShapeAlter(CandidateStorablePropShape $storable_prop_shape): void {
     if ($storable_prop_shape->shape->schema == [
       'type' => 'object',
-      '$ref' => 'json-schema-definitions://sdc_test_all_props.module/date-range',
+      '$ref' => 'json-schema-definitions://canvas.module/date-range',
     ]) {
       $storable_prop_shape->fieldTypeProp = new FieldTypeObjectPropsExpression('daterange', [
-        'from' => new FieldTypePropExpression('daterange', 'end_value'),
-        'to' => new FieldTypePropExpression('daterange', 'value'),
+        'from' => new FieldTypePropExpression('daterange', 'value'),
+        'to' => new FieldTypePropExpression('daterange', 'end_value'),
       ]);
       $storable_prop_shape->fieldStorageSettings = ['datetime_type' => DateTimeItem::DATETIME_TYPE_DATE];
       // @todo Make this actually work in component instance forms in https://www.drupal.org/project/canvas/issues/3523379
@@ -361,20 +387,21 @@ class ShapeMatchingHooks {
       Image::class => [
         'src' => new ReferenceFieldTypePropExpression(
           new FieldTypePropExpression('entity_reference', 'entity'),
-          // TRICKY: Additional computed property on image fields added by Drupal Canvas.
+          // TRICKY: `src_with_alternate_widths` is a computed property added to
+          // image fields by Canvas.
           // @see \Drupal\canvas\Plugin\Field\FieldTypeOverride\ImageItemOverride
-          new FieldPropExpression(BetterEntityDataDefinition::create('media', $media_type_ids), $source_field_names, \NULL, 'src_with_alternate_widths'),
+          new FieldPropExpression(BetterEntityDataDefinition::create('media', $media_type_ids), $source_field_names, NULL, 'src_with_alternate_widths'),
         ),
-        'alt' => new ReferenceFieldTypePropExpression(new FieldTypePropExpression('entity_reference', 'entity'), new FieldPropExpression(BetterEntityDataDefinition::create('media', $media_type_ids), $source_field_names, \NULL, 'alt')),
-        'width' => new ReferenceFieldTypePropExpression(new FieldTypePropExpression('entity_reference', 'entity'), new FieldPropExpression(BetterEntityDataDefinition::create('media', $media_type_ids), $source_field_names, \NULL, 'width')),
-        'height' => new ReferenceFieldTypePropExpression(new FieldTypePropExpression('entity_reference', 'entity'), new FieldPropExpression(BetterEntityDataDefinition::create('media', $media_type_ids), $source_field_names, \NULL, 'height')),
+        'alt' => new ReferenceFieldTypePropExpression(new FieldTypePropExpression('entity_reference', 'entity'), new FieldPropExpression(BetterEntityDataDefinition::create('media', $media_type_ids), $source_field_names, NULL, 'alt')),
+        'width' => new ReferenceFieldTypePropExpression(new FieldTypePropExpression('entity_reference', 'entity'), new FieldPropExpression(BetterEntityDataDefinition::create('media', $media_type_ids), $source_field_names, NULL, 'width')),
+        'height' => new ReferenceFieldTypePropExpression(new FieldTypePropExpression('entity_reference', 'entity'), new FieldPropExpression(BetterEntityDataDefinition::create('media', $media_type_ids), $source_field_names, NULL, 'height')),
       ],
       VideoFile::class => [
         'src' => new ReferenceFieldTypePropExpression(
           new FieldTypePropExpression('entity_reference', 'entity'),
           new ReferenceFieldPropExpression(
-            new FieldPropExpression(BetterEntityDataDefinition::create('media', $media_type_ids), $source_field_names, \NULL, 'entity'),
-            new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'uri', \NULL, 'url')
+            new FieldPropExpression(BetterEntityDataDefinition::create('media', $media_type_ids), $source_field_names, NULL, 'entity'),
+            new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'uri', NULL, 'url')
           )
         ),
       ],
@@ -392,7 +419,7 @@ class ShapeMatchingHooks {
   protected function getMediaSourceFieldName(MediaTypeInterface $media_type): string {
     $source_field_definition = $media_type->getSource()
       ->getSourceFieldDefinition($media_type);
-    \assert($source_field_definition !== \NULL);
+    \assert($source_field_definition !== NULL);
 
     return $source_field_definition->getName();
   }

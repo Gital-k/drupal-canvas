@@ -4,9 +4,14 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Element;
 
+use Drupal\Component\Utility\Xss;
+use Drupal\Core\Cache\CacheableMetadata;
+use Drupal\Core\Form\EnforcedResponseException;
+use Drupal\Core\Form\FormAjaxException;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Drupal\Core\Render\Attribute\RenderElement;
 use Drupal\Core\Render\Element\RenderElementBase;
+use Drupal\Core\Render\Markup;
 use Drupal\Core\Render\RenderContext;
 use Drupal\Core\Render\RendererInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
@@ -60,17 +65,34 @@ final class RenderSafeComponentContainer extends RenderElementBase implements Co
       try {
         return $this->renderer->render($element['#component']);
       }
+      // @todo Remove when https://www.drupal.org/i/2367555 is fixed.
+      catch (EnforcedResponseException | FormAjaxException $e) {
+        throw $e;
+      }
       catch (\Throwable $e) {
         // In this scenario because rendering fails the context isn't updated or
         // bubbled.
-        $context->update($element);
-        $context->bubble();
+        // TRICKY: depending on where an exception is thrown, it is possible
+        // that the render context is in a broken state. Typically, the context
+        // count at this point should be 1. But in some cases (e.g. when a Twig
+        // RuntimeError occurs), it may be >1. This would in turn trigger a
+        // "Bubbling failed" assertion error in ::executeInRenderContext(). This
+        // defeats the purpose of the RenderSafeComponentContainer! So, unwind
+        // the render context to the top level when an exception occurs, so that
+        // ::handleComponentException() can safely render a fallback.
+        while ($context->count() > 1) {
+          $context->update($element);
+          $context->bubble();
+        }
         $fallback = self::handleComponentException(
           $e,
           $element['#component_context'] ?? '',
           $element['#is_preview'] ?? FALSE,
           $element['#component_uuid'] ?? '',
+          CacheableMetadata::createFromRenderArray($element['#component']),
         );
+        // Convey to the caller that this component instance render crashed.
+        $element['#render_crashed'] = TRUE;
         return $this->renderer->render($fallback);
       }
     });
@@ -82,22 +104,32 @@ final class RenderSafeComponentContainer extends RenderElementBase implements Co
     return $element;
   }
 
-  public static function handleComponentException(\Throwable $e, string $componentContext, bool $isPreview, string $componentUuid): array {
-    \Drupal::logger('canvas')->error(\sprintf('%s occurred during rendering of component %s in %s: %s', $e::class, $componentUuid, $componentContext, $e->getMessage()));
+  public static function handleComponentException(\Throwable $e, string $componentContext, bool $isPreview, string $componentUuid, CacheableMetadata $component_exception_cacheability): array {
+    $error_message = \sprintf('%s occurred during rendering of component %s in %s: %s', $e::class, $componentUuid, $componentContext, $e->getMessage());
+    \Drupal::logger('canvas')->error($error_message);
+    $is_verbose = \Drupal::configFactory()->get('system.logging')->get('error_level') === ERROR_REPORTING_DISPLAY_VERBOSE;
     if ($isPreview) {
       return [
         '#type' => 'container',
         '#attributes' => [
           'data-component-uuid' => $componentUuid,
         ],
-        '#markup' => new TranslatableMarkup('Component failed to render, check logs for more detail.'),
+        '#markup' => $is_verbose
+          ? Markup::create('<pre style="white-space: pre-wrap"><code>' . Xss::filterAdmin($error_message) . '</code></pre>')
+          : new TranslatableMarkup('Component failed to render, check logs for more detail.'),
       ];
     }
-    return [
+    $build = [
       '#type' => 'container',
-      '#attributes' => ['data-component-uuid' => $componentUuid],
-      '#markup' => new TranslatableMarkup('Oops, something went wrong! Site admins have been notified.'),
+      '#attributes' => [
+        'data-component-uuid' => $componentUuid,
+      ],
+      '#markup' => $is_verbose
+        ? Markup::create('<pre style="white-space: pre-wrap"><code>' . Xss::filterAdmin($error_message) . '</code></pre>')
+        : new TranslatableMarkup('Oops, something went wrong! Site admins have been notified.'),
     ];
+    $component_exception_cacheability->applyTo($build);
+    return $build;
   }
 
 }

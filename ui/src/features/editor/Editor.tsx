@@ -1,48 +1,51 @@
 import { useEffect } from 'react';
+import clsx from 'clsx';
 import { useParams } from 'react-router';
-import { useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import ErrorBoundary from '@/components/error/ErrorBoundary';
-import ExtensionDialog from '@/components/extensions/ExtensionDialog';
 import ContextualPanel from '@/components/panel/ContextualPanel';
-import PrimaryPanel from '@/components/sidePanel/PrimaryPanel';
-import CodeComponentDialogs from '@/features/code-editor/dialogs/CodeComponentDialogs';
 import ConflictWarning from '@/features/editor/ConflictWarning';
 import EditorFrame from '@/features/editorFrame/EditorFrame';
 import { selectLatestError } from '@/features/error-handling/queryErrorSlice';
-import Layout from '@/features/layout/Layout';
+import LayoutLoader from '@/features/layout/LayoutLoader';
 import { setUpdatePreview } from '@/features/layout/layoutModelSlice';
 import TemplateLayout from '@/features/layout/TemplateLayout';
-import PatternDialogs from '@/features/pattern/PatternDialogs';
-import { setFirstLoadComplete } from '@/features/ui/uiSlice';
-import useLayoutWatcher from '@/hooks/useLayoutWatcher';
+import {
+  selectEditorFrameContext,
+  setEditorFrameContext,
+  setFirstLoadComplete,
+  unsetEditorFrameContext,
+} from '@/features/ui/uiSlice';
 import useReturnableLocation from '@/hooks/useReturnableLocation';
-import useSyncParamsToState from '@/hooks/useSyncParamsToState';
 import { useUndoRedo } from '@/hooks/useUndoRedo';
 
-import styles from './Editor.module.css';
+import type { EditorFrameContext } from '@/features/ui/uiSlice';
 
-const Editor = () => {
+import styles from '@/features/editor/Editor.module.css';
+
+interface EditorProps {
+  context: EditorFrameContext;
+  disable?: boolean;
+}
+
+const Editor: React.FC<EditorProps> = ({ context, disable = false }) => {
   const dispatch = useAppDispatch();
-  useLayoutWatcher();
-  useSyncParamsToState();
   useReturnableLocation();
   const { isUndoable, dispatchUndo } = useUndoRedo();
   const latestError = useAppSelector(selectLatestError);
+  const editorFrameContext = useAppSelector(selectEditorFrameContext);
   const params = useParams();
-  const { pathname } = useLocation();
-
-  let editing = 'page';
-  if (pathname.includes('/template/')) {
-    editing = 'template';
-  }
+  const navigate = useNavigate();
 
   useEffect(() => {
+    dispatch(setEditorFrameContext(context));
     return () => {
       dispatch(setFirstLoadComplete(false));
+      dispatch(unsetEditorFrameContext());
     };
-  }, [dispatch]);
+  }, [context, dispatch]);
 
   useEffect(() => {
     dispatch(setUpdatePreview(false));
@@ -57,25 +60,55 @@ const Editor = () => {
     }
   }
 
+  if (context === 'none' || editorFrameContext === 'none') {
+    return null;
+  }
+
+  // Render content based on context.
+  const renderContextContent = () => {
+    switch (editorFrameContext) {
+      case 'entity':
+        return (
+          <ErrorBoundary
+            title="An unexpected error has occurred while fetching the layout."
+            variant="alert"
+            onReset={isUndoable ? dispatchUndo : undefined}
+            resetButtonText={isUndoable ? 'Undo last action' : undefined}
+          >
+            <LayoutLoader />
+          </ErrorBoundary>
+        );
+      case 'template':
+        return (
+          <ErrorBoundary
+            title="An error has occurred while fetching the template."
+            variant="alert"
+            onReset={() =>
+              navigate(
+                `/template/${params.entityType}/${params.bundle}/${params.viewMode}`,
+                { replace: true },
+              )
+            }
+            resetButtonText="Return to templates"
+          >
+            <TemplateLayout />
+          </ErrorBoundary>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <>
-      <PrimaryPanel />
-      <ErrorBoundary
-        title="An unexpected error has occurred while fetching the layout."
-        variant="alert"
-        onReset={isUndoable ? dispatchUndo : undefined}
-        resetButtonText={isUndoable ? 'Undo last action' : undefined}
-      >
-        {editing === 'page' && <Layout />}
-        {editing === 'template' && <TemplateLayout />}
-      </ErrorBoundary>
+      {renderContextContent()}
       <EditorFrame />
       <ContextualPanel />
-      <div className={styles.absoluteContainer}>
-        <PatternDialogs />
-        <CodeComponentDialogs />
-        <ExtensionDialog />
-      </div>
+      <div
+        className={clsx(styles.editorInactive, {
+          [styles.visible]: disable,
+        })}
+      ></div>
     </>
   );
 };

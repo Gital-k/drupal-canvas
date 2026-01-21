@@ -4,12 +4,11 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\PropShape;
 
+use Drupal\canvas\Plugin\ComponentPluginManager;
+use Drupal\Component\Assertion\Inspector;
 use Drupal\Core\Extension\ModuleHandlerInterface;
-use Drupal\Core\Plugin\Component;
-use Drupal\Core\Template\Attribute;
-use Drupal\Core\Theme\Component\ComponentMetadata;
 use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaType;
-use Drupal\canvas\PropExpressions\Component\ComponentPropExpression;
+use Drupal\Core\Extension\ThemeHandlerInterface;
 
 /**
  * A prop shape: a normalized component prop's JSON schema.
@@ -43,71 +42,72 @@ final class PropShape {
   }
 
   /**
+   * Standardizes a prop shape: minimizes JSON Schema, if possible to just $ref.
+   *
+   * (If just `$ref`, we call the result a "well-known prop shape" because it
+   * has a defined name.)
+   *
+   * @param array $raw_sdc_prop_schema
+   *
+   * @return \Drupal\canvas\PropShape\PropShape
+   */
+  public static function standardize(array $raw_sdc_prop_schema): PropShape {
+    // Resolving alone is not enough, also normalize: otherwise no match may be
+    // found due to frivolities such as `title` being present.
+    $resolved_normalized = self::normalizePropSchema(self::resolveSchemaReferences($raw_sdc_prop_schema));
+    // TRICKY: specifically do NOT use strict comparisons here, because the
+    // props of an object-shaped prop may be ordered differently.
+    // @see tests/modules/canvas_test_sdc/components/image-without-ref/image-without-ref.component.yml
+    // @phpstan-ignore function.strict
+    $well_known_prop_shape = array_search($resolved_normalized, self::getWellKnownPropShapes(), FALSE);
+
+    if ($well_known_prop_shape !== FALSE) {
+      return PropShape::normalize([
+        'type' => $resolved_normalized['type'],
+        '$ref' => $well_known_prop_shape,
+      ]);
+    }
+
+    // If this is an array shape, try standardizing to an array of a well-known
+    // shape. But make sure to keep `minItems`, `maxItems` etc!
+    if (JsonSchemaType::fromSdcPropJsonSchema($raw_sdc_prop_schema) === JsonSchemaType::Array && array_key_exists('items', $raw_sdc_prop_schema)) {
+      $resolved_normalized_array_items = self::normalizePropSchema(self::resolveSchemaReferences($raw_sdc_prop_schema['items']));
+      // TRICKY: specifically do NOT use strict comparisons here, because the
+      // props of an object-shaped prop may be ordered differently.
+      // @see tests/modules/canvas_test_sdc/components/image-without-ref/image-without-ref.component.yml
+      // @phpstan-ignore function.strict
+      $well_known_prop_shape = array_search($resolved_normalized_array_items, self::getWellKnownPropShapes(), FALSE);
+      if ($well_known_prop_shape !== FALSE) {
+        $other_key_value_pairs = array_diff_key($resolved_normalized, array_flip(['type', 'items']));
+        return PropShape::normalize([
+          'type' => 'array',
+          'items' => [
+            '$ref' => $well_known_prop_shape,
+            'type' => $resolved_normalized_array_items['type'],
+          ],
+          ...$other_key_value_pairs,
+        ]);
+      }
+    }
+
+    return PropShape::normalize($raw_sdc_prop_schema);
+  }
+
+  public function getType(): JsonSchemaType {
+    return JsonSchemaType::from($this->resolvedSchema['type']);
+  }
+
+  /**
    * @param JsonSchema $schema
    * @return JsonSchema
-   *
-   * @see \Drupal\canvas\Plugin\Adapter\AdapterBase::resolveSchemaReferences
    */
   private static function resolveSchemaReferences(array $schema): array {
-    if (isset($schema['$ref'])) {
-      // Perform the same schema resolving as `justinrainbow/json-schema`.
-      // @todo Delete this method, actually use `justinrainbow/json-schema`.
-      $schema = json_decode(file_get_contents($schema['$ref']) ?: '{}', TRUE);
-    }
-
-    // Recurse.
-    if ($schema['type'] === 'object' && isset($schema['properties'])) {
-      $schema['properties'] = array_map([__CLASS__, 'resolveSchemaReferences'], $schema['properties']);
-    }
-    elseif ($schema['type'] === 'array' && isset($schema['items'])) {
-      $schema['items'] = self::resolveSchemaReferences($schema['items']);
-    }
-
-    return $schema;
+    return self::componentPluginManager()->resolveJsonSchemaReferences($schema);
   }
 
   /**
-   * @param \Drupal\Core\Plugin\Component $component
-   *
-   * @return \Drupal\canvas\PropShape\PropShape[]
+   * @todo Rename to key()
    */
-  public static function getComponentProps(Component $component): array {
-    return self::getComponentPropsForMetadata($component->getPluginId(), $component->metadata);
-  }
-
-  /**
-   * @param string $plugin_id
-   * @param \Drupal\Core\Theme\Component\ComponentMetadata $metadata
-   *
-   * @return \Drupal\canvas\PropShape\PropShape[]
-   */
-  public static function getComponentPropsForMetadata(string $plugin_id, ComponentMetadata $metadata): array {
-    $prop_shapes = [];
-
-    // Retrieve the full JSON schema definition from the SDC's metadata.
-    // @see \Drupal\sdc\Component\ComponentValidator::validateProps()
-    // @see \Drupal\sdc\Component\ComponentMetadata::parseSchemaInfo()
-    /** @var array<string, mixed> $component_schema */
-    $component_schema = $metadata->schema;
-    foreach ($component_schema['properties'] ?? [] as $prop_name => $prop_schema) {
-      // TRICKY: `Attribute`-typed props are a special case that we need to ignore.
-      // Even more TRICKY, `attributes` named prop is even a more special case —
-      // as it's initialized by default.
-      // @see \Drupal\sdc\Twig\TwigExtension::mergeAdditionalRenderContext()
-      // @see https://www.drupal.org/project/drupal/issues/3352063#comment-15277820
-      // @see `canvas_test_sdc:attributes` component template as an example for
-      // how to initialize the `Attribute`-typed prop.
-      if (in_array(Attribute::class, $prop_schema['type'], TRUE)) {
-        continue;
-      }
-
-      $component_prop_expression = new ComponentPropExpression($plugin_id, $prop_name);
-      $prop_shapes[(string) $component_prop_expression] = static::normalize($prop_schema);
-    }
-
-    return $prop_shapes;
-  }
-
   public function uniquePropSchemaKey(): string {
     // A reliable key thanks to ::normalizePropSchema().
     return urldecode(http_build_query($this->schema));
@@ -122,6 +122,7 @@ final class PropShape {
     ksort($prop_schema);
 
     // Normalization is not (yet) possible when `$ref`s are still present.
+    // @todo Once https://www.drupal.org/i/3352063 is fixed and Canvas requires it, convert this to a \LogicException instead, because it should not be possible to occur anymore.
     if (!array_key_exists('type', $prop_schema) && array_key_exists('$ref', $prop_schema)) {
       return $prop_schema;
     }
@@ -156,45 +157,84 @@ final class PropShape {
       );
     }
 
+    // Omit the ID containing the resolved $ref URI.
+    // @see \JsonSchema\SchemaStorage::resolveRefSchema()
+    // @see \JsonSchema\Uri\UriRetriever::retrieve()
+    unset($normalized_prop_schema['id']);
+
     return $normalized_prop_schema;
   }
 
-  public function getStorage(): ?StorablePropShape {
-    // The default storable prop shape, if any. Prefer the original prop shape,
-    // which may contain `$ref`, and allows hook_storage_prop_shape_alter()
-    // implementations to suggest a field type based on the
-    // definition name.
-    // If that finds no field type storage, resolve `$ref`, which removes `$ref`
-    // altogether. Try to find a field type storage again, but then the decision
-    // relies solely on the final (fully resolved) JSON schema.
-    $json_schema_type = JsonSchemaType::from($this->schema['type']);
-    $storable_prop_shape = JsonSchemaType::from($this->schema['type'])->computeStorablePropShape($this);
-    if ($storable_prop_shape === NULL) {
-      $resolved_prop_shape = PropShape::normalize($this->resolvedSchema);
-      $storable_prop_shape = $json_schema_type->computeStorablePropShape($resolved_prop_shape);
+  /**
+   * @return array<string, JsonSchema>
+   *
+   * @see https://en.wikipedia.org/wiki/Well-known_URI
+   * @todo Before making this a public API that allows contrib to define more well-known prop shapes, actually spec it out beyond "/schema.json in extension root and define $defs". It is too undefined to be a reliable public API right now
+   */
+  private static function getWellKnownPropShapes(): array {
+    static $known_normalized;
+    if (isset($known_normalized)) {
+      return $known_normalized;
     }
 
-    $alterable = $storable_prop_shape
-      ? CandidateStorablePropShape::fromStorablePropShape($storable_prop_shape)
-      // If no default storable prop shape exists, generate an empty candidate.
-      : new CandidateStorablePropShape($this);
-
-    // Allow modules to alter the default.
-    self::moduleHandler()->alter(
-      'storage_prop_shape',
-      // The value that other modules can alter.
-      $alterable,
+    // Support `$ref`s defined by Drupal extensions in a `/schema.json` file.
+    // So: `json-schema-definitions://<extension>.<extension type>/<definition>`
+    // @see \Drupal\canvas\JsonSchemaDefinitionsStreamwrapper
+    // @todo Validate the `/schema.json` files.
+    $known_normalized = [];
+    $installed_modules = self::moduleHandler()->getModuleList();
+    $installed_themes = self::themeHandler()->listInfo();
+    \assert(empty(array_intersect_key($installed_modules, $installed_themes)));
+    $installed_extensions = $installed_modules + $installed_themes;
+    foreach ($installed_extensions as $extension_name => $extension) {
+      \assert(is_string($extension_name));
+      $schema_json_path = $extension->getPath() . '/schema.json';
+      if (!file_exists($schema_json_path)) {
+        continue;
+      }
+      // @phpstan-ignore argument.type
+      $json = json_decode(file_get_contents($schema_json_path), TRUE);
+      if (!is_array($json) || !array_key_exists('$defs', $json)) {
+        continue;
+      }
+      \assert(Inspector::assertAllStrings(array_keys($json['$defs'])));
+      $extension_type = array_key_exists($extension_name, $installed_modules) ? 'module' : 'theme';
+      $known_normalized += array_combine(
+        array_map(
+          fn(string $def_name) => "json-schema-definitions://$extension_name.$extension_type/$def_name",
+          array_keys($json['$defs']),
+        ),
+        array_map(
+          fn(array $prop_schema) => self::normalizePropSchema(self::resolveSchemaReferences($prop_schema)),
+          $json['$defs'],
+        ),
+      );
+    }
+    // No 2 modules should provide the same definition; otherwise we won't know
+    // whose was intended.
+    $unique_keys_as_values = array_map(
+      fn (array $schema) => self::normalize($schema)->uniquePropSchemaKey(),
+      $known_normalized
     );
-
-    // @todo DX: validate that the field type exists.
-    // @todo DX: validate that the field prop exists.
-    // @todo DX: validate that the field widget exists.
-
-    return $alterable->toStorablePropShape();
+    if (count($known_normalized) > count(array_unique($unique_keys_as_values))) {
+      throw new \LogicException(sprintf(
+        '🐛 Duplicate $ref definitions detected: %s.',
+        implode(',', array_keys(array_diff_key($known_normalized, array_unique($unique_keys_as_values))))
+      ));
+    }
+    return $known_normalized;
   }
 
   private static function moduleHandler(): ModuleHandlerInterface {
     return \Drupal::moduleHandler();
+  }
+
+  private static function themeHandler(): ThemeHandlerInterface {
+    return \Drupal::service(ThemeHandlerInterface::class);
+  }
+
+  private static function componentPluginManager(): ComponentPluginManager {
+    return \Drupal::service(ComponentPluginManager::class);
   }
 
 }

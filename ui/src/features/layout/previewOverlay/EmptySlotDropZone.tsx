@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import clsx from 'clsx';
+import { kebabCase } from 'lodash';
 import { useDroppable } from '@dnd-kit/core';
 import { BoxModelIcon } from '@radix-ui/react-icons';
 
 import { useAppSelector } from '@/app/hooks';
 import { selectLayout } from '@/features/layout/layoutModelSlice';
 import { findNodePathByUuid } from '@/features/layout/layoutUtils';
+import useGetComponentName from '@/hooks/useGetComponentName';
 
 import type React from 'react';
 import type {
@@ -24,6 +26,8 @@ const EmptySlotDropZone: React.FC<EmptySlotDropZoneProps> = (props) => {
   const { slot, slotName, parentComponent } = props;
   const layout = useAppSelector(selectLayout);
   const [activeName, setActiveName] = useState('');
+  const [activeOrigin, setActiveOrigin] = useState('');
+  const parentComponentName = useGetComponentName(parentComponent);
 
   const slotPath = findNodePathByUuid(layout, slot.id);
   if (!slotPath) {
@@ -32,16 +36,20 @@ const EmptySlotDropZone: React.FC<EmptySlotDropZoneProps> = (props) => {
   // We want to drop into the first (0th) space in the empty slot.
   slotPath.push(0);
 
+  const accepts = ['overlay', 'library'];
+
   const {
     setNodeRef: setDropRef,
     isOver,
     active,
   } = useDroppable({
     id: `${slot.id}`,
+    disabled: !accepts.includes(activeOrigin),
     data: {
       component: parentComponent,
       parentSlot: slot,
       path: slotPath,
+      accepts,
     },
   });
 
@@ -53,13 +61,21 @@ const EmptySlotDropZone: React.FC<EmptySlotDropZoneProps> = (props) => {
     }
   }, [active, isOver]);
 
+  useEffect(() => {
+    if (active) {
+      setActiveOrigin(active.data?.current?.origin);
+    } else {
+      setActiveOrigin('');
+    }
+  }, [active]);
+
   return (
-    <div className={styles.emptySlotContainer}>
+    <div className={styles.emptySlotContainer} data-testid="canvas-empty-slot">
       <div
         className={clsx(styles.emptySlotDropZone, {
           [styles.isOver]: isOver,
         })}
-        data-testid="canvas-empty-slot-drop-zone"
+        data-testid={`canvas-empty-slot-drop-zone-${kebabCase(parentComponentName)}:${kebabCase(slotName)}`}
         ref={setDropRef}
       >
         {activeName ? (

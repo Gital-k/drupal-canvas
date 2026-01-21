@@ -39,8 +39,8 @@ class CanvasOauthAuthenticationProvider implements AuthenticationProviderInterfa
    * {@inheritdoc}
    */
   public function applies(Request $request) {
-    // Currently, this authentication provider is only applied to the routes that
-    // work with Canvas's config entities.
+    // Currently, this authentication provider is only applied to the routes
+    // that work with Canvas's config entities.
     // @see \Drupal\canvas_oauth\Routing\CanvasOauthRouteSubscriber
     $route_match = RouteMatch::createFromRequest($request);
     $entity_type_id = $route_match->getRawParameter('canvas_config_entity_type_id');
@@ -51,7 +51,7 @@ class CanvasOauthAuthenticationProvider implements AuthenticationProviderInterfa
       AssetLibrary::ENTITY_TYPE_ID,
     ];
 
-    if ($entity_type_id === NULL || !in_array($entity_type_id, $protected_entity_types)) {
+    if ($entity_type_id === NULL || !in_array($entity_type_id, $protected_entity_types, TRUE)) {
       return FALSE;
     }
 

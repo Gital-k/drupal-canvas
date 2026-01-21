@@ -18,7 +18,7 @@ describe('Image code component', () => {
     () => {
       cy.loadURLandWaitForCanvasLoaded({ url: 'canvas/editor/node/2' });
       cy.openLibraryPanel();
-      cy.get('.primaryPanelContent').findByText('Vanilla Image').click();
+      cy.insertComponent({ name: 'Vanilla Image' });
       // Check the default image src is set.
       cy.waitForElementInIframe(
         'img[src="https://placehold.co/1200x900@2x.png"]',

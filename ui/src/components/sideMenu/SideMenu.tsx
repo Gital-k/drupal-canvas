@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback } from 'react';
+import clsx from 'clsx';
+import { useParams } from 'react-router';
 import { useLocation } from 'react-router-dom';
-import ExtensionIcon from '@assets/icons/extension_sm.svg?react';
+import ExtensionIcon from '@assets/icons/extension-sm.svg?react';
+import TemplateIcon from '@assets/icons/template.svg?react';
 import {
-  Component1Icon,
-  FileIcon,
+  CodeIcon,
   FileTextIcon,
   LayersIcon,
   PlusIcon,
@@ -16,7 +18,7 @@ import {
   setActivePanel,
   unsetActivePanel,
 } from '@/features/ui/primaryPanelSlice';
-import { getCanvasSettings } from '@/utils/drupal-globals';
+import { hasPermission } from '@/utils/permissions';
 
 import styles from './SideMenu.module.css';
 
@@ -38,19 +40,41 @@ const { drupalSettings } = window;
 interface SideMenuProps {}
 
 export const SideMenu: React.FC<SideMenuProps> = () => {
-  const canvasSettings = getCanvasSettings();
   const activePanel = useAppSelector(selectActivePanel);
-  const activePanelRef = useRef(activePanel);
-  let hasExtensions = false;
+  let hasLegacyExtensions = false;
   if (drupalSettings && drupalSettings.canvasExtension) {
-    hasExtensions = Object.values(drupalSettings.canvasExtension).length > 0;
+    hasLegacyExtensions =
+      Object.values(drupalSettings.canvasExtension).length > 0;
   }
-  const { pathname } = useLocation();
-  const segments = pathname.split('/').filter(Boolean); // removes empty strings
-  const isCodeEditor = segments.includes('code-editor');
-  const isEditor = segments.includes('editor');
-
+  const hasExtensions =
+    drupalSettings.canvas.extensionsAvailable || hasLegacyExtensions;
   const dispatch = useAppDispatch();
+
+  const { pathname } = useLocation();
+  const params = useParams();
+  const segments = pathname.split('/').filter(Boolean); // removes empty strings
+  const hasActiveEditorFrame =
+    (segments.includes('editor') && params.entityId !== undefined) ||
+    (segments.includes('template') && params.previewEntityId !== undefined);
+
+  /**
+   * Navigate to previously edited item when opening layers or library panel
+   */
+  // const previouslyEdited = useAppSelector(selectPreviouslyEdited);
+  // const navigate = useNavigate();
+  // useEffect(() => {
+  //   // This useEffect can immediately navigate to the previously edited item when the user clicks on the layers or library panel buttons.
+  //   // however this currently causes a page reload which is a bit disruptive.
+  //   if (
+  //     !hasActiveEditorFrame &&
+  //     (activePanel === 'layers' || activePanel === 'library') &&
+  //     previouslyEdited?.path
+  //   ) {
+  //     console.log('navigate to editor');
+  //     navigate(previouslyEdited.path);
+  //   }
+  // }, [activePanel, previouslyEdited, hasActiveEditorFrame, navigate]);
+  /** Re-add this block once we allow navigating between entities without a page load  */
 
   const handleMenuClick = useCallback(
     (panelId: string) => {
@@ -63,55 +87,37 @@ export const SideMenu: React.FC<SideMenuProps> = () => {
     [dispatch, activePanel],
   );
 
-  useEffect(() => {
-    activePanelRef.current = activePanel;
-  }, [activePanel]);
-
-  /**
-   * When coming into the Code Editor switch to the Manage Library panel.
-   * When coming into the Editor from the Code Editor switch to the "Add" (library) panel.
-   * When coming into the Editor fresh, default to the Layers panel.
-   */
-  useEffect(() => {
-    if (isCodeEditor) {
-      dispatch(setActivePanel('manageLibrary'));
-    } else if (isEditor && activePanelRef.current === 'manageLibrary') {
-      // we came from the library to the editor, so switch to "library"
-      dispatch(setActivePanel('library'));
-    }
-  }, [dispatch, isCodeEditor, isEditor]);
-
   const menuItems: SideMenuItem[] = [
     {
       type: 'button',
       id: 'library',
       icon: <PlusIcon />,
-      label: 'Add',
+      label: 'Library',
       enabled: true,
-      hidden: isCodeEditor,
+      hidden: false,
     },
     {
       type: 'button',
       id: 'layers',
       icon: <LayersIcon />,
       label: 'Layers',
-      enabled: true,
-      hidden: isCodeEditor,
-    },
-    { type: 'separator', hidden: isCodeEditor },
-    {
-      type: 'button',
-      id: 'manageLibrary',
-      icon: <Component1Icon />,
-      label: 'Manage library',
-      enabled: true,
+      enabled: hasActiveEditorFrame,
       hidden: false,
     },
-    { type: 'separator', hidden: !canvasSettings.devMode },
+    { type: 'separator', hidden: false },
+
+    {
+      type: 'button',
+      id: 'code',
+      icon: <CodeIcon />,
+      label: 'Code',
+      enabled: true,
+      hidden: !hasPermission('codeComponents'),
+    },
     {
       type: 'button',
       id: 'pages',
-      icon: <FileIcon />,
+      icon: <FileTextIcon />,
       label: 'Pages',
       enabled: true,
       hidden: false,
@@ -119,10 +125,10 @@ export const SideMenu: React.FC<SideMenuProps> = () => {
     {
       type: 'button',
       id: 'templates',
-      icon: <FileTextIcon />,
+      icon: <TemplateIcon />,
       label: 'Templates',
       enabled: true,
-      hidden: !canvasSettings.devMode,
+      hidden: !hasPermission('contentTemplates'),
     },
     { type: 'separator', hidden: !hasExtensions },
     {
@@ -147,8 +153,13 @@ export const SideMenu: React.FC<SideMenuProps> = () => {
               <Button
                 variant="ghost"
                 color="gray"
+                highContrast={true}
                 disabled={!item.enabled}
-                className={`${styles.menuItem} ${item.enabled ? '' : styles.disabled} ${activePanel === item.id ? styles.active : ''}`}
+                className={clsx(
+                  styles.menuItem,
+                  !item.enabled && styles.disabled,
+                  activePanel === item.id && styles.active,
+                )}
                 onClick={
                   item.enabled ? () => handleMenuClick(item.id) : undefined
                 }

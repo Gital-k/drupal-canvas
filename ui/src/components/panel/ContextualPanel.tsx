@@ -17,6 +17,8 @@ import ErrorBoundary from '@/components/error/ErrorBoundary';
 import PageDataForm from '@/components/PageDataForm';
 import { setCurrentComponent } from '@/features/form/formStateSlice';
 import {
+  EditorFrameContext,
+  selectEditorFrameContext,
   selectIsMultiSelect,
   selectSelectedComponentUuid,
   selectSelection,
@@ -27,16 +29,18 @@ import type React from 'react';
 
 import styles from './ContextualPanel.module.css';
 
-interface ContextualPanelProps {}
-
-const ContextualPanel: React.FC<ContextualPanelProps> = () => {
+const ContextualPanel: React.FC = () => {
   const selectedComponent = useAppSelector(selectSelectedComponentUuid);
   const isMultiSelect = useAppSelector(selectIsMultiSelect);
   const selection = useAppSelector(selectSelection);
   const dispatch = useAppDispatch();
+  const editorFrameContext = useAppSelector(selectEditorFrameContext);
+  const isTemplateContext = editorFrameContext === EditorFrameContext.TEMPLATE;
+  const mainTabText = isTemplateContext ? 'Template data' : 'Page data';
 
   const [activePanel, setActivePanel] = useState('pageData');
   const offRightClasses = useHidePanelClasses('right');
+  const [hidePanel, setHidePanel] = useState(false);
 
   useEffect(() => {
     if (selectedComponent) {
@@ -54,11 +58,23 @@ const ContextualPanel: React.FC<ContextualPanelProps> = () => {
     }
   }, [dispatch, selectedComponent, isMultiSelect]);
 
+  useEffect(() => {
+    if (isTemplateContext && !isMultiSelect && !selectedComponent) {
+      setHidePanel(true);
+    } else {
+      setHidePanel(false);
+    }
+  }, [selectedComponent, isMultiSelect, isTemplateContext]);
+
   return (
     <Box
       data-testid="canvas-contextual-panel"
       pt="2"
-      className={clsx(styles.contextualPanel, ...offRightClasses)}
+      className={clsx(
+        styles.contextualPanel,
+        { [styles.hidePanel]: hidePanel },
+        ...offRightClasses,
+      )}
     >
       <Flex
         flexGrow="1"
@@ -74,12 +90,14 @@ const ContextualPanel: React.FC<ContextualPanelProps> = () => {
             className={clsx(styles.tabRoot)}
           >
             <Tabs.List justify="start" mx="4" size="1">
-              <Tabs.Trigger
-                value="pageData"
-                data-testid="canvas-contextual-panel--page-data"
-              >
-                Page data
-              </Tabs.Trigger>
+              {!isTemplateContext && (
+                <Tabs.Trigger
+                  value="pageData"
+                  data-testid="canvas-contextual-panel--page-data"
+                >
+                  {mainTabText}
+                </Tabs.Trigger>
+              )}
               {(selectedComponent || isMultiSelect) && (
                 <Tabs.Trigger
                   value="settings"
@@ -151,13 +169,15 @@ const ContextualPanel: React.FC<ContextualPanelProps> = () => {
                     <Outlet />
                   </ErrorBoundary>
                 </Tabs.Content>
-                <Tabs.Content
-                  value={'pageData'}
-                  forceMount={true}
-                  hidden={activePanel !== 'pageData'}
-                >
-                  <PageDataForm />
-                </Tabs.Content>
+                {!isTemplateContext && (
+                  <Tabs.Content
+                    value={'pageData'}
+                    forceMount={true}
+                    hidden={activePanel !== 'pageData'}
+                  >
+                    {editorFrameContext === 'entity' && <PageDataForm />}
+                  </Tabs.Content>
+                )}
               </Box>
             </ScrollArea>
           </Tabs.Root>

@@ -12,6 +12,8 @@ use Drupal\Core\Plugin\ContextAwarePluginTrait;
 use Drupal\Core\Plugin\PluginBase;
 
 /**
+ * @internal
+ *
  * Defines a base class for component source plugins.
  *
  * @see \Drupal\canvas\Attribute\ComponentSource
@@ -22,6 +24,14 @@ abstract class ComponentSourceBase extends PluginBase implements ComponentSource
 
   use ContextAwarePluginAssignmentTrait;
   use ContextAwarePluginTrait;
+
+  public function determineDefaultFolder(): string {
+    return 'Other';
+  }
+
+  public function getSourceSpecificComponentId(): string {
+    return $this->getConfiguration()['local_source_id'];
+  }
 
   public function generateVersionHash(): string {
     // @phpstan-ignore-next-line
@@ -143,7 +153,7 @@ abstract class ComponentSourceBase extends PluginBase implements ComponentSource
         // Config and content entities have the dependency names as keys while
         // module and theme dependencies are indexed arrays of dependency names.
         // @see \Drupal\Core\Config\ConfigManager::callOnDependencyRemoval()
-        if (in_array($type, ['config', 'content'])) {
+        if (in_array($type, ['config', 'content'], TRUE)) {
           $removed = array_intersect_key($removed_dependencies[$type], array_flip($dependencies));
         }
         else {
@@ -175,6 +185,18 @@ abstract class ComponentSourceBase extends PluginBase implements ComponentSource
   public function optimizeExplicitInput(array $values): array {
     // Nil-op.
     return $values;
+  }
+
+  /**
+   * @todo Remove in clean-up follow-up; minimize non-essential changes.
+   */
+  public function checkRequirements(): void {
+    $discovery_class = $this->getPluginDefinition()['discovery'];
+    // @phpstan-ignore globalDrupalDependencyInjection.useDependencyInjection
+    $discovery = \Drupal::classResolver($discovery_class);
+    \assert($discovery instanceof ComponentCandidatesDiscoveryInterface);
+
+    $discovery->checkRequirements($this->getSourceSpecificComponentId());
   }
 
 }

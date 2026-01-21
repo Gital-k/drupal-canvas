@@ -4,7 +4,11 @@ import { createApi } from '@reduxjs/toolkit/query/react';
 import { setPostPreviewCompleted } from '@/components/review/PublishReview.slice';
 import { setLayoutModel } from '@/features/layout/layoutModelSlice';
 import { setHtml } from '@/features/pagePreview/previewSlice';
-import { baseQueryWithAutoSaves } from '@/services/baseQuery';
+import {
+  baseQueryWithAutoSaves,
+  popCanvasLayoutRequest,
+  pushCanvasLayoutRequest,
+} from '@/services/baseQuery';
 import { pendingChangesApi } from '@/services/pendingChangesApi';
 import { handleAutoSavesHashUpdate } from '@/utils/autoSaves';
 
@@ -13,6 +17,7 @@ import type {
   ComponentModel,
   EvaluatedComponentModel,
 } from '@/features/layout/layoutModelSlice';
+import type { EditorFrameContext } from '@/features/ui/uiSlice';
 import type { ConflictError } from '@/services/pendingChangesApi';
 import type { AutoSavesHash } from '@/types/AutoSaves';
 
@@ -25,6 +30,7 @@ export type UpdateComponentResultType = {
 };
 
 export type UpdateComponentQueryArg = {
+  type: EditorFrameContext;
   componentInstanceUuid: string;
   componentType: string;
   model: Omit<ComponentModel, 'name'> | Omit<EvaluatedComponentModel, 'name'>;
@@ -61,13 +67,26 @@ export const previewApi = createApi({
       UpdateComponentResultType,
       UpdateComponentQueryArg
     >({
-      query: (body) => ({
-        url: 'canvas/api/v0/layout/{entity_type}/{entity_id}',
-        method: 'PATCH',
-        body,
-      }),
+      query: ({ type, ...body }) => {
+        let url = '';
+        if (type === 'entity') {
+          url = 'canvas/api/v0/layout/{entity_type}/{entity_id}';
+        } else if (type === 'template') {
+          url =
+            'canvas/api/v0/layout-content-template/{entity_type}.{template_bundle}.{template_view_mode}/{entity_id}';
+        }
+        return {
+          url,
+          method: 'PATCH',
+          body,
+        };
+      },
       async onQueryStarted(body, { dispatch, queryFulfilled }) {
+        // Force any ajax calls to wait.
+        pushCanvasLayoutRequest();
         const { data, meta } = await queryFulfilled;
+        // Tell ajax calls they're good to go.
+        popCanvasLayoutRequest();
         const { html, layout, model, autoSaves } = data;
         dispatch(
           pendingChangesApi.util.invalidateTags([

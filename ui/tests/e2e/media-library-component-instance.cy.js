@@ -95,7 +95,9 @@ const testMediaLibraryInComponentInstanceForm = (
     cy.waitForAjax();
     cy.wait('@patch');
     cy.get('div[role="dialog"]').should('not.exist');
-    cy.get('@inputForm').shouldHaveUpdatedFormBuildId({ timeout: 11000 });
+    cy.selectorShouldHaveUpdatedFormBuildId(
+      '[data-testid*="canvas-component-form-"]',
+    );
     cy.get(
       `[class*="contextualPanel"] input[aria-label="${step.removeAriaLabel}"]`,
     ).should('exist');
@@ -181,15 +183,15 @@ describe('Media Library component instance', () => {
   });
 
   it(
-    'Can open the media library widget in an canvas_page props form',
+    'Can open the media library widget in a canvas_page props form',
     { retries: { openMode: 0, runMode: 3 } },
     () => {
       cy.drupalLogin('canvasUser', 'canvasUser');
       cy.loadURLandWaitForCanvasLoaded({ url: 'canvas/editor/canvas_page/2' });
       cy.openLibraryPanel();
-      cy.get('.primaryPanelContent').findByText('Test SDC Image').click();
+      cy.insertComponent({ name: 'Test SDC Image' });
 
-      cy.get('.primaryPanelContent').findByText('Test SDC Image').click();
+      cy.insertComponent({ name: 'Test SDC Image' });
       cy.get(
         '.previewOverlay [data-canvas-component-id="sdc.canvas_test_sdc.image"]',
       ).should('have.length', 2);

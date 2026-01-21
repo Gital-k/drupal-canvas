@@ -11,12 +11,13 @@ dependencies:
     - file
     - media
     - media_library
-active_version: b5e039b71b27fef6
+active_version: d7462e4cd76d37c6
 versioned_properties:
   active:
     settings:
       prop_field_definitions:
         image:
+          required: false
           field_type: entity_reference
           field_storage_settings:
             target_type: media
@@ -35,4 +36,3 @@ id: js.canvas_test_code_components_vanilla_image
 provider: null
 source: js
 source_local_id: canvas_test_code_components_vanilla_image
-category: '@todo'

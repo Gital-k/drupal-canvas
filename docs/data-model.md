@@ -84,7 +84,7 @@ Given a component developed by a [Front-End Developer](diagrams/structurizr-Syst
 Content Creator to place a `component instance` in the `component tree`, specify values for the `component input`s and
 `component slot`s?
 
-### 3.1 Data Model: from Front-End Developer to an Canvas data model that empowers the Content Creator
+### 3.1 Data Model: from Front-End Developer to a Canvas data model that empowers the Content Creator
 
 Moved to the [`Canvas Shape Matching into Field Types` doc](shape-matching-into-field-types.md).
 
@@ -184,7 +184,7 @@ Example: A simple tree showing a root item (`41595148-e5c1-4873-b373-be3ae6e2134
 [
   'uuid' => '41595148-e5c1-4873-b373-be3ae6e21340',
   'component_id' => 'sdc.canvas_test_sdc.props-slots',
-  'component_version' => 'ab4d3ddce315cf64',
+  'component_version' => '85a5c0c7dd53e0bb',
   'inputs' => [
     'heading' => [
       'sourceType' => 'static:field_item:string',
@@ -196,7 +196,7 @@ Example: A simple tree showing a root item (`41595148-e5c1-4873-b373-be3ae6e2134
 [
   'uuid' => '3b305d86-86a7-4684-8664-7ef1fc2be070',
   'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
-  'component_version' => '95f4f1d5ee47663b',
+  'component_version' => 'b1e991f726a2a266',
   'parent_uuid' => '41595148-e5c1-4873-b373-be3ae6e21340',
   'slot' => 'the_body',
   'inputs' => [
@@ -212,6 +212,51 @@ Example: A simple tree showing a root item (`41595148-e5c1-4873-b373-be3ae6e2134
     'component_version' => '247a23298360adb2',
     // Example, that populates a Block component instance.
     // Note how much simpler the stored information is, because it uses the Block system's native input UX:
+    'inputs' => [
+      'label' => '',
+      'label_display' => FALSE,
+      'use_site_logo' => TRUE,
+      'use_site_name' => TRUE,
+      'use_site_slogan' => TRUE,
+    ],
+  ],
+],
+```
+
+The above is the _runtime_ representation.
+
+The _stored_ representation is optimized for compactness, and each `ComponentSource` is the authority for how to
+optimize the stored data. For example:
+- `ComponentSource`s whose explicit inputs are populated by `StaticPropSource`s can decide that all instances of some
+  `component version` must use the exact same `StaticPropSource`. That enables them to store only the value inside the
+  `StaticPropSource`, and load the metadata when needed. Result: see below.
+- The `Block` `ComponentSource` _could_ (but does not yet at the time of writing) choose to omit `label` and
+  `label_display` settings (which exist for _every_ block plugin), because it's forcing it to not have a label anyway.
+
+```php
+[
+  'uuid' => '41595148-e5c1-4873-b373-be3ae6e21340',
+  'component_id' => 'sdc.canvas_test_sdc.props-slots',
+  'component_version' => '85a5c0c7dd53e0bb',
+  'inputs' => [
+    // Note how much simpler this is compared to the runtime representation above.
+    'heading' => "Hello, world!",
+  ],
+],
+[
+  'uuid' => '3b305d86-86a7-4684-8664-7ef1fc2be070',
+  'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+  'component_version' => 'b1e991f726a2a266',
+  'parent_uuid' => '41595148-e5c1-4873-b373-be3ae6e21340',
+  'slot' => 'the_body',
+  'inputs' => [
+    // Note how much simpler this is compared to the runtime representation above.
+    'heading' => "It's me!",
+  ],
+  [
+    'uuid' => '41595148-e5c1-4873-b373-be3ae6e21340',
+    'component_id' => 'block.system_branding_block',
+    'component_version' => '247a23298360adb2',
     'inputs' => [
       'label' => '',
       'label_display' => FALSE,

@@ -14,9 +14,7 @@ test.describe('Canvas UI Permissions', () => {
     async ({ browser, drupalSite }) => {
       const page = await browser.newPage();
       const drupal: Drupal = new Drupal({ page, drupalSite });
-      await drupal.installModules(['canvas']);
-      await drupal.applyRecipe(`core/recipes/image_media_type`);
-      await drupal.setupCanvasTestSite();
+      await drupal.installModules(['canvas', 'canvas_test_sdc']);
       await page.close();
     },
   );
@@ -27,9 +25,20 @@ test.describe('Canvas UI Permissions', () => {
     canvasEditor,
   }) => {
     await drupal.loginAsAdmin();
-    await page.goto('/first');
+    await drupal.createCanvasPage('UI Permissions 1', '/ui-perms-1');
+    await page.goto('/ui-perms-1');
     await canvasEditor.goToEditor();
-    await page.getByText('Two Column').click({ button: 'right' });
+
+    await expect(page.getByText('No changes')).toBeAttached();
+
+    await canvasEditor.openLibraryPanel();
+    await canvasEditor.addComponent({ id: 'sdc.canvas_test_sdc.two_column' });
+
+    await canvasEditor.openLayersPanel();
+    await page
+      .getByTestId('canvas-primary-panel')
+      .getByText('Two Column')
+      .click({ button: 'right' });
 
     const menu = page.getByRole('menu', {
       name: 'Context menu for Two Column',
@@ -47,14 +56,12 @@ test.describe('Canvas UI Permissions', () => {
     ).toBeAttached();
 
     // Click the dropdown button with the aria-label
-    const dropdownButton = page.getByLabel(
-      'Page options for Page without a path',
-    );
+    const dropdownButton = page.getByLabel('Page options for UI Permissions 1');
     await dropdownButton.click({ force: true });
 
     // Verify the dropdown menu is visible
     const contextMenu = page.getByRole('menu', {
-      name: 'Page options for Page without',
+      name: 'Page options for UI Permissions 1',
     });
     await expect(contextMenu).toBeVisible();
 
@@ -66,20 +73,22 @@ test.describe('Canvas UI Permissions', () => {
     await expect(contextMenu).not.toBeAttached();
 
     await canvasEditor.openLibraryPanel();
-    // Check that a button with the text "Add new" exists inside canvas-primary-panel
-    const primaryPanel = page.getByTestId('canvas-primary-panel');
+    // Open the "New" dropdown
+    await page.getByTestId('canvas-page-list-new-button').click();
+
+    // The add new code component button should be visible
     await expect(
-      primaryPanel.getByRole('button', { name: 'Create code component' }),
+      page.getByTestId('canvas-library-new-code-component-button'),
     ).toBeVisible();
 
-    // Make a change to the page
-    await expect(page.getByText('No changes')).toBeAttached();
-
+    // Close the dropdown
     await page
-      .locator('[aria-label="Draggable component Hero"]')
-      .first()
-      .click();
-    await page.waitForTimeout(500);
+      .getByTestId('canvas-page-list-new-button')
+      .click({ force: true });
+
+    // Make a change to the page
+    await canvasEditor.addComponent({ name: 'Hero' });
+
     await expect(page.getByLabel('Sub-heading')).toBeAttached();
     await page.getByLabel('Sub-heading').fill('New Heading');
     await expect(page.getByLabel('Sub-heading')).toHaveValue('New Heading');
@@ -93,16 +102,13 @@ test.describe('Canvas UI Permissions', () => {
     drupal,
     canvasEditor,
   }) => {
+    await drupal.loginAsAdmin();
+    await drupal.createCanvasPage('UI Permissions 2', '/ui-perms-2');
     // Create a role with no (well, minimal) Canvas permissions
     await drupal.createRole({ name: 'canvas_no_permissions' });
     await drupal.addPermissions({
       role: 'canvas_no_permissions',
-      permissions: [
-        'view the administration theme',
-        'edit canvas_page',
-        'edit any page content',
-        'edit any article content',
-      ],
+      permissions: ['view the administration theme', 'edit canvas_page'],
     });
 
     // Create a user with that role
@@ -114,11 +120,20 @@ test.describe('Canvas UI Permissions', () => {
       roles: ['canvas_no_permissions'],
     };
     await drupal.createUser(user);
+    await drupal.logout();
     await drupal.login(user);
-    await page.goto('/first');
+    await page.goto('/ui-perms-2');
     await canvasEditor.goToEditor();
 
-    await page.getByText('Two Column').click({ button: 'right' });
+    await canvasEditor.openLibraryPanel();
+    await canvasEditor.addComponent({ id: 'sdc.canvas_test_sdc.two_column' });
+
+    await canvasEditor.openLayersPanel();
+
+    await page
+      .getByTestId('canvas-primary-panel')
+      .getByText('Two Column')
+      .click({ button: 'right' });
     const menu = page.getByRole('menu', {
       name: 'Context menu for Two Column',
     });
@@ -135,14 +150,12 @@ test.describe('Canvas UI Permissions', () => {
     ).not.toBeAttached();
 
     // Click the dropdown button with the aria-label
-    const dropdownButton = page.getByLabel(
-      'Page options for Page without a path',
-    );
+    const dropdownButton = page.getByLabel('Page options for UI Permissions 2');
     await dropdownButton.click({ force: true });
 
     // Verify the dropdown menu is visible
     const contextMenu = page.getByRole('menu', {
-      name: 'Page options for Page without',
+      name: 'Page options for UI Permissions 2',
     });
     await expect(contextMenu).toBeVisible();
 
@@ -158,28 +171,33 @@ test.describe('Canvas UI Permissions', () => {
     // Open the library panel
     await canvasEditor.openLibraryPanel();
 
-    // Check that a button with the text "Add new" does not exist inside canvas-primary-panel
-    const primaryPanel = page.getByTestId('canvas-primary-panel');
+    // The "New" dropdown should not be visible
     await expect(
-      primaryPanel.getByRole('button', { name: 'Create code component' }),
+      page.getByTestId('canvas-page-list-new-button'),
     ).not.toBeAttached();
+
+    const primaryPanel = page.getByTestId('canvas-primary-panel');
     await expect(
       primaryPanel.getByRole('button', { name: 'Code' }),
     ).not.toBeAttached();
 
     // Ensure the "Patterns" button is visible - users with no permissions should still be able to use patterns.
     await expect(
-      primaryPanel.getByTestId('canvas-manage-library-patterns-tab-select'),
+      primaryPanel.getByTestId('canvas-library-patterns-tab-select'),
     ).toBeAttached();
 
-    // A change to the page was made in the previous test, so it should be visible.
-    await page.getByText('Review 1 change').click();
+    await canvasEditor.addComponent({ name: 'Hero' });
+    await page.getByTestId('canvas-publish-review').click();
+    await page
+      .getByTestId('canvas-publish-reviews-content')
+      .filter({ hasText: 'Unpublished changes' })
+      .waitFor({ state: 'visible' });
     await page.getByTestId('canvas-publish-review-select-all').click();
     // but the user should not be able to publish changes.
     await expect(page.getByText('Publish 1 selected')).not.toBeAttached();
 
     // User without "administer components" should not be able to access the code editor.
-    await page.goto('/canvas/code-editor/code/foobar');
+    await page.goto('/canvas/code-editor/component/foobar');
     await expect(
       page.getByText('You do not have permission to access the code editor.'),
     ).toBeVisible();

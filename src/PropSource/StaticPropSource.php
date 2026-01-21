@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\PropSource;
 
+use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Datetime\DrupalDateTime;
 use Drupal\Core\Entity\FieldableEntityInterface;
@@ -48,7 +49,7 @@ final class StaticPropSource extends PropSourceBase {
    */
   public function __construct(
     public readonly FieldItemListInterface $fieldItemList,
-    private readonly StructuredDataPropExpressionInterface $expression,
+    public readonly StructuredDataPropExpressionInterface $expression,
     // - which cardinality to use in case of a list (`type: array`)
     // @see \Drupal\Core\Field\FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED
     private readonly ?int $cardinality,
@@ -61,13 +62,6 @@ final class StaticPropSource extends PropSourceBase {
     //   field type — necessary for the `entity_reference` field type
     private readonly ?array $fieldInstanceSettings = NULL,
   ) {}
-
-  /**
-   * {@inheritdoc}
-   */
-  public static function getSourceTypePrefix(): string {
-    return 'static';
-  }
 
   /**
    * Two StaticPropSources have the same shape if they have identical storage.
@@ -133,10 +127,12 @@ final class StaticPropSource extends PropSourceBase {
     // - field type
     // - cardinality
     // @see \Drupal\Core\Field\FieldStorageDefinitionInterface
-    // TRICKY: this does not work due to it using BaseFieldDefinition, and BaseFieldDefinition::getOptionsProvider() assuming it to exist on the host entity. Hence the use of Canvas's own \Drupal\canvas\PropSource\FieldStorageDefinition.
+    // TRICKY: this does not work due to it using BaseFieldDefinition, and
+    // BaseFieldDefinition::getOptionsProvider() assuming it to exist on the
+    // host entity. Hence the use of Canvas's own
+    // \Drupal\canvas\PropSource\FieldStorageDefinition.
     // @see \Drupal\Core\Field\TypedData\FieldItemDataDefinition::createFromDataType()
     // @todo Refactor this after https://www.drupal.org/node/2280639 is fixed.
-    // $field_item_definition = $typed_data_manager->createDataDefinition($data_type);
     $storage_definition = FieldStorageDefinition::create($field_type);
     // @see \Drupal\Core\Field\BaseFieldDefinition::getCardinality()
     if ($cardinality) {
@@ -386,7 +382,7 @@ final class StaticPropSource extends PropSourceBase {
   /**
    * {@inheritdoc}
    */
-  public function evaluate(?FieldableEntityInterface $host_entity, bool $is_required): mixed {
+  public function evaluate(?FieldableEntityInterface $host_entity, bool $is_required): EvaluationResult {
     return match ($this->getCardinality()) {
       // @phpstan-ignore-next-line
       1 => Evaluator::evaluate($this->fieldItemList->first(), $this->expression, $is_required),
@@ -399,7 +395,7 @@ final class StaticPropSource extends PropSourceBase {
   }
 
   public function getSourceType(): string {
-    return self::getSourceTypePrefix() . self::SOURCE_TYPE_PREFIX_SEPARATOR . $this->fieldItemList->getItemDefinition()->getDataType();
+    return parent::getSourceType() . self::SOURCE_TYPE_PREFIX_SEPARATOR . $this->fieldItemList->getItemDefinition()->getDataType();
   }
 
   public function getValue(): mixed {
@@ -445,7 +441,7 @@ final class StaticPropSource extends PropSourceBase {
     };
   }
 
-  public function getWidget(string $component_config_entity_id, ?string $component_config_entity_version, string $prop_name, string $sdc_prop_label, ?string $field_widget_plugin_id): WidgetInterface {
+  public function getWidget(string $component_config_entity_id, ?string $component_config_entity_version, string $prop_name, string $sdc_prop_label, ?string $field_widget_plugin_id, ?string $sdc_prop_description = NULL): WidgetInterface {
     // @phpstan-ignore-next-line
     $field_widget_plugin_manager = \Drupal::service('plugin.manager.field.widget');
     assert($field_widget_plugin_manager instanceof WidgetPluginManager);
@@ -475,7 +471,8 @@ final class StaticPropSource extends PropSourceBase {
             ],
           ],
         ])
-        ->setLabel($sdc_prop_label),
+        ->setLabel($sdc_prop_label)
+        ->setDescription($sdc_prop_description ?? ''),
       'configuration' => $configuration,
       'prepare' => TRUE,
     ]);
@@ -499,8 +496,10 @@ final class StaticPropSource extends PropSourceBase {
       $field->appendItem();
     }
     // Most widgets do not need an entity context, but some do:
+    // @see \Drupal\Core\Field\FieldItemListInterface::getEntity()
     // @see \Drupal\file\Plugin\Field\FieldWidget\FileWidget
     // @see \Drupal\image\Plugin\Field\FieldWidget\ImageWidget
+    // @see \Drupal\Core\Field\Plugin\Field\FieldWidget\OptionsWidgetBase::getOptions()
     if ($host_entity) {
       $field->setContext(NULL, EntityAdapter::createFromEntity($host_entity));
     }

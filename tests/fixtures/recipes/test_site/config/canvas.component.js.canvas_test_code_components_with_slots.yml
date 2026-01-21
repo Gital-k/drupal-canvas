@@ -9,13 +9,13 @@ id: js.canvas_test_code_components_with_slots
 provider: null
 source: js
 source_local_id: canvas_test_code_components_with_slots
-category: '@todo'
-active_version: 5d3d256aa45dea9e
+active_version: d5c6ab208aeca9cf
 versioned_properties:
   active:
     settings:
       prop_field_definitions:
         name:
+          required: true
           field_type: string
           field_storage_settings: {  }
           field_instance_settings: {  }

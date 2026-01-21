@@ -8,10 +8,10 @@ use Drupal\ai\Attribute\FunctionCall;
 use Drupal\ai\Base\FunctionCallBase;
 use Drupal\ai\Service\FunctionCalling\ExecutableFunctionCallInterface;
 use Drupal\ai\Service\FunctionCalling\FunctionCallInterface;
-use Drupal\ai\Utility\ContextDefinitionNormalizer;
 use Drupal\ai_agents\PluginInterfaces\AiAgentContextInterface;
 use Drupal\canvas_ai\AiResponseValidator;
 use Drupal\canvas_ai\CanvasAiPageBuilderHelper;
+use Drupal\canvas_ai\CanvasAiPermissions;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 use Drupal\Core\Session\AccountProxyInterface;
@@ -24,7 +24,7 @@ use Symfony\Component\Yaml\Yaml;
   id: 'canvas_ai:set_component_structure',
   function_name: 'set_component_structure',
   name: 'Set Component Structure',
-  description: 'This tool should be used to add new components to the current page based on the user’s request. Pass the component structure in YAML format.',
+  description: 'This is the tool that should be used to apply the component structure generated to the current page. The input should be a YAML string representing the component structure with operations. Components will not be added to the page unless this tool is called. It may also return errors if the structure is invalid.',
   group: 'modification_tools',
   context_definitions: [
     'component_structure' => new ContextDefinition(
@@ -35,7 +35,7 @@ use Symfony\Component\Yaml\Yaml;
     ),
   ],
 )]
-final class SetAIGeneratedComponentStructure extends FunctionCallBase implements ExecutableFunctionCallInterface, AiAgentContextInterface {
+final class SetAIGeneratedComponentStructure extends FunctionCallBase implements ExecutableFunctionCallInterface, AiAgentContextInterface, BuilderResponseFunctionCallInterface {
 
   /**
    * The Canvas page builder helper service.
@@ -73,7 +73,7 @@ final class SetAIGeneratedComponentStructure extends FunctionCallBase implements
       $configuration,
       $plugin_id,
       $plugin_definition,
-      new ContextDefinitionNormalizer(),
+      $container->get('ai.context_definition_normalizer'),
     );
     $instance->pageBuilderHelper = $container->get('canvas_ai.page_builder_helper');
     $instance->loggerFactory = $container->get('logger.factory');
@@ -87,29 +87,70 @@ final class SetAIGeneratedComponentStructure extends FunctionCallBase implements
    */
   public function execute(): void {
     // Make sure that the user has the right permissions.
-    if (!$this->currentUser->hasPermission('use Drupal Canvas ai')) {
+    if (!$this->currentUser->hasPermission(CanvasAiPermissions::USE_CANVAS_AI)) {
       throw new \Exception('The current user does not have the right permissions to run this tool.');
     }
     try {
       $component_structure = $this->getContextValue('component_structure');
       $component_structure_array = Yaml::parse($component_structure);
-
-      // Validate reference node path.
-      if (count($component_structure_array['reference_nodepath']) % 2 !== 0) {
-        throw new \Exception(sprintf('The reference_nodepath %s is incomplete and missing elements. Provide the complete nodepath from current layout.', implode(', ', $component_structure_array['reference_nodepath'])));
+      if (empty($component_structure_array['operations'])) {
+        throw new \Exception('The operations key is missing in the component structure.');
       }
-      \assert($component_structure_array['components'], 'The components key is missing in the component structure.');
-      $this->responseValidator->validateComponentStructure($component_structure_array['components']);
+      $allErrors = [];
+
+      foreach ($component_structure_array['operations'] as $index => $operation) {
+        $allErrors = array_merge($allErrors, $this->validatePlacementParams($operation, $index));
+        $this->responseValidator->validateComponentStructure($operation['components']);
+      }
+
+      if (!empty($allErrors)) {
+        throw new \Exception(Yaml::dump($allErrors));
+      }
 
       // Once validated, convert this yml to JSON that will be processed by
       // the Canvas UI.
-      $output = $this->pageBuilderHelper->customYamlToArrayMapper($component_structure);
-      $this->setOutput(Yaml::dump($output));
+      $custom_yaml = $this->pageBuilderHelper->customYamlToArrayMapper($component_structure);
+      \assert(array_keys($custom_yaml) === ['operations']);
+      $this->setStructuredOutput($custom_yaml);
     }
     catch (\Exception $e) {
       $this->loggerFactory->get('canvas_ai')->error($e->getMessage());
       $this->setOutput(sprintf('Failed to process layout data: %s', $e->getMessage()));
     }
+  }
+
+  private function validatePlacementParams(array $operation, int $index): array {
+    $errors = [];
+    $errorKey = 'Operation ' . $index;
+
+    if (!isset($operation['placement']) || !in_array($operation['placement'], ['above', 'below', 'inside'], TRUE)) {
+      $errors[$errorKey][] = 'The placement key is missing or invalid in the operation.';
+      return $errors;
+    }
+
+    $placement = $operation['placement'];
+    // If placement is 'above' or 'below', `reference_uuid` must be provided.
+    if (in_array($placement, ['above', 'below'], TRUE) && empty($operation['reference_uuid'])) {
+      $errors[$errorKey][] = 'The reference_uuid must be provided for above/below placement.';
+    }
+
+    // If placement is 'inside', `reference_uuid` is not needed.
+    if ($placement === 'inside') {
+      if (!empty($operation['reference_uuid'])) {
+        $errors[$errorKey][] = 'The reference_uuid is not required for inside placement.';
+      }
+      // If placement is 'inside', the target must not contain child components.
+      if ($this->pageBuilderHelper->hasChildComponents($operation['target'])) {
+        $errors[$errorKey][] = 'The target ' . $operation['target'] . ' has "inside" placement specified, but it contains child components. Select any child component in the target and use "above" or "below" placement instead.';
+      }
+    }
+
+    // Operation must contain components.
+    if (empty($operation['components'])) {
+      $errors[$errorKey][] = 'The operation must contain components.';
+    }
+
+    return $errors;
   }
 
 }

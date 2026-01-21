@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource;
 
+use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\Core\File\FileExists;
 use Drupal\Core\StreamWrapper\PublicStream;
 use Drupal\Core\Url;
@@ -11,7 +12,6 @@ use Drupal\canvas\Controller\ApiAutoSaveController;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\canvas\Entity\Page;
-use Drupal\canvas\Plugin\ComponentPluginManager;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent;
 use Drupal\file\Entity\File;
 use Drupal\media\Entity\Media;
@@ -20,6 +20,7 @@ use Drupal\Tests\canvas\Kernel\ApiLayoutControllerTestBase;
 use Drupal\Tests\canvas\Traits\AutoSaveManagerTestTrait;
 use Drupal\Tests\canvas\Traits\CanvasFieldTrait;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
+use Drupal\Tests\user\Traits\UserCreationTrait;
 use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -29,12 +30,14 @@ use Symfony\Component\HttpFoundation\Response;
  *
  * @coversDefaultClass \Drupal\canvas\Plugin\Canvas\ComponentSource\Fallback
  * @group canvas
+ * @group canvas_component_sources
  */
 final class FallbackInputTest extends ApiLayoutControllerTestBase {
 
   use MediaTypeCreationTrait;
   use AutoSaveManagerTestTrait;
   use CanvasFieldTrait;
+  use UserCreationTrait;
 
   protected static $modules = [
     // Required modules.
@@ -50,6 +53,7 @@ final class FallbackInputTest extends ApiLayoutControllerTestBase {
     'image',
     'link',
     'options',
+    'text',
     // Allow using media for image plugin.
     'media',
     'media_library',
@@ -62,6 +66,7 @@ final class FallbackInputTest extends ApiLayoutControllerTestBase {
     // Our module!
     'canvas',
     // Test components we can force fallback and recovery on.
+    'datetime',
     'canvas_test_sdc',
   ];
 
@@ -96,8 +101,7 @@ final class FallbackInputTest extends ApiLayoutControllerTestBase {
       'access content',
     ]);
 
-    // Force generation of component config entities.
-    $this->container->get(ComponentPluginManager::class)->getDefinitions();
+    $this->container->get(ComponentSourceManager::class)->generateComponents();
   }
 
   /**
@@ -110,6 +114,7 @@ final class FallbackInputTest extends ApiLayoutControllerTestBase {
    *           [false]
    */
   public function testFallbackInputCanBeRecovered(bool $publish = FALSE): void {
+    $this->setUpCurrentUser(permissions: ['view media', 'access content', Page::EDIT_PERMISSION]);
     $component_to_recover = Component::load('sdc.canvas_test_sdc.image');
     \assert($component_to_recover instanceof ComponentInterface);
     $component_to_edit = Component::load('sdc.canvas_test_sdc.heading');
@@ -240,7 +245,7 @@ final class FallbackInputTest extends ApiLayoutControllerTestBase {
     $new_model['source']['text']['value'] = 'New heading text';
     $response = $this->request(Request::create($api_endpoint_uri, method: 'PATCH', content: \json_encode([
       'model' => $new_model,
-      'componentType' => 'sdc.canvas_test_sdc.heading@8dd7b865998f53b0',
+      'componentType' => 'sdc.canvas_test_sdc.heading@8c01a2bdb897a810',
       'componentInstanceUuid' => $component_to_edit_uuid,
     ] + $this->getPatchContentsDefaults([$page]), JSON_THROW_ON_ERROR)));
     self::assertEquals(Response::HTTP_OK, $response->getStatusCode());
@@ -272,10 +277,8 @@ final class FallbackInputTest extends ApiLayoutControllerTestBase {
     // fallback.
     $this->createMediaType('image', ['id' => 'image', 'label' => 'Image']);
 
-    // Rebuild component entities.
-    $component_plugin_manager = $this->container->get(ComponentPluginManager::class);
-    $component_plugin_manager->clearCachedDefinitions();
-    $component_plugin_manager->getDefinitions();
+    // Rebuild Component entities.
+    $this->container->get(ComponentSourceManager::class)->generateComponents();
     /** @var \Drupal\canvas\Entity\ComponentInterface $component_to_recover */
     $component_to_recover = Component::load($component_to_recover->id());
     self::assertFalse($component_to_recover->status());

@@ -8,9 +8,15 @@ use Behat\Mink\Element\NodeElement;
 use Behat\Mink\Session;
 use Drupal\block\Entity\Block;
 use Drupal\block\Plugin\DisplayVariant\BlockPageVariant;
+use Drupal\canvas\ComponentSource\ComponentSourceBase;
+use Drupal\canvas\ComponentSource\ComponentSourceManager;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent;
+use Drupal\canvas\PropSource\PropSource;
+use Drupal\canvas\PropSource\PropSourceBase;
 use Drupal\Component\Serialization\Json;
 use Drupal\Core\Cache\CacheableDependencyInterface;
 use Drupal\Core\Cache\CacheableMetadata;
+use Drupal\Core\Cache\Context\CacheContextsManager;
 use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\Core\Render\Plugin\DisplayVariant\SimplePageVariant;
 use Drupal\Core\Session\AccountInterface;
@@ -28,6 +34,7 @@ use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\system\Functional\Cache\AssertPageCacheContextsAndTagsTrait;
 use Drupal\user\Entity\Role;
 use Symfony\Component\DomCrawler\Crawler;
+use Symfony\Component\Validator\ConstraintViolationInterface;
 
 /**
  * @group canvas
@@ -68,7 +75,7 @@ class CanvasPageVariantTest extends FunctionalTestBase {
     $this->mink?->registerSession('canvas_ui', new Session($this->getDefaultDriverInstance()));
     $this->mink?->setDefaultSessionName('canvas_ui');
     /** @var \Drupal\user\UserInterface $admin_user */
-    $admin_user = $this->createUser();
+    $admin_user = $this->createUser(name: 'Eddy the Admin');
     // cspell:ignore canvaspageadmin
     Role::create([
       'id' => 'canvaspageadmin',
@@ -139,13 +146,6 @@ class CanvasPageVariantTest extends FunctionalTestBase {
     // created for the default theme, Canvas's CanvasPageVariant is used instead.
     $slogan = 'JavaScript is the future!';
     $this->config('system.site')->set('slogan', $slogan)->save();
-    $generate_static_prop_source = function (string $label): array {
-      return [
-        'sourceType' => 'static:field_item:string',
-        'value' => "Hello, $label!",
-        'expression' => 'ℹ︎string␟value',
-      ];
-    };
     $pageRegion = PageRegion::create([
       'theme' => $this->defaultTheme,
       'region' => 'sidebar_first',
@@ -153,9 +153,9 @@ class CanvasPageVariantTest extends FunctionalTestBase {
         [
           'uuid' => self::UUID_IN_ROOT,
           'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
-          'component_version' => '95f4f1d5ee47663b',
+          'component_version' => 'b1e991f726a2a266',
           'inputs' => [
-            'heading' => $generate_static_prop_source('world'),
+            'heading' => "Hello, world!",
           ],
         ],
         [
@@ -208,15 +208,79 @@ class CanvasPageVariantTest extends FunctionalTestBase {
         ],
         [
           'uuid' => self::UUID_IN_ROOT_ANOTHER,
-          'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
-          'component_version' => '95f4f1d5ee47663b',
+          'component_id' => 'sdc.canvas_test_sdc.props-slots',
+          'component_version' => '85a5c0c7dd53e0bb',
           'inputs' => [
-            'heading' => $generate_static_prop_source('another world'),
+            'heading' => [
+              'sourceType' => PropSource::Static->value . PropSourceBase::SOURCE_TYPE_PREFIX_SEPARATOR . 'field_item:entity_reference',
+              'value' => [
+                // @see ::setUp()
+                'target_id' => 2,
+              ],
+              'expression' => 'ℹ︎entity_reference␟entity␜␜entity:user␝name␞␟value',
+              'sourceTypeSettings' => [
+                'storage' => [
+                  'target_type' => 'user',
+                ],
+              ],
+            ],
           ],
         ],
       ],
     ]);
+
+    // The UUID_IN_ROOT_ANOTHER component instance is doing something funky to
+    // test bubbling of cacheability: it populates a "string" prop shape with
+    // the name of a referenced User entity. Canvas allows for this, but only if
+    // the Component config entity is configured to do exactly this: component
+    // instances must comply with the referenced Component version.
+    self::assertSame([
+      'Using a static prop source that deviates from the configuration for Component <em class="placeholder">sdc.canvas_test_sdc.props-slots</em> at version <em class="placeholder">85a5c0c7dd53e0bb</em>.',
+    ], array_map(
+      fn (ConstraintViolationInterface $v) => (string) $v->getMessage(),
+      iterator_to_array($pageRegion->getTypedData()->validate()),
+    ));
+    // Create a new version on the Component that shows the name of a User.
+    $component = Component::load('sdc.canvas_test_sdc.props-slots');
+    self::assertInstanceOf(Component::class, $component);
+    self::assertCount(1, $component->getVersions());
+    $new_settings = $component->getSettings();
+    $new_settings['prop_field_definitions']['heading']['field_type'] = 'entity_reference';
+    $new_settings['prop_field_definitions']['heading']['field_storage_settings'] = ['target_type' => 'user'];
+    $new_settings['prop_field_definitions']['heading']['default_value'][0] = ['target_id' => '0'];
+    $new_settings['prop_field_definitions']['heading']['expression'] = 'ℹ︎entity_reference␟entity␜␜entity:user␝name␞␟value';
+    $new_settings['prop_field_definitions']['heading']['field_widget'] = 'entity_reference_autocomplete';
+    $source = $this->container->get(ComponentSourceManager::class)->createInstance(SingleDirectoryComponent::SOURCE_PLUGIN_ID, [
+      'local_source_id' => 'canvas_test_sdc:props-slots',
+      ...$new_settings,
+    ]);
+    \assert($source instanceof ComponentSourceBase);
+    $component->createVersion($source->generateVersionHash())
+      ->setSettings($new_settings)
+      ->save();
+    self::assertCount(2, $component->getVersions());
+    // Update the component instance.
+    $tree = $pageRegion->getComponentTree();
+    $index = $tree->getComponentTreeDeltaByUuid(self::UUID_IN_ROOT_ANOTHER);
+    \assert($index !== NULL);
+    $tree->removeItem($index);
+    $tree->appendItem([
+      'uuid' => self::UUID_IN_ROOT_ANOTHER,
+      'component_id' => 'sdc.canvas_test_sdc.props-slots',
+      // New Component version.
+      'component_version' => $component->getActiveVersion(),
+      // Collapsed inputs.
+      'inputs' => [
+        'heading' => ['target_id' => 2],
+      ],
+    ]);
+    $pageRegion->setComponentTree($tree->getValue());
+    self::assertSame([], array_map(
+      fn (ConstraintViolationInterface $v) => (string) $v->getMessage(),
+      iterator_to_array($pageRegion->getTypedData()->validate()),
+    ));
     $pageRegion->save();
+
     // ⚠️ In the future, we may want to reduce the number of cache tags and rely
     // solely on the Canvas PageRegion config entity's list cache tag. That would
     // require intersecting every Canvas Component config entity cache tag
@@ -225,14 +289,24 @@ class CanvasPageVariantTest extends FunctionalTestBase {
     // PageRegion config entities is relatively small (one per region per theme)
     // this should be totally plausible. FOR NOW THIS WOULD BE PREMATURE
     // OPTIMIZATION.
-    $this->assertPageDisplayVariant(CanvasPageVariant::class, Component::loadMultiple([
-      'block.page_title_block',
-      'block.system_branding_block',
-      'block.local_actions_block',
-      'block.system_messages_block',
-      'block.user_login_block',
-      'sdc.canvas_test_sdc.props-no-slots',
-    ]), [], ['route']);
+    $this->assertPageDisplayVariant(CanvasPageVariant::class,
+      Component::loadMultiple([
+        'block.page_title_block',
+        'block.system_branding_block',
+        'block.local_actions_block',
+        'block.system_messages_block',
+        'block.user_login_block',
+        'sdc.canvas_test_sdc.props-no-slots',
+        // @todo Stop expecting this cache tag in https://www.drupal.org/i/3559820
+        'sdc.canvas_test_sdc.props-slots',
+      ]),
+      expected_additional_cache_tags: [],
+      expected_additional_cache_contexts: [
+        'route',
+        // @see \Drupal\user\UserAccessControlHandler::checkAccess()
+        'user',
+      ],
+    );
     // The branding block is rendered using Twig, no Astro island found.
     $this->assertSame([
       'blocks' => [self::UUID_TITLE, self::UUID_BRANDING],
@@ -240,9 +314,61 @@ class CanvasPageVariantTest extends FunctionalTestBase {
     ], $this->getRenderedComponentInstances());
     $assert_session->responseContains('rel="home">Drupal</a>');
     $assert_session->pageTextContains($slogan);
+    $assert_session->pageTextNotContains('Eddy the Admin');
+
+    // 6. The UUID_IN_ROOT_ANOTHER component instance is populated by the name
+    // of a referenced User. Granting the permission must have IMMEDIATE effect.
+    Role::load('anonymous')?->grantPermission('access user profiles')->save();
+    $this->assertPageDisplayVariant(CanvasPageVariant::class,
+      Component::loadMultiple([
+        'block.page_title_block',
+        'block.system_branding_block',
+        'block.local_actions_block',
+        'block.system_messages_block',
+        'block.user_login_block',
+        'sdc.canvas_test_sdc.props-no-slots',
+        // Extra Component is rendered, because its required `heading` prop is
+        // actually populated thanks to granting the permission.
+        'sdc.canvas_test_sdc.props-slots',
+      ]),
+      // The name of User 2 is displayed, so its cache tag must be present.
+      expected_additional_cache_tags: ['user:2'],
+      expected_additional_cache_contexts: ['route'],
+    );
+    $assert_session->pageTextContains('Eddy the Admin');
+
+    // 7. Revoking the permission must IMMEDIATELY hide the user name.
+    Role::load('anonymous')?->revokePermission('access user profiles')->save();
+    $this->assertPageDisplayVariant(CanvasPageVariant::class,
+      Component::loadMultiple([
+        'block.page_title_block',
+        'block.system_branding_block',
+        'block.local_actions_block',
+        'block.system_messages_block',
+        'block.user_login_block',
+        'sdc.canvas_test_sdc.props-no-slots',
+        // @todo Stop expecting this cache tag in https://www.drupal.org/i/3559820
+        'sdc.canvas_test_sdc.props-slots',
+      ]),
+      // ⚠️ Note the absence of the `user:2` cache tag, which correctly
+      // conveys User 2's data is not even being considered when rendering the
+      // front page:
+      // - of course, no User 2 data is rendered
+      // - but also, the access control logic does not inspect anything specific
+      //   about User 2: it only checks permissions and whether the referenced
+      //   User matches the actively logged in User (hence the `user` cache
+      //   context).
+      expected_additional_cache_tags: [],
+      expected_additional_cache_contexts: [
+        'route',
+        // @see \Drupal\user\UserAccessControlHandler::checkAccess()
+        'user',
+      ],
+    );
+    $assert_session->pageTextNotContains('Eddy the Admin');
 
     // @todo add test coverage installs a code component rendering `drupalSettings.canvasData.v0.branding`.
-    // 6. Creating an exposed JavaScriptComponent config entity that overrides
+    // 8. Creating an exposed JavaScriptComponent config entity that overrides
     // a placed `block`-sourced Component results in that block being rendered
     // using an Astro island.
     $this->container->get(ModuleInstallerInterface::class)->install(['canvas_test_e2e_code_components']);
@@ -287,12 +413,18 @@ class CanvasPageVariantTest extends FunctionalTestBase {
         'block.system_messages_block',
         'block.user_login_block',
         'sdc.canvas_test_sdc.props-no-slots',
+        // @todo Stop expecting this cache tag in https://www.drupal.org/i/3559820
+        'sdc.canvas_test_sdc.props-slots',
       ]),
       expected_additional_cache_tags: [
         ...$branding_component->getCacheTags(),
         ...$matching_component->getCacheTags(),
       ],
-      expected_additional_cache_contexts: ['route'],
+      expected_additional_cache_contexts: [
+        'route',
+        // @see \Drupal\user\UserAccessControlHandler::checkAccess()
+        'user',
+      ],
     );
     // The branding block is NOT rendered by Twig anymore, Astro island found,
     // using the branding Block component instance UUID.
@@ -309,7 +441,7 @@ class CanvasPageVariantTest extends FunctionalTestBase {
       expected_slots: ['siteSlogan' => $slogan],
     );
 
-    // 7. Creating a draft version of the JavaScriptComponent config entity (by
+    // 9. Creating a draft version of the JavaScriptComponent config entity (by
     // simulating using Canvas's in-browser code component editor having auto-saved
     // changes) should result in … NO changes on the front page! Because auto-
     // saved data must only appear inside Canvas's UI.
@@ -331,6 +463,8 @@ class CanvasPageVariantTest extends FunctionalTestBase {
         'block.system_messages_block',
         'block.user_login_block',
         'sdc.canvas_test_sdc.props-no-slots',
+        // @todo Stop expecting this cache tag in https://www.drupal.org/i/3559820
+        'sdc.canvas_test_sdc.props-slots',
       ]),
       expected_additional_cache_tags: [
         // ⚠️ Note the absence of the auto-save cache tag, which correctly
@@ -340,7 +474,11 @@ class CanvasPageVariantTest extends FunctionalTestBase {
         ...$branding_component->getCacheTags(),
         ...$matching_component->getCacheTags(),
       ],
-      expected_additional_cache_contexts: ['route'],
+      expected_additional_cache_contexts: [
+        'route',
+        // @see \Drupal\user\UserAccessControlHandler::checkAccess()
+        'user',
+      ],
     );
     // Ensure the auto-saved component is NOT rendered on the front page.
     $this->assertRenderedJavaScriptComponent(
@@ -388,7 +526,7 @@ class CanvasPageVariantTest extends FunctionalTestBase {
     self::assertNotNull($this->mink);
     $this->mink->setDefaultSessionName('default');
 
-    // 8. If all Drupal Canvas PageRegion config entities are disabled,
+    // 10. If all Drupal Canvas PageRegion config entities are disabled,
     // BlockPageVariant is used once again.
     $pageRegion->disable()->save();
     $this->assertPageDisplayVariant(BlockPageVariant::class, [$block], expected_additional_cache_contexts: ['route.name']);
@@ -445,16 +583,21 @@ class CanvasPageVariantTest extends FunctionalTestBase {
     $this->rebuildAll();
     $this->drupalGet('');
     $this->assertCacheTags($expected_cache_tags, FALSE);
-    $this->assertCacheContexts(array_merge([
+    $expected_cache_contexts = array_merge([
       'languages:language_interface',
       'theme',
       'url.path',
       'url.query_args',
       'user.permissions',
       'user.roles:authenticated',
-    ], $expected_additional_cache_contexts), NULL, FALSE);
+    ], $expected_additional_cache_contexts);
+    $optimized_cache_contexts = $this->container->get(CacheContextsManager::class)->optimizeTokens($expected_cache_contexts);
+    $this->assertCacheContexts($optimized_cache_contexts, include_default_contexts: FALSE);
     $this->assertSession()->responseHeaderEquals('X-Drupal-Cache-Max-Age', '-1 (Permanent)');
-    $this->assertSession()->responseHeaderEquals('X-Drupal-Dynamic-Cache', 'MISS');
+    $expected_dynamic_page_cache_miss = !in_array('user', $expected_cache_contexts, TRUE)
+      ? 'MISS'
+      : 'UNCACHEABLE (poor cacheability)';
+    $this->assertSession()->responseHeaderEquals('X-Drupal-Dynamic-Cache', $expected_dynamic_page_cache_miss);
     $this->assertSession()->responseHeaderEquals('X-Drupal-Cache', 'MISS');
   }
 

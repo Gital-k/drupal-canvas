@@ -31,8 +31,9 @@ import {
 } from '@/features/ui/uiSlice';
 import { assetLibraryApi } from '@/services/assetLibrary';
 import { componentAndLayoutApi } from '@/services/componentAndLayout';
+import { componentInstanceFormApi } from '@/services/componentInstanceForm';
 import { contentApi } from '@/services/content';
-import { dummyPropsFormApi } from '@/services/dummyPropsForm';
+import { extensionsApi } from '@/services/extensions';
 import { pageDataFormApi } from '@/services/pageDataForm';
 import { patternApi } from '@/services/patterns';
 import { pendingChangesApi } from '@/services/pendingChangesApi';
@@ -44,7 +45,7 @@ import type { Action, Middleware, ThunkAction } from '@reduxjs/toolkit';
 import type { UnknownAction } from 'redux';
 import type { LayoutModelSliceState } from '@/features/layout/layoutModelSlice';
 import type { PageDataState } from '@/features/pageData/pageDataSlice';
-import type { UndoRedoType } from '@/features/ui/uiSlice';
+import type { UndoRedoStackItem, UndoRedoType } from '@/features/ui/uiSlice';
 
 // Reducer enhancer to decorate undoable aware reducers and unset future state
 // if an action is performed on another undoable slice.
@@ -61,8 +62,10 @@ const historyEraser = <T>(
     const type = action.type;
     if (
       type === 'ui/pushUndo' &&
-      action.payload !== undefined &&
-      action.payload !== thisType &&
+      action.payload !== null &&
+      typeof action.payload === 'object' &&
+      'targetSlice' in action.payload &&
+      (action.payload as UndoRedoStackItem).targetSlice !== thisType &&
       newState.future.length > 0
     ) {
       // Discard the future (redo) states for this slice as we've moved into a
@@ -134,8 +137,9 @@ const rootReducer = combineSlices(
   personalizationApi,
   componentAndLayoutApi,
   previewApi,
-  dummyPropsFormApi,
+  componentInstanceFormApi,
   pageDataFormApi,
+  extensionsApi,
   configurationSlice,
   primaryPanelSlice,
   dialogSlice,
@@ -185,7 +189,21 @@ const undoRedoActionIdMiddleware: Middleware<{}, RootState> =
     }
     const [slice] = type.split('/');
     if (slice === 'layoutModel' || slice === 'pageData') {
-      store.dispatch(pushUndo(slice as UndoRedoType));
+      // Get current route from state and push undo with route snapshot.
+      const state = store.getState();
+      const currentRoute = state.ui.currentRoute;
+      store.dispatch(
+        pushUndo({
+          targetSlice: slice as UndoRedoType,
+          routeSnapshot: currentRoute,
+          ...(import.meta.env.DEV &&
+            import.meta.env.TEST === false && {
+              // Add debug info for the action that triggered the undo/redo,
+              // only in development mode.
+              debugInfoAction: action as Action,
+            }),
+        }),
+      );
     }
     return next(action);
   };
@@ -204,14 +222,33 @@ export const makeStore = (preloadedState?: Partial<RootState>) => {
         personalizationApi.middleware,
         componentAndLayoutApi.middleware,
         previewApi.middleware,
-        dummyPropsFormApi.middleware,
+        componentInstanceFormApi.middleware,
         pageDataFormApi.middleware,
+        extensionsApi.middleware,
         undoRedoActionIdMiddleware,
         pendingChangesApi.middleware,
         contentApi.middleware,
         rtkQueryErrorHandler, // Add the error handling middleware
       );
     },
+    ...(import.meta.env.DEV && {
+      // Configuration passed to Redux DevTools.
+      // @see https://github.com/reduxjs/redux-devtools/blob/main/extension/docs/API/Arguments.md
+      devTools: {
+        actionsDenylist: [
+          // Do not include actions from RTK Query in the logs. They are
+          // usually not useful for debugging, and can be very verbose.
+          '.*Api/.*',
+          '__rtkq',
+          // The following actions from the UI slice can fill up the list of
+          // actions very quickly. It's better to comment out the following
+          // lines when they're specifically needed for debugging.
+          'ui/setIsPanning',
+          'ui/setHoveredComponent',
+          'ui/unsetHoveredComponent',
+        ],
+      },
+    }),
     preloadedState,
   });
   // configure listeners using the provided defaults

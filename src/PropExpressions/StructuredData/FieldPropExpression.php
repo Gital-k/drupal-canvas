@@ -75,9 +75,12 @@ final class FieldPropExpression implements StructuredDataPropExpressionInterface
       }
     }
     if (is_array($propName)) {
-      // If propName is an array, fieldName must be too.
+      // If propName is an array, fieldName must be too: a field property name
+      // MUST be specified for every field name.
+      // TRICKY: ⚠️ It is possible that the same field name occurs multiple
+      // times (if different bundles use the same field).
       assert(is_array($fieldName));
-      if (array_values($fieldName) !== array_keys($propName)) {
+      if (array_values(array_unique($fieldName)) !== array_keys($propName)) {
         throw new \InvalidArgumentException('A field property name must be specified for every field name, and in the same order.');
       }
       if (array_values(array_unique($propName)) === [StructuredDataPropExpressionInterface::SYMBOL_OBJECT_MAPPED_OPTIONAL_PROP]) {
@@ -87,7 +90,7 @@ final class FieldPropExpression implements StructuredDataPropExpressionInterface
   }
 
   public function __toString(): string {
-    return static::PREFIX
+    return static::PREFIX_EXPRESSION_TYPE
       . static::PREFIX_ENTITY_LEVEL . $this->entityType->getDataType()
       // Note that BetterEntityDataDefinition sorts bundles alphabetically (to
       // ensure a predictable data type ID). Hence an array of field names must
@@ -96,7 +99,19 @@ final class FieldPropExpression implements StructuredDataPropExpressionInterface
       . static::PREFIX_FIELD_ITEM_LEVEL . ($this->delta ?? '')
       // See the above remark: the same is true for an array of field property
       // names.
-      . static::PREFIX_PROPERTY_LEVEL . implode('|', (array) $this->propName);
+      . static::PREFIX_PROPERTY_LEVEL . match (is_array($this->propName)) {
+        // phpcs:ignore Drupal.WhiteSpace.ScopeIndent.IncorrectExact
+        FALSE => $this->propName,
+        // ⚠️ TRICKY: it is possible that the same field name occurs multiple
+        // times (if different bundles use the same field). Ensure that every
+        // bundle's field has a field property listed, even if the same field
+        // (and hence field property) occurs multiple times.
+        TRUE => implode('|', array_map(
+          fn (string $field_name): string => $this->propName[$field_name],
+          // @phpstan-ignore-next-line argument.type
+          $this->fieldName,
+        )),
+      };
   }
 
   /**
@@ -152,6 +167,7 @@ final class FieldPropExpression implements StructuredDataPropExpressionInterface
         $dependencies = NestedArray::mergeDeep($dependencies, self::calculateDependenciesForProperty(
           $host_entity,
           $this->fieldName,
+          $this->delta,
           $this->propName,
           $field_definition
         ));
@@ -183,6 +199,7 @@ final class FieldPropExpression implements StructuredDataPropExpressionInterface
           $dependencies = NestedArray::mergeDeep($dependencies, self::calculateDependenciesForProperty(
             $host_entity,
             $bundle_specific_field_name,
+            $this->delta,
             $prop_name,
             // @phpstan-ignore-next-line argument.type
             $host_entity->getFieldDefinition($bundle_specific_field_name),
@@ -194,7 +211,7 @@ final class FieldPropExpression implements StructuredDataPropExpressionInterface
     return $dependencies;
   }
 
-  private static function calculateDependenciesForProperty(FieldableEntityInterface $host_entity, string $field_name, string $prop_name, FieldDefinitionInterface $field_definition): array {
+  private static function calculateDependenciesForProperty(FieldableEntityInterface $host_entity, string $field_name, ?int $targeted_delta, string $prop_name, FieldDefinitionInterface $field_definition): array {
     $dependencies = [];
 
     $property_definitions = $field_definition->getFieldStorageDefinition()->getPropertyDefinitions();
@@ -204,7 +221,10 @@ final class FieldPropExpression implements StructuredDataPropExpressionInterface
     }
     elseif (is_a($property_definitions[$prop_name]->getClass(), DependentPluginInterface::class, TRUE)) {
       assert($property_definitions[$prop_name]->isComputed());
-      foreach ($host_entity->get($field_name) as $field_item) {
+      foreach ($host_entity->get($field_name) as $delta => $field_item) {
+        if ($targeted_delta !== NULL && $targeted_delta !== $delta) {
+          continue;
+        }
         assert($field_item->get($prop_name) instanceof DependentPluginInterface);
         $dependencies = NestedArray::mergeDeep($dependencies, $field_item->get($prop_name)->calculateDependencies());
       }
@@ -223,8 +243,9 @@ final class FieldPropExpression implements StructuredDataPropExpressionInterface
 
     // Otherwise, this must be a non-base field definition, and additional
     // dependencies are necessary.
-    assert(is_string($bundle));
-    $config = $field_definition->getConfig($bundle);
+    $target_bundle = $field_definition->getTargetBundle();
+    \assert(is_string($target_bundle));
+    $config = $field_definition->getConfig($target_bundle);
     assert($config instanceof BaseFieldOverride || $config instanceof FieldConfigInterface);
     // Ignore config auto-generated by ::getConfig().
     if (!$config->isNew()) {
@@ -283,18 +304,26 @@ final class FieldPropExpression implements StructuredDataPropExpressionInterface
     );
   }
 
-  public function isSupported(EntityInterface|FieldItemInterface|FieldItemListInterface $entity): bool {
+  public function validateSupport(EntityInterface|FieldItemInterface|FieldItemListInterface $entity): void {
     assert($entity instanceof EntityInterface);
     $expected_entity_type_id = $this->entityType->getEntityTypeId();
-    $expected_bundles = $this->entityType->getBundles();
     if ($entity->getEntityTypeId() !== $expected_entity_type_id) {
       throw new \DomainException(sprintf("`%s` is an expression for entity type `%s`, but the provided entity is of type `%s`.", (string) $this, $expected_entity_type_id, $entity->getEntityTypeId()));
     }
-    if ($expected_bundles !== NULL && !in_array($entity->bundle(), $expected_bundles)) {
+    $expected_bundles = $this->entityType->getBundles();
+    if ($expected_bundles !== NULL && !in_array($entity->bundle(), $expected_bundles, TRUE)) {
       throw new \DomainException(sprintf("`%s` is an expression for entity type `%s`, bundle(s) `%s`, but the provided entity is of the bundle `%s`.", (string) $this, $expected_entity_type_id, implode(', ', $expected_bundles), $entity->bundle()));
     }
     // @todo validate that the field exists?
-    return TRUE;
+  }
+
+  public function getHostEntityDataDefinition(): EntityDataDefinitionInterface {
+    return $this->entityType;
+  }
+
+  public function isMultiBundle(): bool {
+    // @see ::__construct()
+    return is_array($this->fieldName);
   }
 
 }

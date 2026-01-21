@@ -4,7 +4,12 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Controller;
 
+use Drupal\canvas\ComponentSource\ComponentSourceInterface;
+use Drupal\canvas\ComponentSource\ComponentSourceManager;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\Fallback;
 use Drupal\Core\Entity\FieldableEntityInterface;
+use Drupal\Core\Render\Component\Exception\ComponentNotFoundException;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\Validation\BasicRecursiveValidatorFactory;
 use Drupal\canvas\ComponentSource\ComponentSourceWithSwitchCasesInterface;
 use Drupal\canvas\Entity\Component;
@@ -45,7 +50,7 @@ trait ClientServerConversionTrait {
       // @see https://www.drupal.org/project/canvas/issues/3525746#comment-16121437
       // @see \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem::getClientSideRepresentation()
       // @see \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList::getClientSideRepresentation()
-      assert(in_array($component['nodeType'], ['component', ComponentSourceWithSwitchCasesInterface::SWITCH, ComponentSourceWithSwitchCasesInterface::CASE]));
+      assert(in_array($component['nodeType'], ['component', ComponentSourceWithSwitchCasesInterface::SWITCH, ComponentSourceWithSwitchCasesInterface::CASE], TRUE));
       $items = \array_merge($items, self::doClientComponentToServerTree($component, $model, ComponentTreeItemList::ROOT_UUID, NULL));
     }
     if ($validate) {
@@ -84,7 +89,7 @@ trait ClientServerConversionTrait {
    */
   private static function doClientComponentToServerTree(array $layout, array $model, string $parent_uuid, ?string $parent_slot): array {
     \assert(\array_key_exists('nodeType', $layout));
-    assert(in_array($layout['nodeType'], ['component', ComponentSourceWithSwitchCasesInterface::SWITCH, ComponentSourceWithSwitchCasesInterface::CASE]));
+    assert(in_array($layout['nodeType'], ['component', ComponentSourceWithSwitchCasesInterface::SWITCH, ComponentSourceWithSwitchCasesInterface::CASE], TRUE));
 
     $uuid = $layout['uuid'] ?? NULL;
     $component_id = $layout['type'] ?? NULL;
@@ -145,9 +150,24 @@ trait ClientServerConversionTrait {
       assert($component instanceof ComponentInterface);
       $component->loadVersion($version);
       $source = $component->getComponentSource();
+      $useFallback = $component->getComponentSource()->isBroken();
       // First we transform the incoming client model into input values using
       // the source plugin.
-      $items[$delta]['inputs'] = $source->clientModelToInput($uuid, $component, $inputs, $entity, $violation_list);
+      if (!$useFallback) {
+        try {
+          $items[$delta]['inputs'] = $source->clientModelToInput($uuid, $component, $inputs, $entity, $violation_list);
+        }
+        catch (ComponentNotFoundException) {
+          $useFallback = TRUE;
+        }
+      }
+      if ($useFallback) {
+        $fallback_source = \Drupal::service(ComponentSourceManager::class)->createInstance(Fallback::PLUGIN_ID, [
+          'fallback_reason' => new TranslatableMarkup('Component is missing. Fix the component or copy values to a new component.'),
+        ]);
+        \assert($fallback_source instanceof ComponentSourceInterface);
+        $items[$delta]['inputs'] = $fallback_source->clientModelToInput($uuid, $component, $inputs['resolved'] ?? [], $entity, $violation_list);
+      }
       if ($violation_list !== NULL) {
         // Then we ensure the input values are valid using the source plugin.
         $component_violations = self::translateConstraintPropertyPathsAndRoot(
@@ -155,8 +175,7 @@ trait ClientServerConversionTrait {
           $source->validateComponentInput($items[$delta]['inputs'], $uuid, $entity)
         );
         if ($component_violations->count() > 0) {
-          // @todo Remove the foreach and use ::addAll once
-          // https://www.drupal.org/project/drupal/issues/3490588 has been resolved.
+          // @todo Remove the foreach and use ::addAll once https://www.drupal.org/project/drupal/issues/3490588 has been resolved.
           foreach ($component_violations as $violation) {
             $violation_list->add($violation);
           }

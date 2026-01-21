@@ -10,10 +10,18 @@ use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\canvas\PropExpressions\PropExpressionInterface;
 use Drupal\canvas\PropSource\ContentAwareDependentInterface;
 
+/**
+ * @internal
+ */
 interface StructuredDataPropExpressionInterface extends PropExpressionInterface, ContentAwareDependentInterface {
 
-  // Structured data contains information, hence a prefix that conveys that..
-  const PREFIX = 'ℹ︎';
+  /**
+   * {@inheritdoc}
+   *
+   * Structured data contains information, hence a prop expression type prefix
+   * that conveys that: the Unicode information source symbol.
+   */
+  public const string PREFIX_EXPRESSION_TYPE = 'ℹ︎';
 
   // All prefixes for denoting the pieces inside structured data expressions.
   // @see https://github.com/SixArm/usv
@@ -39,8 +47,8 @@ interface StructuredDataPropExpressionInterface extends PropExpressionInterface,
    *   - A field item when the expression starts in a single-cardinality field
    *     type.
    *
-   * @return bool
+   * @return void
    */
-  public function isSupported(EntityInterface|FieldItemInterface|FieldItemListInterface $entity_or_field): bool;
+  public function validateSupport(EntityInterface|FieldItemInterface|FieldItemListInterface $entity_or_field): void;
 
 }

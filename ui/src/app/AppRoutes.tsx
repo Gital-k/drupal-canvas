@@ -3,23 +3,27 @@ import {
   Navigate,
   Outlet,
   RouterProvider,
+  useParams,
 } from 'react-router-dom';
 import { Flex } from '@radix-ui/themes';
 
 import App from '@/app/App';
-import DummyPropsEditForm from '@/components/DummyPropsEditForm';
+import ComponentInstanceForm from '@/components/ComponentInstanceForm';
 import { RouteErrorBoundary } from '@/components/error/ErrorBoundary';
 import ErrorCard from '@/components/error/ErrorCard';
+import ExtensionDialog from '@/components/extensions/ExtensionDialog';
 import PermissionCheck from '@/components/PermissionCheck';
 import SideMenu from '@/components/sideMenu/SideMenu';
 import PrimaryPanel from '@/components/sidePanel/PrimaryPanel';
+import CodeEditorContainer from '@/features/code-editor/CodeEditorContainer';
 import CodeComponentDialogs from '@/features/code-editor/dialogs/CodeComponentDialogs';
-import MosaicContainer from '@/features/code-editor/MosaicContainer';
 import Editor from '@/features/editor/Editor';
 import TemplateRoot from '@/features/editor/TemplateRoot';
 import PagePreview from '@/features/pagePreview/PagePreview';
+import PatternDialogs from '@/features/pattern/PatternDialogs';
 import SegmentDashboard from '@/features/personalization/SegmentDashboard';
 import SegmentPanel from '@/features/personalization/SegmentPanel';
+import { EditorFrameContext } from '@/features/ui/uiSlice';
 import Welcome from '@/features/welcome/Welcome';
 
 import type React from 'react';
@@ -27,6 +31,17 @@ import type React from 'react';
 interface AppRoutesInterface {
   basePath: string;
 }
+
+const UiShell = ({ children }: { children: React.ReactNode }) => (
+  <>
+    <SideMenu />
+    <PrimaryPanel />
+    <Flex flexGrow="1" style={{ overflow: 'hidden', position: 'relative' }}>
+      {children}
+    </Flex>
+    <Dialogs />
+  </>
+);
 
 const CodeEditorUi = (
   <PermissionCheck
@@ -40,12 +55,24 @@ const CodeEditorUi = (
       </Flex>
     }
   >
-    <SideMenu />
-    <PrimaryPanel />
-    <MosaicContainer />
-    <CodeComponentDialogs />
+    <UiShell>
+      <CodeEditorContainer />
+    </UiShell>
   </PermissionCheck>
 );
+
+const Dialogs = () => (
+  <div style={{ position: 'absolute' }}>
+    <PatternDialogs />
+    <CodeComponentDialogs />
+    <ExtensionDialog />
+  </div>
+);
+
+const LegacyCodeEditorRedirect: React.FC = () => {
+  const { codeComponentId } = useParams<{ codeComponentId: string }>();
+  return <Navigate to={`/code-editor/component/${codeComponentId}`} replace />;
+};
 
 const AppRoutes: React.FC<AppRoutesInterface> = ({ basePath }) => {
   const router = createBrowserRouter(
@@ -59,67 +86,70 @@ const AppRoutes: React.FC<AppRoutesInterface> = ({ basePath }) => {
             index: true, // base path
             element:
               basePath === '/canvas' ? (
-                <Welcome />
+                <UiShell>
+                  <Welcome />
+                </UiShell>
               ) : (
                 <Navigate to="/editor" replace />
               ),
           },
           {
             path: '/editor/',
-            element: <Welcome />,
+            element: (
+              <UiShell>
+                <Welcome />
+              </UiShell>
+            ),
           },
           {
             path: '/editor/:entityType/:entityId',
             element: (
-              <>
-                <SideMenu />
-                <Editor />
-              </>
+              <UiShell>
+                <Editor context={EditorFrameContext.ENTITY} />
+              </UiShell>
             ),
             children: [
               {
                 path: '/editor/:entityType/:entityId/region/:regionId/component/:componentId',
-                element: <DummyPropsEditForm />,
+                element: <ComponentInstanceForm />,
               },
               {
                 path: '/editor/:entityType/:entityId/region/:regionId',
-                element: <DummyPropsEditForm />,
+                element: <ComponentInstanceForm />,
               },
               {
                 path: '/editor/:entityType/:entityId/component/:componentId',
-                element: <DummyPropsEditForm />,
+                element: <ComponentInstanceForm />,
               },
             ],
           },
           {
             path: '/template/:entityType/:bundle/:viewMode',
             element: (
-              <>
-                <SideMenu />
+              <UiShell>
                 <TemplateRoot />
-              </>
+              </UiShell>
             ),
           },
           {
             path: '/template/:entityType/:bundle/:viewMode/:previewEntityId',
             element: (
-              <>
-                <SideMenu />
-                <Editor />
-              </>
+              <UiShell>
+                <Editor context={EditorFrameContext.TEMPLATE} />
+              </UiShell>
             ),
             children: [
               {
                 path: '/template/:entityType/:bundle/:viewMode/:previewEntityId/region/:regionId/component/:componentId',
-                element: <DummyPropsEditForm />,
+                element: <ComponentInstanceForm />,
               },
               {
                 path: '/template/:entityType/:bundle/:viewMode/:previewEntityId/region/:regionId',
-                element: <DummyPropsEditForm />,
+                element: <ComponentInstanceForm />,
               },
               {
                 path: '/template/:entityType/:bundle/:viewMode/:previewEntityId/component/:componentId',
-                element: <DummyPropsEditForm />,
+                element: <ComponentInstanceForm />,
               },
             ],
           },
@@ -132,9 +162,18 @@ const AppRoutes: React.FC<AppRoutesInterface> = ({ basePath }) => {
             element: <PagePreview />,
           },
           {
-            // Opens the code editor for an item under 'Code'.
-            path: '/code-editor/code/:codeComponentId',
+            // belt and braces to catch navigation to /code-editor without component id rather than showing a 404
+            path: '/code-editor/',
             element: CodeEditorUi,
+          },
+          {
+            path: '/code-editor/component',
+            element: CodeEditorUi,
+          },
+          {
+            // Legacy route for backward compatibility.
+            path: '/code-editor/code/:codeComponentId',
+            element: <LegacyCodeEditorRedirect />,
           },
           {
             // Opens the code editor for an item under 'Components'.

@@ -3,10 +3,14 @@
 namespace Drupal\canvas_ai\Controller;
 
 use Drupal\ai\AiProviderPluginManager;
+use Drupal\ai_agents\Enum\AiAgentStatusItemTypes;
 use Drupal\ai_agents\Plugin\AiFunctionCall\AiAgentWrapper;
 use Drupal\ai\OperationType\Chat\ChatInput;
 use Drupal\ai\OperationType\Chat\ChatMessage;
 use Drupal\ai\OperationType\GenericType\ImageFile;
+use Drupal\ai_agents\Service\AgentStatus\Interfaces\AiAgentStatusPollerServiceInterface;
+use Drupal\ai_agents\Service\AgentStatus\UpdateItems\TextGenerated;
+use Drupal\canvas_ai\Plugin\AiFunctionCall\BuilderResponseFunctionCallInterface;
 use Drupal\Component\Plugin\PluginManagerInterface;
 use Drupal\Component\Serialization\Json;
 use Drupal\Core\Access\CsrfTokenGenerator;
@@ -14,12 +18,6 @@ use Drupal\Core\Controller\ControllerBase;
 use Drupal\ai_agents\PluginInterfaces\AiAgentInterface;
 use Drupal\Core\File\FileExists;
 use Drupal\Core\File\FileSystemInterface;
-use Drupal\canvas_ai\Plugin\AiFunctionCall\AddMetadata;
-use Drupal\canvas_ai\Plugin\AiFunctionCall\CreateComponent;
-use Drupal\canvas_ai\Plugin\AiFunctionCall\EditComponentJs;
-use Drupal\canvas_ai\Plugin\AiFunctionCall\CreateFieldContent;
-use Drupal\canvas_ai\Plugin\AiFunctionCall\EditFieldContent;
-use Drupal\canvas_ai\Plugin\AiFunctionCall\SetAIGeneratedComponentStructure;
 use Drupal\canvas_ai\CanvasAiPageBuilderHelper;
 use Drupal\canvas_ai\CanvasAiTempStore;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -27,7 +25,6 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
-use Symfony\Component\Yaml\Yaml;
 
 /**
  * Renders the Drupal Canvas AI calls.
@@ -44,6 +41,7 @@ final class CanvasBuilder extends ControllerBase {
     protected CanvasAiPageBuilderHelper $canvasAiPageBuilderHelper,
     protected CanvasAiTempStore $canvasAiTempStore,
     protected FileSystemInterface $fileSystem,
+    protected AiAgentStatusPollerServiceInterface $poller,
   ) {}
 
   /**
@@ -57,6 +55,7 @@ final class CanvasBuilder extends ControllerBase {
       $container->get('canvas_ai.page_builder_helper'),
       $container->get('canvas_ai.tempstore'),
       $container->get('file_system'),
+      $container->get('ai_agents.agent_status_poller'),
     );
   }
 
@@ -82,6 +81,9 @@ final class CanvasBuilder extends ControllerBase {
     else {
       $prompt = $request->request->all();
       $files = $request->files->all();
+      $prompt['derived_proptypes'] = Json::decode($prompt['derived_proptypes']);
+      $prompt['selected_component_required_props'] = Json::decode($prompt['selected_component_required_props']);
+      $prompt['custom_libraries'] = Json::decode($prompt['custom_libraries']);
     }
     // If $prompt['messages'] is missing or invalid, this code reconstructs it
     // by scanning for keys named 'message <number>', and
@@ -183,10 +185,18 @@ final class CanvasBuilder extends ControllerBase {
         break;
       }
       else {
-        $messages[] = new ChatMessage($message['role'] === 'user' ? 'user' : 'assistant', $message['text']);
+        if (!empty($message['text'])) {
+          $messages[] = new ChatMessage($message['role'] === 'user' ? 'user' : 'assistant', $message['text']);
+        }
       }
     }
     $agent->setChatHistory($messages);
+    $agent->setProgressThreadId($prompt['request_id']);
+    $agent->setDetailedProgressTracking([
+      AiAgentStatusItemTypes::Started,
+      AiAgentStatusItemTypes::TextGenerated,
+      AiAgentStatusItemTypes::Finished,
+    ]);
     $default = $this->providerService->getDefaultProviderForOperationType('chat');
     if (!is_array($default) || empty($default['provider_id']) || empty($default['model_id'])) {
       return new JsonResponse([
@@ -206,8 +216,30 @@ final class CanvasBuilder extends ControllerBase {
     $agent->setModelName($default['model_id']);
     $agent->setAiConfiguration([]);
     $agent->setCreateDirectly(TRUE);
-    $agent->setTokenContexts(['entity_type' => $prompt['entity_type'], 'entity_id' => $prompt['entity_id'], 'selected_component' => $prompt['selected_component'] ?? NULL, 'layout' => $prompt['layout'] ?? NULL, 'derived_proptypes' => JSON::encode($prompt['derived_proptypes']) ?? NULL, 'page_title' => $prompt['page_title'], 'page_description' => $prompt['page_description'] ?? NULL, 'active_component_uuid' => $prompt['active_component_uuid'] ?? 'None']);
-    $solvability = $agent->determineSolvability();
+    $agent->setTokenContexts([
+      'entity_type' => $prompt['entity_type'] ?? NULL,
+      'entity_id' => $prompt['entity_id'] ?? NULL,
+      'selected_component' => $prompt['selected_component'] ?? NULL,
+      'selected_component_required_props' => isset($prompt['selected_component_required_props']) ? Json::encode($prompt['selected_component_required_props']) : NULL,
+      'layout' => $prompt['layout'] ?? NULL,
+      'derived_proptypes' => isset($prompt['derived_proptypes']) ? Json::encode($prompt['derived_proptypes']) : NULL,
+      'page_title' => $prompt['page_title'] ?? NULL,
+      'page_description' => $prompt['page_description'] ?? NULL,
+      'active_component_uuid' => $prompt['active_component_uuid'] ?? 'None',
+      'menu_fetch_source' => $this->getMenuFetchSource(),
+      'json_api_module_status' => $this->moduleHandler()->moduleExists('jsonapi') ? 'enabled' : 'disabled',
+      'verbose_context_for_orchestrator' => $this->canvasAiPageBuilderHelper->generateVerboseContextForOrchestrator($prompt),
+      'custom_libraries' => $this->getSupportedLibraries(),
+    ]);
+    try {
+      $solvability = $agent->determineSolvability();
+    }
+    catch (\Exception $e) {
+      return new JsonResponse([
+        'status' => FALSE,
+        'message' => $e->getMessage(),
+      ]);
+    }
     $status = FALSE;
     $message = '';
     $response = [];
@@ -224,32 +256,10 @@ final class CanvasBuilder extends ControllerBase {
     elseif ($solvability == AiAgentInterface::JOB_SOLVABLE) {
       $response['status'] = TRUE;
       $tools = $agent->getToolResults(TRUE);
-      $map = [
-        EditComponentJs::class => ['js_structure', 'props_metadata'],
-        CreateComponent::class => ['component_structure'],
-        CreateFieldContent:: class => ['created_content'],
-        EditFieldContent:: class => ['refined_text'],
-        AddMetadata::class => ['metadata'],
-        SetAIGeneratedComponentStructure::class => ['operations'],
-      ];
       if (!empty($tools)) {
         foreach ($tools as $tool) {
-          foreach ($map as $class => $keys) {
-            if ($tool instanceof $class) {
-              // @todo Refactor this after https://www.drupal.org/i/3529313 is fixed.
-              $output = $tool->getReadableOutput();
-              try {
-                $data = Yaml::parse($output);
-                foreach ($keys as $key) {
-                  if (!empty($data[$key])) {
-                    $response[$key] = $data[$key];
-                  }
-                }
-              }
-              catch (\Throwable) {
-                // Do nothing, the output is not YAML parsable.
-              }
-            }
+          if ($tool instanceof BuilderResponseFunctionCallInterface) {
+            $response = array_merge($response, $tool->getStructuredOutput());
           }
           if ($tool instanceof AiAgentWrapper) {
             $response['message'] = $tool->getReadableOutput();
@@ -280,6 +290,188 @@ final class CanvasBuilder extends ControllerBase {
    */
   public function getCsrfToken(Request $request): Response {
     return new Response($this->csrfTokenGenerator->get('canvas_ai.canvas_builder'));
+  }
+
+  /**
+   * Function to get the source for menu fetching.
+   *
+   * @return string
+   *   The menu fetch source.
+   */
+  private function getMenuFetchSource(): string {
+    if ($this->moduleHandler()->moduleExists('jsonapi_menu_items')) {
+      $menuFetchSource = 'jsonapi_menu_items';
+    }
+    elseif ($this->config('system.feature_flags')->get('linkset_endpoint') === TRUE) {
+      $menuFetchSource = 'linkset';
+    }
+    elseif ($this->currentUser()->hasPermission('administer site configuration')) {
+      $menuFetchSource = 'linkset_not_configured';
+    }
+    else {
+      $menuFetchSource = 'menu_fetching_functionality_not_available';
+    }
+    return $menuFetchSource;
+  }
+
+  /**
+   * Poller function to get the AI progress.
+   *
+   * @param \Symfony\Component\HttpFoundation\Request $request
+   *   The current request.
+   *
+   * @return \Symfony\Component\HttpFoundation\JsonResponse
+   *   The JSON response.
+   */
+  public function getAiProgress(Request $request): JsonResponse {
+    $token = $request->headers->get('X-CSRF-Token') ?? '';
+    if (!$this->csrfTokenGenerator->validate($token, 'canvas_ai.canvas_builder')) {
+      throw new AccessDeniedHttpException('Invalid CSRF token');
+    }
+
+    $progress = $this->poller->getLatestStatusUpdates($request->query->getString('request_id'));
+    $items = [];
+    $agent_runner_to_agent_id = [];
+    $is_finished = FALSE;
+
+    foreach ($progress->getItems() as $event) {
+      /** @var \Drupal\ai_agents\Service\AgentStatus\Interfaces\UpdateItems\StatusBaseInterface $event */
+      $event_type = $event->getType();
+      $agent_id = $event->getAgentId();
+
+      if ($event_type == AiAgentStatusItemTypes::Started) {
+        $agent_runner_id = $event->getAgentRunnerId();
+        $agent_runner_to_agent_id[$agent_runner_id] = $agent_id;
+        $items[$agent_id] = [
+          'id' => $agent_id,
+          'type' => 'agent',
+          'name' => $event->getAgentName(),
+          'description' => $this->getAgentDescription($agent_id, $event->getAgentName() ?? 'Agent'),
+          'status' => 'running',
+          'generated_text' => '',
+          'agent_runner_id' => $agent_runner_id,
+        ];
+      }
+      elseif ($event_type == AiAgentStatusItemTypes::Finished) {
+        if (isset($items[$agent_id])) {
+          $items[$agent_id]['status'] = 'completed';
+          if ($agent_id == 'canvas_ai_orchestrator') {
+            $is_finished = TRUE;
+            break;
+          }
+        }
+      }
+      elseif ($event_type == AiAgentStatusItemTypes::TextGenerated) {
+        if ($event instanceof TextGenerated) {
+          $generated_text = $event->getGeneratedText();
+          if (!empty($generated_text)) {
+            $agent_runner_id = $event->getAgentRunnerId();
+            if (isset($agent_runner_to_agent_id[$agent_runner_id])) {
+              $target_agent_id = $agent_runner_to_agent_id[$agent_runner_id];
+              if (isset($items[$target_agent_id])) {
+                $items[$target_agent_id]['generated_text'] = !empty($items[$target_agent_id]['generated_text'])
+                  ? $items[$target_agent_id]['generated_text'] . "\n\n" . $generated_text
+                  : $generated_text;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    if ($is_finished) {
+      foreach ($items as $key => $item) {
+        if ($item['status'] !== 'completed') {
+          $items[$key]['status'] = 'completed';
+        }
+      }
+    }
+
+    // If there is only one item, and it's the orchestrator, remove its
+    // generated_text to avoid duplicating the final response.
+    if (count($items) === 1 && isset($items['canvas_ai_orchestrator'])) {
+      unset($items['canvas_ai_orchestrator']['generated_text']);
+    }
+
+    return new JsonResponse([
+      'is_finished' => $is_finished,
+      'items' => array_values($items),
+    ]);
+  }
+
+  /**
+   * Function to return the agent description.
+   *
+   * @param string $agent_id
+   *   The agent ID.
+   * @param string $agent_name
+   *   The agent name.
+   *
+   * @return string
+   *   The agent description.
+   */
+  private function getAgentDescription(string $agent_id, string $agent_name): string {
+    $descriptions = [
+      'canvas_ai_orchestrator' => $this->t('Thinking'),
+      'canvas_title_generation_agent' => $this->t('Generate a title'),
+      'canvas_component_agent' => $this->t('Generate a component'),
+      'canvas_metadata_generation_agent' => $this->t('Generate metadata'),
+      'canvas_page_builder_agent' => $this->t('Building the page'),
+    ];
+    return $descriptions[$agent_id] ?? $this->t('@agentName working', ['@agentName' => $agent_name]);
+  }
+
+  /**
+   * Gets the libraries supported by Canvas.
+   *
+   * @return array
+   *   The array of supported libraries.
+   */
+  protected function getSupportedLibraries(): array {
+    return [
+      [
+        "name" => "importing_packages",
+        "type" => "External npm package",
+        "description" => "Although a number of useful built-in and bundled packages are provided, you can also import any npm package through the web.",
+        "code" => "```js\nimport { motion } from 'https://esm.sh/motion@12.23.26/react?external=react,react-dom'\n```",
+      ],
+      [
+        "name" => "formatted_text",
+        "type" => "Built-in custom package",
+        "description" => "A built-in component to render text with trusted HTML using [`dangerouslySetInnerHTML`](https://react.dev/reference/react-dom/components/common#dangerously-setting-the-inner-html). The content is safe when processed through Drupal's filter system that is [correctly configured](https://www.drupal.org/docs/administering-a-drupal-site/security-in-drupal/configuring-text-formats-aka-input-formats-for-security).",
+        "code" => "``jsx\nimport FormattedText from 'drupal-canvas';\n\nexport default function Example() {\n  return (\n    <FormattedText>\n      <em>Hello, world!</em>\n    </FormattedText>\n  );\n}\n```",
+      ],
+      [
+        "name" => "cn",
+        "type" => "Built-in custom package",
+        "description" => "Utility for combining Tailwind CSS classes.",
+        "code" => "```jsx\nimport { cn } from 'drupal-canvas';\n\nexport default function Example() {\n  return <ControlDots className=\"top-4 left-4 stroke-white absolute\" />;\n}\n\nconst ControlDots = ({ className }) => (\n  <svg\n    xmlns=\"http://www.w3.org/2000/svg\"\n    viewBox=\"0 0 31 9\"\n    fill=\"none\"\n    strokeWidth=\"2\"\n    className={cn('w-12', className)}\n  >\n    <ellipse cx=\"4.13\" cy=\"4.97\" rx=\"3.13\" ry=\"2.97\" />\n    <ellipse cx=\"15.16\" cy=\"4.97\" rx=\"3.13\" ry=\"2.97\" />\n    <ellipse cx=\"26.19\" cy=\"4.97\" rx=\"3.13\" ry=\"2.97\" />\n  </svg>\n);\n```",
+      ],
+      [
+        "name" => "tailwind",
+        "type" => "Bundled npm package",
+        "description" => "Tailwind 4 is available to all components by default. The global CSS is added to all pages with the `@import \"tailwindcss\"` directive included. You can use the [`@theme` directive to customize theme variables](https://tailwindcss.com/docs/theme). For example, you can add a new color to your project by defining a theme variable like `--color-drupal-blue`: Now you can use utility classes like `bg-drupal-blue`, `text-drupal-blue`, or `fill-drupal-blue` in your component markup:",
+        "code" => "```css\n@theme {\n  --color-drupal-blue: #009cde;\n}\n``` \n```jsx\nexport default function Example() {\nreturn <div className=\"bg-drupal-blue\">Drupal Blue</div>;\n}\n```",
+      ],
+      [
+        "name" => "clsx",
+        "type" => "Bundled npm package",
+        "description" => "A tiny utility for constructing `className` strings conditionally. Also serves as a faster & smaller drop-in replacement for the `classnames` module.",
+        "code" => "```jsx\nimport { clsx } from 'clsx'\n\nexport default function Example() {\n  return (\n    <div className={clsx('foo', true && 'bar', 'baz');} />\n    // => 'foo bar baz'\n  );\n};\n```",
+      ],
+      [
+        "name" => "class_variance_authority",
+        "type" => "Bundled npm package",
+        "description" => "CVA helps you define components with multiple visual variants (like size, color, state) in a clean, type-safe way. Instead of manually concatenating CSS classes or writing complex conditional logic, you define variants upfront and let CVA handle the class composition.",
+        "code" => "```js\nimport { cva } from 'class-variance-authority';\n\nconst button = cva(\n  'font-semibold border rounded', // base classes\n  {\n    variants: {\n      intent: {\n        primary: 'bg-blue-500 text-white border-blue-500',\n        secondary: 'bg-gray-200 text-gray-900 border-gray-200',\n      },\n      size: {\n        small: 'text-sm py-1 px-2',\n        medium: 'text-base py-2 px-4',\n      },\n    },\n    defaultVariants: {\n      intent: 'primary',\n      size: 'medium',\n    },\n  },\n);\n\n// Usage\nbutton({ intent: 'secondary', size: 'small' });\n// Returns: \"font-semibold border rounded bg-gray-200 text-gray-900 border-gray-200 text-sm py-1 px-2\"\n```",
+      ],
+      [
+        "name" => "tailwind_merge",
+        "type" => "Bundled npm package",
+        "description" => "A utility function to efficiently merge Tailwind CSS classes in JS without style conflicts.",
+        "code" => "```js\nimport { twMerge } from 'tailwind-merge';\n\ntwMerge('px-2 py-1 bg-red hover:bg-dark-red', 'p-3 bg-[#B91C1C]');\n// → 'hover:bg-dark-red p-3 bg-[#B91C1C]'\n```",
+      ],
+    ];
   }
 
 }

@@ -54,6 +54,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
     FieldConfig::create([
       'entity_type' => 'node',
       'field_name' => 'field_silly_image',
+      'label' => 'Silly image 🤡',
       'bundle' => 'article',
       'required' => TRUE,
     ])->save();
@@ -73,6 +74,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
     ])->save();
 
     // Optional, single-cardinality user profile picture field.
+    // @see core/profiles/standard/config/install/field.storage.user.user_picture.yml
     FieldStorageConfig::create([
       'entity_type' => 'user',
       'field_name' => 'user_picture',
@@ -80,8 +82,9 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
       'translatable' => FALSE,
       'cardinality' => 1,
     ])->save();
+    // @see core/profiles/standard/config/install/field.field.user.user.user_picture.yml
     FieldConfig::create([
-      'label' => 'User Picture',
+      'label' => 'Picture',
       'description' => '',
       'field_name' => 'user_picture',
       'entity_type' => 'user',
@@ -89,9 +92,25 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
       'required' => FALSE,
     ])->save();
 
+    // Optional, multiple-cardinality tags field.
+    FieldStorageConfig::create([
+      'entity_type' => 'node',
+      'field_name' => 'field_tags',
+      'type' => 'entity_reference',
+      'cardinality' => FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
+    ])->save();
+    FieldConfig::create([
+      'entity_type' => 'node',
+      'field_name' => 'field_tags',
+      'label' => 'Tags',
+      'bundle' => 'article',
+      'required' => FALSE,
+    ])->save();
+
     $account = $this->createUser([
       ContentTemplate::ADMIN_PERMISSION,
       'edit any article content',
+      'view own unpublished content',
     ]);
     \assert($account instanceof UserInterface);
     $this->drupalLogin($account);
@@ -102,13 +121,13 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
   }
 
   /**
-   * @dataProvider providerSuggestStructuredDataForPropShapes
-   * @see \Drupal\Tests\canvas\Kernel\FieldForComponentSuggesterTest
+   * @dataProvider providerSuggestPropSources
+   * @see \Drupal\Tests\canvas\Kernel\PropSourceSuggesterTest
    */
-  public function testSuggestStructuredDataForPropShapes(string $component_config_entity_id, string $content_entity_type_id, string $bundle, array $expected): void {
+  public function testSuggestPropSources(string $component_config_entity_id, string $content_entity_type_id, string $bundle, array $expected): void {
     $json = $this->assertExpectedResponse(
       method: 'GET',
-      url: Url::fromUri("base:/canvas/api/v0/ui/content_template/suggestions/structured-data-for-prop_shapes/$content_entity_type_id/$bundle/$component_config_entity_id"),
+      url: Url::fromUri("base:/canvas/api/v0/ui/content_template/suggestions/prop-sources/$content_entity_type_id/$bundle/$component_config_entity_id"),
       request_options: [],
       expected_status: Response::HTTP_OK,
       expected_cache_contexts: NULL,
@@ -119,14 +138,56 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
     $this->assertSame($expected, $json);
   }
 
-  public static function providerSuggestStructuredDataForPropShapes(): \Generator {
+  public static function providerSuggestPropSources(): \Generator {
     $choice_article_title = [
-      'label' => "This Article's Title",
       'source' => ['sourceType' => 'dynamic', 'expression' => 'ℹ︎␜entity:node:article␝title␞␟value'],
+      'label' => "Title",
     ];
     $choice_article_image = [
-      'label' => "Subset of this Article's field_silly_image: src_with_alternate_widths, alt, width, height (4 of 7 props — absent: entity, title, srcset_candidate_uri_template)",
       'source' => ['sourceType' => 'dynamic', 'expression' => 'ℹ︎␜entity:node:article␝field_silly_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}'],
+      'label' => "Silly image 🤡",
+    ];
+    $choice_article_author_name = [
+      'source' => [
+        'sourceType' => 'dynamic',
+        'expression' => 'ℹ︎␜entity:node:article␝uid␞␟entity␜␜entity:user␝name␞␟value',
+      ],
+      'label' => 'Name',
+    ];
+    $choice_article_author_picture_alt = [
+      'source' => [
+        'sourceType' => 'dynamic',
+        'expression' => 'ℹ︎␜entity:node:article␝uid␞␟entity␜␜entity:user␝user_picture␞␟alt',
+      ],
+      'label' => 'Alternative text',
+    ];
+    $choice_article_author_picture_title = [
+      'source' => [
+        'sourceType' => 'dynamic',
+        'expression' => 'ℹ︎␜entity:node:article␝uid␞␟entity␜␜entity:user␝user_picture␞␟title',
+      ],
+      'label' => 'Title',
+    ];
+    $choice_article_revision_user_name = [
+      'source' => [
+        'sourceType' => 'dynamic',
+        'expression' => 'ℹ︎␜entity:node:article␝revision_uid␞␟entity␜␜entity:user␝name␞␟value',
+      ],
+      'label' => 'Name',
+    ];
+    $choice_article_revision_user_picture_alt = [
+      'source' => [
+        'sourceType' => 'dynamic',
+        'expression' => 'ℹ︎␜entity:node:article␝revision_uid␞␟entity␜␜entity:user␝user_picture␞␟alt',
+      ],
+      'label' => 'Alternative text',
+    ];
+    $choice_article_revision_user_picture_title = [
+      'source' => [
+        'sourceType' => 'dynamic',
+        'expression' => 'ℹ︎␜entity:node:article␝revision_uid␞␟entity␜␜entity:user␝user_picture␞␟title',
+      ],
+      'label' => 'Title',
     ];
     $hash_for_choice = fn (array $choice) =>  \hash('xxh64', $choice['source']['expression']);
 
@@ -136,7 +197,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
       'bundle' => 'article',
       'expected' => [
         'text' => [
-          $hash_for_choice($choice_article_title) => $choice_article_title,
+          ['id' => $hash_for_choice($choice_article_title)] + $choice_article_title,
         ],
         'style' => [],
         'element' => [],
@@ -147,7 +208,16 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
       'content_entity_type_id' => 'user',
       'bundle' => 'user',
       'expected' => [
-        'text' => [],
+        'text' => [
+          [
+            'id' => '67f45d35294a49e0',
+            'source' => [
+              'sourceType' => 'dynamic',
+              'expression' => 'ℹ︎␜entity:user␝name␞␟value',
+            ],
+            'label' => 'Name',
+          ],
+        ],
         'style' => [],
         'element' => [],
       ],
@@ -172,7 +242,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
       'bundle' => 'article',
       'expected' => [
         'image' => [
-          $hash_for_choice($choice_article_image) => $choice_article_image,
+          ['id' => $hash_for_choice($choice_article_image)] + $choice_article_image,
         ],
       ],
     ];
@@ -182,7 +252,43 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
       'bundle' => 'article',
       'expected' => [
         'image' => [
-          $hash_for_choice($choice_article_image) => $choice_article_image,
+          ['id' => $hash_for_choice($choice_article_image)] + $choice_article_image,
+          [
+            'items' => [
+              [
+                'items' => [
+                  [
+                    'id' => '0bded99fb661deb7',
+                    'source' => [
+                      'sourceType' => 'dynamic',
+                      'expression' => 'ℹ︎␜entity:node:article␝uid␞␟entity␜␜entity:user␝user_picture␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
+                    ],
+                    'label' => 'Picture',
+                  ],
+                ],
+                'label' => 'User',
+              ],
+            ],
+            'label' => 'Authored by',
+          ],
+          [
+            'items' => [
+              [
+                'items' => [
+                  [
+                    'id' => '32b7fa7b2bad34a6',
+                    'source' => [
+                      'sourceType' => 'dynamic',
+                      'expression' => 'ℹ︎␜entity:node:article␝revision_uid␞␟entity␜␜entity:user␝user_picture␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
+                    ],
+                    'label' => 'Picture',
+                  ],
+                ],
+                'label' => 'User',
+              ],
+            ],
+            'label' => 'Revision user',
+          ],
         ],
       ],
     ];
@@ -200,7 +306,63 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
       'bundle' => 'user',
       'expected' => [
         'image' => [
-          // @todo This SHOULD find the `user_picture` field, fix in https://www.drupal.org/project/canvas/issues/3541361
+          [
+            'id' => '57e3db5a8919b50e',
+            'source' => [
+              'sourceType' => 'dynamic',
+              'expression' => 'ℹ︎␜entity:user␝user_picture␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
+            ],
+            'label' => 'Picture',
+          ],
+        ],
+      ],
+    ];
+
+    yield 'an OPTIONAL array of strings example (sdc.canvas_test_sdc.tags, entity:node:article)' => [
+      'component_config_entity_id' => 'sdc.canvas_test_sdc.tags',
+      'content_entity_type_id' => 'node',
+      'bundle' => 'article',
+      'expected' => [
+        'tags' => [
+          [
+            'items' => [
+              [
+                'id' => '1138e38cc9e6b7dd',
+                'source' => [
+                  'sourceType' => 'dynamic',
+                  'expression' => 'ℹ︎␜entity:node:article␝field_screenshots␞␟title',
+                ],
+                'label' => 'Title',
+              ],
+              [
+                'id' => '6f972dac9b3e8954',
+                'source' => [
+                  'sourceType' => 'dynamic',
+                  'expression' => 'ℹ︎␜entity:node:article␝field_screenshots␞␟alt',
+                ],
+                'label' => 'Alternative text',
+              ],
+            ],
+            'label' => 'field_screenshots',
+          ],
+          [
+            'items' => [
+              [
+                'items' => [
+                  [
+                    'id' => '563f6a4e0001da4c',
+                    'source' => [
+                      'sourceType' => 'dynamic',
+                      'expression' => 'ℹ︎␜entity:node:article␝field_tags␞␟entity␜␜entity:node␝title␞␟value',
+                    ],
+                    'label' => 'Title',
+                  ],
+                ],
+                'label' => 'Content',
+              ],
+            ],
+            'label' => 'Tags',
+          ],
         ],
       ],
     ];
@@ -211,39 +373,281 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
       'bundle' => 'article',
       'expected' => [
         'caption' => [
-          '82ec95693bc89080' => [
-            'label' => "Subset of this Article's field_silly_image: alt (1 of 7 props — absent: entity, title, width, height, srcset_candidate_uri_template, src_with_alternate_widths)",
-            'source' => [
-              'sourceType' => 'dynamic',
-              'expression' => 'ℹ︎␜entity:node:article␝field_silly_image␞␟alt',
+          ['id' => $hash_for_choice($choice_article_title)] + $choice_article_title,
+          [
+            'items' => [
+              [
+                'id' => '1409e675864fd2e6',
+                'source' => [
+                  'sourceType' => 'dynamic',
+                  'expression' => 'ℹ︎␜entity:node:article␝field_silly_image␞␟title',
+                ],
+                'label' => "Title",
+              ],
+              [
+                'id' => '82ec95693bc89080',
+                'source' => [
+                  'sourceType' => 'dynamic',
+                  'expression' => 'ℹ︎␜entity:node:article␝field_silly_image␞␟alt',
+                ],
+                'label' => "Alternative text",
+              ],
             ],
+            'label' => 'Silly image 🤡',
           ],
-          '1409e675864fd2e6' => [
-            'label' => "Subset of this Article's field_silly_image: title (1 of 7 props — absent: entity, alt, width, height, srcset_candidate_uri_template, src_with_alternate_widths)",
-            'source' => [
-              'sourceType' => 'dynamic',
-              'expression' => 'ℹ︎␜entity:node:article␝field_silly_image␞␟title',
+          [
+            'items' => [
+              [
+                'items' => [
+                  ['id' => $hash_for_choice($choice_article_revision_user_name)] + $choice_article_revision_user_name,
+                  [
+                    'items' => [
+                      ['id' => $hash_for_choice($choice_article_revision_user_picture_alt)] + $choice_article_revision_user_picture_alt,
+                      ['id' => $hash_for_choice($choice_article_revision_user_picture_title)] + $choice_article_revision_user_picture_title,
+                    ],
+                    'label' => 'Picture',
+                  ],
+                ],
+                'label' => 'User',
+              ],
             ],
+            'label' => 'Revision user',
           ],
-          '7ca10058b43f4d0f' => [
-            'label' => "This Article's Revision log message",
-            'source' => [
-              'sourceType' => 'dynamic',
-              'expression' => 'ℹ︎␜entity:node:article␝revision_log␞␟value',
+          [
+            'items' => [
+              [
+                'items' => [
+                  ['id' => $hash_for_choice($choice_article_author_name)] + $choice_article_author_name,
+                  [
+                    'items' => [
+                      ['id' => $hash_for_choice($choice_article_author_picture_alt)] + $choice_article_author_picture_alt,
+                      ['id' => $hash_for_choice($choice_article_author_picture_title)] + $choice_article_author_picture_title,
+                    ],
+                    'label' => 'Picture',
+                  ],
+                ],
+                'label' => 'User',
+              ],
             ],
+            'label' => 'Authored by',
           ],
-          $hash_for_choice($choice_article_title) => $choice_article_title,
         ],
         'images' => [
-          '441f35fe6e2feefd' => [
-            'label' => "Subset of this Article's field_screenshots: src_with_alternate_widths, alt, width, height (4 of 7 props — absent: entity, title, srcset_candidate_uri_template)",
+          [
+            'id' => '441f35fe6e2feefd',
             "source" => [
               'sourceType' => 'dynamic',
               'expression' => 'ℹ︎␜entity:node:article␝field_screenshots␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
             ],
+            'label' => "field_screenshots",
           ],
         ],
       ],
+    ];
+
+    yield 'a simple code component with link prop (js.canvas_test_code_components_with_link_prop, entity:node:article)' => [
+      'component_config_entity_id' => 'js.canvas_test_code_components_with_link_prop',
+      'content_entity_type_id' => 'node',
+      'bundle' => 'article',
+      'expected' => [
+        'text' => [
+          ['id' => $hash_for_choice($choice_article_title)] + $choice_article_title,
+          [
+            'items' => [
+              [
+                'id' => '1409e675864fd2e6',
+                'source' => [
+                  'sourceType' => 'dynamic',
+                  'expression' => 'ℹ︎␜entity:node:article␝field_silly_image␞␟title',
+                ],
+                'label' => "Title",
+              ],
+              [
+                'id' => '82ec95693bc89080',
+                'source' => [
+                  'sourceType' => 'dynamic',
+                  'expression' => 'ℹ︎␜entity:node:article␝field_silly_image␞␟alt',
+                ],
+                'label' => "Alternative text",
+              ],
+            ],
+            'label' => 'Silly image 🤡',
+          ],
+          [
+            'items' => [
+              [
+                'items' => [
+                  ['id' => $hash_for_choice($choice_article_revision_user_name)] + $choice_article_revision_user_name,
+                  [
+                    'items' => [
+                      ['id' => $hash_for_choice($choice_article_revision_user_picture_alt)] + $choice_article_revision_user_picture_alt,
+                      ['id' => $hash_for_choice($choice_article_revision_user_picture_title)] + $choice_article_revision_user_picture_title,
+                    ],
+                    'label' => 'Picture',
+                  ],
+                ],
+                'label' => 'User',
+              ],
+            ],
+            'label' => 'Revision user',
+          ],
+          [
+            'items' => [
+              [
+                'items' => [
+                  ['id' => $hash_for_choice($choice_article_author_name)] + $choice_article_author_name,
+                  [
+                    'items' => [
+                      ['id' => $hash_for_choice($choice_article_author_picture_alt)] + $choice_article_author_picture_alt,
+                      ['id' => $hash_for_choice($choice_article_author_picture_title)] + $choice_article_author_picture_title,
+                    ],
+                    'label' => 'Picture',
+                  ],
+                ],
+                'label' => 'User',
+              ],
+            ],
+            'label' => 'Authored by',
+          ],
+        ],
+        'link' => [
+          [
+            'id' => '51af7eb3ee57c3a5',
+            'source' => [
+              'sourceType' => 'host-entity-url',
+              'absolute' => FALSE,
+            ],
+            'label' => 'Relative URL',
+          ],
+          [
+            'id' => '4999dcb72722c69a',
+            'source' => [
+              'sourceType' => 'dynamic',
+              'expression' => 'ℹ︎␜entity:node:article␝field_silly_image␞␟src_with_alternate_widths',
+            ],
+            'items' => [
+              [
+                'id' => '4a83ce0c963911b4',
+                'source' => [
+                  'sourceType' => 'dynamic',
+                  'expression' => 'ℹ︎␜entity:node:article␝field_silly_image␞␟entity␜␜entity:file␝uri␞␟value',
+                ],
+                'items' => [
+                  [
+                    'id' => 'cd27d546be8c9a31',
+                    'source' => [
+                      'sourceType' => 'dynamic',
+                      'expression' => 'ℹ︎␜entity:node:article␝field_silly_image␞␟entity␜␜entity:file␝uri␞␟url',
+                    ],
+                    'label' => 'Root-relative file URL',
+                  ],
+                ],
+                'label' => "URI",
+              ],
+            ],
+            'label' => 'Silly image 🤡',
+          ],
+          [
+            'items' => [
+              [
+                'id' => '40aec6943bb1f70a',
+                'source' => [
+                  'sourceType' => 'dynamic',
+                  'expression' => 'ℹ︎␜entity:node:article␝uid␞␟url',
+                ],
+                'label' => 'URL',
+              ],
+              [
+                'items' => [
+                  [
+                    'id' => '134a8de6cbb83338',
+                    'source' => [
+                      'sourceType' => 'dynamic',
+                      'expression' => 'ℹ︎␜entity:node:article␝uid␞␟entity␜␜entity:user␝user_picture␞␟src_with_alternate_widths',
+                    ],
+                    'items' => [
+                      [
+                        'id' => 'b3d2d175491909ed',
+                        'source' => [
+                          'sourceType' => 'dynamic',
+                          'expression' => 'ℹ︎␜entity:node:article␝uid␞␟entity␜␜entity:user␝user_picture␞␟entity␜␜entity:file␝uri␞␟value',
+                        ],
+                        'items' => [
+                          [
+                            'id' => 'ecacb2058b74367b',
+                            'source' => [
+                              'sourceType' => 'dynamic',
+                              'expression' => 'ℹ︎␜entity:node:article␝uid␞␟entity␜␜entity:user␝user_picture␞␟entity␜␜entity:file␝uri␞␟url',
+                            ],
+                            'label' => 'Root-relative file URL',
+                          ],
+                        ],
+                        'label' => 'URI',
+                      ],
+                    ],
+                    'label' => 'Picture',
+                  ],
+                ],
+                'label' => 'User',
+              ],
+            ],
+            'label' => 'Authored by',
+          ],
+          [
+            'items' => [
+              [
+                'id' => 'f406165063d98f55',
+                'source' => [
+                  'sourceType' => 'dynamic',
+                  'expression' => 'ℹ︎␜entity:node:article␝revision_uid␞␟url',
+                ],
+                'label' => 'URL',
+              ],
+              [
+                'items' => [
+                  [
+                    'id' => '5b16c0771fff7364',
+                    'source' => [
+                      'sourceType' => 'dynamic',
+                      'expression' => 'ℹ︎␜entity:node:article␝revision_uid␞␟entity␜␜entity:user␝user_picture␞␟src_with_alternate_widths',
+                    ],
+                    'items' => [
+                      [
+                        'id' => '09abeca99c3ea43b',
+                        'source' => [
+                          'sourceType' => 'dynamic',
+                          'expression' => 'ℹ︎␜entity:node:article␝revision_uid␞␟entity␜␜entity:user␝user_picture␞␟entity␜␜entity:file␝uri␞␟value',
+                        ],
+                        'items' => [
+                          [
+                            'id' => '1dfa84dcb4d9bbe3',
+                            'source' => [
+                              'sourceType' => 'dynamic',
+                              'expression' => 'ℹ︎␜entity:node:article␝revision_uid␞␟entity␜␜entity:user␝user_picture␞␟entity␜␜entity:file␝uri␞␟url',
+                            ],
+                            'label' => 'Root-relative file URL',
+                          ],
+                        ],
+                        'label' => 'URI',
+                      ],
+                    ],
+                    'label' => 'Picture',
+                  ],
+                ],
+                'label' => 'User',
+              ],
+            ],
+            'label' => 'Revision user',
+          ],
+        ],
+      ],
+    ];
+
+    yield 'a simple code component with no props (js.canvas_test_code_components_with_no_props, entity:node:article)' => [
+      'component_config_entity_id' => 'js.canvas_test_code_components_with_no_props',
+      'content_entity_type_id' => 'node',
+      'bundle' => 'article',
+      'expected' => [],
     ];
   }
 
@@ -252,13 +656,11 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
    *           ["a/b/sdc.canvas_test_sdc.image", 404, "The `a` content entity type does not exist."]
    *           ["node/b/sdc.canvas_test_sdc.image", 404, "The `node` content entity type does not have a `b` bundle."]
    *           ["node/article/block.user_login_block", 400, "Only components that define their inputs using JSON Schema and use fields to populate their inputs are currently supported."]
-   *           ["node/article/js.canvas_test_code_components_with_link_prop", 400, "Code components are not supported yet."]
-   *           ["node/article/js.canvas_test_code_components_with_no_props", 400, "Code components are not supported yet."]
    */
-  public function testSuggestStructuredDataForPropShapesClientErrors(string $trail, int $expected_status_code, string $expected_error_message): void {
+  public function testSuggestPropSourcesClientErrors(string $trail, int $expected_status_code, string $expected_error_message): void {
     $json = $this->assertExpectedResponse(
       method: 'GET',
-      url: Url::fromUri('base:/canvas/api/v0/ui/content_template/suggestions/structured-data-for-prop_shapes/' . $trail),
+      url: Url::fromUri('base:/canvas/api/v0/ui/content_template/suggestions/prop-sources/' . $trail),
       request_options: [],
       expected_status: $expected_status_code,
       expected_cache_contexts: NULL,
@@ -275,7 +677,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
     $this->drupalLogin($this->limitedPermissionsUser);
     $json = $this->assertExpectedResponse(
       method: 'GET',
-      url: Url::fromUri('base:/canvas/api/v0/ui/content_template/suggestions/structured-data-for-prop_shapes/' . $trail),
+      url: Url::fromUri('base:/canvas/api/v0/ui/content_template/suggestions/prop-sources/' . $trail),
       request_options: [],
       expected_status: Response::HTTP_FORBIDDEN,
       expected_cache_contexts: ['user.permissions'],
@@ -315,7 +717,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
       $entity_storage->create([
         'title' => 'Entity ' . $i,
         'type' => $bundle,
-        'changed' => \time() - $i * 1000,
+        'changed' => \time() - ($i * 15000),
       ])->save();
     }
 
@@ -353,6 +755,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
     $entity_storage->create([
       'title' => 'Entity LAST',
       'type' => $bundle,
+      'changed' => \time() - 5000,
     ])->save();
     $json = $this->assertExpectedResponse(
       method: 'GET',
@@ -412,6 +815,155 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
       2 => ['id' => '2', 'label' => 'Entity 2'],
       4 => ['id' => '4', 'label' => 'Entity 4'],
       5 => ['id' => '5', 'label' => 'Entity 5'],
+    ];
+    $this->assertSame($expected, $json);
+
+    // Test with unpublished content entities - they should also appear in the list.
+    $entity_storage->create([
+      'title' => 'Unpublished Entity 1',
+      'type' => $bundle,
+      'status' => 0,
+      'changed' => \time() + 5000,
+    ])->save();
+    $entity_storage->create([
+      'title' => 'Unpublished Entity 2',
+      'type' => $bundle,
+      'status' => 0,
+      'changed' => \time() + 10000,
+    ])->save();
+    // Test the 10-entity limit: create additional entities to exceed the limit.
+    // The oldest entities (by changed time) should be excluded from the response.
+    $entity_storage->create([
+      'title' => 'New Entity 9',
+      'type' => $bundle,
+      'status' => 1,
+      'changed' => \time() + 15000,
+    ])->save();
+    $entity_storage->create([
+      'title' => 'New Entity 10',
+      'type' => $bundle,
+      'status' => 1,
+      'changed' => \time() + 20000,
+    ])->save();
+    $entity_storage->create([
+      'title' => 'New Entity 11',
+      'type' => $bundle,
+      'status' => 1,
+      'changed' => \time() + 25000,
+    ])->save();
+
+    // Unpublished entities should be included in the response.
+    $json = $this->assertExpectedResponse(
+      method: 'GET',
+      url: Url::fromUri("base:/canvas/api/v0/ui/content_template/suggestions/preview/$content_entity_type_id/$bundle"),
+      request_options: [],
+      expected_status: Response::HTTP_OK,
+      expected_cache_contexts: [
+        'user',
+      ],
+      expected_cache_tags: [
+        'http_response',
+        $content_entity_type_id . ':1',
+        $content_entity_type_id . ':10',
+        $content_entity_type_id . ':11',
+        $content_entity_type_id . ':2',
+        $content_entity_type_id . ':3',
+        $content_entity_type_id . ':4',
+        $content_entity_type_id . ':6',
+        $content_entity_type_id . ':7',
+        $content_entity_type_id . ':8',
+        $content_entity_type_id . ':9',
+        $content_entity_type_id . '_list:' . $bundle,
+      ],
+      expected_page_cache: 'UNCACHEABLE (request policy)',
+      expected_dynamic_page_cache: 'UNCACHEABLE (poor cacheability)',
+    );
+    // Expected should now include the unpublished nodes and exclude
+    // the oldest ones to maintain the 10-entity limit.
+    $expected = [
+      11 => ['id' => '11', 'label' => 'New Entity 11'],
+      10 => ['id' => '10', 'label' => 'New Entity 10'],
+      9 => ['id' => '9', 'label' => 'New Entity 9'],
+      8 => ['id' => '8', 'label' => 'Unpublished Entity 2'],
+      7 => ['id' => '7', 'label' => 'Unpublished Entity 1'],
+      3 => ['id' => '3', 'label' => 'Updated article'],
+      6 => ['id' => '6', 'label' => 'Entity LAST'],
+      1 => ['id' => '1', 'label' => 'Entity 1'],
+      2 => ['id' => '2', 'label' => 'Entity 2'],
+      4 => ['id' => '4', 'label' => 'Entity 4'],
+    ];
+    $this->assertSame($expected, $json);
+  }
+
+  /**
+   * Tests that users without 'view own unpublished content' permission cannot see unpublished content.
+   */
+  public function testSuggestPreviewWithoutUnpublishedPermission(): void {
+    $content_entity_type_id = 'node';
+    $bundle = 'article';
+
+    // Create a user WITHOUT 'view own unpublished content' permission.
+    $user_without_permission = $this->createUser([
+      ContentTemplate::ADMIN_PERMISSION,
+      'edit any article content',
+    ]);
+    \assert($user_without_permission instanceof UserInterface);
+
+    // Create published and unpublished content entities.
+    $entity_storage = $this->container->get('entity_type.manager')->getStorage($content_entity_type_id);
+
+    // Create published entities.
+    for ($i = 1; $i <= 3; ++$i) {
+      $entity_storage->create([
+        'title' => 'Published Entity ' . $i,
+        'type' => $bundle,
+        'status' => 1,
+        'uid' => $user_without_permission->id(),
+        'changed' => \time() - $i * 1000,
+      ])->save();
+    }
+
+    // Create unpublished entities owned by the user.
+    for ($i = 1; $i <= 2; ++$i) {
+      $entity_storage->create([
+        'title' => 'Unpublished Entity ' . $i,
+        'type' => $bundle,
+        'status' => 0,
+        'uid' => $user_without_permission->id(),
+        'changed' => \time() + $i * 1000,
+      ])->save();
+    }
+
+    // Login as the user without 'view own unpublished content' permission.
+    $this->drupalLogin($user_without_permission);
+
+    // Request the preview suggestions.
+    $json = $this->assertExpectedResponse(
+      method: 'GET',
+      url: Url::fromUri("base:/canvas/api/v0/ui/content_template/suggestions/preview/$content_entity_type_id/$bundle"),
+      request_options: [],
+      expected_status: Response::HTTP_OK,
+      expected_cache_contexts: [
+        'user.node_grants:view',
+        'user.permissions',
+      ],
+      expected_cache_tags: [
+        'http_response',
+        $content_entity_type_id . ':1',
+        $content_entity_type_id . ':2',
+        $content_entity_type_id . ':3',
+        $content_entity_type_id . '_list:' . $bundle,
+      ],
+      expected_page_cache: 'UNCACHEABLE (request policy)',
+      expected_dynamic_page_cache: 'MISS',
+    );
+
+    // Only published entities should be returned,
+    // unpublished entities 4 and 5 should NOT be included.
+    $expected = [
+      1 => ['id' => '1', 'label' => 'Published Entity 1'],
+      2 => ['id' => '2', 'label' => 'Published Entity 2'],
+      3 => ['id' => '3', 'label' => 'Published Entity 3'],
     ];
     $this->assertSame($expected, $json);
   }

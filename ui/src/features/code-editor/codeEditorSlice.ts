@@ -5,7 +5,7 @@ import {
   getPropMachineName,
   serializeProps,
   serializeSlots,
-} from '@/features/code-editor/utils';
+} from '@/features/code-editor/utils/utils';
 
 import type { PayloadAction } from '@reduxjs/toolkit';
 import type { RootState } from '@/app/store';
@@ -22,6 +22,7 @@ interface CodeEditorState {
   codeComponent: CodeComponent;
   globalAssetLibrary: AssetLibrary;
   previewCompiledJsForSlots: string;
+  forceRefresh: boolean;
 }
 
 interface CodeEditorStatusOptions {
@@ -70,6 +71,7 @@ export const initialState: CodeEditorState = {
     },
   },
   previewCompiledJsForSlots: '',
+  forceRefresh: false,
 };
 
 export const codeEditorSlice = createSlice({
@@ -365,6 +367,12 @@ export const codeEditorSlice = createSlice({
     clearDataFetches: (state) => {
       state.codeComponent.dataFetches = {};
     },
+    setForceRefresh: (state, action: PayloadAction<boolean>) => {
+      return {
+        ...state,
+        forceRefresh: action.payload,
+      };
+    },
   }),
 });
 
@@ -407,7 +415,6 @@ export const selectCodeComponentSerialized = createSelector(
     compiledJs: codeComponent.compiledJs,
     compiledCss: codeComponent.compiledCss,
     importedJsComponents: codeComponent.importedJsComponents,
-    dataFetches: codeComponent.dataFetches,
     dataDependencies: codeComponent.dataDependencies,
   }),
 );
@@ -443,6 +450,9 @@ export const selectGlobalAssetLibraryProperty =
 export const selectPreviewCompiledJsForSlots = (state: RootState) =>
   state.codeEditor.previewCompiledJsForSlots;
 
+export const selectForceRefresh = (state: RootState) =>
+  state.codeEditor.forceRefresh;
+
 export const {
   initializeCodeEditor,
   resetCodeEditor,
@@ -461,6 +471,7 @@ export const {
   setPreviewCompiledJsForSlots,
   addDataFetch,
   clearDataFetches,
+  setForceRefresh,
 } = codeEditorSlice.actions;
 
 export default codeEditorSlice;

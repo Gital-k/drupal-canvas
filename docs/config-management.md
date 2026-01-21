@@ -100,7 +100,7 @@ applications, too. The Canvas OAuth module, an optional submodule of Canvas, pro
 
 See:
 - `\Drupal\canvas\Entity\Component`
-- `\Drupal\canvas\Plugin\ComponentPluginManager`
+- `\Drupal\canvas\ComponentSource\ComponentSourceDiscoveryInterface`
 - `\Drupal\canvas\ComponentSource\ComponentSourceInterface`
 
 One `Component config entity` is [automatically created (and updated](https://www.drupal.org/project/canvas/issues/3463999)
@@ -126,7 +126,7 @@ The `Component` config entity contains:
   "obsolete"). Existing content can then continue to use disabled `Component`s (in other words: nothing breaks), while
   new content must use the most current Site Builder-curated list of `Component`s.
 - which `field type` and `field widget` must be used to populate it with `unstructured data` — for algorithmic details,
- see [`Canvas Data model`, section 3.1: "from Front-End Developer to an Canvas data model that empowers the Content Creator](./data-model.md#3.1)
+ see [`Canvas Data model`, section 3.1: "from Front-End Developer to a Canvas data model that empowers the Content Creator](./data-model.md#3.1)
 - the (versioned) `fallback_metadata`: when the `Component Source Plugin` can no longer find the `component` because a dependency is
   removed (e.g. the module providing an SDC is uninstalled or a `JavaScriptComponent` config entity is deleted), this
   metadata (currently only slot definitions) will be used to fall back to the special `fallback` source to ensure
@@ -179,7 +179,7 @@ restrictions are applied during validation:
   schema_! This ensures a good DX for those modifying (exported) configuration by hand.
   See `config/schema/canvas.json_schema.yml`.
 
-Once a _code component_ is considered ready for use by its creator, it can be exposed as an Canvas `component` (which under
+Once a _code component_ is considered ready for use by its creator, it can be exposed as a Canvas `component` (which under
 the hood involves creating a sibling `Component config entity` — see [section 3.1](#3.1) above). This is made possible
 by the `JS` `Component Source Plugin`. Section `3.2.1` below describes this in detail.
 
@@ -270,13 +270,16 @@ A `ContentTemplate` config entity can be created by Ambitious Site Builders to a
 
 When rendering content entities, a content template will be used to render the entity if, and _only_ if, two things are true:
 
-1. The entity is opted into Drupal Canvas, which means it has an `Canvas field`.
-2. There is a `ContentTemplate` for that content entity type and bundle, in the view mode that is being rendered.
+1. There is a `ContentTemplate` for that content entity type and bundle, in the view mode that is being rendered.
+2. The content entity type is `Node`.
 
 If a `ContentTemplate` is used for rendering a content entity, then `hook_entity_display_build_alter()` will NOT be invoked for that entity, because that hook (and all its implementations) assume field formatters are used to render (all or some) fields in sequence, which is not the case when using Canvas.
 
 ⚠️ Still to be built:
 - A UI to create content templates, and manage existing templates: https://www.drupal.org/i/3518248
+- Later, when support for exposed slots is added, a second requirement will be added: "The entity is opted into Drupal
+Canvas, which means it has an `Canvas field`."
+- Later, after https://www.drupal.org/i/3498525, remove the second requirement: support more than just `Node`.
 
 ### 3.6 `StagedConfigUpdate` config entity
 

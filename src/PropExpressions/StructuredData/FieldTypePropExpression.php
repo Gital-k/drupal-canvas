@@ -24,7 +24,7 @@ final class FieldTypePropExpression implements StructuredDataPropExpressionInter
   ) {}
 
   public function __toString(): string {
-    return static::PREFIX
+    return static::PREFIX_EXPRESSION_TYPE
       . $this->fieldType
       . static::PREFIX_PROPERTY_LEVEL . $this->propName;
   }
@@ -73,13 +73,12 @@ final class FieldTypePropExpression implements StructuredDataPropExpressionInter
     return $dependencies;
   }
 
-  public function isSupported(EntityInterface|FieldItemInterface|FieldItemListInterface $field): bool {
+  public function validateSupport(EntityInterface|FieldItemInterface|FieldItemListInterface $field): void {
     assert($field instanceof FieldItemInterface || $field instanceof FieldItemListInterface);
     $actual_field_type = $field->getFieldDefinition()->getType();
     if ($actual_field_type !== $this->fieldType) {
       throw new \DomainException(sprintf("`%s` is an expression for field type `%s`, but the provided field item (list) is of type `%s`.", (string) $this, $this->fieldType, $actual_field_type));
     }
-    return TRUE;
   }
 
 }

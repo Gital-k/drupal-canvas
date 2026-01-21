@@ -27,7 +27,8 @@ final class StorablePropShape {
   public function __construct(
     public readonly PropShape $shape,
     // The corresponding UX for the prop shape:
-    // - field type to use + which field properties to extract from an instance of the field type
+    // - field type to use + which field properties to extract from an instance
+    // of the field type
     public readonly FieldTypePropExpression|ReferenceFieldTypePropExpression|FieldTypeObjectPropsExpression $fieldTypeProp,
     // - which widget to use to populate an instance of the field type
     public readonly string $fieldWidget,
@@ -64,6 +65,12 @@ final class StorablePropShape {
 
   public function toStaticPropSource(): StaticPropSource {
     return StaticPropSource::generate($this->fieldTypeProp, $this->cardinality, $this->fieldStorageSettings, $this->fieldInstanceSettings);
+  }
+
+  public function getFieldType(): string {
+    return $this->fieldTypeProp instanceof ReferenceFieldTypePropExpression
+      ? $this->fieldTypeProp->referencer->fieldType
+      : $this->fieldTypeProp->fieldType;
   }
 
 }

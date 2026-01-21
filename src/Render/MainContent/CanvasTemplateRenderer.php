@@ -63,7 +63,7 @@ final class CanvasTemplateRenderer implements MainContentRendererInterface {
    *   Array of all dependencies, including nested ones.
    */
   private function resolveLibraryDependencies(string $library, array &$collected_dependencies = []): array {
-    if (in_array($library, $collected_dependencies)) {
+    if (in_array($library, $collected_dependencies, TRUE)) {
       return [];
     }
 
@@ -79,7 +79,7 @@ final class CanvasTemplateRenderer implements MainContentRendererInterface {
 
     $dependencies = [];
     foreach ($library_info['dependencies'] as $dependency) {
-      if (!in_array($dependency, $collected_dependencies)) {
+      if (!in_array($dependency, $collected_dependencies, TRUE)) {
         $collected_dependencies[] = $dependency;
         $dependencies[] = $dependency;
         $nested_dependencies = $this->resolveLibraryDependencies($dependency, $collected_dependencies);
@@ -115,9 +115,9 @@ final class CanvasTemplateRenderer implements MainContentRendererInterface {
 
     // A few Drupal asset libraries need Canvas-specific variants, because of:
     // - some assets in the library conflict
-    // - the library is requested by `canvas_stark` but should be rendered by the
-    //   current admin theme, so we account for the admin theme's library extend
-    //   and overrides.
+    // - the library is requested by `canvas_stark` but should be rendered by
+    //   the current admin theme, so we account for the admin theme's library
+    //   extend and overrides.
     // @see \Drupal\canvas\Hook\LibraryHooks::customizeDialogLibrary()
     // This is performed here instead of library_info_alter() as this
     // information is cached per-theme and this distinction needs to be made
@@ -128,7 +128,7 @@ final class CanvasTemplateRenderer implements MainContentRendererInterface {
       'core/drupal.dialog.ajax' => 'canvas/canvas.drupal.dialog.ajax',
     ];
     foreach ($libraries_replace as $original => $replacement) {
-      if ($index = array_search($original, $assets->libraries)) {
+      if ($index = array_search($original, $assets->libraries, TRUE)) {
         $assets->libraries[$index] = $replacement;
       }
     }

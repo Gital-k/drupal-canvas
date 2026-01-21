@@ -6,7 +6,9 @@ namespace Drupal\canvas_ai\Hook;
 
 use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
+use Drupal\canvas_ai\CanvasAiPermissions;
 
 /**
  * Hook implementations for canvas_ai tokens.
@@ -14,11 +16,10 @@ use Drupal\Core\StringTranslation\StringTranslationTrait;
 class CanvasAiHooks {
   use StringTranslationTrait;
 
-  protected ConfigFactoryInterface $configFactory;
-
-  public function __construct(ConfigFactoryInterface $configFactory) {
-    $this->configFactory = $configFactory;
-  }
+  public function __construct(
+    private readonly AccountInterface $currentUser,
+    private readonly ConfigFactoryInterface $configFactory,
+  ) {}
 
   /**
    * Implements hook_token_info().
@@ -46,6 +47,10 @@ class CanvasAiHooks {
             'name' => $this->t('Selected Component'),
             'description' => $this->t('Returns the selected component name passed to the AI Agent.'),
           ],
+          'selected_component_required_props' => [
+            'name' => $this->t('Selected Component Required Props'),
+            'description' => $this->t('Returns the required props of the selected component passed to the AI Agent.'),
+          ],
           'layout' => [
             'name' => $this->t('Layout'),
             'description' => $this->t('Returns the current page layout value passed to the AI Agent.'),
@@ -66,6 +71,22 @@ class CanvasAiHooks {
             'name' => $this->t('Active Component UUID'),
             'description' => $this->t('Returns the UUID of the active component in the page.'),
           ],
+          'menu_fetch_source' => [
+            'name' => $this->t('Menu Fetch Source'),
+            'description' => $this->t('Returns the source for menu fetching.'),
+          ],
+          'json_api_module_status' => [
+            'name' => $this->t('JSON API Module status'),
+            'description' => $this->t('Returns the status of JSON API module.'),
+          ],
+          'verbose_context_for_orchestrator' => [
+            'name' => $this->t('Verbose Context for Orchestrator'),
+            'description' => $this->t('Returns a detailed context summary for the AI Orchestrator.'),
+          ],
+          'custom_libraries' => [
+            'name' => $this->t('Custom libraries in Canvas.'),
+            'description' => $this->t('Returns the custom libraries in Canvas.'),
+          ],
         ],
       ],
     ];
@@ -82,35 +103,55 @@ class CanvasAiHooks {
       foreach ($tokens as $name => $original) {
         switch ($name) {
           case 'entity_type':
-            $replacements[$original] = !empty($data['entity_type']) ? $data['entity_type'] : NULL;
+            $replacements[$original] = $data['entity_type'] ?? NULL;
             break;
 
           case 'entity_id':
-            $replacements[$original] = !empty($data['entity_id']) ? $data['entity_id'] : NULL;
+            $replacements[$original] = $data['entity_id'] ?? NULL;
             break;
 
           case 'selected_component':
-            $replacements[$original] = !empty($data['selected_component']) ? $data['selected_component'] : NULL;
+            $replacements[$original] = $data['selected_component'] ?? NULL;
+            break;
+
+          case 'selected_component_required_props':
+            $replacements[$original] = $data['selected_component_required_props'] ?? NULL;
             break;
 
           case 'layout':
-            $replacements[$original] = !empty($data['layout']) ? $data['layout'] : NULL;
+            $replacements[$original] = $data['layout'] ?? NULL;
             break;
 
           case 'derived_proptypes':
-            $replacements[$original] = !empty($data['derived_proptypes']) ? $data['derived_proptypes'] : NULL;
+            $replacements[$original] = $data['derived_proptypes'] ?? NULL;
             break;
 
           case 'page_title':
-            $replacements[$original] = !empty($data['page_title']) ? $data['page_title'] : NULL;
+            $replacements[$original] = $data['page_title'] ?? NULL;
             break;
 
           case 'page_description':
-            $replacements[$original] = !empty($data['page_description']) ? $data['page_description'] : NULL;
+            $replacements[$original] = $data['page_description'] ?? NULL;
             break;
 
           case 'active_component_uuid':
-            $replacements[$original] = !empty($data['active_component_uuid']) ? $data['active_component_uuid'] : 'None';
+            $replacements[$original] = $data['active_component_uuid'] ?? 'None';
+            break;
+
+          case 'menu_fetch_source':
+            $replacements[$original] = $data['menu_fetch_source'] ?? NULL;
+            break;
+
+          case 'json_api_module_status':
+            $replacements[$original] = $data['json_api_module_status'];
+            break;
+
+          case 'verbose_context_for_orchestrator':
+            $replacements[$original] = !empty($data['verbose_context_for_orchestrator']) ? $data['verbose_context_for_orchestrator'] : NULL;
+            break;
+
+          case 'custom_libraries':
+            $replacements[$original] = $data['custom_libraries'];
             break;
         }
       }
@@ -124,11 +165,13 @@ class CanvasAiHooks {
    */
   #[Hook('js_settings_alter')]
   public function jsSettingsAlter(array &$settings): void {
-    $config = $this->configFactory->get('canvas_ai.settings');
-    $file_upload_size_mb = $config->get('file_upload_size') ?? 2;
-    $file_upload_size_bytes = $file_upload_size_mb * 1024 * 1024;
-
-    $settings['canvas']['canvasAiMaxFileSize'] = $file_upload_size_bytes;
+    if (!empty($settings['canvas']['aiExtensionAvailable'])) {
+      $config = $this->configFactory->get('canvas_ai.settings');
+      $file_upload_size_mb = $config->get('file_upload_size') ?? 2;
+      $file_upload_size_bytes = $file_upload_size_mb * 1024 * 1024;
+      $settings['canvas']['canvasAiMaxFileSize'] = $file_upload_size_bytes;
+      $settings['canvas']['permissions']['useCanvasAi'] = $this->currentUser->hasPermission(CanvasAiPermissions::USE_CANVAS_AI);
+    }
   }
 
 }

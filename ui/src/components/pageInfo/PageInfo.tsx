@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useErrorBoundary } from 'react-error-boundary';
 import { NavLink, useLocation, useParams } from 'react-router-dom';
+import TemplateIcon from '@assets/icons/template.svg?react';
 import {
   ChevronLeftIcon,
   CodeIcon,
   CubeIcon,
-  FileIcon,
+  FileTextIcon,
   HomeIcon,
   SectionIcon,
   StackIcon,
@@ -31,11 +32,16 @@ import {
   setHomepagePath,
 } from '@/features/configuration/configurationSlice';
 import { selectLayout } from '@/features/layout/layoutModelSlice';
-import { DEFAULT_REGION, selectPreviouslyEdited } from '@/features/ui/uiSlice';
+import {
+  DEFAULT_REGION,
+  selectEditorFrameContext,
+  selectPreviouslyEdited,
+} from '@/features/ui/uiSlice';
 import useDebounce from '@/hooks/useDebounce';
 import useEditorNavigation from '@/hooks/useEditorNavigation';
 import { useEntityTitle } from '@/hooks/useEntityTitle';
-import { useGetContentTemplatesQuery } from '@/services/componentAndLayout';
+import { useSmartRedirect } from '@/hooks/useSmartRedirect';
+import { useTemplateCaption } from '@/hooks/useTemplateCaption';
 import {
   useCreateContentMutation,
   useDeleteContentMutation,
@@ -44,7 +50,7 @@ import {
   useSetStagedConfigMutation,
 } from '@/services/content';
 import { pageDataFormApi } from '@/services/pageDataForm';
-import { getBaseUrl, getCanvasSettings } from '@/utils/drupal-globals';
+import { getCanvasSettings } from '@/utils/drupal-globals';
 import { getQueryErrorMessage } from '@/utils/error-handling';
 import {
   removeComponentFromPathname,
@@ -59,12 +65,12 @@ interface PageType {
 }
 
 const iconMap: PageType = {
-  Page: <FileIcon />,
+  Page: <FileTextIcon />,
   ContentType: <StackIcon />,
   ComponentName: <CodeIcon />,
   GlobalPatternName: <SectionIcon />,
   Homepage: <HomeIcon />,
-  Template: <FileIcon />,
+  Template: <TemplateIcon />,
 };
 
 const canvasSettings = getCanvasSettings();
@@ -74,7 +80,12 @@ export const HOMEPAGE_CONFIG_ID = 'canvas_set_homepage';
 const PageInfo = () => {
   const { showBoundary } = useErrorBoundary();
   const { setEditorEntity } = useEditorNavigation();
-  const { regionId: focusedRegion = DEFAULT_REGION } = useParams();
+  const { redirectToNextBestPage } = useSmartRedirect();
+  const {
+    regionId: focusedRegion = DEFAULT_REGION,
+    entityType,
+    entityId,
+  } = useParams();
   const codeComponentName = useAppSelector(selectCodeComponentProperty('name'));
   const isCodeEditor = codeComponentName !== '';
   const layout = useAppSelector(selectLayout);
@@ -83,56 +94,14 @@ const PageInfo = () => {
   const focusedRegionName = layout.find(
     (region) => region.id === focusedRegion,
   )?.name;
-  const { entityType, entityId, bundle, viewMode } = useParams();
   const location = useLocation();
   const title = useEntityTitle();
 
   // Check if we're on a template route
-  const isTemplateRoute = location.pathname.startsWith('/template/');
+  const isTemplateRoute =
+    useAppSelector(selectEditorFrameContext) === 'template';
+  const templateCaption = useTemplateCaption();
 
-  // Fetch template data from API
-  const { data: templatesData } = useGetContentTemplatesQuery(undefined, {
-    skip: !isTemplateRoute,
-  });
-
-  // Helper function to get bundle name from templates API
-  const getBundleName = (entityType: string, bundle: string): string => {
-    if (!templatesData || !entityType || !bundle) {
-      return bundle?.charAt(0).toUpperCase() + bundle?.slice(1) || '';
-    }
-
-    const entityTemplates = templatesData[entityType];
-    const bundleData = entityTemplates?.bundles?.[bundle];
-    return (
-      bundleData?.label || bundle.charAt(0).toUpperCase() + bundle.slice(1)
-    );
-  };
-
-  // Helper function to get view mode name from templates API (matching TemplateList format)
-  const getViewModeName = (
-    entityType: string,
-    bundle: string,
-    viewMode: string,
-  ): string => {
-    if (!templatesData || !entityType || !bundle || !viewMode) {
-      return `${viewMode} template`;
-    }
-
-    const entityTemplates = templatesData[entityType];
-    const bundleData = entityTemplates?.bundles?.[bundle];
-    const viewModeData = bundleData?.viewModes?.[viewMode];
-
-    // Use viewModeLabel to match TemplateList format: "${viewMode.viewModeLabel} template"
-    return viewModeData?.viewModeLabel
-      ? `${viewModeData.viewModeLabel} template`
-      : `${viewMode} template`;
-  };
-
-  // Generate template caption
-  const templateCaption =
-    isTemplateRoute && entityType && bundle && viewMode
-      ? `${getBundleName(entityType, bundle)} - ${getViewModeName(entityType, bundle, viewMode)}`
-      : undefined;
   const [searchTerm, setSearchTerm] = useState<string>('');
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
   // @todo: https://www.drupal.org/i/3513566 this needs to be generalized to check all content entity types.
@@ -149,7 +118,6 @@ const PageInfo = () => {
     search: debouncedSearchTerm,
   });
 
-  const baseUrl = getBaseUrl();
   const [
     createContent,
     {
@@ -203,33 +171,16 @@ const PageInfo = () => {
     useSetStagedConfigMutation();
 
   async function handleDeletePage(item: ContentStub) {
-    // Find another page to redirect to (filtering out the page being deleted)
-    const remainingPages =
-      pageItems?.filter((page) => page.id !== item.id) || [];
     const pageToDeleteId = String(item.id);
     await deleteContent({
       entityType: 'canvas_page',
       entityId: pageToDeleteId,
     });
-    const homepage = pageItems?.find(
-      (page) => page.internalPath === homepagePath,
-    );
-    // If the current page is the one being deleted, redirect to the homepage.
+
     if (entityType === 'canvas_page' && entityId === pageToDeleteId) {
-      if (homepage) {
-        setEditorEntity('canvas_page', String(homepage.id));
-      } else if (remainingPages.length > 0) {
-        // It's possible there is no homepage set yet right now, so we redirect to the first remaining page.
-        setEditorEntity('canvas_page', String(remainingPages[0].id));
-      } else {
-        // If there are no more pages, redirect out of Canvas.
-        // @todo: Remove this in https://www.drupal.org/i/3506434
-        //   since deleting the homepage in Canvas should be disallowed in that issue so remaining pages should never be 0.
-        setTimeout(() => {
-          window.location.href = baseUrl;
-        }, 100);
-      }
+      redirectToNextBestPage(pageToDeleteId);
     }
+
     // Keep local storage tidy and clear out the array of collapsed layers for the deleted item.
     window.localStorage.removeItem(
       `Canvas.collapsedLayers.canvas_page.${pageToDeleteId}`,

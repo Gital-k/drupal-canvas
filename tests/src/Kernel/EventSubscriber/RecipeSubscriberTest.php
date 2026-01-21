@@ -23,6 +23,7 @@ use Drupal\media\MediaInterface;
 use Drupal\Tests\canvas\Kernel\Traits\VfsPublicStreamUrlTrait;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\canvas\Traits\CrawlerTrait;
+use Drupal\Tests\user\Traits\UserCreationTrait;
 
 /**
  * @group canvas
@@ -35,6 +36,7 @@ final class RecipeSubscriberTest extends KernelTestBase {
   use ContribStrictConfigSchemaTestTrait;
   use RecipeTestTrait;
   use CrawlerTrait;
+  use UserCreationTrait;
   use VfsPublicStreamUrlTrait;
 
   private const string FIXTURES_DIR = __DIR__ . '/../../../fixtures/recipes';
@@ -85,6 +87,7 @@ final class RecipeSubscriberTest extends KernelTestBase {
   }
 
   public function testEntityReferencesInDefaultContentComponents(): void {
+    $this->setUpCurrentUser(permissions: ['view media', 'access content']);
     $image_uri = $this->getRandomGenerator()
       ->image('public://test.png', '100x100', '200x200');
     $file = File::create(['uri' => $image_uri]);
@@ -126,36 +129,6 @@ final class RecipeSubscriberTest extends KernelTestBase {
     // target_uuid.
     self::assertStringContainsString(\urldecode($file_url), $crawler->filter('img')->attr('src') ?? '');
     $this->assertGreaterThan(1, $media->id());
-  }
-
-  public function testComponentConfigActions(): void {
-    $recipe = $this->createRecipe(<<<YAML
-name: Disable components
-type: Testing
-install:
-  - canvas
-  - stark
-  - canvas_stark
-config:
-  import:
-    canvas: '*'
-  actions:
-    canvas.component.sdc.canvas.*:
-      disable: []
-YAML
-    );
-    RecipeRunner::processRecipe($recipe);
-
-    $components = Component::loadMultiple();
-    $this->assertNotEmpty($components);
-    // All Component config entities must be `status: true`, except this one.
-    self::assertGreaterThanOrEqual(2, count($components));
-    foreach ($components as $id => $component) {
-      $this->assertSame(
-        !str_contains($id, 'sdc.canvas.'),
-        $component->status(),
-      );
-    }
   }
 
 }

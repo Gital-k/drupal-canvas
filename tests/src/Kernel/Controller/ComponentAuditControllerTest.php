@@ -42,6 +42,7 @@ final class ComponentAuditControllerTest extends KernelTestBase {
     'canvas',
     'system',
     'node',
+    'datetime',
     'canvas_test_sdc',
     ...self::PAGE_TEST_MODULES,
     // Canvas's dependencies (modules providing field types + widgets).
@@ -153,16 +154,21 @@ final class ComponentAuditControllerTest extends KernelTestBase {
     $audit_url = Url::fromRoute('entity.component.audit', ['component' => 'sdc.canvas_test_sdc.props-slots'])->toString();
     $response = $this->request(Request::create($audit_url));
     assert($response instanceof HtmlResponse);
-    $this->assertSame([
+    self::assertEqualsCanonicalizing([
       'theme',
       'user.roles:authenticated',
       'languages:language_interface',
       'user.permissions',
       'url.query_args:_wrapper_format',
     ], $response->getCacheableMetadata()->getCacheContexts());
-    $this->assertSame([
+    self::assertEqualsCanonicalizing([
       'rendered',
       'http_response',
+      // Cache tag bubbled by the conditional attaching of the asset library for
+      // tracking which page to navigate to when exiting the Canvas UI.
+      // @see \Drupal\canvas\Hook\ModuleHooks::pageAttachments()
+      // @see \Drupal\canvas\Access\CanvasUiAccessCheck
+      'test_create_access_cache_tag',
     ], $response->getCacheableMetadata()->getCacheTags());
 
     $this->assertTitle('Audit of Canvas test SDC with props and slots usages | ');
@@ -194,16 +200,21 @@ final class ComponentAuditControllerTest extends KernelTestBase {
     $audit_url = Url::fromRoute('entity.component.audit', ['component' => 'sdc.canvas_test_sdc.druplicon'])->toString();
     $response = $this->request(Request::create($audit_url));
     assert($response instanceof HtmlResponse);
-    $this->assertSame([
+    self::assertEqualsCanonicalizing([
       'theme',
       'user.roles:authenticated',
       'languages:language_interface',
       'user.permissions',
       'url.query_args:_wrapper_format',
     ], $response->getCacheableMetadata()->getCacheContexts());
-    $this->assertSame([
+    self::assertEqualsCanonicalizing([
       'rendered',
       'http_response',
+      // Cache tag bubbled by the conditional attaching of the asset library for
+      // tracking which page to navigate to when exiting the Canvas UI.
+      // @see \Drupal\canvas\Hook\ModuleHooks::pageAttachments()
+      // @see \Drupal\canvas\Access\CanvasUiAccessCheck
+      'test_create_access_cache_tag',
     ], $response->getCacheableMetadata()->getCacheTags());
 
     $this->assertTitle('Audit of Druplicon usages | ');

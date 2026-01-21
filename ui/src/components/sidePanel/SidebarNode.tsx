@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { clsx } from 'clsx';
+import TemplateIcon from '@assets/icons/template.svg?react';
 import {
   BoxModelIcon,
   CodeIcon,
@@ -8,12 +9,14 @@ import {
   ComponentBooleanIcon,
   CubeIcon,
   DotsHorizontalIcon,
-  FileIcon,
+  ExclamationTriangleIcon,
   FileTextIcon,
   HomeIcon,
   SectionIcon,
 } from '@radix-ui/react-icons';
 import { DropdownMenu, Flex, Text } from '@radix-ui/themes';
+
+import { useIndentContext } from './ListIndentContext';
 
 import styles from './SidebarNode.module.css';
 
@@ -23,11 +26,12 @@ const VARIANTS = {
   codeComponent: { icon: <Component2Icon /> },
   dynamicComponent: { icon: <ComponentBooleanIcon /> },
   homepage: { icon: <HomeIcon /> },
-  page: { icon: <FileIcon /> },
+  page: { icon: <FileTextIcon /> },
   region: { icon: <CubeIcon /> },
   pattern: { icon: <SectionIcon /> },
   slot: { icon: <BoxModelIcon /> },
-  template: { icon: <FileTextIcon /> },
+  template: { icon: <TemplateIcon /> },
+  broken: { icon: <ExclamationTriangleIcon /> },
 } as const;
 
 export type SideBarNodeVariant = keyof typeof VARIANTS;
@@ -42,12 +46,17 @@ const SidebarNode = React.forwardRef<
     draggable?: boolean;
     selected?: boolean;
     disabled?: boolean;
+    broken?: boolean;
     dropdownMenuContent?: React.ReactNode;
     open?: boolean;
     className?: string;
     onMenuOpenChange?: (open: boolean) => void;
-    includeDropdown?: boolean;
     href?: string;
+    /**
+     * Number of indentation levels to apply to the node.
+     * Will fall back to the ListIndentContext if not provided.
+     */
+    indent?: number;
   } & React.HTMLAttributes<HTMLDivElement>
 >(
   (
@@ -57,29 +66,34 @@ const SidebarNode = React.forwardRef<
       leadingContent,
       hovered = false,
       selected = false,
-      draggable = true,
+      draggable = false,
       disabled = false,
+      broken = false,
       dropdownMenuContent = null,
       open = false,
       className,
       onMenuOpenChange,
-      includeDropdown = true,
       href,
+      indent,
       ...props
     },
     ref,
   ) => {
+    const contextIndent = useIndentContext();
+    const effectiveIndent = indent ?? contextIndent;
+    const isDisabled = disabled || broken;
     const content = (
       <Flex
         align="center"
         pr="2"
         maxWidth="100%"
+        pl={`calc(${effectiveIndent} * var(--space-2))`}
         className={clsx(
           styles[`${variant}Variant`],
           {
             [styles.hovered]: hovered,
             [styles.selected]: selected,
-            [styles.disabled]: disabled,
+            [styles.disabled]: isDisabled,
             [styles.draggable]: draggable,
             [styles.open]: open,
           },
@@ -100,7 +114,9 @@ const SidebarNode = React.forwardRef<
             </Flex>
           )}
           <Flex pl="2" align="center" flexShrink="0" className={styles.icon}>
-            {VARIANTS[variant].icon}
+            {broken
+              ? VARIANTS['broken']?.icon
+              : VARIANTS[variant]?.icon || <Component1Icon />}
           </Flex>
           <Flex px="2" align="center" flexGrow="1" overflow="hidden">
             <Text size="1" truncate className={styles.title}>
@@ -108,7 +124,7 @@ const SidebarNode = React.forwardRef<
             </Text>
           </Flex>
         </Flex>
-        {includeDropdown && dropdownMenuContent && (
+        {dropdownMenuContent && (
           <DropdownMenu.Root onOpenChange={onMenuOpenChange}>
             <DropdownMenu.Trigger>
               <button

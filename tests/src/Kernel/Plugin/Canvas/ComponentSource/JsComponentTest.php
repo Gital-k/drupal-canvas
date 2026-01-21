@@ -6,17 +6,28 @@ namespace Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource;
 
 // cspell:ignore Tilly anzut nhsy sxnz Umso Dzyawdvr Mafgg Royu Cmsy Pmsg Lgfkq ergmkgy Ptgi Ltxk
 
+use Drupal\canvas\ComponentSource\ComponentSourceBase;
+use Drupal\canvas\ComponentSource\ComponentSourceManager;
+use Drupal\canvas\ComponentSource\ComponentSourceWithSlotsInterface;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponentDiscovery;
+use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
 use Drupal\Component\Serialization\Json;
 use Drupal\Component\Utility\Crypt;
 use Drupal\Component\Utility\NestedArray;
+use Drupal\Core\Access\AccessResultForbidden;
 use Drupal\Core\Asset\AssetResolverInterface;
 use Drupal\Core\Asset\AttachedAssets;
+use Drupal\Core\Cache\Cache;
 use Drupal\Core\Cache\CacheableDependencyInterface;
 use Drupal\Core\Cache\CacheableMetadata;
+use Drupal\Core\Config\StorageInterface;
 use Drupal\Core\Extension\ModuleExtensionList;
 use Drupal\Core\File\FileUrlGeneratorInterface;
+use Drupal\Core\GeneratedUrl;
 use Drupal\Core\StreamWrapper\StreamWrapperInterface;
 use Drupal\Core\StreamWrapper\StreamWrapperManagerInterface;
+use Drupal\Tests\canvas\Kernel\BrokenPluginManagerInterface;
+use Drupal\link\LinkItemInterface;
 use Drupal\Tests\canvas\Kernel\Traits\CacheBustingTrait;
 use Drupal\Tests\canvas\Kernel\Traits\CiModulePathTrait;
 use Drupal\Tests\canvas\Traits\CrawlerTrait;
@@ -28,7 +39,6 @@ use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
-use Drupal\canvas\PropExpressions\StructuredData\FieldTypePropExpression;
 use Drupal\canvas\PropSource\StaticPropSource;
 use Drupal\canvas\Render\ImportMapResponseAttachmentsProcessor;
 use Drupal\media\Entity\MediaType;
@@ -39,11 +49,12 @@ use Drupal\canvas_test_code_components\Hook\IslandCastaway;
  *
  * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent
  * @group canvas
+ * @group canvas_component_sources
  * @group JavaScriptComponents
  *
  * @phpstan-import-type ComponentConfigEntityId from \Drupal\canvas\Entity\Component
  */
-final class JsComponentTest extends ComponentSourceTestBase {
+final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSourceBaseTestBase {
 
   use CiModulePathTrait;
   use UserCreationTrait;
@@ -52,6 +63,14 @@ final class JsComponentTest extends ComponentSourceTestBase {
 
   protected readonly AssetResolverInterface $assetResolver;
   protected readonly CodeComponentDataProvider $codeComponentDataProvider;
+
+  /**
+   * @see ::testRenderSdcWithOptionalObjectShape())
+   */
+  protected string $componentWithOptionalImageProp = 'js.canvas_test_code_components_vanilla_image';
+
+  const string PSEUDO_RANDOM_CODE_COMPONENT_ID = 'pseudo_random_id';
+
   /**
    * {@inheritdoc}
    */
@@ -149,7 +168,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
       $private_method = new \ReflectionMethod($source, 'getDefaultStaticPropSource');
       $private_method->setAccessible(TRUE);
       foreach (array_keys($settings[$component_id]['prop_field_definitions']) as $prop) {
-        $static_prop_source = $private_method->invoke($source, $prop);
+        $static_prop_source = $private_method->invoke($source, $prop, TRUE);
         $this->assertInstanceOf(StaticPropSource::class, $static_prop_source);
       }
     }
@@ -159,29 +178,8 @@ final class JsComponentTest extends ComponentSourceTestBase {
     return [
       'js.canvas_test_code_components_captioned_video' => [
         'prop_field_definitions' => [
-          'caption' => [
-            'field_type' => 'string',
-            'field_storage_settings' => [],
-            'field_instance_settings' => [],
-            'field_widget' => 'string_textfield',
-            'default_value' => [
-              ['value' => 'A video'],
-            ],
-            'expression' => 'ℹ︎string␟value',
-          ],
-          'displayWidth' => [
-            'field_type' => 'list_integer',
-            'field_storage_settings' => [
-              'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
-            ],
-            'field_instance_settings' => [],
-            'field_widget' => 'options_select',
-            'default_value' => [
-              ['value' => 400],
-            ],
-            'expression' => 'ℹ︎list_integer␟value',
-          ],
           'video' => [
+            'required' => TRUE,
             'field_type' => 'entity_reference',
             'field_storage_settings' => [
               'target_type' => 'media',
@@ -200,11 +198,36 @@ final class JsComponentTest extends ComponentSourceTestBase {
             'default_value' => [],
             'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:video␝field_media_video_file␞␟entity␜␜entity:file␝uri␞␟url}',
           ],
+          'displayWidth' => [
+            'required' => FALSE,
+            'field_type' => 'list_integer',
+            'field_storage_settings' => [
+              'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
+            ],
+            'field_instance_settings' => [],
+            'field_widget' => 'options_select',
+            'default_value' => [
+              ['value' => 400],
+            ],
+            'expression' => 'ℹ︎list_integer␟value',
+          ],
+          'caption' => [
+            'required' => TRUE,
+            'field_type' => 'string',
+            'field_storage_settings' => [],
+            'field_instance_settings' => [],
+            'field_widget' => 'string_textfield',
+            'default_value' => [
+              ['value' => 'A video'],
+            ],
+            'expression' => 'ℹ︎string␟value',
+          ],
         ],
       ],
       'js.canvas_test_code_components_interactive' => [
         'prop_field_definitions' => [
           'name' => [
+            'required' => TRUE,
             'field_type' => 'string',
             'field_storage_settings' => [],
             'field_instance_settings' => [],
@@ -223,6 +246,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
       'js.canvas_test_code_components_vanilla_image' => [
         'prop_field_definitions' => [
           'image' => [
+            'required' => FALSE,
             'field_type' => 'image',
             'field_storage_settings' => [],
             'field_instance_settings' => [],
@@ -237,6 +261,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
       'js.canvas_test_code_components_with_enums' => [
         'prop_field_definitions' => [
           'favorite_color' => [
+            'required' => FALSE,
             'field_type' => 'list_string',
             'field_storage_settings' => [
               'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
@@ -251,6 +276,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
             'expression' => 'ℹ︎list_string␟value',
           ],
           'size' => [
+            'required' => FALSE,
             'field_type' => 'list_string',
             'field_storage_settings' => [
               'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
@@ -268,11 +294,22 @@ final class JsComponentTest extends ComponentSourceTestBase {
       ],
       'js.canvas_test_code_components_with_link_prop' => [
         'prop_field_definitions' => [
+          'text' => [
+            'required' => FALSE,
+            'field_type' => 'string',
+            'field_storage_settings' => [],
+            'field_instance_settings' => [],
+            'field_widget' => 'string_textfield',
+            'default_value' => [0 => ['value' => 'This is my link']],
+            'expression' => 'ℹ︎string␟value',
+          ],
           'link' => [
+            'required' => FALSE,
             'field_type' => 'link',
             'field_storage_settings' => [],
             'field_instance_settings' => [
               'title' => 0,
+              'link_type' => LinkItemInterface::LINK_GENERIC,
             ],
             'field_widget' => 'link_default',
             'default_value' => [
@@ -283,14 +320,6 @@ final class JsComponentTest extends ComponentSourceTestBase {
             ],
             'expression' => 'ℹ︎link␟url',
           ],
-          'text' => [
-            'field_type' => 'string',
-            'field_storage_settings' => [],
-            'field_instance_settings' => [],
-            'field_widget' => 'string_textfield',
-            'default_value' => [0 => ['value' => 'This is my link']],
-            'expression' => 'ℹ︎string␟value',
-          ],
         ],
       ],
       'js.canvas_test_code_components_with_no_props' => [
@@ -298,15 +327,8 @@ final class JsComponentTest extends ComponentSourceTestBase {
       ],
       'js.canvas_test_code_components_with_props' => [
         'prop_field_definitions' => [
-          'age' => [
-            'field_type' => 'integer',
-            'field_storage_settings' => [],
-            'field_instance_settings' => [],
-            'field_widget' => 'number',
-            'default_value' => [0 => ['value' => 40]],
-            'expression' => 'ℹ︎integer␟value',
-          ],
           'name' => [
+            'required' => TRUE,
             'field_type' => 'string',
             'field_storage_settings' => [],
             'field_instance_settings' => [],
@@ -314,11 +336,22 @@ final class JsComponentTest extends ComponentSourceTestBase {
             'default_value' => [0 => ['value' => 'Canvas']],
             'expression' => 'ℹ︎string␟value',
           ],
+          'age' => [
+            'required' => FALSE,
+            'field_type' => 'integer',
+            'field_storage_settings' => [],
+            'field_instance_settings' => [],
+            'field_widget' => 'number',
+            'default_value' => [0 => ['value' => 40]],
+            'expression' => 'ℹ︎integer␟value',
+          ],
+
         ],
       ],
       'js.canvas_test_code_components_with_slots' => [
         'prop_field_definitions' => [
           'name' => [
+            'required' => TRUE  ,
             'field_type' => 'string',
             'field_storage_settings' => [],
             'field_instance_settings' => [],
@@ -404,6 +437,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
         '@/lib/jsonapi-utils' => \sprintf('%s/ui/lib/astro-hydration/dist/jsonapi-utils.js?2.1.0-alpha3', $module_path),
         '@/lib/drupal-utils' => \sprintf('%s/ui/lib/astro-hydration/dist/drupal-utils.js?2.1.0-alpha3', $module_path),
         'swr' => \sprintf('%s/ui/lib/astro-hydration/dist/swr.js?2.1.0-alpha3', $module_path),
+        'drupal-canvas' => \sprintf('%s/ui/lib/astro-hydration/dist/drupal-canvas.js?2.1.0-alpha3', $module_path),
       ],
     ];
 
@@ -690,7 +724,10 @@ final class JsComponentTest extends ComponentSourceTestBase {
     $js_component = $source->getJavaScriptComponent();
     $expected_component_compiled_js = $js_component->getJs();
     $expected_component_compiled_css = $js_component->getCss();
-    $expected_component_props = $js_component->getProps();
+    $expected_component_props = array_map(
+      fn (array $prop_json_schema) => new EvaluationResult($prop_json_schema['examples'][0]),
+      $js_component->getProps() ?? [],
+    );
 
     // Create auto-save entry if that's expected by this test case.
     if ($auto_save_exists) {
@@ -716,7 +753,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
 
     $island = $source->renderComponent([
       'props' => $expected_component_props,
-    ], 'some-uuid', $preview_requested);
+    ], $source->getSlotDefinitions(), 'some-uuid', $preview_requested);
 
     $this->assertEquals($expected_cacheability, CacheableMetadata::createFromRenderArray($island));
 
@@ -729,9 +766,9 @@ final class JsComponentTest extends ComponentSourceTestBase {
     // they should not be present as props in the canvas-island element.
     // Ternary because empty arrays are encoded as '[]' in Json::encode().
     $json_expected = (empty($expected_component_props)) ? '{}' :
-      Json::encode(\array_map(static fn(mixed $value): array => [
+      Json::encode(\array_map(static fn(EvaluationResult $r): array => [
         'raw',
-        $value,
+        $r->value,
       ], $expected_component_props));
     self::assertJsonStringEqualsJsonString($json_expected, $element->attr('props') ?? '');
 
@@ -790,14 +827,25 @@ final class JsComponentTest extends ComponentSourceTestBase {
     $source = $video_component->getComponentSource();
     self::assertInstanceOf(JsComponent::class, $source);
 
+    $assert_cacheability = function (GeneratedUrl $g) {
+      self::assertEqualsCanonicalizing([], $g->getCacheTags());
+      self::assertEqualsCanonicalizing([], $g->getCacheContexts());
+      self::assertSame(Cache::PERMANENT, $g->getCacheMaxAge());
+    };
+
     // Assert that the two example videos Canvas ships with are rewritten to include
     // the relative path on the current site.
     $module_path = \Drupal::service(ModuleExtensionList::class)->getPath('canvas');
-    self::assertSame(\base_path() . $module_path . JsComponent::EXAMPLE_VIDEO_HORIZONTAL, $source->rewriteExampleUrl(JsComponent::EXAMPLE_VIDEO_HORIZONTAL));
-    self::assertSame(\base_path() . $module_path . JsComponent::EXAMPLE_VIDEO_VERTICAL, $source->rewriteExampleUrl(JsComponent::EXAMPLE_VIDEO_VERTICAL));
+    foreach ([JsComponent::EXAMPLE_VIDEO_HORIZONTAL, JsComponent::EXAMPLE_VIDEO_VERTICAL] as $shipped_video_file) {
+      $generated_url = $source->rewriteExampleUrl($shipped_video_file);
+      self::assertSame(\base_path() . $module_path . $shipped_video_file, $generated_url->getGeneratedUrl());
+      $assert_cacheability($generated_url);
+    }
 
-    // Assert that full URLs are left alone.
-    self::assertSame('https://www.example.com/', $source->rewriteExampleUrl('https://www.example.com/'));
+    // Assert that full URLs are left alone, and get permanent cacheability.
+    $generated_url = $source->rewriteExampleUrl('https://www.example.com/');
+    self::assertSame('https://www.example.com/', $generated_url->getGeneratedUrl());
+    $assert_cacheability($generated_url);
 
     // Assert that any other `/ui/assets/…` URL is disallowed, not even one to
     // the containing directory.
@@ -924,6 +972,30 @@ final class JsComponentTest extends ComponentSourceTestBase {
     ], $this->callSourceMethodForEach('calculateDependencies', $component_ids));
   }
 
+  protected function alterEnvironmentForCrashTestDummyComponentTree(string $component_id, array $inputs): void {
+    // The test case that tries to pass a string where an integer is needed.
+    if (\array_key_exists('age', $inputs) && $inputs['age'] === "It's rude to ask") {
+      $component = Component::load($component_id);
+      self::assertInstanceOf(Component::class, $component);
+      self::assertCount(1, $component->getVersions());
+      $new_settings = $component->getSettings();
+      self::assertSame('integer', $new_settings['prop_field_definitions']['age']['field_type']);
+      $new_settings['prop_field_definitions']['age']['field_type'] = 'string';
+      $new_settings['prop_field_definitions']['age']['default_value'][0] = ['value' => 'Oh hi'];
+      $new_settings['prop_field_definitions']['age']['expression'] = 'ℹ︎string␟value';
+      $new_settings['prop_field_definitions']['age']['field_widget'] = 'string_textfield';
+      $source = $this->container->get(ComponentSourceManager::class)->createInstance(JsComponent::SOURCE_PLUGIN_ID, [
+        'local_source_id' => JsComponentDiscovery::getSourceSpecificComponentId($component_id),
+        ...$new_settings,
+      ]);
+      \assert($source instanceof ComponentSourceBase);
+      $component->createVersion($source->generateVersionHash())
+        ->setSettings($new_settings)
+        ->save();
+      self::assertCount(2, $component->getVersions());
+    }
+  }
+
   /**
    * {@inheritdoc}
    */
@@ -954,14 +1026,10 @@ final class JsComponentTest extends ComponentSourceTestBase {
       'expected_output_selector' => NULL,
     ];
 
-    yield "JS Component with invalid props, validation error" => [
+    yield "JS Component with invalid props (wrong shape: string instead of integer!), validation error" => [
       'component_id' => $component_id,
       'inputs' => [
-        'age' => [
-          'sourceType' => "static:field_item:string",
-          'value' => "It's rude to ask",
-          'expression' => (string) new FieldTypePropExpression('string', 'value'),
-        ],
+        'age' => "It's rude to ask",
         'name' => 'Tilly',
       ],
       'expected_validation_errors' => [
@@ -969,7 +1037,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
       ],
       'expected_exception' => NULL,
       // JsComponents can recover from invalid inputs.
-      'expected_output_selector' => \sprintf('canvas-island[uid="%s"]', self::UUID_CRASH_TEST_DUMMY),
+      'expected_output_selector' => \sprintf('canvas-island[uid="%s"][props*="Tilly"]', self::UUID_CRASH_TEST_DUMMY),
     ];
 
     yield "JS Component with missing props, validation error" => [
@@ -1083,6 +1151,8 @@ final class JsComponentTest extends ComponentSourceTestBase {
       ],
       'dataDependencies' => [],
     ]);
+    $js_component->save();
+
     // Add the dependency through client API.
     $js_component_data = $js_component->normalizeForClientSide()->values;
     $js_component_data['importedJsComponents'] = ['dependency_component', 'dependency_component_no_css'];
@@ -1136,7 +1206,8 @@ final class JsComponentTest extends ComponentSourceTestBase {
     $component = Component::load(JsComponent::componentIdFromJavascriptComponentId((string) $js_component->id()));
     \assert($component instanceof ComponentInterface);
     $source = $component->getComponentSource();
-    $rendered_component = $source->renderComponent([], 'test-uuid', $preview);
+    \assert($source instanceof ComponentSourceWithSlotsInterface);
+    $rendered_component = $source->renderComponent([], $source->getSlotDefinitions(), 'test-uuid', $preview);
     self::assertArrayHasKey('#import_maps', $rendered_component);
     self::assertArrayHasKey(ImportMapResponseAttachmentsProcessor::SCOPED_IMPORTS, $rendered_component['#import_maps']);
     $scoped_import_maps = $rendered_component['#import_maps']['scopes'];
@@ -1169,7 +1240,9 @@ final class JsComponentTest extends ComponentSourceTestBase {
       self::assertNotContains('canvas/astro_island.dependency_component.draft', $attached_libraries);
     }
     self::assertEquals(['@/components/nested_dependency_component' => $nested_dependency_js_path], $scoped_import_maps[$dependency_import_key]);
+    // @phpstan-ignore-next-line argument.type
     self::assertArrayNotHasKey($nested_dependency_key, $scoped_import_maps);
+    // @phpstan-ignore-next-line argument.type
     self::assertArrayNotHasKey($dependency_without_css_import_key, $scoped_import_maps);
 
     // If we created an auto-save entry for the main component, and we are in
@@ -1185,7 +1258,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
       $autoSave->saveEntity(
         $js_component,
       );
-      $rendered_component = $source->renderComponent([], 'test-uuid', $preview);
+      $rendered_component = $source->renderComponent([], $source->getSlotDefinitions(), 'test-uuid', $preview);
       self::assertArrayHasKey('#import_maps', $rendered_component);
       self::assertArrayNotHasKey(ImportMapResponseAttachmentsProcessor::SCOPED_IMPORTS, $rendered_component['#import_maps']);
       self::assertNotEmpty($rendered_component['#attached']['library']);
@@ -1212,8 +1285,8 @@ final class JsComponentTest extends ComponentSourceTestBase {
           'video' => [
             'required' => TRUE,
             'jsonSchema' => [
-              'title' => 'video',
               'type' => 'object',
+              'title' => 'video',
               'required' => ['src'],
               'properties' => [
                 'src' => [
@@ -1221,16 +1294,18 @@ final class JsComponentTest extends ComponentSourceTestBase {
                   'type' => 'string',
                   'format' => 'uri-reference',
                   'contentMediaType' => 'video/*',
-                  'pattern' => '^(/|https?://)?(?!.*\://)[^\s]+$',
+                  'x-allowed-schemes' => ['http', 'https'],
                 ],
                 'poster' => [
-                  'title' => 'Image URL',
+                  'title' => 'Poster image URL',
                   'type' => 'string',
                   'format' => 'uri-reference',
                   'contentMediaType' => 'image/*',
-                  'pattern' => '^(/|https?://)?(?!.*\://)[^\s]+$',
+                  'x-allowed-schemes' => ['http', 'https'],
+                  'id' => 'json-schema-definitions://canvas.module/image-uri',
                 ],
               ],
+              'id' => 'json-schema-definitions://canvas.module/video',
             ],
             'sourceType' => 'static:field_item:entity_reference',
             'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:video␝field_media_video_file␞␟entity␜␜entity:file␝uri␞␟url}',
@@ -1355,8 +1430,8 @@ final class JsComponentTest extends ComponentSourceTestBase {
           'image' => [
             'required' => FALSE,
             'jsonSchema' => [
-              'title' => 'image',
               'type' => 'object',
+              'title' => 'image',
               'required' => [
                 0 => 'src',
               ],
@@ -1366,7 +1441,8 @@ final class JsComponentTest extends ComponentSourceTestBase {
                   'type' => 'string',
                   'format' => 'uri-reference',
                   'contentMediaType' => 'image/*',
-                  'pattern' => '^(/|https?://)?(?!.*\://)[^\s]+$',
+                  'x-allowed-schemes' => ['http', 'https'],
+                  'id' => 'json-schema-definitions://canvas.module/image-uri',
                 ],
                 'alt' => [
                   'title' => 'Alternative text',
@@ -1381,6 +1457,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
                   'type' => 'integer',
                 ],
               ],
+              'id' => 'json-schema-definitions://canvas.module/image',
             ],
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
@@ -1495,6 +1572,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
             'sourceTypeSettings' => [
               'instance' => [
                 'title' => 0,
+                'link_type' => LinkItemInterface::LINK_GENERIC,
               ],
             ],
             'default_values' => [
@@ -1681,7 +1759,19 @@ final class JsComponentTest extends ComponentSourceTestBase {
   protected function deleteConfigAndTriggerComponentFallback(ComponentInterface $used_component, ComponentInterface $unused_component): void {
     $source = $used_component->getComponentSource();
     \assert($source instanceof JsComponent);
-    $source->getJavaScriptComponent()->delete();
+
+    // Deletion is prevented by the access handler.
+    $js_component = $source->getJavaScriptComponent();
+    // @phpstan-ignore-next-line argument.type
+    $access = $js_component->access('delete', $this->createUser([JavaScriptComponent::ADMIN_PERMISSION]), return_as_object: TRUE);
+    self::assertEquals(
+      (new AccessResultForbidden('This code component is in use in a default revision and cannot be deleted.'))->addCacheContexts(['user.permissions']),
+      $access,
+    );
+
+    // However, scripts (and config management) do not check access.
+    $js_component->delete();
+
     $source = $unused_component->getComponentSource();
     \assert($source instanceof JsComponent);
     $source->getJavaScriptComponent()->delete();
@@ -1845,9 +1935,8 @@ final class JsComponentTest extends ComponentSourceTestBase {
   }
 
   protected function createAndSaveInUseComponentForUninstallValidationTesting(): ComponentInterface {
-    $js_component_id = $this->randomMachineName();
     $js_component = JavaScriptComponent::create([
-      'machineName' => $js_component_id,
+      'machineName' => self::PSEUDO_RANDOM_CODE_COMPONENT_ID,
       'name' => $this->getRandomGenerator()->sentences(5),
       'status' => FALSE,
       'props' => [
@@ -1871,7 +1960,7 @@ final class JsComponentTest extends ComponentSourceTestBase {
       'dataDependencies' => [],
     ]);
     $js_component->enable()->save();
-    $component_id = JsComponent::componentIdFromJavascriptComponentId($js_component_id);
+    $component_id = JsComponent::componentIdFromJavascriptComponentId(self::PSEUDO_RANDOM_CODE_COMPONENT_ID);
     /** @var \Drupal\canvas\Entity\ComponentInterface */
     return Component::load($component_id);
   }
@@ -1887,6 +1976,39 @@ final class JsComponentTest extends ComponentSourceTestBase {
 
   protected function getAllowedModuleForUninstallValidatorTesting(): string {
     $this->markTestSkipped('Uninstall is not valid for JS Components as they only depend on config, not optional modules.');
+  }
+
+  protected function triggerBrokenComponent(ComponentInterface $component): ?BrokenPluginManagerInterface {
+    $config_storage = \Drupal::service('config.storage');
+    assert($config_storage instanceof StorageInterface);
+    $js_component_source = $component->getComponentSource();
+    assert($js_component_source instanceof JsComponent);
+
+    // Delete the JavaScriptComponent config WITHOUT triggering
+    // Component::onDependencyRemoval(), hence simulating a bypassing of all
+    // protections.
+    $config_storage->delete($js_component_source->getJavaScriptComponent()->getConfigDependencyName());
+
+    return NULL;
+  }
+
+  /**
+   * {@inheritdoc}
+   *
+   * Code components do not render final HTML, so adjust expectations.
+   */
+  public static function providerHydrationAndRenderingEdgeCases(): array {
+    $test_cases = parent::providerHydrationAndRenderingEdgeCases();
+    $test_cases['populated optional object prop'][2] = 'props="{&quot;image&quot;:[&quot;raw&quot;,{&quot;src&quot;:&quot;\/cat.jpg&quot;,&quot;alt&quot;:&quot;\ud83e\udd99&quot;,&quot;width&quot;:1,&quot;height&quot;:1}]}"';
+    $test_cases['NULLish optional object prop'][2] = 'props="{}"';
+    $test_cases['NULL optional object prop'][2] = 'props="{}"';
+    return $test_cases;
+  }
+
+  protected function getExpectedVerboseErrorMessage(): string {
+    // The code component was deleted by bypassing lots of protections.
+    // @see ::triggerBrokenComponent()
+    return sprintf('The JavaScript Component with ID `%s` does not exist.', self::PSEUDO_RANDOM_CODE_COMPONENT_ID);
   }
 
 }

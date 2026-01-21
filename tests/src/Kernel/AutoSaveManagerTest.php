@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
+use Drupal\Component\Datetime\Time;
 use Drupal\Core\Config\ConfigManagerInterface;
+use Drupal\Core\DependencyInjection\ContainerBuilder;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Extension\ThemeInstallerInterface;
@@ -21,6 +23,7 @@ use Drupal\canvas\Plugin\DisplayVariant\CanvasPageVariant;
 use Drupal\canvas\Render\PreviewEnvelope;
 use Drupal\KernelTests\KernelTestBase;
 use Drupal\node\Entity\Node;
+use Drupal\Tests\canvas\Traits\CanvasFieldCreationTrait;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\canvas\Traits\CanvasFieldTrait;
@@ -35,6 +38,7 @@ use Symfony\Component\Validator\ConstraintViolationInterface;
  */
 class AutoSaveManagerTest extends KernelTestBase {
 
+  use CanvasFieldCreationTrait;
   use CanvasFieldTrait;
   use ContribStrictConfigSchemaTestTrait;
   use GenerateComponentConfigTrait;
@@ -61,7 +65,7 @@ class AutoSaveManagerTest extends KernelTestBase {
     'field',
     'editor',
     'ckeditor5',
-    'canvas_dev_standard',
+    'datetime',
   ];
 
   private static function recursiveReverseSort(array $data): array {
@@ -80,11 +84,25 @@ class AutoSaveManagerTest extends KernelTestBase {
   /**
    * {@inheritdoc}
    */
+  public function register(ContainerBuilder $container): void {
+    parent::register($container);
+
+    $container->getDefinition('datetime.time')
+      ->setClass(AutoSaveManagerTestTime::class);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   protected function setUp(): void {
     parent::setUp();
     $this->container->get(ThemeInstallerInterface::class)->install(['stark']);
     $this->config('system.theme')->set('default', 'stark')->save();
     $this->installConfig('canvas');
+    // URLs are generated during some of these kernel tests. Canvas depends on
+    // the `path` module, so the PathAlias entity type must be installed. URL
+    // generation fails without this.
+    $this->installEntitySchema('path_alias');
     $this->generateComponentConfig();
   }
 
@@ -190,7 +208,10 @@ class AutoSaveManagerTest extends KernelTestBase {
 
     $envelope = \Drupal::classResolver(ApiLayoutController::class)->get($canvas_page);
     \assert($envelope instanceof PreviewEnvelope);
-    $matching_client_data = \array_intersect_key($envelope->additionalData, \array_flip(['layout', 'model', 'entity_form_fields']));
+    $matching_client_data = \array_intersect_key(
+      $envelope->additionalData,
+      \array_flip(['layout', 'model', 'entity_form_fields'])
+    );
     $new_title_client_data = $matching_client_data;
     $new_title_client_data['entity_form_fields']['title[0][value]'] = '5 MORE amazing uses for old toothbrushes';
     $this->assertAutoSaveCreated($canvas_page, $matching_client_data, $new_title_client_data);
@@ -216,7 +237,7 @@ class AutoSaveManagerTest extends KernelTestBase {
         [
           'uuid' => self::UUID_IN_ROOT,
           'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
-          'component_version' => '95f4f1d5ee47663b',
+          'component_version' => 'b1e991f726a2a266',
           'inputs' => [
             'heading' => 'world',
           ],
@@ -292,8 +313,8 @@ class AutoSaveManagerTest extends KernelTestBase {
     $this->installConfig('node');
     $this->installConfig('system');
     $this->createContentType(['type' => 'article']);
-    $this->installConfig('canvas_dev_standard');
     $this->createMediaType('image', ['id' => 'image', 'label' => 'Image']);
+    $this->createComponentTreeField('node', 'article', 'field_component_tree');
     $this->setUpImages();
     $node = Node::create([
       'type' => 'article',
@@ -311,7 +332,10 @@ class AutoSaveManagerTest extends KernelTestBase {
 
     $envelope = \Drupal::classResolver(ApiLayoutController::class)->get($node);
     \assert($envelope instanceof PreviewEnvelope);
-    $matching_client_data = \array_intersect_key($envelope->additionalData, \array_flip(['layout', 'model', 'entity_form_fields']));
+    $matching_client_data = \array_intersect_key(
+      $envelope->additionalData,
+      \array_flip(['layout', 'model', 'entity_form_fields'])
+    );
     $new_title_client_data = $matching_client_data;
     $new_title_client_data['entity_form_fields']['title[0][value]'] = '5 MORE amazing uses for old toothbrushes';
     $this->assertAutoSaveCreated($node, $matching_client_data, $new_title_client_data);
@@ -449,6 +473,77 @@ class AutoSaveManagerTest extends KernelTestBase {
     $auto_save_manager->delete($page);
     $violations = $auto_save_manager->getComponentInstanceFormViolations($uuid);
     self::assertCount(0, $violations);
+  }
+
+  /**
+   * Tests that auto-save entries do not expire.
+   *
+   * Verifies that auto-save entries stored in the key-value store remain
+   * accessible over extended periods of time.
+   *
+   * @covers ::saveEntity
+   * @covers ::getAutoSaveEntity
+   * @covers ::getAllAutoSaveList
+   */
+  public function testAutoSaveDoesNotExpire(): void {
+    $this->installEntitySchema('user');
+    $this->installEntitySchema('path_alias');
+    $this->installEntitySchema(Page::ENTITY_TYPE_ID);
+
+    $auto_save_manager = $this->container->get(AutoSaveManager::class);
+    \assert($auto_save_manager instanceof AutoSaveManager);
+
+    // Create a page entity.
+    $page = Page::create([
+      'title' => 'Test page for persistence',
+      'components' => [],
+    ]);
+    self::assertSame(SAVED_NEW, $page->save());
+
+    // Make a change to trigger an auto-save.
+    $page->set('title', 'Updated title');
+    $auto_save_manager->saveEntity($page);
+
+    // Verify the auto-save exists.
+    $auto_save_key = AutoSaveManager::getAutoSaveKey($page);
+    $list = $auto_save_manager->getAllAutoSaveList();
+    self::assertCount(1, $list);
+    self::assertArrayHasKey($auto_save_key, $list);
+    self::assertFalse($auto_save_manager->getAutoSaveEntity($page)->isEmpty());
+    self::assertEquals('Updated title', $list[$auto_save_key]['label']);
+
+    $tempstore_expire = \Drupal::getContainer()->getParameter('tempstore.expire');
+    self::assertIsInt($tempstore_expire);
+    // Advance time so the tempstore has expired.
+    AutoSaveManagerTestTime::$offset = $tempstore_expire + 24 * 60;
+
+    // Verify the auto-save entry still persists after the tempstore has expired.
+    $list = $auto_save_manager->getAllAutoSaveList();
+    self::assertCount(1, $list);
+    self::assertArrayHasKey($auto_save_key, $list);
+    self::assertFalse($auto_save_manager->getAutoSaveEntity($page)->isEmpty());
+    self::assertEquals('Updated title', $list[$auto_save_key]['label']);
+  }
+
+}
+
+/**
+ * Test time service that allows time offset for testing.
+ */
+class AutoSaveManagerTestTime extends Time {
+
+  /**
+   * An offset to add to the request time.
+   *
+   * @var int
+   */
+  public static $offset = 0;
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getRequestTime() {
+    return parent::getRequestTime() + static::$offset;
   }
 
 }

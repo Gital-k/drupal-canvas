@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Plugin\DataType;
 
+use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
+use Drupal\canvas\PropSource\AdaptedPropSource;
 use Drupal\Component\Serialization\Json;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Entity\FieldableEntityInterface;
@@ -22,11 +24,25 @@ use Drupal\canvas\PropSource\StaticPropSource;
  * @phpstan-import-type AdaptedPropSourceArray from \Drupal\canvas\PropSource\PropSourceBase
  * @phpstan-import-type DefaultRelativeUrlPropSourceArray from \Drupal\canvas\PropSource\PropSourceBase
  * @phpstan-type SingleComponentInputArray array<string, PropSourceArray|AdaptedPropSourceArray|DefaultRelativeUrlPropSourceArray>
+ * @see \Drupal\canvas\ComponentSource\ComponentSourceInterface::optimizeExplicitInput()
+ * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::optimizeExplicitInput()
+ * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::collapse()
+ * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::uncollapse()
+ * @phpstan-type OptimizedExplicitInput bool|int|float|string|bool[]|int[]|float[]|string[]
+ * @phpstan-type OptimizedSingleComponentInputArray array<string, PropSourceArray|AdaptedPropSourceArray|DefaultRelativeUrlPropSourceArray|OptimizedExplicitInput>
  */
 #[DataType(
   id: "component_inputs",
   label: new TranslatableMarkup("Component inputs"),
   description: new TranslatableMarkup("The input values for the components in a component tree: without structure"),
+  // TRICKY: this does not provide validation constraints, because this is
+  // validated at the component instance level. Component (instance) inputs can
+  // only be validated by the ComponentSource plugin providing this component
+  // that powers this component instance (and is referenced using the Component
+  // ID and version).
+  // @see \Drupal\canvas\ComponentSource\ComponentSourceInterface::validateComponentInput()
+  // @see \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem
+  // @see \Drupal\canvas\Plugin\Validation\Constraint\ValidComponentTreeItemConstraintValidator
 )]
 final class ComponentInputs extends TypedData implements ContentAwareDependentInterface {
 
@@ -42,7 +58,7 @@ final class ComponentInputs extends TypedData implements ContentAwareDependentIn
   /**
    * The parsed data value.
    *
-   * @var SingleComponentInputArray
+   * @var OptimizedSingleComponentInputArray
    */
   protected array $inputs = [];
 
@@ -104,15 +120,14 @@ final class ComponentInputs extends TypedData implements ContentAwareDependentIn
    * Retrieves the list of unique types of prop sources used.
    *
    * @return string[]
-   *   A list of all unique PropSourceBase::getSourceTypePrefix() return values
-   *   stored in this list of component input values, for this component tree.
+   *   A list of all unique prop source types in this list of component input
+   *   values, for this component tree.
    */
-  public function getPropSourceTypePrefixList(): array {
-    $source_type_prefixes = [];
-    foreach ($this->getPropSources() as $propSource) {
-      $source_type_prefixes[] = explode(':', $propSource->getSourceType())[0];
-    }
-    return array_unique($source_type_prefixes);
+  public function getPropSourceTypes(): array {
+    return array_unique(array_map(
+      PropSource::getTypePrefix(...),
+      iterator_to_array($this->getPropSources()),
+    ));
   }
 
   /**
@@ -139,6 +154,28 @@ final class ComponentInputs extends TypedData implements ContentAwareDependentIn
   }
 
   /**
+   * Gets all prop sources that use a particular expression class.
+   *
+   * @param string $expression_class
+   *   The expression class (e.g. `\Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression::class`).
+   *
+   * @return iterable<string, \Drupal\canvas\PropSource\PropSourceBase>
+   *   An array of prop sources that use a particular expression class.
+   *   The keys will be strings in the form of "INSTANCE_UUID:PROP_NAME".
+   */
+  public function getPropSourcesUsingExpressionClass(string $expression_class): iterable {
+    assert(is_a($expression_class, StructuredDataPropExpression::class, TRUE));
+    foreach ($this->getPropSources() as $key => $prop_source) {
+      if ($prop_source instanceof AdaptedPropSource) {
+        throw new \LogicException('@todo as soon as adapted prop sources are actually used');
+      }
+      if (property_exists($prop_source, 'expression') && is_a($prop_source->expression, $expression_class)) {
+        yield $key => $prop_source;
+      }
+    }
+  }
+
+  /**
    * @return \Generator<string, \Drupal\canvas\PropSource\PropSourceBase>
    */
   private function getPropSources(): \Generator {
@@ -153,6 +190,7 @@ final class ComponentInputs extends TypedData implements ContentAwareDependentIn
     foreach ($this->inputs as $name => $raw_prop_source) {
       if (!\is_array($raw_prop_source) || !\array_key_exists('sourceType', $raw_prop_source)) {
         // This is likely a *collapsed* StaticPropSource.
+        /** @var OptimizedExplicitInput $raw_prop_source */
         // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::collapse()
         // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::uncollapse()
         try {
@@ -176,6 +214,9 @@ final class ComponentInputs extends TypedData implements ContentAwareDependentIn
         // @see https://www.drupal.org/project/canvas/issues/3467954
         continue;
       }
+
+      // phpcs:ignore
+      /** @var PropSourceArray|AdaptedPropSourceArray|DefaultRelativeUrlPropSourceArray $raw_prop_source */
       try {
         yield "$name" => PropSource::parse($raw_prop_source);
       }
@@ -189,7 +230,7 @@ final class ComponentInputs extends TypedData implements ContentAwareDependentIn
   /**
    * Gets the values for a given component instance.
    *
-   * @return array<string, array<string, array|string>>
+   * @return OptimizedSingleComponentInputArray
    *
    * @throws \Drupal\Core\TypedData\Exception\MissingDataException
    * @throws \Drupal\canvas\MissingComponentInputsException

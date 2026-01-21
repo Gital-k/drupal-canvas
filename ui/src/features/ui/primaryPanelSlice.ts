@@ -21,6 +21,7 @@ export interface PrimaryPanelState {
   activePanel: string;
   isHidden: boolean;
   aiPanelOpen: boolean;
+  manageLibraryTab: string | null;
 }
 
 export enum LayoutItemType {
@@ -34,17 +35,21 @@ export enum LayoutItemType {
 const savedState = loadSavedState();
 
 const initialState: PrimaryPanelState = {
-  activePanel: savedState.activePanel || 'layers',
+  activePanel: savedState.activePanel || '',
   isHidden: false,
   aiPanelOpen: false,
+  manageLibraryTab: null,
 };
 
 // Temporary workaround to persist primary panel state when switching between entities until
-// we can use routing without full page reloads.
+// we can use routing without full page reloads. It only remembers 'pages' or 'templates' as the active panel.
 const saveToLocalStorage = (state: PrimaryPanelState) => {
   try {
     const dataToSave = {
-      activePanel: state.activePanel,
+      activePanel:
+        state.activePanel === 'templates' || state.activePanel === 'pages'
+          ? state.activePanel
+          : '',
     };
     localStorage.setItem(PANEL_STATE_KEY, JSON.stringify(dataToSave));
   } catch (e) {
@@ -72,6 +77,9 @@ export const primaryPanelSlice = createAppSlice({
     setAiPanelClosed: create.reducer((state) => {
       state.aiPanelOpen = false;
     }),
+    setLibraryTab: create.reducer((state, action: PayloadAction<string>) => {
+      state.manageLibraryTab = action.payload;
+    }),
   }),
   selectors: {
     selectActivePanel: (primaryPanel): string => {
@@ -79,6 +87,9 @@ export const primaryPanelSlice = createAppSlice({
     },
     selectAiPanelOpen: (primaryPanel): boolean => {
       return primaryPanel.aiPanelOpen;
+    },
+    selectLibraryTab: (primaryPanel): string | null => {
+      return primaryPanel.manageLibraryTab;
     },
   },
 });
@@ -89,8 +100,9 @@ export const {
   unsetActivePanel,
   setAiPanelOpen,
   setAiPanelClosed,
+  setLibraryTab,
 } = primaryPanelSlice.actions;
 
 // Selectors returned by `slice.selectors` take the root state as their first argument.
-export const { selectActivePanel, selectAiPanelOpen } =
+export const { selectActivePanel, selectAiPanelOpen, selectLibraryTab } =
   primaryPanelSlice.selectors;

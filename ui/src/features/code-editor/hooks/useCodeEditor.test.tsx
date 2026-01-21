@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { compileCss } from 'tailwindcss-in-browser';
+import { compileCss, compilePartialCss } from 'tailwindcss-in-browser';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import AppWrapper from '@tests/vitest/components/AppWrapper';
@@ -71,6 +71,10 @@ vi.mock('@/features/code-editor/hooks/useCompileCss', () => {
           await compileCss(['test'], '@theme {}');
           return { css: '/* compiled TW CSS */' };
         }),
+      buildComponentCss: vi.fn().mockImplementation(async () => {
+        await compilePartialCss('.test { @apply mb-1; }', '@theme {}');
+        return { css: '/* compiled CSS */' };
+      }),
     }),
   };
 });
@@ -158,8 +162,8 @@ describe('useCodeEditor hook', () => {
         wrapper: ({ children }) => (
           <AppWrapper
             store={store}
-            location="/code-editor/code/test_component"
-            path="/code-editor/code/:codeComponentId"
+            location="/code-editor/component/test_component"
+            path="/code-editor/component/:codeComponentId"
           >
             {children}
           </AppWrapper>
@@ -191,8 +195,8 @@ describe('useCodeEditor hook', () => {
         wrapper: ({ children }) => (
           <AppWrapper
             store={store}
-            location="/code-editor/code/test_component"
-            path="/code-editor/code/:codeComponentId"
+            location="/code-editor/component/test_component"
+            path="/code-editor/component/:codeComponentId"
           >
             {children}
           </AppWrapper>
@@ -231,8 +235,8 @@ describe('useCodeEditor hook', () => {
           wrapper: ({ children }) => (
             <AppWrapper
               store={store}
-              location="/code-editor/code/test_component"
-              path="/code-editor/code/:codeComponentId"
+              location="/code-editor/component/test_component"
+              path="/code-editor/component/:codeComponentId"
             >
               {children}
             </AppWrapper>
@@ -243,7 +247,7 @@ describe('useCodeEditor hook', () => {
     await act(async () => {
       vi.advanceTimersByTime(1500);
     });
-    // We started on /code-editor/code/test_component.
+    // We started on /code-editor/component/test_component.
     expect(store.getState().codeEditor.codeComponent.machineName).toBe(
       'test_component',
     );
@@ -262,9 +266,9 @@ describe('useCodeEditor hook', () => {
       isSuccess: true,
     });
 
-    // Navigate away to /code-editor/code/test_component_2.
+    // Navigate away to /code-editor/component/test_component_2.
     await act(async () => {
-      navigate('/code-editor/code/test_component_2');
+      navigate('/code-editor/component/test_component_2');
     });
 
     await act(async () => {
@@ -282,8 +286,8 @@ describe('useCodeEditor hook', () => {
         wrapper: ({ children }) => (
           <AppWrapper
             store={store}
-            location="/code-editor/code/test_component"
-            path="/code-editor/code/:codeComponentId"
+            location="/code-editor/component/test_component"
+            path="/code-editor/component/:codeComponentId"
           >
             {children}
           </AppWrapper>
@@ -319,8 +323,8 @@ describe('useCodeEditor hook', () => {
         wrapper: ({ children }) => (
           <AppWrapper
             store={store}
-            location="/code-editor/code/test_component"
-            path="/code-editor/code/:codeComponentId"
+            location="/code-editor/component/test_component"
+            path="/code-editor/component/:codeComponentId"
           >
             {children}
           </AppWrapper>
@@ -376,8 +380,8 @@ describe('useCodeEditor hook', () => {
         wrapper: ({ children }) => (
           <AppWrapper
             store={store}
-            location="/code-editor/code/test_component"
-            path="/code-editor/code/:codeComponentId"
+            location="/code-editor/component/test_component"
+            path="/code-editor/component/:codeComponentId"
           >
             {children}
           </AppWrapper>
@@ -428,8 +432,8 @@ describe('useCodeEditor hook', () => {
         wrapper: ({ children }) => (
           <AppWrapper
             store={store}
-            location="/code-editor/code/test_component"
-            path="/code-editor/code/:codeComponentId"
+            location="/code-editor/component/test_component"
+            path="/code-editor/component/:codeComponentId"
           >
             {children}
           </AppWrapper>
@@ -469,8 +473,8 @@ describe('useCodeEditor hook', () => {
         wrapper: ({ children }) => (
           <AppWrapper
             store={store}
-            location="/code-editor/code/test_component"
-            path="/code-editor/code/:codeComponentId"
+            location="/code-editor/component/test_component"
+            path="/code-editor/component/:codeComponentId"
           >
             {children}
           </AppWrapper>
@@ -535,8 +539,8 @@ describe('useCodeEditor hook', () => {
         wrapper: ({ children }) => (
           <AppWrapper
             store={store}
-            location="/code-editor/code/test_component"
-            path="/code-editor/code/:codeComponentId"
+            location="/code-editor/component/test_component"
+            path="/code-editor/component/:codeComponentId"
           >
             {children}
           </AppWrapper>

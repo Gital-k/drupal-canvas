@@ -9,7 +9,7 @@ use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\canvas\Controller\ClientServerConversionTrait;
 use Drupal\canvas\Exception\ConstraintViolationException;
 use Drupal\canvas\Plugin\DisplayVariant\CanvasPageVariant;
-use Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponentDiscovery;
 use Drupal\Core\Entity\Attribute\ConfigEntityType;
 use Drupal\canvas\EntityHandlers\CanvasConfigEntityAccessControlHandler;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
@@ -202,6 +202,11 @@ final class PageRegion extends ComponentTreeConfigEntityBase {
     }
     parent::preSave($storage);
     self::getConfigUpdater()->updateConfigEntityWithComponentTreeInputs($this);
+    if ($this->isSyncing() && self::getConfigUpdater()->needsIntermediateDependenciesComponentUpdate($this)) {
+      // We might need to update dependencies even on import.
+      // @see \canvas_post_update_0002_intermediate_component_dependencies_in_page_regions()
+      $this->calculateDependencies();
+    }
   }
 
   /**
@@ -228,7 +233,7 @@ final class PageRegion extends ComponentTreeConfigEntityBase {
 
     $regions = [];
     foreach ($blocks as $block) {
-      $component_id = BlockComponent::componentIdFromBlockPluginId($block->getPluginId());
+      $component_id = BlockComponentDiscovery::getComponentConfigEntityId($block->getPluginId());
       if (!Component::load($component_id)) {
         // This block isn't supported by Canvas.
         // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent::checkRequirements()

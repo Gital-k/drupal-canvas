@@ -19,10 +19,12 @@ describe('Media Library', () => {
   it('Can remove an optional image no example and there is no image in the preview', () => {
     cy.drupalLogin('canvasUser', 'canvasUser');
     cy.loadURLandWaitForCanvasLoaded({ url: 'canvas/editor/node/2' });
+
     cy.openLibraryPanel();
-    cy.get(
-      '[data-canvas-component-id="sdc.canvas_test_sdc.image-optional-without-example"]',
-    ).realClick();
+    cy.insertComponent({
+      name: 'Canvas test SDC with optional image, without example',
+    });
+
     cy.waitForElementNotInIframe('.layout-content img');
     cy.get(
       '[class*="contextualPanel"] .js-media-library-open-button[data-once="drupal-ajax"]',
@@ -47,9 +49,9 @@ describe('Media Library', () => {
     cy.drupalLogin('canvasUser', 'canvasUser');
     cy.loadURLandWaitForCanvasLoaded({ url: 'canvas/editor/node/2' });
     cy.openLibraryPanel();
-    cy.get(
-      '[data-canvas-component-id="sdc.canvas_test_sdc.image-optional-with-example"]',
-    ).realClick();
+    cy.insertComponent({
+      name: 'Canvas test SDC with optional image, with example',
+    });
     cy.waitForElementInIframe('.layout-content img[alt="Boring placeholder"]');
     cy.get(
       '[class*="contextualPanel"] .js-media-library-open-button[data-once="drupal-ajax"]',
@@ -74,9 +76,9 @@ describe('Media Library', () => {
     cy.drupalLogin('canvasUser', 'canvasUser');
     cy.loadURLandWaitForCanvasLoaded({ url: 'canvas/editor/node/2' });
     cy.openLibraryPanel();
-    cy.get(
-      '[data-canvas-component-id="js.canvas_test_e2e_code_components_optional_image"]',
-    ).realClick();
+    cy.insertComponent({
+      id: 'js.canvas_test_e2e_code_components_optional_image',
+    });
     cy.waitForElementInIframe(
       '.layout-content img[alt="Example image placeholder"]',
     );
@@ -121,9 +123,9 @@ describe('Media Library', () => {
     cy.drupalLogin('canvasUser', 'canvasUser');
     cy.loadURLandWaitForCanvasLoaded({ url: 'canvas/editor/node/2' });
     cy.openLibraryPanel();
-    cy.get(
-      '[data-canvas-component-id="js.canvas_test_e2e_code_components_req_image"]',
-    ).realClick();
+    cy.insertComponent({
+      id: 'js.canvas_test_e2e_code_components_req_image',
+    });
     cy.waitForElementInIframe(
       '.layout-content img[alt="Example image placeholder"]',
     );

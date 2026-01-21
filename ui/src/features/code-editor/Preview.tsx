@@ -15,9 +15,11 @@ import {
 import {
   getDataDependenciesFromAst,
   getImportsFromAst,
+} from '@/features/code-editor/utils/ast-utils';
+import {
   getPropValuesForPreview,
   getSlotNamesForPreview,
-} from '@/features/code-editor/utils';
+} from '@/features/code-editor/utils/utils';
 import { useGetCodeComponentsQuery } from '@/services/componentAndLayout';
 import {
   getBaseUrl,
@@ -72,6 +74,10 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
   const [iframeSrcDoc, setIframeSrcDoc] = useState('');
 
   // @see JsComponent.php
+  // Whenever updating this import map, also update the list of supported imports
+  // in packages/eslint-config/src/rules/component-imports.ts.
+  // @see https://drupal.org/i/3552914
+  // @see https://drupal.org/i/3560197
   const importMap = useMemo(
     () => ({
       imports: {
@@ -86,17 +92,19 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
         clsx: `${CANVAS_MODULE_UI_PATH}/lib/astro-hydration/dist/clsx.js`,
         'class-variance-authority': `${CANVAS_MODULE_UI_PATH}/lib/astro-hydration/dist/class-variance-authority.js`,
         'tailwind-merge': `${CANVAS_MODULE_UI_PATH}/lib/astro-hydration/dist/tailwind-merge.js`,
-        '@/lib/FormattedText': `${CANVAS_MODULE_UI_PATH}/lib/astro-hydration/dist/FormattedText.js`,
-        'next-image-standalone': `${CANVAS_MODULE_UI_PATH}/lib/astro-hydration/dist/next-image-standalone.js`,
-        '@/lib/utils': `${CANVAS_MODULE_UI_PATH}/lib/astro-hydration/dist/utils.js`,
         '@/components/': Drupal.url(
           'canvas/api/v0/auto-saves/js/js_component/',
         ),
-        '@drupal-api-client/json-api-client': `${CANVAS_MODULE_UI_PATH}/lib/astro-hydration/dist/jsonapi-client.js`,
         'drupal-jsonapi-params': `${CANVAS_MODULE_UI_PATH}/lib/astro-hydration/dist/jsonapi-params.js`,
+        swr: `${CANVAS_MODULE_UI_PATH}/lib/astro-hydration/dist/swr.js`,
+        'drupal-canvas': `${CANVAS_MODULE_UI_PATH}/lib/astro-hydration/dist/drupal-canvas.js`,
+        // Backward compatibility entries for elements that were moved into drupal-canvas package.
+        '@/lib/FormattedText': `${CANVAS_MODULE_UI_PATH}/lib/astro-hydration/dist/FormattedText.js`,
+        'next-image-standalone': `${CANVAS_MODULE_UI_PATH}/lib/astro-hydration/dist/next-image-standalone.js`,
+        '@/lib/utils': `${CANVAS_MODULE_UI_PATH}/lib/astro-hydration/dist/utils.js`,
+        '@drupal-api-client/json-api-client': `${CANVAS_MODULE_UI_PATH}/lib/astro-hydration/dist/jsonapi-client.js`,
         '@/lib/jsonapi-utils': `${CANVAS_MODULE_UI_PATH}/lib/astro-hydration/dist/jsonapi-utils.js`,
         '@/lib/drupal-utils': `${CANVAS_MODULE_UI_PATH}/lib/astro-hydration/dist/drupal-utils.js`,
-        swr: `${CANVAS_MODULE_UI_PATH}/lib/astro-hydration/dist/swr.js`,
       },
     }),
     [],
@@ -265,31 +273,6 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
     props,
     slots,
   ]);
-
-  // Add an invisible overlay to the iframe when the Mosaic window is being resized.
-  // This prevents the iframe from intercepting mouse events from the parent Mosaic window.
-  // This is necessary because when a user is resizing their preview window, and their mouse enters the iframe,
-  // the parent window stops receiving mouse events so the resizing stops.
-  useEffect(() => {
-    const handleOnChange = () => {
-      if (parentRef.current) {
-        parentRef.current.classList.add('iframe-overlay');
-      }
-    };
-    const handleOnRelease = () => {
-      if (parentRef.current) {
-        parentRef.current.classList.remove('iframe-overlay');
-      }
-    };
-
-    window.addEventListener('mosaicOnChange', handleOnChange);
-    window.addEventListener('mosaicOnRelease', handleOnRelease);
-
-    return () => {
-      window.removeEventListener('mosaicOnChange', handleOnChange);
-      window.removeEventListener('mosaicOnRelease', handleOnRelease);
-    };
-  }, []);
 
   const renderCompileError = () => (
     <ErrorCard

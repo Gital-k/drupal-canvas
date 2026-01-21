@@ -11,6 +11,7 @@ use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
 use Drupal\Core\Config\Entity\ConfigEntityInterface;
 use Drupal\Core\Entity\Attribute\ConfigEntityType;
 use Drupal\Core\Entity\ContentEntityInterface;
+use Drupal\Core\Entity\ContentEntityTypeInterface;
 use Drupal\Core\Entity\Display\EntityViewDisplayInterface;
 use Drupal\Core\Entity\EntityChangedInterface;
 use Drupal\Core\Entity\EntityStorageInterface;
@@ -19,6 +20,8 @@ use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Entity\EntityViewModeInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Entity\Query\QueryInterface;
+use Drupal\Core\Entity\TypedData\EntityDataDefinition;
+use Drupal\Core\Entity\TypedData\EntityDataDefinitionInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Storage\ComponentTreeLoader;
@@ -150,6 +153,11 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
     $this->id = $this->id();
     parent::preSave($storage);
     self::getConfigUpdater()->updateConfigEntityWithComponentTreeInputs($this);
+    if ($this->isSyncing() && self::getConfigUpdater()->needsIntermediateDependenciesComponentUpdate($this)) {
+      // We might need to update dependencies even on import.
+      // @see \canvas_post_update_0002_intermediate_component_dependencies_in_content_templates()
+      $this->calculateDependencies();
+    }
   }
 
   /**
@@ -285,6 +293,29 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
     return (string) $this->content_entity_type_id;
   }
 
+  public function getTargetEntityDataDefinition(): EntityDataDefinitionInterface {
+    return EntityDataDefinition::create(
+      $this->getTargetEntityTypeId(),
+      $this->getTargetBundle(),
+    );
+  }
+
+  public function createEmptyTargetEntity(): FieldableEntityInterface {
+    $entity_type_manager = \Drupal::entityTypeManager();
+    $storage = $entity_type_manager->getStorage($this->getTargetEntityTypeId());
+    $content_entity_type = $entity_type_manager->getDefinition($this->getTargetEntityTypeId());
+    assert($content_entity_type instanceof ContentEntityTypeInterface);
+
+    $empty_target_entity = $content_entity_type->hasKey('bundle')
+      ? $storage->create([
+        $content_entity_type->getKey('bundle') => $this->getTargetBundle(),
+      ])
+      : $storage->create();
+    assert($empty_target_entity instanceof FieldableEntityInterface);
+
+    return $empty_target_entity;
+  }
+
   /**
    * {@inheritdoc}
    */
@@ -323,12 +354,17 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
       throw new \LogicException('Content templates cannot be applied to entities that have their own component trees.');
     }
 
-    // The entity is *expected* to have an Canvas field, or it's not considered
-    // opted in to Canvas. An entity that isn't opted into Canvas should never be passed
-    // to this method, so we don't need to catch the possible exception here.
+    // When no exposed slots exist, no Canvas field is required.
+    // @todo Consider always requiring a Canvas field again after 1.0, once exposed slot support is added to the UI.
+    if (empty($this->getExposedSlots())) {
+      return $this->getComponentTree($entity)->toRenderable($this, $isPreview);
+    }
+
+    // @todo Prior to supporting multiple exposed slots, https://www.drupal.org/i/3526189
+    //   must be investigated and a decision needs to be made.
+    assert(count($this->getExposedSlots()) === 1);
     $canvas_field_name = \Drupal::service(ComponentTreeLoader::class)
       ->getCanvasFieldName($entity);
-
     $sub_tree_item_list = $entity->get($canvas_field_name);
     \assert($sub_tree_item_list instanceof ComponentTreeItemList);
     return $this->getComponentTree($entity)
@@ -474,12 +510,7 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
       assert(is_string($bundle_key));
       $entity_query->condition($bundle_key, $bundle);
     }
-    // @todo Remove conditionality in https://www.drupal.org/i/3498525
-    if ($entity_definition->hasKey('published')) {
-      $published_key = $entity_definition->getKey('published');
-      assert(is_string($published_key));
-      $entity_query->condition($published_key, TRUE);
-    }
+
     // @todo Remove conditionality in https://www.drupal.org/i/3498525
     if ($entity_definition->entityClassImplements(EntityChangedInterface::class)) {
       $entity_query->sort('changed', 'DESC');

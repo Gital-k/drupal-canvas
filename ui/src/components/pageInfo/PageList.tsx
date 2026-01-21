@@ -1,17 +1,20 @@
 import { useEffect } from 'react';
 import {
   ChevronDownIcon,
-  FileIcon,
+  FileTextIcon,
   InfoCircledIcon,
   MagnifyingGlassIcon,
   PlusIcon,
 } from '@radix-ui/react-icons';
 import {
   AlertDialog,
+  Box,
   Button,
   Callout,
+  ContextMenu,
   DropdownMenu,
   Flex,
+  Skeleton,
   TextField,
 } from '@radix-ui/themes';
 
@@ -62,7 +65,9 @@ const createPageMenuContent = (
   }
 
   return (
-    <UnifiedMenu.Content menuType="dropdown" align="start" side="right">
+    <>
+      <UnifiedMenu.Label>{item.autoSaveLabel || item.title}</UnifiedMenu.Label>
+      <UnifiedMenu.Separator />
       {hasDuplicate && (
         <UnifiedMenu.Item
           onClick={(event) => event.stopPropagation()}
@@ -121,7 +126,7 @@ const createPageMenuContent = (
           </AlertDialog.Root>
         </>
       )}
-    </UnifiedMenu.Content>
+    </>
   );
 };
 
@@ -154,7 +159,7 @@ const ContentGroup = ({
   }
 
   return (
-    <Flex data-testid="canvas-page-list" direction="column" gap="2">
+    <Flex data-testid="canvas-page-list" direction="column" gap="1">
       {items.map((item) => {
         const isSelected =
           selectedPageId !== undefined &&
@@ -171,16 +176,27 @@ const ContentGroup = ({
         );
 
         return (
-          <SidebarNode
-            key={item.id}
-            title={title}
-            variant={isHomepage ? 'homepage' : 'page'}
-            selected={isSelected}
-            dropdownMenuContent={dropdownMenuContent}
-            includeDropdown={!!dropdownMenuContent}
-            onClick={onSelect ? () => onSelect(item) : undefined}
-            data-canvas-page-id={item.id}
-          />
+          <ContextMenu.Root key={item.id}>
+            <ContextMenu.Trigger>
+              <SidebarNode
+                title={title}
+                variant={isHomepage ? 'homepage' : 'page'}
+                selected={isSelected}
+                dropdownMenuContent={
+                  dropdownMenuContent ? (
+                    <UnifiedMenu.Content menuType="dropdown">
+                      {dropdownMenuContent}
+                    </UnifiedMenu.Content>
+                  ) : null
+                }
+                onClick={onSelect ? () => onSelect(item) : undefined}
+                data-canvas-page-id={item.id}
+              />
+            </ContextMenu.Trigger>
+            <UnifiedMenu.Content menuType="context" align="start" side="right">
+              {dropdownMenuContent}
+            </UnifiedMenu.Content>
+          </ContextMenu.Root>
         );
       })}
     </Flex>
@@ -229,7 +245,7 @@ const PageList = ({
   }, [onSearch]);
 
   return (
-    <div data-testid="canvas-page-list">
+    <div data-testid="canvas-page-list-panel">
       <Flex direction="row" gap="2" mb="4">
         <form
           style={{ flexGrow: 1 }}
@@ -276,31 +292,51 @@ const PageList = ({
                 onClick={onNewPage}
                 data-testid="canvas-page-list-new-page-button"
               >
-                <FileIcon />
+                <FileTextIcon />
                 New page
               </DropdownMenu.Item>
             </DropdownMenu.Content>
           </DropdownMenu.Root>
         )}
       </Flex>
-      {isPageItemsLoading && <p>Loading...</p>}
-      {!isPageItemsLoading && !pageItemsError && (
-        <ContentGroup
-          items={pageItems}
-          homepagePath={homepagePath}
-          selectedPageId={selectedPageId}
-          onSelect={onSelectPage}
-          onDuplicate={onDuplicatePage}
-          onSetHomepage={onSetHomepage}
-          onDelete={onDeletePage}
-        />
-      )}
-      {pageItemsError && (
-        <ErrorCard
-          title="An unexpected error has occurred while loading pages."
-          error={pageItemsError}
-        />
-      )}
+      <Skeleton
+        height="1.2rem"
+        loading={isPageItemsLoading}
+        width="100%"
+        my="3"
+      >
+        <Box>
+          {!pageItemsError && (
+            <ContentGroup
+              items={pageItems}
+              homepagePath={homepagePath}
+              selectedPageId={selectedPageId}
+              onSelect={onSelectPage}
+              onDuplicate={onDuplicatePage}
+              onSetHomepage={onSetHomepage}
+              onDelete={onDeletePage}
+            />
+          )}
+          {pageItemsError && (
+            <ErrorCard
+              title="An unexpected error has occurred while loading pages."
+              error={pageItemsError}
+            />
+          )}
+        </Box>
+      </Skeleton>
+      <Skeleton
+        loading={isPageItemsLoading}
+        height="1.2rem"
+        width="100%"
+        my="3"
+      />
+      <Skeleton
+        loading={isPageItemsLoading}
+        height="1.2rem"
+        width="100%"
+        my="3"
+      />
     </div>
   );
 };

@@ -5,13 +5,15 @@ import { CardStackPlusIcon, PersonIcon } from '@radix-ui/react-icons';
 import * as Menubar from '@radix-ui/react-menubar';
 import { Box, Button, Flex, Grid, Tooltip } from '@radix-ui/themes';
 
+import { useAppSelector } from '@/app/hooks';
 import AIToggleButton from '@/components/aiExtension/AiToggleButton';
 import PreviewControls from '@/components/PreviewControls';
 import UnpublishedChanges from '@/components/review/UnpublishedChanges';
 import ContentPreviewSelector from '@/components/templates/ContentPreviewSelector';
 import UndoRedo from '@/components/UndoRedo';
+import { selectEditorFrameContext } from '@/features/ui/uiSlice';
 import { useGetPreviewContentEntitiesQuery } from '@/services/componentAndLayout';
-import { getDrupalSettings } from '@/utils/drupal-globals';
+import { getBaseUrl, getDrupalSettings } from '@/utils/drupal-globals';
 
 import PageInfo from '../pageInfo/PageInfo';
 
@@ -26,13 +28,18 @@ const Topbar = () => {
   const isPreview = location.pathname.includes('/preview');
   const isEditor = location.pathname.includes('/editor');
   const isSegments = location.pathname.includes('/segments');
-  const isTemplateRoute = location.pathname.startsWith('/template/');
+  const isTemplateEditorContext =
+    useAppSelector(selectEditorFrameContext) === 'template';
+  const drupalBaseUrl = getBaseUrl();
 
   let hasAiExtensionAvailable = false;
   let hasPersonalizeExtensionAvailable = false;
 
   const drupalSettings = getDrupalSettings();
-  if (drupalSettings && drupalSettings.canvas.aiExtensionAvailable) {
+  if (
+    drupalSettings?.canvas?.aiExtensionAvailable &&
+    (drupalSettings.canvas as any).permissions?.useCanvasAi === true
+  ) {
     hasAiExtensionAvailable = true;
   }
   if (
@@ -49,21 +56,29 @@ const Topbar = () => {
       bundle: bundle || '',
     },
     {
-      skip: !isTemplateRoute || !entityType || !bundle,
+      skip: !isTemplateEditorContext || !entityType || !bundle,
     },
   );
 
   // Handle preview entity selection change
   const handlePreviewEntityChange = (selectedEntityId: string) => {
     if (entityType && bundle && viewMode) {
-      navigate(
-        `/template/${entityType}/${bundle}/${viewMode}/${selectedEntityId}`,
-      );
+      // @todo: Change to use navigate() when we can do full FE routing.
+      setTimeout(() => {
+        // Use a timeout to ensure that RTK query cleans up its subscriptions first before navigating away.
+        // Without this timeout, RTK throws an error because it tries to make a request following cache invalidation while
+        // the window.location.href is in progress.
+        window.location.href = `${drupalBaseUrl}canvas/template/${entityType}/${bundle}/${viewMode}/${selectedEntityId}`;
+      }, 100);
     }
   };
 
   const backHref =
     window.sessionStorage.getItem(PREVIOUS_URL_STORAGE_KEY) ?? '/';
+
+  // Must be wide enough to accommodate all the buttons that can appear in the top left and top right. The two
+  // columns must be the same width so that the center column is always centered to the whole window.
+  const leftRightColumnWidth = '300px';
 
   return (
     <Menubar.Root data-testid="canvas-topbar" asChild>
@@ -73,8 +88,13 @@ const Topbar = () => {
         })}
         pr="4"
       >
-        <Grid columns="3" gap="0" width="auto" height="100%">
-          <Flex align="center" gap="2">
+        <Grid
+          columns="max-content 1fr max-content"
+          gap="0"
+          width="auto"
+          height="100%"
+        >
+          <Flex align="center" gap="2" width={leftRightColumnWidth}>
             <Tooltip content="Exit Drupal Canvas">
               <a
                 href={backHref}
@@ -130,7 +150,7 @@ const Topbar = () => {
           </Flex>
           <Flex align="center" justify="center" gap="2">
             <PageInfo />
-            {isTemplateRoute && (
+            {isTemplateEditorContext && (
               <ContentPreviewSelector
                 items={previewEntities}
                 selectedItemId={previewEntityId}
@@ -138,7 +158,12 @@ const Topbar = () => {
               />
             )}
           </Flex>
-          <Flex align="center" justify="end" gap="2">
+          <Flex
+            align="center"
+            justify="end"
+            gap="2"
+            width={leftRightColumnWidth}
+          >
             <PreviewControls isPreview={isPreview} />
             <UnpublishedChanges />
           </Flex>

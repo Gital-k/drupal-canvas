@@ -42,11 +42,11 @@ final class PageHooks {
   public function entityBaseFieldInfo(EntityTypeInterface $entity_type): array {
     $fields = [];
     if ($entity_type->id() === Page::ENTITY_TYPE_ID) {
-      // Modules providing an entity type cannot add dynamic base fields based on
-      // other modules. The entity field manager determines if a field should be
-      // installed based on its "provider", which is the module providing the
-      // field definition. All fields from an entity's `baseFieldDefinitions` are
-      // always set to the provider of the entity type.
+      // Modules providing an entity type cannot add dynamic base fields based
+      // on other modules. The entity field manager determines if a field should
+      // be installed based on its "provider", which is the module providing the
+      // field definition. All fields from an entity's `baseFieldDefinitions`
+      // are always set to the provider of the entity type.
       //
       // To work around this limitation, we provide the base field definition in
       // this hook, where we can specify the provider as the Metatag module.
@@ -96,7 +96,8 @@ final class PageHooks {
         $paths = array_unique([$path_alias, $internal_path]);
       }
       catch (\Exception) {
-        // If the entity does not have a canonical URL, we cannot check the path.
+        // If the entity does not have a canonical URL, we cannot check the
+        // path.
         return AccessResult::neutral();
       }
       if (in_array($homepage, $paths, TRUE)) {
@@ -126,6 +127,20 @@ final class PageHooks {
       assert($pathauto_item instanceof PathautoItem);
       $pathauto_item->set('pathauto', PathautoState::SKIP);
     }
+  }
+
+  /**
+   * Implements hook_gin_ignore_sticky_form_actions().
+   *
+   * Make sure the media library works in the Canvas sidebar with Gin.
+   *
+   * @todo This should be fixed in Gin at https://www.drupal.org/i/3554265.
+   * @todo If not, https://www.drupal.org/i/3498525 should generalize this to
+   *   all eligible content entity types.
+   */
+  #[Hook('gin_ignore_sticky_form_actions')]
+  public function ignoreGinStickyForm(): array {
+    return ['canvas_page_form'];
   }
 
 }

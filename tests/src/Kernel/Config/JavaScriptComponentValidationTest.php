@@ -26,10 +26,15 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
   protected static $modules = [
     'canvas',
     // Canvas's dependencies (the subset that is needed for these tests).
+    'editor',
     'file',
+    'filter',
     'image',
+    'media',
     'link',
     'options',
+    'text',
+    'user',
   ];
 
   /**
@@ -386,6 +391,10 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
             // Valid root-relative URL.
             'src' => '/root/relative/path/to/image.png',
           ],
+          [
+            // Valid absolute URL, but using a disallowed scheme.
+            'src' => 'public://cat.jpg',
+          ],
         ],
       ],
     ]);
@@ -397,8 +406,9 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
         "'src' is a required key.",
       ],
       'props.some_object.examples.1' => 'This value should not be null.',
-      'props.some_object.examples.4.src' => '<em class="placeholder">&quot;hi mum, this is not a url&quot;</em> does not match the pattern <em class="placeholder">@^(/|https?://)?(?!.*\://)[^\s]+$@</em>.',
+      'props.some_object.examples.4.src' => 'This value should be a valid URI reference.',
       'props.some_object.examples.5' => "'src' is a required key.",
+      'props.some_object.examples.8.src' => "'public' is not allowed, must be one of the allowed schemes: http, https.",
     ]);
   }
 
@@ -796,7 +806,7 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
           'dataDependencies' => [],
         ],
         [
-          '' => 'Prop "image" is of type "object" without a $ref, which is not supported',
+          '' => 'Drupal Canvas does not know of a field type/widget to allow populating the <code>image</code> prop, with the shape <code>{"type":"object"}</code>.',
           'props.image' => '\'$ref\' is a required key because props.image.type is object (see config schema type canvas.json_schema.prop.object).',
           'props.image.examples.0.alt' => "'alt' is not a supported key.",
           'props.image.examples.0.height' => "'height' is not a supported key.",
@@ -847,18 +857,18 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
           'props.image.examples.0.width' => "'width' is not a supported key.",
         ],
       ],
-      'Valid: textarea prop with $ref' => [
+      'Valid: markup prop' => [
         [
           'machineName' => 'test-props-no-slots',
           'name' => 'Test',
           'props' => [
-            'textarea' => [
-              'title' => 'Textarea',
+            'markup' => [
+              'title' => 'Markup',
               'type' => 'string',
-              '$ref' => "json-schema-definitions://canvas.module/textarea",
+              'contentMediaType' => 'text/html',
+              'x-formatting-context' => 'block',
               'examples' => [
-                'Simple',
-                'Example',
+                '<p>This is a paragraph with <strong>bold</strong> text.</p><ul><li>List item 1</li><li>List item 2</li></ul>',
               ],
             ],
           ],

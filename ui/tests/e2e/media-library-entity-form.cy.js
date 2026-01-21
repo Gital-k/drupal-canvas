@@ -35,6 +35,7 @@ const testMediaLibraryInEntityForm = (cy, loadOptions = {}, title) => {
     'data-state',
     'active',
   );
+  const entityFormSelector = '[data-testid="canvas-page-data-form"]';
   cy.findByTestId('canvas-page-data-form').as('entityForm');
   // Log all ajax form requests to help with debugging.
   cy.intercept('POST', '**/canvas/api/v0/form/content-entity/**');
@@ -55,7 +56,7 @@ const testMediaLibraryInEntityForm = (cy, loadOptions = {}, title) => {
       // Wait for the preview to finish loading.
       cy.wait('@updatePreview');
       cy.findByLabelText('Loading Preview').should('not.exist');
-      cy.get('@entityForm').shouldHaveUpdatedFormBuildId();
+      cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
       cy.log(`Iteration ${ix + 1}: ${step.removeText} complete`);
     }
     cy.get('@entityForm')
@@ -65,7 +66,7 @@ const testMediaLibraryInEntityForm = (cy, loadOptions = {}, title) => {
     // The first time the media dialog opens there are a lot of CSS files to
     // load, and it can take more than the default timeout of 4s.
     cy.findByRole('dialog', { timeout: 10000 }).as('dialog');
-    cy.get('@entityForm').shouldHaveUpdatedFormBuildId();
+    cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
     cy.get('@dialog').findByLabelText(step.selectNewText).check();
     cy.intercept('POST', '**/canvas/api/v0/layout/**').as('updatePreview');
     cy.get('@dialog')
@@ -81,7 +82,7 @@ const testMediaLibraryInEntityForm = (cy, loadOptions = {}, title) => {
     cy.get('@entityForm')
       .findByRole('button', { name: step.removeAriaLabel })
       .should('exist');
-    cy.get('@entityForm').shouldHaveUpdatedFormBuildId();
+    cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
     cy.log(`Iteration ${ix + 1}: Adding ${step.expectedAlt} complete`);
   });
 
@@ -89,7 +90,7 @@ const testMediaLibraryInEntityForm = (cy, loadOptions = {}, title) => {
   // in the contextual panel.
   cy.openLibraryPanel();
   cy.get('.primaryPanelContent').should('contain.text', 'Components');
-  cy.get('.primaryPanelContent').findByText('Hero').click();
+  cy.insertComponent({ name: 'Hero' });
   cy.findByTestId('canvas-contextual-panel').should('exist');
   cy.get(
     '[class*="contextualPanel"] [data-drupal-selector="component-instance-form"]',

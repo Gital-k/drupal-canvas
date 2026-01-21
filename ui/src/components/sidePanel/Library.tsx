@@ -1,27 +1,30 @@
+import { useState } from 'react';
 import { Flex, Tabs } from '@radix-ui/themes';
 
 import ErrorBoundary from '@/components/error/ErrorBoundary';
 import ComponentList from '@/components/list/ComponentList';
 import PatternList from '@/components/list/PatternList';
-import PermissionCheck from '@/components/PermissionCheck';
-import AddCodeComponentButton from '@/features/code-editor/AddCodeComponentButton';
+import LibraryToolbar from '@/components/sidePanel/LibraryToolbar';
+import useDebounce from '@/hooks/useDebounce';
 
 import styles from './Library.module.css';
 
 const Library = () => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
   return (
     <>
       <Tabs.Root defaultValue="components">
         <Tabs.List justify="start" mt="-2" size="1">
           <Tabs.Trigger
             value="components"
-            data-testid="canvas-manage-library-components-tab-select"
+            data-testid="canvas-library-components-tab-select"
           >
             Components
           </Tabs.Trigger>
           <Tabs.Trigger
             value="patterns"
-            data-testid="canvas-manage-library-patterns-tab-select"
+            data-testid="canvas-library-patterns-tab-select"
           >
             Patterns
           </Tabs.Trigger>
@@ -30,24 +33,31 @@ const Library = () => {
           <Tabs.Content
             value={'components'}
             className={styles.tabContent}
-            data-testid="canvas-manage-library-components-tab-content"
+            data-testid="canvas-library-components-tab-content"
           >
-            <PermissionCheck hasPermission="codeComponents">
-              <Flex direction="column">
-                <AddCodeComponentButton />
-              </Flex>
-            </PermissionCheck>
             <ErrorBoundary title="An unexpected error has occurred while fetching components.">
-              <ComponentList />
+              <LibraryToolbar
+                type={'component'}
+                searchTerm={searchTerm}
+                onSearch={setSearchTerm}
+                showNewMenu={true}
+              />
+              <ComponentList searchTerm={debouncedSearchTerm} />
             </ErrorBoundary>
           </Tabs.Content>
           <Tabs.Content
             value={'patterns'}
             className={styles.tabContent}
-            data-testid="canvas-manage-library-patterns-tab-content"
+            data-testid="canvas-library-patterns-tab-content"
           >
             <ErrorBoundary title="An unexpected error has occurred while fetching patterns.">
-              <PatternList />
+              <LibraryToolbar
+                type={'pattern'}
+                searchTerm={searchTerm}
+                onSearch={setSearchTerm}
+                showNewMenu={true}
+              />
+              <PatternList searchTerm={debouncedSearchTerm} />
             </ErrorBoundary>
           </Tabs.Content>
         </Flex>

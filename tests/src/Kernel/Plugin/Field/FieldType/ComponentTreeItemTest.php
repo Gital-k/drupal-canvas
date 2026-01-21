@@ -21,6 +21,7 @@ use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\canvas\Traits\SingleDirectoryComponentTreeTestTrait;
 use Drupal\Tests\image\Kernel\ImageFieldCreationTrait;
+use Drupal\Tests\user\Traits\UserCreationTrait;
 
 /**
  * @coversDefaultClass \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem
@@ -34,6 +35,7 @@ class ComponentTreeItemTest extends KernelTestBase {
   use ContribStrictConfigSchemaTestTrait;
   use GenerateComponentConfigTrait;
   use CiModulePathTrait;
+  use UserCreationTrait;
   use ImageFieldCreationTrait;
 
   /**
@@ -54,12 +56,14 @@ class ComponentTreeItemTest extends KernelTestBase {
     'image',
     'options',
     'link',
+    'text',
     'system',
     'media',
     'canvas_test_code_components',
     'filter',
     'ckeditor5',
     'editor',
+    'datetime',
   ];
 
   /**
@@ -88,7 +92,7 @@ class ComponentTreeItemTest extends KernelTestBase {
     self::assertCount(1, $component->getVersions());
     $settings = $component->getSettings();
     $settings['prop_field_definitions']['heading']['default_value'][0]['value'] = 'Updated example value 👋';
-    $component->createVersion('a9ff855f3d425e0d')
+    $component->createVersion('bcf3fbf52a2b169b')
       ->setSettings($settings)
       ->save();
     $violations = $component->getTypedData()->validate();
@@ -235,8 +239,8 @@ class ComponentTreeItemTest extends KernelTestBase {
     $this->assertCount(2, $item_list);
     $violations = $item_list->validate();
     $this->assertSame([
-      '0.component_version' => "'lol' is not a version that exists on component config entity 'sdc.canvas_test_sdc.props-slots'. Available versions: 'ab4d3ddce315cf64'.",
-      '1.component_version' => "'active' is not a version that exists on component config entity 'sdc.canvas_test_sdc.props-no-slots'. Available versions: '95f4f1d5ee47663b'.",
+      '0.component_version' => "'lol' is not a version that exists on component config entity 'sdc.canvas_test_sdc.props-slots'. Available versions: '85a5c0c7dd53e0bb'.",
+      '1.component_version' => "'active' is not a version that exists on component config entity 'sdc.canvas_test_sdc.props-no-slots'. Available versions: 'b1e991f726a2a266'.",
     ], self::violationsToArray($violations));
   }
 
@@ -485,6 +489,7 @@ class ComponentTreeItemTest extends KernelTestBase {
     $test_cases['invalid values using dynamic inputs'][] = [
       'field_canvas_test.0' => "The 'dynamic' prop source type must be absent.",
     ];
+    $test_cases['invalid values using dynamic inputs'][] = ['access content'];
     $test_cases['invalid UUID, missing component_id key'][] = [
       'field_canvas_test.0.uuid' => 'This is not a valid UUID.',
       'field_canvas_test.0.component_id' => 'This value should not be blank.',
@@ -497,6 +502,7 @@ class ComponentTreeItemTest extends KernelTestBase {
       'field_canvas_test.1' => "The 'dynamic' prop source type must be absent.",
       'field_canvas_test.2' => "The 'dynamic' prop source type must be absent.",
     ];
+    $test_cases['missing components, using dynamic inputs'][] = ['access content'];
     $test_cases['missing components, using only static inputs'][] = [
       'field_canvas_test.0.component_id' => "The 'canvas.component.sdc.sdc_test.missing' config does not exist.",
     ];
@@ -507,8 +513,16 @@ class ComponentTreeItemTest extends KernelTestBase {
       'field_canvas_test.1' => "The 'dynamic' prop source type must be absent.",
       'field_canvas_test.2' => "The 'dynamic' prop source type must be absent.",
     ];
-    $test_cases['inputs invalid, using only static inputs'][] = [
-      \sprintf('field_canvas_test.0.inputs.%s.heading', self::UUID_DYNAMIC_STATIC_CARD_2) => 'The property heading is required.',
+    $test_cases['inputs invalid, using dynamic inputs'][] = ['access content'];
+
+    // If inputs are invalid, we get an OutOfRangeException thrown.
+    $test_cases['inputs invalid, using only static inputs'][] = [];
+    $test_cases['inputs invalid, using only static inputs'][] = [];
+    $test_cases['inputs invalid, using only static inputs'][] = \OutOfRangeException::class;
+    $test_cases['inputs invalid, using only static inputs'][] = "'heading-x' is not a prop on this version of the Component 'Single-directory component: <em class=\"placeholder\">Canvas test SDC with props but no slots</em>'.";
+
+    $test_cases['inputs invalid, using only static inputs with a StaticPropSource deviating from that defined in the referenced Component entity version'][] = [
+      \sprintf('field_canvas_test.0.inputs.%s', self::UUID_DYNAMIC_STATIC_CARD_2) => 'Using a static prop source that deviates from the configuration for Component <em class="placeholder">sdc.canvas_test_sdc.props-no-slots</em> at version <em class="placeholder">b1e991f726a2a266</em>.',
     ];
     $test_cases['missing inputs key'][] = [
       \sprintf('field_canvas_test.0.inputs.%s', self::UUID_DYNAMIC_STATIC_CARD_2) => 'The required properties are missing.',
@@ -531,16 +545,25 @@ class ComponentTreeItemTest extends KernelTestBase {
    * @coversClass \Drupal\canvas\Plugin\Validation\Constraint\ValidComponentTreeItemConstraintValidator
    * @param array $field_values
    * @param array $expected_violations
+   * @param list<string> $permissions
+   * @param ?class-string<\Throwable> $expected_exception
+   * @param ?string $exception_message
    *
    * @dataProvider providerInvalidField
    */
-  public function testInvalidField(array $field_values, array $expected_violations): void {
+  public function testInvalidField(array $field_values, array $expected_violations, array $permissions = [], ?string $expected_exception = NULL, ?string $exception_message = NULL): void {
+    $this->setUpCurrentUser(permissions: $permissions);
     $this->container->get('module_installer')->install(['canvas_test_config_node_article']);
     $node = Node::create([
       'title' => 'Test node',
       'type' => 'article',
       'field_canvas_test' => $field_values,
     ]);
+    if ($expected_exception !== NULL) {
+      $this->expectException($expected_exception);
+      assert(is_string($exception_message));
+      $this->expectExceptionMessage($exception_message);
+    }
     $violations = $node->validate();
     $this->assertSame($expected_violations, self::violationsToArray($violations));
   }

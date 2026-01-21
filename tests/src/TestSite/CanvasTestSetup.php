@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\TestSite;
 
+use Drupal\canvas\Entity\Component as ComponentEntity;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent;
+use Drupal\Component\FileCache\FileCacheFactory;
 use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Entity\JavaScriptComponent;
@@ -20,6 +23,7 @@ use Drupal\media\Entity\Media;
 use Drupal\node\Entity\Node;
 use Drupal\node\Entity\NodeType;
 use Drupal\Tests\block\Traits\BlockCreationTrait;
+use Drupal\Tests\canvas\Traits\CanvasFieldCreationTrait;
 use Drupal\Tests\canvas\Traits\CreateTestJsComponentTrait;
 use Drupal\Tests\image\Kernel\ImageFieldCreationTrait;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
@@ -28,6 +32,7 @@ use Drupal\Tests\TestFileCreationTrait;
 use Drupal\TestSite\TestSetupInterface;
 use Drupal\user\Entity\Role;
 use Drupal\user\Entity\User;
+use Symfony\Component\Yaml\Yaml as SymfonyYaml;
 
 if (!\class_exists(TestSetupInterface::class)) {
   // We're running test-discovery inside run-tests.sh which is before
@@ -68,8 +73,17 @@ class CanvasTestSetup implements TestSetupInterface {
   use ImageFieldCreationTrait;
   use BlockCreationTrait;
   use CreateTestJsComponentTrait;
+  use CanvasFieldCreationTrait;
 
   protected string $root;
+
+  protected static array $configSchemaCheckerExclusions = [
+    // The "all-props" test-only SDC is used to assess also prop shapes that are
+    // not yet storable, and hence do not meet the requirements.
+    // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponentDiscovery::checkRequirements()
+    // @see /ui/tests/e2e/prop-types.cy.js
+    'canvas.' . ComponentEntity::ENTITY_TYPE_ID . '.' . SingleDirectoryComponent::SOURCE_PLUGIN_ID . '.sdc_test_all_props.all-props',
+  ];
 
   public function setup(bool $createContentTemplate = FALSE): void {
     // CreateTestJsComponentTrait requires having the $root set.
@@ -77,6 +91,49 @@ class CanvasTestSetup implements TestSetupInterface {
     $root = $container && $container->hasParameter('app.root') ? $container->getParameter('app.root') : DRUPAL_ROOT;
     assert(is_string($root));
     $this->root = $root;
+
+    // TRICKY: this runs in TestSiteInstallCommand, which has no way for either
+    // disabling strict config schema checking OR for adding config schema
+    // exclusions.
+    // We cannot do that by implementing \Drupal\TestSite\TestPreinstallInterface
+    // because that's too early.
+    // So we are in a difficult spot: we already installed Drupal, and we can
+    // use its services, but we cannot alter them.
+    // So time for hacking the services.yml file, which we can ensure it exists
+    // because of \Drupal\TestSite\Commands\TestSiteInstallCommand::installDrupal
+    // using \Drupal\Core\Test\FunctionalTestSetupTrait::prepareSettings.
+    // This works around that Drupal core limitation.
+    // But... we are reusing this in some Kernel/Functional tests, which we
+    // should stop doing. In the meantime, we need to verify to only alter this
+    // file if it exists. For the use cases where it doesn't, we don't care as
+    // those will pick up the proper $configSchemaCheckerExclusions from the
+    // test itself.
+    $site_path = $container->getParameter('site.path');
+    assert(is_string($site_path));
+    $services_yml = $site_path . '/services.yml';
+    if (file_exists($services_yml)) {
+      $yaml = new SymfonyYaml();
+      $content = file_get_contents($services_yml);
+      assert(is_string($content));
+      $services = $yaml->parse($content);
+      // @see \Drupal\Core\Test\FunctionalTestSetupTrait::prepareSettings
+      // for the`testing.config_schema_checker` service definition.
+      array_push(
+        $services['services']['testing.config_schema_checker']['arguments'][1],
+        ...self::$configSchemaCheckerExclusions,
+      );
+      file_put_contents($services_yml, $yaml->dump($services));
+
+      // Container service files like the one we just changed are cached. We
+      // need to invalidate it so the container is rebuilt reliably.
+      // @see \Drupal\Core\Test\FunctionalTestSetupTrait::setContainerParameter()
+      FileCacheFactory::get('container_yaml_loader')->delete($services_yml);
+
+      // Rebuild the container before the test continues with the installation.
+      $kernel = \Drupal::service('kernel');
+      $kernel->invalidateContainer();
+      $kernel->rebuildContainer();
+    }
 
     $module_installer = \Drupal::service('module_installer');
     $module_installer->install(['system', 'user']);
@@ -124,9 +181,9 @@ class CanvasTestSetup implements TestSetupInterface {
     ]);
 
     // The `image` media type must be installed before
-    // media_library_storage_prop_shape_alter() is invoked, which it is after
-    // installing new modules.
-    // @see media_library_storage_prop_shape_alter()
+    // \Drupal\canvas\Hook\ShapeMatchingHooks::mediaLibraryStorablePropShapeAlter()
+    // is invoked, which it is after installing new modules.
+    // @see \Drupal\canvas\Hook\ShapeMatchingHooks::mediaLibraryStorablePropShapeAlter()
     $this->createMediaType('image', ['id' => 'image', 'label' => 'Image']);
     $test_image_files = $this->getTestFiles('image');
     $first_image_file = $test_image_files[0];
@@ -165,7 +222,6 @@ class CanvasTestSetup implements TestSetupInterface {
     ])->save();
     $module_installer->install([
       'canvas',
-      'canvas_dev_standard',
       // Enabling Canvas OAuth to ensure that we don't break any routes for
       // non-OAuth2 requests.
       'canvas_oauth',
@@ -173,6 +229,16 @@ class CanvasTestSetup implements TestSetupInterface {
       'canvas_e2e_support',
       'system',
     ]);
+    $this->createComponentTreeField('node', 'article', 'field_canvas_demo');
+    \Drupal::service('entity_display.repository')
+      ->getViewDisplay('node', 'article')
+      ->setComponent('field_canvas_demo', [
+        'label' => 'hidden',
+        'type' => 'canvas_naive_render_sdc_tree',
+        // The image field has weight -1 by default.
+        'weight' => -2,
+      ])
+      ->save();
 
     $this->createMyCtaComponentFromSdc();
     $this->createTestCodeComponent();
@@ -210,39 +276,13 @@ class CanvasTestSetup implements TestSetupInterface {
     // Rely on `StaticPropSource::toArray()` (just like at runtime!) to ensure
     // consistent key order, enabling deterministic auto-save hashing.
     $static_image_prop_source = StaticPropSource::parse($static_image_prop_source)->toArray();
-    $cta1href = [
-      'sourceType' => 'static:field_item:uri',
-      'value' => 'https://drupal.org',
-      'expression' => 'ℹ︎uri␟value',
-    ];
-    $use_uri = \Drupal::moduleHandler()->moduleExists('canvas_test_storage_prop_shape_alter');
-    if (!$use_uri) {
-      $cta1href = [
-        'sourceType' => 'static:field_item:link',
-        'sourceTypeSettings' => [
-          'instance' => [
-            'title' => \DRUPAL_DISABLED,
-          ],
-        ],
-        'value' => ['uri' => 'https://drupal.org'],
-        'expression' => 'ℹ︎link␟url',
-      ];
-    }
+    $use_uri = \Drupal::moduleHandler()->moduleExists('canvas_test_storable_prop_shape_alter');
     $items = [
       [
         'component_id' => 'sdc.canvas_test_sdc.two_column',
         'uuid' => self::UUID_TWO_COLUMN_UUID,
         'inputs' => [
-          'width' => [
-            'sourceType' => 'static:field_item:list_integer',
-            'value' => 50,
-            'expression' => 'ℹ︎list_integer␟value',
-            'sourceTypeSettings' => [
-              'storage' => [
-                'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
-              ],
-            ],
-          ],
+          'width' => 50,
         ],
       ],
       [
@@ -251,7 +291,7 @@ class CanvasTestSetup implements TestSetupInterface {
         'component_id' => 'sdc.canvas_test_sdc.image',
         'uuid' => self::UUID_STATIC_IMAGE,
         'inputs' => [
-          'image' => $static_image_prop_source,
+          'image' => ['target_id' => 3],
         ],
       ],
       [
@@ -260,12 +300,10 @@ class CanvasTestSetup implements TestSetupInterface {
         'component_id' => 'sdc.canvas_test_sdc.my-hero',
         'uuid' => self::UUID_STATIC_CARD1,
         'inputs' => [
-          'heading' => [
-            'sourceType' => 'static:field_item:string',
-            'value' => 'hello, world!',
-            'expression' => 'ℹ︎string␟value',
-          ],
-          'cta1href' => $cta1href,
+          'heading' => 'hello, world!',
+          'cta1href' => $use_uri
+            ? 'https://drupal.org'
+            : ['uri' => 'https://drupal.org', 'options' => []],
         ],
       ],
       [
@@ -274,16 +312,8 @@ class CanvasTestSetup implements TestSetupInterface {
         'component_id' => 'js.test-code-component',
         'uuid' => self::UUID_CODE_COMPONENT,
         'inputs' => [
-          'heading' => [
-            'sourceType' => 'static:field_item:string',
-            'value' => 'Test Code Component Heading',
-            'expression' => 'ℹ︎string␟value',
-          ],
-          'content' => [
-            'sourceType' => 'static:field_item:string',
-            'value' => 'This is a test code component for testing the Edit component action',
-            'expression' => 'ℹ︎string␟value',
-          ],
+          'heading' => 'Test Code Component Heading',
+          'content' => 'This is a test code component for testing the Edit component action',
         ],
       ],
       // Test edge cases in representations:
@@ -297,16 +327,7 @@ class CanvasTestSetup implements TestSetupInterface {
         'uuid' => self::UUID_ALL_SLOTS_EMPTY,
         'component_id' => 'sdc.canvas_test_sdc.one_column',
         'inputs' => [
-          'width' => [
-            'sourceType' => 'static:field_item:list_string',
-            'value' => 'full',
-            'expression' => 'ℹ︎list_string␟value',
-            'sourceTypeSettings' => [
-              'storage' => [
-                'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
-              ],
-            ],
-          ],
+          'width' => 'full',
         ],
       ],
       [
@@ -315,12 +336,10 @@ class CanvasTestSetup implements TestSetupInterface {
         'uuid' => self::UUID_STATIC_CARD2,
         'component_id' => 'sdc.canvas_test_sdc.my-hero',
         'inputs' => [
-          'heading' => [
-            'sourceType' => 'static:field_item:string',
-            'value' => 'Canvas Needs This For The Time Being',
-            'expression' => 'ℹ︎string␟value',
-          ],
-          'cta1href' => $cta1href,
+          'heading' => 'Canvas Needs This For The Time Being',
+          'cta1href' => $use_uri
+            ? 'https://drupal.org'
+            : ['uri' => 'https://drupal.org', 'options' => []],
         ],
       ],
       [
@@ -329,14 +348,10 @@ class CanvasTestSetup implements TestSetupInterface {
         'uuid' => self::UUID_STATIC_CARD3,
         'component_id' => 'sdc.canvas_test_sdc.my-hero',
         'inputs' => [
-          'heading' => [
-            'sourceType' => 'static:field_item:string',
-            'value' => 'Canvas Needs This For The Time Being',
-            'expression' => 'ℹ︎string␟value',
-          ],
-          'cta1href' => [
-            'value' => $use_uri ? $fileUrl : ['uri' => $fileUrl],
-          ] + $cta1href,
+          'heading' => 'Canvas Needs This For The Time Being',
+          'cta1href' => $use_uri
+            ? $fileUrl
+            : ['uri' => $fileUrl, 'options' => []],
         ],
       ],
       [
@@ -461,11 +476,7 @@ class CanvasTestSetup implements TestSetupInterface {
           'uuid' => self::UUID_COMPONENT_SDC,
           'component_id' => 'sdc.canvas_test_sdc.props-slots',
           'inputs' => [
-            'heading' => [
-              'sourceType' => 'static:field_item:string',
-              'value' => 'Welcome to the site!',
-              'expression' => 'ℹ︎string␟value',
-            ],
+            'heading' => 'Welcome to the site!',
           ],
         ],
         [

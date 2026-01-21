@@ -13,6 +13,8 @@ use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Entity\Plugin\DataType\EntityAdapter;
 use Drupal\Core\Field\FieldItemList;
+use Drupal\Core\Form\EnforcedResponseException;
+use Drupal\Core\Form\FormAjaxException;
 use Drupal\Core\Render\Markup;
 use Drupal\Core\Render\RenderableInterface;
 use Drupal\canvas\ComponentSource\ComponentSourceInterface;
@@ -28,9 +30,9 @@ use Drupal\canvas\Plugin\Validation\Constraint\ComponentTreeStructureConstraint;
 /**
  * A component tree: a list item class for ComponentTreeItem.
  *
- * @phpstan-type ComponentTreeItemArray array{'uuid': string, 'component_id': string, 'parent_uuid'?: string, 'slot'?: string, inputs: SingleComponentInputArray}
+ * @phpstan-import-type OptimizedSingleComponentInputArray from \Drupal\canvas\Plugin\DataType\ComponentInputs
+ * @phpstan-type ComponentTreeItemArray array{'uuid': string, 'component_id': string, 'parent_uuid'?: string, 'slot'?: string, inputs: OptimizedSingleComponentInputArray}
  * @phpstan-type ComponentTreeItemListArray array<int, ComponentTreeItemArray>
- * @phpstan-import-type SingleComponentInputArray from \Drupal\canvas\Plugin\DataType\ComponentInputs
  * @phpstan-type ExposedSlotDefinitions array<string, array{'component_uuid': string, 'slot_name': string, 'label': string}>
  */
 final class ComponentTreeItemList extends FieldItemList implements RenderableInterface, CacheableDependencyInterface, DependentPluginInterface {
@@ -107,7 +109,11 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
       // @see docs/data-model.md#3.4.1
       $known_slot_names_for_component = match ($source instanceof ComponentSourceWithSlotsInterface) {
         FALSE => [],
-        TRUE => array_keys($source->getSlotDefinitions()),
+        // We explicitly load the slots from the Component and not the source,
+        // preventing the preview to become unusable if the real time definition
+        // is missing. So use the known slots at the time of the component
+        // config entity creation.
+        TRUE => $item->getComponent() ? array_keys($item->getComponent()->getSlotDefinitions()) : [],
       };
       foreach ($known_slot_names_for_component as $slot_name) {
         $component_instance_slot = [
@@ -115,7 +121,7 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
           'name' => $slot_name,
           'nodeType' => 'slot',
         ];
-        $child_build = self::buildLayoutAndModel($this->componentTreeItemsIterator(self::isChildOfComponentTreeItemSlot($component_instance_uuid, $slot_name)));
+        $child_build = self::buildLayoutAndModel($this->componentTreeItemsIterator(self::isChildOfComponentTreeItemSlot($component_instance_uuid, (string) $slot_name)), $host_entity);
         $built['model'] += $child_build['model'];
         $component_instance_slot['components'] = $child_build['layout'];
         $item_layout_node['slots'][] = $component_instance_slot;
@@ -162,11 +168,14 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
     return NULL;
   }
 
-  private function getComponentIdList(): array {
+  public function getComponentIdList(): array {
     return \array_unique(\array_column($this->getValue(), 'component_id'));
   }
 
-  public function getConstraints() {
+  /**
+   * {@inheritdoc}
+   */
+  public function getConstraints(): array {
     $constraints = parent::getConstraints();
     $constraint_manger = $this->getTypedDataManager()
       ->getValidationConstraintManager();
@@ -221,31 +230,34 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
           $component = Component::load($component_instance['component']);
           assert($component instanceof Component);
           $source = $component->getComponentSource();
-          $element = $source->renderComponent($component_instance, $component_instance_uuid, $isPreview);
+          $element = $source->renderComponent($component_instance, $component->getSlotDefinitions(), $component_instance_uuid, $isPreview);
 
-          // A component instance provided by a ComponentSourceWithSwitchCasesInterface
-          // is guaranteed to either be a `switch` or a `case`. The `switch` component
-          // instance is the inevitable container (that may render nothing at all on the
-          // live site) that contains the different possible `case`s. On the live site,
-          // only ONE `case` will ever be rendered: the negotiated one.
+          // A component instance provided by a
+          // ComponentSourceWithSwitchCasesInterface is guaranteed to either be
+          // a `switch` or a `case`. The `switch` component instance is the
+          // inevitable container (that may render nothing at all on the live
+          // site) that contains the different possible `case`s. On the live
+          // site, only ONE `case` will ever be rendered: the negotiated one.
           if ($source instanceof ComponentSourceWithSwitchCasesInterface && !$isPreview) {
             if ($source->isCase() && !$source->isNegotiatedCase($component_instance)) {
               unset($component_instance['slots']);
             }
           }
 
-          // Wrap each rendered component instance in HTML comments that allow the
-          // client side to identify it.
+          // Wrap each rendered component instance in HTML comments that allow
+          // the client side to identify it.
           if ($isPreview) {
             $element['#prefix'] = Markup::create("<!-- canvas-start-$component_instance_uuid -->");
             $element['#suffix'] = Markup::create("<!-- canvas-end-$component_instance_uuid -->");
           }
 
-          // Associate the `Component` config entity cache tag with every rendered
-          // component instance — remove the need for each `ComponentSource`
-          // plugin to do this in an awkward way in their `::renderComponent()`.
-          // This also associates any cache contexts and max-age; both may be used
-          // for dynamic config overrides.
+          // Associate the `Component` config entity cache tag with every
+          // rendered component instance — remove the need for each
+          // `ComponentSource` plugin to do this in an awkward way in their
+          // `::renderComponent()`.
+          // This also associates any cache contexts and max-age; both may be
+          // used for dynamic config overrides.
+          // @todo Ensure this does not appear anymore for components omitted due to field/entity access in https://www.drupal.org/i/3559820
           CacheableMetadata::createFromRenderArray($element)
             ->addCacheableDependency($component)
             ->applyTo($element);
@@ -263,8 +275,8 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
                   ? ['#plain_text' => $slot_value]
                   // TRICKY: this goes beyond what Drupal core appears to allow
                   // in https://www.drupal.org/node/3398039, but the SDC plugin
-                  // manager accepts this as a valid SDC definition, so Canvas has
-                  // no choice but to support it.
+                  // manager accepts this as a valid SDC definition, so Canvas
+                  // has no choice but to support it.
                   : ['#markup' => $slot_value];
               }
               // When previewing and the slot value is a default: omit the
@@ -292,6 +304,10 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
             '#is_preview' => $isPreview,
           ];
         }
+        // @todo Remove when https://www.drupal.org/i/2367555 is fixed.
+        catch (EnforcedResponseException | FormAjaxException $e) {
+          throw $e;
+        }
         catch (\Throwable $e) {
           // @todo Remove all the wrapping-in-RenderSafeComponentContainer complexity and make ComponentSourceInterface::renderComponent() for that instead in https://www.drupal.org/i/3521041
           $build[$component_subtree_uuid][$component_instance_uuid] = RenderSafeComponentContainer::handleComponentException(
@@ -299,6 +315,7 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
             $componentRenderingContext,
             $isPreview,
             $component_instance_uuid,
+            CacheableMetadata::createFromObject($component ?? NULL),
           );
         }
       }
@@ -443,7 +460,11 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
       $source = $component->getComponentSource();
       $hydrated[$uuid] = [
         'component' => $component_id,
-      ] + $source->hydrateComponent($source->getExplicitInput($uuid, $item));
+      ] + $source->hydrateComponent(
+        $source->getExplicitInput($uuid, $item),
+        $component->getSlotDefinitions(),
+      );
+      \assert(!array_key_exists('slots', $hydrated[$uuid]) || is_array($hydrated[$uuid]['slots']));
     }
 
     // Transform the flat list of hydrated components into a hydrated component
@@ -454,13 +475,16 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
       if ($parent_uuid === self::ROOT_UUID) {
         continue;
       }
-      assert(array_key_exists('slots', $hydrated[$parent_uuid]));
+      \assert(array_key_exists('slots', $hydrated[$parent_uuid]) && is_array($hydrated[$parent_uuid]['slots']));
 
       // Remove default slot value: this slot is populated.
       if (\array_key_exists($slot, $hydrated[$parent_uuid]['slots']) && \is_string($hydrated[$parent_uuid]['slots'][$slot])) {
-        unset($hydrated[$parent_uuid]['slots'][$slot]);
+        $hydrated[$parent_uuid]['slots'][$slot] = [];
       }
 
+      // @phpstan-ignore-next-line
+      \assert(!array_key_exists($uuid, $hydrated[$parent_uuid]['slots'][$slot]));
+      // @phpstan-ignore-next-line
       $hydrated[$parent_uuid]['slots'][$slot][$uuid] = $hydrated[$uuid];
       unset($hydrated[$uuid]);
     }
@@ -479,16 +503,16 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
    * Retrieves the list of unique types of prop sources used.
    *
    * @return string[]
-   *   A list of all unique PropSourceBase::getSourceTypePrefix() return values
-   *   stored in this list of component input values, for this component tree.
+   *   A list of all unique prop source types in this list of component input
+   *   values, for this component tree.
    */
-  public function getPropSourceTypePrefixList(): array {
+  public function getPropSourceTypes(): array {
     $source_type_prefixes = [];
     foreach ($this as $item) {
       \assert($item instanceof ComponentTreeItem);
       /** @var \Drupal\canvas\Plugin\DataType\ComponentInputs $inputs */
       $inputs = $item->get('inputs');
-      $source_type_prefixes = \array_merge($source_type_prefixes, $inputs->getPropSourceTypePrefixList());
+      $source_type_prefixes = \array_merge($source_type_prefixes, $inputs->getPropSourceTypes());
     }
     return \array_unique($source_type_prefixes);
   }

@@ -6,10 +6,16 @@ namespace Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource;
 
 // cspell:ignore Druplicons
 
+use Drupal\canvas\Controller\ApiConfigControllers;
+use Drupal\canvas\Form\ComponentInstanceForm;
+use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
+use Drupal\Component\Render\MarkupInterface;
 use Drupal\Component\Utility\Html;
 use Drupal\Component\Uuid\UuidInterface;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\DependencyInjection\ContainerBuilder;
+use Drupal\Core\DependencyInjection\ServiceModifierInterface;
 use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Logger\RfcLoggerTrait;
@@ -29,6 +35,7 @@ use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Drupal\canvas\PropSource\StaticPropSource;
 use Drupal\canvas\Storage\ComponentTreeLoader;
 use Drupal\KernelTests\KernelTestBase;
+use Drupal\Tests\canvas\Kernel\BrokenPluginManagerInterface;
 use Drupal\Tests\canvas\Kernel\Traits\CiModulePathTrait;
 use Drupal\Tests\canvas\Kernel\Traits\VfsPublicStreamUrlTrait;
 use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
@@ -36,8 +43,12 @@ use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\canvas\Traits\CrawlerTrait;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\canvas\Traits\UninstallValidatorTestTrait;
+use Drupal\Tests\user\Traits\UserCreationTrait;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DomCrawler\Crawler;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Session\Session;
+use Symfony\Component\HttpFoundation\Session\Storage\MockArraySessionStorage;
 
 /**
  * Provides the basic infrastructure for consistently testing component sources.
@@ -58,11 +69,13 @@ use Symfony\Component\DomCrawler\Crawler;
  *
  * @phpstan-import-type ComponentConfigEntityId from \Drupal\canvas\Entity\Component
  */
-abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerInterface {
+abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerInterface, ServiceModifierInterface {
 
   use RfcLoggerTrait;
   use UninstallValidatorTestTrait;
+  use UserCreationTrait;
   use VfsPublicStreamUrlTrait;
+  use UserCreationTrait;
 
   protected const string UUID_CRASH_TEST_DUMMY = '3204a711-a1bd-401d-9ce0-895665487eaa';
 
@@ -108,6 +121,7 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
     'image',
     'link',
     'options',
+    'text',
     'system',
     'media',
     'path',
@@ -118,6 +132,7 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
     'filter',
     'ckeditor5',
     'editor',
+    'path_alias',
   ];
 
   /**
@@ -131,6 +146,7 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
     $this->componentTreeLoader = $this->container->get(ComponentTreeLoader::class);
     $this->renderer = $this->container->get(RendererInterface::class);
     $this->installEntitySchema('user');
+    $this->installEntitySchema('path_alias');
     $this->installSchema('user', 'users_data');
     $this->installConfig('canvas');
   }
@@ -142,11 +158,13 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
   abstract public function testDiscovery(): array;
 
   /**
+   * @param array<ComponentConfigEntityId> $component_ids
    * @see ::renderComponentsLive()
    */
   abstract public function testRenderComponentLive(array $component_ids): void;
 
   /**
+   * @param array<ComponentConfigEntityId> $component_ids
    * @see ::getReferencedPluginClasses()
    * @see \Drupal\canvas\Plugin\Validation\Constraint\ComponentTreeMeetsRequirementsConstraint
    */
@@ -202,7 +220,7 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
     return $return_values;
   }
 
-  public function findCreatedComponentConfigEntities(string $component_source_plugin_id, string $test_module): array {
+  public function findCreatedComponentConfigEntities(string $component_source_plugin_id, string $extension): array {
     // @phpstan-ignore-next-line
     $component_config_entity_type_prefix = $this->componentStorage->getEntityType()->getConfigPrefix();
 
@@ -212,7 +230,7 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
       '%s.%s.%s',
       $component_config_entity_type_prefix,
       $component_source_plugin_id,
-      $test_module,
+      $extension,
     );
 
     // Transform from `canvas.component.<ID>` to just `<ID>`.
@@ -222,16 +240,16 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
       $discovered_component_config_names
     );
 
-    ksort($discovered_component_entity_ids);
+    sort($discovered_component_entity_ids);
     return $discovered_component_entity_ids;
   }
 
-  public function findIneligibleComponents(string $component_source_plugin_id, string $test_module): array {
+  public function findIneligibleComponents(string $component_source_plugin_id, string $extension): array {
     $ineligible_components = $this->componentReasonRepository->getReasons()[$component_source_plugin_id] ?? [];
     ksort($ineligible_components);
     return array_filter(
       $ineligible_components,
-      fn (string $id) => str_starts_with($id, $component_source_plugin_id . '.' . $test_module),
+      fn (string $id) => str_starts_with($id, $component_source_plugin_id . '.' . $extension),
       ARRAY_FILTER_USE_KEY,
     );
   }
@@ -262,8 +280,10 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
     $rendered = [];
     foreach ($this->componentStorage->loadMultiple($component_ids) as $component_id => $component) {
       assert($component instanceof ComponentInterface);
-      $build = $component->getComponentSource()->renderComponent(
+      $source = $component->getComponentSource();
+      $build = $source->renderComponent(
         $get_default_input($component),
+        $source instanceof ComponentSourceWithSlotsInterface ? $source->getSlotDefinitions() : [],
         'some-uuid',
         // Live: `isPreview: FALSE`.
         FALSE,
@@ -319,7 +339,7 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
           continue;
         }
 
-        $explicit_inputs[$sdc_prop_name] = $client_side_info_for_prop['default_values']['resolved'];
+        $explicit_inputs[$sdc_prop_name] = new EvaluationResult($client_side_info_for_prop['default_values']['resolved']);
         continue;
       }
 
@@ -363,6 +383,7 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
       $this->assertCount($this->expectedDefaultComponentInstallCount, $this->componentStorage->loadMultiple());
       $this->generateComponentConfig();
     }
+    $this->alterEnvironmentForCrashTestDummyComponentTree($component_id, $inputs);
 
     $field_item = $this->createDanglingComponentTreeItemList();
     $field_item->setValue([
@@ -407,12 +428,19 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
     return $field_item;
   }
 
+  protected function alterEnvironmentForCrashTestDummyComponentTree(string $component_id, array $inputs): void {
+    // No-op by default. For some test, environment alterations may be needed.
+  }
+
   /**
    * @dataProvider providerRenderComponentFailure
    *
    * @phpstan-param array{'class': string, 'message': string}|NULL $expected_exception
+   *
+   * @see ::alterEnvironmentForCrashTestDummyComponentTree()
    */
   public function testRenderComponentFailure(string $component_id, array $inputs, array $expected_validation_errors, ?array $expected_exception, ?string $expected_output_selector): void {
+    $this->setUpCurrentUser(permissions: ['view media']);
     $component_tree = $this->generateCrashTestDummyComponentTree($component_id, $inputs);
     // Child implementations of ::generateCrashTestDummyComponentTree may
     // install additional modules, which will rebuild the container. So we add
@@ -497,7 +525,19 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
     }
 
     // Test all other expected client-side info.
-    self::assertSame($expected_client_side_info, $actual_client_side_info);
+    // As we cannot compare FilteredMarkup objects, let's cast those to strings.
+    $filteredMarkupAsString = function (array &$values) use (&$filteredMarkupAsString): array {
+      foreach ($values as &$value) {
+        if ($value instanceof MarkupInterface) {
+          $value = (string) $value;
+        }
+        if (is_array($value)) {
+          $filteredMarkupAsString($value);
+        }
+      }
+      return $values;
+    };
+    self::assertSame($filteredMarkupAsString($expected_client_side_info), $filteredMarkupAsString($actual_client_side_info));
   }
 
   /**
@@ -568,6 +608,7 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
   }
 
   public function testFallback(): void {
+    $this->setUpCurrentUser(permissions: ['view media', 'access content']);
     $this->installEntitySchema(Page::ENTITY_TYPE_ID);
     $this->generateComponentConfig();
     $used_component = $this->createAndSaveInUseComponentForFallbackTesting();
@@ -667,16 +708,8 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
         'inputs' => [
           // Give it some inputs we can assert still exist when the fallback
           // conditions are triggered.
-          'text' => [
-            'sourceType' => 'static:field_item:string',
-            'value' => \sprintf('This is %s', $slot),
-            'expression' => 'ℹ︎string␟value',
-          ],
-          'element' => [
-            'sourceType' => 'static:field_item:list_string',
-            'value' => 'h1',
-            'expression' => 'ℹ︎list_string␟value',
-          ],
+          'text' => \sprintf('This is %s', $slot),
+          'element' => 'h1',
         ],
       ];
     }
@@ -722,5 +755,122 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
     self::assertNotNull($unused_component->id());
     self::assertNull($component_storage->loadUnchanged($unused_component->id()));
   }
+
+  public function alter(ContainerBuilder $container): void {
+    // Swap in the broken versions of the Component source plugin manager, e.g.
+    // \Drupal\Tests\canvas\Kernel\BrokenComponentManager or
+    // \Drupal\Tests\canvas\Kernel\BrokenBlockManager.
+    // We provide an empty implementation so those that don't need this aren't
+    // forced to implement it.
+    // @see ::testIsBroken()
+  }
+
+  public function testIsBroken(): void {
+    // Enable required themes and set the default.
+    $this->container->get('theme_installer')->install(['stark', 'canvas_stark']);
+    $this->container->get('config.factory')->getEditable('system.theme')->set('default', 'stark')->save();
+
+    // Setup the required entity-types.
+    $this->installEntitySchema(Page::ENTITY_TYPE_ID);
+
+    // Set the current user to someone who can access the component list.
+    $this->setUpCurrentUser(permissions: [Page::CREATE_PERMISSION, Page::EDIT_PERMISSION]);
+
+    // Generate config and a component that can be used for testing.
+    $this->generateComponentConfig();
+    $component = $this->createAndSaveInUseComponentForUninstallValidationTesting();
+    $source = $component->getComponentSource();
+    $slots = [];
+    if ($source instanceof ComponentSourceWithSlotsInterface) {
+      $slots = \array_keys($source->getSlotDefinitions());
+    }
+
+    // Create a page with the given component.
+    $props = static::getPropsForUninstallValidationTesting();
+    $entity = Page::create([
+      'title' => $this->randomMachineName(),
+      'components' => self::generateFallbackOrUninstallValidationComponentTree($component, $slots, $props),
+    ]);
+
+    // The component tree should be valid.
+    self::assertCount(0, $entity->validate());
+
+    // Now save the entity.
+    $entity->save();
+
+    // Then break things.
+    // @see \Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource\ComponentSourceTestBase::alter
+    // @see \Drupal\Tests\canvas\Kernel\BrokenPluginManagerTrait::removeBrokenPlugins
+    \Drupal::state()->set('canvas_broken_components', TRUE);
+    $pluginId = $source->getSourceSpecificComponentId();
+    $this->triggerBrokenComponent($component)?->markPluginAsMissing($pluginId);
+    // Trigger cache invalidations.
+    $this->generateComponentConfig();
+
+    // Should still be valid.
+    self::assertCount(0, $entity->validate());
+
+    // Should not trigger an exception during page view.
+    $entityView = \Drupal::entityTypeManager()->getViewBuilder(Page::ENTITY_TYPE_ID)->view($entity);
+    $pageCrawler = $this->crawlerForRenderArray($entityView);
+    $componentOutput = $pageCrawler->filter(\sprintf('[data-component-uuid="%s"]', self::UUID_FALLBACK_ROOT));
+    self::assertEquals(1, $componentOutput->count());
+    self::assertStringContainsString('Oops, something went wrong! Site admins have been notified.', $componentOutput->text());
+
+    // Should not trigger an exception during component list rendering.
+    $listOutput = \Drupal::classResolver(ApiConfigControllers::class)->list(Component::ENTITY_TYPE_ID);
+    $list = \json_decode($listOutput->getContent() ?: '[]', TRUE, \JSON_THROW_ON_ERROR);
+    self::assertArrayHasKey($component->id(), $list);
+    // Component should be flagged as broken.
+    self::assertTrue($list[$component->id()]['broken']);
+    // And contain the failed to render message.
+    self::assertStringContainsString('Component failed to render', $list[$component->id()]['default_markup']);
+
+    // Page view should output verbose error, if 'error_level' is set to 'verbose'.
+    // @see \Drupal\canvas\Element\RenderSafeComponentContainer::handleComponentException()
+    \Drupal::configFactory()->getEditable('system.logging')->set('error_level', ERROR_REPORTING_DISPLAY_VERBOSE)->save();
+    $entityView = \Drupal::entityTypeManager()->getViewBuilder(Page::ENTITY_TYPE_ID)->view($entity);
+    $pageCrawler = $this->crawlerForRenderArray($entityView);
+    $componentOutput = $pageCrawler->filter(\sprintf('[data-component-uuid="%s"]', self::UUID_FALLBACK_ROOT));
+    self::assertEquals(1, $componentOutput->count());
+    // Should contain "verbose" error message.
+    self::assertStringContainsString($this->getExpectedVerboseErrorMessage(), $componentOutput->text());
+
+    // Component list's preview should also output verbose error.
+    $listOutput = \Drupal::classResolver(ApiConfigControllers::class)->list(Component::ENTITY_TYPE_ID);
+    $list = \json_decode($listOutput->getContent() ?: '[]', TRUE, \JSON_THROW_ON_ERROR);
+    self::assertArrayHasKey($component->id(), $list);
+    // Component should be flagged as broken.
+    self::assertTrue($list[$component->id()]['broken']);
+    // And contain the "verbose" failed to render message.
+    self::assertStringContainsString($this->getExpectedVerboseErrorMessage(), $list[$component->id()]['default_markup']);
+
+    // Set the current request to enable the form to be built.
+    $request = Request::create('/', 'PATCH', [
+      'form_canvas_tree' => json_encode([
+        'nodeType' => 'component',
+        'slots' => [],
+        'type' => \sprintf('%s@%s', $component->id(), $component->getActiveVersion()),
+        'uuid' => self::UUID_FALLBACK_ROOT,
+      ], JSON_THROW_ON_ERROR),
+      'form_canvas_props' => json_encode($props, JSON_THROW_ON_ERROR),
+      'form_canvas_selected' => self::UUID_FALLBACK_ROOT,
+    ]);
+    $request->setSession(new Session(new MockArraySessionStorage()));
+    $this->container->get('request_stack')->push($request);
+
+    // Should not trigger an exception in the component instance form.
+    $builtForm = \Drupal::formBuilder()->getForm(ComponentInstanceForm::class, $entity);
+    $formOut = $this->crawlerForRenderArray($builtForm);
+    // Output should show the props and allow user to copy them.
+    // TRICKY: for edge cases around this, additional test coverage exists.
+    // @see \Drupal\Tests\canvas\Kernel\ComponentInstanceFormTest::testBlockComponentThatHasGoneAway()
+    // @see \Drupal\Tests\canvas\Kernel\ComponentInstanceFormTest::testCodeComponentNoPropsThatHasGoneAway()
+    self::assertStringContainsString('Fix the component or copy values to a new component', $formOut->text());
+  }
+
+  abstract protected function triggerBrokenComponent(ComponentInterface $component): ?BrokenPluginManagerInterface;
+
+  abstract protected function getExpectedVerboseErrorMessage(): string;
 
 }

@@ -46,6 +46,7 @@ final class ConfigEntityVersionReference extends EntityReference {
    * The entity ID.
    *
    * @var string
+   * @phpstan-ignore property.phpDocType
    */
   protected $id;
 
@@ -69,6 +70,7 @@ final class ConfigEntityVersionReference extends EntityReference {
    */
   public function isTargetNew() {
     // If only an ID is given, the reference cannot be a new entity.
+    // @phpstan-ignore-next-line isset.property
     return !isset($this->id) && isset($this->target) && $this->target->getValue()->isNew();
   }
 
@@ -76,6 +78,7 @@ final class ConfigEntityVersionReference extends EntityReference {
    * {@inheritdoc}
    */
   public function getTarget(): ?TypedDataInterface {
+    // @phpstan-ignore-next-line isset.property
     if (!isset($this->target) && isset($this->id)) {
       $entity_type_id = $this->getTargetDefinition()->getEntityTypeId();
       \assert(\is_string($entity_type_id));
@@ -86,7 +89,8 @@ final class ConfigEntityVersionReference extends EntityReference {
       if ($entity !== NULL &&
         $this->version !== NULL &&
         $entity->getLoadedVersion() !== $this->version &&
-        // Do not allow a component instance to explicitly reference the fallback version.
+        // Do not allow a component instance to explicitly reference the
+        // fallback version.
         $this->version !== ComponentInterface::FALLBACK_VERSION
       ) {
         // A non-default version is referenced, so load that one.

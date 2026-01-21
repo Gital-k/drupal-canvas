@@ -10,7 +10,6 @@ use Drupal\ai\Attribute\FunctionCall;
 use Drupal\ai\Base\FunctionCallBase;
 use Drupal\ai\Service\FunctionCalling\ExecutableFunctionCallInterface;
 use Drupal\ai\Service\FunctionCalling\FunctionCallInterface;
-use Drupal\ai\Utility\ContextDefinitionNormalizer;
 use Drupal\ai_agents\PluginInterfaces\AiAgentContextInterface;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Exception\ConstraintViolationException;
@@ -56,7 +55,7 @@ use Symfony\Component\Yaml\Yaml;
     ),
   ],
 )]
-final class CreateComponent extends FunctionCallBase implements ExecutableFunctionCallInterface, AiAgentContextInterface {
+final class CreateComponent extends FunctionCallBase implements ExecutableFunctionCallInterface, AiAgentContextInterface, BuilderResponseFunctionCallInterface {
 
   use ConstraintPropertyPathTranslatorTrait;
 
@@ -77,7 +76,7 @@ final class CreateComponent extends FunctionCallBase implements ExecutableFuncti
       $configuration,
       $plugin_id,
       $plugin_definition,
-      new ContextDefinitionNormalizer(),
+      $container->get('ai.context_definition_normalizer'),
     );
     $instance->entityTypeManager = $container->get(EntityTypeManagerInterface::class);
     $instance->logger = $container->get('logger.factory')->get('canvas_ai');
@@ -105,8 +104,13 @@ final class CreateComponent extends FunctionCallBase implements ExecutableFuncti
         throw new \Exception("The component with same name already exists.");
       }
 
+      if (str_contains($css, '@apply')) {
+        $this->setOutput(Yaml::dump(['error' => '@apply directives are not supported.'], 10, 2));
+        return;
+      }
       $props_array = Json::decode($props);
       $transformed_props = [];
+      $required_props = [];
       if (is_array($props_array)) {
         foreach ($props_array as $prop) {
           if (!empty($prop['id']) && !empty($prop['name']) && !empty($prop['type']) && !empty($prop['example'])) {
@@ -121,6 +125,10 @@ final class CreateComponent extends FunctionCallBase implements ExecutableFuncti
               }
             }
             $transformed_props[$prop['id']] = $transformed;
+
+            if (!empty($prop['required']) && $prop['required'] === TRUE) {
+              $required_props[] = $prop['id'];
+            }
           }
         }
       }
@@ -136,6 +144,7 @@ final class CreateComponent extends FunctionCallBase implements ExecutableFuncti
         'compiledCss' => '',
         'importedJsComponents' => [],
         'props' => $transformed_props,
+        'required' => $required_props,
         'dataDependencies' => [],
       ];
       $violations = JavaScriptComponent::createFromClientSide($output)->getTypedData()->validate();
@@ -157,14 +166,7 @@ final class CreateComponent extends FunctionCallBase implements ExecutableFuncti
       $this->setOutput(Yaml::dump(['error' => sprintf('Failed to process Javascript component data: %s', $e->getMessage())], 10, 2));
       return;
     }
-
-    // \Drupal\canvas_ai\Controller\CanvasBuilder::render() expects a YAML parsable
-    // string.
-    // @see \Drupal\canvas_ai\Controller\CanvasBuilder::render()
-    $this->setOutput(Yaml::dump([
-      'component_structure' => $output,
-    ], 10, 2)
-    );
+    $this->setStructuredOutput(['component_structure' => $output]);
   }
 
 }

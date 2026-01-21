@@ -1,16 +1,3 @@
-import { HTML5toTouch } from 'rdndmb-html5-to-touch';
-// `react-mosaic` (https://github.com/nomcopter/react-mosaic) uses `react-dnd`
-// for its drag & drop functionality. The primary component of `react-mosaic`,
-// `Mosaic` doesn't require to be wrapped in `DndProvider`, it does that on its
-// own, but we use `MosaicWithoutDragDropContext`, so we can explicity decide
-// where to add the `DndProvider` context provider in the app's component tree.
-// This solves a race condition where multiple context providers would be
-// mounted as users are quickly changing routes.
-// @see `ui/src/features/code-editor/MosaicContainer.tsx`
-// @see https://drupal.org/i/3510436
-// @see https://drupal.org/i/3520994
-import { DndProvider } from 'react-dnd';
-import { MultiBackend } from 'react-dnd-multi-backend';
 import { Outlet } from 'react-router-dom';
 import {
   DndContext,
@@ -24,16 +11,19 @@ import { InfoCircledIcon } from '@radix-ui/react-icons';
 import { Box, Callout, Flex } from '@radix-ui/themes';
 
 import AiPanel from '@/components/aiExtension/AiPanel';
+import DevTools from '@/components/devTools/DevTools';
 import ErrorBoundary from '@/components/error/ErrorBoundary';
 import SavingOverlay from '@/components/SavingOverlay';
 import Toast from '@/components/Toast';
 import Topbar from '@/components/topbar/Topbar';
+import useExtensions from '@/features/extensions/useExtensions';
 import DragEventsHandler from '@/features/layout/previewOverlay/DragEventsHandler';
+import useRouteSync from '@/hooks/useRouteSync';
 
 import type React from 'react';
 import type { CollisionDetection } from '@dnd-kit/core';
 
-import styles from '@/features/editor/Editor.module.css';
+import styles from '@/features/editor/App.module.css';
 
 // This uses the suggested composition here https://docs.dndkit.com/api-documentation/context-provider/collision-detection-algorithms#composition-of-existing-algorithms
 // the collision will use the mouse cursor's position, but if the mouse cursor is not in a valid dropzone it will fallback
@@ -59,6 +49,9 @@ function customCollisionDetectionAlgorithm(
 }
 
 const App: React.FC = () => {
+  useRouteSync();
+  useExtensions();
+
   const pointerSensor = useSensor(PointerSensor, {
     // Require the mouse to move by 3 pixels before activating - without this you can't click to select a component
     activationConstraint: {
@@ -94,18 +87,17 @@ const App: React.FC = () => {
             sensors={sensors}
             collisionDetection={customCollisionDetectionAlgorithm}
           >
-            <DndProvider backend={MultiBackend} options={HTML5toTouch}>
-              <Flex className={styles.canvasContainer} gap="0">
-                <ErrorBoundary variant="page">
-                  <AiPanel />
-                  <Outlet />
-                </ErrorBoundary>
-              </Flex>
-              <Topbar />
-              <DragEventsHandler />
-              <SavingOverlay />
-              <Toast />
-            </DndProvider>
+            <Flex className={styles.canvasContainer} gap="0">
+              <ErrorBoundary variant="page">
+                <AiPanel />
+                <Outlet />
+              </ErrorBoundary>
+            </Flex>
+            <Topbar />
+            <DragEventsHandler />
+            {import.meta.env.DEV && <DevTools />}
+            <SavingOverlay />
+            <Toast />
           </DndContext>
         </ErrorBoundary>
       </div>

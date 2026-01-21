@@ -58,6 +58,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
     'filter',
     'ckeditor5',
     'editor',
+    'datetime',
   ];
 
   /**
@@ -103,18 +104,10 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
         [
           'uuid' => '435d1d20-a697-4d36-9892-9d61c825c99c',
           'component_id' => 'sdc.canvas_test_sdc.my-cta',
-          'component_version' => '53ed322c96bee384',
+          'component_version' => '89881c04a0fde367',
           'inputs' => [
-            'text' => [
-              'sourceType' => 'static:field_item:string',
-              'value' => 'This is really tricky for a first-timer',
-              'expression' => 'ℹ︎string␟value',
-            ],
-            'href' => [
-              'sourceType' => 'static:field_item:uri',
-              'value' => 'https://drupal.org',
-              'expression' => 'ℹ︎uri␟value',
-            ],
+            'text' => 'This is really tricky for a first-timer',
+            'href' => 'https://drupal.org',
           ],
           'label' => Random::string(255),
         ],
@@ -122,7 +115,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
         [
           'uuid' => '57afe4ed-c593-4457-a741-2ac5053be928',
           'component_id' => 'js.my-cta',
-          'component_version' => '53ed322c96bee384',
+          'component_version' => '89881c04a0fde367',
           'inputs' => [
             'text' => [
               'sourceType' => 'dynamic',
@@ -134,11 +127,23 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
         [
           'uuid' => '2d06782a-0f24-43ae-963c-b5aff807dd95',
           'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
-          'component_version' => '95f4f1d5ee47663b',
+          'component_version' => 'b1e991f726a2a266',
           'inputs' => [
             'heading' => [
               'sourceType' => 'dynamic',
               'expression' => 'ℹ︎␜entity:node:alpha␝field_test␞␟value',
+            ],
+          ],
+        ],
+        // An SDC populated with the host entity's canonical URL.
+        [
+          'uuid' => '15616c29-72c6-417a-a7d9-aff329467cc4',
+          'component_id' => 'sdc.canvas_test_sdc.my-cta',
+          'component_version' => '89881c04a0fde367',
+          'inputs' => [
+            'text' => 'Behold this node in all its glory',
+            'href' => [
+              'sourceType' => 'host-entity-url',
             ],
           ],
         ],
@@ -159,13 +164,9 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
         [
           'uuid' => 'b4937e35-ddc2-4f36-8d4c-b1cc14aaefef',
           'component_id' => 'sdc.canvas_test_sdc.props-slots',
-          'component_version' => 'ab4d3ddce315cf64',
+          'component_version' => '85a5c0c7dd53e0bb',
           'inputs' => [
-            'heading' => [
-              'sourceType' => 'static:field_item:string',
-              'value' => 'There be a slot here',
-              'expression' => 'ℹ︎string␟value',
-            ],
+            'heading' => 'There be a slot here',
           ],
         ],
       ],
@@ -194,9 +195,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
           'field.field.node.alpha.field_test',
           'node.type.alpha',
         ],
-        'module' => [
-          'node',
-        ],
+        'module' => ['link', 'node'],
       ],
       $this->entity->getDependencies()
     );
@@ -214,10 +213,10 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
         'field.storage.node.field_test',
       ],
       'module' => [
+        'link',
         'node',
         'canvas',
         'system',
-        'link',
         'options',
         'canvas_test_sdc',
         'core',
@@ -239,11 +238,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
   public static function providerInvalidComponentTree(): \Generator {
     yield "missing `component_tree` property" => [
       'component_tree' => [],
-      'expected_messages' => [
-        // @todo Add back message when we require dynamic prop sources in
-        //   https://drupal.org/i/3541054.
-        // 'component_tree' => 'The \'dynamic\' prop source type must be present.',
-      ],
+      'expected_messages' => [],
     ];
 
     yield "no DynamicPropSource, so no structured data from the content entity" => [
@@ -255,11 +250,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
           'inputs' => [],
         ],
       ],
-      'expected_messages' => [
-        // @todo Add back message when we require dynamic prop sources in
-        //   https://drupal.org/i/3541054.
-        // 'component_tree' => "The 'dynamic' prop source type must be present.",
-      ],
+      'expected_messages' => [],
     ];
 
     yield "using disallowed Block-sourced Components" => [
@@ -267,7 +258,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
         [
           'uuid' => '19ff9a18-54a2-422a-bf68-49d65a5d53ac',
           'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
-          'component_version' => '95f4f1d5ee47663b',
+          'component_version' => 'b1e991f726a2a266',
           'inputs' => [
             'heading' => [
               'sourceType' => 'dynamic',
@@ -319,7 +310,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
         [
           'uuid' => '90804335-d16d-4799-9e80-ddb11692530a',
           'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
-          'component_version' => '95f4f1d5ee47663b',
+          'component_version' => 'b1e991f726a2a266',
           'inputs' => [
             'heading' => [
               'sourceType' => 'dynamic',
@@ -330,7 +321,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
         [
           'uuid' => '7240f848-ea70-4ad2-a9d6-3ab60cba4d78',
           'component_id' => 'sdc.canvas_test_sdc.image',
-          'component_version' => '5eabbfdb96b39a59',
+          'component_version' => 'f4d1c916802ab8db',
           'inputs' => [
             'image' => [
               'sourceType' => 'adapter:image_apply_style',
@@ -359,7 +350,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
         [
           'uuid' => 'garry-sensible-jeans',
           'component_id' => 'sdc.canvas_test_sdc.props-slots',
-          'component_version' => 'ab4d3ddce315cf64',
+          'component_version' => '85a5c0c7dd53e0bb',
           'inputs' => [
             'heading' => [
               'sourceType' => 'dynamic',
@@ -370,7 +361,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
         [
           'uuid' => 'fa9ff0a8-e23a-492a-ab14-5460611fa2c1',
           'component_id' => 'sdc.canvas_test_sdc.props-slots',
-          'component_version' => 'ab4d3ddce315cf64',
+          'component_version' => '85a5c0c7dd53e0bb',
           'inputs' => [
             'heading' => [
               'sourceType' => 'dynamic',
@@ -389,7 +380,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
         [
           'uuid' => 'fa9ff0a8-e23a-492a-ab14-5460611fa2c1',
           'component_id' => 'sdc.canvas_test_sdc.props-slots',
-          'component_version' => 'ab4d3ddce315cf64',
+          'component_version' => '85a5c0c7dd53e0bb',
           'inputs' => [
             'heading' => [
               'sourceType' => 'dynamic',
@@ -402,7 +393,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
           'slot' => 'the_body',
           'parent_uuid' => '6381352f-5b0a-4ca1-960d-a5505b37b27c',
           'component_id' => 'sdc.canvas_test_sdc.props-slots',
-          'component_version' => 'ab4d3ddce315cf64',
+          'component_version' => '85a5c0c7dd53e0bb',
           'inputs' => [
             'heading' => [
               'sourceType' => 'dynamic',
@@ -421,7 +412,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
         [
           'uuid' => 'fa9ff0a8-e23a-492a-ab14-5460611fa2c1',
           'component_id' => 'sdc.canvas_test_sdc.props-slots',
-          'component_version' => 'ab4d3ddce315cf64',
+          'component_version' => '85a5c0c7dd53e0bb',
           'inputs' => [
             'heading' => [
               'sourceType' => 'dynamic',
@@ -434,7 +425,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
           'slot' => 'banana',
           'parent_uuid' => 'fa9ff0a8-e23a-492a-ab14-5460611fa2c1',
           'component_id' => 'sdc.canvas_test_sdc.props-slots',
-          'component_version' => 'ab4d3ddce315cf64',
+          'component_version' => '85a5c0c7dd53e0bb',
           'inputs' => [
             'heading' => [
               'sourceType' => 'dynamic',
@@ -453,7 +444,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
         [
           'uuid' => 'e303dd88-9409-4dc7-8a8b-a31602884a94',
           'component_id' => 'sdc.canvas_test_sdc.props-slots',
-          'component_version' => 'ab4d3ddce315cf64',
+          'component_version' => '85a5c0c7dd53e0bb',
           'inputs' => [
             'heading' => [
               'sourceType' => 'dynamic',
@@ -481,7 +472,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
         [
           'uuid' => '90804335-d16d-4799-9e80-ddb11692530a',
           'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
-          'component_version' => '95f4f1d5ee47663b',
+          'component_version' => 'b1e991f726a2a266',
           'inputs' => [
             'heading' => [
               'sourceType' => 'dynamic',
@@ -491,7 +482,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
         ],
       ],
       'expected_messages' => [
-        'component_tree.0.component_version' => "'abc' is not a version that exists on component config entity 'sdc.canvas_test_sdc.props-slots'. Available versions: 'ab4d3ddce315cf64'.",
+        'component_tree.0.component_version' => "'abc' is not a version that exists on component config entity 'sdc.canvas_test_sdc.props-slots'. Available versions: '85a5c0c7dd53e0bb'.",
       ],
     ];
   }
@@ -667,7 +658,6 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
       'label' => 'Component with an invalid source-defined slot',
       'source' => InvalidSlots::PLUGIN_ID,
       'source_local_id' => InvalidSlots::PLUGIN_ID,
-      'category' => 'Test',
       'active_version' => 'ccab0b28617f1f56',
     ])->save();
 

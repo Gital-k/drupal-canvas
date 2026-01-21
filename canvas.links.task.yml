@@ -5,14 +5,19 @@ entity.component.collection:
   weight: 200
 
 canvas.component.status:
-  title: 'Enabled components'
+  title: 'Available components'
   route_name: entity.component.collection
   parent_id: entity.component.collection
 
 canvas.component.status.disabled:
-  title: 'Disabled components'
+  title: 'Disabled & incompatible components'
   route_name: canvas.component.status
   parent_id: entity.component.collection
+
+entity.canvas_page.collection:
+  title: Pages
+  route_name: entity.canvas_page.collection
+  base_route: system.admin_content
 
 entity.canvas_page.canonical:
   title: 'View'

@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
-import { debounce } from 'lodash';
+import { useEffect, useState } from 'react';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import { getDefaultValue } from '@/components/form/formUtil';
@@ -10,6 +9,7 @@ import './InputBehaviors.css';
 
 import Ajv from 'ajv';
 
+import InputDescription from '@/components/form/components/drupal/InputDescription';
 import { InputBehaviorsComponentPropsForm } from '@/components/form/InputBehaviorsComponentPropsForm';
 import { InputBehaviorsEntityForm } from '@/components/form/InputBehaviorsEntityForm';
 import { FORM_TYPES } from '@/features/form/constants';
@@ -21,6 +21,7 @@ import {
   setFieldValue,
 } from '@/features/form/formStateSlice';
 import { AJAX_UPDATE_FORM_BUILD_ID_EVENT } from '@/types/Ajax';
+import { isAjaxing } from '@/utils/isAjaxing';
 
 import type { ErrorObject } from 'ajv/dist/types';
 import type { FormId } from '@/features/form/formStateSlice';
@@ -29,6 +30,69 @@ import type { Attributes } from '@/types/DrupalAttribute';
 import type { PropsValues } from '@/types/Form';
 
 const ajv = new Ajv();
+
+// Helper function to dispatch field value updates
+const dispatchFieldValue = (
+  dispatch: ReturnType<typeof useAppDispatch>,
+  formId: FormId,
+  fieldName: string,
+  value: any,
+) => {
+  dispatch(
+    setFieldValue({
+      formId,
+      fieldName,
+      value,
+    }),
+  );
+};
+
+// Helper function to dispatch field error updates
+const dispatchFieldError = (
+  dispatch: ReturnType<typeof useAppDispatch>,
+  formId: FormId,
+  fieldName: string,
+  validationResult: ValidationResult,
+) => {
+  dispatch(
+    setFieldError({
+      type: 'error',
+      message:
+        validationResult.errorMessage ||
+        ajv.errorsText(validationResult.errors),
+      formId,
+      fieldName,
+    }),
+  );
+};
+
+// Helper to check if initial dispatch should be skipped for certain element types
+const shouldSkipInitialDispatch = (elementType: string, inputValue: any) =>
+  (elementType === 'radios' && inputValue === '') || elementType === 'radio';
+
+// Helper to check if hidden field value should be tracked
+const shouldTrackHiddenValue = (
+  elementType: string,
+  fieldName: string,
+  attributes: Attributes,
+) =>
+  !['hidden', 'submit'].includes(elementType) ||
+  fieldName === 'form_build_id' ||
+  attributes['data-track-hidden-value'];
+
+// Helper to check if form state should be updated based on validation
+const shouldUpdateFormState = (
+  e: React.ChangeEvent,
+  validationResult: ValidationResult,
+) => {
+  if (
+    typeof e?.target?.hasAttribute === 'function' &&
+    e.target.hasAttribute('data-canvas-no-update')
+  ) {
+    return false;
+  }
+  return validationResult.valid || validationResult.skipEarlyReturn;
+};
 
 export const POLLED_BACKGROUND_TIMEOUT = 1000;
 export const DEBOUNCE_TIMEOUT = 400;
@@ -60,7 +124,6 @@ export const InputBehaviorsCommon = ({
   OriginalInput,
   props,
   callbacks,
-  shouldDebounce = true,
 }: {
   OriginalInput: React.FC<InputProps>;
   props: {
@@ -70,15 +133,26 @@ export const InputBehaviorsCommon = ({
       onChange: (e: React.ChangeEvent) => void;
       onBlur: (e: React.FocusEvent) => void;
     };
+    description?: {
+      content: string;
+      attributes: Attributes;
+    };
+    descriptionDisplay?: 'before' | 'after' | 'invisible';
   };
   callbacks: {
     commitFormState: (newFormState: PropsValues) => void;
     parseNewValue: (newValue: React.ChangeEvent) => any;
     validateNewValue: (e: React.ChangeEvent, newValue: any) => ValidationResult;
   };
-  shouldDebounce?: boolean;
 }) => {
-  const { attributes, options, value, ...passProps } = props;
+  const {
+    attributes,
+    options,
+    value,
+    descriptionDisplay = 'before',
+    description = false,
+    ...passProps
+  } = props;
   const { commitFormState, parseNewValue, validateNewValue } = callbacks;
   const dispatch = useAppDispatch();
   const defaultValue = getDefaultValue(options, attributes, value);
@@ -103,24 +177,15 @@ export const InputBehaviorsCommon = ({
   // when an element is added via AJAX.
   const elementType = attributes.type || attributes['data-canvas-type'];
   useEffect(() => {
-    if (
-      // Ignore radios in indeterminate (initial unset) state.
-      // @see https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/indeterminate
-      (elementType === 'radios' && inputValue === '') ||
-      // Every individual radio element has a value, but it isn't
-      // the value of the field unless it is checked. The value of the field is
-      // managed by the radios group, not the individual radio elements.
-      elementType === 'radio'
-    ) {
+    if (shouldSkipInitialDispatch(elementType as string, inputValue)) {
       return;
     }
     if (fieldName && formId) {
-      dispatch(
-        setFieldValue({
-          formId,
-          fieldName,
-          value: elementType === 'checkbox' ? !!inputValue : inputValue,
-        }),
+      dispatchFieldValue(
+        dispatch,
+        formId,
+        fieldName,
+        elementType === 'checkbox' ? !!inputValue : inputValue,
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -136,12 +201,11 @@ export const InputBehaviorsCommon = ({
     // our form state and value.
     const formBuildIdListener = (e: AjaxUpdateFormBuildIdEvent) => {
       if (e.detail.formId === formId) {
-        dispatch(
-          setFieldValue({
-            formId,
-            fieldName,
-            value: e.detail.newFormBuildId,
-          }),
+        dispatchFieldValue(
+          dispatch,
+          formId,
+          fieldName,
+          e.detail.newFormBuildId,
         );
         setInputValue(e.detail.newFormBuildId);
       }
@@ -158,32 +222,9 @@ export const InputBehaviorsCommon = ({
     };
   }, [dispatch, fieldName, formId, setInputValue]);
 
-  // Use debounce to prevent excessive repaints of the layout if the wrapping
-  // component requests it.
-  const debounceStoreUpdate = shouldDebounce
-    ? debounce(
-        commitFormState,
-        ['checkbox', 'radio'].includes(elementType as string)
-          ? IMMEDIATE_TIMEOUT
-          : DEBOUNCE_TIMEOUT,
-      )
-    : commitFormState;
-
-  // Register the debounced store function as a callback so debouncing is
-  // preserved between renders.
-  const storeUpdateCallback = useCallback(
-    (value: PropsValues) => debounceStoreUpdate(value),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  );
-
   // Don't track the value of hidden fields except for form_build_id or ones
   // with the 'data-track-hidden-value' attribute set.
-  if (
-    ['hidden', 'submit'].includes(elementType as string) &&
-    fieldName !== 'form_build_id' &&
-    !attributes['data-track-hidden-value']
-  ) {
+  if (!shouldTrackHiddenValue(elementType as string, fieldName, attributes)) {
     attributes.readOnly = '';
   } else if (!attributes['data-drupal-uncontrolled']) {
     // If the input is not explicitly set as uncontrolled, its state should
@@ -207,23 +248,9 @@ export const InputBehaviorsCommon = ({
       // Update the value of the input in the local state.
       setInputValue(newValue);
 
-      // The data-canvas-no-update indicates we should return early and not update the
-      // store.
-      if (
-        typeof e?.target?.hasAttribute === 'function' &&
-        e.target.hasAttribute('data-canvas-no-update')
-      ) {
-        return;
-      }
       // Update the value of the input in the Redux store.
       if (formId) {
-        dispatch(
-          setFieldValue({
-            formId,
-            fieldName,
-            value: newValue,
-          }),
-        );
+        dispatchFieldValue(dispatch, formId, fieldName, newValue);
       }
 
       // Check the current value against the JSON Schema definition for the
@@ -236,24 +263,25 @@ export const InputBehaviorsCommon = ({
         e.target.form instanceof HTMLFormElement
       ) {
         const validationResult = validateNewValue(e, newValue);
-        if (!validationResult.valid && formId) {
-          dispatch(
-            setFieldError({
-              type: 'error',
-              message:
-                validationResult.errorMessage ||
-                ajv.errorsText(validationResult.errors),
-              formId,
-              fieldName,
-            }),
-          );
-          if (!validationResult?.skipEarlyReturn) {
-            return;
+        if (!shouldUpdateFormState(e, validationResult)) {
+          if (formId) {
+            dispatchFieldError(dispatch, formId, fieldName, validationResult);
           }
+          return;
         }
       }
 
-      storeUpdateCallback({ ...formValues, [fieldName]: newValue });
+      // If no AJAX operations are in progress, update the form state and store.
+      if (!isAjaxing()) {
+        commitFormState({ ...formValues, [fieldName]: newValue });
+        return;
+      }
+      // This is only reached if AJAX operations are in progress. Add an event
+      // listener to update the form state once ajax is complete.
+      const stopListener = () => {
+        commitFormState({ ...formValues, [fieldName]: newValue });
+      };
+      document.addEventListener('drupalAjaxStop', stopListener, { once: true });
     };
 
     attributes.onBlur = (e: React.FocusEvent) => {
@@ -261,16 +289,7 @@ export const InputBehaviorsCommon = ({
       if (!validationResult.valid) {
         if (formId) {
           attributes['data-invalid-prop-value'] = 'true';
-          dispatch(
-            setFieldError({
-              type: 'error',
-              message:
-                validationResult.errorMessage ||
-                ajv.errorsText(validationResult.errors),
-              formId,
-              fieldName,
-            }),
-          );
+          dispatchFieldError(dispatch, formId, fieldName, validationResult);
         }
       }
     };
@@ -290,12 +309,21 @@ export const InputBehaviorsCommon = ({
 
   return (
     <>
-      <OriginalInput {...passProps} attributes={attributes} options={options} />
-      {fieldError && (
-        <span data-prop-message>
-          {`${fieldError.type === 'error' ? '❌ ' : ''}${fieldError.message}`}
-        </span>
-      )}
+      <InputDescription
+        description={description}
+        descriptionDisplay={descriptionDisplay}
+      >
+        <OriginalInput
+          {...passProps}
+          attributes={attributes}
+          options={options}
+        />
+        {fieldError && (
+          <span data-prop-message>
+            {`${fieldError.type === 'error' ? '❌ ' : ''}${fieldError.message}`}
+          </span>
+        )}
+      </InputDescription>
     </>
   );
 };

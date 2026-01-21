@@ -7,6 +7,7 @@ namespace Drupal\Tests\canvas\Kernel;
 use Drupal\canvas\Entity\ComponentTreeEntityInterface;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Storage\ComponentTreeLoader;
+use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Http\Exception\CacheableAccessDeniedHttpException;
@@ -17,6 +18,7 @@ use Drupal\canvas\Controller\ApiLayoutController;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Plugin\DisplayVariant\CanvasPageVariant;
+use Drupal\link\LinkItemInterface;
 use Drupal\node\Entity\Node;
 use Drupal\node\Entity\NodeType;
 use Drupal\node\NodeInterface;
@@ -39,7 +41,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
    */
   protected static $modules = [
     // Allows format=uri to be stored using URI field type.
-    'canvas_test_storage_prop_shape_alter',
+    'canvas_test_storable_prop_shape_alter',
     'sdc_test',
   ];
 
@@ -80,12 +82,14 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
     $contentTemplate = $this->getTestEntity(ContentTemplate::ENTITY_TYPE_ID);
     \assert($contentTemplate instanceof ContentTemplate);
 
+    $top_level_component_uuid = '5f71027b-d9d3-4f3d-8990-a6502c0ba676';
+    $nested_component_uuid = '8caf6e23-8fb4-4524-bdb6-f57a2a6e7859';
     // Add a heading populated by a dynamic prop source using the `title` field.
     $components = [
       [
-        'uuid' => '5f71027b-d9d3-4f3d-8990-a6502c0ba676',
-        'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
-        'component_version' => '95f4f1d5ee47663b',
+        'uuid' => $top_level_component_uuid,
+        'component_id' => 'sdc.canvas_test_sdc.props-slots',
+        'component_version' => '85a5c0c7dd53e0bb',
         'inputs' => [
           'heading' => [
             'sourceType' => 'dynamic',
@@ -93,10 +97,23 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
           ],
         ],
       ],
+      [
+        'uuid' => $nested_component_uuid,
+        'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+        'component_version' => 'b1e991f726a2a266',
+        'inputs' => [
+          'heading' => [
+            'sourceType' => 'dynamic',
+            'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
+          ],
+        ],
+        'slot' => 'the_body',
+        'parent_uuid' => $top_level_component_uuid,
+      ],
     ];
     $contentTemplate->setComponentTree($components)->save();
     // @todo Remove this in favor of using ContribStrictConfigSchemaTestTrait in https://www.drupal.org/project/canvas/issues/3531679
-    self::assertCount(0, $contentTemplate->getTypedData()->validate());
+    self::assertCount(0, $contentTemplate->getTypedData()->validate(), (string) $contentTemplate->getTypedData()->validate());
     $get_layout_api_request = Request::create($this->getLayoutUrl($contentTemplate)->toString());
     $this->setUpCurrentUser([], [self::getAdminPermission($contentTemplate)]);
 
@@ -104,14 +121,20 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
     // - entity label
     // - `model` in API response
     // - `html` in API
-    $title_matches_resolved_and_html = function (string $expected_title, JsonResponse $response) {
+    $title_matches_resolved_and_html = function (string $expected_title, JsonResponse $response) use ($top_level_component_uuid, $nested_component_uuid) {
       // Current preview entity label MUST match the expected title.
       self::assertSame($expected_title, $this->previewEntity?->label());
       // The `model` of the layout API response MUST contain the expected title.
-      self::assertSame($expected_title, static::decodeResponse($response)['model']['5f71027b-d9d3-4f3d-8990-a6502c0ba676']['resolved']['heading']);
-      // The `html` of the layout API response MUST render the expected title.
-      self::assertCount(1, $this->cssSelect('[data-component-id="canvas_test_sdc:props-no-slots"]'));
-      self::assertSame($expected_title, (string) $this->cssSelect('[data-component-id="canvas_test_sdc:props-no-slots"] h1')[0]);
+      self::assertSame($expected_title, static::decodeResponse($response)['model'][$top_level_component_uuid]['resolved']['heading']);
+      self::assertSame($expected_title, static::decodeResponse($response)['model'][$nested_component_uuid]['resolved']['heading']);
+      // The `html` of the layout API response MUST render the expected title in
+      // the both the top-level and nested component.
+      self::assertCount(1, $this->cssSelect('[data-component-id="canvas_test_sdc:props-slots"]'));
+      // Make sure we match only the h1 that is direct the child of the component
+      // so don't match the one in the nested component.
+      self::assertSame($expected_title, (string) $this->cssSelect('[data-component-id="canvas_test_sdc:props-slots"] > h1')[0]);
+      self::assertCount(1, $this->cssSelect('[data-component-id="canvas_test_sdc:props-slots"] [data-component-id="canvas_test_sdc:props-no-slots"]'));
+      self::assertSame($expected_title, (string) $this->cssSelect('[data-component-id="canvas_test_sdc:props-slots"] [data-component-id="canvas_test_sdc:props-no-slots"] > h1')[0]);
     };
 
     // Assert the original resolved dynamic prop source + resulting HTML.
@@ -185,7 +208,11 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
     // Draft of highlighted region in global template should be returned even if
     // there is no auto-save data for the node.
     $response = $this->request(Request::create($url->toString()));
-    $this->assertTitle($entity->label() . ' | Drupal');
+    $expected_title = match(TRUE) {
+      ContentTemplate::ENTITY_TYPE_ID === $entity_type && $this->previewEntity instanceof ContentEntityInterface => $this->previewEntity->label(),
+      default => $entity->label(),
+    };
+    $this->assertTitle($expected_title . ' | Drupal');
     $this->assertResponseAutoSaves($response, [$entity], TRUE);
     $json = static::decodeResponse($response);
     self::assertArrayHasKey('layout', $json);
@@ -230,7 +257,11 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
     $this->assertResponseAutoSaves($response, [$original_entity], TRUE);
 
     // Extract HTML from JSON response for title assertion
-    $this->assertTitle($original_entity->label() . " | Drupal");
+    $expected_title = match(TRUE) {
+      ContentTemplate::ENTITY_TYPE_ID === $entity_type && $this->previewEntity instanceof ContentEntityInterface => $this->previewEntity->label(),
+      default => $original_entity->label(),
+    };
+    $this->assertTitle($expected_title . " | Drupal");
 
     $json = static::decodeResponse($response);
     self::assertArrayHasKey('layout', $json);
@@ -349,7 +380,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
         [
           'uuid' => CanvasTestSetup::UUID_TWO_COLUMN_UUID,
           'nodeType' => 'component',
-          'type' => 'sdc.canvas_test_sdc.two_column@b1ae1e286c75438e',
+          'type' => 'sdc.canvas_test_sdc.two_column@f90c1f6cfb2fc04a',
           'name' => NULL,
           'slots' => [
             [
@@ -360,28 +391,28 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
                 [
                   'uuid' => CanvasTestSetup::UUID_STATIC_IMAGE,
                   'nodeType' => 'component',
-                  'type' => 'sdc.canvas_test_sdc.image@cc9b97c9370aabdf',
+                  'type' => 'sdc.canvas_test_sdc.image@abadf2538ecfdecc',
                   'name' => NULL,
                   'slots' => [],
                 ],
                 [
                   'uuid' => CanvasTestSetup::UUID_STATIC_CARD1,
                   'nodeType' => 'component',
-                  'type' => 'sdc.canvas_test_sdc.my-hero@888412021fbcc837',
+                  'type' => 'sdc.canvas_test_sdc.my-hero@a681ae184a8f6b7f',
                   'name' => NULL,
                   'slots' => [],
                 ],
                 [
                   'uuid' => CanvasTestSetup::UUID_CODE_COMPONENT,
                   'nodeType' => 'component',
-                  'type' => 'js.test-code-component@b09d5da457224c5e',
+                  'type' => 'js.test-code-component@36a8cee6a86c3d8d',
                   'name' => NULL,
                   'slots' => [],
                 ],
                 [
                   'uuid' => CanvasTestSetup::UUID_ALL_SLOTS_EMPTY,
                   'nodeType' => 'component',
-                  'type' => 'sdc.canvas_test_sdc.one_column@0555ab081a3c8721',
+                  'type' => 'sdc.canvas_test_sdc.one_column@80cc82f44d0a94f2',
                   'name' => NULL,
                   'slots' => [
                     [
@@ -402,21 +433,21 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
                 [
                   'uuid' => CanvasTestSetup::UUID_STATIC_CARD2,
                   'nodeType' => 'component',
-                  'type' => 'sdc.canvas_test_sdc.my-hero@888412021fbcc837',
+                  'type' => 'sdc.canvas_test_sdc.my-hero@a681ae184a8f6b7f',
                   'name' => NULL,
                   'slots' => [],
                 ],
                 [
                   'uuid' => CanvasTestSetup::UUID_STATIC_CARD3,
                   'nodeType' => 'component',
-                  'type' => 'sdc.canvas_test_sdc.my-hero@888412021fbcc837',
+                  'type' => 'sdc.canvas_test_sdc.my-hero@a681ae184a8f6b7f',
                   'name' => NULL,
                   'slots' => [],
                 ],
                 [
                   'uuid' => CanvasTestSetup::UUID_ADAPTED_IMAGE,
                   'nodeType' => 'component',
-                  'type' => 'sdc.canvas_test_sdc.image@cc9b97c9370aabdf',
+                  'type' => 'sdc.canvas_test_sdc.image@abadf2538ecfdecc',
                   'name' => 'Magnificent image!',
                   'slots' => [],
                 ],
@@ -445,8 +476,18 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
 
         ],
         'cta1href' => [
-          'sourceType' => 'static:field_item:uri',
-          'expression' => 'ℹ︎uri␟value',
+          'sourceType' => 'static:field_item:link',
+          'value' => [
+            'uri' => 'https://drupal.org',
+            'options' => [],
+          ],
+          'expression' => 'ℹ︎link␟url',
+          'sourceTypeSettings' => [
+            'instance' => [
+              'title' => \DRUPAL_DISABLED,
+              'link_type' => LinkItemInterface::LINK_GENERIC,
+            ],
+          ],
         ],
       ],
     ], $json['model'][CanvasTestSetup::UUID_STATIC_CARD2]);
@@ -554,7 +595,10 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
     /** @var \Drupal\canvas\Controller\ApiLayoutController $controller */
     $controller = \Drupal::classResolver(ApiLayoutController::class);
     $this->expectException(\LogicException::class);
-    $this->expectExceptionMessage('This entity does not have an Canvas field!');
+    // @todo Fix in https://drupal.org/i/3498525 for testing a bundle where a
+    //   canvas field is not present.
+    // @see \Drupal\canvas\Storage\ComponentTreeLoader::getCanvasFieldName
+    $this->expectExceptionMessage('For now Canvas only works if the entity is a canvas_page! Other entity types and bundles must use content templates for now, see https://drupal.org/i/3498525');
     $controller->get($node);
   }
 

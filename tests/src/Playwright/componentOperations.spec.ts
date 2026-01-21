@@ -42,7 +42,7 @@ test.describe('Perform CRUD operations on components', () => {
       if (
         consoleMessage &&
         typeof consoleMessage === 'object' &&
-        Object.hasOwn(consoleMessage, 'status')
+        'status' in consoleMessage
       ) {
         expect(consoleMessage.status).not.toBe(500);
       }
@@ -55,257 +55,32 @@ test.describe('Perform CRUD operations on components', () => {
     await canvasEditor.goToEditor();
     await expect(page.locator('[data-testid="canvas-side-menu"]'))
       .toMatchAriaSnapshot(`
-        - button "Add":
+        - button "Library":
           - img
         - button "Layers":
           - img
         - separator
-        - button "Manage library":
+        - button "Code":
           - img
       `);
-    await page
-      .locator('[data-testid="canvas-side-menu"]')
-      .locator('[aria-label="Add"]')
-      .click();
-    await expect(
-      page.locator(
-        '[data-testid="canvas-primary-panel"] h4:has-text("Library")',
-      ),
-    ).toBeVisible();
-    const collapsedButtons = page.locator(
-      '[data-testid="canvas-primary-panel"] button[aria-expanded="false"]',
-    );
+    await canvasEditor.openLibraryPanel();
+
+    const collapsedFolderButtonsSelector =
+      '[data-testid="canvas-primary-panel"] button[aria-label^="Expand"][aria-label$="folder"]';
+
+    const collapsedButtons = page.locator(collapsedFolderButtonsSelector);
     const buttonCount = await collapsedButtons.count();
     for (let i = 0; i < buttonCount; i++) {
       const collapsedButton = page
-        .locator(
-          '[data-testid="canvas-primary-panel"] button[aria-expanded="false"]',
-        )
+        .locator(collapsedFolderButtonsSelector)
         .first();
       await collapsedButton.click();
     }
-    await expect(page.locator('[data-testid="canvas-primary-panel"]'))
-      .toMatchAriaSnapshot(`
-        - heading "Library" [level=4]
-        - button:
-          - img
-        - tablist:
-          - tab "Components" [selected]
-          - tab "Patterns"
-        - tabpanel "Components":
-          - button "Create code component":
-            - img
-            - text: Create code component
-          - button "Atom/Media 1" [expanded]:
-            - img
-            - text: Atom/Media 1
-            - img
-          - list:
-            - button "Video":
-              - img
-              - text: Video
-          - button "Atom/Tabs 2" [expanded]:
-            - img
-            - text: Atom/Tabs 2
-            - img
-          - list:
-            - button "Shoe Tab":
-              - img
-              - text: Shoe Tab
-            - button "Shoe Tab Panel":
-              - img
-              - text: Shoe Tab Panel
-          - button "Atom/Text 2" [expanded]:
-            - img
-            - text: Atom/Text 2
-            - img
-          - list:
-            - button "Heading":
-              - img
-              - text: Heading
-            - button "Shoe Badge":
-              - img
-              - text: Shoe Badge
-          - button "Container 3" [expanded]:
-            - img
-            - text: Container 3
-            - img
-          - list:
-            - button "Grid Container":
-              - img
-              - text: Grid Container
-            - button "One Column":
-              - img
-              - text: One Column
-            - button "Two Column":
-              - img
-              - text: Two Column
-          - button "Container/Special 1" [expanded]:
-            - img
-            - text: Container/Special 1
-            - img
-          - list:
-            - button "Shoe Tab Group":
-              - img
-              - text: Shoe Tab Group
-          - button "core 3" [expanded]:
-            - img
-            - text: core 3
-            - img
-          - list:
-            - button "Page title":
-              - img
-              - text: Page title
-            - button "Primary admin actions":
-              - img
-              - text: Primary admin actions
-            - button "Tabs":
-              - img
-              - text: Tabs
-          - button "Forms 1" [expanded]:
-            - img
-            - text: Forms 1
-            - img
-          - list:
-            - button "User login":
-              - img
-              - text: User login
-          - button "Lists (Views) 2" [expanded]:
-            - img
-            - text: Lists (Views) 2
-            - img
-          - list:
-            - button "Recent content":
-              - img
-              - text: Recent content
-            - button "Who's online":
-              - img
-              - text: Who's online
-          - button "Menus 5" [expanded]:
-            - img
-            - text: Menus 5
-            - img
-          - list:
-            - button "Administration":
-              - img
-              - text: Administration
-            - button "Footer":
-              - img
-              - text: Footer
-            - button "Main navigation":
-              - img
-              - text: Main navigation
-            - button "Tools":
-              - img
-              - text: Tools
-            - button "User account menu":
-              - img
-              - text: User account menu
-          - button "Other 20" [expanded]:
-            - img
-            - text: Other 20
-            - img
-          - list:
-            - button "Call to Absolute Action":
-              - img
-              - text: Call to Absolute Action
-            - button "Canvas test SDC for image gallery (>1 image)":
-              - img
-              - text: Canvas test SDC for image gallery (>1 image)
-            - button "Canvas test SDC for sparkline (>1 integers between -100 and 100)":
-              - img
-              - text: Canvas test SDC for sparkline (>1 integers between -100 and 100)
-            - 'button "Canvas test SDC for testing type: \`Drupal\\\\Core\\\\Template\\\\Attribute\` special casing"':
-              - img
-              - text: "Canvas test SDC for testing type: \`Drupal\\\\Core\\\\Template\\\\Attribute\` special casing"
-            - button "Canvas test SDC that crashes when 'crash' prop is TRUE":
-              - img
-              - text: Canvas test SDC that crashes when 'crash' prop is TRUE
-            - button "Canvas test SDC with optional image and heading":
-              - img
-              - text: Canvas test SDC with optional image and heading
-            - button "Canvas test SDC with optional image, with example":
-              - img
-              - text: Canvas test SDC with optional image, with example
-            - button "Canvas test SDC with optional image, without example":
-              - img
-              - text: Canvas test SDC with optional image, without example
-            - button "Canvas test SDC with props and slots":
-              - img
-              - text: Canvas test SDC with props and slots
-            - button "Canvas test SDC with props but no slots":
-              - img
-              - text: Canvas test SDC with props but no slots
-            - button "Canvas test SDC with required image, with example":
-              - img
-              - text: Canvas test SDC with required image, with example
-            - button "Card":
-              - img
-              - text: Card
-            - button "Card with local image":
-              - img
-              - text: Card with local image
-            - button "Card with remote image":
-              - img
-              - text: Card with remote image
-            - button "Card with stream wrapper image":
-              - img
-              - text: Card with stream wrapper image
-            - button "Component no meta:enum":
-              - img
-              - text: Component no meta:enum
-            - button "Druplicon":
-              - img
-              - text: Druplicon
-            - button "Hero":
-              - img
-              - text: Hero
-            - button "Section":
-              - img
-              - text: Section
-            - button "Test SDC Image":
-              - img
-              - text: Test SDC Image
-          - button "Status 2" [expanded]:
-            - img
-            - text: Status 2
-            - img
-          - list:
-            - button "Deprecated SDC":
-              - img
-              - text: Deprecated SDC
-            - button "Experimental SDC":
-              - img
-              - text: Experimental SDC
-          - button "System 5" [expanded]:
-            - img
-            - text: System 5
-            - img
-          - list:
-            - button "Breadcrumbs":
-              - img
-              - text: Breadcrumbs
-            - button "Clear cache":
-              - img
-              - text: Clear cache
-            - button "Messages":
-              - img
-              - text: Messages
-            - button "Powered by Drupal":
-              - img
-              - text: Powered by Drupal
-            - button "Site branding":
-              - img
-              - text: Site branding
-          - button "User 1" [expanded]:
-            - img
-            - text: User 1
-            - img
-          - list:
-            - button "Who's new":
-              - img
-              - text: Who's new
-         `);
+    await expect(
+      page.locator('[data-testid="canvas-primary-panel"]'),
+    ).toMatchAriaSnapshot({
+      name: 'Perform-CRUD-operations-on-components-Layer-and-Components-Panel-1.aria.yml',
+    });
   });
 
   test('Component hovers and clicks', async ({
@@ -316,6 +91,7 @@ test.describe('Perform CRUD operations on components', () => {
     await drupal.createCanvasPage('Hovers', '/hovers');
     await page.goto('/hovers');
     await canvasEditor.goToEditor();
+    await canvasEditor.openLibraryPanel();
     await canvasEditor.addComponent({ id: 'sdc.canvas_test_sdc.my-hero' });
     await canvasEditor.addComponent({ id: 'sdc.canvas_test_sdc.card' });
     await canvasEditor.openLayersPanel();
@@ -379,6 +155,36 @@ test.describe('Perform CRUD operations on components', () => {
     ).toBeVisible();
   });
 
+  test('Shows prop descriptions, but omits link field help', async ({
+    page,
+    drupal,
+    canvasEditor,
+  }) => {
+    await drupal.createCanvasPage('Hero', '/hero');
+    await page.goto('/hero');
+    await canvasEditor.goToEditor();
+    await expect(page.locator('#block-stark-page-title h1')).toHaveCount(0);
+    await canvasEditor.openLibraryPanel();
+    await canvasEditor.addComponent({ id: 'sdc.canvas_test_sdc.my-hero' });
+
+    // Heading.
+    await expect(
+      (await canvasEditor.getActivePreviewFrame()).locator(
+        '[data-component-id="canvas_test_sdc:my-hero"] h1',
+      ),
+    ).toContainText('There goes my hero');
+    await expect(
+      await page.getByText('The main heading of the hero').count(),
+    ).toEqual(1);
+    await expect(
+      await page
+        .getByText('Start typing the title of a piece of content', {
+          exact: false,
+        })
+        .count(),
+    ).toEqual(0);
+  });
+
   test('Can handle empty heading prop in hero component', async ({
     page,
     drupal,
@@ -388,7 +194,7 @@ test.describe('Perform CRUD operations on components', () => {
     await page.goto('/hero');
     await canvasEditor.goToEditor();
     await expect(page.locator('#block-stark-page-title h1')).toHaveCount(0);
-
+    await canvasEditor.openLibraryPanel();
     await canvasEditor.addComponent({ id: 'sdc.canvas_test_sdc.my-hero' });
 
     // Heading.
@@ -406,6 +212,9 @@ test.describe('Perform CRUD operations on components', () => {
 
     // Refresh the page.
     await page.reload();
+    await expect(
+      await page.getByLabel('Heading', { exact: true }),
+    ).not.toHaveValue('There goes my hero');
     await expect(
       (await canvasEditor.getActivePreviewFrame()).locator(
         '[data-component-id="canvas_test_sdc:my-hero"] h1',
@@ -439,6 +248,7 @@ test.describe('Perform CRUD operations on components', () => {
     await drupal.createCanvasPage('Delete', '/delete');
     await page.goto('/delete');
     await canvasEditor.goToEditor();
+    await canvasEditor.openLibraryPanel();
     await canvasEditor.addComponent({ id: 'sdc.canvas_test_sdc.card' });
     await canvasEditor.deleteComponent('sdc.canvas_test_sdc.card');
   });
@@ -451,6 +261,7 @@ test.describe('Perform CRUD operations on components', () => {
     await drupal.createCanvasPage('Slots', '/slots');
     await page.goto('/slots');
     await canvasEditor.goToEditor();
+    await canvasEditor.openLibraryPanel();
     await canvasEditor.addComponent({ id: 'sdc.canvas_test_sdc.props-slots' });
     await canvasEditor.addComponent({ id: 'sdc.canvas_test_sdc.card' });
     await canvasEditor.openLayersPanel();
@@ -466,47 +277,37 @@ test.describe('Perform CRUD operations on components', () => {
           - button "Collapse component tree" [expanded]:
             - img
           - img
-          - text: Canvas test SDC with props and slots
           - button "Open contextual menu"
           - img
-          - text: The Body
           - img
-          - text: The Footer
           - img
-          - text: The Colophon
         - treeitem "Card Open contextual menu":
           - img
-          - text: Card
-      `);
+          - button "Open contextual menu"
+    `);
     await canvasEditor.moveComponent('Card', 'the_footer');
     await expect(page.locator('[data-testid="canvas-primary-panel"]'))
       .toMatchAriaSnapshot(`
-      - heading "Layers" [level=4]
-      - button:
+        - heading "Layers" [level=4]
+        - button:
+          - img
         - img
-      - img
-      - text: Content
-      - tree:
-        - treeitem "Collapse component tree Canvas test SDC with props and slots Open contextual menu":
-          - button "Collapse component tree" [expanded]:
-            - img
-          - img
-          - text: Canvas test SDC with props and slots
-          - button "Open contextual menu"
-          - img
-          - text: The Body
-          - button "Collapse slot" [expanded]:
-            - img
-          - img
-          - text: The Footer
-          - tree:
-            - treeitem "Card Open contextual menu":
+        - text: Content
+        - tree:
+          - treeitem "Collapse component tree Canvas test SDC with props and slots Open contextual menu":
+            - button "Collapse component tree" [expanded]:
               - img
-              - text: Card
-              - button "Open contextual menu"
-          - img
-          - text: The Colophon
-
+            - img
+            - button "Open contextual menu"
+            - img
+            - button "Collapse slot" [expanded]:
+              - img
+            - img
+            - tree:
+              - treeitem "Card Open contextual menu":
+                - img
+                - button "Open contextual menu"
+            - img
       `);
   });
 
@@ -519,6 +320,7 @@ test.describe('Perform CRUD operations on components', () => {
     await drupal.createCanvasPage('Load SDC CSS', '/sdc-styles');
     await page.goto('/sdc-styles');
     await canvasEditor.goToEditor();
+    await canvasEditor.openLibraryPanel();
     await canvasEditor.addComponent({ name: 'Hero' });
 
     const head = await canvasEditor.getIframeHead();
@@ -542,7 +344,7 @@ test.describe('Perform CRUD operations on components', () => {
     await drupal.createCanvasPage('Blur Autocomplete', '/blur-autocomplete');
     await page.goto('/blur-autocomplete');
     await canvasEditor.goToEditor();
-
+    await canvasEditor.openLibraryPanel();
     await canvasEditor.addComponent({ name: 'Hero' });
 
     // Fill in Heading and Sub-heading fields

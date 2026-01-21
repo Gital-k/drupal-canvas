@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
+use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\Component\Serialization\Json;
 use Drupal\Core\Cache\MemoryCache\MemoryCacheInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Url;
 use Drupal\canvas\AutoSave\AutoSaveManager;
@@ -174,7 +176,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
                   'nodeType' => 'slot',
                 ],
               ],
-              'type' => 'sdc.canvas_test_sdc.one_column@0555ab081a3c8721',
+              'type' => 'sdc.canvas_test_sdc.one_column@80cc82f44d0a94f2',
               'uuid' => 'c4074d1f-149a-4662-aaf3-615151531cf6',
             ],
           ],
@@ -258,11 +260,26 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
     // Add a new component to the content region.
     $uuid = '173c4899-a5f7-442a-b008-ea8c925735be';
     $json['model'][$uuid] = self::getNewHeadingComponentModel();
+    $static_heading_text = $json['model'][$uuid]['resolved']['text'];
+    if ($entity_type === ContentTemplate::ENTITY_TYPE_ID) {
+      \assert($this->previewEntity instanceof ContentEntityInterface);
+      $preview_entity_title = (string) $this->previewEntity->label();
+      self::assertNotSame($static_heading_text, $preview_entity_title);
+      $json['model'][$uuid]['source']['text'] = [
+        'sourceType' => 'dynamic',
+        'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
+      ];
+      $json['model'][$uuid]['resolved']['text'] = NULL;
+      $expected_heading_text = $preview_entity_title;
+    }
+    else {
+      $expected_heading_text = $static_heading_text;
+    }
     unset($json['isNew'], $json['isPublished'], $json['html']);
     $json['layout'][0]['components'][] = [
       'nodeType' => 'component',
       'uuid' => $uuid,
-      'type' => 'sdc.canvas_test_sdc.heading@8dd7b865998f53b0',
+      'type' => 'sdc.canvas_test_sdc.heading@8c01a2bdb897a810',
       'slots' => [],
     ];
     // And update the first card model to use a URI reference.
@@ -279,10 +296,21 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
     \assert($node1 instanceof NodeInterface);
     self::assertCount(1, $crawler->filter(\sprintf('a[href="%s"].my-hero__cta--primary', 'https://drupal.org')));
     self::assertCount(1, $crawler->filter(\sprintf('a[href="%s"].my-hero__cta--primary', $node1->toUrl()->toString())));
+    self::assertSame($expected_heading_text, (string) $this->cssSelect('h1[data-component-id="canvas_test_sdc:heading"]')[0]);
     $this->assertResponseAutoSaves($response, [$entity]);
     self::assertFalse($autoSave->getAutoSaveEntity($entity)->isEmpty());
 
     $this->assertRequestAutoSaveConflict(Request::create($url, method: 'POST', content: $this->filterLayoutForPost($original_content)));
+
+    if ($entity_type === ContentTemplate::ENTITY_TYPE_ID) {
+      // Ensure we can update the dynamic prop source to a static source.
+      $json['model'][$uuid] = self::getNewHeadingComponentModel();
+      $json += $this->getPostContentsDefaults($entity);
+      $response = $this->request(Request::create($url, method: 'POST', content: \json_encode($json, JSON_THROW_ON_ERROR)));
+      self::assertSame($static_heading_text, (string) $this->cssSelect('h1[data-component-id="canvas_test_sdc:heading"]')[0]);
+      $this->assertResponseAutoSaves($response, [$entity]);
+      self::assertFalse($autoSave->getAutoSaveEntity($entity)->isEmpty());
+    }
 
     // Now re-fetch the layout to confirm we don't update the hash if an auto-save
     // entry already exists.
@@ -340,7 +368,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
     $json['layout'][\key($highlightedRegion)]['components'][] = [
       'nodeType' => 'component',
       'uuid' => $uuid,
-      'type' => 'sdc.canvas_test_sdc.heading@8dd7b865998f53b0',
+      'type' => 'sdc.canvas_test_sdc.heading@8c01a2bdb897a810',
       'slots' => [],
     ];
     $json += $this->getPostContentsDefaults($entity);
@@ -417,7 +445,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
   /**
    * @dataProvider providerEntityTypes
    */
-  public function testWithDraftCodeComponent(string $entity_type): void {
+  public function testWithCodeComponent(string $entity_type): void {
     $entity = $this->getTestEntity($entity_type);
     $this->setUpCurrentUser([], [self::getAdminPermission($entity)]);
 
@@ -459,10 +487,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
     ];
     $code_component->set('props', $props);
     $code_component->set('name', 'Here comes the');
-    // But store an overridden version in auto-save (draft).
-    /** @var \Drupal\canvas\AutoSave\AutoSaveManager $autoSave */
-    $autoSave = $this->container->get(AutoSaveManager::class);
-    $autoSave->saveEntity($code_component);
+    $code_component->save();
 
     // Load the test data from the layout controller.
     $url = $this->getLayoutUrl($entity)->toString();
@@ -656,7 +681,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
     $expected_preview_html = str_replace('Canvas/MODULE/PATH', $module_path, $expected_preview_html);
     \assert($reference_media->field_media_image->entity instanceof FileInterface);
     // @phpstan-ignore-next-line
-    $expected_preview_html = str_replace('!!REFERENCED_MEDIA!!', $reference_media->field_media_image->src_with_alternate_widths, $expected_preview_html);
+    $expected_preview_html = str_replace('!!REFERENCED_MEDIA!!', $reference_media->field_media_image->src_with_alternate_widths->getGeneratedUrl(), $expected_preview_html);
 
     unset($json['html'], $json['isPublished'], $json['isNew']);
     $this->request(Request::create('/canvas/api/v0/layout/node/1', method: 'POST', content: json_encode($json, JSON_THROW_ON_ERROR)));

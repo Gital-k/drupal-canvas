@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Drupal\canvas\Controller;
 
 use Drupal\canvas\Entity\ContentTemplate;
@@ -12,36 +14,32 @@ use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\TypedData\EntityDataDefinition;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase;
-use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent;
-use Drupal\canvas\PropExpressions\Component\ComponentPropExpression;
-use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpressionInterface;
-use Drupal\canvas\PropSource\DynamicPropSource;
-use Drupal\canvas\ShapeMatcher\FieldForComponentSuggester;
+use Drupal\canvas\ShapeMatcher\PropSourceSuggester;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
- * Controllers exposing HTTP API for powering Canvas's Content Template editor UI.
+ * Controllers exposing HTTP API for powering Content Template editor UI.
  *
  * @internal This HTTP API is intended only for the Canvas UI. These controllers
  *   and associated routes may change at any time.
  *
- * @see \Drupal\canvas\ShapeMatcher\FieldForComponentSuggester
+ * @see \Drupal\canvas\ShapeMatcher\PropSourceSuggester
  */
 final class ApiUiContentTemplateControllers extends ApiControllerBase {
 
   public function __construct(
     private readonly EntityTypeManagerInterface $entityTypeManager,
     private readonly EntityTypeBundleInfoInterface $entityTypeBundleInfo,
-    private readonly FieldForComponentSuggester $fieldForComponentSuggester,
+    private readonly PropSourceSuggester $propSourceSuggester,
     private readonly EntityTypeBundleInfoInterface $bundleInfo,
     private readonly EntityDisplayRepositoryInterface $entityDisplayRepository,
   ) {}
 
   /**
-   * Provides suggestions for a given Component based on entity type and bundle.
+   * Suggests prop sources for an SDC-like Component.
    *
    * @param string $content_entity_type_id
    *   A content entity type ID.
@@ -56,52 +54,23 @@ final class ApiUiContentTemplateControllers extends ApiControllerBase {
    * @throws \Symfony\Component\HttpKernel\Exception\BadRequestHttpException
    * @throws \Symfony\Component\HttpKernel\Exception\NotFoundHttpException
    */
-  public function suggestStructuredDataForPropShapes(string $content_entity_type_id, string $bundle, string $component_config_entity_id): JsonResponse {
+  public function suggestPropSources(string $content_entity_type_id, string $bundle, string $component_config_entity_id): JsonResponse {
     // @see \Drupal\Core\EventSubscriber\ExceptionJsonSubscriber
     $this->validateRequest($content_entity_type_id, $bundle, $component_config_entity_id);
     // @phpstan-ignore-next-line
     $source = Component::load($component_config_entity_id)->getComponentSource();
     assert($source instanceof GeneratedFieldExplicitInputUxComponentSourceBase);
 
-    $suggestions = $this->fieldForComponentSuggester->suggest(
-      $source->getSdcPlugin()->getPluginId(),
+    $suggestions = $this->propSourceSuggester->suggest(
+      $source->getSourceSpecificComponentId(),
+      $source->getMetadata(),
       EntityDataDefinition::createFromDataType("entity:$content_entity_type_id:$bundle"),
     );
 
-    return new JsonResponse(status: Response::HTTP_OK, data: array_combine(
-      // Top-level keys: the prop names of the targeted component.
-      array_map(
-        fn (string $key): string => ComponentPropExpression::fromString($key)->propName,
-        array_keys($suggestions),
-      ),
-      array_map(
-        fn (array $instances): array => array_combine(
-          // Second level keys: opaque identifiers for the suggestions to
-          // populate the component prop.
-          array_map(
-            fn (StructuredDataPropExpressionInterface $expr): string => \hash('xxh64', (string) $expr),
-            array_values($instances),
-          ),
-          // Values: objects with "label" and "source" keys, with:
-          // - "label": the human-readable label that the Content Template UI
-          //   should present to the human
-          // - "source": the array representation of the DynamicPropSource that,
-          //   if selected by the human, the client should use verbatim as the
-          //   source to populate this component instance's prop.
-          array_map(
-            function (string $label, StructuredDataPropExpressionInterface $expr) {
-              return [
-                'label' => $label,
-                'source' => (new DynamicPropSource($expr))->toArray(),
-              ];
-            },
-            array_keys($instances),
-            array_values($instances),
-          ),
-        ),
-        array_column($suggestions, 'instances'),
-      ),
-    ));
+    return new JsonResponse(
+      status: Response::HTTP_OK,
+      data: PropSourceSuggester::structureSuggestionsForHierarchicalResponse($suggestions),
+    );
   }
 
   /**
@@ -117,11 +86,6 @@ final class ApiUiContentTemplateControllers extends ApiControllerBase {
     $source = $component->getComponentSource();
     if (!$source instanceof GeneratedFieldExplicitInputUxComponentSourceBase) {
       throw new BadRequestHttpException('Only components that define their inputs using JSON Schema and use fields to populate their inputs are currently supported.');
-    }
-
-    // @todo Add support for suggestions for code components in https://www.drupal.org/i/3503038
-    if (!$source instanceof SingleDirectoryComponent) {
-      throw new BadRequestHttpException('Code components are not supported yet.');
     }
 
     if ($this->entityTypeManager->getDefinition($content_entity_type_id, FALSE) === NULL) {

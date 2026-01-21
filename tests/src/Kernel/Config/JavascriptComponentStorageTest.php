@@ -19,8 +19,7 @@ use Drupal\Tests\user\Traits\UserCreationTrait;
  * Tests JavascriptComponentStorage.
  *
  * @covers \Drupal\canvas\EntityHandlers\JavascriptComponentStorage
- * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::createConfigEntity
- * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::updateConfigEntity
+ * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponentDiscovery
  * @group JavaScriptComponents
  * @group canvas
  */
@@ -44,6 +43,7 @@ final class JavascriptComponentStorageTest extends AssetLibraryStorageTest {
     'options',
     'path',
     'link',
+    'text',
     'filter',
     'ckeditor5',
     'editor',
@@ -188,13 +188,13 @@ final class JavascriptComponentStorageTest extends AssetLibraryStorageTest {
 
     $component = $this->loadComponent($component_id);
     self::assertEquals($new_name, $component->label());
-    self::assertEquals(['noodles', 'title'], \array_keys($component->getSettings()['prop_field_definitions']));
+    self::assertEquals(['title', 'noodles'], \array_keys($component->getSettings()['prop_field_definitions']));
 
     return $js_component->toArray();
   }
 
   /**
-   * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::updateConfigEntity()
+   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponentDiscovery::computeCurrentComponentMetadata()
    * @depends testComponentEntityCreation
    */
   public function testComponentEntityUpdate(array $js_component_values): void {

@@ -45,6 +45,7 @@ export default [
         JSX: true,
         NodeJS: true,
         React: true,
+        jQuery: true,
       },
 
       parser: tsParser,
@@ -53,7 +54,7 @@ export default [
 
       parserOptions: {
         project: true,
-        tsconfigRootDir: './',
+        tsconfigRootDir: __dirname,
       },
     },
 

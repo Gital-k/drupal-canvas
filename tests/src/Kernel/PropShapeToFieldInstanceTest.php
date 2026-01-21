@@ -2,10 +2,20 @@
 
 declare(strict_types=1);
 
+// cspell:ignore msword openxmlformats officedocument wordprocessingml
+
 namespace Drupal\Tests\canvas\Kernel;
 
+use Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase;
+use Drupal\canvas\PropShape\PersistentPropShapeRepository;
+use Drupal\canvas\PropShape\PropShapeRepositoryInterface;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent;
+use Drupal\Core\Entity\EntityTypeBundleInfoInterface;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\Core\Plugin\Component;
+use Drupal\canvas\Entity\Component as ComponentEntity;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaStringFormat;
 use Drupal\canvas\PropExpressions\Component\ComponentPropExpression;
@@ -18,6 +28,7 @@ use Drupal\canvas\ShapeMatcher\JsonSchemaFieldInstanceMatcher;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\KernelTests\KernelTestBase;
+use Drupal\link\LinkItemInterface;
 use Drupal\node\Entity\NodeType;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
@@ -35,11 +46,20 @@ use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
  * @see docs/data-model.md
  * @see \Drupal\Tests\canvas\Kernel\PropShapeRepositoryTest
  * @group canvas
+ *
+ * @phpstan-type ShapeMatchingResults array{'SDC props': non-empty-list<string>, 'static prop source': null|string, instances: string[], adapter_matches_field_type: string[], adapter_matches_instance: string[]}
  */
 class PropShapeToFieldInstanceTest extends KernelTestBase {
 
   use ContribStrictConfigSchemaTestTrait;
   use MediaTypeCreationTrait;
+
+  protected static $configSchemaCheckerExclusions = [
+    // The "all-props" test-only SDC is used to assess also prop shapes that are
+    // not yet storable, and hence do not meet the requirements.
+    // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponentDiscovery::checkRequirements()
+    'canvas.' . ComponentEntity::ENTITY_TYPE_ID . '.' . SingleDirectoryComponent::SOURCE_PLUGIN_ID . '.sdc_test_all_props.all-props',
+  ];
 
   /**
    * {@inheritdoc}
@@ -58,6 +78,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
     'filter',
     'ckeditor5',
     'editor',
+    'datetime',
     'canvas_test_sdc',
   ];
 
@@ -75,10 +96,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
   }
 
   /**
-   * Tests matches for SDC props.
-   *
-   * @param string[] $modules
-   * @param array{'modules': string[], 'expected': array<string, array<mixed>>} $expected
+   * Tests matches for \Drupal\Core\Theme\Component\ComponentMetadata props.
    *
    * @dataProvider provider
    */
@@ -93,7 +111,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
     $module_installer->install($modules);
 
     // Create configurable fields for certain combinations of modules.
-    if (empty(array_diff(['node', 'field', 'image'], $modules))) {
+    if (empty(array_diff(['node', 'field', 'image', 'link'], $modules))) {
       $this->installEntitySchema('node');
       $this->installEntitySchema('field_storage_config');
       $this->installEntitySchema('field_config');
@@ -113,6 +131,22 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
         'field_name' => 'field_silly_image',
         'bundle' => 'foo',
         'required' => TRUE,
+      ])->save();
+      // Create a "check it out" field.
+      FieldStorageConfig::create([
+        'entity_type' => 'node',
+        'field_name' => 'field_check_it_out',
+        'type' => 'link',
+      ])->save();
+      FieldConfig::create([
+        'entity_type' => 'node',
+        'field_name' => 'field_check_it_out',
+        'bundle' => 'foo',
+        'required' => TRUE,
+        'settings' => [
+          'title' => DRUPAL_OPTIONAL,
+          'link_type' => LinkItemInterface::LINK_GENERIC,
+        ],
       ])->save();
       // Create a "event duration" field on the "Foo" node type.
       FieldStorageConfig::create([
@@ -134,7 +168,6 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
         'type' => 'entity_reference',
         'settings' => [
           'target_type' => 'media',
-          'required' => TRUE,
         ],
       ])->save();
       FieldConfig::create([
@@ -153,12 +186,98 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           ],
         ],
       ])->save();
+      // Optional, single-cardinality video media reference field.
+      FieldStorageConfig::create([
+        'field_name' => 'media_optional_vacation_videos',
+        'entity_type' => 'node',
+        'type' => 'entity_reference',
+        'settings' => [
+          'target_type' => 'media',
+        ],
+      ])->save();
+      FieldConfig::create([
+        'label' => 'Vacation videos',
+        'field_name' => 'media_optional_vacation_videos',
+        'entity_type' => 'node',
+        'bundle' => 'foo',
+        'field_type' => 'entity_reference',
+        'required' => FALSE,
+        'settings' => [
+          'handler_settings' => [
+            'target_bundles' => [
+              'vacation_videos' => 'vacation_videos',
+            ],
+          ],
+        ],
+      ])->save();
+      $this->createMediaType('file', ['id' => 'press_releases']);
+      FieldStorageConfig::create([
+        'field_name' => 'marketing_docs',
+        'entity_type' => 'node',
+        'type' => 'entity_reference',
+        'settings' => [
+          'target_type' => 'media',
+        ],
+      ])->save();
+      FieldConfig::create([
+        'label' => 'Marketing docs',
+        'field_name' => 'marketing_docs',
+        'entity_type' => 'node',
+        'bundle' => 'foo',
+        'field_type' => 'entity_reference',
+        'required' => TRUE,
+        'settings' => [
+          'handler_settings' => [
+            'target_bundles' => [
+              // Targets `text/*` *and* `application/*`! Specifically:
+              // - text/plain
+              // - application/msword
+              // - application/vnd.openxmlformats-officedocument.wordprocessingml.document
+              // - application/pdf
+              'press_releases' => 'press_releases',
+            ],
+          ],
+        ],
+      ])->save();
     }
+
+    if (in_array('options', $modules, TRUE)) {
+      FieldStorageConfig::create([
+        'field_name' => 'one_from_an_integer_list',
+        'entity_type' => 'node',
+        'type' => 'list_integer',
+        'cardinality' => 1,
+        'settings' => [
+          'allowed_values' => [
+            // Make sure that 0 works as an option.
+            0 => 'Zero',
+            1 => 'One',
+            // Make sure that option text is properly sanitized.
+            2 => 'Some <script>dangerous</script> & unescaped <strong>markup</strong>',
+          ],
+        ],
+      ])->save();
+      FieldConfig::create([
+        'label' => 'A pre-defined integer',
+        'field_name' => 'one_from_an_integer_list',
+        'entity_type' => 'node',
+        'bundle' => 'foo',
+        'field_type' => 'list_integer',
+        'required' => TRUE,
+      ])->save();
+    }
+
+    $propShapeRepository = $this->container->get(PropShapeRepositoryInterface::class);
+    self::assertInstanceOf(PersistentPropShapeRepository::class, $propShapeRepository);
+    // Trigger a cache write in PropShapeRepository — this happens on kernel
+    // shutdown normally, but in a test we need to call it manually.
+    $propShapeRepository->destruct();
 
     $sdc_manager = \Drupal::service('plugin.manager.sdc');
     $matcher = \Drupal::service(JsonSchemaFieldInstanceMatcher::class);
     assert($matcher instanceof JsonSchemaFieldInstanceMatcher);
 
+    /** @var array<string,ShapeMatchingResults> $matches */
     $matches = [];
     $components = $sdc_manager->getAllComponents();
     // Shape matching is only ever relevant to SDCs that may appear in the UI,
@@ -186,10 +305,28 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
       unset($components['canvas_test_sdc:' . $key]);
     }
 
+    // Gather the full list of fieldable entity types' IDs and bundles to find
+    // matches for.
+    $entity_types_and_bundles = [];
+    $entity_types = $this->container->get(EntityTypeManagerInterface::class)->getDefinitions();
+    $bundle_info = $this->container->get(EntityTypeBundleInfoInterface::class);
+    foreach ($entity_types as $entity_type_id => $entity_type) {
+      if (!$entity_type->entityClassImplements(FieldableEntityInterface::class)) {
+        continue;
+      }
+      $bundles = array_keys($bundle_info->getBundleInfo($entity_type_id));
+      sort($bundles);
+      foreach ($bundles as $bundle) {
+        $entity_types_and_bundles[] = ['type' => $entity_type_id, 'bundle' => $bundle];
+      }
+    }
+
+    /** @var \Drupal\canvas\PropShape\PropShapeRepositoryInterface $prop_shape_repository */
+    $prop_shape_repository = \Drupal::service(PropShapeRepositoryInterface::class);
     foreach ($components as $component) {
       // Do not find a match for every unique SDC prop, but only for unique prop
       // shapes. This avoids a lot of meaningless test expectations.
-      foreach (PropShape::getComponentProps($component) as $cpe_string => $prop_shape) {
+      foreach (GeneratedFieldExplicitInputUxComponentSourceBase::getComponentInputsForMetadata($component->getPluginId(), $component->metadata) as $cpe_string => $prop_shape) {
         $cpe = ComponentPropExpression::fromString($cpe_string);
         // @see https://json-schema.org/understanding-json-schema/reference/object#required
         // @see https://json-schema.org/learn/getting-started-step-by-step#required
@@ -200,9 +337,21 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           $prop_shape->uniquePropSchemaKey(),
         );
 
+        if (!\array_key_exists($unique_match_key, $matches)) {
+          $matches[$unique_match_key] = [
+            'SDC props' => [],
+            'static prop source' => [],
+            'instances' => [],
+            'adapter_matches_field_type' => [],
+            'adapter_matches_instance' => [],
+          ];
+        }
+
+        // Track every SDC prop that has this shape.
         $matches[$unique_match_key]['SDC props'][] = $cpe_string;
 
-        if (isset($matches[$unique_match_key]['static prop source'])) {
+        // Only perform shape matching once per shape.
+        if (!empty($matches[$unique_match_key]['static prop source'])) {
           continue;
         }
 
@@ -211,11 +360,17 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
         // 1. compute viable field type + storage settings + instance settings
         // @see \Drupal\canvas\PropShape\StorablePropShape::toStaticPropSource()
         // @see \Drupal\canvas\PropSource\StaticPropSource()
-        $storable_prop_shape = $prop_shape->getStorage();
+        $storable_prop_shape = $prop_shape_repository->getStorablePropShape($prop_shape);
         $primitive_type = JsonSchemaType::from($schema['type']);
         // 2. find matching field instances
         // @see \Drupal\canvas\PropSource\DynamicPropSource
-        $instance_candidates = $matcher->findFieldInstanceFormatMatches($primitive_type, $is_required, $schema);
+        $instance_candidates = [];
+        foreach ($entity_types_and_bundles as ['type' => $entity_type_id, 'bundle' => $bundle]) {
+          $instance_candidates = [
+            ...$instance_candidates,
+            ...$matcher->findFieldInstanceFormatMatches($primitive_type, $is_required, $schema, $entity_type_id, $bundle),
+          ];
+        }
         // 3. adapters.
         // @see \Drupal\canvas\PropSource\AdaptedPropSource
         $adapter_output_matches = $matcher->findAdaptersByMatchingOutput($schema);
@@ -223,7 +378,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
         $adapter_matches_instance = [];
         foreach ($adapter_output_matches as $match) {
           foreach ($match->getInputs() as $input_name => $input_schema_ref) {
-            $storable_prop_shape_for_adapter_input = PropShape::normalize($input_schema_ref)->getStorage();
+            $storable_prop_shape_for_adapter_input = $prop_shape_repository->getStorablePropShape(PropShape::normalize($input_schema_ref));
 
             $input_schema = $match->getInputSchema($input_name);
             $input_primitive_type = JsonSchemaType::from(
@@ -231,7 +386,13 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
             );
 
             $input_is_required = $match->inputIsRequired($input_name);
-            $instance_matches = $matcher->findFieldInstanceFormatMatches($input_primitive_type, $input_is_required, $input_schema);
+            $instance_matches = [];
+            foreach ($entity_types_and_bundles as ['type' => $entity_type_id, 'bundle' => $bundle]) {
+              $instance_matches = [
+                ...$instance_matches,
+                ...$matcher->findFieldInstanceFormatMatches($input_primitive_type, $input_is_required, $input_schema, $entity_type_id, $bundle),
+              ];
+            }
 
             $adapter_matches_field_type[$match->getPluginId()][$input_name] = $storable_prop_shape_for_adapter_input
               ? (string) $storable_prop_shape_for_adapter_input->fieldTypeProp
@@ -257,13 +418,22 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
     }
 
     ksort($matches);
-    $this->assertSame($expected, $matches);
+    self::assertSame(array_keys($expected), array_keys($matches));
+    foreach (array_keys($expected) as $key) {
+      $matches_instances_extraneous = array_diff($matches[$key]['instances'], $expected[$key]['instances']);
+      $matches_instances_missing = array_diff($expected[$key]['instances'], $matches[$key]['instances']);
+      self::assertSame([], $matches_instances_extraneous, "🐛 $key — either extraneous field instance matches found, or missing expectations");
+      self::assertSame([], $matches_instances_missing, "🐛 $key — either missing field instance matches found, or extraneous expectations");
+      self::assertSame($expected[$key], $matches[$key], "🐛 $key expectations do not match reality.");
+    }
+    // 💡 This assertion alone suffices, but makes for painful DX.
+    self::assertSame($expected, $matches);
 
     $module_installer->uninstall($modules);
   }
 
   /**
-   * @return array<string, array{'modules': string[], 'expected': array<string, array<mixed>>}>
+   * @return array<string, array{'modules': string[], 'expected': array<string, ShapeMatchingResults>}>
    */
   public static function provider(): array {
     $cases = [];
@@ -293,7 +463,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
         // Media Types are installed, hence the matching field instances for
         // `$ref: json-schema-definitions://canvas.module/image` are
         // image fields, not media reference fields!
-        // @see media_library_storage_prop_shape_alter()
+        // @see \Drupal\canvas\Hook\ShapeMatchingHooks::mediaLibraryStorablePropShapeAlter()
         // @see \Drupal\canvas\PropShape\PropShape::getStorage()
         // @see \Drupal\canvas\ShapeMatcher\JsonSchemaFieldInstanceMatcher
         'media_library',
@@ -305,7 +475,9 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
             '⿲canvas_test_sdc:card-with-remote-image␟height',
           ],
           'static prop source' => 'ℹ︎integer␟value',
-          'instances' => [],
+          'instances' => [
+            'ℹ︎␜entity:node:foo␝one_from_an_integer_list␞␟value',
+          ],
           'adapter_matches_field_type' => [
             'day_count' => [
               'oldest' => 'ℹ︎datetime␟value',
@@ -334,11 +506,21 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
         ],
+        'REQUIRED, type=integer&enum[0]=1&enum[1]=2&enum[2]=3&enum[3]=4&enum[4]=5&enum[5]=6' => [
+          'SDC props' => [
+            0 => '⿲canvas_test_sdc:columns␟columns',
+          ],
+          'static prop source' => 'ℹ︎list_integer␟value',
+          'instances' => [],
+          'adapter_matches_field_type' => [],
+          'adapter_matches_instance' => [],
+        ],
         'REQUIRED, type=object&$ref=json-schema-definitions://canvas.module/image' => [
           'SDC props' => [
             '⿲canvas_test_sdc:card␟image',
             '⿲canvas_test_sdc:image␟image',
             '⿲canvas_test_sdc:image-srcset-candidate-template-uri␟image',
+            '⿲canvas_test_sdc:image-without-ref␟image',
           ],
           'static prop source' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
           'instances' => [
@@ -372,6 +554,8 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           'instances' => [
             'ℹ︎␜entity:media:baby_videos␝field_media_video_file␞␟{src↝entity␜␜entity:file␝uri␞␟url}',
             'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟{src↝entity␜␜entity:file␝uri␞␟url}',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media:vacation_videos␝field_media_video_file_1␞␟{src↝entity␜␜entity:file␝uri␞␟url}',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟{src↝entity␜␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝uri␞␟url,poster↝entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url}',
           ],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
@@ -379,6 +563,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
         'REQUIRED, type=string' => [
           'SDC props' => [
             '⿲canvas_test_sdc:attributes␟not_attributes',
+            '⿲canvas_test_sdc:banner␟heading',
             '⿲canvas_test_sdc:card-with-local-image␟alt',
             '⿲canvas_test_sdc:card-with-remote-image␟alt',
             '⿲canvas_test_sdc:card-with-stream-wrapper-image␟alt',
@@ -394,11 +579,14 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           'instances' => [
             'ℹ︎␜entity:canvas_page␝title␞␟value',
             'ℹ︎␜entity:media:baby_videos␝name␞␟value',
+            'ℹ︎␜entity:media:press_releases␝name␞␟value',
             'ℹ︎␜entity:media:vacation_videos␝name␞␟value',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝name␞␟value',
             'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝name␞␟value',
             'ℹ︎␜entity:node:foo␝title␞␟value',
             'ℹ︎␜entity:path_alias␝alias␞␟value',
             'ℹ︎␜entity:path_alias␝path␞␟value',
+            'ℹ︎␜entity:user␝name␞␟value',
           ],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
@@ -424,14 +612,12 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           ],
           'adapter_matches_field_type' => [
             'image_extract_url' => [
-              'imageUri' => NULL,
+              'imageUri' => 'ℹ︎image␟entity␜␜entity:file␝uri␞␟value',
             ],
           ],
           'adapter_matches_instance' => [
             'image_extract_url' => [
               'imageUri' => [
-                'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
-                'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
                 'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝uri␞␟value',
               ],
             ],
@@ -452,7 +638,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           'SDC props' => [
             '⿲sdc_test_all_props:all-props␟test_REQUIRED_string_html',
           ],
-          'static prop source' => 'ℹ︎text_long␟value',
+          'static prop source' => 'ℹ︎text_long␟processed',
           'instances' => [],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
@@ -461,7 +647,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           'SDC props' => [
             '⿲sdc_test_all_props:all-props␟test_REQUIRED_string_html_block',
           ],
-          'static prop source' => 'ℹ︎text_long␟value',
+          'static prop source' => 'ℹ︎text_long␟processed',
           'instances' => [],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
@@ -470,7 +656,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           'SDC props' => [
             '⿲sdc_test_all_props:all-props␟test_REQUIRED_string_html_inline',
           ],
-          'static prop source' => 'ℹ︎text␟value',
+          'static prop source' => 'ℹ︎text␟processed',
           'instances' => [],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
@@ -536,16 +722,12 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           ],
           'static prop source' => 'ℹ︎link␟url',
           'instances' => [
-            // @todo This includes relative URLs, fix in https://www.drupal.org/project/canvas/issues/3542895
-            'ℹ︎␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:file␝uri␞␟value',
-            'ℹ︎␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝uri␞␟value',
-            'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟value',
-            'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝uri␞␟value',
-            'ℹ︎␜entity:node:foo␝field_silly_image␞␟src_with_alternate_widths',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟value',
           ],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
@@ -562,9 +744,36 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
             'ℹ︎␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝uri␞␟value',
             'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:node:foo␝field_check_it_out␞␟url',
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝uri␞␟value',
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟src_with_alternate_widths',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟url',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝uri␞␟url',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟url',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟url',
+          ],
+          'adapter_matches_field_type' => [],
+          'adapter_matches_instance' => [],
+        ],
+        'REQUIRED, type=string&format=uri-reference&x-allowed-schemes[0]=http&x-allowed-schemes[1]=https' => [
+          'SDC props' => [
+            '⿲sdc_test_all_props:all-props␟test_REQUIRED_string_format_uri_reference_web_links',
+          ],
+          'static prop source' => 'ℹ︎link␟url',
+          'instances' => [
+            'ℹ︎␜entity:file␝uri␞␟url',
+            'ℹ︎␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝uri␞␟url',
+            'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟url',
+            'ℹ︎␜entity:node:foo␝field_check_it_out␞␟url',
+            'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝uri␞␟url',
+            'ℹ︎␜entity:node:foo␝field_silly_image␞␟src_with_alternate_widths',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟url',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝uri␞␟url',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟url',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟url',
           ],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
@@ -577,11 +786,14 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           'instances' => [
             'ℹ︎␜entity:canvas_page␝title␞␟value',
             'ℹ︎␜entity:media:baby_videos␝name␞␟value',
+            'ℹ︎␜entity:media:press_releases␝name␞␟value',
             'ℹ︎␜entity:media:vacation_videos␝name␞␟value',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝name␞␟value',
             'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝name␞␟value',
             'ℹ︎␜entity:node:foo␝title␞␟value',
             'ℹ︎␜entity:path_alias␝alias␞␟value',
             'ℹ︎␜entity:path_alias␝path␞␟value',
+            'ℹ︎␜entity:user␝name␞␟value',
           ],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
@@ -614,7 +826,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           'adapter_matches_instance' => [],
         ],
         // ⚠️ This (unsupported!) SDC prop appears here because it's in the `all-props` test-only SDC.
-        // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent::componentMeetsRequirements()
+        // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponentDiscovery::checkRequirements()
         'optional, type=array&items[type]=integer&maxItems=20&minItems=1' => [
           'SDC props' => [
             '⿲sdc_test_all_props:all-props␟test_array_integer_minMaxItems',
@@ -625,7 +837,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           'adapter_matches_instance' => [],
         ],
         // ⚠️ This (unsupported!) SDC prop appears here because it's in the `all-props` test-only SDC.
-        // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent::componentMeetsRequirements()
+        // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponentDiscovery::checkRequirements
         'optional, type=array&items[type]=integer&minItems=1' => [
           'SDC props' => [
             '⿲sdc_test_all_props:all-props␟test_array_integer_minItems',
@@ -636,12 +848,21 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           'adapter_matches_instance' => [],
         ],
         // ⚠️ This (unsupported!) SDC prop appears here because it's in the `all-props` test-only SDC.
-        // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent::componentMeetsRequirements()
+        // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponentDiscovery::checkRequirements()
         'optional, type=array&items[type]=integer&minItems=2' => [
           'SDC props' => [
             '⿲sdc_test_all_props:all-props␟test_array_integer_minItemsMultiple',
           ],
           'static prop source' => NULL,
+          'instances' => [],
+          'adapter_matches_field_type' => [],
+          'adapter_matches_instance' => [],
+        ],
+        'optional, type=array&items[type]=string' => [
+          'SDC props' => [
+            '⿲canvas_test_sdc:tags␟tags',
+          ],
+          'static prop source' => 'ℹ︎string␟value',
           'instances' => [],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
@@ -690,6 +911,16 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
             'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟entity␜␜entity:file␝status␞␟value',
             'ℹ︎␜entity:media:baby_videos␝uid␞␟entity␜␜entity:user␝default_langcode␞␟value',
             'ℹ︎␜entity:media:baby_videos␝uid␞␟entity␜␜entity:user␝status␞␟value',
+            'ℹ︎␜entity:media:press_releases␝default_langcode␞␟value',
+            'ℹ︎␜entity:media:press_releases␝field_media_file␞␟display',
+            'ℹ︎␜entity:media:press_releases␝field_media_file␞␟entity␜␜entity:file␝status␞␟value',
+            'ℹ︎␜entity:media:press_releases␝revision_default␞␟value',
+            'ℹ︎␜entity:media:press_releases␝revision_user␞␟entity␜␜entity:user␝default_langcode␞␟value',
+            'ℹ︎␜entity:media:press_releases␝revision_user␞␟entity␜␜entity:user␝status␞␟value',
+            'ℹ︎␜entity:media:press_releases␝status␞␟value',
+            'ℹ︎␜entity:media:press_releases␝thumbnail␞␟entity␜␜entity:file␝status␞␟value',
+            'ℹ︎␜entity:media:press_releases␝uid␞␟entity␜␜entity:user␝default_langcode␞␟value',
+            'ℹ︎␜entity:media:press_releases␝uid␞␟entity␜␜entity:user␝status␞␟value',
             'ℹ︎␜entity:media:vacation_videos␝default_langcode␞␟value',
             'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟display',
             'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝status␞␟value',
@@ -702,6 +933,14 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
             'ℹ︎␜entity:media:vacation_videos␝uid␞␟entity␜␜entity:user␝status␞␟value',
             'ℹ︎␜entity:node:foo␝default_langcode␞␟value',
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝status␞␟value',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media:press_releases␝field_media_file␞␟display',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝default_langcode␞␟value',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝revision_default␞␟value',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝status␞␟value',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media:vacation_videos␝field_media_video_file_1␞␟display',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media␝default_langcode␞␟value',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media␝revision_default␞␟value',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media␝status␞␟value',
             'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media:baby_videos␝field_media_video_file␞␟display',
             'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media:vacation_videos␝field_media_video_file_1␞␟display',
             'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝default_langcode␞␟value',
@@ -729,84 +968,17 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           ],
           'static prop source' => 'ℹ︎integer␟value',
           'instances' => [
-            'ℹ︎␜entity:canvas_page␝changed␞␟value',
-            'ℹ︎␜entity:canvas_page␝created␞␟value',
-            'ℹ︎␜entity:canvas_page␝image␞␟entity␜␜entity:media␝changed␞␟value',
-            'ℹ︎␜entity:canvas_page␝image␞␟entity␜␜entity:media␝created␞␟value',
-            'ℹ︎␜entity:canvas_page␝image␞␟entity␜␜entity:media␝revision_created␞␟value',
-            'ℹ︎␜entity:canvas_page␝owner␞␟entity␜␜entity:user␝access␞␟value',
-            'ℹ︎␜entity:canvas_page␝owner␞␟entity␜␜entity:user␝changed␞␟value',
-            'ℹ︎␜entity:canvas_page␝owner␞␟entity␜␜entity:user␝created␞␟value',
-            'ℹ︎␜entity:canvas_page␝owner␞␟entity␜␜entity:user␝login␞␟value',
-            'ℹ︎␜entity:canvas_page␝revision_created␞␟value',
-            'ℹ︎␜entity:canvas_page␝revision_user␞␟entity␜␜entity:user␝access␞␟value',
-            'ℹ︎␜entity:canvas_page␝revision_user␞␟entity␜␜entity:user␝changed␞␟value',
-            'ℹ︎␜entity:canvas_page␝revision_user␞␟entity␜␜entity:user␝created␞␟value',
-            'ℹ︎␜entity:canvas_page␝revision_user␞␟entity␜␜entity:user␝login␞␟value',
-            'ℹ︎␜entity:file␝changed␞␟value',
-            'ℹ︎␜entity:file␝created␞␟value',
             'ℹ︎␜entity:file␝filesize␞␟value',
-            'ℹ︎␜entity:file␝uid␞␟entity␜␜entity:user␝access␞␟value',
-            'ℹ︎␜entity:file␝uid␞␟entity␜␜entity:user␝changed␞␟value',
-            'ℹ︎␜entity:file␝uid␞␟entity␜␜entity:user␝created␞␟value',
-            'ℹ︎␜entity:file␝uid␞␟entity␜␜entity:user␝login␞␟value',
-            'ℹ︎␜entity:media:baby_videos␝changed␞␟value',
-            'ℹ︎␜entity:media:baby_videos␝created␞␟value',
-            'ℹ︎␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝changed␞␟value',
-            'ℹ︎␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝created␞␟value',
             'ℹ︎␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝filesize␞␟value',
-            'ℹ︎␜entity:media:baby_videos␝revision_created␞␟value',
-            'ℹ︎␜entity:media:baby_videos␝revision_user␞␟entity␜␜entity:user␝access␞␟value',
-            'ℹ︎␜entity:media:baby_videos␝revision_user␞␟entity␜␜entity:user␝changed␞␟value',
-            'ℹ︎␜entity:media:baby_videos␝revision_user␞␟entity␜␜entity:user␝created␞␟value',
-            'ℹ︎␜entity:media:baby_videos␝revision_user␞␟entity␜␜entity:user␝login␞␟value',
-            'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟entity␜␜entity:file␝changed␞␟value',
-            'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟entity␜␜entity:file␝created␞␟value',
             'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟entity␜␜entity:file␝filesize␞␟value',
-            'ℹ︎␜entity:media:baby_videos␝uid␞␟entity␜␜entity:user␝access␞␟value',
-            'ℹ︎␜entity:media:baby_videos␝uid␞␟entity␜␜entity:user␝changed␞␟value',
-            'ℹ︎␜entity:media:baby_videos␝uid␞␟entity␜␜entity:user␝created␞␟value',
-            'ℹ︎␜entity:media:baby_videos␝uid␞␟entity␜␜entity:user␝login␞␟value',
-            'ℹ︎␜entity:media:vacation_videos␝changed␞␟value',
-            'ℹ︎␜entity:media:vacation_videos␝created␞␟value',
-            'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝changed␞␟value',
-            'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝created␞␟value',
+            'ℹ︎␜entity:media:press_releases␝field_media_file␞␟entity␜␜entity:file␝filesize␞␟value',
+            'ℹ︎␜entity:media:press_releases␝thumbnail␞␟entity␜␜entity:file␝filesize␞␟value',
             'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝filesize␞␟value',
-            'ℹ︎␜entity:media:vacation_videos␝revision_created␞␟value',
-            'ℹ︎␜entity:media:vacation_videos␝revision_user␞␟entity␜␜entity:user␝access␞␟value',
-            'ℹ︎␜entity:media:vacation_videos␝revision_user␞␟entity␜␜entity:user␝changed␞␟value',
-            'ℹ︎␜entity:media:vacation_videos␝revision_user␞␟entity␜␜entity:user␝created␞␟value',
-            'ℹ︎␜entity:media:vacation_videos␝revision_user␞␟entity␜␜entity:user␝login␞␟value',
-            'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟entity␜␜entity:file␝changed␞␟value',
-            'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟entity␜␜entity:file␝created␞␟value',
             'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟entity␜␜entity:file␝filesize␞␟value',
-            'ℹ︎␜entity:media:vacation_videos␝uid␞␟entity␜␜entity:user␝access␞␟value',
-            'ℹ︎␜entity:media:vacation_videos␝uid␞␟entity␜␜entity:user␝changed␞␟value',
-            'ℹ︎␜entity:media:vacation_videos␝uid␞␟entity␜␜entity:user␝created␞␟value',
-            'ℹ︎␜entity:media:vacation_videos␝uid␞␟entity␜␜entity:user␝login␞␟value',
-            'ℹ︎␜entity:node:foo␝changed␞␟value',
-            'ℹ︎␜entity:node:foo␝created␞␟value',
-            'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝changed␞␟value',
-            'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝created␞␟value',
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝filesize␞␟value',
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟height',
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟width',
-            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝changed␞␟value',
-            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝created␞␟value',
-            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝revision_created␞␟value',
-            'ℹ︎␜entity:node:foo␝revision_timestamp␞␟value',
-            'ℹ︎␜entity:node:foo␝revision_uid␞␟entity␜␜entity:user␝access␞␟value',
-            'ℹ︎␜entity:node:foo␝revision_uid␞␟entity␜␜entity:user␝changed␞␟value',
-            'ℹ︎␜entity:node:foo␝revision_uid␞␟entity␜␜entity:user␝created␞␟value',
-            'ℹ︎␜entity:node:foo␝revision_uid␞␟entity␜␜entity:user␝login␞␟value',
-            'ℹ︎␜entity:node:foo␝uid␞␟entity␜␜entity:user␝access␞␟value',
-            'ℹ︎␜entity:node:foo␝uid␞␟entity␜␜entity:user␝changed␞␟value',
-            'ℹ︎␜entity:node:foo␝uid␞␟entity␜␜entity:user␝created␞␟value',
-            'ℹ︎␜entity:node:foo␝uid␞␟entity␜␜entity:user␝login␞␟value',
-            'ℹ︎␜entity:user␝access␞␟value',
-            'ℹ︎␜entity:user␝changed␞␟value',
-            'ℹ︎␜entity:user␝created␞␟value',
-            'ℹ︎␜entity:user␝login␞␟value',
+            'ℹ︎␜entity:node:foo␝one_from_an_integer_list␞␟value',
           ],
           'adapter_matches_field_type' => [
             'day_count' => [
@@ -842,25 +1014,96 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           ],
           'static prop source' => 'ℹ︎integer␟value',
           'instances' => [
+            'ℹ︎␜entity:canvas_page␝changed␞␟value',
+            'ℹ︎␜entity:canvas_page␝created␞␟value',
+            'ℹ︎␜entity:canvas_page␝image␞␟entity␜␜entity:media␝changed␞␟value',
+            'ℹ︎␜entity:canvas_page␝image␞␟entity␜␜entity:media␝created␞␟value',
+            'ℹ︎␜entity:canvas_page␝image␞␟entity␜␜entity:media␝revision_created␞␟value',
             'ℹ︎␜entity:canvas_page␝owner␞␟entity␜␜entity:user␝access␞␟value',
+            'ℹ︎␜entity:canvas_page␝owner␞␟entity␜␜entity:user␝changed␞␟value',
+            'ℹ︎␜entity:canvas_page␝owner␞␟entity␜␜entity:user␝created␞␟value',
             'ℹ︎␜entity:canvas_page␝owner␞␟entity␜␜entity:user␝login␞␟value',
+            'ℹ︎␜entity:canvas_page␝revision_created␞␟value',
             'ℹ︎␜entity:canvas_page␝revision_user␞␟entity␜␜entity:user␝access␞␟value',
+            'ℹ︎␜entity:canvas_page␝revision_user␞␟entity␜␜entity:user␝changed␞␟value',
+            'ℹ︎␜entity:canvas_page␝revision_user␞␟entity␜␜entity:user␝created␞␟value',
             'ℹ︎␜entity:canvas_page␝revision_user␞␟entity␜␜entity:user␝login␞␟value',
+            'ℹ︎␜entity:file␝changed␞␟value',
+            'ℹ︎␜entity:file␝created␞␟value',
             'ℹ︎␜entity:file␝uid␞␟entity␜␜entity:user␝access␞␟value',
+            'ℹ︎␜entity:file␝uid␞␟entity␜␜entity:user␝changed␞␟value',
+            'ℹ︎␜entity:file␝uid␞␟entity␜␜entity:user␝created␞␟value',
             'ℹ︎␜entity:file␝uid␞␟entity␜␜entity:user␝login␞␟value',
+            'ℹ︎␜entity:media:baby_videos␝changed␞␟value',
+            'ℹ︎␜entity:media:baby_videos␝created␞␟value',
+            'ℹ︎␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝changed␞␟value',
+            'ℹ︎␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝created␞␟value',
+            'ℹ︎␜entity:media:baby_videos␝revision_created␞␟value',
             'ℹ︎␜entity:media:baby_videos␝revision_user␞␟entity␜␜entity:user␝access␞␟value',
+            'ℹ︎␜entity:media:baby_videos␝revision_user␞␟entity␜␜entity:user␝changed␞␟value',
+            'ℹ︎␜entity:media:baby_videos␝revision_user␞␟entity␜␜entity:user␝created␞␟value',
             'ℹ︎␜entity:media:baby_videos␝revision_user␞␟entity␜␜entity:user␝login␞␟value',
+            'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟entity␜␜entity:file␝changed␞␟value',
+            'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟entity␜␜entity:file␝created␞␟value',
             'ℹ︎␜entity:media:baby_videos␝uid␞␟entity␜␜entity:user␝access␞␟value',
+            'ℹ︎␜entity:media:baby_videos␝uid␞␟entity␜␜entity:user␝changed␞␟value',
+            'ℹ︎␜entity:media:baby_videos␝uid␞␟entity␜␜entity:user␝created␞␟value',
             'ℹ︎␜entity:media:baby_videos␝uid␞␟entity␜␜entity:user␝login␞␟value',
+            'ℹ︎␜entity:media:press_releases␝changed␞␟value',
+            'ℹ︎␜entity:media:press_releases␝created␞␟value',
+            'ℹ︎␜entity:media:press_releases␝field_media_file␞␟entity␜␜entity:file␝changed␞␟value',
+            'ℹ︎␜entity:media:press_releases␝field_media_file␞␟entity␜␜entity:file␝created␞␟value',
+            'ℹ︎␜entity:media:press_releases␝revision_created␞␟value',
+            'ℹ︎␜entity:media:press_releases␝revision_user␞␟entity␜␜entity:user␝access␞␟value',
+            'ℹ︎␜entity:media:press_releases␝revision_user␞␟entity␜␜entity:user␝changed␞␟value',
+            'ℹ︎␜entity:media:press_releases␝revision_user␞␟entity␜␜entity:user␝created␞␟value',
+            'ℹ︎␜entity:media:press_releases␝revision_user␞␟entity␜␜entity:user␝login␞␟value',
+            'ℹ︎␜entity:media:press_releases␝thumbnail␞␟entity␜␜entity:file␝changed␞␟value',
+            'ℹ︎␜entity:media:press_releases␝thumbnail␞␟entity␜␜entity:file␝created␞␟value',
+            'ℹ︎␜entity:media:press_releases␝uid␞␟entity␜␜entity:user␝access␞␟value',
+            'ℹ︎␜entity:media:press_releases␝uid␞␟entity␜␜entity:user␝changed␞␟value',
+            'ℹ︎␜entity:media:press_releases␝uid␞␟entity␜␜entity:user␝created␞␟value',
+            'ℹ︎␜entity:media:press_releases␝uid␞␟entity␜␜entity:user␝login␞␟value',
+            'ℹ︎␜entity:media:vacation_videos␝changed␞␟value',
+            'ℹ︎␜entity:media:vacation_videos␝created␞␟value',
+            'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝changed␞␟value',
+            'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝created␞␟value',
+            'ℹ︎␜entity:media:vacation_videos␝revision_created␞␟value',
             'ℹ︎␜entity:media:vacation_videos␝revision_user␞␟entity␜␜entity:user␝access␞␟value',
+            'ℹ︎␜entity:media:vacation_videos␝revision_user␞␟entity␜␜entity:user␝changed␞␟value',
+            'ℹ︎␜entity:media:vacation_videos␝revision_user␞␟entity␜␜entity:user␝created␞␟value',
             'ℹ︎␜entity:media:vacation_videos␝revision_user␞␟entity␜␜entity:user␝login␞␟value',
+            'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟entity␜␜entity:file␝changed␞␟value',
+            'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟entity␜␜entity:file␝created␞␟value',
             'ℹ︎␜entity:media:vacation_videos␝uid␞␟entity␜␜entity:user␝access␞␟value',
+            'ℹ︎␜entity:media:vacation_videos␝uid␞␟entity␜␜entity:user␝changed␞␟value',
+            'ℹ︎␜entity:media:vacation_videos␝uid␞␟entity␜␜entity:user␝created␞␟value',
             'ℹ︎␜entity:media:vacation_videos␝uid␞␟entity␜␜entity:user␝login␞␟value',
+            'ℹ︎␜entity:node:foo␝changed␞␟value',
+            'ℹ︎␜entity:node:foo␝created␞␟value',
+            'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝changed␞␟value',
+            'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝created␞␟value',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝changed␞␟value',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝created␞␟value',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝revision_created␞␟value',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media␝changed␞␟value',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media␝created␞␟value',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media␝revision_created␞␟value',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝changed␞␟value',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝created␞␟value',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝revision_created␞␟value',
+            'ℹ︎␜entity:node:foo␝revision_timestamp␞␟value',
             'ℹ︎␜entity:node:foo␝revision_uid␞␟entity␜␜entity:user␝access␞␟value',
+            'ℹ︎␜entity:node:foo␝revision_uid␞␟entity␜␜entity:user␝changed␞␟value',
+            'ℹ︎␜entity:node:foo␝revision_uid␞␟entity␜␜entity:user␝created␞␟value',
             'ℹ︎␜entity:node:foo␝revision_uid␞␟entity␜␜entity:user␝login␞␟value',
             'ℹ︎␜entity:node:foo␝uid␞␟entity␜␜entity:user␝access␞␟value',
+            'ℹ︎␜entity:node:foo␝uid␞␟entity␜␜entity:user␝changed␞␟value',
+            'ℹ︎␜entity:node:foo␝uid␞␟entity␜␜entity:user␝created␞␟value',
             'ℹ︎␜entity:node:foo␝uid␞␟entity␜␜entity:user␝login␞␟value',
             'ℹ︎␜entity:user␝access␞␟value',
+            'ℹ︎␜entity:user␝changed␞␟value',
+            'ℹ︎␜entity:user␝created␞␟value',
             'ℹ︎␜entity:user␝login␞␟value',
           ],
           'adapter_matches_field_type' => [],
@@ -884,101 +1127,66 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
         ],
+        'optional, type=integer&multipleOf=12' => [
+          'SDC props' => [
+            '⿲sdc_test_all_props:all-props␟test_integer_by_the_dozen',
+          ],
+          'static prop source' => NULL,
+          'instances' => [],
+          'adapter_matches_field_type' => [],
+          'adapter_matches_instance' => [],
+        ],
         'optional, type=number' => [
           'SDC props' => [
             '⿲sdc_test_all_props:all-props␟test_number',
           ],
           'static prop source' => 'ℹ︎float␟value',
           'instances' => [
-            'ℹ︎␜entity:canvas_page␝changed␞␟value',
-            'ℹ︎␜entity:canvas_page␝created␞␟value',
-            'ℹ︎␜entity:canvas_page␝image␞␟entity␜␜entity:media␝changed␞␟value',
-            'ℹ︎␜entity:canvas_page␝image␞␟entity␜␜entity:media␝created␞␟value',
-            'ℹ︎␜entity:canvas_page␝image␞␟entity␜␜entity:media␝revision_created␞␟value',
-            'ℹ︎␜entity:canvas_page␝owner␞␟entity␜␜entity:user␝access␞␟value',
-            'ℹ︎␜entity:canvas_page␝owner␞␟entity␜␜entity:user␝changed␞␟value',
-            'ℹ︎␜entity:canvas_page␝owner␞␟entity␜␜entity:user␝created␞␟value',
-            'ℹ︎␜entity:canvas_page␝owner␞␟entity␜␜entity:user␝login␞␟value',
-            'ℹ︎␜entity:canvas_page␝revision_created␞␟value',
-            'ℹ︎␜entity:canvas_page␝revision_user␞␟entity␜␜entity:user␝access␞␟value',
-            'ℹ︎␜entity:canvas_page␝revision_user␞␟entity␜␜entity:user␝changed␞␟value',
-            'ℹ︎␜entity:canvas_page␝revision_user␞␟entity␜␜entity:user␝created␞␟value',
-            'ℹ︎␜entity:canvas_page␝revision_user␞␟entity␜␜entity:user␝login␞␟value',
-            'ℹ︎␜entity:file␝changed␞␟value',
-            'ℹ︎␜entity:file␝created␞␟value',
             'ℹ︎␜entity:file␝filesize␞␟value',
-            'ℹ︎␜entity:file␝uid␞␟entity␜␜entity:user␝access␞␟value',
-            'ℹ︎␜entity:file␝uid␞␟entity␜␜entity:user␝changed␞␟value',
-            'ℹ︎␜entity:file␝uid␞␟entity␜␜entity:user␝created␞␟value',
-            'ℹ︎␜entity:file␝uid␞␟entity␜␜entity:user␝login␞␟value',
-            'ℹ︎␜entity:media:baby_videos␝changed␞␟value',
-            'ℹ︎␜entity:media:baby_videos␝created␞␟value',
-            'ℹ︎␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝changed␞␟value',
-            'ℹ︎␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝created␞␟value',
             'ℹ︎␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝filesize␞␟value',
-            'ℹ︎␜entity:media:baby_videos␝revision_created␞␟value',
-            'ℹ︎␜entity:media:baby_videos␝revision_user␞␟entity␜␜entity:user␝access␞␟value',
-            'ℹ︎␜entity:media:baby_videos␝revision_user␞␟entity␜␜entity:user␝changed␞␟value',
-            'ℹ︎␜entity:media:baby_videos␝revision_user␞␟entity␜␜entity:user␝created␞␟value',
-            'ℹ︎␜entity:media:baby_videos␝revision_user␞␟entity␜␜entity:user␝login␞␟value',
-            'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟entity␜␜entity:file␝changed␞␟value',
-            'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟entity␜␜entity:file␝created␞␟value',
             'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟entity␜␜entity:file␝filesize␞␟value',
-            'ℹ︎␜entity:media:baby_videos␝uid␞␟entity␜␜entity:user␝access␞␟value',
-            'ℹ︎␜entity:media:baby_videos␝uid␞␟entity␜␜entity:user␝changed␞␟value',
-            'ℹ︎␜entity:media:baby_videos␝uid␞␟entity␜␜entity:user␝created␞␟value',
-            'ℹ︎␜entity:media:baby_videos␝uid␞␟entity␜␜entity:user␝login␞␟value',
-            'ℹ︎␜entity:media:vacation_videos␝changed␞␟value',
-            'ℹ︎␜entity:media:vacation_videos␝created␞␟value',
-            'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝changed␞␟value',
-            'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝created␞␟value',
+            'ℹ︎␜entity:media:press_releases␝field_media_file␞␟entity␜␜entity:file␝filesize␞␟value',
+            'ℹ︎␜entity:media:press_releases␝thumbnail␞␟entity␜␜entity:file␝filesize␞␟value',
             'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝filesize␞␟value',
-            'ℹ︎␜entity:media:vacation_videos␝revision_created␞␟value',
-            'ℹ︎␜entity:media:vacation_videos␝revision_user␞␟entity␜␜entity:user␝access␞␟value',
-            'ℹ︎␜entity:media:vacation_videos␝revision_user␞␟entity␜␜entity:user␝changed␞␟value',
-            'ℹ︎␜entity:media:vacation_videos␝revision_user␞␟entity␜␜entity:user␝created␞␟value',
-            'ℹ︎␜entity:media:vacation_videos␝revision_user␞␟entity␜␜entity:user␝login␞␟value',
-            'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟entity␜␜entity:file␝changed␞␟value',
-            'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟entity␜␜entity:file␝created␞␟value',
             'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟entity␜␜entity:file␝filesize␞␟value',
-            'ℹ︎␜entity:media:vacation_videos␝uid␞␟entity␜␜entity:user␝access␞␟value',
-            'ℹ︎␜entity:media:vacation_videos␝uid␞␟entity␜␜entity:user␝changed␞␟value',
-            'ℹ︎␜entity:media:vacation_videos␝uid␞␟entity␜␜entity:user␝created␞␟value',
-            'ℹ︎␜entity:media:vacation_videos␝uid␞␟entity␜␜entity:user␝login␞␟value',
-            'ℹ︎␜entity:node:foo␝changed␞␟value',
-            'ℹ︎␜entity:node:foo␝created␞␟value',
-            'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝changed␞␟value',
-            'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝created␞␟value',
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝filesize␞␟value',
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟height',
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟width',
-            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝changed␞␟value',
-            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝created␞␟value',
-            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝revision_created␞␟value',
-            'ℹ︎␜entity:node:foo␝revision_timestamp␞␟value',
-            'ℹ︎␜entity:node:foo␝revision_uid␞␟entity␜␜entity:user␝access␞␟value',
-            'ℹ︎␜entity:node:foo␝revision_uid␞␟entity␜␜entity:user␝changed␞␟value',
-            'ℹ︎␜entity:node:foo␝revision_uid␞␟entity␜␜entity:user␝created␞␟value',
-            'ℹ︎␜entity:node:foo␝revision_uid␞␟entity␜␜entity:user␝login␞␟value',
-            'ℹ︎␜entity:node:foo␝uid␞␟entity␜␜entity:user␝access␞␟value',
-            'ℹ︎␜entity:node:foo␝uid␞␟entity␜␜entity:user␝changed␞␟value',
-            'ℹ︎␜entity:node:foo␝uid␞␟entity␜␜entity:user␝created␞␟value',
-            'ℹ︎␜entity:node:foo␝uid␞␟entity␜␜entity:user␝login␞␟value',
-            'ℹ︎␜entity:user␝access␞␟value',
-            'ℹ︎␜entity:user␝changed␞␟value',
-            'ℹ︎␜entity:user␝created␞␟value',
-            'ℹ︎␜entity:user␝login␞␟value',
+            'ℹ︎␜entity:node:foo␝one_from_an_integer_list␞␟value',
+          ],
+          'adapter_matches_field_type' => [],
+          'adapter_matches_instance' => [],
+        ],
+        'optional, type=object&$ref=json-schema-definitions://canvas.module/date-range' => [
+          'SDC props' => [
+            '⿲sdc_test_all_props:all-props␟test_object_drupal_date_range',
+          ],
+          'static prop source' => 'ℹ︎daterange␟{from↠value,to↠end_value}',
+          'instances' => [
+            'ℹ︎␜entity:node:foo␝field_event_duration␞␟{from↠value,to↠end_value}',
           ],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
         ],
         'optional, type=object&$ref=json-schema-definitions://canvas.module/image' => [
           'SDC props' => [
+            '⿲canvas_test_sdc:banner␟image',
             '⿲sdc_test_all_props:all-props␟test_object_drupal_image',
           ],
           'static prop source' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
           'instances' => [
+            'ℹ︎␜entity:canvas_page␝image␞␟entity␜␜entity:media␝thumbnail␞␟{src↠src_with_alternate_widths,width↝entity␜␜entity:file␝filesize␞␟value}',
+            'ℹ︎␜entity:canvas_page␝image␞␟{src↝entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url,alt↝entity␜␜entity:media␝revision_user␞␟entity␜␜entity:user␝name␞␟value,width↝entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝filesize␞␟value}',
+            'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟{src↠src_with_alternate_widths,alt↝entity␜␜entity:file␝uid␞␟entity␜␜entity:user␝name␞␟value,width↝entity␜␜entity:file␝filesize␞␟value}',
+            'ℹ︎␜entity:media:press_releases␝thumbnail␞␟{src↠src_with_alternate_widths,alt↝entity␜␜entity:file␝uid␞␟entity␜␜entity:user␝name␞␟value,width↝entity␜␜entity:file␝filesize␞␟value}',
+            'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟{src↠src_with_alternate_widths,alt↝entity␜␜entity:file␝uid␞␟entity␜␜entity:user␝name␞␟value,width↝entity␜␜entity:file␝filesize␞␟value}',
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝thumbnail␞␟{src↠src_with_alternate_widths,width↝entity␜␜entity:file␝filesize␞␟value}',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟{src↝entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url,alt↝entity␜␜entity:media␝revision_user␞␟entity␜␜entity:user␝name␞␟value,width↝entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝filesize␞␟value,height↝entity␜␜entity:media:press_releases␝field_media_file␞␟entity␜␜entity:file␝filesize␞␟value}',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media␝thumbnail␞␟{src↠src_with_alternate_widths,width↝entity␜␜entity:file␝filesize␞␟value}',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟{src↝entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url,alt↝entity␜␜entity:media␝revision_user␞␟entity␜␜entity:user␝name␞␟value,width↝entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝filesize␞␟value,height↝entity␜␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝filesize␞␟value}',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝thumbnail␞␟{src↠src_with_alternate_widths,width↝entity␜␜entity:file␝filesize␞␟value}',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟{src↝entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url,alt↝entity␜␜entity:media␝revision_user␞␟entity␜␜entity:user␝name␞␟value,width↝entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝filesize␞␟value,height↝entity␜␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝filesize␞␟value}',
           ],
           'adapter_matches_field_type' => [
             'image_apply_style' => [
@@ -1010,21 +1218,42 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           'static prop source' => NULL,
           'instances' => [
             'ℹ︎␜entity:canvas_page␝description␞␟{label↠value}',
-            'ℹ︎␜entity:canvas_page␝image␞␟{label↝entity␜␜entity:media␝revision_log_message␞␟value,slot↝entity␜␜entity:media␝name␞␟value}',
+            'ℹ︎␜entity:canvas_page␝image␞␟{label↝entity␜␜entity:media␝revision_user␞␟entity␜␜entity:user␝name␞␟value,slot↝entity␜␜entity:media␝revision_log_message␞␟value}',
+            'ℹ︎␜entity:canvas_page␝owner␞␟{label↝entity␜␜entity:user␝name␞␟value}',
             'ℹ︎␜entity:canvas_page␝revision_log␞␟{label↠value}',
+            'ℹ︎␜entity:canvas_page␝revision_user␞␟{label↝entity␜␜entity:user␝name␞␟value}',
             'ℹ︎␜entity:canvas_page␝title␞␟{label↠value}',
-            'ℹ︎␜entity:media:baby_videos␝field_media_video_file␞␟{label↠description}',
+            'ℹ︎␜entity:file␝uid␞␟{label↝entity␜␜entity:user␝name␞␟value}',
+            'ℹ︎␜entity:media:baby_videos␝field_media_video_file␞␟{label↠description,slot↝entity␜␜entity:file␝uid␞␟entity␜␜entity:user␝name␞␟value}',
             'ℹ︎␜entity:media:baby_videos␝name␞␟{label↠value}',
             'ℹ︎␜entity:media:baby_videos␝revision_log_message␞␟{label↠value}',
-            'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟{label↠description}',
+            'ℹ︎␜entity:media:baby_videos␝revision_user␞␟{label↝entity␜␜entity:user␝name␞␟value}',
+            'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟{label↝entity␜␜entity:file␝uid␞␟entity␜␜entity:user␝name␞␟value}',
+            'ℹ︎␜entity:media:baby_videos␝uid␞␟{label↝entity␜␜entity:user␝name␞␟value}',
+            'ℹ︎␜entity:media:press_releases␝field_media_file␞␟{label↠description,slot↝entity␜␜entity:file␝uid␞␟entity␜␜entity:user␝name␞␟value}',
+            'ℹ︎␜entity:media:press_releases␝name␞␟{label↠value}',
+            'ℹ︎␜entity:media:press_releases␝revision_log_message␞␟{label↠value}',
+            'ℹ︎␜entity:media:press_releases␝revision_user␞␟{label↝entity␜␜entity:user␝name␞␟value}',
+            'ℹ︎␜entity:media:press_releases␝thumbnail␞␟{label↝entity␜␜entity:file␝uid␞␟entity␜␜entity:user␝name␞␟value}',
+            'ℹ︎␜entity:media:press_releases␝uid␞␟{label↝entity␜␜entity:user␝name␞␟value}',
+            'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟{label↠description,slot↝entity␜␜entity:file␝uid␞␟entity␜␜entity:user␝name␞␟value}',
             'ℹ︎␜entity:media:vacation_videos␝name␞␟{label↠value}',
             'ℹ︎␜entity:media:vacation_videos␝revision_log_message␞␟{label↠value}',
+            'ℹ︎␜entity:media:vacation_videos␝revision_user␞␟{label↝entity␜␜entity:user␝name␞␟value}',
+            'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟{label↝entity␜␜entity:file␝uid␞␟entity␜␜entity:user␝name␞␟value}',
+            'ℹ︎␜entity:media:vacation_videos␝uid␞␟{label↝entity␜␜entity:user␝name␞␟value}',
+            'ℹ︎␜entity:node:foo␝field_check_it_out␞␟{label↠title}',
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟{label↠alt,slot↠title}',
-            'ℹ︎␜entity:node:foo␝media_video_field␞␟{label↝entity␜␜entity:media␝revision_log_message␞␟value,slot↝entity␜␜entity:media␝name␞␟value}',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟{label↝entity␜␜entity:media␝revision_user␞␟entity␜␜entity:user␝name␞␟value,slot↝entity␜␜entity:media␝revision_log_message␞␟value}',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟{label↝entity␜␜entity:media␝revision_user␞␟entity␜␜entity:user␝name␞␟value,slot↝entity␜␜entity:media␝revision_log_message␞␟value}',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟{label↝entity␜␜entity:media␝revision_user␞␟entity␜␜entity:user␝name␞␟value,slot↝entity␜␜entity:media␝revision_log_message␞␟value}',
             'ℹ︎␜entity:node:foo␝revision_log␞␟{label↠value}',
+            'ℹ︎␜entity:node:foo␝revision_uid␞␟{label↝entity␜␜entity:user␝name␞␟value}',
             'ℹ︎␜entity:node:foo␝title␞␟{label↠value}',
+            'ℹ︎␜entity:node:foo␝uid␞␟{label↝entity␜␜entity:user␝name␞␟value}',
             'ℹ︎␜entity:path_alias␝alias␞␟{label↠value}',
             'ℹ︎␜entity:path_alias␝path␞␟{label↠value}',
+            'ℹ︎␜entity:user␝name␞␟{label↠value}',
           ],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
@@ -1037,17 +1266,10 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           'instances' => [
             'ℹ︎␜entity:media:baby_videos␝field_media_video_file␞␟{src↝entity␜␜entity:file␝uri␞␟url}',
             'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟{src↝entity␜␜entity:file␝uri␞␟url}',
-          ],
-          'adapter_matches_field_type' => [],
-          'adapter_matches_instance' => [],
-        ],
-        'optional, type=object&$ref=json-schema-definitions://sdc_test_all_props.module/date-range' => [
-          'SDC props' => [
-            '⿲sdc_test_all_props:all-props␟test_object_drupal_date_range',
-          ],
-          'static prop source' => 'ℹ︎daterange␟{from↠end_value,to↠value}',
-          'instances' => [
-            'ℹ︎␜entity:node:foo␝field_event_duration␞␟{from↠value,to↠end_value}',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media:vacation_videos␝field_media_video_file_1␞␟{src↝entity␜␜entity:file␝uri␞␟url}',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟{src↝entity␜␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟url,poster↝entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url}',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media:vacation_videos␝field_media_video_file_1␞␟{src↝entity␜␜entity:file␝uri␞␟url}',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟{src↝entity␜␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝uri␞␟url,poster↝entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url}',
           ],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
@@ -1067,6 +1289,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
             '⿲canvas_test_sdc:card-with-stream-wrapper-image␟heading',
             '⿲canvas_test_sdc:card-with-stream-wrapper-image␟content',
             '⿲canvas_test_sdc:card-with-stream-wrapper-image␟footer',
+            '⿲canvas_test_sdc:date␟caption',
             '⿲canvas_test_sdc:my-hero␟subheading',
             '⿲canvas_test_sdc:my-hero␟cta1',
             '⿲canvas_test_sdc:my-hero␟cta2',
@@ -1083,102 +1306,82 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
             'ℹ︎␜entity:canvas_page␝description␞␟value',
             'ℹ︎␜entity:canvas_page␝image␞␟entity␜␜entity:media␝name␞␟value',
             'ℹ︎␜entity:canvas_page␝image␞␟entity␜␜entity:media␝revision_log_message␞␟value',
+            'ℹ︎␜entity:canvas_page␝owner␞␟entity␜␜entity:user␝name␞␟value',
             'ℹ︎␜entity:canvas_page␝revision_log␞␟value',
+            'ℹ︎␜entity:canvas_page␝revision_user␞␟entity␜␜entity:user␝name␞␟value',
             'ℹ︎␜entity:canvas_page␝title␞␟value',
+            'ℹ︎␜entity:file␝uid␞␟entity␜␜entity:user␝name␞␟value',
             'ℹ︎␜entity:media:baby_videos␝field_media_video_file␞␟description',
             'ℹ︎␜entity:media:baby_videos␝name␞␟value',
             'ℹ︎␜entity:media:baby_videos␝revision_log_message␞␟value',
+            'ℹ︎␜entity:media:baby_videos␝revision_user␞␟entity␜␜entity:user␝name␞␟value',
+            'ℹ︎␜entity:media:baby_videos␝uid␞␟entity␜␜entity:user␝name␞␟value',
+            'ℹ︎␜entity:media:press_releases␝field_media_file␞␟description',
+            'ℹ︎␜entity:media:press_releases␝name␞␟value',
+            'ℹ︎␜entity:media:press_releases␝revision_log_message␞␟value',
+            'ℹ︎␜entity:media:press_releases␝revision_user␞␟entity␜␜entity:user␝name␞␟value',
+            'ℹ︎␜entity:media:press_releases␝uid␞␟entity␜␜entity:user␝name␞␟value',
             'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟description',
             'ℹ︎␜entity:media:vacation_videos␝name␞␟value',
             'ℹ︎␜entity:media:vacation_videos␝revision_log_message␞␟value',
+            'ℹ︎␜entity:media:vacation_videos␝revision_user␞␟entity␜␜entity:user␝name␞␟value',
+            'ℹ︎␜entity:media:vacation_videos␝uid␞␟entity␜␜entity:user␝name␞␟value',
+            'ℹ︎␜entity:node:foo␝field_check_it_out␞␟title',
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟alt',
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟title',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media:press_releases␝field_media_file␞␟description',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝name␞␟value',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝revision_log_message␞␟value',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media:vacation_videos␝field_media_video_file_1␞␟description',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media␝name␞␟value',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media␝revision_log_message␞␟value',
             'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media:baby_videos␝field_media_video_file␞␟description',
             'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media:vacation_videos␝field_media_video_file_1␞␟description',
             'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝name␞␟value',
             'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝revision_log_message␞␟value',
             'ℹ︎␜entity:node:foo␝revision_log␞␟value',
+            'ℹ︎␜entity:node:foo␝revision_uid␞␟entity␜␜entity:user␝name␞␟value',
             'ℹ︎␜entity:node:foo␝title␞␟value',
+            'ℹ︎␜entity:node:foo␝uid␞␟entity␜␜entity:user␝name␞␟value',
             'ℹ︎␜entity:path_alias␝alias␞␟value',
             'ℹ︎␜entity:path_alias␝path␞␟value',
+            'ℹ︎␜entity:user␝name␞␟value',
           ],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
         ],
-        // 💡 The matches here are identical to those for
-        // `optional, type=string&contentMediaType=image/*&format=uri-reference&pattern=^(/|https?://)?(?!.*\://)[^\s]+$`
         'optional, type=string&$ref=json-schema-definitions://canvas.module/image-uri' => [
           'SDC props' => [
+            '⿲sdc_test_all_props:all-props␟test_string_format_' . JsonSchemaStringFormat::Uri->value . '_image',
             '⿲sdc_test_all_props:all-props␟test_string_format_' . JsonSchemaStringFormat::Uri->value . '_image_using_ref',
           ],
           'static prop source' => 'ℹ︎image␟src_with_alternate_widths',
           'instances' => [
+            'ℹ︎␜entity:canvas_page␝image␞␟entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:canvas_page␝image␞␟entity␜␜entity:media␝thumbnail␞␟src_with_alternate_widths',
             'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟src_with_alternate_widths',
+            'ℹ︎␜entity:media:press_releases␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url',
+            'ℹ︎␜entity:media:press_releases␝thumbnail␞␟src_with_alternate_widths',
             'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟src_with_alternate_widths',
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟src_with_alternate_widths',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝thumbnail␞␟src_with_alternate_widths',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media␝thumbnail␞␟src_with_alternate_widths',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝thumbnail␞␟src_with_alternate_widths',
           ],
           'adapter_matches_field_type' => [
             'image_extract_url' => [
-              'imageUri' => NULL,
+              'imageUri' => 'ℹ︎image␟entity␜␜entity:file␝uri␞␟value',
             ],
           ],
           'adapter_matches_instance' => [
             'image_extract_url' => [
               'imageUri' => [
-                'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
-                'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
-                'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝uri␞␟value',
-              ],
-            ],
-          ],
-        ],
-        'optional, type=string&$ref=json-schema-definitions://canvas.module/textarea' => [
-          'SDC props' => [
-            '⿲sdc_test_all_props:all-props␟test_string_multiline',
-          ],
-          'static prop source' => 'ℹ︎string_long␟value',
-          'instances' => [
-            'ℹ︎␜entity:canvas_page␝description␞␟value',
-            'ℹ︎␜entity:canvas_page␝image␞␟entity␜␜entity:media␝revision_log_message␞␟value',
-            'ℹ︎␜entity:canvas_page␝revision_log␞␟value',
-            'ℹ︎␜entity:media:baby_videos␝revision_log_message␞␟value',
-            'ℹ︎␜entity:media:vacation_videos␝revision_log_message␞␟value',
-            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝revision_log_message␞␟value',
-            'ℹ︎␜entity:node:foo␝revision_log␞␟value',
-          ],
-          'adapter_matches_field_type' => [],
-          'adapter_matches_instance' => [],
-        ],
-        'optional, type=string&contentMediaType=image/*&format=uri-reference&pattern=^(/|https?://)?(?!.*\://)[^\s]+$' => [
-          'SDC props' => [
-            '⿲sdc_test_all_props:all-props␟test_string_format_' . JsonSchemaStringFormat::Uri->value . '_image',
-          ],
-          'static prop source' => 'ℹ︎image␟src_with_alternate_widths',
-          'instances' => [
-            'ℹ︎␜entity:canvas_page␝image␞␟entity␜␜entity:media␝thumbnail␞␟src_with_alternate_widths',
-            'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url',
-            'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟src_with_alternate_widths',
-            'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url',
-            'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟src_with_alternate_widths',
-            'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝uri␞␟url',
-            'ℹ︎␜entity:node:foo␝field_silly_image␞␟src_with_alternate_widths',
-            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝thumbnail␞␟src_with_alternate_widths',
-          ],
-          'adapter_matches_field_type' => [
-            'image_extract_url' => [
-              'imageUri' => NULL,
-            ],
-          ],
-          'adapter_matches_instance' => [
-            'image_extract_url' => [
-              'imageUri' => [
-                'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
-                'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
                 'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝uri␞␟value',
               ],
             ],
@@ -1188,16 +1391,17 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           'SDC props' => [
             '⿲sdc_test_all_props:all-props␟test_string_html',
           ],
-          'static prop source' => 'ℹ︎text_long␟value',
+          'static prop source' => 'ℹ︎text_long␟processed',
           'instances' => [],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
         ],
         'optional, type=string&contentMediaType=text/html&x-formatting-context=block' => [
           'SDC props' => [
+            '⿲canvas_test_sdc:banner␟text',
             '⿲sdc_test_all_props:all-props␟test_string_html_block',
           ],
-          'static prop source' => 'ℹ︎text_long␟value',
+          'static prop source' => 'ℹ︎text_long␟processed',
           'instances' => [],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
@@ -1206,7 +1410,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           'SDC props' => [
             '⿲sdc_test_all_props:all-props␟test_string_html_inline',
           ],
-          'static prop source' => 'ℹ︎text␟value',
+          'static prop source' => 'ℹ︎text␟processed',
           'instances' => [],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
@@ -1299,6 +1503,8 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
         ],
         'optional, type=string&format=date' => [
           'SDC props' => [
+            '⿲canvas_test_sdc:card␟' . JsonSchemaStringFormat::Date->value,
+            '⿲canvas_test_sdc:date␟date',
             '⿲sdc_test_all_props:all-props␟test_string_format_' . JsonSchemaStringFormat::Date->value,
           ],
           'static prop source' => 'ℹ︎datetime␟value',
@@ -1313,7 +1519,9 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           ],
           'adapter_matches_instance' => [
             'unix_to_date' => [
-              'unix' => [],
+              'unix' => [
+                'ℹ︎␜entity:node:foo␝one_from_an_integer_list␞␟value',
+              ],
             ],
           ],
         ],
@@ -1355,6 +1563,10 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
             'ℹ︎␜entity:media:baby_videos␝revision_user␞␟entity␜␜entity:user␝mail␞␟value',
             'ℹ︎␜entity:media:baby_videos␝uid␞␟entity␜␜entity:user␝init␞␟value',
             'ℹ︎␜entity:media:baby_videos␝uid␞␟entity␜␜entity:user␝mail␞␟value',
+            'ℹ︎␜entity:media:press_releases␝revision_user␞␟entity␜␜entity:user␝init␞␟value',
+            'ℹ︎␜entity:media:press_releases␝revision_user␞␟entity␜␜entity:user␝mail␞␟value',
+            'ℹ︎␜entity:media:press_releases␝uid␞␟entity␜␜entity:user␝init␞␟value',
+            'ℹ︎␜entity:media:press_releases␝uid␞␟entity␜␜entity:user␝mail␞␟value',
             'ℹ︎␜entity:media:vacation_videos␝revision_user␞␟entity␜␜entity:user␝init␞␟value',
             'ℹ︎␜entity:media:vacation_videos␝revision_user␞␟entity␜␜entity:user␝mail␞␟value',
             'ℹ︎␜entity:media:vacation_videos␝uid␞␟entity␜␜entity:user␝init␞␟value',
@@ -1395,6 +1607,10 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
             'ℹ︎␜entity:media:baby_videos␝revision_user␞␟entity␜␜entity:user␝mail␞␟value',
             'ℹ︎␜entity:media:baby_videos␝uid␞␟entity␜␜entity:user␝init␞␟value',
             'ℹ︎␜entity:media:baby_videos␝uid␞␟entity␜␜entity:user␝mail␞␟value',
+            'ℹ︎␜entity:media:press_releases␝revision_user␞␟entity␜␜entity:user␝init␞␟value',
+            'ℹ︎␜entity:media:press_releases␝revision_user␞␟entity␜␜entity:user␝mail␞␟value',
+            'ℹ︎␜entity:media:press_releases␝uid␞␟entity␜␜entity:user␝init␞␟value',
+            'ℹ︎␜entity:media:press_releases␝uid␞␟entity␜␜entity:user␝mail␞␟value',
             'ℹ︎␜entity:media:vacation_videos␝revision_user␞␟entity␜␜entity:user␝init␞␟value',
             'ℹ︎␜entity:media:vacation_videos␝revision_user␞␟entity␜␜entity:user␝mail␞␟value',
             'ℹ︎␜entity:media:vacation_videos␝uid␞␟entity␜␜entity:user␝init␞␟value',
@@ -1451,23 +1667,20 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           ],
           'static prop source' => 'ℹ︎link␟url',
           'instances' => [
-            'ℹ︎␜entity:canvas_page␝image␞␟entity␜␜entity:media␝thumbnail␞␟src_with_alternate_widths',
-            'ℹ︎␜entity:file␝uri␞␟url',
+            'ℹ︎␜entity:canvas_page␝image␞␟entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
             'ℹ︎␜entity:file␝uri␞␟value',
-            'ℹ︎␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝uri␞␟value',
-            'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
-            'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟src_with_alternate_widths',
-            'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟url',
+            'ℹ︎␜entity:media:press_releases␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
             'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟value',
-            'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
-            'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟src_with_alternate_widths',
-            'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝uri␞␟value',
-            'ℹ︎␜entity:node:foo␝field_silly_image␞␟src_with_alternate_widths',
-            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝thumbnail␞␟src_with_alternate_widths',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
           ],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
@@ -1478,23 +1691,82 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           ],
           'static prop source' => 'ℹ︎link␟url',
           'instances' => [
+            'ℹ︎␜entity:canvas_page␝image␞␟entity␜␜entity:media␝revision_user␞␟url',
+            'ℹ︎␜entity:canvas_page␝image␞␟entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uid␞␟url',
+            'ℹ︎␜entity:canvas_page␝image␞␟entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url',
+            'ℹ︎␜entity:canvas_page␝image␞␟entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
             'ℹ︎␜entity:canvas_page␝image␞␟entity␜␜entity:media␝thumbnail␞␟src_with_alternate_widths',
+            'ℹ︎␜entity:canvas_page␝image␞␟entity␜␜entity:media␝uid␞␟url',
+            'ℹ︎␜entity:canvas_page␝image␞␟url',
+            'ℹ︎␜entity:canvas_page␝owner␞␟url',
+            'ℹ︎␜entity:canvas_page␝revision_user␞␟url',
+            'ℹ︎␜entity:file␝uid␞␟url',
             'ℹ︎␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝uid␞␟url',
             'ℹ︎␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:media:baby_videos␝revision_user␞␟url',
+            'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟entity␜␜entity:file␝uid␞␟url',
             'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
             'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟src_with_alternate_widths',
+            'ℹ︎␜entity:media:baby_videos␝uid␞␟url',
+            'ℹ︎␜entity:media:press_releases␝field_media_file␞␟entity␜␜entity:file␝uid␞␟url',
+            'ℹ︎␜entity:media:press_releases␝revision_user␞␟url',
+            'ℹ︎␜entity:media:press_releases␝thumbnail␞␟entity␜␜entity:file␝uid␞␟url',
+            'ℹ︎␜entity:media:press_releases␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url',
+            'ℹ︎␜entity:media:press_releases␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:media:press_releases␝thumbnail␞␟src_with_alternate_widths',
+            'ℹ︎␜entity:media:press_releases␝uid␞␟url',
+            'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uid␞␟url',
             'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:media:vacation_videos␝revision_user␞␟url',
+            'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟entity␜␜entity:file␝uid␞␟url',
             'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
             'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟src_with_alternate_widths',
+            'ℹ︎␜entity:media:vacation_videos␝uid␞␟url',
+            'ℹ︎␜entity:node:foo␝field_check_it_out␞␟uri',
+            'ℹ︎␜entity:node:foo␝field_check_it_out␞␟url',
+            'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝uid␞␟url',
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝uri␞␟value',
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟src_with_alternate_widths',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media:press_releases␝field_media_file␞␟entity␜␜entity:file␝uid␞␟url',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝revision_user␞␟url',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uid␞␟url',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝thumbnail␞␟src_with_alternate_widths',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝uid␞␟url',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟url',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uid␞␟url',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟url',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media␝revision_user␞␟url',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uid␞␟url',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media␝thumbnail␞␟src_with_alternate_widths',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media␝uid␞␟url',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟url',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝uid␞␟url',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝uri␞␟url',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uid␞␟url',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟url',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝revision_user␞␟url',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uid␞␟url',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
             'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝thumbnail␞␟src_with_alternate_widths',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝uid␞␟url',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟url',
+            'ℹ︎␜entity:node:foo␝revision_uid␞␟url',
+            'ℹ︎␜entity:node:foo␝uid␞␟url',
           ],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
@@ -1545,23 +1817,20 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           ],
           'static prop source' => 'ℹ︎link␟url',
           'instances' => [
-            'ℹ︎␜entity:canvas_page␝image␞␟entity␜␜entity:media␝thumbnail␞␟src_with_alternate_widths',
-            'ℹ︎␜entity:file␝uri␞␟url',
+            'ℹ︎␜entity:canvas_page␝image␞␟entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
             'ℹ︎␜entity:file␝uri␞␟value',
-            'ℹ︎␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝uri␞␟value',
-            'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
-            'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟src_with_alternate_widths',
-            'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟url',
+            'ℹ︎␜entity:media:press_releases␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
             'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟value',
-            'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
-            'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟src_with_alternate_widths',
-            'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝uri␞␟value',
-            'ℹ︎␜entity:node:foo␝field_silly_image␞␟src_with_alternate_widths',
-            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝thumbnail␞␟src_with_alternate_widths',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
           ],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
@@ -1572,23 +1841,82 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           ],
           'static prop source' => 'ℹ︎link␟url',
           'instances' => [
+            'ℹ︎␜entity:canvas_page␝image␞␟entity␜␜entity:media␝revision_user␞␟url',
+            'ℹ︎␜entity:canvas_page␝image␞␟entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uid␞␟url',
+            'ℹ︎␜entity:canvas_page␝image␞␟entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url',
+            'ℹ︎␜entity:canvas_page␝image␞␟entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
             'ℹ︎␜entity:canvas_page␝image␞␟entity␜␜entity:media␝thumbnail␞␟src_with_alternate_widths',
+            'ℹ︎␜entity:canvas_page␝image␞␟entity␜␜entity:media␝uid␞␟url',
+            'ℹ︎␜entity:canvas_page␝image␞␟url',
+            'ℹ︎␜entity:canvas_page␝owner␞␟url',
+            'ℹ︎␜entity:canvas_page␝revision_user␞␟url',
+            'ℹ︎␜entity:file␝uid␞␟url',
             'ℹ︎␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝uid␞␟url',
             'ℹ︎␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:media:baby_videos␝revision_user␞␟url',
+            'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟entity␜␜entity:file␝uid␞␟url',
             'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
             'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟src_with_alternate_widths',
+            'ℹ︎␜entity:media:baby_videos␝uid␞␟url',
+            'ℹ︎␜entity:media:press_releases␝field_media_file␞␟entity␜␜entity:file␝uid␞␟url',
+            'ℹ︎␜entity:media:press_releases␝revision_user␞␟url',
+            'ℹ︎␜entity:media:press_releases␝thumbnail␞␟entity␜␜entity:file␝uid␞␟url',
+            'ℹ︎␜entity:media:press_releases␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url',
+            'ℹ︎␜entity:media:press_releases␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:media:press_releases␝thumbnail␞␟src_with_alternate_widths',
+            'ℹ︎␜entity:media:press_releases␝uid␞␟url',
+            'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uid␞␟url',
             'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:media:vacation_videos␝revision_user␞␟url',
+            'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟entity␜␜entity:file␝uid␞␟url',
             'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
             'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟src_with_alternate_widths',
+            'ℹ︎␜entity:media:vacation_videos␝uid␞␟url',
+            'ℹ︎␜entity:node:foo␝field_check_it_out␞␟uri',
+            'ℹ︎␜entity:node:foo␝field_check_it_out␞␟url',
+            'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝uid␞␟url',
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝uri␞␟url',
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝uri␞␟value',
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟src_with_alternate_widths',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media:press_releases␝field_media_file␞␟entity␜␜entity:file␝uid␞␟url',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝revision_user␞␟url',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uid␞␟url',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝thumbnail␞␟src_with_alternate_widths',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝uid␞␟url',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟url',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uid␞␟url',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟url',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media␝revision_user␞␟url',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uid␞␟url',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media␝thumbnail␞␟src_with_alternate_widths',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media␝uid␞␟url',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟url',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝uid␞␟url',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝uri␞␟url',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uid␞␟url',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟url',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝revision_user␞␟url',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uid␞␟url',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uri␞␟url',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
             'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝thumbnail␞␟src_with_alternate_widths',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝uid␞␟url',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟url',
+            'ℹ︎␜entity:node:foo␝revision_uid␞␟url',
+            'ℹ︎␜entity:node:foo␝uid␞␟url',
           ],
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
@@ -1611,8 +1939,11 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           'instances' => [
             'ℹ︎␜entity:canvas_page␝image␞␟entity␜␜entity:media␝thumbnail␞␟srcset_candidate_uri_template',
             'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟srcset_candidate_uri_template',
+            'ℹ︎␜entity:media:press_releases␝thumbnail␞␟srcset_candidate_uri_template',
             'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟srcset_candidate_uri_template',
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟srcset_candidate_uri_template',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝thumbnail␞␟srcset_candidate_uri_template',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media␝thumbnail␞␟srcset_candidate_uri_template',
             'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝thumbnail␞␟srcset_candidate_uri_template',
           ],
           'adapter_matches_field_type' => [],
@@ -1645,6 +1976,15 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
             'ℹ︎␜entity:media:baby_videos␝uid␞␟entity␜␜entity:user␝uuid␞␟value',
             'ℹ︎␜entity:media:baby_videos␝uid␞␟target_uuid',
             'ℹ︎␜entity:media:baby_videos␝uuid␞␟value',
+            'ℹ︎␜entity:media:press_releases␝field_media_file␞␟entity␜␜entity:file␝uid␞␟target_uuid',
+            'ℹ︎␜entity:media:press_releases␝field_media_file␞␟entity␜␜entity:file␝uuid␞␟value',
+            'ℹ︎␜entity:media:press_releases␝revision_user␞␟entity␜␜entity:user␝uuid␞␟value',
+            'ℹ︎␜entity:media:press_releases␝revision_user␞␟target_uuid',
+            'ℹ︎␜entity:media:press_releases␝thumbnail␞␟entity␜␜entity:file␝uid␞␟target_uuid',
+            'ℹ︎␜entity:media:press_releases␝thumbnail␞␟entity␜␜entity:file␝uuid␞␟value',
+            'ℹ︎␜entity:media:press_releases␝uid␞␟entity␜␜entity:user␝uuid␞␟value',
+            'ℹ︎␜entity:media:press_releases␝uid␞␟target_uuid',
+            'ℹ︎␜entity:media:press_releases␝uuid␞␟value',
             'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uid␞␟target_uuid',
             'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uuid␞␟value',
             'ℹ︎␜entity:media:vacation_videos␝revision_user␞␟entity␜␜entity:user␝uuid␞␟value',
@@ -1656,6 +1996,14 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
             'ℹ︎␜entity:media:vacation_videos␝uuid␞␟value',
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝uid␞␟target_uuid',
             'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝uuid␞␟value',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝revision_user␞␟target_uuid',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝uid␞␟target_uuid',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝uuid␞␟value',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟target_uuid',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media␝revision_user␞␟target_uuid',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media␝uid␞␟target_uuid',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media␝uuid␞␟value',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟target_uuid',
             'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝revision_user␞␟target_uuid',
             'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝uid␞␟target_uuid',
             'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝uuid␞␟value',
@@ -1671,9 +2019,30 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
           'adapter_matches_field_type' => [],
           'adapter_matches_instance' => [],
         ],
+        'optional, type=string&pattern=(.|\r?\n)*' => [
+          'SDC props' => [
+            '⿲sdc_test_all_props:all-props␟test_string_multiline',
+          ],
+          'static prop source' => 'ℹ︎string_long␟value',
+          'instances' => [
+            'ℹ︎␜entity:canvas_page␝description␞␟value',
+            'ℹ︎␜entity:canvas_page␝image␞␟entity␜␜entity:media␝revision_log_message␞␟value',
+            'ℹ︎␜entity:canvas_page␝revision_log␞␟value',
+            'ℹ︎␜entity:media:baby_videos␝revision_log_message␞␟value',
+            'ℹ︎␜entity:media:press_releases␝revision_log_message␞␟value',
+            'ℹ︎␜entity:media:vacation_videos␝revision_log_message␞␟value',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝revision_log_message␞␟value',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media␝revision_log_message␞␟value',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝revision_log_message␞␟value',
+            'ℹ︎␜entity:node:foo␝revision_log␞␟value',
+          ],
+          'adapter_matches_field_type' => [],
+          'adapter_matches_instance' => [],
+        ],
       ],
     ];
 
+    // @phpstan-ignore-next-line
     return $cases;
   }
 

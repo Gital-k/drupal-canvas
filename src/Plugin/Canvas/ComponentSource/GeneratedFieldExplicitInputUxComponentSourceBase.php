@@ -4,25 +4,38 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Plugin\Canvas\ComponentSource;
 
+use Drupal\canvas\InvalidComponentInputsPropSourceException;
+use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\canvas\PropShape\PropShapeRepositoryInterface;
+use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
+use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\canvas\PropSource\DynamicPropSource;
+use Drupal\canvas\ShapeMatcher\PropSourceSuggester;
+use Drupal\canvas\PropSource\HostEntityUrlPropSource;
+use Drupal\canvas\Utility\ComponentMetadataHelper;
+use Drupal\Component\Assertion\Inspector;
 use Drupal\Component\Plugin\DependentPluginInterface;
 use Drupal\Component\Utility\NestedArray;
+use Drupal\Component\Utility\Unicode;
+use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Field\WidgetPluginManager;
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\Core\Plugin\Component as SdcPlugin;
+use Drupal\Core\Http\Exception\CacheableAccessDeniedHttpException;
+use Drupal\Core\Logger\LoggerChannelInterface;
+use Drupal\Core\Plugin\Component as ComponentPlugin;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Drupal\Core\Render\Component\Exception\ComponentNotFoundException;
 use Drupal\Core\Render\Component\Exception\InvalidComponentException;
+use Drupal\Core\Render\Element;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\Theme\Component\ComponentMetadata;
 use Drupal\Core\Theme\Component\ComponentValidator;
 use Drupal\canvas\ComponentSource\ComponentSourceBase;
 use Drupal\canvas\ComponentSource\ComponentSourceWithSlotsInterface;
 use Drupal\canvas\Entity\Component;
-use Drupal\canvas\Entity\Component as ComponentEntity;
 use Drupal\canvas\MissingHostEntityException;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\PropExpressions\Component\ComponentPropExpression;
@@ -38,6 +51,7 @@ use Drupal\canvas\PropSource\StaticPropSource;
 use Drupal\canvas\ShapeMatcher\JsonSchemaFieldInstanceMatcher;
 use Drupal\canvas\Utility\TypedDataHelper;
 use Symfony\Component\DependencyInjection\ContainerInterface;
+use Symfony\Component\HttpKernel\Exception\NotAcceptableHttpException;
 use Symfony\Component\Validator\ConstraintViolation;
 use Symfony\Component\Validator\ConstraintViolationList;
 use Symfony\Component\Validator\ConstraintViolationListInterface;
@@ -51,6 +65,11 @@ use Symfony\Component\Validator\ConstraintViolationListInterface;
  * are stored in dangling field instances, by mapping schema to field types.
  *
  * @see \Drupal\Core\Theme\Component\ComponentMetadata
+ * @see \Drupal\canvas\JsonSchemaInterpreter\JsonSchemaType::computeStorablePropShape()
+ *
+ * They can *also* be populated using structured data whose shape matches the
+ * shape specified in the SDC metadata.
+ *
  * @see \Drupal\canvas\ShapeMatcher\JsonSchemaFieldInstanceMatcher
  *
  * Component Source plugins included in the Drupal Canvas module using it:
@@ -61,6 +80,8 @@ use Symfony\Component\Validator\ConstraintViolationListInterface;
  * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent
  *
  * @phpstan-import-type PropSourceArray from \Drupal\canvas\PropSource\PropSourceBase
+ * @phpstan-import-type OptimizedExplicitInput from \Drupal\canvas\Plugin\DataType\ComponentInputs
+ * @phpstan-import-type OptimizedSingleComponentInputArray from \Drupal\canvas\Plugin\DataType\ComponentInputs
  *
  * @internal
  */
@@ -69,12 +90,16 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
   public const EXPLICIT_INPUT_NAME = 'props';
 
   /**
-   * @var array<string, \Drupal\canvas\PropSource\StaticPropSource> */
+   * @var array<string, \Drupal\canvas\PropSource\StaticPropSource>
+   */
   private array $defaultStaticPropSources = [];
+
   /**
-   * @var array<string, \Drupal\canvas\PropSource\DefaultRelativeUrlPropSource> */
+   * @var array<string, \Drupal\canvas\PropSource\DefaultRelativeUrlPropSource>
+   */
   private array $defaultRelativeUrlPropSources = [];
-  protected ?SdcPlugin $componentPlugin = NULL;
+  protected ?ComponentPlugin $componentPlugin = NULL;
+  protected ?ComponentMetadata $metadata;
 
   public function __construct(
     array $configuration,
@@ -83,6 +108,9 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     private readonly ComponentValidator $componentValidator,
     private readonly WidgetPluginManager $fieldWidgetPluginManager,
     protected readonly EntityTypeManagerInterface $entityTypeManager,
+    private readonly PropSourceSuggester $propSourceSuggester,
+    private readonly LoggerChannelInterface $logger,
+    protected readonly PropShapeRepositoryInterface $propShapeRepository,
   ) {
     assert(array_key_exists('local_source_id', $configuration));
     parent::__construct($configuration, $plugin_id, $plugin_definition);
@@ -100,19 +128,35 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       $container->get(ComponentValidator::class),
       $container->get('plugin.manager.field.widget'),
       $container->get(EntityTypeManagerInterface::class),
+      $container->get(PropSourceSuggester::class),
+      $container->get('logger.channel.canvas'),
+      $container->get(PropShapeRepositoryInterface::class),
     );
   }
 
   /**
-   * The SDC metadata that everything else in this trait builds upon.
+   * When validating explicit inputs, an SDC plugin instance is needed.
    *
-   * @todo Refactor to only need ComponentMetadata, but that requires refactoring Canvas's shape matching infrastructure
-   *   as well as core's component validator.
-   * @see \Drupal\Core\Theme\Component\ComponentMetadata
-   * @see \Drupal\canvas\PropShape\PropShape::getComponentProps()
-   * @todo Remove in https://www.drupal.org/project/canvas/issues/3503038
+   * This is imposed by the SDC validation infrastructure provided by Drupal
+   * core.
+   *
+   * @see ::validateComponentInput()
+   * @see \Drupal\Core\Theme\Component\ComponentValidator::validateProps()
+   * @todo Deprecate and then remove this once ComponentValidator::validateProps() accepts a plugin ID + component metadata
    */
-  abstract public function getSdcPlugin(): SdcPlugin;
+  abstract protected function getComponentPlugin(): ComponentPlugin;
+
+  /**
+   * The crucial metadata: describes the explicit inputs and slots.
+   *
+   * @return \Drupal\Core\Theme\Component\ComponentMetadata
+   */
+  public function getMetadata(): ComponentMetadata {
+    if (!isset($this->metadata)) {
+      $this->metadata = $this->getComponentPlugin()->metadata;
+    }
+    return $this->metadata;
+  }
 
   /**
    * {@inheritdoc}
@@ -149,30 +193,36 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
    * @return \Drupal\canvas\PropSource\StaticPropSource
    *   The prop source object.
    */
-  private function getDefaultStaticPropSource(string $prop_name, bool $validate_prop_name = TRUE): StaticPropSource {
+  private function getDefaultStaticPropSource(string $prop_name, bool $validate_prop_name): StaticPropSource {
+    if ($validate_prop_name && !array_key_exists($prop_name, $this->getMetadata()->schema['properties'] ?? [])) {
+      throw new \OutOfRangeException(sprintf("'%s' is not a prop on the code powering the component '%s'.", $prop_name, $this->getComponentDescription()));
+    }
+
     if (\array_key_exists($prop_name, $this->defaultStaticPropSources)) {
       return $this->defaultStaticPropSources[$prop_name];
     }
+
     assert(isset($this->configuration['prop_field_definitions']));
-    assert(is_array($this->configuration['prop_field_definitions']));
-    $component_schema = $this->getSdcPlugin()->metadata->schema ?? [];
-    if ($validate_prop_name && !array_key_exists($prop_name, $component_schema['properties'] ?? [])) {
-      throw new \OutOfRangeException(sprintf("'%s' is not a prop on the component '%s'.", $prop_name, $this->getComponentDescription()));
+    $propFieldDefinitions = $this->configuration['prop_field_definitions'];
+    assert(is_array($propFieldDefinitions));
+    if (!array_key_exists($prop_name, $propFieldDefinitions)) {
+      throw new \OutOfRangeException(sprintf("'%s' is not a prop on this version of the Component '%s'.", $prop_name, $this->getComponentDescription()));
     }
 
+    $propFieldDefinition = $propFieldDefinitions[$prop_name];
     $sdc_prop_source = [
-      'sourceType' => 'static:field_item:' . $this->configuration['prop_field_definitions'][$prop_name]['field_type'],
-      'value' => $this->configuration['prop_field_definitions'][$prop_name]['default_value'],
-      'expression' => $this->configuration['prop_field_definitions'][$prop_name]['expression'],
+      'sourceType' => 'static:field_item:' . $propFieldDefinition['field_type'],
+      'value' => $propFieldDefinition['default_value'],
+      'expression' => $propFieldDefinition['expression'],
     ];
-    if (array_key_exists('field_storage_settings', $this->configuration['prop_field_definitions'][$prop_name])) {
-      $sdc_prop_source['sourceTypeSettings']['storage'] = $this->configuration['prop_field_definitions'][$prop_name]['field_storage_settings'];
+    if (array_key_exists('field_storage_settings', $propFieldDefinition)) {
+      $sdc_prop_source['sourceTypeSettings']['storage'] = $propFieldDefinition['field_storage_settings'];
     }
-    if (array_key_exists('field_instance_settings', $this->configuration['prop_field_definitions'][$prop_name])) {
-      $sdc_prop_source['sourceTypeSettings']['instance'] = $this->configuration['prop_field_definitions'][$prop_name]['field_instance_settings'];
+    if (array_key_exists('field_instance_settings', $propFieldDefinition)) {
+      $sdc_prop_source['sourceTypeSettings']['instance'] = $propFieldDefinition['field_instance_settings'];
     }
-    if (array_key_exists('cardinality', $this->configuration['prop_field_definitions'][$prop_name])) {
-      $sdc_prop_source['sourceTypeSettings']['cardinality'] = $this->configuration['prop_field_definitions'][$prop_name]['cardinality'];
+    if (array_key_exists('cardinality', $propFieldDefinition)) {
+      $sdc_prop_source['sourceTypeSettings']['cardinality'] = $propFieldDefinition['cardinality'];
     }
 
     $static_prop_source = StaticPropSource::parse($sdc_prop_source);
@@ -184,13 +234,12 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     if (\array_key_exists($prop_name, $this->defaultRelativeUrlPropSources)) {
       return $this->defaultRelativeUrlPropSources[$prop_name];
     }
-    $component_plugin = $this->getSdcPlugin();
-    assert(array_key_exists(0, $component_plugin->metadata->schema['properties'][$prop_name]['examples'] ?? []));
+    assert(array_key_exists(0, $this->getMetadata()->schema['properties'][$prop_name]['examples'] ?? []));
     $default_relative_url_prop_source = new DefaultRelativeUrlPropSource(
     // @phpstan-ignore-next-line offsetAccess.notFound
-      value: $component_plugin->metadata->schema['properties'][$prop_name]['examples'][0],
+      value: $this->getMetadata()->schema['properties'][$prop_name]['examples'][0],
       // @phpstan-ignore-next-line offsetAccess.notFound
-      jsonSchema: PropShape::normalize($component_plugin->metadata->schema['properties'][$prop_name])->resolvedSchema,
+      jsonSchema: PropShape::normalize($this->getMetadata()->schema['properties'][$prop_name])->resolvedSchema,
       componentId: $component_id,
     );
     $this->defaultRelativeUrlPropSources[$prop_name] = $default_relative_url_prop_source;
@@ -198,17 +247,17 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
   }
 
   public function getSlotDefinitions(): array {
-    return $this->getSdcPlugin()->metadata->slots;
+    return $this->getMetadata()->slots;
   }
 
   /**
    * {@inheritdoc}
    */
   protected function getExplicitInputDefinitions(): array {
-    $sdc_plugin = $this->getSdcPlugin();
-    $prop_shapes = PropShape::getComponentProps($this->getSdcPlugin());
+    $prop_shapes = self::getComponentInputsForMetadata($this->getSourceSpecificComponentId(), $this->getMetadata());
+
     return [
-      'required' => $sdc_plugin->metadata->schema['required'] ?? [],
+      'required' => $this->getMetadata()->schema['required'] ?? [],
       'shapes' => array_combine(
         array_map(fn (string $cpe) => ComponentPropExpression::fromString($cpe)->propName, array_keys($prop_shapes)),
         array_map(fn (PropShape $shape) => $shape->schema, $prop_shapes),
@@ -217,27 +266,44 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
   }
 
   /**
+   * @param string $plugin_id
+   * @param \Drupal\Core\Theme\Component\ComponentMetadata $metadata
+   *
+   * @return array<string, \Drupal\canvas\PropShape\PropShape>
+   */
+  public static function getComponentInputsForMetadata(string $plugin_id, ComponentMetadata $metadata): array {
+    $prop_shapes = [];
+    foreach (ComponentMetadataHelper::getNonAttributeComponentProperties($metadata) as $prop_name => $prop_schema) {
+      $component_prop_expression = new ComponentPropExpression($plugin_id, $prop_name);
+      $prop_shapes[(string) $component_prop_expression] = PropShape::standardize($prop_schema);
+    }
+    return $prop_shapes;
+  }
+
+  /**
    * @return array<int, array{'value': mixed, 'label': 'string'}>
    *
    * @see \canvas_load_allowed_values_for_component_prop()
-   * @todo Ensure that when Canvas adds translation support, that SDC `meta:enum`s are loaded from interface translation, and those for code components from config translation.
+   * @todo Ensure that when Canvas adds translation support, that SDC
+   *   `meta:enum`s are loaded from interface translation, and those for code
+   *   components from config translation.
    */
   public function getOptionsForExplicitInputEnumProp(string $prop_name): array {
     $explicit_input_definitions = $this->getExplicitInputDefinitions();
     if (!array_key_exists($prop_name, $explicit_input_definitions['shapes'])) {
-      throw new \LogicException("`$prop_name` is not an explicit input prop on `{$this->getPluginId()}.{$this->getSdcPlugin()->getPluginId()}`.");
+      throw new \LogicException("`$prop_name` is not an explicit input prop on `{$this->getPluginId()}.{$this->getSourceSpecificComponentId()}`.");
     }
 
     // Retrieve the JSON schema for this explicit input prop.
     $schema = (new PropShape($explicit_input_definitions['shapes'][$prop_name]))->resolvedSchema;
     if (!array_key_exists('enum', $schema)) {
-      throw new \LogicException("`enum` is missing for schema of `$prop_name` explicit input prop of `{$this->getPluginId()}.{$this->getSdcPlugin()->getPluginId()}`.");
+      throw new \LogicException("`enum` is missing for schema of `$prop_name` explicit input prop of `{$this->getPluginId()}.{$this->getSourceSpecificComponentId()}`.");
     }
     // @todo Simplify in https://www.drupal.org/project/canvas/issues/3518247
-    $raw_schema = $this->getSdcPlugin()->metadata->schema['properties'][$prop_name] ?? [];
+    $raw_schema = $this->getMetadata()->schema['properties'][$prop_name] ?? [];
     if (!array_key_exists('meta:enum', $schema)) {
       if (!array_key_exists('meta:enum', $raw_schema)) {
-        throw new \LogicException("`meta:enum` is missing for schema of `$prop_name` explicit input prop of `{$this->getPluginId()}.{$this->getSdcPlugin()->getPluginId()}`.");
+        throw new \LogicException("`meta:enum` is missing for schema of `$prop_name` explicit input prop of `{$this->getPluginId()}.{$this->getSourceSpecificComponentId()}`.");
       }
       else {
         $schema['meta:enum'] = $raw_schema['meta:enum'];
@@ -267,37 +333,91 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     $is_dangling = $item->getRoot() === $item->getParent();
     $entity = $is_dangling ? $host_entity : $item->getEntity();
     $values = $item->getInputs() ?? [];
+    $resolved_values = [];
     foreach ($values as $prop => $input) {
       $values[$prop] = $this->uncollapse($input, $prop)->toArray();
+      try {
+        $resolved_values[$prop] = PropSource::parse($values[$prop])
+          ->evaluate($entity, is_required: FALSE);
+      }
+      catch (CacheableAccessDeniedHttpException $e) {
+        $this->logger->warning('Access denied when evaluating prop source for prop %prop of component instance %uuid with input `%input`. Original error: %error', [
+          '%prop' => $prop,
+          '%input' => json_encode($input),
+          '%uuid' => $uuid,
+          '%error' => $e->getMessage(),
+        ]);
+        $resolved_values[$prop] = new EvaluationResult(NULL, $e);
+      }
     }
 
+    // @phpstan-ignore staticMethod.alreadyNarrowedType
+    \assert(Inspector::assertAllObjects($resolved_values, EvaluationResult::class));
     return [
       'source' => $values,
-      'resolved' => array_map(
-      // @phpstan-ignore-next-line
-        fn(array $prop_source): mixed => PropSource::parse($prop_source)
-          ->evaluate($entity, is_required: FALSE),
-        $values,
-      ),
+      'resolved' => $resolved_values,
     ];
   }
 
   /**
    * {@inheritdoc}
    */
-  public function hydrateComponent(array $explicit_input): array {
+  public function hydrateComponent(array $explicit_input, array $slot_definitions): array {
     $hydrated[self::EXPLICIT_INPUT_NAME] = $explicit_input['resolved'];
+    \assert(Inspector::assertAllObjects($explicit_input['resolved'], EvaluationResult::class));
 
-    if ($slots = $this->getSlotDefinitions()) {
+    // Omit optional props whose value evaluated to NULL. Otherwise, an SDC
+    // validation error is triggered.
+    // @see \Drupal\Core\Theme\Component\ComponentValidator::validateProps()
+    $prop_field_definitions = $this->configuration['prop_field_definitions'];
+    foreach ($hydrated[self::EXPLICIT_INPUT_NAME] as $prop => $resolved_value) {
+      // The stored inputs SHOULD match the live schema, but mid-development or
+      // due to a botched release, that is impossible to guarantee.
+      // @see https://en.wikipedia.org/wiki/Robustness_principle
+      if (!array_key_exists($prop, $prop_field_definitions)) {
+        continue;
+      }
+      $is_required = $prop_field_definitions[$prop]['required'];
+      if (!$is_required && $resolved_value->value === NULL) {
+        unset($hydrated[self::EXPLICIT_INPUT_NAME][$prop]);
+        continue;
+      }
+      // Special case: optional `type: object`-shaped props if all key-value
+      // pairs evaluated to NULL (which is only possible/allowed because the
+      // entire object is optional).
+      $prop_expression = StructuredDataPropExpression::fromString($prop_field_definitions[$prop]['expression']);
+      $is_object_prop_shape = $prop_expression instanceof FieldTypeObjectPropsExpression;
+      if (!$is_required && $is_object_prop_shape && empty(array_filter($resolved_value->value))) {
+        unset($hydrated[self::EXPLICIT_INPUT_NAME][$prop]);
+      }
+    }
+
+    if (!empty($slot_definitions)) {
       // Use the first example defined in SDC metadata, if it exists. Otherwise,
       // fall back to `"#plain_text => ''`, which is accepted by SDC's rendering
       // logic but still results in an empty slot.
       // @see https://www.drupal.org/node/3391702
       // @see \Drupal\Core\Render\Element\ComponentElement::generateComponentTemplate()
-      $hydrated['slots'] = array_map(fn($slot) => $slot['examples'][0] ?? '', $slots);
+      $hydrated['slots'] = array_map(fn($slot) => $slot['examples'][0] ?? '', $slot_definitions);
     }
 
     return $hydrated;
+  }
+
+  /**
+   * @param array<string, EvaluationResult> $props_evaluation_results
+   *
+   * @return array{0: array<string, mixed>, 1: \Drupal\Core\Cache\CacheableMetadata}
+   */
+  protected static function getResolvedPropsAndCacheability(array $props_evaluation_results): array {
+    \assert(Inspector::assertAllObjects($props_evaluation_results, EvaluationResult::class));
+    $props_cacheability = new CacheableMetadata();
+    $props = [];
+    foreach ($props_evaluation_results as $prop_name => $evaluation_result) {
+      $props_cacheability->addCacheableDependency($evaluation_result);
+      $props[$prop_name] = $evaluation_result->value;
+    }
+    return [$props, $props_cacheability];
   }
 
   /**
@@ -306,9 +426,16 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
   public function inputToClientModel(array $explicit_input): array {
     // @see PropSourceComponent type-script definition.
     // @see EvaluatedComponentModel type-script definition.
-    $model = $explicit_input;
+    \assert(is_array($explicit_input['resolved']));
+    \assert(Inspector::assertAllObjects($explicit_input['resolved'], EvaluationResult::class));
+    $model = [
+      'source' => $explicit_input['source'],
+      // The client model doesn't need cacheability metadata.
+      'resolved' => array_map(fn (EvaluationResult $r) => $r->value, $explicit_input['resolved']),
+    ];
+    \assert(Inspector::assertAll(fn ($r) => !$r instanceof EvaluationResult, $model['resolved']));
 
-    foreach ($explicit_input['resolved'] as $prop_name => $value) {
+    foreach ($explicit_input['resolved'] as $prop_name => $evaluation_result) {
       // Undo what ::clientModelToInput() and ::getExplicitInput() did: restore
       // the `source` to pass the necessary information to the client that
       // \Drupal\canvas\Form\ComponentInstanceForm expects (and hence
@@ -318,7 +445,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       // to in order to correctly render the component instance.
       // Also note that this will NOT run anymore for a given prop once the
       // Content Creator has specified a value in the generated field widget.
-      if ($model['source'][$prop_name]['sourceType'] === DefaultRelativeUrlPropSource::getSourceTypePrefix()) {
+      if (PropSource::tryFrom($model['source'][$prop_name]['sourceType']) === PropSource::DefaultRelativeUrl) {
         // TRICKY: use the default static prop source as-is, with its default
         // value, because:
         // - the server side can ONLY store a `StaticPropSource` if it actually
@@ -326,7 +453,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
         //   empty by the field type)
         // - the server side MUST fall back to a `DefaultRelativeUrlPropSource`
         //   to be able to render the component at all
-        $model['source'][$prop_name] = $this->getDefaultStaticPropSource($prop_name)
+        $model['source'][$prop_name] = $this->getDefaultStaticPropSource($prop_name, FALSE)
           ->toArray();
       }
       // Don't duplicate value if the resolved value matches the static value.
@@ -334,7 +461,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       // that it's possible for the preview ('resolved') to not match the input
       // ('source'): the source will retain its own value, even if that is the
       // empty array in for example the case of a default image.
-      if (\array_key_exists('value', $model['source'][$prop_name]) && $value === $model['source'][$prop_name]['value']) {
+      if (\array_key_exists('value', $model['source'][$prop_name]) && $evaluation_result->value === $model['source'][$prop_name]['value']) {
         unset($model['source'][$prop_name]['value']);
       }
     }
@@ -346,7 +473,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
    * {@inheritdoc}
    */
   public function requiresExplicitInput(): bool {
-    return !empty($this->getSdcPlugin()->metadata->schema['properties']);
+    return !empty($this->configuration['prop_field_definitions']);
   }
 
   /**
@@ -356,7 +483,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     $inputs = [];
     foreach (array_keys($this->configuration['prop_field_definitions']) as $prop_name) {
       assert(is_string($prop_name));
-      $inputs[$prop_name] = $this->getDefaultStaticPropSource($prop_name)->toArray();
+      $inputs[$prop_name] = $this->getDefaultStaticPropSource($prop_name, validate_prop_name: FALSE)->toArray();
     }
     return $inputs;
   }
@@ -408,7 +535,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       $resolvedInputValues = array_map(
       // @phpstan-ignore-next-line
         fn(array $prop_source): mixed => PropSource::parse($prop_source)
-          ->evaluate($entity, is_required: FALSE),
+          ->evaluate($entity, is_required: FALSE)->value,
         $inputValues,
       );
     }
@@ -438,7 +565,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     }
 
     try {
-      $this->componentValidator->validateProps($resolvedInputValues, $this->getSdcPlugin());
+      $this->componentValidator->validateProps($resolvedInputValues, $this->getComponentPlugin());
     }
     catch (ComponentNotFoundException) {
       // The violation for a missing component will be added in the validation
@@ -451,11 +578,13 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       $errors = explode("\n", $e->getMessage());
       foreach ($errors as $error) {
         // An example error:
+        // phpcs:disable Drupal.Files.LineLength.TooLong
         // @code
         // [style] Does not have a value in the enumeration ["primary","secondary"]
         // @endcode
-        // In that string, `[style]` is the bracket-enclosed SDC prop name
-        // for which an error occurred. This string must be parsed.
+        // phpcs:enable
+        // In that string, `[style]` is the bracket-enclosed SDC prop name for
+        // which an error occurred. This string must be parsed.
         $sdc_prop_name_closing_bracket_pos = strpos($error, ']', 1);
         assert($sdc_prop_name_closing_bracket_pos !== FALSE);
         // This extracts `style` and the subsequent error message from the
@@ -487,49 +616,78 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
   public function buildComponentInstanceForm(
     array $form,
     FormStateInterface $form_state,
-    ?Component $component = NULL,
+    Component $component,
     string $component_instance_uuid = '',
-    array $client_model = [],
+    array $inputValues = [],
     ?EntityInterface $entity = NULL,
     array $settings = [],
   ): array {
     $transforms = [];
-    assert($entity instanceof FieldableEntityInterface);
-    $component_plugin = $this->getSdcPlugin();
-    $component_schema = $component_plugin->metadata->schema ?? [];
+    $component_schema = $this->getMetadata()->schema ?? [];
 
-    // Allow form alterations specific to Canvas component instance forms (currently
-    // only "static prop sources").
+    // @todo Uncomment this once it is guaranteed that the POST request to add
+    // the component instance happens first.
+    // phpcs:disable Drupal.Files.LineLength.TooLong
+    // assert(!is_null(\Drupal::service(ComponentTreeLoader::class)->load($entity)->getComponentTreeItemByUuid($component_instance_uuid)), 'The passed $entity does not contain the component instance being edited.');
+    // phpcs:enable
+    // Some field widgets need an entity object. Provide such a "parent" entity.
+    // @see \Drupal\Core\Field\FieldItemListInterface::getEntity()
+    // @see \Drupal\canvas\PropSource\StaticPropSource::formTemporaryRemoveThisExclamationExclamationExclamation()
+    $entity_object_for_field_widget = match (TRUE) {
+      $entity instanceof FieldableEntityInterface => $entity,
+      $entity instanceof ContentTemplate => $entity->createEmptyTargetEntity(),
+      default => throw new \LogicException(),
+    };
+
+    // Allow form alterations specific to Canvas component instance forms
+    // (currently only "static prop sources").
     $form_state->set('is_canvas_static_prop_source', TRUE);
 
+    assert(isset($settings['prop_field_definitions']));
     $prop_field_definitions = $settings['prop_field_definitions'];
-    $default_prop_sources = $this->getDefaultExplicitInput();
 
-    // To ensure the order of the fields always matches the order of the schema
-    // we loop over the properties from the schema, but first we have to
-    // exclude props that aren't storable.
-    foreach (PropShape::getComponentProps($component_plugin) as $component_prop_expression => $prop_shape) {
-      $storable_prop_shape = $prop_shape->getStorage();
-      // @todo Remove this once every SDC prop shape can be stored. See PropShapeRepositoryTest::getExpectedUnstorablePropShapes()
-      // @todo Create a status report that lists which SDC prop shapes are not storable.
-      if (!$storable_prop_shape) {
-        continue;
+    // The Component config entity's prop_field_definitions:
+    // - contains all the metadata needed to construct a static prop source
+    // - tracks for each whether it is required
+    // Hence this method (in the critical path for Canvas' UI) is relying only
+    // on a config load.
+    // (⚠️And for the very special, test-only "all-props" Component, it already
+    // does not include props that Canvas does not yet know to store. For any
+    // other component, not knowing how to store >=1 prop would result in no
+    // Component config entity being created!)
+    foreach ($prop_field_definitions as $sdc_prop_name => $static_prop_source_field_definition) {
+      // Uncollapse if set; otherwise fall back to the default static prop
+      // source, but *made empty* instead of the default value.
+      // Note that ::clientModelToInput() guarantees $inputValues contains a
+      // value for every required prop, even when a required property is allowed
+      // to be empty during editing for improved usability.
+      // @see ::getDefaultExplicitInput()
+      // @see ::clientModelToInput()
+      // @see https://www.drupal.org/i/3529788
+      assert(array_key_exists($sdc_prop_name, $inputValues) || !in_array($sdc_prop_name, $this->getExplicitInputDefinitions()['required'], TRUE));
+      $source = $this->uncollapse($inputValues[$sdc_prop_name] ?? NULL, $sdc_prop_name);
+      // Any component instance with props populated with a StaticPropSource
+      // MUST use the StaticPropSource shape stored in the Component version. If
+      // it does not, it is corrupt. Rather than building a potentially broken
+      // form, abort and inform the user.
+      $default_static_source = $this->getDefaultStaticPropSource($sdc_prop_name, FALSE);
+      if ($source instanceof StaticPropSource && !$source->hasSameShapeAs($default_static_source)) {
+        throw new NotAcceptableHttpException(sprintf(
+          "Corrupted component instance detected: an instance of the %s Component (version %s) is being populated using a deviating storage shape for the %s prop. Manually recreate this component in the UI to resolve this.",
+          $component->id(),
+          $component->getActiveVersion(),
+          $sdc_prop_name,
+        ));
       }
-
-      $component_prop = ComponentPropExpression::fromString($component_prop_expression);
-      $sdc_prop_name = $component_prop->propName;
-      $source = $this->uncollapse($client_model[$sdc_prop_name] ?? $default_prop_sources[$sdc_prop_name], $sdc_prop_name);
       $disabled = FALSE;
-      $label_suffix = '';
+      $linked_prop_source = ($source instanceof DynamicPropSource || $source instanceof HostEntityUrlPropSource) ? $source : NULL;
       if (!$source instanceof StaticPropSource) {
         // @todo Build DynamicPropSource UX in https://www.drupal.org/i/3541037. Related: https://www.drupal.org/project/canvas/issues/3459234
         // @todo Design is undefined for the AdaptedPropSource UX.
-        // Fall back to the static version, disabled for now where the design is undefined.
+        // Fall back to the static version, disabled for now where the design is
+        // undefined.
         $disabled = !$source instanceof DefaultRelativeUrlPropSource;
-        if ($source instanceof DynamicPropSource) {
-          $label_suffix = sprintf(" — ⚠️ DISABLED because this prop is actually populated by a DynamicPropSource (%s)", $source->toArray()['expression']);
-        }
-        $source = $this->getDefaultStaticPropSource($sdc_prop_name);
+        $source = $default_static_source;
       }
 
       // 1. If the given static prop source matches the *current* field type
@@ -537,16 +695,51 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       // 2. Worst case: fall back to the default widget for this field type.
       // @todo Implement 2. in https://www.drupal.org/project/canvas/issues/3463996
       $field_widget_plugin_id = NULL;
-      if ($source->getSourceType() === 'static:field_item:' . $prop_field_definitions[$sdc_prop_name]['field_type']) {
-        $field_widget_plugin_id = $prop_field_definitions[$sdc_prop_name]['field_widget'];
+      if ($source->getSourceType() === 'static:field_item:' . $static_prop_source_field_definition['field_type']) {
+        $field_widget_plugin_id = $static_prop_source_field_definition['field_widget'];
       }
-      assert(isset($component_schema['properties'][$sdc_prop_name]['title']));
-      $label = $component_schema['properties'][$sdc_prop_name]['title'];
-      assert($component instanceof Component);
-      $widget = $source->getWidget($component->id(), $component->getLoadedVersion(), $sdc_prop_name, $label . $label_suffix, $field_widget_plugin_id);
-      $is_required = isset($component_schema['required']) && in_array($sdc_prop_name, $component_schema['required'], TRUE);
-      $form[$sdc_prop_name] = $source->formTemporaryRemoveThisExclamationExclamationExclamation($widget, $sdc_prop_name, $is_required, $entity, $form, $form_state);
+      $label = $component_schema['properties'][$sdc_prop_name]['title'] ?? Unicode::ucfirst($sdc_prop_name);
+      $description = $component_schema['properties'][$sdc_prop_name]['description'] ?? NULL;
+      $widget = $source->getWidget($component->id(), $component->getLoadedVersion(), $sdc_prop_name, $label, $field_widget_plugin_id, $description);
+      $is_required = $static_prop_source_field_definition['required'];
+      $form[$sdc_prop_name] = $source->formTemporaryRemoveThisExclamationExclamationExclamation($widget, $sdc_prop_name, $is_required, $entity_object_for_field_widget, $form, $form_state);
       $form[$sdc_prop_name]['#disabled'] = $disabled;
+
+      if ($entity instanceof ContentTemplate) {
+        $suggestions = PropSourceSuggester::structureSuggestionsForHierarchicalResponse($this->propSourceSuggester->suggest(
+          $this->getSourceSpecificComponentId(),
+          $this->getMetadata(),
+          $entity->getTargetEntityDataDefinition(),
+        ));
+        $could_use_dynamic_prop_source = !empty($suggestions[$sdc_prop_name]);
+
+        // If the prop is already linked, replace the widget entirely. The
+        // replacement will show the linker by the field label, and replace the
+        // form elements with a linked field badge.
+        if ($linked_prop_source) {
+          // This full replacement of the widget ensures that the resulting form
+          // has consistent and valid html, regardless of field type and widget.
+          $form[$sdc_prop_name]['widget'] = [
+            '#type' => 'linked_prop_source',
+            '#sdc_prop_name' => $sdc_prop_name,
+            '#sdc_prop_label' => $label,
+            '#linked_prop_source' => $linked_prop_source,
+            '#field_link_suggestions' => $suggestions[$sdc_prop_name],
+            '#description' => $component_schema['properties'][$sdc_prop_name]['description'] ?? NULL,
+            '#is_required' => $is_required,
+          ];
+        }
+        // If the prop can be linked, but isn't yet, add attributes that will
+        // result in the prop linker appearing next to the field label.
+        elseif ($could_use_dynamic_prop_source) {
+          $form[$sdc_prop_name]['widget']['#prop_link_data'] = [
+            'linked' => FALSE,
+            'prop_name' => $form[$sdc_prop_name]['widget']['#field_name'],
+            'description' => $component_schema['properties'][$sdc_prop_name]['description'] ?? NULL,
+            'suggestions' => $suggestions[$sdc_prop_name],
+          ];
+        }
+      }
 
       $widget_definition = $this->fieldWidgetPluginManager->getDefinition($widget->getPluginId());
       if (\array_key_exists('canvas', $widget_definition) && \array_key_exists('transforms', $widget_definition['canvas'])) {
@@ -556,37 +749,72 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
         throw new \LogicException(sprintf(
           "Drupal Canvas determined the `%s` field widget plugin must be used to populate the `%s` prop on the `%s` component. However, no `canvas.transforms` metadata is defined on the field widget plugin definition. This makes it impossible for this widget to work. Please define the missing metadata. See %s for guidance.",
           $field_widget_plugin_id,
-          $component_plugin->getPluginId(),
+          $this->getSourceSpecificComponentId(),
           $sdc_prop_name,
           'https://git.drupalcode.org/project/canvas/-/raw/0.x/canvas.api.php?ref_type=heads',
         ));
       }
     }
     $form['#attached']['canvas-transforms'] = $transforms;
+    if ($entity instanceof ContentTemplate) {
+      $form['#after_build'][] = [static::class, 'moveSuggestionsToLabel'];
+    }
     return $form;
+  }
+
+  public static function moveSuggestionsToLabel(array $element, FormStateInterface $form_state): array {
+    // Recursively traverse elements and add prop_link_data to title attributes
+    static::processElementTreeLinkerLabels($element);
+    return $element;
+  }
+
+  /**
+   * Recursively processes the element so labels get link suggestion data.
+   *
+   * @param array $element
+   *   The form element to process.
+   * @param array $propLinkData
+   *   Prop link data from a parent element to pass down.
+   */
+  public static function processElementTreeLinkerLabels(array &$element, array $propLinkData = []): void {
+    // If this element has prop_link_data, use it for this subtree
+    if (!empty($element['#prop_link_data'])) {
+      $propLinkData = $element['#prop_link_data'];
+    }
+
+    // If we have prop link data and this element has a title display, add the
+    // data to label attributes.
+    if (!empty($propLinkData) && isset($element['#title_display'])) {
+      $element['#label_attributes']['prop_link_data'] = $propLinkData;
+    }
+
+    foreach (Element::children($element) as $key) {
+      static::processElementTreeLinkerLabels($element[$key], $propLinkData);
+    }
   }
 
   /**
    * {@inheritdoc}
    */
-  public function getClientSideInfo(ComponentEntity $component): array {
-    $component_plugin = $this->getSdcPlugin();
+  public function getClientSideInfo(Component $component): array {
     $prop_field_definitions = $component->getSettings()['prop_field_definitions'];
+    // The client needs the actual JSON Schema for client-side validation. Hence
+    // it needs richer information than what "prop field definitions" can offer.
+    // Note: the results of this method end up being cached in Dynamic Page
+    // Cache, for the `/canvas/api/v0/config/component` route; this expense is
+    // incurred only when Components change.
+    // @see \Drupal\Tests\canvas\Functional\CanvasConfigEntityHttpApiTest::testComponent()
+    $prop_shapes = GeneratedFieldExplicitInputUxComponentSourceBase::getComponentInputsForMetadata($component->id(), $this->getMetadata());
 
     $field_data = [];
     $default_props_for_default_markup = [];
     $unpopulated_props_for_default_markup = [];
     $transforms = [];
-    foreach (PropShape::getComponentProps($component_plugin) as $component_prop_expression => $prop_shape) {
-      $storable_prop_shape = $prop_shape->getStorage();
-      // @todo Remove this once every SDC prop shape can be stored. See PropShapeRepositoryTest::getExpectedUnstorablePropShapes()
-      // @todo Create a status report that lists which SDC prop shapes are not storable.
-      if (!$storable_prop_shape) {
-        continue;
-      }
-
-      $component_prop = ComponentPropExpression::fromString($component_prop_expression);
-      $prop_name = $component_prop->propName;
+    foreach ($prop_field_definitions as $prop_name => $static_prop_source_field_definition) {
+      $component_prop_expression = new ComponentPropExpression($component->id(), $prop_name);
+      $prop_shape = $prop_shapes[(string) $component_prop_expression];
+      $storable_prop_shape = $this->propShapeRepository->getStorablePropShape($prop_shape);
+      \assert($storable_prop_shape instanceof StorablePropShape);
 
       // Determine the default:
       // - resolved value (used for the preview of the component)
@@ -609,7 +837,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       // stored as the default in the Component config entity is NULL.
       // @see \Drupal\canvas\ComponentMetadataRequirementsChecker
       assert(self::exampleValueRequiresEntity($storable_prop_shape) === ($this->configuration['prop_field_definitions'][$prop_name]['default_value'] === []));
-      $default_source_value = $this->configuration['prop_field_definitions'][$prop_name]['default_value'];
+      $default_source_value = $static_prop_source_field_definition['default_value'];
       $has_default_source_value = match ($default_source_value) {
         // NULL is stored to signal this is an optional SDC prop without an
         // example value.
@@ -628,12 +856,12 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       // - populate the client-side (data) `model`
       // … which in both cases boils down to: "this value is passed directly
       // into the SDC".
-      $default_resolved_value = NULL;
+      $default_resolved = new EvaluationResult(NULL);
       // Use the stored default, if any. This is required for all required SDC
       // props, optional for all optional SDC props.
-      $default_static_prop_source = $this->getDefaultStaticPropSource($prop_name);
+      $default_static_prop_source = $this->getDefaultStaticPropSource($prop_name, TRUE);
       if ($has_default_source_value) {
-        $default_resolved_value = $default_static_prop_source->evaluate(NULL, is_required: FALSE);
+        $default_resolved = $default_static_prop_source->evaluate(NULL, is_required: FALSE);
       }
       // One special case: example values that require a Drupal entity to
       // exist. In these cases (for either required or optional SDC props),
@@ -641,15 +869,18 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       elseif (self::exampleValueRequiresEntity($storable_prop_shape)) {
         // An example may be present in the SDC metadata, it just cannot be
         // mapped to a default value in the prop source.
-        if (isset($component_plugin->metadata->schema['properties'][$prop_name]['examples'][0])) {
-          $default_resolved_value = $component_plugin->metadata->schema['properties'][$prop_name]['examples'][0];
+        if (isset($this->getMetadata()->schema['properties'][$prop_name]['examples'][0])) {
+          $default_resolved = new EvaluationResult(
+            $this->getMetadata()->schema['properties'][$prop_name]['examples'][0],
+            (new CacheableMetadata())->setCacheTags($this->getPluginDefinition()['discoveryCacheTags']),
+          );
         }
       }
 
       // Collect the 'resolved' values for all SDC props, to generate a preview
       // ("default markup").
-      if ($default_resolved_value !== NULL) {
-        $default_props_for_default_markup[$prop_name] = $default_resolved_value;
+      if ($default_resolved->value !== NULL) {
+        $default_props_for_default_markup[$prop_name] = $default_resolved;
       }
       // Track those SDC props without a 'resolved' value (because an example
       // value is missing, which is allowed for optional SDC props), because it
@@ -663,22 +894,23 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       // generate a form.
       // @see \Drupal\canvas\Form\ComponentInstanceForm
       $field_data[$prop_name] = [
-        'required' => in_array($prop_name, $component_plugin->metadata->schema['required'] ?? [], TRUE),
+        'required' => in_array($prop_name, $this->getMetadata()->schema['required'] ?? [], TRUE),
         'jsonSchema' => array_diff_key($prop_shape->resolvedSchema, array_flip(['meta:enum', 'x-translation-context'])),
       ] + \array_diff_key($default_static_prop_source->toArray(), \array_flip(['value']));
-      if ($default_resolved_value !== NULL) {
+      if ($default_resolved->value !== NULL) {
         $field_data[$prop_name]['default_values']['source'] = $default_source_value;
-        $field_data[$prop_name]['default_values']['resolved'] = $default_resolved_value;
+        $field_data[$prop_name]['default_values']['resolved'] = $default_resolved->value;
       }
 
       // Now that the JSON schema is available, generate the final resolved
       // example value (with relative URLs rewritten), if needed for this prop.
-      if (self::exampleValueRequiresEntity($storable_prop_shape) && $default_resolved_value !== NULL) {
-        $default_props_for_default_markup[$prop_name] = $field_data[$prop_name]['default_values']['resolved'] = (new DefaultRelativeUrlPropSource(
-          value: $default_resolved_value,
+      if (self::exampleValueRequiresEntity($storable_prop_shape) && $default_resolved->value !== NULL) {
+        $default_props_for_default_markup[$prop_name] = (new DefaultRelativeUrlPropSource(
+          value: $default_resolved->value,
           jsonSchema: $field_data[$prop_name]['jsonSchema'],
           componentId: $component->id(),
         ))->evaluate(NULL, is_required: FALSE);
+        $field_data[$prop_name]['default_values']['resolved'] = $default_props_for_default_markup[$prop_name]->value;
       }
 
       // Build transforms from widget metadata.
@@ -696,16 +928,21 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
         throw new \LogicException(sprintf(
           "Drupal Canvas determined the `%s` field widget plugin must be used to populate the `%s` prop on the `%s` component. However, no `canvas.transforms` metadata is defined on the field widget plugin definition. This makes it impossible for this widget to work. Please define the missing metadata. See %s for guidance.",
           $field_widget_plugin_id,
-          $component_prop->componentName,
-          $component_prop->propName,
-          'https://git.drupalcode.org/project/canvas/-/raw/0.x/canvas.api.php?ref_type=heads',
+          $component->getComponentSource()->getSourceSpecificComponentId(),
+          $prop_name,
+          'https://git.drupalcode.org/project/canvas/-/raw/1.x/canvas.api.php?ref_type=heads',
         ));
       }
     }
 
     return [
       'source' => (string) $this->getSourceLabel(),
-      'build' => $this->renderComponent([self::EXPLICIT_INPUT_NAME => $default_props_for_default_markup], $component->uuid(), TRUE),
+      'build' => $this->renderComponent(
+        [self::EXPLICIT_INPUT_NAME => $default_props_for_default_markup],
+        $component->getSlotDefinitions(),
+        $component->uuid(),
+        TRUE
+      ),
       // Additional data only needed for SDCs.
       // @todo UI does not use any other metadata - should `slots` move to top level?
       'metadata' => ['slots' => $this->getSlotDefinitions()],
@@ -731,20 +968,22 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
    * @return array<string, array{field_type: string, field_widget: string, expression: string, default_value: mixed, field_storage_settings: array<string, mixed>, field_instance_settings: array<string, mixed>, cardinality?: int}>
    *   The prop settings.
    */
-  public static function getPropsForComponentPlugin(SdcPlugin $component_plugin): array {
+  public static function getPropsForComponentPlugin(ComponentPlugin $component_plugin): array {
     $props = [];
-    foreach (PropShape::getComponentProps($component_plugin) as $cpe_string => $prop_shape) {
+    /** @var \Drupal\canvas\PropShape\PropShapeRepositoryInterface $prop_shape_repository */
+    $prop_shape_repository = \Drupal::service(PropShapeRepositoryInterface::class);
+    foreach (self::getComponentInputsForMetadata($component_plugin->pluginId, $component_plugin->metadata) as $cpe_string => $prop_shape) {
       $cpe = ComponentPropExpression::fromString($cpe_string);
 
-      $storable_prop_shape = $prop_shape->getStorage();
+      $storable_prop_shape = $prop_shape_repository->getStorablePropShape($prop_shape);
       if (is_null($storable_prop_shape)) {
         continue;
       }
 
+      $schema = $component_plugin->metadata->schema ?? [];
       $props[$cpe->propName] = [
-        'field_type' => $storable_prop_shape->fieldTypeProp instanceof ReferenceFieldTypePropExpression
-          ? $storable_prop_shape->fieldTypeProp->referencer->fieldType
-          : $storable_prop_shape->fieldTypeProp->fieldType,
+        'required' => isset($schema['required']) && in_array($cpe->propName, $schema['required'], TRUE),
+        'field_type' => $storable_prop_shape->getFieldType(),
         'field_widget' => $storable_prop_shape->fieldWidget,
         'expression' => (string) $storable_prop_shape->fieldTypeProp,
         'default_value' => self::computeDefaultFieldValue($storable_prop_shape, $component_plugin->metadata, $cpe->propName),
@@ -803,8 +1042,8 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
    * Whether this storable prop shape needs a (referenceable) entity created.
    *
    * TRICKY: SDCs whose storable prop shape uses an entity reference CAN NOT
-   * ever have a default value specified in their corresponding Component config
-   * entity.
+   * ever have a default value specified in their corresponding Component
+   * config entity.
    *
    * It is in fact possible to transform the example value in the SDC into a
    * corresponding real (saved) entity in Drupal, but that would pollute the
@@ -814,8 +1053,8 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
    * To avoid this pollution, we allow such SDC props to not specify a default
    * value for its StorablePropShape stored in the Component config entity.
    * To offer an equivalently smooth experience, with the specified example
-   * value, Canvas instead is able to generate valid values for rendering the SDC
-   * using a transformed-at-runtime relative URL.
+   * value, Canvas instead is able to generate valid values for rendering the
+   * SDC using a transformed-at-runtime relative URL.
    *
    * Typical examples:
    * - an SDC prop accepting an image, i.e.
@@ -825,8 +1064,8 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
    *
    * This is only necessary for URL-shaped props, because URLs must be
    * resolvable (by the browser), and for a relative URL to be resolvable it
-   * must be rewritten for the current site. By contrast, other prop shapes work
-   * in isolation.
+   * must be rewritten for the current site. By contrast, other prop shapes
+   * work in isolation.
    *
    * @see \Drupal\canvas\PropSource\DefaultRelativeUrlPropSource
    * @see \Drupal\canvas\ComponentSource\UrlRewriteInterface
@@ -880,7 +1119,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
   /**
    * {@inheritdoc}
    */
-  public function clientModelToInput(string $component_instance_uuid, ComponentEntity $component, array $client_model, ?FieldableEntityInterface $host_entity, ?ConstraintViolationListInterface $violations = NULL): array {
+  public function clientModelToInput(string $component_instance_uuid, Component $component, array $client_model, ?FieldableEntityInterface $host_entity, ?ConstraintViolationListInterface $violations = NULL): array {
     $props = [];
 
     $required_props = $this->getExplicitInputDefinitions()['required'];
@@ -889,6 +1128,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       // The client should always provide a resolved value when providing a
       // corresponding source but may not.
       $prop_value = $client_model['resolved'][$prop] ?? NULL;
+      $is_static_prop_source = str_starts_with($prop_source['sourceType'] ?? '', PropSource::getTypePrefix(StaticPropSource::class));
       try {
         // TRICKY: this is always set, *except* in the case of an auto-saved
         // code component that just gained a new prop.
@@ -899,10 +1139,10 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
         // `StaticPropSource`. This is true for any example values that must be
         // transformed into browser-resolvable URLs, rather than component
         // -relative URLs: links, image URLs, video URLs, etc.
-        // These example values are used both in Canvas's preview and when rendering
-        // the live site. The Content Author must be given the opportunity to
-        // specify a value different from the example. But both are powered by
-        // different prop sources:
+        // These example values are used both in Canvas's preview and when
+        // rendering the live site. The Content Author must be given the
+        // opportunity to specify a value different from the example. But both
+        // are powered by different prop sources:
         // - actual values specified by the Content Creator are represented in
         //   `StaticPropSource`s
         // - example values (of this very specific nature that a URL rewrite is
@@ -920,15 +1160,17 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
         // In these cases, fall back to `DefaultRelativeUrlPropSource`.
         // @see \Drupal\canvas\PropSource\DefaultRelativeUrlPropSource
         // @see ::exampleValueRequiresEntity()
-        if ($default_source_value === []) {
+        if ($default_source_value === [] && $is_static_prop_source) {
           assert($this->configuration['prop_field_definitions'][$prop]['default_value'] === []);
-          $component_plugin = $this->getSdcPlugin();
-          if (array_key_exists(0, $component_plugin->metadata->schema['properties'][$prop]['examples'] ?? [])) {
+          if (array_key_exists(0, $this->getMetadata()->schema['properties'][$prop]['examples'] ?? [])) {
             // Detect 2 possible `resolved` values from the client model:
             // 1. the empty array
             // 2. an exact match for what's in the client-side info
             // Ignore these and fall back fall back to the example value stored
-            // in the component itself,
+            // in the component itself, but again: only if the user intent is to
+            // populate this using a StaticPropSource: otherwise the default URL
+            // would override the (potentially empty!) resolved value of a
+            // DynamicPropSource.
             // @see ::getClientSideInfo()
             $client_side_info = $this->getClientSideInfo($component);
             \assert(isset($client_side_info['propSources'][$prop]['jsonSchema']));
@@ -941,14 +1183,24 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
 
         // @see PropSourceComponent type-script definition.
         // @see EvaluatedComponentModel type-script definition.
-        // Undo what ::inputToClientModel() did: restore the omitted `'value'`
-        // in cases where it is the same as the source value.
-        if (!\array_key_exists('value', $prop_source)) {
+        // For static props undo what ::inputToClientModel() did: restore the
+        // omitted `'value'` in cases where it is the same as the source value.
+        if ($is_static_prop_source && !\array_key_exists('value', $prop_source)) {
           $prop_source['value'] = $prop_value;
         }
         $source = PropSource::parse($prop_source);
+        if ($source instanceof DynamicPropSource) {
+          if ($host_entity === NULL) {
+            throw new \InvalidArgumentException('A host entity is required to set dynamic prop sources.');
+          }
+          $source->expression->validateSupport($host_entity);
+          $props[$prop] = $this->collapse($source, $prop);
+          continue;
+        }
         // Make sure we can evaluate this prop source with the passed values.
-        $evaluated = $source->evaluate($host_entity, $is_required_prop);
+        // Cacheability does not matter here: requests containing a client model
+        // do not need cached responses: the client model changes rapidly.
+        $evaluated = $source->evaluate($host_entity, $is_required_prop)->value;
 
         // Optional component props that evaluate to NULL can be omitted:
         // storing these would be a waste of storage space.
@@ -959,10 +1211,10 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
         // Required string component props that are completely free-form (so:
         // without a non-zero `minLength`, without a `format` or `pattern`) that
         // evaluate to '' must be retained: while the empty string is NOT
-        // considered a valid value, this is the fallback behavior Canvas opts for
-        // to enhance the user experience: it allows a component to render even
-        // at the point in time where a Content Author has *emptied* the string
-        // input, as they're thinking about what string they do want.
+        // considered a valid value, this is the fallback behavior Canvas opts
+        // for to enhance the user experience: it allows a component to render
+        // even at the point in time where a Content Author has *emptied* the
+        // string input, as they're thinking about what string they do want.
         // ⚠️ This won't work for components whose logic specifically checks for
         // an empty string and refuses to render then.
         // @todo Expand to support multiple-cardinality.
@@ -974,9 +1226,9 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
           assert(!$source instanceof StaticPropSource || ($source->fieldItemList->count() > 0 && $source->fieldItemList->isEmpty()));
         }
         // 💡 Automatically inform developers of missing client-side transforms,
-        // which is the most likely explanation for a value sent by the Canvas UI
-        // not being accepted by the field type. However, gracefully degrade and
-        // log a deprecation error.
+        // which is the most likely explanation for a value sent by the Canvas
+        // UI not being accepted by the field type. However, gracefully degrade
+        // and log a deprecation error.
         // @see https://en.wikipedia.org/wiki/Robustness_principle
         elseif ($source instanceof StaticPropSource && $source->fieldItemList->count() > 0 && $source->fieldItemList->isEmpty()) {
           // @todo Investigate in https://www.drupal.org/project/canvas/issues/3535024, and preferably add extra guardrails and convert this to an exception
@@ -1006,16 +1258,32 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
         // The inputs have already been stored collapsed. Prove using assertions
         // (which does not have a production performance impact).
         assert($this->uncollapse($input, $prop) instanceof StaticPropSource);
-        assert($this->uncollapse($input, $prop)->hasSameShapeAs($this->getDefaultStaticPropSource($prop)));
+        assert($this->uncollapse($input, $prop)->hasSameShapeAs($this->getDefaultStaticPropSource($prop, FALSE)));
         continue;
       }
       // phpcs:ignore
       /** @var PropSourceArray $input */
       $source = PropSource::parse($input);
-      $collapsed_input = $this->collapse($source, $prop);
-      if ($input !== $collapsed_input) {
-        $values[$prop] = $collapsed_input;
+
+      // For static prop sources, the requirements are more strict: to ensure it
+      // is technically viable to provide update paths for component instances
+      // that are populated by StaticPropSources, require every
+      // instance to comply with the default static prop source for the version
+      // of the Component entity that this component instance uses.
+      // @see https://www.drupal.org/i/3463996
+      if ($source instanceof StaticPropSource) {
+        $default_source = $this->getDefaultStaticPropSource($prop, FALSE);
+        if (!$source->hasSameShapeAs($default_source)) {
+          throw new InvalidComponentInputsPropSourceException(sprintf(
+            "The shape of prop %s of component %s has the following shape: '%s', but must match the default, which is '%s'.",
+            $prop,
+            $this->getPluginId() . '.' . $this->getSourceSpecificComponentId(),
+            json_encode(array_diff_key($source->toArray(), array_flip(['value']))),
+            json_encode(array_diff_key($default_source->toArray(), array_flip(['value']))),
+          ));
+        }
       }
+      $values[$prop] = $this->collapse($source, $prop);
     }
     return $values;
   }
@@ -1027,19 +1295,22 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
    * metadata to be known: field type, storage settings, instance settings and
    * expression.
    * When a StaticPropSource is being stored (to populate some component prop),
-   * check if it matches that metadata in the `prop_field_definitions` for this
-   * component instance's referenced version of the Component config entity. If
-   * it does match, all metadata can be omitted, which significantly reduces the
-   * amount of data stored.
+   * it MUST match the metadata in the `prop_field_definitions` for this
+   * component instance's referenced version of the Component config entity.
+   * This significantly reduces the amount of data stored, and increases
+   * consistency, simplifying update paths.
    *
    * @param \Drupal\canvas\PropSource\PropSourceBase $source
    *
-   * @return mixed|PropSourceArray
+   * @return OptimizedExplicitInput|PropSourceArray
    *   Either:
    *   - the collapsed prop source storage representation, which means either a
    *     scalar or an array without a `sourceType` key
    *   - the uncollapsed prop source storage representation, which means this
    *     will be an array with a `sourceType` key.
+   *   Note that EVERY `StaticPropSource` must be collapsed, only other types of
+   *   prop sources (such as `DynamicPropSource` and `HostEntityUrlPropSource`)
+   *   are allowed to be the latter.
    *
    * @see ::uncollapse()
    */
@@ -1047,10 +1318,18 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     // @todo Simplify this to just `if ($source instanceof StaticPropSource && $source->hasSameShapeAs($this->getDefaultStaticPropSource($prop_name))) { return $source->getValue(); }` in https://www.drupal.org/project/canvas/issues/3532414
     if ($source instanceof StaticPropSource) {
       try {
-        $default_source = $this->getDefaultStaticPropSource($prop_name);
-        return $source->hasSameShapeAs($default_source)
-          ? $source->getValue()
-          : $source->toArray();
+        $default_source = $this->getDefaultStaticPropSource($prop_name, FALSE);
+        if (!$source->hasSameShapeAs($default_source)) {
+          throw new \LogicException(sprintf(
+            "The prop %s of component %s has the following static prop source: '%s', but must match the default, which is '%s'. This prop source should be just: '%s'.",
+            $prop_name,
+            $this->getPluginId() . '.' . $this->getSourceSpecificComponentId(),
+            json_encode(array_diff_key($source->toArray(), array_flip(['value']))),
+            json_encode(array_diff_key($default_source->toArray(), array_flip(['value']))),
+            json_encode($source->getValue()),
+          ));
+        }
+        return $source->getValue();
       }
       catch (\OutOfRangeException) {
         // TRICKY: https://www.drupal.org/node/3500386 and its test coverage
@@ -1068,7 +1347,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
   /**
    * Uncollapses a (collapsed or not) prop source.
    *
-   * @param mixed|PropSourceArray $value
+   * @param OptimizedExplicitInput|PropSourceArray $value
    * @param string $prop_name
    *
    * @return \Drupal\canvas\PropSource\PropSourceBase
@@ -1077,7 +1356,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
    */
   private function uncollapse(mixed $value, string $prop_name): PropSourceBase {
     if (!\is_array($value) || !\array_key_exists('sourceType', $value)) {
-      return $this->getDefaultStaticPropSource($prop_name)->withValue($value, allow_empty: TRUE);
+      return $this->getDefaultStaticPropSource($prop_name, validate_prop_name: FALSE)->withValue($value, allow_empty: TRUE);
     }
     // phpcs:ignore
     /** @var PropSourceArray $value */

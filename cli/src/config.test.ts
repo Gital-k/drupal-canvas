@@ -26,7 +26,6 @@ describe('config', () => {
         clientId: '',
         clientSecret: '',
         componentDir: './components',
-        verbose: false,
       });
     });
 
@@ -38,7 +37,7 @@ describe('config', () => {
         clientSecret: '',
         scope: 'canvas:js_component canvas:asset_library',
         componentDir: './components',
-        verbose: false,
+        userAgent: '',
       });
     });
 
@@ -53,7 +52,7 @@ describe('config', () => {
         clientSecret: '',
         scope: 'canvas:js_component canvas:asset_library',
         componentDir: './components',
-        verbose: false,
+        userAgent: '',
       });
     });
   });
@@ -224,7 +223,7 @@ describe('config', () => {
       vi.stubEnv('CANVAS_CLIENT_SECRET', 'test-secret');
       vi.stubEnv('CANVAS_SCOPE', 'canvas:js_component canvas:asset_library');
       vi.stubEnv('CANVAS_COMPONENT_DIR', './test-components');
-      vi.stubEnv('CANVAS_VERBOSE', 'true');
+      vi.stubEnv('CANVAS_USER_AGENT', 'simpletest123456');
 
       // Re-import config to trigger initialization
       const { getConfig } = await import('./config');
@@ -235,7 +234,7 @@ describe('config', () => {
         clientSecret: 'test-secret',
         scope: 'canvas:js_component canvas:asset_library',
         componentDir: './test-components',
-        verbose: true,
+        userAgent: 'simpletest123456',
       });
     });
 
@@ -251,7 +250,7 @@ describe('config', () => {
         clientSecret: '',
         scope: 'canvas:js_component canvas:asset_library',
         componentDir: './components',
-        verbose: false,
+        userAgent: '',
       });
     });
   });

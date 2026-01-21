@@ -643,16 +643,27 @@ Cypress.Commands.add(
 );
 
 Cypress.Commands.add('openLibraryPanel', () => {
-  // Going to Layers and then Library ensures that if the Library is already open the panel won't get closed when clicking the Add button.
-  cy.findByTestId('canvas-side-menu').findByLabelText('Layers').click();
-  cy.findByTestId('canvas-side-menu').findByLabelText('Add').click();
+  cy.findByTestId('canvas-side-menu').findByLabelText('Library').click();
+
+  cy.findByText('Library', { selector: 'h4' }).should(($el) => {
+    expect(
+      $el.length,
+      'openLibraryPanel: Library panel did not open - was it already open?.',
+    ).to.be.greaterThan(0);
+  });
+
   cy.findByTestId('canvas-components-library-loading').should('not.exist');
 });
 
 Cypress.Commands.add('openLayersPanel', () => {
   // Going to Library and then Layers ensures that if Layers is already open the panel won't get closed when clicking the Layers button.
-  cy.findByTestId('canvas-side-menu').findByLabelText('Add').click();
   cy.findByTestId('canvas-side-menu').findByLabelText('Layers').click();
+  cy.findByText('Layers', { selector: 'h4' }).should(($el) => {
+    expect(
+      $el.length,
+      'openLayersPanel: Layers panel did not open - was it already open?.',
+    ).to.be.greaterThan(0);
+  });
 });
 
 /**
@@ -728,14 +739,13 @@ Cypress.Commands.add('recordFormBuildId', { prevSubject: true }, (subject) => {
 });
 
 Cypress.Commands.add(
-  'shouldHaveUpdatedFormBuildId',
-  {
-    prevSubject: true,
-  },
-  (subject, customTimeout) => {
-    cy.wrap(subject, {
+  'selectorShouldHaveUpdatedFormBuildId',
+  (selector, customTimeout) => {
+    cy.get('body', {
       timeout: customTimeout || Cypress.config('defaultCommandTimeout'),
-    }).should((subject) => {
+    }).should((body) => {
+      const subject = body.find(selector);
+      expect(subject).to.exist;
       const newFormBuildId = subject.find('input[name="form_build_id"]').val();
       expect(newFormBuildId).not.to.equal(formBuildId[subject.attr('id')]);
       formBuildId[subject.attr('id')] = newFormBuildId;
@@ -863,6 +873,13 @@ Cypress.Commands.add(
 Cypress.Commands.add(
   'clickComponentInLayersView',
   (componentName, index = 0) => {
+    cy.findByText('Layers', { selector: 'h4' }).should(($el) => {
+      expect(
+        $el.length,
+        'The Layers panel must be open before calling clickComponentInLayersView.',
+      ).to.be.greaterThan(0);
+    });
+
     cy.get('.primaryPanelContent')
       .findAllByLabelText(componentName)
       .eq(index)
@@ -1289,4 +1306,63 @@ Cypress.Commands.add('waitForAjax', () => {
         (instance) => instance && instance.ajaxing === true,
       ),
   );
+});
+
+Cypress.Commands.add('insertComponent', (identifier, options = {}) => {
+  const { id, name } = identifier;
+  const { hasInputs = true } = options;
+
+  cy.findByText('Library', { selector: 'h4' }).should(($el) => {
+    expect(
+      $el.length,
+      'The Library panel must be open before calling insertComponent.',
+    ).to.be.greaterThan(0);
+  });
+
+  let selector, previewSelector;
+  if (id) {
+    selector = `[data-canvas-type="component"][data-canvas-component-id="${id}"]`;
+    previewSelector = `#canvasPreviewOverlay [data-canvas-component-id="${id}"]`;
+  } else if (name) {
+    selector = `[data-canvas-type="component"][data-canvas-name="${name}"]`;
+    previewSelector = `#canvasPreviewOverlay [aria-label="${name}"]`;
+  } else {
+    throw new Error("Either 'id' or 'name' must be provided.");
+  }
+
+  // Count existing instances robustly (even if zero)
+  cy.document().then((doc) => {
+    const initialCount = doc.querySelectorAll(previewSelector).length;
+
+    // Open contextual menu and click Insert
+    cy.get('[data-testid="canvas-primary-panel"]')
+      .find(selector)
+      .trigger('contextmenu');
+
+    cy.findByText('Insert').click();
+    // Assert new instance appears
+    cy.get(previewSelector).should('have.length', initialCount + 1);
+
+    // Ensure the new instance is rendered
+    cy.get(previewSelector)
+      .eq(initialCount) // Get the newly added instance
+      .should('exist');
+
+    // @todo I'm not sure but it seems like some components DON'T have size (e.g. "Canvas test SDC with optional image, without example")
+    // Wait for all instances to have size
+    // cy.get(previewSelector).each(($el) => {
+    //   cy.wrap($el).should(($el) => {
+    //     const rect = $el[0].getBoundingClientRect();
+    //     expect(rect.width).to.be.greaterThan(0);
+    //     expect(rect.height).to.be.greaterThan(0);
+    //   });
+    // });
+
+    // Optionally wait for the component input form to have any html
+    if (hasInputs) {
+      cy.get('form[data-form-id="component_instance_form"]')
+        .should('exist')
+        .should('not.be.empty');
+    }
+  });
 });

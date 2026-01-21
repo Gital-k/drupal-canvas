@@ -6,11 +6,8 @@ namespace Drupal\Tests\canvas\Kernel\Config;
 
 use Drupal\Core\Entity\EntityListBuilderInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
-use Drupal\Core\Theme\ComponentPluginManager as CoreComponentPluginManager;
-use Drupal\canvas\ComponentIncompatibilityReasonRepository;
 use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\canvas\Entity\VersionedConfigEntityInterface;
-use Drupal\canvas\Plugin\ComponentPluginManager;
 use Drupal\canvas\Entity\Component;
 use Drupal\KernelTests\KernelTestBase;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
@@ -18,6 +15,7 @@ use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 
 /**
  * @group canvas
+ * @group canvas_component_sources
  */
 class ComponentTest extends KernelTestBase {
 
@@ -27,9 +25,6 @@ class ComponentTest extends KernelTestBase {
   const MISSING_COMPONENT_ID = 'canvas:missing-component';
   const MISSING_CONFIG_ENTITY_ID = 'sdc.canvas.missing-component';
   const LABEL = 'Test Component';
-
-  protected CoreComponentPluginManager $componentPluginManager;
-  protected ComponentIncompatibilityReasonRepository $repository;
 
   /**
    * {@inheritdoc}
@@ -52,6 +47,7 @@ class ComponentTest extends KernelTestBase {
     'filter',
     'ckeditor5',
     'editor',
+    'datetime',
   ];
 
   /**
@@ -59,9 +55,8 @@ class ComponentTest extends KernelTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
-    $this->componentPluginManager = $this->container->get(ComponentPluginManager::class);
-    $this->repository = $this->container->get(ComponentIncompatibilityReasonRepository::class);
     $this->installConfig('canvas');
+    $this->generateComponentConfig();
   }
 
   protected function midTestSetUp(): void {
@@ -98,12 +93,10 @@ class ComponentTest extends KernelTestBase {
   }
 
   /**
-   * @see media_library_storage_prop_shape_alter()
+   * @see \Drupal\canvas\Hook\ShapeMatchingHooks::mediaLibraryStorablePropShapeAlter()
    * @see \Drupal\Tests\canvas\Kernel\MediaLibraryHookStoragePropAlterTest
    */
   public function testComponentAutoUpdate(): void {
-    $this->assertEmpty(Component::loadMultiple());
-    $this->componentPluginManager->getDefinitions();
     $initial_components = Component::loadMultiple();
     $this->assertNotEmpty($initial_components);
 
@@ -114,7 +107,7 @@ class ComponentTest extends KernelTestBase {
     $this->assertArrayHasKey('sdc.canvas_test_sdc.image', $initial_components);
     $initial_component = $initial_components['sdc.canvas_test_sdc.image'];
     $this->assertSame('image', $initial_component->getSettings()['prop_field_definitions']['image']['field_type']);
-    $initial_expected_version = '5eabbfdb96b39a59';
+    $initial_expected_version = 'f4d1c916802ab8db';
     self::assertSame($initial_expected_version, $initial_component->getActiveVersion());
     self::assertSame([$initial_expected_version], $initial_component->getVersions());
     self::assertSame([
@@ -145,9 +138,9 @@ class ComponentTest extends KernelTestBase {
     $updated_component = Component::load('sdc.canvas_test_sdc.image');
     assert($updated_component instanceof Component);
     $this->assertSame('entity_reference', $updated_component->getSettings()['prop_field_definitions']['image']['field_type']);
-    $updated_expected_version = 'cc9b97c9370aabdf';
-    self::assertSame('cc9b97c9370aabdf', $updated_component->getActiveVersion());
-    self::assertSame(['cc9b97c9370aabdf', '5eabbfdb96b39a59'], $updated_component->getVersions());
+    $updated_expected_version = 'abadf2538ecfdecc';
+    self::assertSame($updated_expected_version, $updated_component->getActiveVersion());
+    self::assertSame([$updated_expected_version, 'f4d1c916802ab8db'], $updated_component->getVersions());
     self::assertSame([
       'config' => [
         'field.field.media.image.field_media_image',
@@ -186,7 +179,7 @@ class ComponentTest extends KernelTestBase {
     // ::calculateDependencies() again causes ::getDependencies() to return only
     // the dependencies of THAT version. ⚠️
     self::assertTrue($updated_component->isLoadedVersionActiveVersion());
-    $updated_component->loadVersion('5eabbfdb96b39a59');
+    $updated_component->loadVersion('f4d1c916802ab8db');
     self::assertFalse($updated_component->isLoadedVersionActiveVersion());
     $this->assertSame('image', $updated_component->getSettings()['prop_field_definitions']['image']['field_type']);
     self::assertSame([
@@ -217,7 +210,7 @@ class ComponentTest extends KernelTestBase {
         'media_library',
       ],
     ], $updated_component->calculateDependencies()->getDependencies());
-    $updated_component->loadVersion('cc9b97c9370aabdf');
+    $updated_component->loadVersion($updated_expected_version);
     self::assertTrue($updated_component->isLoadedVersionActiveVersion());
 
     // Finally, because no component instances exist that use the old version,
@@ -242,10 +235,8 @@ class ComponentTest extends KernelTestBase {
   }
 
   public function testOperations(): void {
-    $this->installConfig('canvas');
     $list_builder = $this->container->get(EntityTypeManagerInterface::class)->getListBuilder(Component::ENTITY_TYPE_ID);
     \assert($list_builder instanceof EntityListBuilderInterface);
-    $this->componentPluginManager->getDefinitions();
     $component = Component::load('sdc.canvas_test_sdc.image');
     \assert($component instanceof ComponentInterface);
     $operations = $list_builder->getOperations($component);

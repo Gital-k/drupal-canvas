@@ -24,9 +24,26 @@ use Symfony\Component\Validator\ConstraintViolationListInterface;
   id: self::PLUGIN_ID,
   label: new TranslatableMarkup('Fallback'),
   supportsImplicitInputs: FALSE,
+  discovery: FALSE,
 )]
 final class Fallback extends ComponentSourceBase implements ComponentSourceWithSlotsInterface {
   public const string PLUGIN_ID = 'fallback';
+
+  /**
+   * {@inheritdoc}
+   */
+  public function isBroken(): bool {
+    return FALSE;
+  }
+
+  /**
+   * The `fallback` plugin is not required to specify a source-local ID.
+   *
+   * @see config/schema/canvas.schema.yml:canvas.component_source_settings.fallback
+   */
+  public function getSourceSpecificComponentId(): string {
+    return '';
+  }
 
   public function defaultConfiguration(): array {
     return parent::defaultConfiguration() + ['slots' => []];
@@ -40,7 +57,7 @@ final class Fallback extends ComponentSourceBase implements ComponentSourceWithS
     return new TranslatableMarkup('Fallback');
   }
 
-  public function renderComponent(array $inputs, string $componentUuid, bool $isPreview): array {
+  public function renderComponent(array $inputs, array $slot_definitions, string $componentUuid, bool $isPreview): array {
     return [
       '#type' => 'inline_template',
       '#template' => '<div data-fallback="{{ component_uuid }}"></div>',
@@ -48,8 +65,8 @@ final class Fallback extends ComponentSourceBase implements ComponentSourceWithS
         'component_uuid' => $componentUuid,
         // Ensure our Twig node visitor can emit the required HTML comments
         // that allow the preview overlay to work.
-        // @see \Drupal\canvas\Extension\CanvasWrapperNode
-        // @see \Drupal\canvas\Extension\CanvasPropVisitor::enterNode
+        // @see \Drupal\canvas\Twig\CanvasWrapperNode
+        // @see \Drupal\canvas\Twig\CanvasPropVisitor::enterNode
         'canvas_uuid' => $componentUuid,
         'canvas_is_preview' => $isPreview,
       ],
@@ -78,9 +95,9 @@ final class Fallback extends ComponentSourceBase implements ComponentSourceWithS
     return $item->getInputs() ?? [];
   }
 
-  public function hydrateComponent(array $explicit_input): array {
+  public function hydrateComponent(array $explicit_input, array $slot_definitions): array {
     return [
-      'slots' => array_map(fn($slot) => $slot['examples'][0] ?? '', $this->getSlotDefinitions()),
+      'slots' => array_map(fn($slot) => $slot['examples'][0] ?? '', $slot_definitions),
     ];
   }
 
@@ -92,23 +109,26 @@ final class Fallback extends ComponentSourceBase implements ComponentSourceWithS
   public function getClientSideInfo(Component $component): array {
     return [
       'source' => (string) new TranslatableMarkup('Fallback component'),
-      'build' => $this->renderComponent([], $component->uuid(), FALSE),
+      'build' => $this->renderComponent([], $component->getSlotDefinitions(), $component->uuid(), FALSE),
       'metadata' => ['slots' => $this->getSlotDefinitions()],
       'field_data' => [],
       'transforms' => [],
     ];
   }
 
-  public function buildComponentInstanceForm(array $form, FormStateInterface $form_state, ?Component $component = NULL, string $component_instance_uuid = '', array $client_model = [], ?EntityInterface $entity = NULL, array $settings = []): array {
+  public function buildComponentInstanceForm(array $form, FormStateInterface $form_state, Component $component, string $component_instance_uuid = '', array $inputValues = [], ?EntityInterface $entity = NULL, array $settings = []): array {
     // @todo Improve this in https://drupal.org/i/3524299.
     $form['warning'] = [
       '#type' => 'html_tag',
       '#tag' => 'strong',
-      '#value' => $this->t('Component has been deleted. Copy values to new component.'),
+      '#value' =>
+      $this->configuration['fallback_reason'] ??
+      $this->t('Component has been deleted. Copy values to new component.'),
     ];
+    ksort($inputValues);
     $form['input'] = [
       '#type' => 'textarea',
-      '#value' => \json_encode($client_model, \JSON_PRETTY_PRINT & \JSON_THROW_ON_ERROR),
+      '#value' => \json_encode($inputValues, \JSON_PRETTY_PRINT & \JSON_THROW_ON_ERROR),
       '#disabled' => TRUE,
       '#title' => $this->t('Previously stored input'),
     ];
@@ -117,7 +137,6 @@ final class Fallback extends ComponentSourceBase implements ComponentSourceWithS
 
   public function clientModelToInput(string $component_instance_uuid, Component $component, array $client_model, ?FieldableEntityInterface $host_entity, ?ConstraintViolationListInterface $violations = NULL): array {
     // Just keep things as is.
-    // @phpstan-ignore-next-line Array shape here is unknown.
     return $client_model;
   }
 
@@ -154,8 +173,8 @@ final class Fallback extends ComponentSourceBase implements ComponentSourceWithS
     $build['#context'] += $slots;
     $slot_names = \array_keys($slots);
     // Add the slot ID metadata that triggers the Twig node visitor.
-    // @see \Drupal\canvas\Extension\CanvasWrapperNode
-    // @see \Drupal\canvas\Extension\CanvasPropVisitor::enterNode
+    // @see \Drupal\canvas\Twig\CanvasWrapperNode
+    // @see \Drupal\canvas\Twig\CanvasPropVisitor::enterNode
     $build['#context']['canvas_slot_ids'] = $slot_names;
     $build['#template'] = '<div data-fallback="{{ component_uuid }}">';
     foreach ($slot_names as $slot_name) {
@@ -163,8 +182,8 @@ final class Fallback extends ComponentSourceBase implements ComponentSourceWithS
       $escaped_slot_name = Html::escape((string) $slot_name);
       // Print each slot by name. This ensures our Twig node visitor can emit
       // the required HTML comments that allow the slot overlay to work.
-      // @see \Drupal\canvas\Extension\CanvasWrapperNode
-      // @see \Drupal\canvas\Extension\CanvasPropVisitor::enterNode
+      // @see \Drupal\canvas\Twig\CanvasWrapperNode
+      // @see \Drupal\canvas\Twig\CanvasPropVisitor::enterNode
       $build['#template'] .= \sprintf('{{ %s }}', $escaped_slot_name);
     }
     $build['#template'] .= '</div>';

@@ -15,7 +15,7 @@ test.describe('Basic accessibility', () => {
       const page = await browser.newPage();
       const drupal: Drupal = new Drupal({ page, drupalSite });
       await drupal.installModules(['canvas', 'canvas_test_sdc']);
-      await drupal.createCanvasPage('Homepage', '/homepage');
+      await drupal.createCanvasPage('a11y', '/a11y');
       await page.close();
     },
   );
@@ -35,8 +35,7 @@ test.describe('Basic accessibility', () => {
       'scrollable-region-focusable',
     ];
     await drupal.loginAsAdmin();
-    await page.goto('/homepage');
-    await canvasEditor.goToEditor();
+    await canvasEditor.goToCanvasRoot();
     const editorScan = await new AxeBuilder({ page })
       .disableRules(baseline)
       .analyze();
@@ -44,9 +43,14 @@ test.describe('Basic accessibility', () => {
       body: JSON.stringify(editorScan, null, 2),
       contentType: 'application/json',
     });
-    expect(editorScan.violations).toEqual([]);
+    expect(
+      editorScan.violations,
+      'Canvas root screen to pass a11y check',
+    ).toEqual([]);
 
     // Layers Panel.
+    await page.goto('/a11y');
+    await canvasEditor.goToEditor();
     await canvasEditor.openLayersPanel();
     const layersScan = await new AxeBuilder({ page })
       .disableRules(baseline)
@@ -55,7 +59,9 @@ test.describe('Basic accessibility', () => {
       body: JSON.stringify(layersScan, null, 2),
       contentType: 'application/json',
     });
-    expect(layersScan.violations).toEqual([]);
+    expect(layersScan.violations, 'Layers panel to pass a11y check').toEqual(
+      [],
+    );
 
     // Library Panel.
     await canvasEditor.openLibraryPanel();
@@ -66,10 +72,12 @@ test.describe('Basic accessibility', () => {
       body: JSON.stringify(libraryScan, null, 2),
       contentType: 'application/json',
     });
-    expect(libraryScan.violations).toEqual([]);
+    expect(libraryScan.violations, 'Library panel to pass a11y check').toEqual(
+      [],
+    );
 
     // Props Panel.
-    canvasEditor.addComponent({ id: 'sdc.canvas_test_sdc.my-hero' });
+    await canvasEditor.addComponent({ id: 'sdc.canvas_test_sdc.my-hero' });
     const propsScan = await new AxeBuilder({ page })
       .disableRules(baseline)
       .analyze();
@@ -77,6 +85,9 @@ test.describe('Basic accessibility', () => {
       body: JSON.stringify(libraryScan, null, 2),
       contentType: 'application/json',
     });
-    expect(propsScan.violations).toEqual([]);
+    expect(
+      propsScan.violations,
+      'Component instance form to pass a11y check',
+    ).toEqual([]);
   });
 });

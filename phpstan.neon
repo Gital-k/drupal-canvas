@@ -1,5 +1,8 @@
 parameters:
   level: 8
+  strictRules:
+    allRules: false
+    strictFunctionCalls: true
   fileExtensions:
     - php
     - module
@@ -16,7 +19,6 @@ parameters:
     - src/TypedData/BetterEntityDataDefinition.php
     # This trait decorates core's \Drupal\Core\Test\FunctionalTestSetupTrait::prepareSettings(), which itself triggers a PHPStan warning that core ignores. Match that.
     - tests/src/Traits/ContribStrictConfigSchemaTestTrait.php
-    - scripts/src/ConverterCommand.php
   treatPhpDocTypesAsCertain: false
   drupal:
     entityMapping:
@@ -40,7 +42,27 @@ parameters:
     # Ignore invalid phpunit methods/covers
     # @todo Remove in https://drupal.org/i/3533845
     - identifier: phpunit.coversMethod
+    # PHPStan finds many false positives for this, specifically when using the DIC or Typed Data.
+    - identifier: varTag.type
+    -
+      identifier: deadCode.unreachable
+      path: tests/src/Kernel/Plugin/Canvas/ComponentSource/JsComponentEvolutionTest.php
     - identifier: phpunit.covers
+    -
+      message: '#^Access to an undefined property object\:\:\$data\.$#'
+      identifier: property.notFound
+      count: 1
+      path: canvas.post_update.php
+    -
+      message: '#^Access to an undefined property object\:\:\$owner\.$#'
+      identifier: property.notFound
+      count: 1
+      path: canvas.post_update.php
+    -
+      message: '#^Access to an undefined property object\:\:\$updated\.$#'
+      identifier: property.notFound
+      count: 1
+      path: canvas.post_update.php
     -
       message: "#^Class .* extends @internal class#"
       count: 1
@@ -50,12 +72,43 @@ parameters:
       count: 1
       path: src/PropSource/StaticPropSource.php
     -
-      messages:
-        - "#^Missing cache backend declaration for performance\\.$#"
-      paths:
-        - src/Plugin/BlockManager.php
-        - src/Plugin/ComponentPluginManager.php
-    -
       message: "#^Method Drupal\\\\canvas\\\\Entity\\\\Pattern\\:\\:preCreate\\(\\) has no return type specified\\.$#"
       count: 1
       path: src/Entity/Pattern.php
+    # The following ignores can be removed when we depend on Drupal 11.3 or later.
+    -
+      message: "#^Class Drupal\\\\Core\\\\DefaultContent\\\\PreExportEvent not found\\.$#"
+      count: 1
+      path: src/EventSubscriber/DefaultContentSubscriber.php
+    -
+      message: "#^Parameter \\$event of method Drupal\\\\canvas\\\\EventSubscriber\\\\DefaultContentSubscriber\\:\\:preExport\\(\\) has invalid type Drupal\\\\Core\\\\DefaultContent\\\\PreExportEvent\\.$#"
+      count: 1
+      path: src/EventSubscriber/DefaultContentSubscriber.php
+    -
+      message: "#^Call to method setCallback\\(\\) on an unknown class Drupal\\\\Core\\\\DefaultContent\\\\PreExportEvent\\.$#"
+      count: 1
+      path: src/EventSubscriber/DefaultContentSubscriber.php
+    -
+      message: "#^Parameter \\$metadata of anonymous function has invalid type Drupal\\\\Core\\\\DefaultContent\\\\ExportMetadata\\.$#"
+      count: 1
+      path: src/EventSubscriber/DefaultContentSubscriber.php
+    -
+      message: "#^Call to method addDependency\\(\\) on an unknown class Drupal\\\\Core\\\\DefaultContent\\\\ExportMetadata\\.$#"
+      count: 1
+      path: src/EventSubscriber/DefaultContentSubscriber.php
+    -
+      message: "#^Class Drupal\\\\Core\\\\DefaultContent\\\\PreEntityImportEvent not found\\.$#"
+      count: 1
+      path: src/EventSubscriber/DefaultContentSubscriber.php
+    -
+      message: "#^Parameter \\$event of method Drupal\\\\canvas\\\\EventSubscriber\\\\DefaultContentSubscriber\\:\\:preEntityImport\\(\\) has invalid type Drupal\\\\Core\\\\DefaultContent\\\\PreEntityImportEvent\\.$#"
+      count: 1
+      path: src/EventSubscriber/DefaultContentSubscriber.php
+    -
+      message: "#^Access to property \\$metadata on an unknown class Drupal\\\\Core\\\\DefaultContent\\\\PreEntityImportEvent\\.$#"
+      count: 4
+      path: src/EventSubscriber/DefaultContentSubscriber.php
+    -
+      message: "#^Access to property \\$data on an unknown class Drupal\\\\Core\\\\DefaultContent\\\\PreEntityImportEvent\\.$#"
+      count: 1
+      path: src/EventSubscriber/DefaultContentSubscriber.php

@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Config\Schema;
 
+use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaStringFormat;
+use Drupal\canvas\Plugin\Validation\Constraint\UriConstraint;
+use Drupal\canvas\Plugin\Validation\Constraint\UriSchemeConstraint;
 use Drupal\Core\Config\Schema\Mapping;
 use Drupal\Core\TypedData\DataDefinitionInterface;
 use Drupal\Core\TypedData\MapDataDefinition;
@@ -38,13 +41,13 @@ final class JsonSchemaObject extends Mapping {
     foreach ($schema['properties'] as $property_name => $detail) {
       if (\array_key_exists('$ref', $detail)) {
         $prop_schema = \json_decode(\file_get_contents($detail['$ref']) ?: '{}', TRUE, \JSON_THROW_ON_ERROR);
-        if (!\in_array($prop_schema['type'] ?? NULL, $supported_property_types)) {
+        if (!\in_array($prop_schema['type'] ?? NULL, $supported_property_types, TRUE)) {
           throw new \LogicException(sprintf("The schema definition at `%s` is invalid: the parent '\$ref' property contains a '%s' property that uses an unsupported config schema type '%s'. This is not supported.", $parent?->getPropertyPath() ?? $name, $property_name, $prop_schema['type'] ?? 'unknown'));
         }
         // Resolve the $ref.
         $detail += $prop_schema;
       }
-      if (!\in_array($detail['type'], $supported_property_types)) {
+      if (!\in_array($detail['type'], $supported_property_types, TRUE)) {
         throw new \LogicException(sprintf("The schema definition at `%s` is invalid: the parent '\$ref' property contains a '%s' property that uses an unsupported config schema type '%s'. This is not supported.", $parent?->getPropertyPath() ?? $name, $property_name, $detail['type']));
       }
       $definition['mapping'][$property_name] = [
@@ -59,6 +62,19 @@ final class JsonSchemaObject extends Mapping {
           'pattern' => \sprintf('@%s@', $detail['pattern']),
           'message' => '%value does not match the pattern %pattern.',
         ];
+      }
+      if ($detail['type'] === 'string' && \array_key_exists('format', $detail)) {
+        // @see \Drupal\canvas\JsonSchemaInterpreter\JsonSchemaStringFormat::toDataTypeShapeRequirements()
+        if (in_array($detail['format'], [JsonSchemaStringFormat::Iri->value, JsonSchemaStringFormat::IriReference->value, JsonSchemaStringFormat::Uri->value, JsonSchemaStringFormat::UriReference->value], TRUE)) {
+          $definition['mapping'][$property_name]['constraints'][UriConstraint::PLUGIN_ID] = [
+            'allowReferences' => in_array($detail['format'], [JsonSchemaStringFormat::IriReference->value, JsonSchemaStringFormat::UriReference->value], TRUE),
+          ];
+          if (array_key_exists('x-allowed-schemes', $detail)) {
+            $definition['mapping'][$property_name]['constraints'][UriSchemeConstraint::PLUGIN_ID] = [
+              'allowedSchemes' => $detail['x-allowed-schemes'],
+            ];
+          }
+        }
       }
       if (\array_key_exists('enum', $detail)) {
         $definition['mapping'][$property_name]['constraints']['Choice'] = ['choices' => $detail['enum']];

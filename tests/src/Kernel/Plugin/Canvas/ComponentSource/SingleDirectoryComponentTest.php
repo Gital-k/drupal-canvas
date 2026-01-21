@@ -4,16 +4,20 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource;
 
+use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponentDiscovery;
+use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
+use Drupal\Core\Cache\Cache;
 use Drupal\Core\Cache\CacheableMetadata;
+use Drupal\Core\DependencyInjection\ContainerBuilder;
 use Drupal\Core\Extension\ExtensionPathResolver;
 use Drupal\Core\Extension\ModuleExtensionList;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\Core\File\FileExists;
 use Drupal\Core\File\FileSystemInterface;
+use Drupal\Core\GeneratedUrl;
 use Drupal\Core\Site\Settings;
 use Drupal\Core\StreamWrapper\PublicStream;
-use Drupal\Core\Theme\ComponentPluginManager;
 use Drupal\canvas\Entity\Component;
 use Drupal\Core\Plugin\Component as SdcPlugin;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase;
@@ -21,42 +25,49 @@ use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
-use Drupal\canvas\PropExpressions\StructuredData\FieldTypePropExpression;
 use Drupal\canvas\PropSource\PropSource;
 use Drupal\canvas\PropSource\StaticPropSource;
+use Drupal\datetime\Plugin\Field\FieldType\DateTimeItem;
 use Drupal\file\Entity\File;
+use Drupal\link\LinkItemInterface;
 use Drupal\media\Entity\Media;
 use Drupal\media\Entity\MediaType;
 use Drupal\node\Entity\Node;
+use Drupal\node\Entity\NodeType;
+use Drupal\Tests\canvas\Kernel\BrokenComponentManager;
+use Drupal\Tests\canvas\Kernel\BrokenPluginManagerInterface;
 use Drupal\Tests\canvas\Kernel\Traits\CiModulePathTrait;
 use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
 use Drupal\Tests\canvas\Traits\SingleDirectoryComponentTreeTestTrait;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
-use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\canvas\Traits\CrawlerTrait;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
 use Drupal\Tests\node\Traits\ContentTypeCreationTrait;
 use Drupal\Tests\TestFileCreationTrait;
+use Drupal\Tests\user\Traits\UserCreationTrait;
 use Twig\Error\Error;
 use Twig\Error\RuntimeError;
 use Twig\Error\SyntaxError;
 
 /**
  * @coversDefaultClass \Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent
+ * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponentDiscovery
  * @group canvas
+ * @group canvas_component_sources
  * @phpstan-import-type ComponentConfigEntityId from \Drupal\canvas\Entity\Component
+ * @phpstan-import-type SingleComponentInputArray from \Drupal\canvas\Plugin\DataType\ComponentInputs
  */
-final class SingleDirectoryComponentTest extends ComponentSourceTestBase {
+final class SingleDirectoryComponentTest extends GeneratedFieldExplicitInputUxComponentSourceBaseTestBase {
 
   use ConstraintViolationsTestTrait;
   use ContribStrictConfigSchemaTestTrait;
   use SingleDirectoryComponentTreeTestTrait;
-  use GenerateComponentConfigTrait;
   use CiModulePathTrait;
   use CrawlerTrait;
   use MediaTypeCreationTrait;
   use TestFileCreationTrait;
   use ContentTypeCreationTrait;
+  use UserCreationTrait;
 
   /**
    * {@inheritdoc}
@@ -71,6 +82,11 @@ final class SingleDirectoryComponentTest extends ComponentSourceTestBase {
     'field',
     'text',
   ];
+
+  /**
+   * @see ::testRenderSdcWithOptionalObjectShape())
+   */
+  protected string $componentWithOptionalImageProp = 'sdc.canvas_test_sdc.image-optional-with-example-and-additional-prop';
 
   /**
    * Setup tests.
@@ -96,6 +112,8 @@ final class SingleDirectoryComponentTest extends ComponentSourceTestBase {
     $directory = 'public://';
     $file_system->prepareDirectory($directory, FileSystemInterface::CREATE_DIRECTORY);
     $file_system->copy($source, $destination, FileExists::Replace);
+
+    $this->container->get('theme_installer')->install(['sdc_theme_test']);
   }
 
   /**
@@ -111,24 +129,22 @@ final class SingleDirectoryComponentTest extends ComponentSourceTestBase {
   /**
    * All test module SDCs must either have a Component or a reason why not.
    *
-   * @covers ::checkRequirements()
-   * @covers \Drupal\canvas\Plugin\ComponentPluginManager::setCachedDefinitions()
+   * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponentDiscovery::discover()
+   * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponentDiscovery::checkRequirements()
    */
   public function testDiscovery(): array {
     // Nothing discovered initially.
     self::assertSame([], $this->findIneligibleComponents(SingleDirectoryComponent::SOURCE_PLUGIN_ID, 'canvas_test_sdc'));
     self::assertSame([], $this->findCreatedComponentConfigEntities(SingleDirectoryComponent::SOURCE_PLUGIN_ID, 'canvas_test_sdc'));
 
+    self::assertSame([], $this->findIneligibleComponents(SingleDirectoryComponent::SOURCE_PLUGIN_ID, 'sdc_theme_test'));
+    self::assertSame([], $this->findCreatedComponentConfigEntities(SingleDirectoryComponent::SOURCE_PLUGIN_ID, 'sdc_theme_test'));
+
     // Trigger component generation, as if the test module was just installed.
     // (Kernel tests don't trigger all hooks that are triggered in reality.)
     $this->generateComponentConfig();
 
     self::assertSame([
-      'sdc.canvas_test_sdc.component-mismatch-meta-enum' => [
-        'The "meta:enum" keys for the "style" prop enum cannot contain a dot. Offending key: "contains.dots"',
-        'The "meta:enum" keys for the "numbers" prop enum cannot contain a dot. Offending key: "3.14"',
-        'The values for the "numbers" prop enum must be defined in "meta:enum". Missing keys: "3_14"',
-      ],
       'sdc.canvas_test_sdc.empty-enum' => [
         'Prop "pets" has an empty enum value.',
       ],
@@ -146,15 +162,15 @@ final class SingleDirectoryComponentTest extends ComponentSourceTestBase {
         // because its purpose is to test the ability for components to opt in
         // to consuming additional computed properties on a field instance.
         // See the `the image-srcset-candidate-template-uri component` test case
-        // in FieldForComponentSuggesterTest.
-        // @see \Drupal\Tests\canvas\Kernel\FieldForComponentSuggesterTest
+        // in PropSourceSuggesterTest.
+        // @see \Drupal\Tests\canvas\Kernel\PropSourceSuggesterTest
         'Drupal Canvas does not know of a field type/widget to allow populating the <code>srcSetCandidateTemplate</code> prop, with the shape <code>{"type":"string","format":"uri-template","x-required-variables":["width"]}</code>.',
       ],
       'sdc.canvas_test_sdc.obsolete' => [
         'Component has "obsolete" status',
       ],
       'sdc.canvas_test_sdc.props-invalid-shapes' => [
-        'Prop "invalid_shape" is of type "object" without a $ref, which is not supported',
+        'Drupal Canvas does not know of a field type/widget to allow populating the <code>invalid_shape</code> prop, with the shape <code>{"type":"object"}</code>.',
       ],
       'sdc.canvas_test_sdc.props-no-examples' => [
         'Prop "heading" is required, but does not have example value',
@@ -167,6 +183,7 @@ final class SingleDirectoryComponentTest extends ComponentSourceTestBase {
       ],
       'sdc.canvas_test_sdc.shoe_details' => [
         'Drupal Canvas does not know of a field type/widget to allow populating the <code>expand_icon</code> prop, with the shape <code>{"type":"object","$ref":"json-schema-definitions://canvas.module/shoe-icon"}</code>.',
+        'Drupal Canvas does not know of a field type/widget to allow populating the <code>collapse_icon</code> prop, with the shape <code>{"type":"object","$ref":"json-schema-definitions://canvas.module/shoe-icon"}</code>.',
       ],
       'sdc.canvas_test_sdc.shoe_icon' => [
         'Prop "size" has an empty enum value.',
@@ -183,15 +200,26 @@ final class SingleDirectoryComponentTest extends ComponentSourceTestBase {
         'Drupal Canvas does not know of a field type/widget to allow populating the <code>data</code> prop, with the shape <code>{"type":"array","items":{"type":"integer","minimum":-100,"maximum":100},"maxItems":100,"minItems":2}</code>.',
       ],
     ], $this->findIneligibleComponents(SingleDirectoryComponent::SOURCE_PLUGIN_ID, 'canvas_test_sdc'));
-    $auto_created_components = $this->findCreatedComponentConfigEntities(SingleDirectoryComponent::SOURCE_PLUGIN_ID, 'canvas_test_sdc');
+    self::assertSame([
+      'sdc.sdc_theme_test.css-load-order' => ['Prop "dummy" must have title'],
+      'sdc.sdc_theme_test.foo' => ['Prop "prop1" must have title'],
+    ], $this->findIneligibleComponents(SingleDirectoryComponent::SOURCE_PLUGIN_ID, 'sdc_theme_test'));
+    $auto_created_components = [
+      ...$this->findCreatedComponentConfigEntities(SingleDirectoryComponent::SOURCE_PLUGIN_ID, 'canvas_test_sdc'),
+      ...$this->findCreatedComponentConfigEntities(SingleDirectoryComponent::SOURCE_PLUGIN_ID, 'sdc_theme_test'),
+    ];
     self::assertSame([
       'sdc.canvas_test_sdc.attributes',
+      'sdc.canvas_test_sdc.banner',
       'sdc.canvas_test_sdc.card',
       'sdc.canvas_test_sdc.card-with-local-image',
       'sdc.canvas_test_sdc.card-with-remote-image',
       'sdc.canvas_test_sdc.card-with-stream-wrapper-image',
+      'sdc.canvas_test_sdc.columns',
+      'sdc.canvas_test_sdc.component-mismatch-meta-enum',
       'sdc.canvas_test_sdc.component-no-meta-enum',
       'sdc.canvas_test_sdc.crash',
+      'sdc.canvas_test_sdc.date',
       'sdc.canvas_test_sdc.deprecated',
       'sdc.canvas_test_sdc.druplicon',
       'sdc.canvas_test_sdc.experimental',
@@ -203,6 +231,7 @@ final class SingleDirectoryComponentTest extends ComponentSourceTestBase {
       'sdc.canvas_test_sdc.image-optional-with-example-and-additional-prop',
       'sdc.canvas_test_sdc.image-optional-without-example',
       'sdc.canvas_test_sdc.image-required-with-example',
+      'sdc.canvas_test_sdc.image-without-ref',
       'sdc.canvas_test_sdc.my-cta',
       'sdc.canvas_test_sdc.my-hero',
       'sdc.canvas_test_sdc.my-section',
@@ -214,8 +243,13 @@ final class SingleDirectoryComponentTest extends ComponentSourceTestBase {
       'sdc.canvas_test_sdc.shoe_tab_group',
       'sdc.canvas_test_sdc.shoe_tab_panel',
       'sdc.canvas_test_sdc.sparkline',
+      'sdc.canvas_test_sdc.tags',
       'sdc.canvas_test_sdc.two_column',
       'sdc.canvas_test_sdc.video',
+      'sdc.sdc_theme_test.bar',
+      'sdc.sdc_theme_test.lib-overrides',
+      'sdc.sdc_theme_test.my-card',
+      'sdc.sdc_theme_test_base.my-card-no-schema',
     ], $auto_created_components);
 
     return array_combine($auto_created_components, $auto_created_components);
@@ -243,7 +277,7 @@ final class SingleDirectoryComponentTest extends ComponentSourceTestBase {
       $private_method = new \ReflectionMethod($source, 'getDefaultStaticPropSource');
       $private_method->setAccessible(TRUE);
       foreach (array_keys($settings[$component_id]['prop_field_definitions']) as $prop) {
-        $static_prop_source = $private_method->invoke($source, $prop);
+        $static_prop_source = $private_method->invoke($source, $prop, TRUE);
         $this->assertInstanceOf(StaticPropSource::class, $static_prop_source);
       }
     }
@@ -309,12 +343,46 @@ HTML,
           ],
         ],
       ],
+      'sdc.canvas_test_sdc.banner' => [
+        'html' => <<<HTML
+<article class="banner">
+  <header>
+    <h2>My banner title</h2>
+  </header>
+  <div class="container">
+          <div class="image">
+        <img
+   class="banner--image"
+   src="::CANVAS_MODULE_PATH::/tests/modules/canvas_test_sdc/components/banner/balloons.png"
+           alt="Hot air balloons"
+           width="640"
+           height="427"
+      loading="lazy"
+    data-testid="banner-component-image" data-component-id="canvas:image"
+/>
+      </div>
+        <div class="content">
+      <p><p>In a curious work, published in <em>Paris</em> in 1863 by <strong>Delaville Dedreux</strong>, there is a suggestion for reaching the North Pole by an aerostat.</p></p>
+    </div>
+  </div>
+</article>
+
+HTML,
+        'cacheability' => $default_cacheability,
+        'attachments' => [
+          'library' => [
+            'core/components.canvas_test_sdc--banner',
+            'core/components.canvas--image',
+            'core/components.canvas_test_sdc--banner',
+          ],
+        ],
+      ],
       'sdc.canvas_test_sdc.card' => [
         'html' => <<<HTML
 <article class="card">
   <header>
     <h2>Card</h2>
-  </header>
+      </header>
 
   <img
    class="card--image"
@@ -347,7 +415,7 @@ HTML,
 <article class="card--with-local-image">
   <header>
     <h2>Card with local image</h2>
-  </header>
+      </header>
 
   <img
    class="card--image"
@@ -381,7 +449,7 @@ HTML,
 <article class="card--with-remote-image">
   <header>
     <h2>Card with remote image</h2>
-  </header>
+      </header>
 
   <img
    class="card--image"
@@ -592,6 +660,20 @@ HTML,
           ],
         ],
       ],
+      'sdc.canvas_test_sdc.date' => [
+        'html' => '<figure class="date">
+    <time datetime=""></time>
+      <figcaption>Birthday</figcaption>
+  </figure>
+',
+        'cacheability' => $default_cacheability,
+        'attachments' => [
+          'library' => [
+            'core/components.canvas_test_sdc--date',
+            'core/components.canvas_test_sdc--date',
+          ],
+        ],
+      ],
       'sdc.canvas_test_sdc.sparkline' => [
         'html' => '
 
@@ -612,6 +694,21 @@ HTML,
           ],
         ],
       ],
+      'sdc.canvas_test_sdc.tags' => [
+        'html' => '  <div class="tag-list">
+          <span class="tag">foo</span>
+          <span class="tag">bar</span>
+          <span class="tag">baz</span>
+      </div>
+',
+        'cacheability' => $default_cacheability,
+        'attachments' => [
+          'library' => [
+            'core/components.canvas_test_sdc--tags',
+            'core/components.canvas_test_sdc--tags',
+          ],
+        ],
+      ],
       'sdc.canvas_test_sdc.my-cta' => [
         'cacheability' => $default_cacheability,
         'html' => '<a  data-component-id="canvas_test_sdc:my-cta" href="https://www.drupal.org">
@@ -622,6 +719,28 @@ HTML,
           'library' => [
             'core/components.canvas_test_sdc--my-cta',
             'core/components.canvas_test_sdc--my-cta',
+          ],
+        ],
+      ],
+      'sdc.canvas_test_sdc.columns' => [
+        'cacheability' => $default_cacheability,
+        'html' => '<div  data-component-id="canvas_test_sdc:columns"></div>
+',
+        'attachments' => [
+          'library' => [
+            'core/components.canvas_test_sdc--columns',
+            'core/components.canvas_test_sdc--columns',
+          ],
+        ],
+      ],
+      'sdc.canvas_test_sdc.component-mismatch-meta-enum' => [
+        'cacheability' => $default_cacheability,
+        'html' => 'small!
+',
+        'attachments' => [
+          'library' => [
+            'core/components.canvas_test_sdc--component-mismatch-meta-enum',
+            'core/components.canvas_test_sdc--component-mismatch-meta-enum',
           ],
         ],
       ],
@@ -838,6 +957,85 @@ activation="auto">
           ],
         ],
       ],
+      'sdc.sdc_theme_test.bar' => [
+        'html' => <<<'HTML'
+<h1>Bar</h1>
+
+HTML,
+        'cacheability' => $default_cacheability,
+        'attachments' => [
+          'library' => [
+            'core/components.sdc_theme_test--bar',
+            'core/components.sdc_theme_test--bar',
+          ],
+        ],
+      ],
+      'sdc.sdc_theme_test.lib-overrides' => [
+        'html' => 'It works
+',
+        'cacheability' => $default_cacheability,
+        'attachments' => [
+          'library' => [
+            'core/components.sdc_theme_test--lib-overrides',
+            'core/components.sdc_theme_test--lib-overrides',
+          ],
+        ],
+      ],
+      'sdc.sdc_theme_test.my-card' => [
+        'html' => <<<'HTML'
+<div  data-component-id="sdc_theme_test:my-card">
+  <h2 class="component--my-card__header">I am a header!</h2>
+  <div class="component--my-card__body">
+          Default contents for a card
+      </div>
+</div>
+
+HTML
+        ,
+        'cacheability' => $default_cacheability,
+        'attachments' => [
+          'library' => [
+            'core/components.sdc_theme_test--my-card',
+            'core/components.sdc_theme_test--my-card',
+          ],
+        ],
+      ],
+      'sdc.sdc_theme_test_base.my-card-no-schema' => [
+        'html' => <<<'HTML'
+<div  data-component-id="sdc_theme_test_base:my-card-no-schema">
+  <h2 class="component--my-card-no-schema__header"></h2>
+  <div class="component--my-card-no-schema__body">
+          Default contents for a card
+      </div>
+</div>
+
+HTML
+        ,
+        'cacheability' => $default_cacheability,
+        'attachments' => [
+          'library' => [
+            'core/components.sdc_theme_test_base--my-card-no-schema',
+            'core/components.sdc_theme_test_base--my-card-no-schema',
+          ],
+        ],
+      ],
+
+      'sdc.canvas_test_sdc.image-without-ref' => [
+        'html' => '<div class="inline-image-test">
+  <img src="https://example.com/image.png"
+       alt="Alternative text"
+       width="800"
+       height="600">
+</div>
+',
+        'cacheability' => $default_cacheability,
+        'attachments' => [
+          'library' => [
+            'core/components.canvas_test_sdc--image-without-ref',
+            'core/components.canvas_test_sdc--image-without-ref',
+          ],
+        ],
+      ],
     ], $rendered);
   }
 
@@ -845,37 +1043,64 @@ activation="auto">
    * Tests that relative file URLs are rewritten to reference the correct file path.
    */
   public function testRewriteExampleUrl(): void {
-    $plugin = \Drupal::service(ComponentPluginManager::class)->createInstance('canvas_test_sdc:image');
-    $component = SingleDirectoryComponent::createConfigEntity($plugin);
+    $this->generateComponentConfig();
+    $component = Component::load(SingleDirectoryComponentDiscovery::getComponentConfigEntityId('canvas_test_sdc:image'));
+    self::assertNotNull($component);
     $source = $component->getComponentSource();
     self::assertInstanceOf(SingleDirectoryComponent::class, $source);
     // Assert that existing files are rewritten to include the module path.
     $canvas_test_sdc_module_path = \Drupal::service(ModuleExtensionList::class)->getPath('canvas_test_sdc');
 
-    self::assertStringEndsWith($canvas_test_sdc_module_path . '/components/image/600x400.png', $source->rewriteExampleUrl('600x400.png'));
-    self::assertStringEndsWith($canvas_test_sdc_module_path . '/components/image/600x400.png', $source->rewriteExampleUrl('/600x400.png'));
-    self::assertStringEndsWith('/tests/fixtures/600x400.png', $source->rewriteExampleUrl('../../tests/fixtures/600x400.png'));
+    $assert_cacheability = function (GeneratedUrl $g, $cache_tags = []) {
+      self::assertEqualsCanonicalizing($cache_tags, $g->getCacheTags());
+      self::assertEqualsCanonicalizing([], $g->getCacheContexts());
+      self::assertSame(Cache::PERMANENT, $g->getCacheMaxAge());
+    };
+
+    // Assert that relative URL to a file inside the SDC DOES get the
+    // `component_plugins` cache tag.
+    $cases = [
+      '600x400.png' => $canvas_test_sdc_module_path . '/components/image/600x400.png',
+      '/600x400.png' => $canvas_test_sdc_module_path . '/components/image/600x400.png',
+    ];
+    foreach ($cases as $case => $expectation) {
+      $generated_url = $source->rewriteExampleUrl($case);
+      self::assertStringEndsWith($expectation, $generated_url->getGeneratedUrl());
+      $assert_cacheability($generated_url, cache_tags: ['component_plugins']);
+    }
+
+    // Assert that relative URL to a file outside the SDC does NOT get the
+    // `component_plugins` cache tag.
+    $generated_url = $source->rewriteExampleUrl('../../tests/fixtures/600x400.png');
+    self::assertStringEndsWith('/tests/fixtures/600x400.png', $generated_url->getGeneratedUrl());
+    $assert_cacheability($generated_url);
 
     // Assert that non-existing links have a leading slash but do not include the module nor SDC path.
-    $url = $source->rewriteExampleUrl('test/path');
+    $generated_url = $source->rewriteExampleUrl('test/path');
+    $url = $generated_url->getGeneratedUrl();
     self::assertStringEndsWith('/test/path', $url);
     self::assertStringNotContainsString($canvas_test_sdc_module_path, $url);
     self::assertStringNotContainsString('components', $url);
+    $assert_cacheability($generated_url);
 
     // Assert that non-existing links with a leading slash are not doubled.
-    $url = $source->rewriteExampleUrl('/test/path');
+    $generated_url = $source->rewriteExampleUrl('/test/path');
+    $url = $generated_url->getGeneratedUrl();
     self::assertStringEndsWith('/test/path', $url);
     self::assertStringNotContainsString('//', $url);
+    $assert_cacheability($generated_url);
 
     // Assert that full URLs are left alone.
-    self::assertSame('https://www.example.com/', $source->rewriteExampleUrl('https://www.example.com/'));
+    $generated_url = $source->rewriteExampleUrl('https://www.example.com/');
+    self::assertSame('https://www.example.com/', $generated_url->getGeneratedUrl());
+    $assert_cacheability($generated_url);
   }
 
   /**
    * @covers ::getExplicitInput()
    * @dataProvider providerComponentResolving
    */
-  public function testGetExplicitInput(array $component_item_value, array $expected_props_for_uuids): void {
+  public function testGetExplicitInput(array $component_item_value, array $expected_props_for_uuids, ?array $permissions = NULL): void {
     $this->generateComponentConfig();
     $this->installEntitySchema('node');
     $this->container->get('module_installer')->install(['canvas_test_config_node_article']);
@@ -885,6 +1110,17 @@ activation="auto">
       'field_canvas_test' => $component_item_value,
     ]);
     $canvas_field_item = $node->field_canvas_test[0];
+    if ($permissions !== NULL) {
+      // If we are setting permissions to check access, we need to save the node,
+      // but we cannot use $permissions for the user saving the node because we
+      // may be testing insufficient permissions. So we temporarily set a user with
+      // 'access content' permission to save the node, then use the permissions
+      // we are testing with.
+      $this->setUpCurrentUser(permissions: ['access content']);
+      $node->save();
+      $this->setUpCurrentUser(permissions: $permissions);
+    }
+
     $this->assertInstanceOf(ComponentTreeItem::class, $canvas_field_item);
     $actual_props = array_combine(
       array_keys($expected_props_for_uuids),
@@ -893,7 +1129,7 @@ activation="auto">
         array_keys($expected_props_for_uuids)
       )
     );
-    $this->assertSame($expected_props_for_uuids, $actual_props);
+    self::assertEquals($expected_props_for_uuids, $actual_props);
   }
 
   public static function providerComponentResolving(): array {
@@ -906,7 +1142,7 @@ activation="auto">
     $test_cases['invalid UUID, missing component_id key'][] = [];
     $test_cases['valid values using static inputs'][] = [
       'dynamic-static-card2df' => [
-        'heading' => 'They say I am static, but I want to believe I can change!',
+        'heading' => new EvaluationResult('They say I am static, but I want to believe I can change!'),
       ],
     ];
     $test_cases['valid values for propless component'][] = [
@@ -914,20 +1150,92 @@ activation="auto">
     ];
     $test_cases['valid value for optional explicit input using an URL prop shape, with default value'][] = [
       'optional-url-with-default-value' => [
-        'heading' => 'Gracie says hi!',
-        'image' => [
-          'src' => self::getCiModulePath() . '/tests/modules/canvas_test_sdc/components/image-optional-with-example-and-additional-prop/gracie.jpg',
-          'alt' => 'A good dog',
-          'width' => 601,
-          'height' => 402,
+        'heading' => new EvaluationResult('Gracie says hi!'),
+        'image' => new EvaluationResult(
+          [
+            'src' => self::getCiModulePath() . '/tests/modules/canvas_test_sdc/components/image-optional-with-example-and-additional-prop/gracie.jpg',
+            'alt' => 'A good dog',
+            'width' => 601,
+            'height' => 402,
+          ],
+          (new CacheableMetadata())->setCacheTags(['component_plugins']),
+        ),
+      ],
+    ];
+    $hero_with_dynamic_sources = [
+      'uuid' => 'partly-dynamic-hero',
+      'component_id' => 'sdc.canvas_test_sdc.my-hero',
+      'component_version' => '888412021fbcc837',
+      'inputs' => [
+        'heading' => 'hello, world!',
+        'subheading' => [
+          'sourceType' => 'dynamic',
+          'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
+        ],
+        'cta1href' => ['uri' => 'https://drupal.org'],
+        'cta1' => [
+          'sourceType' => 'dynamic',
+          'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
         ],
       ],
+    ];
+    $test_cases['values values, dynamic sources WITH access'] = [
+      [
+        $hero_with_dynamic_sources,
+      ],
+      [
+        'partly-dynamic-hero' => [
+          // Permanent cacheability because populated by StaticPropSource
+          // without references.
+          'heading' => new EvaluationResult('hello, world!'),
+          // Node 1 and access-dependent cacheability because DynamicPropSource.
+          'subheading' => new EvaluationResult(
+            'Test node',
+            (new CacheableMetadata())
+              ->setCacheTags(['node:1'])
+              ->setCacheContexts(['user.permissions'])
+          ),
+          // Permanent cacheability because populated by StaticPropSource
+          // without references.
+          'cta1href' => new EvaluationResult('https://drupal.org'),
+          // Node 1 and access-dependent cacheability because DynamicPropSource.
+          'cta1' => new EvaluationResult(
+            'Test node',
+            (new CacheableMetadata())
+              ->setCacheTags(['node:1'])
+              ->setCacheContexts(['user.permissions'])
+          ),
+        ],
+      ],
+      ['access content'],
+    ];
+    $test_cases['values values, dynamic sources WITHOUT access'] = [
+      [
+        $hero_with_dynamic_sources,
+      ],
+      [
+        'partly-dynamic-hero' => [
+          'heading' => new EvaluationResult('hello, world!'),
+          // Node access-dependent cacheability because DynamicPropSource.
+          'subheading' => new EvaluationResult(
+            NULL,
+            (new CacheableMetadata())->setCacheContexts(['user.permissions'])
+          ),
+          'cta1href' => new EvaluationResult('https://drupal.org'),
+          // Node access-dependent cacheability because DynamicPropSource.
+          'cta1' => new EvaluationResult(
+            NULL,
+            (new CacheableMetadata())->setCacheContexts(['user.permissions'])
+          ),
+        ],
+      ],
+      [],
     ];
     return $test_cases;
   }
 
   protected function generateCrashTestDummyComponentTree(string $component_id, array $inputs, bool $assertCount = TRUE): ComponentTreeItemList {
-    if ($component_id === 'sdc.canvas_broken_sdcs.invalid-filter') {
+    if (str_starts_with($component_id, 'sdc.canvas_broken_sdcs.')) {
       // This component needs an extra module.
       $this->assertCount(0, $this->componentStorage->loadMultiple());
       \Drupal::service(ModuleInstallerInterface::class)->install(['canvas_broken_sdcs']);
@@ -937,6 +1245,50 @@ activation="auto">
       return parent::generateCrashTestDummyComponentTree($component_id, $inputs, assertCount: FALSE);
     }
     return parent::generateCrashTestDummyComponentTree($component_id, $inputs);
+  }
+
+  protected function alterEnvironmentForCrashTestDummyComponentTree(string $component_id, array $inputs): void {
+    // Register the private file stream.
+    $this->setSetting('file_private_path', 'private');
+    // Setup file entity.
+    $this->installEntitySchema('file');
+    $this->installSchema('file', 'file_usage');
+    $user = $this->setUpCurrentUser(permissions: ['access content', 'view media']);
+    // Create a private file.
+    /** @var \Drupal\Core\File\FileSystemInterface $fileSystem */
+    $fileSystem = \Drupal::service(FileSystemInterface::class);
+    $directory = 'private://test';
+    self::assertTrue($fileSystem->prepareDirectory($directory, FileSystemInterface::CREATE_DIRECTORY | FileSystemInterface::MODIFY_PERMISSIONS));
+    $fileSystem->copy(\Drupal::root() . '/core/tests/fixtures/files/image-1.png', 'private://test/image.png');
+    $private_file = File::create([
+      'uid' => $user->id(),
+      'fid' => 3000,
+      'status' => 0,
+      'filename' => 'image.png',
+      'uri' => 'private://test/image.png',
+      'filesize' => \filesize('private://test/image.png'),
+      'filemime' => 'image/png',
+    ]);
+    $private_file->enforceIsNew();
+    $private_file->setPermanent();
+    $private_file->save();
+
+    // And a public file.
+    $directory = 'public://test';
+    self::assertTrue($fileSystem->prepareDirectory($directory, FileSystemInterface::CREATE_DIRECTORY | FileSystemInterface::MODIFY_PERMISSIONS));
+    $fileSystem->copy(\Drupal::root() . '/core/tests/fixtures/files/image-1.png', 'public://test/image.png');
+    $public_file = File::create([
+      'uid' => $user->id(),
+      'fid' => 3001,
+      'status' => 0,
+      'filename' => 'image.png',
+      'uri' => 'public://test/image.png',
+      'filesize' => \filesize('public://test/image.png'),
+      'filemime' => 'image/png',
+    ]);
+    $public_file->enforceIsNew();
+    $public_file->setPermanent();
+    $public_file->save();
   }
 
   public static function providerRenderComponentFailure(): \Generator {
@@ -963,21 +1315,33 @@ activation="auto">
       'expected_output_selector' => NULL,
     ];
 
-    yield "SDC with invalid prop, with exception" => [
+    yield "SDC with invalid prop type is cast by typed data, raises exception" => [
       'component_id' => 'sdc.canvas_test_sdc.crash',
       'inputs' => [
-        'crash' => [
-          'sourceType' => "static:field_item:string",
-          'value' => 'this is an invalid value for the SDC prop',
-          'expression' => (string) new FieldTypePropExpression('string', 'value'),
-        ],
+        'crash' => 'this is is not a boolean prop but gets cast to TRUE by \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::validateComponentInput',
+      ],
+      'expected_validation_errors' => [],
+      'expected_exception' => [
+        'class' => Error::class,
+        'message' => 'Intentional test exception in "canvas_test_sdc:crash" at line 2.',
+      ],
+      'expected_output_selector' => NULL,
+    ];
+
+    // @see \Drupal\canvas\Validation\JsonSchema\UriSchemeAwareFormatConstraint
+    yield "SDC with invalid value for `type: string, format: uri, x-allowed-schemes: ['public']`-shaped prop " => [
+      'component_id' => 'sdc.canvas_test_sdc.card-with-stream-wrapper-image',
+      'inputs' => [
+        'alt' => 'Majestic creature',
+        // Use a private file, which isn't allowed here.
+        'src' => ['target_id' => 3000],
       ],
       'expected_validation_errors' => [
-        \sprintf('2.inputs.%s.crash', self::UUID_CRASH_TEST_DUMMY) => 'String value found, but a boolean or an object is required. The provided value is: "this is an invalid value for the SDC prop".',
+        \sprintf('2.inputs.%s.src', self::UUID_CRASH_TEST_DUMMY) => 'The "private" URI scheme is not allowed. The provided value is: "private://test/image.png".',
       ],
       'expected_exception' => [
         'class' => RuntimeError::class,
-        'message' => 'An exception has been thrown during the rendering of a template ("[canvas_test_sdc:crash/crash] String value found, but a boolean or an object is required. The provided value is: "this is an invalid value for the SDC prop".") in "canvas_test_sdc:crash" at line 1.',
+        'message' => 'An exception has been thrown during the rendering of a template ("[canvas_test_sdc:card-with-stream-wrapper-image/src] The "private" URI scheme is not allowed. The provided value is: "private://test/image.png".") in "canvas_test_sdc:card-with-stream-wrapper-image" at line 1.',
       ],
       'expected_output_selector' => NULL,
     ];
@@ -995,7 +1359,7 @@ activation="auto">
       'expected_output_selector' => NULL,
     ];
 
-    yield "SDC with invalid Twig" => [
+    yield "SDC with invalid Twig (due to filter)" => [
       'component_id' => 'sdc.canvas_broken_sdcs.invalid-filter',
       'inputs' => [
         'name' => 'Gaia',
@@ -1007,6 +1371,21 @@ activation="auto">
       ],
       'expected_output_selector' => NULL,
     ];
+
+    yield "SDC with valid prop, but invalid Twig (due to printing an object-shaped prop)" => [
+      'component_id' => 'sdc.canvas_broken_sdcs.malformed-image',
+      'inputs' => [
+        'image' => ['target_id' => 3001],
+      ],
+      // Note there's no validation error - the file with fid 3001 is a valid
+      // public file.
+      'expected_validation_errors' => [],
+      'expected_exception' => [
+        'class' => RuntimeError::class,
+        'message' => 'An exception has been thrown during the rendering of a template (""src" is an invalid render array key. Value should be an array but got a string.") in "canvas_broken_sdcs:malformed-image" at line 2.',
+      ],
+      'expected_output_selector' => NULL,
+    ];
   }
 
   public static function getExpectedSettings(): array {
@@ -1014,6 +1393,7 @@ activation="auto">
       'sdc.canvas_test_sdc.attributes' => [
         'prop_field_definitions' => [
           'not_attributes' => [
+            'required' => TRUE,
             'field_type' => 'string',
             'field_storage_settings' => [],
             'field_instance_settings' => [],
@@ -1023,9 +1403,67 @@ activation="auto">
           ],
         ],
       ],
+      'sdc.canvas_test_sdc.banner' => [
+        'prop_field_definitions' => [
+          'heading' => [
+            'required' => TRUE,
+            'field_type' => 'string',
+            'field_storage_settings' => [],
+            'field_instance_settings' => [],
+            'field_widget' => 'string_textfield',
+            'default_value' => [
+              0 => [
+                'value' => 'My banner title',
+              ],
+            ],
+            'expression' => 'ℹ︎string␟value',
+          ],
+          'text' => [
+            'required' => FALSE,
+            'field_type' => 'text_long',
+            'field_storage_settings' => [],
+            'field_instance_settings' => [
+              'allowed_formats' => [
+                'canvas_html_block',
+              ],
+            ],
+            'field_widget' => 'text_textarea',
+            'default_value' => [
+              0 => [
+                'value' => '<p>In a curious work, published in <em>Paris</em> in 1863 by <strong>Delaville Dedreux</strong>, there is a suggestion for reaching the North Pole by an aerostat.</p>',
+                'format' => 'canvas_html_block',
+              ],
+            ],
+            'expression' => 'ℹ︎text_long␟processed',
+          ],
+          'image' => [
+            'required' => FALSE,
+            'field_type' => 'image',
+            'field_storage_settings' => [],
+            'field_instance_settings' => [],
+            'field_widget' => 'image_image',
+            'default_value' => [],
+            'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
+          ],
+        ],
+      ],
       'sdc.canvas_test_sdc.card' => [
         'prop_field_definitions' => [
+          'heading' => [
+            'required' => FALSE,
+            'field_type' => 'string',
+            'field_storage_settings' => [],
+            'field_instance_settings' => [],
+            'field_widget' => 'string_textfield',
+            'default_value' => [
+              0 => [
+                'value' => 'Card',
+              ],
+            ],
+            'expression' => 'ℹ︎string␟value',
+          ],
           'content' => [
+            'required' => FALSE,
             'field_type' => 'string',
             'field_storage_settings' => [],
             'field_instance_settings' => [],
@@ -1038,6 +1476,7 @@ activation="auto">
             'expression' => 'ℹ︎string␟value',
           ],
           'footer' => [
+            'required' => FALSE,
             'field_type' => 'string',
             'field_storage_settings' => [],
             'field_instance_settings' => [],
@@ -1049,19 +1488,19 @@ activation="auto">
             ],
             'expression' => 'ℹ︎string␟value',
           ],
-          'heading' => [
-            'field_type' => 'string',
-            'field_storage_settings' => [],
-            'field_instance_settings' => [],
-            'field_widget' => 'string_textfield',
-            'default_value' => [
-              0 => [
-                'value' => 'Card',
-              ],
+          'date' => [
+            'required' => FALSE,
+            'field_type' => 'datetime',
+            'field_storage_settings' => [
+              'datetime_type' => 'date',
             ],
-            'expression' => 'ℹ︎string␟value',
+            'field_instance_settings' => [],
+            'field_widget' => 'datetime_default',
+            'default_value' => NULL,
+            'expression' => 'ℹ︎datetime␟value',
           ],
           'image' => [
+            'required' => TRUE,
             'field_type' => 'image',
             'field_storage_settings' => [],
             'field_instance_settings' => [],
@@ -1069,7 +1508,21 @@ activation="auto">
             'default_value' => [],
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
           ],
+          'sizes' => [
+            'required' => FALSE,
+            'field_type' => 'string',
+            'field_storage_settings' => [],
+            'field_instance_settings' => [],
+            'field_widget' => 'string_textfield',
+            'default_value' => [
+              0 => [
+                'value' => 'auto 50vw',
+              ],
+            ],
+            'expression' => 'ℹ︎string␟value',
+          ],
           'loading' => [
+            'required' => TRUE,
             'field_type' => 'list_string',
             'field_storage_settings' => [
               'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
@@ -1083,35 +1536,25 @@ activation="auto">
             ],
             'expression' => 'ℹ︎list_string␟value',
           ],
-          'sizes' => [
-            'field_type' => 'string',
-            'field_storage_settings' => [],
-            'field_instance_settings' => [],
-            'field_widget' => 'string_textfield',
-            'default_value' => [
-              0 => [
-                'value' => 'auto 50vw',
-              ],
-            ],
-            'expression' => 'ℹ︎string␟value',
-          ],
         ],
       ],
       'sdc.canvas_test_sdc.card-with-local-image' => [
         'prop_field_definitions' => [
-          'alt' => [
+          'heading' => [
+            'required' => FALSE,
             'field_type' => 'string',
             'field_storage_settings' => [],
             'field_instance_settings' => [],
             'field_widget' => 'string_textfield',
             'default_value' => [
               0 => [
-                'value' => 'A classic druplicon',
+                'value' => 'Card with local image',
               ],
             ],
             'expression' => 'ℹ︎string␟value',
           ],
           'content' => [
+            'required' => FALSE,
             'field_type' => 'string',
             'field_storage_settings' => [],
             'field_instance_settings' => [],
@@ -1124,6 +1567,7 @@ activation="auto">
             'expression' => 'ℹ︎string␟value',
           ],
           'footer' => [
+            'required' => FALSE,
             'field_type' => 'string',
             'field_storage_settings' => [],
             'field_instance_settings' => [],
@@ -1135,19 +1579,30 @@ activation="auto">
             ],
             'expression' => 'ℹ︎string␟value',
           ],
-          'heading' => [
+          'src' => [
+            'required' => TRUE,
+            'field_type' => 'image',
+            'field_storage_settings' => [],
+            'field_instance_settings' => [],
+            'field_widget' => 'image_image',
+            'default_value' => [],
+            'expression' => 'ℹ︎image␟src_with_alternate_widths',
+          ],
+          'alt' => [
+            'required' => TRUE,
             'field_type' => 'string',
             'field_storage_settings' => [],
             'field_instance_settings' => [],
             'field_widget' => 'string_textfield',
             'default_value' => [
               0 => [
-                'value' => 'Card with local image',
+                'value' => 'A classic druplicon',
               ],
             ],
             'expression' => 'ℹ︎string␟value',
           ],
           'loading' => [
+            'required' => TRUE,
             'field_type' => 'list_string',
             'field_storage_settings' => [
               'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
@@ -1161,31 +1616,25 @@ activation="auto">
             ],
             'expression' => 'ℹ︎list_string␟value',
           ],
-          'src' => [
-            'field_type' => 'image',
-            'field_storage_settings' => [],
-            'field_instance_settings' => [],
-            'field_widget' => 'image_image',
-            'default_value' => [],
-            'expression' => 'ℹ︎image␟src_with_alternate_widths',
-          ],
         ],
       ],
       'sdc.canvas_test_sdc.card-with-remote-image' => [
         'prop_field_definitions' => [
-          'alt' => [
+          'heading' => [
+            'required' => FALSE,
             'field_type' => 'string',
             'field_storage_settings' => [],
             'field_instance_settings' => [],
             'field_widget' => 'string_textfield',
             'default_value' => [
               0 => [
-                'value' => 'Hot air balloons',
+                'value' => 'Card with remote image',
               ],
             ],
             'expression' => 'ℹ︎string␟value',
           ],
           'content' => [
+            'required' => FALSE,
             'field_type' => 'string',
             'field_storage_settings' => [],
             'field_instance_settings' => [],
@@ -1198,6 +1647,7 @@ activation="auto">
             'expression' => 'ℹ︎string␟value',
           ],
           'footer' => [
+            'required' => FALSE,
             'field_type' => 'string',
             'field_storage_settings' => [],
             'field_instance_settings' => [],
@@ -1209,19 +1659,43 @@ activation="auto">
             ],
             'expression' => 'ℹ︎string␟value',
           ],
-          'heading' => [
+          'src' => [
+            'required' => TRUE,
+            'field_type' => 'image',
+            'field_storage_settings' => [],
+            'field_instance_settings' => [],
+            'field_widget' => 'image_image',
+            'default_value' => [],
+            'expression' => 'ℹ︎image␟src_with_alternate_widths',
+          ],
+          'alt' => [
+            'required' => TRUE,
             'field_type' => 'string',
             'field_storage_settings' => [],
             'field_instance_settings' => [],
             'field_widget' => 'string_textfield',
             'default_value' => [
               0 => [
-                'value' => 'Card with remote image',
+                'value' => 'Hot air balloons',
               ],
             ],
             'expression' => 'ℹ︎string␟value',
           ],
+          'width' => [
+            'required' => TRUE,
+            'field_type' => 'integer',
+            'field_storage_settings' => [],
+            'field_instance_settings' => [],
+            'field_widget' => 'number',
+            'default_value' => [
+              0 => [
+                'value' => 640,
+              ],
+            ],
+            'expression' => 'ℹ︎integer␟value',
+          ],
           'height' => [
+            'required' => TRUE,
             'field_type' => 'integer',
             'field_storage_settings' => [],
             'field_instance_settings' => [],
@@ -1234,6 +1708,7 @@ activation="auto">
             'expression' => 'ℹ︎integer␟value',
           ],
           'loading' => [
+            'required' => FALSE,
             'field_type' => 'list_string',
             'field_storage_settings' => [
               'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
@@ -1247,43 +1722,25 @@ activation="auto">
             ],
             'expression' => 'ℹ︎list_string␟value',
           ],
-          'src' => [
-            'field_type' => 'image',
-            'field_storage_settings' => [],
-            'field_instance_settings' => [],
-            'field_widget' => 'image_image',
-            'default_value' => [],
-            'expression' => 'ℹ︎image␟src_with_alternate_widths',
-          ],
-          'width' => [
-            'field_type' => 'integer',
-            'field_storage_settings' => [],
-            'field_instance_settings' => [],
-            'field_widget' => 'number',
-            'default_value' => [
-              0 => [
-                'value' => 640,
-              ],
-            ],
-            'expression' => 'ℹ︎integer␟value',
-          ],
         ],
       ],
       'sdc.canvas_test_sdc.card-with-stream-wrapper-image' => [
         'prop_field_definitions' => [
-          'alt' => [
+          'heading' => [
+            'required' => FALSE,
             'field_type' => 'string',
             'field_storage_settings' => [],
             'field_instance_settings' => [],
             'field_widget' => 'string_textfield',
             'default_value' => [
               0 => [
-                'value' => 'Hot air balloons',
+                'value' => 'Card with stream wrapper',
               ],
             ],
             'expression' => 'ℹ︎string␟value',
           ],
           'content' => [
+            'required' => FALSE,
             'field_type' => 'string',
             'field_storage_settings' => [],
             'field_instance_settings' => [],
@@ -1296,6 +1753,7 @@ activation="auto">
             'expression' => 'ℹ︎string␟value',
           ],
           'footer' => [
+            'required' => FALSE,
             'field_type' => 'string',
             'field_storage_settings' => [],
             'field_instance_settings' => [],
@@ -1307,19 +1765,30 @@ activation="auto">
             ],
             'expression' => 'ℹ︎string␟value',
           ],
-          'heading' => [
+          'src' => [
+            'required' => TRUE,
+            'field_type' => 'image',
+            'field_storage_settings' => [],
+            'field_instance_settings' => [],
+            'field_widget' => 'image_image',
+            'default_value' => [],
+            'expression' => 'ℹ︎image␟entity␜␜entity:file␝uri␞␟value',
+          ],
+          'alt' => [
+            'required' => TRUE,
             'field_type' => 'string',
             'field_storage_settings' => [],
             'field_instance_settings' => [],
             'field_widget' => 'string_textfield',
             'default_value' => [
               0 => [
-                'value' => 'Card with stream wrapper',
+                'value' => 'Hot air balloons',
               ],
             ],
             'expression' => 'ℹ︎string␟value',
           ],
           'loading' => [
+            'required' => FALSE,
             'field_type' => 'list_string',
             'field_storage_settings' => [
               'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
@@ -1333,19 +1802,53 @@ activation="auto">
             ],
             'expression' => 'ℹ︎list_string␟value',
           ],
-          'src' => [
-            'field_type' => 'image',
-            'field_storage_settings' => [],
+        ],
+      ],
+      'sdc.canvas_test_sdc.columns' => [
+        'prop_field_definitions' => [
+          'columns' => [
+            'required' => TRUE,
+            'field_type' => 'list_integer',
+            'field_storage_settings' => [
+              'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
+            ],
             'field_instance_settings' => [],
-            'field_widget' => 'image_image',
-            'default_value' => [],
-            'expression' => 'ℹ︎image␟entity␜␜entity:file␝uri␞␟value',
+            'field_widget' => 'options_select',
+            'default_value' => [0 => ['value' => 2]],
+            'expression' => 'ℹ︎list_integer␟value',
+          ],
+        ],
+      ],
+      'sdc.canvas_test_sdc.component-mismatch-meta-enum' => [
+        'prop_field_definitions' => [
+          'style' => [
+            'required' => FALSE,
+            'field_type' => 'list_string',
+            'field_storage_settings' => [
+              'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
+            ],
+            'field_instance_settings' => [],
+            'field_widget' => 'options_select',
+            'default_value' => [0 => ['value' => 'small']],
+            'expression' => 'ℹ︎list_string␟value',
+          ],
+          'numbers' => [
+            'required' => FALSE,
+            'field_type' => 'list_string',
+            'field_storage_settings' => [
+              'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
+            ],
+            'field_instance_settings' => [],
+            'field_widget' => 'options_select',
+            'default_value' => [0 => ['value' => '3.14']],
+            'expression' => 'ℹ︎list_string␟value',
           ],
         ],
       ],
       'sdc.canvas_test_sdc.component-no-meta-enum' => [
         'prop_field_definitions' => [
           'style' => [
+            'required' => FALSE,
             'field_type' => 'list_string',
             'field_storage_settings' => [
               'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
@@ -1360,6 +1863,7 @@ activation="auto">
       'sdc.canvas_test_sdc.crash' => [
         'prop_field_definitions' => [
           'crash' => [
+            'required' => TRUE,
             'field_type' => 'boolean',
             'field_storage_settings' => [],
             'field_instance_settings' => [],
@@ -1369,9 +1873,34 @@ activation="auto">
           ],
         ],
       ],
+      'sdc.canvas_test_sdc.date' => [
+        'prop_field_definitions' => [
+          'date' => [
+            'required' => FALSE,
+            'field_type' => 'datetime',
+            'field_storage_settings' => [
+              'datetime_type' => DateTimeItem::DATETIME_TYPE_DATE,
+            ],
+            'field_instance_settings' => [],
+            'field_widget' => 'datetime_default',
+            'default_value' => NULL,
+            'expression' => 'ℹ︎datetime␟value',
+          ],
+          'caption' => [
+            'required' => FALSE,
+            'field_type' => 'string',
+            'field_storage_settings' => [],
+            'field_instance_settings' => [],
+            'field_widget' => 'string_textfield',
+            'default_value' => [0 => ['value' => 'Birthday']],
+            'expression' => 'ℹ︎string␟value',
+          ],
+        ],
+      ],
       'sdc.canvas_test_sdc.deprecated' => [
         'prop_field_definitions' => [
           'text' => [
+            'required' => FALSE,
             'field_type' => 'string',
             'field_storage_settings' => [],
             'field_instance_settings' => [],
@@ -1387,6 +1916,7 @@ activation="auto">
       'sdc.canvas_test_sdc.experimental' => [
         'prop_field_definitions' => [
           'text' => [
+            'required' => FALSE,
             'field_type' => 'string',
             'field_storage_settings' => [],
             'field_instance_settings' => [],
@@ -1399,6 +1929,7 @@ activation="auto">
       'sdc.canvas_test_sdc.grid-container' => [
         'prop_field_definitions' => [
           'direction' => [
+            'required' => TRUE,
             'field_type' => 'list_string',
             'field_storage_settings' => [
               'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
@@ -1412,21 +1943,21 @@ activation="auto">
       ],
       'sdc.canvas_test_sdc.heading' => [
         'prop_field_definitions' => [
-          'element' => [
-            'field_type' => 'list_string',
-            'field_storage_settings' => [
-              'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
-            ],
+          'text' => [
+            'required' => TRUE,
+            'field_type' => 'string',
+            'field_storage_settings' => [],
             'field_instance_settings' => [],
-            'field_widget' => 'options_select',
+            'field_widget' => 'string_textfield',
             'default_value' => [
               0 => [
-                'value' => 'h1',
+                'value' => 'A heading element',
               ],
             ],
-            'expression' => 'ℹ︎list_string␟value',
+            'expression' => 'ℹ︎string␟value',
           ],
           'style' => [
+            'required' => FALSE,
             'field_type' => 'list_string',
             'field_storage_settings' => [
               'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
@@ -1440,23 +1971,27 @@ activation="auto">
             ],
             'expression' => 'ℹ︎list_string␟value',
           ],
-          'text' => [
-            'field_type' => 'string',
-            'field_storage_settings' => [],
+          'element' => [
+            'required' => TRUE,
+            'field_type' => 'list_string',
+            'field_storage_settings' => [
+              'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
+            ],
             'field_instance_settings' => [],
-            'field_widget' => 'string_textfield',
+            'field_widget' => 'options_select',
             'default_value' => [
               0 => [
-                'value' => 'A heading element',
+                'value' => 'h1',
               ],
             ],
-            'expression' => 'ℹ︎string␟value',
+            'expression' => 'ℹ︎list_string␟value',
           ],
         ],
       ],
       'sdc.canvas_test_sdc.image' => [
         'prop_field_definitions' => [
           'image' => [
+            'required' => TRUE,
             'field_type' => 'image',
             'field_storage_settings' => [],
             'field_instance_settings' => [],
@@ -1469,6 +2004,7 @@ activation="auto">
       'sdc.canvas_test_sdc.image-gallery' => [
         'prop_field_definitions' => [
           'caption' => [
+            'required' => FALSE,
             'field_type' => 'string',
             'field_storage_settings' => [],
             'field_instance_settings' => [],
@@ -1477,6 +2013,7 @@ activation="auto">
             'expression' => 'ℹ︎string␟value',
           ],
           'images' => [
+            'required' => TRUE,
             'field_type' => 'image',
             'cardinality' => FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
             'field_storage_settings' => [],
@@ -1492,6 +2029,7 @@ activation="auto">
       'sdc.canvas_test_sdc.image-optional-with-example' => [
         'prop_field_definitions' => [
           'image' => [
+            'required' => FALSE,
             'field_type' => 'image',
             'field_storage_settings' => [],
             'field_instance_settings' => [],
@@ -1506,6 +2044,7 @@ activation="auto">
       'sdc.canvas_test_sdc.image-optional-with-example-and-additional-prop' => [
         'prop_field_definitions' => [
           'heading' => [
+            'required' => FALSE,
             'field_type' => 'string',
             'field_storage_settings' => [],
             'field_instance_settings' => [],
@@ -1514,6 +2053,7 @@ activation="auto">
             'expression' => 'ℹ︎string␟value',
           ],
           'image' => [
+            'required' => FALSE,
             'field_type' => 'image',
             'field_storage_settings' => [],
             'field_instance_settings' => [],
@@ -1528,6 +2068,7 @@ activation="auto">
       'sdc.canvas_test_sdc.image-optional-without-example' => [
         'prop_field_definitions' => [
           'image' => [
+            'required' => FALSE,
             'field_type' => 'image',
             'field_storage_settings' => [],
             'field_instance_settings' => [],
@@ -1542,6 +2083,7 @@ activation="auto">
       'sdc.canvas_test_sdc.image-required-with-example' => [
         'prop_field_definitions' => [
           'image' => [
+            'required' => TRUE,
             'field_type' => 'image',
             'field_storage_settings' => [],
             'field_instance_settings' => [],
@@ -1553,34 +2095,23 @@ activation="auto">
           ],
         ],
       ],
+      'sdc.canvas_test_sdc.image-without-ref' => [
+        'prop_field_definitions' => [
+          'image' => [
+            'required' => TRUE,
+            'field_type' => 'image',
+            'field_storage_settings' => [],
+            'field_instance_settings' => [],
+            'field_widget' => 'image_image',
+            'default_value' => [],
+            'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
+          ],
+        ],
+      ],
       'sdc.canvas_test_sdc.my-cta' => [
         'prop_field_definitions' => [
-          'href' => [
-            'field_type' => 'link',
-            'field_storage_settings' => [],
-            'field_instance_settings' => [
-              'title' => 0,
-            ],
-            'field_widget' => 'link_default',
-            'default_value' => [
-              0 => [
-                'uri' => 'https://www.drupal.org',
-                'options' => [],
-              ],
-            ],
-            'expression' => 'ℹ︎link␟url',
-          ],
-          'target' => [
-            'field_type' => 'list_string',
-            'field_storage_settings' => [
-              'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
-            ],
-            'field_instance_settings' => [],
-            'field_widget' => 'options_select',
-            'default_value' => NULL,
-            'expression' => 'ℹ︎list_string␟value',
-          ],
           'text' => [
+            'required' => TRUE,
             'field_type' => 'string',
             'field_storage_settings' => [],
             'field_instance_settings' => [],
@@ -1592,50 +2123,40 @@ activation="auto">
             ],
             'expression' => 'ℹ︎string␟value',
           ],
-        ],
-      ],
-      'sdc.canvas_test_sdc.my-hero' => [
-        'prop_field_definitions' => [
-          'cta1' => [
-            'field_type' => 'string',
-            'field_storage_settings' => [],
-            'field_instance_settings' => [],
-            'field_widget' => 'string_textfield',
-            'default_value' => [
-              0 => [
-                'value' => 'View',
-              ],
-            ],
-            'expression' => 'ℹ︎string␟value',
-          ],
-          'cta1href' => [
+          'href' => [
+            'required' => TRUE,
             'field_type' => 'link',
             'field_storage_settings' => [],
             'field_instance_settings' => [
               'title' => 0,
+              'link_type' => LinkItemInterface::LINK_EXTERNAL,
             ],
             'field_widget' => 'link_default',
             'default_value' => [
               0 => [
-                'uri' => 'https://example.com',
+                'uri' => 'https://www.drupal.org',
                 'options' => [],
               ],
             ],
             'expression' => 'ℹ︎link␟url',
           ],
-          'cta2' => [
-            'field_type' => 'string',
-            'field_storage_settings' => [],
-            'field_instance_settings' => [],
-            'field_widget' => 'string_textfield',
-            'default_value' => [
-              0 => [
-                'value' => 'Click',
-              ],
+          'target' => [
+            'required' => FALSE,
+            'field_type' => 'list_string',
+            'field_storage_settings' => [
+              'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
             ],
-            'expression' => 'ℹ︎string␟value',
+            'field_instance_settings' => [],
+            'field_widget' => 'options_select',
+            'default_value' => NULL,
+            'expression' => 'ℹ︎list_string␟value',
           ],
+        ],
+      ],
+      'sdc.canvas_test_sdc.my-hero' => [
+        'prop_field_definitions' => [
           'heading' => [
+            'required' => TRUE,
             'field_type' => 'string',
             'field_storage_settings' => [],
             'field_instance_settings' => [],
@@ -1648,6 +2169,7 @@ activation="auto">
             'expression' => 'ℹ︎string␟value',
           ],
           'subheading' => [
+            'required' => FALSE,
             'field_type' => 'string',
             'field_storage_settings' => [],
             'field_instance_settings' => [],
@@ -1659,11 +2181,55 @@ activation="auto">
             ],
             'expression' => 'ℹ︎string␟value',
           ],
+          'cta1' => [
+            'required' => FALSE,
+            'field_type' => 'string',
+            'field_storage_settings' => [],
+            'field_instance_settings' => [],
+            'field_widget' => 'string_textfield',
+            'default_value' => [
+              0 => [
+                'value' => 'View',
+              ],
+            ],
+            'expression' => 'ℹ︎string␟value',
+          ],
+          'cta1href' => [
+            'required' => TRUE,
+            'field_type' => 'link',
+            'field_storage_settings' => [],
+            'field_instance_settings' => [
+              'title' => 0,
+              'link_type' => LinkItemInterface::LINK_GENERIC,
+            ],
+            'field_widget' => 'link_default',
+            'default_value' => [
+              0 => [
+                'uri' => 'https://example.com',
+                'options' => [],
+              ],
+            ],
+            'expression' => 'ℹ︎link␟url',
+          ],
+          'cta2' => [
+            'required' => FALSE,
+            'field_type' => 'string',
+            'field_storage_settings' => [],
+            'field_instance_settings' => [],
+            'field_widget' => 'string_textfield',
+            'default_value' => [
+              0 => [
+                'value' => 'Click',
+              ],
+            ],
+            'expression' => 'ℹ︎string␟value',
+          ],
         ],
       ],
       'sdc.canvas_test_sdc.my-section' => [
         'prop_field_definitions' => [
           'text' => [
+            'required' => TRUE,
             'field_type' => 'string',
             'field_storage_settings' => [],
             'field_instance_settings' => [],
@@ -1680,6 +2246,7 @@ activation="auto">
       'sdc.canvas_test_sdc.one_column' => [
         'prop_field_definitions' => [
           'width' => [
+            'required' => TRUE,
             'field_type' => 'list_string',
             'field_storage_settings' => [
               'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
@@ -1698,6 +2265,7 @@ activation="auto">
       'sdc.canvas_test_sdc.props-no-slots' => [
         'prop_field_definitions' => [
           'heading' => [
+            'required' => TRUE,
             'field_type' => 'string',
             'field_storage_settings' => [],
             'field_instance_settings' => [],
@@ -1710,6 +2278,7 @@ activation="auto">
       'sdc.canvas_test_sdc.props-slots' => [
         'prop_field_definitions' => [
           'heading' => [
+            'required' => TRUE,
             'field_type' => 'string',
             'field_storage_settings' => [],
             'field_instance_settings' => [],
@@ -1721,31 +2290,8 @@ activation="auto">
       ],
       'sdc.canvas_test_sdc.shoe_badge' => [
         'prop_field_definitions' => [
-          'pill' => [
-            'field_type' => 'boolean',
-            'field_storage_settings' => [],
-            'field_instance_settings' => [],
-            'field_widget' => 'boolean_checkbox',
-            'default_value' => [
-              0 => [
-                'value' => TRUE,
-              ],
-            ],
-            'expression' => 'ℹ︎boolean␟value',
-          ],
-          'pulse' => [
-            'field_type' => 'boolean',
-            'field_storage_settings' => [],
-            'field_instance_settings' => [],
-            'field_widget' => 'boolean_checkbox',
-            'default_value' => [
-              0 => [
-                'value' => TRUE,
-              ],
-            ],
-            'expression' => 'ℹ︎boolean␟value',
-          ],
           'variant' => [
+            'required' => TRUE,
             'field_type' => 'list_string',
             'field_storage_settings' => [
               'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
@@ -1759,35 +2305,38 @@ activation="auto">
             ],
             'expression' => 'ℹ︎list_string␟value',
           ],
+          'pill' => [
+            'required' => FALSE,
+            'field_type' => 'boolean',
+            'field_storage_settings' => [],
+            'field_instance_settings' => [],
+            'field_widget' => 'boolean_checkbox',
+            'default_value' => [
+              0 => [
+                'value' => TRUE,
+              ],
+            ],
+            'expression' => 'ℹ︎boolean␟value',
+          ],
+          'pulse' => [
+            'required' => FALSE,
+            'field_type' => 'boolean',
+            'field_storage_settings' => [],
+            'field_instance_settings' => [],
+            'field_widget' => 'boolean_checkbox',
+            'default_value' => [
+              0 => [
+                'value' => TRUE,
+              ],
+            ],
+            'expression' => 'ℹ︎boolean␟value',
+          ],
         ],
       ],
       'sdc.canvas_test_sdc.shoe_tab' => [
         'prop_field_definitions' => [
-          'active' => [
-            'field_type' => 'boolean',
-            'field_storage_settings' => [],
-            'field_instance_settings' => [],
-            'field_widget' => 'boolean_checkbox',
-            'default_value' => NULL,
-            'expression' => 'ℹ︎boolean␟value',
-          ],
-          'closable' => [
-            'field_type' => 'boolean',
-            'field_storage_settings' => [],
-            'field_instance_settings' => [],
-            'field_widget' => 'boolean_checkbox',
-            'default_value' => NULL,
-            'expression' => 'ℹ︎boolean␟value',
-          ],
-          'disabled' => [
-            'field_type' => 'boolean',
-            'field_storage_settings' => [],
-            'field_instance_settings' => [],
-            'field_widget' => 'boolean_checkbox',
-            'default_value' => NULL,
-            'expression' => 'ℹ︎boolean␟value',
-          ],
           'label' => [
+            'required' => TRUE,
             'field_type' => 'string',
             'field_storage_settings' => [],
             'field_instance_settings' => [],
@@ -1800,6 +2349,7 @@ activation="auto">
             'expression' => 'ℹ︎string␟value',
           ],
           'panel' => [
+            'required' => TRUE,
             'field_type' => 'string',
             'field_storage_settings' => [],
             'field_instance_settings' => [],
@@ -1811,11 +2361,54 @@ activation="auto">
             ],
             'expression' => 'ℹ︎string␟value',
           ],
+          'active' => [
+            'required' => FALSE,
+            'field_type' => 'boolean',
+            'field_storage_settings' => [],
+            'field_instance_settings' => [],
+            'field_widget' => 'boolean_checkbox',
+            'default_value' => NULL,
+            'expression' => 'ℹ︎boolean␟value',
+          ],
+          'closable' => [
+            'required' => FALSE,
+            'field_type' => 'boolean',
+            'field_storage_settings' => [],
+            'field_instance_settings' => [],
+            'field_widget' => 'boolean_checkbox',
+            'default_value' => NULL,
+            'expression' => 'ℹ︎boolean␟value',
+          ],
+          'disabled' => [
+            'required' => FALSE,
+            'field_type' => 'boolean',
+            'field_storage_settings' => [],
+            'field_instance_settings' => [],
+            'field_widget' => 'boolean_checkbox',
+            'default_value' => NULL,
+            'expression' => 'ℹ︎boolean␟value',
+          ],
         ],
       ],
       'sdc.canvas_test_sdc.shoe_tab_group' => [
         'prop_field_definitions' => [
+          'placement' => [
+            'required' => TRUE,
+            'field_type' => 'list_string',
+            'field_storage_settings' => [
+              'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
+            ],
+            'field_instance_settings' => [],
+            'field_widget' => 'options_select',
+            'default_value' => [
+              0 => [
+                'value' => 'top',
+              ],
+            ],
+            'expression' => 'ℹ︎list_string␟value',
+          ],
           'activation' => [
+            'required' => FALSE,
             'field_type' => 'list_string',
             'field_storage_settings' => [
               'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
@@ -1830,6 +2423,7 @@ activation="auto">
             'expression' => 'ℹ︎list_string␟value',
           ],
           'no_scroll' => [
+            'required' => FALSE,
             'field_type' => 'boolean',
             'field_storage_settings' => [],
             'field_instance_settings' => [],
@@ -1841,33 +2435,12 @@ activation="auto">
             ],
             'expression' => 'ℹ︎boolean␟value',
           ],
-          'placement' => [
-            'field_type' => 'list_string',
-            'field_storage_settings' => [
-              'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
-            ],
-            'field_instance_settings' => [],
-            'field_widget' => 'options_select',
-            'default_value' => [
-              0 => [
-                'value' => 'top',
-              ],
-            ],
-            'expression' => 'ℹ︎list_string␟value',
-          ],
         ],
       ],
       'sdc.canvas_test_sdc.shoe_tab_panel' => [
         'prop_field_definitions' => [
-          'active' => [
-            'field_type' => 'boolean',
-            'field_storage_settings' => [],
-            'field_instance_settings' => [],
-            'field_widget' => 'boolean_checkbox',
-            'default_value' => NULL,
-            'expression' => 'ℹ︎boolean␟value',
-          ],
           'name' => [
+            'required' => TRUE,
             'field_type' => 'string',
             'field_storage_settings' => [],
             'field_instance_settings' => [],
@@ -1879,11 +2452,21 @@ activation="auto">
             ],
             'expression' => 'ℹ︎string␟value',
           ],
+          'active' => [
+            'required' => FALSE,
+            'field_type' => 'boolean',
+            'field_storage_settings' => [],
+            'field_instance_settings' => [],
+            'field_widget' => 'boolean_checkbox',
+            'default_value' => NULL,
+            'expression' => 'ℹ︎boolean␟value',
+          ],
         ],
       ],
       'sdc.canvas_test_sdc.sparkline' => [
         'prop_field_definitions' => [
           'data' => [
+            'required' => TRUE,
             'field_type' => 'integer',
             'cardinality' => 100,
             'field_storage_settings' => [],
@@ -1907,9 +2490,28 @@ activation="auto">
           ],
         ],
       ],
+      'sdc.canvas_test_sdc.tags' => [
+        'prop_field_definitions' => [
+          'tags' => [
+            'required' => FALSE,
+            'field_type' => 'string',
+            'cardinality' => FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
+            'field_storage_settings' => [],
+            'field_instance_settings' => [],
+            'field_widget' => 'string_textfield',
+            'default_value' => [
+              0 => ['value' => 'foo'],
+              1 => ['value' => 'bar'],
+              2 => ['value' => 'baz'],
+            ],
+            'expression' => 'ℹ︎string␟value',
+          ],
+        ],
+      ],
       'sdc.canvas_test_sdc.two_column' => [
         'prop_field_definitions' => [
           'width' => [
+            'required' => TRUE,
             'field_type' => 'list_integer',
             'field_storage_settings' => [
               'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
@@ -1927,7 +2529,19 @@ activation="auto">
       ],
       'sdc.canvas_test_sdc.video' => [
         'prop_field_definitions' => [
+          'video' => [
+            'required' => TRUE,
+            'field_type' => 'file',
+            'field_storage_settings' => [],
+            'field_instance_settings' => [
+              'file_extensions' => 'mp4',
+            ],
+            'field_widget' => 'file_generic',
+            'default_value' => [],
+            'expression' => 'ℹ︎file␟{src↝entity␜␜entity:file␝uri␞␟url}',
+          ],
           'display_width' => [
+            'required' => FALSE,
             'field_type' => 'integer',
             'field_storage_settings' => [],
             'field_instance_settings' => [
@@ -1938,17 +2552,33 @@ activation="auto">
             'default_value' => NULL,
             'expression' => 'ℹ︎integer␟value',
           ],
-          'video' => [
-            'field_type' => 'file',
+        ],
+      ],
+      'sdc.sdc_theme_test.bar' => [
+        'prop_field_definitions' => [],
+      ],
+      'sdc.sdc_theme_test.lib-overrides' => [
+        'prop_field_definitions' => [],
+      ],
+      'sdc.sdc_theme_test.my-card' => [
+        'prop_field_definitions' => [
+          'header' => [
+            'required' => TRUE,
+            'field_type' => 'string',
             'field_storage_settings' => [],
-            'field_instance_settings' => [
-              'file_extensions' => 'mp4',
+            'field_instance_settings' => [],
+            'field_widget' => 'string_textfield',
+            'default_value' => [
+              0 => [
+                'value' => 'I am a header!',
+              ],
             ],
-            'field_widget' => 'file_generic',
-            'default_value' => [],
-            'expression' => 'ℹ︎file␟{src↝entity␜␜entity:file␝uri␞␟url}',
+            'expression' => 'ℹ︎string␟value',
           ],
         ],
+      ],
+      'sdc.sdc_theme_test_base.my-card-no-schema' => [
+        'prop_field_definitions' => [],
       ],
     ];
   }
@@ -1965,12 +2595,26 @@ activation="auto">
           'canvas_test_sdc',
         ],
       ],
+      'sdc.canvas_test_sdc.banner' => [
+        'config' => [
+          'filter.format.canvas_html_block',
+          'image.style.canvas_parametrized_width',
+        ],
+        'module' => [
+          'core',
+          'file',
+          'image',
+          'text',
+          'canvas_test_sdc',
+        ],
+      ],
       'sdc.canvas_test_sdc.card' => [
         'config' => [
           'image.style.canvas_parametrized_width',
         ],
         'module' => [
           'core',
+          'datetime',
           'file',
           'image',
           'options',
@@ -2014,6 +2658,20 @@ activation="auto">
           'canvas_test_sdc',
         ],
       ],
+      'sdc.canvas_test_sdc.columns' => [
+        'module' => [
+          'core',
+          'options',
+          'canvas_test_sdc',
+        ],
+      ],
+      'sdc.canvas_test_sdc.component-mismatch-meta-enum' => [
+        'module' => [
+          'core',
+          'options',
+          'canvas_test_sdc',
+        ],
+      ],
       'sdc.canvas_test_sdc.component-no-meta-enum' => [
         'module' => [
           'core',
@@ -2024,6 +2682,13 @@ activation="auto">
       'sdc.canvas_test_sdc.crash' => [
         'module' => [
           'core',
+          'canvas_test_sdc',
+        ],
+      ],
+      'sdc.canvas_test_sdc.date' => [
+        'module' => [
+          'core',
+          'datetime',
           'canvas_test_sdc',
         ],
       ],
@@ -2120,6 +2785,16 @@ activation="auto">
           'canvas_test_sdc',
         ],
       ],
+      'sdc.canvas_test_sdc.image-without-ref' => [
+        'config' => [
+          'image.style.canvas_parametrized_width',
+        ],
+        'module' => [
+          'file',
+          'image',
+          'canvas_test_sdc',
+        ],
+      ],
       'sdc.canvas_test_sdc.my-cta' => [
         'module' => [
           'core',
@@ -2192,6 +2867,12 @@ activation="auto">
           'canvas_test_sdc',
         ],
       ],
+      'sdc.canvas_test_sdc.tags' => [
+        'module' => [
+          'core',
+          'canvas_test_sdc',
+        ],
+      ],
       'sdc.canvas_test_sdc.two_column' => [
         'module' => [
           'core',
@@ -2206,6 +2887,19 @@ activation="auto">
           1 => 'file',
           2 => 'canvas_test_sdc',
         ],
+      ],
+      'sdc.sdc_theme_test.bar' => [
+        'theme' => ['sdc_theme_test'],
+      ],
+      'sdc.sdc_theme_test.lib-overrides' => [
+        'theme' => ['sdc_theme_test'],
+      ],
+      'sdc.sdc_theme_test.my-card' => [
+        'module' => ['core'],
+        'theme' => ['sdc_theme_test'],
+      ],
+      'sdc.sdc_theme_test_base.my-card-no-schema' => [
+        'theme' => ['sdc_theme_test_base'],
       ],
     ], $this->callSourceMethodForEach('calculateDependencies', $component_ids));
   }
@@ -2234,6 +2928,103 @@ activation="auto">
                 0 => ['value' => 'The not-attributes SDC prop!'],
               ],
               'resolved' => 'The not-attributes SDC prop!',
+            ],
+          ],
+        ],
+        'transforms' => [],
+      ],
+      'sdc.canvas_test_sdc.banner' => [
+        'expected_output_selectors' => [
+          'article.banner',
+          'article.banner img.banner--image',
+        ],
+        'source' => 'Module component',
+        'metadata' => ['slots' => []],
+        'propSources' => [
+          'heading' => [
+            'required' => TRUE,
+            'jsonSchema' => [
+              'type' => 'string',
+            ],
+            'sourceType' => 'static:field_item:string',
+            'expression' => 'ℹ︎string␟value',
+            'default_values' => [
+              'source' => [
+                0 => [
+                  'value' => 'My banner title',
+                ],
+              ],
+              'resolved' => 'My banner title',
+            ],
+          ],
+          'text' => [
+            'required' => FALSE,
+            'jsonSchema' => [
+              'type' => 'string',
+              'contentMediaType' => 'text/html',
+              'x-formatting-context' => 'block',
+            ],
+            'sourceType' => 'static:field_item:text_long',
+            'expression' => 'ℹ︎text_long␟processed',
+            'sourceTypeSettings' => [
+              'instance' => [
+                'allowed_formats' => [
+                  'canvas_html_block',
+                ],
+              ],
+            ],
+            'default_values' => [
+              'source' => [
+                0 => [
+                  'value' => '<p>In a curious work, published in <em>Paris</em> in 1863 by <strong>Delaville Dedreux</strong>, there is a suggestion for reaching the North Pole by an aerostat.</p>',
+                  'format' => 'canvas_html_block',
+                ],
+              ],
+              'resolved' => '<p>In a curious work, published in <em>Paris</em> in 1863 by <strong>Delaville Dedreux</strong>, there is a suggestion for reaching the North Pole by an aerostat.</p>',
+            ],
+          ],
+          'image' => [
+            'required' => FALSE,
+            'jsonSchema' => [
+              'type' => 'object',
+              'title' => 'image',
+              'required' => [
+                0 => 'src',
+              ],
+              'properties' => [
+                'src' => [
+                  'title' => 'Image URL',
+                  'type' => 'string',
+                  'format' => 'uri-reference',
+                  'contentMediaType' => 'image/*',
+                  'x-allowed-schemes' => ['http', 'https'],
+                  'id' => 'json-schema-definitions://canvas.module/image-uri',
+                ],
+                'alt' => [
+                  'title' => 'Alternative text',
+                  'type' => 'string',
+                ],
+                'width' => [
+                  'title' => 'Image width',
+                  'type' => 'integer',
+                ],
+                'height' => [
+                  'title' => 'Image height',
+                  'type' => 'integer',
+                ],
+              ],
+              'id' => 'json-schema-definitions://canvas.module/image',
+            ],
+            'sourceType' => 'static:field_item:image',
+            'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
+            'default_values' => [
+              'source' => [],
+              'resolved' => [
+                'src' => '/' . \Drupal::service(ExtensionPathResolver::class)->getPath('module', 'canvas_test_sdc') . '/components/banner/balloons.png',
+                'alt' => 'Hot air balloons',
+                'width' => 640,
+                'height' => 427,
+              ],
             ],
           ],
         ],
@@ -2295,11 +3086,25 @@ activation="auto">
               'resolved' => 'I have a footer!',
             ],
           ],
+          'date' => [
+            'required' => FALSE,
+            'jsonSchema' => [
+              'type' => 'string',
+              'format' => 'date',
+            ],
+            'sourceType' => 'static:field_item:datetime',
+            'expression' => 'ℹ︎datetime␟value',
+            'sourceTypeSettings' => [
+              'storage' => [
+                'datetime_type' => 'date',
+              ],
+            ],
+          ],
           'image' => [
             'required' => TRUE,
             'jsonSchema' => [
-              'title' => 'image',
               'type' => 'object',
+              'title' => 'image',
               'required' => [
                 0 => 'src',
               ],
@@ -2309,7 +3114,8 @@ activation="auto">
                   'type' => 'string',
                   'format' => 'uri-reference',
                   'contentMediaType' => 'image/*',
-                  'pattern' => '^(/|https?://)?(?!.*\://)[^\s]+$',
+                  'x-allowed-schemes' => ['http', 'https'],
+                  'id' => 'json-schema-definitions://canvas.module/image-uri',
                 ],
                 'alt' => [
                   'title' => 'Alternative text',
@@ -2324,6 +3130,7 @@ activation="auto">
                   'type' => 'integer',
                 ],
               ],
+              'id' => 'json-schema-definitions://canvas.module/image',
             ],
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
@@ -2440,11 +3247,12 @@ activation="auto">
           'src' => [
             'required' => TRUE,
             'jsonSchema' => [
-              'title' => 'Image URL',
               'type' => 'string',
+              'title' => 'Image URL',
               'format' => 'uri-reference',
               'contentMediaType' => 'image/*',
-              'pattern' => '^(/|https?://)?(?!.*\://)[^\s]+$',
+              'x-allowed-schemes' => ['http', 'https'],
+              'id' => 'json-schema-definitions://canvas.module/image-uri',
             ],
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟src_with_alternate_widths',
@@ -2556,11 +3364,12 @@ activation="auto">
           'src' => [
             'required' => TRUE,
             'jsonSchema' => [
-              'title' => 'Image URL',
               'type' => 'string',
+              'title' => 'Image URL',
               'format' => 'uri-reference',
               'contentMediaType' => 'image/*',
-              'pattern' => '^(/|https?://)?(?!.*\://)[^\s]+$',
+              'x-allowed-schemes' => ['http', 'https'],
+              'id' => 'json-schema-definitions://canvas.module/image-uri',
             ],
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟src_with_alternate_widths',
@@ -2704,11 +3513,12 @@ activation="auto">
           'src' => [
             'required' => TRUE,
             'jsonSchema' => [
-              'title' => 'Stream wrapper image URI',
               'type' => 'string',
+              'title' => 'Stream wrapper image URI',
               'format' => 'uri',
               'contentMediaType' => 'image/*',
-              'pattern' => '^(?!https?://)[\w\-]+://',
+              'x-allowed-schemes' => ['public'],
+              'id' => 'json-schema-definitions://canvas.module/stream-wrapper-image-uri',
             ],
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟entity␜␜entity:file␝uri␞␟value',
@@ -2756,6 +3566,130 @@ activation="auto">
                 ],
               ],
               'resolved' => 'lazy',
+            ],
+          ],
+        ],
+        'transforms' => [],
+      ],
+      'sdc.canvas_test_sdc.columns' => [
+        'expected_output_selectors' => [
+          // TRICKY: there's no content to assert, because the preview by
+          // default doe snot use slot values.
+          'div[data-component-id="canvas_test_sdc:columns"]',
+        ],
+        'source' => 'Module component',
+        'metadata' => [
+          'slots' => [
+            'column_1' => [
+              'title' => 'Column One',
+              'description' => 'The contents of the first column.',
+              'examples' => ['<p>This is column 1 content</p>'],
+            ],
+            'column_2' => [
+              'title' => 'Column Two',
+              'description' => 'The contents of the second column.',
+              'examples' => ['<p>This is column 2 content</p>'],
+            ],
+            'column_3' => [
+              'title' => 'Column Three',
+              'description' => 'The contents of the third column.',
+              'examples' => ['<p>This is column 3 content</p>'],
+            ],
+            'column_4' => [
+              'title' => 'Column Four',
+              'description' => 'The contents of the fourth column.',
+              'examples' => ['<p>This is column 4 content</p>'],
+            ],
+            'column_5' => [
+              'title' => 'Column Five',
+              'description' => 'The contents of the fifth column.',
+              'examples' => ['<p>This is column 5 content</p>'],
+            ],
+            'column_6' => [
+              'title' => 'Column Six',
+              'description' => 'The contents of the sixth column.',
+              'examples' => ['<p>This is column 6 content</p>'],
+            ],
+          ],
+        ],
+        'propSources' => [
+          'columns' => [
+            'required' => TRUE,
+            'jsonSchema' => [
+              'type' => 'integer',
+              'enum' => [1, 2, 3, 4, 5, 6],
+            ],
+            'sourceType' => 'static:field_item:list_integer',
+            'expression' => 'ℹ︎list_integer␟value',
+            'sourceTypeSettings' => [
+              'storage' => [
+                'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
+              ],
+            ],
+            'default_values' => [
+              'source' => [
+                0 => ['value' => 2],
+              ],
+              'resolved' => 2,
+            ],
+          ],
+        ],
+        'transforms' => [],
+      ],
+      'sdc.canvas_test_sdc.component-mismatch-meta-enum' => [
+        'expected_output_selectors' => [
+          ':contains("small")',
+        ],
+        'source' => 'Module component',
+        'metadata' => ['slots' => []],
+        'propSources' => [
+          'style' => [
+            'required' => FALSE,
+            'jsonSchema' => [
+              'type' => 'string',
+              'enum' => [
+                'small',
+                'big',
+                'huge',
+                // @see \Drupal\Tests\canvas\Kernel\Config\ComponentValidationTest::testUnmatchedEnumAndMetaEnum()
+                'contains.dots',
+              ],
+            ],
+            'sourceType' => 'static:field_item:list_string',
+            'expression' => 'ℹ︎list_string␟value',
+            'sourceTypeSettings' => [
+              'storage' => [
+                'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
+              ],
+            ],
+            'default_values' => [
+              'source' => [
+                0 => ['value' => 'small'],
+              ],
+              'resolved' => 'small',
+            ],
+          ],
+          'numbers' => [
+            'required' => FALSE,
+            'jsonSchema' => [
+              'type' => 'string',
+              'enum' => [
+                '7',
+                '3.14',
+              ],
+            ],
+            'sourceType' => 'static:field_item:list_string',
+            'expression' => 'ℹ︎list_string␟value',
+            'sourceTypeSettings' => [
+              'storage' => [
+                'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
+              ],
+            ],
+            'default_values' => [
+              'source' => [
+                0 => ['value' => '3.14'],
+              ],
+              'resolved' => '3.14',
             ],
           ],
         ],
@@ -2814,6 +3748,42 @@ activation="auto">
                 0 => ['value' => FALSE],
               ],
               'resolved' => FALSE,
+            ],
+          ],
+        ],
+        'transforms' => [],
+      ],
+      'sdc.canvas_test_sdc.date' => [
+        'expected_output_selectors' => [
+          'figure.date',
+        ],
+        'source' => 'Module component',
+        'metadata' => ['slots' => []],
+        'propSources' => [
+          'date' => [
+            'required' => FALSE,
+            'jsonSchema' => [
+              'type' => 'string',
+              'format' => 'date',
+            ],
+            'sourceType' => 'static:field_item:datetime',
+            'expression' => 'ℹ︎datetime␟value',
+            'sourceTypeSettings' => [
+              'storage' => [
+                'datetime_type' => DateTimeItem::DATETIME_TYPE_DATE,
+              ],
+            ],
+          ],
+          'caption' => [
+            'required' => FALSE,
+            'jsonSchema' => ['type' => 'string'],
+            'sourceType' => 'static:field_item:string',
+            'expression' => 'ℹ︎string␟value',
+            'default_values' => [
+              'source' => [
+                0 => ['value' => 'Birthday'],
+              ],
+              'resolved' => 'Birthday',
             ],
           ],
         ],
@@ -2974,8 +3944,8 @@ activation="auto">
           'element' => [
             'required' => TRUE,
             'jsonSchema' => [
-              'title' => 'Heading element',
               'type' => 'string',
+              'title' => 'Heading element',
               'enum' => [
                 0 => 'div',
                 1 => 'h1',
@@ -2985,6 +3955,7 @@ activation="auto">
                 5 => 'h5',
                 6 => 'h6',
               ],
+              'id' => 'json-schema-definitions://canvas.module/heading-element',
             ],
             'sourceType' => 'static:field_item:list_string',
             'expression' => 'ℹ︎list_string␟value',
@@ -3017,8 +3988,8 @@ activation="auto">
           'image' => [
             'required' => TRUE,
             'jsonSchema' => [
-              'title' => 'image',
               'type' => 'object',
+              'title' => 'image',
               'required' => [
                 0 => 'src',
               ],
@@ -3028,7 +3999,8 @@ activation="auto">
                   'type' => 'string',
                   'format' => 'uri-reference',
                   'contentMediaType' => 'image/*',
-                  'pattern' => '^(/|https?://)?(?!.*\://)[^\s]+$',
+                  'x-allowed-schemes' => ['http', 'https'],
+                  'id' => 'json-schema-definitions://canvas.module/image-uri',
                 ],
                 'alt' => [
                   'title' => 'Alternative text',
@@ -3043,6 +4015,7 @@ activation="auto">
                   'type' => 'integer',
                 ],
               ],
+              'id' => 'json-schema-definitions://canvas.module/image',
             ],
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
@@ -3081,8 +4054,8 @@ activation="auto">
             'jsonSchema' => [
               'type' => 'array',
               'items' => [
-                'title' => 'image',
                 'type' => 'object',
+                'title' => 'image',
                 'required' => [
                   'src',
                 ],
@@ -3092,7 +4065,8 @@ activation="auto">
                     'type' => 'string',
                     'format' => 'uri-reference',
                     'contentMediaType' => 'image/*',
-                    'pattern' => '^(/|https?://)?(?!.*\://)[^\s]+$',
+                    'x-allowed-schemes' => ['http', 'https'],
+                    'id' => 'json-schema-definitions://canvas.module/image-uri',
                   ],
                   'alt' => [
                     'title' => 'Alternative text',
@@ -3107,6 +4081,7 @@ activation="auto">
                     'type' => 'integer',
                   ],
                 ],
+                'id' => 'json-schema-definitions://canvas.module/image',
               ],
             ],
             'sourceType' => 'static:field_item:image',
@@ -3151,8 +4126,8 @@ activation="auto">
           'image' => [
             'required' => FALSE,
             'jsonSchema' => [
-              'title' => 'image',
               'type' => 'object',
+              'title' => 'image',
               'required' => [
                 'src',
               ],
@@ -3162,7 +4137,8 @@ activation="auto">
                   'type' => 'string',
                   'format' => 'uri-reference',
                   'contentMediaType' => 'image/*',
-                  'pattern' => '^(/|https?://)?(?!.*\://)[^\s]+$',
+                  'x-allowed-schemes' => ['http', 'https'],
+                  'id' => 'json-schema-definitions://canvas.module/image-uri',
                 ],
                 'alt' => [
                   'title' => 'Alternative text',
@@ -3177,6 +4153,7 @@ activation="auto">
                   'type' => 'integer',
                 ],
               ],
+              'id' => 'json-schema-definitions://canvas.module/image',
             ],
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
@@ -3211,8 +4188,8 @@ activation="auto">
           'image' => [
             'required' => FALSE,
             'jsonSchema' => [
-              'title' => 'image',
               'type' => 'object',
+              'title' => 'image',
               'required' => [
                 'src',
               ],
@@ -3222,7 +4199,8 @@ activation="auto">
                   'type' => 'string',
                   'format' => 'uri-reference',
                   'contentMediaType' => 'image/*',
-                  'pattern' => '^(/|https?://)?(?!.*\://)[^\s]+$',
+                  'x-allowed-schemes' => ['http', 'https'],
+                  'id' => 'json-schema-definitions://canvas.module/image-uri',
                 ],
                 'alt' => [
                   'title' => 'Alternative text',
@@ -3237,6 +4215,7 @@ activation="auto">
                   'type' => 'integer',
                 ],
               ],
+              'id' => 'json-schema-definitions://canvas.module/image',
             ],
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
@@ -3261,8 +4240,8 @@ activation="auto">
           'image' => [
             'required' => FALSE,
             'jsonSchema' => [
-              'title' => 'image',
               'type' => 'object',
+              'title' => 'image',
               'required' => [
                 'src',
               ],
@@ -3272,7 +4251,8 @@ activation="auto">
                   'type' => 'string',
                   'format' => 'uri-reference',
                   'contentMediaType' => 'image/*',
-                  'pattern' => '^(/|https?://)?(?!.*\://)[^\s]+$',
+                  'x-allowed-schemes' => ['http', 'https'],
+                  'id' => 'json-schema-definitions://canvas.module/image-uri',
                 ],
                 'alt' => [
                   'title' => 'Alternative text',
@@ -3287,6 +4267,7 @@ activation="auto">
                   'type' => 'integer',
                 ],
               ],
+              'id' => 'json-schema-definitions://canvas.module/image',
             ],
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
@@ -3304,8 +4285,8 @@ activation="auto">
           'image' => [
             'required' => TRUE,
             'jsonSchema' => [
-              'title' => 'image',
               'type' => 'object',
+              'title' => 'image',
               'required' => [
                 'src',
               ],
@@ -3315,7 +4296,8 @@ activation="auto">
                   'type' => 'string',
                   'format' => 'uri-reference',
                   'contentMediaType' => 'image/*',
-                  'pattern' => '^(/|https?://)?(?!.*\://)[^\s]+$',
+                  'x-allowed-schemes' => ['http', 'https'],
+                  'id' => 'json-schema-definitions://canvas.module/image-uri',
                 ],
                 'alt' => [
                   'title' => 'Alternative text',
@@ -3330,6 +4312,7 @@ activation="auto">
                   'type' => 'integer',
                 ],
               ],
+              'id' => 'json-schema-definitions://canvas.module/image',
             ],
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
@@ -3340,6 +4323,60 @@ activation="auto">
                 'alt' => 'Boring placeholder',
                 'width' => 600,
                 'height' => 400,
+              ],
+            ],
+          ],
+        ],
+        'transforms' => [],
+      ],
+      'sdc.canvas_test_sdc.image-without-ref' => [
+        'expected_output_selectors' => [
+          'div.inline-image-test',
+        ],
+        'source' => 'Module component',
+        'metadata' => ['slots' => []],
+        'propSources' => [
+          'image' => [
+            'required' => TRUE,
+            'jsonSchema' => [
+              'type' => 'object',
+              'title' => 'image',
+              'required' => [
+                'src',
+              ],
+              'properties' => [
+                'src' => [
+                  'title' => 'Image URL',
+                  'type' => 'string',
+                  'format' => 'uri-reference',
+                  'contentMediaType' => 'image/*',
+                  'x-allowed-schemes' => ['http', 'https'],
+                  'id' => 'json-schema-definitions://canvas.module/image-uri',
+                ],
+                'alt' => [
+                  'title' => 'Alternative text',
+                  'type' => 'string',
+                ],
+                'width' => [
+                  'title' => 'Image width',
+                  'type' => 'integer',
+                ],
+                'height' => [
+                  'title' => 'Image height',
+                  'type' => 'integer',
+                ],
+              ],
+              'id' => 'json-schema-definitions://canvas.module/image',
+            ],
+            'sourceType' => 'static:field_item:image',
+            'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
+            'default_values' => [
+              'source' => [],
+              'resolved' => [
+                'src' => 'https://example.com/image.png',
+                'alt' => 'Alternative text',
+                'width' => 800,
+                'height' => 600,
               ],
             ],
           ],
@@ -3383,6 +4420,7 @@ activation="auto">
             'sourceTypeSettings' => [
               'instance' => [
                 'title' => 0,
+                'link_type' => LinkItemInterface::LINK_EXTERNAL,
               ],
             ],
             'default_values' => [
@@ -3485,6 +4523,7 @@ activation="auto">
             'sourceTypeSettings' => [
               'instance' => [
                 'title' => 0,
+                'link_type' => LinkItemInterface::LINK_GENERIC,
               ],
             ],
             'default_values' => [
@@ -3991,6 +5030,40 @@ activation="auto">
         ],
         'transforms' => [],
       ],
+      'sdc.canvas_test_sdc.tags' => [
+        'expected_output_selectors' => [
+          'div.tag-list > span.tag:nth-child(3)',
+        ],
+        'source' => 'Module component',
+        'metadata' => [
+          'slots' => [],
+        ],
+        'propSources' => [
+          'tags' => [
+            'required' => FALSE,
+            'jsonSchema' => [
+              'type' => 'array',
+              'items' => [
+                'type' => 'string',
+              ],
+            ],
+            'sourceType' => 'static:field_item:string',
+            'expression' => 'ℹ︎string␟value',
+            'sourceTypeSettings' => [
+              'cardinality' => FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
+            ],
+            'default_values' => [
+              'source' => [
+                0 => ['value' => 'foo'],
+                1 => ['value' => 'bar'],
+                2 => ['value' => 'baz'],
+              ],
+              'resolved' => ['foo', 'bar', 'baz'],
+            ],
+          ],
+        ],
+        'transforms' => [],
+      ],
       'sdc.canvas_test_sdc.two_column' => [
         'expected_output_selectors' => [
           'div[data-component-id="canvas_test_sdc:two_column"]',
@@ -4018,8 +5091,8 @@ activation="auto">
           'width' => [
             'required' => TRUE,
             'jsonSchema' => [
-              'title' => 'Column Width',
               'type' => 'integer',
+              'title' => 'Column Width',
               'enum' => [
                 0 => 25,
                 1 => 33,
@@ -4027,6 +5100,7 @@ activation="auto">
                 3 => 66,
                 4 => 75,
               ],
+              'id' => 'json-schema-definitions://canvas.module/column-width',
             ],
             'sourceType' => 'static:field_item:list_integer',
             'expression' => 'ℹ︎list_integer␟value',
@@ -4060,8 +5134,8 @@ activation="auto">
           'video' => [
             'required' => TRUE,
             'jsonSchema' => [
-              'title' => 'video',
               'type' => 'object',
+              'title' => 'video',
               'required' => [
                 0 => 'src',
               ],
@@ -4071,16 +5145,18 @@ activation="auto">
                   'type' => 'string',
                   'format' => 'uri-reference',
                   'contentMediaType' => 'video/*',
-                  'pattern' => '^(/|https?://)?(?!.*\://)[^\s]+$',
+                  'x-allowed-schemes' => ['http', 'https'],
                 ],
                 'poster' => [
-                  'title' => 'Image URL',
+                  'title' => 'Poster image URL',
                   'type' => 'string',
                   'format' => 'uri-reference',
                   'contentMediaType' => 'image/*',
-                  'pattern' => '^(/|https?://)?(?!.*\://)[^\s]+$',
+                  'x-allowed-schemes' => ['http', 'https'],
+                  'id' => 'json-schema-definitions://canvas.module/image-uri',
                 ],
               ],
+              'id' => 'json-schema-definitions://canvas.module/video',
             ],
             'sourceType' => 'static:field_item:file',
             'expression' => 'ℹ︎file␟{src↝entity␜␜entity:file␝uri␞␟url}',
@@ -4115,6 +5191,67 @@ activation="auto">
         ],
         'transforms' => [],
       ],
+      'sdc.sdc_theme_test.bar' => [
+        'expected_output_selectors' => [
+          'h1',
+        ],
+        'source' => 'Theme component',
+        'metadata' => ['slots' => []],
+        'propSources' => [],
+        'transforms' => [],
+      ],
+      'sdc.sdc_theme_test.lib-overrides' => [
+        'expected_output_selectors' => [
+          ':root ',
+        ],
+        'source' => 'Theme component',
+        'metadata' => ['slots' => []],
+        'propSources' => [],
+        'transforms' => [],
+      ],
+      'sdc.sdc_theme_test.my-card' => [
+        'expected_output_selectors' => [
+          '[data-component-id="sdc_theme_test:my-card"]',
+        ],
+        'source' => 'Theme component',
+        'metadata' => [
+          'slots' => [
+            'card_body' => [
+              'title' => 'Body',
+              'description' => 'The contents of the card.',
+              'examples' => [
+                '<p>Foo is <strong>NOT</strong> bar.</p>',
+              ],
+            ],
+          ],
+        ],
+        'propSources' => [
+          'header' => [
+            'required' => TRUE,
+            'jsonSchema' => [
+              'type' => 'string',
+            ],
+            'sourceType' => 'static:field_item:string',
+            'expression' => 'ℹ︎string␟value',
+            'default_values' => [
+              'source' => [
+                0 => ['value' => 'I am a header!'],
+              ],
+              'resolved' => 'I am a header!',
+            ],
+          ],
+        ],
+        'transforms' => [],
+      ],
+      'sdc.sdc_theme_test_base.my-card-no-schema' => [
+        'expected_output_selectors' => [
+          '[data-component-id="sdc_theme_test_base:my-card-no-schema"]',
+        ],
+        'source' => 'Theme component',
+        'metadata' => ['slots' => []],
+        'propSources' => [],
+        'transforms' => [],
+      ],
     ];
   }
 
@@ -4129,7 +5266,7 @@ activation="auto">
     // could lead to misleading test results.
     foreach ($explicit_input['source'] as $prop_name => $prop_source_array) {
       $resolved_source = PropSource::parse($prop_source_array)->evaluate(NULL, is_required: TRUE);
-      self::assertSame($resolved_source, $explicit_input['resolved'][$prop_name]);
+      self::assertEquals($resolved_source, $explicit_input['resolved'][$prop_name]);
     }
 
     $component = Component::load($component_id);
@@ -4141,6 +5278,153 @@ activation="auto">
     $this->assertEquals($expected_client_model, $actual_model_client);
   }
 
+  /**
+   * @param array{source: SingleComponentInputArray, resolved: array<string, mixed>} $clientModel
+   * @param ?array $nodeValues
+   * @param ?array $expectedInput
+   * @param ?class-string<\Throwable> $expectedExceptionClass
+   * @param ?string $expectedExceptionMessage
+   *
+   * @covers ::clientModelToInput
+   * @dataProvider providerClientModelToInput
+   */
+  public function testClientModelToInput(array $clientModel, ?array $nodeValues, ?array $expectedInput, ?string $expectedExceptionClass, ?string $expectedExceptionMessage): void {
+    $this->generateComponentConfig();
+    $component = Component::load('sdc.canvas_test_sdc.my-hero');
+    self::assertInstanceOf(Component::class, $component);
+
+    $this->installEntitySchema('node');
+    $this->installSchema('node', 'node_access');
+    NodeType::create([
+      'type' => 'page',
+      'name' => 'Page',
+    ])->save();
+    if ($nodeValues !== NULL) {
+      $hostEntity = Node::create($nodeValues);
+      self::assertCount(0, $hostEntity->validate());
+      $hostEntity->save();
+    }
+    else {
+      $hostEntity = NULL;
+    }
+
+    // Ensure the permissions required to evaluate dynamic expressions are not
+    // needed.
+    // @see \Drupal\canvas\PropExpressions\StructuredData\Evaluator::validateAccess()
+    $this->setUpCurrentUser();
+
+    if ($expectedExceptionClass !== NULL) {
+      $this->expectException($expectedExceptionClass);
+      self::assertNotNull($expectedExceptionMessage);
+      $this->expectExceptionMessage($expectedExceptionMessage);
+      self::assertNull($expectedInput);
+    }
+    else {
+      self::assertNull($expectedExceptionMessage);
+      self::assertNotNull($expectedInput);
+    }
+    $input = $component->getComponentSource()->clientModelToInput('a-uuid-for-testing', $component, $clientModel, $hostEntity);
+    self::assertSame($expectedInput, $input);
+  }
+
+  public static function providerClientModelToInput(): \Generator {
+    $clientModel = [
+      'source' => [
+        'heading' => [
+          'sourceType' => 'dynamic',
+          'expression' => 'ℹ︎␜entity:node:page␝title␞␟value',
+          'value' => 'Some value, will be ignored by server',
+        ],
+        'cta1' => [
+          'sourceType' => 'static:field_item:string',
+          'expression' => 'ℹ︎string␟value',
+          'value' => 'Witty test value',
+        ],
+        'cta1href' => [
+          'sourceType' => 'static:field_item:link',
+          'value' => ['uri' => 'https://example.com', 'options' => []],
+          'expression' => 'ℹ︎link␟url',
+          'sourceTypeSettings' => [
+            'instance' => [
+              'title' => 0,
+              'link_type' => LinkItemInterface::LINK_GENERIC,
+            ],
+          ],
+        ],
+        'cta2' => [
+          'sourceType' => 'static:field_item:string',
+          'expression' => 'ℹ︎string␟value',
+          'value' => 'Inside developer joke',
+        ],
+        'subheading' => [
+          'sourceType' => 'dynamic',
+          'expression' => 'ℹ︎␜entity:node:page␝revision_log␞␟value',
+          'value' => NULL,
+        ],
+      ],
+      'resolved' => [
+        'heading' => 'Does not have to match',
+        'cta1' => 'Is what server previously sent',
+        'cta1href' => ['uri' => 'https://example.com', 'options' => []],
+        'cta2' => 'Click, or don\'t',
+        'subheading' => NULL,
+      ],
+    ];
+    $expectedInput = [
+      'heading' => [
+        'sourceType' => 'dynamic',
+        'expression' => 'ℹ︎␜entity:node:page␝title␞␟value',
+      ],
+      'cta1' => 'Witty test value',
+      'cta1href' => [
+        'uri' => 'https://example.com',
+        'options' => [],
+      ],
+      'cta2' => 'Inside developer joke',
+      'subheading' => [
+        'sourceType' => 'dynamic',
+        'expression' => 'ℹ︎␜entity:node:page␝revision_log␞␟value',
+      ],
+    ];
+    $nodeValues = ['type' => 'page', 'title' => 'Test page for inputToClientModel'];
+    // Explicit failure when no host entity is provided.
+    yield "Invalid: DynamicPropSource without host entity" => [
+      'clientModel' => $clientModel,
+      'nodeValues' => NULL,
+      'expectedInput' => NULL,
+      'expectedExceptionClass' => \InvalidArgumentException::class,
+      'expectedExceptionMessage' => 'A host entity is required to set dynamic prop sources.',
+    ];
+    // Expected (server-side) component instance input for the given client model when provided with a host entity.
+    // The non-required property "subheading" is linked to an empty field, revision_log.
+    yield "Valid: DynamicPropSource with host entity, empty non-required property" => [
+      'clientModel' => $clientModel,
+      'nodeValues' => $nodeValues,
+      'expectedInput' => $expectedInput,
+      'expectedExceptionClass' => NULL,
+      'expectedExceptionMessage' => NULL,
+    ];
+    // Expected (server-side) component instance input for the given client model when provided with a host entity.
+    // The non-required property "subheading" is linked to a non-empty field, revision_log.
+    $nodeValues['revision_log'] = 'This is the revision log.';
+    yield "Valid: DynamicPropSource with host entity, not empty non-required property" => [
+      'clientModel' => $clientModel,
+      'nodeValues' => $nodeValues,
+      'expectedInput' => $expectedInput,
+      'expectedExceptionClass' => NULL,
+      'expectedExceptionMessage' => NULL,
+    ];
+    // Modifying the client model to use an expression requiring a different bundle triggers an exception.
+    $clientModel['source']['heading']['expression'] = 'ℹ︎␜entity:node:article␝title␞␟value';
+    yield "Invalid: DynamicPropSource, expression with non-matching bundle" => [
+      'clientModel' => $clientModel,
+      'nodeValues' => $nodeValues,
+      'expectedInput' => NULL,
+      'expectedExceptionClass' => \DomainException::class,
+      'expectedExceptionMessage' => '`ℹ︎␜entity:node:article␝title␞␟value` is an expression for entity type `node`, bundle(s) `article`, but the provided entity is of the bundle `page`.',
+    ];
+  }
+
   public static function explicitsInputsProvider(): \Generator {
     yield 'image' => [
       'sdc.canvas_test_sdc.image',
@@ -4149,7 +5433,7 @@ activation="auto">
           'image' => [
             'sourceType' => 'default-relative-url',
             'value' => [
-              'src' => '/modules/contrib/canvas_test_sdc/components/image/600x400.png',
+              'src' => '/600x400.png',
               'alt' => 'Boring placeholder',
               'width' => 600,
               'height' => 400,
@@ -4161,7 +5445,7 @@ activation="auto">
                   'type' => 'string',
                   'contentMediaType' => 'image/*',
                   'format' => 'uri-reference',
-                  'pattern' => '^(/|https?://)?(?!.*\://)[^\s]+$',
+                  'x-allowed-schemes' => ['http', 'https'],
                 ],
                 'alt' => [
                   'type' => 'string',
@@ -4181,12 +5465,15 @@ activation="auto">
           ],
         ],
         'resolved' => [
-          'image' => [
-            'src' => '/modules/contrib/canvas_test_sdc/components/image/600x400.png',
-            'alt' => 'Boring placeholder',
-            'width' => 600,
-            'height' => 400,
-          ],
+          'image' => new EvaluationResult(
+            [
+              'src' => static::getCiModulePath() . '/tests/modules/canvas_test_sdc/components/image/600x400.png',
+              'alt' => 'Boring placeholder',
+              'width' => 600,
+              'height' => 400,
+            ],
+            (new CacheableMetadata())->setCacheTags(['component_plugins']),
+          ),
         ],
       ],
       [
@@ -4199,7 +5486,7 @@ activation="auto">
         ],
         'resolved' => [
           'image' => [
-            'src' => '/modules/contrib/canvas_test_sdc/components/image/600x400.png',
+            'src' => static::getCiModulePath() . '/tests/modules/canvas_test_sdc/components/image/600x400.png',
             'alt' => 'Boring placeholder',
             'width' => 600,
             'height' => 400,
@@ -4217,8 +5504,40 @@ activation="auto">
     $this->installSchema('file', 'file_usage');
     $this->installEntitySchema('media');
     $this->createMediaType('image', ['id' => 'image', 'label' => 'Image']);
+
+    // @todo Simplify this in https://www.drupal.org/project/canvas/issues/3547579 — that issue should make that happen automatically? If not that, then it should probably expand the below test assertions at the very least.
     /** @var \Drupal\canvas\Entity\ComponentInterface */
-    return Component::load('sdc.canvas_test_sdc.image');
+    $component = Component::load('sdc.canvas_test_sdc.image');
+    self::assertSame([
+      'config' => [
+        'image.style.canvas_parametrized_width',
+      ],
+      'module' => [
+        'canvas_test_sdc',
+        'file',
+        'image',
+      ],
+    ], $component->getDependencies());
+    self::assertCount(1, $component->getVersions());
+    $this->generateComponentConfig();
+    $component = Component::load('sdc.canvas_test_sdc.image');
+    self::assertInstanceOf(ComponentInterface::class, $component);
+    self::assertSame([
+      'config' => [
+        'field.field.media.image.field_media_image',
+        'image.style.canvas_parametrized_width',
+        'media.type.image',
+      ],
+      'module' => [
+        'canvas_test_sdc',
+        'file',
+        'image',
+        'media',
+        'media_library',
+      ],
+    ], $component->getDependencies());
+    self::assertCount(2, $component->getVersions());
+    return $component;
   }
 
   protected function createAndSaveUnusedComponentForFallbackTesting(): ComponentInterface {
@@ -4298,6 +5617,24 @@ activation="auto">
 
   protected function getAllowedModuleForUninstallValidatorTesting(): string {
     return 'canvas_test_sdc';
+  }
+
+  protected function triggerBrokenComponent(ComponentInterface $component): BrokenPluginManagerInterface {
+    /** @var \Drupal\Tests\canvas\Kernel\BrokenPluginManagerInterface */
+    return \Drupal::service('plugin.manager.sdc');
+  }
+
+  public function alter(ContainerBuilder $container): void {
+    // Swap in the broken version of this class.
+    // @see ::triggerBrokenComponent()
+    // @see ::testIsBroken()
+    $container->getDefinition('plugin.manager.sdc')->setClass(BrokenComponentManager::class);
+  }
+
+  protected function getExpectedVerboseErrorMessage(): string {
+    // The test simulates the SDC's Twig template having been deleted, so it fails to load.
+    // @see ::triggerBrokenComponent()
+    return 'Twig\Error\LoaderError occurred during rendering of component';
   }
 
 }

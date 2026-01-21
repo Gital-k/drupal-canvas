@@ -4,6 +4,14 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Entity;
 
+use Drupal\canvas\AutoSave\AutoSaveManager;
+use Drupal\canvas\CanvasUriDefinitions;
+use Drupal\canvas\ComponentSource\ComponentSourceManager;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
+use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
+use Drupal\canvas\Resource\CanvasResourceLink;
+use Drupal\canvas\Resource\CanvasResourceLinkCollection;
+use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
 use Drupal\Core\Config\Entity\ConfigEntityBase;
@@ -93,10 +101,51 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
   protected ?array $dataDependencies;
 
   /**
+   * Shared instance of the ComponentSource plugin manager, for previews.
+   *
+   * @see ::buildPreview()
+   */
+  private static ComponentSourceManager $componentSourceManagerForPreviews;
+
+  /**
+   * Shared instance of the AutoSaveManager, for previews.
+   *
+   * @see ::buildPreview()
+   */
+  private static AutoSaveManager $autoSaveManagerForPreviews;
+
+  /**
    * {@inheritdoc}
    */
   public function id(): string {
     return $this->machineName;
+  }
+
+  private function getEntityOperations(): CanvasResourceLinkCollection {
+    $links = new CanvasResourceLinkCollection([]);
+    // Link relation type => route name.
+    $possible_operations = [
+      CanvasUriDefinitions::LINK_REL_DELETE => ['route_name' => 'canvas.api.config.delete', 'op' => 'delete'],
+      // @todo Add a URL template using the CanvasUriDefinitions::LINK_REL_USAGE_DETAILS link relation type
+    ];
+    foreach ($possible_operations as $link_rel => ['route_name' => $route_name, 'op' => $entity_operation]) {
+      $access = $this->access(operation: $entity_operation, return_as_object: TRUE);
+      assert($access instanceof AccessResult);
+      if ($access->isAllowed()) {
+        $route_params = [
+          'canvas_config_entity_type_id' => self::ENTITY_TYPE_ID,
+          'canvas_config_entity' => $this->id(),
+        ];
+        $links = $links->withLink(
+          $link_rel,
+          new CanvasResourceLink($access, Url::fromRoute($route_name, $route_params), $link_rel)
+        );
+      }
+      else {
+        $links->addCacheableDependency($access);
+      }
+    }
+    return $links;
   }
 
   /**
@@ -112,6 +161,7 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
     // against config schema.
     assert(is_array($this->js));
     assert(is_array($this->css));
+    $linkCollection = $this->getEntityOperations();
     return ClientSideRepresentation::create(
       values: [
         'machineName' => $this->id(),
@@ -125,11 +175,85 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
         'compiledJs' => $this->js['compiled'] ?? '',
         'compiledCss' => $this->css['compiled'] ?? '',
         'dataDependencies' => $this->dataDependencies,
+        // @see https://jsonapi.org/format/#document-links
+        'links' => $linkCollection->asArray(),
       ],
-      preview: [
-        '#markup' => '@todo Make something 🆒 in https://www.drupal.org/project/canvas/issues/3498889',
+      preview: $this->buildPreview(),
+    )->addCacheableDependency($this)
+      ->addCacheableDependency($linkCollection);
+  }
+
+  /**
+   * Renders a preview of a (saved) code component, regardless of `status`.
+   *
+   * Reuses the render infrastructure of the JsComponent ComponentSource plugin.
+   *
+   * @return array
+   *   A render array.
+   *
+   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::renderComponent()
+   */
+  private function buildPreview(): array {
+    // TRICKY: config entity properties may allow NULL, but only valid, saved
+    // config entities are ever normalized: those that have passed validation
+    // against config schema.
+    assert(is_array($this->props));
+    assert(is_array($this->slots));
+    assert(is_string($this->uuid));
+
+    // If there's an auto-saved version of this code component, load that
+    // instead to generate the preview. JsComponent::renderComponent() *already*
+    // does this for the auto-saved JS + CSS; this ensures the auto-saved props
+    // and slots are used, too.
+    self::$autoSaveManagerForPreviews ??= \Drupal::service(AutoSaveManager::class);
+    $autoSavedIfAny = self::$autoSaveManagerForPreviews->getAutoSaveEntity($this)->entity;
+    \assert($autoSavedIfAny === NULL || $autoSavedIfAny instanceof JavaScriptComponent);
+
+    // Instantiate a minimally viable JsComponent source plugin instance subset.
+    self::$componentSourceManagerForPreviews ??= \Drupal::service(ComponentSourceManager::class);
+    $js_component_source = self::$componentSourceManagerForPreviews->createInstance(JsComponent::SOURCE_PLUGIN_ID, [
+      'local_source_id' => $this->id(),
+      // 💡This is left empty because this code is instantiating the JS
+      // ComponentSource plugin to be able to call its `::renderComponent()`
+      // method, to provide an accurate preview of the code component, even if
+      // it's never been exposed (and hence has no `Component` config entity).
+      // IOW: the sole purpose here is to render a preview of a code component,
+      // so not specifying the field definitions to generate StaticPropSources
+      // is fine.
+      'prop_field_definitions' => [],
+    ]);
+    \assert($js_component_source instanceof JsComponent);
+
+    // Retrieve all props' example values, prefer auto-saved ones.
+    $example_inputs = array_filter(array_map(
+      // Note that an example is optional!
+      // @see `type: canvas.json_schema.prop.*`
+      fn (array $prop_definition) : null|bool|int|float|string|\Stringable|array => $prop_definition['examples'][0] ?? NULL,
+      $autoSavedIfAny->props ?? $this->props,
+    ));
+
+    // TRICKY: unlike \Drupal\canvas\Entity\Component::normalizeForClientSide(),
+    // this is not getting wrapped in a render-safe container, because the only
+    // failure modes for code components at the server-side rendering stage are:
+    // 1. the code component's config entity does not exist. But this is a
+    //    method on that config entity type, so that cannot happen.
+    // 2. the code props' example values may violate the JSON schema for props:
+    //    core's `ComponentValidator` would then trigger an exception … except
+    //    that JsComponent::renderComponent() does not perform validation.
+    // So, no render-safe container is necessary here: the only crash that can
+    // happen is on the client side, or if there's a logic bug.
+    $build = $js_component_source->renderComponent(
+      inputs: [
+        JsComponent::EXPLICIT_INPUT_NAME => array_map(
+          fn (bool|int|float|string|\Stringable|array $v) => new EvaluationResult($v),
+          $example_inputs,
+        ),
       ],
-    )->addCacheableDependency($this);
+      slot_definitions: $autoSavedIfAny->slots ?? $this->slots,
+      componentUuid: $this->uuid,
+      isPreview: TRUE,
+    );
+    return $build;
   }
 
   /**
@@ -318,8 +442,8 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
    */
   public function postSave(EntityStorageInterface $storage, $update = TRUE): void {
     parent::postSave($storage, $update);
-    // The files generated in CanvasAssetStorage::doSave() have a content-dependent
-    // hash in their name. This has 2 consequences:
+    // The files generated in CanvasAssetStorage::doSave() have a
+    // content-dependent hash in their name. This has 2 consequences:
     // 1. Cached responses that referred to an older version, continue to work.
     // 2. New responses must use the newly generated files, which requires the
     //    asset library to point to those new files. Hence the library info must
@@ -401,10 +525,10 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
    * {@inheritdoc}
    */
   public function getAssetLibrary(bool $isPreview): string {
-    // Inside the Canvas UI, always load the draft even if there isn't one. Let the
-    // controller logic automatically serve the non-draft assets when a draft
-    // disappears. This is necessary to allow for asset library dependencies,
-    // and avoids race conditions.
+    // Inside the Canvas UI, always load the draft even if there isn't one. Let
+    // the controller logic automatically serve the non-draft assets when a
+    // draft disappears. This is necessary to allow for asset library
+    // dependencies, and avoids race conditions.
     // @see \Drupal\canvas\Hook\LibraryHooks::libraryInfoBuild()
     // @see \Drupal\canvas\Controller\ApiConfigAutoSaveControllers::getCss()
     // @see \Drupal\canvas\Controller\ApiConfigAutoSaveControllers::getJs()

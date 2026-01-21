@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Audit;
 
+use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\canvas\Entity\Page;
-use Drupal\canvas\Plugin\ComponentPluginManager;
-use Drupal\canvas\PropExpressions\StructuredData\FieldTypePropExpression;
-use Drupal\canvas\PropSource\StaticPropSource;
 use Drupal\KernelTests\KernelTestBase;
 
 /**
@@ -25,8 +23,10 @@ abstract class ComponentAuditTestBase extends KernelTestBase {
     'media',
     'path',
     'user',
+    'datetime',
     'canvas_test_sdc',
     'text',
+    'filter',
   ];
 
   protected array $tree = [];
@@ -37,20 +37,17 @@ abstract class ComponentAuditTestBase extends KernelTestBase {
     $this->installEntitySchema('media');
     $this->installEntitySchema('user');
     $this->installEntitySchema(Page::ENTITY_TYPE_ID);
-    $this->container->get(ComponentPluginManager::class)->getDefinitions();
+    $this->container->get(ComponentSourceManager::class)->generateComponents();
     $this->tree = [
       [
         'uuid' => 'my-component',
         'component_id' => 'sdc.canvas_test_sdc.my-cta',
         'inputs' => [
-          'text' => StaticPropSource::generate(
-            expression: new FieldTypePropExpression('string', 'value'),
-            cardinality: 1,
-          )->withValue('Hey there')->toArray(),
-          'href' => StaticPropSource::generate(
-            expression: new FieldTypePropExpression('uri', 'value'),
-            cardinality: 1,
-          )->withValue('https://drupal.org/')->toArray(),
+          'text' => 'Hey there',
+          'href' => [
+            'uri' => 'https://drupal.org/',
+            'options' => [],
+          ],
         ],
       ],
     ];

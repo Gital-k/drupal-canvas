@@ -20,34 +20,38 @@ ddev add-on get drupal-canvas/ddev-drupal-canvas-dev
 ddev canvas-setup
 ddev canvas-dev-extras
 ```
-Additionally, you should add  `$settings['extension_discovery_scan_tests'] = TRUE;` to the end of the `sites/default/settings.php` file (this allows the `canvas_dev_standard` hidden module to be installed).
+Additionally, you should add  `$settings['extension_discovery_scan_tests'] = TRUE;` to the end of the `sites/default/settings.php` file (this allows hidden modules to be installed).
 
 ### First experience
 After this process, you will get the `drush uli` to login into the admin area. You will see an article created. If you edit the article, you will see a new link "Drupal Canvas: Test" to edit this entity with the new Canvas UI.
 
 ### Usage
 The most common commands in the development process are:
-1. `ddev canvas-site-install`: This will reinstall the site and enable a couple of commands. Very useful when you update Canvas and what to have a fresh installation.
-2. `ddev canvas-ui-build`: This will build the `canvas/ui` javascript application. Required whenever you update Canvas.
-3. Tests and linting: The commands `canvas-eslint`, `canvas-fix`, `canvas-phpcs`, `canvas-phpstan` and `canvas-phpunit` must be used before any commit to ensure code looks good and pass tests.
-4. More commands with `ddev | grep canvas-` and in the [ddev-drupal-canvas-dev repo usage](https://github.com/drupal-canvas/ddev-drupal-canvas-dev#usage).
+1. `ddev xb-site-install`: This will reinstall the site and enable a couple of commands. Very useful when you update Canvas and what to have a fresh installation.
+2. `ddev xb-ui-build`: This will build the `canvas/ui` javascript application. Required whenever you update Canvas.
+3. Tests and linting: The commands `xb-eslint`, `xb-fix`, `xb-phpcs`, `xb-phpstan` and `xb-phpunit` must be used before any commit to ensure code looks good and pass tests.
+4. More commands with `ddev | grep xb-` and in the [ddev-drupal-xb-dev repo usage](https://github.com/drupal-xb/ddev-xb-canvas-dev#usage).
 
 Tip: Use `ddev help <command>` for additional information about the command and arguments available.
 
 ## Setting up you local manually
-1. Clone Drupal 11 (preferably a clone for Git archeology: `git clone https://git.drupalcode.org/project/drupal.git` — >= Drupal 11.2 is required).
+1. Clone Drupal 11 (preferably a clone for Git archeology: `git clone git@git.drupal.org:project/drupal.git` — Drupal >=11.2 is required, so also do: `git checkout 11.2.x`).
 2. `cd drupal && git clone git@git.drupal.org:project/canvas.git modules/contrib/canvas`
-4. `composer require drush/drush`
-5. `vendor/bin/drush si standard`
-4. Add `$settings['extension_discovery_scan_tests'] = TRUE;` to the end of the `sites/default/settings.php` file (this allows the `canvas_dev_standard` hidden module to be installed).
-6. `vendor/bin/drush pm:install canvas canvas_dev_standard`
-7.  Build the front end: `cd modules/contrib/canvas/ui` and then either
+3. `composer require drush/drush`
+4. Add `$settings['extension_discovery_scan_tests'] = TRUE;` to the end of the `sites/default/settings.php` file (this allows hidden modules to be installed).
+5.a Recommended: using Recipes to set up a standardized environment for development *and* testing:
+```
+php core/scripts/drupal install minimal
+php core/scripts/drupal recipe modules/contrib/canvas/tests/fixtures/recipes/base
+php core/scripts/drupal recipe modules/contrib/canvas/tests/fixtures/recipes/test_site
+```
+5.b If you prefer Drush and "Standard", and then subsequently manually installing `canvas_test_*` modules:
+6. Build the front end: `cd modules/contrib/canvas/ui` and then either
     * With Node.js available: `npm install && npm run build`
     * With Docker available: `docker build --output dist .`
-8.  Browse to `/node/add/article` just enter a title for the article and hit save. This will create a node with an empty Editor Frame for the field `field_canvas_demo`.
-9.  In the toolbar, click "Drupal Canvas"! 🥳
-10. If you're curious: look at the code, step through it with a debugger, and join us!
-11. If you want to run *all* tests locally: `composer require drupal/simple_oauth:^6 jangregor/phpstan-prophecy league/openapi-psr7-validator devizzent/cebe-php-openapi --dev && composer update`
+7. You can access Drupal Canvas at `/canvas` and start by creating your first Canvas Page!
+8. If you're curious: look at the code, step through it with a debugger, and join us!
+9. If you want to run *all* tests locally: `composer require drupal/simple_oauth:^6 jangregor/phpstan-prophecy league/openapi-psr7-validator devizzent/cebe-php-openapi --dev && composer update`
 
 ### During development
 The following commands assume the recommended development details outlined above, particularly the location of the `vendor` directory. If your `vendor` directory is not adjacent to your `index.php` — if you created your environment using [`drupal/recommended-project`](https://packagist.org/packages/drupal/recommended-project), for example — you will need to adjust the command path (i.e., `../vendor` instead of `vendor`).
@@ -75,21 +79,6 @@ When architectural decisions are made, they should be recorded in _ADRs_. To cre
 1. Install <https://github.com/npryce/adr-tools> — see [installation instructions](https://github.com/npryce/adr-tools/blob/master/INSTALL.md).
 2. From the root of this project: ```adr new This Is A New Decision```.
 
-# C4 model & Auto-Generated Diagrams
-To edit: either modify locally, or copy/paste `docs/Canvas.dsl` into <https://structurizr.com/dsl> for easy previewing!
-
-When updating the C4 model in `docs/Canvas.dsl`, the diagrams (in `docs/diagrams/`) must be updated too. To do that:
-
-```
-structurizr-cli export -workspace docs/Canvas.dsl --format mermaid --output docs/diagrams && for file in docs/diagrams/*.mmd; do printf "\`\`\`mermaid\n" | cat - $file  > temp && mv -f temp $file && echo $'\n```' >> $file; done && find docs/diagrams/ -name "*.mmd" -exec sh -c 'mv "$1" "${1%.mmd}.md"' _ {} \;
-```
-This will auto-update `docs/diagrams/structurizr-*.md`.
-
-(After installing `structurizr-cli`: <https://docs.structurizr.com/cli/installation>.)
-
-# Data Model Diagram
-
-To edit: either modify locally, or copy/paste `docs/diagrams/*.md` (not the ones with the `structurizr-` prefix) into <https://mermaid.live/edit> for easy previewing!
 
 # Developer Tips & Tricks
 
@@ -103,9 +92,9 @@ If you press & hold the `V` key and then click on the iFrame (focusing into it),
 You can then click (focus) outside the iFrame and tap the `V` key once more to return the UI.
 
 ## 2. Always start from a fresh start
-1. Reinstall the site frequently (`ddev canvas-site-install`).
+1. Reinstall the site frequently (`ddev xb-site-install`).
 2. If you're working with sqlite, delete the database frequently (`rm web/sites/default/.ht.sqlite`).
-3. Build the UI frequently (`ddev canvas-ui-build`).
+3. Build the UI frequently (`ddev xb-ui-build`).
 
 # Releases
 
@@ -117,3 +106,9 @@ Therefore, every release must build the UI, commit the built UI, and revert it. 
 This has been semi-automated: use `sh scripts/tag-release.sh` to be asked what tag to create, and it'll create that tag
 in a (temporary) working directory without touching the Drupal Canvas `git` repository the command runs from. Prior
 to pushing, you'll be given the opportunity to inspect the result.
+
+# Frequent contributors: expert tips
+
+1. When early in an MR and/or developing low-level functionality that is unlikely to affect end-to-end (E2E) tests,
+   disable them by changing `_CANVAS_E2E_TESTS: true` to `false`.
+2. _Please contribute more! 🙏_

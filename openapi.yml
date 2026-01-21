@@ -182,8 +182,6 @@ paths:
                       - No items to publish
         '422':
           $ref: '#/components/responses/ClientErrorResponse'
-        '500':
-          $ref: '#/components/responses/ClientErrorResponse'
   /canvas/api/v0/auto-saves/{entityTypeId}/{entityId}:
     description:  Interact with an auto-save entry for a particular entity
     parameters:
@@ -436,18 +434,18 @@ paths:
                       id: 'sdc_test:my-cta'
                       name: Call to Action
                       source: Module component
-                      category: Buttons
                       library: extension_components
-                      version: 53ed322c96bee384
+                      version: 89881c04a0fde367
                       metadata:
                         slots: {}
                       default_markup: "\u003C!-- canvas-start-9f8719d6-d32d-4012-b48b-c7eddee8aea0 --\u003E\u003Ca  data-component-id=\"canvas_test_sdc:my-cta\" href=\"https://www.drupal.org\"\u003E\n  \u003C!-- canvas-prop-start-9f8719d6-d32d-4012-b48b-c7eddee8aea0/text --\u003EPress\u003C!-- canvas-prop-end-9f8719d6-d32d-4012-b48b-c7eddee8aea0/text --\u003E\n\u003C/a\u003E\n\u003C!-- canvas-end-9f8719d6-d32d-4012-b48b-c7eddee8aea0 --\u003E"
                       css: "\u003Clink rel=\"stylesheet\" media=\"all\" href=\"/sites/default/files/css/css_xeBEV2TNeHyWToTeiA5k4v0zjcPmOd_Qpomr5aKDOlY.css?delta=0&amp;language=en&amp;theme=olivero&amp;include=eJxLzi9K1U_Ozy3Iz0vNKynWS07MK0ssji9JLS6JL05J1tXNrdRNLkkEADTcDyY\" /\u003E\n"
                       js_header: ""
                       js_footer: ""
+                      broken: false
               schema:
                 type: object
-                minProperties: 1
+                minProperties: 0
                 # @todo Validate the property keys match the
                 #   '^\\[a-zA-Z0-9_-]:[a-zA-Z0-9_-]$' pattern in
                 #    https://drupal.org/i/3506543.
@@ -655,11 +653,11 @@ paths:
             schema:
               type: object
               allOf:
-                - required:
-                    - name
-                    - weight
-                    - items
                 - $ref: '#/components/schemas/Folder'
+              required:
+                - name
+                - weight
+                - items
       parameters:
         - $ref: '#/components/parameters/configEntityId'
       responses:
@@ -690,7 +688,7 @@ paths:
                 # @todo Validate the property keys match the '^\\[a-zA-Z0-9_-]$'
                 #   pattern in https://drupal.org/i/3506543.
                 additionalProperties:
-                  $ref: '#/components/schemas/CodeComponent'
+                  $ref: '#/components/schemas/ExistingCodeComponent'
     post:
       summary: Creates a new Code Component
       requestBody:
@@ -718,7 +716,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CodeComponent'
+                $ref: '#/components/schemas/ExistingCodeComponent'
         '401':
           description: Unauthorized (unauthenticated) response.
           $ref: '#/components/responses/UnauthorizedErrorResponse'
@@ -756,7 +754,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CodeComponent'
+                $ref: '#/components/schemas/ExistingCodeComponent'
         '401':
           description: Unauthorized (unauthenticated) response.
           $ref: '#/components/responses/UnauthorizedErrorResponse'
@@ -772,14 +770,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CodeComponent'
+              $ref: '#/components/schemas/UpdatedCodeComponent'
       responses:
         '200':
           description: Updated individual Code Component
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CodeComponent'
+                $ref: '#/components/schemas/ExistingCodeComponent'
         '401':
           description: Unauthorized (unauthenticated) response.
           $ref: '#/components/responses/UnauthorizedErrorResponse'
@@ -817,7 +815,7 @@ paths:
                   -
                     uuid: 0b755464-281c-4487-82a0-ece34a9b1121
                     nodeType: component
-                    type: sdc.canvas_test_sdc.my-section@05bd00d2c481f924
+                    type: sdc.canvas_test_sdc.my-section@b277cb81a83a977f
                     slots: [ ]
                 model:
                   0b755464-281c-4487-82a0-ece34a9b1121:
@@ -1236,6 +1234,33 @@ paths:
                   error:
                     type: string
                     example: Cannot find entity to duplicate.
+  '/canvas/api/v0/extensions':
+    description: Returns the available extensions metadata
+    get:
+      summary: Returns the available extensions metadata
+      responses:
+        '200':
+          $ref: '#/components/responses/ExtensionsResponse'
+
+  '/canvas/api/v0/form/component-instance/content_template/{configEntityId}/{entityId}':
+    description: TODO
+    parameters:
+      - $ref: '#/components/parameters/configEntityId'
+      # The preview entity to use. (Used for verifying all DynamicPropSources can be evaluated.)
+      - $ref: '#/components/parameters/entityId'
+    patch:
+      summary: Generates a component instance form for a content template.
+      responses:
+        '200':
+          $ref: '#/components/responses/ComponentInstanceFormResponse'
+    post:
+      summary: AJAX updates for this form.
+      parameters:
+        - $ref: '#/components/parameters/queryAjaxForm'
+        - $ref: '#/components/parameters/queryWrapperFormat'
+      responses:
+        '200':
+          $ref: '#/components/responses/DrupalAjaxResponse'
   '/canvas/api/v0/form/component-instance/{entityTypeId}/{entityId}':
     description: TODO
     parameters:
@@ -1245,87 +1270,15 @@ paths:
       summary: Generates a component instance form.
       responses:
         '200':
-          description: Component instance form
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                  - html
-                  - css
-                  - js
-                  - settings
-                  - transforms
-                properties:
-                  html:
-                    type: string
-                    description: HTML originating from a Drupal render array.
-                  css:
-                    type: array
-                    description: >-
-                      Stringified CSS info structured for use by `add_css` AJAX
-                      command
-                    items:
-                      type: object
-                      additionalProperties: true
-                      properties:
-                        href:
-                          type: string
-                          format: uri-reference
-                        media:
-                          type: string
-                  js:
-                    type: object
-                    description: >-
-                      Stringified JS info structured for use by `add_js` AJAX
-                      command
-                    additionalProperties:
-                      type: object
-                      required:
-                        - src
-                      properties:
-                        src:
-                          type: string
-                          format: uri-reference
-                  settings:
-                    type: object
-                    description: >-
-                      Stringified settings info structured for use by `settings`
-                      AJAX command
-                    additionalProperties: true
-                  transforms:
-                    $ref: '#/components/schemas/ClientSideTransforms'
+          $ref: '#/components/responses/ComponentInstanceFormResponse'
     post:
       summary: AJAX updates for this form.
       parameters:
-        # @see \Drupal\Core\Form\FormBuilderInterface::AJAX_FORM_REQUEST
-        # @see \Drupal\Core\Form\EventSubscriber\FormAjaxSubscriber
-        # @see \Drupal\Core\EventSubscriber\AjaxResponseSubscriber
-        - in: query
-          name: ajax_form
-          required: true
-          schema:
-            type: integer
-            enum:
-              - 1
-        # @see \Drupal\canvas\Render\MainContent\CanvasTemplateRenderer
-        - in: query
-          name: _wrapper_format
-          required: true
-          schema:
-            type: string
-            enum:
-              - canvas_template
-              - drupal_ajax
+        - $ref: '#/components/parameters/queryAjaxForm'
+        - $ref: '#/components/parameters/queryWrapperFormat'
       responses:
         '200':
-          description: AJAX updates
-          content:
-            application/json:
-              schema:
-                type: object
-                description: A Drupal AJAX response.
-                additionalProperties: true
+          $ref: '#/components/responses/DrupalAjaxResponse'
   '/canvas/api/v0/form/content-entity/{entityTypeId}/{entityId}':
     description: TODO
     get:
@@ -1339,25 +1292,8 @@ paths:
     post:
       summary: AJAX updates for this form.
       parameters:
-        # @see \Drupal\Core\Form\FormBuilderInterface::AJAX_FORM_REQUEST
-        # @see \Drupal\Core\Form\EventSubscriber\FormAjaxSubscriber
-        # @see \Drupal\Core\EventSubscriber\AjaxResponseSubscriber
-        - in: query
-          name: ajax_form
-          required: true
-          schema:
-            type: integer
-            enum:
-              - 1
-        # @see \Drupal\canvas\Render\MainContent\CanvasTemplateRenderer
-        - in: query
-          name: _wrapper_format
-          required: true
-          schema:
-            type: string
-            enum:
-              - canvas_template
-              - drupal_ajax
+        - $ref: '#/components/parameters/queryAjaxForm'
+        - $ref: '#/components/parameters/queryWrapperFormat'
       responses:
         '200':
           description: AJAX updates
@@ -1386,25 +1322,8 @@ paths:
     post:
       summary: AJAX updates for this form.
       parameters:
-        # @see \Drupal\Core\Form\FormBuilderInterface::AJAX_FORM_REQUEST
-        # @see \Drupal\Core\Form\EventSubscriber\FormAjaxSubscriber
-        # @see \Drupal\Core\EventSubscriber\AjaxResponseSubscriber
-        - in: query
-          name: ajax_form
-          required: true
-          schema:
-            type: integer
-            enum:
-              - 1
-        # @see \Drupal\canvas\Render\MainContent\CanvasTemplateRenderer
-        - in: query
-          name: _wrapper_format
-          required: true
-          schema:
-            type: string
-            enum:
-              - canvas_template
-              - drupal_ajax
+        - $ref: '#/components/parameters/queryAjaxForm'
+        - $ref: '#/components/parameters/queryWrapperFormat'
       responses:
         '200':
           description: AJAX updates
@@ -1724,7 +1643,7 @@ paths:
           $ref: '#/components/responses/AuthenticationErrorResponse'
     patch:
       summary: >
-        Updates a single component and returns a preview as well
+        Updates a single component instance and returns a preview as well
         as the updated model, entity_fields and layout. The
         new layout is stored as an auto-save entry (until such
         time as it is published)
@@ -1977,17 +1896,17 @@ paths:
         '404':
           description: Non-existent content entity type or bundle.
           $ref: '#/components/responses/ClientErrorResponse'
-  /canvas/api/v0/ui/content_template/suggestions/structured-data-for-prop_shapes/{entityTypeId}/{bundle}/{configEntityId}:
-    description: Provides suggestions for populating the props of a given component using structured data of the specified entity type and bundle.
+  /canvas/api/v0/ui/content_template/suggestions/prop-sources/{entityTypeId}/{bundle}/{configEntityId}:
+    description: Provides suggestions for populating the props of a given component using prop sources available for the specified entity type and bundle.
     get:
-      summary: Gets suggestions for populating the props of a given component using structured data of the specified entity type and bundle.
+      summary: Gets suggestions for populating the props of a given component using prop sources available for the specified entity type and bundle.
       parameters:
         - $ref: '#/components/parameters/entityTypeId'
         - $ref: '#/components/parameters/bundle'
         - $ref: '#/components/parameters/configEntityId'
       responses:
         '200':
-          description: suggestions for populating the props of a given component using structured data of the specified entity type and bundle.
+          description: Suggestions for populating the props of a given component using prop sources available for the specified entity type and bundle.
           content:
             application/json:
               schema:
@@ -1995,26 +1914,70 @@ paths:
                 # There may be 0 props for this component.
                 minProperties: 0
                 additionalProperties:
-                  type: object
-                  # There may be 0 suggestions for this prop for this component.
-                  minProperties: 0
-                  additionalProperties:
-                    $ref: '#/components/schemas/StructuredDataForPropShapeSuggestion'
+                  $ref: '#/components/schemas/SuggestedPropSources'
               examples:
                 Suggestions for a 'canvas_test_sdc.heading' SDC component instance in the context of an article node:
+                  summary: "Typical example: several suggestions, some with non-selectable choices in the middle of the hierarchy"
                   value:
                     text:
-                      256dc2b8dcec7355:
+                      -
+                        label: "Canonical absolute URL"
+                        id: 7ec753fd20670823
+                        source:
+                          sourceType: "host-entity-url"
+                      -
                         label: "This Article's Title"
+                        id: 256dc2b8dcec7355
                         source:
                           sourceType: "dynamic"
                           expression: "ℹ︎␜entity:node:article␝title␞␟value"
-                    style: {}
-                    element: {}
+                      -
+                        label: Image
+                        items:
+                          -
+                            label: Alternative text
+                            id: 41d0eef544f546ef
+                            source:
+                              sourceType: "dynamic"
+                              expression: "ℹ︎␜entity:node:article␝field_image␞␟alt"
+                          -
+                            label: Title
+                            id: 64b16de61768ca7b
+                            source:
+                              sourceType: "dynamic"
+                              expression: "ℹ︎␜entity:node:article␝field_image␞␟title"
+                    style: []
+                    element: []
                 Suggestions for a 'canvas_test_sdc.video' SDC component instance in the context of an article node:
+                  summary: "There may be no suggestions at all"
                   value:
-                    video: {}
-                    display_width: {}
+                    video: []
+                    display_width: []
+                Suggestions for the `test_string_format_uri` prop in the 'sdc_test_all_props.all-props' SDC component instance in the context of an article node:
+                  summary: "Edge case: several suggestions, but with each level in the hierarchy selectable"
+                  description: "Edge case: several suggestions, but with each level in the hierarchy selectable (possible by matching a main property or one derived from the main property, following a reference and matching its main property, and matching a non-main property on that same reference)"
+                  value:
+                    test_string_format_uri:
+                      -
+                        label: image
+                        id: d9ab0f948b35e1f7
+                        source:
+                          sourceType: "dynamic"
+                          expression: "ℹ︎␜entity:node:article␝field_required_image␞␟src_with_alternate_widths"
+                        items:
+                          -
+                            label: URI
+                            id: 33a61863a57daac8
+                            source:
+                              sourceType: "dynamic"
+                              expression: "ℹ︎␜entity:node:article␝field_required_image␞␟entity␜␜entity:file␝uri␞␟value"
+                            items:
+                              -
+                                label: Root-relative file URL
+                                id: 2eda83e7aa37d2ba
+                                source:
+                                  sourceType: "dynamic"
+                                  expression: "ℹ︎␜entity:node:article␝field_required_image␞␟entity␜␜entity:file␝uri␞␟url"
         # @todo fix in https://www.drupal.org/project/canvas/issues/3541366
         '401':
           description: Unauthorized (unauthenticated) response.
@@ -2096,6 +2059,90 @@ paths:
                     teaser:
                       label: Teaser
                       hasTemplate: true
+  /canvas/api/v0/usage/component:
+    get:
+      summary: Get all components to see if they are in use.
+      responses:
+        '200':
+          description: See what component are in use.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - links
+                additionalProperties: false
+                properties:
+                  data:
+                    type: object
+                    additionalProperties: true
+                  links:
+                    type: object
+                    additionalProperties: false
+                    properties:
+                      prev:
+                        type: [ string, "null" ]
+                        description: URL for the previous page, or null if there is no previous page.
+                      next:
+                        type: [ string, "null" ]
+                        description: URL for the next page, or null if there is no next page.
+              examples:
+                example:
+                  value:
+                    data:
+                      sdc.canvas_test_sdc.attributes: false
+                      sdc.canvas_test_sdc.card: true
+                    links:
+                      prev: null
+                      next: '/canvas/api/v0/usage/component?page=1'
+  /canvas/api/v0/usage/component/{configEntityId}:
+    get:
+      summary: Get a specific component entities usage.
+      parameters:
+        - $ref: '#/components/parameters/configEntityId'
+      responses:
+        '200':
+          description: Get a boolean response for a component entities usage.
+          content:
+            application/json:
+              schema:
+                type: boolean
+  /canvas/api/v0/usage/component/{configEntityId}/details:
+    get:
+      summary: Get detailed usage information for a specific component.
+      parameters:
+        - $ref: '#/components/parameters/configEntityId'
+      responses:
+        '200':
+          description: Detailed usage information for a specific component.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  configEntityId:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: false
+                      required:
+                        - title
+                        - id
+                      properties:
+                        title:
+                          type: string
+                          description: Title of the config entity.
+                        id:
+                          type: string
+                          description: ID of the config entity.
+              examples:
+                example:
+                  value:
+                    pattern:
+                      title: Test pattern
+                      id: test_pattern
 # @see https://spec.openapis.org/oas/v3.1.0.html#components-object
 components:
   # @see https://spec.openapis.org/oas/v3.1.0.html#schema-object
@@ -2125,7 +2172,6 @@ components:
       required:
         - name
         - id
-        - category
         - source
         - library
         - version
@@ -2133,6 +2179,7 @@ components:
         - css
         - js_header
         - js_footer
+        - broken
       additionalProperties: false
       properties:
         name:
@@ -2144,9 +2191,6 @@ components:
         version:
           type: string
           description: Active version ID
-        category:
-          type: string
-          description: The component category
         source:
           type: string
           description: Typically, the component source plugin that provides this Component. But plugins have the freedom to choose to subdivide.
@@ -2243,9 +2287,15 @@ components:
           description: The footer JS for default_markup.
         transforms:
           $ref: '#/components/schemas/ClientSideTransforms'
+        broken:
+          type: boolean
+          description: Whether this Component is safe to instantiate (false) or broken (true).
     CodeComponent:
       title: Code Component
       type: object
+      # This is intended to be combined using `allOf`, so it MUST allow additional properties.
+      # @see https://redocly.com/learn/openapi/all-of#closed-schemas-and-allof-are-invalid
+      additionalProperties: true
       properties:
         machineName:
           type: string
@@ -2299,17 +2349,38 @@ components:
               type: array
               items:
                 type: string
-    NewCodeComponent:
+    ExistingCodeComponent:
       type: object
       allOf:
-        - required:
-            - name
-            - machineName
-            - status
-            - importedJsComponents
-            - dataDependencies
         - $ref: '#/components/schemas/CodeComponent'
         - properties:
+            links:
+              type: object
+              additionalProperties:
+                type: string
+                format: uri-reference
+      required:
+        - name
+        - machineName
+        - required
+        - props
+        - slots
+        - status
+        - sourceCodeJs
+        - sourceCodeCss
+        - compiledJs
+        - compiledCss
+        - dataDependencies
+        - links
+      # @todo Additional key-value pairs should be reported as invalid by OpenAPI validation, but aren't today.
+      # @see https://github.com/thephpleague/openapi-psr7-validator/issues/124#issuecomment-1483323527
+      # @see https://github.com/thephpleague/openapi-psr7-validator/issues/163#issuecomment-2359233087
+      unevaluatedProperties: false
+    UpdatedCodeComponent:
+      allOf:
+        - $ref: '#/components/schemas/CodeComponent'
+        - type: object
+          properties:
             # `importedJsComponents` will be required if `sourceCodeJs` or
             # `compiledJs` is provided.
             # @see \Drupal\canvas\Entity\JavaScriptComponent::updateFromClientSide()
@@ -2319,6 +2390,23 @@ components:
               type: array
               items:
                 type: string
+      # @todo Sending `links` in PATCH & POST requests should be reported as invalid by OpenAPI validation, but it isn't today.
+      # @see https://github.com/thephpleague/openapi-psr7-validator/issues/124#issuecomment-1483323527
+      # @see https://github.com/thephpleague/openapi-psr7-validator/issues/163#issuecomment-2359233087
+      unevaluatedProperties: false
+    NewCodeComponent:
+      allOf:
+        - $ref: '#/components/schemas/UpdatedCodeComponent'
+      required:
+        - name
+        - machineName
+        - status
+        - importedJsComponents
+        - dataDependencies
+      # @todo Sending `links` in PATCH & POST requests should be reported as invalid by OpenAPI validation, but it isn't today.
+      # @see https://github.com/thephpleague/openapi-psr7-validator/issues/124#issuecomment-1483323527
+      # @see https://github.com/thephpleague/openapi-psr7-validator/issues/163#issuecomment-2359233087
+      unevaluatedProperties: false
     LayoutComponent:
       title: LayoutComponent
       type: object
@@ -2558,10 +2646,10 @@ components:
     NewAssetLibrary:
       type: object
       allOf:
-        - required:
-            - id
-            - label
         - $ref: '#/components/schemas/AssetLibrary'
+      required:
+        - id
+        - label
     SegmentationRule:
       title: Segmentation Rule
       type: object
@@ -2607,19 +2695,47 @@ components:
         weight:
           type: integer
           description: The weight of the segment, used for ordering segments.
-    StructuredDataForPropShapeSuggestion:
-      title: Suggested structured data (DynamicPropSource) for prop shape
+    SuggestedPropSources:
+      title: A list of suggested prop sources (a level in the tree of hierarchical suggestions)
+      type: array
+      items:
+        type: object
+        oneOf:
+          - $ref: '#/components/schemas/HierarchicalPathToSuggestedPropSourcesItem'
+          - $ref: '#/components/schemas/SuggestedPropSourceItem'
+      minItems: 0
+    HierarchicalPathToSuggestedPropSourcesItem:
+      title: A path to a child level (so, a labeled parent) of suggested prop sources (path only, no choice; points towards a deeper actual choice)
       type: object
       required:
         - label
+      properties:
+        label:
+          type: string
+          description: Human-readable label
+        items:
+          $ref: '#/components/schemas/SuggestedPropSources'
+      additionalProperties: false
+    SuggestedPropSourceItem:
+      title: Suggested prop source, optionally with a child level if the prop source originates from structured data
+      type: object
+      required:
+        - label
+        - id
         - source
       properties:
         label:
           type: string
           description: Human-readable label
+        id:
+          type: string
+          description: Opaque identifier
         source:
           type: object
-          description: The object representation of the DynamicPropSource that, if selected by the human, the client should use verbatim as the source to populate this component instance's prop.
+          description: The object representation of a DynamicPropSource or HostEntityUrlPropSource that, if selected by the human, the client should use verbatim as the source to populate this component instance's prop.
+        items:
+          $ref: '#/components/schemas/SuggestedPropSources'
+      additionalProperties: false
     Error:
       type: object
       required:
@@ -2739,13 +2855,12 @@ components:
           $ref: '#/components/schemas/Model'
       additionalProperties: false
     NewPattern:
-      type: object
       allOf:
-        - required:
-            - name
-            - layout
-            - model
         - $ref: '#/components/schemas/Pattern'
+      required:
+        - name
+        - layout
+        - model
     Folder:
       title: Folder
       type: object
@@ -2777,22 +2892,22 @@ components:
     ExistingFolder:
       type: object
       allOf:
-        - required:
-            - id
-            - name
-            - type
-            - weight
-            - items
         - $ref: '#/components/schemas/Folder'
+      required:
+        - id
+        - name
+        - type
+        - weight
+        - items
     NewFolder:
       type: object
       allOf:
-        - required:
-            - name
-            - type
-            - weight
-            - items
         - $ref: '#/components/schemas/Folder'
+      required:
+        - name
+        - type
+        - weight
+        - items
     StagedConfigUpdate:
       title: Staged Config Update
       type: object
@@ -2883,6 +2998,48 @@ components:
         viewMode:
           type: string
           description: Drupal View Mode
+    Extension:
+      title: Canvas Extension metadata
+      description: Canvas Extension metadata
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - description
+        - url
+      properties:
+        id:
+          type: string
+          description: ID
+        name:
+          type: string
+          description: Human Name
+        description:
+          type: string
+          description: Human Description
+        icon:
+          type: string
+          description: Icon URL (Relative, starting with /, or absolute)
+        url:
+          type: string
+          description: URL (Relative, starting with /, or absolute)
+        type:
+          type: string
+          description: Extension Type
+          enum:
+            - canvas
+            - code-editor
+        api_version:
+          type: string
+          description: Canvas Extension API version
+          examples:
+            - "1.0"
+        permissions:
+          type: array
+          description: Permissions
+          items:
+            type: string
     ContentTemplate:
       title: ContentTemplate as it appears in ContentTemplateList
       type: object
@@ -2923,6 +3080,14 @@ components:
           description: Entity View Mode label.
   # @see https://spec.openapis.org/oas/v3.1.0.html#response-object
   responses:
+    DrupalAjaxResponse:
+      description: AJAX updates
+      content:
+        application/json:
+          schema:
+            type: object
+            description: A Drupal AJAX response.
+            additionalProperties: true
     FormResponse:
       description: The form
       content:
@@ -2938,6 +3103,57 @@ components:
             properties:
               html:
                 type: string
+    ComponentInstanceFormResponse:
+      description: Component instance form
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - html
+              - css
+              - js
+              - settings
+              - transforms
+            properties:
+              html:
+                type: string
+                description: HTML originating from a Drupal render array.
+              css:
+                type: array
+                description: >-
+                  Stringified CSS info structured for use by `add_css` AJAX
+                  command
+                items:
+                  type: object
+                  additionalProperties: true
+                  properties:
+                    href:
+                      type: string
+                      format: uri-reference
+                    media:
+                      type: string
+              js:
+                type: object
+                description: >-
+                  Stringified JS info structured for use by `add_js` AJAX
+                  command
+                additionalProperties:
+                  type: object
+                  required:
+                    - src
+                  properties:
+                    src:
+                      type: string
+                      format: uri-reference
+              settings:
+                type: object
+                description: >-
+                  Stringified settings info structured for use by `settings`
+                  AJAX command
+                additionalProperties: true
+              transforms:
+                $ref: '#/components/schemas/ClientSideTransforms'
     ClientErrorResponse:
       description: Errors in response to the client's request.
       content:
@@ -2952,6 +3168,14 @@ components:
                 description: Error items
                 items:
                   $ref: '#/components/schemas/Error'
+    ExtensionsResponse:
+      description: Canvas Extensions listing
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties:
+              $ref: '#/components/schemas/Extension'
     UnauthorizedErrorResponse:
       description: Error when unauthenticated.
       content:
@@ -3021,6 +3245,27 @@ components:
           value:
             - hopefully_meaningful_name
             - sdc.canvas_test_sdc.my-cta
+    queryAjaxForm:
+      # @see \Drupal\Core\Form\FormBuilderInterface::AJAX_FORM_REQUEST
+      # @see \Drupal\Core\Form\EventSubscriber\FormAjaxSubscriber
+      # @see \Drupal\Core\EventSubscriber\AjaxResponseSubscriber
+      in: query
+      name: ajax_form
+      required: true
+      schema:
+        type: integer
+        enum:
+          - 1
+    # @see \Drupal\canvas\Render\MainContent\CanvasTemplateRenderer
+    queryWrapperFormat:
+      in: query
+      name: _wrapper_format
+      required: true
+      schema:
+        type: string
+        enum:
+          - canvas_template
+          - drupal_ajax
   # @see https://spec.openapis.org/oas/v3.1.0.html#header-object
   requestBodies:
     Layout:
