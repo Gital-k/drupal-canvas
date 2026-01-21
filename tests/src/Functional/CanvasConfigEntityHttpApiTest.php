@@ -2229,18 +2229,8 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     $body = $this->assertExpectedResponse('GET', $list_url, [], 200, ['user.node_grants:view', 'user.permissions'], ['config:core.extension', 'config:content_template_list', 'entity_bundles', 'config:node_type_list', 'http_response', 'node:1', 'node_list:bunny', 'node_list:llama', 'user.node_grants:view'], 'UNCACHEABLE (request policy)', 'MISS');
     // Change the expectation from `NULL` to the entity ID.
     $expected_list_normalization['node']['bundles']['llama']['viewModes']['full']['suggestedPreviewEntityId'] = (int) $node->id();
-    $expected_full_llama_normalization_with_entity_id = [
-      'entityType' => 'node',
-      'bundle' => 'llama',
-      'viewMode' => 'full',
-      'viewModeLabel' => 'Full content',
-      'label' => 'Llamas content items — Full content view',
-      'status' => FALSE,
-      'id' => 'node.llama.full',
-      'suggestedPreviewEntityId' => NULL,
-      'editUrl' => $base . '/canvas/template/node/llama/full/1',
-    ];
-    $this->assertSame($expected_full_llama_normalization_with_entity_id, $body);
+    $expected_list_normalization['node']['bundles']['llama']['viewModes']['full']['editUrl'] .= "/{$node->id()}";
+    $this->assertSame($expected_list_normalization, $body);
 
     // Creating a Content Template with an already-in-use ID: 409.
     $body = $this->assertExpectedResponse('POST', $list_url, $request_options, 409, NULL, NULL, NULL, NULL);
