@@ -460,7 +460,7 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
     $edit_url = Url::fromRoute('canvas.boot.content_template', [
       'entity_type' => $this->content_entity_type_id,
       'bundle' => $this->content_entity_type_bundle,
-      'view_mode' => $this->content_entity_type_view_mode,
+      'view_mode_name' => $this->content_entity_type_view_mode,
     ])->toString();
     if ($preview_entity) {
       $edit_url .= '/' . $preview_entity->id();
