@@ -92,6 +92,7 @@ final class ApiContentControllers {
       $new = $this->entityTypeManager->getStorage($entity_type)->create([
         'title' => static::defaultTitle($entity_type_definition),
         'status' => FALSE,
+        'langcode' => $this->languageManager->getCurrentLanguage(LanguageInterface::TYPE_CONTENT)->getId(),
       ]);
       $new->save();
     }
