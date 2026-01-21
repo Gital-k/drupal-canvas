@@ -6,7 +6,7 @@ const { Drupal, drupalSettings } = window as any;
 export const getDrupal = () => Drupal;
 export const getDrupalSettings = (): DrupalSettings => drupalSettings;
 export const getCanvasSettings = () => drupalSettings?.canvas;
-export const getBaseUrl = () => drupalSettings?.path?.baseUrl;
+export const getBaseUrl = () => drupalSettings?.path?.baseUrl + drupalSettings?.path?.pathPrefix;
 export const getCanvasPermissions = () =>
   drupalSettings.canvas.permissions as Record<string, boolean>;
 export const getCanvasModuleBaseUrl = () =>
