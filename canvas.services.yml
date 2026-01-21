@@ -184,7 +184,3 @@ services:
     # We don't want any other module to display messages
     decoration_priority: -100
     arguments: ['@.inner']
-  canvas.ajax_response_subscriber:
-    class: Drupal\canvas\EventSubscriber\CanvasAjaxResponseSubscriber
-    tags:
-      - { name: event_subscriber }

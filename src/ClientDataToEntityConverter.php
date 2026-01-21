@@ -290,15 +290,6 @@ class ClientDataToEntityConverter {
       }
     }
 
-    // Normalize values for options widgets that handle multiple values.
-    // Some widgets (like options_buttons) may have inconsistent behavior where
-    // they sometimes expect arrays and sometimes receive scalar values,
-    // particularly when values are submitted programmatically. This can happen
-    // due to form caching or widget configuration being interpreted differently
-    // between requests.
-    // @see \Drupal\Core\Field\Plugin\Field\FieldWidget\OptionsWidgetBase::validateElement()
-    self::normalizeOptionsWidgetValues($peek_form, $entity_form_fields);
-
     // Update the form values with unchecked checkboxes set to NULL and any
     // buttons removed.
     $form_state->setUserInput($entity_form_fields);
@@ -440,64 +431,6 @@ class ClientDataToEntityConverter {
       }
     }
     return $elements;
-  }
-
-  /**
-   * Normalizes values for options widgets that handle multiple values.
-   *
-   * Options widgets (like options_buttons, options_select) that have
-   * handlesMultipleValues() return TRUE may expect values in array format even
-   * when only a single value is selected. This method ensures scalar values
-   * are converted to arrays for such widgets to prevent extraction errors.
-   *
-   * @param array $form
-   *   The complete form array.
-   * @param array &$entity_form_fields
-   *   The entity form fields array, passed by reference and modified in place.
-   */
-  private static function normalizeOptionsWidgetValues(array $form, array &$entity_form_fields): void {
-    foreach (Element::children($form) as $field_name) {
-      if (!isset($form[$field_name]['widget'])) {
-        continue;
-      }
-
-      $widget_element = $form[$field_name]['widget'];
-
-      // Check if this is a field widget that handles multiple values.
-      // Widget plugins implementing WidgetInterface have their plugin
-      // definition stored in #field_parents.
-      if (!isset($widget_element['#field_parents'])) {
-        continue;
-      }
-
-      // Look for the widget plugin information in the field element.
-      $field_definition = $form[$field_name]['#field_definition'] ?? NULL;
-      if (!$field_definition) {
-        continue;
-      }
-
-      // Get the widget from the form display.
-      $form_display = $form['#form_display'] ?? NULL;
-      if (!$form_display || !method_exists($form_display, 'getRenderer')) {
-        continue;
-      }
-
-      $widget = $form_display->getRenderer($field_name);
-      if (!$widget || !method_exists($widget, 'handlesMultipleValues')) {
-        continue;
-      }
-
-      // If the widget handles multiple values and we have a scalar value,
-      // normalize it to an array.
-      if ($widget->handlesMultipleValues() && isset($entity_form_fields[$field_name])) {
-        $value = $entity_form_fields[$field_name];
-
-        // Only normalize if it's a scalar value (not already an array).
-        if (!is_array($value)) {
-          $entity_form_fields[$field_name] = [$value];
-        }
-      }
-    }
   }
 
 }
