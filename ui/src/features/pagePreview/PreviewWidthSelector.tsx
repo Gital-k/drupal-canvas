@@ -38,7 +38,11 @@ const PreviewWidthSelector: React.FC<PreviewWidthSelectorProps> = (props) => {
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger>
-        <Button variant="surface" color="gray">
+        <Button
+          variant="surface"
+          color="gray"
+          aria-label="Select preview width"
+        >
           {currentViewport ? (
             <BreakpointIcon width={currentViewport.width} />
           ) : (
@@ -49,23 +53,28 @@ const PreviewWidthSelector: React.FC<PreviewWidthSelectorProps> = (props) => {
         </Button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Content size="1">
-        <DropdownMenu.Item
-          onClick={() => handlePreviewWidthChange('full')}
-          color={currentWidth === 'full' ? 'blue' : undefined}
+        <DropdownMenu.RadioGroup
+          value={currentWidth}
+          onValueChange={handlePreviewWidthChange}
         >
-          <WidthIcon />
-          Full Width
-        </DropdownMenu.Item>
-        {viewportSizes.map((vs) => (
-          <DropdownMenu.Item
-            key={vs.id}
-            onClick={() => handlePreviewWidthChange(vs.id)}
-            color={currentWidth === vs.id ? 'blue' : undefined}
+          <DropdownMenu.RadioItem
+            value="full"
+            color={currentWidth === 'full' ? 'blue' : undefined}
           >
-            <BreakpointIcon width={vs.width} />
-            {vs.name} ({vs.width}px)
-          </DropdownMenu.Item>
-        ))}
+            <WidthIcon />
+            Full Width
+          </DropdownMenu.RadioItem>
+          {viewportSizes.map((vs) => (
+            <DropdownMenu.RadioItem
+              key={vs.id}
+              value={vs.id}
+              color={currentWidth === vs.id ? 'blue' : undefined}
+            >
+              <BreakpointIcon width={vs.width} />
+              {vs.name} ({vs.width}px)
+            </DropdownMenu.RadioItem>
+          ))}
+        </DropdownMenu.RadioGroup>
       </DropdownMenu.Content>
     </DropdownMenu.Root>
   );
