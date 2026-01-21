@@ -527,7 +527,7 @@ canvas.api.usage.component.list:
   methods: [GET]
 
 canvas.boot.content_template:
-  path: '/canvas/template/{entity_type}/{bundle}/{view_mode}'
+  path: '/canvas/template/{entity_type}/{bundle}/{view_mode_name}'
   defaults:
     _controller: 'Drupal\canvas\Controller\CanvasController'
     _title: 'Content Template'
