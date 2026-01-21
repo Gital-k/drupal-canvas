@@ -2211,7 +2211,6 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
 
     // Re-retrieve list: 200, unchanged, but now is a Dynamic Page Cache hit.
     $this->assertExpectedResponse('GET', $list_url, [], 200, ['user.node_grants:view', 'user.permissions'], ['config:core.extension', 'config:content_template_list', 'entity_bundles', 'config:node_type_list', 'http_response', 'node_list:bunny', 'node_list:llama', 'user.node_grants:view'], 'UNCACHEABLE (request policy)', 'HIT');
-    // @phpstan-ignore-next-line method.alreadyNarrowedType
     $this->assertSame($expected_list_normalization, $body);
 
     // Create a node of the bundle that now will be used as the suggested
