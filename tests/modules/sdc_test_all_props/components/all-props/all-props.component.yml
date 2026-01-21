@@ -246,21 +246,21 @@ props:
       type: integer
       examples:
         - -42
-#    test_integer_range_minimum:
-#      title: 'Integer, minimum=0'
-#      description: 'This is the description of Integer, minimum=0'
-#      type: integer
-#      minimum: 0
-#      examples:
-#        - 42
-#    test_integer_range_minimum_maximum_timestamps:
-#      title: 'Integer, minimum=-2147483648, maximum=2147483648'
-#      description: 'This is the description of Integer, minimum=-2147483648, maximum=2147483648'
-#      type: integer
-#      minimum: -2147483648
-#      maximum: 2147483648
-#      examples:
-#        - 1730718000
+    test_integer_range_minimum:
+      title: 'Integer, minimum=0'
+      description: 'This is the description of Integer, minimum=0'
+      type: integer
+      minimum: 0
+      examples:
+        - 42
+    test_integer_range_minimum_maximum_timestamps:
+      title: 'Integer, minimum=-2147483648, maximum=2147483648'
+      description: 'This is the description of Integer, minimum=-2147483648, maximum=2147483648'
+      type: integer
+      minimum: -2147483648
+      maximum: 2147483648
+      examples:
+        - 1730718000
     test_integer_by_the_dozen:
       title: 'Integer, multipleOf=12'
       description: 'This is the description of Integer, multipleOf=12'
