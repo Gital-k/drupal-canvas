@@ -11,7 +11,6 @@ import {
 } from '@/services/baseQuery';
 import { pendingChangesApi } from '@/services/pendingChangesApi';
 import { handleAutoSavesHashUpdate } from '@/utils/autoSaves';
-import { isAjaxing } from '@/utils/isAjaxing';
 
 import type { RootState } from '@/app/store';
 import type {
@@ -21,99 +20,6 @@ import type {
 import type { EditorFrameContext } from '@/features/ui/uiSlice';
 import type { ConflictError } from '@/services/pendingChangesApi';
 import type { AutoSavesHash } from '@/types/AutoSaves';
-
-// Queue to store pending postPreview requests while AJAX is running
-type PostPreviewQueueItem = {
-  body: { layout: any; model: any; entity_form_fields: any };
-  dispatch: any;
-  queryFulfilled: Promise<any>;
-  timestamp: number;
-};
-
-let postPreviewQueue: PostPreviewQueueItem[] = [];
-let postPreviewIntervalId: number | null = null;
-
-/**
- * Processes the most recent postPreview request from the queue once AJAX operations complete.
- * Logs debugging information about queued and executed requests.
- */
-const processPostPreviewQueue = async () => {
-  if (postPreviewQueue.length === 0) {
-    return;
-  }
-
-  const queueLength = postPreviewQueue.length;
-  // Get the most recent request (last item in the queue)
-  const mostRecentRequest = postPreviewQueue[postPreviewQueue.length - 1];
-
-  console.log(
-    `[postPreview] Processing delayed request. Total queued: ${queueLength}, executing most recent only`,
-  );
-
-  // Clear the queue
-  postPreviewQueue = [];
-
-  // Execute the most recent request
-  try {
-    const { data, meta } = await mostRecentRequest.queryFulfilled;
-    const { html, autoSaves } = data;
-    mostRecentRequest.dispatch(
-      pendingChangesApi.util.invalidateTags([
-        { type: 'PendingChanges', id: 'LIST' },
-      ]),
-    );
-    mostRecentRequest.dispatch(setHtml(html));
-    handleAutoSavesHashUpdate(mostRecentRequest.dispatch, autoSaves, meta);
-    mostRecentRequest.dispatch(setPostPreviewCompleted(true));
-
-    console.log('[postPreview] Delayed request completed successfully');
-  } catch (error) {
-    console.error('[postPreview] Delayed request failed:', error);
-  }
-};
-
-/**
- * Checks if AJAX is running and schedules postPreview execution accordingly.
- * If AJAX is active, sets up an interval to wait for completion.
- */
-const schedulePostPreviewExecution = (
-  body: { layout: any; model: any; entity_form_fields: any },
-  dispatch: any,
-  queryFulfilled: Promise<any>,
-) => {
-  const queueItem: PostPreviewQueueItem = {
-    body,
-    dispatch,
-    queryFulfilled,
-    timestamp: Date.now(),
-  };
-
-  postPreviewQueue.push(queueItem);
-
-  // If we're not currently waiting for AJAX to complete, set up the interval
-  if (postPreviewIntervalId === null && isAjaxing()) {
-    console.log('[postPreview] AJAX in progress, delaying request execution');
-
-    postPreviewIntervalId = window.setInterval(() => {
-      if (!isAjaxing()) {
-        console.log('[postPreview] AJAX completed, processing queue');
-        clearInterval(postPreviewIntervalId!);
-        postPreviewIntervalId = null;
-        processPostPreviewQueue();
-      }
-    }, 50); // Check every 50ms
-  } else if (!isAjaxing()) {
-    // AJAX is not running, process immediately
-    console.log(
-      '[postPreview] No AJAX in progress, processing request immediately',
-    );
-    processPostPreviewQueue();
-  } else {
-    console.log(
-      `[postPreview] Request added to queue (${postPreviewQueue.length} total), waiting for AJAX to complete`,
-    );
-  }
-};
 
 export type UpdateComponentResultType = {
   html: string;
@@ -144,14 +50,8 @@ export const previewApi = createApi({
         body,
       }),
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
-        // Check if AJAX is in progress and handle accordingly
-        if (isAjaxing()) {
-          // Queue the request instead of processing it immediately
-          schedulePostPreviewExecution(arg, dispatch, queryFulfilled);
-          return;
-        }
-
-        // No AJAX in progress, process normally
+        // Process the response normally.
+        // Note: Requests during AJAX are now prevented at the source in PagePreview.tsx
         const { data, meta } = await queryFulfilled;
         const { html, autoSaves } = data;
         dispatch(
@@ -199,7 +99,6 @@ export const previewApi = createApi({
         handleAutoSavesHashUpdate(dispatch, autoSaves, meta);
         // Pass update preview false to prevent a subsequent preview update,
         // we have the data here.
-        console.log('We will set layout model', model);
         dispatch(setLayoutModel({ layout, model, updatePreview: false }));
       },
     }),
