@@ -127,14 +127,14 @@ const AddTemplateDialog = ({
   ]);
 
   useEffect(() => {
-    if (isSuccess && createdTemplate?.editUrl) {
+    if (isSuccess && createdTemplate?.links?.['edit-form']) {
       setIsOpen(false);
       redirectToSelectedAfterCreation();
       // For now, we are using window.location.href to force a full page reload
       // to ensure all state is reset when switching entities. Later we can use navigate:
       // navigate(`${baseUrl}canvas/${entityType}/${contentType}/${viewMode}`);
       setTimeout(() => {
-        window.location.href = createdTemplate.editUrl;
+        window.location.href = createdTemplate.links['edit-form'];
       }, 100);
       setSelectedContentType('');
       setSelectedViewMode(null);

@@ -42,7 +42,9 @@ export type TemplateViewMode = {
   status: boolean;
   id: string;
   suggestedPreviewEntityId?: number;
-  editUrl: string;
+  links: {
+    'edit-form'?: string;
+  };
 };
 
 export type TemplateInBundle = {

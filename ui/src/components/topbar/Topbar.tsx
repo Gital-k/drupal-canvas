@@ -75,7 +75,7 @@ const Topbar = () => {
     if (entityType && bundle && viewMode && templatesData) {
       const templateEditUrl =
         templatesData[entityType]?.bundles?.[bundle]?.viewModes?.[viewMode]
-          ?.editUrl;
+          ?.links?.['edit-form'];
 
       if (templateEditUrl) {
         // @todo: Change to use navigate() when we can do full FE routing.
