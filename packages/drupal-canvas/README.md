@@ -37,13 +37,16 @@ const ControlDots = ({ className }) => (
 
 Access information about the current page.
 
-[See here for documentation.](https://project.pages.drupalcode.org/canvas/code-components/data-fetching#drupal-data)
-
 ```js
 import { getPageData } from 'drupal-canvas';
 
 const { pageTitle, breadcrumbs, mainEntity } = getPageData();
+const { bundle, entityTypeId, uuid } = mainEntity;
 ```
+#### Main entity metadata
+The main entity is the primary Drupal entity (e.g. article, canvas_page, blog) associated with the current page.
+Access main entity metadata of the page you are on with `getPageData`. This can be used to construct JSON:API parameters for requests.
+[View documentation and example here.](https://project.pages.drupalcode.org/canvas/code-components/data-fetching#main-entity-metadata)
 
 ### `getSiteData`
 
