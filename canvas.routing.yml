@@ -537,6 +537,8 @@ canvas.boot.content_template:
     # 2. Set it to '' not NULL, otherwise ParamConverterManager::convert() skips it
     # 3. The ParamConverter reads entity_type/bundle/view_mode_name and loads the entity
     # 4. Then _entity_access can check permissions against the loaded entity
+    # @see \Drupal\Core\Access\AccessManager::checkNamedRoute()
+    # @see \Drupal\Core\ParamConverter\ParamConverterManager::convert()
     content_template: ''
   requirements:
     _entity_access: 'content_template.edit'
