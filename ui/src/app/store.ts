@@ -106,7 +106,6 @@ const rootReducer = combineSlices(
         filter: (action, currentState, previousHistory) => {
           const { present } = previousHistory;
           return (
-            // typeof action.payload === 'object' &&
             Object.keys(present.model).length > 0 &&
             action.type !== setInitialLayoutModel.type &&
             action.type !== setUpdatePreview.type
@@ -125,7 +124,6 @@ const rootReducer = combineSlices(
         filter: (action, currentState, previousHistory) => {
           const { present } = previousHistory;
           return (
-            // typeof action.payload === 'object' &&
             Object.keys(present).length > 0 &&
             action.type !== setInitialPageData.type
           );
@@ -192,7 +190,6 @@ const undoRedoActionIdMiddleware: Middleware<{}, RootState> =
     const [slice] = type.split('/');
     if (slice === 'layoutModel' || slice === 'pageData') {
       // Get current route from state and push undo with route snapshot.
-      // console.group(`UndoRedo Middleware for ${slice}`);
       const state = store.getState();
       const currentRoute = state.ui.currentRoute;
 
