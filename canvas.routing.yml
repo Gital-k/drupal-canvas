@@ -531,8 +531,22 @@ canvas.boot.content_template:
   defaults:
     _controller: 'Drupal\canvas\Controller\CanvasController'
     _title: 'Content Template'
+    # TRICKY: This parameter is not in the URL path, but we need it populated
+    # for access checking during link generation. To make this work:
+    # 1. Add it to defaults (not just options/parameters) so AccessManager knows about it
+    # 2. Set it to '' not NULL, otherwise ParamConverterManager::convert() skips it
+    # 3. The ParamConverter reads entity_type/bundle/view_mode_name and loads the entity
+    # 4. Then _entity_access can check permissions against the loaded entity
+    canvas_config_entity: ''
   requirements:
-    _canvas_content_template_access: TRUE
+    _entity_access: 'canvas_config_entity.edit'
+    canvas_config_entity_type_id: 'content_template'
+    _canvas_ui_access: 'TRUE'
+  options:
+    parameters:
+      canvas_config_entity:
+        # @see \Drupal\canvas\Routing\ContentTemplateFromPartsParamConverter
+        type: canvas_content_template_from_parts
 
 canvas.boot.empty:
   path: '/canvas'
