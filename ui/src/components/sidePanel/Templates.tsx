@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import parse from 'html-react-parser';
 import { PlusIcon } from '@radix-ui/react-icons';
 import { Box, Button, Flex, Select, Text } from '@radix-ui/themes';
@@ -100,8 +100,10 @@ const AddTemplateDialog = ({
   );
   const [selectedViewMode, setSelectedViewMode] = useState<string | null>();
 
-  const [createTemplate, { reset, isSuccess, isError, error }] =
-    useCreateContentTemplateMutation();
+  const [
+    createTemplate,
+    { reset, isSuccess, isError, error, data: createdTemplate },
+  ] = useCreateContentTemplateMutation();
   const {
     data,
     error: getViewModeError,
@@ -125,15 +127,21 @@ const AddTemplateDialog = ({
   ]);
 
   useEffect(() => {
-    if (isSuccess) {
+    if (isSuccess && createdTemplate?.editUrl) {
       setIsOpen(false);
       redirectToSelectedAfterCreation();
+      // For now, we are using window.location.href to force a full page reload
+      // to ensure all state is reset when switching entities. Later we can use navigate:
+      // navigate(`${baseUrl}canvas/${entityType}/${contentType}/${viewMode}`);
+      setTimeout(() => {
+        window.location.href = createdTemplate.editUrl;
+      }, 100);
       setSelectedContentType('');
       setSelectedViewMode(null);
       setSelectedEntityType('null');
       reset();
     }
-  }, [isSuccess, reset, setIsOpen, redirectToSelectedAfterCreation]);
+  }, [isSuccess, createdTemplate, reset, setIsOpen]);
 
   useEffect(() => {
     setSelectedViewMode('');

@@ -13,7 +13,10 @@ import ContentPreviewSelector from '@/components/templates/ContentPreviewSelecto
 import UndoRedo from '@/components/UndoRedo';
 import { selectEditorFrameContext } from '@/features/ui/uiSlice';
 import useEditorNavigation from '@/hooks/useEditorNavigation';
-import { useGetPreviewContentEntitiesQuery } from '@/services/componentAndLayout';
+import {
+  useGetContentTemplatesQuery,
+  useGetPreviewContentEntitiesQuery,
+} from '@/services/componentAndLayout';
 import { getDrupalSettings } from '@/utils/drupal-globals';
 
 import PageInfo from '../pageInfo/PageInfo';
@@ -50,6 +53,11 @@ const Topbar = () => {
     hasPersonalizeExtensionAvailable = true;
   }
 
+  // Fetch template data to get editUrl
+  const { data: templatesData } = useGetContentTemplatesQuery(undefined, {
+    skip: !isTemplateEditorContext,
+  });
+
   // Fetch preview content entities for template routes
   const { data: previewEntities = {} } = useGetPreviewContentEntitiesQuery(
     {
@@ -64,6 +72,21 @@ const Topbar = () => {
   // Handle preview entity selection change
   const handlePreviewEntityChange = (selectedEntityId: string) => {
     setTemplatePreviewEntityId(selectedEntityId);
+    if (entityType && bundle && viewMode && templatesData) {
+      const templateEditUrl =
+        templatesData[entityType]?.bundles?.[bundle]?.viewModes?.[viewMode]
+          ?.editUrl;
+
+      if (templateEditUrl) {
+        // @todo: Change to use navigate() when we can do full FE routing.
+        setTimeout(() => {
+          // Use a timeout to ensure that RTK query cleans up its subscriptions first before navigating away.
+          // Without this timeout, RTK throws an error because it tries to make a request following cache invalidation while
+          // the window.location.href is in progress.
+          window.location.href = `${templateEditUrl}/${selectedEntityId}`;
+        }, 100);
+      }
+    }
   };
 
   const backHref =
