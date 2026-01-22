@@ -42,26 +42,19 @@ import { getPageData } from 'drupal-canvas';
 const { pageTitle, breadcrumbs, mainEntity } = getPageData();
 ```
 
-You can also access site information with the `getSiteData` utility
-
-```js
-import { getSiteData } from 'drupal-canvas';
-
-const { siteName } = getSiteData().branding;
-```
-![Drupal's Drupal Canvas data fetch pane showing the results of access page
-and site data](../../../assets/images/data-fetch-2.webp)
-
-### Main entity metadata
+#### Main entity metadata
 The main entity is the primary Drupal entity (e.g. article, canvas_page, blog) associated with the current page.
 Access main entity metadata of the page you are on with `getPageData`.
 This can be used to construct JSON:API parameters for requests.
 
-ℹ️Not every route has a main entity, in that case `mainEntity` will be null
+ℹ️ Not every route has a main entity, in that case `mainEntity` will be null
 (e.g. front page, /user/login, or inside the Canvas code editor).
 
 If the code component is added to a region that may appear on all pages (including pages without a main entity),
-ensure to check for the existence of `mainEntity` before trying to access its metadata to avoid JS errors.
+ensure to check for the existence of `mainEntity` before trying to access its metadata to avoid JS errors. The example below
+uses a wrapper component to check for the existence of `mainEntity` and also checks that `mainEntity` is an article node
+before calling the `useSWR` hook that fetches related articles. If the code component will only be used
+on pages with a main entity, then this check is not necessary.
 
 **Example usage that fetches a list of articles but excludes the current article being viewed:**
 ```js
@@ -72,34 +65,51 @@ import useSWR from 'swr'
 
 const client = new JsonApiClient();
 
-export default function RelatedArticles() {
-const { mainEntity } = getPageData();
+function RelatedArticles({ mainEntity }) {
+  const { bundle, entityTypeId, uuid } = mainEntity;
+  const { data, error, isLoading } = useSWR(
+  [
+    'node--article',
+    {
+      queryString: new DrupalJsonApiParams()
+        .addFilter('id', uuid, '<>') // Exclude current article by uuid.
+        .getQueryString(),
+    },
+  ],
+  ([type, options]) => client.getCollection(type, options),
+  );
 
-// Check that mainEntity exists.
-if (!mainEntity) {
-  return;
+   return (...);
 }
-const { bundle, entityTypeId, uuid } = mainEntity;
 
-// Check the uuid is associated with an article node type.
-if (bundle !== 'article') {
-  return;
-}
-const { data, error, isLoading } = useSWR(
-[
-  'node--article',
-  {
-    queryString: new DrupalJsonApiParams()
-      .addFilter('id', uuid, '<>') // Exclude current article by uuid.
-      .getQueryString(),
-  },
-],
-([type, options]) => client.getCollection(type, options),
-);
+// Wrapper component to check for mainEntity existence and type before calling a hook since
+// hooks cannot be called conditionally (React rules of hooks).
+function RelatedArticlesWrapper() {
+  const { mainEntity } = getPageData();
 
- return (...);
+  // Return early if there is no mainEntity, or it is not an article node.
+   if (
+     !mainEntity ||
+     mainEntity.entityTypeId !== 'node' ||
+     mainEntity.bundle !== 'article'
+   ) {
+     return null;
+  }
+  return <RelatedArticles mainEntity={mainEntity} />;
 }
+
+export default RelatedArticlesWrapper;
 ```
+
+You can also access site information with the `getSiteData` utility
+
+```js
+import { getSiteData } from 'drupal-canvas';
+
+const { siteName } = getSiteData().branding;
+```
+![Drupal's Drupal Canvas data fetch pane showing the results of access page
+and site data](../../../assets/images/data-fetch-2.webp)
 
 ### JSON:API
 
