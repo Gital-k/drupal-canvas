@@ -354,15 +354,20 @@ final class ApiConfigControllers extends ApiControllerBase {
    * those previews are highly dynamic.
    */
   private function normalize(CanvasHttpApiEligibleConfigEntityInterface $entity): ClientSideRepresentation {
+    $clientSideRepresentation = $entity->normalizeForClientSide();
+    if ($clientSideRepresentation->preview === NULL) {
+      // No preview to render, so no cacheability issues.
+      return $clientSideRepresentation;
+    }
     // TRICKY: some components may (erroneously!) bubble cacheability even
     // when just constructing a render array. For maximum ecosystem
     // compatibility, account for this, and catch the bubbled cacheability.
     // @see \Drupal\views\Plugin\Block\ViewsBlock::build()
-    $get_representation = function (CanvasHttpApiEligibleConfigEntityInterface $entity): ClientSideRepresentation {
+    $get_representation = function (ClientSideRepresentation $clientSideRepresentation): ClientSideRepresentation {
       $context = new RenderContext();
       $representation = $this->renderer->executeInRenderContext(
         $context,
-        fn () => $entity->normalizeForClientSide()->renderPreviewIfAny($this->renderer, $this->assetRenderer),
+        fn () => $clientSideRepresentation->renderPreviewIfAny($this->renderer, $this->assetRenderer),
       );
       assert($representation instanceof ClientSideRepresentation);
       if (!$context->isEmpty()) {
@@ -372,7 +377,7 @@ final class ApiConfigControllers extends ApiControllerBase {
       return $representation;
     };
 
-    $representation = $get_representation($entity);
+    $representation = $get_representation($clientSideRepresentation);
 
     // Use core's `renderer.config` container parameter to determine which cache
     // contexts are considered poorly cacheable.
@@ -393,7 +398,7 @@ final class ApiConfigControllers extends ApiControllerBase {
 
       try {
         $this->accountSwitcher->switchTo(new AnonymousUserSession());
-        $representation = $get_representation($entity);
+        $representation = $get_representation($entity->normalizeForClientSide());
         // Ignore these cache contexts if they still exist, because it's been
         // re-rendered as the anonymous user. If they still exist, they are safe
         // to ignore for preview purposes.
