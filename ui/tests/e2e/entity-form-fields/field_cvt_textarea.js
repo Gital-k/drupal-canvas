@@ -31,8 +31,10 @@ export const edit = (cy) => {
   cy.get('@textarea-wrapper')
     .findByTestId('text-format-select')
     .select('restricted_html');
+  cy.get('@textarea').should('have.value', input);
 };
 export const assertData = (response) => {
+  console.log('response', response);
   expect(response.attributes.field_cvt_textarea.format).to.eq(
     'restricted_html',
   );

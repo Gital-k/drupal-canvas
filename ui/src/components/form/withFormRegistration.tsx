@@ -467,9 +467,11 @@ const ComponentFormField = <P extends Record<string, any>>({
           field.onChange(newValue);
           dispatchFieldValue(dispatch, formId, fieldName, newValue);
 
-          // Call original onChange
+          // Call original onChange (unless skipOriginalOnChange is set)
+          // This allows nested components like FormatSelect to call enhancedOnChange
+          // without creating a cascade
           const originalOnChange = props.attributes?.onChange || props.onChange;
-          if (originalOnChange) {
+          if (originalOnChange && !e?.skipOriginalOnChange) {
             originalOnChange(e);
           }
 
@@ -774,9 +776,11 @@ const PageDataFormField = <P extends Record<string, any>>({
             );
           }
 
-          // Call original onChange
+          // Call original onChange (unless skipOriginalOnChange is set)
+          // This allows nested components like FormatSelect to call enhancedOnChange
+          // without creating a cascade
           const originalOnChange = props.attributes?.onChange || props.onChange;
-          if (originalOnChange) {
+          if (originalOnChange && !e?.skipOriginalOnChange) {
             originalOnChange(e);
           }
           if (!isAjaxing()) {

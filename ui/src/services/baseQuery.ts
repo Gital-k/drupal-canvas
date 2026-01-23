@@ -22,6 +22,131 @@ const requestDebounceMap = new Map<
 >();
 const REQUEST_DEBOUNCE_TIME = 300; // ms
 
+// Timing statistics for determining optimal debounce time
+const requestTimingStats = new Map<
+  string,
+  {
+    lastRequestTime: number;
+    timeBetweenRequests: number[];
+    duplicatesSaved: number;
+  }
+>();
+
+/**
+ * Analyzes request timing patterns and recommends optimal debounce time.
+ * Call this in browser console: window.analyzeDebounceTimings()
+ */
+export const analyzeDebounceTimings = () => {
+  console.group('📊 Request Debounce Timing Analysis');
+
+  if (requestTimingStats.size === 0) {
+    console.log('No request data collected yet.');
+    console.groupEnd();
+    return;
+  }
+
+  let totalDuplicatesSaved = 0;
+  const allTimings: number[] = [];
+
+  requestTimingStats.forEach((stats, key) => {
+    const shortKey = key.substring(0, 40);
+    totalDuplicatesSaved += stats.duplicatesSaved;
+    allTimings.push(...stats.timeBetweenRequests);
+
+    if (stats.timeBetweenRequests.length > 0) {
+      const min = Math.min(...stats.timeBetweenRequests);
+      const max = Math.max(...stats.timeBetweenRequests);
+      const avg =
+        stats.timeBetweenRequests.reduce((a, b) => a + b, 0) /
+        stats.timeBetweenRequests.length;
+      const median = stats.timeBetweenRequests.sort((a, b) => a - b)[
+        Math.floor(stats.timeBetweenRequests.length / 2)
+      ];
+
+      console.group(`🔑 ${shortKey}...`);
+      console.log(`Total requests: ${stats.timeBetweenRequests.length + 1}`);
+      console.log(`Duplicates prevented: ${stats.duplicatesSaved}`);
+      console.log('Request timing (ms):');
+      console.log(`  Min: ${min.toFixed(0)}ms`);
+      console.log(`  Max: ${max.toFixed(0)}ms`);
+      console.log(`  Avg: ${avg.toFixed(0)}ms`);
+      console.log(`  Median: ${median.toFixed(0)}ms`);
+      console.log(
+        `  All timings: [${stats.timeBetweenRequests.map((t) => t.toFixed(0)).join(', ')}]`,
+      );
+      console.groupEnd();
+    }
+  });
+
+  if (allTimings.length > 0) {
+    const sortedTimings = allTimings.sort((a, b) => a - b);
+    const p50 = sortedTimings[Math.floor(sortedTimings.length * 0.5)];
+    const p95 = sortedTimings[Math.floor(sortedTimings.length * 0.95)];
+    const p99 = sortedTimings[Math.floor(sortedTimings.length * 0.99)];
+    const min = Math.min(...allTimings);
+    const max = Math.max(...allTimings);
+    const avg = allTimings.reduce((a, b) => a + b, 0) / allTimings.length;
+
+    console.group('📈 Overall Statistics');
+    console.log(`Total duplicates prevented: ${totalDuplicatesSaved}`);
+    console.log(`Current debounce time: ${REQUEST_DEBOUNCE_TIME}ms`);
+    console.log('\nTime between consecutive identical requests:');
+    console.log(`  Min: ${min.toFixed(0)}ms`);
+    console.log(`  Avg: ${avg.toFixed(0)}ms`);
+    console.log(`  P50 (median): ${p50.toFixed(0)}ms`);
+    console.log(`  P95: ${p95.toFixed(0)}ms`);
+    console.log(`  P99: ${p99.toFixed(0)}ms`);
+    console.log(`  Max: ${max.toFixed(0)}ms`);
+    console.groupEnd();
+
+    console.group('💡 Recommendations');
+    if (p95 < REQUEST_DEBOUNCE_TIME) {
+      console.log(
+        `✅ You could REDUCE debounce time to ${Math.ceil(p95 + 50)}ms`,
+      );
+      console.log(
+        `   (Current: ${REQUEST_DEBOUNCE_TIME}ms, P95: ${p95.toFixed(0)}ms)`,
+      );
+    } else if (min < 50) {
+      console.log(
+        `⚠️  Some requests arrive very quickly (min: ${min.toFixed(0)}ms)`,
+      );
+      console.log(
+        `   Current debounce time (${REQUEST_DEBOUNCE_TIME}ms) seems appropriate.`,
+      );
+    } else {
+      console.log(
+        `✅ Current debounce time (${REQUEST_DEBOUNCE_TIME}ms) looks good.`,
+      );
+    }
+
+    if (totalDuplicatesSaved === 0) {
+      console.log(
+        `ℹ️  No duplicates detected - debounce time might be too short or no duplicates occurring.`,
+      );
+    } else {
+      console.log(
+        `✅ Prevented ${totalDuplicatesSaved} duplicate request(s) - debouncer is working!`,
+      );
+    }
+    console.groupEnd();
+  }
+
+  console.groupEnd();
+
+  return {
+    totalDuplicatesSaved,
+    currentDebounceTime: REQUEST_DEBOUNCE_TIME,
+    allTimings,
+    requestCount: requestTimingStats.size,
+  };
+};
+
+// Make it available globally for console access
+if (typeof window !== 'undefined') {
+  (window as any).analyzeDebounceTimings = analyzeDebounceTimings;
+}
+
 /**
  * Creates a debounced baseQuery that prevents duplicate network requests
  * while preserving Redux actions
@@ -55,12 +180,27 @@ const createDebouncedBaseQuery = (
       method,
       body,
     });
-    const shortKey = requestKey.substring(0, 16);
+    // const shortKey = requestKey.substring(0, 128);
     const currentTime = Date.now();
 
-    console.log(
-      `[baseQuery-debounce] REQUEST ATTEMPT - Key: ${shortKey}, Method: ${method}, URL: ${url}`,
-    );
+    // Track timing between requests for statistics
+    let timeSinceLastRequest: number | null = null;
+    const statsEntry = requestTimingStats.get(requestKey);
+    if (statsEntry) {
+      timeSinceLastRequest = currentTime - statsEntry.lastRequestTime;
+      statsEntry.timeBetweenRequests.push(timeSinceLastRequest);
+      statsEntry.lastRequestTime = currentTime;
+    } else {
+      requestTimingStats.set(requestKey, {
+        lastRequestTime: currentTime,
+        timeBetweenRequests: [],
+        duplicatesSaved: 0,
+      });
+    }
+
+    // console.log(
+    //   `[baseQuery-debounce] REQUEST ATTEMPT - Time ${new Date().getTime()} Key: ${shortKey}, Method: ${method}, URL: ${url}${timeSinceLastRequest !== null ? `, Time since last: ${timeSinceLastRequest}ms` : ''}`,
+    // );
 
     // Check if we have a recent identical request
     const existingRequest = requestDebounceMap.get(requestKey);
@@ -68,37 +208,43 @@ const createDebouncedBaseQuery = (
       const timeDiff = currentTime - existingRequest.timestamp;
 
       if (timeDiff < REQUEST_DEBOUNCE_TIME) {
-        console.log(
-          `[baseQuery-debounce] DUPLICATE DETECTED - Key: ${shortKey}, TimeDiff: ${timeDiff}ms`,
-        );
+        // Track that we saved a duplicate
+        const stats = requestTimingStats.get(requestKey);
+        if (stats) {
+          stats.duplicatesSaved++;
+        }
+
+        // console.log(
+        //   `[baseQuery-debounce] DUPLICATE DETECTED - Time ${new Date().getTime()} Key: ${shortKey}, TimeDiff: ${timeDiff}ms, DuplicatesSaved: ${stats?.duplicatesSaved || 0}`,
+        // );
 
         // If there's an ongoing promise, wait for it
         if (existingRequest.promise) {
-          console.log(
-            `[baseQuery-debounce] REUSING ONGOING REQUEST - Key: ${shortKey}`,
-          );
+          // console.log(
+          //   `[baseQuery-debounce] REUSING ONGOING REQUEST - Time ${new Date().getTime()} Key: ${shortKey}`,
+          // );
           try {
             const result = await existingRequest.promise;
             return result;
           } catch (error) {
-            console.log(
-              `[baseQuery-debounce] ONGOING REQUEST FAILED - Key: ${shortKey}, proceeding with new request`,
-            );
+            // console.log(
+            //   `[baseQuery-debounce] ONGOING REQUEST FAILED -Time ${new Date().getTime()}  Key: ${shortKey}, proceeding with new request`,
+            // );
             // Fall through to make new request
           }
         } else if (existingRequest.result) {
           // We have a cached result, return it
-          console.log(
-            `[baseQuery-debounce] RETURNING CACHED RESULT - Key: ${shortKey}`,
-          );
+          // console.log(
+          //   `[baseQuery-debounce] RETURNING CACHED RESULT - Time ${new Date().getTime()} Key: ${shortKey}`,
+          // );
           return existingRequest.result;
         }
       }
     }
 
-    console.log(
-      `[baseQuery-debounce] PROCEEDING WITH NETWORK REQUEST - Key: ${shortKey}`,
-    );
+    // console.log(
+    //   `[baseQuery-debounce] PROCEEDING WITH NETWORK REQUEST - Time ${new Date().getTime()} Key: ${shortKey}`,
+    // );
 
     // Make the actual request using the original baseQuery
     const requestPromise = originalBaseQuery(args, api, extraOptions);
@@ -112,30 +258,35 @@ const createDebouncedBaseQuery = (
     // Handle completion
     try {
       const result = await requestPromise;
-      console.log(`[baseQuery-debounce] REQUEST COMPLETED - Key: ${shortKey}`);
+      const completionTime = Date.now();
+      // console.log(
+      //   `[baseQuery-debounce] REQUEST COMPLETED - Time ${new Date().getTime()} Key: ${shortKey}, took ${completionTime - currentTime}ms`,
+      // );
 
-      // Cache the result briefly for immediate reuse
+      // Cache the result and mark as completed
+      // This prevents duplicate requests for the full debounce window
       requestDebounceMap.set(requestKey, {
-        timestamp: currentTime,
+        timestamp: completionTime, // Use completion time for debounce window
         result,
       });
 
-      // Clean up after debounce time
+      // Clean up after debounce time from completion
       setTimeout(() => {
         const entry = requestDebounceMap.get(requestKey);
-        if (entry && entry.timestamp === currentTime) {
+        // Only clean up if this is still our entry (timestamp matches completion time)
+        if (entry && entry.timestamp === completionTime) {
           requestDebounceMap.delete(requestKey);
-          console.log(`[baseQuery-debounce] CLEANED UP - Key: ${shortKey}`);
+          // console.log(`[baseQuery-debounce] CLEANED UP - Key: ${shortKey}`);
         }
       }, REQUEST_DEBOUNCE_TIME);
 
       return result;
     } catch (error) {
-      console.log(
-        `[baseQuery-debounce] REQUEST FAILED - Key: ${shortKey}`,
-        error,
-      );
-      // Remove failed request from cache
+      // console.log(
+      //   `[baseQuery-debounce] REQUEST FAILED - Key: ${shortKey}`,
+      //   error,
+      // );
+      // For failed requests, clean up immediately so it can be retried
       const entry = requestDebounceMap.get(requestKey);
       if (entry && entry.timestamp === currentTime) {
         requestDebounceMap.delete(requestKey);

@@ -221,7 +221,7 @@ const DrupalFormattedTextArea = forwardRef<
         {...a2p(attributes, {}, { skipAttributes: ['value', 'onChange'] })}
         ref={ref}
         style={{ display: 'none' }}
-        value={attributes.value?.toString() ?? ''}
+        defaultValue={attributes.value?.toString() ?? ''}
         onChange={attributes.onChange}
       ></textarea>
     </>

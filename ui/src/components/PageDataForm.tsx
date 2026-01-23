@@ -75,7 +75,6 @@ const PageDataFormRenderer = () => {
       e: AjaxUpdateFormStateEvent,
     ) => void = ({ detail }) => {
       const { updates, formId } = detail;
-      console.log('HEY FOLKS WE ARE IN THE LISTENER', updates, formId);
       // We only care about the entity form, not the component instance form.
       if (formId === FORM_TYPES.ENTITY_FORM) {
         if (Object.keys(updates).length === 0) {
