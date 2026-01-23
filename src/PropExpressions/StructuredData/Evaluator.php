@@ -280,12 +280,16 @@ final class Evaluator {
             )
           );
         })(),
-        ReferenceFieldPropExpression::class => self::evaluate(
-          // @phpstan-ignore argument.type
-          self::evaluate($entity, $expr->referencer, $is_required)->value,
-          $expr->referenced,
-          $is_required
-        ),
+        ReferenceFieldPropExpression::class => (function () use ($entity, $expr, $is_required) {
+          $value = self::evaluate($entity, $expr->referencer, $is_required)->value;
+          if (is_array($value)) {
+            return array_map(
+              fn ($e) => self::evaluate($e, $expr->referenced, $is_required),
+              $value
+            );
+          }
+          return self::evaluate($value, $expr->referenced, $is_required);
+        })(),
         FieldObjectPropsExpression::class => array_map(
           fn((ScalarPropExpressionInterface&EntityFieldBasedPropExpressionInterface)|(ReferencePropExpressionInterface&EntityFieldBasedPropExpressionInterface) $sub_expr): EvaluationResult => self::evaluate($entity_or_field, $sub_expr, $is_required),
           $expr->getObjectExpressions(),
