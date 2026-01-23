@@ -32,7 +32,6 @@ const DrupalForm = ({
   const [ajaxContents, setAjaxContents] = useState<AjaxContent[]>([]);
   const processedIdsRef = useRef<Set<string>>(new Set());
 
-  // Log when AJAX contents change and handle cleanup
   useEffect(() => {
     // After ajaxContents updates and portals are created, clean up context elements
     if (ajaxContents.length > 0) {
@@ -153,8 +152,8 @@ const DrupalForm = ({
   const formContent = (
     <>
       {renderChildren}
-      {/* Render AJAX content using portals so it appears in the correct DOM location
-          but maintains access to FormProvider context */}
+      {/* Render AJAX content using portals so it appears in the correct DOM
+      location and has access to the FormProvider context */}
       {ajaxContents.map((ajaxContent) => {
         return createPortal(
           ajaxContent.application,

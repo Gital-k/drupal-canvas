@@ -11,9 +11,6 @@ const TextField = ({
   className?: string;
   attributes?: Attributes;
 }) => {
-  if (attributes.type === 'hidden') {
-    console.log(`hidden ${attributes.name} !!`);
-  }
   return (
     <div className={styles.wrap}>
       <input
@@ -43,19 +40,13 @@ const TextField = ({
                 }
                 // Call the original setter to update the value
                 originalSetter.call(this, newValue);
-                const changeEvent = new Event('change');
-                Object.defineProperty(changeEvent, 'target', {
-                  writable: false,
-                  value: element,
-                });
-
-                if (typeof attributes.onChange === 'function') {
-                  // attributes.onChange(changeEvent);
-                  if (window.jQuery) {
-                    const $target = window.jQuery(this);
-                    if ($target.length) {
-                      $target.trigger('change');
-                    }
+                // Trigger a jQuery change event if jQuery is available, so
+                // Drupal states and other jQuery-based logic can respond to the
+                // change.
+                if (window.jQuery) {
+                  const $target = window.jQuery(this);
+                  if ($target.length) {
+                    $target.trigger('change');
                   }
                 }
               },

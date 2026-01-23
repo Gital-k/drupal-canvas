@@ -192,16 +192,18 @@ const undoRedoActionIdMiddleware: Middleware<{}, RootState> =
       // Get current route from state and push undo with route snapshot.
       const state = store.getState();
       const currentRoute = state.ui.currentRoute;
-
-      const itemToAdd = {
-        targetSlice: slice as UndoRedoType,
-        routeSnapshot: currentRoute,
-        ...(import.meta.env.DEV &&
-          import.meta.env.TEST === false && {
-            debugInfoAction: action as Action,
-          }),
-      };
-      store.dispatch(pushUndo(itemToAdd));
+      store.dispatch(
+        pushUndo({
+          targetSlice: slice as UndoRedoType,
+          routeSnapshot: currentRoute,
+          ...(import.meta.env.DEV &&
+            import.meta.env.TEST === false && {
+              // Add debug info for the action that triggered the undo/redo,
+              // only in development mode.
+              debugInfoAction: action as Action,
+            }),
+        }),
+      );
     }
     return next(action);
   };

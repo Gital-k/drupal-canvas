@@ -45,6 +45,7 @@ const DrupalTextArea = ({
     (attributes?.['data-canvas-format-select-attributes'] &&
       JSON.parse(`${attributes['data-canvas-format-select-attributes']}`)) ||
     {};
+
   return (
     <>
       {format?.editor === 'ckeditor5' && format.editorSettings && (
@@ -141,9 +142,6 @@ const FormatSelect = ({
           };
           setFormat(newFormat);
 
-          // Call enhancedOnChange via attributes.onChange
-          // This triggers the full flow: RHF update, Redux update, and preview refresh
-          // The skipOriginalOnChange flag prevents calling the original onChange again
           if (typeof attributes?.onChange === 'function') {
             // Create a synthetic event with the skipOriginalOnChange flag
             const changeEvent = new Event('change') as any;
@@ -151,6 +149,7 @@ const FormatSelect = ({
               writable: false,
               value: e.target,
             });
+
             // Add flag to prevent cascade
             changeEvent.skipOriginalOnChange = true;
 

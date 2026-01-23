@@ -126,7 +126,7 @@ export const analyzeDebounceTimings = () => {
       );
     } else {
       console.log(
-        `✅ Prevented ${totalDuplicatesSaved} duplicate request(s) - debouncer is working!`,
+        `✅ Prevented ${totalDuplicatesSaved} duplicate request(s) - debounce is working!`,
       );
     }
     console.groupEnd();

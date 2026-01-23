@@ -560,7 +560,6 @@
       Drupal.AjaxCommands.prototype.update_build_id = function (...args) {
         const [, response] = args;
         const formId = getFormId(response.old);
-        console.log(`Updating form build ID for form: ${formId} old: ${response.old} new: ${response.new}`);
         if (!formId) {
           return;
         }

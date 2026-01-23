@@ -60,7 +60,6 @@ const Hidden = ({ attributes }: { attributes?: Attributes }) => {
               });
             }
 
-            // Also call onChange if it exists (backward compatibility)
             if (
               attributes?.onChange &&
               typeof attributes.onChange === 'function'

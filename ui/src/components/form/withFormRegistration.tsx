@@ -6,18 +6,16 @@ import { Controller } from 'react-hook-form';
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import {
   ComponentPreviewUpdateEvent,
+  DEBOUNCE_TIMEOUT,
   getPropSchemas,
   getPropsValues,
+  POLLED_BACKGROUND_TIMEOUT,
   propInputData,
   shouldSkipPropValidation,
+  syncPropSourcesToResolvedValues,
   toPropName,
   validateProp,
 } from '@/components/form/formUtil';
-import {
-  DEBOUNCE_TIMEOUT,
-  POLLED_BACKGROUND_TIMEOUT,
-} from '@/components/form/inputBehaviors';
-import { syncPropSourcesToResolvedValues } from '@/components/form/InputBehaviorsComponentPropsForm';
 import { useSafeFormContext, useSafeRHFContext } from '@/contexts/FormContext';
 import { FORM_TYPES } from '@/features/form/constants';
 import {
@@ -472,6 +470,7 @@ const ComponentFormField = <P extends Record<string, any>>({
           // without creating a cascade
           const originalOnChange = props.attributes?.onChange || props.onChange;
           if (originalOnChange && !e?.skipOriginalOnChange) {
+            // @todo - do we actually need this?
             originalOnChange(e);
           }
 

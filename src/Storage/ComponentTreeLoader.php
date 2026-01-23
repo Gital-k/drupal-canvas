@@ -57,7 +57,7 @@ final class ComponentTreeLoader {
   public function getCanvasFieldName(FieldableEntityInterface $entity): string {
     // @todo Remove this restriction once other entity types and bundles are
     //   allowed in https://drupal.org/i/3498525.
-    $articles_allowed_only_on_tests = $entity->getEntityTypeId() === 'node' && $entity->bundle() === 'article' && (drupal_valid_test_ua() || $this->moduleHandler->moduleExists('canvas_vite'));
+    $articles_allowed_only_on_tests = $entity->getEntityTypeId() === 'node' && $entity->bundle() === 'article' && (drupal_valid_test_ua() || $this->moduleHandler->moduleExists('canvas_test_article_fields'));
     if ($entity->getEntityTypeId() !== Page::ENTITY_TYPE_ID && !$articles_allowed_only_on_tests) {
       throw new \LogicException('For now Canvas only works if the entity is a canvas_page! Other entity types and bundles must use content templates for now, see https://drupal.org/i/3498525');
     }
