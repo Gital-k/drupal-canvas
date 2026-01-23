@@ -32,9 +32,13 @@ const PagePreview = () => {
   useEffect(() => {
     const sendPreviewRequest = async () => {
       try {
-        // Preview request logic
-      } catch (error) {
-        showBoundary(error);
+        await postPreview({
+          layout,
+          model,
+          entity_form_fields,
+        }).unwrap();
+      } catch (err) {
+        showBoundary(err);
       }
     };
     if (updatePreview) {

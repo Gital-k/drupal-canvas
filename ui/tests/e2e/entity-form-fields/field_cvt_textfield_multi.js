@@ -31,17 +31,9 @@ export const edit = (cy) => {
       method: 'POST',
     }).as('updatePreview');
     cy.waitForAjax();
-
-    // Despite waiting on the layout request and AJAX completion, this wait is
-    // still necessary in order to prevent a specific problem where the first
-    // only the first item in the loop makes it to the published version of the
-    // node, despite all items being properly added to the form.
-    // eslint-disable-next-line cypress/no-unnecessary-waiting
-    cy.wait(2000);
     cy.log(`adding item ${ix + 1}`);
     cy.get('@add-another-text').click({ force: true });
-    // eslint-disable-next-line cypress/no-unnecessary-waiting
-    cy.wait(2000);
+
     cy.selectorShouldHaveUpdatedFormBuildId(
       '[data-testid="canvas-page-data-form"]',
       15000,

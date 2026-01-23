@@ -25,6 +25,7 @@ import {
   selectUpdateComponentLoadingState,
   usePostPreviewMutation,
 } from '@/services/preview';
+import { isAjaxing } from '@/utils/isAjaxing';
 
 import type React from 'react';
 
@@ -42,6 +43,8 @@ const Preview: React.FC<PreviewProps> = () => {
   const previousEntityFormTitle = useRef(title);
   // @todo stop hardcoding `path` after https://drupal.org/i/3503446.
   const previousEntityFormAlias = useRef(entity_form_fields['path[0][alias]']);
+  const pendingPreviewRequest = useRef<boolean>(false);
+  const pendingTemplatePreviewRequest = useRef<boolean>(false);
 
   const [postPreview, { isLoading: isFetching }] = usePostPreviewMutation({
     fixedCacheKey: 'editorFramePreview',
@@ -79,31 +82,108 @@ const Preview: React.FC<PreviewProps> = () => {
         showBoundary(err);
       }
     };
+
+    const executePendingPreviewRequest = () => {
+      if (pendingPreviewRequest.current) {
+        pendingPreviewRequest.current = false;
+        console.log(
+          '[Preview] Executing postponed preview request after AJAX completed',
+        );
+        sendPreviewRequest().then(() => {
+          // @todo stop hardcoding `path` after https://drupal.org/i/3503446.
+          if (
+            title !== previousEntityFormTitle.current ||
+            entity_form_fields['path[0][alias]'] !==
+              previousEntityFormAlias.current
+          ) {
+            dispatch(
+              contentApi.util.invalidateTags([{ type: 'Content', id: 'LIST' }]),
+            );
+          }
+        });
+      }
+    };
+
+    const executePendingTemplatePreviewRequest = () => {
+      if (pendingTemplatePreviewRequest.current) {
+        pendingTemplatePreviewRequest.current = false;
+        console.log(
+          '[Preview] Executing postponed template preview request after AJAX completed',
+        );
+        sendTemplatePreviewRequest().then(() => {});
+      }
+    };
+
+    const schedulePreviewRequest = () => {
+      if (isAjaxing()) {
+        if (!pendingPreviewRequest.current) {
+          console.log(
+            '[Preview] Postponing preview request - AJAX is in progress',
+          );
+        }
+        pendingPreviewRequest.current = true;
+
+        // Set up an interval to check when AJAX is done
+        const interval = setInterval(() => {
+          if (!isAjaxing()) {
+            clearInterval(interval);
+            executePendingPreviewRequest();
+          }
+        }, 50);
+      } else {
+        sendPreviewRequest().then(() => {
+          // @todo stop hardcoding `path` after https://drupal.org/i/3503446.
+          if (
+            title !== previousEntityFormTitle.current ||
+            entity_form_fields['path[0][alias]'] !==
+              previousEntityFormAlias.current
+          ) {
+            dispatch(
+              contentApi.util.invalidateTags([{ type: 'Content', id: 'LIST' }]),
+            );
+          }
+        });
+      }
+    };
+
+    const scheduleTemplatePreviewRequest = () => {
+      if (isAjaxing()) {
+        if (!pendingTemplatePreviewRequest.current) {
+          console.log(
+            '[Preview] Postponing template preview request - AJAX is in progress',
+          );
+        }
+        pendingTemplatePreviewRequest.current = true;
+
+        // Set up an interval to check when AJAX is done
+        const interval = setInterval(() => {
+          if (!isAjaxing()) {
+            clearInterval(interval);
+            executePendingTemplatePreviewRequest();
+          }
+        }, 50);
+      } else {
+        sendTemplatePreviewRequest().then(() => {});
+      }
+    };
+
     if (updatePreview) {
       // Specifically when updating the Title or Alias, the page list used in the navigator must be re-fetched so that
       // it can display those updated values.
-      let invalidatePageList = false;
       if (
         title !== previousEntityFormTitle.current ||
         // @todo stop hardcoding `path` after https://drupal.org/i/3503446.
         entity_form_fields['path[0][alias]'] !== previousEntityFormAlias.current
       ) {
-        invalidatePageList = true;
         previousEntityFormTitle.current = title;
         // @todo stop hardcoding `path` after https://drupal.org/i/3503446.
         previousEntityFormAlias.current = entity_form_fields['path[0][alias]'];
       }
 
       if (editorFrameContext === 'template') {
-        sendTemplatePreviewRequest().then(() => {});
+        scheduleTemplatePreviewRequest();
       } else if (editorFrameContext === 'entity') {
-        sendPreviewRequest().then(() => {
-          if (invalidatePageList) {
-            dispatch(
-              contentApi.util.invalidateTags([{ type: 'Content', id: 'LIST' }]),
-            );
-          }
-        });
+        schedulePreviewRequest();
       }
     }
   }, [
