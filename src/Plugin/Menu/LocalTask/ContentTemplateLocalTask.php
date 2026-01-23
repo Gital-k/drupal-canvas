@@ -71,8 +71,9 @@ class ContentTemplateLocalTask extends LocalTaskDefault implements ContainerFact
     if ($entity instanceof ContentEntityInterface) {
       $parameters['entity_type'] = $entity_type_id;
       $parameters['bundle'] = $entity->bundle();
-      // Default to 'full' view mode. This needs to be adjusted if other view modes are supported.
-      $parameters['view_mode'] = 'full';
+      // Default to 'full' view mode.
+      // This needs to be adjusted if other view modes are supported.
+      $parameters['view_mode_name'] = 'full';
     }
 
     return $parameters;

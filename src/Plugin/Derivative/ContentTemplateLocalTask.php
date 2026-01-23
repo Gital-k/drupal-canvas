@@ -7,6 +7,7 @@ namespace Drupal\canvas\Plugin\Derivative;
 use Drupal\Component\Plugin\Derivative\DeriverBase;
 use Drupal\Core\Entity\ContentEntityTypeInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Plugin\Discovery\ContainerDeriverInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\StringTranslation\TranslationInterface;
@@ -36,18 +37,28 @@ class ContentTemplateLocalTask extends DeriverBase implements ContainerDeriverIn
   protected EntityTypeManagerInterface $entityTypeManager;
 
   /**
+   * The module handler.
+   *
+   * @var \Drupal\Core\Extension\ModuleHandlerInterface
+   */
+  protected ModuleHandlerInterface $moduleHandler;
+
+  /**
    * Constructs a new ContentTemplateLocalTask.
    *
    * @param string $base_plugin_id
    *   The base plugin ID.
    * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entity_type_manager
    *   The entity type manager.
+   * @param \Drupal\Core\Extension\ModuleHandlerInterface $module_handler
+   *   The module handler.
    * @param \Drupal\Core\StringTranslation\TranslationInterface $string_translation
    *   The translation manager.
    */
-  public function __construct(string $base_plugin_id, EntityTypeManagerInterface $entity_type_manager, TranslationInterface $string_translation) {
+  public function __construct(string $base_plugin_id, EntityTypeManagerInterface $entity_type_manager, ModuleHandlerInterface $module_handler, TranslationInterface $string_translation) {
     $this->basePluginId = $base_plugin_id;
     $this->entityTypeManager = $entity_type_manager;
+    $this->moduleHandler = $module_handler;
     $this->stringTranslation = $string_translation;
   }
 
@@ -58,6 +69,7 @@ class ContentTemplateLocalTask extends DeriverBase implements ContainerDeriverIn
     return new static(
       $base_plugin_id,
       $container->get('entity_type.manager'),
+      $container->get('module_handler'),
       $container->get('string_translation')
     );
   }
@@ -67,6 +79,11 @@ class ContentTemplateLocalTask extends DeriverBase implements ContainerDeriverIn
    */
   public function getDerivativeDefinitions($base_plugin_definition): array {
     $this->derivatives = [];
+
+    // Only create local tasks if the navigation module is enabled.
+    if (!$this->moduleHandler->moduleExists('navigation')) {
+      return $this->derivatives;
+    }
 
     foreach ($this->entityTypeManager->getDefinitions() as $entity_type_id => $entity_type) {
       if (!$entity_type instanceof ContentEntityTypeInterface) {
@@ -79,7 +96,7 @@ class ContentTemplateLocalTask extends DeriverBase implements ContainerDeriverIn
 
       // Create a local task for each entity type's canonical page.
       $this->derivatives["canvas_template_$entity_type_id"] = [
-        'route_name' => 'canvas.template.entity',
+        'route_name' => 'canvas.boot.content_template',
         'title' => $this->t('Edit Content Template'),
         'base_route' => "entity.$entity_type_id.canonical",
       ];
