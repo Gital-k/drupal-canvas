@@ -441,32 +441,37 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
   /**
    * Gets the available operations for this content template.
    *
-   * @param \Drupal\Core\Entity\ContentEntityInterface|null $preview_entity
-   *   Optional preview entity to include in the edit URL.
-   *
    * @return \Drupal\canvas\Resource\CanvasResourceLinkCollection
    *   A collection of links for this content template.
    */
-  private function getEntityOperations(?ContentEntityInterface $preview_entity = NULL): CanvasResourceLinkCollection {
+  private function getEntityOperations(): CanvasResourceLinkCollection {
     $links = new CanvasResourceLinkCollection([]);
     // Link relation type => route name.
     $possible_operations = [
-      CanvasUriDefinitions::LINK_REL_EDIT => ['route_name' => 'canvas.boot.content_template', 'op' => 'update'],
+      CanvasUriDefinitions::LINK_REL_EDIT => [
+        'route' => [
+          'name' => 'canvas.boot.content_template',
+          'params' => [
+            'entity_type' => $this->content_entity_type_id,
+            'bundle' => $this->content_entity_type_bundle,
+            'view_mode_name' => $this->content_entity_type_view_mode,
+          ],
+        ],
+      ],
     ];
-    foreach ($possible_operations as $link_rel => ['route_name' => $route_name, 'op' => $entity_operation]) {
-      $access = $this->access(operation: $entity_operation, return_as_object: TRUE);
+    foreach ($possible_operations as $link_rel => $operation) {
+      $route_name = $operation['route']['name'];
+      $route_params = $operation['route']['params'] ?? [];
+      $entity_operation = $operation['op'] ?? NULL;
+      $url = Url::fromRoute($route_name, $route_params);
+      if ($entity_operation === NULL) {
+        $access = $url->access(return_as_object: TRUE);
+      }
+      else {
+        $access = $this->access(operation: $entity_operation, return_as_object: TRUE);
+      }
       assert($access instanceof AccessResult);
       if ($access->isAllowed()) {
-        $route_params = [
-          'entity_type' => $this->content_entity_type_id,
-          'bundle' => $this->content_entity_type_bundle,
-          'view_mode_name' => $this->content_entity_type_view_mode,
-        ];
-        $url = Url::fromRoute($route_name, $route_params);
-        // Append the preview entity ID to the URL path if provided.
-        if ($preview_entity !== NULL) {
-          $url->setOption('query', ['preview_entity' => $preview_entity->id()]);
-        }
         $links = $links->withLink(
           $link_rel,
           new CanvasResourceLink($access, $url, $link_rel)
@@ -502,7 +507,7 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
     }
 
     // Expose available entity operations.
-    $linkCollection = $this->getEntityOperations($preview_entity);
+    $linkCollection = $this->getEntityOperations();
 
     return ClientSideRepresentation::create(
       values: [
