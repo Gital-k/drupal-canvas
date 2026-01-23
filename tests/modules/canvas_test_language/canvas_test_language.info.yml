@@ -1,0 +1,8 @@
+name: 'Canvas Test language'
+description: 'Test anything related with content translation and language'
+type: module
+package: Testing
+
+dependencies:
+  - drupal:language
+  - drupal:content_translation

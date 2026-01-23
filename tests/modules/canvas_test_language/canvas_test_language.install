@@ -1,0 +1,98 @@
+<?php
+
+/**
+ * @file
+ * Custom configuration to test canvas multilingual.
+ */
+
+use Drupal\language\Entity\ConfigurableLanguage;
+
+/**
+ * Create languages and prepare language negotiation.
+ */
+function canvas_test_language_install() {
+  $langcodes = ['es'];
+  foreach ($langcodes as $langcode) {
+    ConfigurableLanguage::createFromLangcode($langcode)->save();
+  }
+
+  canvas_test_language_setup_language_negotiation();
+}
+
+/**
+ * Setup all configuration related with language negotiation.
+ */
+function canvas_test_language_setup_language_negotiation() {
+  $language_negotiation = \Drupal::configFactory()->getEditable('language.negotiation');
+  $language_negotiation->setData([
+    'session' => [
+      'parameter' => 'language',
+    ],
+    'url' => [
+      'source' => 'path_prefix',
+      'prefixes' => [
+        'en' => '',
+        'es' => 'es',
+      ],
+      'domains' => [
+        'en' => '',
+        'es' => '',
+      ],
+    ],
+    'selected_langcode' => 'site_default',
+  ]);
+  $language_negotiation->save();
+
+  $language_mapping = \Drupal::configFactory()->getEditable('language.types');
+
+  $language_mapping->setData([
+    'all' => [
+      'language_interface',
+      'language_content',
+      'language_url',
+    ],
+    'configurable' => [
+      'language_interface',
+      'language_content',
+    ],
+    'negotiation' => [
+      'language_content' => [
+        'enabled' => [
+          'language-url' => -8,
+          'language-interface' => 9,
+          'language-selected' => 12,
+        ],
+        'method_weights' => [
+          'language-content-entity' => -9,
+          'language-url' => -8,
+          'language-session' => -6,
+          'language-user' => -4,
+          'language-browser' => -2,
+          'language-interface' => 9,
+          'language-selected' => 12,
+        ],
+      ],
+      'language_url' => [
+        'enabled' => [
+          'language-url' => 0,
+          'language-url-fallback' => 1,
+        ],
+      ],
+      'language_interface' => [
+        'enabled' => [
+          'language-url' => -8,
+          'language-selected' => 12,
+        ],
+        'method_weights' => [
+          'language-user-admin' => -10,
+          'language-url' => -8,
+          'language-session' => -6,
+          'language-user' => -4,
+          'language-browser' => -2,
+          'language-selected' => 12,
+        ],
+      ],
+    ],
+  ]);
+  $language_mapping->save();
+}
