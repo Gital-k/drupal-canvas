@@ -1,18 +1,15 @@
 import { fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
-
-
 import { getCanvasSettings } from '@/utils/drupal-globals';
 
-
-
-import type { BaseQueryApi, BaseQueryFn, FetchArgs, FetchBaseQueryError } from '@reduxjs/toolkit/query/react';
+import type {
+  BaseQueryApi,
+  BaseQueryFn,
+  FetchArgs,
+  FetchBaseQueryError,
+} from '@reduxjs/toolkit/query/react';
 import type { RootState } from '@/app/store';
 import type { AppConfiguration } from '@/features/configuration/configurationSlice';
-
-
-
-
 
 // Global debouncing state for baseQuery
 const requestDebounceMap = new Map<
@@ -356,5 +353,4 @@ export const baseQueryWithAutoSaves: BaseQueryFn<
   string | FetchArgs,
   unknown,
   FetchBaseQueryError
-// > = withAutoSavesInjection(baseQuery);
 > = withAutoSavesInjection(createDebouncedBaseQuery(baseQuery));
