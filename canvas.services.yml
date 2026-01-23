@@ -125,6 +125,9 @@ services:
   Drupal\canvas\Routing\ParametrizedImageStyleConverter:
     tags:
       - { name: paramconverter }
+  Drupal\canvas\Routing\ContentTemplateFromPartsParamConverter:
+    tags:
+      - { name: paramconverter }
 
   # Access.
   Drupal\canvas\Access\CanvasHttpApiEligibleConfigEntityAccessCheck:
@@ -145,10 +148,6 @@ services:
   Drupal\canvas\Access\AuthenticationAccessChecker:
     tags:
       - { name: access_check, applies_to: _canvas_authentication_required }
-  Drupal\canvas\Access\ContentTemplateAccessCheck:
-    tags:
-      - { name: access_check, applies_to: _canvas_content_template_access }
-
   # Twig.
   Drupal\canvas\Twig\CanvasTwigExtension:
     tags:

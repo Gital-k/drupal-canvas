@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Plugin\Menu\LocalTask;
 
+use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Menu\LocalTaskDefault;
@@ -25,6 +26,13 @@ class ContentTemplateLocalTask extends LocalTaskDefault implements ContainerFact
    * @var \Drupal\Core\Entity\EntityTypeManagerInterface
    */
   protected EntityTypeManagerInterface $entityTypeManager;
+
+  /**
+   * Cached content template for the current route.
+   *
+   * @var \Drupal\canvas\Entity\ContentTemplate|null|false
+   */
+  protected ContentTemplate|null|false $contentTemplate = FALSE;
 
   /**
    * Constructs a new ContentTemplateLocalTask.
@@ -77,6 +85,69 @@ class ContentTemplateLocalTask extends LocalTaskDefault implements ContainerFact
     }
 
     return $parameters;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getCacheTags(): array {
+    $tags = parent::getCacheTags();
+
+    // Add the content template as a cache dependency so the local task
+    // is rebuilt when the template is created, updated, or deleted.
+    $content_template = $this->getContentTemplate();
+    if ($content_template) {
+      $tags = array_merge($tags, $content_template->getCacheTags());
+    }
+    else {
+      // If no template exists yet, add the content_template_list tag so
+      // the local task is rebuilt when a new template is created.
+      $tags[] = 'content_template_list';
+    }
+
+    return $tags;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getCacheContexts(): array {
+    $contexts = parent::getCacheContexts();
+
+    // Add URL context since the local task depends on the entity in the route.
+    $contexts[] = 'url';
+
+    return array_unique($contexts);
+  }
+
+  /**
+   * Gets the content template for the current route.
+   *
+   * @return \Drupal\canvas\Entity\ContentTemplate|null
+   *   The content template, or NULL if not found.
+   */
+  protected function getContentTemplate(): ?ContentTemplate {
+    if ($this->contentTemplate !== FALSE) {
+      return $this->contentTemplate;
+    }
+    $route_match = \Drupal::routeMatch();
+
+    // Extract the entity type ID from the derivative ID.
+    $derivative_id = $this->getDerivativeId();
+    $entity_type_id = str_replace('canvas_template_', '', $derivative_id);
+
+    $entity = $route_match->getParameter($entity_type_id);
+
+    if (!$entity instanceof ContentEntityInterface) {
+      $this->contentTemplate = NULL;
+      return NULL;
+    }
+
+    // Load and cache the content template for this entity.
+    // Using 'full' as the default view mode. This needs to be
+    // adjusted if other view modes are supported.
+    $this->contentTemplate = ContentTemplate::loadForEntity($entity, 'full');
+    return $this->contentTemplate;
   }
 
 }
