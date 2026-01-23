@@ -5,12 +5,16 @@
  * Custom configuration to test canvas multilingual.
  */
 
+declare(strict_types=1)
+
 use Drupal\language\Entity\ConfigurableLanguage;
 
 /**
+ * Implements hook_install().
+ *
  * Create languages and prepare language negotiation.
  */
-function canvas_test_language_install() {
+function canvas_test_language_install() : void {
   $langcodes = ['es'];
   foreach ($langcodes as $langcode) {
     ConfigurableLanguage::createFromLangcode($langcode)->save();
@@ -22,7 +26,7 @@ function canvas_test_language_install() {
 /**
  * Setup all configuration related with language negotiation.
  */
-function canvas_test_language_setup_language_negotiation() {
+function canvas_test_language_setup_language_negotiation() : void {
   $language_negotiation = \Drupal::configFactory()->getEditable('language.negotiation');
   $language_negotiation->setData([
     'session' => [
