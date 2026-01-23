@@ -496,6 +496,8 @@ paths:
                               status: true
                               id: node.article.full
                               suggestedPreviewEntityId: 1
+                              links:
+                                edit-form: /canvas/template/node/article/full/1
                           editFieldsUrl: null
                           deleteUrl: null
                         page:
@@ -510,6 +512,8 @@ paths:
                               status: false
                               id: node.page.full
                               suggestedPreviewEntityId: 4
+                              links:
+                                edit-form: /canvas/template/node/page/full/4
                           editFieldsUrl: null
                           deleteUrl: null
                 single content entity type, no preview available:
@@ -562,6 +566,8 @@ paths:
                   suggestedPreviewEntityId: NULL
                   viewModeLabel: 'Full content'
                   label: 'article content items — Full content view'
+                  links:
+                    edit-form: /canvas/template/node/article/full
   /canvas/api/v0/config/content_template/{configEntityId}:
     description: Specific ContentTemplate endpoints.
     get:

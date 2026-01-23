@@ -202,7 +202,11 @@ const TemplateListItem = ({ viewMode }: { viewMode: TemplateViewMode }) => {
         <ContextMenu.Trigger>
           <SidebarNode
             key={viewMode.id}
-            href={viewMode.links?.['edit-form']}
+            href={
+              viewMode.suggestedPreviewEntityId
+                ? `${viewMode.links['edit-form']}/${viewMode.suggestedPreviewEntityId}`
+                : viewMode.links['edit-form']
+            }
             title={`${viewMode.viewModeLabel} template`}
             variant="template"
             dropdownMenuContent={

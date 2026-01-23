@@ -2080,6 +2080,14 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
 
     $base = rtrim(base_path(), '/');
     $list_url = Url::fromUri('base:/canvas/api/v0/config/content_template');
+    $template_url = Url::fromRoute('canvas.boot.content_template')
+      ->setRouteParameters(
+        [
+          'entity_type' => $this->content_entity_type_id,
+          'bundle' => $this->content_entity_type_bundle,
+          'view_mode_name' => $this->content_entity_type_view_mode,
+        ],
+      );
 
     $request_options = [
       RequestOptions::HEADERS => [

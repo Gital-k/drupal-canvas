@@ -53,7 +53,7 @@ const Topbar = () => {
     hasPersonalizeExtensionAvailable = true;
   }
 
-  // Fetch template data to get editUrl
+  // Fetch template data to get edit-form link
   const { data: templatesData } = useGetContentTemplatesQuery(undefined, {
     skip: !isTemplateEditorContext,
   });
@@ -71,27 +71,22 @@ const Topbar = () => {
 
   // Handle preview entity selection change
   const handlePreviewEntityChange = (selectedEntityId: string) => {
-    setTemplatePreviewEntityId(selectedEntityId);
-    if (entityType && bundle && viewMode && templatesData) {
-      const templateEditUrl =
-        templatesData[entityType]?.bundles?.[bundle]?.viewModes?.[viewMode]
-          ?.links?.['edit-form'];
-
-      if (templateEditUrl) {
-        // @todo: Change to use navigate() when we can do full FE routing.
-        setTimeout(() => {
-          // Use a timeout to ensure that RTK query cleans up its subscriptions first before navigating away.
-          // Without this timeout, RTK throws an error because it tries to make a request following cache invalidation while
-          // the window.location.href is in progress.
-          window.location.href = `${templateEditUrl}/${selectedEntityId}`;
-        }, 100);
-      }
+    if (templatesData && entityType && bundle && viewMode) {
+      const templateLink =
+        templatesData[entityType]['bundles'][bundle]['viewModes'][viewMode]
+          .links['edit-form'];
+      // @todo: Change to use navigate() when we can do full FE routing.
+      setTimeout(() => {
+        // Use a timeout to ensure that RTK query cleans up its subscriptions first before navigating away.
+        // Without this timeout, RTK throws an error because it tries to make a request following cache invalidation while
+        // the window.location.href is in progress.
+        window.location.href = `${templateLink}/${selectedEntityId}`;
+      }, 100);
     }
   };
 
   const backHref =
     window.sessionStorage.getItem(PREVIOUS_URL_STORAGE_KEY) ?? '/';
-
   // Must be wide enough to accommodate all the buttons that can appear in the top left and top right. The two
   // columns must be the same width so that the center column is always centered to the whole window.
   const leftRightColumnWidth = '300px';

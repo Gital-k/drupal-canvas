@@ -43,7 +43,7 @@ export type TemplateViewMode = {
   id: string;
   suggestedPreviewEntityId?: number;
   links: {
-    'edit-form'?: string;
+    'edit-form': string;
   };
 };
 
