@@ -7,6 +7,7 @@ declare(strict_types=1);
 namespace Drupal\Tests\canvas\Kernel;
 
 use Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase;
+use Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface;
 use Drupal\canvas\PropShape\PersistentPropShapeRepository;
 use Drupal\canvas\PropShape\PropShapeRepositoryInterface;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent;
@@ -19,9 +20,6 @@ use Drupal\canvas\Entity\Component as ComponentEntity;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaStringFormat;
 use Drupal\canvas\PropExpressions\Component\ComponentPropExpression;
-use Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression;
-use Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression;
-use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression;
 use Drupal\canvas\PropShape\PropShape;
 use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaType;
 use Drupal\canvas\ShapeMatcher\JsonSchemaFieldInstanceMatcher;
@@ -265,6 +263,28 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
         'field_type' => 'list_integer',
         'required' => TRUE,
       ])->save();
+      FieldStorageConfig::create([
+        'field_name' => 'one_from_an_string_list',
+        'entity_type' => 'node',
+        'type' => 'list_string',
+        'cardinality' => 1,
+        'settings' => [
+          'allowed_values' => [
+            'first_key' => 'First Value',
+            'second_key' => 'Second Value',
+            // Make sure that the allowed value's label is properly sanitized.
+            'sanitization_required' => 'Some <script>dangerous</script> & unescaped <strong>markup</strong>',
+          ],
+        ],
+      ])->save();
+      FieldConfig::create([
+        'label' => 'A pre-defined string',
+        'field_name' => 'one_from_an_string_list',
+        'entity_type' => 'node',
+        'bundle' => 'foo',
+        'field_type' => 'list_string',
+        'required' => TRUE,
+      ])->save();
     }
 
     $propShapeRepository = $this->container->get(PropShapeRepositoryInterface::class);
@@ -397,7 +417,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
             $adapter_matches_field_type[$match->getPluginId()][$input_name] = $storable_prop_shape_for_adapter_input
               ? (string) $storable_prop_shape_for_adapter_input->fieldTypeProp
               : NULL;
-            $adapter_matches_instance[$match->getPluginId()][$input_name] = array_map(fn (FieldPropExpression|ReferenceFieldPropExpression|FieldObjectPropsExpression $e): string => (string) $e, $instance_matches);
+            $adapter_matches_instance[$match->getPluginId()][$input_name] = array_map(fn (EntityFieldBasedPropExpressionInterface $e): string => (string) $e, $instance_matches);
           }
           ksort($adapter_matches_field_type);
           ksort($adapter_matches_instance);
@@ -411,7 +431,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
         $matches[$unique_match_key]['static prop source'] = $storable_prop_shape
           ? (string) $storable_prop_shape->fieldTypeProp
           : NULL;
-        $matches[$unique_match_key]['instances'] = array_map(fn (FieldPropExpression|ReferenceFieldPropExpression|FieldObjectPropsExpression $e): string => (string) $e, $instance_candidates);
+        $matches[$unique_match_key]['instances'] = array_map(fn (EntityFieldBasedPropExpressionInterface $e): string => (string) $e, $instance_candidates);
         $matches[$unique_match_key]['adapter_matches_field_type'] = $adapter_matches_field_type;
         $matches[$unique_match_key]['adapter_matches_instance'] = $adapter_matches_instance;
       }
@@ -583,6 +603,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
             'ℹ︎␜entity:media:vacation_videos␝name␞␟value',
             'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝name␞␟value',
             'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝name␞␟value',
+            'ℹ︎␜entity:node:foo␝one_from_an_string_list␞␟label',
             'ℹ︎␜entity:node:foo␝title␞␟value',
             'ℹ︎␜entity:path_alias␝alias␞␟value',
             'ℹ︎␜entity:path_alias␝path␞␟value',
@@ -790,6 +811,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
             'ℹ︎␜entity:media:vacation_videos␝name␞␟value',
             'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝name␞␟value',
             'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝name␞␟value',
+            'ℹ︎␜entity:node:foo␝one_from_an_string_list␞␟label',
             'ℹ︎␜entity:node:foo␝title␞␟value',
             'ℹ︎␜entity:path_alias␝alias␞␟value',
             'ℹ︎␜entity:path_alias␝path␞␟value',
@@ -1247,6 +1269,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
             'ℹ︎␜entity:node:foo␝marketing_docs␞␟{label↝entity␜␜entity:media␝revision_user␞␟entity␜␜entity:user␝name␞␟value,slot↝entity␜␜entity:media␝revision_log_message␞␟value}',
             'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟{label↝entity␜␜entity:media␝revision_user␞␟entity␜␜entity:user␝name␞␟value,slot↝entity␜␜entity:media␝revision_log_message␞␟value}',
             'ℹ︎␜entity:node:foo␝media_video_field␞␟{label↝entity␜␜entity:media␝revision_user␞␟entity␜␜entity:user␝name␞␟value,slot↝entity␜␜entity:media␝revision_log_message␞␟value}',
+            'ℹ︎␜entity:node:foo␝one_from_an_string_list␞␟{label↠label}',
             'ℹ︎␜entity:node:foo␝revision_log␞␟{label↠value}',
             'ℹ︎␜entity:node:foo␝revision_uid␞␟{label↝entity␜␜entity:user␝name␞␟value}',
             'ℹ︎␜entity:node:foo␝title␞␟{label↠value}',
@@ -1339,6 +1362,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
             'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media:vacation_videos␝field_media_video_file_1␞␟description',
             'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝name␞␟value',
             'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝revision_log_message␞␟value',
+            'ℹ︎␜entity:node:foo␝one_from_an_string_list␞␟label',
             'ℹ︎␜entity:node:foo␝revision_log␞␟value',
             'ℹ︎␜entity:node:foo␝revision_uid␞␟entity␜␜entity:user␝name␞␟value',
             'ℹ︎␜entity:node:foo␝title␞␟value',
