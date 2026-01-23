@@ -1,15 +1,152 @@
 import { fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
+
+
 import { getCanvasSettings } from '@/utils/drupal-globals';
 
-import type {
-  BaseQueryApi,
-  BaseQueryFn,
-  FetchArgs,
-  FetchBaseQueryError,
-} from '@reduxjs/toolkit/query/react';
+
+
+import type { BaseQueryApi, BaseQueryFn, FetchArgs, FetchBaseQueryError } from '@reduxjs/toolkit/query/react';
 import type { RootState } from '@/app/store';
 import type { AppConfiguration } from '@/features/configuration/configurationSlice';
+
+
+
+
+
+// Global debouncing state for baseQuery
+const requestDebounceMap = new Map<
+  string,
+  {
+    timestamp: number;
+    promise?: Promise<any>;
+    result?: any;
+  }
+>();
+const REQUEST_DEBOUNCE_TIME = 300; // ms
+
+/**
+ * Creates a debounced baseQuery that prevents duplicate network requests
+ * while preserving Redux actions
+ */
+const createDebouncedBaseQuery = (
+  originalBaseQuery: BaseQueryFn<
+    string | FetchArgs,
+    unknown,
+    FetchBaseQueryError
+  >,
+): BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> => {
+  return async (args, api, extraOptions) => {
+    // Extract URL for checking - handle both string and FetchArgs types
+    const url = typeof args === 'string' ? args : args.url;
+    const method = typeof args === 'string' ? 'GET' : args.method || 'GET';
+    const body = typeof args === 'string' ? undefined : args.body;
+
+    // Only debounce layout API calls that cause duplicate issues
+    const isLayoutAPI =
+      url.includes('canvas/api/v0/layout') ||
+      url.includes('canvas/api/v0/layout-content-template');
+
+    if (!isLayoutAPI) {
+      // Not a layout API call, proceed normally
+      return originalBaseQuery(args, api, extraOptions);
+    }
+
+    // Create a unique key for this request
+    const requestKey = JSON.stringify({
+      url,
+      method,
+      body,
+    });
+    const shortKey = requestKey.substring(0, 16);
+    const currentTime = Date.now();
+
+    console.log(
+      `[baseQuery-debounce] REQUEST ATTEMPT - Key: ${shortKey}, Method: ${method}, URL: ${url}`,
+    );
+
+    // Check if we have a recent identical request
+    const existingRequest = requestDebounceMap.get(requestKey);
+    if (existingRequest) {
+      const timeDiff = currentTime - existingRequest.timestamp;
+
+      if (timeDiff < REQUEST_DEBOUNCE_TIME) {
+        console.log(
+          `[baseQuery-debounce] DUPLICATE DETECTED - Key: ${shortKey}, TimeDiff: ${timeDiff}ms`,
+        );
+
+        // If there's an ongoing promise, wait for it
+        if (existingRequest.promise) {
+          console.log(
+            `[baseQuery-debounce] REUSING ONGOING REQUEST - Key: ${shortKey}`,
+          );
+          try {
+            const result = await existingRequest.promise;
+            return result;
+          } catch (error) {
+            console.log(
+              `[baseQuery-debounce] ONGOING REQUEST FAILED - Key: ${shortKey}, proceeding with new request`,
+            );
+            // Fall through to make new request
+          }
+        } else if (existingRequest.result) {
+          // We have a cached result, return it
+          console.log(
+            `[baseQuery-debounce] RETURNING CACHED RESULT - Key: ${shortKey}`,
+          );
+          return existingRequest.result;
+        }
+      }
+    }
+
+    console.log(
+      `[baseQuery-debounce] PROCEEDING WITH NETWORK REQUEST - Key: ${shortKey}`,
+    );
+
+    // Make the actual request using the original baseQuery
+    const requestPromise = originalBaseQuery(args, api, extraOptions);
+
+    // Store the promise for reuse by concurrent requests
+    requestDebounceMap.set(requestKey, {
+      timestamp: currentTime,
+      promise: requestPromise as Promise<any>,
+    });
+
+    // Handle completion
+    try {
+      const result = await requestPromise;
+      console.log(`[baseQuery-debounce] REQUEST COMPLETED - Key: ${shortKey}`);
+
+      // Cache the result briefly for immediate reuse
+      requestDebounceMap.set(requestKey, {
+        timestamp: currentTime,
+        result,
+      });
+
+      // Clean up after debounce time
+      setTimeout(() => {
+        const entry = requestDebounceMap.get(requestKey);
+        if (entry && entry.timestamp === currentTime) {
+          requestDebounceMap.delete(requestKey);
+          console.log(`[baseQuery-debounce] CLEANED UP - Key: ${shortKey}`);
+        }
+      }, REQUEST_DEBOUNCE_TIME);
+
+      return result;
+    } catch (error) {
+      console.log(
+        `[baseQuery-debounce] REQUEST FAILED - Key: ${shortKey}`,
+        error,
+      );
+      // Remove failed request from cache
+      const entry = requestDebounceMap.get(requestKey);
+      if (entry && entry.timestamp === currentTime) {
+        requestDebounceMap.delete(requestKey);
+      }
+      throw error;
+    }
+  };
+};
 
 export const baseQuery: BaseQueryFn<
   string | FetchArgs,
@@ -214,9 +351,10 @@ export const withAutoSavesInjection: (
   };
 };
 
-// Export a baseQuery with autoSaves injection by default
+// Export a baseQuery with autoSaves injection and debouncing by default
 export const baseQueryWithAutoSaves: BaseQueryFn<
   string | FetchArgs,
   unknown,
   FetchBaseQueryError
-> = withAutoSavesInjection(baseQuery);
+// > = withAutoSavesInjection(baseQuery);
+> = withAutoSavesInjection(createDebouncedBaseQuery(baseQuery));
