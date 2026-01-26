@@ -151,6 +151,7 @@ if (typeof window !== 'undefined') {
  * Creates a debounced baseQuery that prevents duplicate network requests
  * while preserving Redux actions
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const createDebouncedBaseQuery = (
   originalBaseQuery: BaseQueryFn<
     string | FetchArgs,
@@ -504,4 +505,6 @@ export const baseQueryWithAutoSaves: BaseQueryFn<
   string | FetchArgs,
   unknown,
   FetchBaseQueryError
-> = withAutoSavesInjection(createDebouncedBaseQuery(baseQuery));
+> = withAutoSavesInjection(baseQuery);
+
+// > = withAutoSavesInjection(createDebouncedBaseQuery(baseQuery));

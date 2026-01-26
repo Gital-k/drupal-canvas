@@ -69,6 +69,7 @@ const Preview: React.FC<PreviewProps> = () => {
       currentEntityFormFields: typeof entity_form_fields,
     ) => {
       try {
+        console.log('POST PREVIEW ' + new Date().getTime());
         // Trigger the mutation with current values at execution time
         await postPreview({
           layout: currentLayout,

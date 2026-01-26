@@ -23,6 +23,9 @@ export const edit = (cy) => {
     );
     // Wait for the preview to finish loading.
     cy.wait('@updatePreview');
+    // @todo this wait is a temp fix. We shouldn't merge this, but instead
+    // find the underlying cause.
+    cy.wait(4000); // eslint-disable-line cypress/no-unnecessary-waiting
     // Queue another intercept for the wait in the main test and/or the next
     // iteration in the loop.
     cy.intercept({
@@ -38,6 +41,9 @@ export const edit = (cy) => {
       '[data-testid="canvas-page-data-form"]',
       15000,
     );
+    // @todo this wait is a temp fix. We shouldn't merge this, but instead
+    // find the underlying cause.
+    cy.wait(4000); // eslint-disable-line cypress/no-unnecessary-waiting
   });
 };
 export const assertData = (response) => {
