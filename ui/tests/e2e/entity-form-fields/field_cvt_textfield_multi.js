@@ -112,8 +112,7 @@ export const edit = (cy) => {
 
     cy.log(`adding item ${ix + 1}`);
 
-    cy.get('@add-another-text')
-      .click();
+    cy.get('@add-another-text').click();
 
     cy.waitForAjax().then(() => {
       console.log(`[Iteration ${ix + 1}] waitForAjax after click completed`);
