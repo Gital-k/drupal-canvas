@@ -61,7 +61,7 @@ const testMediaLibraryInEntityForm = (cy, loadOptions = {}, title) => {
       // Wait for the preview to finish loading.
       cy.wait('@updatePreview');
       cy.findByLabelText('Loading Preview').should('not.exist');
-      cy.waitForAjax();
+      // cy.waitForAjax();
       cy.get(removeIt).should('not.exist', { timeout: 10000 });
       cy.log(`Iteration ${ix + 1}: ${step.removeText} complete`);
     }
@@ -76,7 +76,7 @@ const testMediaLibraryInEntityForm = (cy, loadOptions = {}, title) => {
       expect(isDisabled, 'Button should not be disabled').to.be.false;
     });
     cy.get(addIt).first().click({ force: true });
-    cy.waitForAjax();
+    // cy.waitForAjax();
 
     //   .click();
     // The first time the media dialog opens there are a lot of CSS files to
@@ -94,13 +94,13 @@ const testMediaLibraryInEntityForm = (cy, loadOptions = {}, title) => {
     // Wait for the preview to finish loading.
     cy.wait('@updatePreview', { timeout: 10000 });
     cy.findByLabelText('Loading Preview').should('not.exist');
-    cy.waitForAjax();
+    // cy.waitForAjax();
     cy.get('@entityForm').findByAltText(step.expectedAlt).should('exist');
     cy.get('@entityForm')
       .findByRole('button', { name: step.removeAriaLabel })
       .should('exist');
     cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
-    cy.waitForAjax();
+    // cy.waitForAjax();
     cy.log(`Iteration ${ix + 1}: Adding ${step.expectedAlt} complete`);
   });
 
