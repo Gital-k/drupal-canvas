@@ -21,11 +21,20 @@ use Drupal\field\FieldConfigInterface;
 /**
  * For pointing to a prop in a concrete field.
  */
-final class FieldPropExpression implements StructuredDataPropExpressionInterface {
+final class FieldPropExpression implements EntityFieldBasedPropExpressionInterface, ScalarPropExpressionInterface {
+
+  use EntityFieldBasedExpressionTrait;
 
   public function __construct(
     // @todo will this break down once we support config entities? It must, because top-level config entity props ~= content entity fields, but deeper than that it is different.
     public readonly EntityDataDefinitionInterface $entityType,
+    // TRICKY: #3530521 allowed multiple field names to be defined here to allow
+    // targeting multiple bundles with different field names, but was only ever
+    // used in the context of reference fields, not stand-alone. It mistakenly
+    // added the "multi-bundle reference" infrastructure to FieldPropExpression
+    // rather than ReferenceField(Type)PropExpression. #3550750 is fixing this.
+    // @todo Deprecate what https://www.drupal.org/node/3530521 introduced and refactor this in https://www.drupal.org/project/canvas/issues/3550750
+    // @see \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression::__construct()
     public readonly string|array $fieldName,
     // A content entity field item delta is optional.
     // @todo Should this allow expressing "all deltas"? Should that be represented using `NULL`, `TRUE`, `*` or `∀`? For now assuming NULL.
@@ -311,19 +320,44 @@ final class FieldPropExpression implements StructuredDataPropExpressionInterface
       throw new \DomainException(sprintf("`%s` is an expression for entity type `%s`, but the provided entity is of type `%s`.", (string) $this, $expected_entity_type_id, $entity->getEntityTypeId()));
     }
     $expected_bundles = $this->entityType->getBundles();
-    if ($expected_bundles !== NULL && !in_array($entity->bundle(), $expected_bundles)) {
+    if ($expected_bundles !== NULL && !in_array($entity->bundle(), $expected_bundles, TRUE)) {
       throw new \DomainException(sprintf("`%s` is an expression for entity type `%s`, bundle(s) `%s`, but the provided entity is of the bundle `%s`.", (string) $this, $expected_entity_type_id, implode(', ', $expected_bundles), $entity->bundle()));
     }
     // @todo validate that the field exists?
   }
 
+  /**
+   * {@inheritdoc}
+   */
   public function getHostEntityDataDefinition(): EntityDataDefinitionInterface {
     return $this->entityType;
   }
 
-  public function isMultiBundle(): bool {
-    // @see ::__construct()
-    return is_array($this->fieldName);
+  /**
+   * {@inheritdoc}
+   */
+  public function getFieldName(): string {
+    // @todo Deprecate what https://www.drupal.org/node/3530521 introduced and refactor this in https://www.drupal.org/project/canvas/issues/3550750
+    // @see \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression::__construct()
+    \assert(!is_array($this->fieldName));
+    return $this->fieldName;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getFieldPropertyName(): string {
+    // @todo Deprecate what https://www.drupal.org/node/3530521 introduced and refactor this in https://www.drupal.org/project/canvas/issues/3550750
+    // @see \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression::__construct()
+    \assert(!is_array($this->propName));
+    return $this->propName;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getDelta(): ?int {
+    return $this->delta;
   }
 
 }

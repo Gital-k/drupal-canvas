@@ -13,9 +13,6 @@ use Drupal\Core\Plugin\Component;
 use Drupal\Core\Theme\ComponentPluginManager;
 use Drupal\Core\TypedData\DataReferenceTargetDefinition;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
-use Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression;
-use Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression;
-use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression;
 use Drupal\canvas\ShapeMatcher\PropSourceSuggester;
 use Drupal\canvas\ShapeMatcher\JsonSchemaFieldInstanceMatcher;
 use Drupal\field\Entity\FieldConfig;
@@ -65,7 +62,7 @@ final class FieldInstanceSupportTest extends EcosystemSupportTestBase {
    *
    * @see \Drupal\canvas\ShapeMatcher\JsonSchemaFieldInstanceMatcher::IGNORE_FIELD_TYPES
    */
-  public const MATCHING_ALL_FIELD_TYPES = 0.8064516129032258;
+  public const MATCHING_ALL_FIELD_TYPES = 0.8387096774193549;
 
   /**
    * Current % of CLAIMED supported field type field properties.
@@ -79,7 +76,7 @@ final class FieldInstanceSupportTest extends EcosystemSupportTestBase {
    *
    * (For example: the `password` field type never makes sense to match.)
    */
-  public const MATCHING_ALL_FIELD_TYPE_PROPERTIES = 0.7843137254901961;
+  public const MATCHING_ALL_FIELD_TYPE_PROPERTIES = 0.7884615384615384;
 
   /**
    * Supported field types (keys), with explicitly unsupported props (values).
@@ -136,6 +133,7 @@ final class FieldInstanceSupportTest extends EcosystemSupportTestBase {
     ],
     'list_float' => [],
     'list_integer' => [],
+    'list_string' => [],
     // Note that 'password' is deliberately not here (unsupported) as we don't
     // want any of its properties to be associated with a dynamic prop source.
     'path' => [
@@ -310,15 +308,7 @@ final class FieldInstanceSupportTest extends EcosystemSupportTestBase {
       foreach ($suggested_instances as $dynamic_prop_source) {
         \assert($dynamic_prop_source instanceof DynamicPropSource);
         $expr = $dynamic_prop_source->expression;
-        $field_name = match (get_class($expr)) {
-          FieldPropExpression::class, FieldObjectPropsExpression::class => $expr->fieldName,
-          ReferenceFieldPropExpression::class => $expr->referencer->fieldName,
-        };
-        // Even though FieldPropExpression's `fieldName` can be an array at the
-        // data structure level, it can only be a string here: because the logic
-        // in JsonSchemaFieldInstanceMatcher asses one entity type + bundle at
-        // time.
-        assert(is_string($field_name));
+        $field_name = $expr->getFieldName();
         if (!str_starts_with($field_name, self::CANVAS_TEST_FIELD_PREFIX)) {
           continue;
         }
