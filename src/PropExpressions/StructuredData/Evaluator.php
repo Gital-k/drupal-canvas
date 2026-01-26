@@ -166,6 +166,7 @@ final class Evaluator {
       $entity = $entity_or_field;
       // @todo support non-fieldable entities?
       assert($entity instanceof FieldableEntityInterface);
+      /** @var \Drupal\Core\Entity\FieldableEntityInterface $entity */
       $entity = \Drupal::service('entity.repository')->getTranslationFromContext($entity_or_field);
       $entity_access = self::validateAccess($entity, $expr);
       $field_name = match ($expr::class) {
