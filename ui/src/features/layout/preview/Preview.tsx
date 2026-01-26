@@ -45,6 +45,7 @@ const Preview: React.FC<PreviewProps> = () => {
   const previousEntityFormAlias = useRef(entity_form_fields['path[0][alias]']);
   const pendingPreviewRequest = useRef<boolean>(false);
   const pendingTemplatePreviewRequest = useRef<boolean>(false);
+  const shouldInvalidatePageList = useRef<boolean>(false);
 
   const [postPreview, { isLoading: isFetching }] = usePostPreviewMutation({
     fixedCacheKey: 'editorFramePreview',
@@ -62,21 +63,33 @@ const Preview: React.FC<PreviewProps> = () => {
   const editorFrameContext = useAppSelector(selectEditorFrameContext);
 
   useEffect(() => {
-    const sendPreviewRequest = async () => {
+    const sendPreviewRequest = async (
+      currentLayout: typeof layout,
+      currentModel: typeof model,
+      currentEntityFormFields: typeof entity_form_fields,
+    ) => {
       try {
-        // Trigger the mutation
-        await postPreview({ layout, model, entity_form_fields }).unwrap();
+        // Trigger the mutation with current values at execution time
+        await postPreview({
+          layout: currentLayout,
+          model: currentModel,
+          entity_form_fields: currentEntityFormFields,
+        }).unwrap();
       } catch (err) {
         showBoundary(err);
       }
     };
-    const sendTemplatePreviewRequest = async () => {
+    const sendTemplatePreviewRequest = async (
+      currentLayout: typeof layout,
+      currentModel: typeof model,
+      currentEntityFormFields: typeof entity_form_fields,
+    ) => {
       try {
-        // Trigger the mutation
+        // Trigger the mutation with current values at execution time
         await postTemplatePreview({
-          layout,
-          model,
-          entity_form_fields,
+          layout: currentLayout,
+          model: currentModel,
+          entity_form_fields: currentEntityFormFields,
         }).unwrap();
       } catch (err) {
         showBoundary(err);
@@ -89,13 +102,10 @@ const Preview: React.FC<PreviewProps> = () => {
         console.log(
           '[Preview] Executing postponed preview request after AJAX completed',
         );
-        sendPreviewRequest().then(() => {
+        sendPreviewRequest(layout, model, entity_form_fields).then(() => {
           // @todo stop hardcoding `path` after https://drupal.org/i/3503446.
-          if (
-            title !== previousEntityFormTitle.current ||
-            entity_form_fields['path[0][alias]'] !==
-              previousEntityFormAlias.current
-          ) {
+          if (shouldInvalidatePageList.current) {
+            shouldInvalidatePageList.current = false;
             dispatch(
               contentApi.util.invalidateTags([{ type: 'Content', id: 'LIST' }]),
             );
@@ -110,7 +120,9 @@ const Preview: React.FC<PreviewProps> = () => {
         console.log(
           '[Preview] Executing postponed template preview request after AJAX completed',
         );
-        sendTemplatePreviewRequest().then(() => {});
+        sendTemplatePreviewRequest(layout, model, entity_form_fields).then(
+          () => {},
+        );
       }
     };
 
@@ -131,13 +143,10 @@ const Preview: React.FC<PreviewProps> = () => {
           }
         }, 50);
       } else {
-        sendPreviewRequest().then(() => {
+        sendPreviewRequest(layout, model, entity_form_fields).then(() => {
           // @todo stop hardcoding `path` after https://drupal.org/i/3503446.
-          if (
-            title !== previousEntityFormTitle.current ||
-            entity_form_fields['path[0][alias]'] !==
-              previousEntityFormAlias.current
-          ) {
+          if (shouldInvalidatePageList.current) {
+            shouldInvalidatePageList.current = false;
             dispatch(
               contentApi.util.invalidateTags([{ type: 'Content', id: 'LIST' }]),
             );
@@ -163,7 +172,9 @@ const Preview: React.FC<PreviewProps> = () => {
           }
         }, 50);
       } else {
-        sendTemplatePreviewRequest().then(() => {});
+        sendTemplatePreviewRequest(layout, model, entity_form_fields).then(
+          () => {},
+        );
       }
     };
 
@@ -175,6 +186,7 @@ const Preview: React.FC<PreviewProps> = () => {
         // @todo stop hardcoding `path` after https://drupal.org/i/3503446.
         entity_form_fields['path[0][alias]'] !== previousEntityFormAlias.current
       ) {
+        shouldInvalidatePageList.current = true;
         previousEntityFormTitle.current = title;
         // @todo stop hardcoding `path` after https://drupal.org/i/3503446.
         previousEntityFormAlias.current = entity_form_fields['path[0][alias]'];

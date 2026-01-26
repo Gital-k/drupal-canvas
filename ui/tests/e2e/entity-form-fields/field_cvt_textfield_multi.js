@@ -32,8 +32,8 @@ export const edit = (cy) => {
     }).as('updatePreview');
     cy.waitForAjax();
     cy.log(`adding item ${ix + 1}`);
-    cy.get('@add-another-text').click({ force: true });
-
+    cy.get('@add-another-text').click();
+    cy.waitForAjax();
     cy.selectorShouldHaveUpdatedFormBuildId(
       '[data-testid="canvas-page-data-form"]',
       15000,
