@@ -20,6 +20,7 @@ function canvas_test_language_install() : void {
     ConfigurableLanguage::createFromLangcode($langcode)->save();
   }
 
+  \Drupal::service('content_translation.manager')->setEnabled('canvas_page', 'canvas_page', TRUE);
   canvas_test_language_setup_language_negotiation();
 }
 

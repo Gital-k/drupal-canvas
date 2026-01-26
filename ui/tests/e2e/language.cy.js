@@ -50,16 +50,6 @@ const testCanvasPagesCanBeCreatedInMultilingualSites = (
 describe('Canvas pages can be created in any language', () => {
   before(() => {
     cy.drupalCanvasInstall(['canvas_test_language']);
-    cy.drupalLoginAsAdmin(() => {
-      cy.visit('/admin/config/regional/content-language');
-      cy.get('#edit-entity-types-canvas-page').click();
-      cy.get('[aria-controls="edit-settings-canvas-page"]').click();
-      cy.get(
-        '[name="settings[canvas_page][canvas_page][translatable]"]',
-      ).click();
-      cy.get('#edit-entity-types-canvas-page').should('be.checked');
-      cy.get('[value="Save configuration"]').click();
-    });
   });
 
   it('Using default language', () => {
