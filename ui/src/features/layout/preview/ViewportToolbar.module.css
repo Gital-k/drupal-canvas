@@ -30,3 +30,15 @@
   margin-right: 5px;
   border-radius: 4px;
 }
+
+.scaleToFitButton {
+  pointer-events: all;
+}
+
+.dropdownTrigger {
+  padding: 0 4px;
+  margin-left: -1px;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  box-shadow: 0 5px 10px 2px rgba(0, 0, 0, 0.1);
+}
