@@ -50,7 +50,9 @@ export const previewApi = createApi({
         body,
       }),
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        pushCanvasLayoutRequest();
         const { data, meta } = await queryFulfilled;
+        popCanvasLayoutRequest();
         const { html, autoSaves } = data;
         dispatch(
           pendingChangesApi.util.invalidateTags([
