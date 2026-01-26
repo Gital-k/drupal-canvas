@@ -36,3 +36,16 @@ a.tabledrag-handle .handle.handle {
 drupal-html-fragment {
   display: contents;
 }
+
+[data-once="drupal-ajax"] {
+  transition: opacity 0.3s ease;
+}
+
+[data-canvas-layout-request-in-progress] [data-once="drupal-ajax"]{
+  pointer-events: none;
+  user-select: none;
+  opacity: 0.5;
+  & input[type="button"] {
+    font-size: 3rem;
+  }
+}

@@ -69,7 +69,6 @@ const Preview: React.FC<PreviewProps> = () => {
       currentEntityFormFields: typeof entity_form_fields,
     ) => {
       try {
-        console.log('POST PREVIEW ' + new Date().getTime());
         // Trigger the mutation with current values at execution time
         await postPreview({
           layout: currentLayout,
@@ -100,9 +99,6 @@ const Preview: React.FC<PreviewProps> = () => {
     const executePendingPreviewRequest = () => {
       if (pendingPreviewRequest.current) {
         pendingPreviewRequest.current = false;
-        console.log(
-          '[Preview] Executing postponed preview request after AJAX completed',
-        );
         sendPreviewRequest(layout, model, entity_form_fields).then(() => {
           // @todo stop hardcoding `path` after https://drupal.org/i/3503446.
           if (shouldInvalidatePageList.current) {
@@ -118,9 +114,6 @@ const Preview: React.FC<PreviewProps> = () => {
     const executePendingTemplatePreviewRequest = () => {
       if (pendingTemplatePreviewRequest.current) {
         pendingTemplatePreviewRequest.current = false;
-        console.log(
-          '[Preview] Executing postponed template preview request after AJAX completed',
-        );
         sendTemplatePreviewRequest(layout, model, entity_form_fields).then(
           () => {},
         );
@@ -129,11 +122,6 @@ const Preview: React.FC<PreviewProps> = () => {
 
     const schedulePreviewRequest = () => {
       if (isAjaxing()) {
-        if (!pendingPreviewRequest.current) {
-          console.log(
-            '[Preview] Postponing preview request - AJAX is in progress',
-          );
-        }
         pendingPreviewRequest.current = true;
 
         // Set up an interval to check when AJAX is done
@@ -158,11 +146,6 @@ const Preview: React.FC<PreviewProps> = () => {
 
     const scheduleTemplatePreviewRequest = () => {
       if (isAjaxing()) {
-        if (!pendingTemplatePreviewRequest.current) {
-          console.log(
-            '[Preview] Postponing template preview request - AJAX is in progress',
-          );
-        }
         pendingTemplatePreviewRequest.current = true;
 
         // Set up an interval to check when AJAX is done

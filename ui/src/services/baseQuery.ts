@@ -317,6 +317,7 @@ export const pushCanvasLayoutRequest = () => {
   if (typeof canvasSettings?.canvasLayoutRequestInProgress === 'undefined') {
     canvasSettings.canvasLayoutRequestInProgress = [];
   }
+  document.body.setAttribute('data-canvas-layout-request-in-progress', 'true');
   canvasSettings.canvasLayoutRequestInProgress.push(true);
 };
 
@@ -327,6 +328,7 @@ export const popCanvasLayoutRequest = () => {
     // Notify the application that the layout request has completed.
     const event = new CustomEvent('canvasLayoutRequestComplete');
     document.dispatchEvent(event);
+    document.body.removeAttribute('data-canvas-layout-request-in-progress');
   }
 };
 
