@@ -464,9 +464,10 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
       $route_params = $operation['route']['params'] ?? [];
       $entity_operation = $operation['op'] ?? NULL;
       $url = Url::fromRoute($route_name, $route_params);
-      $access = AccessResult::allowed();
-      if ($entity_operation !== NULL) {
-        assert(is_string($entity_operation));
+      if ($entity_operation === NULL) {
+        $access = $url->access(return_as_object: TRUE);
+      }
+      else {
         $access = $this->access(operation: $entity_operation, return_as_object: TRUE);
       }
       assert($access instanceof AccessResult);
