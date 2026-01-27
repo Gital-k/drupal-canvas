@@ -71,10 +71,15 @@ const Topbar = () => {
 
   // Handle preview entity selection change
   const handlePreviewEntityChange = (selectedEntityId: string) => {
-    if (templatesData && entityType && bundle && viewMode) {
-      const templateLink =
-        templatesData[entityType]['bundles'][bundle]['viewModes'][viewMode]
-          .links['edit-form'];
+    const templateLink =
+      templatesData &&
+      entityType &&
+      bundle &&
+      viewMode &&
+      templatesData[entityType]?.['bundles']?.[bundle]?.['viewModes']?.[
+        viewMode
+      ]?.links?.['edit-form'];
+    if (templateLink) {
       // @todo: Change to use navigate() when we can do full FE routing.
       setTimeout(() => {
         // Use a timeout to ensure that RTK query cleans up its subscriptions first before navigating away.

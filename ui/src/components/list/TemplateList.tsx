@@ -203,9 +203,11 @@ const TemplateListItem = ({ viewMode }: { viewMode: TemplateViewMode }) => {
           <SidebarNode
             key={viewMode.id}
             href={
-              viewMode.suggestedPreviewEntityId
-                ? `${viewMode.links['edit-form']}/${viewMode.suggestedPreviewEntityId}`
-                : viewMode.links['edit-form']
+              viewMode.links?.['edit-form']
+                ? viewMode.suggestedPreviewEntityId
+                  ? `${viewMode.links['edit-form']}/${viewMode.suggestedPreviewEntityId}`
+                  : viewMode.links['edit-form']
+                : ''
             }
             title={`${viewMode.viewModeLabel} template`}
             variant="template"
