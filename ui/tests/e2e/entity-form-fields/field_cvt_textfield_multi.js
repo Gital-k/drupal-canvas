@@ -23,80 +23,7 @@ export const edit = (cy) => {
     );
     // Wait for the preview to finish loading.
     cy.wait('@updatePreview');
-
-    // @todo this wait is a temp fix. We shouldn't merge this, but instead
-    // find the underlying cause.
-    cy.log(`Setting up monitoring for iteration ${ix + 1}`);
-
-    // Set up monitoring BEFORE the wait
-    // cy.window().then((win) => {
-    //   const startTime = Date.now();
-    //   const originalFetch = win.fetch;
-    //   const originalXHROpen = win.XMLHttpRequest.prototype.open;
-    //
-    //   console.log(`[Iteration ${ix + 1}] Starting 2ms wait at ${startTime}`);
-    //
-    //   // Track fetch requests
-    //   win.fetch = function(...args) {
-    //     const elapsed = Date.now() - startTime;
-    //     const url = args[0]?.url || args[0];
-    //     console.log(`[Iteration ${ix + 1}] [${elapsed}ms] FETCH:`, url, args[1]?.method || 'GET');
-    //     return originalFetch.apply(this, args);
-    //   };
-    //
-    //   // Track XHR requests
-    //   win.XMLHttpRequest.prototype.open = function(method, url) {
-    //     const elapsed = Date.now() - startTime;
-    //     console.log(`[Iteration ${ix + 1}] [${elapsed}ms] XHR:`, method, url);
-    //     return originalXHROpen.apply(this, arguments);
-    //   };
-    //
-    //   // Sample state periodically during the wait
-    //   let intervalCount = 0;
-    //   const checkInterval = setInterval(() => {
-    //     intervalCount++;
-    //     const elapsed = Date.now() - startTime;
-    //
-    //     console.log(`[Iteration ${ix + 1}] [${elapsed}ms] Interval check #${intervalCount}`);
-    //
-    //     // Check postPreview queue
-    //     const queueLength = win.__postPreviewQueue ? win.__postPreviewQueue.length : 'undefined';
-    //     console.log(`[Iteration ${ix + 1}] [${elapsed}ms] postPreviewQueue:`, queueLength);
-    //
-    //     // Check if AJAX is running
-    //     const ajaxActive = win.jQuery ? win.jQuery.active : 'no jQuery';
-    //     console.log(`[Iteration ${ix + 1}] [${elapsed}ms] jQuery.active:`, ajaxActive);
-    //
-    //     // Check Redux store
-    //     if (win.reduxStore) {
-    //       const state = win.reduxStore.getState();
-    //       const buildId = state.formState?.pageData?.form_build_id;
-    //       console.log(`[Iteration ${ix + 1}] [${elapsed}ms] form_build_id:`, buildId);
-    //     } else {
-    //       console.log(`[Iteration ${ix + 1}] [${elapsed}ms] No reduxStore available`);
-    //     }
-    //   }, 500); // Check every 500ms
-    //
-    //   // Store cleanup function
-    //   win.__cleanupMonitoring = () => {
-    //     clearInterval(checkInterval);
-    //     win.fetch = originalFetch;
-    //     win.XMLHttpRequest.prototype.open = originalXHROpen;
-    //     const totalElapsed = Date.now() - startTime;
-    //     console.log(`[Iteration ${ix + 1}] Completed 2ms wait after ${totalElapsed}ms (${intervalCount} interval checks)`);
-    //   };
-    // });
-
-    // Now do the actual wait
     cy.wait(25); // eslint-disable-line cypress/no-unnecessary-waiting
-
-    // Clean up monitoring
-    // cy.window().then((win) => {
-    //   if (win.__cleanupMonitoring) {
-    //     win.__cleanupMonitoring();
-    //     delete win.__cleanupMonitoring;
-    //   }
-    // });
 
     // Queue another intercept for the wait in the main test and/or the next
     // iteration in the loop.
@@ -105,10 +32,6 @@ export const edit = (cy) => {
       times: 1,
       method: 'POST',
     }).as('updatePreview');
-
-    // cy.waitForAjax().then(() => {
-    //   console.log(`[Iteration ${ix + 1}] waitForAjax completed`);
-    // });
 
     cy.log(`adding item ${ix + 1}`);
 

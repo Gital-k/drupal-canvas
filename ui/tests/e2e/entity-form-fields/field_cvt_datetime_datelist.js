@@ -35,23 +35,6 @@ export const edit = (cy) => {
   };
   Object.entries(newValues).forEach(([key, value]) => {
     cy.get(`@${key}`).select(String(value));
-    cy.window().then((win) => {
-      const drupalAjax = win.Drupal?.ajax;
-      if (drupalAjax?.instances) {
-        const isAjaxing = drupalAjax.instances.some(
-          (instance) => instance && instance.ajaxing === true,
-        );
-        console.log(
-          `[${key}=${value}] Drupal.ajax.instances length:`,
-          drupalAjax.instances.length,
-          'isAjaxing:',
-          isAjaxing,
-        );
-      } else {
-        console.log(`[${key}=${value}] No Drupal.ajax.instances available`);
-      }
-    });
-    // cy.waitForAjax();
     cy.get(`@${key}`).should('have.value', String(value));
   });
 };

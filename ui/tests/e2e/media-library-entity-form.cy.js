@@ -55,9 +55,9 @@ const testMediaLibraryInEntityForm = (cy, loadOptions = {}, title) => {
       //   .click();
       const removeIt = `[class*="contextualPanel"] .js-media-library-selection  [aria-label="${step.removeText}"][data-form-id="page_data_form"][data-once="drupal-ajax"][data-ajax="true"]:not(.visually-hidden)`;
       // eslint-disable-next-line cypress/no-unnecessary-waiting
-      cy.wait(100);
+      cy.wait(200);
       cy.get(removeIt).realClick();
-      // cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
+      cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
 
       // Wait for the preview to finish loading.
       cy.wait('@updatePreview');
@@ -67,8 +67,6 @@ const testMediaLibraryInEntityForm = (cy, loadOptions = {}, title) => {
       cy.log(`Iteration ${ix + 1}: ${step.removeText} complete`);
     }
     const addIt = `[data-form-id="page_data_form"] .js-media-library-widget .js-media-library-open-button[data-once="drupal-ajax"]`;
-    // eslint-disable-next-line cypress/no-unnecessary-waiting
-    cy.wait(100);
     cy.get(addIt).should(($button) => {
       expect($button).to.exist;
       // Custom check for disabled to account for the disabled attribute
@@ -78,6 +76,8 @@ const testMediaLibraryInEntityForm = (cy, loadOptions = {}, title) => {
         disabled !== undefined && disabled !== false && disabled !== 'false';
       expect(isDisabled, 'Button should not be disabled').to.be.false;
     });
+    // eslint-disable-next-line cypress/no-unnecessary-waiting
+    cy.wait(200);
     cy.get(addIt).first().click();
     // cy.waitForAjax();
 
