@@ -218,7 +218,10 @@ final class CanvasBuilder extends ControllerBase {
     $agent->setCreateDirectly(TRUE);
     $agent->setTokenContexts([
       'entity_type' => $prompt['entity_type'] ?? NULL,
+      'bundle' => $prompt['bundle'] ?? NULL,
       'entity_id' => $prompt['entity_id'] ?? NULL,
+      'view_mode' => $prompt['view_mode'] ?? NULL,
+      'preview_entity_id' => $prompt['preview_entity_id'] ?? NULL,
       'selected_component' => $prompt['selected_component'] ?? NULL,
       'selected_component_required_props' => isset($prompt['selected_component_required_props']) ? Json::encode($prompt['selected_component_required_props']) : NULL,
       'layout' => $prompt['layout'] ?? NULL,

@@ -99,7 +99,7 @@ final class SetAIGeneratedComponentStructure extends FunctionCallBase implements
       $allErrors = [];
 
       foreach ($component_structure_array['operations'] as $index => $operation) {
-        $allErrors = array_merge($allErrors, $this->validatePlacementParams($operation, $index));
+        $allErrors = array_merge($allErrors, $this->responseValidator->validatePlacementParams($operation, $index));
         $this->responseValidator->validateComponentStructure($operation['components']);
       }
 
@@ -117,40 +117,6 @@ final class SetAIGeneratedComponentStructure extends FunctionCallBase implements
       $this->loggerFactory->get('canvas_ai')->error($e->getMessage());
       $this->setOutput(sprintf('Failed to process layout data: %s', $e->getMessage()));
     }
-  }
-
-  private function validatePlacementParams(array $operation, int $index): array {
-    $errors = [];
-    $errorKey = 'Operation ' . $index;
-
-    if (!isset($operation['placement']) || !in_array($operation['placement'], ['above', 'below', 'inside'], TRUE)) {
-      $errors[$errorKey][] = 'The placement key is missing or invalid in the operation.';
-      return $errors;
-    }
-
-    $placement = $operation['placement'];
-    // If placement is 'above' or 'below', `reference_uuid` must be provided.
-    if (in_array($placement, ['above', 'below'], TRUE) && empty($operation['reference_uuid'])) {
-      $errors[$errorKey][] = 'The reference_uuid must be provided for above/below placement.';
-    }
-
-    // If placement is 'inside', `reference_uuid` is not needed.
-    if ($placement === 'inside') {
-      if (!empty($operation['reference_uuid'])) {
-        $errors[$errorKey][] = 'The reference_uuid is not required for inside placement.';
-      }
-      // If placement is 'inside', the target must not contain child components.
-      if ($this->pageBuilderHelper->hasChildComponents($operation['target'])) {
-        $errors[$errorKey][] = 'The target ' . $operation['target'] . ' has "inside" placement specified, but it contains child components. Select any child component in the target and use "above" or "below" placement instead.';
-      }
-    }
-
-    // Operation must contain components.
-    if (empty($operation['components'])) {
-      $errors[$errorKey][] = 'The operation must contain components.';
-    }
-
-    return $errors;
   }
 
 }

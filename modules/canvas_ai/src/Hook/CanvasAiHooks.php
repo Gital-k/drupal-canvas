@@ -43,6 +43,14 @@ class CanvasAiHooks {
             'name' => $this->t('Entity Id'),
             'description' => $this->t('Returns the entity id value passed to the AI Agent.'),
           ],
+          'bundle' => [
+            'name' => $this->t('Bundle'),
+            'description' => $this->t('Returns the bundle value passed to the AI Agent.'),
+          ],
+          'view_mode' => [
+            'name' => $this->t('View Mode'),
+            'description' => $this->t('Returns the view mode value passed to the AI Agent.'),
+          ],
           'selected_component' => [
             'name' => $this->t('Selected Component'),
             'description' => $this->t('Returns the selected component name passed to the AI Agent.'),
@@ -108,6 +116,14 @@ class CanvasAiHooks {
 
           case 'entity_id':
             $replacements[$original] = $data['entity_id'] ?? NULL;
+            break;
+
+          case 'bundle':
+            $replacements[$original] = $data['bundle'] ?? NULL;
+            break;
+
+          case 'view_mode':
+            $replacements[$original] = $data['view_mode'] ?? NULL;
             break;
 
           case 'selected_component':
