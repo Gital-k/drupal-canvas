@@ -533,6 +533,7 @@ paths:
                               id: 'node.article.full'
                               suggestedPreviewEntityId: null
                               viewModeLabel: 'Full content'
+                              links: []
                               label: 'article content items — Full content view'
                           editFieldsUrl: null
                           deleteUrl: null
@@ -566,8 +567,6 @@ paths:
                   suggestedPreviewEntityId: NULL
                   viewModeLabel: 'Full content'
                   label: 'article content items — Full content view'
-                  links:
-                    edit-form: /canvas/template/node/article/full
   /canvas/api/v0/config/content_template/{configEntityId}:
     description: Specific ContentTemplate endpoints.
     get:

@@ -446,7 +446,7 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
    */
   private function getEntityOperations(): CanvasResourceLinkCollection {
     $links = new CanvasResourceLinkCollection([]);
-    // Link relation type => route name.
+    /** @var array<string, array{route: array{name: string, params?: array<string, string|null>}, op?: string}> $possible_operations */
     $possible_operations = [
       CanvasUriDefinitions::LINK_REL_EDIT => [
         'route' => [
@@ -462,13 +462,12 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
     foreach ($possible_operations as $link_rel => $operation) {
       $route_name = $operation['route']['name'];
       $route_params = $operation['route']['params'] ?? [];
-      $entity_operation = $operation['op'] ?? NULL;
       $url = Url::fromRoute($route_name, $route_params);
-      if ($entity_operation === NULL) {
-        $access = $url->access(return_as_object: TRUE);
+      if (isset($operation['op'])) {
+        $access = $this->access(operation: $operation['op'], return_as_object: TRUE);
       }
       else {
-        $access = $this->access(operation: $entity_operation, return_as_object: TRUE);
+        $access = $url->access(return_as_object: TRUE);
       }
       assert($access instanceof AccessResult);
       if ($access->isAllowed()) {
