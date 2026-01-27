@@ -43,7 +43,7 @@ use Symfony\Component\Validator\ConstraintViolationListInterface;
  * can grow forever.
  * However, auto-save entries for a (content or config) entity are deleted when:
  * - publishing an entity's auto-save entry
- * - deleting an entity
+ * - deleting an entity.
  *
  * @see \Drupal\canvas\Controller\ApiAutoSaveController::post()
  * @see \Drupal\canvas\Hook\AutoSaveHooks::entityDelete()
@@ -73,7 +73,7 @@ class AutoSaveManager implements EventSubscriberInterface {
   public function __construct(
     private readonly ConfigManagerInterface $configManager,
     private readonly CacheTagsInvalidatorInterface $cacheTagsInvalidator,
-    private readonly EntityTypeManagerInterface $entityTypeManager,
+    protected readonly EntityTypeManagerInterface $entityTypeManager,
     #[Autowire(service: 'cache.static')]
     private readonly CacheBackendInterface $cache,
     #[Autowire(service: 'keyvalue')]
@@ -86,6 +86,9 @@ class AutoSaveManager implements EventSubscriberInterface {
     $this->componentInstanceFormViolationsStore = $keyValueFactory->get(self::COMPONENT_INSTANCE_FORM_VIOLATIONS_STORE);
   }
 
+  /**
+   *
+   */
   public function saveEntity(EntityInterface $entity, ?string $clientId = NULL): void {
     $key = $this->getAutoSaveKey($entity);
     $data = self::normalizeEntity($entity);
@@ -184,6 +187,9 @@ class AutoSaveManager implements EventSubscriberInterface {
     return $this->componentInstanceFormViolationsStore->get($component_uuid) ?? new ConstraintViolationList();
   }
 
+  /**
+   *
+   */
   private static function normalizeEntity(EntityInterface $entity): array {
     if (!$entity instanceof FieldableEntityInterface) {
       if ($entity instanceof ComponentTreeEntityInterface && $entity instanceof ConfigEntityInterface) {
@@ -241,6 +247,9 @@ class AutoSaveManager implements EventSubscriberInterface {
     return $normalized;
   }
 
+  /**
+   *
+   */
   public static function getAutoSaveKey(EntityInterface $entity): string {
     // @todo Make use of https://www.drupal.org/project/drupal/issues/3026957
     // @todo This will likely to also take into account the workspace ID.
@@ -278,6 +287,9 @@ class AutoSaveManager implements EventSubscriberInterface {
     ];
   }
 
+  /**
+   *
+   */
   private function getUnchangedHash(EntityInterface $entity): ?string {
     assert(!is_null($entity->id()));
     $original = $this->entityTypeManager->getStorage($entity->getEntityTypeId())->loadUnchanged($entity->id());
@@ -287,6 +299,9 @@ class AutoSaveManager implements EventSubscriberInterface {
     return self::generateHash(self::normalizeEntity($original));
   }
 
+  /**
+   *
+   */
   public function getAutoSaveEntity(EntityInterface $entity): AutoSaveEntity {
     $key = $this->getAutoSaveKey($entity);
     $cached = $this->cache->get($key);
@@ -331,9 +346,23 @@ class AutoSaveManager implements EventSubscriberInterface {
     [
       // Remove the unique session key for anonymous users.
       'owner' => \is_numeric($entry['owner']) ? (int) $entry['owner'] : 0,
-      'entity' => $with_entities ? $this->entityTypeManager->getStorage($entry['entity_type'])->create($entry['data']) : NULL,
+      'entity' => $with_entities ? $this->createEntityFromAutoSave($entry) : NULL,
     ], $entries);
     return $result;
+  }
+
+  /**
+   * Creates an entity from a canvas autosave.
+   *
+   * @param array $entry
+   *   It needs the entity_type and data keys.
+   *
+   * @return \Drupal\Core\Entity\EntityInterface
+   *   Created entity.
+   */
+  protected function createEntityFromAutoSave(array $entry) {
+    ['entity_type' => $entity_type, 'data' => $entity_values] = $entry;
+    return $this->entityTypeManager->getStorage($entity_type)->create($entity_values);
   }
 
   /**
@@ -361,6 +390,9 @@ class AutoSaveManager implements EventSubscriberInterface {
     }
   }
 
+  /**
+   *
+   */
   public function deleteAll(): void {
     $this->cacheTagsInvalidator->invalidateTags([self::CACHE_TAG]);
     $this->autoSaveStore->deleteAll();
@@ -368,6 +400,9 @@ class AutoSaveManager implements EventSubscriberInterface {
     $this->componentInstanceFormViolationsStore->deleteAll();
   }
 
+  /**
+   *
+   */
   private static function generateHash(array $data): string {
     // When called from ::recordInitialClientSideRepresentation() and ::save()
     // the keys for an individual component are in different orders. This causes
@@ -383,6 +418,9 @@ class AutoSaveManager implements EventSubscriberInterface {
     return \hash('xxh64', \json_encode($data, JSON_THROW_ON_ERROR));
   }
 
+  /**
+   *
+   */
   private static function recursiveKsort(array &$array): void {
     ksort($array);
     foreach ($array as &$value) {
@@ -392,6 +430,9 @@ class AutoSaveManager implements EventSubscriberInterface {
     }
   }
 
+  /**
+   *
+   */
   public function onCanvasConfigEntitySave(ConfigCrudEvent $event): void {
     [$module] = explode('.', $event->getConfig()->getName(), 2);
     if ($module !== 'canvas') {
@@ -448,6 +489,9 @@ class AutoSaveManager implements EventSubscriberInterface {
     }
   }
 
+  /**
+   *
+   */
   public function onCanvasConfigDelete(ConfigCrudEvent $event): void {
     $autoSaveEntities = $this->getAllAutoSaveList(TRUE);
     $autoSaveEntities = array_filter($autoSaveEntities, fn($entityData) => $entityData['entity'] instanceof StagedConfigUpdate);
@@ -469,6 +513,9 @@ class AutoSaveManager implements EventSubscriberInterface {
     return $events;
   }
 
+  /**
+   *
+   */
   public static function entityIsConsideredNew(ContentEntityInterface|ContentTemplate $entity): bool {
     if ($entity instanceof ContentTemplate) {
       return !$entity->status();
