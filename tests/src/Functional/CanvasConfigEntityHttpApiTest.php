@@ -2232,7 +2232,6 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     $body = $this->assertExpectedResponse('GET', $list_url, [], 200, ['user.node_grants:view', 'user.permissions'], ['config:core.extension', 'config:content_template_list', 'entity_bundles', 'config:node_type_list', 'http_response', 'node:1', 'node_list:bunny', 'node_list:llama', 'user.node_grants:view'], 'UNCACHEABLE (request policy)', 'MISS');
     // Change the expectation from `NULL` to the entity ID.
     $expected_list_normalization['node']['bundles']['llama']['viewModes']['full']['suggestedPreviewEntityId'] = (int) $node->id();
-    $expected_list_normalization['node']['bundles']['llama']['viewModes']['full']['links']['edit-form'] .= "/{$node->id()}";
     $this->assertSame($expected_list_normalization, $body);
 
     // Creating a Content Template with an already-in-use ID: 409.
