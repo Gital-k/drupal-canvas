@@ -563,7 +563,7 @@
         const [, response] = args;
         const el = args[0].element;
         const domFormId = el.closest('form')?.getAttribute('id');
-        const commandId = domFormId + ' | ' + response.old + ' | ' + response.new;
+        const commandId = `${domFormId} | ${response.old} | ${response.new}`;
         if (!buildIdHistory.includes(commandId)) {
           buildIdHistory.push(commandId);
         }
@@ -584,8 +584,8 @@
             formId,
           },
         });
-        if (!buildIdHistory.includes(commandId + ' event')) {
-          buildIdHistory.push(commandId + ' event');
+        if (!buildIdHistory.includes(`${commandId} event`)) {
+          buildIdHistory.push(`${commandId} event`);
           console.log(`Build id change `, commandId);
           document.dispatchEvent(event);
         }
