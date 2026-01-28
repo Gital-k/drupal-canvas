@@ -85,8 +85,11 @@ const testMediaLibraryInEntityForm = (cy, loadOptions = {}, title) => {
     // The first time the media dialog opens there are a lot of CSS files to
     // load, and it can take more than the default timeout of 4s.
     cy.findByRole('dialog', { timeout: 10000 }).as('dialog');
+    cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
+    cy.wait(100); // eslint-disable-line cypress/no-unnecessary-waiting
     cy.get('@dialog').findByLabelText(step.selectNewText).check();
     cy.intercept('POST', '**/canvas/api/v0/layout/**').as('updatePreview');
+    cy.wait(100); // eslint-disable-line cypress/no-unnecessary-waiting
     cy.get('@dialog')
       .findByRole('button', {
         name: 'Insert selected',
