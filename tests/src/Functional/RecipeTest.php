@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Drupal\Tests\navigation\Functional;
+namespace Drupal\Tests\canvas\Functional;
 
 use Drupal\Tests\system\Functional\Recipe\GenericRecipeTestBase;
 
