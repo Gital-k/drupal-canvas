@@ -5,6 +5,16 @@
 
 /* global csstree */
 (function (Drupal, csstree, drupalSettings) {
+  const formEventLog = [];
+
+  /**
+   * A map to keep track of the association between form build ID and the
+   * form ID.
+   *
+   * @type {{}}
+   */
+  const formBuildIdMap = {};
+
   // Keeps track of shorthand properties and their corresponding longhand
   // properties.
   const shorthands = {
@@ -532,14 +542,6 @@
       const originalUpdateBuildId =
         Drupal.AjaxCommands.prototype.update_build_id;
 
-      /**
-       * A map to keep track of the association between form build ID and the
-       * form ID.
-       *
-       * @type {{}}
-       */
-      const formBuildIdMap = {};
-
       const getFormId = (oldId) => {
         const oldInput = document.querySelector(
           `input[name="form_build_id"][value="${oldId}"]`,
@@ -559,6 +561,13 @@
 
       Drupal.AjaxCommands.prototype.update_build_id = function (...args) {
         const [, response] = args;
+        const el = args[0].element;
+        const domFormId = el.closest('form')?.getAttribute('id');
+        const commandId = domFormId + ' | ' + response.old + ' | ' + response.new;
+        if (!formEventLog.includes(commandId)) {
+          console.log('> update_build_id called ' +  commandId, formEventLog);
+          formEventLog.push(commandId);
+        }
         const formId = getFormId(response.old);
         if (!formId) {
           return;
@@ -576,7 +585,11 @@
             formId,
           },
         });
-        document.dispatchEvent(event);
+        if (!formEventLog.includes(commandId + ' event')) {
+          formEventLog.push(commandId + ' event');
+          console.log(`Build id change `, commandId);
+          document.dispatchEvent(event);
+        }
       };
     },
   };

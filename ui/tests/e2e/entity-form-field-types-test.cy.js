@@ -4,7 +4,7 @@ describe(
   'Entity form field types',
   { retries: { openMode: 0, runMode: 3 } },
   () => {
-    before(() => {
+    beforeEach(() => {
       // We need to set the timezone in the running browser too.
       Cypress.automation('remote:debugger:protocol', {
         command: 'Emulation.setTimezoneOverride',
@@ -18,13 +18,14 @@ describe(
         // For validating the shape of the node.
         'jsonapi',
       ]);
-    });
-
-    beforeEach(() => {
       cy.drupalSession();
     });
 
-    after(() => {
+    // beforeEach(() => {
+    //   cy.drupalSession();
+    // });
+
+    afterEach(() => {
       cy.drupalUninstall();
     });
 

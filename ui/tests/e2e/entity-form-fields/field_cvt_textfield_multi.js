@@ -23,7 +23,7 @@ export const edit = (cy) => {
     );
     // Wait for the preview to finish loading.
     cy.wait('@updatePreview');
-    cy.wait(25); // eslint-disable-line cypress/no-unnecessary-waiting
+    cy.wait(100); // eslint-disable-line cypress/no-unnecessary-waiting
 
     // Queue another intercept for the wait in the main test and/or the next
     // iteration in the loop.
