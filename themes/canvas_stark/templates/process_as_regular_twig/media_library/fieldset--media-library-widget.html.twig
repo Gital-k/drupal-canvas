@@ -71,9 +71,7 @@
     {% endif %}
     {{ children }}
     {% if description.content %}
-      <canvas-box width="100%" className="description" />
-        {{ description.content }}
-      <canvas-box>
+      <canvas-description description="{{ description.content }}" />
     {% endif %}
   </div>
 </fieldset>
