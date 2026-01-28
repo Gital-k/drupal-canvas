@@ -1,0 +1,5 @@
+name: '3552121 Canvas'
+description: 'Installs canvas'
+type: 'Canvas'
+install:
+  - canvas
