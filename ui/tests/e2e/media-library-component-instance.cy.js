@@ -66,16 +66,22 @@ const testMediaLibraryInComponentInstanceForm = (
     );
     cy.get('[class*="contextualPanel"]').should('exist');
     cy.get('div[role="dialog"]').should('not.exist');
+
+    cy.log(
+      `Confirm removing a required image in step ${index + 1} results in the example appearing in the preview.`,
+    );
+
     const removeIt = `[class*="contextualPanel"] .js-media-library-selection  [aria-label="${step.removeText}"][data-once="drupal-ajax"]`;
     // eslint-disable-next-line cypress/no-unnecessary-waiting
     cy.wait(100);
     cy.get(removeIt).realClick();
     // cy.waitForAjax();
     // cy.pause();
-    cy.log(
-      `Confirm removing a required image in step ${index + 1} results in the example appearing in the preview.`,
-    );
 
+    cy.get(removeIt).should('not.exist');
+    cy.selectorShouldHaveUpdatedFormBuildId(
+      '[data-testid*="canvas-component-form-"]',
+    );
     // The default image should appear because the prop is required.
     cy.waitForElementInIframe(defaultPlaceholder);
 

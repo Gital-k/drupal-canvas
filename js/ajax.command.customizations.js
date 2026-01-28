@@ -5,7 +5,7 @@
 
 /* global csstree */
 (function (Drupal, csstree, drupalSettings) {
-  const formEventLog = [];
+  const buildIdHistory = [];
 
   /**
    * A map to keep track of the association between form build ID and the
@@ -564,9 +564,8 @@
         const el = args[0].element;
         const domFormId = el.closest('form')?.getAttribute('id');
         const commandId = domFormId + ' | ' + response.old + ' | ' + response.new;
-        if (!formEventLog.includes(commandId)) {
-          console.log('> update_build_id called ' +  commandId, formEventLog);
-          formEventLog.push(commandId);
+        if (!buildIdHistory.includes(commandId)) {
+          buildIdHistory.push(commandId);
         }
         const formId = getFormId(response.old);
         if (!formId) {
@@ -585,8 +584,8 @@
             formId,
           },
         });
-        if (!formEventLog.includes(commandId + ' event')) {
-          formEventLog.push(commandId + ' event');
+        if (!buildIdHistory.includes(commandId + ' event')) {
+          buildIdHistory.push(commandId + ' event');
           console.log(`Build id change `, commandId);
           document.dispatchEvent(event);
         }

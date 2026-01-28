@@ -85,12 +85,18 @@ export const previewApi = createApi({
         const executePreview = async () => {
           const id = generateRandomString(8);
           pushCanvasLayoutRequest();
-          console.log(`[${id}] (RTK-ID: ${requestId.substring(0, 8)}) preview requested`, timeStr());
+          console.log(
+            `[${id}] (RTK-ID: ${requestId.substring(0, 8)}) preview requested`,
+            timeStr(),
+          );
 
           try {
             const { data, meta } = await queryFulfilled;
             // @ts-ignore
-            console.log(`[${id}] (${meta?.response?.status}) preview`, timeStr());
+            console.log(
+              `[${id}] (${meta?.response?.status}) preview`,
+              timeStr(),
+            );
             const { html, autoSaves } = data;
             dispatch(
               pendingChangesApi.util.invalidateTags([
@@ -116,7 +122,9 @@ export const previewApi = createApi({
 
             // Add specific 500 error handling with retry logic
             if (error?.error?.status === 500 && !has500BeenRetried) {
-              console.log(`[${id}] ✓ 500 error detected. Scheduling retry in 10ms...`);
+              console.log(
+                `[${id}] ✓ 500 error detected. Scheduling retry in 10ms...`,
+              );
               has500BeenRetried = true;
               popCanvasLayoutRequest();
 
@@ -142,11 +150,21 @@ export const previewApi = createApi({
 
             // Log errors only if not retrying or if retry also failed
             const status = error?.error?.status || 'unknown';
-            console.error(`[${id}] (${status}) preview FAILED`, timeStr(), error);
+            console.error(
+              `[${id}] (${status}) preview FAILED`,
+              timeStr(),
+              error,
+            );
 
             if (error?.error?.status === 500) {
-              const errorMessage = error?.error?.data?.message || error?.error?.data || 'Unknown error';
-              console.error(`[${id}] 500 Server Error - Message:`, errorMessage);
+              const errorMessage =
+                error?.error?.data?.message ||
+                error?.error?.data ||
+                'Unknown error';
+              console.error(
+                `[${id}] 500 Server Error - Message:`,
+                errorMessage,
+              );
               console.error(`[${id}] 500 Server Error - Full error details:`, {
                 status: error.error.status,
                 data: error.error.data,
@@ -154,7 +172,9 @@ export const previewApi = createApi({
               });
 
               if (has500BeenRetried) {
-                console.error(`[${id}] 500 error occurred again after retry. Not retrying further.`);
+                console.error(
+                  `[${id}] 500 error occurred again after retry. Not retrying further.`,
+                );
               }
             }
 
@@ -204,10 +224,7 @@ export const previewApi = createApi({
 
               // Check for errors in the dispatched result
               if ('error' in result && result.error) {
-                console.error(
-                  'Queued preview request failed:',
-                  result.error,
-                );
+                console.error('Queued preview request failed:', result.error);
               }
             }
           });
