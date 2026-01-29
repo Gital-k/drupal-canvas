@@ -19,7 +19,9 @@ use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\Core\Form\FormBuilderInterface;
+use Drupal\Core\Form\FormInterface;
 use Drupal\Core\Form\FormState;
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 use Drupal\Core\Logger\LoggerChannelInterface;
 use Drupal\canvas\Controller\ClientServerConversionTrait;
@@ -545,9 +547,17 @@ class ClientDataToEntityConverter {
   }
 
   /**
-   * @throws \TypeError
+   * Builds a form and allows TypeError to be caught by the caller.
+   *
+   * @param \Drupal\Core\Form\FormInterface|string $form_object
+   *   The form object or form ID.
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *   The form state.
+   *
+   * @return array
+   *   The built form array.
    */
-  private function buildFormWithPossibleTypeError(object $form_object, FormState $form_state): array {
+  private function buildFormWithPossibleTypeError(FormInterface|string $form_object, FormStateInterface $form_state): array {
     return $this->formBuilder->buildForm($form_object, $form_state);
   }
 
@@ -563,6 +573,5 @@ class ClientDataToEntityConverter {
     }
     return $elements;
   }
-
 
 }
