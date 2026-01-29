@@ -43,7 +43,7 @@ export default function FormPropTypeEnum({
   example: string;
   required: boolean;
   type: 'string' | 'integer' | 'number';
-  isDisabled: boolean;
+  isDisabled?: boolean;
 }) {
   const dispatch = useAppDispatch();
   const [localRequired, setLocalRequired] = useState(required);
@@ -269,6 +269,7 @@ function EnumValuesForm({
               </FormElement>
             </Box>
             <Button
+              aria-label="Remove value"
               data-testid={`canvas-prop-enum-value-delete-${propId}-${index}`}
               size="1"
               color="red"
