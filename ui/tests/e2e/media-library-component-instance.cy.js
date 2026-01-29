@@ -28,7 +28,7 @@ const testMediaLibraryInComponentInstanceForm = (
   );
   cy.findByLabelText('Select The bones are their money').check();
   // cy.pause();
-  cy.get('button:contains("Insert selected")').click();
+  cy.get('button[data-once="drupal-ajax"]:contains("Insert selected")').click();
   // cy.waitForAjax();
   cy.get('div[role="dialog"]').should('not.exist');
   cy.get(
@@ -97,7 +97,7 @@ const testMediaLibraryInComponentInstanceForm = (
 
     cy.get('div[role="dialog"]').should('exist');
     cy.findByLabelText(step.selectNewText).check();
-    cy.get('button:contains("Insert selected")').realClick();
+    cy.get('button:contains("Insert selected")').click();
     // cy.waitForAjax();
     cy.wait('@patch');
     cy.get('div[role="dialog"]').should('not.exist');

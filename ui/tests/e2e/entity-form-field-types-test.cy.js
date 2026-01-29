@@ -140,7 +140,7 @@ describe(
       cy.get('@checkbox').should('be.checked');
     });
 
-    it.only(
+    it(
       'Can interact with form fields',
       { retries: { openMode: 0, runMode: 3 } },
       () => {

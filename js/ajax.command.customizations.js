@@ -592,7 +592,6 @@
         });
         if (!buildIdHistory.includes(`${commandId} event`)) {
           buildIdHistory.push(`${commandId} event`);
-          console.log(`Actual vanilla Build id change (no event)`, commandId);
           document.dispatchEvent(event);
         }
       };

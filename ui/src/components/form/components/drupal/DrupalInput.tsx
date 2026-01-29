@@ -1,4 +1,3 @@
-import { useRef } from 'react';
 import clsx from 'clsx';
 
 import Checkbox from '@/components/form/components/Checkbox';
