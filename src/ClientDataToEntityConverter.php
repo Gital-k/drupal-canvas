@@ -305,7 +305,6 @@ class ClientDataToEntityConverter {
         strpos($e->getMessage(), 'must be of type array, string given') !== FALSE) {
 
         // Log the issue for debugging
-        // @phpstan-ignore-next-line globalDrupalDependencyInjection.useDependencyInjection
         \Drupal::logger('canvas')->warning('Options widget race condition detected: @message. Rebuilding form and retrying.', [
           '@message' => $e->getMessage(),
         ]);
