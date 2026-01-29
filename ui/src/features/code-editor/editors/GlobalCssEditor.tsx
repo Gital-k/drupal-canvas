@@ -10,7 +10,7 @@ import {
 
 import styles from '../CanvasCodeMirror.module.css';
 
-const GlobalCssEditor = ({ isLoading }: { isLoading: boolean }) => {
+const GlobalCssEditor = () => {
   const dispatch = useAppDispatch();
   const value = useAppSelector(
     selectGlobalAssetLibraryProperty(['css', 'original']),
@@ -19,9 +19,7 @@ const GlobalCssEditor = ({ isLoading }: { isLoading: boolean }) => {
   function onChangeHandler(value: string) {
     dispatch(setGlobalAssetLibraryProperty(['css', 'original', value]));
   }
-  if (isLoading) {
-    return null;
-  }
+
   return (
     <CodeMirror
       className={styles.canvasCodeMirrorEditor}
