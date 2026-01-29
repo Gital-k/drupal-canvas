@@ -23,6 +23,7 @@ import useAutoSave from '@/features/code-editor/hooks/useAutoSave';
 import useGetCodeEditorData from '@/features/code-editor/hooks/useGetCodeEditorData';
 import useSourceCode from '@/features/code-editor/hooks/useSourceCode';
 import { deserializeCodeComponent } from '@/features/code-editor/utils/utils';
+import { selectWasmStatus } from '@/features/ui/uiSlice';
 
 import type {
   AssetLibrary,
@@ -43,6 +44,9 @@ const useCodeEditor: () => {
     selectCodeComponentProperty('machineName'),
   );
 
+  const { isCssWasmAvailable, isJsWasmAvailable } =
+    useAppSelector(selectWasmStatus);
+
   // Get the code component and global asset library data.
   const {
     dataCodeComponent,
@@ -55,10 +59,12 @@ const useCodeEditor: () => {
     skip: requestedComponentId === loadedComponentId,
   });
 
+  const isAppLoaded = !isLoading && isJsWasmAvailable && isCssWasmAvailable;
+
   // Initialize the code editor with the data.
   useEffect(() => {
     if (
-      isLoading ||
+      !isAppLoaded ||
       (!isLoading && !isSuccess) ||
       !dataCodeComponent ||
       !dataGlobalAssetLibrary ||
@@ -96,6 +102,7 @@ const useCodeEditor: () => {
     dataCodeComponent,
     dataGlobalAssetLibrary,
     dataBrandKit,
+    isAppLoaded,
     isLoading,
     isSuccess,
     dispatch,
@@ -114,7 +121,7 @@ const useCodeEditor: () => {
     };
   }, [dispatch]);
 
-  return { isLoading };
+  return { isLoading: !isAppLoaded };
 };
 
 export default useCodeEditor;

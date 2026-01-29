@@ -76,12 +76,18 @@ export interface uiSliceState {
   redoStack: Array<UndoRedoStackItem>;
   currentRoute: RouteSnapshot;
   PreviouslyEdited: PreviouslyEdited;
+  wasmStatus: WasmStatus;
 }
 
 type UpdateViewportPayload = {
   x?: number | undefined;
   y?: number | undefined;
   scale?: number | undefined;
+};
+
+type WasmStatus = {
+  isCssWasmAvailable: boolean;
+  isJsWasmAvailable: boolean;
 };
 
 export const initialState: uiSliceState = {
@@ -122,6 +128,10 @@ export const initialState: uiSliceState = {
   },
   collapsedLayers: [],
   PreviouslyEdited: { name: '', path: '' },
+  wasmStatus: {
+    isCssWasmAvailable: false,
+    isJsWasmAvailable: false,
+  },
 };
 
 export interface ScaleValue {
@@ -373,6 +383,12 @@ export const uiSlice = createAppSlice({
         state.currentRoute = action.payload;
       },
     ),
+    setWasmStatus: create.reducer(
+      (state, action: PayloadAction<Partial<WasmStatus>>) => ({
+        ...state,
+        wasmStatus: { ...state.wasmStatus, ...action.payload },
+      }),
+    ),
   }),
   // You can define your selectors here. These selectors receive the slice
   // state as their first argument.
@@ -453,6 +469,9 @@ export const uiSlice = createAppSlice({
     selectCurrentRoute: (ui): RouteSnapshot => {
       return ui.currentRoute;
     },
+    selectWasmStatus: (ui): WasmStatus => {
+      return ui.wasmStatus;
+    },
   },
 });
 
@@ -493,6 +512,7 @@ export const {
   toggleCollapsedLayer,
   removeCollapsedLayers,
   setCurrentRoute,
+  setWasmStatus,
 } = uiSlice.actions;
 
 export const {
@@ -517,6 +537,7 @@ export const {
   selectCollapsedLayers,
   selectPreviouslyEdited,
   selectCurrentRoute,
+  selectWasmStatus,
 } = uiSlice.selectors;
 
 // Memoized selectors using createSelector for better performance

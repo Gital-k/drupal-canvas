@@ -36,6 +36,7 @@ import {
   detectValidPropOrSlotChange,
   getJsForSlotsPreview,
 } from '@/features/code-editor/utils/utils';
+import { selectWasmStatus } from '@/features/ui/uiSlice';
 
 import type {
   CodeComponentProp,
@@ -51,13 +52,15 @@ const useSourceCode = (requestedComponentId: string): void => {
 
   const { needsAutoSaveOnFirstCompilation } = useAppSelector(selectStatus);
 
+  const { isCssWasmAvailable, isJsWasmAvailable } =
+    useAppSelector(selectWasmStatus);
+
   const {
     extractClassNameCandidates,
     buildTailwindCssFromClassNameCandidates,
     buildComponentCss,
   } = useCompileCss();
-  const { isJavaScriptCompilerReady, compileJavaScript } =
-    useCompileJavaScript();
+  const { compileJavaScript } = useCompileJavaScript();
 
   const componentId = useAppSelector(
     selectCodeComponentProperty('machineName'),
@@ -150,7 +153,8 @@ const useSourceCode = (requestedComponentId: string): void => {
     if (
       requestedComponentId !== componentId ||
       !componentId ||
-      !isJavaScriptCompilerReady
+      !isCssWasmAvailable ||
+      !isJsWasmAvailable
     ) {
       setHasCompiledOnce(false);
       return;
@@ -263,7 +267,8 @@ const useSourceCode = (requestedComponentId: string): void => {
     dispatch,
     extractClassNameCandidates,
     globalSourceCodeCSS,
-    isJavaScriptCompilerReady,
+    isCssWasmAvailable,
+    isJsWasmAvailable,
     requestedComponentId,
     slots,
     sourceCodeCSS,
