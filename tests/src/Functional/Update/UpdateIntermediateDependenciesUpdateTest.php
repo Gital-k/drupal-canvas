@@ -34,25 +34,44 @@ final class UpdateIntermediateDependenciesUpdateTest extends CanvasUpdatePathTes
     $this->databaseDumpFiles[] = \dirname(__DIR__, 3) . '/fixtures/update/intermediate_component_dependencies/add-patterns.php';
     $this->databaseDumpFiles[] = \dirname(__DIR__, 3) . '/fixtures/update/intermediate_component_dependencies/add-content-template.php';
     $this->databaseDumpFiles[] = \dirname(__DIR__, 3) . '/fixtures/update/intermediate_component_dependencies/change-field_config-default_value.php';
+    // Add entities WITHOUT reference field expressions (negative test cases).
+    $this->databaseDumpFiles[] = \dirname(__DIR__, 3) . '/fixtures/update/intermediate_component_dependencies/add-regions-without-ref-expressions.php';
+    $this->databaseDumpFiles[] = \dirname(__DIR__, 3) . '/fixtures/update/intermediate_component_dependencies/add-patterns-without-ref-expressions.php';
   }
 
   /**
    * Tests updated intermediate dependencies.
    */
   public function testUpdatedIntermediateDependencies(): void {
-    $entities_under_test = [
+    // Entities WITH reference field expressions that SHOULD be updated.
+    $entities_that_should_update = [
       Pattern::ENTITY_TYPE_ID => 'a_pattern_to_be_reused',
       PageRegion::ENTITY_TYPE_ID => 'stark.sidebar_first',
       'field_config' => 'node.article.field_canvas_demo',
       ContentTemplate::ENTITY_TYPE_ID => 'node.article.reverse',
     ];
+    // Entities WITHOUT reference field expressions that should NOT be updated.
+    $entities_that_should_not_update = [
+      Pattern::ENTITY_TYPE_ID => 'pattern_without_ref_expressions',
+      PageRegion::ENTITY_TYPE_ID => 'stark.footer',
+    ];
+
     $tracked_dependencies = [];
 
-    foreach ($entities_under_test as $entity_type_id => $entity_id) {
+    // Track dependencies before update for entities that SHOULD update.
+    foreach ($entities_that_should_update as $entity_type_id => $entity_id) {
       $before = \Drupal::entityTypeManager()->getStorage($entity_type_id)->load($entity_id);
-      self::assertNotNull($before);
+      self::assertNotNull($before, "Entity $entity_type_id:$entity_id should exist before update");
       \assert($before instanceof ConfigEntityInterface);
-      $tracked_dependencies[$entity_type_id] = $before->getDependencies();
+      $tracked_dependencies['should_update'][$entity_type_id] = $before->getDependencies();
+    }
+
+    // Track dependencies before update for entities that should NOT update.
+    foreach ($entities_that_should_not_update as $entity_type_id => $entity_id) {
+      $before = \Drupal::entityTypeManager()->getStorage($entity_type_id)->load($entity_id);
+      self::assertNotNull($before, "Entity $entity_type_id:$entity_id should exist before update");
+      \assert($before instanceof ConfigEntityInterface);
+      $tracked_dependencies['should_not_update'][$entity_type_id] = $before->getDependencies();
     }
 
     $this->runUpdates();
@@ -66,7 +85,8 @@ final class UpdateIntermediateDependenciesUpdateTest extends CanvasUpdatePathTes
       'module' => [],
     ];
 
-    foreach ($entities_under_test as $entity_type_id => $entity_id) {
+    // Verify entities WITH reference expressions gained the intermediate dependency.
+    foreach ($entities_that_should_update as $entity_type_id => $entity_id) {
       $after = \Drupal::entityTypeManager()->getStorage($entity_type_id)->load($entity_id);
       self::assertInstanceOf(ConfigEntityInterface::class, $after);
       self::assertEntityIsValid($after);
@@ -77,10 +97,26 @@ final class UpdateIntermediateDependenciesUpdateTest extends CanvasUpdatePathTes
           $expectations_config_diff[$dependency_type],
           \array_diff(
             $dependencies_after[$dependency_type] ?? [],
-            $tracked_dependencies[$entity_type_id][$dependency_type] ?? []
-          )
+            $tracked_dependencies['should_update'][$entity_type_id][$dependency_type] ?? []
+          ),
+          "Entity $entity_type_id:$entity_id should have gained intermediate dependencies for $dependency_type"
         );
       }
+    }
+
+    // Verify entities WITHOUT reference expressions did NOT gain the intermediate dependency.
+    foreach ($entities_that_should_not_update as $entity_type_id => $entity_id) {
+      $after = \Drupal::entityTypeManager()->getStorage($entity_type_id)->load($entity_id);
+      self::assertInstanceOf(ConfigEntityInterface::class, $after);
+      self::assertEntityIsValid($after);
+      $after->calculateDependencies();
+      $dependencies_after = $after->getDependencies();
+      // Verify the intermediate file dependency was NOT added.
+      self::assertNotContains(
+        'file:file:f7e35fba-14ba-47f1-b2e1-16d2c6d70dd0',
+        $dependencies_after['content'] ?? [],
+        "Entity $entity_type_id:$entity_id should NOT have gained the intermediate file dependency"
+      );
     }
   }
 
