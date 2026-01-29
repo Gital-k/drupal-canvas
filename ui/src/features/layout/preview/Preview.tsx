@@ -46,7 +46,7 @@ const Preview: React.FC<PreviewProps> = () => {
   const pendingPreviewRequest = useRef<boolean>(false);
   const pendingTemplatePreviewRequest = useRef<boolean>(false);
   const shouldInvalidatePageList = useRef<boolean>(false);
-
+  const priorPayloadRef = useRef('');
   const [postPreview, { isLoading: isFetching }] = usePostPreviewMutation({
     fixedCacheKey: 'editorFramePreview',
   });
@@ -84,13 +84,21 @@ const Preview: React.FC<PreviewProps> = () => {
       currentModel: typeof model,
       currentEntityFormFields: typeof entity_form_fields,
     ) => {
+      const payload = {
+        layout: currentLayout,
+        model: currentModel,
+        entity_form_fields: currentEntityFormFields,
+      };
+      const stringPayload: string = JSON.stringify(payload);
       try {
+        if (priorPayloadRef.current === stringPayload) {
+          console.log('Skipping template preview request, payload unchanged.');
+          //Skip sending the request if the payload hasn't changed.
+          return;
+        }
         // Trigger the mutation with current values at execution time
-        await postTemplatePreview({
-          layout: currentLayout,
-          model: currentModel,
-          entity_form_fields: currentEntityFormFields,
-        }).unwrap();
+        await postTemplatePreview(payload).unwrap();
+        priorPayloadRef.current = stringPayload;
       } catch (err) {
         showBoundary(err);
       }

@@ -70,7 +70,12 @@ const TextFieldAutocomplete = ({
     <div className={clsx(styles.wrap, styles.autocompleteWrap)}>
       <input
         autoComplete="off"
-        {...a2p(attributes, {}, { skipAttributes: ['onBlur', 'onChange'] })}
+        defaultValue={attributes.value}
+        {...a2p(
+          attributes,
+          {},
+          { skipAttributes: ['onBlur', 'onChange', 'value'] },
+        )}
         className={clsx(styles.root, styles.autocomplete, className)}
         ref={(node) => {
           if (node) {
@@ -86,9 +91,9 @@ const TextFieldAutocomplete = ({
           }
           // Call the onChange listener, which will update the UI but not the
           // store or preview, due to the attribute set above.
-          if (typeof attributes.onChange === 'function') {
-            attributes.onChange(e);
-          }
+          // if (typeof attributes.onChange === 'function') {
+          //   attributes.onChange(e);
+          // }
 
           const autocompleteDelay =
             inputRef.current &&

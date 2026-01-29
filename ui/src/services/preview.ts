@@ -44,10 +44,6 @@ let queuedPreviewRequest: {
   entity_form_fields: any;
 } | null = null;
 
-// 500 error retry management
-let pending500RetryTimeout: NodeJS.Timeout | null = null;
-let has500BeenRetried = false;
-
 export const previewApi = createApi({
   reducerPath: 'previewApi',
   baseQuery: baseQueryWithAutoSaves,
@@ -85,19 +81,19 @@ export const previewApi = createApi({
         const executePreview = async () => {
           const id = generateRandomString(8);
           pushCanvasLayoutRequest();
-          console.log(
-            `[${id}] (RTK-ID: ${requestId.substring(0, 8)}) preview requested`,
-            timeStr(),
-          );
+          // console.log(
+          //   `[${id}] (RTK-ID: ${requestId.substring(0, 8)}) preview requested`,
+          //   timeStr(),
+          // );
 
           try {
             const { data, meta } = await queryFulfilled;
             // @ts-ignore
-            console.log(
-              // @ts-ignore
-              `[${id}] (${meta?.response?.status}) preview`,
-              timeStr(),
-            );
+            // console.log(
+            //   // @ts-ignore
+            //   `[${id}] (${meta?.response?.status}) preview`,
+            //   timeStr(),
+            // );
             const { html, autoSaves } = data;
             dispatch(
               pendingChangesApi.util.invalidateTags([
@@ -108,48 +104,10 @@ export const previewApi = createApi({
             handleAutoSavesHashUpdate(dispatch, autoSaves, meta);
             popCanvasLayoutRequest();
             dispatch(setPostPreviewCompleted(true));
-
-            // Reset retry flag on success
-            has500BeenRetried = false;
           } catch (error: any) {
-            // Log the error structure to understand what we're dealing with
-            console.log(`[${id}] Error caught - checking structure:`, {
-              hasError: !!error?.error,
-              errorStatus: error?.error?.status,
-              statusType: typeof error?.error?.status,
-              has500BeenRetried,
-              willRetry: error?.error?.status === 500 && !has500BeenRetried,
-            });
+            popCanvasLayoutRequest();
 
-            // Add specific 500 error handling with retry logic
-            if (error?.error?.status === 500 && !has500BeenRetried) {
-              console.log(
-                `[${id}] ✓ 500 error detected. Scheduling retry in 10ms...`,
-              );
-              has500BeenRetried = true;
-              popCanvasLayoutRequest();
-
-              // Schedule a retry after 10ms
-              return new Promise((resolve, reject) => {
-                pending500RetryTimeout = setTimeout(() => {
-                  pending500RetryTimeout = null;
-                  console.log(`[${id}] ➤ Executing 500 error retry now`);
-
-                  // Retry by dispatching the same request again
-                  dispatch(previewApi.endpoints.postPreview.initiate(arg))
-                    .then((result) => {
-                      console.log(`[${id}] ✓ Retry completed successfully`);
-                      resolve(result);
-                    })
-                    .catch((retryError) => {
-                      console.error(`[${id}] ✗ Retry failed:`, retryError);
-                      reject(retryError);
-                    });
-                }, 10);
-              });
-            }
-
-            // Log errors only if not retrying or if retry also failed
+            // Log all errors
             const status = error?.error?.status || 'unknown';
             console.error(
               `[${id}] (${status}) preview FAILED`,
@@ -171,42 +129,30 @@ export const previewApi = createApi({
                 data: error.error.data,
                 error: error.error,
               });
-
-              if (has500BeenRetried) {
-                console.error(
-                  `[${id}] 500 error occurred again after retry. Not retrying further.`,
-                );
-              }
             }
 
-            popCanvasLayoutRequest();
-            throw error; // Re-throw to maintain error behavior
+            // Don't re-throw errors - swallow them to prevent error boundary
+            // console.log(`[${id}] Error swallowed to prevent error boundary`);
           }
         };
-
-        // Cancel any pending 500 retry if a new request comes in
-        if (pending500RetryTimeout) {
-          console.log('New request detected - cancelling pending 500 retry');
-          clearTimeout(pending500RetryTimeout);
-          pending500RetryTimeout = null;
-          has500BeenRetried = false;
-        }
 
         if (activePreviewPromise) {
           // Queue this request, replacing any previously queued request
           queuedPreviewRequest = arg;
-          console.log(
-            'Preview request queued, will use latest after current completes',
-          );
+          // console.log(
+          //   'Preview request queued, will use latest after current completes',
+          // );
           return;
         }
 
         // Execute the request
         activePreviewPromise = executePreview()
           .catch((error) => {
-            // Ensure errors are logged even if they bubble up
-            console.error('Preview request failed in promise chain:', error);
-            throw error;
+            // Log error but don't re-throw to prevent error boundary
+            console.error(
+              'Preview request error in promise chain (swallowed):',
+              error,
+            );
           })
           .finally(async () => {
             activePreviewPromise = null;
@@ -215,7 +161,7 @@ export const previewApi = createApi({
             if (queuedPreviewRequest) {
               const nextRequest = queuedPreviewRequest;
               queuedPreviewRequest = null;
-              console.log('Executing queued preview request');
+              // console.log('Executing queued preview request');
 
               // Trigger the mutation again with the queued request
               // We need to await this and handle errors properly

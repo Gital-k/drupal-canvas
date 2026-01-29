@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import clsx from 'clsx';
 
 import Checkbox from '@/components/form/components/Checkbox';
@@ -17,6 +18,9 @@ const DrupalInput = ({
     onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   };
 }) => {
+  const buildRef = useRef<HTMLInputElement | null>(null);
+  const buildLog = useRef([]);
+
   switch (attributes?.type) {
     case 'checkbox': {
       return <Checkbox attributes={attributes} />;
@@ -40,10 +44,19 @@ const DrupalInput = ({
       if (attributes['data-track-hidden-value']) {
         return <Hidden attributes={attributes} />;
       }
-      // The a2p() process converts 'value to 'defaultValue', which is typically
-      // what React wants. Explicitly set the value on submit inputs since that
-      // is the text it displays.
-      return <input {...a2p(attributes)} value={attributes.value || ''} />;
+      if (attributes.name === 'form_build_id') {
+        return (
+          <input
+            {...a2p(attributes, {}, { skipAttributes: ['value'] })}
+            defaultValue={attributes.value || ''}
+          />
+        );
+      }
+      return <input {...a2p(attributes)} value={attributes.value} />;
+    // The a2p() process converts 'value to 'defaultValue', which is typically
+    // what React wants. Explicitly set the value on submit inputs since that
+    // is the text it displays.
+
     default:
       if (
         attributes?.class instanceof Array &&

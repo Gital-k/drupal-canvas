@@ -924,6 +924,7 @@ export const withFormRegistration = <P extends Record<string, any>>(
       // our form state and value.
       const formBuildIdListener = (e: AjaxUpdateFormBuildIdEvent) => {
         if (e.detail.formId === formContext?.formId) {
+          console.log('the event said update it to ', e.detail.newFormBuildId);
           dispatchFieldValue(
             dispatch,
             formContext.formId,

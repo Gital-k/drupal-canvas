@@ -563,19 +563,25 @@
         const [, response] = args;
         const el = args[0].element;
         const domFormId = el.closest('form')?.getAttribute('id');
-        const commandId = `${domFormId} | ${response.old} | ${response.new}`;
+        const commandId = `${domFormId} | old: ${response.old} | new: ${response.new}`;
         if (!buildIdHistory.includes(commandId)) {
           buildIdHistory.push(commandId);
         }
         const formId = getFormId(response.old);
         if (!formId) {
+          console.log('no form id', domFormId);
           return;
         }
+        if (!['page_data_form', 'component_instance_form'].includes(formId)) {
+          originalUpdateBuildId.apply(this, args);
+          return;
+        }
+
+
         // Keep a record of the association between these form build IDs and the
         // form ID they relate to.
         formBuildIdMap[response.old] = formId;
         formBuildIdMap[response.new] = formId;
-        originalUpdateBuildId.apply(this, args);
         // Notify the application that the form build ID has changed.
         const event = new CustomEvent('ajaxUpdateFormBuildId', {
           detail: {
@@ -586,7 +592,7 @@
         });
         if (!buildIdHistory.includes(`${commandId} event`)) {
           buildIdHistory.push(`${commandId} event`);
-          console.log(`Build id change `, commandId);
+          console.log(`Actual vanilla Build id change (no event)`, commandId);
           document.dispatchEvent(event);
         }
       };

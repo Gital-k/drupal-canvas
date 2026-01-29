@@ -328,7 +328,9 @@ export const popCanvasLayoutRequest = () => {
     // Notify the application that the layout request has completed.
     const event = new CustomEvent('canvasLayoutRequestComplete');
     document.dispatchEvent(event);
-    document.body.removeAttribute('data-canvas-layout-request-in-progress');
+    setTimeout(() => {
+      document.body.removeAttribute('data-canvas-layout-request-in-progress');
+    }, 10);
   }
 };
 
