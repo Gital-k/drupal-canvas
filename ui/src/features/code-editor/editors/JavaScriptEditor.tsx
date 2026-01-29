@@ -11,16 +11,14 @@ import ImportButton from '@/features/code-editor/ImportButton';
 
 import styles from '@/features/code-editor/CanvasCodeMirror.module.css';
 
-const JavaScriptEditor = ({ isLoading }: { isLoading: boolean }) => {
+const JavaScriptEditor = () => {
   const dispatch = useAppDispatch();
   const value = useAppSelector(selectCodeComponentProperty('sourceCodeJs'));
 
   function onChangeHandler(value: string) {
     dispatch(setCodeComponentProperty(['sourceCodeJs', value]));
   }
-  if (isLoading) {
-    return null;
-  }
+
   return (
     <>
       <CodeMirror

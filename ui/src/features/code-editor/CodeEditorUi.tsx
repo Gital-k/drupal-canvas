@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { useParams } from 'react-router';
 import { DragHandleDots1Icon, ViewVerticalIcon } from '@radix-ui/react-icons';
-import { Box, Button, Flex, Heading, Tabs } from '@radix-ui/themes';
+import { Box, Button, Flex, Heading, Spinner, Tabs } from '@radix-ui/themes';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import {
@@ -116,17 +116,17 @@ const CodeEditorUi = () => {
               </Flex>
             </Flex>
             <TabGroup />
-            <Flex
-              width="100%"
-              height="calc(100% - 38px)"
-              style={{ position: 'relative' }}
-            >
-              {activeTab === 'js' && <JavaScriptEditor isLoading={isLoading} />}
-              {activeTab === 'css' && <CssEditor isLoading={isLoading} />}
-              {activeTab === 'global-css' && (
-                <GlobalCssEditor isLoading={isLoading} />
-              )}
-            </Flex>
+            <Spinner loading={isLoading}>
+              <Flex
+                width="100%"
+                height="calc(100% - 38px)"
+                style={{ position: 'relative', minHeight: '120px' }}
+              >
+                {activeTab === 'js' && <JavaScriptEditor />}
+                {activeTab === 'css' && <CssEditor />}
+                {activeTab === 'global-css' && <GlobalCssEditor />}
+              </Flex>
+            </Spinner>
           </Flex>
         </Panel>
         {maximizedEditorLayout ? null : (
