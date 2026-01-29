@@ -74,7 +74,7 @@ const useCompileJavaScript = (): {
       }
     };
     initializeSwc();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const compileJavaScript = useCallback(
     (

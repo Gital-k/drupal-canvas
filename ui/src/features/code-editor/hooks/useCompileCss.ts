@@ -58,7 +58,7 @@ const useCompileCss = (): {
       }
     };
     initializeLightningCss();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   /**
    * Builds CSS with Tailwind CSS using class name candidates.
