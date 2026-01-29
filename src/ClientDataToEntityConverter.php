@@ -19,11 +19,7 @@ use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\Core\Form\FormBuilderInterface;
-use Drupal\Core\Form\FormInterface;
 use Drupal\Core\Form\FormState;
-use Drupal\Core\Form\FormStateInterface;
-use Drupal\Core\Logger\LoggerChannelFactoryInterface;
-use Drupal\Core\Logger\LoggerChannelInterface;
 use Drupal\canvas\Controller\ClientServerConversionTrait;
 use Drupal\canvas\Exception\ConstraintViolationException;
 use Drupal\canvas\Storage\ComponentTreeLoader;
@@ -37,8 +33,6 @@ class ClientDataToEntityConverter {
   use ClientServerConversionTrait;
   use EntityFormTrait;
 
-  private readonly LoggerChannelInterface $logger;
-
   public function __construct(
     private readonly EntityTypeManagerInterface $entityTypeManager,
     #[Autowire(service: FormBuilderInterface::class)]
@@ -46,10 +40,7 @@ class ClientDataToEntityConverter {
     private readonly CsrfTokenGenerator $csrfTokenGenerator,
     private readonly ComponentTreeLoader $componentTreeLoader,
     private readonly AutoSaveManager $autoSaveManager,
-    LoggerChannelFactoryInterface $loggerFactory,
-  ) {
-    $this->logger = $loggerFactory->get('canvas');
-  }
+  ) {}
 
   /**
    * @todo remove the validate flag in https://www.drupal.org/i/3505018.
@@ -286,10 +277,7 @@ class ClientDataToEntityConverter {
     // field is unchecked. We need to remove these from the field values when
     // that is the case.
     $checkboxes_parents = ClientFormSubmissionHelper::spotCheckboxesParents($peek_form);
-    $empty_checkboxes = \array_filter(
-      $checkboxes_parents,
-      static fn (array $parents) => NestedArray::getValue($entity_form_fields, $parents) === '0'
-    );
+    $empty_checkboxes = \array_filter($checkboxes_parents, static fn (array $parents) => NestedArray::getValue($entity_form_fields, $parents) === '0');
     foreach ($empty_checkboxes as $parents) {
       $value = NestedArray::getValue($entity_form_fields, $parents);
       // This covers NULL, FALSE, 0 and '0' by design.
@@ -307,38 +295,37 @@ class ClientDataToEntityConverter {
     $form_state->setUserInput($entity_form_fields);
 
     try {
-      $form = $this->buildFormWithPossibleTypeError($form_object, $form_state);
+      $form = $this->formBuilder->buildForm($form_object, $form_state);
     }
+    // @phpstan-ignore-next-line catch.neverThrown
     catch (\TypeError $e) {
       // Handle race condition where options_buttons widget receives string
       // instead of array.
-      if (
-        strpos($e->getMessage(), 'massageFormValues') !== FALSE
-        && strpos($e->getMessage(), 'must be of type array, string given') !== FALSE
-      ) {
-        // Log the issue for debugging.
-        $this->logger->warning(
-          'Options widget race condition detected: @message. Rebuilding form and retrying.',
-          [
-            '@message' => $e->getMessage(),
-          ]
-        );
+      if (strpos($e->getMessage(), 'massageFormValues') !== FALSE &&
+        strpos($e->getMessage(), 'must be of type array, string given') !== FALSE) {
 
-        // Clear any potentially corrupted cached form state and rebuild from scratch.
+        // Log the issue for debugging
+        // @phpstan-ignore-next-line globalDrupalDependencyInjection.useDependencyInjection
+        \Drupal::logger('canvas')->warning('Options widget race condition detected: @message. Rebuilding form and retrying.', [
+          '@message' => $e->getMessage(),
+        ]);
+
+        // Clear any potentially corrupted cached form state and rebuild from
+        // scratch.
         if ($ajax_form_build_id) {
           $this->formBuilder->deleteCache($ajax_form_build_id);
         }
 
-        // Create a fresh form state and try again.
+        // Create a fresh form state and try again
         $form_state = ClientFormSubmissionHelper::prepareProgrammedFormStateForFormObject(
           (new FormState()),
           $form_object
         )->setUserInput($entity_form_fields);
 
-        $form = $this->buildFormWithPossibleTypeError($form_object, $form_state);
+        $form = $this->formBuilder->buildForm($form_object, $form_state);
       }
       else {
-        // Re-throw if it's a different TypeError.
+        // Re-throw if it's a different TypeError
         throw $e;
       }
     }
@@ -354,8 +341,8 @@ class ClientDataToEntityConverter {
         $property_path = \implode('.', $parents);
         $invalid_value = NestedArray::getValue($entity_form_fields, $parents);
         $violations_list->add(new ConstraintViolation(
-          // Some errors may contain markup from the user of % placeholders in
-          // TranslatableMarkup. We just want the plain text version.
+        // Some errors may contain markup from the user of % placeholders in
+        // TranslatableMarkup. We just want the plain text version.
           PlainTextOutput::renderFromHtml((string) $error),
           NULL,
           [],
@@ -375,76 +362,72 @@ class ClientDataToEntityConverter {
     catch (\TypeError $e) {
       // Handle race condition where options_buttons widget receives string
       // instead of array.
-      if (
-        strpos($e->getMessage(), 'massageFormValues') !== FALSE
-        && strpos($e->getMessage(), 'must be of type array, string given') !== FALSE
-      ) {
-        // Log the issue for debugging.
-        $this->logger->warning(
-          'Options widget race condition detected during submitForm (TypeError): @message. Clearing cache and retrying.',
-          [
-            '@message' => $e->getMessage(),
-          ]
-        );
+      if (strpos($e->getMessage(), 'massageFormValues') !== FALSE &&
+        strpos($e->getMessage(), 'must be of type array, string given') !== FALSE) {
 
-        // Clear any potentially corrupted cached form state and rebuild from scratch.
+        // Log the issue for debugging
+        // @phpstan-ignore-next-line globalDrupalDependencyInjection.useDependencyInjection
+        \Drupal::logger('canvas')->warning('Options widget race condition detected during submitForm (TypeError): @message. Clearing cache and retrying.', [
+          '@message' => $e->getMessage(),
+        ]);
+
+        // Clear any potentially corrupted cached form state and rebuild from
+        // scratch.
         if ($ajax_form_build_id) {
           $this->formBuilder->deleteCache($ajax_form_build_id);
         }
 
-        // Create a fresh form state and rebuild the form, then try submit again.
+        // Create a fresh form state and rebuild the form, then try submit again
         $fresh_form_state = ClientFormSubmissionHelper::prepareProgrammedFormStateForFormObject(
           (new FormState()),
           $form_object
         )->setUserInput($entity_form_fields);
 
-        $fresh_form = $this->buildFormWithPossibleTypeError($form_object, $fresh_form_state);
+        $fresh_form = $this->formBuilder->buildForm($form_object, $fresh_form_state);
         $form_object->submitForm($fresh_form, $fresh_form_state);
 
-        // Update our references to use the fresh versions.
+        // Update our references to use the fresh versions
         $form = $fresh_form;
         $form_state = $fresh_form_state;
       }
       else {
-        // Re-throw if it's a different TypeError.
+        // Re-throw if it's a different TypeError
         throw $e;
       }
     }
     catch (\Exception $e) {
       // Handle race condition where options_buttons widget receives string
       // instead of array.
-      if (
-        strpos($e->getMessage(), 'Widget expected array') !== FALSE
-        && strpos($e->getMessage(), 'values extraction for') !== FALSE
-      ) {
-        // Log the issue for debugging.
-        $this->logger->warning(
-          'Options widget race condition detected during submitForm (Exception): @message. Clearing cache and retrying.',
-          [
-            '@message' => $e->getMessage(),
-          ]
-        );
+      if (strpos($e->getMessage(), 'Widget expected array') !== FALSE &&
+        strpos($e->getMessage(), 'values extraction for') !== FALSE) {
 
-        // Clear any potentially corrupted cached form state and rebuild from scratch.
+        // Log the issue for debugging
+        // @phpstan-ignore-next-line globalDrupalDependencyInjection.useDependencyInjection
+        \Drupal::logger('canvas')->warning('Options widget race condition detected during submitForm (Exception): @message. Clearing cache and retrying.', [
+          '@message' => $e->getMessage(),
+        ]);
+
+        // Clear any potentially corrupted cached form state and rebuild from
+        // scratch.
         if ($ajax_form_build_id) {
           $this->formBuilder->deleteCache($ajax_form_build_id);
         }
 
-        // Create a fresh form state and rebuild the form, then try submit again.
+        // Create a fresh form state and rebuild the form, then try submit again
         $fresh_form_state = ClientFormSubmissionHelper::prepareProgrammedFormStateForFormObject(
           (new FormState()),
           $form_object
         )->setUserInput($entity_form_fields);
 
-        $fresh_form = $this->buildFormWithPossibleTypeError($form_object, $fresh_form_state);
+        $fresh_form = $this->formBuilder->buildForm($form_object, $fresh_form_state);
         $form_object->submitForm($fresh_form, $fresh_form_state);
 
-        // Update our references to use the fresh versions.
+        // Update our references to use the fresh versions
         $form = $fresh_form;
         $form_state = $fresh_form_state;
       }
       else {
-        // Re-throw if it's a different Exception.
+        // Re-throw if it's a different Exception
         throw $e;
       }
     }
@@ -544,21 +527,6 @@ class ClientDataToEntityConverter {
       $values['form_id'] = $form['#form_id'];
     }
     return $values;
-  }
-
-  /**
-   * Builds a form and allows TypeError to be caught by the caller.
-   *
-   * @param \Drupal\Core\Form\FormInterface|string $form_object
-   *   The form object or form ID.
-   * @param \Drupal\Core\Form\FormStateInterface $form_state
-   *   The form state.
-   *
-   * @return array
-   *   The built form array.
-   */
-  private function buildFormWithPossibleTypeError(FormInterface|string $form_object, FormStateInterface $form_state): array {
-    return $this->formBuilder->buildForm($form_object, $form_state);
   }
 
   private static function spotElementsByType(array $form, string $type): array {
