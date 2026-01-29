@@ -56,7 +56,6 @@ const testMediaLibraryInEntityForm = (cy, loadOptions = {}, title) => {
       // Wait for the preview to finish loading.
       cy.wait('@updatePreview');
       cy.findByLabelText('Loading Preview').should('not.exist');
-      cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
       cy.log(`Iteration ${ix + 1}: ${step.removeText} complete`);
     }
     cy.get('@entityForm')

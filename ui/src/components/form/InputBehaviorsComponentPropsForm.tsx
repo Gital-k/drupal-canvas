@@ -1,8 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { debounce } from 'lodash';
 
-import { useAppDispatch, useAppSelector } from '@/app/hooks';
-import { useComponentTransforms } from '@/components/ComponentInstanceForm';
+import { useAppSelector } from '@/app/hooks';
 import {
   ComponentPreviewUpdateEvent,
   getPropSchemas,
@@ -21,10 +20,7 @@ import { FORM_TYPES } from '@/features/form/constants';
 import { selectFormValues } from '@/features/form/formStateSlice';
 import { isEvaluatedComponentModel } from '@/features/layout/layoutModelSlice';
 import { setPreviewBackgroundUpdate } from '@/features/pagePreview/previewSlice';
-import { selectEditorFrameContext } from '@/features/ui/uiSlice';
-import useInputUIData from '@/hooks/useInputUIData';
-import { useGetComponentsQuery } from '@/services/componentAndLayout';
-import { useUpdateComponentMutation } from '@/services/preview';
+import { useComponentFormInputInfo } from '@/hooks/useComponentFormInputInfo';
 import { isPropSourceComponent } from '@/types/Component';
 import { flaggedForRemoval, parseValue } from '@/utils/function-utils';
 
@@ -33,7 +29,7 @@ import type {
   ResolvedValues,
   Sources,
 } from '@/features/layout/layoutModelSlice';
-import type { CanvasComponent, PropSourceComponent } from '@/types/Component';
+import type { CanvasComponent } from '@/types/Component';
 import type { InputUIData, PropsValues } from '@/types/Form';
 
 export const InputBehaviorsComponentPropsForm = (
@@ -46,25 +42,25 @@ export const InputBehaviorsComponentPropsForm = (
    * rendering in the correct React Router context so we can't get the selected component ID from the url in inputBehaviors.tsx.
    * We already have a workaround for this for the Redux provider, could we do the same for the React Router context?
    */
-  const editorFrameContext = useAppSelector(selectEditorFrameContext);
-  const dispatch = useAppDispatch();
-  const polledBackgroundUpdate = useRef<number | null>(null);
   const { attributes } = props;
-  const { data: components } = useGetComponentsQuery();
-  const transforms = useComponentTransforms();
-  const inputAndUiData = useInputUIData();
-  const { selectedComponentType, version, selectedComponent } = inputAndUiData;
-  const component = components?.[selectedComponentType] as PropSourceComponent;
-  const [patchComponent] = useUpdateComponentMutation({
-    fixedCacheKey: selectedComponent,
-  });
-
   const fieldName = attributes.name || attributes['data-canvas-name'];
-  const propName = toPropName(fieldName, selectedComponent);
-  // Scalar prop-types might be able to perform real-time updates.
-  const isScalarProp = ['number', 'integer', 'string', 'boolean'].includes(
-    component?.propSources?.[propName]?.jsonSchema?.type as string,
-  );
+
+  // Get all component form data and utilities from the hook
+  const {
+    editorFrameContext,
+    dispatch,
+    polledBackgroundUpdate,
+    components,
+    transforms,
+    inputAndUiData,
+    selectedComponentType,
+    version,
+    selectedComponent,
+    component,
+    patchComponent,
+    propName,
+    isScalarProp,
+  } = useComponentFormInputInfo(fieldName);
 
   const formStateToStore = (
     newFormState: PropsValues,

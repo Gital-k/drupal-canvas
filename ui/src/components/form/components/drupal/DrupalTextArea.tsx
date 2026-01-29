@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { Flex } from '@radix-ui/themes';
 
 import TextArea from '@/components/form/components/TextArea';
-import InputBehaviors from '@/components/form/inputBehaviors';
+import { withFormRegistration } from '@/components/form/withFormRegistration';
 import { a2p } from '@/local_packages/utils.js';
 import { getDrupalSettings } from '@/utils/drupal-globals';
 
@@ -127,14 +127,14 @@ const FormatSelect = ({
   );
 };
 
-// We need to create a wrapper for FormatSelect that can be processed by InputBehaviors
-// InputBehaviors expects a component that can accept any props, but we have specific prop requirements
+// We need to create a wrapper for FormatSelect that can be processed by withFormRegistration
+// withFormRegistration expects a component that can accept any props, but we have specific prop requirements
 const FormatSelectWrapper = (props: any) => {
   // Ensure we're using the right props
   return <FormatSelect {...(props as FormatSelectProps)} />;
 };
 
-// Now InputBehaviors can process our component correctly
-const WrappedFormatSelect = InputBehaviors(FormatSelectWrapper);
+// Now withFormRegistration can process our component correctly
+const WrappedFormatSelect = withFormRegistration(FormatSelectWrapper);
 
-export default InputBehaviors(DrupalTextArea);
+export default withFormRegistration(DrupalTextArea);

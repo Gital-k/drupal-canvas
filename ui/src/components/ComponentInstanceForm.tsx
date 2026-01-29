@@ -217,7 +217,7 @@ const ComponentInstanceFormRenderer: React.FC<
 
         const component = components?.[selectedComponentType];
         if (isEvaluatedComponentModel(selectedModel) && component) {
-          patchComponent({
+          const patchPayload = {
             type: editorFrameContext,
             componentInstanceUuid: selectedComponentId,
             componentType: `${selectedComponentType}@${version}`,
@@ -229,7 +229,9 @@ const ComponentInstanceFormRenderer: React.FC<
               ),
               resolved,
             },
-          });
+          };
+          console.log('ajax patch payload', patchPayload);
+          patchComponent(patchPayload);
           return;
         }
         patchComponent({

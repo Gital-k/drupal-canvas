@@ -466,7 +466,7 @@ export function getPropsValues(
       ).propSources[fieldName as keyof PropsValues].default_values.resolved;
     }
   });
-
+  console.log('getPropsValues', { propsValues, selectedModel });
   return { propsValues, selectedModel };
 }
 

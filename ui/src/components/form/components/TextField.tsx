@@ -45,6 +45,7 @@ const TextField = ({
                   writable: false,
                   value: element,
                 });
+
                 if (typeof attributes.onChange === 'function') {
                   attributes.onChange(changeEvent);
                   if (window.jQuery) {
