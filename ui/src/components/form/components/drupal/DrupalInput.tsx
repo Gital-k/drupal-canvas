@@ -18,9 +18,6 @@ const DrupalInput = ({
     onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   };
 }) => {
-  const buildRef = useRef<HTMLInputElement | null>(null);
-  const buildLog = useRef([]);
-
   switch (attributes?.type) {
     case 'checkbox': {
       return <Checkbox attributes={attributes} />;
