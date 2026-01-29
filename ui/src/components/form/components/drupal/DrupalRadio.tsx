@@ -1,7 +1,7 @@
 import { createContext, useContext, useRef, useState } from 'react';
 
 import { RadioGroup, RadioItem } from '@/components/form/components/Radio';
-import { withFormRegistration } from '@/components/form/withFormRegistration';
+import { wrapRHF } from '@/components/form/wrapRHF';
 import { a2p } from '@/local_packages/utils.js';
 
 import type { Attributes } from '@/types/DrupalAttribute';
@@ -99,6 +99,6 @@ const DrupalRadioItem = ({ attributes = {} }: { attributes?: Attributes }) => {
   );
 };
 
-const WrappedDrupalRadioGroup = withFormRegistration(DrupalRadioGroup);
+const WrappedDrupalRadioGroup = wrapRHF(DrupalRadioGroup);
 
 export { WrappedDrupalRadioGroup as DrupalRadioGroup, DrupalRadioItem };

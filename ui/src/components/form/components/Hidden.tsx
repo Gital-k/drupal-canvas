@@ -38,7 +38,7 @@ const Hidden = ({ attributes }: { attributes?: Attributes }) => {
           ) {
             ref.current.value = '';
 
-            // Dispatch custom event to trigger form state update in withFormRegistration
+            // Dispatch custom event to trigger form state update in wrapRHF
             // This triggers the full commitFormState -> formStateToStore flow
             if (fieldName) {
               const fieldUpdateEvent = new CustomEvent('canvas:fieldUpdate', {

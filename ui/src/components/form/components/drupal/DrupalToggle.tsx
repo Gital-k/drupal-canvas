@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 import Toggle from '@/components/form/components/Toggle';
-import { withFormRegistration } from '@/components/form/withFormRegistration';
+import { wrapRHF } from '@/components/form/wrapRHF';
 import { a2p } from '@/local_packages/utils.js';
 
 import type { Attributes } from '@/types/DrupalAttribute';
@@ -57,4 +57,4 @@ const DrupalToggle = ({
   );
 };
 
-export default withFormRegistration(DrupalToggle);
+export default wrapRHF(DrupalToggle);

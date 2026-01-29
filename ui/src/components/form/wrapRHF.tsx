@@ -872,12 +872,12 @@ const PageDataFormField = <P extends Record<string, any>>({
  * - Works with any input component that has an `attributes` prop with a `name` field
  *
  * Usage:
- *   export default withFormRegistration(MyComponent);
+ *   export default wrapRHF(MyComponent);
  */
-export const withFormRegistration = <P extends Record<string, any>>(
+export const wrapRHF = <P extends Record<string, any>>(
   WrappedComponent: ComponentType<P>,
 ): ComponentType<P> => {
-  const WithFormRegistration = (props: P) => {
+  const WrapRHF = (props: P) => {
     // Get form contexts - they may be null for external forms
     const dispatch = useAppDispatch();
     const formContext = useSafeFormContext();
@@ -1062,9 +1062,9 @@ export const withFormRegistration = <P extends Record<string, any>>(
     );
   };
 
-  WithFormRegistration.displayName = `withFormRegistration(${WrappedComponent.displayName || WrappedComponent.name || 'Component'})`;
+  WrapRHF.displayName = `wrapRHF(${WrappedComponent.displayName || WrappedComponent.name || 'Component'})`;
 
-  return WithFormRegistration;
+  return WrapRHF;
 };
 
-export default withFormRegistration;
+export default wrapRHF;
