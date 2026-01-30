@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import Ajv from 'ajv';
 import { debounce } from 'lodash';
 import { Controller } from 'react-hook-form';
+import {useAjaxFieldRegistration} from '@/components/form/wrapRHF-hooks/useAjaxFieldRegistration';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import {
@@ -900,30 +901,8 @@ export const wrapRHF = <P extends Record<string, any>>(
       };
     }, [dispatch, fieldName, formContext, rhfContext]);
 
-    // For AJAX-added inputs, register them dynamically with react-hook-form
-    // This ensures they become controlled inputs like all other form inputs
-    useEffect(() => {
-      if (!rhfContext || !fieldName) {
-        return;
-      }
-      const currentValue = getCurrentValue();
 
-      // Check if field is already registered
-      const fieldState = rhfContext.getFieldState(fieldName);
-
-      // If field is not yet registered (AJAX-added), register it now
-      if (!fieldState || fieldState.invalid === undefined) {
-        rhfContext.register(fieldName);
-        // Set initial value
-        rhfContext.setValue(fieldName, currentValue, {
-          shouldValidate: false,
-          shouldDirty: false,
-          shouldTouch: false,
-        });
-      }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [rhfContext, fieldName]);
-
+    useAjaxFieldRegistration(fieldName, rhfContext, getCurrentValue);
     // If no react-hook-form context, the form isn't using RHF - render without enhancement
     // If no field name, we can't register it - render without enhancement
     if (!rhfContext || !fieldName) {
