@@ -22,13 +22,12 @@ import { useFormBuildIdSync } from '@/components/form/wrapRHF-hooks/useFormBuild
 import { usePageDataFormInputInfo } from '@/components/form/wrapRHF-hooks/usePageDataFormInputInfo';
 import { useUndoRedoSync } from '@/components/form/wrapRHF-hooks/useUndoRedoSync';
 import {
+  applyEnhancedProps,
   createEnhancedOnBlur,
   createEnhancedOnChange,
-  dispatchFieldError,
   dispatchFieldValue,
   extractPageDataValue,
   getCurrentValueFromProps,
-  applyEnhancedProps,
 } from '@/components/form/wrapRHF-utils';
 import { useSafeFormContext, useSafeRHFContext } from '@/contexts/FormContext';
 import { FORM_TYPES } from '@/features/form/constants';
@@ -46,11 +45,9 @@ import {
 } from '@/features/pageData/pageDataSlice';
 import { setPreviewBackgroundUpdate } from '@/features/pagePreview/previewSlice';
 import { flaggedForRemoval, parseValue } from '@/utils/function-utils';
-import { isAjaxing } from '@/utils/isAjaxing';
 
 import type { ComponentType } from 'react';
 import type * as React from 'react';
-import type { ValidationResult } from '@/components/form/wrapRHF-utils';
 import type { FormId } from '@/features/form/formStateSlice';
 import type { ComponentModels } from '@/features/layout/layoutModelSlice';
 import type { InputUIData, PropsValues } from '@/types/Form';
@@ -74,7 +71,6 @@ const ComponentFormField = <P extends Record<string, any>>({
 }: FormFieldProps<P>) => {
   const formContext = useSafeFormContext();
   const rhfContext = useSafeRHFContext();
-  const formId = 'component_instance_form';
   const getCurrentValue = () => getCurrentValueFromProps(props);
   // const formValues = useAppSelector((state) =>
   //   selectFormValues(state, formId as FormId),
@@ -374,7 +370,7 @@ const ComponentFormField = <P extends Record<string, any>>({
           field,
           props,
           dispatch,
-          formContext,
+          formId: formContext?.formId,
           fieldName,
           validateNewValue,
           errorsText,
@@ -564,7 +560,7 @@ const PageDataFormField = <P extends Record<string, any>>({
           field,
           props,
           dispatch,
-          formContext,
+          formId: formContext?.formId,
           fieldName,
           validateNewValue,
           errorsText,

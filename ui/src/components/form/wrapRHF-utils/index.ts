@@ -59,18 +59,6 @@ export const extractPageDataValue = (e: any): any => {
   }
   return null;
 };
-
-export const parseTextValue = (e: ChangeEvent) => {
-  const target = e.target as HTMLInputElement;
-  if (target.value !== undefined) {
-    return target.value === '_none' ? null : target.value;
-  }
-  if ('checked' in target) {
-    return target.checked;
-  }
-  return null;
-};
-
 export const getCurrentValueFromProps = (props: Record<string, any>) => {
   if (props.options && props.options.some((opt: any) => opt.selected)) {
     return props.options.find((opt: any) => opt.selected).value;
@@ -93,7 +81,7 @@ type CreateEnhancedOnBlurParams = {
   };
   props: Record<string, any>;
   dispatch: ReturnType<typeof useAppDispatch>;
-  formContext: { formId: FormId } | null;
+  formId: string | null | undefined;
   fieldName: string;
   validateNewValue: (e: any, value: any) => ValidationResult;
   errorsText: ErrorsText;
@@ -103,7 +91,7 @@ export const createEnhancedOnBlur = ({
   field,
   props,
   dispatch,
-  formContext,
+  formId,
   fieldName,
   validateNewValue,
   errorsText,
@@ -121,13 +109,13 @@ export const createEnhancedOnBlur = ({
     // Perform validation on blur
     const validationResult = validateNewValue(e as any, field.value);
     if (!validationResult.valid) {
-      if (formContext?.formId) {
+      if (formId) {
         if (props.attributes) {
           props.attributes['data-invalid-prop-value'] = 'true';
         }
         dispatchFieldError(
           dispatch,
-          formContext.formId,
+          formId as FormId,
           fieldName,
           validationResult,
           errorsText,
@@ -164,7 +152,7 @@ export const createEnhancedOnChange = ({
   validateNewValue,
   errorsText,
 }: CreateEnhancedOnChangeParams) => {
-  return (e: any) => {
+  return (e: ChangeEvent) => {
     const newValue = extractNewValue(e);
 
     // Update react-hook-form state
@@ -178,10 +166,10 @@ export const createEnhancedOnChange = ({
     // Call original onChange (unless skipOriginalOnChange is set)
     // This allows nested components like FormatSelect to call enhancedOnChange
     // without creating a cascade
-    const originalOnChange = props.attributes?.onChange || props.onChange;
-    if (originalOnChange && !e?.skipOriginalOnChange) {
-      originalOnChange(e);
-    }
+    // const originalOnChange = props.attributes?.onChange || props.onChange;
+    // if (originalOnChange && !e?.skipOriginalOnChange) {
+    //   originalOnChange(e);
+    // }
 
     // Component form validation logic (optional)
     if (validateNewValue && errorsText) {
