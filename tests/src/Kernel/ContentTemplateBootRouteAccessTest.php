@@ -38,11 +38,6 @@ final class ContentTemplateBootRouteAccessTest extends KernelTestBase {
     'node',
     'field',
     'text',
-    'filter',
-    'editor',
-    'ckeditor5',
-    'image',
-    'file',
     'media',
   ];
 
@@ -51,11 +46,9 @@ final class ContentTemplateBootRouteAccessTest extends KernelTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
-    $this->container->get('theme_installer')->install(['stark']);
     $this->installEntitySchema('user');
     $this->installEntitySchema('node');
-    $this->installConfig(['node', 'system', 'filter', 'image']);
-    $this->installConfig(['canvas']);
+    $this->installConfig(['node', 'system']);
     $this->createContentType(['type' => 'article']);
   }
 
@@ -99,7 +92,17 @@ final class ContentTemplateBootRouteAccessTest extends KernelTestBase {
     $access = $url->access($admin_user, TRUE);
     $this->assertTrue($access->isAllowed());
 
-    // Test 2: User with 'administer code components' permission.
+    // Test 2: User with 'administer content templates' permission
+    // but ContentTemplate does not exist.
+    $url = Url::fromRoute('canvas.boot.content_template', [
+      'entity_type' => 'invalid_entity_type',
+      'bundle' => 'invalid_bundle',
+      'view_mode_name' => 'invalid_view_mode',
+    ]);
+    $access = $url->access($admin_user, TRUE);
+    $this->assertFalse($access->isAllowed());
+
+    // Test 3: User with 'administer code components' permission.
     // This also grants Canvas UI access, but not edit ContentTemplates.
     $code_admin_user = $this->createUser(['administer code components']);
     assert($code_admin_user instanceof UserInterface);
