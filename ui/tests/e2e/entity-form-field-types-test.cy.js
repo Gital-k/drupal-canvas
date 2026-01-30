@@ -165,6 +165,12 @@ describe(
 
         // Perform field edits.
         Object.entries(fields).forEach(([key, value]) => {
+          // if (key === 'field_cvt_boolean_checkbox') {
+          //    return;
+          // }
+          // if (key !== 'field_cvt_textfield_multi') {
+          //   return;
+          // }
           cy.log(`Performing edits for ${key}`);
           cy.intercept({
             url: '**/canvas/api/v0/layout/node/2',
@@ -196,6 +202,12 @@ describe(
             expect(itemResponse.status).to.eq(200);
             // Perform assertions on the draft entity.
             Object.entries(fields).forEach(([key, value]) => {
+              // if (key === 'field_cvt_boolean_checkbox') {
+              //   return;
+              // }
+              // if (key !== 'field_cvt_textfield_multi') {
+              //   return;
+              // }
               cy.log(`Performing validation for ${key}`);
               value.assertData(itemResponse.body.data);
             });

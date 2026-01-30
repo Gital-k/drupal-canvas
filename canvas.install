@@ -1,9 +1,25 @@
 <?php
 
+// phpcs:ignoreFile
+
 declare(strict_types=1);
 
 use Drupal\Core\Extension\ThemeInstallerInterface;
 use Drupal\canvas\AutoSave\AutoSaveManager;
+use Drupal\node\Entity\NodeType;
+use Drupal\field\Entity\FieldStorageConfig;
+use Drupal\field\Entity\FieldConfig;
+use Drupal\media\Entity\MediaType;
+use Drupal\file\Entity\File;
+use Drupal\media\Entity\Media;
+use Drupal\Core\Block\BlockManagerInterface;
+use Drupal\user\Entity\Role;
+use Drupal\user\Entity\User;
+use Drupal\canvas\Entity\Page;
+use Drupal\canvas\Entity\JavaScriptComponent;
+use Drupal\canvas\Entity\Pattern;
+use Drupal\canvas\Entity\PageRegion;
+use Drupal\canvas\PropSource\StaticPropSource;
 
 /**
  * Implements hook_install().
@@ -88,4 +104,329 @@ function canvas_requirements(string $phase): array {
     }
   }
   return $requirements;
+}
+
+//function canvas_update_11101(): void {
+//  $module_installer = \Drupal::service('module_installer');
+//  $module_installer->install(['node', 'media', 'block', 'file']);
+//
+//  // Install themes used by tests (optional).
+//  /** @var ThemeInstallerInterface $theme_installer */
+//  $theme_installer = \Drupal::service('theme_installer');
+//  foreach (['stark', 'claro'] as $theme) {
+//    if (!\Drupal::service('theme_handler')->themeExists($theme)) {
+//      $theme_installer->install([$theme]);
+//    }
+//  }
+//  \Drupal::service('config.factory')->getEditable('system.theme')
+//    ->set('default', 'stark')
+//    ->set('admin', 'claro')
+//    ->save();
+//
+//  // Place key blocks.
+////    /** @var BlockManagerInterface $block_manager */
+//  $block_manager = \Drupal::service('plugin.manager.block');
+////  _canvas_place_block($block_manager, 'page_title_block', 'highlighted');
+////  _canvas_place_block($block_manager, 'system_messages_block', NULL);
+////  _canvas_place_block($block_manager, 'system_main_block', NULL);
+//
+//  // Content type `article`.
+//  if (!NodeType::load('article')) {
+//    $type = NodeType::create(['type' => 'article', 'name' => 'Article']);
+//    $type->save();
+//  }
+//
+//  // Image field `field_hero` with required storage settings.
+//  if (!FieldStorageConfig::loadByName('node', 'field_hero')) {
+//    FieldStorageConfig::create([
+//      'field_name' => 'field_hero',
+//      'entity_type' => 'node',
+//      'type' => 'image',
+//      'settings' => [
+//        // Mirrors override used in tests.
+//        'display_default' => TRUE,
+//      ],
+//    ])->save();
+//  }
+//  if (!FieldConfig::load('node', 'article', 'field_hero')) {
+//    FieldConfig::create([
+//      'label' => 'Hero',
+//      'field_name' => 'field_hero',
+//      'entity_type' => 'node',
+//      'bundle' => 'article',
+//      'required' => FALSE,
+//      'settings' => [],
+//    ])->save();
+//  }
+//
+//  // Media bundle `image`.
+//  if (!MediaType::load('image')) {
+//    MediaType::create([
+//      'id' => 'image',
+//      'label' => 'Image',
+//      'source' => 'image',
+//      'new_revision' => FALSE,
+//    ])->save();
+//  }
+//
+//  // Seed two image files and media items if assets exist.
+//  $seed_media_ids = _canvas_seed_images_and_media();
+//
+//  // Create the component tree field on article.
+//  if (!FieldStorageConfig::loadByName('node', 'field_canvas_demo')) {
+//    FieldStorageConfig::create([
+//      'field_name' => 'field_canvas_demo',
+//      'entity_type' => 'node',
+//      'type' => 'canvas_component_tree',
+//      'settings' => [],
+//    ])->save();
+//  }
+//  if (!FieldConfig::load('node', 'article', 'field_canvas_demo')) {
+//    FieldConfig::create([
+//      'label' => 'Canvas Demo',
+//      'field_name' => 'field_canvas_demo',
+//      'entity_type' => 'node',
+//      'bundle' => 'article',
+//      'required' => FALSE,
+//      'settings' => [],
+//    ])->save();
+//  }
+//
+//  // View display config for the component field.
+//  \Drupal::service('entity_display.repository')
+//    ->getViewDisplay('node', 'article')
+//    ->setComponent('field_canvas_demo', [
+//      'label' => 'hidden',
+//      'type' => 'canvas_naive_render_sdc_tree',
+//      'weight' => -2,
+//    ])
+//    ->save();
+//
+//  // Ensure canvas and test modules are enabled.
+//  $module_installer->install([
+//    'canvas',
+//    'canvas_oauth',
+//    'canvas_test_sdc',
+//    'canvas_e2e_support',
+//    'system',
+//  ]);
+//
+//  // Build component tree items (mirrors the test setup, simplified).
+//  $use_uri = \Drupal::moduleHandler()->moduleExists('canvas_test_storable_prop_shape_alter');
+//  $static_image_prop_source = StaticPropSource::parse([
+//    'sourceType' => 'static:field_item:entity_reference',
+//    'value' => ['target_id' => $seed_media_ids['first_media_id'] ?? 1],
+//    'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:image␝field_media_image␞␟src_with_alternate_widths,alt↝entity␜␜entity:media:image␝field_media_image␞␟alt,width↝entity␜␜entity:media:image␝field_media_image␞␟width,height↝entity␜␜entity:media:image␝field_media_image␞␟height}',
+//    'sourceTypeSettings' => [
+//      'storage' => ['target_type' => 'media'],
+//      'instance' => [
+//        'handler' => 'default:media',
+//        'handler_settings' => [
+//          'target_bundles' => ['image' => 'image'],
+//        ],
+//      ],
+//    ],
+//  ])->toArray();
+//
+//  $items = _canvas_build_component_tree_items($static_image_prop_source, $use_uri);
+//
+//  // Create seeded nodes and pages.
+//  _canvas_seed_nodes_and_pages($items, $seed_media_ids);
+//
+//  // Create role and user with required permissions.
+//  _canvas_seed_role_and_user();
+//}
+
+/**
+ * Place a block instance of a given plugin id.
+ */
+  function _canvas_place_block(BlockManagerInterface $block_manager, string $plugin_id, ?string $region = NULL): void {
+    $definition = $block_manager->getDefinition($plugin_id, FALSE);
+    if (!$definition) {
+      return;
+    }
+    $block = \Drupal\block\Entity\Block::create([
+      'id' => $plugin_id . '_seed',
+      'theme' => \Drupal::config('system.theme')->get('default') ?: 'stark',
+      'plugin' => $plugin_id,
+      'region' => $region ?? 'content',
+      'settings' => [],
+      'visibility' => [],
+      'status' => TRUE,
+    ]);
+    $block->save();
+  }
+
+
+/**
+ * Build the component tree items array used by tests.
+ */
+function _canvas_build_component_tree_items(array $static_image_prop_source, bool $use_uri): array {
+  return [
+    [
+      'component_id' => 'sdc.canvas_test_sdc.two_column',
+      'uuid' => '16176e0b-8197-40e3-ad49-48f1b6e9a7f9',
+      'inputs' => ['width' => 50],
+    ],
+    [
+      'parent_uuid' => '16176e0b-8197-40e3-ad49-48f1b6e9a7f9',
+      'slot' => 'column_one',
+      'component_id' => 'sdc.canvas_test_sdc.image',
+      'uuid' => '8f6780cd-7b64-499e-9545-321a14951a0d',
+      'inputs' => ['image' => ['target_id' => 1]],
+    ],
+    [
+      'parent_uuid' => '16176e0b-8197-40e3-ad49-48f1b6e9a7f9',
+      'slot' => 'column_one',
+      'component_id' => 'sdc.canvas_test_sdc.my-hero',
+      'uuid' => '208452de-10d6-4fb8-89a1-10e340b3744c',
+      'inputs' => [
+        'heading' => 'hello, world!',
+        'cta1href' => $use_uri ? 'https://drupal.org' : ['uri' => 'https://drupal.org', 'options' => []],
+      ],
+    ],
+    // Additional items can be copied from the test setup as needed.
+    [
+      'parent_uuid' => '16176e0b-8197-40e3-ad49-48f1b6e9a7f9',
+      'slot' => 'column_two',
+      'uuid' => 'd8afcb97-c2ba-426e-b2da-94600afd484b',
+      'component_id' => 'sdc.canvas_test_sdc.image',
+      'inputs' => [
+        'image' => [
+          'sourceType' => 'adapter:image_apply_style',
+          'adapterInputs' => [
+            'image' => $static_image_prop_source,
+            'imageStyle' => [
+              'sourceType' => 'static:field_item:string',
+              'value' => 'thumbnail',
+              'expression' => 'ℹ︎string␟value',
+            ],
+          ],
+        ],
+      ],
+      'label' => 'Magnificent image!',
+    ],
+  ];
+}
+
+/**
+ * Create nodes and pages used by tests.
+ */
+function _canvas_seed_nodes_and_pages(array $items, array $seed_media_ids): void {
+  // Helper: generate sample value for `field_hero` without Test traits.
+  $media_id = $seed_media_ids['first_media_id'] ?? NULL;
+  $image_field_value = $media_id ? [
+    'target_id' => \Drupal::entityTypeManager()->getStorage('media')->load($media_id)?->get('field_media_image')->target_id,
+    'alt' => '',
+    'title' => '',
+  ] : NULL;
+
+  $node = \Drupal\node\Entity\Node::create([
+    'type' => 'article',
+    'title' => 'Canvas Needs This For The Time Being',
+    'field_hero' => $image_field_value,
+    'field_canvas_demo' => $items,
+  ]);
+  $node->save();
+
+  $empty_node = \Drupal\node\Entity\Node::create([
+    'type' => 'article',
+    'title' => 'I am an empty node',
+    'path' => ['alias' => '/i-am-an-empty-node'],
+    'field_hero' => $image_field_value,
+  ]);
+  $empty_node->save();
+
+  $node2 = \Drupal\node\Entity\Node::create([
+    'type' => 'article',
+    'path' => ['alias' => '/the-one-with-a-block'],
+    'title' => 'Canvas With a block in the layout',
+    'field_hero' => $image_field_value,
+    'field_canvas_demo' => $items,
+  ]);
+  $node2->save();
+
+  $page = Page::create([
+    'title' => 'Homepage',
+    'description' => 'This is the homepage',
+    'path' => ['alias' => '/homepage'],
+    'components' => [
+      [
+        'uuid' => '2c6e91ae-23ac-433d-9bb8-687144464b34',
+        'component_id' => 'sdc.canvas_test_sdc.props-slots',
+        'inputs' => ['heading' => 'Welcome to the site!'],
+      ],
+      [
+        'uuid' => '78c73c1d-4988-4f9b-ad17-f7e337d40c29',
+        'component_id' => 'block.system_branding_block',
+        'inputs' => [
+          'label' => '',
+          'label_display' => FALSE,
+          'use_site_logo' => TRUE,
+          'use_site_name' => TRUE,
+          'use_site_slogan' => TRUE,
+        ],
+      ],
+    ],
+  ]);
+  $page->save();
+
+  Page::create([
+    'title' => 'Empty Page',
+    'description' => 'This is an empty page',
+    'path' => ['alias' => '/test-page'],
+  ])->save();
+
+  Page::create([
+    'title' => 'Page without a path',
+    'description' => 'This is a page without a path',
+  ])->save();
+}
+
+/**
+ * Create role and user used by tests.
+ */
+function _canvas_seed_role_and_user(): void {
+  if (!Role::load('canvas')) {
+    $canvas_role = Role::create([
+      'id' => 'canvas',
+      'label' => 'canvas',
+      'permissions' => [
+        'access content',
+        'administer media',
+        'access media overview',
+        'view media',
+        'create media',
+        'edit any article content',
+        'create article content',
+        Page::CREATE_PERMISSION,
+        Page::EDIT_PERMISSION,
+        Page::DELETE_PERMISSION,
+        AutoSaveManager::PUBLISH_PERMISSION,
+        'administer url aliases',
+        'create url aliases',
+        JavaScriptComponent::ADMIN_PERMISSION,
+        Pattern::ADMIN_PERMISSION,
+        'administer themes',
+        'administer comments',
+        'post comments',
+        'administer permissions',
+        PageRegion::ADMIN_PERMISSION,
+        'administer site configuration',
+      ],
+    ]);
+    $canvas_role->save();
+  }
+
+  $user = user_load_by_name('canvasUser');
+  if (!$user) {
+    $canvas_user = User::create();
+    $canvas_user->setUsername('canvasUser');
+    $canvas_user->setPassword('canvasUser');
+    $canvas_user->setEmail('canvas@test.com');
+    $canvas_user->addRole('canvas');
+    $canvas_user->enforceIsNew();
+    $canvas_user->activate();
+    $canvas_user->save();
+  }
 }

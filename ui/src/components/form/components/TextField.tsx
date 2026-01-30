@@ -11,6 +11,9 @@ const TextField = ({
   className?: string;
   attributes?: Attributes;
 }) => {
+  if (attributes.type === 'hidden') {
+    console.log(`hidden ${attributes.name} !!`);
+  }
   return (
     <div className={styles.wrap}>
       <input
@@ -45,8 +48,9 @@ const TextField = ({
                   writable: false,
                   value: element,
                 });
+
                 if (typeof attributes.onChange === 'function') {
-                  attributes.onChange(changeEvent);
+                  // attributes.onChange(changeEvent);
                   if (window.jQuery) {
                     const $target = window.jQuery(this);
                     if ($target.length) {

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import TextField from '@/components/form/components/TextField';
-import InputBehaviors from '@/components/form/inputBehaviors';
+import { withFormRegistration } from '@/components/form/withFormRegistration';
 import { useEntityTitle } from '@/hooks/useEntityTitle';
 import { a2p } from '@/local_packages/utils.js';
 import { useGetPageLayoutQuery } from '@/services/componentAndLayout';
@@ -89,6 +89,9 @@ const DrupalPathWidget = ({
     }
 
     const newValue = getPathAlias(titleInput ?? '');
+    if (newValue === pathValue) {
+      return;
+    }
     const syntheticEvent = {
       target: {
         value: newValue,
@@ -126,4 +129,4 @@ const DrupalPathWidget = ({
   return <TextField attributes={processedAttrs} />;
 };
 
-export default InputBehaviors(DrupalPathWidget);
+export default withFormRegistration(DrupalPathWidget);

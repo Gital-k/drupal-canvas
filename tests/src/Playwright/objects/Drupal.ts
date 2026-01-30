@@ -384,6 +384,9 @@ export class Drupal {
     // https://www.drupal.org/project/canvas/issues/3535215
     await this.page
       .locator('input[name="media[0][fields][field_media_image][0][alt]"]')
+      .waitFor({ timeout: 24000 });
+    await this.page
+      .locator('input[name="media[0][fields][field_media_image][0][alt]"]')
       .evaluate((el: HTMLInputElement, value) => {
         el.value = value;
       }, alt);

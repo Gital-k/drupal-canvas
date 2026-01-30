@@ -229,7 +229,12 @@ export const InputBehaviorsCommon = ({
   } else if (!attributes['data-drupal-uncontrolled']) {
     // If the input is not explicitly set as uncontrolled, its state should
     // be managed by React.
-    attributes.value = inputValue;
+    // EXCEPTION: For radio inputs, don't override the value attribute as each
+    // radio button needs its own distinct option value. The checked state will
+    // be managed via the checked attribute instead.
+    if (elementType !== 'radio') {
+      attributes.value = inputValue;
+    }
 
     attributes.onChange = (e: React.ChangeEvent) => {
       delete attributes['data-invalid-prop-value'];

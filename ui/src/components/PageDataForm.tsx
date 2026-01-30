@@ -5,7 +5,10 @@ import { Box, Spinner } from '@radix-ui/themes';
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import twigToJSXComponentMap from '@/components/form/twig-to-jsx-component-map';
 import { FORM_TYPES } from '@/features/form/constants';
-import { selectFormValues } from '@/features/form/formStateSlice';
+import {
+  selectFormValues,
+  setFieldValue,
+} from '@/features/form/formStateSlice';
 import { setUpdatePreview } from '@/features/layout/layoutModelSlice';
 import { selectPageData, setPageData } from '@/features/pageData/pageDataSlice';
 import { useDrupalBehaviors } from '@/hooks/useDrupalBehaviors';
@@ -72,6 +75,7 @@ const PageDataFormRenderer = () => {
       e: AjaxUpdateFormStateEvent,
     ) => void = ({ detail }) => {
       const { updates, formId } = detail;
+      console.log('HEY FOLKS WE ARE IN THE LISTENER', updates, formId);
       // We only care about the entity form, not the component instance form.
       if (formId === FORM_TYPES.ENTITY_FORM) {
         if (Object.keys(updates).length === 0) {
@@ -81,6 +85,10 @@ const PageDataFormRenderer = () => {
 
         // Flag that we need to update the preview.
         dispatch(setUpdatePreview(true));
+        Object.entries(updates).forEach(([fieldName, value]) => {
+          dispatch(setFieldValue({ formId, fieldName, value }));
+        });
+        // dispatch(setFieldValue({})
         dispatch(setPageData({ ...formState, ...updates }));
       }
     };
