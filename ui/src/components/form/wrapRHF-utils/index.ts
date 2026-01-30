@@ -1,5 +1,7 @@
 import { setFieldError, setFieldValue } from '@/features/form/formStateSlice';
+import { isAjaxing } from '@/utils/isAjaxing';
 
+import type * as React from 'react';
 import type { ChangeEvent } from 'react';
 import type { ErrorObject } from 'ajv/dist/types';
 import type { useAppDispatch } from '@/app/hooks';
@@ -48,20 +50,14 @@ export const dispatchFieldError = (
   );
 };
 
-export const extractValue = (e: any): any => {
-  if (typeof e === 'boolean') {
-    return e;
-  }
-  if (e?.target?.type === 'checkbox') {
+export const extractPageDataValue = (e: any): any => {
+  if ('checked' in e.target) {
     return e.target.checked;
   }
   if (e?.target?.value !== undefined) {
-    return e.target.value;
+    return e.target.value === '_none' ? null : e.target.value;
   }
-  if (e?.target?.checked !== undefined) {
-    return e.target.checked;
-  }
-  return e;
+  return null;
 };
 
 export const parseTextValue = (e: ChangeEvent) => {
@@ -88,4 +84,186 @@ export const getCurrentValueFromProps = (props: Record<string, any>) => {
     return props.element['#default_value'];
   }
   return undefined;
+};
+
+type CreateEnhancedOnBlurParams = {
+  field: {
+    onBlur: () => void;
+    value: any;
+  };
+  props: Record<string, any>;
+  dispatch: ReturnType<typeof useAppDispatch>;
+  formContext: { formId: FormId } | null;
+  fieldName: string;
+  validateNewValue: (e: any, value: any) => ValidationResult;
+  errorsText: ErrorsText;
+};
+
+export const createEnhancedOnBlur = ({
+  field,
+  props,
+  dispatch,
+  formContext,
+  fieldName,
+  validateNewValue,
+  errorsText,
+}: CreateEnhancedOnBlurParams) => {
+  return async (e: React.FocusEvent) => {
+    // Call react-hook-form's onBlur to mark field as touched
+    field.onBlur();
+
+    // Call original onBlur if it exists
+    const originalOnBlur = props.attributes?.onBlur;
+    if (originalOnBlur) {
+      originalOnBlur(e);
+    }
+
+    // Perform validation on blur
+    const validationResult = validateNewValue(e as any, field.value);
+    if (!validationResult.valid) {
+      if (formContext?.formId) {
+        if (props.attributes) {
+          props.attributes['data-invalid-prop-value'] = 'true';
+        }
+        dispatchFieldError(
+          dispatch,
+          formContext.formId,
+          fieldName,
+          validationResult,
+          errorsText,
+        );
+      }
+    }
+  };
+};
+
+type CreateEnhancedOnChangeParams = {
+  field: {
+    onChange: (value: any) => void;
+  };
+  props: Record<string, any>;
+  dispatch: ReturnType<typeof useAppDispatch>;
+  formId: string | null | undefined;
+  fieldName: string;
+  formState: Record<string, any>;
+  commitFormState: (newFormState: Record<string, any>) => void;
+  extractNewValue: (e: any) => any;
+  validateNewValue?: (e: any, value: any) => ValidationResult;
+  errorsText?: ErrorsText;
+};
+
+export const createEnhancedOnChange = ({
+  field,
+  props,
+  dispatch,
+  formId,
+  fieldName,
+  formState,
+  commitFormState,
+  extractNewValue,
+  validateNewValue,
+  errorsText,
+}: CreateEnhancedOnChangeParams) => {
+  return (e: any) => {
+    const newValue = extractNewValue(e);
+
+    // Update react-hook-form state
+    field.onChange(newValue);
+
+    // Update Redux store
+    if (formId) {
+      dispatchFieldValue(dispatch, formId as FormId, fieldName, newValue);
+    }
+
+    // Call original onChange (unless skipOriginalOnChange is set)
+    // This allows nested components like FormatSelect to call enhancedOnChange
+    // without creating a cascade
+    const originalOnChange = props.attributes?.onChange || props.onChange;
+    if (originalOnChange && !e?.skipOriginalOnChange) {
+      originalOnChange(e);
+    }
+
+    // Component form validation logic (optional)
+    if (validateNewValue && errorsText) {
+      const validationResult = validateNewValue(e, newValue);
+
+      // Check if we should skip form state update
+      const shouldSkip =
+        (typeof e?.target?.hasAttribute === 'function' &&
+          e.target.hasAttribute('data-canvas-no-update')) ||
+        (!validationResult.valid && !validationResult.skipEarlyReturn);
+
+      if (shouldSkip) {
+        if (formId && validationResult?.valid !== true) {
+          dispatchFieldError(
+            dispatch,
+            formId as FormId,
+            fieldName,
+            validationResult,
+            errorsText,
+          );
+        }
+        return;
+      }
+    }
+
+    // If no AJAX operations are in progress, update the form state and store.
+    if (!isAjaxing()) {
+      commitFormState({ ...formState, [fieldName]: newValue });
+      return;
+    }
+
+    // This is only reached if AJAX operations are in progress. Add an event
+    // listener to update the form state once ajax is complete.
+    const stopListener = () => {
+      commitFormState({ ...formState, [fieldName]: newValue });
+    };
+    document.addEventListener('drupalAjaxStop', stopListener, {
+      once: true,
+    });
+  };
+};
+
+/**
+ * Applies enhanced onChange, onBlur, and value props to a component.
+ * Handles different component types (attributes-based, onCheckedChange, direct props).
+ */
+export const applyEnhancedProps = <P extends Record<string, any>>(
+  props: P,
+  field: { value: any },
+  enhancedOnChange: (e: any) => void,
+  enhancedOnBlur: (e: any) => void,
+): P => {
+  const enhancedProps = { ...props };
+  const elementType =
+    enhancedProps.attributes?.type ||
+    enhancedProps.attributes?.['data-canvas-type'];
+  const isRadioElement = elementType === 'radios' || elementType === 'radio';
+
+  if (enhancedProps.attributes) {
+    const baseAttributes = {
+      ...enhancedProps.attributes,
+      onChange: enhancedOnChange,
+      onBlur: enhancedOnBlur,
+    };
+
+    // Don't override value for radio elements - each radio needs its own value
+    if (!isRadioElement) {
+      // Safety check: Only set value if we have an onChange handler
+      // This prevents React warnings about controlled inputs without onChange
+      baseAttributes.value = field.value;
+    }
+
+    (enhancedProps as any).attributes = baseAttributes;
+  } else if ((props as any).onCheckedChange) {
+    (enhancedProps as any).onCheckedChange = enhancedOnChange;
+    (enhancedProps as any).onBlur = enhancedOnBlur;
+    (enhancedProps as any).checked = field.value;
+  } else {
+    (enhancedProps as any).onChange = enhancedOnChange;
+    (enhancedProps as any).onBlur = enhancedOnBlur;
+    (enhancedProps as any).value = field.value;
+  }
+
+  return enhancedProps;
 };
