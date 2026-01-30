@@ -466,7 +466,7 @@ cypress E2E:
   extends: .cypress-base
   parallel: 4
   script:
-    - sudo -u www-data env CYPRESS_CACHE_FOLDER=$CYPRESS_CACHE_FOLDER node $DRUPAL_PROJECT_FOLDER/node_modules/.bin/cypress run --browser chrome --reporter junit --reporter-options "mochaFile=junit-[hash].xml" --spec=`node ./ui/tests/support/parallel.js`
+    - sudo -u www-data env CYPRESS_CACHE_FOLDER=$CYPRESS_CACHE_FOLDER node $DRUPAL_PROJECT_FOLDER/node_modules/.bin/cypress run --browser chrome --reporter junit --reporter-options "mochaFile=junit-[hash].xml" --spec=`node ./tests/support/parallel.js`
 
 cypress unit:
   extends: .cypress-base
