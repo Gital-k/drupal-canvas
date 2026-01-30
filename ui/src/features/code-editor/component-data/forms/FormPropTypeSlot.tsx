@@ -1,4 +1,3 @@
-import { useId } from 'react';
 import { EditorView } from 'codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 import { Flex } from '@radix-ui/themes';
@@ -22,7 +21,6 @@ export default function FormPropTypeSlot({
   isDisabled = false,
 }: Pick<CodeComponentSlot, 'id' | 'example'> & { isDisabled?: boolean }) {
   const dispatch = useAppDispatch();
-  const textboxId = useId();
 
   return (
     <Flex direction="column" gap="4" flexGrow="1">
@@ -31,7 +29,6 @@ export default function FormPropTypeSlot({
         <Label>Example HTML/JSX value</Label>
         <div className={styles.editorWrapper}>
           <CodeMirror
-            id={textboxId}
             data-testid={`slot-example-${id}`}
             value={example}
             height="100px"
