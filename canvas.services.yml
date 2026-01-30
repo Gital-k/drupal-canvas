@@ -149,6 +149,7 @@ services:
   Drupal\canvas\Access\AuthenticationAccessChecker:
     tags:
       - { name: access_check, applies_to: _canvas_authentication_required }
+
   # Twig.
   Drupal\canvas\Twig\CanvasTwigExtension:
     tags:
