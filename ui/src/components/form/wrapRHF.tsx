@@ -21,8 +21,6 @@ import { FORM_TYPES } from '@/features/form/constants';
 import {
   selectFieldError,
   selectFormValues,
-  setFieldError,
-  setFieldValue,
 } from '@/features/form/formStateSlice';
 import {
   isEvaluatedComponentModel,
@@ -45,78 +43,26 @@ import { isAjaxing } from '@/utils/isAjaxing';
 
 import type { ComponentType } from 'react';
 import type * as React from 'react';
-import type { ErrorObject } from 'ajv/dist/types';
 import type { FormId } from '@/features/form/formStateSlice';
 import type { ComponentModels } from '@/features/layout/layoutModelSlice';
 import type { AjaxUpdateFormBuildIdEvent } from '@/types/Ajax';
 import type { InputUIData, PropsValues } from '@/types/Form';
+import {
+  dispatchFieldError,
+  dispatchFieldValue,
+  extractValue,
+  type ValidationResult,
+} from '@/components/form/wrapRHF-utils';
 
 const ajv = new Ajv();
+const errorsText = (errors?: any) => ajv.errorsText(errors || null);
 
-type ValidationResult = {
-  valid: boolean;
-  errors?: null | ErrorObject[];
-  errorMessage?: string;
-  skipEarlyReturn?: boolean;
-};
-
-const dispatchFieldValue = (
-  dispatch: ReturnType<typeof useAppDispatch>,
-  formId: FormId,
-  fieldName: string,
-  value: any,
-) => {
-  dispatch(
-    setFieldValue({
-      formId,
-      fieldName,
-      value,
-    }),
-  );
-};
-
-// Helper function to dispatch field error updates
-const dispatchFieldError = (
-  dispatch: ReturnType<typeof useAppDispatch>,
-  formId: FormId,
-  fieldName: string,
-  validationResult: ValidationResult,
-) => {
-  dispatch(
-    setFieldError({
-      type: 'error',
-      message:
-        validationResult.errorMessage ||
-        ajv.errorsText(validationResult.errors),
-      formId,
-      fieldName,
-    }),
-  );
-};
-
-// Shared types
 interface FormFieldProps<P> {
   props: P;
   WrappedComponent: ComponentType<P>;
   fieldName: string;
   getCurrentValue: () => any;
 }
-
-/**
- * Helper to extract new value from various event types
- */
-const extractValue = (e: any): any => {
-  if (typeof e === 'boolean') {
-    return e;
-  } else if (e?.target?.type === 'checkbox') {
-    return e.target.checked;
-  } else if (e?.target?.value !== undefined) {
-    return e.target.value;
-  } else if (e?.target?.checked !== undefined) {
-    return e.target.checked;
-  }
-  return e;
-};
 
 /**
  * Component form field - handles component instance form inputs
@@ -478,7 +424,13 @@ const ComponentFormField = <P extends Record<string, any>>({
 
           if (!shouldUpdateFormState(e, validationResult)) {
             if (formId && validationResult?.valid !== true) {
-              dispatchFieldError(dispatch, formId, fieldName, validationResult);
+              dispatchFieldError(
+                dispatch,
+                formId,
+                fieldName,
+                validationResult,
+                errorsText,
+              );
             }
             return;
           }
@@ -520,6 +472,7 @@ const ComponentFormField = <P extends Record<string, any>>({
                 formContext.formId,
                 fieldName,
                 validationResult,
+                errorsText,
               );
             }
           }
@@ -818,6 +771,7 @@ const PageDataFormField = <P extends Record<string, any>>({
                 formContext.formId,
                 fieldName,
                 validationResult,
+                errorsText,
               );
             }
           }
