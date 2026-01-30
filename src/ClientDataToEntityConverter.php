@@ -299,9 +299,10 @@ class ClientDataToEntityConverter {
     }
     // @phpstan-ignore-next-line catch.neverThrown
     catch (\TypeError $e) {
-      // Handle situation where #element_validate does not appear to be called, such
-      // as the options_buttons widget not converting the string value into the
-      // expected array in \Drupal\Core\Field\Plugin\Field\FieldWidget\OptionsWidgetBase::validateElement.
+      // Handle situation where #element_validate does not appear to be called,
+      // such as the options_buttons widget not converting the string value into
+      // the expected array in
+      // \Drupal\Core\Field\Plugin\Field\FieldWidget\OptionsWidgetBase::validateElement.
       if (strpos($e->getMessage(), 'massageFormValues') !== FALSE &&
         strpos($e->getMessage(), 'must be of type array, string given') !== FALSE) {
 
@@ -360,9 +361,10 @@ class ClientDataToEntityConverter {
       $form_object->submitForm($form, $form_state);
     }
     catch (\TypeError $e) {
-      // Handle situation where #element_validate does not appear to be called, such
-      // as the options_buttons widget not converting the string value into the
-      // expected array in \Drupal\Core\Field\Plugin\Field\FieldWidget\OptionsWidgetBase::validateElement.
+      // Handle situation where #element_validate does not appear to be called,
+      // such as the options_buttons widget not converting the string value
+      // into the expected array in
+      // \Drupal\Core\Field\Plugin\Field\FieldWidget\OptionsWidgetBase::validateElement.
       if (strpos($e->getMessage(), 'massageFormValues') !== FALSE &&
         strpos($e->getMessage(), 'must be of type array, string given') !== FALSE) {
 

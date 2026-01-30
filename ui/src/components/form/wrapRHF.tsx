@@ -2,7 +2,6 @@ import { useEffect, useRef } from 'react';
 import Ajv from 'ajv';
 import { debounce } from 'lodash';
 import { Controller } from 'react-hook-form';
-import {useAjaxFieldRegistration} from '@/components/form/wrapRHF-hooks/useAjaxFieldRegistration';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import {
@@ -17,10 +16,16 @@ import {
   toPropName,
   validateProp,
 } from '@/components/form/formUtil';
+import { useAjaxFieldRegistration } from '@/components/form/wrapRHF-hooks/useAjaxFieldRegistration';
+import { useComponentFormInputInfo } from '@/components/form/wrapRHF-hooks/useComponentFormInputInfo';
+import { useFormBuildIdSync } from '@/components/form/wrapRHF-hooks/useFormBuildIdSync';
+import { usePageDataFormInputInfo } from '@/components/form/wrapRHF-hooks/usePageDataFormInputInfo';
+import { useUndoRedoSync } from '@/components/form/wrapRHF-hooks/useUndoRedoSync';
 import {
   dispatchFieldError,
   dispatchFieldValue,
   extractValue,
+  getCurrentValueFromProps,
 } from '@/components/form/wrapRHF-utils';
 import { useSafeFormContext, useSafeRHFContext } from '@/contexts/FormContext';
 import { FORM_TYPES } from '@/features/form/constants';
@@ -37,13 +42,6 @@ import {
   setPageData,
 } from '@/features/pageData/pageDataSlice';
 import { setPreviewBackgroundUpdate } from '@/features/pagePreview/previewSlice';
-import {
-  selectLatestUndoRedoActionId,
-  selectUndoRedoMetadata,
-} from '@/features/ui/uiSlice';
-import { useComponentFormInputInfo } from '@/hooks/useComponentFormInputInfo';
-import { usePageDataFormInputInfo } from '@/hooks/usePageDataFormInputInfo';
-import { AJAX_UPDATE_FORM_BUILD_ID_EVENT } from '@/types/Ajax';
 import { flaggedForRemoval, parseValue } from '@/utils/function-utils';
 import { isAjaxing } from '@/utils/isAjaxing';
 
@@ -52,7 +50,6 @@ import type * as React from 'react';
 import type { ValidationResult } from '@/components/form/wrapRHF-utils';
 import type { FormId } from '@/features/form/formStateSlice';
 import type { ComponentModels } from '@/features/layout/layoutModelSlice';
-import type { AjaxUpdateFormBuildIdEvent } from '@/types/Ajax';
 import type { InputUIData, PropsValues } from '@/types/Form';
 
 const ajv = new Ajv();
@@ -62,7 +59,6 @@ interface FormFieldProps<P> {
   props: P;
   WrappedComponent: ComponentType<P>;
   fieldName: string;
-  getCurrentValue: () => any;
 }
 
 /**
@@ -72,11 +68,11 @@ const ComponentFormField = <P extends Record<string, any>>({
   props,
   WrappedComponent,
   fieldName,
-  getCurrentValue,
 }: FormFieldProps<P>) => {
   const formContext = useSafeFormContext();
   const rhfContext = useSafeRHFContext();
   const formId = 'component_instance_form';
+  const getCurrentValue = () => getCurrentValueFromProps(props);
   // const formValues = useAppSelector((state) =>
   //   selectFormValues(state, formId as FormId),
   // );
@@ -115,42 +111,44 @@ const ComponentFormField = <P extends Record<string, any>>({
     selectFormValues(state, FORM_TYPES.COMPONENT_INSTANCE_FORM),
   );
 
-  // Watch for undo/redo actions and sync react-hook-form
-  const latestUndoRedoActionId = useAppSelector(selectLatestUndoRedoActionId);
-  const undoRedoMetadata = useAppSelector(selectUndoRedoMetadata);
-  const previousUndoRedoIdRef = useRef<string>('');
+  useUndoRedoSync(fieldName, getCurrentValue, rhfContext, 'layoutModel');
 
-  useEffect(() => {
-    // Skip on initial mount
-    if (!latestUndoRedoActionId) {
-      return;
-    }
-
-    // Skip if this undo/redo is not for layoutModel
-    if (undoRedoMetadata.targetSlice !== 'layoutModel') {
-      return;
-    }
-
-    // If undo/redo occurred, sync react-hook-form with current Redux state
-    if (
-      latestUndoRedoActionId !== previousUndoRedoIdRef.current &&
-      rhfContext
-    ) {
-      const currentValue = getCurrentValue();
-      rhfContext.setValue(fieldName, currentValue, {
-        shouldValidate: false,
-        shouldDirty: false,
-        shouldTouch: false,
-      });
-      previousUndoRedoIdRef.current = latestUndoRedoActionId;
-    }
-  }, [
-    latestUndoRedoActionId,
-    undoRedoMetadata,
-    fieldName,
-    getCurrentValue,
-    rhfContext,
-  ]);
+  // // Watch for undo/redo actions and sync react-hook-form
+  // const latestUndoRedoActionId = useAppSelector(selectLatestUndoRedoActionId);
+  // const undoRedoMetadata = useAppSelector(selectUndoRedoMetadata);
+  // const previousUndoRedoIdRef = useRef<string>('');
+  //
+  // useEffect(() => {
+  //   // Skip on initial mount
+  //   if (!latestUndoRedoActionId) {
+  //     return;
+  //   }
+  //
+  //   // Skip if this undo/redo is not for layoutModel
+  //   if (undoRedoMetadata.targetSlice !== 'layoutModel') {
+  //     return;
+  //   }
+  //
+  //   // If undo/redo occurred, sync react-hook-form with current Redux state
+  //   if (
+  //     latestUndoRedoActionId !== previousUndoRedoIdRef.current &&
+  //     rhfContext
+  //   ) {
+  //     const currentValue = getCurrentValue();
+  //     rhfContext.setValue(fieldName, currentValue, {
+  //       shouldValidate: false,
+  //       shouldDirty: false,
+  //       shouldTouch: false,
+  //     });
+  //     previousUndoRedoIdRef.current = latestUndoRedoActionId;
+  //   }
+  // }, [
+  //   latestUndoRedoActionId,
+  //   undoRedoMetadata,
+  //   fieldName,
+  //   getCurrentValue,
+  //   rhfContext,
+  // ]);
 
   const formStateToStore = (
     newFormState: PropsValues,
@@ -525,15 +523,12 @@ const PageDataFormField = <P extends Record<string, any>>({
   props,
   WrappedComponent,
   fieldName,
-  getCurrentValue,
 }: FormFieldProps<P>) => {
   const formContext = useSafeFormContext();
   const rhfContext = useSafeRHFContext();
+  const getCurrentValue = () => getCurrentValueFromProps(props);
 
-  const { dispatch, pageData, latestUndoRedoActionId, formState } =
-    usePageDataFormInputInfo();
-
-  const undoRedoMetadata = useAppSelector(selectUndoRedoMetadata);
+  const { dispatch, pageData, formState } = usePageDataFormInputInfo();
 
   const { attributes } = props;
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -551,40 +546,8 @@ const PageDataFormField = <P extends Record<string, any>>({
   };
 
   // Watch for undo/redo actions and sync react-hook-form
-  const previousUndoRedoIdRef = useRef<string>('');
-
-  useEffect(() => {
-    // Skip on initial mount
-    if (!latestUndoRedoActionId) {
-      return;
-    }
-
-    // Skip if this undo/redo is not for pageData
-    if (undoRedoMetadata.targetSlice !== 'pageData') {
-      return;
-    }
-
-    // If undo/redo occurred, sync react-hook-form with current Redux state
-    if (
-      latestUndoRedoActionId !== previousUndoRedoIdRef.current &&
-      rhfContext
-    ) {
-      const currentValue = getCurrentValueFromRedux();
-      rhfContext.setValue(fieldName, currentValue, {
-        shouldValidate: false,
-        shouldDirty: false,
-        shouldTouch: false,
-      });
-      previousUndoRedoIdRef.current = latestUndoRedoActionId;
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    latestUndoRedoActionId,
-    undoRedoMetadata,
-    fieldName,
-    rhfContext,
-    pageData,
-  ]);
+  // const previousUndoRedoIdRef = useRef<string>('');
+  useUndoRedoSync(fieldName, getCurrentValueFromRedux, rhfContext, 'pageData');
 
   // Page data form specific hooks
   useEffect(() => {
@@ -853,54 +816,11 @@ export const wrapRHF = <P extends Record<string, any>>(
       }),
     );
     // Get the current value from various possible sources
-    const getCurrentValue = () => {
-      if (props.options && props.options.some((opt: any) => opt.selected)) {
-        return props.options.find((opt: any) => opt.selected).value;
-      }
-      if (props.checked !== undefined) return props.checked;
-      if (props.value !== undefined) return props.value;
-      if (props.attributes?.checked !== undefined)
-        return props.attributes.checked;
-      if (props.attributes?.value !== undefined) return props.attributes.value;
-      if (props.element?.['#value'] !== undefined)
-        return props.element['#value'];
-      if (props.element?.['#default_value'] !== undefined)
-        return props.element['#default_value'];
-      return undefined;
-    };
+    const getCurrentValue = () => getCurrentValueFromProps(props);
 
     // Special handling for the form_build_id which can be updated by an ajax
     // callback without using hyperscriptify to render a new React component.
-    useEffect(() => {
-      if (fieldName !== 'form_build_id' || !rhfContext || !formContext) {
-        return;
-      }
-      // Listen for changes to the form build ID so we can update that in
-      // our form state and value.
-      const formBuildIdListener = (e: AjaxUpdateFormBuildIdEvent) => {
-        if (e.detail.formId === formContext?.formId) {
-          dispatchFieldValue(
-            dispatch,
-            formContext.formId,
-            fieldName,
-            e.detail.newFormBuildId,
-          );
-          // Update react-hook-form value
-          rhfContext.setValue(fieldName, e.detail.newFormBuildId);
-        }
-      };
-      document.addEventListener(
-        AJAX_UPDATE_FORM_BUILD_ID_EVENT,
-        formBuildIdListener as unknown as EventListener,
-      );
-      return () => {
-        document.removeEventListener(
-          AJAX_UPDATE_FORM_BUILD_ID_EVENT,
-          formBuildIdListener as unknown as EventListener,
-        );
-      };
-    }, [dispatch, fieldName, formContext, rhfContext]);
-
+    useFormBuildIdSync(fieldName, formContext?.formId, rhfContext, dispatch);
 
     useAjaxFieldRegistration(fieldName, rhfContext, getCurrentValue);
     // If no react-hook-form context, the form isn't using RHF - render without enhancement
@@ -975,7 +895,6 @@ export const wrapRHF = <P extends Record<string, any>>(
       props,
       WrappedComponent,
       fieldName,
-      getCurrentValue,
     };
 
     return (

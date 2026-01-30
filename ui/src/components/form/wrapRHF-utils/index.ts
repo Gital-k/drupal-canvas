@@ -75,3 +75,17 @@ export const parseTextValue = (e: ChangeEvent) => {
   return null;
 };
 
+export const getCurrentValueFromProps = (props: Record<string, any>) => {
+  if (props.options && props.options.some((opt: any) => opt.selected)) {
+    return props.options.find((opt: any) => opt.selected).value;
+  }
+  if (props.checked !== undefined) return props.checked;
+  if (props.value !== undefined) return props.value;
+  if (props.attributes?.checked !== undefined) return props.attributes.checked;
+  if (props.attributes?.value !== undefined) return props.attributes.value;
+  if (props.element?.['#value'] !== undefined) return props.element['#value'];
+  if (props.element?.['#default_value'] !== undefined) {
+    return props.element['#default_value'];
+  }
+  return undefined;
+};
