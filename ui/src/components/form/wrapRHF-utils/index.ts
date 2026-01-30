@@ -1,10 +1,9 @@
-import type { ErrorObject } from 'ajv/dist/types';
-import type { ChangeEvent } from 'react';
-
 import { setFieldError, setFieldValue } from '@/features/form/formStateSlice';
 
-import type { FormId } from '@/features/form/formStateSlice';
+import type { ChangeEvent } from 'react';
+import type { ErrorObject } from 'ajv/dist/types';
 import type { useAppDispatch } from '@/app/hooks';
+import type { FormId } from '@/features/form/formStateSlice';
 
 type ErrorsText = (errors?: ErrorObject[] | null) => string;
 

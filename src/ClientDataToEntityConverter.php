@@ -299,8 +299,9 @@ class ClientDataToEntityConverter {
     }
     // @phpstan-ignore-next-line catch.neverThrown
     catch (\TypeError $e) {
-      // Handle race condition where options_buttons widget receives string
-      // instead of array.
+      // Handle situation where #element_validate does not appear to be called, such
+      // as the options_buttons widget not converting the string value into the
+      // expected array in \Drupal\Core\Field\Plugin\Field\FieldWidget\OptionsWidgetBase::validateElement.
       if (strpos($e->getMessage(), 'massageFormValues') !== FALSE &&
         strpos($e->getMessage(), 'must be of type array, string given') !== FALSE) {
 
@@ -359,8 +360,9 @@ class ClientDataToEntityConverter {
       $form_object->submitForm($form, $form_state);
     }
     catch (\TypeError $e) {
-      // Handle race condition where options_buttons widget receives string
-      // instead of array.
+      // Handle situation where #element_validate does not appear to be called, such
+      // as the options_buttons widget not converting the string value into the
+      // expected array in \Drupal\Core\Field\Plugin\Field\FieldWidget\OptionsWidgetBase::validateElement.
       if (strpos($e->getMessage(), 'massageFormValues') !== FALSE &&
         strpos($e->getMessage(), 'must be of type array, string given') !== FALSE) {
 
@@ -394,42 +396,7 @@ class ClientDataToEntityConverter {
         throw $e;
       }
     }
-    catch (\Exception $e) {
-      // Handle race condition where options_buttons widget receives string
-      // instead of array.
-      if (strpos($e->getMessage(), 'Widget expected array') !== FALSE &&
-        strpos($e->getMessage(), 'values extraction for') !== FALSE) {
 
-        // Log the issue for debugging
-        // @phpstan-ignore-next-line globalDrupalDependencyInjection.useDependencyInjection
-        \Drupal::logger('canvas')->warning('Options widget race condition detected during submitForm (Exception): @message. Clearing cache and retrying.', [
-          '@message' => $e->getMessage(),
-        ]);
-
-        // Clear any potentially corrupted cached form state and rebuild from
-        // scratch.
-        if ($ajax_form_build_id) {
-          $this->formBuilder->deleteCache($ajax_form_build_id);
-        }
-
-        // Create a fresh form state and rebuild the form, then try submit again
-        $fresh_form_state = ClientFormSubmissionHelper::prepareProgrammedFormStateForFormObject(
-          (new FormState()),
-          $form_object
-        )->setUserInput($entity_form_fields);
-
-        $fresh_form = $this->formBuilder->buildForm($form_object, $fresh_form_state);
-        $form_object->submitForm($fresh_form, $fresh_form_state);
-
-        // Update our references to use the fresh versions
-        $form = $fresh_form;
-        $form_state = $fresh_form_state;
-      }
-      else {
-        // Re-throw if it's a different Exception
-        throw $e;
-      }
-    }
     if ($ajax_form_build_id !== NULL && $ajax_submitted_form !== NULL) {
       // This conversion submitted the form and didn't trigger a form rebuild.
       // That means that the form cache entry will be deleted. The AJAX form in

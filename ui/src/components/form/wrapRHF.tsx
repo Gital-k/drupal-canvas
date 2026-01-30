@@ -16,6 +16,11 @@ import {
   toPropName,
   validateProp,
 } from '@/components/form/formUtil';
+import {
+  dispatchFieldError,
+  dispatchFieldValue,
+  extractValue,
+} from '@/components/form/wrapRHF-utils';
 import { useSafeFormContext, useSafeRHFContext } from '@/contexts/FormContext';
 import { FORM_TYPES } from '@/features/form/constants';
 import {
@@ -43,16 +48,11 @@ import { isAjaxing } from '@/utils/isAjaxing';
 
 import type { ComponentType } from 'react';
 import type * as React from 'react';
+import type { ValidationResult } from '@/components/form/wrapRHF-utils';
 import type { FormId } from '@/features/form/formStateSlice';
 import type { ComponentModels } from '@/features/layout/layoutModelSlice';
 import type { AjaxUpdateFormBuildIdEvent } from '@/types/Ajax';
 import type { InputUIData, PropsValues } from '@/types/Form';
-import {
-  dispatchFieldError,
-  dispatchFieldValue,
-  extractValue,
-  type ValidationResult,
-} from '@/components/form/wrapRHF-utils';
 
 const ajv = new Ajv();
 const errorsText = (errors?: any) => ajv.errorsText(errors || null);
