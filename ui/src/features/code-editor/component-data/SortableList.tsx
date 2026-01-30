@@ -92,13 +92,7 @@ export default function SortableList<T>({
               {renderContent(item)}
             </SortablePanel>
           ))}
-          <Button
-            size="1"
-            variant="soft"
-            mb="4"
-            onClick={onAdd}
-            disabled={isDisabled}
-          >
+          <Button size="1" variant="soft" mb="4" onClick={onAdd}>
             <PlusIcon />
             Add
           </Button>
