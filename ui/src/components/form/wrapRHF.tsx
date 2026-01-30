@@ -20,6 +20,7 @@ import { useAjaxFieldRegistration } from '@/components/form/wrapRHF-hooks/useAja
 import { useComponentFormInputInfo } from '@/components/form/wrapRHF-hooks/useComponentFormInputInfo';
 import { useFormBuildIdSync } from '@/components/form/wrapRHF-hooks/useFormBuildIdSync';
 import { usePageDataFormInputInfo } from '@/components/form/wrapRHF-hooks/usePageDataFormInputInfo';
+import { usePageDataInitialValue } from '@/components/form/wrapRHF-hooks/usePageDataInitialValue';
 import { useUndoRedoSync } from '@/components/form/wrapRHF-hooks/useUndoRedoSync';
 import {
   applyEnhancedProps,
@@ -423,15 +424,13 @@ const PageDataFormField = <P extends Record<string, any>>({
   useUndoRedoSync(fieldName, getCurrentValueFromRedux, rhfContext, 'pageData');
 
   // Page data form specific hooks
-  useEffect(() => {
-    if (!formContext?.formId) return;
-
-    const currentValue = getCurrentValueFromRedux();
-
-    // Update Redux store with initial field value
-    dispatchFieldValue(dispatch, formContext.formId, fieldName, currentValue);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dispatch, fieldName, formContext?.formId, WrappedComponent]);
+  usePageDataInitialValue(
+    dispatch,
+    fieldName,
+    formContext,
+    getCurrentValueFromRedux,
+    WrappedComponent,
+  );
 
   const formStateToStore = (newFormState: PropsValues) => {
     const values = Object.keys(newFormState).reduce(

@@ -51,11 +51,17 @@ export const dispatchFieldError = (
 };
 
 export const extractPageDataValue = (e: any): any => {
-  if ('checked' in e.target) {
-    return e.target.checked;
+  const target = e?.target as HTMLInputElement | HTMLSelectElement | undefined;
+  if (!target) return null;
+
+  if (
+    target instanceof HTMLInputElement &&
+    (target.type === 'checkbox' || target.type === 'radio')
+  ) {
+    return target.checked;
   }
-  if (e?.target?.value !== undefined) {
-    return e.target.value === '_none' ? null : e.target.value;
+  if ('value' in target) {
+    return target.value === '_none' ? null : target.value;
   }
   return null;
 };
