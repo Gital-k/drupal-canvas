@@ -3,47 +3,26 @@ import Ajv from 'ajv';
 import { debounce } from 'lodash';
 import { Controller } from 'react-hook-form';
 
+
+
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
-import {
-  ComponentPreviewUpdateEvent,
-  DEBOUNCE_TIMEOUT,
-  getPropSchemas,
-  getPropsValues,
-  POLLED_BACKGROUND_TIMEOUT,
-  propInputData,
-  shouldSkipPropValidation,
-  syncPropSourcesToResolvedValues,
-  toPropName,
-  validateProp,
-} from '@/components/form/formUtil';
+import { ComponentPreviewUpdateEvent, DEBOUNCE_TIMEOUT, getPropSchemas, getPropsValues, POLLED_BACKGROUND_TIMEOUT, propInputData, shouldSkipPropValidation, syncPropSourcesToResolvedValues, toPropName, validateProp } from '@/components/form/formUtil';
 import { useAjaxFieldRegistration } from '@/components/form/wrapRHF-hooks/useAjaxFieldRegistration';
 import { useComponentFormInputInfo } from '@/components/form/wrapRHF-hooks/useComponentFormInputInfo';
 import { useFormBuildIdSync } from '@/components/form/wrapRHF-hooks/useFormBuildIdSync';
 import { usePageDataFormInputInfo } from '@/components/form/wrapRHF-hooks/usePageDataFormInputInfo';
 import { useUndoRedoSync } from '@/components/form/wrapRHF-hooks/useUndoRedoSync';
-import {
-  dispatchFieldError,
-  dispatchFieldValue,
-  extractValue,
-  getCurrentValueFromProps,
-} from '@/components/form/wrapRHF-utils';
+import { dispatchFieldError, dispatchFieldValue, extractValue, getCurrentValueFromProps } from '@/components/form/wrapRHF-utils';
 import { useSafeFormContext, useSafeRHFContext } from '@/contexts/FormContext';
 import { FORM_TYPES } from '@/features/form/constants';
-import {
-  selectFieldError,
-  selectFormValues,
-} from '@/features/form/formStateSlice';
-import {
-  isEvaluatedComponentModel,
-  setUpdatePreview,
-} from '@/features/layout/layoutModelSlice';
-import {
-  externalUpdateComplete,
-  setPageData,
-} from '@/features/pageData/pageDataSlice';
+import { selectFieldError, selectFormValues } from '@/features/form/formStateSlice';
+import { isEvaluatedComponentModel, setUpdatePreview } from '@/features/layout/layoutModelSlice';
+import { externalUpdateComplete, setPageData } from '@/features/pageData/pageDataSlice';
 import { setPreviewBackgroundUpdate } from '@/features/pagePreview/previewSlice';
 import { flaggedForRemoval, parseValue } from '@/utils/function-utils';
 import { isAjaxing } from '@/utils/isAjaxing';
+
+
 
 import type { ComponentType } from 'react';
 import type * as React from 'react';
@@ -51,6 +30,10 @@ import type { ValidationResult } from '@/components/form/wrapRHF-utils';
 import type { FormId } from '@/features/form/formStateSlice';
 import type { ComponentModels } from '@/features/layout/layoutModelSlice';
 import type { InputUIData, PropsValues } from '@/types/Form';
+
+
+
+
 
 const ajv = new Ajv();
 const errorsText = (errors?: any) => ajv.errorsText(errors || null);
@@ -112,43 +95,6 @@ const ComponentFormField = <P extends Record<string, any>>({
   );
 
   useUndoRedoSync(fieldName, getCurrentValue, rhfContext, 'layoutModel');
-
-  // // Watch for undo/redo actions and sync react-hook-form
-  // const latestUndoRedoActionId = useAppSelector(selectLatestUndoRedoActionId);
-  // const undoRedoMetadata = useAppSelector(selectUndoRedoMetadata);
-  // const previousUndoRedoIdRef = useRef<string>('');
-  //
-  // useEffect(() => {
-  //   // Skip on initial mount
-  //   if (!latestUndoRedoActionId) {
-  //     return;
-  //   }
-  //
-  //   // Skip if this undo/redo is not for layoutModel
-  //   if (undoRedoMetadata.targetSlice !== 'layoutModel') {
-  //     return;
-  //   }
-  //
-  //   // If undo/redo occurred, sync react-hook-form with current Redux state
-  //   if (
-  //     latestUndoRedoActionId !== previousUndoRedoIdRef.current &&
-  //     rhfContext
-  //   ) {
-  //     const currentValue = getCurrentValue();
-  //     rhfContext.setValue(fieldName, currentValue, {
-  //       shouldValidate: false,
-  //       shouldDirty: false,
-  //       shouldTouch: false,
-  //     });
-  //     previousUndoRedoIdRef.current = latestUndoRedoActionId;
-  //   }
-  // }, [
-  //   latestUndoRedoActionId,
-  //   undoRedoMetadata,
-  //   fieldName,
-  //   getCurrentValue,
-  //   rhfContext,
-  // ]);
 
   const formStateToStore = (
     newFormState: PropsValues,
@@ -460,7 +406,6 @@ const ComponentFormField = <P extends Record<string, any>>({
 
           // Perform validation on blur
           const validationResult = validateNewValue(e as any, field.value);
-
           if (!validationResult.valid) {
             if (formContext?.formId) {
               if (props.attributes) {
@@ -633,29 +578,26 @@ const PageDataFormField = <P extends Record<string, any>>({
     return { valid: true, errors: null };
   };
 
-  const forceUpdateInputValue = (fieldName: string, theNewValue: string) => {
-    dispatch(externalUpdateComplete(fieldName));
+  // Watch for external updates to pageData and sync to RHF
+  useEffect(() => {
+    if (!rhfContext || !pageData) return;
 
-    // Update react-hook-form context if available
-    if (rhfContext) {
-      rhfContext.setValue(fieldName, theNewValue, {
+    // If this field was updated externally, sync it to RHF
+    if (
+      pageData.externalUpdates?.includes(fieldName) &&
+      fieldName in pageData
+    ) {
+      rhfContext.setValue(fieldName, pageData[fieldName], {
         shouldValidate: false,
         shouldDirty: true,
         shouldTouch: false,
       });
-    }
-  };
 
-  if (
-    pageData &&
-    pageData?.externalUpdates &&
-    pageData.externalUpdates.includes(fieldName) &&
-    pageData[fieldName]
-  ) {
-    setTimeout(() => {
-      forceUpdateInputValue(fieldName, pageData[fieldName]);
-    });
-  }
+      // Clear the external update flag for this field
+      dispatch(externalUpdateComplete(fieldName));
+    }
+  }, [pageData, pageData?.externalUpdates, fieldName, rhfContext, dispatch]);
+
 
   const commitFormState = (newFormState: PropsValues) => {
     const elementType = attributes.type || attributes['data-canvas-type'];
