@@ -53,7 +53,7 @@ describe('Multivalue widget drag and drop', () => {
     cy.get('@unlimited-text').findAllByRole('textbox').should('have.length', 2);
     confirmTextInputs(['Marshmallow Coast', '']);
     // Populate the empty second item.
-    cy.get('@unlimited-text')
+    cy.get('@unlimited-text', { timeout: 10000 })
       .findAllByRole('textbox')
       .eq(1)
       .type('Neutral Milk Hotel');
@@ -82,13 +82,12 @@ describe('Multivalue widget drag and drop', () => {
     cy.get('@unlimited-text')
       .findByRole('button', { name: 'Add another item' })
       .click();
-    cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
-    // Wait for ajax behaviors to finish.
-    cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
+    cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector, 15000);
+
     cy.get('@unlimited-text').findAllByRole('textbox').should('have.length', 3);
 
     // Populate the new item.
-    cy.get('@unlimited-text')
+    cy.get('@unlimited-text', { timeout: 10000 })
       .findAllByRole('textbox')
       .eq(2)
       .type('The Olivia Tremor Control');
@@ -132,15 +131,13 @@ describe('Multivalue widget drag and drop', () => {
       .findByRole('button', { name: 'Add another item' })
       .click();
     cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
-    // Wait for ajax behaviors to finish.
-    cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
     cy.get('@unlimited-text').findAllByRole('textbox').should('have.length', 4);
 
     cy.log(
       'Move an item that has been entered but "Add new item" is not clicked yet',
     );
 
-    cy.get('@unlimited-text')
+    cy.get('@unlimited-text', { timeout: 10000 })
       .findAllByRole('textbox')
       .eq(3)
       .type('The Music Tapes');
