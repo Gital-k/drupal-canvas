@@ -1,12 +1,4 @@
-import { InfoCircledIcon } from '@radix-ui/react-icons';
-import {
-  Box,
-  Callout,
-  Flex,
-  Select,
-  Switch,
-  TextField,
-} from '@radix-ui/themes';
+import { Box, Flex, Select, Switch, TextField } from '@radix-ui/themes';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import {
@@ -42,7 +34,6 @@ export default function Props() {
   const dispatch = useAppDispatch();
   const props = useAppSelector(selectCodeComponentProperty('props'));
   const required = useAppSelector(selectCodeComponentProperty('required'));
-  const componentStatus = useAppSelector(selectCodeComponentProperty('status'));
 
   const handleAddProp = () => {
     dispatch(addProp());
@@ -78,7 +69,6 @@ export default function Props() {
                     }),
                   )
                 }
-                disabled={componentStatus}
               />
             </FormElement>
           </Box>
@@ -108,7 +98,6 @@ export default function Props() {
                     );
                   }
                 }}
-                disabled={componentStatus}
               >
                 <Select.Trigger id={`prop-type-${prop.id}`} />
                 <Select.Content>
@@ -136,7 +125,6 @@ export default function Props() {
                   }),
                 )
               }
-              disabled={componentStatus}
             />
           </Flex>
         </Flex>
@@ -151,7 +139,6 @@ export default function Props() {
                   id={prop.id}
                   type={prop.type as 'string' | 'number' | 'integer'}
                   example={prop.example as string}
-                  isDisabled={componentStatus}
                 />
               );
             case 'formattedText':
@@ -159,7 +146,6 @@ export default function Props() {
                 <FormPropTypeFormattedText
                   id={prop.id}
                   example={prop.example}
-                  isDisabled={componentStatus}
                 />
               );
             case 'link':
@@ -167,7 +153,6 @@ export default function Props() {
                 <FormPropTypeLink
                   id={prop.id}
                   example={prop.example as string}
-                  isDisabled={componentStatus}
                 />
               );
             case 'image':
@@ -175,7 +160,6 @@ export default function Props() {
                 <FormPropTypeImage
                   id={prop.id}
                   example={prop.example as CodeComponentPropImageExample}
-                  isDisabled={componentStatus}
                   required={required.includes(propName)}
                 />
               );
@@ -184,7 +168,6 @@ export default function Props() {
                 <FormPropTypeVideo
                   id={prop.id}
                   example={prop.example as CodeComponentPropVideoExample}
-                  isDisabled={componentStatus}
                   required={required.includes(propName)}
                 />
               );
@@ -193,7 +176,6 @@ export default function Props() {
                 <FormPropTypeBoolean
                   id={prop.id}
                   example={prop.example as string}
-                  isDisabled={componentStatus}
                 />
               );
             case 'listText':
@@ -205,7 +187,6 @@ export default function Props() {
                   required={required.includes(propName)}
                   enum={prop.enum || []}
                   example={prop.example as string}
-                  isDisabled={componentStatus}
                 />
               );
           }
@@ -215,37 +196,16 @@ export default function Props() {
   };
 
   return (
-    <>
-      {/* If a component is exposed, show a callout to inform the user that props and slots are locked */}
-      {componentStatus && (
-        <Box flexGrow="1" pt="4" maxWidth="500px" mx="auto">
-          <Callout.Root size="1" variant="surface">
-            <Callout.Icon>
-              <InfoCircledIcon />
-            </Callout.Icon>
-            <Callout.Text>
-              Props and slots are locked when a component is added to{' '}
-              <b>Components</b>.
-              <br />
-              <br />
-              To modify props and slots, remove the component from{' '}
-              <b>Components</b>.
-            </Callout.Text>
-          </Callout.Root>
-        </Box>
-      )}
-      <SortableList
-        items={props.filter((prop) => prop.derivedType !== null)}
-        onAdd={handleAddProp}
-        onReorder={handleReorder}
-        onRemove={handleRemoveProp}
-        renderContent={renderPropContent}
-        getItemId={(item) => item.id}
-        data-testid="prop"
-        moveAriaLabel="Move prop"
-        removeAriaLabel="Remove prop"
-        isDisabled={componentStatus}
-      />
-    </>
+    <SortableList
+      items={props.filter((prop) => prop.derivedType !== null)}
+      onAdd={handleAddProp}
+      onReorder={handleReorder}
+      onRemove={handleRemoveProp}
+      renderContent={renderPropContent}
+      getItemId={(item) => item.id}
+      data-testid="prop"
+      moveAriaLabel="Move prop"
+      removeAriaLabel="Remove prop"
+    />
   );
 }
