@@ -18,6 +18,7 @@ import {
 } from '@/components/form/formUtil';
 import { useAjaxFieldRegistration } from '@/components/form/wrapRHF-hooks/useAjaxFieldRegistration';
 import { useComponentFormInputInfo } from '@/components/form/wrapRHF-hooks/useComponentFormInputInfo';
+import { useComponentInitialValue } from '@/components/form/wrapRHF-hooks/useComponentInitialValue';
 import { useFormBuildIdSync } from '@/components/form/wrapRHF-hooks/useFormBuildIdSync';
 import { usePageDataFormInputInfo } from '@/components/form/wrapRHF-hooks/usePageDataFormInputInfo';
 import { usePageDataInitialValue } from '@/components/form/wrapRHF-hooks/usePageDataInitialValue';
@@ -331,18 +332,13 @@ const ComponentFormField = <P extends Record<string, any>>({
   }, [fieldName, formState]);
 
   // Component form specific hooks
-  useEffect(() => {
-    if (!formContext?.formId) return;
-
-    const currentValue = getCurrentValue();
-
-    // Update Redux store with initial field value
-    dispatchFieldValue(dispatch, formContext.formId, fieldName, currentValue);
-    // This intentionally has fewer dependencies - the useEffect exists to populate
-    // the initial value after mounting, after which the value is managed by
-    // react-hook-form.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dispatch, fieldName, propName]);
+  useComponentInitialValue(
+    dispatch,
+    fieldName,
+    formContext?.formId ?? null,
+    getCurrentValue,
+    propName,
+  );
 
   if (!rhfContext) {
     return <WrappedComponent {...props} />;
