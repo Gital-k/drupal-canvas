@@ -100,8 +100,6 @@ const ComponentFormField = <P extends Record<string, any>>({
     selectFormValues(state, FORM_TYPES.COMPONENT_INSTANCE_FORM),
   );
 
-  useUndoRedoSync(fieldName, getCurrentValue, rhfContext, 'layoutModel');
-
   const formStateToStore = (
     newFormState: PropsValues,
     newInputAndUiData: InputUIData,
@@ -220,6 +218,23 @@ const ComponentFormField = <P extends Record<string, any>>({
     };
   }, [debounceFormStateToStore]);
 
+  const commitFormState = (newFormState: PropsValues) => {
+    const elementType = attributes.type || attributes['data-canvas-type'];
+
+    // We don't debounce updates for code components where the prop is scalar -
+    // but all other components/props should be debounced to avoid thrashing the
+    // server with multiple PATCH requests.
+    const shouldDebounce =
+      !isScalarProp ||
+      components?.[selectedComponentType]?.source !== 'Code component' ||
+      !['checkbox', 'radio'].includes(elementType as string);
+    if (shouldDebounce) {
+      debounceFormStateToStore(newFormState, inputAndUiData, formState);
+    } else {
+      formStateToStore(newFormState, inputAndUiData, formState);
+    }
+  };
+
   const propsOverrides: { options?: Object[] } = {};
 
   const { multipleInputsSingleValue } = propInputData(
@@ -294,44 +309,27 @@ const ComponentFormField = <P extends Record<string, any>>({
     }
   }
 
-  const commitFormState = (newFormState: PropsValues) => {
-    const elementType = attributes.type || attributes['data-canvas-type'];
-
-    // We don't debounce updates for code components where the prop is scalar -
-    // but all other components/props should be debounced to avoid thrashing the
-    // server with multiple PATCH requests.
-    const shouldDebounce =
-      !isScalarProp ||
-      components?.[selectedComponentType]?.source !== 'Code component' ||
-      !['checkbox', 'radio'].includes(elementType as string);
-    if (shouldDebounce) {
-      debounceFormStateToStore(newFormState, inputAndUiData, formState);
-    } else {
-      formStateToStore(newFormState, inputAndUiData, formState);
-    }
-  };
-
   // Listen for custom events from nested components (like Hidden) that need to update form state
-  useEffect(() => {
-    const handleFieldUpdate = (e: CustomEvent) => {
-      if (e.detail.fieldName === fieldName) {
-        commitFormState({ ...formState, [fieldName]: e.detail.value });
-      }
-    };
-    document.addEventListener(
-      'canvas:fieldUpdate',
-      handleFieldUpdate as EventListener,
-    );
-    return () => {
-      document.removeEventListener(
-        'canvas:fieldUpdate',
-        handleFieldUpdate as EventListener,
-      );
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fieldName, formState]);
+  // useEffect(() => {
+  //   const handleFieldUpdate = (e: CustomEvent) => {
+  //     if (e.detail.fieldName === fieldName) {
+  //       commitFormState({ ...formState, [fieldName]: e.detail.value });
+  //     }
+  //   };
+  //   document.addEventListener(
+  //     'canvas:fieldUpdate',
+  //     handleFieldUpdate as EventListener,
+  //   );
+  //   return () => {
+  //     document.removeEventListener(
+  //       'canvas:fieldUpdate',
+  //       handleFieldUpdate as EventListener,
+  //     );
+  //   };
+  //   // eslint-disable-next-line react-hooks/exhaustive-deps
+  // }, [fieldName, formState]);
 
-  // Component form specific hooks
+  useUndoRedoSync(fieldName, getCurrentValue, rhfContext, 'layoutModel');
   useComponentInitialValue(
     dispatch,
     fieldName,
@@ -401,32 +399,6 @@ const PageDataFormField = <P extends Record<string, any>>({
   const { dispatch, pageData, formState } = usePageDataFormInputInfo();
 
   const { attributes } = props;
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const formId = 'page_data_form';
-
-  // Override getCurrentValue to use pageData from Redux instead of props
-  // This ensures undo/redo updates are properly reflected
-  const getCurrentValueFromRedux = () => {
-    // For page data forms, get value from Redux pageData state
-    if (pageData && fieldName in pageData) {
-      return pageData[fieldName];
-    }
-    // Fallback to the original getCurrentValue if not in pageData
-    return getCurrentValue();
-  };
-
-  // Watch for undo/redo actions and sync react-hook-form
-  // const previousUndoRedoIdRef = useRef<string>('');
-  useUndoRedoSync(fieldName, getCurrentValueFromRedux, rhfContext, 'pageData');
-
-  // Page data form specific hooks
-  usePageDataInitialValue(
-    dispatch,
-    fieldName,
-    formContext,
-    getCurrentValueFromRedux,
-    WrappedComponent,
-  );
 
   const formStateToStore = (newFormState: PropsValues) => {
     const values = Object.keys(newFormState).reduce(
@@ -455,24 +427,34 @@ const PageDataFormField = <P extends Record<string, any>>({
     };
   }, [debounceFormStateToStore]);
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const parseNewValue = (e: React.ChangeEvent) => {
-    const target = e.target as HTMLInputElement;
-    // If the target is an input element, return its value
-    if (target.value !== undefined) {
-      // We have a special case for `_none`, which represents an empty value in a
-      // select element. It is converted to an empty string so it can leverage
-      // the logic for textfields where an empty string results in the prop
-      // being removed from the model.
-      return target.value === '_none' ? null : target.value;
+  const commitFormState = (newFormState: PropsValues) => {
+    const elementType = attributes.type || attributes['data-canvas-type'];
+    if (['checkbox', 'radio'].includes(elementType as string)) {
+      formStateToStore(newFormState);
+    } else {
+      debounceFormStateToStore(newFormState);
     }
-    // If the target is a checkbox or radio button, return its checked
-    if ('checked' in target) {
-      return target.checked;
-    }
-    // If the target is neither an input element nor a checkbox/radio button, return null
-    return null;
   };
+  // Get pageData from Redux (when available) instead of props.
+  // This ensures undo/redo updates are properly reflected
+  const getCurrentValueFromRedux = () => {
+    // For page data forms, get value from Redux pageData state
+    if (pageData && fieldName in pageData) {
+      return pageData[fieldName];
+    }
+    // Fallback to the original getCurrentValue if not in pageData
+    return getCurrentValue();
+  };
+
+  // Watch for undo/redo actions and sync react-hook-form
+  useUndoRedoSync(fieldName, getCurrentValueFromRedux, rhfContext, 'pageData');
+  usePageDataInitialValue(
+    dispatch,
+    fieldName,
+    formContext,
+    getCurrentValueFromRedux,
+    WrappedComponent,
+  );
 
   const validateNewValue = (e: React.ChangeEvent, newValue: any) => {
     if (!(e.target instanceof HTMLInputElement)) {
@@ -520,15 +502,6 @@ const PageDataFormField = <P extends Record<string, any>>({
       dispatch(externalUpdateComplete(fieldName));
     }
   }, [pageData, pageData?.externalUpdates, fieldName, rhfContext, dispatch]);
-
-  const commitFormState = (newFormState: PropsValues) => {
-    const elementType = attributes.type || attributes['data-canvas-type'];
-    if (['checkbox', 'radio'].includes(elementType as string)) {
-      formStateToStore(newFormState);
-    } else {
-      debounceFormStateToStore(newFormState);
-    }
-  };
 
   if (!rhfContext) {
     return <WrappedComponent {...props} />;
