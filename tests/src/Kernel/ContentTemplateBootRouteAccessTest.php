@@ -79,7 +79,7 @@ final class ContentTemplateBootRouteAccessTest extends KernelTestBase {
     ]);
     $template->setStatus(TRUE)->save();
     $admin_user = $this->createUser(['administer content templates']);
-    assert($admin_user instanceof UserInterface);
+    self::assertInstanceOf(UserInterface::class, $admin_user);
 
     // Test 1: User with 'administer content templates' permission.
     // This user should have access to edit ContentTemplates and Canvas UI
@@ -105,7 +105,7 @@ final class ContentTemplateBootRouteAccessTest extends KernelTestBase {
     // Test 3: User with 'administer code components' permission.
     // This also grants Canvas UI access, but not edit ContentTemplates.
     $code_admin_user = $this->createUser(['administer code components']);
-    assert($code_admin_user instanceof UserInterface);
+    self::assertInstanceOf(UserInterface::class, $code_admin_user);
     $access = $url->access($code_admin_user, TRUE);
     $this->assertFalse($access->isAllowed());
   }

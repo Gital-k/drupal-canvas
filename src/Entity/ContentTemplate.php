@@ -469,7 +469,7 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
       else {
         $access = $url->access(return_as_object: TRUE);
       }
-      assert($access instanceof AccessResult);
+      \assert($access instanceof AccessResult);
       if ($access->isAllowed()) {
         $links = $links->withLink(
           $link_rel,
