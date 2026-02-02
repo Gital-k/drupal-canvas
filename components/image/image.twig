@@ -8,7 +8,7 @@
    src="{{ src }}"
    {% if srcset and srcset is not empty %}
      srcset="{{ srcset }}"
-     sizes="{{ sizes ?? 'auto 100vw' }}"
+     sizes="{{ sizes ?? 'auto, 100vw' }}"
    {% endif %}
    {% if alt %}
      alt="{{ alt }}"
