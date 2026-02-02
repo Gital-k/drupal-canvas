@@ -2089,6 +2089,9 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
       'status' => FALSE,
       'id' => 'node.bunny.full',
       'suggestedPreviewEntityId' => NULL,
+      'links' => [
+        'edit-form' => $base . '/canvas/template/node/bunny/full',
+      ],
     ];
 
     // The list response MUST contain unpublished ContentTemplates.
@@ -2173,6 +2176,9 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
       'status' => FALSE,
       'id' => 'node.llama.full',
       'suggestedPreviewEntityId' => NULL,
+      'links' => [
+        'edit-form' => $base . '/canvas/template/node/llama/full',
+      ],
     ];
     $this->assertSame($expected_full_llama_normalization, $body);
     // The same normalization should be present when GETting the `Location`.
@@ -2193,7 +2199,6 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
 
     // Re-retrieve list: 200, unchanged, but now is a Dynamic Page Cache hit.
     $this->assertExpectedResponse('GET', $list_url, [], 200, ['user.node_grants:view', 'user.permissions'], ['config:core.extension', 'config:content_template_list', 'entity_bundles', 'config:node_type_list', 'http_response', 'node_list:bunny', 'node_list:llama', 'user.node_grants:view'], 'UNCACHEABLE (request policy)', 'HIT');
-    // @phpstan-ignore-next-line method.alreadyNarrowedType
     $this->assertSame($expected_list_normalization, $body);
 
     // Create a node of the bundle that now will be used as the suggested
@@ -2211,6 +2216,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     $body = $this->assertExpectedResponse('GET', $list_url, [], 200, ['user.node_grants:view', 'user.permissions'], ['config:core.extension', 'config:content_template_list', 'entity_bundles', 'config:node_type_list', 'http_response', 'node:1', 'node_list:bunny', 'node_list:llama', 'user.node_grants:view'], 'UNCACHEABLE (request policy)', 'MISS');
     // Change the expectation from `NULL` to the entity ID.
     $expected_list_normalization['node']['bundles']['llama']['viewModes']['full']['suggestedPreviewEntityId'] = (int) $node->id();
+    $expected_list_normalization['node']['bundles']['llama']['viewModes']['full']['links']['edit-form'] .= "/{$node->id()}";
     $this->assertSame($expected_list_normalization, $body);
 
     // Creating a Content Template with an already-in-use ID: 409.

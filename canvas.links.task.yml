@@ -28,3 +28,8 @@ entity.canvas_page.edit_form:
   title: 'Edit'
   base_route: entity.canvas_page.canonical
   route_name: entity.canvas_page.edit_form
+
+canvas.template.entity.local_tasks:
+  deriver: 'Drupal\canvas\Plugin\Derivative\ContentTemplateLocalTask'
+  class: 'Drupal\canvas\Plugin\Menu\LocalTask\ContentTemplateLocalTask'
+  weight: 30

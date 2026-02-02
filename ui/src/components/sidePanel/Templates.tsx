@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import parse from 'html-react-parser';
 import { PlusIcon } from '@radix-ui/react-icons';
 import { Box, Button, Flex, Select, Text } from '@radix-ui/themes';
@@ -16,7 +16,7 @@ import {
   useCreateContentTemplateMutation,
   useGetViewModesQuery,
 } from '@/services/componentAndLayout';
-import { getBaseUrl, getCanvasSettings } from '@/utils/drupal-globals';
+import { getCanvasSettings } from '@/utils/drupal-globals';
 
 import type { ModeData } from '@/services/componentAndLayout';
 
@@ -98,39 +98,31 @@ const AddTemplateDialog = ({
   );
   const [selectedViewMode, setSelectedViewMode] = useState<string | null>();
 
-  const [createTemplate, { reset, isSuccess, isError, error }] =
-    useCreateContentTemplateMutation();
+  const [
+    createTemplate,
+    { reset, isSuccess, isError, error, data: createdTemplate },
+  ] = useCreateContentTemplateMutation();
   const {
     data,
     error: getViewModeError,
     isError: isGetViewModeError,
   } = useGetViewModesQuery();
-  const drupalBaseUrl = getBaseUrl();
-
-  const redirectToSelectedAfterCreation = useCallback(() => {
-    // For now, we are using window.location.href to force a full page reload
-    // to ensure all state is reset when switching entities. Later we can use navigate:
-    // navigate(`${baseUrl}canvas/${entityType}/${contentType}/${viewMode}`);
-    setTimeout(() => {
-      window.location.href = `${drupalBaseUrl}canvas/template/${selectedEntityType}/${selectedContentType}/${selectedViewMode}`;
-    }, 100);
-  }, [
-    drupalBaseUrl,
-    selectedContentType,
-    selectedEntityType,
-    selectedViewMode,
-  ]);
 
   useEffect(() => {
-    if (isSuccess) {
+    if (isSuccess && createdTemplate?.links?.['edit-form']) {
       setIsOpen(false);
-      redirectToSelectedAfterCreation();
+      // For now, we are using window.location.href to force a full page reload
+      // to ensure all state is reset when switching entities. Later we can use navigate:
+      // navigate(`${baseUrl}canvas/${entityType}/${contentType}/${viewMode}`);
+      setTimeout(() => {
+        window.location.href = createdTemplate.links['edit-form'];
+      }, 100);
       setSelectedContentType('');
       setSelectedViewMode(null);
       setSelectedEntityType('null');
       reset();
     }
-  }, [isSuccess, reset, setIsOpen, redirectToSelectedAfterCreation]);
+  }, [isSuccess, createdTemplate, reset, setIsOpen]);
 
   useEffect(() => {
     setSelectedViewMode('');

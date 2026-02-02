@@ -12,8 +12,11 @@ import UnpublishedChanges from '@/components/review/UnpublishedChanges';
 import ContentPreviewSelector from '@/components/templates/ContentPreviewSelector';
 import UndoRedo from '@/components/UndoRedo';
 import { selectEditorFrameContext } from '@/features/ui/uiSlice';
-import { useGetPreviewContentEntitiesQuery } from '@/services/componentAndLayout';
-import { getBaseUrl, getDrupalSettings } from '@/utils/drupal-globals';
+import {
+  useGetContentTemplatesQuery,
+  useGetPreviewContentEntitiesQuery,
+} from '@/services/componentAndLayout';
+import { getDrupalSettings } from '@/utils/drupal-globals';
 
 import PageInfo from '../pageInfo/PageInfo';
 
@@ -30,7 +33,6 @@ const Topbar = () => {
   const isSegments = location.pathname.includes('/segments');
   const isTemplateEditorContext =
     useAppSelector(selectEditorFrameContext) === 'template';
-  const drupalBaseUrl = getBaseUrl();
 
   let hasAiExtensionAvailable = false;
   let hasPersonalizeExtensionAvailable = false;
@@ -49,6 +51,11 @@ const Topbar = () => {
     hasPersonalizeExtensionAvailable = true;
   }
 
+  // Fetch template data to get editUrl
+  const { data: templatesData } = useGetContentTemplatesQuery(undefined, {
+    skip: !isTemplateEditorContext,
+  });
+
   // Fetch preview content entities for template routes
   const { data: previewEntities = {} } = useGetPreviewContentEntitiesQuery(
     {
@@ -62,14 +69,20 @@ const Topbar = () => {
 
   // Handle preview entity selection change
   const handlePreviewEntityChange = (selectedEntityId: string) => {
-    if (entityType && bundle && viewMode) {
-      // @todo: Change to use navigate() when we can do full FE routing.
-      setTimeout(() => {
-        // Use a timeout to ensure that RTK query cleans up its subscriptions first before navigating away.
-        // Without this timeout, RTK throws an error because it tries to make a request following cache invalidation while
-        // the window.location.href is in progress.
-        window.location.href = `${drupalBaseUrl}canvas/template/${entityType}/${bundle}/${viewMode}/${selectedEntityId}`;
-      }, 100);
+    if (entityType && bundle && viewMode && templatesData) {
+      const templateEditUrl =
+        templatesData[entityType]?.bundles?.[bundle]?.viewModes?.[viewMode]
+          ?.links?.['edit-form'];
+
+      if (templateEditUrl) {
+        // @todo: Change to use navigate() when we can do full FE routing.
+        setTimeout(() => {
+          // Use a timeout to ensure that RTK query cleans up its subscriptions first before navigating away.
+          // Without this timeout, RTK throws an error because it tries to make a request following cache invalidation while
+          // the window.location.href is in progress.
+          window.location.href = `${templateEditUrl}/${selectedEntityId}`;
+        }, 100);
+      }
     }
   };
 

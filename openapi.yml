@@ -3053,6 +3053,7 @@ components:
         - suggestedPreviewEntityId
         - label
         - viewModeLabel
+        - links
       properties:
         entityType:
           type: string
@@ -3078,6 +3079,12 @@ components:
         viewModeLabel:
           type: string
           description: Entity View Mode label.
+        links:
+          type: object
+          description: Available operations for this content template.
+          additionalProperties:
+            type: string
+            format: uri-reference
   # @see https://spec.openapis.org/oas/v3.1.0.html#response-object
   responses:
     DrupalAjaxResponse:

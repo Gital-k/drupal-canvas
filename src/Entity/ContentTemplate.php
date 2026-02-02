@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Entity;
 
+use Drupal\canvas\CanvasUriDefinitions;
 use Drupal\canvas\ClientSideRepresentation;
 use Drupal\canvas\EntityHandlers\VisibleWhenDisabledCanvasConfigEntityAccessControlHandler;
+use Drupal\canvas\Resource\CanvasResourceLink;
+use Drupal\canvas\Resource\CanvasResourceLinkCollection;
+use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
 use Drupal\Core\Config\Entity\ConfigEntityInterface;
@@ -23,6 +27,7 @@ use Drupal\Core\Entity\Query\QueryInterface;
 use Drupal\Core\Entity\TypedData\EntityDataDefinition;
 use Drupal\Core\Entity\TypedData\EntityDataDefinitionInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\Core\Url;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Storage\ComponentTreeLoader;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
@@ -433,6 +438,47 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
     return $this;
   }
 
+  /**
+   * Gets the available operations for this content template.
+   *
+   * @param \Drupal\Core\Entity\ContentEntityInterface|null $preview_entity
+   *   Optional preview entity to include in the edit URL.
+   *
+   * @return \Drupal\canvas\Resource\CanvasResourceLinkCollection
+   *   A collection of links for this content template.
+   */
+  private function getEntityOperations(?ContentEntityInterface $preview_entity = NULL): CanvasResourceLinkCollection {
+    $links = new CanvasResourceLinkCollection([]);
+    // Link relation type => route name.
+    $possible_operations = [
+      CanvasUriDefinitions::LINK_REL_EDIT => ['route_name' => 'canvas.boot.content_template', 'op' => 'update'],
+    ];
+    foreach ($possible_operations as $link_rel => ['route_name' => $route_name, 'op' => $entity_operation]) {
+      $access = $this->access(operation: $entity_operation, return_as_object: TRUE);
+      assert($access instanceof AccessResult);
+      if ($access->isAllowed()) {
+        $route_params = [
+          'entity_type' => $this->content_entity_type_id,
+          'bundle' => $this->content_entity_type_bundle,
+          'view_mode_name' => $this->content_entity_type_view_mode,
+        ];
+        $url = Url::fromRoute($route_name, $route_params);
+        // Append the preview entity ID to the URL path if provided.
+        if ($preview_entity !== NULL) {
+          $url->setOption('query', ['preview_entity' => $preview_entity->id()]);
+        }
+        $links = $links->withLink(
+          $link_rel,
+          new CanvasResourceLink($access, $url, $link_rel)
+        );
+      }
+      else {
+        $links->addCacheableDependency($access);
+      }
+    }
+    return $links;
+  }
+
   public function normalizeForClientSide(): ClientSideRepresentation {
     $entity_type_manager = $this->entityTypeManager();
     $content_entity_type = $entity_type_manager->getDefinition($this->content_entity_type_id);
@@ -454,6 +500,9 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
       }
     }
 
+    // Expose available entity operations.
+    $linkCollection = $this->getEntityOperations($preview_entity);
+
     return ClientSideRepresentation::create(
       values: [
         'entityType' => $this->content_entity_type_id,
@@ -464,10 +513,13 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
         'status' => $this->status,
         'id' => $this->id(),
         'suggestedPreviewEntityId' => $preview_entity ? (int) $preview_entity->id() : NULL,
+        // @see https://jsonapi.org/format/#document-links
+        'links' => $linkCollection->asArray(),
       ],
       preview: NULL,
     )
       ->addCacheableDependency($preview_entity_cacheability)
+      ->addCacheableDependency($linkCollection)
       // Cacheability metadata for the suggested preview entity.
       ->addCacheTags($content_entity_type->getListCacheContexts())
       // @phpstan-ignore-next-line argument.type
