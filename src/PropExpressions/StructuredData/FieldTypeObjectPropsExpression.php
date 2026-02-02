@@ -14,7 +14,7 @@ use Drupal\Core\Field\FieldItemListInterface;
 /**
  * For pointing to a prop in a field type (not considering any delta).
  */
-final class FieldTypeObjectPropsExpression implements StructuredDataPropExpressionInterface {
+final class FieldTypeObjectPropsExpression implements FieldTypeBasedPropExpressionInterface, ObjectPropExpressionInterface {
 
   use CompoundExpressionTrait;
 
@@ -23,15 +23,16 @@ final class FieldTypeObjectPropsExpression implements StructuredDataPropExpressi
    *
    * @param string $fieldType
    *   A field type.
-   * @param array<string, \Drupal\canvas\PropExpressions\StructuredData\FieldTypePropExpression|\Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression> $objectPropsToFieldTypeProps
-   *   A mapping of SDC prop names to Field Type prop expressions.
+   * @param non-empty-array<string, \Drupal\canvas\PropExpressions\StructuredData\FieldTypePropExpression|\Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression> $objectPropsToFieldTypeProps
+   *   A mapping of prop names to non-object field type-based expressions.
    */
   public function __construct(
     public readonly string $fieldType,
     public readonly array $objectPropsToFieldTypeProps,
   ) {
-    assert(Inspector::assertAllStrings(array_keys($this->objectPropsToFieldTypeProps)));
-    assert(Inspector::assertAll(function ($expr) {
+    \assert(!empty($this->objectPropsToFieldTypeProps));
+    \assert(Inspector::assertAllStrings(array_keys($this->objectPropsToFieldTypeProps)));
+    \assert(Inspector::assertAll(function ($expr) {
       return $expr instanceof FieldTypePropExpression || $expr instanceof ReferenceFieldTypePropExpression;
     }, $this->objectPropsToFieldTypeProps));
   }
@@ -41,7 +42,7 @@ final class FieldTypeObjectPropsExpression implements StructuredDataPropExpressi
       . $this->fieldType
       . static::PREFIX_PROPERTY_LEVEL . static::PREFIX_OBJECT
       . implode(',', array_map(
-        fn (string $obj_prop_name, FieldTypePropExpression|ReferenceFieldTypePropExpression $expr) => sprintf('%s%s%s',
+        fn (string $obj_prop_name, FieldTypePropExpression|ReferenceFieldTypePropExpression $expr) => \sprintf('%s%s%s',
           $obj_prop_name,
           $expr instanceof ReferenceFieldTypePropExpression
             ? self::SYMBOL_OBJECT_MAPPED_FOLLOW_REFERENCE
@@ -60,7 +61,7 @@ final class FieldTypeObjectPropsExpression implements StructuredDataPropExpressi
    * {@inheritdoc}
    */
   public function calculateDependencies(FieldableEntityInterface|FieldItemListInterface|null $field_item_list = NULL): array {
-    assert($field_item_list === NULL || $field_item_list instanceof FieldItemListInterface);
+    \assert($field_item_list === NULL || $field_item_list instanceof FieldItemListInterface);
     $dependencies = [];
     foreach ($this->objectPropsToFieldTypeProps as $expr) {
       $dependencies = NestedArray::mergeDeep($dependencies, $expr->calculateDependencies($field_item_list));
@@ -83,7 +84,7 @@ final class FieldTypeObjectPropsExpression implements StructuredDataPropExpressi
         [$sdc_obj_prop_name, $remainder] = explode(self::SYMBOL_OBJECT_MAPPED_FOLLOW_REFERENCE, $obj_prop_mapping);
         [$field_type_prop_name, $remainder] = explode(self::PREFIX_ENTITY_LEVEL, $remainder, 2);
         $referenced = StructuredDataPropExpression::fromString(static::PREFIX_EXPRESSION_TYPE . $remainder);
-        assert($referenced instanceof FieldPropExpression || $referenced instanceof ReferenceFieldPropExpression);
+        \assert($referenced instanceof FieldPropExpression || $referenced instanceof ReferenceFieldPropExpression);
         $objectPropsToFieldTypeProps[$sdc_obj_prop_name] = new ReferenceFieldTypePropExpression(
           new FieldTypePropExpression($field_type, $field_type_prop_name),
           $referenced
@@ -95,11 +96,27 @@ final class FieldTypeObjectPropsExpression implements StructuredDataPropExpressi
   }
 
   public function validateSupport(EntityInterface|FieldItemInterface|FieldItemListInterface $field): void {
-    assert($field instanceof FieldItemInterface || $field instanceof FieldItemListInterface);
+    \assert($field instanceof FieldItemInterface || $field instanceof FieldItemListInterface);
     $actual_field_type = $field->getFieldDefinition()->getType();
     if ($actual_field_type !== $this->fieldType) {
-      throw new \DomainException(sprintf("`%s` is an expression for field type `%s`, but the provided field item (list) is of type `%s`.", (string) $this, $this->fieldType, $actual_field_type));
+      throw new \DomainException(\sprintf("`%s` is an expression for field type `%s`, but the provided field item (list) is of type `%s`.", (string) $this, $this->fieldType, $actual_field_type));
     }
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getFieldType(): string {
+    return $this->fieldType;
+  }
+
+  /**
+   * {@inheritdoc}
+   *
+   * @return non-empty-array<string, (\Drupal\canvas\PropExpressions\StructuredData\ScalarPropExpressionInterface&\Drupal\canvas\PropExpressions\StructuredData\FieldTypeBasedPropExpressionInterface)|(\Drupal\canvas\PropExpressions\StructuredData\ReferencePropExpressionInterface&\Drupal\canvas\PropExpressions\StructuredData\FieldTypeBasedPropExpressionInterface)>
+   */
+  public function getObjectExpressions(): array {
+    return $this->objectPropsToFieldTypeProps;
   }
 
 }

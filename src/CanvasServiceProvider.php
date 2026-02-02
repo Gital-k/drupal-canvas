@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupal\canvas;
 
 use Drupal\canvas\Access\ViewModeAccessCheck;
+use Drupal\canvas\Config\ThemeSettingsDiscovery;
 use Drupal\canvas\Plugin\ComponentPluginManager;
 use Drupal\Core\DefaultContent\Exporter;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
@@ -25,7 +26,7 @@ class CanvasServiceProvider extends ServiceProviderBase {
    */
   public function register(ContainerBuilder $container): void {
     $modules = $container->getParameter('container.modules');
-    assert(is_array($modules));
+    \assert(is_array($modules));
     if (array_key_exists('media_library', $modules)) {
       $container->register('canvas.media_library.opener', MediaLibraryCanvasPropOpener::class)
         ->addArgument(new Reference(CanvasUiAccessCheck::class))
@@ -39,6 +40,14 @@ class CanvasServiceProvider extends ServiceProviderBase {
         ->setAutowired(TRUE)
         ->addTag('event_subscriber');
     }
+
+    // Register the theme settings discovery service.
+    $container->register(ThemeSettingsDiscovery::class)
+      ->setArguments([
+        new Reference('theme.initialization'),
+        '%app.root%',
+        new Reference('cache.discovery'),
+      ]);
   }
 
   /**

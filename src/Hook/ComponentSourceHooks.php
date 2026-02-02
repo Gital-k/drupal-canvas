@@ -41,6 +41,7 @@ readonly final class ComponentSourceHooks {
     'canvas/canvasData.v0.baseUrl' => 'getCanvasDataBaseUrlV0',
     'canvas/canvasData.v0.branding' => 'getCanvasDataBrandingV0',
     'canvas/canvasData.v0.breadcrumbs' => 'getCanvasDataBreadcrumbsV0',
+    'canvas/canvasData.v0.mainEntity' => 'getCanvasDataMainEntityV0',
     'canvas/canvasData.v0.pageTitle' => 'getCanvasDataPageTitleV0',
     'canvas/canvasData.v0.jsonapiSettings' => 'getCanvasDataJsonApiSettingsV0',
   ];
@@ -93,7 +94,7 @@ readonly final class ComponentSourceHooks {
     }
 
     $route = $this->routeMatch->getRouteObject();
-    assert($route instanceof Route);
+    \assert($route instanceof Route);
     $is_preview = $route->getOption('_canvas_use_template_draft') === TRUE;
     // TRICKY: the `route` cache context varies also by route parameters, that
     // is unnecessary here, because this only varies by route definition.
@@ -145,6 +146,12 @@ readonly final class ComponentSourceHooks {
         $canvasData = array_replace_recursive($canvasData, $this->memoize($request, 'canvas/canvasData.v0.pageTitle'));
       }
     }
+    if ($all || in_array('canvas/canvasData.v0.mainEntity', $all_attached_asset_libraries, TRUE)) {
+      // Allow overrides: only set if still NULL.
+      if (NestedArray::getValue($settings, [...$path, 'mainEntity']) === NULL) {
+        $canvasData = array_replace_recursive($canvasData, $this->memoize($request, 'canvas/canvasData.v0.mainEntity'));
+      }
+    }
     if ($all || in_array('canvas/canvasData.v0.jsonapiSettings', $all_attached_asset_libraries, TRUE)) {
       // Allow overrides: only set if still NULL.
       if (NestedArray::getValue($settings, [...$path, 'jsonapiSettings']) === NULL) {
@@ -163,7 +170,7 @@ readonly final class ComponentSourceHooks {
    * @see \Drupal\canvas\CodeComponentDataProvider
    */
   private function memoize(Request $request, string $asset_library): array {
-    assert(str_starts_with($asset_library, 'canvas/canvasData.v0.'));
+    \assert(str_starts_with($asset_library, 'canvas/canvasData.v0.'));
 
     static $cached;
     if (!isset($cached)) {
@@ -174,7 +181,7 @@ readonly final class ComponentSourceHooks {
     }
     if (!isset($cached[$asset_library][$request])) {
       $method = self::ASSET_LIBRARY_METHOD_MAPPING[$asset_library];
-      assert(method_exists($this->codeComponentDataProvider, $method));
+      \assert(method_exists($this->codeComponentDataProvider, $method));
       $cached[$asset_library][$request] = $this->codeComponentDataProvider->$method();
     }
 

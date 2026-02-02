@@ -6,10 +6,8 @@ namespace Drupal\canvas\PropSource;
 
 use Drupal\canvas\Plugin\Adapter\AdapterInterface;
 use Drupal\canvas\Plugin\AdapterManager;
+use Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface;
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
-use Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression;
-use Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression;
-use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression;
 use Drupal\Component\Plugin\Definition\PluginDefinitionInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Field\FieldItemListInterface;
@@ -35,13 +33,13 @@ use Drupal\Core\StringTranslation\TranslatableMarkup;
 final class DynamicPropSource extends PropSourceBase {
 
   /**
-   * @param \Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression|\Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression|\Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression $expression
+   * @param \Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface $expression
    * @param \Drupal\canvas\Plugin\Adapter\AdapterInterface|null $adapter
    *   Optionally, a single adapter plugin instance can be specified, with a
    *   single input.
    */
   public function __construct(
-    public readonly FieldPropExpression|ReferenceFieldPropExpression|FieldObjectPropsExpression $expression,
+    public readonly EntityFieldBasedPropExpressionInterface $expression,
     private readonly ?AdapterInterface $adapter = NULL,
   ) {
     // If the (optional) adapter plugin instance is provided, perform extra
@@ -56,9 +54,9 @@ final class DynamicPropSource extends PropSourceBase {
   public function withAdapter(string $adapter_plugin_id): static {
     // @phpstan-ignore globalDrupalDependencyInjection.useDependencyInjection
     $adapter_manager = \Drupal::service(AdapterManager::class);
-    assert($adapter_manager instanceof AdapterManager);
+    \assert($adapter_manager instanceof AdapterManager);
     $adapter_instance = $adapter_manager->createInstance($adapter_plugin_id);
-    assert($adapter_instance instanceof AdapterInterface);
+    \assert($adapter_instance instanceof AdapterInterface);
     return new static(
       expression: $this->expression,
       adapter: $adapter_instance,
@@ -88,9 +86,9 @@ final class DynamicPropSource extends PropSourceBase {
     // `sourceType = dynamic` requires an expression to be specified.
     $missing = array_diff(['expression'], array_keys($sdc_prop_source));
     if (!empty($missing)) {
-      throw new \LogicException(sprintf('Missing the keys %s.', implode(',', $missing)));
+      throw new \LogicException(\sprintf('Missing the keys %s.', implode(',', $missing)));
     }
-    assert(array_key_exists('expression', $sdc_prop_source));
+    \assert(array_key_exists('expression', $sdc_prop_source));
 
     // @phpstan-ignore-next-line argument.type
     $instance = new DynamicPropSource(StructuredDataPropExpression::fromString($sdc_prop_source['expression']));
@@ -136,7 +134,7 @@ final class DynamicPropSource extends PropSourceBase {
    * {@inheritdoc}
    */
   public function calculateDependencies(FieldableEntityInterface|FieldItemListInterface|null $host_entity = NULL): array {
-    assert($host_entity === NULL || $host_entity instanceof FieldableEntityInterface);
+    \assert($host_entity === NULL || $host_entity instanceof FieldableEntityInterface);
     // The only dependencies are those of the used expression. If a host entity
     // is given, then `content` dependencies may appear as well; otherwise the
     // calculated dependencies will be limited to the entity types, bundle (if
@@ -157,19 +155,9 @@ final class DynamicPropSource extends PropSourceBase {
   }
 
   public function label(): TranslatableMarkup|string {
-    $entity_data_definition = $this->expression instanceof ReferenceFieldPropExpression
-      ? $this->expression->referencer->entityType
-      : $this->expression->entityType;
+    $field_name = $this->expression->getFieldName();
+    $entity_data_definition = $this->expression->getHostEntityDataDefinition();
     $field_definitions = $entity_data_definition->getPropertyDefinitions();
-
-    $field_name = $this->expression instanceof ReferenceFieldPropExpression
-      ? $this->expression->referencer->fieldName
-      : $this->expression->fieldName;
-    // TRICKY: FieldPropExpression::$fieldName can be an array, but only
-    // when used in a reference.
-    // @see https://www.drupal.org/i/3530521
-    assert(is_string($field_name));
-
     \assert(\array_key_exists($field_name, $field_definitions));
     // @phpstan-ignore-next-line return.type
     return $field_definitions[$field_name]->getLabel();

@@ -35,7 +35,7 @@ use Prophecy\Prophet;
  */
 class PropExpressionTest extends UnitTestCase {
 
-  const string LABELER_TYPE_ERROR_MESSAGE_FORMAT = 'Drupal\canvas\PropExpressions\StructuredData\Labeler::label(): Argument #1 ($expr) must be of type Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression|Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression|Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression, %s given';
+  const string LABELER_TYPE_ERROR_MESSAGE_FORMAT = 'Drupal\canvas\PropExpressions\StructuredData\Labeler::label(): Argument #1 ($expr) must be of type Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface, %s given';
 
   /**
    * {@inheritdoc}
@@ -91,7 +91,7 @@ class PropExpressionTest extends UnitTestCase {
     \Drupal::setContainer($container);
     $generate_meaningful_case_label = function (string $prefix, array $cases) : array {
       return array_combine(
-        array_map(fn (int|string $key) => sprintf("$prefix - %s", is_string($key) ? $key : "#$key"), array_keys($cases)),
+        array_map(fn (int|string $key) => \sprintf("$prefix - %s", is_string($key) ? $key : "#$key"), array_keys($cases)),
         $cases,
       );
     };
@@ -741,7 +741,7 @@ class PropExpressionTest extends UnitTestCase {
     // Labeler does not allow FieldTypePropExpression and will throw
     // TypeError. This is expected and intentional.
     // @see \Drupal\canvas\PropExpressions\StructuredData\Labeler::label()
-    $type_error_message = sprintf(self::LABELER_TYPE_ERROR_MESSAGE_FORMAT, FieldTypePropExpression::class);
+    $type_error_message = \sprintf(self::LABELER_TYPE_ERROR_MESSAGE_FORMAT, FieldTypePropExpression::class);
     return [
       // Field type with single property.
       // @see \Drupal\Core\Field\Plugin\Field\FieldType\StringItem
@@ -801,7 +801,7 @@ class PropExpressionTest extends UnitTestCase {
     // Labeler does not allow ReferenceFieldTypePropExpression and will throw
     // TypeError. This is expected and intentional.
     // @see \Drupal\canvas\PropExpressions\StructuredData\Labeler::label()
-    $type_error_message = sprintf(self::LABELER_TYPE_ERROR_MESSAGE_FORMAT, ReferenceFieldTypePropExpression::class);
+    $type_error_message = \sprintf(self::LABELER_TYPE_ERROR_MESSAGE_FORMAT, ReferenceFieldTypePropExpression::class);
     return [
       // Reference field type for a single property.
       // @see \Drupal\Core\Field\Plugin\Field\FieldType\StringItem
@@ -903,7 +903,7 @@ class PropExpressionTest extends UnitTestCase {
     // Labeler does not allow FieldTypeObjectPropsExpression and will throw
     // TypeError. This is expected and intentional.
     // @see \Drupal\canvas\PropExpressions\StructuredData\Labeler::label()
-    $type_error_message = sprintf(self::LABELER_TYPE_ERROR_MESSAGE_FORMAT, FieldTypeObjectPropsExpression::class);
+    $type_error_message = \sprintf(self::LABELER_TYPE_ERROR_MESSAGE_FORMAT, FieldTypeObjectPropsExpression::class);
     return [
       // Context: entity type, base field.
       [

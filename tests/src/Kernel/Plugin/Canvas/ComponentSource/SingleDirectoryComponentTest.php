@@ -272,7 +272,7 @@ final class SingleDirectoryComponentTest extends GeneratedFieldExplicitInputUxCo
     $components = $this->componentStorage->loadMultiple($component_ids);
     foreach ($components as $component_id => $component) {
       // Use reflection to test the private ::getDefaultStaticPropSource() method.
-      assert($component instanceof Component);
+      \assert($component instanceof Component);
       $source = $component->getComponentSource();
       $private_method = new \ReflectionMethod($source, 'getDefaultStaticPropSource');
       $private_method->setAccessible(TRUE);
@@ -5622,6 +5622,24 @@ HTML
   protected function triggerBrokenComponent(ComponentInterface $component): BrokenPluginManagerInterface {
     /** @var \Drupal\Tests\canvas\Kernel\BrokenPluginManagerInterface */
     return \Drupal::service('plugin.manager.sdc');
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function providerComponentForValidateInputRejectsUnexpectedProps(): array {
+    return [
+      'SDC with props and slots' => [
+        'source_id' => 'sdc',
+        'source_specific_id' => 'canvas_test_sdc:props-slots',
+        'valid_prop_name' => 'heading',
+        'valid_prop_input' => [
+          'sourceType' => 'static:field_item:string',
+          'value' => [['value' => 'Valid heading']],
+          'expression' => 'ℹ︎string␟value',
+        ],
+      ],
+    ];
   }
 
   public function alter(ContainerBuilder $container): void {
