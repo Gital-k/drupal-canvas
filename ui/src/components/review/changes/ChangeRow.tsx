@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import { DotsVerticalIcon } from '@radix-ui/react-icons';
+import { ClockIcon, DotsVerticalIcon } from '@radix-ui/react-icons';
 import {
   Avatar,
   Badge,
@@ -115,28 +115,40 @@ const ChangeRow = ({
           gap="2"
           className={styles.changeRowRight}
         >
-          <Box pt="1">
-            {isArchived || willBeArchived ? (
-              <Badge
-                size="1"
-                variant="solid"
-                color="gray"
-                style={{
-                  fontSize: '11px',
-                  height: '16px',
-                  lineHeight: '16px',
-                  padding: '0 4px',
-                }}
+          {(isArchived || willBeArchived) && (
+            <Box pt="1">
+              <Tooltip
+                content={willBeArchived ? 'Applies on next publish' : undefined}
               >
-                {willBeArchived ? 'Archive*' : 'Archived'}
-              </Badge>
-            ) : (
-              <Tooltip content={date.toLocaleString()}>
-                <Text className={styles.time} size="1" wrap="nowrap">
-                  {getTimeAgo(change.updated)}
-                </Text>
+                <Badge
+                  size="1"
+                  variant="solid"
+                  color="gray"
+                  style={{
+                    fontSize: '11px',
+                    height: '16px',
+                    lineHeight: '16px',
+                    padding: '0 4px',
+                  }}
+                >
+                  {willBeArchived ? (
+                    <Flex align="center" gap="1">
+                      <ClockIcon width="11" height="11" />
+                      Archive
+                    </Flex>
+                  ) : (
+                    'Archived'
+                  )}
+                </Badge>
               </Tooltip>
-            )}
+            </Box>
+          )}
+          <Box pt="1">
+            <Tooltip content={date.toLocaleString()}>
+              <Text className={styles.time} size="1" wrap="nowrap">
+                {getTimeAgo(change.updated)}
+              </Text>
+            </Tooltip>
           </Box>
           <Tooltip content={`By ${change.owner.name}`}>
             <Avatar

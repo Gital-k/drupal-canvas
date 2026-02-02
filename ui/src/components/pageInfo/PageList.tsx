@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   ChevronDownIcon,
+  ClockIcon,
   FileTextIcon,
   InfoCircledIcon,
   MagnifyingGlassIcon,
@@ -17,6 +18,7 @@ import {
   Flex,
   Skeleton,
   TextField,
+  Tooltip,
 } from '@radix-ui/themes';
 
 import ErrorCard from '@/components/error/ErrorCard';
@@ -215,7 +217,7 @@ const PageListItem = ({
   );
 
   // Determine archive status:
-  // - Show "Archive*" if there's an unsaved status change to unpublished
+  // - Show "Clock icon + Archive" if there's an unsaved status change to unpublished
   // - Show "Archived" if page is unpublished (but not a new draft) and no unsaved changes
   // - Draft pages (never published) should not show any archived badge
   const isArchived =
@@ -235,14 +237,29 @@ const PageListItem = ({
             variant={isHomepage ? 'homepage' : 'page'}
             selected={isSelected}
             trailingContent={
-              !(isHovered || isMenuOpen) && (isArchived || willBeArchived) ? (
-                <Badge
-                  size="1"
-                  variant="solid"
-                  color={isSelected ? 'blue' : 'gray'}
-                >
-                  {willBeArchived ? 'Archive*' : 'Archived'}
-                </Badge>
+              !isMenuOpen && (isArchived || willBeArchived) ? (
+                willBeArchived ? (
+                  <Tooltip content="Applies on next publish">
+                    <Badge
+                      size="1"
+                      variant="solid"
+                      color={isSelected ? 'blue' : 'gray'}
+                    >
+                      <Flex align="center" gap="1">
+                        <ClockIcon width="11" height="11" />
+                        Archive
+                      </Flex>
+                    </Badge>
+                  </Tooltip>
+                ) : (
+                  <Badge
+                    size="1"
+                    variant="solid"
+                    color={isSelected ? 'blue' : 'gray'}
+                  >
+                    Archived
+                  </Badge>
+                )
               ) : undefined
             }
             dropdownMenuContent={

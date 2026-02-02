@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   ChevronDownIcon,
+  ClockIcon,
   DotsVerticalIcon,
   FileTextIcon,
   HomeIcon,
@@ -21,6 +22,7 @@ import {
   ScrollArea,
   Text,
   TextField,
+  Tooltip,
 } from '@radix-ui/themes';
 
 import { useAppSelector } from '@/app/hooks';
@@ -210,7 +212,7 @@ const NavigationItem = ({
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   // Determine archive status:
-  // - Show "Archive*" if there's an unsaved status change to unpublished
+  // - Show "Clock icon + Archive" if there's an unsaved status change to unpublished
   // - Show "Archived" if page is unpublished (but not a new draft) and no unsaved changes
   // - Draft pages (never published) should not show any archived badge
   const isArchived =
@@ -249,9 +251,20 @@ const NavigationItem = ({
       </Flex>
       {!isMenuOpen && (isArchived || willBeArchived) && (
         <Flex align="center" mr="2">
-          <Badge size="1" variant="solid" color="gray">
-            {willBeArchived ? 'Archive*' : 'Archived'}
-          </Badge>
+          {willBeArchived ? (
+            <Tooltip content="Applies on next publish">
+              <Badge size="1" variant="solid" color="gray">
+                <Flex align="center" gap="1">
+                  <ClockIcon width="11" height="11" />
+                  Archive
+                </Flex>
+              </Badge>
+            </Tooltip>
+          ) : (
+            <Badge size="1" variant="solid" color="gray">
+              Archived
+            </Badge>
+          )}
         </Flex>
       )}
       {Object.keys(item.links).length && (

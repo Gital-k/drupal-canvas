@@ -47,7 +47,9 @@ test.describe('Canvas Page Archive/Publish', () => {
       .getByTestId('canvas-navigation-results')
       .filter({ hasText: 'Archive Test Page' });
     await expect(pageListItem).toBeVisible();
-    await expect(pageListItem.getByText('Archive*')).toBeVisible();
+    await expect(
+      pageListItem.getByText('Archive', { exact: true }),
+    ).toBeVisible();
 
     await page.getByRole('button', { name: 'Review 1 change' }).click();
     await expect(
@@ -65,7 +67,9 @@ test.describe('Canvas Page Archive/Publish', () => {
       .filter({ hasText: 'Archive Test Page' });
     await expect(pageListItem).toBeVisible();
     await expect(pageListItem.getByText('Archived')).toBeVisible();
-    await expect(pageListItem.getByText('Archive*')).not.toBeVisible();
+    await expect(
+      pageListItem.getByText('Archive', { exact: true }),
+    ).not.toBeVisible();
 
     // Verify an archived page can be published.
     await page.getByTestId('canvas-navigation-button').click();
@@ -101,7 +105,9 @@ test.describe('Canvas Page Archive/Publish', () => {
       .getByTestId('canvas-navigation-results')
       .filter({ hasText: 'Archive Test Page' });
     await expect(pageListItem).toBeVisible();
-    await expect(pageListItem.getByText('Archive*')).not.toBeVisible();
+    await expect(
+      pageListItem.getByText('Archive', { exact: true }),
+    ).not.toBeVisible();
     await expect(pageListItem.getByText('Archived')).not.toBeVisible();
 
     // Close navigation menu before interacting with Review button
@@ -126,7 +132,9 @@ test.describe('Canvas Page Archive/Publish', () => {
       .filter({ hasText: 'Archive Test Page' });
     await expect(pageListItem).toBeVisible();
     await expect(pageListItem.getByText('Archived')).not.toBeVisible();
-    await expect(pageListItem.getByText('Archive*')).not.toBeVisible();
+    await expect(
+      pageListItem.getByText('Archive', { exact: true }),
+    ).not.toBeVisible();
 
     await page.getByTestId('canvas-navigation-button').click();
 
