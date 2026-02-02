@@ -305,7 +305,7 @@ final class ApiAutoSaveController extends ApiControllerBase {
         // correctly.
         if ($is_draft
           && $entity instanceof EntityPublishedInterface) {
-          assert($original_entity instanceof EntityPublishedInterface);
+          \assert($original_entity instanceof EntityPublishedInterface);
           // Only auto-publish if both the original and autosaved entities are
           // unpublished. This ensures we're publishing a draft entity, not
           // overriding an explicit archive action.

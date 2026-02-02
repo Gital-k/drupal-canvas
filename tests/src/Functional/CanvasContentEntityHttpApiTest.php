@@ -530,13 +530,13 @@ final class CanvasContentEntityHttpApiTest extends HttpApiTestBase {
 
     // Verify the page is archived via auto-save.
     $page_1 = Page::load(1);
-    assert($page_1 instanceof Page);
+    \assert($page_1 instanceof Page);
     $this->assertTrue($page_1->isPublished(), 'Original page should still be published.');
 
     $autoSaveManager = $this->container->get(AutoSaveManager::class);
     $autoSaveData = $autoSaveManager->getAutoSaveEntity($page_1);
     $this->assertFalse($autoSaveData->isEmpty(), 'Auto-save data should exist.');
-    assert($autoSaveData->entity instanceof EntityPublishedInterface);
+    \assert($autoSaveData->entity instanceof EntityPublishedInterface);
     $this->assertFalse($autoSaveData->entity->isPublished(), 'Auto-saved page should be unpublished.');
 
     // Test publishing an archived page.
@@ -551,7 +551,7 @@ final class CanvasContentEntityHttpApiTest extends HttpApiTestBase {
     // Try to archive the homepage (page 2).
     // First, publish page 2 so it can be archived.
     $page_2 = Page::load(2);
-    assert($page_2 instanceof Page);
+    \assert($page_2 instanceof Page);
     $page_2->setPublished()->save();
 
     $url = Url::fromUri('base:/canvas/api/v0/content/canvas_page/2');
@@ -573,10 +573,10 @@ final class CanvasContentEntityHttpApiTest extends HttpApiTestBase {
     $this->assertSame(204, $response->getStatusCode());
 
     $page_3 = Page::load(3);
-    assert($page_3 instanceof Page);
+    \assert($page_3 instanceof Page);
     $autoSaveData = $autoSaveManager->getAutoSaveEntity($page_3);
     $this->assertFalse($autoSaveData->isEmpty());
-    assert($autoSaveData->entity instanceof EntityPublishedInterface);
+    \assert($autoSaveData->entity instanceof EntityPublishedInterface);
     $this->assertFalse($autoSaveData->entity->isPublished());
   }
 
@@ -587,22 +587,22 @@ final class CanvasContentEntityHttpApiTest extends HttpApiTestBase {
     $url = Url::fromUri('base:/canvas/api/v0/content/canvas_page');
 
     $user = $this->createUser([Page::EDIT_PERMISSION], 'edit_canvas_page_user');
-    assert($user instanceof UserInterface);
+    \assert($user instanceof UserInterface);
     $this->drupalLogin($user);
 
     // Get the initial list.
     $body = $this->assertExpectedResponse('GET', $url, [], 200, ['url.query_args:search', 'user.permissions'], [AutoSaveManager::CACHE_TAG, 'config:system.site', 'http_response', 'canvas_page:2', 'canvas_page_list'], 'UNCACHEABLE (request policy)', 'MISS');
-    assert(\is_array($body));
+    \assert(\is_array($body));
 
     // Page 1 is published, should have archive link and set-as-homepage link.
-    assert(\array_key_exists('1', $body) && \array_key_exists('links', $body['1']));
+    \assert(\array_key_exists('1', $body) && \array_key_exists('links', $body['1']));
     $this->assertArrayHasKey(CanvasUriDefinitions::LINK_REL_ARCHIVE, $body['1']['links'], 'Published page should have archive link.');
     $this->assertArrayNotHasKey(CanvasUriDefinitions::LINK_REL_PUBLISH, $body['1']['links'], 'Published page should not have publish link.');
     $this->assertArrayHasKey(CanvasUriDefinitions::LINK_REL_SET_AS_HOMEPAGE, $body['1']['links'], 'Published page should have set-as-homepage link.');
     $this->assertFalse($body['1']['isNew'], 'Published page should not be marked as new.');
 
     // Page 2 is unpublished draft (never published), should have set-as-homepage link but not archive or publish link.
-    assert(\array_key_exists('2', $body) && \array_key_exists('links', $body['2']));
+    \assert(\array_key_exists('2', $body) && \array_key_exists('links', $body['2']));
     $this->assertArrayNotHasKey(CanvasUriDefinitions::LINK_REL_ARCHIVE, $body['2']['links'], 'Draft page should not have archive link.');
     $this->assertArrayNotHasKey(CanvasUriDefinitions::LINK_REL_PUBLISH, $body['2']['links'], 'Draft page should not have publish link.');
     $this->assertArrayHasKey(CanvasUriDefinitions::LINK_REL_SET_AS_HOMEPAGE, $body['2']['links'], 'Draft page should have set-as-homepage link.');
@@ -619,10 +619,10 @@ final class CanvasContentEntityHttpApiTest extends HttpApiTestBase {
 
     // Fetch the list again and check the archived page.
     $body = $this->assertExpectedResponse('GET', $url, [], 200, ['url.query_args:search', 'user.permissions'], [AutoSaveManager::CACHE_TAG, 'config:system.site', 'http_response', 'canvas_page:2', 'canvas_page_list'], 'UNCACHEABLE (request policy)', 'MISS');
-    assert(\is_array($body));
+    \assert(\is_array($body));
 
     $archived_page_id = (string) $archived_page->id();
-    assert(\array_key_exists($archived_page_id, $body) && \array_key_exists('links', $body[$archived_page_id]));
+    \assert(\array_key_exists($archived_page_id, $body) && \array_key_exists('links', $body[$archived_page_id]));
     $this->assertArrayNotHasKey(CanvasUriDefinitions::LINK_REL_ARCHIVE, $body[$archived_page_id]['links'], 'Archived page should not have archive link.');
     $this->assertArrayHasKey(CanvasUriDefinitions::LINK_REL_PUBLISH, $body[$archived_page_id]['links'], 'Archived page should have publish link.');
     $this->assertArrayNotHasKey(CanvasUriDefinitions::LINK_REL_SET_AS_HOMEPAGE, $body[$archived_page_id]['links'], 'Archived page should not have set-as-homepage link.');
@@ -632,15 +632,15 @@ final class CanvasContentEntityHttpApiTest extends HttpApiTestBase {
     // Test that auto-save archive operation shows correct links.
     $autoSaveManager = $this->container->get(AutoSaveManager::class);
     $page_1 = Page::load(1);
-    assert($page_1 instanceof Page);
+    \assert($page_1 instanceof Page);
     $page_1->setUnpublished();
     $autoSaveManager->saveEntity($page_1);
 
     $body = $this->assertExpectedResponse('GET', $url, [], 200, ['url.query_args:search', 'user.permissions'], [AutoSaveManager::CACHE_TAG, 'config:system.site', 'http_response', 'canvas_page:2', 'canvas_page_list'], 'UNCACHEABLE (request policy)', 'MISS');
-    assert(\is_array($body));
+    \assert(\is_array($body));
 
     // Page 1 now has auto-save with unpublished status.
-    assert(\array_key_exists('1', $body) && \array_key_exists('links', $body['1']));
+    \assert(\array_key_exists('1', $body) && \array_key_exists('links', $body['1']));
     $this->assertArrayNotHasKey(CanvasUriDefinitions::LINK_REL_ARCHIVE, $body['1']['links'], 'Page with auto-saved unpublished status should not have archive link.');
     $this->assertArrayHasKey(CanvasUriDefinitions::LINK_REL_PUBLISH, $body['1']['links'], 'Page with auto-saved unpublished status should have publish link (revert).');
     $this->assertArrayNotHasKey(CanvasUriDefinitions::LINK_REL_SET_AS_HOMEPAGE, $body['1']['links'], 'Page with auto-saved unpublished status should not have set-as-homepage link.');

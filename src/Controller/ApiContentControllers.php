@@ -137,10 +137,10 @@ final class ApiContentControllers {
     $content = $request->getContent();
     $body = json_decode($content, TRUE);
 
-    assert($canvas_page instanceof EntityPublishedInterface);
+    \assert($canvas_page instanceof EntityPublishedInterface);
     $entity_type = $canvas_page->getEntityType();
     $published_key = $entity_type->getKey('published');
-    assert(is_string($published_key), 'Entity type must have a `published` key');
+    \assert(is_string($published_key), 'Entity type must have a `published` key');
 
     // Validate that only supported fields are present in the request body.
     $allowed_fields = [$published_key, 'clientInstanceId'];
@@ -166,10 +166,10 @@ final class ApiContentControllers {
     $entity_to_update = $autoSaveData->isEmpty()
       ? $canvas_page
       : $autoSaveData->entity;
-    assert($entity_to_update instanceof EntityPublishedInterface);
+    \assert($entity_to_update instanceof EntityPublishedInterface);
 
     // Set the entity status based on the request.
-    assert(is_bool($body[$published_key]));
+    \assert(is_bool($body[$published_key]));
     if ($body[$published_key] === FALSE) {
       // Prevent archiving the homepage.
       if ($canvas_page->isPublished() && $this->isHomepage($canvas_page)) {
@@ -300,7 +300,7 @@ final class ApiContentControllers {
     // Determine if the entity is considered new (draft).
     // A page is only a draft if it matches the "new" criteria AND has never
     // been published.
-    assert($content_entity instanceof ContentEntityInterface);
+    \assert($content_entity instanceof ContentEntityInterface);
     $is_new = $this->autoSaveManager->entityIsConsideredNew($content_entity);
 
     // Determine if there's an unsaved status change.
@@ -539,7 +539,7 @@ final class ApiContentControllers {
     $effective_is_published = $auto_save_is_published ?? $original_is_published;
 
     // Check if this is a draft (never been published).
-    assert($content_entity instanceof ContentEntityInterface);
+    \assert($content_entity instanceof ContentEntityInterface);
     $is_draft = $this->autoSaveManager->entityIsConsideredNew($content_entity);
 
     // Determine which actions to show based on state.

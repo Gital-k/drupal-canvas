@@ -1389,7 +1389,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
 
     // Verify: Node should remain published with updated title.
     $published_node = $node_storage->loadUnchanged($published_node_id);
-    assert($published_node instanceof NodeInterface);
+    \assert($published_node instanceof NodeInterface);
     self::assertTrue($published_node->isPublished());
     self::assertSame('Updated Published Article', $published_node->getTitle());
 
@@ -1425,7 +1425,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
 
     // Verify: Node should be unpublished (archived) with updated title.
     $to_be_archived_node = $node_storage->loadUnchanged($to_be_archived_node_id);
-    assert($to_be_archived_node instanceof NodeInterface);
+    \assert($to_be_archived_node instanceof NodeInterface);
     self::assertFalse($to_be_archived_node->isPublished());
     self::assertSame('Archived Article', $to_be_archived_node->getTitle());
     // Verify it's not a draft since it was published previously.
@@ -1448,14 +1448,14 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
 
     // Now archive it by creating a new revision.
     $to_be_republished_node = $node_storage->loadUnchanged($to_be_republished_node_id);
-    assert($to_be_republished_node instanceof NodeInterface);
+    \assert($to_be_republished_node instanceof NodeInterface);
     $to_be_republished_node->set('status', FALSE);
     $to_be_republished_node->setNewRevision();
     $to_be_republished_node->save();
 
     // Reload to verify it's archived.
     $to_be_republished_node = $node_storage->loadUnchanged($to_be_republished_node_id);
-    assert($to_be_republished_node instanceof NodeInterface);
+    \assert($to_be_republished_node instanceof NodeInterface);
     self::assertFalse($to_be_republished_node->isPublished());
     // Verify it's not a draft (has been published before).
     self::assertFalse($autoSave->entityIsConsideredNew($to_be_republished_node));
@@ -1477,7 +1477,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
 
     // Verify: Node should be published again with updated title.
     $to_be_republished_node = $node_storage->loadUnchanged($to_be_republished_node_id);
-    assert($to_be_republished_node instanceof NodeInterface);
+    \assert($to_be_republished_node instanceof NodeInterface);
     self::assertTrue($to_be_republished_node->isPublished());
     self::assertSame('Republished Article', $to_be_republished_node->getTitle());
 
@@ -1514,7 +1514,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
 
     // Verify: Draft should be auto-published (existing behavior).
     $draft_node = $node_storage->loadUnchanged($draft_node_id);
-    assert($draft_node instanceof NodeInterface);
+    \assert($draft_node instanceof NodeInterface);
     self::assertTrue($draft_node->isPublished());
     self::assertSame('Updated Draft Article', $draft_node->getTitle());
   }

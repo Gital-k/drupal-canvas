@@ -486,7 +486,7 @@ class AutoSaveManager implements EventSubscriberInterface {
       return !$entity->status();
     }
     $entity_type = $entity->getEntityType();
-    assert($entity instanceof EntityPublishedInterface && $entity_type->isRevisionable());
+    \assert($entity instanceof EntityPublishedInterface && $entity_type->isRevisionable());
 
     // If the entity is published, it's definitely not a draft.
     if ($entity->isPublished()) {
@@ -496,11 +496,11 @@ class AutoSaveManager implements EventSubscriberInterface {
     // Check if there's a published revision in the entity's history.
     // If the entity has ever been published, it's not a draft (it's archived).
     $storage = $this->entityTypeManager->getStorage($entity_type->id());
-    assert($storage instanceof RevisionableStorageInterface);
+    \assert($storage instanceof RevisionableStorageInterface);
     $id_key = $entity_type->getKey('id');
-    assert(is_string($id_key), 'Entity type must have an ID key');
+    \assert(is_string($id_key), 'Entity type must have an ID key');
     $published_key = $entity_type->getKey('published');
-    assert(is_string($published_key), 'Entity type must have an `published` key');
+    \assert(is_string($published_key), 'Entity type must have an `published` key');
     // Query for any published revision of this entity.
     $query = $storage->getQuery()
       ->accessCheck(FALSE)

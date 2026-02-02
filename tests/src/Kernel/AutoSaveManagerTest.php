@@ -535,7 +535,7 @@ class AutoSaveManagerTest extends KernelTestBase {
     $this->installEntitySchema(Page::ENTITY_TYPE_ID);
 
     $autoSaveManager = $this->container->get(AutoSaveManager::class);
-    assert($autoSaveManager instanceof AutoSaveManager);
+    \assert($autoSaveManager instanceof AutoSaveManager);
 
     // A newly created unpublished page is a draft.
     $draft_page = Page::create([
