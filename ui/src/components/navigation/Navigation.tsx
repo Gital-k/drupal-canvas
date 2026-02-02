@@ -62,6 +62,11 @@ const hasPermission = (
   }
 };
 
+const shouldShowSeparator = (
+  item: ContentStub,
+  permissions: Array<'edit' | 'duplicate' | 'homepage' | 'archive' | 'publish'>,
+) => permissions.some((permission) => hasPermission(permission, item));
+
 // Helper functions to return JSX or null based on item links/permissions
 const renderDuplicateButton = (
   item: ContentStub,
@@ -99,12 +104,9 @@ const renderArchiveButton = (
 ) =>
   hasPermission('archive', item) ? (
     <>
-      {/* If there are any links above, show a separator */}
-      {hasPermission('edit', item) ||
-      hasPermission('homepage', item) ||
-      hasPermission('duplicate', item) ? (
+      {shouldShowSeparator(item, ['edit', 'homepage', 'duplicate']) && (
         <DropdownMenu.Separator />
-      ) : null}
+      )}
       <DropdownMenu.Item
         onClick={(event) => event.stopPropagation()}
         onSelect={onArchive ? () => onArchive(item) : undefined}
@@ -120,13 +122,12 @@ const renderPublishButton = (
 ) =>
   hasPermission('publish', item) ? (
     <>
-      {/* If there are any links above, show a separator */}
-      {hasPermission('edit', item) ||
-      hasPermission('homepage', item) ||
-      hasPermission('duplicate', item) ||
-      hasPermission('archive', item) ? (
-        <DropdownMenu.Separator />
-      ) : null}
+      {shouldShowSeparator(item, [
+        'edit',
+        'homepage',
+        'duplicate',
+        'archive',
+      ]) && <DropdownMenu.Separator />}
       <DropdownMenu.Item
         onClick={(event) => event.stopPropagation()}
         onSelect={onPublish ? () => onPublish(item) : undefined}
@@ -142,13 +143,12 @@ const renderDeleteButton = (
 ) =>
   hasPermission('delete', item) ? (
     <>
-      {/* If there are any links above, show a separator */}
-      {hasPermission('edit', item) ||
-      hasPermission('homepage', item) ||
-      hasPermission('duplicate', item) ||
-      hasPermission('archive', item) ? (
-        <DropdownMenu.Separator />
-      ) : null}
+      {shouldShowSeparator(item, [
+        'edit',
+        'homepage',
+        'duplicate',
+        'archive',
+      ]) && <DropdownMenu.Separator />}
       <AlertDialog.Root>
         <AlertDialog.Trigger>
           <DropdownMenu.Item
@@ -209,9 +209,6 @@ const NavigationItem = ({
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  // Hide badge only when menu is open
-  const shouldHideBadge = isMenuOpen;
-
   // Determine archive status:
   // - Show "Archive*" if there's an unsaved status change to unpublished
   // - Show "Archived" if page is unpublished (but not a new draft) and no unsaved changes
@@ -250,7 +247,7 @@ const NavigationItem = ({
           </Text>
         </Flex>
       </Flex>
-      {!shouldHideBadge && (isArchived || willBeArchived) && (
+      {!isMenuOpen && (isArchived || willBeArchived) && (
         <Flex align="center" mr="2">
           <Badge size="1" variant="solid" color="gray">
             {willBeArchived ? 'Archive*' : 'Archived'}

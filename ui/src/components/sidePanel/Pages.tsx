@@ -71,7 +71,8 @@ const Pages = () => {
 
   const [deleteContent, { error: deleteContentError }] =
     useDeleteContentMutation();
-  const [updateContent] = useUpdateContentMutation();
+  const [updateContent, { error: updateContentError }] =
+    useUpdateContentMutation();
   const [setHomepage, { error: setHomepageError }] =
     useSetStagedConfigMutation();
 
@@ -193,6 +194,12 @@ const Pages = () => {
       showBoundary(setHomepageError);
     }
   }, [setHomepageError, showBoundary]);
+
+  useEffect(() => {
+    if (updateContentError) {
+      showBoundary(updateContentError);
+    }
+  }, [updateContentError, showBoundary]);
 
   // Determine the currently selected page
   const selectedPageId = entityType === 'canvas_page' ? entityId : undefined;

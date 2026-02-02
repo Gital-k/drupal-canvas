@@ -214,9 +214,6 @@ const PageListItem = ({
     homepagePath,
   );
 
-  // Hide badge when menu button is visible (hovered or menu open)
-  const shouldHideBadge = isHovered || isMenuOpen;
-
   // Determine archive status:
   // - Show "Archive*" if there's an unsaved status change to unpublished
   // - Show "Archived" if page is unpublished (but not a new draft) and no unsaved changes
@@ -238,7 +235,7 @@ const PageListItem = ({
             variant={isHomepage ? 'homepage' : 'page'}
             selected={isSelected}
             trailingContent={
-              !shouldHideBadge && (isArchived || willBeArchived) ? (
+              !(isHovered || isMenuOpen) && (isArchived || willBeArchived) ? (
                 <Badge
                   size="1"
                   variant="solid"
