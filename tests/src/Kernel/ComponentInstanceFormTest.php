@@ -94,7 +94,7 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
             'image' => [
               'value' => [],
               'sourceType' => 'static:field_item:entity_reference',
-              'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:image␝field_media_image␞␟src_with_alternate_widths,alt↝entity␜␜entity:media:image␝field_media_image␞␟alt,width↝entity␜␜entity:media:image␝field_media_image␞␟width,height↝entity␜␜entity:media:image␝field_media_image␞␟height}',
+              'expression' => 'ℹ︎entity_reference␟entity␜␜entity:media:image␝field_media_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
               'sourceTypeSettings' => [
                 'storage' => ['target_type' => 'media'],
                 'instance' => [
@@ -130,7 +130,7 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
             'image' => [
               'value' => [],
               'sourceType' => 'static:field_item:entity_reference',
-              'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:image␝field_media_image␞␟src_with_alternate_widths,alt↝entity␜␜entity:media:image␝field_media_image␞␟alt,width↝entity␜␜entity:media:image␝field_media_image␞␟width,height↝entity␜␜entity:media:image␝field_media_image␞␟height}',
+              'expression' => 'ℹ︎entity_reference␟entity␜␜entity:media:image␝field_media_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
               'sourceTypeSettings' => [
                 'storage' => ['target_type' => 'media'],
                 'instance' => [
@@ -171,7 +171,7 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
             'image' => [
               'value' => [],
               'sourceType' => 'static:field_item:entity_reference',
-              'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:image␝field_media_image␞␟src_with_alternate_widths,alt↝entity␜␜entity:media:image␝field_media_image␞␟alt,width↝entity␜␜entity:media:image␝field_media_image␞␟width,height↝entity␜␜entity:media:image␝field_media_image␞␟height}',
+              'expression' => 'ℹ︎entity_reference␟entity␜␜entity:media:image␝field_media_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
               'sourceTypeSettings' => [
                 'storage' => ['target_type' => 'media'],
                 'instance' => [
@@ -221,7 +221,7 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
             'images' => [
               'value' => [],
               'sourceType' => 'static:field_item:entity_reference',
-              'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:image␝field_media_image␞␟src_with_alternate_widths,alt↝entity␜␜entity:media:image␝field_media_image␞␟alt,width↝entity␜␜entity:media:image␝field_media_image␞␟width,height↝entity␜␜entity:media:image␝field_media_image␞␟height}',
+              'expression' => 'ℹ︎entity_reference␟entity␜␜entity:media:image␝field_media_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
               'sourceTypeSettings' => [
                 'storage' => ['target_type' => 'media'],
                 'instance' => [
@@ -277,7 +277,7 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
             'images' => [
               'value' => [],
               'sourceType' => 'static:field_item:entity_reference',
-              'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:image␝field_media_image␞␟src_with_alternate_widths,alt↝entity␜␜entity:media:image␝field_media_image␞␟alt,width↝entity␜␜entity:media:image␝field_media_image␞␟width,height↝entity␜␜entity:media:image␝field_media_image␞␟height}',
+              'expression' => 'ℹ︎entity_reference␟entity␜␜entity:media:image␝field_media_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
               'sourceTypeSettings' => [
                 'storage' => ['target_type' => 'media'],
                 'instance' => [
@@ -300,19 +300,19 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
     $needle = is_array($label) ? reset($label) : $label;
     // When recursing, the $prop key won't exist.
     $haystack = array_key_exists($prop, $suggestions) ? $suggestions[$prop] : $suggestions;
-    assert(array_is_list($haystack));
+    \assert(array_is_list($haystack));
     foreach ($haystack as $suggestion) {
       if ($suggestion['label'] === $needle) {
         if ($is_final_level) {
-          assert(array_key_exists('id', $suggestion));
-          assert(array_key_exists('source', $suggestion));
-          assert(array_key_exists('label', $suggestion));
+          \assert(array_key_exists('id', $suggestion));
+          \assert(array_key_exists('source', $suggestion));
+          \assert(array_key_exists('label', $suggestion));
           return $suggestion;
         }
         return self::findSuggestionByLabel(array_slice($label, 1), $prop, $suggestion['items']);
       }
     }
-    throw new \LogicException(sprintf('No suggestion found for prop %s with label %s', $prop, $needle));
+    throw new \LogicException(\sprintf('No suggestion found for prop %s with label %s', $prop, $needle));
   }
 
   public function testDynamicProps(): void {

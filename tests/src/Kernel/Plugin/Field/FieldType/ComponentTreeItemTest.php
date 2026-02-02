@@ -86,7 +86,7 @@ class ComponentTreeItemTest extends KernelTestBase {
   public function testSetValue(): void {
     $this->generateComponentConfig();
     $component = Component::load('sdc.canvas_test_sdc.props-slots');
-    assert($component !== NULL);
+    \assert($component !== NULL);
 
     // The test Component has a single version; create a second version.
     self::assertCount(1, $component->getVersions());
@@ -298,7 +298,7 @@ class ComponentTreeItemTest extends KernelTestBase {
 
     // Call all convenience methods on the root component instance.
     $root = $item_list->get(0);
-    assert($root instanceof ComponentTreeItem);
+    \assert($root instanceof ComponentTreeItem);
     $this->assertNull($root->getParentUuid());
     $this->assertNull($root->getParentComponentTreeItem());
     $this->assertNull($root->getSlot());
@@ -311,7 +311,7 @@ class ComponentTreeItemTest extends KernelTestBase {
 
     // Call all convenience methods on the child component instance.
     $child = $item_list->get(1);
-    assert($child instanceof ComponentTreeItem);
+    \assert($child instanceof ComponentTreeItem);
     $this->assertSame($root_uuid, $child->getParentUuid());
     $this->assertSame($root, $child->getParentComponentTreeItem());
     $this->assertSame('the_body', $child->getSlot());
@@ -508,8 +508,10 @@ class ComponentTreeItemTest extends KernelTestBase {
     ];
     $test_cases['inputs invalid, using dynamic inputs'][] = [
       \sprintf('field_canvas_test.0.inputs.%s.heading', self::UUID_DYNAMIC_STATIC_CARD_2) => 'The property heading is required.',
+      'field_canvas_test.0.inputs.9145b0da-85a1-4ee7-ad1d-b1b63614aed6.heading-2' => 'Component `9145b0da-85a1-4ee7-ad1d-b1b63614aed6`: the `heading-2` prop is not defined.',
       'field_canvas_test.0' => "The 'dynamic' prop source type must be absent.",
       \sprintf('field_canvas_test.1.inputs.%s.heading', self::UUID_DYNAMIC_STATIC_CARD_3) => 'The property heading is required.',
+      'field_canvas_test.1.inputs.dab1145b-c5d5-4779-9be8-0a41c2d8ed29.heading-1' => 'Component `dab1145b-c5d5-4779-9be8-0a41c2d8ed29`: the `heading-1` prop is not defined.',
       'field_canvas_test.1' => "The 'dynamic' prop source type must be absent.",
       'field_canvas_test.2' => "The 'dynamic' prop source type must be absent.",
     ];
@@ -561,7 +563,7 @@ class ComponentTreeItemTest extends KernelTestBase {
     ]);
     if ($expected_exception !== NULL) {
       $this->expectException($expected_exception);
-      assert(is_string($exception_message));
+      \assert(is_string($exception_message));
       $this->expectExceptionMessage($exception_message);
     }
     $violations = $node->validate();

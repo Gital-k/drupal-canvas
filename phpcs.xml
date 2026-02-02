@@ -40,5 +40,11 @@ core.phpcs.xml.dist -> /PATH/TO/DRUPAL/ROOT/core/phpcs.xml.dist
   </rule>
 
   <!-- Canvas' additional coding standards. -->
+  <rule ref="SlevomatCodingStandard.Namespaces.FullyQualifiedGlobalFunctions">
+    <properties>
+      <!-- @todo Keep expanding this list until it applies to all global functions. -->
+      <property name="include" type="array" value="assert,sprintf" />
+    </properties>
+  </rule>
   <rule ref="./phpcs/Sniffs/Namespacing/LanguageConstantsSniff.php"/>
 </ruleset>

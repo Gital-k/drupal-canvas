@@ -71,7 +71,7 @@ class ParametrizedImageStyleTest extends KernelTestBase {
 
     // Transform to relative URL.
     $file_url_generator = \Drupal::service(FileUrlGeneratorInterface::class);
-    assert($file_url_generator instanceof FileUrlGeneratorInterface);
+    \assert($file_url_generator instanceof FileUrlGeneratorInterface);
     $parametrized_image_style_relative_url = $file_url_generator->transformRelative($parametrized_image_style_url);
     self::assertSame(
       \base_path() . $this->siteDirectory . '/files/styles/canvas_parametrized_width--{width}/public/2025-04/cat.jpg.webp?itok=DnW_VIs-',
@@ -114,6 +114,7 @@ class ParametrizedImageStyleTest extends KernelTestBase {
     $uris = [];
     \assert(\is_string($new_uri));
     self::assertFileExists($new_uri);
+    $style = NULL;
     foreach (ParametrizedImageStyleConverter::ALLOWED_WIDTHS as $width) {
       $style = ParametrizedImageStyle::loadWithParameters('canvas_parametrized_width', ['width' => $width]);
       \assert($style instanceof ParametrizedImageStyle);

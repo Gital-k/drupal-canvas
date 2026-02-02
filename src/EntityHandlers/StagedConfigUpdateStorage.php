@@ -35,6 +35,7 @@ final class StagedConfigUpdateStorage extends ConfigEntityStorage {
    *
    * @return array<string, \Drupal\canvas\Entity\StagedConfigUpdate|null>
    */
+  // @phpstan-ignore-next-line method.childParameterType
   public function loadMultiple(?array $ids = NULL): array {
     if ($ids === NULL) {
       return [];
@@ -52,7 +53,7 @@ final class StagedConfigUpdateStorage extends ConfigEntityStorage {
    * @return \Drupal\canvas\Entity\StagedConfigUpdate|null
    */
   public function load($id) {
-    assert(is_string($id));
+    \assert(is_string($id));
     $stub = StagedConfigUpdate::createFromClientSide([
       'id' => $id,
       'label' => '',
@@ -63,7 +64,7 @@ final class StagedConfigUpdateStorage extends ConfigEntityStorage {
     if ($auto_save_entity->entity === NULL) {
       return NULL;
     }
-    assert($auto_save_entity->entity instanceof StagedConfigUpdate);
+    \assert($auto_save_entity->entity instanceof StagedConfigUpdate);
     return $auto_save_entity->entity->enforceIsNew(FALSE);
   }
 
@@ -82,7 +83,7 @@ final class StagedConfigUpdateStorage extends ConfigEntityStorage {
   }
 
   public function save(EntityInterface $entity): int {
-    assert($entity instanceof StagedConfigUpdate);
+    \assert($entity instanceof StagedConfigUpdate);
     $entity->enforceIsNew(FALSE);
     $entity->setOriginalId($entity->id());
     $return = SAVED_NEW;

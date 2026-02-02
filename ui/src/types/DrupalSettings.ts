@@ -21,6 +21,9 @@ export interface DrupalSettings {
       jsHeader: string;
       jsFooter: string;
     };
+    viewports?: {
+      [viewportId: string]: number | string;
+    };
     canvasLayoutRequestInProgress?: boolean[];
     layoutUtils: PropsValues;
     componentSelectionUtils: PropsValues;
@@ -52,6 +55,11 @@ export interface DrupalSettings {
         text: string;
         url: string;
       }>;
+      mainEntity: null | {
+        bundle: string;
+        entityTypeId: string;
+        uuid: string;
+      };
       jsonapiSettings: null | {
         apiPrefix: string;
       };

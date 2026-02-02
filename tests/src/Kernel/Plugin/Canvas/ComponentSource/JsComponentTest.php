@@ -163,7 +163,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
     $components = $this->componentStorage->loadMultiple($component_ids);
     foreach ($components as $component_id => $component) {
       // Use reflection to test the private ::getDefaultStaticPropSource() method.
-      assert($component instanceof Component);
+      \assert($component instanceof Component);
       $source = $component->getComponentSource();
       $private_method = new \ReflectionMethod($source, 'getDefaultStaticPropSource');
       $private_method->setAccessible(TRUE);
@@ -196,7 +196,8 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
             // ⚠️ Empty default value.
             // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::exampleValueRequiresEntity()
             'default_value' => [],
-            'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:video␝field_media_video_file␞␟entity␜␜entity:file␝uri␞␟url}',
+            // @see \Drupal\canvas\Hook\ShapeMatchingHooks::mediaLibraryStorablePropShapeAlter()
+            'expression' => 'ℹ︎entity_reference␟entity␜␜entity:media:video␝field_media_video_file␞␟{src↝entity␜␜entity:file␝uri␞␟url}',
           ],
           'displayWidth' => [
             'required' => FALSE,
@@ -238,6 +239,9 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
         ],
       ],
       'js.canvas_test_code_components_using_drupalsettings_get_site_data' => [
+        'prop_field_definitions' => [],
+      ],
+      'js.canvas_test_code_components_using_get_page_data' => [
         'prop_field_definitions' => [],
       ],
       'js.canvas_test_code_components_using_imports' => [
@@ -652,6 +656,27 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
           'import_maps' => $default_imports,
         ],
       ],
+      'js.canvas_test_code_components_using_get_page_data' => [
+        'cacheability' => (clone $default_cacheability)
+          ->setCacheTags(['config:canvas.js_component.canvas_test_code_components_using_get_page_data']),
+        'attachments' => [
+          'library' => [
+            'canvas/astro_island.canvas_test_code_components_using_get_page_data',
+            ...$default_libraries,
+          ],
+          'html_head_link' => [
+            ...$default_html_head_links,
+            [
+              [
+                'rel' => 'modulepreload',
+                'fetchpriority' => 'high',
+                'href' => \sprintf('/%s/files/astro-island/xQS78lbNqAghM9-MAQpdZmGt_tTf-fB2CQJMVvxqLek.js', $site_path),
+              ],
+            ],
+          ],
+          'import_maps' => $default_imports,
+        ],
+      ],
       'js.canvas_test_code_components_using_drupalsettings_get_site_data' => [
         'cacheability' => (clone $default_cacheability)
           ->setCacheTags(['config:canvas.js_component.canvas_test_code_components_using_drupalsettings_get_site_data']),
@@ -691,7 +716,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
 
     $this->generateComponentConfig();
     foreach ($this->componentStorage->loadMultiple($component_ids) as $component) {
-      assert($component instanceof Component);
+      \assert($component instanceof Component);
       $source = $component->getComponentSource();
       \assert($source instanceof JsComponent);
       $expected_cacheability = (new CacheableMetadata())
@@ -915,6 +940,11 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
           'canvas.js_component.canvas_test_code_components_using_drupalsettings_get_site_data',
         ],
       ],
+      'js.canvas_test_code_components_using_get_page_data' => [
+        'config' => [
+          'canvas.js_component.canvas_test_code_components_using_get_page_data',
+        ],
+      ],
       'js.canvas_test_code_components_using_imports' => [
         'config' => [
           'canvas.js_component.canvas_test_code_components_using_imports',
@@ -1065,7 +1095,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
    *           [true, true, true, "draft"]
    */
   public function testImportMaps(bool $preview, bool $create_auto_save, bool $create_dependency_auto_save, string $dependencies_expected_result): void {
-    assert(in_array($dependencies_expected_result, ['draft', 'live'], TRUE));
+    \assert(in_array($dependencies_expected_result, ['draft', 'live'], TRUE));
     $file_generator = $this->container->get(FileUrlGeneratorInterface::class);
     \assert($file_generator instanceof FileUrlGeneratorInterface);
 
@@ -1160,7 +1190,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
     $js_component->save();
 
     $autoSave = $this->container->get(AutoSaveManager::class);
-    assert($autoSave instanceof AutoSaveManager);
+    \assert($autoSave instanceof AutoSaveManager);
     $touch_component = function (JavaScriptComponent $component) {
       $css = $component->get('css');
       // We need to make this different to the saved value.
@@ -1308,7 +1338,8 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
               'id' => 'json-schema-definitions://canvas.module/video',
             ],
             'sourceType' => 'static:field_item:entity_reference',
-            'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:video␝field_media_video_file␞␟entity␜␜entity:file␝uri␞␟url}',
+            // @see \Drupal\canvas\Hook\ShapeMatchingHooks::mediaLibraryStorablePropShapeAlter()
+            'expression' => 'ℹ︎entity_reference␟entity␜␜entity:media:video␝field_media_video_file␞␟{src↝entity␜␜entity:file␝uri␞␟url}',
             'sourceTypeSettings' => [
               'storage' => [
                 'target_type' => 'media',
@@ -1402,6 +1433,16 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       'js.canvas_test_code_components_using_drupalsettings_get_site_data' => [
         'expected_output_selectors' => [
           'canvas-island[opts*="Using drupalSettings getSiteData"][props="{}"]',
+          'script[blocking="render"][src*="/ui/lib/astro-hydration/dist/client.js"]',
+        ],
+        'source' => 'Code component',
+        'metadata' => ['slots' => []],
+        'propSources' => [],
+        'transforms' => [],
+      ],
+      'js.canvas_test_code_components_using_get_page_data' => [
+        'expected_output_selectors' => [
+          'canvas-island[opts*="Using drupalSettings getPageData"][props="{}"]',
           'script[blocking="render"][src*="/ui/lib/astro-hydration/dist/client.js"]',
         ],
         'source' => 'Code component',
@@ -1684,9 +1725,9 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
 
     // Grab one of the test components.
     $component = Component::load(JsComponent::componentIdFromJavascriptComponentId("canvas_test_code_components_with_props"));
-    assert($component instanceof ComponentInterface);
+    \assert($component instanceof ComponentInterface);
     $source = $component->getComponentSource();
-    assert($source instanceof JsComponent);
+    \assert($source instanceof JsComponent);
     $js_component = $source->getJavaScriptComponent();
     // Create an auto-save entry for this test code component.
     $js_component->set('name', 'With props - Draft');
@@ -1843,7 +1884,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
     // Save and enable to create a component.
     $js_component->enable()->save();
     $corresponding_component = Component::load(JsComponent::SOURCE_PLUGIN_ID . '.joy_is_everything');
-    assert($corresponding_component instanceof Component);
+    \assert($corresponding_component instanceof Component);
 
     $original_version = $corresponding_component->getActiveVersion();
     $versions = [$original_version];
@@ -1860,7 +1901,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       ],
     ])->save();
     $second_version_component = Component::load(JsComponent::SOURCE_PLUGIN_ID . '.joy_is_everything');
-    assert($second_version_component instanceof Component);
+    \assert($second_version_component instanceof Component);
 
     $second_version = $second_version_component->getActiveVersion();
     self::assertNotEquals($original_version, $second_version);
@@ -1886,7 +1927,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
     ])->save();
 
     $third_version_component = Component::load(JsComponent::SOURCE_PLUGIN_ID . '.joy_is_everything');
-    assert($third_version_component instanceof Component);
+    \assert($third_version_component instanceof Component);
 
     $third_version = $third_version_component->getActiveVersion();
     $versions[] = $third_version;
@@ -1911,7 +1952,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
     ])->save();
 
     $fourth_version_component = Component::load(JsComponent::SOURCE_PLUGIN_ID . '.joy_is_everything');
-    assert($fourth_version_component instanceof Component);
+    \assert($fourth_version_component instanceof Component);
 
     $fourth_version = $fourth_version_component->getActiveVersion();
     self::assertEquals($fourth_version, $third_version);
@@ -1927,7 +1968,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
     ])->save();
 
     $fifth_version_component = Component::load(JsComponent::SOURCE_PLUGIN_ID . '.joy_is_everything');
-    assert($fifth_version_component instanceof Component);
+    \assert($fifth_version_component instanceof Component);
 
     $fifth_version = $fifth_version_component->getActiveVersion();
     $versions[] = $fifth_version;
@@ -1980,9 +2021,9 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
 
   protected function triggerBrokenComponent(ComponentInterface $component): ?BrokenPluginManagerInterface {
     $config_storage = \Drupal::service('config.storage');
-    assert($config_storage instanceof StorageInterface);
+    \assert($config_storage instanceof StorageInterface);
     $js_component_source = $component->getComponentSource();
-    assert($js_component_source instanceof JsComponent);
+    \assert($js_component_source instanceof JsComponent);
 
     // Delete the JavaScriptComponent config WITHOUT triggering
     // Component::onDependencyRemoval(), hence simulating a bypassing of all
@@ -2005,10 +2046,138 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
     return $test_cases;
   }
 
+  /**
+   * Tests that validation always uses published prop definitions.
+   *
+   * IMPORTANT: This test covers a scenario that is impossible to trigger with
+   * the Canvas UI. When a JavaScript component has an auto-save entry with
+   * different props than the published version, the validation MUST still use
+   * the published version's props, not the auto-save version's props.
+   *
+   * This ensures that validation is consistent and predictable, regardless of
+   * whether an auto-save entry exists.
+   *
+   * @param bool $auto_save_existing
+   *   Whether an auto-save entry should exist for the test component.
+   *
+   * @covers ::validateComponentInput
+   * @testWith [false]
+   *           [true]
+   */
+  public function testValidateComponentInput(bool $auto_save_existing): void {
+    // Create a JavaScript component with initial props.
+    $js_component = JavaScriptComponent::create([
+      'machineName' => 'test_validation',
+      'name' => 'Test Validation Component',
+      'status' => TRUE,
+      'props' => [
+        'heading' => [
+          'type' => 'string',
+          'title' => 'Heading',
+          'examples' => ['Hello'],
+        ],
+      ],
+      'slots' => [],
+      'js' => [
+        'original' => 'console.log("test")',
+        'compiled' => 'console.log("test")',
+      ],
+      'css' => [
+        'original' => '',
+        'compiled' => '',
+      ],
+      'dataDependencies' => [],
+    ]);
+    $js_component->save();
+
+    $component_id = 'js.test_validation';
+    $component = Component::load($component_id);
+    $this->assertInstanceOf(Component::class, $component);
+
+    $source = $component->getComponentSource();
+    $this->assertInstanceOf(JsComponent::class, $source);
+    $uuid = 'test-uuid-123';
+
+    // If testing with an auto-save entry, create one with additional props that
+    // are NOT in the published version. We test this scenario for completeness
+    // to ensure the validation system is robust and always uses the published
+    // version's props.
+    if ($auto_save_existing) {
+      $js_component_for_auto_save = JavaScriptComponent::load('test_validation');
+      $this->assertInstanceOf(JavaScriptComponent::class, $js_component_for_auto_save);
+
+      $draft_props = $js_component_for_auto_save->get('props');
+      // Add a prop that only exists in the auto-save, not in the published version.
+      $draft_props['newProp'] = [
+        'type' => 'string',
+        'title' => 'New Prop (only in auto-save)',
+        'examples' => ['This should not affect validation'],
+      ];
+      $js_component_for_auto_save->set('props', $draft_props);
+      $js_component_for_auto_save->updateFromClientSide([
+        'importedJsComponents' => [],
+        'compiledJs' => $js_component_for_auto_save->getJs(),
+      ]);
+      $this->container->get(AutoSaveManager::class)->saveEntity($js_component_for_auto_save);
+    }
+
+    // Test 1: Published props are valid.
+    $valid_input = [
+      'heading' => [
+        'sourceType' => 'static:field_item:string',
+        'value' => [['value' => 'Valid heading']],
+        'expression' => 'ℹ︎string␟value',
+      ],
+    ];
+    $violations = $source->validateComponentInput($valid_input, $uuid, NULL);
+    $this->assertCount(0, $violations, 'Valid published prop should pass validation');
+
+    // Test 2: Unexpected props are ALWAYS rejected, regardless of whether
+    // they exist in an auto-save entry. Validation must use published props only.
+    $input_with_new_prop = [
+      'heading' => [
+        'sourceType' => 'static:field_item:string',
+        'value' => [['value' => 'Valid heading']],
+        'expression' => 'ℹ︎string␟value',
+      ],
+      'newProp' => [
+        'sourceType' => 'static:field_item:string',
+        'value' => [['value' => 'Should not be allowed']],
+        'expression' => 'ℹ︎string␟value',
+      ],
+    ];
+    $violations = $source->validateComponentInput($input_with_new_prop, $uuid, NULL);
+
+    // The 'newProp' should be rejected in BOTH cases:
+    // - When no auto-save exists: obvious - prop doesn't exist in published version
+    // - When auto-save exists with 'newProp': still rejected because validation
+    //   uses the published version, not the auto-save version
+    $this->assertCount(1, $violations, 'Unexpected prop should be rejected regardless of auto-save existence');
+    $this->assertSame("Component `$uuid`: the `newProp` prop is not defined.", $violations->get(0)->getMessage());
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function providerComponentForValidateInputRejectsUnexpectedProps(): array {
+    return [
+      'JS component with props' => [
+        'source_id' => 'js',
+        'source_specific_id' => 'canvas_test_code_components_with_props',
+        'valid_prop_name' => 'name',
+        'valid_prop_input' => [
+          'sourceType' => 'static:field_item:string',
+          'value' => [['value' => 'Valid name']],
+          'expression' => 'ℹ︎string␟value',
+        ],
+      ],
+    ];
+  }
+
   protected function getExpectedVerboseErrorMessage(): string {
     // The code component was deleted by bypassing lots of protections.
     // @see ::triggerBrokenComponent()
-    return sprintf('The JavaScript Component with ID `%s` does not exist.', self::PSEUDO_RANDOM_CODE_COMPONENT_ID);
+    return \sprintf('The JavaScript Component with ID `%s` does not exist.', self::PSEUDO_RANDOM_CODE_COMPONENT_ID);
   }
 
 }

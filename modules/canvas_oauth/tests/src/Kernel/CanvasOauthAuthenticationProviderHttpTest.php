@@ -153,7 +153,7 @@ class CanvasOauthAuthenticationProviderHttpTest extends AuthorizedRequestBase {
       // Expect an exception because the user has no permissions.
       $exception_class = $method === 'GET' ? CacheableAccessDeniedHttpException::class : AccessDeniedHttpException::class;
       $this->expectException($exception_class);
-      $this->expectExceptionMessage(sprintf("The '%s' permission is required.", $required_permissions[0]));
+      $this->expectExceptionMessage(\sprintf("The '%s' permission is required.", $required_permissions[0]));
     }
     $response = $this->request($request);
     if (empty($required_permissions)) {
@@ -286,7 +286,7 @@ class CanvasOauthAuthenticationProviderHttpTest extends AuthorizedRequestBase {
       $method,
       content: json_encode($data) ?: NULL,
     );
-    if (in_array($method, ['POST', 'PATCH'])) {
+    if (in_array($method, ['POST', 'PATCH'], TRUE)) {
       $request->headers->set('Content-Type', 'application/json');
     }
     return $request;
