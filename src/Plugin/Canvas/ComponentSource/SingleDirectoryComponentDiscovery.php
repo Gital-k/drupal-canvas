@@ -61,7 +61,7 @@ final class SingleDirectoryComponentDiscovery implements ComponentCandidatesDisc
 
     $component_plugin = $this->componentPluginManager->createInstance($source_specific_id);
 
-    if (isset($component_plugin->metadata->noUi) && $component_plugin->metadata->noUi === TRUE) {
+    if (property_exists($component_plugin->metadata, 'noUi') && $component_plugin->metadata->noUi === TRUE) {
       throw new ComponentDoesNotMeetRequirementsException(['Component flagged "noUi".']);
     }
     // The above only works on Drupal core >=11.3.
@@ -108,7 +108,7 @@ final class SingleDirectoryComponentDiscovery implements ComponentCandidatesDisc
     $component_plugin = $this->componentPluginManager->createInstance($source_specific_id);
     // Disabled if obsolete or flagged with noUi.
     $initial_status = !(
-      (isset($component_plugin->metadata->noUi) && $component_plugin->metadata->noUi === TRUE)
+      (property_exists($component_plugin->metadata, 'noUi') && $component_plugin->metadata->noUi === TRUE)
       // The above only works on Drupal core >=11.3.
       // @todo Remove in https://www.drupal.org/i/3537695
       // @phpstan-ignore offsetAccess.nonOffsetAccessible
@@ -140,7 +140,7 @@ final class SingleDirectoryComponentDiscovery implements ComponentCandidatesDisc
    */
   public static function getComponentConfigEntityId(string $source_specific_component_id): string {
     \assert(str_contains($source_specific_component_id, ':'));
-    return sprintf('%s.%s',
+    return \sprintf('%s.%s',
       SingleDirectoryComponent::SOURCE_PLUGIN_ID,
       str_replace(':', '.', $source_specific_component_id),
     );

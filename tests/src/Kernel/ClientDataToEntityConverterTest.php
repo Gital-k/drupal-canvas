@@ -72,7 +72,7 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
     (new CanvasTestSetup())->setup();
     $this->setUpImages();
     $other_user = $this->createUser();
-    assert($other_user instanceof User);
+    \assert($other_user instanceof User);
     $this->otherUser = $other_user;
   }
 
@@ -240,7 +240,7 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
     if ($with_content_moderation) {
       $permissions[] = 'use editorial transition create_new_draft';
     }
-    $this->setupCurrentUser([], $permissions);
+    $this->setUpCurrentUser([], $permissions);
     $limited_user = \Drupal::currentUser();
     $limited_user_id = $limited_user->id();
     $new_author = \sprintf('%s (%d)', $limited_user->getDisplayName(), $limited_user_id);
@@ -280,7 +280,7 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
     if ($with_content_moderation) {
       $permissions[] = 'use editorial transition create_new_draft';
     }
-    $this->setupCurrentUser([
+    $this->setUpCurrentUser([
       'timezone' => \date_default_timezone_get(),
     ], $permissions);
     $test_node = $this->createTestNode();
@@ -557,7 +557,7 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
         ],
       ],
     ] + $values);
-    assert($node instanceof Node);
+    \assert($node instanceof Node);
     $this->assertSame(SAVED_NEW, $node->save());
     return $node;
   }
@@ -567,7 +567,7 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
     \Drupal::keyValue(CanvasTestArticleFieldsHooks::CANVAS_STATE)->set(CanvasTestArticleFieldsHooks::GRAVY_STATE, TRUE);
     $autoSave = $this->container->get(AutoSaveManager::class);
     \assert($autoSave instanceof AutoSaveManager);
-    $this->setupCurrentUser(permissions: [
+    $this->setUpCurrentUser(permissions: [
       'access administration pages',
       'edit any article content',
       'use editorial transition create_new_draft',

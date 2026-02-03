@@ -16,7 +16,7 @@ use Drupal\Core\Field\FieldItemListInterface;
 /**
  * For pointing to a prop in a field type (not considering any delta).
  */
-final class FieldTypePropExpression implements StructuredDataPropExpressionInterface {
+final class FieldTypePropExpression implements FieldTypeBasedPropExpressionInterface, ScalarPropExpressionInterface {
 
   public function __construct(
     public readonly string $fieldType,
@@ -24,7 +24,7 @@ final class FieldTypePropExpression implements StructuredDataPropExpressionInter
   ) {}
 
   public function __toString(): string {
-    return static::PREFIX
+    return static::PREFIX_EXPRESSION_TYPE
       . $this->fieldType
       . static::PREFIX_PROPERTY_LEVEL . $this->propName;
   }
@@ -38,10 +38,10 @@ final class FieldTypePropExpression implements StructuredDataPropExpressionInter
    * {@inheritdoc}
    */
   public function calculateDependencies(FieldableEntityInterface|FieldItemListInterface|null $field_item_list = NULL): array {
-    assert($field_item_list === NULL || $field_item_list instanceof FieldItemListInterface);
+    \assert($field_item_list === NULL || $field_item_list instanceof FieldItemListInterface);
     // @phpstan-ignore-next-line
     $field_type_manager = \Drupal::service(FieldTypePluginManagerInterface::class);
-    assert($field_type_manager instanceof FieldTypePluginManagerInterface);
+    \assert($field_type_manager instanceof FieldTypePluginManagerInterface);
     $provider = $field_type_manager->getDefinition($this->fieldType)['provider'] ?? NULL;
 
     $dependencies = [];
@@ -60,10 +60,10 @@ final class FieldTypePropExpression implements StructuredDataPropExpressionInter
       $property_definitions = $field_storage_definition->getPropertyDefinitions();
       if (!array_key_exists($this->propName, $property_definitions)) {
         // @phpcs:ignore Drupal.Semantics.FunctionTriggerError.TriggerErrorTextLayoutRelaxed
-        @trigger_error(sprintf('Property %s does not exist', $this->propName), E_USER_DEPRECATED);
+        @trigger_error(\sprintf('Property %s does not exist', $this->propName), E_USER_DEPRECATED);
       }
       elseif (is_a($property_definitions[$this->propName]->getClass(), DependentPluginInterface::class, TRUE)) {
-        assert($property_definitions[$this->propName]->isComputed());
+        \assert($property_definitions[$this->propName]->isComputed());
         foreach ($field_item_list as $field_item) {
           $dependencies = NestedArray::mergeDeep($dependencies, $field_item->get($this->propName)->calculateDependencies());
         }
@@ -74,11 +74,25 @@ final class FieldTypePropExpression implements StructuredDataPropExpressionInter
   }
 
   public function validateSupport(EntityInterface|FieldItemInterface|FieldItemListInterface $field): void {
-    assert($field instanceof FieldItemInterface || $field instanceof FieldItemListInterface);
+    \assert($field instanceof FieldItemInterface || $field instanceof FieldItemListInterface);
     $actual_field_type = $field->getFieldDefinition()->getType();
     if ($actual_field_type !== $this->fieldType) {
-      throw new \DomainException(sprintf("`%s` is an expression for field type `%s`, but the provided field item (list) is of type `%s`.", (string) $this, $this->fieldType, $actual_field_type));
+      throw new \DomainException(\sprintf("`%s` is an expression for field type `%s`, but the provided field item (list) is of type `%s`.", (string) $this, $this->fieldType, $actual_field_type));
     }
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getFieldType(): string {
+    return $this->fieldType;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getFieldPropertyName(): string {
+    return $this->propName;
   }
 
 }

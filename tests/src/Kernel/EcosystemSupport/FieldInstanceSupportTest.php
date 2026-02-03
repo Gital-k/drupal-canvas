@@ -13,9 +13,6 @@ use Drupal\Core\Plugin\Component;
 use Drupal\Core\Theme\ComponentPluginManager;
 use Drupal\Core\TypedData\DataReferenceTargetDefinition;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
-use Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression;
-use Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression;
-use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression;
 use Drupal\canvas\ShapeMatcher\PropSourceSuggester;
 use Drupal\canvas\ShapeMatcher\JsonSchemaFieldInstanceMatcher;
 use Drupal\field\Entity\FieldConfig;
@@ -65,7 +62,7 @@ final class FieldInstanceSupportTest extends EcosystemSupportTestBase {
    *
    * @see \Drupal\canvas\ShapeMatcher\JsonSchemaFieldInstanceMatcher::IGNORE_FIELD_TYPES
    */
-  public const MATCHING_ALL_FIELD_TYPES = 0.8064516129032258;
+  public const MATCHING_ALL_FIELD_TYPES = 0.8387096774193549;
 
   /**
    * Current % of CLAIMED supported field type field properties.
@@ -79,7 +76,7 @@ final class FieldInstanceSupportTest extends EcosystemSupportTestBase {
    *
    * (For example: the `password` field type never makes sense to match.)
    */
-  public const MATCHING_ALL_FIELD_TYPE_PROPERTIES = 0.7843137254901961;
+  public const MATCHING_ALL_FIELD_TYPE_PROPERTIES = 0.7884615384615384;
 
   /**
    * Supported field types (keys), with explicitly unsupported props (values).
@@ -136,6 +133,7 @@ final class FieldInstanceSupportTest extends EcosystemSupportTestBase {
     ],
     'list_float' => [],
     'list_integer' => [],
+    'list_string' => [],
     // Note that 'password' is deliberately not here (unsupported) as we don't
     // want any of its properties to be associated with a dynamic prop source.
     'path' => [
@@ -229,7 +227,7 @@ final class FieldInstanceSupportTest extends EcosystemSupportTestBase {
     $expected_supported_field_props = [];
     $expected_unsupported_field_props = [];
     foreach ($entity_data->getPropertyDefinitions() as $field_name => $field_definition) {
-      assert($field_definition instanceof FieldDefinitionInterface);
+      \assert($field_definition instanceof FieldDefinitionInterface);
       if (!str_starts_with($field_name, self::CANVAS_TEST_FIELD_PREFIX)) {
         continue;
       }
@@ -245,7 +243,7 @@ final class FieldInstanceSupportTest extends EcosystemSupportTestBase {
         // Don't consider the properties of unsupported fields.
         continue;
       }
-      assert($field_definition->getItemDefinition() instanceof FieldItemDataDefinitionInterface);
+      \assert($field_definition->getItemDefinition() instanceof FieldItemDataDefinitionInterface);
       foreach ($field_definition->getItemDefinition()->getPropertyDefinitions() as $field_prop_name => $field_prop_definition) {
         // It makes no sense to map reference *targets*, only the *actual*
         // references. IOW: ignore `target_id` on entity reference fields, only
@@ -293,7 +291,7 @@ final class FieldInstanceSupportTest extends EcosystemSupportTestBase {
     // Perform the actual shape matching: find suggestions for every prop in the
     // test-only `all-props` SDC, which contains EVERY possible SDC prop shape.
     $component = \Drupal::service(ComponentPluginManager::class)->find('sdc_test_all_props:all-props');
-    assert($component instanceof Component);
+    \assert($component instanceof Component);
     $suggestions = $this->container->get(PropSourceSuggester::class)
       ->suggest(
         $component->getPluginId(),
@@ -310,15 +308,7 @@ final class FieldInstanceSupportTest extends EcosystemSupportTestBase {
       foreach ($suggested_instances as $dynamic_prop_source) {
         \assert($dynamic_prop_source instanceof DynamicPropSource);
         $expr = $dynamic_prop_source->expression;
-        $field_name = match (get_class($expr)) {
-          FieldPropExpression::class, FieldObjectPropsExpression::class => $expr->fieldName,
-          ReferenceFieldPropExpression::class => $expr->referencer->fieldName,
-        };
-        // Even though FieldPropExpression's `fieldName` can be an array at the
-        // data structure level, it can only be a string here: because the logic
-        // in JsonSchemaFieldInstanceMatcher asses one entity type + bundle at
-        // time.
-        assert(is_string($field_name));
+        $field_name = $expr->getFieldName();
         if (!str_starts_with($field_name, self::CANVAS_TEST_FIELD_PREFIX)) {
           continue;
         }
@@ -351,14 +341,14 @@ final class FieldInstanceSupportTest extends EcosystemSupportTestBase {
     $this->assertSame(
       self::MATCHING_CLAIMED_SUPPORTED_FIELD_TYPES,
       (float) count($actually_supported_fields) / count($expected_fields),
-      sprintf('Not yet supported: a JSON schema (prop shape) for the following fields: %s', implode(', ', $missing_fields))
+      \sprintf('Not yet supported: a JSON schema (prop shape) for the following fields: %s', implode(', ', $missing_fields))
     );
     self::assertSame(
       self::MATCHING_ALL_FIELD_TYPES,
       (float) count($expected_fields) / (count($expected_supported_fields) + count($expected_unsupported_fields)),
     );
     // @phpcs:ignore Drupal.Semantics.FunctionTriggerError.TriggerErrorTextLayoutRelaxed
-    @trigger_error(sprintf('Not yet supported: a JSON schema (prop shape) for the following fields: %s', implode(', ', $expected_unsupported_fields)), E_USER_DEPRECATED);
+    @trigger_error(\sprintf('Not yet supported: a JSON schema (prop shape) for the following fields: %s', implode(', ', $expected_unsupported_fields)), E_USER_DEPRECATED);
 
     // Verify that also at the field type props level, all expectations are met.
     $this->assertSame([], array_values(array_diff($expected_supported_field_props, array_keys($compatible_sdc_prop_shapes_per_field_prop))), 'The known supported field types are actually supported, for all their field props.');
@@ -369,14 +359,14 @@ final class FieldInstanceSupportTest extends EcosystemSupportTestBase {
     $this->assertSame(
       self::MATCHING_CLAIMED_SUPPORTED_FIELD_TYPE_PROPERTIES,
       (float) count($actually_supported_field_props) / count($expected_field_props),
-      sprintf('Not yet supported: a JSON schema (prop shape) for the following field properties: %s', implode(', ', $missing_field_props))
+      \sprintf('Not yet supported: a JSON schema (prop shape) for the following field properties: %s', implode(', ', $missing_field_props))
     );
     self::assertSame(
       self::MATCHING_ALL_FIELD_TYPE_PROPERTIES,
       (float) count($expected_field_props) / (count($expected_supported_field_props) + count($expected_unsupported_field_props)),
     );
     // @phpcs:ignore Drupal.Semantics.FunctionTriggerError.TriggerErrorTextLayoutRelaxed
-    @trigger_error(sprintf('Not yet supported: a JSON schema (prop shape) for the following field properties: %s', implode(', ', $expected_unsupported_field_props)), E_USER_DEPRECATED);
+    @trigger_error(\sprintf('Not yet supported: a JSON schema (prop shape) for the following field properties: %s', implode(', ', $expected_unsupported_field_props)), E_USER_DEPRECATED);
   }
 
   private function createFieldsForAllFieldTypes(): array {

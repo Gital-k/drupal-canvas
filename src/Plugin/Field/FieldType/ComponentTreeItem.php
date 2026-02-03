@@ -125,6 +125,7 @@ class ComponentTreeItem extends FieldItemBase {
    * @return ($name is 'parent_item' ? \Drupal\canvas\Plugin\DataType\ParentComponentReference : ($name is 'inputs' ? \Drupal\canvas\Plugin\DataType\ComponentInputs : ($name is 'component' ? \Drupal\Core\Entity\Plugin\DataType\EntityReference : \Drupal\Core\TypedData\Plugin\DataType\StringData)))
    */
   // phpcs:enable Drupal.Commenting.DataTypeNamespace.DataTypeNamespace
+  // @phpstan-ignore-next-line method.childParameterType
   public function get($name) {
     // @phpstan-ignore-next-line
     return parent::get($name);
@@ -426,6 +427,7 @@ class ComponentTreeItem extends FieldItemBase {
   /**
    * {@inheritdoc}
    */
+  // @phpstan-ignore-next-line method.childParameterType
   public function setValue($values, $notify = TRUE): void {
     if (is_array($values)) {
       parent::setValue($values, FALSE);
@@ -538,7 +540,7 @@ class ComponentTreeItem extends FieldItemBase {
     return [
       'uuid' => $this->getUuid(),
       'nodeType' => 'component',
-      'type' => sprintf('%s@%s', $this->getComponentId(), $this->getComponentVersion()),
+      'type' => \sprintf('%s@%s', $this->getComponentId(), $this->getComponentVersion()),
       // TRICKY: the client-side representation uses `name`, the server-side
       // representation uses `label`, due to TypedData limitations.
       // @see \Drupal\Core\TypedData\TypedData::$name
@@ -593,7 +595,7 @@ class ComponentTreeItem extends FieldItemBase {
     // constraints because it does not validate user input: it only helps ensure
     // that the logic of this field type is correct.
     if ($input_values === NULL && $source->requiresExplicitInput()) {
-      throw new \LogicException(sprintf('Missing input for component instance with UUID %s', $component_instance_uuid));
+      throw new \LogicException(\sprintf('Missing input for component instance with UUID %s', $component_instance_uuid));
     }
     $this->optimizeInputs();
     // @todo Omit defaults that are stored at the content type template level, e.g. in core.entity_view_display.node.article.default.yml
@@ -610,7 +612,7 @@ class ComponentTreeItem extends FieldItemBase {
     // Re-run the validation logic now that fields that are required on this
     // entity are guaranteed to exist (i.e. the entity is no longer new, because
     // it already was saved).
-    assert($this->getEntity()->isNew() === FALSE);
+    \assert($this->getEntity()->isNew() === FALSE);
     // Because the entity is now guaranteed to not be new, a slightly stricter
     // validation is performed — if it fails, then an exception is thrown and
     // the entity saving database transaction is rolled back, and an error

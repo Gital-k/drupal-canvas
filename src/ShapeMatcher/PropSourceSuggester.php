@@ -6,10 +6,11 @@ namespace Drupal\canvas\ShapeMatcher;
 
 use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaStringFormat;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase;
-use Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression;
+use Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface;
 use Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\Labeler;
-use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression;
+use Drupal\canvas\PropExpressions\StructuredData\ObjectPropExpressionInterface;
+use Drupal\canvas\PropExpressions\StructuredData\ReferencePropExpressionInterface;
 use Drupal\canvas\PropShape\PropShape;
 use Drupal\canvas\PropSource\DynamicPropSource;
 use Drupal\canvas\PropSource\HostEntityUrlPropSource;
@@ -73,14 +74,15 @@ final class PropSourceSuggester {
    *
    * @todo Refactor after https://www.drupal.org/project/drupal/issues/3557353
    */
-  private function isConsideredIrrelevant(FieldPropExpression|ReferenceFieldPropExpression|FieldObjectPropsExpression $expression): bool {
+  private function isConsideredIrrelevant(EntityFieldBasedPropExpressionInterface $expression): bool {
     $entity_type_id = $expression->getHostEntityDataDefinition()->getEntityTypeId();
-    $expression_field_name = Labeler::getFieldName($expression, $expression->getHostEntityDataDefinition());
-    $referenced_entity_type_id = $expression instanceof ReferenceFieldPropExpression
-      ? $expression->referenced->getHostEntityDataDefinition()->getEntityTypeId()
+    \assert(\is_string($entity_type_id));
+    $expression_field_name = $expression->getFieldName();
+    $referenced_entity_type_id = $expression instanceof ReferencePropExpressionInterface
+      ? $expression->getTargetExpression()->getHostEntityDataDefinition()->getEntityTypeId()
       : NULL;
-    $referenced_expression_field_name = $expression instanceof ReferenceFieldPropExpression
-      ? Labeler::getFieldName($expression->referenced, $expression->referenced->getHostEntityDataDefinition())
+    $referenced_expression_field_name = $expression instanceof ReferencePropExpressionInterface
+      ? $expression->getTargetExpression()->getFieldName()
       : NULL;
 
     // Node-specific heuristics:
@@ -92,7 +94,7 @@ final class PropSourceSuggester {
 
     // File-specific heuristics:
     // 1. do not suggest `uid` base field if the File entity was referenced
-    if ($referenced_entity_type_id === 'file' && $expression instanceof ReferenceFieldPropExpression && $referenced_expression_field_name === 'uid') {
+    if ($referenced_entity_type_id === 'file' && $expression instanceof ReferencePropExpressionInterface && $referenced_expression_field_name === 'uid') {
       return TRUE;
     }
 
@@ -112,13 +114,16 @@ final class PropSourceSuggester {
     }
 
     // Recurse, if needed.
-    return match ($expression::class) {
-      FieldPropExpression::class => FALSE,
-      ReferenceFieldPropExpression::class => $this->isConsideredIrrelevant($expression->referenced),
-      FieldObjectPropsExpression::class => array_any(
-        $expression->objectPropsToFieldProps,
-        fn(FieldPropExpression|ReferenceFieldPropExpression $sub_expr) => $this->isConsideredIrrelevant($sub_expr),
+    return match (TRUE) {
+      $expression instanceof ReferencePropExpressionInterface => $this->isConsideredIrrelevant($expression->getTargetExpression()),
+      $expression instanceof ObjectPropExpressionInterface => array_any(
+        $expression->getObjectExpressions(),
+        // PHPStan incorrectly flags this error. It fails to conclude that the
+        // function argument already is of the correct type.
+        // @phpstan-ignore argument.type
+        $this->isConsideredIrrelevant(...),
       ),
+      default => FALSE,
     };
   }
 
@@ -133,9 +138,9 @@ final class PropSourceSuggester {
    */
   public function suggest(string $component_plugin_id, ComponentMetadata $component_metadata, EntityDataDefinitionInterface $host_entity_type): array {
     $host_entity_type_id = $host_entity_type->getEntityTypeId();
-    assert(is_string($host_entity_type_id));
+    \assert(is_string($host_entity_type_id));
     $bundles = $host_entity_type->getBundles();
-    assert(is_array($bundles) && !empty($bundles));
+    \assert(is_array($bundles) && !empty($bundles));
     $host_entity_type_bundle = reset($bundles);
 
     // 1. Get raw matches.
@@ -164,7 +169,7 @@ final class PropSourceSuggester {
         if ($this->isConsideredIrrelevant($expr)) {
           continue;
         }
-        $bucketed_by_field[Labeler::getFieldName($expr, $expr->getHostEntityDataDefinition())][] = $s;
+        $bucketed_by_field[$expr->getFieldName()][] = $s;
       }
       // Keep only non-empty (field) buckets.
       $bucketed_by_field = array_map('array_filter', $bucketed_by_field);
@@ -406,22 +411,14 @@ final class PropSourceSuggester {
 
     $hierarchical_response = [];
     foreach ($flat_response_structure as $prop_name => &$suggestions) {
-      // 1. Enrich and sort this prop's suggestions.
+      // 1. Enrich this prop's suggestions. The sorting is already correct based
+      // on the form display.
       $enriched_suggestions = array_map(
         [self::class, 'enrichSuggestion'],
         $suggestions,
       );
-      $original_order = array_keys($suggestions);
 
-      // 2. Sort this prop's suggestions from shallow to deep. This retains the
-      // relative ordering between those suggestions that have the same depth.
-      array_multisort(
-        array_column($enriched_suggestions, 'depth'), SORT_ASC,
-        $original_order, SORT_ASC,
-        $enriched_suggestions,
-      );
-
-      // 3. Walk the depth-sorted suggestions and generate a hierarchy according
+      // 2. Walk the depth-sorted suggestions and generate a hierarchy according
       // to the label parts.
       $hierarchical_suggestions = [];
       array_walk($enriched_suggestions, function ($enriched_suggestion, string $opaque_id) use (&$hierarchical_suggestions) {
@@ -432,8 +429,8 @@ final class PropSourceSuggester {
         NestedArray::setValue($hierarchical_suggestions, $enriched_suggestion['path'], $hierarchical_suggestion);
       });
 
-      // 4. Recursively process the hierarchical suggestions: move the label
-      // parts that were used in step 3 from array keys into a `label` key-value
+      // 3. Recursively process the hierarchical suggestions: move the label
+      // parts that were used in step 2 from array keys into a `label` key-value
       // pair in each node in the tree. Replace them with numerical indexes,
       // respecting the original sort order.
       // TRICKY: \array_walk_recursive() cannot be used because it operates only

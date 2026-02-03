@@ -10,8 +10,8 @@ import {
   replaceUUIDsAndUpdateModel,
 } from '@/features/layout/layoutUtils';
 
-import layoutFixture from '../fixtures/layout-default.json';
-import regionsLayoutFixture from '../fixtures/layout-regions.json';
+import layoutFixture from '../../fixtures/layout-default.json';
+import regionsLayoutFixture from '../../fixtures/layout-regions.json';
 
 let layout, regionsLayout;
 
@@ -110,7 +110,7 @@ describe('replaceUUIDsAndUpdateModel', () => {
       'sdc.canvas_test_sdc.my-cta@e5ef92acda2ee2d1',
     );
     expect(updatedNode.slots[0].components[3].type).to.equal(
-      'sdc.canvas_test_sdc.image@abadf2538ecfdecc',
+      'sdc.canvas_test_sdc.image@fb40be57bd7e0973',
     );
 
     // Check if model data is preserved

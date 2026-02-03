@@ -9,22 +9,21 @@ use Drupal\Core\Entity\TypedData\EntityDataDefinitionInterface;
 use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Field\TypedData\FieldItemDataDefinitionInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\Core\TypedData\DataDefinitionInterface;
 use Drupal\Core\TypedData\DataReferenceDefinitionInterface;
 
 /**
- * Labels field instance expressions.
+ * Labels entity field expressions.
  *
- * @see FieldPropExpression
- * @see FieldObjectPropsExpression
- * @see ReferenceFieldPropExpression
+ * @see \Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface
  */
 final class Labeler {
 
   /**
-   * Computed a (hierarchical) label for a field instance expression.
+   * Computed a (hierarchical) label for an entity field expression.
    *
-   * @param FieldPropExpression|FieldObjectPropsExpression|ReferenceFieldPropExpression $expr
-   *   A field instance expression.
+   * @param \Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface $expr
+   *   An entity field expression.
    * @param \Drupal\Core\Entity\TypedData\EntityDataDefinitionInterface $actual_entity_type_and_bundle
    *   The actual entity type and bundle this expression will be evaluated for;
    *   necessary to generate a label when an expression describes how to
@@ -35,43 +34,40 @@ final class Labeler {
    *
    * @see ::flatten())
    */
-  public static function label(FieldPropExpression|FieldObjectPropsExpression|ReferenceFieldPropExpression $expr, EntityDataDefinitionInterface $actual_entity_type_and_bundle): TranslatableMarkup {
+  public static function label(EntityFieldBasedPropExpressionInterface $expr, EntityDataDefinitionInterface $actual_entity_type_and_bundle): TranslatableMarkup {
     $expression_entity_definition = $expr->getHostEntityDataDefinition();
     if ($expression_entity_definition->getEntityTypeId() !== $actual_entity_type_and_bundle->getEntityTypeId()) {
-      throw new \LogicException(sprintf('Expression expects entity type `%s`, actual entity type is `%s`.', $expression_entity_definition->getEntityTypeId(), $actual_entity_type_and_bundle->getEntityTypeId()));
+      throw new \LogicException(\sprintf('Expression expects entity type `%s`, actual entity type is `%s`.', $expression_entity_definition->getEntityTypeId(), $actual_entity_type_and_bundle->getEntityTypeId()));
     }
 
     // To generate a label, the target entity type and bundle must be known.
     $actual_bundles = $actual_entity_type_and_bundle->getBundles();
     if (is_array($actual_bundles) && count($actual_bundles) > 1) {
-      throw new \LogicException(sprintf('Multi-bundle entity definition given (`%s`), not allowed.', implode('`, `', $actual_bundles)));
+      throw new \LogicException(\sprintf('Multi-bundle entity definition given (`%s`), not allowed.', implode('`, `', $actual_bundles)));
     }
 
     // Bundle-specific expressions need further validation.
     $expression_bundles = $expression_entity_definition->getBundles();
     if ($expression_bundles !== NULL) {
+      \assert(count($expression_bundles) === 1);
       if ($actual_bundles === NULL) {
-        throw new \LogicException(sprintf('Expression expects bundle `%s`, no bundle given.', implode(', ', $expression_bundles)));
+        throw new \LogicException(\sprintf('Expression expects bundle `%s`, no bundle given.', implode(', ', $expression_bundles)));
       }
-      if (count($expression_bundles) === 1 && reset($expression_bundles) !== reset($actual_bundles)) {
-        throw new \LogicException(sprintf('Expression expects bundle `%s`, actual bundle is `%s`.', reset($expression_bundles), reset($actual_bundles)));
-      }
-      if (count($expression_bundles) > 1 && !in_array(reset($actual_bundles), $expression_bundles, TRUE)) {
-        throw new \LogicException(sprintf('Expression expects one bundle of `%s`, actual bundle is `%s`.', implode('`, `', $expression_bundles), reset($actual_bundles)));
+      if (reset($expression_bundles) !== reset($actual_bundles)) {
+        throw new \LogicException(\sprintf('Expression expects bundle `%s`, actual bundle is `%s`.', reset($expression_bundles), reset($actual_bundles)));
       }
     }
 
-    $field_name = self::getFieldName($expr, $actual_entity_type_and_bundle);
-
+    $field_name = $expr->getFieldName();
     $field_definition = $actual_entity_type_and_bundle->getPropertyDefinition($field_name);
     if ($field_definition === NULL) {
-      throw new \LogicException(sprintf("Field `%s` does not exist on `%s` entities.",
+      throw new \LogicException(\sprintf("Field `%s` does not exist on `%s` entities.",
         $field_name,
         $actual_entity_type_and_bundle->getDataType(),
       ));
     }
-    assert($field_definition instanceof FieldDefinitionInterface);
-    assert($field_definition->getItemDefinition() instanceof FieldItemDataDefinitionInterface);
+    \assert($field_definition instanceof FieldDefinitionInterface);
+    \assert($field_definition->getItemDefinition() instanceof FieldItemDataDefinitionInterface);
 
     // To correctly represent this, this must take into account what
     // JsonSchemaFieldInstanceMatcher may or may not match. It will
@@ -82,15 +78,11 @@ final class Labeler {
     // - props explicitly marked as internal
     // @see \Drupal\Core\TypedData\DataDefinition::isInternal
     $main_property = $field_definition->getItemDefinition()->getMainPropertyName();
-    assert(is_string($main_property));
+    \assert(is_string($main_property));
 
     // When an expression targets a specific field item, generate an ordinal
     // suffix for the label.
-    $delta = match (get_class($expr)) {
-      FieldPropExpression::class, FieldObjectPropsExpression::class => $expr->delta,
-      ReferenceFieldPropExpression::class => $expr->referencer->delta,
-      default => NULL,
-    };
+    $delta = $expr->getDelta();
     if ($delta !== NULL) {
       $human_delta = $delta + 1;
       $label_item_delta_parts = [
@@ -116,32 +108,68 @@ final class Labeler {
         '@field-label' => $field_definition->getLabel(),
         ...$label_item_delta_arguments,
       ];
-      // @phpstan-ignore-next-line match.unhandled
-      return match (TRUE) {
-        $expr instanceof FieldPropExpression, $expr instanceof FieldObjectPropsExpression => new TranslatableMarkup(
+
+      // Non-reference expression: simple label.
+      if (!$expr instanceof ReferencePropExpressionInterface) {
+        return new TranslatableMarkup(
           // phpcs:ignore Drupal.Semantics.FunctionT.NotLiteralString
           implode('', $label_parts),
           $label_arguments,
+        );
+      }
+
+      // Multi-bundle reference expression: convey only the reachable entity
+      // type and bundles, do not recurse further even though this may omit
+      // crucial information.
+      // @todo Refine: consider (conditionally) recursing to better inform Canvas content template authors in https://www.drupal.org/i/3563309
+      if ($expr->targetsMultipleBundles()) {
+        // @phpstan-ignore property.notFound
+        \assert($expr->referenced instanceof ReferencedBundleSpecificBranches);
+        $referenceable_bundle_labels = array_map(
+          // @phpstan-ignore return.type
+          fn (EntityFieldBasedPropExpressionInterface $bundle_specific_expr): string => $bundle_specific_expr->getHostEntityDataDefinition()->getLabel(),
+          $expr->referenced->bundleSpecificReferencedExpressions,
+        );
+        return new TranslatableMarkup(
+          // phpcs:ignore Drupal.Semantics.FunctionT.NotLiteralString
+          implode('', [
+            ...$label_parts,
+            StructuredDataPropExpressionInterface::PREFIX_ENTITY_LEVEL,
+            '@referenced-entity-bundle-labels',
+          ]),
+          $label_arguments + [
+            '@referenced-entity-bundle-labels' => implode(', ', $referenceable_bundle_labels),
+          ],
+        );
+      }
+
+      // Reference expression: convey the reference in the label, but use
+      // heuristics to keep it user-friendly.
+      $targets_file_entity_type = $expr->getTargetExpression()->getHostEntityDataDefinition()->getEntityTypeId() === 'file';
+      $label_arguments = [
+        ...$label_arguments,
+        '@referenced' => self::label(
+          $expr->getTargetExpression(),
+          $expr->getTargetExpression()->getHostEntityDataDefinition(),
         ),
-        // For UX purposes, consider references to File entities an
+      ];
+      return match ($targets_file_entity_type) {
+        // For UX purposes, consider references targeting File entities an
         // implementation detail irrelevant to the Site Builder: omit them from
         // the hierarchical label when following a reference. Result: it seems
         // that fields on Files are field properties on e.g. an image field or
         // on a media entity reference field.
-        $expr->referenced->getHostEntityDataDefinition()->getEntityTypeId() === 'file' => new TranslatableMarkup(
+        TRUE => new TranslatableMarkup(
           // phpcs:ignore Drupal.Semantics.FunctionT.NotLiteralString
           implode('', [
             ...$label_parts,
             StructuredDataPropExpressionInterface::PREFIX_FIELD_LEVEL,
             '@referenced',
           ]),
-          [
-            ...$label_arguments,
-            '@referenced' => self::label($expr->referenced, $expr->referenced->getHostEntityDataDefinition()),
-          ],
+          $label_arguments,
         ),
-        // All non-File reference expressions.
-        $expr->referenced->getHostEntityDataDefinition()->getEntityTypeId() !== 'file' => new TranslatableMarkup(
+        // All non-File target reference expressions.
+        FALSE => new TranslatableMarkup(
           // phpcs:ignore Drupal.Semantics.FunctionT.NotLiteralString
           implode('', [
             ...$label_parts,
@@ -152,8 +180,7 @@ final class Labeler {
           ]),
           [
             ...$label_arguments,
-            '@referenced-entity-type-bundle-label' => $expr->referenced->getHostEntityDataDefinition()->getLabel(),
-            '@referenced' => self::label($expr->referenced, $expr->referenced->getHostEntityDataDefinition()),
+            '@referenced-entity-type-bundle-label' => $expr->getTargetExpression()->getHostEntityDataDefinition()->getLabel(),
           ],
         ),
       };
@@ -229,75 +256,39 @@ final class Labeler {
    * @todo Make private.
    * @internal
    */
-  public static function getFieldName(FieldPropExpression|FieldObjectPropsExpression|ReferenceFieldPropExpression $expr, EntityDataDefinitionInterface $actual_entity_type_and_bundle): string {
-    $expr_field_name = match (get_class($expr)) {
-      ReferenceFieldPropExpression::class => $expr->referencer->fieldName,
-      FieldPropExpression::class, FieldObjectPropsExpression::class => $expr->fieldName,
-    };
-    // TRICKY: FieldPropExpression::$fieldName can be an array, but only
-    // when used in a reference.
-    // @see https://www.drupal.org/i/3530521
-    if (is_string($expr_field_name)) {
-      return $expr_field_name;
-    }
-    \assert(is_array($actual_entity_type_and_bundle->getBundles()));
-    \assert(array_keys($actual_entity_type_and_bundle->getBundles()) === [0]);
-    $actual_bundle = $actual_entity_type_and_bundle->getBundles()[0];
-    \assert(array_key_exists($actual_bundle, $expr_field_name));
-    return $expr_field_name[$actual_bundle];
-  }
-
-  /**
-   * @todo Make private.
-   * @internal
-   */
-  public static function getUsedFieldProps(FieldPropExpression|ReferenceFieldPropExpression|FieldObjectPropsExpression $expr, EntityDataDefinitionInterface $actual_entity_type_and_bundle): string|array {
-    $props = match (get_class($expr)) {
-      FieldPropExpression::class => $expr->propName,
-      ReferenceFieldPropExpression::class => $expr->referencer->propName,
-      FieldObjectPropsExpression::class => array_map(
-        fn (FieldPropExpression|ReferenceFieldPropExpression $obj_expr) => self::getUsedFieldProps($obj_expr, $actual_entity_type_and_bundle),
-        $expr->objectPropsToFieldProps
+  public static function getUsedFieldProps(EntityFieldBasedPropExpressionInterface $expr, EntityDataDefinitionInterface $actual_entity_type_and_bundle): string|array {
+    $props = match (TRUE) {
+      $expr instanceof ObjectPropExpressionInterface => array_map(
+        // PHPStan incorrectly flags this error. It fails to realize that the
+        // argument is of the correct type.
+        // @phpstan-ignore argument.type
+        fn ($obj_expr) => self::getUsedFieldProps($obj_expr, $actual_entity_type_and_bundle),
+        $expr->getObjectExpressions(),
       ),
+      $expr instanceof ScalarPropExpressionInterface,
+      $expr instanceof ReferencePropExpressionInterface => $expr->getFieldPropertyName(),
+      default => throw new \LogicException('Unhandled expression type.'),
     };
 
-    // Multi-bundle expressions need extra care.
-    if ($expr instanceof FieldPropExpression && is_array($expr->fieldName)) {
-      // Even though a multi-bundle expression may target multiple fields, they
-      // may all use the same field property.
-      if (is_string($props)) {
-        return $props;
-      }
-      \assert(!array_is_list($props));
-      \assert(is_array($actual_entity_type_and_bundle->getBundles()));
-      \assert(array_keys($actual_entity_type_and_bundle->getBundles()) === [0]);
-      // Use the actual bundle to determine the actual field name, to in turn
-      // determine the props actually used by this expression.
-      $actual_bundle = $actual_entity_type_and_bundle->getBundles()[0];
-      $actual_field = $expr->fieldName[$actual_bundle];
-      $actual_props = $props[$actual_field];
-      \assert(is_string($actual_props));
-      return $actual_props;
-    }
-
-    // An array of props can only be returned for FieldObjectPropsExpressions.
-    \assert(is_string($props) || ($expr instanceof FieldObjectPropsExpression && !array_is_list($props)));
+    // An array of props can only be returned for object expressions.
+    \assert(is_string($props) || ($expr instanceof ObjectPropExpressionInterface && !array_is_list($props)));
     return $props;
   }
 
-  private static function usesMainProperty(FieldPropExpression|FieldObjectPropsExpression|ReferenceFieldPropExpression $expr, FieldDefinitionInterface $field_definition, EntityDataDefinitionInterface $actual_entity_type_and_bundle): bool {
+  private static function usesMainProperty(EntityFieldBasedPropExpressionInterface $expr, FieldDefinitionInterface $field_definition, EntityDataDefinitionInterface $actual_entity_type_and_bundle): bool {
     // Easiest case: a reference field's entire purpose is to reference, so
     // following the reference definitely is considered using the main property.
-    if ($expr instanceof ReferenceFieldPropExpression) {
+    if ($expr instanceof ReferencePropExpressionInterface) {
       return TRUE;
     }
 
-    assert($field_definition->getItemDefinition() instanceof FieldItemDataDefinitionInterface);
-    $main_property = $field_definition->getItemDefinition()->getMainPropertyName();
-    assert(is_string($main_property));
+    $field_item_definition = $field_definition->getItemDefinition();
+    \assert($field_item_definition instanceof FieldItemDataDefinitionInterface);
+    $main_property = $field_item_definition->getMainPropertyName();
+    \assert(is_string($main_property));
 
     $used_props = (array) self::getUsedFieldProps($expr, $actual_entity_type_and_bundle);
-    assert(count($used_props) >= 1);
+    \assert(count($used_props) >= 1);
 
     // Easy case: if the main property is used directly.
     if (in_array($main_property, $used_props, TRUE)) {
@@ -306,6 +297,12 @@ final class Labeler {
 
     // Otherwise, check if one of the used field properties is a computed one
     // that depends on the main one.
+    $main_property_definition = $field_item_definition->getPropertyDefinition($main_property);
+    \assert($main_property_definition instanceof DataDefinitionInterface);
+    if (in_array($main_property_definition->getSetting('is source for'), $used_props, TRUE)) {
+      return TRUE;
+    }
+
     // Drupal core does not have native support for this; Canvas adds additional
     // metadata to be able to determine this. Any contributed field types that
     // wish to have computed properties automatically matched/suggested, need to
@@ -313,12 +310,12 @@ final class Labeler {
     // @see \Drupal\canvas\Plugin\Field\FieldTypeOverride\ImageItemOverride
     // @see \Drupal\canvas\Plugin\DataType\ComputedUrlWithQueryString
     foreach ($used_props as $prop_name) {
-      $property_definition = $field_definition->getItemDefinition()->getPropertyDefinition($prop_name);
+      $property_definition = $field_item_definition->getPropertyDefinition($prop_name);
       if ($property_definition === NULL) {
-        throw new \LogicException(sprintf("Property `%s` does not exist on field type `%s`. The following field properties exist: `%s`.",
+        throw new \LogicException(\sprintf("Property `%s` does not exist on field type `%s`. The following field properties exist: `%s`.",
           $prop_name,
           $field_definition->getType(),
-          implode('`, `', array_keys($field_definition->getItemDefinition()->getPropertyDefinitions())),
+          implode('`, `', array_keys($field_item_definition->getPropertyDefinitions())),
         ));
       }
 
@@ -338,7 +335,7 @@ final class Labeler {
       // Final sanity check: the reference expression found in the computed
       // property definition's settings MUST target the field type used by this
       // field instance.
-      assert($expr_used_by_computed_property->referencer->fieldType === $field_definition->getType());
+      \assert($expr_used_by_computed_property->getFieldType() === $field_definition->getType());
       return TRUE;
     }
 

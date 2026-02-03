@@ -107,6 +107,19 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
       'required' => FALSE,
     ])->save();
 
+    // Set explicitly the form display components to ensure the suggestions
+    // sorting is as expected.
+    $form_display = \Drupal::service('entity_display.repository')
+      ->getFormDisplay('node', 'article');
+    $weight = 10;
+    foreach (['field_silly_image', 'uid', 'field_screenshots', 'user_picture', 'field_tags'] as $form_display_component_id) {
+      $form_component = $form_display->getComponent($form_display_component_id);
+      $form_component['weight'] = $weight;
+      $form_display->setComponent($form_display_component_id, $form_component);
+      $weight += 5;
+    }
+    $form_display->save();
+
     $account = $this->createUser([
       ContentTemplate::ADMIN_PERMISSION,
       'edit any article content',
@@ -116,7 +129,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
     $this->drupalLogin($account);
 
     $user2 = $this->createUser(['view media']);
-    assert($user2 instanceof UserInterface);
+    \assert($user2 instanceof UserInterface);
     $this->limitedPermissionsUser = $user2;
   }
 
@@ -327,20 +340,20 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
           [
             'items' => [
               [
-                'id' => '1138e38cc9e6b7dd',
-                'source' => [
-                  'sourceType' => 'dynamic',
-                  'expression' => 'ℹ︎␜entity:node:article␝field_screenshots␞␟title',
-                ],
-                'label' => 'Title',
-              ],
-              [
                 'id' => '6f972dac9b3e8954',
                 'source' => [
                   'sourceType' => 'dynamic',
                   'expression' => 'ℹ︎␜entity:node:article␝field_screenshots␞␟alt',
                 ],
                 'label' => 'Alternative text',
+              ],
+              [
+                'id' => '1138e38cc9e6b7dd',
+                'source' => [
+                  'sourceType' => 'dynamic',
+                  'expression' => 'ℹ︎␜entity:node:article␝field_screenshots␞␟title',
+                ],
+                'label' => 'Title',
               ],
             ],
             'label' => 'field_screenshots',
@@ -377,14 +390,6 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
           [
             'items' => [
               [
-                'id' => '1409e675864fd2e6',
-                'source' => [
-                  'sourceType' => 'dynamic',
-                  'expression' => 'ℹ︎␜entity:node:article␝field_silly_image␞␟title',
-                ],
-                'label' => "Title",
-              ],
-              [
                 'id' => '82ec95693bc89080',
                 'source' => [
                   'sourceType' => 'dynamic',
@@ -392,26 +397,16 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
                 ],
                 'label' => "Alternative text",
               ],
-            ],
-            'label' => 'Silly image 🤡',
-          ],
-          [
-            'items' => [
               [
-                'items' => [
-                  ['id' => $hash_for_choice($choice_article_revision_user_name)] + $choice_article_revision_user_name,
-                  [
-                    'items' => [
-                      ['id' => $hash_for_choice($choice_article_revision_user_picture_alt)] + $choice_article_revision_user_picture_alt,
-                      ['id' => $hash_for_choice($choice_article_revision_user_picture_title)] + $choice_article_revision_user_picture_title,
-                    ],
-                    'label' => 'Picture',
-                  ],
+                'id' => '1409e675864fd2e6',
+                'source' => [
+                  'sourceType' => 'dynamic',
+                  'expression' => 'ℹ︎␜entity:node:article␝field_silly_image␞␟title',
                 ],
-                'label' => 'User',
+                'label' => "Title",
               ],
             ],
-            'label' => 'Revision user',
+            'label' => 'Silly image 🤡',
           ],
           [
             'items' => [
@@ -430,6 +425,24 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
               ],
             ],
             'label' => 'Authored by',
+          ],
+          [
+            'items' => [
+              [
+                'items' => [
+                  ['id' => $hash_for_choice($choice_article_revision_user_name)] + $choice_article_revision_user_name,
+                  [
+                    'items' => [
+                      ['id' => $hash_for_choice($choice_article_revision_user_picture_alt)] + $choice_article_revision_user_picture_alt,
+                      ['id' => $hash_for_choice($choice_article_revision_user_picture_title)] + $choice_article_revision_user_picture_title,
+                    ],
+                    'label' => 'Picture',
+                  ],
+                ],
+                'label' => 'User',
+              ],
+            ],
+            'label' => 'Revision user',
           ],
         ],
         'images' => [
@@ -455,14 +468,6 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
           [
             'items' => [
               [
-                'id' => '1409e675864fd2e6',
-                'source' => [
-                  'sourceType' => 'dynamic',
-                  'expression' => 'ℹ︎␜entity:node:article␝field_silly_image␞␟title',
-                ],
-                'label' => "Title",
-              ],
-              [
                 'id' => '82ec95693bc89080',
                 'source' => [
                   'sourceType' => 'dynamic',
@@ -470,26 +475,16 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
                 ],
                 'label' => "Alternative text",
               ],
-            ],
-            'label' => 'Silly image 🤡',
-          ],
-          [
-            'items' => [
               [
-                'items' => [
-                  ['id' => $hash_for_choice($choice_article_revision_user_name)] + $choice_article_revision_user_name,
-                  [
-                    'items' => [
-                      ['id' => $hash_for_choice($choice_article_revision_user_picture_alt)] + $choice_article_revision_user_picture_alt,
-                      ['id' => $hash_for_choice($choice_article_revision_user_picture_title)] + $choice_article_revision_user_picture_title,
-                    ],
-                    'label' => 'Picture',
-                  ],
+                'id' => '1409e675864fd2e6',
+                'source' => [
+                  'sourceType' => 'dynamic',
+                  'expression' => 'ℹ︎␜entity:node:article␝field_silly_image␞␟title',
                 ],
-                'label' => 'User',
+                'label' => "Title",
               ],
             ],
-            'label' => 'Revision user',
+            'label' => 'Silly image 🤡',
           ],
           [
             'items' => [
@@ -509,127 +504,15 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
             ],
             'label' => 'Authored by',
           ],
-        ],
-        'link' => [
-          [
-            'id' => '51af7eb3ee57c3a5',
-            'source' => [
-              'sourceType' => 'host-entity-url',
-              'absolute' => FALSE,
-            ],
-            'label' => 'Relative URL',
-          ],
-          [
-            'id' => '4999dcb72722c69a',
-            'source' => [
-              'sourceType' => 'dynamic',
-              'expression' => 'ℹ︎␜entity:node:article␝field_silly_image␞␟src_with_alternate_widths',
-            ],
-            'items' => [
-              [
-                'id' => '4a83ce0c963911b4',
-                'source' => [
-                  'sourceType' => 'dynamic',
-                  'expression' => 'ℹ︎␜entity:node:article␝field_silly_image␞␟entity␜␜entity:file␝uri␞␟value',
-                ],
-                'items' => [
-                  [
-                    'id' => 'cd27d546be8c9a31',
-                    'source' => [
-                      'sourceType' => 'dynamic',
-                      'expression' => 'ℹ︎␜entity:node:article␝field_silly_image␞␟entity␜␜entity:file␝uri␞␟url',
-                    ],
-                    'label' => 'Root-relative file URL',
-                  ],
-                ],
-                'label' => "URI",
-              ],
-            ],
-            'label' => 'Silly image 🤡',
-          ],
           [
             'items' => [
               [
-                'id' => '40aec6943bb1f70a',
-                'source' => [
-                  'sourceType' => 'dynamic',
-                  'expression' => 'ℹ︎␜entity:node:article␝uid␞␟url',
-                ],
-                'label' => 'URL',
-              ],
-              [
                 'items' => [
+                  ['id' => $hash_for_choice($choice_article_revision_user_name)] + $choice_article_revision_user_name,
                   [
-                    'id' => '134a8de6cbb83338',
-                    'source' => [
-                      'sourceType' => 'dynamic',
-                      'expression' => 'ℹ︎␜entity:node:article␝uid␞␟entity␜␜entity:user␝user_picture␞␟src_with_alternate_widths',
-                    ],
                     'items' => [
-                      [
-                        'id' => 'b3d2d175491909ed',
-                        'source' => [
-                          'sourceType' => 'dynamic',
-                          'expression' => 'ℹ︎␜entity:node:article␝uid␞␟entity␜␜entity:user␝user_picture␞␟entity␜␜entity:file␝uri␞␟value',
-                        ],
-                        'items' => [
-                          [
-                            'id' => 'ecacb2058b74367b',
-                            'source' => [
-                              'sourceType' => 'dynamic',
-                              'expression' => 'ℹ︎␜entity:node:article␝uid␞␟entity␜␜entity:user␝user_picture␞␟entity␜␜entity:file␝uri␞␟url',
-                            ],
-                            'label' => 'Root-relative file URL',
-                          ],
-                        ],
-                        'label' => 'URI',
-                      ],
-                    ],
-                    'label' => 'Picture',
-                  ],
-                ],
-                'label' => 'User',
-              ],
-            ],
-            'label' => 'Authored by',
-          ],
-          [
-            'items' => [
-              [
-                'id' => 'f406165063d98f55',
-                'source' => [
-                  'sourceType' => 'dynamic',
-                  'expression' => 'ℹ︎␜entity:node:article␝revision_uid␞␟url',
-                ],
-                'label' => 'URL',
-              ],
-              [
-                'items' => [
-                  [
-                    'id' => '5b16c0771fff7364',
-                    'source' => [
-                      'sourceType' => 'dynamic',
-                      'expression' => 'ℹ︎␜entity:node:article␝revision_uid␞␟entity␜␜entity:user␝user_picture␞␟src_with_alternate_widths',
-                    ],
-                    'items' => [
-                      [
-                        'id' => '09abeca99c3ea43b',
-                        'source' => [
-                          'sourceType' => 'dynamic',
-                          'expression' => 'ℹ︎␜entity:node:article␝revision_uid␞␟entity␜␜entity:user␝user_picture␞␟entity␜␜entity:file␝uri␞␟value',
-                        ],
-                        'items' => [
-                          [
-                            'id' => '1dfa84dcb4d9bbe3',
-                            'source' => [
-                              'sourceType' => 'dynamic',
-                              'expression' => 'ℹ︎␜entity:node:article␝revision_uid␞␟entity␜␜entity:user␝user_picture␞␟entity␜␜entity:file␝uri␞␟url',
-                            ],
-                            'label' => 'Root-relative file URL',
-                          ],
-                        ],
-                        'label' => 'URI',
-                      ],
+                      ['id' => $hash_for_choice($choice_article_revision_user_picture_alt)] + $choice_article_revision_user_picture_alt,
+                      ['id' => $hash_for_choice($choice_article_revision_user_picture_title)] + $choice_article_revision_user_picture_title,
                     ],
                     'label' => 'Picture',
                   ],
@@ -638,6 +521,76 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
               ],
             ],
             'label' => 'Revision user',
+          ],
+        ],
+        'link' => [
+          [
+            'id' => '4999dcb72722c69a',
+            'source' => [
+              'sourceType' => 'dynamic',
+              'expression' => 'ℹ︎␜entity:node:article␝field_silly_image␞␟src_with_alternate_widths',
+            ],
+            'label' => 'Silly image 🤡',
+          ],
+          [
+            'items' => [
+              [
+                'items' => [
+                  [
+                    'id' => '134a8de6cbb83338',
+                    'source' => [
+                      'sourceType' => 'dynamic',
+                      'expression' => 'ℹ︎␜entity:node:article␝uid␞␟entity␜␜entity:user␝user_picture␞␟src_with_alternate_widths',
+                    ],
+                    'label' => 'Picture',
+                  ],
+                ],
+                'label' => 'User',
+              ],
+              [
+                'id' => '40aec6943bb1f70a',
+                'source' => [
+                  'sourceType' => 'dynamic',
+                  'expression' => 'ℹ︎␜entity:node:article␝uid␞␟url',
+                ],
+                'label' => 'URL',
+              ],
+            ],
+            'label' => 'Authored by',
+          ],
+          [
+            'items' => [
+              [
+                'items' => [
+                  [
+                    'id' => '5b16c0771fff7364',
+                    'source' => [
+                      'sourceType' => 'dynamic',
+                      'expression' => 'ℹ︎␜entity:node:article␝revision_uid␞␟entity␜␜entity:user␝user_picture␞␟src_with_alternate_widths',
+                    ],
+                    'label' => 'Picture',
+                  ],
+                ],
+                'label' => 'User',
+              ],
+              [
+                'id' => 'f406165063d98f55',
+                'source' => [
+                  'sourceType' => 'dynamic',
+                  'expression' => 'ℹ︎␜entity:node:article␝revision_uid␞␟url',
+                ],
+                'label' => 'URL',
+              ],
+            ],
+            'label' => 'Revision user',
+          ],
+          [
+            'id' => '51af7eb3ee57c3a5',
+            'source' => [
+              'sourceType' => 'host-entity-url',
+              'absolute' => FALSE,
+            ],
+            'label' => 'Relative URL',
           ],
         ],
       ],
@@ -685,7 +638,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
       expected_page_cache: 'UNCACHEABLE (request policy)',
       expected_dynamic_page_cache: NULL,
     );
-    $this->assertSame(['errors' => [sprintf("The '%s' permission is required.", ContentTemplate::ADMIN_PERMISSION)]], $json);
+    $this->assertSame(['errors' => [\sprintf("The '%s' permission is required.", ContentTemplate::ADMIN_PERMISSION)]], $json);
   }
 
   public function testSuggestPreviewContentEntities(): void {

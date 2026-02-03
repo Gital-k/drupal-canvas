@@ -405,9 +405,88 @@ final class JsComponentEvolutionTest extends KernelTestBase {
 
   #[DataProvider('providerTrueFalse')]
   public function testCodeComponentCanAddRequiredProp(bool $usingHttpApi = FALSE): void {
-    $this->markTestSkipped('To be fixed in https://www.drupal.org/project/canvas/issues/3556338');
     $this->addOrUpdateAgeProp($usingHttpApi, TRUE);
     $this->assertRequiredPropNewVersion();
+  }
+
+  #[DataProvider('providerTrueFalse')]
+  public function testCodeComponentCanRemoveRequiredPropThenAddAnotherRequiredProp(bool $usingHttpApi = FALSE): void {
+    $this->removeNamePropAndAddAgeProp($usingHttpApi, TRUE);
+
+    $inputs = [
+      // Populate the new prop.
+      'age' => 27,
+    ];
+    // We removed a required prop, so we can only test with the latest version.
+    $this->assertNewVersion([
+      'age' => 'integer',
+    ], $inputs, fn(string $version) => [
+      'layout' => [
+        [
+          'uuid' => self::COMPONENT_INSTANCE_UUID,
+          'nodeType' => 'component',
+          'type' => \sprintf('%s@%s', self::COMPONENT_ID, $version),
+          'slots' => [
+            [
+              'id' => \sprintf('%s/description', self::COMPONENT_INSTANCE_UUID),
+              'name' => 'description',
+              'nodeType' => 'slot',
+              'components' => [
+                [
+                  'uuid' => self::CHILD_COMPONENT_INSTANCE_ID,
+                  'nodeType' => 'component',
+                  'type' => $this->childType,
+                  'slots' => [],
+                  'name' => NULL,
+                ],
+              ],
+            ],
+          ],
+          'name' => NULL,
+        ],
+      ],
+      'model' => [
+        self::COMPONENT_INSTANCE_UUID => [
+          'source' => [
+            'age' => [
+              'sourceType' => 'static:field_item:integer',
+              'expression' => 'ℹ︎integer␟value',
+            ],
+          ],
+          'resolved' => $inputs,
+        ],
+      ],
+    ]);
+  }
+
+  protected function removeNamePropAndAddAgeProp(bool $usingHttpRequest = FALSE, bool $required = FALSE): void {
+    $js_component = $this->reloadJavascriptComponent();
+    $props = $js_component->getProps();
+    \assert(\is_array($props));
+    self::assertArrayHasKey('name', $props);
+    unset($props['name']);
+    $props['age'] = [
+      'title' => 'Age',
+      'type' => 'integer',
+      'examples' => [],
+    ];
+
+    $requiredProps = \array_diff($js_component->getRequiredProps(), ['name']);
+    if ($required) {
+      $props['age']['examples'][] = 27;
+      $requiredProps[] = 'age';
+    }
+    if (!$usingHttpRequest) {
+      $js_component->set('required', $requiredProps);
+      $js_component->setProps($props);
+      self::assertCount(0, $js_component->getTypedData()->validate());
+      $js_component->save();
+      return;
+    }
+    $data = $js_component->normalizeForClientSide()->values;
+    $data['props'] = $props;
+    $data['required'] = $requiredProps;
+    $this->patchComponent($data);
   }
 
   protected function assertRequiredPropNewVersion(): void {
@@ -612,7 +691,6 @@ final class JsComponentEvolutionTest extends KernelTestBase {
 
   #[DataProvider('providerTrueFalse')]
   public function testCodeComponentCanMakeAnOptionalPropRequired(bool $usingHttpApi = FALSE): void {
-    $this->markTestSkipped('To be fixed in https://www.drupal.org/project/canvas/issues/3556339');
     $this->addOrUpdateAgeProp($usingHttpApi);
     $this->makeAgePropRequired($usingHttpApi);
     $this->assertRequiredPropNewVersion();
@@ -629,7 +707,6 @@ final class JsComponentEvolutionTest extends KernelTestBase {
 
   #[DataProvider('providerTrueFalse')]
   public function testCodeComponentCanMakeARequiredPropOptional(bool $usingHttpApi = FALSE): void {
-    $this->markTestSkipped('To be fixed in https://www.drupal.org/project/canvas/issues/3556339');
     $this->addOrUpdateAgeProp($usingHttpApi, TRUE);
     $this->makeAgePropOptional($usingHttpApi);
     $this->assertOptionalPropNewVersion();
@@ -776,7 +853,6 @@ final class JsComponentEvolutionTest extends KernelTestBase {
 
   #[DataProvider('providerTrueFalse')]
   public function testCodeComponentCanRemoveASlot(bool $usingHttpApi = FALSE): void {
-    $this->markTestSkipped('To be fixed in https://www.drupal.org/project/canvas/issues/3557272');
     $this->removeDescriptionSlot($usingHttpApi);
     $inputs = ['name' => 'D. Boon'];
     $expectedClientModelFunction = fn(string $version) => [
@@ -801,9 +877,52 @@ final class JsComponentEvolutionTest extends KernelTestBase {
         ],
       ],
     ];
-    $this->assertNewVersion([
+    $new_items = $this->assertNewVersion([
       'name' => 'string',
     ], $inputs, $expectedClientModelFunction, FALSE);
+
+    // New version has no slots; adding a child should be rejected.
+    $new_items->appendItem([
+      'uuid' => self::CHILD_COMPONENT_INSTANCE_ID,
+      'component_id' => 'js.canvas_test_code_components_with_no_props',
+      'inputs' => [],
+      'parent_uuid' => self::COMPONENT_INSTANCE_UUID,
+      'slot' => 'description',
+    ]);
+    $violations = $new_items->validate();
+    self::assertSame([
+      '1.parent_uuid' => 'Invalid component subtree. A component subtree must only exist for components with >=1 slot, but the component <em class="placeholder">js.canvas_test_code_components_with_slots</em> has no slots, yet a subtree exists for the instance with UUID <em class="placeholder">1191fb41-5fb7-4ed3-955d-03df4fde199d</em>.',
+    ], self::violationsToArray($violations));
+
+    // Old instances keep their historical version and remain valid.
+    $component_tree_item_list_values = self::convertClientToServer($this->originalClientModel['layout'], $this->originalClientModel['model']);
+    $original_items = self::staticallyCreateDanglingComponentTreeItemList(\Drupal::typedDataManager());
+    $original_items->setValue($component_tree_item_list_values);
+    self::assertCount(0, $original_items->validate(), 'Old component instances referencing historical versions with the slot should still validate');
+
+    // Verify the child is still in the correct slot.
+    $values = $original_items->getValue();
+    self::assertCount(2, $values, 'Both parent and child should be present');
+    self::assertSame('description', $values[1]['slot'], 'Child should still be in description slot');
+    self::assertSame(self::COMPONENT_INSTANCE_UUID, $values[1]['parent_uuid'], 'Child should still reference parent');
+  }
+
+  protected function reAddDescriptionSlot(bool $usingHttpRequest = FALSE): void {
+    $js_component = $this->reloadJavascriptComponent();
+    $slots = $js_component->get('slots');
+    $slots['description'] = [
+      'title' => 'Description',
+      'examples' => ['<p>Example description</p>'],
+    ];
+    if (!$usingHttpRequest) {
+      $js_component->set('slots', $slots);
+      self::assertCount(0, $js_component->getTypedData()->validate());
+      $js_component->save();
+      return;
+    }
+    $data = $js_component->normalizeForClientSide()->values;
+    $data['slots'] = $slots;
+    $this->patchComponent($data);
   }
 
   protected function modifyPropType(bool $usingHttpRequest = FALSE): void {

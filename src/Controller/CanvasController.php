@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupal\canvas\Controller;
 
 use Drupal\canvas\CanvasUriDefinitions;
+use Drupal\canvas\Config\ThemeSettingsDiscovery;
 use Drupal\canvas\Entity\ComponentTreeEntityInterface;
 use Drupal\canvas\Entity\Folder;
 use Drupal\canvas\Extension\CanvasExtensionPluginManager;
@@ -56,6 +57,7 @@ final class CanvasController {
     private readonly EntityTypeBundleInfoInterface $entityTypeBundleInfo,
     private readonly UrlGeneratorInterface $urlGenerator,
     private readonly CanvasExtensionPluginManager $extensionPluginManager,
+    private readonly ThemeSettingsDiscovery $themeSettingsDiscovery,
   ) {}
 
   private const HTML = <<<HTML
@@ -98,7 +100,7 @@ HTML;
 
   public function __invoke(?string $entity_type, ?EntityInterface $entity) : HtmlResponse {
     // @phpstan-ignore-next-line function.alreadyNarrowedType
-    assert($this->validateTransformAssetLibraries());
+    \assert($this->validateTransformAssetLibraries());
     // List of libraries to load in the preview iframe.
     $preview_libraries = [
       'system/base',
@@ -133,6 +135,11 @@ HTML;
       }
     }
     $extensions = $this->extensionPluginManager->getDefinitions();
+
+    // Get theme-level Canvas settings from the default theme.
+    $theme_config = $this->configFactory->get('system.theme');
+    $default_theme_name = $theme_config->get('default');
+    $theme_settings = $this->themeSettingsDiscovery->getSettings($default_theme_name);
 
     $all_content_entity_create_links = $this->getAllContentEntityCreateLinks();
     // From the "content entity create" link collection, construct a nested
@@ -194,6 +201,7 @@ HTML;
             'contentEntityCreateOperations' => $content_entity_create_operations,
             'homepagePath' => $system_site_config->get('page.front'),
             'loginUrl' => $this->urlGenerator->generateFromRoute('user.login'),
+            'viewports' => $theme_settings['viewports'] ?? [],
           ],
           // Override actual `canvasData` with dummy data for code component
           // editor development purposes.
@@ -212,6 +220,10 @@ HTML;
                   'url' => \base_path() . 'user',
                 ],
               ],
+              // Set to NULL since there is no associated entity when a code
+              // component is open in the code editor.
+              // (Nor when e.g. on the /user/login route.)
+              'mainEntity' => NULL,
             ],
           ],
         ],
@@ -328,7 +340,7 @@ HTML;
     );
     $missing = array_diff($transforms, $encountered_transform_asset_libraries);
     if (!empty($missing)) {
-      throw new \LogicException(sprintf("Client-side transforms '%s' encountered without corresponding asset libraries.", implode("', '", $missing)));
+      throw new \LogicException(\sprintf("Client-side transforms '%s' encountered without corresponding asset libraries.", implode("', '", $missing)));
     }
 
     return TRUE;

@@ -309,6 +309,27 @@ export const componentAndLayoutApi = createApi({
           type: body.type,
         },
       }),
+      async onQueryStarted(body, { getState }) {
+        // If weight is not explicitly provided, calculate it to place the folder at the top.
+        if (body.weight === undefined || body.weight === 0) {
+          const state = getState() as any;
+          const foldersData =
+            state.componentAndLayoutApi?.queries?.['getFolders(undefined)']
+              ?.data;
+
+          if (foldersData?.folders) {
+            const folders = Object.values(foldersData.folders);
+            if (folders.length > 0) {
+              // Find the minimum weight among existing folders
+              const minWeight = Math.min(
+                ...folders.map((folder: any) => folder.weight || 0),
+              );
+              // Set new folder weight to be less than minimum to appear at top
+              body.weight = minWeight - 1;
+            }
+          }
+        }
+      },
       invalidatesTags: [{ type: 'Folders', id: 'LIST' }],
     }),
     updateFolder: builder.mutation<any, any>({
@@ -320,6 +341,16 @@ export const componentAndLayoutApi = createApi({
       invalidatesTags: () => [
         { type: 'Folders', id: 'LIST' },
         { type: 'Layout' },
+      ],
+    }),
+    deleteFolder: builder.mutation<void, string>({
+      query: (id) => ({
+        url: `canvas/api/v0/config/folder/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: [
+        { type: 'Folders', id: 'LIST' },
+        { type: 'Components', id: 'LIST' },
       ],
     }),
     getFolders: builder.query<
@@ -447,6 +478,7 @@ export const {
   useDeleteCodeComponentMutation,
   useCreateFolderMutation,
   useUpdateFolderMutation,
+  useDeleteFolderMutation,
   useGetFoldersQuery,
   useGetAutoSaveQuery,
   useUpdateAutoSaveMutation,

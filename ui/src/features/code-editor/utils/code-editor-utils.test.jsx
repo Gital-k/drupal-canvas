@@ -375,6 +375,7 @@ describe('getDataDependenciesFromAst', () => {
         'v0.branding',
         'v0.breadcrumbs',
         'v0.pageTitle',
+        'v0.mainEntity',
       ],
     });
   });

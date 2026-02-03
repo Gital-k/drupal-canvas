@@ -120,6 +120,11 @@ preview:
   dependencies:
     - core/once
 
+menu-icons:
+  css:
+    theme:
+      css/menu-icons.css: {}
+
 shoelace:
   css:
     theme:
@@ -142,6 +147,11 @@ navigation.canvas.override:
     theme:
       css/navigation-override.css: {}
 
+canvas_cta:
+  css:
+    theme:
+      css/canvas-cta.css: {}
+
 jquery.overrides:
   js:
     js/jquery.overrides.js: {}
@@ -155,6 +165,7 @@ canvasData.v0:
     - canvas/canvasData.v0.baseUrl
     - canvas/canvasData.v0.branding
     - canvas/canvasData.v0.breadcrumbs
+    - canvas/canvasData.v0.mainEntity
     - canvas/canvasData.v0.pageTitle
     - canvas/canvasData.v0.jsonapiSettings
   drupalSettings:
@@ -187,6 +198,14 @@ canvasData.v0.breadcrumbs:
     canvasData:
       v0:
         breadcrumbs: null
+
+canvasData.v0.mainEntity:
+  dependencies:
+    - core/drupalSettings
+  drupalSettings:
+    canvasData:
+      v0:
+        mainEntity: null
 
 canvasData.v0.pageTitle:
   dependencies:

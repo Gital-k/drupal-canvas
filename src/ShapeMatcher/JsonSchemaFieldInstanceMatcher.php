@@ -7,6 +7,9 @@ namespace Drupal\canvas\ShapeMatcher;
 use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaStringFormat;
 use Drupal\canvas\Plugin\ComponentPluginManager;
 use Drupal\canvas\Plugin\Validation\Constraint\UriConstraint;
+use Drupal\canvas\PropExpressions\StructuredData\ObjectPropExpressionInterface;
+use Drupal\canvas\PropExpressions\StructuredData\ReferencedBundleSpecificBranches;
+use Drupal\canvas\PropExpressions\StructuredData\ReferencePropExpressionInterface;
 use Drupal\canvas\TypedData\BetterEntityDataDefinition;
 use Drupal\Component\Assertion\Inspector;
 use Drupal\Component\Plugin\DependentPluginInterface;
@@ -50,12 +53,10 @@ use Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
-use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpressionInterface;
 use Drupal\file\Plugin\Field\FieldType\FileItem;
 use Drupal\file\Plugin\Field\FieldType\FileUriItem;
 use Drupal\options\Plugin\Field\FieldType\ListFloatItem;
 use Drupal\options\Plugin\Field\FieldType\ListIntegerItem;
-use Drupal\options\Plugin\Field\FieldType\ListStringItem;
 use Drupal\telephone\Plugin\Field\FieldType\TelephoneItem;
 use Drupal\text\TextProcessed;
 use Symfony\Component\Validator\Constraint;
@@ -70,14 +71,13 @@ use Symfony\Component\Validator\Constraint;
  * @see \Drupal\canvas\ShapeMatcher\DataTypeShapeRequirements
  * @see \Drupal\canvas\JsonSchemaInterpreter\JsonSchemaType::toDataTypeShapeRequirements()
  *
- * Then traverses all (base, bundle, configurable) field instances on all entity
- * types (and bundles), to find a match. Matches are described using structured
- * data prop expressions.
+ * Then traverses all entity fields to find a match:
+ * - all content entity types (and bundles)
+ * - all (base, bundle, configurable) field instances on those
  *
- * @see \Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpressionInterface
- * @see \Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression
- * @see \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression
- * @see \Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression
+ * Matches are described using structured data prop expressions.
+ *
+ * @see \Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface
  *
  * These are then used in "dynamic prop sources".
  *
@@ -131,19 +131,6 @@ final class JsonSchemaFieldInstanceMatcher {
         ['type' => 'integer'],
         ['type' => 'number'],
       ],
-    ],
-    // @todo Add support in https://www.drupal.org/i/3548749
-    'list_string' => [
-      'class' => ListStringItem::class,
-      // NO exceptions for `list_string`, because such fields are virtually
-      // always configured to have human-readable labels as keys and machine
-      // names as values, meaning they are *structured* strings, not prose. The
-      // challenge is it is impossible to know what kind of structure the
-      // strings adhere to: it could be anything from locale identifiers, color
-      // names, dark-vs-light, car makes, UUIDs…
-      // @see \Drupal\canvas\Plugin\Validation\Constraint\StringSemanticsConstraint::STRUCTURED
-      // @todo Allow matching `list_string` to any `type: string` in https://www.drupal.org/i/3548749, by flipping around how it works: it should NOT pass the *stored* string (the "value"), but the *human-readable label* (the "key") to a `type: string`. This will require adding a new computed property to the `list_string` field type that fetches the label ("key") from its `allowed_values` setting, translated to the current \Drupal\Core\Language\LanguageInterface::TYPE_CONTENT language, despite it being a config translation.
-      'exceptions' => [],
     ],
     // The `map` field type has no widget, is broken, and is hidden in the UI.
     // @see https://www.drupal.org/node/2563843
@@ -207,11 +194,11 @@ final class JsonSchemaFieldInstanceMatcher {
 
   /**
    * @param JsonSchema $schema
-   * @return ($levels_to_recurse is positive-int ? array<int, \Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression|\Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression|\Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression> : array<int, \Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression|\Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression>)
+   * @return ($levels_to_recurse is positive-int ? array<int, \Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface> : array<int, \Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression|\Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression>)
    */
   private function matchEntityProps(EntityDataDefinitionInterface $entity_data_definition, int $levels_to_recurse, JsonSchemaType $primitive_type, bool $is_required_in_json_schema, ?array $schema): array {
     if ($primitive_type === JsonSchemaType::Array) {
-      assert(is_array($schema));
+      \assert(is_array($schema));
       // Drupal core's Field API only supports specifying "required or not",
       // and required means ">=1 value". There's no (native) ability to
       // configure a minimum number of values for a field. Plus, JSON schema
@@ -226,7 +213,7 @@ final class JsonSchemaFieldInstanceMatcher {
         return [];
       }
       $cardinality = $schema['maxItems'] ?? FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED;
-      assert(isset($schema['items']) && isset($schema['items']['type']));
+      \assert(isset($schema['items']) && isset($schema['items']['type']));
       $primitive_type = JsonSchemaType::from($schema['items']['type']);
       $schema = $schema['items'];
     }
@@ -285,10 +272,10 @@ final class JsonSchemaFieldInstanceMatcher {
           // cross-referencing. This works because scalar matches are performed
           // against the given $entity_data_definition, and hence the fields on
           // that entity type + bundle.
-          $referenced_leaf = $reference_match->getLeaf();
-          $leaf_field_name = self::getFieldNameForSingleBundleExpression($referenced_leaf);
-          $reference_key = $reference_match->getFullReferenceChain() . ':' . $leaf_field_name;
-          $matches_references[self::getFieldNameForSingleBundleExpression($reference_match)][$reference_key] = $reference_match;
+          $referenced_final_expression = $reference_match->getFinalTargetExpression();
+          $final_field_name = $referenced_final_expression->getFieldName();
+          $reference_key = $reference_match->getFullReferenceChain() . ':' . $final_field_name;
+          $matches_references[$reference_match->getFieldName()][$reference_key] = $reference_match;
           // Ensure that when the naïve scalar matches are processed, all that
           // contain a prefix of the reference matches are skipped.
           $scalar_match_prefixes_to_avoid = [
@@ -305,9 +292,14 @@ final class JsonSchemaFieldInstanceMatcher {
     $inverted = [];
     foreach (array_keys($per_object_prop_scalar_matches) as $object_prop_name) {
       foreach ($per_object_prop_scalar_matches[$object_prop_name] as $field_prop_expr) {
-        $field_name = self::getFieldNameForSingleBundleExpression($field_prop_expr);
+        $field_name = $field_prop_expr->getFieldName();
         // The same field name prop should never be used multiple times; best
         // match is selected in object prop order.
+        // TRICKY: cannot use strict comparison here, because the prop
+        // expression instances differ due to different instantiation (even if
+        // their values are identical). Storing them as strings would solve that
+        // but would prevent the instanceof checks below.
+        // @phpstan-ignore function.strict
         if (in_array($field_prop_expr, $inverted[$field_name] ?? [], FALSE)) {
           continue;
         }
@@ -361,9 +353,9 @@ final class JsonSchemaFieldInstanceMatcher {
 
       // How many object props do the possibly superior object matches populate?
       foreach ($matches_references[$field_name] as $reference_match) {
-        $reference_leaf = $reference_match->getLeaf();
-        \assert($reference_leaf instanceof FieldObjectPropsExpression);
-        $reference_match_object_props_populated = count(array_keys($reference_leaf->objectPropsToFieldProps));
+        $reference_leaf = $reference_match->getFinalTargetExpression();
+        \assert($reference_leaf instanceof ObjectPropExpressionInterface);
+        $reference_match_object_props_populated = count(array_keys($reference_leaf->getObjectExpressions()));
 
         // If the reference match is superior, omit the scalar match.
         if ($scalar_match_object_props_populated <= $reference_match_object_props_populated) {
@@ -397,11 +389,10 @@ final class JsonSchemaFieldInstanceMatcher {
     foreach ($matches_complete + $matches_minimal as $field_name => $mapping) {
       // @todo Support nested/recursive/chained FieldObjectPropsExpression?
       // @see https://www.drupal.org/project/canvas/issues/3467890#comment-16036211
-      /** @var array<string, \Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression|\Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression> $mapping */
       $matches[] = new FieldObjectPropsExpression($entity_data_definition, $field_name, NULL, $mapping);
     }
-    \assert(Inspector::assertAll(fn ($expr) => $expr instanceof FieldObjectPropsExpression, $matches));
-    \assert(Inspector::assertAll(fn ($expr) => $expr instanceof ReferenceFieldPropExpression, $matches_references));
+    \assert(Inspector::assertAll(fn ($expr) => $expr instanceof ObjectPropExpressionInterface, $matches));
+    \assert(Inspector::assertAll(fn ($expr) => $expr instanceof ReferencePropExpressionInterface, $matches_references));
     return [...$matches_references, ...$matches];
   }
 
@@ -439,6 +430,8 @@ final class JsonSchemaFieldInstanceMatcher {
           continue;
         }
         $referencer_key = (string) $expr->referencer;
+        // @todo Add multi-branch support in https://www.drupal.org/i/3563309, remove this assertion
+        \assert(!$expr->referenced instanceof ReferencedBundleSpecificBranches);
         $target_entity_type_and_bundle = $expr->referenced
           ->getHostEntityDataDefinition()
           ->getDataType();
@@ -515,7 +508,7 @@ final class JsonSchemaFieldInstanceMatcher {
     $matches = [];
     $field_definitions = $this->recurseDataDefinitionInterface($entity_data_definition);
     foreach ($field_definitions as $field_definition) {
-      assert($field_definition instanceof FieldDefinitionInterface);
+      \assert($field_definition instanceof FieldDefinitionInterface);
       foreach (self::IGNORE_FIELD_TYPES as ['class' => $field_type_class, 'exceptions' => $allowed_schemas]) {
         // DO NOT ignore the field type if it's one of a carefully selected set
         // of exceptions.
@@ -626,14 +619,14 @@ final class JsonSchemaFieldInstanceMatcher {
             if (count($target_bundles) > 0) {
               $base_field_names = array_keys($target->getPropertyDefinitions());
               foreach ($target_bundles as $target_bundle) {
-                assert($target->getBundles() === NULL);
+                \assert($target->getBundles() === NULL);
                 $bundle_specific_target = clone $target;
                 $bundle_specific_target->setBundles([$target_bundle]);
                 $referenced_matches = $this->matchEntityProps($bundle_specific_target, $levels_to_recurse - 1, $primitive_type, $is_required_in_json_schema, $schema);
                 // Ignore base field matches; those are already handled by the
                 // logic just before this ">1 target bundles" conditional.
                 foreach ($referenced_matches as $referenced_match) {
-                  $field_name = self::getFieldNameForSingleBundleExpression($referenced_match);
+                  $field_name = $referenced_match->getFieldName();
                   if (!in_array($field_name, $base_field_names, TRUE)) {
                     $matches[] = new ReferenceFieldPropExpression($current_entity_field_prop, $referenced_match);
                   }
@@ -693,7 +686,7 @@ final class JsonSchemaFieldInstanceMatcher {
           // its FilteredMarkup encapsulation to avoid Twig escaping the
           // processed text.
           // @see \Drupal\filter\Render\FilteredMarkup
-          assert(is_a($property_definition->getClass(), PrimitiveInterface::class, TRUE) || is_a($property_definition->getClass(), TextProcessed::class, TRUE));
+          \assert(is_a($property_definition->getClass(), PrimitiveInterface::class, TRUE) || is_a($property_definition->getClass(), TextProcessed::class, TRUE));
           $field_item = $this->typedDataManager->createInstance("field_item:" . $field_definition->getType(), [
             'name' => NULL,
             'parent' => NULL,
@@ -762,19 +755,19 @@ final class JsonSchemaFieldInstanceMatcher {
     // @see https://json-schema.org/understanding-json-schema/reference/non_json_data#contentmediatype-and-contentencoding
     if (count(array_unique($mime_media_type_names)) > 1) {
       // @todo Add support for this when adding support for linking documents in https://www.drupal.org/i/3524130
-      throw new \OutOfRangeException(sprintf("The file extensions `%s` correspond to more than one MIME media type (`%s`), this is not yet supported.",
+      throw new \OutOfRangeException(\sprintf("The file extensions `%s` correspond to more than one MIME media type (`%s`), this is not yet supported.",
         implode(', ', $extensions),
         implode(', ', array_unique($mime_media_type_names))
       ));
     }
-    $target_content_media_type = sprintf("%s/*", array_unique($mime_media_type_names)[0]);
-    assert(UriTargetMediaTypeConstraint::isValidWildCard($target_content_media_type));
+    $target_content_media_type = \sprintf("%s/*", array_unique($mime_media_type_names)[0]);
+    \assert(UriTargetMediaTypeConstraint::isValidWildCard($target_content_media_type));
     return $target_content_media_type;
   }
 
   /**
    * @param JsonSchema $schema
-   * @return array<int, \Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression|\Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression|\Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression>
+   * @return array<int, \Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface>
    */
   public function findFieldInstanceFormatMatches(
     JsonSchemaType $primitive_type,
@@ -810,7 +803,7 @@ final class JsonSchemaFieldInstanceMatcher {
     };
     $entity_data_definition = EntityDataDefinition::createFromDataType("entity:$host_entity_type:$host_entity_bundle");
     $matches = $this->matchEntityProps($entity_data_definition, $levels_to_recurse, $primitive_type, $is_required_in_json_schema, $schema);
-    /** @var array<\Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression|\Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression|\Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression> */
+    /** @var array<\Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface> */
     $keyed_by_string = array_combine(array_map(fn ($e) => (string) $e, $matches), $matches);
     ksort($keyed_by_string);
     $instances = array_values($keyed_by_string);
@@ -845,7 +838,7 @@ final class JsonSchemaFieldInstanceMatcher {
     };
 
     // If the primitive type does not match, this is not a candidate.
-    if (!in_array($json_schema_primitive_type, $field_primitive_types)) {
+    if (!in_array($json_schema_primitive_type, $field_primitive_types, TRUE)) {
       return FALSE;
     }
 
@@ -900,7 +893,7 @@ final class JsonSchemaFieldInstanceMatcher {
     }
 
     $field_item = $data->getParent();
-    assert($field_item instanceof FieldItemInterface);
+    \assert($field_item instanceof FieldItemInterface);
     $field_property_name = $data->getName();
 
     // TRICKY: to correctly merge these, these arrays must be rekeyed to allow
@@ -952,7 +945,7 @@ final class JsonSchemaFieldInstanceMatcher {
     if ($required_shape instanceof DataTypeShapeRequirement) {
       if ($required_shape->constraint === 'NOT YET SUPPORTED') {
         // @phpcs:ignore Drupal.Semantics.FunctionTriggerError.TriggerErrorTextLayoutRelaxed
-        @trigger_error(sprintf("NOT YET SUPPORTED: a `%s` Drupal field data type that matches the JSON schema %s.", $json_schema_primitive_type->value, json_encode($schema)), E_USER_DEPRECATED);
+        @trigger_error(\sprintf("NOT YET SUPPORTED: a `%s` Drupal field data type that matches the JSON schema %s.", $json_schema_primitive_type->value, json_encode($schema)), E_USER_DEPRECATED);
         return FALSE;
       }
 
@@ -964,7 +957,7 @@ final class JsonSchemaFieldInstanceMatcher {
         if (!$this->dataTypeShapeRequirementMatchesFinalConstraintSet($r, $property_data_definition, $constraints)) {
           if ($r->constraint === 'NOT YET SUPPORTED') {
             // @phpcs:ignore Drupal.Semantics.FunctionTriggerError.TriggerErrorTextLayoutRelaxed
-            @trigger_error(sprintf("NOT YET SUPPORTED: a `%s` Drupal field data type that matches the JSON schema %s.", $json_schema_primitive_type->value, json_encode($schema)), E_USER_DEPRECATED);
+            @trigger_error(\sprintf("NOT YET SUPPORTED: a `%s` Drupal field data type that matches the JSON schema %s.", $json_schema_primitive_type->value, json_encode($schema)), E_USER_DEPRECATED);
             return FALSE;
           }
           return FALSE;
@@ -988,10 +981,12 @@ final class JsonSchemaFieldInstanceMatcher {
     // Is the data shape requirement met?
     // 1. Constraint.
     $required_constraint = $this->constraintManager->create($required_shape->constraint, $required_shape->constraintOptions);
-    $constraint_found = in_array(
-      $required_constraint,
-      $constraints
-    );
+    // TRICKY: cannot use strict comparison here, because the constraint
+    // instances may differ due to different instantiation (even if their
+    // configuration is identical). Until upstream Symfony adds a mechanism to
+    // compare constraints by value, we must ignore strictness here.
+    // @phpstan-ignore function.strict
+    $constraint_found = in_array($required_constraint, $constraints, FALSE);
     // 1.b Some constraints target a subset. For example: `uri-reference` also
     // allows absolute URLs.
     // @todo Generalize this ::isSupersetOf(). Find more needs first.
@@ -1019,15 +1014,15 @@ final class JsonSchemaFieldInstanceMatcher {
           // @todo load config entity type, look at export properties?
           return [];
         }
-        assert($dd->getClass() === EntityAdapter::class);
+        \assert($dd->getClass() === EntityAdapter::class);
         $entity_type_id = $dd->getEntityTypeId();
-        assert(is_string($entity_type_id));
+        \assert(is_string($entity_type_id));
         // If no bundles or multiple bundles are specified, inspect the base
         // fields. Otherwise (if a single bundle is specified, or if it is a
         // bundleless entity type), inspect all fields.
         $bundles = $dd->getBundles();
         $specific_bundle = (is_array($bundles) && count($bundles) == 1) ? reset($bundles) : NULL;
-        if ($specific_bundle === NULL && !$this->entityTypeManager->getDefinition($dd->getEntityTypeId())->hasKey('bundle')) {
+        if ($specific_bundle === NULL && !$this->entityTypeManager->getDefinition($entity_type_id)->hasKey('bundle')) {
           $specific_bundle = $entity_type_id;
         }
         if ($specific_bundle !== NULL) {
@@ -1065,8 +1060,8 @@ final class JsonSchemaFieldInstanceMatcher {
       /*
       TRUE => (function ($td_or_dd) {
         match (TRUE) {
-          $td_or_dd instanceof TypedDataInterface => @trigger_error(sprintf("Unhandled data type class: `%s` Drupal field type `%s` property uses `%s` data type class that is not yet supported", $td_or_dd->getParent()->getDataDefinition()->getFieldDefinition()->getType(), $td_or_dd->getName(), $td_or_dd->getDataDefinition()->getClass()), E_USER_DEPRECATED),
-          $td_or_dd instanceof DataDefinitionInterface => @trigger_error(sprintf("Unhandled data type class: `%s` data type class that is not yet supported", $td_or_dd->getClass()), E_USER_DEPRECATED),
+          $td_or_dd instanceof TypedDataInterface => @trigger_error(\sprintf("Unhandled data type class: `%s` Drupal field type `%s` property uses `%s` data type class that is not yet supported", $td_or_dd->getParent()->getDataDefinition()->getFieldDefinition()->getType(), $td_or_dd->getName(), $td_or_dd->getDataDefinition()->getClass()), E_USER_DEPRECATED),
+          $td_or_dd instanceof DataDefinitionInterface => @trigger_error(\sprintf("Unhandled data type class: `%s` data type class that is not yet supported", $td_or_dd->getClass()), E_USER_DEPRECATED),
 
         };
         return NULL;
@@ -1094,11 +1089,11 @@ final class JsonSchemaFieldInstanceMatcher {
     else {
       $property_definition = $expr_or_property_definition;
     }
-    assert($property_definition instanceof DataReferenceDefinitionInterface);
-    assert(is_a($property_definition->getClass(), EntityReference::class, TRUE));
+    \assert($property_definition instanceof DataReferenceDefinitionInterface);
+    \assert(is_a($property_definition->getClass(), EntityReference::class, TRUE));
 
     $target = $property_definition->getTargetDefinition();
-    assert($target instanceof EntityDataDefinition);
+    \assert($target instanceof EntityDataDefinition);
     // @todo Remove this once https://www.drupal.org/project/drupal/issues/2169813 is fixed.
     $target = BetterEntityDataDefinition::createFromBuggyInCoreEntityDataDefinition($target);
 
@@ -1112,7 +1107,7 @@ final class JsonSchemaFieldInstanceMatcher {
         'parent' => NULL,
         'data_definition' => $field_definition->getItemDefinition(),
       ]);
-      assert($field_item instanceof FileItem);
+      \assert($field_item instanceof FileItem);
       $target->addConstraint('FileExtension', $field_item->getUploadValidators()['FileExtension']);
     }
     return $target;
@@ -1123,7 +1118,7 @@ final class JsonSchemaFieldInstanceMatcher {
   }
 
   public static function getReferenceDependency(DataDefinitionInterface $data_definition): ?ReferenceFieldTypePropExpression {
-    assert(!str_starts_with($data_definition->getDataType(), 'field_item:'));
+    \assert(!str_starts_with($data_definition->getDataType(), 'field_item:'));
 
     if (!$data_definition->isReadOnly() && is_a($data_definition->getClass(), DependentPluginInterface::class, TRUE)) {
       return NULL;
@@ -1133,7 +1128,7 @@ final class JsonSchemaFieldInstanceMatcher {
     $settings = $data_definition->getSettings();
     $found_expressions = [];
     array_walk_recursive($settings, function ($current) use (&$found_expressions) {
-      if (is_string($current) && str_starts_with($current, StructuredDataPropExpressionInterface::PREFIX)) {
+      if (is_string($current) && StructuredDataPropExpression::isA($current)) {
         $found_expressions[] = $current;
       }
     });
@@ -1147,20 +1142,6 @@ final class JsonSchemaFieldInstanceMatcher {
     }
 
     return NULL;
-  }
-
-  private static function getFieldNameForSingleBundleExpression(FieldPropExpression|FieldObjectPropsExpression|ReferenceFieldPropExpression $leaf_expr): string {
-    $field_name = match (get_class($leaf_expr)) {
-      FieldPropExpression::class, FieldObjectPropsExpression::class => $leaf_expr->fieldName,
-      ReferenceFieldPropExpression::class => $leaf_expr->referencer->fieldName,
-      default => throw new \LogicException('Unhandled.'),
-    };
-    // Even though FieldPropExpression's `fieldName` can be an array at the
-    // data structure level, it can only be a string here: because the logic
-    // in ::matchEntityPropsForScalar() asses one entity type + bundle at a
-    // time.
-    assert(!$leaf_expr->isMultiBundle() && is_string($field_name));
-    return $field_name;
   }
 
   private static function componentPluginManager(): ComponentPluginManager {
