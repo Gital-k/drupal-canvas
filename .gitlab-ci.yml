@@ -439,7 +439,6 @@ vitest:
     - echo -e "\e[0Ksection_start:`date +%s`:Cypress-install[collapsed=true]\r\e[0KInstall Cypress."
     - npm ci
     - cd ui
-    - ln -s ../node_modules/cypress node_modules/cypress
     - cp .env.example .env
     - echo "BASE_URL='${SIMPLETEST_BASE_URL}'" >> .env
     - echo "DB_URL='${DRUPAL_TEST_DB_URL}'" >> .env
@@ -451,6 +450,8 @@ vitest:
     - chmod -R 755 $CYPRESS_CACHE_FOLDER
     - sudo -u www-data CYPRESS_CACHE_FOLDER=$CYPRESS_CACHE_FOLDER node $DRUPAL_PROJECT_FOLDER/node_modules/.bin/cypress install
     - sudo -u www-data CYPRESS_CACHE_FOLDER=$CYPRESS_CACHE_FOLDER node $DRUPAL_PROJECT_FOLDER/node_modules/.bin/cypress --version
+    - node $DRUPAL_PROJECT_FOLDER/node_modules/.bin/cypress verify
+    - node -e "console.log(require.resolve('cypress'))"
     - echo -e "\e[0Ksection_end:`date +%s`:Cypress-install\r\e[0K"
   variables:
     _TARGET_DB_TYPE: sqlite
@@ -468,12 +469,12 @@ cypress E2E:
   extends: .cypress-base
   parallel: 4
   script:
-    - CYPRESS_CACHE_FOLDER=$CYPRESS_CACHE_FOLDER npx cypress run --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml" --spec=`node ./tests/support/parallel.js`
+    - NODE_PATH=$DRUPAL_PROJECT_FOLDER/node_modules node $DRUPAL_PROJECT_FOLDER/node_modules/.bin/cypress run --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml" --spec=`node ./tests/support/parallel.js`
 
 cypress unit:
   extends: .cypress-base
   script:
-    - CYPRESS_CACHE_FOLDER=$CYPRESS_CACHE_FOLDER npx cypress run --component --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml"
+    - NODE_PATH=$DRUPAL_PROJECT_FOLDER/node_modules node $DRUPAL_PROJECT_FOLDER/node_modules/.bin/cypress run --component --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml"
   rules:
     - *is-push-rule
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
