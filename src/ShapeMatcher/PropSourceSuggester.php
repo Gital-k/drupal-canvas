@@ -76,15 +76,13 @@ final class PropSourceSuggester {
    */
   private function isConsideredIrrelevant(EntityFieldBasedPropExpressionInterface $expression): bool {
     $entity_type_id = $expression->getHostEntityDataDefinition()->getEntityTypeId();
-    $expression_field_name = Labeler::getFieldName($expression, $expression->getHostEntityDataDefinition());
+    \assert(\is_string($entity_type_id));
+    $expression_field_name = $expression->getFieldName();
     $referenced_entity_type_id = $expression instanceof ReferencePropExpressionInterface
       ? $expression->getTargetExpression()->getHostEntityDataDefinition()->getEntityTypeId()
       : NULL;
     $referenced_expression_field_name = $expression instanceof ReferencePropExpressionInterface
-      ? Labeler::getFieldName(
-        $expression->getTargetExpression(),
-        $expression->getTargetExpression()->getHostEntityDataDefinition(),
-      )
+      ? $expression->getTargetExpression()->getFieldName()
       : NULL;
 
     // Node-specific heuristics:
@@ -140,9 +138,9 @@ final class PropSourceSuggester {
    */
   public function suggest(string $component_plugin_id, ComponentMetadata $component_metadata, EntityDataDefinitionInterface $host_entity_type): array {
     $host_entity_type_id = $host_entity_type->getEntityTypeId();
-    assert(is_string($host_entity_type_id));
+    \assert(is_string($host_entity_type_id));
     $bundles = $host_entity_type->getBundles();
-    assert(is_array($bundles) && !empty($bundles));
+    \assert(is_array($bundles) && !empty($bundles));
     $host_entity_type_bundle = reset($bundles);
 
     // 1. Get raw matches.
@@ -171,7 +169,7 @@ final class PropSourceSuggester {
         if ($this->isConsideredIrrelevant($expr)) {
           continue;
         }
-        $bucketed_by_field[Labeler::getFieldName($expr, $expr->getHostEntityDataDefinition())][] = $s;
+        $bucketed_by_field[$expr->getFieldName()][] = $s;
       }
       // Keep only non-empty (field) buckets.
       $bucketed_by_field = array_map('array_filter', $bucketed_by_field);
