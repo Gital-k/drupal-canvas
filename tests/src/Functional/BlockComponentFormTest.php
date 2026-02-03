@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Functional;
 
+use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\Page;
 use Drupal\Core\Session\AccountInterface;
 use Symfony\Component\DomCrawler\Crawler;
@@ -34,12 +35,15 @@ final class BlockComponentFormTest extends FunctionalTestBase {
     \assert($user instanceof AccountInterface);
     $this->drupalLogin($user);
 
+    $component = Component::load('block.test_form_in_block');
+    self::assertNotNull($component);
+
     $page = Page::create([
       'title' => 'Test page using a block component',
       'components' => [
         'uuid' => '16176e0b-8197-40e3-ad49-48f1b6e9a7f9',
         'component_id' => 'block.test_form_in_block',
-        'component_version' => 'fd9a41c092d9de57',
+        'component_version' => $component->getActiveVersion(),
       ],
     ]);
 
