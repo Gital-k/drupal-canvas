@@ -1,12 +1,15 @@
 import * as fs from 'fs';
+import { createRequire } from 'module';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
-import { defineConfig } from 'cypress';
 import installLogsPrinter from 'cypress-terminal-report/src/installLogsPrinter.js';
 import dotenv from 'dotenv';
 import glob from 'fast-glob';
 import minimist from 'minimist';
 import webpackPreprocessor from '@cypress/webpack-preprocessor';
+
+const require = createRequire(import.meta.url);
+const { defineConfig } = require('cypress');
 
 dotenv.config();
 
