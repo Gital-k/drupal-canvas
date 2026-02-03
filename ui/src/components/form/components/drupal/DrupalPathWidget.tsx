@@ -17,7 +17,7 @@ const getTransliterate = (): TransliterateType => {
 const drupalSettings = getDrupalSettings();
 const getPathAlias = (titleValue: string) => {
   const drupalTransliterate = getTransliterate();
-  let alias = titleValue
+  const alias = titleValue
     .toLowerCase()
     .replace(/\s+/g, '-')
     .replace(/[^\w-]+/g, '')
