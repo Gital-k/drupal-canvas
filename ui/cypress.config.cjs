@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
-const { fileURLToPath } = require('url');
 const fs = require('fs');
 const path = require('path');
 const { defineConfig } = require('cypress');
@@ -10,9 +9,6 @@ const minimist = require('minimist');
 const webpackPreprocessor = require('@cypress/webpack-preprocessor');
 
 dotenv.config();
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const viewportHeight = 1080;
 const viewportWidth = 1920;
@@ -32,7 +28,7 @@ const getCoreDir = () => {
   }
 };
 
-export default defineConfig({
+module.exports = defineConfig({
   chromeWebSecurity: false,
   defaultBrowser: process.env.DRUPAL_TEST_DEFAULT_BROWSER || 'chrome',
   watchForFileChanges: false,
