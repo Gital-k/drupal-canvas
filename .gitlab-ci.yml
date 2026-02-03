@@ -439,6 +439,8 @@ vitest:
     - echo -e "\e[0Ksection_start:`date +%s`:Cypress-install[collapsed=true]\r\e[0KInstall Cypress."
     - npm ci
     - cd ui
+    - rm -rf node_modules
+    - mv ../node_modules .
     - cp .env.example .env
     - echo "BASE_URL='${SIMPLETEST_BASE_URL}'" >> .env
     - echo "DB_URL='${DRUPAL_TEST_DB_URL}'" >> .env
@@ -467,12 +469,12 @@ cypress E2E:
   extends: .cypress-base
   parallel: 4
   script:
-    - NODE_PATH=$DRUPAL_PROJECT_FOLDER/node_modules node $DRUPAL_PROJECT_FOLDER/node_modules/.bin/cypress run --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml" --spec=`node ./tests/support/parallel.js`
+    - node ./node_modules/.bin/cypress run --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml" --spec=`node ./tests/support/parallel.js`
 
 cypress unit:
   extends: .cypress-base
   script:
-    - NODE_PATH=$DRUPAL_PROJECT_FOLDER/node_modules node $DRUPAL_PROJECT_FOLDER/node_modules/.bin/cypress run --component --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml"
+    - node ./node_modules/.bin/cypress run --component --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml"
   rules:
     - *is-push-rule
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
