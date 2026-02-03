@@ -438,6 +438,8 @@ vitest:
     - cd $DRUPAL_PROJECT_FOLDER
     - echo -e "\e[0Ksection_start:`date +%s`:Cypress-install[collapsed=true]\r\e[0KInstall Cypress."
     - npm ci
+    - ls -al
+    - ls -al node_modules
     - cd ui
     - rm -rf node_modules
     - mv ../node_modules .
