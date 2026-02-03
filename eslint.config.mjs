@@ -25,6 +25,8 @@ export default defineConfig([
     },
     rules: {
       ...vitest.configs.recommended.rules,
+      'vitest/valid-expect': 'off', // https://github.com/vitest-dev/eslint-plugin-vitest/issues/675'
+      'vitest/no-conditional-expect': 'off',
     },
   },
   {

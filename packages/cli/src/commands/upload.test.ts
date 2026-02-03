@@ -1,4 +1,3 @@
-/* eslint-disable vitest/no-conditional-expect */
 import { describe, expect, it, vi } from 'vitest';
 
 describe('Upload Command Optimizations', () => {

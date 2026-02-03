@@ -1,5 +1,5 @@
 /* cspell:ignore Mycomponentname HelloWorldexample */
-/* eslint-disable vitest/expect-expect,vitest/valid-expect */
+/* eslint-disable vitest/expect-expect */
 import { describe, expect, it } from 'vitest';
 import { parse } from '@babel/parser';
 import fixtureProps from '@tests/fixtures/code-component-props.json';
