@@ -467,12 +467,12 @@ cypress E2E:
   extends: .cypress-base
   parallel: 4
   script:
-    - CYPRESS_CACHE_FOLDER=$CYPRESS_CACHE_FOLDER npx cypress run --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml" --spec=`node ./tests/support/parallel.js`
+    - cd $DRUPAL_PROJECT_FOLDER && CYPRESS_CACHE_FOLDER=$CYPRESS_CACHE_FOLDER npx --workspace=ui cypress run --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml" --spec=`node ./tests/support/parallel.js`
 
 cypress unit:
   extends: .cypress-base
   script:
-    - cd $DRUPAL_PROJECT_FOLDER && CYPRESS_CACHE_FOLDER=$CYPRESS_CACHE_FOLDER npm run --workspace=ui cy:run -- --component --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml"
+    - cd $DRUPAL_PROJECT_FOLDER && CYPRESS_CACHE_FOLDER=$CYPRESS_CACHE_FOLDER npx --workspace=ui cypress run -- --component --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml"
   rules:
     - *is-push-rule
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
