@@ -4,8 +4,13 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas_ai\Kernel;
 
+use Drupal\canvas\Entity\Component;
+use Drupal\canvas\Entity\Page;
 use Drupal\KernelTests\KernelTestBase;
 use Drupal\canvas_ai\CanvasAiPageBuilderHelper;
+use Drupal\Core\Extension\ModuleInstallerInterface;
+use Drupal\Tests\user\Traits\UserCreationTrait;
+use Drupal\user\Entity\User;
 use Symfony\Component\Yaml\Yaml;
 
 /**
@@ -14,6 +19,7 @@ use Symfony\Component\Yaml\Yaml;
  * @group canvas_ai
  */
 final class CanvasAiPageBuilderHelperTest extends KernelTestBase {
+  use UserCreationTrait;
 
   /**
    * The CanvasAiPageBuilderHelper service.
@@ -30,6 +36,7 @@ final class CanvasAiPageBuilderHelperTest extends KernelTestBase {
     'user',
     'canvas',
     'canvas_ai',
+    'media',
   ];
 
   /**
@@ -37,6 +44,19 @@ final class CanvasAiPageBuilderHelperTest extends KernelTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
+    $this->installEntitySchema('user');
+    $this->installEntitySchema(Page::ENTITY_TYPE_ID);
+    $this->container->get(ModuleInstallerInterface::class)->install(['canvas_test_sdc']);
+    $this->container->get('theme_installer')->install(['stark']);
+    $this->container->get('config.factory')
+      ->getEditable('system.theme')
+      ->set('default', 'stark')
+      ->save();
+    $privileged_user = $this->createUser(['create canvas_page']);
+    if (!$privileged_user instanceof User) {
+      throw new \Exception('Failed to create test user');
+    }
+    $this->container->get('current_user')->setAccount($privileged_user);
 
     // Get the service from the container.
     $this->canvasAiPageBuilderHelper = $this->container->get('canvas_ai.page_builder_helper');
@@ -309,6 +329,35 @@ YAML;
   public function testGenerateVerboseContextForOrchestrator(array $prompt, string $expected): void {
     $result = $this->canvasAiPageBuilderHelper->generateVerboseContextForOrchestrator($prompt);
     $this->assertEquals($expected, $result);
+  }
+
+  /**
+   * Tests that getAllComponentsKeyedBySource uses cache correctly.
+   */
+  public function testGetAllComponentsKeyedBySourceCaching(): void {
+    $cache = $this->container->get('cache.default');
+    $cache_key = CanvasAiPageBuilderHelper::CACHE_KEY_ALL_COMPONENTS_BY_SOURCE;
+
+    // Ensure cache is empty initially.
+    $cache->delete($cache_key);
+    $this->assertFalse($cache->get($cache_key), 'Cache is empty before first call');
+
+    // First call - should fetch fresh data and cache it.
+    $this->canvasAiPageBuilderHelper->getAllComponentsKeyedBySource();
+
+    // Verify cache now contains data.
+    $cached1 = $cache->get($cache_key);
+    $this->assertIsObject($cached1, 'Data is now cached after first call');
+    $this->assertNotEmpty($cached1->data, 'Cached data is not empty');
+
+    // Disable a component to force cache invalidation.
+    $breadcrumb_component = Component::load('block.system_breadcrumb_block');
+    $this->assertNotNull($breadcrumb_component, 'Breadcrumb component exists');
+    $breadcrumb_component->disable()->save();
+    // Check if cache is invalidated.
+    $cached2 = $cache->get($cache_key);
+    // @phpstan-ignore-next-line method.alreadyNarrowedType
+    $this->assertFalse($cached2, 'Cache is invalidated after component disable');
   }
 
 }

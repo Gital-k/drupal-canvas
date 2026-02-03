@@ -9,6 +9,7 @@ use Drupal\Core\Theme\ComponentPluginManager;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Symfony\Component\Yaml\Yaml;
 use Drupal\Component\Utility\DiffArray;
+use Drupal\Component\Render\MarkupInterface;
 use Drupal\Component\Uuid\UuidInterface;
 use Drupal\canvas\Controller\ApiConfigControllers;
 use Drupal\Core\Config\ConfigFactoryInterface;
@@ -26,7 +27,7 @@ class CanvasAiPageBuilderHelper {
   /**
    * Cache key for storing all components keyed by source.
    */
-  private const CACHE_KEY_ALL_COMPONENTS_BY_SOURCE = 'canvas_ai:all_components_by_source';
+  public const CACHE_KEY_ALL_COMPONENTS_BY_SOURCE = 'canvas_ai:all_components_by_source';
 
   /**
    * Constructor.
@@ -260,8 +261,8 @@ class CanvasAiPageBuilderHelper {
   public function getAllComponentsKeyedBySource(): array {
     // Check cache first.
     $cache = $this->cacheBackend->get(self::CACHE_KEY_ALL_COMPONENTS_BY_SOURCE);
-    if ($cache && !empty($cache->data)) {
-      return $cache->data;
+    if ($cache) {
+      return $cache->data ?? [];
     }
 
     $output = [];
@@ -518,14 +519,22 @@ class CanvasAiPageBuilderHelper {
       $client_normalized = $component->normalizeForClientSide()->values;
       $output[$source_id]['components'][$component_id]['props'] = [];
       foreach ($props as $prop_name => $prop_details) {
-        if ($prop_name === 'attributes') {
+        // Skip Drupal attributes prop.
+        if ($prop_details['type'] === 'Drupal\Core\Template\Attribute') {
           continue;
+        }
+        $default_value = $client_normalized["propSources"][$prop_name]["default_values"]["resolved"] ?? $prop_details['default'] ?? $prop_details['examples'][0] ?? NULL;
+        // Default values of some props may have HTML markup as default value.
+        // Convert it to string so that it can be safely YAML encoded when saving
+        // the CanvasAiComponentDescriptionSettingsForm config.
+        if ($default_value instanceof MarkupInterface) {
+          $default_value = $default_value->__toString();
         }
         $output[$source_id]['components'][$component_id]['props'][$prop_name] = [
           'name' => $prop_details['title'] ?? $prop_name,
           'description' => $prop_details['description'] ?? 'No description available',
           'type' => $prop_details['type'],
-          'default' => $client_normalized["propSources"][$prop_name]["default_values"]["resolved"] ?? $prop_details['default'] ?? $prop_details['examples'][0] ?? NULL,
+          'default' => $default_value,
         ];
 
         // Mark required props.
