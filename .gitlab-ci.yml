@@ -442,7 +442,7 @@ vitest:
     - ls -al node_modules
     - cd ui
     - rm -rf node_modules
-    - mv ../node_modules .
+    - mv $DRUPAL_PROJECT_FOLDER/node_modules .
     - cp .env.example .env
     - echo "BASE_URL='${SIMPLETEST_BASE_URL}'" >> .env
     - echo "DB_URL='${DRUPAL_TEST_DB_URL}'" >> .env
