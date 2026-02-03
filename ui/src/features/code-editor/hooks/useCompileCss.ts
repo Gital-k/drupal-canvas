@@ -7,16 +7,16 @@
  */
 
 import { useCallback, useEffect } from 'react';
-import lightningCssInit from 'lightningcss-wasm';
-import lightningCssWasm from 'lightningcss-wasm/lightningcss_node.wasm?url';
 import {
   compilePartialCss,
   compileCss as compileTailwindCss,
   extractClassNameCandidates,
+  lightningCssInit,
+  transformCss,
 } from 'tailwindcss-in-browser';
+import lightningCssWasm from 'tailwindcss-in-browser/lightningcss_node.wasm?url';
 
 import { useAppDispatch } from '@/app/hooks';
-import transformCss from '@/features/code-editor/utils/transformCss';
 import { setWasmStatus } from '@/features/ui/uiSlice';
 import { getBaseUrl, getCanvasSettings } from '@/utils/drupal-globals';
 

@@ -74,7 +74,7 @@ export default defineConfig(({ command, mode }) => {
     optimizeDeps: {
       // These libraries need to be excluded from Vite's dependency optimization until
       // https://github.com/vitejs/vite/issues/8427 is fixed.
-      exclude: ['@swc/wasm-web', 'lightningcss-wasm'],
+      exclude: ['@swc/wasm-web', 'tailwindcss-in-browser'],
     },
   };
 });
