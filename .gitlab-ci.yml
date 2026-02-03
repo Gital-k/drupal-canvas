@@ -451,7 +451,7 @@ vitest:
     - sudo -u www-data CYPRESS_CACHE_FOLDER=$CYPRESS_CACHE_FOLDER node $DRUPAL_PROJECT_FOLDER/node_modules/.bin/cypress install
     - sudo -u www-data CYPRESS_CACHE_FOLDER=$CYPRESS_CACHE_FOLDER node $DRUPAL_PROJECT_FOLDER/node_modules/.bin/cypress --version
     - node $DRUPAL_PROJECT_FOLDER/node_modules/.bin/cypress verify
-    - node -e "console.log(require.resolve('cypress'))"
+    - NODE_PATH=$DRUPAL_PROJECT_FOLDER/node_modules node -e "console.log(require.resolve('cypress'))"
     - echo -e "\e[0Ksection_end:`date +%s`:Cypress-install\r\e[0K"
   variables:
     _TARGET_DB_TYPE: sqlite
