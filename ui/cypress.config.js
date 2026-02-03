@@ -1,13 +1,12 @@
-/* eslint-disable @typescript-eslint/no-require-imports */
-const { fileURLToPath } = require('url');
-const fs = require('fs');
-const path = require('path');
-const { defineConfig } = require('cypress');
-const installLogsPrinter = require('cypress-terminal-report/src/installLogsPrinter.js');
-const dotenv = require('dotenv');
-const glob = require('fast-glob');
-const minimist = require('minimist');
-const webpackPreprocessor = require('@cypress/webpack-preprocessor');
+import * as fs from 'fs';
+import * as path from 'path';
+import { defineConfig } from 'cypress';
+import { fileURLToPath } from 'url';
+import installLogsPrinter from 'cypress-terminal-report/src/installLogsPrinter.js';
+import dotenv from 'dotenv';
+import glob from 'fast-glob';
+import minimist from 'minimist';
+import webpackPreprocessor from '@cypress/webpack-preprocessor';
 
 dotenv.config();
 
