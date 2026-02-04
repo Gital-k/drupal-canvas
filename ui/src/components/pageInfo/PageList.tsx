@@ -203,7 +203,6 @@ const PageListItem = ({
   onPublish?: (page: ContentStub) => void;
   onDelete?: (page: ContentStub) => void;
 }) => {
-  const [isHovered, setIsHovered] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const title = `${item.autoSaveLabel || item.title} ${item.autoSavePath || item.path}`;
   const dropdownMenuContent = createPageMenuContent(
@@ -228,10 +227,7 @@ const PageListItem = ({
   return (
     <ContextMenu.Root>
       <ContextMenu.Trigger>
-        <div
-          onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
-        >
+        <div>
           <SidebarNode
             title={title}
             variant={isHomepage ? 'homepage' : 'page'}
