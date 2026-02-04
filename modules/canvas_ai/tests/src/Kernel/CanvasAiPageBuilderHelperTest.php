@@ -336,17 +336,26 @@ YAML;
    */
   public function testGetAllComponentsKeyedBySourceCaching(): void {
     $cache = $this->container->get('cache.default');
-    $cache_key = CanvasAiPageBuilderHelper::CACHE_KEY_ALL_COMPONENTS_BY_SOURCE;
+    // The helper varies the cache ID by cache contexts, so compute the cache ID
+    // the same way.
+    $component_entity_type = $this->container->get('entity_type.manager')->getDefinition(Component::ENTITY_TYPE_ID);
+    $cache_contexts = $component_entity_type->getListCacheContexts();
+    $cache_contexts[] = 'user.permissions';
+    $context_cache_keys = $this->container->get('cache_contexts_manager')->convertTokensToKeys($cache_contexts);
+    $cache_id = implode(':', [
+      CanvasAiPageBuilderHelper::CACHE_KEY_ALL_COMPONENTS_BY_SOURCE,
+      ...$context_cache_keys->getKeys(),
+    ]);
 
     // Ensure cache is empty initially.
-    $cache->delete($cache_key);
-    $this->assertFalse($cache->get($cache_key), 'Cache is empty before first call');
+    $cache->delete($cache_id);
+    $this->assertFalse($cache->get($cache_id), 'Cache is empty before first call');
 
     // First call - should fetch fresh data and cache it.
     $this->canvasAiPageBuilderHelper->getAllComponentsKeyedBySource();
 
     // Verify cache now contains data.
-    $cached1 = $cache->get($cache_key);
+    $cached1 = $cache->get($cache_id);
     $this->assertIsObject($cached1, 'Data is now cached after first call');
     $this->assertNotEmpty($cached1->data, 'Cached data is not empty');
 
@@ -355,7 +364,7 @@ YAML;
     $this->assertNotNull($breadcrumb_component, 'Breadcrumb component exists');
     $breadcrumb_component->disable()->save();
     // Check if cache is invalidated.
-    $cached2 = $cache->get($cache_key);
+    $cached2 = $cache->get($cache_id);
     // @phpstan-ignore-next-line method.alreadyNarrowedType
     $this->assertFalse($cached2, 'Cache is invalidated after component disable');
   }
