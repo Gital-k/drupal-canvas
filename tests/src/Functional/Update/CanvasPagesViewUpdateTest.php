@@ -9,7 +9,7 @@ use Drupal\views\Entity\View;
 /**
  * Tests canvas_pages view update to use publication state computed field.
  *
- * @covers canvas_post_update_0011_update_pages_view()
+ * @covers canvas_post_update_0013_update_pages_view()
  * @group canvas
  */
 final class CanvasPagesViewUpdateTest extends CanvasUpdatePathTestBase {
