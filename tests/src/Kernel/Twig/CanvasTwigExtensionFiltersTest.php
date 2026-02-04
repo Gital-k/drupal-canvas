@@ -7,6 +7,7 @@ namespace Drupal\Tests\canvas\Kernel\Twig;
 use Drupal\Core\Image\ImageFactory;
 use Drupal\Core\Image\ImageInterface;
 use Drupal\Core\Site\Settings;
+use Drupal\Core\StreamWrapper\PublicStream;
 use Drupal\Core\StreamWrapper\StreamWrapperManagerInterface;
 use Drupal\canvas\Twig\CanvasTwigExtension;
 use Drupal\canvas\Routing\ParametrizedImageStyleConverter;
@@ -21,6 +22,7 @@ use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
  *
  * @group canvas
  * @covers \Drupal\canvas\Twig\CanvasTwigExtension::toSrcSet
+ * @covers \Drupal\canvas\Twig\CanvasTwigExtension::applyImageStyle
  */
 #[RunTestsInSeparateProcesses]
 class CanvasTwigExtensionFiltersTest extends CanvasKernelTestBase {
@@ -122,6 +124,94 @@ class CanvasTwigExtensionFiltersTest extends CanvasKernelTestBase {
       fn ($width) => "/sites/default/files/styles/canvas_parametrized_width--$width/public/balloons.png.avif?itok=Oa4IMo7_ {$width}w",
       $widths
     ));
+  }
+
+  /**
+   * Tests the image_style filter with stream wrapper URI.
+   *
+   * @covers \Drupal\canvas\Twig\CanvasTwigExtension::applyImageStyle
+   */
+  public function testImageStyleWithStreamWrapperUri(): void {
+    // Create a test image style.
+    ImageStyle::create([
+      'name' => 'test_style',
+      'label' => 'Test Style',
+    ])->save();
+
+    // Use the real services for this test.
+    $extension = $this->container->get(CanvasTwigExtension::class);
+    \assert($extension instanceof CanvasTwigExtension);
+
+    $result = $extension->applyImageStyle('public://test-image.jpg', 'test_style');
+
+    $this->assertNotNull($result);
+    // Should return a stream wrapper URI for the styled derivative.
+    $this->assertStringStartsWith('public://styles/test_style/', $result);
+    $this->assertStringContainsString('test-image.jpg', $result);
+  }
+
+  /**
+   * Tests the image_style filter with local file URL.
+   *
+   * @covers \Drupal\canvas\Twig\CanvasTwigExtension::applyImageStyle
+   */
+  public function testImageStyleWithLocalFileUrl(): void {
+    // Create a test image style.
+    ImageStyle::create([
+      'name' => 'test_style',
+      'label' => 'Test Style',
+    ])->save();
+
+    // Use the real services for this test.
+    $extension = $this->container->get(CanvasTwigExtension::class);
+    \assert($extension instanceof CanvasTwigExtension);
+
+    // Test with local file URL matching the actual public files path.
+    $publicBasePath = PublicStream::basePath();
+    $result = $extension->applyImageStyle('/' . $publicBasePath . '/test-image.jpg', 'test_style');
+
+    $this->assertNotNull($result);
+    // Should return a stream wrapper URI for the styled derivative.
+    $this->assertStringStartsWith('public://styles/test_style/', $result);
+    $this->assertStringContainsString('test-image.jpg', $result);
+  }
+
+  /**
+   * Tests the image_style filter with external URL returns unchanged.
+   *
+   * @covers \Drupal\canvas\Twig\CanvasTwigExtension::applyImageStyle
+   */
+  public function testImageStyleWithExternalUrl(): void {
+    // Create a test image style.
+    ImageStyle::create([
+      'name' => 'test_style',
+      'label' => 'Test Style',
+    ])->save();
+
+    // Use the real services for this test.
+    $extension = $this->container->get(CanvasTwigExtension::class);
+    \assert($extension instanceof CanvasTwigExtension);
+
+    $externalUrl = 'https://example.com/image.jpg';
+    $result = $extension->applyImageStyle($externalUrl, 'test_style');
+
+    // External URLs should be returned unchanged.
+    $this->assertSame($externalUrl, $result);
+  }
+
+  /**
+   * Tests the image_style filter with invalid style name returns NULL.
+   *
+   * @covers \Drupal\canvas\Twig\CanvasTwigExtension::applyImageStyle
+   */
+  public function testImageStyleWithInvalidStyleName(): void {
+    // Use the real services for this test.
+    $extension = $this->container->get(CanvasTwigExtension::class);
+    \assert($extension instanceof CanvasTwigExtension);
+
+    $result = $extension->applyImageStyle('public://test-image.jpg', 'nonexistent_style');
+
+    $this->assertNull($result);
   }
 
 }

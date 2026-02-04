@@ -7,8 +7,10 @@ namespace Drupal\canvas\Twig;
 use Drupal\Component\Utility\UrlHelper;
 use Drupal\Core\File\FileUrlGeneratorInterface;
 use Drupal\Core\Image\ImageFactory;
+use Drupal\Core\StreamWrapper\PublicStream;
 use Drupal\Core\StreamWrapper\StreamWrapperManagerInterface;
 use Drupal\canvas\Entity\ParametrizedImageStyle;
+use Drupal\image\Entity\ImageStyle;
 use Drupal\canvas\Plugin\Field\FieldTypeOverride\ImageItemOverride;
 use Drupal\canvas\Routing\ParametrizedImageStyleConverter;
 use Twig\Extension\AbstractExtension;
@@ -64,6 +66,10 @@ final class CanvasTwigExtension extends AbstractExtension {
       new TwigFilter(
         'getHeight',
         [$this, 'getHeight'],
+      ),
+      new TwigFilter(
+        'image_style',
+        [$this, 'applyImageStyle'],
       ),
     ];
   }
@@ -164,6 +170,57 @@ final class CanvasTwigExtension extends AbstractExtension {
       }
     }
     return NULL;
+  }
+
+  /**
+   * Applies an image style to an image and returns the styled derivative URI.
+   *
+   * Returns a stream wrapper URI for the styled derivative, which can be
+   * passed to the Canvas Image component. This allows the Image component
+   * to generate responsive images via toSrcSet.
+   *
+   * Accepts the same input formats as the Canvas Image component:
+   * - Stream wrapper URIs (e.g., public://image.jpg)
+   * - Local file URLs (e.g., /sites/default/files/image.jpg)
+   * - External URLs (returned unchanged - cannot be styled)
+   *
+   * @param string $src
+   *   The image source: stream wrapper URI, local URL, or external URL.
+   * @param string $styleName
+   *   The machine name of the image style.
+   *
+   * @return string|null
+   *   The stream wrapper URI for the styled derivative (e.g.,
+   *   public://styles/thumbnail/public/image.jpg), or the original URL if
+   *   styling is not possible, or NULL if the style doesn't exist.
+   */
+  public function applyImageStyle(string $src, string $styleName): ?string {
+    $style = ImageStyle::load($styleName);
+    if (!$style) {
+      return NULL;
+    }
+
+    // Handle stream wrapper URIs directly (e.g., public://image.jpg).
+    if ($this->streamWrapperManager->isValidUri($src)) {
+      // Return the styled derivative URI so it can work with toSrcSet.
+      return $style->buildUri($src);
+    }
+
+    // Handle local file URLs by converting to stream wrapper URI.
+    // Check if this is a local URL pointing to the public files directory.
+    $publicBasePath = PublicStream::basePath();
+    $path = ltrim(parse_url($src, PHP_URL_PATH) ?? $src, '/');
+
+    if (str_starts_with($path, $publicBasePath . '/')) {
+      // Convert /sites/default/files/image.jpg -> public://image.jpg
+      $target = substr($path, strlen($publicBasePath) + 1);
+      $uri = 'public://' . $target;
+      // Return the styled derivative URI so it can work with toSrcSet.
+      return $style->buildUri($uri);
+    }
+
+    // External URLs or unrecognized paths - return unchanged.
+    return $src;
   }
 
 }
