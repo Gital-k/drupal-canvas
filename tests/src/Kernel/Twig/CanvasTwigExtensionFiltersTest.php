@@ -16,7 +16,6 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 
 // cspell:ignore itok
-
 /**
  * Tests Twig filter functionality.
  *
@@ -28,6 +27,8 @@ use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 class CanvasTwigExtensionFiltersTest extends CanvasKernelTestBase {
 
   /**
+   * The Canvas Twig extension under test.
+   *
    * @var \Drupal\canvas\Twig\CanvasTwigExtension
    */
   private CanvasTwigExtension $canvasTwigExtension;
@@ -47,25 +48,25 @@ class CanvasTwigExtensionFiltersTest extends CanvasKernelTestBase {
     ]);
     $instance_property->setValue(NULL, $settings);
 
-    // Mock File entity
+    // Mock File entity.
     $file = $this->createMock(FileInterface::class);
     $file->method('getFileUri')->willReturn('public://balloons.png');
     $file->method('id')->willReturn('123');
 
-    // Mock Image
+    // Mock Image.
     $image = $this->createMock(ImageInterface::class);
     $image->method('getWidth')->willReturn(640);
     $image->method('getHeight')->willReturn(427);
     $image->method('isValid')->willReturn(TRUE);
 
-    // Configure mocks
+    // Configure mocks.
     $imageFactory = $this->createMock(ImageFactory::class);
     $imageFactory->method('get')->with('public://balloons.png')->willReturn($image);
     $streamWrapperManager = $this->createMock(StreamWrapperManagerInterface::class);
     $streamWrapperManager->method('isValidUri')->willReturn(TRUE);
     $fileUrlGenerator = $this->container->get('file_url_generator');
 
-    // Create the extension instance
+    // Create the extension instance.
     $this->canvasTwigExtension = new CanvasTwigExtension($streamWrapperManager, $imageFactory, $fileUrlGenerator);
 
     $test_base_url = 'http://localhost/sites/default/files';
@@ -127,35 +128,51 @@ class CanvasTwigExtensionFiltersTest extends CanvasKernelTestBase {
   }
 
   /**
-   * Tests the image_style filter with stream wrapper URI.
+   * Tests the apply_image_style filter with stream wrapper URI.
    *
    * @covers \Drupal\canvas\Twig\CanvasTwigExtension::applyImageStyle
    */
-  public function testImageStyleWithStreamWrapperUri(): void {
-    // Create a test image style.
-    ImageStyle::create([
+  public function testApplyImageStyleWithStreamWrapperUri(): void {
+    // Create a test image style with a resize effect.
+    $style = ImageStyle::create([
       'name' => 'test_style',
       'label' => 'Test Style',
-    ])->save();
+    ]);
+    $style->addImageEffect([
+      'id' => 'image_scale',
+      'data' => ['width' => 200, 'height' => NULL, 'upscale' => FALSE],
+    ]);
+    $style->save();
 
     // Use the real services for this test.
     $extension = $this->container->get(CanvasTwigExtension::class);
     \assert($extension instanceof CanvasTwigExtension);
 
-    $result = $extension->applyImageStyle('public://test-image.jpg', 'test_style');
+    $image = [
+      'src' => 'public://test-image.jpg',
+      'width' => 800,
+      'height' => 600,
+      'alt' => 'Test image',
+    ];
+    $result = $extension->applyImageStyle($image, 'test_style');
 
-    $this->assertNotNull($result);
-    // Should return a stream wrapper URI for the styled derivative.
-    $this->assertStringStartsWith('public://styles/test_style/', $result);
-    $this->assertStringContainsString('test-image.jpg', $result);
+    $this->assertIsArray($result);
+    // Should return a URL for the styled derivative.
+    $this->assertStringContainsString('/styles/test_style/', $result['src']);
+    $this->assertStringContainsString('test-image.jpg', $result['src']);
+    // Dimensions should be transformed (scaled to width 200).
+    $this->assertEquals(200, $result['width']);
+    $this->assertEquals(150, $result['height']);
+    // Alt should be preserved.
+    $this->assertEquals('Test image', $result['alt']);
   }
 
   /**
-   * Tests the image_style filter with local file URL.
+   * Tests the apply_image_style filter with local file URL.
    *
    * @covers \Drupal\canvas\Twig\CanvasTwigExtension::applyImageStyle
    */
-  public function testImageStyleWithLocalFileUrl(): void {
+  public function testApplyImageStyleWithLocalFileUrl(): void {
     // Create a test image style.
     ImageStyle::create([
       'name' => 'test_style',
@@ -168,20 +185,25 @@ class CanvasTwigExtensionFiltersTest extends CanvasKernelTestBase {
 
     // Test with local file URL matching the actual public files path.
     $publicBasePath = PublicStream::basePath();
-    $result = $extension->applyImageStyle('/' . $publicBasePath . '/test-image.jpg', 'test_style');
+    $image = [
+      'src' => '/' . $publicBasePath . '/test-image.jpg',
+      'width' => 400,
+      'height' => 300,
+    ];
+    $result = $extension->applyImageStyle($image, 'test_style');
 
-    $this->assertNotNull($result);
-    // Should return a stream wrapper URI for the styled derivative.
-    $this->assertStringStartsWith('public://styles/test_style/', $result);
-    $this->assertStringContainsString('test-image.jpg', $result);
+    $this->assertIsArray($result);
+    // Should return a URL for the styled derivative.
+    $this->assertStringContainsString('/styles/test_style/', $result['src']);
+    $this->assertStringContainsString('test-image.jpg', $result['src']);
   }
 
   /**
-   * Tests the image_style filter with external URL returns unchanged.
+   * Tests the apply_image_style filter with external URL returns unchanged.
    *
    * @covers \Drupal\canvas\Twig\CanvasTwigExtension::applyImageStyle
    */
-  public function testImageStyleWithExternalUrl(): void {
+  public function testApplyImageStyleWithExternalUrl(): void {
     // Create a test image style.
     ImageStyle::create([
       'name' => 'test_style',
@@ -193,25 +215,42 @@ class CanvasTwigExtensionFiltersTest extends CanvasKernelTestBase {
     \assert($extension instanceof CanvasTwigExtension);
 
     $externalUrl = 'https://example.com/image.jpg';
-    $result = $extension->applyImageStyle($externalUrl, 'test_style');
+    $image = [
+      'src' => $externalUrl,
+      'width' => 400,
+      'height' => 300,
+    ];
+    $result = $extension->applyImageStyle($image, 'test_style');
 
     // External URLs should be returned unchanged.
-    $this->assertSame($externalUrl, $result);
+    $this->assertIsArray($result);
+    $this->assertSame($externalUrl, $result['src']);
+    $this->assertSame(400, $result['width']);
+    $this->assertSame(300, $result['height']);
   }
 
   /**
-   * Tests the image_style filter with invalid style name returns NULL.
+   * Tests the apply_image_style filter with invalid style name.
    *
    * @covers \Drupal\canvas\Twig\CanvasTwigExtension::applyImageStyle
    */
-  public function testImageStyleWithInvalidStyleName(): void {
+  public function testApplyImageStyleWithInvalidStyleName(): void {
     // Use the real services for this test.
     $extension = $this->container->get(CanvasTwigExtension::class);
     \assert($extension instanceof CanvasTwigExtension);
 
-    $result = $extension->applyImageStyle('public://test-image.jpg', 'nonexistent_style');
+    $image = [
+      'src' => 'public://test-image.jpg',
+      'width' => 400,
+      'height' => 300,
+    ];
+    $result = $extension->applyImageStyle($image, 'nonexistent_style');
 
-    $this->assertNull($result);
+    // With invalid style, the original image should be returned unchanged.
+    $this->assertIsArray($result);
+    $this->assertSame('public://test-image.jpg', $result['src']);
+    $this->assertSame(400, $result['width']);
+    $this->assertSame(300, $result['height']);
   }
 
 }
