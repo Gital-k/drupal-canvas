@@ -42,12 +42,14 @@ import useEditorNavigation from '@/hooks/useEditorNavigation';
 import { useEntityTitle } from '@/hooks/useEntityTitle';
 import { useSmartRedirect } from '@/hooks/useSmartRedirect';
 import { useTemplateCaption } from '@/hooks/useTemplateCaption';
+import { componentAndLayoutApi } from '@/services/componentAndLayout';
 import {
   useCreateContentMutation,
   useDeleteContentMutation,
   useGetContentListQuery,
   useGetStagedConfigQuery,
   useSetStagedConfigMutation,
+  useUpdateContentMutation,
 } from '@/services/content';
 import { pageDataFormApi } from '@/services/pageDataForm';
 import { getCanvasSettings } from '@/utils/drupal-globals';
@@ -167,6 +169,8 @@ const PageInfo = () => {
 
   const [deleteContent, { error: deleteContentError }] =
     useDeleteContentMutation();
+  const [updateContent, { error: updateContentError }] =
+    useUpdateContentMutation();
   const [setHomepage, { error: setHomepageError }] =
     useSetStagedConfigMutation();
 
@@ -197,6 +201,34 @@ const PageInfo = () => {
   // @todo https://www.drupal.org/i/3498525 should generalize this to all eligible content entity types.
   function handleOnSelect(item: ContentStub) {
     setEditorEntity('canvas_page', String(item.id));
+  }
+
+  async function handleArchivePage(item: ContentStub) {
+    const pageToArchiveId = String(item.id);
+    await updateContent({
+      entityType: 'canvas_page',
+      entityId: pageToArchiveId,
+      status: false,
+    });
+
+    // If the current page is being archived, invalidate the layout cache to refetch with updated hasUnsavedStatusChange
+    if (entityType === 'canvas_page' && entityId === pageToArchiveId) {
+      dispatch(componentAndLayoutApi.util.invalidateTags([{ type: 'Layout' }]));
+    }
+  }
+
+  async function handlePublishPage(item: ContentStub) {
+    const pageToPublishId = String(item.id);
+    await updateContent({
+      entityType: 'canvas_page',
+      entityId: pageToPublishId,
+      status: true,
+    });
+
+    // If the current page is being published, invalidate the layout cache to refetch with updated hasUnsavedStatusChange
+    if (entityType === 'canvas_page' && entityId === pageToPublishId) {
+      dispatch(componentAndLayoutApi.util.invalidateTags([{ type: 'Layout' }]));
+    }
   }
 
   function handleSetHomepage(item: ContentStub) {
@@ -246,6 +278,12 @@ const PageInfo = () => {
       showBoundary(setHomepageError);
     }
   }, [setHomepageError, showBoundary]);
+
+  useEffect(() => {
+    if (updateContentError) {
+      showBoundary(updateContentError);
+    }
+  }, [updateContentError, showBoundary]);
 
   return (
     <Flex gap="2" align="center">
@@ -327,6 +365,8 @@ const PageInfo = () => {
                   onSelect={handleOnSelect}
                   onDuplicate={handleDuplication}
                   onSetHomepage={handleSetHomepage}
+                  onArchive={handleArchivePage}
+                  onPublish={handlePublishPage}
                   onDelete={handleDeletePage}
                 />
               )}

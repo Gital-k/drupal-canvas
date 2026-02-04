@@ -1334,6 +1334,191 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     }
   }
 
+  /**
+   * Tests publishing behavior for draft, published, and archived pages.
+   *
+   * This test covers different publishing scenarios:
+   * - Draft pages (never published): auto-publish when publishing changes
+   * - Published pages: preserve status from autosaved entity
+   * - Archived pages (previously published, now unpublished): preserve status
+   *   from autosaved entity, allowing both archiving and republishing.
+   *
+   * @covers ::post
+   */
+  public function testPublishingBehaviorForDraftPublishedAndArchivedPages(): void {
+    $this->setUpCurrentUser(permissions: [
+      'bypass node access',
+      Page::EDIT_PERMISSION,
+      AutoSaveManager::PUBLISH_PERMISSION,
+    ]);
+
+    /** @var \Drupal\canvas\AutoSave\AutoSaveManager $autoSave */
+    $autoSave = $this->container->get(AutoSaveManager::class);
+    $entity_type_manager = $this->container->get(EntityTypeManagerInterface::class);
+    $node_storage = $entity_type_manager->getStorage('node');
+
+    // Test Case 1: Published page with changes that will remain published.
+    // This verifies that published pages can have changes published while
+    // maintaining their published status.
+    $published_node = Node::create([
+      'type' => 'article',
+      'title' => 'Published Article',
+      'status' => TRUE,
+    ]);
+    self::assertSame(SAVED_NEW, $published_node->save());
+    self::assertTrue($published_node->isPublished());
+    $published_node_id = $published_node->id();
+    self::assertNotNull($published_node_id);
+    // Verify it's not a draft since it was published.
+    self::assertFalse($autoSave->entityIsConsideredNew($published_node));
+
+    // Make changes via auto-save, keeping it published.
+    $published_node->set('title', 'Updated Published Article');
+    $published_node->set('status', TRUE);
+    $autoSave->saveEntity($published_node);
+
+    $auto_save_data = $this->getAutoSaveStatesFromServer();
+    $published_node_key = AutoSaveManager::getAutoSaveKey($published_node);
+    self::assertArrayHasKey($published_node_key, $auto_save_data);
+
+    // Publish the changes.
+    $response = $this->makePublishAllRequest([
+      $published_node_key => $auto_save_data[$published_node_key],
+    ]);
+    self::assertEquals(Response::HTTP_OK, $response->getStatusCode());
+
+    // Verify: Node should remain published with updated title.
+    $published_node = $node_storage->loadUnchanged($published_node_id);
+    \assert($published_node instanceof NodeInterface);
+    self::assertTrue($published_node->isPublished());
+    self::assertSame('Updated Published Article', $published_node->getTitle());
+
+    // Test Case 2: Published page that will be archived (unpublished).
+    // This tests the ability to archive (unpublish) a published page by
+    // setting status to FALSE in auto-save and then publishing.
+    $to_be_archived_node = Node::create([
+      'type' => 'article',
+      'title' => 'Article To Archive',
+      'status' => TRUE,
+    ]);
+    self::assertSame(SAVED_NEW, $to_be_archived_node->save());
+    self::assertTrue($to_be_archived_node->isPublished());
+    $to_be_archived_node_id = $to_be_archived_node->id();
+    self::assertNotNull($to_be_archived_node_id);
+    // Verify it's not a draft since it was published.
+    self::assertFalse($autoSave->entityIsConsideredNew($to_be_archived_node));
+
+    // Make changes via auto-save, setting status to FALSE (archiving).
+    $to_be_archived_node->set('title', 'Archived Article');
+    $to_be_archived_node->set('status', FALSE);
+    $autoSave->saveEntity($to_be_archived_node);
+
+    $auto_save_data = $this->getAutoSaveStatesFromServer();
+    $to_be_archived_node_key = AutoSaveManager::getAutoSaveKey($to_be_archived_node);
+    self::assertArrayHasKey($to_be_archived_node_key, $auto_save_data);
+
+    // Publish the changes.
+    $response = $this->makePublishAllRequest([
+      $to_be_archived_node_key => $auto_save_data[$to_be_archived_node_key],
+    ]);
+    self::assertEquals(Response::HTTP_OK, $response->getStatusCode());
+
+    // Verify: Node should be unpublished (archived) with updated title.
+    $to_be_archived_node = $node_storage->loadUnchanged($to_be_archived_node_id);
+    \assert($to_be_archived_node instanceof NodeInterface);
+    self::assertFalse($to_be_archived_node->isPublished());
+    self::assertSame('Archived Article', $to_be_archived_node->getTitle());
+    // Verify it's not a draft since it was published previously.
+    self::assertFalse($autoSave->entityIsConsideredNew($to_be_archived_node));
+
+    // Test Case 3: Archived page that will be published.
+    // This tests the ability to republish an archived page (one that was
+    // previously published but is now unpublished) by setting status to TRUE
+    // in auto-save and then publishing.
+    // Create a node, publish it, then archive it (so it's not a draft).
+    $to_be_republished_node = Node::create([
+      'type' => 'article',
+      'title' => 'Article To Republish',
+      'status' => TRUE,
+    ]);
+    self::assertSame(SAVED_NEW, $to_be_republished_node->save());
+    self::assertTrue($to_be_republished_node->isPublished());
+    $to_be_republished_node_id = $to_be_republished_node->id();
+    self::assertNotNull($to_be_republished_node_id);
+
+    // Now archive it by creating a new revision.
+    $to_be_republished_node = $node_storage->loadUnchanged($to_be_republished_node_id);
+    \assert($to_be_republished_node instanceof NodeInterface);
+    $to_be_republished_node->set('status', FALSE);
+    $to_be_republished_node->setNewRevision();
+    $to_be_republished_node->save();
+
+    // Reload to verify it's archived.
+    $to_be_republished_node = $node_storage->loadUnchanged($to_be_republished_node_id);
+    \assert($to_be_republished_node instanceof NodeInterface);
+    self::assertFalse($to_be_republished_node->isPublished());
+    // Verify it's not a draft (has been published before).
+    self::assertFalse($autoSave->entityIsConsideredNew($to_be_republished_node));
+
+    // Make changes via auto-save, setting status back to TRUE (republishing).
+    $to_be_republished_node->set('title', 'Republished Article');
+    $to_be_republished_node->set('status', TRUE);
+    $autoSave->saveEntity($to_be_republished_node);
+
+    $auto_save_data = $this->getAutoSaveStatesFromServer();
+    $to_be_republished_node_key = AutoSaveManager::getAutoSaveKey($to_be_republished_node);
+    self::assertArrayHasKey($to_be_republished_node_key, $auto_save_data);
+
+    // Publish the changes.
+    $response = $this->makePublishAllRequest([
+      $to_be_republished_node_key => $auto_save_data[$to_be_republished_node_key],
+    ]);
+    self::assertEquals(Response::HTTP_OK, $response->getStatusCode());
+
+    // Verify: Node should be published again with updated title.
+    $to_be_republished_node = $node_storage->loadUnchanged($to_be_republished_node_id);
+    \assert($to_be_republished_node instanceof NodeInterface);
+    self::assertTrue($to_be_republished_node->isPublished());
+    self::assertSame('Republished Article', $to_be_republished_node->getTitle());
+
+    // Test Case 4: Draft page auto-publishes.
+    // This verifies that draft pages (never published) are automatically
+    // published when publishing changes, even if the autosaved entity has
+    // status FALSE.
+    $draft_node = Node::create([
+      'type' => 'article',
+      'title' => 'Draft Article',
+      'status' => FALSE,
+    ]);
+    self::assertSame(SAVED_NEW, $draft_node->save());
+    self::assertFalse($draft_node->isPublished());
+    $draft_node_id = $draft_node->id();
+    self::assertNotNull($draft_node_id);
+    // Verify it's a draft.
+    self::assertTrue($autoSave->entityIsConsideredNew($draft_node));
+
+    // Make changes via auto-save, keeping status FALSE.
+    $draft_node->set('title', 'Updated Draft Article');
+    $draft_node->set('status', FALSE);
+    $autoSave->saveEntity($draft_node);
+
+    $auto_save_data = $this->getAutoSaveStatesFromServer();
+    $draft_node_key = AutoSaveManager::getAutoSaveKey($draft_node);
+    self::assertArrayHasKey($draft_node_key, $auto_save_data);
+
+    // Publish the changes.
+    $response = $this->makePublishAllRequest([
+      $draft_node_key => $auto_save_data[$draft_node_key],
+    ]);
+    self::assertEquals(Response::HTTP_OK, $response->getStatusCode());
+
+    // Verify: Draft should be auto-published (existing behavior).
+    $draft_node = $node_storage->loadUnchanged($draft_node_id);
+    \assert($draft_node instanceof NodeInterface);
+    self::assertTrue($draft_node->isPublished());
+    self::assertSame('Updated Draft Article', $draft_node->getTitle());
+  }
+
   private function assertSiteHomepage(string $path): void {
     self::assertEquals($path, $this->config('system.site')->get('page.front'));
   }

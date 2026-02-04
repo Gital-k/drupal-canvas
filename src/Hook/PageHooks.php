@@ -9,6 +9,7 @@ use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Access\AccessResultInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Entity\EntityPublishedInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
@@ -16,6 +17,7 @@ use Drupal\Core\Field\BaseFieldDefinition;
 use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Entity\Page;
 use Drupal\pathauto\PathautoItem;
 use Drupal\pathauto\PathautoState;
@@ -32,6 +34,7 @@ final class PageHooks {
   public function __construct(
     private readonly ModuleHandlerInterface $moduleHandler,
     private readonly ConfigFactoryInterface $configFactory,
+    private readonly AutoSaveManager $autoSaveManager,
   ) {
   }
 
@@ -80,13 +83,14 @@ final class PageHooks {
   /**
    * Implements hook_entity_access().
    *
-   * Prevents the deletion of entity whose path is set as homepage.
+   * Prevents the deletion and archiving of entity whose path is set as
+   * homepage.
    *
    * @todo Move to non-Page-specific hooks in https://www.drupal.org/i/3498525
    */
   #[Hook('entity_access')]
-  public function preventHomepageDeletion(EntityInterface $entity, string $operation, AccountInterface $account): AccessResultInterface {
-    if ($operation === 'delete' && $entity instanceof FieldableEntityInterface) {
+  public function preventHomepageModification(EntityInterface $entity, string $operation, AccountInterface $account): AccessResultInterface {
+    if (($operation === 'delete' || $operation === 'update') && $entity instanceof FieldableEntityInterface) {
       $system_config = $this->configFactory->get('system.site');
       $homepage = $system_config->get('page.front');
       try {
@@ -101,10 +105,22 @@ final class PageHooks {
         return AccessResult::neutral();
       }
       if (in_array($homepage, $paths, TRUE)) {
-        return AccessResult::forbidden()
-          ->addCacheableDependency($system_config)
-          ->addCacheableDependency($entity)
-          ->setReason('This entity cannot be deleted because its path is set as the homepage.');
+        if ($operation === 'delete') {
+          return AccessResult::forbidden()
+            ->addCacheableDependency($system_config)
+            ->addCacheableDependency($entity)
+            ->setReason('This entity cannot be deleted because its path is set as the homepage.');
+        }
+        // For update operations, check if it's an unpublish attempt via
+        // auto-save.
+        $autoSaveData = $this->autoSaveManager->getAutoSaveEntity($entity);
+        if (!$autoSaveData->isEmpty() && $entity instanceof EntityPublishedInterface && $autoSaveData->entity instanceof EntityPublishedInterface && $entity->isPublished() && !$autoSaveData->entity->isPublished()) {
+          return AccessResult::forbidden()
+            ->addCacheableDependency($system_config)
+            ->addCacheableDependency($entity)
+            ->addCacheableDependency($autoSaveData)
+            ->setReason('This entity cannot be archived because its path is set as the homepage.');
+        }
       }
       return AccessResult::neutral()->addCacheableDependency($system_config);
     }

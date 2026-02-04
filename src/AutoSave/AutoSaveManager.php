@@ -2,6 +2,8 @@
 
 namespace Drupal\canvas\AutoSave;
 
+use Drupal\Core\Entity\RevisionableStorageInterface;
+use Drupal\Core\Entity\EntityPublishedInterface;
 use Drupal\canvas\Entity\ComponentTreeEntityInterface;
 use Drupal\Core\Cache\CacheBackendInterface;
 use Drupal\Core\Cache\CacheTagsInvalidatorInterface;
@@ -26,7 +28,6 @@ use Drupal\Core\TypedData\PrimitiveInterface;
 use Drupal\Core\TypedData\TypedDataInterface;
 use Drupal\Component\Datetime\TimeInterface;
 use Drupal\canvas\AutoSaveEntity;
-use Drupal\canvas\Controller\ApiContentControllers;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\StagedConfigUpdate;
 use Drupal\canvas\Entity\CanvasHttpApiEligibleConfigEntityInterface;
@@ -469,11 +470,53 @@ class AutoSaveManager implements EventSubscriberInterface {
     return $events;
   }
 
-  public static function entityIsConsideredNew(ContentEntityInterface|ContentTemplate $entity): bool {
+  /**
+   * Determines if an entity should be considered new.
+   *
+   * @param \Drupal\Core\Entity\ContentEntityInterface|\Drupal\canvas\Entity\ContentTemplate $entity
+   *   The entity to check.
+   *
+   * @return bool
+   *   TRUE if the entity is a draft (new and never published), FALSE otherwise.
+   *   For ContentTemplate entities, this checks the status property since they
+   *   do not support revisions.
+   */
+  public function entityIsConsideredNew(ContentEntityInterface|ContentTemplate $entity): bool {
     if ($entity instanceof ContentTemplate) {
       return !$entity->status();
     }
-    return (string) $entity->label() == ApiContentControllers::defaultTitle($entity->getEntityType()) || str_ends_with((string) $entity->label(), self::ENTITY_DUPLICATE_SUFFIX);
+    $entity_type = $entity->getEntityType();
+    \assert($entity instanceof EntityPublishedInterface && $entity_type->isRevisionable());
+
+    // If the entity is published, it's definitely not a draft.
+    if ($entity->isPublished()) {
+      return FALSE;
+    }
+
+    // Check if there's a published revision in the entity's history.
+    // If the entity has ever been published, it's not a draft (it's archived).
+    $storage = $this->entityTypeManager->getStorage($entity_type->id());
+    \assert($storage instanceof RevisionableStorageInterface);
+    $id_key = $entity_type->getKey('id');
+    \assert(is_string($id_key), 'Entity type must have an ID key');
+    $published_key = $entity_type->getKey('published');
+    \assert(is_string($published_key), 'Entity type must have an `published` key');
+    // Query for any published revision of this entity.
+    $query = $storage->getQuery()
+      ->accessCheck(FALSE)
+      ->allRevisions()
+      ->condition($id_key, $entity->id())
+      ->condition($published_key, 1)
+      ->range(0, 1);
+    $published_revision_ids = $query->execute();
+    // If there's a published revision, it's not a draft (it's archived).
+    if (!empty($published_revision_ids)) {
+      return FALSE;
+    }
+
+    // At this point, the entity is unpublished and has never been published.
+    // It's a draft.
+    return TRUE;
   }
 
 }

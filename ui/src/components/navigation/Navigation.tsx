@@ -1,6 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ChevronDownIcon,
+  ClockIcon,
   DotsVerticalIcon,
   FileTextIcon,
   HomeIcon,
@@ -10,6 +11,7 @@ import {
 } from '@radix-ui/react-icons';
 import {
   AlertDialog,
+  Badge,
   Box,
   Button,
   Callout,
@@ -20,6 +22,7 @@ import {
   ScrollArea,
   Text,
   TextField,
+  Tooltip,
 } from '@radix-ui/themes';
 
 import { useAppSelector } from '@/app/hooks';
@@ -31,7 +34,13 @@ import type { ContentStub } from '@/types/Content';
 import styles from './Navigation.module.css';
 
 const hasPermission = (
-  permission: 'edit' | 'duplicate' | 'homepage' | 'delete',
+  permission:
+    | 'edit'
+    | 'duplicate'
+    | 'homepage'
+    | 'delete'
+    | 'archive'
+    | 'publish',
   item: ContentStub,
 ) => {
   const links = item.links || {};
@@ -46,10 +55,19 @@ const hasPermission = (
       ];
     case 'delete':
       return !!links['delete-form'];
+    case 'archive':
+      return !!links['disable'];
+    case 'publish':
+      return !!links['enable'];
     default:
       return false;
   }
 };
+
+const shouldShowSeparator = (
+  item: ContentStub,
+  permissions: Array<'edit' | 'duplicate' | 'homepage' | 'archive' | 'publish'>,
+) => permissions.some((permission) => hasPermission(permission, item));
 
 // Helper functions to return JSX or null based on item links/permissions
 const renderDuplicateButton = (
@@ -82,18 +100,57 @@ const renderSetAsHomepageButton = (
     </>
   ) : null;
 
+const renderArchiveButton = (
+  item: ContentStub,
+  onArchive?: (page: ContentStub) => void,
+) =>
+  hasPermission('archive', item) ? (
+    <>
+      {shouldShowSeparator(item, ['edit', 'homepage', 'duplicate']) && (
+        <DropdownMenu.Separator />
+      )}
+      <DropdownMenu.Item
+        onClick={(event) => event.stopPropagation()}
+        onSelect={onArchive ? () => onArchive(item) : undefined}
+      >
+        Archive page
+      </DropdownMenu.Item>
+    </>
+  ) : null;
+
+const renderPublishButton = (
+  item: ContentStub,
+  onPublish?: (page: ContentStub) => void,
+) =>
+  hasPermission('publish', item) ? (
+    <>
+      {shouldShowSeparator(item, [
+        'edit',
+        'homepage',
+        'duplicate',
+        'archive',
+      ]) && <DropdownMenu.Separator />}
+      <DropdownMenu.Item
+        onClick={(event) => event.stopPropagation()}
+        onSelect={onPublish ? () => onPublish(item) : undefined}
+      >
+        Publish page
+      </DropdownMenu.Item>
+    </>
+  ) : null;
+
 const renderDeleteButton = (
   item: ContentStub,
   onDelete?: (page: ContentStub) => void,
 ) =>
   hasPermission('delete', item) ? (
     <>
-      {/* If there are any links above, show a separator */}
-      {hasPermission('edit', item) ||
-      hasPermission('homepage', item) ||
-      hasPermission('duplicate', item) ? (
-        <DropdownMenu.Separator />
-      ) : null}
+      {shouldShowSeparator(item, [
+        'edit',
+        'homepage',
+        'duplicate',
+        'archive',
+      ]) && <DropdownMenu.Separator />}
       <AlertDialog.Root>
         <AlertDialog.Trigger>
           <DropdownMenu.Item
@@ -132,12 +189,117 @@ const renderDeleteButton = (
     </>
   ) : null;
 
+// Component for individual navigation item to manage menu state
+const NavigationItem = ({
+  item,
+  homepagePath,
+  onSelect,
+  onDuplicate,
+  onSetHomepage,
+  onArchive,
+  onPublish,
+  onDelete,
+}: {
+  item: ContentStub;
+  homepagePath?: string;
+  onSelect?: (value: ContentStub) => void;
+  onDuplicate?: (page: ContentStub) => void;
+  onSetHomepage?: (page: ContentStub) => void;
+  onArchive?: (page: ContentStub) => void;
+  onPublish?: (page: ContentStub) => void;
+  onDelete?: (page: ContentStub) => void;
+}) => {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  // Determine archive status:
+  // - Show "Clock icon + Archive" if there's an unsaved status change to unpublished
+  // - Show "Archived" if page is unpublished (but not a new draft) and no unsaved changes
+  // - Draft pages (never published) should not show any archived badge
+  const isArchived =
+    !item.status && !item.isNew && !item.hasUnsavedStatusChange;
+  const willBeArchived =
+    !item.status && !item.isNew && item.hasUnsavedStatusChange;
+
+  return (
+    <Flex
+      direction={'row'}
+      align={'center'}
+      role={'list'}
+      mr="4"
+      p="1"
+      pr="2"
+      className={styles.item}
+      data-canvas-page-id={item.id}
+    >
+      <Flex
+        role={'listitem'}
+        className={styles.pageLink}
+        flexGrow="1"
+        onClick={onSelect ? () => onSelect(item) : undefined}
+      >
+        <Box px="3" pt="1">
+          {item.internalPath === homepagePath ? <HomeIcon /> : <FileTextIcon />}
+        </Box>
+        <Flex flexGrow="1" align="center">
+          <Text as="span" size="1">
+            {item.autoSaveLabel || item.title}{' '}
+            <span className={styles.path}>
+              {item.autoSavePath || item.path}
+            </span>
+          </Text>
+        </Flex>
+      </Flex>
+      {!isMenuOpen && (isArchived || willBeArchived) && (
+        <Flex align="center" mr="2">
+          {willBeArchived ? (
+            <Tooltip content="Applies on next publish">
+              <Badge size="1" variant="solid" color="gray">
+                <Flex align="center" gap="1">
+                  <ClockIcon width="11" height="11" />
+                  Archive
+                </Flex>
+              </Badge>
+            </Tooltip>
+          ) : (
+            <Badge size="1" variant="solid" color="gray">
+              Archived
+            </Badge>
+          )}
+        </Flex>
+      )}
+      {Object.keys(item.links).length && (
+        <DropdownMenu.Root onOpenChange={setIsMenuOpen}>
+          <DropdownMenu.Trigger>
+            <IconButton
+              variant="ghost"
+              color="gray"
+              className={styles.optionsButton}
+              aria-label={`Page options for ${item.title}`}
+            >
+              <DotsVerticalIcon />
+            </IconButton>
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Content>
+            {renderDuplicateButton(item, onDuplicate)}
+            {renderSetAsHomepageButton(item, onSetHomepage, homepagePath)}
+            {renderArchiveButton(item, onArchive)}
+            {renderPublishButton(item, onPublish)}
+            {renderDeleteButton(item, onDelete)}
+          </DropdownMenu.Content>
+        </DropdownMenu.Root>
+      )}
+    </Flex>
+  );
+};
+
 const ContentGroup = ({
   title,
   items,
   onSelect,
   onDuplicate,
   onSetHomepage,
+  onArchive,
+  onPublish,
   onDelete,
 }: {
   title: string;
@@ -145,6 +307,8 @@ const ContentGroup = ({
   onSelect?: (value: ContentStub) => void;
   onDuplicate?: (page: ContentStub) => void;
   onSetHomepage?: (page: ContentStub) => void;
+  onArchive?: (page: ContentStub) => void;
+  onPublish?: (page: ContentStub) => void;
   onDelete?: (page: ContentStub) => void;
 }) => {
   const homepagePath = useAppSelector(selectHomepagePath);
@@ -174,67 +338,19 @@ const ContentGroup = ({
         gap="2"
         mt="2"
       >
-        {items.map((item) => {
-          return (
-            <Flex
-              direction={'row'}
-              align={'center'}
-              role={'list'}
-              mr="4"
-              p="1"
-              pr="2"
-              className={styles.item}
-              key={item.id}
-              data-canvas-page-id={item.id}
-            >
-              <Flex
-                role={'listitem'}
-                className={styles.pageLink}
-                flexGrow="1"
-                onClick={onSelect ? () => onSelect(item) : undefined}
-              >
-                <Box px="3" pt="1">
-                  {item.internalPath === homepagePath ? (
-                    <HomeIcon />
-                  ) : (
-                    <FileTextIcon />
-                  )}
-                </Box>
-                <Flex flexGrow="1" align="center">
-                  <Text as="span" size="1">
-                    {item.autoSaveLabel || item.title}{' '}
-                    <span className={styles.path}>
-                      {item.autoSavePath || item.path}
-                    </span>
-                  </Text>
-                </Flex>
-              </Flex>
-              {Object.keys(item.links).length && (
-                <DropdownMenu.Root>
-                  <DropdownMenu.Trigger>
-                    <IconButton
-                      variant="ghost"
-                      color="gray"
-                      className={styles.optionsButton}
-                      aria-label={`Page options for ${item.title}`}
-                    >
-                      <DotsVerticalIcon />
-                    </IconButton>
-                  </DropdownMenu.Trigger>
-                  <DropdownMenu.Content>
-                    {renderDuplicateButton(item, onDuplicate)}
-                    {renderSetAsHomepageButton(
-                      item,
-                      onSetHomepage,
-                      homepagePath,
-                    )}
-                    {renderDeleteButton(item, onDelete)}
-                  </DropdownMenu.Content>
-                </DropdownMenu.Root>
-              )}
-            </Flex>
-          );
-        })}
+        {items.map((item) => (
+          <NavigationItem
+            key={`${item.id}-${item.status}`}
+            item={item}
+            homepagePath={homepagePath}
+            onSelect={onSelect}
+            onDuplicate={onDuplicate}
+            onSetHomepage={onSetHomepage}
+            onArchive={onArchive}
+            onPublish={onPublish}
+            onDelete={onDelete}
+          />
+        ))}
       </Flex>
     </div>
   );
@@ -249,6 +365,8 @@ const Navigation = ({
   onSelect,
   onDuplicate,
   onSetHomepage,
+  onArchive,
+  onPublish,
   onDelete,
 }: {
   loading: boolean;
@@ -259,6 +377,8 @@ const Navigation = ({
   onSelect?: (value: ContentStub) => void;
   onDuplicate?: (page: ContentStub) => void;
   onSetHomepage?: (page: ContentStub) => void;
+  onArchive?: (page: ContentStub) => void;
+  onPublish?: (page: ContentStub) => void;
   onDelete?: (page: ContentStub) => void;
 }) => {
   // Reset search when the component unmounts
@@ -334,6 +454,8 @@ const Navigation = ({
             onSelect={onSelect}
             onDuplicate={onDuplicate}
             onSetHomepage={onSetHomepage}
+            onArchive={onArchive}
+            onPublish={onPublish}
             onDelete={onDelete}
           />
         )}
