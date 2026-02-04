@@ -73,7 +73,8 @@ final class ValidComponentTreeItemConstraintValidator extends ConstraintValidato
 
     // Validate the prop source resolves into a value that is considered
     // valid by the source plugin.
-    $component_source = $value->getComponent()?->getComponentSource();
+    $component = $value->getComponent();
+    $component_source = $component?->getComponentSource();
     if ($component_source === NULL) {
       // TRICKY: ignore missing Component config entities; that's the
       // responsibility of another validator.
@@ -133,6 +134,7 @@ final class ValidComponentTreeItemConstraintValidator extends ConstraintValidato
       $component_source->validateComponentInput(
         inputValues: $stored_explicit_input,
         component_instance_uuid: $value->getUuid(),
+        is_active_component_version: $component->isLoadedVersionActiveVersion(),
         entity: $host_entity,
       ),
       // We need to ensure the validation root context is transferred over.

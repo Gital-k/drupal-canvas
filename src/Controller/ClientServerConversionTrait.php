@@ -172,7 +172,7 @@ trait ClientServerConversionTrait {
         // Then we ensure the input values are valid using the source plugin.
         $component_violations = self::translateConstraintPropertyPathsAndRoot(
           ['inputs.' => 'model.'],
-          $source->validateComponentInput($items[$delta]['inputs'], $uuid, $entity)
+          $source->validateComponentInput($items[$delta]['inputs'], $uuid, $component->isLoadedVersionActiveVersion(), $entity)
         );
         if ($component_violations->count() > 0) {
           // @todo Remove the foreach and use ::addAll once https://www.drupal.org/project/drupal/issues/3490588 has been resolved.

@@ -492,7 +492,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
   /**
    * {@inheritdoc}
    */
-  public function validateComponentInput(array $inputValues, string $component_instance_uuid, ?FieldableEntityInterface $entity): ConstraintViolationListInterface {
+  public function validateComponentInput(array $inputValues, string $component_instance_uuid, bool $is_active_component_version, ?FieldableEntityInterface $entity): ConstraintViolationListInterface {
     $violations = new ConstraintViolationList();
     foreach ($inputValues as $component_prop_name => $raw_prop_source) {
       $raw_prop_source = $this->uncollapse($raw_prop_source, $component_prop_name)->toArray();
@@ -566,7 +566,9 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     }
 
     try {
-      $this->componentValidator->validateProps($resolvedInputValues, $this->getComponentPlugin());
+      if ($is_active_component_version || $this->shouldValidateInactiveVersions()) {
+        $this->componentValidator->validateProps($resolvedInputValues, $this->getComponentPlugin());
+      }
     }
     catch (ComponentNotFoundException) {
       // The violation for a missing component will be added in the validation
@@ -1383,6 +1385,17 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     // phpcs:ignore
     /** @var PropSourceArray $value */
     return PropSource::parse($value);
+  }
+
+  /**
+   * Checks if inactive versions can be validated with the component validator.
+   *
+   * @return bool
+   *   TRUE if this source can validate inactive versions with the
+   *   component validator.
+   */
+  protected function shouldValidateInactiveVersions(): bool {
+    return TRUE;
   }
 
 }

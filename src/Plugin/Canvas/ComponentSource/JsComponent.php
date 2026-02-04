@@ -355,4 +355,11 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
     return $this;
   }
 
+  /**
+   * {@inheritdoc}
+   */
+  protected function shouldValidateInactiveVersions(): bool {
+    return FALSE;
+  }
+
 }

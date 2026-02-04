@@ -127,7 +127,7 @@ final class InvalidSlots extends ComponentSourceBase implements ComponentSourceW
   /**
    * {@inheritdoc}
    */
-  public function validateComponentInput(array $inputValues, string $component_instance_uuid, ?FieldableEntityInterface $entity): ConstraintViolationListInterface {
+  public function validateComponentInput(array $inputValues, string $component_instance_uuid, bool $is_active_component_version, ?FieldableEntityInterface $entity): ConstraintViolationListInterface {
     return new ConstraintViolationList();
   }
 
