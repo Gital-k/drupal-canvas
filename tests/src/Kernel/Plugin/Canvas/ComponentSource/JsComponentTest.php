@@ -1443,7 +1443,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       'js.canvas_test_code_components_using_get_page_data' => [
         'expected_output_selectors' => [
           'canvas-island[opts*="Using drupalSettings getPageData"][props="{}"]',
-          'script[blocking="render"][src*="/ui/lib/astro-hydration/dist/client.js"]',
+          'script[blocking="render"][src*="/packages/astro-hydration/dist/client.js"]',
         ],
         'source' => 'Code component',
         'metadata' => ['slots' => []],
