@@ -2,8 +2,11 @@
 
 namespace Drupal\canvas_ai;
 
+use Drupal\Component\Datetime\TimeInterface;
 use Drupal\Component\Serialization\Json;
+use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Cache\CacheBackendInterface;
+use Drupal\Core\Cache\Context\CacheContextsManager;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Theme\ComponentPluginManager;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
@@ -30,6 +33,13 @@ class CanvasAiPageBuilderHelper {
   public const CACHE_KEY_ALL_COMPONENTS_BY_SOURCE = 'canvas_ai:all_components_by_source';
 
   /**
+   * The available components, cached during the current request.
+   *
+   * @var array|null
+   */
+  private ?array $fetchedComponents = NULL;
+
+  /**
    * Constructor.
    *
    * @param \Drupal\Core\Theme\ComponentPluginManager $componentPluginManager
@@ -42,8 +52,12 @@ class CanvasAiPageBuilderHelper {
    *   The UUID service.
    * @param \Drupal\canvas_ai\CanvasAiTempStore $canvasAiTempstore
    *   The Canvas AI tempstore.
+   * @param \Drupal\Core\Cache\Context\CacheContextsManager $cacheContextsManager
+   *   The cache contexts manager.
    * @param \Drupal\Core\Cache\CacheBackendInterface $cacheBackend
    *   The cache backend.
+   * @param \Drupal\Component\Datetime\TimeInterface $time
+   *   The time service.
    * @param \Drupal\canvas\Controller\ApiConfigControllers $apiConfigControllers
    *   The API config controllers service.
    */
@@ -53,7 +67,9 @@ class CanvasAiPageBuilderHelper {
     private readonly ConfigFactoryInterface $configFactory,
     private readonly UuidInterface $uuidService,
     private readonly CanvasAiTempStore $canvasAiTempstore,
+    private readonly CacheContextsManager $cacheContextsManager,
     private readonly CacheBackendInterface $cacheBackend,
+    private readonly TimeInterface $time,
     private readonly ApiConfigControllers $apiConfigControllers,
   ) {
   }
@@ -259,12 +275,17 @@ class CanvasAiPageBuilderHelper {
    *   The components keyed by source.
    */
   public function getAllComponentsKeyedBySource(): array {
-    // Check cache first.
-    $cache = $this->cacheBackend->get(self::CACHE_KEY_ALL_COMPONENTS_BY_SOURCE);
-    if ($cache) {
-      return $cache->data ?? [];
+    if ($this->fetchedComponents !== NULL) {
+      return $this->fetchedComponents;
     }
 
+    $base_cacheability = $this->getComponentListCacheability();
+    $cache_id = $this->buildCacheId($base_cacheability);
+    $cache = $this->cacheBackend->get($cache_id);
+    if ($cache) {
+      $this->fetchedComponents = $cache->data ?? [];
+      return $this->fetchedComponents;
+    }
     $output = [];
 
     // Call the controller method directly instead of making a subrequest.
@@ -308,16 +329,49 @@ class CanvasAiPageBuilderHelper {
         ];
       }
     }
-    // Cache the output.
-    $component_entity_type = $this->entityTypeManager->getDefinition(Component::ENTITY_TYPE_ID);
-    $this->cacheBackend->set(
-      self::CACHE_KEY_ALL_COMPONENTS_BY_SOURCE,
-      $output,
-      CacheBackendInterface::CACHE_PERMANENT,
-      $component_entity_type->getListCacheTags()
-    );
+    $response_cacheability = $available_components_response->getCacheableMetadata();
+    $response_cacheability->addCacheableDependency($base_cacheability);
 
-    return $output;
+    $max_age = $response_cacheability->getCacheMaxAge();
+    if ($max_age !== 0) {
+      $expire = $max_age === CacheBackendInterface::CACHE_PERMANENT
+        ? CacheBackendInterface::CACHE_PERMANENT
+        : $this->time->getRequestTime() + $max_age;
+      $this->cacheBackend->set(
+        $cache_id,
+        $output,
+        $expire,
+        $response_cacheability->getCacheTags()
+      );
+    }
+
+    $this->fetchedComponents = $output;
+    return $this->fetchedComponents;
+  }
+
+  /**
+   * Builds cacheable metadata for the component listing.
+   */
+  private function getComponentListCacheability(): CacheableMetadata {
+    $component_entity_type = $this->entityTypeManager->getDefinition(Component::ENTITY_TYPE_ID);
+    $cacheability = new CacheableMetadata();
+    $cacheability->setCacheContexts($component_entity_type->getListCacheContexts());
+    $cacheability->setCacheTags($component_entity_type->getListCacheTags());
+    $cacheability->addCacheContexts(['user.permissions']);
+    return $cacheability;
+  }
+
+  /**
+   * Builds a cache ID that varies by cache contexts.
+   */
+  private function buildCacheId(CacheableMetadata $cacheability): string {
+    $keys = [self::CACHE_KEY_ALL_COMPONENTS_BY_SOURCE];
+    if ($contexts = $cacheability->getCacheContexts()) {
+      $context_cache_keys = $this->cacheContextsManager->convertTokensToKeys($contexts);
+      $keys = array_merge($keys, $context_cache_keys->getKeys());
+      $cacheability->addCacheableDependency($context_cache_keys);
+    }
+    return implode(':', $keys);
   }
 
   /**

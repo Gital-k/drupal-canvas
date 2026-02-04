@@ -21,22 +21,19 @@ canvas_ai.component_description.settings:
   mapping:
     component_context:
       type: sequence
-      label: 'Component context definitions'
-      constraints:
-        ValidSequenceKeys:
-          constraints:
-            NotBlank: []
+      label: 'Component Source'
+      orderby: key
       sequence:
-        type: component_source_entry
-        label: 'Component source entry'
-
-component_source_entry:
-  type: mapping
-  label: 'Single component source with components'
-  mapping:
-    enabled:
-      type: boolean
-      label: 'Enable components from this source in the context'
-    data:
-      type: text
-      label: 'YAML string of components'
+        type: mapping
+        label: 'Source config'
+        mapping:
+          enabled:
+            type: boolean
+            label: 'Enabled'
+            description: 'Enable or disable the components from this source.'
+          data:
+            type: text
+            label: 'Data'
+            description: 'YAML string containing the component data.'
+            constraints:
+              NotBlank: []
