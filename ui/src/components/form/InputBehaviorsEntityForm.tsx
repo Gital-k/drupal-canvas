@@ -1,20 +1,16 @@
 import { useEffect, useRef } from 'react';
 import { debounce } from 'lodash';
 
-import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import {
   DEBOUNCE_TIMEOUT,
   InputBehaviorsCommon,
 } from '@/components/form/inputBehaviors';
-import { FORM_TYPES } from '@/features/form/constants';
-import { selectFormValues } from '@/features/form/formStateSlice';
 import { setUpdatePreview } from '@/features/layout/layoutModelSlice';
 import {
   externalUpdateComplete,
-  selectPageData,
   setPageData,
 } from '@/features/pageData/pageDataSlice';
-import { selectLatestUndoRedoActionId } from '@/features/ui/uiSlice';
+import { usePageDataFormInputInfo } from '@/hooks/usePageDataFormInputInfo';
 
 import type * as React from 'react';
 import type { PropsValues } from '@/types/Form';
@@ -25,12 +21,9 @@ export const InputBehaviorsEntityForm = (
   OriginalInput: React.FC,
   props: React.ComponentProps<any>,
 ): React.ReactElement => {
-  const dispatch = useAppDispatch();
-  const pageData = useAppSelector(selectPageData);
-  const latestUndoRedoActionId = useAppSelector(selectLatestUndoRedoActionId);
-  const formState = useAppSelector((state) =>
-    selectFormValues(state, FORM_TYPES.ENTITY_FORM),
-  );
+  // Get all page data form data and utilities from the hook
+  const { dispatch, pageData, latestUndoRedoActionId, formState } =
+    usePageDataFormInputInfo();
 
   const { attributes } = props;
   const fieldName = attributes.name || attributes['data-canvas-name'];

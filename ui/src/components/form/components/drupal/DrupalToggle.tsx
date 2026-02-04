@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 import Toggle from '@/components/form/components/Toggle';
-import InputBehaviors from '@/components/form/inputBehaviors';
+import { withFormRegistration } from '@/components/form/withFormRegistration';
 import { a2p } from '@/local_packages/utils.js';
 
 import type { Attributes } from '@/types/DrupalAttribute';
@@ -57,4 +57,4 @@ const DrupalToggle = ({
   );
 };
 
-export default InputBehaviors(DrupalToggle);
+export default withFormRegistration(DrupalToggle);

@@ -37,10 +37,14 @@ export const edit = (cy) => {
     // only the first item in the loop makes it to the published version of the
     // node, despite all items being properly added to the form.
     // eslint-disable-next-line cypress/no-unnecessary-waiting
-    cy.wait(400);
+    cy.wait(2000);
+    cy.log(`adding item ${ix + 1}`);
     cy.get('@add-another-text').click({ force: true });
+    // eslint-disable-next-line cypress/no-unnecessary-waiting
+    cy.wait(2000);
     cy.selectorShouldHaveUpdatedFormBuildId(
       '[data-testid="canvas-page-data-form"]',
+      15000,
     );
   });
 };

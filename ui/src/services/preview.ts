@@ -50,6 +50,8 @@ export const previewApi = createApi({
         body,
       }),
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        // Process the response normally.
+        // Note: Requests during AJAX are now prevented at the source in PagePreview.tsx
         const { data, meta } = await queryFulfilled;
         const { html, autoSaves } = data;
         dispatch(

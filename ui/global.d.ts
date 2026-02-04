@@ -23,7 +23,7 @@ declare global {
     Redux: typeof ReactRedux;
     ReduxToolkit: typeof ReduxToolkit;
     Drupal: {
-      attachBehaviors: (element: HTMLElement) => void;
+      attachBehaviors: (element: HTMLElement, settings?: object) => void;
       CKEditor5Instances: Map;
     };
     CKEditor5: CKEditor5Types;

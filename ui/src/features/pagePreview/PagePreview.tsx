@@ -13,6 +13,7 @@ import { selectPageData } from '@/features/pageData/pageDataSlice';
 import { selectPreviewHtml } from '@/features/pagePreview/previewSlice';
 import { usePostPreviewMutation } from '@/services/preview';
 import { getViewportSizes } from '@/utils/viewports';
+import { isAjaxing } from '@/utils/isAjaxing';
 
 import styles from './PagePreview.module.css';
 
@@ -33,6 +34,13 @@ const PagePreview = () => {
 
   useEffect(() => {
     const sendPreviewRequest = async () => {
+      // Skip sending preview request if AJAX is in progress.
+      // The AJAX completion will update form state, which will trigger
+      // a new preview request with the updated data.
+      if (isAjaxing()) {
+        return;
+      }
+
       try {
         await postPreview({
           layout,
