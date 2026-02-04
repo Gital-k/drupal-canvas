@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { defineConfig } from 'cypress';
 import { fileURLToPath } from 'url';
+import { defineConfig } from 'cypress';
 import installLogsPrinter from 'cypress-terminal-report/src/installLogsPrinter.js';
 import dotenv from 'dotenv';
 import glob from 'fast-glob';
