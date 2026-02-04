@@ -435,14 +435,10 @@ vitest:
     #
     # 👆
     #
-    - cd $DRUPAL_PROJECT_FOLDER
+    - cd $CI_PROJECT_DIR
     - echo -e "\e[0Ksection_start:`date +%s`:Cypress-install[collapsed=true]\r\e[0KInstall Cypress."
     - npm ci
-    - ls -al
-    - ls -al node_modules
     - cd ui
-    - rm -rf node_modules
-    - mv $DRUPAL_PROJECT_FOLDER/node_modules .
     - cp .env.example .env
     - echo "BASE_URL='${SIMPLETEST_BASE_URL}'" >> .env
     - echo "DB_URL='${DRUPAL_TEST_DB_URL}'" >> .env
@@ -452,8 +448,8 @@ vitest:
     - mkdir -p $CYPRESS_CACHE_FOLDER /var/www/.npm /home/apache/.cache/fontconfig ~/.cache /usr/share/fonts/ /var/cache/fontconfig
     - chown -R www-data:www-data $CYPRESS_CACHE_FOLDER /var/www/.npm /usr/bin/npm /home/apache/.cache/fontconfig ~/.cache /usr/share/fonts/ /var/cache/fontconfig
     - chmod -R 755 $CYPRESS_CACHE_FOLDER
-    - sudo -u www-data CYPRESS_CACHE_FOLDER=$CYPRESS_CACHE_FOLDER node $DRUPAL_PROJECT_FOLDER/node_modules/.bin/cypress install
-    - sudo -u www-data CYPRESS_CACHE_FOLDER=$CYPRESS_CACHE_FOLDER node $DRUPAL_PROJECT_FOLDER/node_modules/.bin/cypress --version
+    - sudo -u www-data CYPRESS_CACHE_FOLDER=$CYPRESS_CACHE_FOLDER npx cypress install
+    - sudo -u www-data CYPRESS_CACHE_FOLDER=$CYPRESS_CACHE_FOLDER npx cypress --version
     - echo -e "\e[0Ksection_end:`date +%s`:Cypress-install\r\e[0K"
   variables:
     _TARGET_DB_TYPE: sqlite
@@ -471,12 +467,12 @@ cypress E2E:
   extends: .cypress-base
   parallel: 4
   script:
-    - node ./node_modules/.bin/cypress run --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml" --spec=`node ./tests/support/parallel.js`
+    - npx cypress run --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml" --spec=`node ./tests/support/parallel.js`
 
 cypress unit:
   extends: .cypress-base
   script:
-    - node ./node_modules/.bin/cypress run --component --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml"
+    - npx cypress run --component --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml"
   rules:
     - *is-push-rule
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
