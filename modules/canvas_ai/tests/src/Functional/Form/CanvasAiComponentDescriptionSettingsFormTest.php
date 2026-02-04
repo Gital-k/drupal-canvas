@@ -54,7 +54,7 @@ final class CanvasAiComponentDescriptionSettingsFormTest extends BrowserTestBase
       'administer components',
       'create canvas_page',
     ]);
-    assert($admin_user instanceof AccountInterface);
+    \assert($admin_user instanceof AccountInterface);
     $this->drupalLogin($admin_user);
 
     // Get the expected title from the route definition.
@@ -80,7 +80,7 @@ final class CanvasAiComponentDescriptionSettingsFormTest extends BrowserTestBase
       'administer components',
       'create canvas_page',
     ]);
-    assert($admin_user instanceof AccountInterface);
+    \assert($admin_user instanceof AccountInterface);
     $this->drupalLogin($admin_user);
 
     // Navigate to the form.
@@ -102,7 +102,7 @@ final class CanvasAiComponentDescriptionSettingsFormTest extends BrowserTestBase
       'administer components',
       'create canvas_page',
     ]);
-    assert($admin_user instanceof AccountInterface);
+    \assert($admin_user instanceof AccountInterface);
     $this->drupalLogin($admin_user);
 
     // Load the 'Canvas test SDC with props and slots' component definition.
@@ -170,10 +170,10 @@ final class CanvasAiComponentDescriptionSettingsFormTest extends BrowserTestBase
     // Get the block plugin manager
     $block_manager = \Drupal::service('plugin.manager.block');
     $plugin_block = $block_manager->createInstance('system_branding_block', []);
-    assert($plugin_block instanceof BlockPluginInterface);
+    \assert($plugin_block instanceof BlockPluginInterface);
     // Get the admin label.
     $definition = $plugin_block->getPluginDefinition();
-    assert(is_array($definition));
+    \assert(is_array($definition));
     $label = $definition['admin_label']->__toString();
     $this->assertSession()->fieldValueEquals(
       'component_context[block][components][block.system_branding_block][description]',
@@ -191,7 +191,7 @@ final class CanvasAiComponentDescriptionSettingsFormTest extends BrowserTestBase
       'administer components',
       'create canvas_page',
     ]);
-    assert($admin_user instanceof AccountInterface);
+    \assert($admin_user instanceof AccountInterface);
     $this->drupalLogin($admin_user);
 
     // Navigate to the form.
