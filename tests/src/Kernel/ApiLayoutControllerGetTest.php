@@ -827,16 +827,16 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
     \assert($controller instanceof ApiLayoutController);
 
     $envelope_en = $controller->get($page_en);
-    self::assertInstanceOf(PreviewEnvelope::class, $envelope_en);
     $data_en = $envelope_en->additionalData;
     self::assertArrayHasKey('model', $data_en);
     self::assertArrayHasKey('test-translation-uuid', $data_en['model']);
     self::assertSame('English Heading', $data_en['model']['test-translation-uuid']['resolved']['text']);
 
     // Test GET for French version by directly calling controller with French entity.
-    $page_fr_loaded = Page::load($page_en->id())->getTranslation('fr');
+    $page_fr_loaded_entity = Page::load($page_en->id());
+    \assert($page_fr_loaded_entity instanceof Page);
+    $page_fr_loaded = $page_fr_loaded_entity->getTranslation('fr');
     $envelope_fr = $controller->get($page_fr_loaded);
-    self::assertInstanceOf(PreviewEnvelope::class, $envelope_fr);
     $data_fr = $envelope_fr->additionalData;
     self::assertArrayHasKey('model', $data_fr);
     self::assertArrayHasKey('test-translation-uuid', $data_fr['model']);
@@ -847,7 +847,9 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
     \assert($autoSave instanceof AutoSaveManager);
 
     // Modify the French translation in auto-save.
-    $page_fr_modified = Page::load($page_en->id())->getTranslation('fr');
+    $page_fr_modified_entity = Page::load($page_en->id());
+    \assert($page_fr_modified_entity instanceof Page);
+    $page_fr_modified = $page_fr_modified_entity->getTranslation('fr');
     $page_fr_modified->set('title', 'Modified French Title');
     $page_fr_modified->setComponentTree([
       [
@@ -864,14 +866,13 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
 
     // Verify French auto-save is returned.
     $envelope_fr_autosave = $controller->get($page_fr_loaded);
-    self::assertInstanceOf(PreviewEnvelope::class, $envelope_fr_autosave);
     $data_fr_autosave = $envelope_fr_autosave->additionalData;
     self::assertSame('Modified French Heading', $data_fr_autosave['model']['test-translation-uuid']['resolved']['text']);
 
     // Verify English version is still unaffected.
     $page_en_check = Page::load($page_en->id());
+    \assert($page_en_check instanceof Page);
     $envelope_en_check = $controller->get($page_en_check);
-    self::assertInstanceOf(PreviewEnvelope::class, $envelope_en_check);
     $data_en_check = $envelope_en_check->additionalData;
     self::assertSame('English Heading', $data_en_check['model']['test-translation-uuid']['resolved']['text']);
   }
