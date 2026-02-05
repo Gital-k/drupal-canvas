@@ -148,7 +148,6 @@ class CanvasTwigExtensionFiltersTest extends CanvasKernelTestBase {
     ]);
     $style->save();
 
-    // Use the real services for this test.
     $extension = $this->container->get(CanvasTwigExtension::class);
     \assert($extension instanceof CanvasTwigExtension);
 
@@ -177,13 +176,11 @@ class CanvasTwigExtensionFiltersTest extends CanvasKernelTestBase {
    * @covers \Drupal\canvas\Twig\CanvasTwigExtension::applyImageStyle
    */
   public function testApplyImageStyleWithLocalFileUrl(): void {
-    // Create a test image style.
     ImageStyle::create([
       'name' => 'test_style',
       'label' => 'Test Style',
     ])->save();
 
-    // Use the real services for this test.
     $extension = $this->container->get(CanvasTwigExtension::class);
     \assert($extension instanceof CanvasTwigExtension);
 
@@ -208,13 +205,11 @@ class CanvasTwigExtensionFiltersTest extends CanvasKernelTestBase {
    * @covers \Drupal\canvas\Twig\CanvasTwigExtension::applyImageStyle
    */
   public function testApplyImageStyleWithExternalUrl(): void {
-    // Create a test image style.
     ImageStyle::create([
       'name' => 'test_style',
       'label' => 'Test Style',
     ])->save();
 
-    // Use the real services for this test.
     $extension = $this->container->get(CanvasTwigExtension::class);
     \assert($extension instanceof CanvasTwigExtension);
 
@@ -239,7 +234,6 @@ class CanvasTwigExtensionFiltersTest extends CanvasKernelTestBase {
    * @covers \Drupal\canvas\Twig\CanvasTwigExtension::applyImageStyle
    */
   public function testApplyImageStyleWithLocalFileOutsidePublicPath(): void {
-    // Create a test image style.
     ImageStyle::create([
       'name' => 'test_style',
       'label' => 'Test Style',
@@ -269,7 +263,6 @@ class CanvasTwigExtensionFiltersTest extends CanvasKernelTestBase {
    * @covers \Drupal\canvas\Twig\CanvasTwigExtension::applyImageStyle
    */
   public function testApplyImageStyleWithInvalidStyleName(): void {
-    // Use the real services for this test.
     $extension = $this->container->get(CanvasTwigExtension::class);
     \assert($extension instanceof CanvasTwigExtension);
 
