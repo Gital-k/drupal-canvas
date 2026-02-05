@@ -774,8 +774,6 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
    *
    * Verifies that EntityConverter and language negotiation work correctly for
    * the canvas_page entity type.
-   *
-   * @covers \Drupal\canvas\Controller\ApiLayoutController::get
    */
   public function testPageTranslations(): void {
     $this->container->get('module_installer')->install(['language', 'content_translation']);
