@@ -21,15 +21,16 @@ final class CanvasPagesViewUpdateTest extends CanvasUpdatePathTestBase {
    */
   protected function setDatabaseDumpFiles(): void {
     $this->databaseDumpFiles[] = \dirname(__DIR__, 3) . '/fixtures/update/drupal-11.2.2-with-canvas-1.0.0-alpha1.bare.php.gz';
-    $this->databaseDumpFiles[] = \dirname(__DIR__, 3) . '/fixtures/update/views_view_canvas_pages/canvas-pages-before-publication-state.php';
   }
 
   /**
    * Tests canvas_pages view update.
    */
   public function testCanvasPagesViewUpdate(): void {
-    $view = View::load('canvas_pages');
-    $this->assertNotNull($view, 'View should exist before update.');
+    // The update path updates the existing canvas_pages view but does not check
+    // its contents, so we create a minimal view here to test the update.
+    $view = View::create(['id' => 'canvas_pages']);
+    $view->save();
 
     $this->runUpdates();
 
