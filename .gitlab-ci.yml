@@ -265,6 +265,27 @@ phpunit:
     - *UI-fixtures-files-change-rule
     - *manual-rule
 
+deprecations (php):
+  stage: validate
+  allow_failure: true
+  variables:
+    _PHPUNIT_CONCURRENT: 1
+    _TARGET_DB_TYPE: sqlite
+    _TARGET_DB_VERSION: '3'
+    # @see https://git.drupalcode.org/project/drupal/-/commit/10466dba9d7322ed55165dd9224edb2153c9b27a
+    _TARGET_PHP: '8.3-ubuntu'
+  needs:
+    - composer
+    - UI
+  # @todo Delete this after https://www.drupal.org/project/gitlab_templates/issues/3447792 lands.
+  # @see https://git.drupalcode.org/issue/gitlab_templates-3447792/-/compare/main...3447792-raise-sqlite-version?from_project_id=96292, when 984abb7b4781559a13078d58bb65f6959fe42179 was the last commit.
+  image:
+    name: $_CONFIG_DOCKERHUB_ROOT/php-$PHP_VERSION-ubuntu-apache:$_TARGET_PHP_IMAGE_TAG
+  # @todo Remove when https://www.drupal.org/project/gitlab_templates/issues/3452183 lands.
+  rules:
+    - *is-push-rule
+    - *manual-rule
+
 # Canvas requires 11.2, but may provide >11.2-only features.
 phpunit (>11.2-only features):
   extends: phpunit
