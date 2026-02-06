@@ -275,6 +275,7 @@ deprecations (php):
     _TARGET_DB_VERSION: '3'
     # @see https://git.drupalcode.org/project/drupal/-/commit/10466dba9d7322ed55165dd9224edb2153c9b27a
     _TARGET_PHP: '8.3-ubuntu'
+    SYMFONY_DEPRECATIONS_HELPER: "ignoreFile=$CI_PROJECT_DIR/$_WEB_ROOT/core/.deprecation-ignore.txt"
   needs:
     - composer
     - UI
