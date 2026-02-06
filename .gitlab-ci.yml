@@ -273,7 +273,9 @@ deprecations (php):
     _PHPUNIT_CONCURRENT: 1
     SYMFONY_DEPRECATIONS_HELPER: "ignoreFile=$CI_PROJECT_DIR/$_WEB_ROOT/core/.deprecation-ignore.txt"
   needs:
-    - composer
+    # TRICKY: this is unfixable in 11.2!
+    # @see https://www.drupal.org/project/drupal/issues/3555534#comment-16458397
+    - composer (next minor)
     - UI
   # @todo Remove when https://www.drupal.org/project/gitlab_templates/issues/3452183 lands.
   rules:
