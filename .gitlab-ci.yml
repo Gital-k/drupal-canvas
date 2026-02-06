@@ -266,6 +266,7 @@ phpunit:
     - *manual-rule
 
 deprecations (php):
+  extends: .phpunit-base
   stage: validate
   allow_failure: true
   variables:
