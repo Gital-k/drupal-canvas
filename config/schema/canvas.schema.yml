@@ -69,12 +69,13 @@ canvas.component.*:
         # @todo Remove this constraint after https://www.drupal.org/i/3520484#stable is done.
         # 💡When developing or testing ComponentSource plugins ahead of this being a public API, install the `canvas_dev_mode` module. Thanks for helping make Drupal Canvas awesome! 😊
         Choice:
-          # @see \Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent
-          - sdc
-          # @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent
-          - js
-          # @see \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent
-          - block
+          choices:
+            # @see \Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent
+            - sdc
+            # @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent
+            - js
+            # @see \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent
+            - block
     source_local_id:
       type: canvas.component_source_local_id.[%parent.source]
     versioned_properties:
@@ -223,12 +224,13 @@ canvas.js_component.*:
             label: 'Canvas Drupal settings needed by the component'
             constraints:
               Choice:
-                - v0.branding
-                - v0.breadcrumbs
-                - v0.mainEntity
-                - v0.pageTitle
-                - v0.jsonapiSettings
-                - v0.baseUrl
+                choices:
+                  - v0.branding
+                  - v0.breadcrumbs
+                  - v0.mainEntity
+                  - v0.pageTitle
+                  - v0.jsonapiSettings
+                  - v0.baseUrl
 
 canvas.page_region.*:
   type: config_entity
@@ -748,14 +750,16 @@ canvas.content_template.*.*.*:
           interface: Drupal\Core\Entity\ContentEntityInterface
         # @todo Update this in https://www.drupal.org/project/canvas/issues/3518272
         Choice:
-          - node
+          choices:
+            - node
     content_entity_type_bundle:
       type: string
       label: 'Bundle'
       constraints:
         # @todo Also validate that the bundle actually fulfills Canvas's requirements.
         # @see https://www.drupal.org/project/canvas/issues/3518272
-        EntityBundleExists: '%parent.content_entity_type_id'
+        EntityBundleExists:
+          entityTypeId: '%parent.content_entity_type_id'
     content_entity_type_view_mode:
       type: string
       label: 'View mode machine name'
