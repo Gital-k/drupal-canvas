@@ -140,9 +140,12 @@ export const componentAndLayoutApi = createApi({
     >({
       query: (id) => `/canvas/api/v0/usage/component/${id}/details`,
     }),
-    getPageLayout: builder.query<LayoutApiResponse, void>({
-      query: () => {
-        return `canvas/api/v0/layout/{entity_type}/{entity_id}`;
+    getPageLayout: builder.query<
+      LayoutApiResponse,
+      { entityId: string; entityType: string }
+    >({
+      query: ({ entityId, entityType }) => {
+        return `canvas/api/v0/layout/${entityType}/${entityId}`;
       },
       providesTags: () => [{ type: 'Layout' }],
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
@@ -159,9 +162,17 @@ export const componentAndLayoutApi = createApi({
         }
       },
     }),
-    getTemplateLayout: builder.query<LayoutApiResponse, void>({
-      query: () => {
-        return `canvas/api/v0/layout-content-template/{entity_type}.{template_bundle}.{template_view_mode}/{entity_id}`;
+    getTemplateLayout: builder.query<
+      LayoutApiResponse,
+      {
+        entityType: string;
+        bundle: string;
+        viewMode: string;
+        previewEntityId: string;
+      }
+    >({
+      query: ({ bundle, viewMode, entityType, previewEntityId }) => {
+        return `canvas/api/v0/layout-content-template/${entityType}.${bundle}.${viewMode}/${previewEntityId}`;
       },
       providesTags: () => [{ type: 'Layout' }],
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
@@ -343,6 +354,16 @@ export const componentAndLayoutApi = createApi({
         { type: 'Layout' },
       ],
     }),
+    deleteFolder: builder.mutation<void, string>({
+      query: (id) => ({
+        url: `canvas/api/v0/config/folder/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: [
+        { type: 'Folders', id: 'LIST' },
+        { type: 'Components', id: 'LIST' },
+      ],
+    }),
     getFolders: builder.query<
       {
         folders: Record<string, any>;
@@ -468,6 +489,7 @@ export const {
   useDeleteCodeComponentMutation,
   useCreateFolderMutation,
   useUpdateFolderMutation,
+  useDeleteFolderMutation,
   useGetFoldersQuery,
   useGetAutoSaveQuery,
   useUpdateAutoSaveMutation,

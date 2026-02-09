@@ -9,6 +9,7 @@ use Drupal\canvas\Entity\Component;
 use Drupal\canvas\MissingHostEntityException;
 use Drupal\canvas\Plugin\Adapter\UnixTimestampToDateAdapter;
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
+use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression;
 use Drupal\canvas\PropSource\HostEntityUrlPropSource;
 use Drupal\Component\Plugin\Exception\PluginNotFoundException;
 use Drupal\Component\Serialization\Json;
@@ -40,7 +41,7 @@ use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\canvas\PropSource\AdaptedPropSource;
 use Drupal\canvas\PropSource\DefaultRelativeUrlPropSource;
-use Drupal\canvas\PropSource\DynamicPropSource;
+use Drupal\canvas\PropSource\EntityFieldPropSource;
 use Drupal\canvas\PropSource\PropSource;
 use Drupal\canvas\PropSource\StaticPropSource;
 use Drupal\field\Entity\FieldConfig;
@@ -52,6 +53,7 @@ use Drupal\media_library\Plugin\Field\FieldWidget\MediaLibraryWidget;
 use Drupal\node\Entity\NodeType;
 use Drupal\Tests\canvas\Kernel\Traits\VfsPublicStreamUrlTrait;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
+use Drupal\Tests\field\Traits\EntityReferenceFieldCreationTrait;
 use Drupal\Tests\image\Kernel\ImageFieldCreationTrait;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
 use Drupal\Tests\node\Traits\ContentTypeCreationTrait;
@@ -67,6 +69,8 @@ use PHPUnit\Framework\Attributes\TestWith;
  * @coversDefaultClass \Drupal\canvas\PropSource\PropSource
  * @group canvas
  * @group canvas_component_sources
+ * @group canvas_data_model
+ * @group canvas_data_model__prop_expressions
  */
 class PropSourceTest extends KernelTestBase {
 
@@ -78,6 +82,7 @@ class PropSourceTest extends KernelTestBase {
 
   use ContentTypeCreationTrait;
   use ContribStrictConfigSchemaTestTrait;
+  use EntityReferenceFieldCreationTrait;
   use ImageFieldCreationTrait;
   use MediaTypeCreationTrait;
   use NodeCreationTrait;
@@ -194,6 +199,36 @@ class PropSourceTest extends KernelTestBase {
       'hash_salt' => 'dynamic_image_style_hash_salt',
     ]);
     $instance_property->setValue(NULL, $settings);
+  }
+
+  private function allowSimplifiedExpectations(EvaluationResult $actual_result): EvaluationResult {
+    return new EvaluationResult(
+      // Simplified result to allow simplified test expectations.
+      value: $this->recursivelyReplaceStrings($actual_result->value, [
+        \base_path() . $this->siteDirectory => '::SITE_DIR_BASE_URL::',
+      ]),
+      // Unchanged cacheability.
+      cacheability: $actual_result,
+    );
+  }
+
+  private function recursivelyReplaceStrings(mixed $value, array $string_replacements): mixed {
+    // Recurse.
+    if (is_array($value)) {
+      return array_map(
+        fn (mixed $v) => $this->recursivelyReplaceStrings($v, $string_replacements),
+        $value,
+      );
+    }
+    // Nothing to do.
+    if (!is_string($value)) {
+      return $value;
+    }
+    return str_replace(
+      array_keys($string_replacements),
+      array_values($string_replacements),
+      $value
+    );
   }
 
   /**
@@ -484,11 +519,12 @@ class PropSourceTest extends KernelTestBase {
         ],
       ],
       'value' => NULL,
-      'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:image␝field_media_image␞␟src_with_alternate_widths,alt↝entity␜␜entity:media:image␝field_media_image␞␟alt,width↝entity␜␜entity:media:image␝field_media_image␞␟width,height↝entity␜␜entity:media:image␝field_media_image␞␟height}',
+      // @see \Drupal\canvas\Hook\ShapeMatchingHooks::mediaLibraryStorablePropShapeAlter()
+      'expression' => 'ℹ︎entity_reference␟entity␜␜entity:media:image␝field_media_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
       'expected_array_representation' => [
         'sourceType' => PropSource::Static->value . ':field_item:entity_reference',
         'value' => NULL,
-        'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:image␝field_media_image␞␟src_with_alternate_widths,alt↝entity␜␜entity:media:image␝field_media_image␞␟alt,width↝entity␜␜entity:media:image␝field_media_image␞␟width,height↝entity␜␜entity:media:image␝field_media_image␞␟height}',
+        'expression' => 'ℹ︎entity_reference␟entity␜␜entity:media:image␝field_media_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
         'sourceTypeSettings' => [
           'storage' => ['target_type' => 'media'],
           'instance' => [
@@ -507,7 +543,7 @@ class PropSourceTest extends KernelTestBase {
       // A (dangling) reference field that doesn't reference anything never
       // becomes stale.
       'expected_cacheability' => $permanent_cacheability,
-      'expected_prop_expression' => FieldTypeObjectPropsExpression::class,
+      'expected_prop_expression' => ReferenceFieldTypePropExpression::class,
       'expected_dependencies' => [
         'config' => [
           'field.field.media.image.field_media_image',
@@ -521,6 +557,7 @@ class PropSourceTest extends KernelTestBase {
         ],
       ],
     ];
+
     yield "complex non-empty example with entity_reference and multiple target bundles but same field name" => [
       'sourceType' => 'static:field_item:entity_reference',
       'sourceTypeSettings' => [
@@ -538,7 +575,7 @@ class PropSourceTest extends KernelTestBase {
         ],
       ],
       'value' => [['target_id' => 2], ['target_id' => 1], ['target_id' => 3]],
-      'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:anything_is_possible|image|image_but_not_image_media_source␝field_media_image_1|field_media_image|field_media_test␞␟src_with_alternate_widths|src_with_alternate_widths|value,alt↝entity␜␜entity:media:anything_is_possible|image|image_but_not_image_media_source␝field_media_image_1|field_media_image|field_media_test␞␟alt|alt|␀,width↝entity␜␜entity:media:anything_is_possible|image|image_but_not_image_media_source␝field_media_image_1|field_media_image|field_media_test␞␟width|width|␀,height↝entity␜␜entity:media:anything_is_possible|image|image_but_not_image_media_source␝field_media_image_1|field_media_image|field_media_test␞␟height|height|␀}',
+      'expression' => 'ℹ︎entity_reference␟entity␜[␜entity:media:anything_is_possible␝field_media_image_1␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}][␜entity:media:image␝field_media_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}][␜entity:media:image_but_not_image_media_source␝field_media_test␞␟{src↠value}]',
       'expected_array_representation' => [
         'sourceType' => PropSource::Static->value . ':field_item:entity_reference',
         'value' => [
@@ -546,7 +583,7 @@ class PropSourceTest extends KernelTestBase {
           ['target_id' => 1],
           ['target_id' => 3],
         ],
-        'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:anything_is_possible|image|image_but_not_image_media_source␝field_media_image_1|field_media_image|field_media_test␞␟src_with_alternate_widths|src_with_alternate_widths|value,alt↝entity␜␜entity:media:anything_is_possible|image|image_but_not_image_media_source␝field_media_image_1|field_media_image|field_media_test␞␟alt|alt|␀,width↝entity␜␜entity:media:anything_is_possible|image|image_but_not_image_media_source␝field_media_image_1|field_media_image|field_media_test␞␟width|width|␀,height↝entity␜␜entity:media:anything_is_possible|image|image_but_not_image_media_source␝field_media_image_1|field_media_image|field_media_test␞␟height|height|␀}',
+        'expression' => 'ℹ︎entity_reference␟entity␜[␜entity:media:anything_is_possible␝field_media_image_1␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}][␜entity:media:image␝field_media_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}][␜entity:media:image_but_not_image_media_source␝field_media_test␞␟{src↠value}]',
         'sourceTypeSettings' => [
           'storage' => ['target_type' => 'media'],
           'instance' => [
@@ -568,13 +605,13 @@ class PropSourceTest extends KernelTestBase {
       ],
       'expected_user_value' => [
         [
-          'src' => '::SITE_DIR_BASE_URL::/files/image-3.jpg?alternateWidths=' . UrlHelper::encodePath('::SITE_DIR_BASE_URL::/files/styles/canvas_parametrized_width--{width}/public/image-3.jpg.webp?itok=spSF5vvd'),
+          'src' => '::SITE_DIR_BASE_URL::/files/image-3.jpg?alternateWidths=' . UrlHelper::encodePath('::SITE_DIR_BASE_URL::/files/styles/canvas_parametrized_width--{width}/public/image-3.jpg.avif?itok=ZZaCKDGa'),
           'alt' => 'amazing',
           'width' => 80,
           'height' => 60,
         ],
         [
-          'src' => '::SITE_DIR_BASE_URL::/files/image-2.jpg?alternateWidths=' . UrlHelper::encodePath('::SITE_DIR_BASE_URL::/files/styles/canvas_parametrized_width--{width}/public/image-2.jpg.webp?itok=SnSVAYVj'),
+          'src' => '::SITE_DIR_BASE_URL::/files/image-2.jpg?alternateWidths=' . UrlHelper::encodePath('::SITE_DIR_BASE_URL::/files/styles/canvas_parametrized_width--{width}/public/image-2.jpg.avif?itok=XYZlDjzC'),
           'alt' => 'An image so amazing that to gaze upon it would melt your face',
           'width' => 80,
           'height' => 60,
@@ -592,7 +629,198 @@ class PropSourceTest extends KernelTestBase {
         // Cache contexts added by referenced entity access checking.
         // @see \Drupal\canvas\PropExpressions\StructuredData\Evaluator::validateAccess()
         ->setCacheContexts(['user.permissions']),
-      'expected_prop_expression' => FieldTypeObjectPropsExpression::class,
+      'expected_prop_expression' => ReferenceFieldTypePropExpression::class,
+      'expected_dependencies' => [
+        'config' => [
+          'field.field.media.anything_is_possible.field_media_image_1',
+          'field.field.media.image.field_media_image',
+          'field.field.media.image_but_not_image_media_source.field_media_test',
+          'image.style.canvas_parametrized_width',
+          'media.type.anything_is_possible',
+          'media.type.image',
+          'media.type.image_but_not_image_media_source',
+        ],
+        'content' => [
+          'file:file:' . self::FILE_UUID2,
+          'file:file:' . self::FILE_UUID1,
+          'media:anything_is_possible:' . self::IMAGE_MEDIA_UUID2,
+          'media:image:' . self::IMAGE_MEDIA_UUID1,
+          'media:image_but_not_image_media_source:' . self::TEST_MEDIA,
+        ],
+        'module' => [
+          'file',
+          'media',
+        ],
+      ],
+      'permissions' => ['view media', 'access content'],
+    ];
+
+    // Complex entity_reference example using multiple branches, where each
+    // branch uses different bundle and field name to get the final value.
+    // Resolved values are strings.
+    yield "complex non-empty example with entity_reference containing multiple branches but not an object" => [
+      'sourceType' => 'static:field_item:entity_reference',
+      'sourceTypeSettings' => [
+        'cardinality' => 5,
+        'storage' => ['target_type' => 'media'],
+        'instance' => [
+          'handler' => 'default:media',
+          'handler_settings' => [
+            'target_bundles' => [
+              'anything_is_possible' => 'anything_is_possible',
+              'image' => 'image',
+              'image_but_not_image_media_source' => 'image_but_not_image_media_source',
+            ],
+          ],
+        ],
+      ],
+      'value' => [['target_id' => 2], ['target_id' => 1], ['target_id' => 3]],
+      'expression' => 'ℹ︎entity_reference␟entity␜[␜entity:media:anything_is_possible␝field_media_image_1␞␟entity␜␜entity:file␝uri␞␟value][␜entity:media:image␝field_media_image␞␟entity␜␜entity:file␝uri␞␟value][␜entity:media:image_but_not_image_media_source␝field_media_test␞␟value]',
+      'expected_array_representation' => [
+        'sourceType' => PropSource::Static->value . ':field_item:entity_reference',
+        'value' => [
+          ['target_id' => 2],
+          ['target_id' => 1],
+          ['target_id' => 3],
+        ],
+        'expression' => 'ℹ︎entity_reference␟entity␜[␜entity:media:anything_is_possible␝field_media_image_1␞␟entity␜␜entity:file␝uri␞␟value][␜entity:media:image␝field_media_image␞␟entity␜␜entity:file␝uri␞␟value][␜entity:media:image_but_not_image_media_source␝field_media_test␞␟value]',
+        'sourceTypeSettings' => [
+          'storage' => [
+            'target_type' => 'media',
+          ],
+          'instance' => [
+            'handler' => 'default:media',
+            'handler_settings' => [
+              'target_bundles' => [
+                'anything_is_possible' => 'anything_is_possible',
+                'image' => 'image',
+                'image_but_not_image_media_source' => 'image_but_not_image_media_source',
+              ],
+            ],
+          ],
+          'cardinality' => 5,
+        ],
+      ],
+      'field_widgets' => [
+        NULL => EntityReferenceAutocompleteWidget::class,
+        'media_library_widget' => MediaLibraryWidget::class,
+      ],
+      'expected_user_value' => [
+        'public://image-3.jpg',
+        'public://image-2.jpg',
+        'Jack is awesome!',
+      ],
+      'expected_cacheability' => (new CacheableMetadata())
+        ->setCacheTags([
+          'media:1', 'media:2', 'media:3',
+          'file:1', 'file:2',
+        ])
+        // Cache contexts added by referenced entity access checking.
+        // @see \Drupal\canvas\PropExpressions\StructuredData\Evaluator::validateAccess()
+        ->setCacheContexts(['user.permissions']),
+      'expected_prop_expression' => ReferenceFieldTypePropExpression::class,
+      'expected_dependencies' => [
+        'config' => [
+          'field.field.media.anything_is_possible.field_media_image_1',
+          'field.field.media.image.field_media_image',
+          'field.field.media.image_but_not_image_media_source.field_media_test',
+          'image.style.canvas_parametrized_width',
+          'media.type.anything_is_possible',
+          'media.type.image',
+          'media.type.image_but_not_image_media_source',
+        ],
+        'content' => [
+          'file:file:' . self::FILE_UUID2,
+          'file:file:' . self::FILE_UUID1,
+          'media:anything_is_possible:' . self::IMAGE_MEDIA_UUID2,
+          'media:image:' . self::IMAGE_MEDIA_UUID1,
+          'media:image_but_not_image_media_source:' . self::TEST_MEDIA,
+        ],
+        'module' => [
+          'file',
+          'media',
+        ],
+      ],
+      'permissions' => ['view media', 'access content'],
+    ];
+
+    // Complex entity_reference example using multiple branches where resolved
+    // value is an object with multiple props. Each branch maps its set of
+    // props to different combination of bundles, fields and props.
+    // Resolved values are objects containing multiple props.
+    yield "complex non-empty example with entity_reference containing multiple branches" => [
+      'sourceType' => 'static:field_item:entity_reference',
+      'sourceTypeSettings' => [
+        'cardinality' => 5,
+        'storage' => ['target_type' => 'media'],
+        'instance' => [
+          'handler' => 'default:media',
+          'handler_settings' => [
+            'target_bundles' => [
+              'anything_is_possible' => 'anything_is_possible',
+              'image' => 'image',
+              'image_but_not_image_media_source' => 'image_but_not_image_media_source',
+            ],
+          ],
+        ],
+      ],
+      'value' => [['target_id' => 2], ['target_id' => 1], ['target_id' => 3]],
+      'expression' => 'ℹ︎entity_reference␟entity␜[␜entity:media:anything_is_possible␝field_media_image_1␞␟{src↝entity␜␜entity:file␝uri␞␟value,alt↠alt}][␜entity:media:image␝field_media_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}][␜entity:media:image_but_not_image_media_source␝field_media_test␞␟{src↠value,alt↠value}]',
+      'expected_array_representation' => [
+        'sourceType' => PropSource::Static->value . ':field_item:entity_reference',
+        'value' => [
+          ['target_id' => 2],
+          ['target_id' => 1],
+          ['target_id' => 3],
+        ],
+        'expression' => 'ℹ︎entity_reference␟entity␜[␜entity:media:anything_is_possible␝field_media_image_1␞␟{src↝entity␜␜entity:file␝uri␞␟value,alt↠alt}][␜entity:media:image␝field_media_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}][␜entity:media:image_but_not_image_media_source␝field_media_test␞␟{src↠value,alt↠value}]',
+        'sourceTypeSettings' => [
+          'storage' => [
+            'target_type' => 'media',
+          ],
+          'instance' => [
+            'handler' => 'default:media',
+            'handler_settings' => [
+              'target_bundles' => [
+                'anything_is_possible' => 'anything_is_possible',
+                'image' => 'image',
+                'image_but_not_image_media_source' => 'image_but_not_image_media_source',
+              ],
+            ],
+          ],
+          'cardinality' => 5,
+        ],
+      ],
+      'field_widgets' => [
+        NULL => EntityReferenceAutocompleteWidget::class,
+        'media_library_widget' => MediaLibraryWidget::class,
+      ],
+      'expected_user_value' => [
+        [
+          'src' => 'public://image-3.jpg',
+          'alt' => 'amazing',
+        ],
+        [
+          'src' => '::SITE_DIR_BASE_URL::/files/image-2.jpg?alternateWidths=' . UrlHelper::encodePath('::SITE_DIR_BASE_URL::/files/styles/canvas_parametrized_width--{width}/public/image-2.jpg.avif?itok=XYZlDjzC'),
+          'alt' => 'An image so amazing that to gaze upon it would melt your face',
+          'width' => 80,
+          'height' => 60,
+        ],
+        [
+          'src' => 'Jack is awesome!',
+          'alt' => 'Jack is awesome!',
+        ],
+      ],
+      'expected_cacheability' => (new CacheableMetadata())
+        ->setCacheTags([
+          'media:1', 'media:2', 'media:3',
+          'file:1', 'file:2',
+          'config:image.style.canvas_parametrized_width',
+        ])
+        // Cache contexts added by referenced entity access checking.
+        // @see \Drupal\canvas\PropExpressions\StructuredData\Evaluator::validateAccess()
+        ->setCacheContexts(['user.permissions']),
+      'expected_prop_expression' => ReferenceFieldTypePropExpression::class,
       'expected_dependencies' => [
         'config' => [
           'field.field.media.anything_is_possible.field_media_image_1',
@@ -620,10 +848,10 @@ class PropSourceTest extends KernelTestBase {
   }
 
   /**
-   * @coversClass \Drupal\canvas\PropSource\DynamicPropSource
-   * @dataProvider providerDynamicPropSource
+   * @coversClass \Drupal\canvas\PropSource\EntityFieldPropSource
+   * @dataProvider providerEntityFieldPropSource
    */
-  public function testDynamicPropSource(
+  public function testEntityFieldPropSource(
     array $permissions,
     string $expression,
     ?string $adapter_plugin_id,
@@ -637,8 +865,8 @@ class PropSourceTest extends KernelTestBase {
     array $expected_dependencies_expression_only,
     array $expected_dependencies_with_host_entity,
   ): void {
-    // Evaluating dynamic props requires entity and field access of the data
-    // being accessed.
+    // Evaluating entity field props requires entity and field access of the
+    // data being accessed.
 
     // For testing expressions relying on users.
     $this->installEntitySchema('user');
@@ -667,22 +895,31 @@ class PropSourceTest extends KernelTestBase {
       'label' => 'A timestamp, maybe',
       'entity_type' => 'node',
       'bundle' => 'page',
-      // Optional, to be able to test how DynamicPropSource' adapter support
+      // Optional, to be able to test how EntityFieldPropSource' adapter support
       // handles missing optional values (i.e. NULL).
       'required' => FALSE,
       'settings' => [],
     ])->save();
-    $node = $this->createNode(['uid' => $user->id(), 'field_image' => ['target_id' => 1]]);
+    $this->createEntityReferenceField('node', 'page', 'field_photos', 'Photos', 'media',
+      selection_handler_settings: [
+        'target_bundles' => [
+          'anything_is_possible',
+          'image',
+          'image_but_not_image_media_source',
+        ],
+      ],
+      cardinality: FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
+    );
+    $node = $this->createNode([
+      'type' => 'page',
+      'uid' => $user->id(),
+      'field_image' => ['target_id' => 1],
+      'field_photos' => [['target_id' => 2], ['target_id' => 1], ['target_id' => 3]],
+    ]);
 
-    // For testing expressions relying on multiple bundles of the `node` entity
-    // type.
-    NodeType::create(['type' => 'bio', 'name' => 'biography'])->save();
-    $this->createImageField('field_photo', 'node', 'bio');
-    $node2 = $this->createNode(['uid' => $user->id(), 'type' => 'bio', 'field_photo' => ['target_id' => 2]]);
-
-    $original = DynamicPropSource::parse(match ($adapter_plugin_id) {
-      NULL => ['sourceType' => 'dynamic', 'expression' => $expression],
-      default => ['sourceType' => 'dynamic', 'expression' => $expression, 'adapter' => $adapter_plugin_id],
+    $original = EntityFieldPropSource::parse(match ($adapter_plugin_id) {
+      NULL => ['sourceType' => PropSource::EntityField->value, 'expression' => $expression],
+      default => ['sourceType' => PropSource::EntityField->value, 'expression' => $expression, 'adapter' => $adapter_plugin_id],
     });
     // First, get the string representation and parse it back, to prove
     // serialization and deserialization works.
@@ -691,13 +928,13 @@ class PropSourceTest extends KernelTestBase {
     $this->assertSame($expected_array_representation, $decoded_representation);
     // @phpstan-ignore argument.type
     $parsed = PropSource::parse($decoded_representation);
-    $this->assertInstanceOf(DynamicPropSource::class, $parsed);
+    $this->assertInstanceOf(EntityFieldPropSource::class, $parsed);
     // The contained information read back out.
-    $this->assertSame('dynamic', $parsed->getSourceType());
+    $this->assertSame(PropSource::EntityField->value, $parsed->getSourceType());
     // @phpstan-ignore-next-line argument.type
     $this->assertInstanceOf($expected_expression_class, StructuredDataPropExpression::fromString($parsed->asChoice()));
 
-    // Test the functionality of a DynamicPropSource:
+    // Test the functionality of a EntityFieldPropSource:
     $parsed_expression = StructuredDataPropExpression::fromString($expression);
     $correct_host_entity_type = match (get_class($parsed_expression)) {
       FieldPropExpression::class, FieldObjectPropsExpression::class => $parsed_expression->entityType->getEntityTypeId(),
@@ -739,7 +976,7 @@ class PropSourceTest extends KernelTestBase {
       }
     }
     catch (\DomainException $e) {
-      self::assertSame(sprintf("`%s` is an expression for entity type `%s`, but the provided entity is of type `user`.", (string) $parsed_expression, $correct_host_entity_type), $e->getMessage());
+      self::assertSame(\sprintf("`%s` is an expression for entity type `%s`, but the provided entity is of type `user`.", (string) $parsed_expression, $correct_host_entity_type), $e->getMessage());
     }
 
     // - evaluate it to populate an SDC prop using a `node` host entity
@@ -774,16 +1011,11 @@ class PropSourceTest extends KernelTestBase {
         self::assertEqualsCanonicalizing($expected_evaluation_with_node_host_entity->getCacheTags(), $result->getCacheTags());
         self::assertEqualsCanonicalizing($expected_evaluation_with_node_host_entity->getCacheContexts(), $result->getCacheContexts());
         self::assertSame($expected_evaluation_with_node_host_entity->getCacheMaxAge(), $result->getCacheMaxAge());
-        // TRICKY: this one test case is hard to parametrize using a data
-        // provider, see the more precise/expansive assertions at the end of the
-        // test method.
-        if ($expression !== 'ℹ︎␜entity:node:page|bio␝field_photo|field_image␞␟srcset_candidate_uri_template|src_with_alternate_widths') {
-          self::assertSame($expected_evaluation_with_node_host_entity->value, $result->value);
-        }
+        self::assertSame($expected_evaluation_with_node_host_entity->value, $this->allowSimplifiedExpectations($result)->value);
       }
     }
     catch (\DomainException $e) {
-      self::assertSame(sprintf("`%s` is an expression for entity type `%s`, but the provided entity is of type `node`.", (string) $parsed_expression, $correct_host_entity_type), $e->getMessage());
+      self::assertSame(\sprintf("`%s` is an expression for entity type `%s`, but the provided entity is of type `node`.", (string) $parsed_expression, $correct_host_entity_type), $e->getMessage());
     }
 
     // - calculate its dependencies
@@ -794,41 +1026,16 @@ class PropSourceTest extends KernelTestBase {
       default => throw new \LogicException(),
     };
     $this->assertSame($expected_dependencies_with_host_entity, $parsed->calculateDependencies($correct_host_entity));
-
-    if ($expression === 'ℹ︎␜entity:node:page|bio␝field_photo|field_image␞␟srcset_candidate_uri_template|src_with_alternate_widths') {
-      // For the "bio" node, expect `image-2` and an `alternateWidths` query
-      // string (NOT: a URI template).
-      // @phpstan-ignore argument.type
-      $this->assertStringContainsString('image-2', $parsed->evaluate($node, $is_required)->value);
-      // @phpstan-ignore argument.type
-      $this->assertStringContainsString('?alternateWidths=', $parsed->evaluate($node, $is_required)->value);
-      // @phpstan-ignore argument.type
-      $this->assertStringNotContainsString('{width}', $parsed->evaluate($node, $is_required)->value);
-      // For the "bio" node, expect `image-3` and a URI template (NOT: an
-      // `alternateWidths` query string).
-      // @phpstan-ignore argument.type
-      $this->assertStringContainsString('image-3', $parsed->evaluate($node2, $is_required)->value);
-      // @phpstan-ignore argument.type
-      $this->assertStringContainsString('{width}', $parsed->evaluate($node2, $is_required)->value);
-      // @phpstan-ignore argument.type
-      $this->assertStringNotContainsString('?alternateWidths=', $parsed->evaluate($node2, $is_required)->value);
-
-      // The expression in the context of node 2 (a `bio` node), which surfaces
-      // no `content` dependencies because the `srcset_candidate_uri_template`
-      // property does not provide such a dependency
-      // @see \Drupal\canvas\TypedData\ImageDerivativeWithParametrizedWidth
-      $this->assertSame($expected_dependencies_expression_only, $parsed->calculateDependencies($node2));
-    }
   }
 
-  public static function providerDynamicPropSource(): \Generator {
+  public static function providerEntityFieldPropSource(): \Generator {
     yield "simple: FieldPropExpression" => [
       'permissions' => ['access user profiles'],
       'expression' => 'ℹ︎␜entity:user␝name␞␟value',
       'adapter_plugin_id' => NULL,
       'is_required' => TRUE,
       'expected_array_representation' => [
-        'sourceType' => PropSource::Dynamic->value,
+        'sourceType' => PropSource::EntityField->value,
         'expression' => 'ℹ︎␜entity:user␝name␞␟value',
       ],
       'expected_expression_class' => FieldPropExpression::class,
@@ -856,7 +1063,7 @@ class PropSourceTest extends KernelTestBase {
       'adapter_plugin_id' => 'unix_to_date',
       'is_required' => TRUE,
       'expected_array_representation' => [
-        'sourceType' => PropSource::Dynamic->value,
+        'sourceType' => PropSource::EntityField->value,
         'expression' => 'ℹ︎␜entity:user␝created␞␟value',
         'adapter' => UnixTimestampToDateAdapter::PLUGIN_ID,
       ],
@@ -895,7 +1102,7 @@ class PropSourceTest extends KernelTestBase {
       'adapter_plugin_id' => 'unix_to_date',
       'is_required' => FALSE,
       'expected_array_representation' => [
-        'sourceType' => PropSource::Dynamic->value,
+        'sourceType' => PropSource::EntityField->value,
         'expression' => 'ℹ︎␜entity:node:page␝a_timestamp_maybe␞␟value',
         'adapter' => UnixTimestampToDateAdapter::PLUGIN_ID,
       ],
@@ -947,7 +1154,7 @@ class PropSourceTest extends KernelTestBase {
       'adapter_plugin_id' => NULL,
       'is_required' => TRUE,
       'expected_array_representation' => [
-        'sourceType' => PropSource::Dynamic->value,
+        'sourceType' => PropSource::EntityField->value,
         'expression' => 'ℹ︎␜entity:node:page␝uid␞␟url',
       ],
       'expected_expression_class' => FieldPropExpression::class,
@@ -1001,7 +1208,7 @@ class PropSourceTest extends KernelTestBase {
       'adapter_plugin_id' => NULL,
       'is_required' => FALSE,
       'expected_array_representation' => [
-        'sourceType' => PropSource::Dynamic->value,
+        'sourceType' => PropSource::EntityField->value,
         'expression' => 'ℹ︎␜entity:node:page␝uid␞␟url',
       ],
       'expected_expression_class' => FieldPropExpression::class,
@@ -1051,7 +1258,7 @@ class PropSourceTest extends KernelTestBase {
       'adapter_plugin_id' => NULL,
       'is_required' => TRUE,
       'expected_array_representation' => [
-        'sourceType' => PropSource::Dynamic->value,
+        'sourceType' => PropSource::EntityField->value,
         'expression' => 'ℹ︎␜entity:node:page␝uid␞␟entity␜␜entity:user␝name␞␟value',
       ],
       'expected_expression_class' => ReferenceFieldPropExpression::class,
@@ -1094,7 +1301,7 @@ class PropSourceTest extends KernelTestBase {
       'adapter_plugin_id' => NULL,
       'is_required' => TRUE,
       'expected_array_representation' => [
-        'sourceType' => PropSource::Dynamic->value,
+        'sourceType' => PropSource::EntityField->value,
         'expression' => 'ℹ︎␜entity:node:page␝uid␞␟{human_id↝entity␜␜entity:user␝name␞␟value,machine_id↠target_id}',
       ],
       'expected_expression_class' => FieldObjectPropsExpression::class,
@@ -1137,48 +1344,193 @@ class PropSourceTest extends KernelTestBase {
     $expected_dependencies_expression = [
       'module' => [
         'node',
+        'media',
+        'media',
         'file',
+        'media',
         'file',
+        'media',
+        'file',
+        'media',
+        'file',
+        'media',
+        'file',
+        'media',
+        'file',
+        'media',
+        'file',
+        'media',
+        'file',
+        'media',
       ],
       'config' => [
-        'node.type.bio',
         'node.type.page',
-        'field.field.node.bio.field_photo',
+        'field.field.node.page.field_photos',
+        'media.type.anything_is_possible',
+        'media.type.image',
+        'media.type.image_but_not_image_media_source',
+        'media.type.anything_is_possible',
+        'field.field.media.anything_is_possible.field_media_image_1',
         'image.style.canvas_parametrized_width',
-        'field.field.node.page.field_image',
+        'media.type.anything_is_possible',
+        'field.field.media.anything_is_possible.field_media_image_1',
         'image.style.canvas_parametrized_width',
+        'media.type.anything_is_possible',
+        'field.field.media.anything_is_possible.field_media_image_1',
+        'image.style.canvas_parametrized_width',
+        'media.type.anything_is_possible',
+        'field.field.media.anything_is_possible.field_media_image_1',
+        'image.style.canvas_parametrized_width',
+        'media.type.image',
+        'field.field.media.image.field_media_image',
+        'image.style.canvas_parametrized_width',
+        'media.type.image',
+        'field.field.media.image.field_media_image',
+        'image.style.canvas_parametrized_width',
+        'media.type.image',
+        'field.field.media.image.field_media_image',
+        'image.style.canvas_parametrized_width',
+        'media.type.image',
+        'field.field.media.image.field_media_image',
+        'image.style.canvas_parametrized_width',
+        'media.type.image_but_not_image_media_source',
+        'field.field.media.image_but_not_image_media_source.field_media_test',
       ],
     ];
     // The expression in the context of the `page` node, which surfaces content
     // dependencies because the `src_with_alternate_widths` property DOES
-    // provide such dependencies
+    // provide such dependencies.
+    // Module dependencies are different from those for the expression, because
+    // this includes those surfaced during evaluation of node 1.
     // @see \Drupal\canvas\Plugin\DataType\ComputedUrlWithQueryString
-    $expected_node_1_expression_dependencies = $expected_dependencies_expression;
-    $expected_node_1_expression_dependencies['module'][] = 'file';
-    $expected_node_1_expression_dependencies['content'][] = 'file:file:' . self::FILE_UUID1;
+    $expected_node_1_expression_dependencies = [
+      'module' => [
+        'node',
+        'media',
+        'media',
+        'file',
+        'file',
+        'media',
+        'file',
+        'media',
+        'file',
+        'media',
+        'file',
+        'media',
+        'file',
+        'media',
+        'file',
+        'media',
+        'file',
+        'media',
+        'file',
+        'media',
+      ],
+      'config' => $expected_dependencies_expression['config'],
+      'content' => [
+        'media:anything_is_possible:' . self::IMAGE_MEDIA_UUID2,
+        'file:file:' . self::FILE_UUID2,
+      ],
+    ];
 
-    yield "Contrived multi-bundle example, with per-bundle field names *and* per-field property names" => [
-      'permissions' => ['access content'],
-      'expression' => 'ℹ︎␜entity:node:page|bio␝field_photo|field_image␞␟srcset_candidate_uri_template|src_with_alternate_widths',
+    $per_media_type_specific_expression_branches = '[␜entity:media:anything_is_possible␝field_media_image_1␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}][␜entity:media:image␝field_media_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}][␜entity:media:image_but_not_image_media_source␝field_media_test␞␟{src↠value}]';
+    yield "complex object: ReferenceFieldPropExpression with per-target bundle branches, for single delta (similar for single-cardinality field)" => [
+      'permissions' => ['access content', 'view media'],
+      'expression' => "ℹ︎␜entity:node:page␝field_photos␞0␟entity␜$per_media_type_specific_expression_branches",
       'adapter_plugin_id' => NULL,
       'is_required' => TRUE,
       'expected_array_representation' => [
-        'sourceType' => PropSource::Dynamic->value,
-        'expression' => 'ℹ︎␜entity:node:bio|page␝field_photo|field_image␞␟srcset_candidate_uri_template|src_with_alternate_widths',
+        'sourceType' => PropSource::EntityField->value,
+        'expression' => "ℹ︎␜entity:node:page␝field_photos␞0␟entity␜$per_media_type_specific_expression_branches",
       ],
-      'expected_expression_class' => FieldPropExpression::class,
+      'expected_expression_class' => ReferenceFieldPropExpression::class,
       'expected_evaluation_with_user_host_entity' => NULL,
       'expected_user_access_denied_message' => NULL,
       'expected_evaluation_with_node_host_entity' => new EvaluationResult(
-        '<impossible to express in a data provider, see test>',
+        [
+          'src' => '::SITE_DIR_BASE_URL::/files/image-3.jpg?alternateWidths=::SITE_DIR_BASE_URL::' . UrlHelper::encodePath('/files/styles/canvas_parametrized_width--{width}/public/image-3.jpg.avif?itok=ZZaCKDGa'),
+          'alt' => 'amazing',
+          'width' => 80,
+          'height' => 60,
+        ],
         (new CacheableMetadata())
           ->setCacheTags([
             // The host entity.
             'node:1',
+            // The media entity being referenced by delta 0: of the media type
+            // `anything_is_possible`.
+            'media:2',
             // The entity used by the computed `src_with_alternate_widths` field
             // property.
             // @see \Drupal\canvas\Plugin\Field\FieldTypeOverride\ImageItemOverride::propertyDefinitions()
             // @see \Drupal\canvas\Plugin\DataType\ComputedUrlWithQueryString
+            'file:2',
+            // The parametrized image style used by the computed
+            // `srcset_candidate_uri_template` field property, which is in turn
+            // used by the above `src_with_alternate_widths` field property.
+            // @see \Drupal\canvas\Plugin\Field\FieldTypeOverride\ImageItemOverride::propertyDefinitions()
+            // @see \Drupal\canvas\TypedData\ImageDerivativeWithParametrizedWidth
+            'config:image.style.canvas_parametrized_width',
+          ])
+          // Cache contexts added by host entity and referenced entity access
+          // checking.
+          // @see \Drupal\canvas\PropExpressions\StructuredData\Evaluator::validateAccess()
+          ->setCacheContexts(['user.permissions']),
+      ),
+      'expected_node_access_denied_message' => [
+        "Access denied to entity while evaluating expression, ℹ︎␜entity:node:page␝field_photos␞0␟entity␜$per_media_type_specific_expression_branches, reason: The 'access content' permission is required.",
+        // 💡 This illustrates which one of the three branches is evaluated.
+        "Access denied to entity while evaluating expression, ℹ︎␜entity:media:anything_is_possible␝field_media_image_1␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}, reason: The 'view media' permission is required when the media item is published.",
+      ],
+      'expected_dependencies_expression_only' => $expected_dependencies_expression,
+      'expected_dependencies_with_host_entity' => $expected_node_1_expression_dependencies,
+    ];
+    yield "complex object: ReferenceFieldPropExpression with per-target bundle branches, for all deltas" => [
+      'permissions' => ['access content', 'view media'],
+      'expression' => "ℹ︎␜entity:node:page␝field_photos␞␟entity␜$per_media_type_specific_expression_branches",
+      'adapter_plugin_id' => NULL,
+      'is_required' => TRUE,
+      'expected_array_representation' => [
+        'sourceType' => PropSource::EntityField->value,
+        'expression' => "ℹ︎␜entity:node:page␝field_photos␞␟entity␜$per_media_type_specific_expression_branches",
+      ],
+      'expected_expression_class' => ReferenceFieldPropExpression::class,
+      'expected_evaluation_with_user_host_entity' => NULL,
+      'expected_user_access_denied_message' => NULL,
+      'expected_evaluation_with_node_host_entity' => new EvaluationResult(
+        [
+          [
+            'src' => '::SITE_DIR_BASE_URL::/files/image-3.jpg?alternateWidths=::SITE_DIR_BASE_URL::' . UrlHelper::encodePath('/files/styles/canvas_parametrized_width--{width}/public/image-3.jpg.avif?itok=ZZaCKDGa'),
+            'alt' => 'amazing',
+            'width' => 80,
+            'height' => 60,
+          ],
+          [
+            'src' => '::SITE_DIR_BASE_URL::/files/image-2.jpg?alternateWidths=::SITE_DIR_BASE_URL::' . UrlHelper::encodePath('/files/styles/canvas_parametrized_width--{width}/public/image-2.jpg.avif?itok=XYZlDjzC'),
+            'alt' => 'An image so amazing that to gaze upon it would melt your face',
+            'width' => 80,
+            'height' => 60,
+          ],
+          [
+            'src' => 'Jack is awesome!',
+          ],
+        ],
+        (new CacheableMetadata())
+          ->setCacheTags([
+            // The host entity.
+            'node:1',
+            // All referenced media entities.
+            'media:2',
+            'media:1',
+            'media:3',
+            // The entities used by the 2 computed `src_with_alternate_widths`
+            // field properties: those for the `image` Media and the
+            // `anything_is_possible` Media.
+            // The `image_but_not_image_media_source` Media type does not use
+            // File entities.
+            // @see \Drupal\canvas\Plugin\Field\FieldTypeOverride\ImageItemOverride::propertyDefinitions()
+            // @see \Drupal\canvas\Plugin\DataType\ComputedUrlWithQueryString
+            'file:2',
             'file:1',
             // The parametrized image style used by the computed
             // `srcset_candidate_uri_template` field property, which is in turn
@@ -1192,13 +1544,122 @@ class PropSourceTest extends KernelTestBase {
           // @see \Drupal\canvas\PropExpressions\StructuredData\Evaluator::validateAccess()
           ->setCacheContexts(['user.permissions']),
       ),
-      'expected_node_access_denied_message' => ["Access denied to entity while evaluating expression, ℹ︎␜entity:node:bio|page␝field_photo|field_image␞␟srcset_candidate_uri_template|src_with_alternate_widths, reason: The 'access content' permission is required."],
+      'expected_node_access_denied_message' => [
+        "Access denied to entity while evaluating expression, ℹ︎␜entity:node:page␝field_photos␞␟entity␜$per_media_type_specific_expression_branches, reason: The 'access content' permission is required.",
+        // 💡 This illustrates which one of the three branches is evaluated
+        // FIRST: the first referenced entity. Once the `view media` permission
+        // is granted, the subsequent 2 references can be resolved, too.
+        "Access denied to entity while evaluating expression, ℹ︎␜entity:media:anything_is_possible␝field_media_image_1␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}, reason: The 'view media' permission is required when the media item is published.",
+      ],
       'expected_dependencies_expression_only' => $expected_dependencies_expression,
-      'expected_dependencies_with_host_entity' => $expected_node_1_expression_dependencies,
+      // Unlike the above test case, the one below will evaluate ALL deltas in the
+      // given entity field, so these additional dependencies arise.
+      'expected_dependencies_with_host_entity' => [
+        'module' => [
+          ...$expected_node_1_expression_dependencies['module'],
+          'media',
+          'file',
+          'media',
+          'file',
+          'media',
+          'file',
+          'media',
+          'file',
+          'media',
+          'file',
+          'file',
+          'media',
+          'file',
+          'media',
+          'file',
+          'media',
+          'file',
+          'media',
+          'media',
+          'file',
+          'media',
+          'file',
+          'media',
+          'file',
+          'media',
+          'file',
+          'media',
+          'file',
+          'media',
+          'file',
+          'media',
+          'file',
+          'media',
+          'file',
+          'media',
+        ],
+        'config' => [
+          ...$expected_node_1_expression_dependencies['config'],
+          'media.type.anything_is_possible',
+          'field.field.media.anything_is_possible.field_media_image_1',
+          'image.style.canvas_parametrized_width',
+          'media.type.anything_is_possible',
+          'field.field.media.anything_is_possible.field_media_image_1',
+          'image.style.canvas_parametrized_width',
+          'media.type.anything_is_possible',
+          'field.field.media.anything_is_possible.field_media_image_1',
+          'image.style.canvas_parametrized_width',
+          'media.type.anything_is_possible',
+          'field.field.media.anything_is_possible.field_media_image_1',
+          'image.style.canvas_parametrized_width',
+          'media.type.image',
+          'field.field.media.image.field_media_image',
+          'image.style.canvas_parametrized_width',
+          'media.type.image',
+          'field.field.media.image.field_media_image',
+          'image.style.canvas_parametrized_width',
+          'media.type.image',
+          'field.field.media.image.field_media_image',
+          'image.style.canvas_parametrized_width',
+          'media.type.image',
+          'field.field.media.image.field_media_image',
+          'image.style.canvas_parametrized_width',
+          'media.type.image_but_not_image_media_source',
+          'field.field.media.image_but_not_image_media_source.field_media_test',
+          'media.type.anything_is_possible',
+          'field.field.media.anything_is_possible.field_media_image_1',
+          'image.style.canvas_parametrized_width',
+          'media.type.anything_is_possible',
+          'field.field.media.anything_is_possible.field_media_image_1',
+          'image.style.canvas_parametrized_width',
+          'media.type.anything_is_possible',
+          'field.field.media.anything_is_possible.field_media_image_1',
+          'image.style.canvas_parametrized_width',
+          'media.type.anything_is_possible',
+          'field.field.media.anything_is_possible.field_media_image_1',
+          'image.style.canvas_parametrized_width',
+          'media.type.image',
+          'field.field.media.image.field_media_image',
+          'image.style.canvas_parametrized_width',
+          'media.type.image',
+          'field.field.media.image.field_media_image',
+          'image.style.canvas_parametrized_width',
+          'media.type.image',
+          'field.field.media.image.field_media_image',
+          'image.style.canvas_parametrized_width',
+          'media.type.image',
+          'field.field.media.image.field_media_image',
+          'image.style.canvas_parametrized_width',
+          'media.type.image_but_not_image_media_source',
+          'field.field.media.image_but_not_image_media_source.field_media_test',
+        ],
+        'content' => [
+          'media:anything_is_possible:' . self::IMAGE_MEDIA_UUID2,
+          'media:image:' . self::IMAGE_MEDIA_UUID1,
+          'media:image_but_not_image_media_source:' . self::TEST_MEDIA,
+          'file:file:' . self::FILE_UUID2,
+          'file:file:' . self::FILE_UUID1,
+        ],
+      ],
     ];
   }
 
-  public static function providerInvalidDynamicPropSourceFieldPropExpressionDueToDelta(): iterable {
+  public static function providerInvalidEntityFieldPropSourceFieldPropExpressionDueToDelta(): iterable {
     yield [
       "ℹ︎␜entity:user␝name␞␟value",
       NULL,
@@ -1258,8 +1719,8 @@ class PropSourceTest extends KernelTestBase {
   /**
    * @covers \Drupal\canvas\PropExpressions\StructuredData\Evaluator
    */
-  #[DataProvider('providerInvalidDynamicPropSourceFieldPropExpressionDueToDelta')]
-  public function testInvalidDynamicPropSourceFieldPropExpressionDueToDelta(string $expression, ?string $expected_message, mixed $expected_value, CacheableMetadata $expected_cacheability): void {
+  #[DataProvider('providerInvalidEntityFieldPropSourceFieldPropExpressionDueToDelta')]
+  public function testInvalidEntityFieldPropSourceFieldPropExpressionDueToDelta(string $expression, ?string $expected_message, mixed $expected_value, CacheableMetadata $expected_cacheability): void {
     $this->setUpCurrentUser(permissions: ['administer permissions', 'access user profiles', 'administer users']);
     Role::create(['id' => 'test_role_a', 'label' => 'Test role A'])->save();
     Role::create(['id' => 'test_role_b', 'label' => 'Test role B'])->save();
@@ -1272,14 +1733,14 @@ class PropSourceTest extends KernelTestBase {
     ])->activate();
 
     // @phpstan-ignore-next-line argument.type
-    $dynamic_prop_source_delta_test = new DynamicPropSource(StructuredDataPropExpression::fromString($expression));
+    $entity_field_prop_source_delta_test = new EntityFieldPropSource(StructuredDataPropExpression::fromString($expression));
 
     if ($expected_message !== NULL) {
       $this->expectException(\LogicException::class);
       $this->expectExceptionMessage($expected_message);
     }
 
-    $evaluation_result = $dynamic_prop_source_delta_test->evaluate($user, is_required: TRUE);
+    $evaluation_result = $entity_field_prop_source_delta_test->evaluate($user, is_required: TRUE);
     self::assertSame($expected_value, $evaluation_result->value);
     self::assertSame($expected_cacheability->getCacheTags(), $evaluation_result->getCacheTags());
     self::assertSame($expected_cacheability->getCacheContexts(), $evaluation_result->getCacheContexts());
@@ -1287,15 +1748,15 @@ class PropSourceTest extends KernelTestBase {
   }
 
   /**
-   * @covers \Drupal\canvas\PropSource\DynamicPropSource::withAdapter()
-   * @covers \Drupal\canvas\PropSource\DynamicPropSource::parse())
+   * @covers \Drupal\canvas\PropSource\EntityFieldPropSource::withAdapter()
+   * @covers \Drupal\canvas\PropSource\EntityFieldPropSource::parse())
    */
-  public function testInvalidDynamicPropSourceDueToMissingAdapter(): void {
+  public function testInvalidEntityFieldPropSourceDueToMissingAdapter(): void {
     $this->expectException(PluginNotFoundException::class);
     $this->expectExceptionMessage('The "unix_to_date_oops_I_have_been_renamed" plugin does not exist.');
 
-    DynamicPropSource::parse([
-      'sourceType' => PropSource::Dynamic->value,
+    EntityFieldPropSource::parse([
+      'sourceType' => PropSource::EntityField->value,
       'expression' => 'ℹ︎␜entity:user␝created␞␟value',
       'adapter' => 'unix_to_date_oops_I_have_been_renamed',
     ]);
@@ -1338,7 +1799,7 @@ class PropSourceTest extends KernelTestBase {
     $this->assertInstanceOf(AdaptedPropSource::class, $simple_static_example);
     // The contained information read back out.
     $this->assertSame('adapter:day_count', $simple_static_example->getSourceType());
-    // Test the functionality of a DynamicPropSource:
+    // Test the functionality of a EntityFieldPropSource:
     // - evaluate it to populate an SDC prop
     $user = User::create(['name' => 'John Doe', 'created' => 694695600, 'access' => 1720602713]);
     // TRICKY: entities must be saved for them to have cache tags.
@@ -1358,15 +1819,15 @@ class PropSourceTest extends KernelTestBase {
       ],
     ], $simple_static_example->calculateDependencies());
 
-    // A simple dynamic example.
-    $simple_dynamic_example = AdaptedPropSource::parse([
+    // A simple entity field example.
+    $simple_entity_field_example = AdaptedPropSource::parse([
       'sourceType' => 'adapter:day_count',
       'adapterInputs' => [
         'oldest' => [
           'sourceType' => 'adapter:unix_to_date',
           'adapterInputs' => [
             'unix' => [
-              'sourceType' => 'dynamic',
+              'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:user␝created␞␟value',
             ],
           ],
@@ -1375,7 +1836,7 @@ class PropSourceTest extends KernelTestBase {
           'sourceType' => 'adapter:unix_to_date',
           'adapterInputs' => [
             'unix' => [
-              'sourceType' => 'dynamic',
+              'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:user␝access␞␟value',
             ],
           ],
@@ -1384,13 +1845,13 @@ class PropSourceTest extends KernelTestBase {
     ]);
     // First, get the string representation and parse it back, to prove
     // serialization and deserialization works.
-    $json_representation = (string) $simple_dynamic_example;
-    $this->assertSame('{"sourceType":"adapter:day_count","adapterInputs":{"oldest":{"sourceType":"adapter:unix_to_date","adapterInputs":{"unix":{"sourceType":"dynamic","expression":"ℹ︎␜entity:user␝created␞␟value"}}},"newest":{"sourceType":"adapter:unix_to_date","adapterInputs":{"unix":{"sourceType":"dynamic","expression":"ℹ︎␜entity:user␝access␞␟value"}}}}}', $json_representation);
-    $simple_dynamic_example = PropSource::parse(json_decode($json_representation, TRUE));
-    $this->assertInstanceOf(AdaptedPropSource::class, $simple_dynamic_example);
+    $json_representation = (string) $simple_entity_field_example;
+    $this->assertSame('{"sourceType":"adapter:day_count","adapterInputs":{"oldest":{"sourceType":"adapter:unix_to_date","adapterInputs":{"unix":{"sourceType":"entity-field","expression":"ℹ︎␜entity:user␝created␞␟value"}}},"newest":{"sourceType":"adapter:unix_to_date","adapterInputs":{"unix":{"sourceType":"entity-field","expression":"ℹ︎␜entity:user␝access␞␟value"}}}}}', $json_representation);
+    $simple_entity_field_example = PropSource::parse(json_decode($json_representation, TRUE));
+    $this->assertInstanceOf(AdaptedPropSource::class, $simple_entity_field_example);
     // The contained information read back out.
-    $this->assertSame('adapter:day_count', $simple_dynamic_example->getSourceType());
-    // Test the functionality of a DynamicPropSource:
+    $this->assertSame('adapter:day_count', $simple_entity_field_example->getSourceType());
+    // Test the functionality of a EntityFieldPropSource:
     // - evaluate it to populate an SDC prop
     $this->setUpCurrentUser(permissions: ['access user profiles', 'administer users']);
     self::assertEquals(
@@ -1399,7 +1860,7 @@ class PropSourceTest extends KernelTestBase {
         (new CacheableMetadata())
           ->setCacheTags(['user:1'])
           ->setCacheContexts(['user.permissions'])),
-      $simple_dynamic_example->evaluate($user, is_required: TRUE)
+      $simple_entity_field_example->evaluate($user, is_required: TRUE)
     );
     self::assertSame([
       'module' => [
@@ -1409,7 +1870,7 @@ class PropSourceTest extends KernelTestBase {
         'canvas',
         'user',
       ],
-    ], $simple_dynamic_example->calculateDependencies($user));
+    ], $simple_entity_field_example->calculateDependencies($user));
 
     // A complex example.
     $complex_example = AdaptedPropSource::parse([
@@ -1429,7 +1890,7 @@ class PropSourceTest extends KernelTestBase {
           'sourceType' => 'adapter:unix_to_date',
           'adapterInputs' => [
             'unix' => [
-              'sourceType' => 'dynamic',
+              'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:user␝access␞␟value',
             ],
           ],
@@ -1439,12 +1900,12 @@ class PropSourceTest extends KernelTestBase {
     // First, get the string representation and parse it back, to prove
     // serialization and deserialization works.
     $json_representation = (string) $complex_example;
-    $this->assertSame('{"sourceType":"adapter:day_count","adapterInputs":{"oldest":{"sourceType":"static:field_item:datetime","value":"2020-04-16","expression":"ℹ︎datetime␟value","sourceTypeSettings":{"storage":{"datetime_type":"date"}}},"newest":{"sourceType":"adapter:unix_to_date","adapterInputs":{"unix":{"sourceType":"dynamic","expression":"ℹ︎␜entity:user␝access␞␟value"}}}}}', $json_representation);
+    $this->assertSame('{"sourceType":"adapter:day_count","adapterInputs":{"oldest":{"sourceType":"static:field_item:datetime","value":"2020-04-16","expression":"ℹ︎datetime␟value","sourceTypeSettings":{"storage":{"datetime_type":"date"}}},"newest":{"sourceType":"adapter:unix_to_date","adapterInputs":{"unix":{"sourceType":"entity-field","expression":"ℹ︎␜entity:user␝access␞␟value"}}}}}', $json_representation);
     $complex_example = PropSource::parse(json_decode($json_representation, TRUE));
     $this->assertInstanceOf(AdaptedPropSource::class, $complex_example);
     // The contained information read back out.
     $this->assertSame('adapter:day_count', $complex_example->getSourceType());
-    // Test the functionality of a DynamicPropSource:
+    // Test the functionality of a EntityFieldPropSource:
     // - evaluate it to populate an SDC prop
     self::assertEquals(
       new EvaluationResult(
@@ -1486,7 +1947,7 @@ class PropSourceTest extends KernelTestBase {
           'sourceType' => 'adapter:unix_to_date',
           'adapterInputs' => [
             'unix' => [
-              'sourceType' => 'dynamic',
+              'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:user␝access␞␟value',
             ],
           ],
@@ -1501,7 +1962,7 @@ class PropSourceTest extends KernelTestBase {
     $this->assertInstanceOf(AdaptedPropSource::class, $complex_example_bc);
     // The contained information read back out.
     $this->assertSame('adapter:day_count', $complex_example_bc->getSourceType());
-    // Test the functionality of a DynamicPropSource:
+    // Test the functionality of a EntityFieldPropSource:
     // - evaluate it to populate an SDC prop
     self::assertEquals(
       new EvaluationResult(
@@ -1640,48 +2101,48 @@ class PropSourceTest extends KernelTestBase {
    * @param class-string<\Throwable>|null $expected_exception
    */
   #[TestWith([
-    ['sourceType' => 'host-entity-url'],
-    ['sourceType' => 'host-entity-url', 'absolute' => TRUE],
+    ['sourceType' => PropSource::HostEntityUrl->value],
+    ['sourceType' => PropSource::HostEntityUrl->value, 'absolute' => TRUE],
     'media',
     self::IMAGE_MEDIA_UUID1,
     '/media/1/edit',
     NULL,
   ])]
   #[TestWith([
-    ['sourceType' => 'host-entity-url'],
-    ['sourceType' => 'host-entity-url', 'absolute' => TRUE],
+    ['sourceType' => PropSource::HostEntityUrl->value],
+    ['sourceType' => PropSource::HostEntityUrl->value, 'absolute' => TRUE],
     'file',
     self::FILE_UUID1,
     NULL,
     UndefinedLinkTemplateException::class,
   ])]
   #[TestWith([
-    ['sourceType' => 'host-entity-url'],
-    ['sourceType' => 'host-entity-url', 'absolute' => TRUE],
+    ['sourceType' => PropSource::HostEntityUrl->value],
+    ['sourceType' => PropSource::HostEntityUrl->value, 'absolute' => TRUE],
     'media',
     'not-a-real-uuid',
     NULL,
     MissingHostEntityException::class,
   ])]
   #[TestWith([
-    ['sourceType' => 'host-entity-url'],
-    ['sourceType' => 'host-entity-url', 'absolute' => TRUE],
+    ['sourceType' => PropSource::HostEntityUrl->value],
+    ['sourceType' => PropSource::HostEntityUrl->value, 'absolute' => TRUE],
     'node',
     'with-alias',
     '/awesome-page',
     NULL,
   ])]
   #[TestWith([
-    ['sourceType' => 'host-entity-url'],
-    ['sourceType' => 'host-entity-url', 'absolute' => TRUE],
+    ['sourceType' => PropSource::HostEntityUrl->value],
+    ['sourceType' => PropSource::HostEntityUrl->value, 'absolute' => TRUE],
     'node',
     'without-alias',
     '/node/1',
     NULL,
   ])]
   #[TestWith([
-    ['sourceType' => 'host-entity-url', 'absolute' => FALSE],
-    ['sourceType' => 'host-entity-url', 'absolute' => FALSE],
+    ['sourceType' => PropSource::HostEntityUrl->value, 'absolute' => FALSE],
+    ['sourceType' => PropSource::HostEntityUrl->value, 'absolute' => FALSE],
     'node',
     'with-alias',
     '/awesome-page',
@@ -1700,11 +2161,11 @@ class PropSourceTest extends KernelTestBase {
     // Confirm that the array representation can be parsed back.
     $source = PropSource::parse($expected_array_representation);
     self::assertInstanceOf(HostEntityUrlPropSource::class, $source);
-    self::assertSame('host-entity-url', $source->getSourceType());
+    self::assertSame(PropSource::HostEntityUrl->value, $source->getSourceType());
     self::assertSame($expected_array_representation['absolute'], $source->absolute);
     self::assertSame([], $source->calculateDependencies());
     self::assertSame(
-      sprintf('host-entity-url:%s:canonical', $source->absolute ? 'absolute' : 'relative'),
+      \sprintf('host-entity-url:%s:canonical', $source->absolute ? 'absolute' : 'relative'),
       $source->asChoice(),
     );
     self::assertSame(
@@ -1737,6 +2198,19 @@ class PropSourceTest extends KernelTestBase {
       $this->expectException($expected_exception);
     }
     self::assertSame($expected_url, $source->evaluate($entity, TRUE)->value);
+  }
+
+  /**
+   * @covers PropSource::Dynamic
+   * @group legacy
+   */
+  public function testDynamicPrefixIsTransformedOnLoad(): void {
+    $this->expectDeprecation('The "dynamic" prop source was renamed to "entity field" is deprecated in canvas:1.2.0 and will be removed from canvas:2.0.0. Re-save (and re-export) all Canvas content templates. See https://www.drupal.org/node/3566701');
+    $prop_source = PropSource::parse([
+      'sourceType' => PropSource::Dynamic->value,
+      'expression' => "ℹ︎␜entity:user␝name␞␟value",
+    ]);
+    self::assertInstanceOf(EntityFieldPropSource::class, $prop_source);
   }
 
 }

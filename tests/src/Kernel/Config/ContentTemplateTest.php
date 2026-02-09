@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Config;
 
+use Drupal\canvas\PropSource\PropSource;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\Page;
@@ -87,19 +88,19 @@ final class ContentTemplateTest extends KernelTestBase {
   public function testOnlyContentEntitiesCanUseTemplates(): void {
     $manager = \Drupal::entityTypeManager();
     $definition = $manager->getDefinition('node');
-    assert($definition instanceof EntityTypeInterface);
+    \assert($definition instanceof EntityTypeInterface);
     $this->assertTrue($definition->hasHandlerClass(ContentTemplateAwareViewBuilder::DECORATED_HANDLER_KEY));
     $this->assertSame(ContentTemplateAwareViewBuilder::class, $definition->getViewBuilderClass());
 
     // Config entities have no view builder and Canvas doesn't touch them.
     $definition = $manager->getDefinition('user_role');
-    assert($definition instanceof EntityTypeInterface);
+    \assert($definition instanceof EntityTypeInterface);
     $this->assertFalse($definition->hasViewBuilderClass());
     $this->assertFalse($definition->hasHandlerClass(ContentTemplateAwareViewBuilder::DECORATED_HANDLER_KEY));
 
     // Canvas pages are left alone despite being content entities.
     $definition = $manager->getDefinition(Page::ENTITY_TYPE_ID);
-    assert($definition instanceof EntityTypeInterface);
+    \assert($definition instanceof EntityTypeInterface);
     $this->assertFalse($definition->hasHandlerClass(ContentTemplateAwareViewBuilder::DECORATED_HANDLER_KEY));
   }
 
@@ -159,7 +160,7 @@ final class ContentTemplateTest extends KernelTestBase {
         'component_version' => 'b1e991f726a2a266',
         'inputs' => [
           'heading' => [
-            'sourceType' => 'dynamic',
+            'sourceType' => PropSource::EntityField->value,
             'expression' => 'ℹ︎␜entity:node:alpha␝title␞␟value',
           ],
         ],
@@ -240,7 +241,7 @@ final class ContentTemplateTest extends KernelTestBase {
           'component_version' => 'b1e991f726a2a266',
           'inputs' => [
             'heading' => [
-              'sourceType' => 'dynamic',
+              'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:node:alpha␝title␞␟value',
             ],
           ],

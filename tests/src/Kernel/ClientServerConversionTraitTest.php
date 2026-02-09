@@ -52,10 +52,10 @@ class ClientServerConversionTraitTest extends KernelTestBase {
     $json = $this->traitGetValidClientJson(NULL, $dynamic_image);
     // @see \Drupal\canvas\ClientDataToEntityConverter::convert()
     $content_region = \array_values(\array_filter($json['layout'], static fn(array $region) => $region['id'] === 'content'))[0];
-    assert(count(array_intersect(['nodeType', 'id', 'name', 'components'], array_keys($content_region))) === 4);
-    assert($content_region['nodeType'] === 'region');
-    assert($content_region['id'] === 'content');
-    assert(is_array($content_region['components']));
+    \assert(count(array_intersect(['nodeType', 'id', 'name', 'components'], array_keys($content_region))) === 4);
+    \assert($content_region['nodeType'] === 'region');
+    \assert($content_region['id'] === 'content');
+    \assert(is_array($content_region['components']));
     $createComponentWithSlots = fn(string $uuid, array $body_component = []) => [
       'nodeType' => 'component',
       'uuid' => $uuid,
@@ -144,7 +144,7 @@ class ClientServerConversionTraitTest extends KernelTestBase {
       [
         'uuid' => self::TEST_IMAGE_UUID,
         'component_id' => 'sdc.canvas_test_sdc.image',
-        'component_version' => 'abadf2538ecfdecc',
+        'component_version' => 'fb40be57bd7e0973',
       ],
       [
         'uuid' => self::TEST_BLOCK,
@@ -197,7 +197,7 @@ class ClientServerConversionTraitTest extends KernelTestBase {
       [
         'uuid' => self::TEST_IMAGE_UUID,
         'component_id' => 'sdc.canvas_test_sdc.image',
-        'component_version' => 'abadf2538ecfdecc',
+        'component_version' => 'fb40be57bd7e0973',
       ],
       [
         'uuid' => self::TEST_BLOCK,
@@ -336,7 +336,7 @@ class ClientServerConversionTraitTest extends KernelTestBase {
         [
           'nodeType' => 'component',
           'uuid' => self::TEST_IMAGE_UUID,
-          'type' => 'sdc.canvas_test_sdc.image@abadf2538ecfdecc',
+          'type' => 'sdc.canvas_test_sdc.image@fb40be57bd7e0973',
           'slots' => [],
         ],
         [
@@ -391,7 +391,7 @@ class ClientServerConversionTraitTest extends KernelTestBase {
             'image' => [
               'value' => $this->mediaEntity->id(),
               'sourceType' => 'static:field_item:entity_reference',
-              'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:image␝field_media_image␞␟src_with_alternate_widths,alt↝entity␜␜entity:media:image␝field_media_image␞␟alt,width↝entity␜␜entity:media:image␝field_media_image␞␟width,height↝entity␜␜entity:media:image␝field_media_image␞␟height}',
+              'expression' => 'ℹ︎entity_reference␟entity␜␜entity:media:image␝field_media_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
               'sourceTypeSettings' => [
                 'storage' => ['target_type' => 'media'],
                 'instance' => [

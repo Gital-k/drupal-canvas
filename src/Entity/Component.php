@@ -490,11 +490,23 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
   /**
    * {@inheritdoc}
    */
-  public function getSettings(): array {
+  public function getSettings(?string $version = NULL): array {
+    if ($version !== NULL) {
+      self::assertVersionExists($version);
+      // The version key is the given version string, except in one case.
+      $version_key = $version === $this->active_version ? self::ACTIVE_VERSION : $version;
+      return $this->versioned_properties[$version_key]['settings'] ?? [];
+    }
     return $this->get('settings') ?? [];
   }
 
-  public function getSlotDefinitions(): array {
+  public function getSlotDefinitions(?string $version = NULL): array {
+    if ($version !== NULL) {
+      self::assertVersionExists($version);
+      // The version key is the given version string, except in one case.
+      $version_key = $version === $this->active_version ? self::ACTIVE_VERSION : $version;
+      return $this->versioned_properties[$version_key]['fallback_metadata']['slot_definitions'] ?? [];
+    }
     return $this->get('fallback_metadata')['slot_definitions'] ?? [];
   }
 
@@ -569,7 +581,7 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
    * @return void
    */
   private function populateFallbackMetadata(): void {
-    assert($this->isLoadedVersionActiveVersion());
+    \assert($this->isLoadedVersionActiveVersion());
     $source = $this->getComponentSource();
 
     if ($source instanceof Fallback) {
@@ -591,6 +603,7 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
       $this->getConfigUpdater()->updatePropFieldDefinitionsUsingTextValue($this);
       $this->getConfigUpdater()->updatePropOrder($this);
       $this->getConfigUpdater()->unsetComponentCategoryProperty($this);
+      $this->getConfigUpdater()->updateMultiBundleReferencePropExpressionToMultiBranch($this);
     }
     parent::preSave($storage);
 
@@ -672,8 +685,8 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
 
     // @phpstan-ignore-next-line
     $component = $context->getObject()->getParent();
-    assert($component instanceof Mapping);
-    assert($component->getDataDefinition()->getDataType() === 'canvas.component.*');
+    \assert($component instanceof Mapping);
+    \assert($component->getDataDefinition()->getDataType() === 'canvas.component.*');
     // The version should be based on the source-specific settings for this
     // version, not on anything else (certainly not the fallback metadata.)
     $raw = $component->getValue();
@@ -683,7 +696,7 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
           'local_source_id' => $raw['source_local_id'],
           ...$raw['versioned_properties'][VersionedConfigEntityInterface::ACTIVE_VERSION]['settings'],
         ]);
-      assert($source instanceof ComponentSourceInterface);
+      \assert($source instanceof ComponentSourceInterface);
       $expected_version = $source->generateVersionHash();
     }
     catch (\Exception) {

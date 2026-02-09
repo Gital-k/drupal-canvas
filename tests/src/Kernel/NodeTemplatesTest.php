@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupal\Tests\canvas\Kernel;
 
 use ColinODell\PsrTestLogger\TestLogger;
+use Drupal\canvas\PropSource\PropSource;
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
@@ -117,7 +118,7 @@ final class NodeTemplatesTest extends KernelTestBase {
     FALSE,
     [
       // Components in the component tree — minus the ones whose props failed to
-      // resolve because they were inaccessible: DynamicPropSources populated by
+      // resolve because they were inaccessible: EntityFieldPropSources populated by
       // the host entity.
       'config:canvas.component.sdc.canvas_test_sdc.my-hero',
       // @todo Stop expecting this cache tag in https://www.drupal.org/i/3559820
@@ -144,35 +145,35 @@ final class NodeTemplatesTest extends KernelTestBase {
             // Tests static prop source end-to-end.
             // @see \Drupal\canvas\PropSource\StaticPropSource
             'heading' => 'Canvas is large and in charge!',
-            // Tests adapted dynamic prop source end-to-end.
-            // @see \Drupal\canvas\PropSource\DynamicPropSource::__construct(adapter)
+            // Tests adapted entity field prop source end-to-end.
+            // @see \Drupal\canvas\PropSource\EntityFieldPropSource::__construct(adapter)
             'subheading' => [
-              'sourceType' => 'dynamic',
+              'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:node:article␝created␞␟value',
               'adapter' => 'unix_to_date',
             ],
-            // Tests dynamic prop source end-to-end.
-            // @see \Drupal\canvas\PropSource\DynamicPropSource
+            // Tests entity field prop source end-to-end.
+            // @see \Drupal\canvas\PropSource\EntityFieldPropSource
             'cta1' => [
-              'sourceType' => 'dynamic',
+              'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
             ],
             // Tests host entity URL prop source end-to-end.
             // @see \Drupal\canvas\PropSource\HostEntityUrlPropSource
             'cta1href' => [
-              'sourceType' => 'host-entity-url',
+              'sourceType' => PropSource::HostEntityUrl->value,
             ],
           ],
         ],
-        // The node body, which needs to be using a dynamic prop source
-        // because all content templates require at least one dynamic prop
+        // The node body, which needs to be using a entity field prop source
+        // because all content templates require at least one entity field prop
         // source.
         [
           'uuid' => '6cf8297a-fc60-4019-be81-c336fd828c39',
           'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
           'inputs' => [
             'heading' => [
-              'sourceType' => 'dynamic',
+              'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:node:article␝body␞␟processed',
             ],
           ],
@@ -205,7 +206,7 @@ HTML;
     // Canvas for rendering.
     self::assertCount(0, $crawler->filter('h1.my-hero__heading:contains("Canvas is large and in charge!")'));
     self::assertCount(0, $crawler->filter('div.my-hero__container > p.my-hero__subheading:contains("2025-12-04")'));
-    self::assertCount(0, $crawler->filter(sprintf('div.my-hero__container > div.my-hero__actions > a[href="%s/node/1"]:contains("%s")', $GLOBALS['base_url'], $node->getTitle())));
+    self::assertCount(0, $crawler->filter(\sprintf('div.my-hero__container > div.my-hero__actions > a[href="%s/node/1"]:contains("%s")', $GLOBALS['base_url'], $node->getTitle())));
     self::assertCount(1, $crawler->filter('p:contains("Hey this is allowed")'));
     self::assertCount(0, $crawler->filter('script'));
     self::assertEqualsCanonicalizing([
@@ -233,11 +234,11 @@ HTML;
     // Confirm although we've opted in the status of the template is false so
     // will not be used.
     $template = ContentTemplate::load('node.article.full');
-    assert($template instanceof ContentTemplate);
+    \assert($template instanceof ContentTemplate);
     self::assertFalse($template->status());
     self::assertCount(0, $crawler->filter('h1.my-hero__heading:contains("Canvas is large and in charge!")'));
     self::assertCount(0, $crawler->filter('div.my-hero__container > p.my-hero__subheading:contains("2025-12-04")'));
-    self::assertCount(0, $crawler->filter(sprintf('div.my-hero__container > div.my-hero__actions > a[href="%s/node/1"]:contains("%s")', $GLOBALS['base_url'], $node->getTitle())));
+    self::assertCount(0, $crawler->filter(\sprintf('div.my-hero__container > div.my-hero__actions > a[href="%s/node/1"]:contains("%s")', $GLOBALS['base_url'], $node->getTitle())));
     self::assertCount(1, $crawler->filter('p:contains("Hey this is allowed")'));
     self::assertCount(0, $crawler->filter('script'));
 
@@ -262,7 +263,7 @@ HTML;
     self::assertStringContainsString('Canvas is large and in charge!', $html);
     self::assertCount(1, $crawler->filter('h1.my-hero__heading:contains("Canvas is large and in charge!")'));
     self::assertCount($expected_entity_data_is_accessible ? 1 : 0, $crawler->filter('div.my-hero__container > p.my-hero__subheading:contains("2025-12-04")'));
-    self::assertCount($expected_entity_data_is_accessible ? 1 : 0, $crawler->filter(sprintf('div.my-hero__container > div.my-hero__actions > a[href="%s/node/1"]:contains("%s")', $GLOBALS['base_url'], $node->getTitle())));
+    self::assertCount($expected_entity_data_is_accessible ? 1 : 0, $crawler->filter(\sprintf('div.my-hero__container > div.my-hero__actions > a[href="%s/node/1"]:contains("%s")', $GLOBALS['base_url'], $node->getTitle())));
     self::assertCount($expected_entity_data_is_accessible ? 1 : 0, $crawler->filter('p:contains("Hey this is allowed")'));
     self::assertCount(0, $crawler->filter('script'));
     self::assertEqualsCanonicalizing([
@@ -290,7 +291,7 @@ HTML;
     $crawler = $this->crawlerForRenderArray($output);
     // Confirm that the template is NOT used when viewing the node as a teaser,
     // even though the content type is opted into Canvas.
-    self::assertCount(0, $crawler->filter(sprintf('a[href="%s/node/1"]:contains("Canvas is large and in charge!")', $GLOBALS['base_url'])));
+    self::assertCount(0, $crawler->filter(\sprintf('a[href="%s/node/1"]:contains("Canvas is large and in charge!")', $GLOBALS['base_url'])));
     // TRICKY: note that entity access is NOT checked by the EntityViewBuilder,
     // that is up to the caller! The above is specifically testing Canvas
     // ContentTemplates' render arrays. Those are populated by field properties
@@ -321,7 +322,7 @@ HTML;
           'component_version' => '85a5c0c7dd53e0bb',
           'inputs' => [
             'heading' => [
-              'sourceType' => 'dynamic',
+              'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
             ],
           ],
@@ -385,8 +386,7 @@ HTML;
       // Components in the component tree.
       'config:canvas.component.sdc.canvas_test_sdc.props-slots',
       'config:canvas.component.sdc.canvas_test_sdc.props-no-slots',
-      // Dynamic prop sources that pulled data from the entity should propagate the entity's
-      // cache tags.
+      // Entity field prop sources should propagate the entity's cache tags.
       'node:1',
     ], $build['#cache']['tags']);
     self::assertEqualsCanonicalizing(self::REQUIRED_CACHE_CONTEXTS, $build['#cache']['contexts']);

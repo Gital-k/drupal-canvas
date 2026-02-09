@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Traits;
 
+use Drupal\canvas\PropSource\PropSource;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\file\Entity\File;
 use Drupal\media\Entity\Media;
@@ -32,7 +33,7 @@ trait CanvasFieldTrait {
       ],
       self::TEST_IMAGE_UUID => $dynamic_image ? [
         'image' => [
-          'sourceType' => 'dynamic',
+          'sourceType' => PropSource::EntityField->value,
           'expression' => 'ℹ︎␜entity:node:article␝field_hero␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
         ],
       ] : [
@@ -68,7 +69,7 @@ trait CanvasFieldTrait {
       ],
     ]);
     $media->save();
-    assert($media instanceof Media);
+    \assert($media instanceof Media);
     $this->mediaEntity = $media;
     $this->unreferencedImage = $this->createFileEntity($test_image_files[3]);
   }
@@ -78,13 +79,13 @@ trait CanvasFieldTrait {
     $uri = $test_image->uri;
     $file = File::create(['uri' => $uri]);
     $file->save();
-    assert($file instanceof File);
+    \assert($file instanceof File);
     return $file;
   }
 
   private function assertNodeValues(Node $node, array $expected_component_ids, array $expected_inputs, array $expected_field_values): void {
     $nid = $node->id();
-    assert(is_string($nid));
+    \assert(is_string($nid));
     // Reset the node to ensure we're not getting a cached version.
     $this->container->get('entity_type.manager')
       ->getStorage('node')
@@ -136,7 +137,7 @@ trait CanvasFieldTrait {
             [
               'nodeType' => 'component',
               'uuid' => self::TEST_IMAGE_UUID,
-              'type' => 'sdc.canvas_test_sdc.image@abadf2538ecfdecc',
+              'type' => 'sdc.canvas_test_sdc.image@fb40be57bd7e0973',
               'slots' => [],
             ],
             [
@@ -205,7 +206,7 @@ trait CanvasFieldTrait {
           ],
           'source' => [
             'image' => [
-              'sourceType' => 'dynamic',
+              'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:node:article␝field_hero␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
             ],
           ],
@@ -222,7 +223,8 @@ trait CanvasFieldTrait {
             'image' => [
               'value' => (int) $this->mediaEntity->id(),
               'sourceType' => 'static:field_item:entity_reference',
-              'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:image␝field_media_image␞␟src_with_alternate_widths,alt↝entity␜␜entity:media:image␝field_media_image␞␟alt,width↝entity␜␜entity:media:image␝field_media_image␞␟width,height↝entity␜␜entity:media:image␝field_media_image␞␟height}',
+              // @see \Drupal\canvas\Hook\ShapeMatchingHooks::mediaLibraryStorablePropShapeAlter()
+              'expression' => 'ℹ︎entity_reference␟entity␜␜entity:media:image␝field_media_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
               'sourceTypeSettings' => [
                 'storage' => ['target_type' => 'media'],
                 'instance' => [
@@ -261,7 +263,7 @@ trait CanvasFieldTrait {
 
   private static function getSrcPropertyFromFile(File $file): string {
     $src = str_replace(base_path(), '/', $file->createFileUrl());
-    assert(is_string($src));
+    \assert(is_string($src));
     return $src;
   }
 

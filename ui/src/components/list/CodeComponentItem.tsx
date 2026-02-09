@@ -1,4 +1,4 @@
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { ContextMenu, HoverCard, Text } from '@radix-ui/themes';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
@@ -14,11 +14,12 @@ import {
   openRenameDialog,
 } from '@/features/ui/codeComponentDialogSlice';
 import { selectActivePanel } from '@/features/ui/primaryPanelSlice';
+import useEditorNavigation from '@/hooks/useEditorNavigation';
 
 import type { CodeComponentSerialized } from '@/types/CodeComponent';
 import type { JSComponent } from '@/types/Component';
 
-function removeJsPrefix(input: string): string {
+export function removeJsPrefix(input: string): string {
   if (input.startsWith('js.')) {
     return input.substring(3);
   }
@@ -26,7 +27,7 @@ function removeJsPrefix(input: string): string {
 }
 
 // Helper to get the correct id for a component
-function getComponentId(
+export function getComponentId(
   component: JSComponent | CodeComponentSerialized,
 ): string {
   // JSComponent has id, CodeComponentSerialized has machineName
@@ -55,7 +56,7 @@ const CodeComponentItem: React.FC<CodeComponentItemProps> = ({
   const machineName = removeJsPrefix(componentId);
   const layout = useAppSelector(selectLayout);
   const isComponentInLayout = componentExistsInLayout(layout, componentId);
-  const navigate = useNavigate();
+  const { navigateToCodeEditor, urlForCodeEditor } = useEditorNavigation();
   const { codeComponentId: selectedComponent } = useParams();
   const activePanel = useAppSelector(selectActivePanel);
 
@@ -86,7 +87,7 @@ const CodeComponentItem: React.FC<CodeComponentItemProps> = ({
   };
   const handleEditClick = (e: React.MouseEvent<HTMLDivElement>) => {
     e.stopPropagation();
-    navigate(`/code-editor/component/${machineName}`);
+    navigateToCodeEditor(machineName);
   };
 
   // Menu items for exposed code components
@@ -170,10 +171,9 @@ const CodeComponentItem: React.FC<CodeComponentItemProps> = ({
           selected={machineName === selectedComponent}
           onMenuOpenChange={onMenuOpenChange}
           draggable={true}
-          onClick={() => {
-            activePanel === 'code' &&
-              navigate(`/code-editor/component/${machineName}`);
-          }}
+          to={
+            activePanel === 'code' ? urlForCodeEditor(machineName) : undefined
+          }
         />
       </ContextMenu.Trigger>
       <UnifiedMenu.Content menuType="context" align="start" side="right">

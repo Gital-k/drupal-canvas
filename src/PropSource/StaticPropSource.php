@@ -6,6 +6,8 @@ namespace Drupal\canvas\PropSource;
 
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
 use Drupal\canvas\PropExpressions\StructuredData\FieldTypeBasedPropExpressionInterface;
+use Drupal\canvas\PropShape\PropShape;
+use Drupal\canvas\PropShape\StorablePropShape;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Datetime\DrupalDateTime;
 use Drupal\Core\Entity\FieldableEntityInterface;
@@ -70,21 +72,12 @@ final class StaticPropSource extends PropSourceBase {
     if ((string) $this->expression !== (string) $other->expression) {
       return FALSE;
     }
-    // Cardinality, field storage settings and field instance settings all are
-    // optional:
-    // - cardinality defaults to 1
-    if (($this->cardinality ?? 1) !== ($other->cardinality ?? 1)) {
-      return FALSE;
-    }
-    // - field storage settings defaults to NULL
-    if (($this->fieldStorageSettings ?? []) !== ($other->fieldStorageSettings ?? [])) {
-      return FALSE;
-    }
-    // - field instance settings defaults to NULL
-    if (($this->fieldInstanceSettings ?? []) !== ($other->fieldInstanceSettings ?? [])) {
-      return FALSE;
-    }
-    return TRUE;
+    $irrelevant = $this->getCardinality() === 1
+      ? new PropShape(['type' => 'object'])
+      : new PropShape(['type' => 'array', 'items' => ['type' => 'object']]);
+    $this_storable = new StorablePropShape($irrelevant, $this->expression, 'irrelevant', $this->cardinality, $this->fieldStorageSettings, $this->fieldInstanceSettings);
+    $other_storable = new StorablePropShape($irrelevant, $other->expression, 'irrelevant', $other->cardinality, $other->fieldStorageSettings, $other->fieldInstanceSettings);
+    return $this_storable->fieldDataFitsIn($other_storable);
   }
 
   /**
@@ -98,15 +91,13 @@ final class StaticPropSource extends PropSourceBase {
       'value' => $this->getValue(),
       'expression' => (string) $this->expression,
     ];
-    if ($this->fieldStorageSettings !== NULL && $this->fieldStorageSettings !== []) {
+    if ($this->fieldStorageSettings !== NULL && $this->fieldStorageSettings !== StorablePropShape::DEFAULT_STORAGE_SETTINGS) {
       $array_representation['sourceTypeSettings']['storage'] = $this->fieldStorageSettings;
     }
-    if ($this->fieldInstanceSettings !== NULL && $this->fieldInstanceSettings !== []) {
+    if ($this->fieldInstanceSettings !== NULL && $this->fieldInstanceSettings !== StorablePropShape::DEFAULT_INSTANCE_SETTINGS) {
       $array_representation['sourceTypeSettings']['instance'] = $this->fieldInstanceSettings;
     }
-    // Single-cardinality is the default.
-    // @see ::parse()
-    if ($this->cardinality !== NULL && $this->cardinality !== 1) {
+    if ($this->cardinality !== NULL && $this->cardinality !== StorablePropShape::DEFAULT_CARDINALITY) {
       $array_representation['sourceTypeSettings']['cardinality'] = $this->cardinality;
     }
 
@@ -135,7 +126,7 @@ final class StaticPropSource extends PropSourceBase {
       $storage_definition->setCardinality($cardinality);
     }
     $field_item_definition = $storage_definition->getItemDefinition();
-    assert($field_item_definition instanceof DataDefinition);
+    \assert($field_item_definition instanceof DataDefinition);
 
     // Third: respect field type-specific storage and instance settings.
     if ($field_storage_settings) {
@@ -155,7 +146,7 @@ final class StaticPropSource extends PropSourceBase {
     // @see \Drupal\Core\Field\FieldTypePluginManager::createFieldItemList()
     // @see \Drupal\Core\TypedData\TypedDataManagerInterface::getPropertyInstance()
     $field_item_list = $typed_data_manager->create($storage_definition);
-    assert($field_item_list instanceof FieldItemListInterface);
+    \assert($field_item_list instanceof FieldItemListInterface);
     return $field_item_list;
   }
 
@@ -175,7 +166,7 @@ final class StaticPropSource extends PropSourceBase {
     // TRICKY: unfortunately, `field.storage_settings.*` does not store
     // cardinality, but the FieldStorageConfig entity does (config schema:
     // `field.storage.*.*`). Hence the need for an additional key-value pair.
-    return $this->cardinality ?? 1;
+    return $this->cardinality ?? StorablePropShape::DEFAULT_CARDINALITY;
   }
 
   /**
@@ -204,7 +195,7 @@ final class StaticPropSource extends PropSourceBase {
         // @see \Drupal\Core\Field\Plugin\Field\FieldType\EntityReferenceItem::onChange()
         // @see \Drupal\Core\Entity\Plugin\DataType\EntityReference::isTargetNew()
         $field_item = $field_item_list[$i];
-        assert($field_item instanceof EntityReferenceItem);
+        \assert($field_item instanceof EntityReferenceItem);
         if ($field_item->get('target_id')->getValue() === NULL && $field_item->get('entity')->getValue()->isNew()) {
           $entity = $field_item->get('entity')->getValue();
           $entity->save();
@@ -248,7 +239,7 @@ final class StaticPropSource extends PropSourceBase {
       $field_item_list->filterEmptyItems();
       $after = $field_item_list->count();
       if ($before !== $after) {
-        throw new \LogicException(sprintf('%s called with invalid value for field type %s.', __METHOD__, $this->fieldItemList->getFieldDefinition()->getItemDefinition()->getDataType()));
+        throw new \LogicException(\sprintf('%s called with invalid value for field type %s.', __METHOD__, $this->fieldItemList->getFieldDefinition()->getItemDefinition()->getDataType()));
       }
     }
 
@@ -268,17 +259,17 @@ final class StaticPropSource extends PropSourceBase {
     // `sourceType = static` requires a value and an expression to be specified.
     $missing = array_diff(['value', 'expression'], array_keys($sdc_prop_source));
     if (!empty($missing)) {
-      throw new \LogicException(sprintf('Missing the keys %s.', implode(',', $missing)));
+      throw new \LogicException(\sprintf('Missing the keys %s.', implode(',', $missing)));
     }
-    assert(array_key_exists('value', $sdc_prop_source));
-    assert(array_key_exists('expression', $sdc_prop_source));
+    \assert(array_key_exists('value', $sdc_prop_source));
+    \assert(array_key_exists('expression', $sdc_prop_source));
 
     // First: construct an expression object from the expression string.
     $expression = StructuredDataPropExpression::fromString($sdc_prop_source['expression']);
-    assert($expression instanceof FieldTypeBasedPropExpressionInterface);
+    \assert($expression instanceof FieldTypeBasedPropExpressionInterface);
 
     // Second: retrieve the field storage settings, if any.
-    $cardinality = $sdc_prop_source['sourceTypeSettings']['cardinality'] ?? 1;
+    $cardinality = $sdc_prop_source['sourceTypeSettings']['cardinality'] ?? StorablePropShape::DEFAULT_CARDINALITY;
     $field_storage_settings = $sdc_prop_source['sourceTypeSettings']['storage'] ?? NULL;
     $field_instance_settings = $sdc_prop_source['sourceTypeSettings']['instance'] ?? NULL;
 
@@ -308,7 +299,7 @@ final class StaticPropSource extends PropSourceBase {
    */
   public static function isMinimalRepresentation(array $sdc_prop_source): void {
     $expression = StructuredDataPropExpression::fromString($sdc_prop_source['expression']);
-    assert($expression instanceof FieldTypeBasedPropExpressionInterface);
+    \assert($expression instanceof FieldTypeBasedPropExpressionInterface);
     $cardinality = $sdc_prop_source['sourceTypeSettings']['cardinality'] ?? NULL;
     $field_storage_settings = $sdc_prop_source['sourceTypeSettings']['storage'] ?? NULL;
     $field_instance_settings = $sdc_prop_source['sourceTypeSettings']['instance'] ?? NULL;
@@ -329,11 +320,11 @@ final class StaticPropSource extends PropSourceBase {
     // Single-cardinality StaticPropSources MUST store only a single value, in
     // minimal representation.
     $storage_definition = $field_item_list->getFieldDefinition();
-    assert($storage_definition instanceof FieldStorageDefinitionInterface);
+    \assert($storage_definition instanceof FieldStorageDefinitionInterface);
     if ($cardinality === NULL) {
-      assert($field_item_list->count() === 1);
+      \assert($field_item_list->count() === 1);
       $sole_field_item = $field_item_list->first();
-      assert($sole_field_item instanceof FieldItemInterface);
+      \assert($sole_field_item instanceof FieldItemInterface);
       static::isMinimalFieldItemRepresentation($stored_value, $sole_field_item);
     }
     // Multiple-cardinality StaticPropSources MUST store a list of minimal
@@ -354,7 +345,7 @@ final class StaticPropSource extends PropSourceBase {
     $expected_to_be_stored = $field_item->toArray();
 
     $item_definition = $field_item->getDataDefinition();
-    assert($item_definition instanceof FieldItemDataDefinitionInterface);
+    \assert($item_definition instanceof FieldItemDataDefinitionInterface);
 
     // Only non-computed properties need to be stored.
     $stored_props = array_filter(
@@ -367,7 +358,7 @@ final class StaticPropSource extends PropSourceBase {
       // - the property name SHOULD be omitted from the stored value
       1 => (function () use ($expected_to_be_stored, $stored_value, $field_item) {
         if ($expected_to_be_stored[$field_item::mainPropertyName()] !== $stored_value) {
-          throw new \LogicException(sprintf('Unexpected static prop value: %s should be %s', json_encode($stored_value), json_encode($expected_to_be_stored[$field_item::mainPropertyName()])));
+          throw new \LogicException(\sprintf('Unexpected static prop value: %s should be %s', json_encode($stored_value), json_encode($expected_to_be_stored[$field_item::mainPropertyName()])));
         }
       })(),
       // If this field type has multiple stored properties, then:
@@ -379,7 +370,7 @@ final class StaticPropSource extends PropSourceBase {
           $missing_expected_properties = array_diff_key($expected_to_be_stored, $stored_value);
           $missing_required_expected_properties = array_diff_key($missing_expected_properties, $optional_field_properties);
           if (!empty($missing_required_expected_properties)) {
-            throw new \LogicException(sprintf('Unexpected static prop value: %s should be %s — %s properties are missing', json_encode($stored_value), json_encode($expected_to_be_stored), implode(', ', $missing_required_expected_properties)));
+            throw new \LogicException(\sprintf('Unexpected static prop value: %s should be %s — %s properties are missing', json_encode($stored_value), json_encode($expected_to_be_stored), implode(', ', $missing_required_expected_properties)));
           }
         }
       })(),
@@ -457,13 +448,13 @@ final class StaticPropSource extends PropSourceBase {
   public function getWidget(string $component_config_entity_id, ?string $component_config_entity_version, string $prop_name, string $sdc_prop_label, ?string $field_widget_plugin_id, ?string $sdc_prop_description = NULL): WidgetInterface {
     // @phpstan-ignore-next-line
     $field_widget_plugin_manager = \Drupal::service('plugin.manager.field.widget');
-    assert($field_widget_plugin_manager instanceof WidgetPluginManager);
+    \assert($field_widget_plugin_manager instanceof WidgetPluginManager);
     $configuration = [];
     if ($field_widget_plugin_id) {
       $configuration['type'] = $field_widget_plugin_id;
     }
     $field_storage_definition = $this->fieldItemList->getFieldDefinition();
-    assert($field_storage_definition instanceof FieldStorageDefinition);
+    \assert($field_storage_definition instanceof FieldStorageDefinition);
     $widget = $field_widget_plugin_manager->getInstance([
       'field_definition' => $field_storage_definition
         // TRICKY: we would need to set a name that uniquely identifies this SDC
@@ -489,13 +480,13 @@ final class StaticPropSource extends PropSourceBase {
       'configuration' => $configuration,
       'prepare' => TRUE,
     ]);
-    assert($widget !== FALSE);
+    \assert($widget !== FALSE);
     return $widget;
   }
 
   public function formTemporaryRemoveThisExclamationExclamationExclamation(WidgetInterface $widget, string $sdc_prop_name, bool $is_required, ?FieldableEntityInterface $host_entity, array &$form, FormStateInterface $form_state): array {
     $field_definition = $this->fieldItemList->getFieldDefinition();
-    assert($field_definition instanceof FieldStorageDefinition);
+    \assert($field_definition instanceof FieldStorageDefinition);
     $field_definition->setRequired($is_required);
 
     // A field widget needs a FieldItemListInterface object. Use cloning to
@@ -522,7 +513,7 @@ final class StaticPropSource extends PropSourceBase {
       // @todo Figure out why this is necessary — \DateTimeWidgetBase::createDefaultValue() *is* getting called, but somehow it does not result in the default value being populated unless we do this.
       // @see \Drupal\datetime\Plugin\Field\FieldWidget\DateTimeWidgetBase::createDefaultValue()
       for ($i = 0; $i < $this->fieldItemList->count(); $i++) {
-        assert($this->fieldItemList[$i] !== NULL);
+        \assert($this->fieldItemList[$i] !== NULL);
         $widget_form['widget'][$i]['value']['#default_value'] = new DrupalDateTime($this->fieldItemList[$i]->value);
       }
     }
@@ -539,7 +530,7 @@ final class StaticPropSource extends PropSourceBase {
    * {@inheritdoc}
    */
   public function calculateDependencies(FieldableEntityInterface|FieldItemListInterface|null $host_entity = NULL): array {
-    assert($host_entity === NULL || $host_entity instanceof FieldableEntityInterface);
+    \assert($host_entity === NULL || $host_entity instanceof FieldableEntityInterface);
     // The only dependencies are those of the used expression. If a host entity
     // is given, then `content` dependencies may appear as well; otherwise the
     // calculated dependencies will be limited to the entity types, bundle (if
@@ -550,7 +541,7 @@ final class StaticPropSource extends PropSourceBase {
     // Let the field type plugin specify its own dependencies, based on storage
     // settings and instance settings.
     $field_item_class = $this->fieldItemList->getItemDefinition()->getClass();
-    assert(is_subclass_of($field_item_class, FieldItemInterface::class));
+    \assert(is_subclass_of($field_item_class, FieldItemInterface::class));
     $instance_deps = $field_item_class::calculateDependencies($this->fieldItemList->getFieldDefinition());
     $storage_deps = $field_item_class::calculateStorageDependencies($this->fieldItemList->getFieldDefinition()->getFieldStorageDefinition());
 

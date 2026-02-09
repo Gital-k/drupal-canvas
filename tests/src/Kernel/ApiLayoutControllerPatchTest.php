@@ -10,6 +10,7 @@ use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Plugin\DataType\ComputedUrlWithQueryString;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Plugin\Field\FieldTypeOverride\ImageItemOverride;
+use Drupal\canvas\PropSource\PropSource;
 use Drupal\canvas\Storage\ComponentTreeLoader;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\file\FileInterface;
@@ -104,7 +105,7 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
           'cta1href' => ['uri' => 'https://drupal.org'],
         ],
       ],
-      // Add a component with a pre-existing dynamic property source to ensure
+      // Add a component with a pre-existing entity field prop source to ensure
       // it also is rendered and resolved correctly.
       [
         'uuid' => $uuid2,
@@ -112,7 +113,7 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
         'component_version' => '8c01a2bdb897a810',
         'inputs' => [
           'text' => [
-            'sourceType' => 'dynamic',
+            'sourceType' => PropSource::EntityField->value,
             'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
           ],
           'element' => 'h1',
@@ -149,15 +150,15 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
     self::assertIsArray($data['model']);
     $new_model = $data['model'][$uuid1];
     $new_model['source']['heading'] = [
-      'sourceType' => 'dynamic',
+      'sourceType' => PropSource::EntityField->value,
       'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
     ];
     $new_model['source']['subheading'] = [
-      'sourceType' => 'dynamic',
+      'sourceType' => PropSource::EntityField->value,
       'expression' => 'ℹ︎␜entity:node:article␝revision_log␞␟value',
     ];
-    // The client should set the `resolved` value of a dynamic prop sources to
-    // NULL because it cannot resolve them.
+    // The client should set the `resolved` value of a entity field prop sources
+    // to NULL because it cannot resolve them.
     $new_model['resolved']['subheading'] = NULL;
     $new_model['resolved']['heading'] = NULL;
     $updatedHeroClientData = [
@@ -180,7 +181,7 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
     self::assertIsArray($data['model']);
     $new_model = $data['model'][$uuid1];
     $new_model['source']['subheading'] = [
-      'sourceType' => 'dynamic',
+      'sourceType' => PropSource::EntityField->value,
       'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
     ];
     $new_model['resolved']['subheading'] = NULL;
@@ -229,7 +230,7 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
       BadRequestHttpException::class,
       [
         'componentInstanceUuid' => 'e8c95423-4f22-4210-8707-08bade75ff22',
-        'componentType' => 'sdc.canvas_test_sdc.image@abadf2538ecfdecc',
+        'componentType' => 'sdc.canvas_test_sdc.image@fb40be57bd7e0973',
       ],
     ];
     yield 'No such component in model' => [
@@ -237,7 +238,7 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
       NotFoundHttpException::class,
       [
         'componentInstanceUuid' => 'e8c95423-4f22-4210-8707-08bade75ff22',
-        'componentType' => 'sdc.canvas_test_sdc.image@abadf2538ecfdecc',
+        'componentType' => 'sdc.canvas_test_sdc.image@fb40be57bd7e0973',
         'model' => [],
         'autoSaves' => [],
         'clientInstanceId' => 'sample-client-id',
@@ -389,7 +390,7 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
     $new_model['source']['image']['value'] = $media->id();
     $updateImageClientData = [
       'model' => $new_model,
-      'componentType' => 'sdc.canvas_test_sdc.image@abadf2538ecfdecc',
+      'componentType' => 'sdc.canvas_test_sdc.image@fb40be57bd7e0973',
       'componentInstanceUuid' => CanvasTestSetup::UUID_STATIC_IMAGE,
     ] + $this->getPatchContentsDefaults([$entity]);
     $response = $this->request(Request::create($url, method: 'PATCH', content: \json_encode($updateImageClientData, JSON_THROW_ON_ERROR)));

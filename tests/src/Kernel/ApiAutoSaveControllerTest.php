@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
+use Drupal\canvas\PropSource\PropSource;
 use Drupal\Core\Access\CsrfRequestHeaderAccessCheck;
 use Drupal\Core\Access\CsrfTokenGenerator;
 use Drupal\Core\Cache\CacheableJsonResponse;
@@ -428,7 +429,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     $staged_set_homepage->save();
 
     $user = $this->createUser($permissions);
-    assert($user instanceof AccountInterface);
+    \assert($user instanceof AccountInterface);
     $this->setCurrentUser($user);
 
     $request = Request::create(Url::fromRoute('canvas.api.auto-save.get')->toString());
@@ -510,8 +511,8 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
           'heading' => 'Canvas is large and in charge!',
         ],
       ],
-      // The node body, which needs to be using a dynamic prop source
-      // because all content templates require at least one dynamic prop
+      // The node body, which needs to be using a entity field prop source
+      // because all content templates require at least one entity field prop
       // source.
       [
         'uuid' => '6cf8297a-fc60-4019-be81-c336fd828c39',
@@ -519,7 +520,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
         'component_version' => 'b1e991f726a2a266',
         'inputs' => [
           'heading' => [
-            'sourceType' => 'dynamic',
+            'sourceType' => PropSource::EntityField->value,
             'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
           ],
         ],
@@ -1014,14 +1015,14 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
 
     $this->assertNotNull($page->id());
     $page = $page_storage->loadUnchanged($page->id());
-    assert($page instanceof Page);
+    \assert($page instanceof Page);
     $this->assertTrue($page->isPublished());
     $this->assertSame('The updated title.', $page->label());
     $this->assertSame($page->getRevisionUserId(), $user->id());
 
     $this->assertNotNull($template->id());
     $template = $content_template_storage->loadUnchanged($template->id());
-    assert($template instanceof ContentTemplate);
+    \assert($template instanceof ContentTemplate);
     $this->assertTrue($template->status());
 
     $this->assertNotNull($code_component->id());

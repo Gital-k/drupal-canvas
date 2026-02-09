@@ -6,7 +6,7 @@ import { getPropsValues } from '@/components/form/formUtil';
 import { syncPropSourcesToResolvedValues } from '@/components/form/InputBehaviorsComponentPropsForm';
 import { selectEditorFrameContext } from '@/features/ui/uiSlice';
 import { previewApi } from '@/services/preview';
-import { isPropSourceComponent } from '@/types/Component';
+import { hasSlotDefinitions, isPropSourceComponent } from '@/types/Component';
 import {
   getCanvasSettings,
   setCanvasDrupalSetting,
@@ -325,7 +325,7 @@ export const layoutModelSlice = createSlice({
         }
 
         let updatedModel: ComponentModels = { ...state.model };
-        let newLayout: Array<RegionNode> = JSON.parse(
+        const newLayout: Array<RegionNode> = JSON.parse(
           JSON.stringify(state.layout),
         );
         const components = layoutModel.layout;
@@ -436,6 +436,9 @@ export const layoutModelSlice = createSlice({
     ),
     setInitialized: create.reducer((state, action: PayloadAction<boolean>) => {
       state.isInitialized = action.payload;
+      if (!action.payload) {
+        state.updatePreview = false;
+      }
     }),
     setLayoutModel: create.reducer(
       (state, action: PayloadAction<LayoutModelSliceState>) => {
@@ -537,10 +540,11 @@ export const _addNewComponentToLayout =
     const slots: SlotNode[] = [];
     const uuid = uuidv4();
 
-    if (isPropSourceComponent(component)) {
-      // Create empty slots in the layout data for each child slot the component
-      // has.
-      Object.keys(component.metadata.slots || []).forEach((name) => {
+    // Create empty slots in the layout data for each child slot the component
+    // has. Slot definitions can exist on any component that implements
+    // ComponentSourceWithSlotsInterface.
+    if (hasSlotDefinitions(component)) {
+      Object.keys(component.metadata.slots).forEach((name) => {
         slots.push({
           id: `${uuid}/${name}`,
           name: name,

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Plugin\Field\FieldType;
 
+use Drupal\canvas\Entity\ComponentTreeEntityInterface;
+use Drupal\canvas\PropSource\PropSource;
 use Drupal\Component\Plugin\DependentPluginInterface;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Block\MessagesBlockPluginInterface;
@@ -56,16 +58,19 @@ use Symfony\Component\Validator\ConstraintViolationList;
   constraints: [
     'ValidComponentTreeItem' => [],
     'ComponentTreeMeetRequirements' => [
-      // Only StaticPropSources may be used, because using DynamicPropSources or
-      // HostEntityUrlPropSources a decision that should be made at the Content
-      // Template level by a Site Builder, not by each Content Creator.
+      // Only StaticPropSources may be used, because using
+      // EntityFieldPropSources or HostEntityUrlPropSources is a decision that
+      // should be made at the Content Template level by a Site Builder, not by
+      // each Content Creator.
       // @see https://www.drupal.org/project/canvas/issues/3455629
       'inputs' => [
         'absence' => [
-          'dynamic',
-          'host-entity-url',
+          PropSource::EntityField->value,
+          PropSource::HostEntityUrl->value,
           // @todo Allow adapters that consume a single shape and output that same single shape in https://www.drupal.org/project/canvas/issues/3536115
-          'adapter',
+          PropSource::Adapter->value,
+          // @todo Remove before Canvas 2.0, see https://www.drupal.org/node/3566701
+          PropSource::Dynamic->value,
         ],
         'presence' => NULL,
       ],
@@ -138,7 +143,7 @@ class ComponentTreeItem extends FieldItemBase {
    *
    * @see \Drupal\Component\Plugin\DependentPluginInterface
    */
-  public function calculateFieldItemValueDependencies(?FieldableEntityInterface $host_entity = NULL): array {
+  public function calculateFieldItemValueDependencies(FieldableEntityInterface|ComponentTreeEntityInterface|null $host_entity = NULL): array {
     // Every field property that has dependencies on config or extensions must
     // implement DependentPluginInterface to ensure accurate dependency (i.e.
     // usage) tracking.
@@ -152,7 +157,8 @@ class ComponentTreeItem extends FieldItemBase {
         $dependencies = NestedArray::mergeDeep($dependencies, $property->calculateDependencies());
       }
       elseif ($property instanceof ContentAwareDependentInterface) {
-        $dependencies = NestedArray::mergeDeep($dependencies, $property->calculateDependencies($host_entity));
+        $fieldable_host_entity = $host_entity instanceof FieldableEntityInterface ? $host_entity : NULL;
+        $dependencies = NestedArray::mergeDeep($dependencies, $property->calculateDependencies($fieldable_host_entity));
       }
     }
 
@@ -535,12 +541,13 @@ class ComponentTreeItem extends FieldItemBase {
   }
 
   /**
-   * @todo This belongs in a normalizer */
+   * @todo Move this into a normalizer at https://www.drupal.org/i/3499632
+   */
   public function getClientSideRepresentation(): array {
     return [
       'uuid' => $this->getUuid(),
       'nodeType' => 'component',
-      'type' => sprintf('%s@%s', $this->getComponentId(), $this->getComponentVersion()),
+      'type' => \sprintf('%s@%s', $this->getComponentId(), $this->getComponentVersion()),
       // TRICKY: the client-side representation uses `name`, the server-side
       // representation uses `label`, due to TypedData limitations.
       // @see \Drupal\Core\TypedData\TypedData::$name
@@ -595,7 +602,7 @@ class ComponentTreeItem extends FieldItemBase {
     // constraints because it does not validate user input: it only helps ensure
     // that the logic of this field type is correct.
     if ($input_values === NULL && $source->requiresExplicitInput()) {
-      throw new \LogicException(sprintf('Missing input for component instance with UUID %s', $component_instance_uuid));
+      throw new \LogicException(\sprintf('Missing input for component instance with UUID %s', $component_instance_uuid));
     }
     $this->optimizeInputs();
     // @todo Omit defaults that are stored at the content type template level, e.g. in core.entity_view_display.node.article.default.yml
@@ -612,7 +619,7 @@ class ComponentTreeItem extends FieldItemBase {
     // Re-run the validation logic now that fields that are required on this
     // entity are guaranteed to exist (i.e. the entity is no longer new, because
     // it already was saved).
-    assert($this->getEntity()->isNew() === FALSE);
+    \assert($this->getEntity()->isNew() === FALSE);
     // Because the entity is now guaranteed to not be new, a slightly stricter
     // validation is performed — if it fails, then an exception is thrown and
     // the entity saving database transaction is rolled back, and an error
@@ -653,7 +660,15 @@ class ComponentTreeItem extends FieldItemBase {
   }
 
   public function optimizeInputs(): void {
-    $source = $this->getComponent()?->getComponentSource();
+    $component = $this->getComponent();
+    // We avoid getComponentVersion() to not handle the exception here.
+    // It will be triggered with config schema validation instead.
+    // @see \Drupal\canvas\Entity\Component::save()
+    $version = $this->get('component_version')->getValue();
+    if ($version && in_array($version, $component?->getVersions() ?? [], TRUE)) {
+      $component?->loadVersion($version);
+    }
+    $source = $component?->getComponentSource();
     if ($source === NULL) {
       // This could be running against data that has not been validated, in
       // which case there is nothing we can do without a valid component or

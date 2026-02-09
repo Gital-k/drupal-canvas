@@ -32,6 +32,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
   label: new TranslatableMarkup('Code Components'),
   supportsImplicitInputs: FALSE,
   discovery: JsComponentDiscovery::class,
+  updater: GeneratedFieldExplicitInputUxComponentInstanceUpdater::class,
   // @see \Drupal\canvas\EntityHandlers\JavascriptComponentStorage::doPostSave()
   discoveryCacheTags: ['config:js_component_list'],
 )]
@@ -68,7 +69,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
     // possible to bypass both `delete` access checks and config system
     // integrity checks, so perform the necessary confirmation.
     $js_component_storage = $this->entityTypeManager->getStorage(JavaScriptComponent::ENTITY_TYPE_ID);
-    assert($js_component_storage instanceof ConfigEntityStorageInterface);
+    \assert($js_component_storage instanceof ConfigEntityStorageInterface);
     return $js_component_storage->load($this->getSourceSpecificComponentId()) === NULL;
   }
 
@@ -106,11 +107,11 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
   public function getJavaScriptComponent(): JavaScriptComponent {
     if ($this->jsComponent === NULL) {
       $js_component_storage = $this->entityTypeManager->getStorage(JavaScriptComponent::ENTITY_TYPE_ID);
-      assert($js_component_storage instanceof ConfigEntityStorageInterface);
+      \assert($js_component_storage instanceof ConfigEntityStorageInterface);
       $id = $this->getSourceSpecificComponentId();
       $js_component = $js_component_storage->load($id);
       if (!$js_component instanceof JavaScriptComponent) {
-        throw new ComponentNotFoundException(sprintf('The JavaScript Component with ID `%s` does not exist.', $id));
+        throw new ComponentNotFoundException(\sprintf('The JavaScript Component with ID `%s` does not exist.', $id));
       }
       $this->jsComponent = $js_component;
     }
@@ -164,27 +165,27 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
     // @see https://drupal.org/i/3552914
     // @see https://drupal.org/i/3560197
     $import_maps[ImportMapResponseAttachmentsProcessor::GLOBAL_IMPORTS] = [
-      'preact' => \sprintf('%s%s/ui/lib/astro-hydration/dist/preact.module.js', $base_path, $canvas_path),
-      'preact/hooks' => \sprintf('%s%s/ui/lib/astro-hydration/dist/hooks.module.js', $base_path, $canvas_path),
-      'react/jsx-runtime' => \sprintf('%s%s/ui/lib/astro-hydration/dist/jsx-runtime-default.js', $base_path, $canvas_path),
-      'react' => \sprintf('%s%s/ui/lib/astro-hydration/dist/compat.module.js', $base_path, $canvas_path),
-      'react-dom' => \sprintf('%s%s/ui/lib/astro-hydration/dist/compat.module.js', $base_path, $canvas_path),
-      'react-dom/client' => \sprintf('%s%s/ui/lib/astro-hydration/dist/compat.module.js', $base_path, $canvas_path),
-      'clsx' => \sprintf('%s%s/ui/lib/astro-hydration/dist/clsx.js', $base_path, $canvas_path),
-      'class-variance-authority' => \sprintf('%s%s/ui/lib/astro-hydration/dist/class-variance-authority.js', $base_path, $canvas_path),
-      'tailwind-merge' => \sprintf('%s%s/ui/lib/astro-hydration/dist/tailwind-merge.js', $base_path, $canvas_path),
-      'drupal-jsonapi-params' => \sprintf('%s%s/ui/lib/astro-hydration/dist/jsonapi-params.js', $base_path, $canvas_path),
-      'swr' => \sprintf('%s%s/ui/lib/astro-hydration/dist/swr.js', $base_path, $canvas_path),
+      'preact' => \sprintf('%s%s/packages/astro-hydration/dist/preact.module.js', $base_path, $canvas_path),
+      'preact/hooks' => \sprintf('%s%s/packages/astro-hydration/dist/hooks.module.js', $base_path, $canvas_path),
+      'react/jsx-runtime' => \sprintf('%s%s/packages/astro-hydration/dist/jsx-runtime-default.js', $base_path, $canvas_path),
+      'react' => \sprintf('%s%s/packages/astro-hydration/dist/compat.module.js', $base_path, $canvas_path),
+      'react-dom' => \sprintf('%s%s/packages/astro-hydration/dist/compat.module.js', $base_path, $canvas_path),
+      'react-dom/client' => \sprintf('%s%s/packages/astro-hydration/dist/compat.module.js', $base_path, $canvas_path),
+      'clsx' => \sprintf('%s%s/packages/astro-hydration/dist/clsx.js', $base_path, $canvas_path),
+      'class-variance-authority' => \sprintf('%s%s/packages/astro-hydration/dist/class-variance-authority.js', $base_path, $canvas_path),
+      'tailwind-merge' => \sprintf('%s%s/packages/astro-hydration/dist/tailwind-merge.js', $base_path, $canvas_path),
+      'drupal-jsonapi-params' => \sprintf('%s%s/packages/astro-hydration/dist/jsonapi-params.js', $base_path, $canvas_path),
+      'swr' => \sprintf('%s%s/packages/astro-hydration/dist/swr.js', $base_path, $canvas_path),
 
-      'drupal-canvas' => \sprintf('%s%s/ui/lib/astro-hydration/dist/drupal-canvas.js', $base_path, $canvas_path),
+      'drupal-canvas' => \sprintf('%s%s/packages/astro-hydration/dist/drupal-canvas.js', $base_path, $canvas_path),
       // Backward compatibility entries for elements that were moved
       // into drupal-canvas package.
-      '@/lib/FormattedText' => \sprintf('%s%s/ui/lib/astro-hydration/dist/FormattedText.js', $base_path, $canvas_path),
-      'next-image-standalone' => \sprintf('%s%s/ui/lib/astro-hydration/dist/next-image-standalone.js', $base_path, $canvas_path),
-      '@/lib/utils' => \sprintf('%s%s/ui/lib/astro-hydration/dist/utils.js', $base_path, $canvas_path),
-      '@drupal-api-client/json-api-client' => \sprintf('%s%s/ui/lib/astro-hydration/dist/jsonapi-client.js', $base_path, $canvas_path),
-      '@/lib/jsonapi-utils' => \sprintf('%s%s/ui/lib/astro-hydration/dist/jsonapi-utils.js', $base_path, $canvas_path),
-      '@/lib/drupal-utils' => \sprintf('%s%s/ui/lib/astro-hydration/dist/drupal-utils.js', $base_path, $canvas_path),
+      '@/lib/FormattedText' => \sprintf('%s%s/packages/astro-hydration/dist/FormattedText.js', $base_path, $canvas_path),
+      'next-image-standalone' => \sprintf('%s%s/packages/astro-hydration/dist/next-image-standalone.js', $base_path, $canvas_path),
+      '@/lib/utils' => \sprintf('%s%s/packages/astro-hydration/dist/utils.js', $base_path, $canvas_path),
+      '@drupal-api-client/json-api-client' => \sprintf('%s%s/packages/astro-hydration/dist/jsonapi-client.js', $base_path, $canvas_path),
+      '@/lib/jsonapi-utils' => \sprintf('%s%s/packages/astro-hydration/dist/jsonapi-utils.js', $base_path, $canvas_path),
+      '@/lib/drupal-utils' => \sprintf('%s%s/packages/astro-hydration/dist/drupal-utils.js', $base_path, $canvas_path),
     ];
     // We need a cache-busting query string for the browser to not use cached
     // files after installing an update.
@@ -212,8 +213,8 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
     }
     // Resource hints.
     $resource_hints = [
-      'preact/signals' => \sprintf('%s%s/ui/lib/astro-hydration/dist/signals.module.js', $base_path, $canvas_path),
-      '@/lib/preload-helper' => \sprintf('%s%s/ui/lib/astro-hydration/dist/preload-helper.js', $base_path, $canvas_path),
+      'preact/signals' => \sprintf('%s%s/packages/astro-hydration/dist/signals.module.js', $base_path, $canvas_path),
+      '@/lib/preload-helper' => \sprintf('%s%s/packages/astro-hydration/dist/preload-helper.js', $base_path, $canvas_path),
     ];
     foreach ($resource_hints as $url) {
       $build['#attached']['html_head_link'][] = [
@@ -320,7 +321,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
         continue;
       }
       $seen[] = $js_component_dependency_name;
-      assert($js_component_dependency instanceof JavaScriptComponent);
+      \assert($js_component_dependency instanceof JavaScriptComponent);
       $dependencyAutoSave = $this->autoSaveManager->getAutoSaveEntity($js_component_dependency);
       $dependency_component_url = $js_component_dependency->getComponentUrl($this->fileUrlGenerator, $isPreview);
       $scoped_dependencies[$component_url]["@/components/{$js_component_dependency_name}"] = $js_component_dependency->getComponentUrl($this->fileUrlGenerator, $isPreview);
@@ -342,7 +343,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
         continue;
       }
       $seen[] = $js_component_dependency_name;
-      assert($js_component_dependency instanceof JavaScriptComponent);
+      \assert($js_component_dependency instanceof JavaScriptComponent);
       $dependencyAutoSave = $this->autoSaveManager->getAutoSaveEntity($js_component_dependency);
       $libraries[] = $js_component_dependency->getAssetLibrary($isPreview);
       $libraries = array_merge($libraries, $this->getDependencyLibraries($js_component_dependency, $dependencyAutoSave, $isPreview, $seen));

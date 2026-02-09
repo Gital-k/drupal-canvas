@@ -198,15 +198,17 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
     // and map that into a render array. This guarantees none of this will ever
     // rely on Render API specifics.
     $renderable_component_tree = $this->getHydratedTree();
-
-    $build = [];
-    // @see \Drupal\Core\Entity\EntityViewBuilder::getBuildDefaults()
-    CacheableMetadata::createFromObject($renderable_component_tree)->applyTo($build);
-
     $hydrated = $renderable_component_tree->getTree();
 
-    assert(array_keys($hydrated) === [self::ROOT_UUID]);
-    return self::renderify(self::buildRenderingContext($this, $entity), $hydrated, $isPreview);
+    \assert(array_keys($hydrated) === [self::ROOT_UUID]);
+    $build = self::renderify(self::buildRenderingContext($this, $entity), $hydrated, $isPreview);
+
+    // @see \Drupal\Core\Entity\EntityViewBuilder::getBuildDefaults()
+    CacheableMetadata::createFromObject($renderable_component_tree)
+      ->addCacheableDependency($entity)
+      ->applyTo($build);
+
+    return $build;
   }
 
   /**
@@ -228,7 +230,7 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
       foreach ($component_instances as $component_instance_uuid => $component_instance) {
         try {
           $component = Component::load($component_instance['component']);
-          assert($component instanceof Component);
+          \assert($component instanceof Component);
           $source = $component->getComponentSource();
           $element = $source->renderComponent($component_instance, $component->getSlotDefinitions(), $component_instance_uuid, $isPreview);
 
@@ -429,7 +431,7 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
       // For each vertex (after the filtering above), all edges represent
       // child component instances placed in this slot.
       foreach (array_keys($vertex['edges']) as $component_instance_uuid) {
-        assert(is_string($component_instance_uuid));
+        \assert(is_string($component_instance_uuid));
         yield $parent_uuid => [
           'slot' => $slot_map[$component_instance_uuid],
           'uuid' => $component_instance_uuid,
@@ -454,7 +456,7 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
       $component_id = $item->getComponentId();
       $uuid = $item->getUuid();
       $component = $components[$component_id];
-      assert($component instanceof Component);
+      \assert($component instanceof Component);
       $component->loadVersion($item->getComponentVersion());
 
       $source = $component->getComponentSource();

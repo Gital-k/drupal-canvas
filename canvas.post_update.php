@@ -10,6 +10,7 @@ use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Entity\Pattern;
 use Drupal\Core\Config\Entity\ConfigEntityUpdater;
 use Drupal\field\Entity\FieldConfig;
+use Drupal\image\Entity\ImageStyle;
 
 /**
  * Track that props have the required flag in component config entities.
@@ -228,4 +229,58 @@ function canvas_post_update_0010_migrate_auto_save(): void {
       }
     }
   }
+}
+
+/**
+ * Updates multi-bundle reference prop expressions to the improved format.
+ *
+ * (Also updates single-bundle reference prop expressions that are repeated in
+ * every bundle of a multi-bundle reference prop, to keep things consistent.)
+ *
+ * @see https://www.drupal.org/node/3563451
+ * @see \Drupal\canvas\CanvasConfigUpdater::expressionUsesDeprecatedReference()
+ * @see \Drupal\canvas\Hook\ShapeMatchingHooks::mediaLibraryStorablePropShapeAlter()
+ */
+function canvas_post_update_0011_multi_bundle_reference_prop_expressions(array &$sandbox): void {
+  $canvasConfigUpdater = \Drupal::service(CanvasConfigUpdater::class);
+  \assert($canvasConfigUpdater instanceof CanvasConfigUpdater);
+  $canvasConfigUpdater->setDeprecationsEnabled(FALSE);
+  \Drupal::classResolver(ConfigEntityUpdater::class)
+    ->update($sandbox, Component::ENTITY_TYPE_ID, static fn(Component $component): bool => $canvasConfigUpdater->needsMultiBundleReferencePropExpressionUpdate($component));
+}
+
+/**
+ * Updates Canvas-provided image style to use AVIF with WebP fallback.
+ */
+function canvas_post_update_0012_canvas_image_style_avif(array &$sandbox): void {
+  $image_style = ImageStyle::load('canvas_parametrized_width');
+  $effect_id = '249b8926-f421-4d60-8453-fb5d9265c731';
+  if (!$image_style) {
+    return;
+  }
+  $effects = $image_style->getEffects();
+  $effects_data = $image_style->get('effects');
+  if ($effects->has($effect_id) && $effects->get($effect_id)->getPluginId() === 'image_convert') {
+    $effects_data[$effect_id]['id'] = 'image_convert_avif';
+    $image_style->set('effects', $effects_data);
+    $image_style->save();
+  }
+}
+
+/**
+ * Updates content templates' DynamicPropSources to EntityFieldPropSources.
+ */
+function canvas_post_update_0013_update_dynamic_prop_sources_to_entity_field_prop_sources(array &$sandbox): void {
+  $canvasConfigUpdater = \Drupal::service(CanvasConfigUpdater::class);
+  \assert($canvasConfigUpdater instanceof CanvasConfigUpdater);
+  $canvasConfigUpdater->setDeprecationsEnabled(FALSE);
+  // Loading and re-saving automatically triggers a just-in-time update path.
+  // @see \Drupal\canvas\PropSource\PropSource::parse()
+  \Drupal::classResolver(ConfigEntityUpdater::class)
+    // We might not need to update every single ContentTemplate, because
+    // entity-field prop source presence is allowed, but not enforced via config
+    // schema. But the chances a content template won't have an entity-field
+    // prop source is quite low and irrelevant.
+    ->update($sandbox, ContentTemplate::ENTITY_TYPE_ID, static fn(ContentTemplate $template): bool => TRUE);
+
 }

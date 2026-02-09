@@ -292,10 +292,11 @@ canvas.component_tree:
       # By default, only StaticPropSources may be used in config-defined component trees.
       inputs:
         absence:
-          # DynamicPropSources retrieve structured data from a content entity of a specific entity type and bundle. This
+          # EntityFieldPropSources retrieve structured data from a content entity of a specific entity type and bundle. This
           # is typically the content entity that contains the component tree, but could also be a dynamically loaded
           # content entity. A config entity typically is not associated with any content entity, so require its absence
           # by default.
+          - entity-field
           - dynamic
           - host-entity-url
           # Not yet supported by the Canvas UI.
@@ -529,6 +530,9 @@ canvas.generated_field_explicit_input_ux:
             type: string
             label: 'The expression that contains the field evaluation instructions'
             constraints:
+              # 💡 Crucially, this also will ensure that every expression for every prop field definition for every
+              # version of this Component config entity is valid against the current set of supported expressions: any
+              # exception thrown during validation will prevent saving the Component config entity.
               ValidStructuredDataPropExpression:
                 choices:
                   - FieldTypePropExpression
@@ -616,6 +620,7 @@ field.value.component_tree:
       inputs:
         absence:
           - dynamic
+          - entity-field
           - host-entity-url
           - adapter
         presence: ~
@@ -653,6 +658,7 @@ canvas.pattern.*:
           inputs:
             absence:
               - dynamic
+              - entity-field
               - host-entity-url
               - adapter
             presence: ~
@@ -768,8 +774,8 @@ canvas.content_template.*.*.*:
           inputs:
             absence:
               - adapter
-            # The only Canvas component tree that allows `dynamic` and `host-entity-url`!
-            # @see \Drupal\canvas\PropSource\DynamicPropSource
+            # The only Canvas component tree that allows `entity-field` and `host-entity-url`!
+            # @see \Drupal\canvas\PropSource\EntityFieldPropSource
             # @see \Drupal\canvas\PropSource\HostEntityUrlPropSource
             presence: ~
           tree:

@@ -6,6 +6,8 @@ namespace Drupal\canvas\Plugin\Validation\Constraint;
 
 use Drupal\canvas\InvalidComponentInputsPropSourceException;
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
+use Drupal\Core\Entity\FieldableEntityInterface;
+use Drupal\Core\Entity\Plugin\DataType\ConfigEntityAdapter;
 use Drupal\Core\TypedData\TypedDataManagerInterface;
 use Drupal\canvas\MissingComponentInputsException;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
@@ -41,7 +43,7 @@ final class ValidComponentTreeItemConstraintValidator extends ConstraintValidato
     }
 
     if (!$value instanceof ComponentTreeItem && !is_array($value)) {
-      throw new \UnexpectedValueException(sprintf('The value must be a ComponentTreeItem object or an array, found %s.', gettype($value)));
+      throw new \UnexpectedValueException(\sprintf('The value must be a ComponentTreeItem object or an array, found %s.', gettype($value)));
     }
 
     // Validate the raw structure:
@@ -55,20 +57,19 @@ final class ValidComponentTreeItemConstraintValidator extends ConstraintValidato
 
     // Validate in-depth. This is simpler if the ComponentTreeItem-provided
     // infrastructure is available, so conjure one from $value if not already.
+    $fieldable_host_entity = NULL;
     if (!$value instanceof ComponentTreeItem) {
-      assert(array_key_exists('uuid', $value));
-      assert(array_key_exists('component_id', $value));
-      assert(array_key_exists('inputs', $value));
-      $component_tree_type = 'config';
+      \assert(array_key_exists('uuid', $value));
+      \assert(array_key_exists('component_id', $value));
+      \assert(array_key_exists('inputs', $value));
       $value = $this->conjureFieldItemObject($value);
     }
     else {
-      $component_tree_type = 'content';
-    }
-
-    $host_entity = NULL;
-    if ($component_tree_type === 'content' && $value->getParent()?->getParent() !== NULL) {
-      $host_entity = $value->getEntity();
+      $host_entity = $value->getParent()?->getParent();
+      if ($host_entity !== NULL && !$host_entity instanceof ConfigEntityAdapter) {
+        $fieldable_host_entity = $value->getEntity();
+        \assert($fieldable_host_entity instanceof FieldableEntityInterface);
+      }
     }
 
     // Validate the prop source resolves into a value that is considered
@@ -92,7 +93,7 @@ final class ValidComponentTreeItemConstraintValidator extends ConstraintValidato
     catch (MissingComponentInputsException $e) {
       if ($component_source->requiresExplicitInput()) {
         $this->context->buildViolation('The required properties are missing.')
-          ->atPath(sprintf('inputs.%s', $e->componentInstanceUuid))
+          ->atPath(\sprintf('inputs.%s', $e->componentInstanceUuid))
           ->addViolation();
         return;
       }
@@ -114,7 +115,7 @@ final class ValidComponentTreeItemConstraintValidator extends ConstraintValidato
           '%component_id' => $value->getComponentId(),
           '%component_version' => $value->getComponentVersion(),
         ])
-        ->atPath(sprintf('inputs.%s', $value->getUuid()))
+        ->atPath(\sprintf('inputs.%s', $value->getUuid()))
         ->addViolation();
     }
     // Don't allow uncollapsed inputs for StaticPropSources.
@@ -123,17 +124,17 @@ final class ValidComponentTreeItemConstraintValidator extends ConstraintValidato
     if ($after_optimize !== $before_optimize) {
       // @todo Document this at https://www.drupal.org/i/3564135
       $this->context->buildViolation('When using the default static prop source for a component input, you must use the collapsed input syntax.')
-        ->atPath(sprintf('inputs.%s', $value->getUuid()))
+        ->atPath(\sprintf('inputs.%s', $value->getUuid()))
         ->addViolation();
     }
 
-    assert(is_array($stored_explicit_input));
+    \assert(is_array($stored_explicit_input));
     $component_violations = $this->translateConstraintPropertyPathsAndRoot(
       ['' => $this->context->getPropertyPath() . '.'],
       $component_source->validateComponentInput(
         inputValues: $stored_explicit_input,
         component_instance_uuid: $value->getUuid(),
-        entity: $host_entity,
+        entity: $fieldable_host_entity,
       ),
       // We need to ensure the validation root context is transferred over.
       $this->context->getRoot()

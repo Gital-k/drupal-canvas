@@ -272,7 +272,7 @@ final class SingleDirectoryComponentTest extends GeneratedFieldExplicitInputUxCo
     $components = $this->componentStorage->loadMultiple($component_ids);
     foreach ($components as $component_id => $component) {
       // Use reflection to test the private ::getDefaultStaticPropSource() method.
-      assert($component instanceof Component);
+      \assert($component instanceof Component);
       $source = $component->getComponentSource();
       $private_method = new \ReflectionMethod($source, 'getDefaultStaticPropSource');
       $private_method->setAccessible(TRUE);
@@ -488,7 +488,7 @@ HTML,
   <img
    class="card--image"
    src="::SITE_DIR_BASE_URL::/files/balloons.png"
-        srcset="::SITE_DIR_BASE_URL::/files/styles/canvas_parametrized_width--16/public/balloons.png.webp?itok=uQqtnjV1 16w, ::SITE_DIR_BASE_URL::/files/styles/canvas_parametrized_width--32/public/balloons.png.webp?itok=uQqtnjV1 32w, ::SITE_DIR_BASE_URL::/files/styles/canvas_parametrized_width--48/public/balloons.png.webp?itok=uQqtnjV1 48w, ::SITE_DIR_BASE_URL::/files/styles/canvas_parametrized_width--64/public/balloons.png.webp?itok=uQqtnjV1 64w, ::SITE_DIR_BASE_URL::/files/styles/canvas_parametrized_width--96/public/balloons.png.webp?itok=uQqtnjV1 96w, ::SITE_DIR_BASE_URL::/files/styles/canvas_parametrized_width--128/public/balloons.png.webp?itok=uQqtnjV1 128w, ::SITE_DIR_BASE_URL::/files/styles/canvas_parametrized_width--256/public/balloons.png.webp?itok=uQqtnjV1 256w, ::SITE_DIR_BASE_URL::/files/styles/canvas_parametrized_width--384/public/balloons.png.webp?itok=uQqtnjV1 384w, ::SITE_DIR_BASE_URL::/files/styles/canvas_parametrized_width--640/public/balloons.png.webp?itok=uQqtnjV1 640w"
+        srcset="::SITE_DIR_BASE_URL::/files/styles/canvas_parametrized_width--16/public/balloons.png.avif?itok=Oa4IMo7_ 16w, ::SITE_DIR_BASE_URL::/files/styles/canvas_parametrized_width--32/public/balloons.png.avif?itok=Oa4IMo7_ 32w, ::SITE_DIR_BASE_URL::/files/styles/canvas_parametrized_width--48/public/balloons.png.avif?itok=Oa4IMo7_ 48w, ::SITE_DIR_BASE_URL::/files/styles/canvas_parametrized_width--64/public/balloons.png.avif?itok=Oa4IMo7_ 64w, ::SITE_DIR_BASE_URL::/files/styles/canvas_parametrized_width--96/public/balloons.png.avif?itok=Oa4IMo7_ 96w, ::SITE_DIR_BASE_URL::/files/styles/canvas_parametrized_width--128/public/balloons.png.avif?itok=Oa4IMo7_ 128w, ::SITE_DIR_BASE_URL::/files/styles/canvas_parametrized_width--256/public/balloons.png.avif?itok=Oa4IMo7_ 256w, ::SITE_DIR_BASE_URL::/files/styles/canvas_parametrized_width--384/public/balloons.png.avif?itok=Oa4IMo7_ 384w, ::SITE_DIR_BASE_URL::/files/styles/canvas_parametrized_width--640/public/balloons.png.avif?itok=Oa4IMo7_ 640w"
      sizes="auto 100vw"
            alt="Hot air balloons"
            width="640"
@@ -1165,16 +1165,16 @@ HTML
     $hero_with_dynamic_sources = [
       'uuid' => 'partly-dynamic-hero',
       'component_id' => 'sdc.canvas_test_sdc.my-hero',
-      'component_version' => '888412021fbcc837',
+      'component_version' => 'a681ae184a8f6b7f',
       'inputs' => [
         'heading' => 'hello, world!',
         'subheading' => [
-          'sourceType' => 'dynamic',
+          'sourceType' => PropSource::EntityField->value,
           'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
         ],
         'cta1href' => ['uri' => 'https://drupal.org'],
         'cta1' => [
-          'sourceType' => 'dynamic',
+          'sourceType' => PropSource::EntityField->value,
           'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
         ],
       ],
@@ -5331,7 +5331,7 @@ HTML
     $clientModel = [
       'source' => [
         'heading' => [
-          'sourceType' => 'dynamic',
+          'sourceType' => PropSource::EntityField->value,
           'expression' => 'ℹ︎␜entity:node:page␝title␞␟value',
           'value' => 'Some value, will be ignored by server',
         ],
@@ -5357,7 +5357,7 @@ HTML
           'value' => 'Inside developer joke',
         ],
         'subheading' => [
-          'sourceType' => 'dynamic',
+          'sourceType' => PropSource::EntityField->value,
           'expression' => 'ℹ︎␜entity:node:page␝revision_log␞␟value',
           'value' => NULL,
         ],
@@ -5372,7 +5372,7 @@ HTML
     ];
     $expectedInput = [
       'heading' => [
-        'sourceType' => 'dynamic',
+        'sourceType' => PropSource::EntityField->value,
         'expression' => 'ℹ︎␜entity:node:page␝title␞␟value',
       ],
       'cta1' => 'Witty test value',
@@ -5382,22 +5382,22 @@ HTML
       ],
       'cta2' => 'Inside developer joke',
       'subheading' => [
-        'sourceType' => 'dynamic',
+        'sourceType' => PropSource::EntityField->value,
         'expression' => 'ℹ︎␜entity:node:page␝revision_log␞␟value',
       ],
     ];
     $nodeValues = ['type' => 'page', 'title' => 'Test page for inputToClientModel'];
     // Explicit failure when no host entity is provided.
-    yield "Invalid: DynamicPropSource without host entity" => [
+    yield "Invalid: EntityFieldPropSource without host entity" => [
       'clientModel' => $clientModel,
       'nodeValues' => NULL,
       'expectedInput' => NULL,
       'expectedExceptionClass' => \InvalidArgumentException::class,
-      'expectedExceptionMessage' => 'A host entity is required to set dynamic prop sources.',
+      'expectedExceptionMessage' => 'A host entity is required to set entity field prop sources.',
     ];
     // Expected (server-side) component instance input for the given client model when provided with a host entity.
     // The non-required property "subheading" is linked to an empty field, revision_log.
-    yield "Valid: DynamicPropSource with host entity, empty non-required property" => [
+    yield "Valid: EntityFieldPropSource with host entity, empty non-required property" => [
       'clientModel' => $clientModel,
       'nodeValues' => $nodeValues,
       'expectedInput' => $expectedInput,
@@ -5407,7 +5407,7 @@ HTML
     // Expected (server-side) component instance input for the given client model when provided with a host entity.
     // The non-required property "subheading" is linked to a non-empty field, revision_log.
     $nodeValues['revision_log'] = 'This is the revision log.';
-    yield "Valid: DynamicPropSource with host entity, not empty non-required property" => [
+    yield "Valid: EntityFieldPropSource with host entity, not empty non-required property" => [
       'clientModel' => $clientModel,
       'nodeValues' => $nodeValues,
       'expectedInput' => $expectedInput,
@@ -5416,7 +5416,7 @@ HTML
     ];
     // Modifying the client model to use an expression requiring a different bundle triggers an exception.
     $clientModel['source']['heading']['expression'] = 'ℹ︎␜entity:node:article␝title␞␟value';
-    yield "Invalid: DynamicPropSource, expression with non-matching bundle" => [
+    yield "Invalid: EntityFieldPropSource, expression with non-matching bundle" => [
       'clientModel' => $clientModel,
       'nodeValues' => $nodeValues,
       'expectedInput' => NULL,
@@ -5580,7 +5580,8 @@ HTML
         'sourceType' => 'static:field_item:entity_reference',
         'value' => ['target_id' => $image->id()],
         // This expression resolves `src` to the image's public URL.
-        'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:image␝field_media_image␞␟src_with_alternate_widths,alt↝entity␜␜entity:media:image␝field_media_image␞␟alt,width↝entity␜␜entity:media:image␝field_media_image␞␟width,height↝entity␜␜entity:media:image␝field_media_image␞␟height}',
+        // @see \Drupal\canvas\Hook\ShapeMatchingHooks::mediaLibraryStorablePropShapeAlter()
+        'expression' => 'ℹ︎entity_reference␟entity␜␜entity:media:image␝field_media_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
         'sourceTypeSettings' => [
           'storage' => ['target_type' => 'media'],
           'instance' => [
@@ -5622,6 +5623,24 @@ HTML
   protected function triggerBrokenComponent(ComponentInterface $component): BrokenPluginManagerInterface {
     /** @var \Drupal\Tests\canvas\Kernel\BrokenPluginManagerInterface */
     return \Drupal::service('plugin.manager.sdc');
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function providerComponentForValidateInputRejectsUnexpectedProps(): array {
+    return [
+      'SDC with props and slots' => [
+        'source_id' => 'sdc',
+        'source_specific_id' => 'canvas_test_sdc:props-slots',
+        'valid_prop_name' => 'heading',
+        'valid_prop_input' => [
+          'sourceType' => 'static:field_item:string',
+          'value' => [['value' => 'Valid heading']],
+          'expression' => 'ℹ︎string␟value',
+        ],
+      ],
+    ];
   }
 
   public function alter(ContainerBuilder $container): void {

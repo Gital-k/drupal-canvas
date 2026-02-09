@@ -100,7 +100,7 @@ HTML;
 
   public function __invoke(?string $entity_type, ?EntityInterface $entity) : HtmlResponse {
     // @phpstan-ignore-next-line function.alreadyNarrowedType
-    assert($this->validateTransformAssetLibraries());
+    \assert($this->validateTransformAssetLibraries());
     // List of libraries to load in the preview iframe.
     $preview_libraries = [
       'system/base',
@@ -115,6 +115,7 @@ HTML;
 
     $canvas_module_path = $this->moduleHandler->getModule('canvas')->getPath();
     $dev_mode = $this->moduleHandler->moduleExists('canvas_dev_mode');
+    $dev_translation_mode = $this->moduleHandler->moduleExists('canvas_dev_translation');
     // ⚠️ This is highly experimental and *will* be refactored.
     $ai_extension_available = $this->moduleHandler->moduleExists('canvas_ai');
     // ⚠️ This is highly experimental and *will* be refactored.
@@ -178,6 +179,7 @@ HTML;
             'entityTypeKeys' => $entity_types_with_keys,
             'entityTypeLabels' => $entity_type_labels,
             'devMode' => $dev_mode,
+            'devTranslationMode' => $dev_translation_mode,
             'extensionsAvailable' => count($extensions) > 0,
             'aiExtensionAvailable' => $ai_extension_available,
             'personalizationExtensionAvailable' => $personalization_extension_available,
@@ -340,7 +342,7 @@ HTML;
     );
     $missing = array_diff($transforms, $encountered_transform_asset_libraries);
     if (!empty($missing)) {
-      throw new \LogicException(sprintf("Client-side transforms '%s' encountered without corresponding asset libraries.", implode("', '", $missing)));
+      throw new \LogicException(\sprintf("Client-side transforms '%s' encountered without corresponding asset libraries.", implode("', '", $missing)));
     }
 
     return TRUE;

@@ -22,6 +22,7 @@ use Drupal\canvas\Entity\CanvasHttpApiEligibleConfigEntityInterface;
 use Drupal\canvas\Plugin\DisplayVariant\CanvasPageVariant;
 use Drupal\canvas\Render\PreviewEnvelope;
 use Drupal\KernelTests\KernelTestBase;
+use Drupal\language\Entity\ConfigurableLanguage;
 use Drupal\node\Entity\Node;
 use Drupal\Tests\canvas\Traits\CanvasFieldCreationTrait;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
@@ -53,6 +54,7 @@ class AutoSaveManagerTest extends KernelTestBase {
     'canvas',
     'file',
     'image',
+    'language',
     'link',
     'path',
     'path_alias',
@@ -133,7 +135,7 @@ class AutoSaveManagerTest extends KernelTestBase {
 
   private function assertAutoSaveCreated(EntityInterface $entity, array $matching_client_data, array $updated_client_data): void {
     $autoSave = $this->container->get(AutoSaveManager::class);
-    assert($autoSave instanceof AutoSaveManager);
+    \assert($autoSave instanceof AutoSaveManager);
     $autoSaveEntity = $this->convertClientData($entity, $matching_client_data);
     $autoSave->saveEntity($autoSaveEntity);
     self::assertTrue($autoSave->getAutoSaveEntity($entity)->isEmpty());
@@ -229,6 +231,102 @@ class AutoSaveManagerTest extends KernelTestBase {
     $this->assertAutoSaveCreated($canvas_page, $matching_client_data, $new_component_client_data);
   }
 
+  /**
+   * Tests that auto-saves for different Page translations are stored independently.
+   *
+   * Verifies that:
+   * - Auto-saves for different translations use distinct keys.
+   * - Saving/loading auto-saves in different languages doesn't interfere with each other
+   */
+  public function testPageAutoSaveTranslationBehavior(): void {
+    $this->installEntitySchema('user');
+    $this->installEntitySchema('path_alias');
+    $this->installEntitySchema(Page::ENTITY_TYPE_ID);
+    $this->installConfig(['language']);
+
+    // Create French language.
+    ConfigurableLanguage::createFromLangcode('fr')->save();
+
+    $auto_save_manager = $this->container->get(AutoSaveManager::class);
+    \assert($auto_save_manager instanceof AutoSaveManager);
+
+    // Create the English page (default language).
+    $page_en = Page::create([
+      'title' => 'English page title',
+      'langcode' => 'en',
+      'components' => [],
+    ]);
+    self::assertCount(0, iterator_to_array($page_en->validate()));
+    self::assertSame(SAVED_NEW, $page_en->save());
+
+    // Add French translation.
+    $page_fr = $page_en->addTranslation('fr', [
+      'title' => 'Titre de la page en français',
+    ]);
+    $page_fr->save();
+
+    // Verify auto-save keys are different for each translation.
+    $key_en = AutoSaveManager::getAutoSaveKey($page_en);
+    $key_fr = AutoSaveManager::getAutoSaveKey($page_fr);
+    self::assertNotEquals($key_en, $key_fr);
+
+    // Confirm no auto-saves exist initially.
+    self::assertTrue($auto_save_manager->getAutoSaveEntity($page_en)->isEmpty());
+    self::assertTrue($auto_save_manager->getAutoSaveEntity($page_fr)->isEmpty());
+
+    // Make a change to the English page and save auto-save.
+    $page_en->set('title', 'Modified English title');
+    $auto_save_manager->saveEntity($page_en);
+
+    // Verify English auto-save exists and French is unaffected.
+    self::assertFalse($auto_save_manager->getAutoSaveEntity($page_en)->isEmpty());
+    self::assertTrue($auto_save_manager->getAutoSaveEntity($page_fr)->isEmpty());
+
+    // Verify only English auto-save is in the list.
+    $list = $auto_save_manager->getAllAutoSaveList();
+    self::assertEquals([$key_en], array_keys($list));
+    self::assertEquals('Modified English title', $list[$key_en]['label']);
+
+    // Make a change to the French page and save auto-save.
+    $page_fr->set('title', 'This is the French title');
+    $auto_save_manager->saveEntity($page_fr);
+
+    // Verify both auto-saves exist independently.
+    self::assertFalse($auto_save_manager->getAutoSaveEntity($page_en)->isEmpty());
+    self::assertFalse($auto_save_manager->getAutoSaveEntity($page_fr)->isEmpty());
+
+    // Verify both auto-saves are in the list with correct labels.
+    $list = $auto_save_manager->getAllAutoSaveList();
+    $keys = array_keys($list);
+    asort($keys);
+    self::assertEquals([$key_en, $key_fr], $keys);
+    self::assertEquals('Modified English title', $list[$key_en]['label']);
+    self::assertEquals('This is the French title', $list[$key_fr]['label']);
+
+    // Verify language codes are stored correctly.
+    self::assertEquals('en', $list[$key_en]['langcode']);
+    self::assertEquals('fr', $list[$key_fr]['langcode']);
+
+    // Delete the English auto-save by restoring original title.
+    $page_en->set('title', 'English page title');
+    $auto_save_manager->saveEntity($page_en);
+
+    // Verify English auto-save is gone but French remains.
+    self::assertTrue($auto_save_manager->getAutoSaveEntity($page_en)->isEmpty());
+    self::assertFalse($auto_save_manager->getAutoSaveEntity($page_fr)->isEmpty());
+
+    $list = $auto_save_manager->getAllAutoSaveList();
+    self::assertEquals([$key_fr], array_keys($list));
+
+    // Delete the French auto-save.
+    $auto_save_manager->delete($page_fr);
+
+    // Verify all auto-saves are gone.
+    self::assertTrue($auto_save_manager->getAutoSaveEntity($page_en)->isEmpty());
+    self::assertTrue($auto_save_manager->getAutoSaveEntity($page_fr)->isEmpty());
+    self::assertEmpty($auto_save_manager->getAllAutoSaveList());
+  }
+
   public function testPageRegion(): void {
     $page_region = PageRegion::create([
       'theme' => 'stark',
@@ -295,7 +393,7 @@ class AutoSaveManagerTest extends KernelTestBase {
   public function testAssetLibrary(): void {
     $this->installConfig('canvas');
     $asset_library = AssetLibrary::load('global');
-    assert($asset_library instanceof AssetLibrary);
+    \assert($asset_library instanceof AssetLibrary);
     $asset_library_matching_client_data = $asset_library->normalizeForClientSide()->values;
     $non_matching_asset_library_client_data = $asset_library_matching_client_data;
     $non_matching_asset_library_client_data['label'] = 'Slightly less boring label';
@@ -430,7 +528,7 @@ class AutoSaveManagerTest extends KernelTestBase {
     // On config delete, auto-saved staged config updates targeting that config
     // should be deleted. In the current state, that's everything.
     $config_manager = $this->container->get(ConfigManagerInterface::class);
-    assert($config_manager instanceof ConfigManagerInterface);
+    \assert($config_manager instanceof ConfigManagerInterface);
     $config_manager->getConfigFactory()->getEditable('system.site')->delete();
     $list = $sut->getAllAutoSaveList();
     self::assertEmpty($list);

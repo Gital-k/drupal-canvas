@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupal\Tests\canvas\Kernel;
 
 use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\canvas\PropSource\PropSource;
 use Drupal\Component\Serialization\Json;
 use Drupal\Core\Cache\MemoryCache\MemoryCacheInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
@@ -266,7 +267,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
       $preview_entity_title = (string) $this->previewEntity->label();
       self::assertNotSame($static_heading_text, $preview_entity_title);
       $json['model'][$uuid]['source']['text'] = [
-        'sourceType' => 'dynamic',
+        'sourceType' => PropSource::EntityField->value,
         'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
       ];
       $json['model'][$uuid]['resolved']['text'] = NULL;
@@ -303,7 +304,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
     $this->assertRequestAutoSaveConflict(Request::create($url, method: 'POST', content: $this->filterLayoutForPost($original_content)));
 
     if ($entity_type === ContentTemplate::ENTITY_TYPE_ID) {
-      // Ensure we can update the dynamic prop source to a static source.
+      // Ensure we can update the entity field prop source to a static source.
       $json['model'][$uuid] = self::getNewHeadingComponentModel();
       $json += $this->getPostContentsDefaults($entity);
       $response = $this->request(Request::create($url, method: 'POST', content: \json_encode($json, JSON_THROW_ON_ERROR)));
@@ -536,7 +537,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
 
     unset($json['isNew'], $json['isPublished'], $json['html']);
     $node = Node::load(1);
-    assert($node instanceof NodeInterface);
+    \assert($node instanceof NodeInterface);
     $json += $this->getPostContentsDefaults($node);
     $this->request(Request::create($url, method: 'POST', content: \json_encode($json, JSON_THROW_ON_ERROR)));
     // Check that regions exist and are wrapped.
@@ -632,7 +633,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
     self::assertCount(1, $reference_media);
     $reference_media = \reset($reference_media);
     $node = Node::load(1);
-    assert($node instanceof NodeInterface);
+    \assert($node instanceof NodeInterface);
     // Populate its client model, and take advantage of the fact that the client
     // model is allowed to be invalid when previewing: no validation may occur,
     // to ensure even invalid explicit inputs for component instances result in
@@ -654,7 +655,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
         ],
         'image' => [
           'sourceType' => 'static:field_item:entity_reference',
-          'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:image␝field_media_image␞␟src_with_alternate_widths,alt↝entity␜␜entity:media:image␝field_media_image␞␟alt,width↝entity␜␜entity:media:image␝field_media_image␞␟width,height↝entity␜␜entity:media:image␝field_media_image␞␟height}',
+          'expression' => 'ℹ︎entity_reference␟entity␜␜entity:media:image␝field_media_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
           'sourceTypeSettings' => [
             'storage' => ['target_type' => 'media'],
             'instance' => [
