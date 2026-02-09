@@ -1,0 +1,53 @@
+---
+title: Global regions
+description: Enable and edit theme regions (header, footer, sidebar) in Drupal Canvas instead of Block layout.
+---
+
+**Global regions** are your theme’s regions—header, footer, sidebar, and others—managed in Drupal Canvas instead of the Block layout UI. Each region can hold components that appear on every page (or where the theme places that region). The **Content** region is the main page content and is not a global region; it is always edited per page in Canvas.
+
+## Editing a global region
+
+To edit a global region (add, remove, or reorder components):
+
+1. Open the **Layers** panel in the Canvas editor.
+2. **Double-click** the region name (e.g. **Header**, **Footer**, **Breadcrumb**). The editor focuses that region and you can edit its components.
+3. To return to the main content, use **“Back”** in the top bar.
+
+You can also focus a region by double clicking its overlay in the preview.
+
+**Note:** Empty regions are not shown in the **Layers** panel. A region appears there only after it has at least one component (see [Adding content to an empty global region](#adding-content-to-an-empty-global-region)).
+
+## Adding content to an empty global region
+
+1. Select a component in a page
+2. Right-click the component.
+3. Choose **Move to global region**.
+4. Select the target region (e.g. Header, Footer).
+
+You need the **“administer page template”** permission to see and use **Move to global region**.
+
+## Seeing global regions in the Canvas editor
+
+Global regions appear in the Canvas editor only when:
+
+1. The active theme has **“Use Drupal Canvas for page templates in this theme”** enabled.
+2. At least one region is checked under **Exposed regions**.
+3. Your user has the **“administer page template”** permission.
+
+If you do not see any regions besides **Content** in the **Layers** panel, check theme settings and your permissions.
+
+## Enable Canvas for your theme
+
+To use global regions in Canvas, you must enable Drupal Canvas for your theme:
+
+1. Go to **Appearance** → **Settings** in the Drupal admin.
+2. Open the tab for **your theme** (the default front-end theme), for example **Olivero**. Do not use the “Global settings” tab—Canvas options appear only on each theme’s settings page.
+3. Check **“Use Drupal Canvas for page templates in this theme.”**
+4. Under **Exposed regions**, check the regions you want to edit in Canvas (e.g. Header, Footer, Breadcrumb). Unchecked regions will not appear in the Canvas editor. The **Content** region is always the main content and cannot be turned off.
+5. Click **Save configuration**.
+
+Do this for the **default** theme you use on the front. If you change the default theme later, repeat these steps for the new theme.
+
+## Why header and footer are empty after switching themes
+
+Block layout in Drupal is **per theme**. When you switch to a new default theme, that theme has its own block placement. If you never placed blocks there, the header and footer regions appear empty on the front.
