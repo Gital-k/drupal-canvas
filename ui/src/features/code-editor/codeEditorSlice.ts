@@ -32,6 +32,11 @@ interface CodeEditorStatusOptions {
   isCompiling: boolean;
   isSaving: boolean;
   hasUnsavedChanges: boolean;
+  // Track unsaved props so their type/name can be changed when the component
+  // has been added to Components.
+  // @todo Remove this when all child tasks of https://drupal.org/i/3509115 that
+  //   relate to props have been completed.
+  unsavedProps: Array<string>;
 }
 
 export const initialState: CodeEditorState = {
@@ -42,6 +47,7 @@ export const initialState: CodeEditorState = {
     isCompiling: false,
     isSaving: false,
     hasUnsavedChanges: false,
+    unsavedProps: [],
   },
   codeComponent: {
     machineName: '',
@@ -161,8 +167,9 @@ export const codeEditorSlice = createSlice({
     ),
 
     addProp: (state) => {
+      const id = uuidv4();
       state.codeComponent.props.push({
-        id: uuidv4(),
+        id,
         name: '',
         type: 'string',
         example: '',
@@ -170,6 +177,7 @@ export const codeEditorSlice = createSlice({
         $ref: undefined,
         derivedType: 'text',
       });
+      state.status.unsavedProps.push(id);
     },
     updateProp: (
       state,
@@ -211,6 +219,9 @@ export const codeEditorSlice = createSlice({
         // Set auto-save to true when removing a prop.
         state.status.needsAutoSave = true;
       }
+      state.status.unsavedProps = state.status.unsavedProps.filter(
+        (uuid) => uuid !== propId,
+      );
     },
 
     reorderProps: (
@@ -452,6 +463,9 @@ export const selectPreviewCompiledJsForSlots = (state: RootState) =>
 
 export const selectForceRefresh = (state: RootState) =>
   state.codeEditor.forceRefresh;
+
+export const selectUnsavedProps = (state: RootState) =>
+  state.codeEditor.status.unsavedProps;
 
 export const {
   initializeCodeEditor,
