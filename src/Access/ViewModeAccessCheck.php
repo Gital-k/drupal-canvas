@@ -8,6 +8,8 @@ use Drupal\canvas\ContentTemplateRoutes;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Access\AccessResultInterface;
+use Drupal\Core\Cache\CacheableMetadata;
+use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Routing\Access\AccessInterface;
 use Drupal\Core\Routing\RouteMatchInterface;
@@ -17,7 +19,7 @@ use Symfony\Component\Routing\Route;
 /**
  * Defines an access checker for canvas content template entity.
  */
-class ViewModeAccessCheck implements AccessInterface {
+final class ViewModeAccessCheck implements AccessInterface {
 
   public function __construct(
     private readonly AccessInterface $inner,
@@ -28,25 +30,27 @@ class ViewModeAccessCheck implements AccessInterface {
    * {@inheritdoc}
    */
   public function access(Route $route, RouteMatchInterface $route_match, AccountInterface $account, string $view_mode_name = 'default', ?string $bundle = NULL): AccessResultInterface {
-    // Check if a ContentTemplate access applies to this route.
+    $access = AccessResult::neutral();
+    // Add the ContentTemplate entity storage cacheability. As the access check
+    // needs to rebuild when content templates are created.
+    $access->addCacheableDependency($this->getContentTemplateCacheability());
+    // @todo Remove this hardcoded route override after
+    //   https://www.drupal.org/project/canvas/issues/3498525 is resolved.
     if ($route_match->getRouteName() && ContentTemplateRoutes::applies($route_match->getRouteName())) {
       $template = $this->loadFromRoute($view_mode_name, $route_match, $bundle);
-      $access = AccessResult::neutral();
       if ($template) {
-        // Add the ContentTemplate as a cacheable dependency. As the access
-        // check needs to rebuild when content templates are added or updated.
-        $access = $access->addCacheableDependency($template);
+        // Add the ContentTemplate entity cacheability. As the access check
+        // needs to rebuild when content templates are updated or deleted.
+        $access->addCacheableDependency($this->getContentTemplateCacheability($template));
         if ($template->status()) {
-          // If the content template exists and is enabled, allow access based
-          // on the required permission.
-          return $access->allowedIfHasPermission($account, ContentTemplate::ADMIN_PERMISSION);
+          return $access->orIf(AccessResult::allowedIfHasPermission($account, ContentTemplate::ADMIN_PERMISSION));
         }
       }
     }
     // The AccessInterface class does not define the access method. Hence,
     // we ignore. Possibly will be fixed in https://www.drupal.org/node/2266817
     // @phpstan-ignore-next-line
-    return $this->inner->access($route, $route_match, $account, $view_mode_name, $bundle);
+    return $access->orIf($this->inner->access($route, $route_match, $account, $view_mode_name, $bundle));
   }
 
   /**
@@ -85,6 +89,28 @@ class ViewModeAccessCheck implements AccessInterface {
       }
     }
     return ContentTemplate::load("$entity_type_id.$bundle.$view_mode");
+  }
+
+  /**
+   * Gets cache metadata for content template.
+   *
+   * @param \Drupal\canvas\Entity\ContentTemplate|null $template
+   *   (optional) A content template entity to get bundle-specific cache tags
+   *   for. If NULL, only general list cache tags will be included.
+   *
+   * @return \Drupal\Core\Cache\RefinableCacheableDependencyInterface
+   *   The cacheable dependency.
+   */
+  private function getContentTemplateCacheability(?ContentTemplate $template = NULL): RefinableCacheableDependencyInterface {
+    $storage = $this->entityTypeManager->getStorage(ContentTemplate::ENTITY_TYPE_ID);
+    $dependency = (new CacheableMetadata())
+      ->addCacheContexts($storage->getEntityType()->getListCacheContexts())
+      ->addCacheTags($storage->getEntityType()->getListCacheTags());
+    if ($template) {
+      $dependency
+        ->addCacheTags($storage->getEntityType()->getBundleListCacheTags($template->getTargetBundle()));
+    }
+    return $dependency;
   }
 
 }
