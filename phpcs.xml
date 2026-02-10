@@ -46,4 +46,5 @@ core.phpcs.xml.dist -> /PATH/TO/DRUPAL/ROOT/core/phpcs.xml.dist
       <property name="include" type="array" value="assert,sprintf" />
     </properties>
   </rule>
+  <rule ref="./phpcs/Sniffs/Namespacing/LanguageConstantsSniff.php"/>
 </ruleset>
