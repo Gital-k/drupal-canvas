@@ -352,21 +352,36 @@ YAML;
     $this->assertFalse($cache->get($cache_id), 'Cache is empty before first call');
 
     // First call - should fetch fresh data and cache it.
-    $this->canvasAiPageBuilderHelper->getAllComponentsKeyedBySource();
+    $components_before_disable = $this->canvasAiPageBuilderHelper->getAllComponentsKeyedBySource();
 
     // Verify cache now contains data.
     $cached1 = $cache->get($cache_id);
     $this->assertIsObject($cached1, 'Data is now cached after first call');
     $this->assertNotEmpty($cached1->data, 'Cached data is not empty');
 
-    // Disable a component to force cache invalidation.
+    // Update a component to force cache invalidation and verify a second call
+    // in the same request does not return stale data.
     $breadcrumb_component = Component::load('block.system_breadcrumb_block');
     $this->assertNotNull($breadcrumb_component, 'Breadcrumb component exists');
-    $breadcrumb_component->disable()->save();
+    $breadcrumb_component_id = $breadcrumb_component->id();
+    $source = $breadcrumb_component->getComponentSource()->getPluginId();
+    $this->assertArrayHasKey($source, $components_before_disable);
+    $this->assertArrayHasKey('components', $components_before_disable[$source]);
+    $this->assertArrayHasKey($breadcrumb_component_id, $components_before_disable[$source]['components']);
+    $original_label = $breadcrumb_component->label();
+    $updated_label = $original_label . ' (updated)';
+    $breadcrumb_component->set('label', $updated_label)->save();
     // Check if cache is invalidated.
     $cached2 = $cache->get($cache_id);
     // @phpstan-ignore-next-line method.alreadyNarrowedType
-    $this->assertFalse($cached2, 'Cache is invalidated after component disable');
+    $this->assertFalse($cached2, 'Cache is invalidated after component update');
+
+    $components_after_update = $this->canvasAiPageBuilderHelper->getAllComponentsKeyedBySource();
+    $this->assertArrayHasKey($source, $components_after_update);
+    $this->assertArrayHasKey('components', $components_after_update[$source]);
+    $this->assertArrayHasKey($breadcrumb_component_id, $components_after_update[$source]['components']);
+    $this->assertSame($updated_label, $components_after_update[$source]['components'][$breadcrumb_component_id]['name']);
+    $this->assertSame($updated_label, $components_after_update[$source]['components'][$breadcrumb_component_id]['description']);
   }
 
 }

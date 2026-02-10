@@ -33,13 +33,6 @@ class CanvasAiPageBuilderHelper {
   public const CACHE_KEY_ALL_COMPONENTS_BY_SOURCE = 'canvas_ai:all_components_by_source';
 
   /**
-   * The available components, cached during the current request.
-   *
-   * @var array|null
-   */
-  private ?array $fetchedComponents = NULL;
-
-  /**
    * Constructor.
    *
    * @param \Drupal\Core\Theme\ComponentPluginManager $componentPluginManager
@@ -275,16 +268,11 @@ class CanvasAiPageBuilderHelper {
    *   The components keyed by source.
    */
   public function getAllComponentsKeyedBySource(): array {
-    if ($this->fetchedComponents !== NULL) {
-      return $this->fetchedComponents;
-    }
-
     $base_cacheability = $this->getComponentListCacheability();
     $cache_id = $this->buildCacheId($base_cacheability);
     $cache = $this->cacheBackend->get($cache_id);
     if ($cache) {
-      $this->fetchedComponents = $cache->data ?? [];
-      return $this->fetchedComponents;
+      return $cache->data ?? [];
     }
     $output = [];
 
@@ -345,8 +333,7 @@ class CanvasAiPageBuilderHelper {
       );
     }
 
-    $this->fetchedComponents = $output;
-    return $this->fetchedComponents;
+    return $output;
   }
 
   /**
