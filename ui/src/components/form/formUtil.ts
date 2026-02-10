@@ -11,7 +11,10 @@ import type * as React from 'react';
 import type { PropsValues } from '@drupal-canvas/types';
 import type { SchemaObject, ValidateFunction } from 'ajv';
 import type { ParsedQs } from 'qs';
-import type { ComponentModel, EvaluatedComponentModel } from '@/features/layout/layoutModelSlice';
+import type {
+  ComponentModel,
+  EvaluatedComponentModel,
+} from '@/features/layout/layoutModelSlice';
 import type { FieldDataItem, PropSourceComponent } from '@/types/Component';
 import type { InputUIData } from '@/types/Form';
 import type { TransformConfig, Transforms } from '@/utils/transforms';
