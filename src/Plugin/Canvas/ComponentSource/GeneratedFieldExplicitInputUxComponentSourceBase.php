@@ -779,7 +779,14 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
 
       $widget_definition = $this->fieldWidgetPluginManager->getDefinition($widget->getPluginId());
       if (\array_key_exists('canvas', $widget_definition) && \array_key_exists('transforms', $widget_definition['canvas'])) {
-        $transforms[$sdc_prop_name] = $widget_definition['canvas']['transforms'];
+        $cardinality = $static_prop_source_field_definition['cardinality'] ?? NULL;
+        $transforms[$sdc_prop_name] = \array_map(
+          static fn (array $transform): array =>
+            [
+              ...$transform,
+              'multiple' => $cardinality !== NULL && $cardinality !== 1,
+            ],
+          $widget_definition['canvas']['transforms']);
       }
       else {
         throw new \LogicException(\sprintf(
