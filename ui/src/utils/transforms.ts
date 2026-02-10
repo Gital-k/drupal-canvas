@@ -49,7 +49,14 @@ const mainProperty: Transformer<{
     if (value.length === 0) {
       return null;
     }
-    first = value.shift() as PropsValues;
+    // Multi-value fields (e.g., media_library_widget with multiple selections)
+    // need all items mapped, not just the first.
+    if (value.length > 1) {
+      return value.map((item: PropsValues) =>
+        item && name in item ? item[name] : null,
+      );
+    }
+    first = value[0] as PropsValues;
   }
   if (first && name in first) {
     return first[name];

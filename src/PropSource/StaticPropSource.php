@@ -507,6 +507,22 @@ final class StaticPropSource extends PropSourceBase {
     if ($host_entity) {
       $field->setContext(NULL, EntityAdapter::createFromEntity($host_entity));
     }
+
+    // Initialize widget state with existing items for widgets that rely on it.
+    // This ensures that on AJAX rebuilds, the widget knows about existing items
+    // and doesn't lose them. Only initialize when there are actual items to
+    // preserve.
+    // @see \Drupal\media_library\Plugin\Field\FieldWidget\MediaLibraryWidget::form()
+    if ($widget->getPluginId() === 'media_library_widget' && !$this->fieldItemList->isEmpty()) {
+      $field_name = $field_definition->getName();
+      $widget_state = $widget::getWidgetState($form['#parents'] ?? [], $field_name, $form_state);
+      if (!isset($widget_state['items'])) {
+        // Initialize with current field value (existing items only)
+        $widget_state['items'] = $field->getValue();
+        $widget::setWidgetState($form['#parents'] ?? [], $field_name, $form_state, $widget_state);
+      }
+    }
+
     $widget_form = $widget->form($field, $form, $form_state);
     if ($widget->getPluginId() === 'datetime_default' && !$this->fieldItemList->isEmpty()) {
       // The datetime widget needs a DrupalDateTime object as the value.
