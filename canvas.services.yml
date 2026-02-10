@@ -63,7 +63,9 @@ services:
     class: \Drupal\canvas\Asset\AssetResolver
     decorates: asset.resolver
     arguments: ['@asset.resolver.canvas.inner', '@library.discovery', '@library.dependency_resolver', '@module_handler', '@theme.manager', '@language_manager', '@cache.data', '@theme_handler']
-  Drupal\canvas\ClientDataToEntityConverter: {}
+  Drupal\canvas\ClientDataToEntityConverter:
+    arguments:
+      $lock: '@lock'
   Drupal\canvas\AutoSave\AutoSaveManager: {}
   Drupal\canvas\Storage\ComponentTreeLoader: {}
   Drupal\canvas\CodeComponentDataProvider: {}

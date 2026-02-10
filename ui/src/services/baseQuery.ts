@@ -218,7 +218,7 @@ export const withAutoSavesInjection: (
   };
 };
 
-// Export a baseQuery with autoSaves injection and debouncing by default
+// Export a baseQuery with autoSaves injection by default
 export const baseQueryWithAutoSaves: BaseQueryFn<
   string | FetchArgs,
   unknown,

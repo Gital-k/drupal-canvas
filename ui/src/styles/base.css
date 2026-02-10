@@ -41,7 +41,9 @@ drupal-html-fragment {
   transition: opacity 0.3s ease;
 }
 
-[data-canvas-layout-request-in-progress] [data-once="drupal-ajax"]{
+[data-canvas-layout-request-in-progress] [data-once="drupal-ajax"],
+[data-canvas-layout-request-in-progress] .use-ajax,
+[data-canvas-layout-request-in-progress] .use-ajax-submit{
   pointer-events: none;
   user-select: none;
   opacity: 0.5;

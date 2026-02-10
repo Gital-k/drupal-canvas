@@ -137,8 +137,15 @@ export const previewApi = createApi({
         };
 
         if (activePreviewPromise) {
-          // Queue this request, replacing any previously queued request
+          // If replacing a previously queued request, balance the tracking
+          if (queuedPreviewRequest) {
+            popCanvasLayoutRequest(); // Remove tracking for replaced request
+          }
+
+          // Queue this request, and track it for AJAX coordination
           queuedPreviewRequest = arg;
+          pushCanvasLayoutRequest();
+
           // console.log(
           //   'Preview request queued, will use latest after current completes',
           // );
@@ -161,6 +168,11 @@ export const previewApi = createApi({
             if (queuedPreviewRequest) {
               const nextRequest = queuedPreviewRequest;
               queuedPreviewRequest = null;
+
+              // Balance the push/pop: the queued request was already tracked,
+              // but execution will track it again, so pop first
+              popCanvasLayoutRequest();
+
               // console.log('Executing queued preview request');
 
               // Trigger the mutation again with the queued request

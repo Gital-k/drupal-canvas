@@ -174,7 +174,7 @@ describe(
           }).as('updatePreview');
           value.edit(cy);
           // Wait for the preview to finish loading.
-          cy.wait('@updatePreview');
+          // cy.wait('@updatePreview');
           cy.findByLabelText('Loading Preview').should('not.exist');
         });
 

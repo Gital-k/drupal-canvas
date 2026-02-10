@@ -22,7 +22,7 @@ export const edit = (cy) => {
       item,
     );
     // Wait for the preview to finish loading.
-    cy.wait('@updatePreview');
+    // cy.wait('@updatePreview');
     cy.wait(100); // eslint-disable-line cypress/no-unnecessary-waiting
 
     // Queue another intercept for the wait in the main test and/or the next
@@ -36,6 +36,7 @@ export const edit = (cy) => {
     cy.log(`adding item ${ix + 1}`);
 
     cy.get('@add-another-text').click();
+    cy.wait('@updatePreview');
 
     cy.waitForAjax().then(() => {
       console.log(`[Iteration ${ix + 1}] waitForAjax after click completed`);
@@ -47,6 +48,12 @@ export const edit = (cy) => {
     ).then(() => {
       console.log(`[Iteration ${ix + 1}] Form build ID updated`);
     });
+
+    // cy.intercept({
+    //   url: '**/canvas/api/v0/layout/node/2',
+    //   times: 1,
+    //   method: 'POST',
+    // }).as('updatePreview');
     // @todo this wait is a temp fix. We shouldn't merge this, but instead
     // find the underlying cause.
     // cy.wait(4000); // eslint-disable-line cypress/no-unnecessary-waiting
