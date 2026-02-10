@@ -143,6 +143,13 @@ test.describe('Media Multi-Cardinality', () => {
     );
     await catCheckbox.setChecked(true);
 
+    // Set up listener for auto-save PATCH before clicking insert
+    const autoSavePromise = page.waitForResponse(
+      (response) =>
+        response.url().includes('/canvas/api/v0/layout/canvas_page/') &&
+        response.request().method() === 'PATCH',
+    );
+
     await page
       .getByRole('button', { name: 'Insert selected', exact: true })
       .click();
@@ -157,7 +164,10 @@ test.describe('Media Multi-Cardinality', () => {
       ),
     ).toHaveCount(1);
 
-    // Reload the page (changes are auto-saved)
+    // Wait for auto-save to complete before reloading
+    await autoSavePromise;
+
+    // Reload the page
     await page.reload();
     await canvasEditor.waitForEditorUi();
 
