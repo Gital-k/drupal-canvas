@@ -121,9 +121,9 @@ describe('Transforms - main property', () => {
     expect(
       transforms.mainProperty(
         {
-          '0': { target_id: '3', weight: '0' },
-          '1': { target_id: '4', weight: '1' },
-          '2': { target_id: '5', weight: '2' },
+          0: { target_id: '3', weight: '0' },
+          1: { target_id: '4', weight: '1' },
+          2: { target_id: '5', weight: '2' },
         },
         { name: 'target_id', multiple: true },
         fieldData,
@@ -135,9 +135,9 @@ describe('Transforms - main property', () => {
     expect(
       transforms.mainProperty(
         {
-          '0': { target_id: '5', weight: '0' },
-          '1': { target_id: '3', weight: '1' },
-          '2': { target_id: '4', weight: '2' },
+          0: { target_id: '5', weight: '0' },
+          1: { target_id: '3', weight: '1' },
+          2: { target_id: '4', weight: '2' },
         },
         { name: 'target_id', multiple: true },
         fieldData,
@@ -149,8 +149,8 @@ describe('Transforms - main property', () => {
     expect(
       transforms.mainProperty(
         {
-          '0': { target_id: '4', _weight: '0' },
-          '1': { target_id: '3', _weight: '1' },
+          0: { target_id: '4', _weight: '0' },
+          1: { target_id: '3', _weight: '1' },
         },
         { name: 'target_id', multiple: true },
         fieldData,
@@ -162,8 +162,8 @@ describe('Transforms - main property', () => {
     expect(
       transforms.mainProperty(
         {
-          '0': { target_id: '3', weight: 1 },
-          '1': { target_id: '4', weight: 0 },
+          0: { target_id: '3', weight: 1 },
+          1: { target_id: '4', weight: 0 },
         },
         { name: 'target_id', multiple: true },
         fieldData,
