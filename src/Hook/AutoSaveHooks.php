@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Hook;
 
+use Drupal\Core\Entity\EntityChangedInterface;
 use Drupal\Core\Entity\EntityFormInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\RevisionableInterface;
@@ -34,6 +35,23 @@ class AutoSaveHooks {
   #[Hook('entity_delete')]
   public function entityDelete(EntityInterface $entity): void {
     $this->autoSaveManager->delete($entity);
+  }
+
+  /**
+   * Implements hook_entity_update().
+   */
+  #[Hook('entity_update')]
+  public function entityUpdate(EntityInterface $entity): void {
+    if (!$entity instanceof EntityChangedInterface) {
+      return;
+    }
+    $autoSave = $this->autoSaveManager->getAutoSaveEntity($entity);
+    if (!$autoSave->isEmpty()) {
+      $autoSaveEntity = $autoSave->entity;
+      \assert($autoSaveEntity instanceof EntityChangedInterface);
+      $autoSaveEntity->setChangedTime($entity->getChangedTime());
+      $this->autoSaveManager->saveEntity($autoSaveEntity);
+    }
   }
 
   /**
