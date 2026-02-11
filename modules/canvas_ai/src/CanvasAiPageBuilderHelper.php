@@ -2,6 +2,7 @@
 
 namespace Drupal\canvas_ai;
 
+use Drupal\canvas\Component\Schema\PropMetadataNormalizer;
 use Drupal\Component\Datetime\TimeInterface;
 use Drupal\Component\Serialization\Json;
 use Drupal\Component\Utility\NestedArray;
@@ -57,6 +58,8 @@ class CanvasAiPageBuilderHelper {
    *   The API config controllers service.
    * @param \Drupal\Core\Extension\ThemeHandlerInterface $themeHandler
    *   The theme handler.
+   * @param \Drupal\canvas\Component\Schema\PropMetadataNormalizer $propMetadataNormalizer
+   *   The prop metadata normalizer.
    */
   public function __construct(
     private readonly ComponentPluginManager $componentPluginManager,
@@ -69,6 +72,7 @@ class CanvasAiPageBuilderHelper {
     private readonly TimeInterface $time,
     private readonly ApiConfigControllers $apiConfigControllers,
     private readonly ThemeHandlerInterface $themeHandler,
+    private readonly PropMetadataNormalizer $propMetadataNormalizer,
   ) {
   }
 
@@ -556,7 +560,7 @@ class CanvasAiPageBuilderHelper {
         if ($default_value instanceof MarkupInterface) {
           $default_value = $default_value->__toString();
         }
-        $output[$source_id]['components'][$component_id]['props'][$prop_name] = [
+        $prop_metadata = [
           'name' => $prop_details['title'] ?? $prop_name,
           'description' => $prop_details['description'] ?? 'No description available',
           'type' => $prop_details['type'],
@@ -565,11 +569,12 @@ class CanvasAiPageBuilderHelper {
 
         // Mark required props.
         if (isset($sdc_definition['props']['required']) && in_array($prop_name, $sdc_definition['props']['required'], TRUE)) {
-          $output[$source_id]['components'][$component_id]['props'][$prop_name]['required'] = TRUE;
+          $prop_metadata['required'] = TRUE;
         }
         if (isset($prop_details['enum'])) {
-          $output[$source_id]['components'][$component_id]['props'][$prop_name]['enum'] = $prop_details['enum'];
+          $prop_metadata['enum'] = $prop_details['enum'];
         }
+        $output[$source_id]['components'][$component_id]['props'][$prop_name] = $this->propMetadataNormalizer->normalize($prop_metadata, $prop_details);
       }
     }
   }
