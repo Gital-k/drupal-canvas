@@ -98,7 +98,15 @@ final class Page extends EditorialContentEntityBase implements EntityOwnerInterf
   public const string EDIT_PERMISSION = 'edit canvas_page';
   public const string DELETE_PERMISSION = 'delete canvas_page';
 
-  private bool $isAutoSave = FALSE;
+  public bool $isAutoSave = TRUE;
+
+  public static function loadWithAutoSaveData(Page $original): Page
+  {
+    $new = clone $original;
+    $new->isAutoSave = FALSE;
+    $new->set('title', $new->get('title')->getValue());
+    return $new;
+  }
 
   /**
    * {@inheritdoc}

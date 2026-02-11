@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupal\canvas\AutoSave;
 
 use Drupal\canvas\Entity\ComponentTreeEntityInterface;
+use Drupal\canvas\Entity\Page;
 use Drupal\Core\Cache\CacheBackendInterface;
 use Drupal\Core\Cache\CacheTagsInvalidatorInterface;
 use Drupal\Core\Config\ConfigCrudEvent;
@@ -90,6 +91,9 @@ class AutoSaveManager implements EventSubscriberInterface {
 
   public function saveEntity(EntityInterface $entity, ?string $clientId = NULL): void {
     $key = $this->getAutoSaveKey($entity);
+    if ($entity instanceof Page) {
+      $entity = Page::loadWithAutoSaveData($entity);
+    }
     $data = self::normalizeEntity($entity);
     $data_hash = self::generateHash($data);
     $original_hash = $this->getUnchangedHash($entity);
@@ -286,6 +290,9 @@ class AutoSaveManager implements EventSubscriberInterface {
     if ($original === NULL) {
       return NULL;
     }
+    if ($original instanceof Page) {
+      $original = Page::loadWithAutoSaveData($original);
+    }
     return self::generateHash(self::normalizeEntity($original));
   }
 
@@ -309,7 +316,11 @@ class AutoSaveManager implements EventSubscriberInterface {
     // it to avoid possible issues where someone accidentally calls ::save on
     // the entity. Calling code that needs to reflect the fact that the entity
     // is not new should call ::enforceIsNew as required.
-    $auto_save_entity = new AutoSaveEntity($this->entityTypeManager->getStorage($auto_save_data['entity_type'])->create($auto_save_data['data']), $auto_save_data['data_hash'], $auto_save_data['client_id']);
+    $auto_save_entity = new AutoSaveEntity($this->entityTypeManager->getStorage($auto_save_data['entity_type'])->create(array_merge($auto_save_data['data'], ['isAutoSave' => TRUE])), $auto_save_data['data_hash'], $auto_save_data['client_id']);
+    if ($auto_save_entity instanceof Page) {
+      $auto_save_entity->isAutoSave = TRUE;
+      $auto_save_entity->set('title', $auto_save_entity->get('title'));
+    }
     // Store in static cache to avoid the overhead of calling Entity::create
     // multiple times during layout preview rendering.
     $this->cache->set($key, $auto_save_entity, tags: [self::CACHE_TAG]);

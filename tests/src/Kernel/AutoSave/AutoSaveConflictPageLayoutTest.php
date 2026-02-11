@@ -25,6 +25,7 @@ final class AutoSaveConflictPageLayoutTest extends ApiLayoutControllerTestBase {
     $this->entity->save();
   }
 
+
   protected static function getPermissions(): array {
     return [Page::CREATE_PERMISSION, Page::EDIT_PERMISSION, AutoSaveManager::PUBLISH_PERMISSION];
   }

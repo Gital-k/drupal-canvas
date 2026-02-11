@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Hook;
 
+use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\Component\Serialization\Json;
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Access\AccessResultInterface;
@@ -33,6 +34,29 @@ final class PageHooks {
     private readonly ModuleHandlerInterface $moduleHandler,
     private readonly ConfigFactoryInterface $configFactory,
   ) {
+  }
+
+  /**
+   * Implements hook_ENTITY_TYPE_load() for canvas_page entities.
+   */
+  #[Hook('canvas_page_load')]
+  public function pageLoad($pages): void {
+    foreach ($pages as $page) {
+      \assert($page instanceof Page);
+      if ($page->isAutoSave) {
+        continue;
+      }
+      $autoSaveManager = \Drupal::service(AutoSaveManager::class);
+      \assert($autoSaveManager instanceof AutoSaveManager);
+      $autoSave = $autoSaveManager->getAutoSaveEntity($page);
+      if ($autoSave->isEmpty()) {
+        continue;
+      }
+      $autoSaveEntity = $autoSave->entity;
+      \assert($autoSaveEntity instanceof Page);
+      $autoSaveEntity->isAutoSave = TRUE;
+      $page->set('title', $autoSaveEntity->get('title')->getValue());
+    }
   }
 
   /**
