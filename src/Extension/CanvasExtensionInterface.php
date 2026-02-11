@@ -51,4 +51,9 @@ interface CanvasExtensionInterface {
    */
   public function getPermissions(): array;
 
+  /**
+   * Returns the placements for this extension.
+   */
+  public function getPlacements(): array;
+
 }

@@ -16,6 +16,7 @@ import {
 import PermissionCheck from '@/components/PermissionCheck';
 import ReviewErrors from '@/components/review/ReviewErrors';
 import { Divider } from '@/features/code-editor/component-data/FormElement';
+import ExtensionSlot from '@/features/extensions/ExtensionSlot';
 
 import ChangeList from './changes/ChangeList';
 
@@ -232,6 +233,7 @@ const PublishReview: React.FC<PublishReviewProps> = ({
             </ScrollArea>
           </Box>
           <Divider />
+          <ExtensionSlot slotLocation="publish-dropdown-menu" />
           <PermissionCheck hasPermission="publishChanges">
             <Flex p="4" justify="end" align="center" gap="2" width="100%">
               <Button

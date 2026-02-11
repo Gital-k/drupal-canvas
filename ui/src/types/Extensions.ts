@@ -6,6 +6,14 @@ export interface LegacyExtension {
   component?: any;
 }
 
+export interface Placement {
+  id: string;
+  location: string;
+  label: string;
+  action: string;
+  message_event?: string;
+}
+
 export interface Extension {
   id: string;
   name: string;
@@ -15,6 +23,7 @@ export interface Extension {
   type?: 'canvas' | 'code-editor';
   api_version: string;
   permissions?: string[];
+  placements?: Placement[];
 }
 
 export type ActiveExtension = Extension | null;

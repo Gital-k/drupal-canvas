@@ -73,4 +73,15 @@ class CanvasExtension extends PluginBase implements CanvasExtensionInterface {
     return $this->pluginDefinition['permissions'];
   }
 
+  /**
+   * {@inheritdoc}
+   */
+  public function getPlacements(): array {
+    if (is_array($this->pluginDefinition) && \array_key_exists('placements', $this->pluginDefinition)) {
+      \assert(is_array($this->pluginDefinition['placements']));
+      return $this->pluginDefinition['placements'];
+    }
+    return [];
+  }
+
 }
