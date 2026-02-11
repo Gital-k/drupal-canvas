@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Drupal\Tests\canvas\Kernel\Config\Schema;
 
 use Drupal\Core\Config\TypedConfigManagerInterface;
-use Drupal\KernelTests\KernelTestBase;
-use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Symfony\Component\Validator\ConstraintViolation;
 use Symfony\Component\Validator\ConstraintViolationListInterface;
 
@@ -14,16 +14,8 @@ use Symfony\Component\Validator\ConstraintViolationListInterface;
  * @covers \Drupal\canvas\Config\Schema\JsonSchemaObject
  * @group canvas
  */
-final class JsonSchemaObjectTest extends KernelTestBase {
-
-  use ContribStrictConfigSchemaTestTrait;
-
-  /**
-   * {@inheritdoc}
-   */
-  protected static $modules = [
-    'canvas',
-  ];
+#[RunTestsInSeparateProcesses]
+final class JsonSchemaObjectTest extends CanvasKernelTestBase {
 
   /**
    * {@inheritdoc}

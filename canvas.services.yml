@@ -70,6 +70,7 @@ services:
   Drupal\canvas\Version: {}
   Drupal\canvas\CanvasConfigUpdater: ~
   Drupal\canvas\ComponentTreeInputExtractor: {}
+  Drupal\canvas\GlobalImports: {}
 
   # Event subscribers.
   canvas.openapi.http_request_validator.subscriber:
@@ -157,7 +158,6 @@ services:
   Drupal\canvas\Controller\ApiExtensionControllers: ~
   Drupal\canvas\Controller\ApiLayoutController: {}
   Drupal\canvas\Controller\ApiLogController: {}
-  Drupal\canvas\Controller\ApiContentUpdateForDemoController: {}
   Drupal\canvas\Controller\ApiContentControllers: {}
   Drupal\canvas\Controller\ApiStagedConfigUpdateAutoSaveController: {}
   Drupal\canvas\Controller\ComponentStatusController: {}

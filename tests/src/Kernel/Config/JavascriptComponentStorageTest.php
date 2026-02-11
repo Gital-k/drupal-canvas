@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Drupal\Tests\canvas\Kernel\Config;
 
 use Drupal\Core\Entity\EntityTypeManagerInterface;
-use Drupal\Core\Extension\ThemeInstallerInterface;
 use Drupal\canvas\ComponentIncompatibilityReasonRepository;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ComponentInterface;
@@ -14,6 +13,7 @@ use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
 use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
  * Tests JavascriptComponentStorage.
@@ -23,6 +23,7 @@ use Drupal\Tests\user\Traits\UserCreationTrait;
  * @group JavaScriptComponents
  * @group canvas
  */
+#[RunTestsInSeparateProcesses]
 final class JavascriptComponentStorageTest extends AssetLibraryStorageTest {
 
   use UserCreationTrait;
@@ -32,32 +33,9 @@ final class JavascriptComponentStorageTest extends AssetLibraryStorageTest {
   /**
    * {@inheritdoc}
    */
-  protected static $modules = [
-    'canvas',
-    'user',
-    'system',
-    // Canvas's dependencies (modules providing field types + widgets).
-    'datetime',
-    'file',
-    'image',
-    'options',
-    'path',
-    'link',
-    'text',
-    'filter',
-    'ckeditor5',
-    'editor',
-  ];
-
-  /**
-   * {@inheritdoc}
-   */
   protected function setUp(): void {
     parent::setUp();
     $this->installEntitySchema('user');
-    $this->installConfig(['system']);
-    $this->container->get(ThemeInstallerInterface::class)->install(['stark']);
-    $this->installConfig(['canvas']);
   }
 
   /**

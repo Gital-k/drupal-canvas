@@ -8,6 +8,7 @@ use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\canvas\PropShape\PropShape;
 use Drupal\canvas\PropShape\StorablePropShape;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
  * @covers \Drupal\canvas\Hook\ShapeMatchingHooks::mediaLibraryStoragePropShapeAlter()
@@ -16,6 +17,7 @@ use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
  * @group canvas_data_model
  * @group canvas_data_model__prop_expressions
  */
+#[RunTestsInSeparateProcesses]
 class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
 
   use MediaTypeCreationTrait;
@@ -24,17 +26,7 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
    * {@inheritdoc}
    */
   protected static $modules = [
-    // @see \Drupal\media\Entity\Media
-    'media',
-    // @see \Drupal\media_library\Plugin\Field\FieldWidget\MediaLibraryWidget
-    'media_library',
-    // Without this module installed, the media source fields can't be created,
-    // because the FieldConfig entity type would not exist.
     'field',
-    // The Media Library widget uses Views.
-    'views',
-    // @see \Drupal\media_library\MediaLibraryEditorOpener::__construct()
-    'filter',
   ];
 
   /**
@@ -45,6 +37,7 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
 
     // @see \Drupal\Core\Field\Plugin\Field\FieldType\EntityReferenceItem::generateSampleValue()
     $this->installEntitySchema('media');
+    $this->installEntitySchema('path_alias');
 
     // @see \Drupal\media_library\Plugin\Field\FieldWidget\MediaLibraryWidget
     $this->installEntitySchema('user');

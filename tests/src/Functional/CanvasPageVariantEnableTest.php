@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Functional;
 
+use Drupal\block\Entity\Block;
 use Drupal\Component\Uuid\Uuid;
 use Drupal\Core\Url;
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\Tests\BrowserTestBase;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Drupal\Tests\system\Functional\Cache\AssertPageCacheContextsAndTagsTrait;
 
 /**
@@ -18,6 +20,7 @@ use Drupal\Tests\system\Functional\Cache\AssertPageCacheContextsAndTagsTrait;
  * @covers \Drupal\canvas\Controller\CanvasBlockListController
  * @covers \Drupal\canvas\Entity\PageRegion::createFromBlockLayout()
  */
+#[RunTestsInSeparateProcesses]
 class CanvasPageVariantEnableTest extends BrowserTestBase {
 
   use GenerateComponentConfigTrait;
@@ -69,6 +72,12 @@ class CanvasPageVariantEnableTest extends BrowserTestBase {
       'config:block.block.olivero_site_branding',
       'config:block_list',
     ]);
+
+    // Disable the breadcrumbs block to check its absence from the regions
+    // created when enabling Canvas.
+    $block = Block::load('olivero_breadcrumbs');
+    self::assertNotNull($block);
+    $block->disable()->save();
 
     // No Canvas settings on the global settings page.
     $this->drupalGet('/admin/appearance/settings');
@@ -140,7 +149,6 @@ class CanvasPageVariantEnableTest extends BrowserTestBase {
       'config:canvas.component.block.local_tasks_block',
       'config:canvas.component.block.page_title_block',
       'config:canvas.component.block.system_branding_block',
-      'config:canvas.component.block.system_breadcrumb_block',
       'config:canvas.component.block.system_menu_block.account',
       'config:canvas.component.block.system_menu_block.main',
       'config:canvas.component.block.system_messages_block',

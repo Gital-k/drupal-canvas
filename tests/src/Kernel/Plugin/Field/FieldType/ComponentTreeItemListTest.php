@@ -26,8 +26,9 @@ use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Render\Markup;
 use Drupal\Core\Render\RendererInterface;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\TypedData\TypedDataManagerInterface;
-use Drupal\KernelTests\KernelTestBase;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Kernel\Traits\CacheBustingTrait;
 use Drupal\Tests\canvas\Kernel\Traits\CiModulePathTrait;
 use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
@@ -35,12 +36,14 @@ use Drupal\Tests\canvas\Traits\CreateTestJsComponentTrait;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use Drupal\user\Entity\User;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
  * @coversDefaultClass \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList
  * @group canvas
  */
-class ComponentTreeItemListTest extends KernelTestBase {
+#[RunTestsInSeparateProcesses]
+class ComponentTreeItemListTest extends CanvasKernelTestBase {
 
   use ConstraintViolationsTestTrait;
   use CreateTestJsComponentTrait;
@@ -54,21 +57,6 @@ class ComponentTreeItemListTest extends KernelTestBase {
    * {@inheritdoc}
    */
   protected static $modules = [
-    'canvas',
-    'canvas_test_sdc',
-    'block',
-    // Canvas's dependencies (modules providing field types + widgets).
-    'datetime',
-    'file',
-    'image',
-    'media',
-    'options',
-    'path',
-    'link',
-    'text',
-    'filter',
-    'system',
-    'user',
     'serialization',
     'canvas_test_entity_reference_shape_alter',
   ];
@@ -82,6 +70,7 @@ class ComponentTreeItemListTest extends KernelTestBase {
       ->set('name', 'Canvas Test Site')
       ->set('slogan', 'Drupal Canvas Test Site')
       ->save();
+    $this->installEntitySchema('path_alias');
     $this->generateComponentConfig();
     $this->createMyCtaComponentFromSdc();
     $this->createMyCtaAutoSaveComponentFromSdc();
@@ -493,8 +482,8 @@ HTML,
               'content' => [
                 'site_logo' => [
                   '#theme' => "image",
-                  '#uri' => NULL,
-                  '#alt' => 'Home',
+                  '#uri' => '/core/themes/stark/logo.svg',
+                  '#alt' => new TranslatableMarkup('Home'),
                   '#access' => TRUE,
                 ],
                 'site_name' => [
@@ -527,8 +516,9 @@ HTML,
       ],
       'expected_html' => <<<HTML
 <!-- canvas-start-41595148-e5c1-4873-b373-be3ae6e21340 --><div id="block-41595148-e5c1-4873-b373-be3ae6e21340">
-
-
+<a href="/" rel="home">
+<img src="/core/themes/stark/logo.svg" alt="Home" fetchpriority="high" />
+</a>
           <a href="/" rel="home">Canvas Test Site</a>
     Drupal Canvas Test Site
 </div>
@@ -1071,8 +1061,8 @@ HTML,
                                       'content' => [
                                         'site_logo' => [
                                           '#theme' => 'image',
-                                          '#uri' => NULL,
-                                          '#alt' => 'Home',
+                                          '#uri' => '/core/themes/stark/logo.svg',
+                                          '#alt' => new TranslatableMarkup('Home'),
                                           '#access' => TRUE,
                                         ],
                                         'site_name' => [
@@ -1131,6 +1121,7 @@ HTML,
                                           '@/lib/drupal-utils' => \sprintf('%s/packages/astro-hydration/dist/drupal-utils.js?2.1.0-alpha3', $path),
                                           'swr' => \sprintf('%s/packages/astro-hydration/dist/swr.js?2.1.0-alpha3', $path),
                                           'drupal-canvas' => \sprintf('%s/packages/astro-hydration/dist/drupal-canvas.js?2.1.0-alpha3', $path),
+                                          '@tailwindcss/typography' => \sprintf('%s/packages/astro-hydration/dist/tailwindcss-typography.js?2.1.0-alpha3', $path),
                                         ],
                                       ],
                                       '#attached' => [
@@ -1204,6 +1195,7 @@ HTML,
                                           '@/lib/drupal-utils' => \sprintf('%s/packages/astro-hydration/dist/drupal-utils.js?2.1.0-alpha3', $path),
                                           'swr' => \sprintf('%s/packages/astro-hydration/dist/swr.js?2.1.0-alpha3', $path),
                                           'drupal-canvas' => \sprintf('%s/packages/astro-hydration/dist/drupal-canvas.js?2.1.0-alpha3', $path),
+                                          '@tailwindcss/typography' => \sprintf('%s/packages/astro-hydration/dist/tailwindcss-typography.js?2.1.0-alpha3', $path),
                                         ],
                                       ],
                                       '#attached' => [
@@ -1345,8 +1337,9 @@ HTML,
   <h1 style="font-size: 3em; margin: 0.5em 0; color: #333;"><!-- canvas-prop-start-81c63cac-187d-4f05-8acc-1c38fb2489d3/heading -->Hello, from slot level 3!<!-- canvas-prop-end-81c63cac-187d-4f05-8acc-1c38fb2489d3/heading --></h1>
 </div>
 <!-- canvas-end-81c63cac-187d-4f05-8acc-1c38fb2489d3 --><!-- canvas-start-68167e4a-9245-41be-b564-f1e1dcad1dec --><div id="block-68167e4a-9245-41be-b564-f1e1dcad1dec">
-
-
+<a href="/" rel="home">
+<img src="/core/themes/stark/logo.svg" alt="Home" fetchpriority="high" />
+</a>
           <a href="/" rel="home">Canvas Test Site</a>
     Drupal Canvas Test Site
 </div>
@@ -1498,8 +1491,9 @@ HTML,
       <h1 style="font-size: 3em; margin: 0.5em 0; color: #333;"><!-- canvas-prop-start-81c63cac-187d-4f05-8acc-1c38fb2489d3/heading -->Hello, from slot level 3!<!-- canvas-prop-end-81c63cac-187d-4f05-8acc-1c38fb2489d3/heading --></h1>
      </div>
      <!-- canvas-end-81c63cac-187d-4f05-8acc-1c38fb2489d3 --><!-- canvas-start-68167e4a-9245-41be-b564-f1e1dcad1dec --><div id="block-68167e4a-9245-41be-b564-f1e1dcad1dec">
-
-
+     <a href="/" rel="home">
+     <img src="/core/themes/stark/logo.svg" alt="Home" fetchpriority="high" />
+     </a>
               <a href="/" rel="home">Canvas Test Site</a>
         Drupal Canvas Test Site
      </div>

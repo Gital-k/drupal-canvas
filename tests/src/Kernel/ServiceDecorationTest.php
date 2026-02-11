@@ -6,17 +6,13 @@ namespace Drupal\Tests\canvas\Kernel;
 
 use Drupal\Core\Theme\ComponentPluginManager as CoreComponentPluginManager;
 use Drupal\canvas\Plugin\ComponentPluginManager as CanvasComponentPluginManager;
-use Drupal\KernelTests\KernelTestBase;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
  * @group canvas
  */
-final class ServiceDecorationTest extends KernelTestBase {
-
-  /**
-   * {@inheritdoc}
-   */
-  protected static $modules = ['canvas'];
+#[RunTestsInSeparateProcesses]
+final class ServiceDecorationTest extends CanvasKernelTestBase {
 
   public function testServiceDecoration(): void {
     $this->assertInstanceOf(CanvasComponentPluginManager::class, $this->container->get(CanvasComponentPluginManager::class));

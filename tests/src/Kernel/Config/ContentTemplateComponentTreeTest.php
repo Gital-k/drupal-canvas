@@ -9,6 +9,7 @@ use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\Tests\node\Traits\ContentTypeCreationTrait;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
  * Tests the component tree aspects of the ContentTemplate config entity type.
@@ -16,6 +17,7 @@ use Drupal\Tests\node\Traits\ContentTypeCreationTrait;
  * @group canvas
  * @coversDefaultClass \Drupal\canvas\Entity\PageRegion
  */
+#[RunTestsInSeparateProcesses]
 final class ContentTemplateComponentTreeTest extends ConfigWithComponentTreeTestBase {
 
   use ContentTypeCreationTrait;
@@ -40,7 +42,6 @@ final class ContentTemplateComponentTreeTest extends ConfigWithComponentTreeTest
     parent::setUp();
     $this->installEntitySchema('node');
     $this->installConfig('node');
-    $this->installConfig('canvas');
     $this->createContentType(['type' => 'alpha']);
     FieldStorageConfig::create([
       'field_name' => 'field_test',

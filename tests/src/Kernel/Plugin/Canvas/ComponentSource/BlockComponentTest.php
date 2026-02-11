@@ -30,6 +30,7 @@ use Drupal\Tests\canvas\Traits\CrawlerTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use Drupal\user\Entity\User;
 use Drupal\views\Entity\View;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\Validator\ConstraintViolationInterface;
 
 /**
@@ -39,6 +40,7 @@ use Symfony\Component\Validator\ConstraintViolationInterface;
  * @group canvas_component_sources
  * @phpstan-import-type ComponentConfigEntityId from \Drupal\canvas\Entity\Component
  */
+#[RunTestsInSeparateProcesses]
 final class BlockComponentTest extends ComponentSourceTestBase {
 
   use BlockComponentTreeTestTrait;
@@ -50,10 +52,8 @@ final class BlockComponentTest extends ComponentSourceTestBase {
    * {@inheritdoc}
    */
   protected static $modules = [
-    'block',
     'canvas_test_block',
     'node',
-    'views',
   ];
 
   /**
@@ -351,7 +351,7 @@ HTML,
   public static function providerRenderComponentFailure(): \Generator {
     $block_settings = [
       'label' => 'crash dummy',
-      'label_display' => FALSE,
+      'label_display' => '0',
       'name' => 'Canvas',
     ];
 
@@ -397,7 +397,6 @@ HTML,
   }
 
   protected function createAndSaveInUseComponentForFallbackTesting(): ComponentInterface {
-    $this->installConfig(['system']);
     $this->generateComponentConfig();
     /** @var \Drupal\canvas\Entity\ComponentInterface */
     return Component::load('block.system_menu_block.footer');
@@ -411,7 +410,7 @@ HTML,
   protected static function getPropsForComponentFallbackTesting(): array {
     return [
       'label' => 'Main navigation',
-      'label_display' => '',
+      'label_display' => '0',
       'level' => 1,
       'depth' => NULL,
       'expand_all_items' => TRUE,
@@ -442,8 +441,6 @@ HTML,
    * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponentDiscovery::computeCurrentComponentMetadata()
    */
   public function testDependencyUpdate(): void {
-    // Install the default menus provided by system.module.
-    $this->installConfig(['system']);
     $this->generateComponentConfig();
 
     $config = 'canvas.component.block.system_menu_block.footer';

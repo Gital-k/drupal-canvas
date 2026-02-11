@@ -9,53 +9,28 @@ use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\canvas\Entity\VersionedConfigEntityInterface;
 use Drupal\canvas\Entity\Component;
-use Drupal\KernelTests\KernelTestBase;
-use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
  * @group canvas
  * @group canvas_component_sources
  */
-class ComponentTest extends KernelTestBase {
+#[RunTestsInSeparateProcesses]
+class ComponentTest extends CanvasKernelTestBase {
 
-  use ContribStrictConfigSchemaTestTrait;
   use GenerateComponentConfigTrait;
 
-  const MISSING_COMPONENT_ID = 'canvas:missing-component';
-  const MISSING_CONFIG_ENTITY_ID = 'sdc.canvas.missing-component';
-  const LABEL = 'Test Component';
-
-  /**
-   * {@inheritdoc}
-   */
-  protected static $modules = [
-    'canvas',
-    'sdc',
-    'sdc_test',
-    'canvas_test_sdc',
-    // Canvas's dependencies (modules providing field types + widgets).
-    'datetime',
-    'file',
-    'image',
-    'options',
-    'path',
-    'link',
-    'system',
-    'user',
-    'text',
-    'filter',
-    'ckeditor5',
-    'editor',
-    'datetime',
-  ];
+  const string MISSING_COMPONENT_ID = 'canvas:missing-component';
+  const string MISSING_CONFIG_ENTITY_ID = 'sdc.canvas.missing-component';
+  const string LABEL = 'Test Component';
 
   /**
    * {@inheritdoc}
    */
   protected function setUp(): void {
     parent::setUp();
-    $this->installConfig('canvas');
     $this->generateComponentConfig();
   }
 

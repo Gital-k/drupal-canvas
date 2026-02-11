@@ -11,9 +11,8 @@ use Drupal\Core\StreamWrapper\StreamWrapperManagerInterface;
 use Drupal\canvas\Twig\CanvasTwigExtension;
 use Drupal\canvas\Routing\ParametrizedImageStyleConverter;
 use Drupal\file\FileInterface;
-use Drupal\image\Entity\ImageStyle;
-use Drupal\KernelTests\KernelTestBase;
-use Symfony\Component\Yaml\Yaml;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 
 // cspell:ignore itok
 
@@ -23,18 +22,8 @@ use Symfony\Component\Yaml\Yaml;
  * @group canvas
  * @covers \Drupal\canvas\Twig\CanvasTwigExtension::toSrcSet
  */
-class CanvasTwigExtensionFiltersTest extends KernelTestBase {
-
-  /**
-   * {@inheritdoc}
-   */
-  protected static $modules = [
-    'system',
-    'file',
-    'image',
-    'user',
-    'canvas',
-  ];
+#[RunTestsInSeparateProcesses]
+class CanvasTwigExtensionFiltersTest extends CanvasKernelTestBase {
 
   /**
    * @var \Drupal\canvas\Twig\CanvasTwigExtension
@@ -46,10 +35,6 @@ class CanvasTwigExtensionFiltersTest extends KernelTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
-
-    ImageStyle::create(
-      Yaml::parseFile(__DIR__ . '/../../../../config/install/image.style.canvas_parametrized_width.yml')
-    )->save();
 
     // Fixate the private key & hash salt to get predictable `itok`.
     $this->container->get('state')->set('system.private_key', 'dynamic_image_style_private_key');
@@ -134,7 +119,7 @@ class CanvasTwigExtensionFiltersTest extends KernelTestBase {
    * Generate expected srcset for balloons.png.
    */
   private static function generateExpectedSrcSet(array $widths): string {
-    return implode(', ', array_map(
+    return implode(', ', \array_map(
       fn ($width) => "/sites/default/files/styles/canvas_parametrized_width--$width/public/balloons.png.avif?itok=Oa4IMo7_ {$width}w",
       $widths
     ));

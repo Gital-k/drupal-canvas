@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Drupal\canvas\Plugin\Adapter;
 
 use Drupal\Core\Plugin\PluginBase;
@@ -61,7 +63,7 @@ abstract class AdapterBase extends PluginBase implements AdapterInterface {
       return TRUE;
     }
 
-    $message_parts = array_map(
+    $message_parts = \array_map(
       static function (array $error): string {
         return \sprintf("[%s] %s", $error['property'], $error['message']);
       },

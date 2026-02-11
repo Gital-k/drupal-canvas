@@ -8,8 +8,9 @@ use Drupal\canvas\Entity\Page;
 use Drupal\Core\Render\HtmlResponse;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Url;
-use Drupal\KernelTests\KernelTestBase;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Kernel\Traits\RequestTrait;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Drupal\Tests\canvas\TestSite\CanvasTestSetup;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
@@ -21,7 +22,8 @@ use Symfony\Component\HttpFoundation\Request;
  *
  * @group canvas
  */
-final class ComponentTreeFieldRenderingTest extends KernelTestBase {
+#[RunTestsInSeparateProcesses]
+final class ComponentTreeFieldRenderingTest extends CanvasKernelTestBase {
 
   use RequestTrait;
   use UserCreationTrait;
@@ -31,38 +33,16 @@ final class ComponentTreeFieldRenderingTest extends KernelTestBase {
    * {@inheritdoc}
    */
   protected static $modules = [
-    'canvas',
     'big_pipe',
-    // Canvas's dependencies (modules providing field types + widgets).
-    'ckeditor5',
-    'editor',
-    'field',
-    'file',
-    'filter',
-    'image',
-    'link',
-    'path_alias',
-    'path',
-    'media',
-    'options',
-    'text',
-    'user',
-    'system',
-    'datetime',
-    'canvas_test_sdc',
   ];
 
   protected function setUp(): void {
     parent::setUp();
-    // Drupal Canvas configuration (creates the global AssetLibrary).
-    $this->installConfig('canvas');
-    $this->installConfig('system');
     $this->installEntitySchema('user');
     $this->installEntitySchema('path_alias');
-    $this->installEntitySchema('canvas_page');
-    $this->installConfig('canvas');
+    $this->installEntitySchema(Page::ENTITY_TYPE_ID);
 
-    $themes = ['olivero', 'stark', 'claro'];
+    $themes = ['olivero', 'claro'];
     \Drupal::service('theme_installer')->install($themes);
     $this->config('system.theme')->set('default', 'olivero')->save();
 

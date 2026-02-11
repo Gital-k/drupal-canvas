@@ -7,6 +7,7 @@ namespace Drupal\Tests\canvas\Functional\Update;
 use Drupal\canvas\Entity\Component;
 use Drupal\media\Entity\MediaType;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\Validator\ConstraintViolationInterface;
 
 /**
@@ -18,6 +19,7 @@ use Symfony\Component\Validator\ConstraintViolationInterface;
  * @group canvas_data_model__prop_expressions
  * @group legacy
  */
+#[RunTestsInSeparateProcesses]
 final class ComponentMultiBundleReferencePropExpressionsUpdateTest extends CanvasUpdatePathTestBase {
 
   use MediaTypeCreationTrait;
@@ -275,7 +277,7 @@ final class ComponentMultiBundleReferencePropExpressionsUpdateTest extends Canva
 
   private static function assertActiveVersionIsValid(Component $component): void {
     $violations = iterator_to_array($component->getTypedData()->validate());
-    $property_paths = array_map(fn (ConstraintViolationInterface $v) => $v->getPropertyPath(), $violations);
+    $property_paths = \array_map(fn (ConstraintViolationInterface $v) => $v->getPropertyPath(), $violations);
     $violations_by_property_path = array_combine($property_paths, $violations);
     if (array_key_exists('active_version', $violations_by_property_path)) {
       self::fail(\sprintf('The active version `%s` is invalid: %s',

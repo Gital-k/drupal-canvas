@@ -30,7 +30,7 @@ The most common commands in the development process are:
 1. `ddev xb-site-install`: This will reinstall the site and enable a couple of commands. Very useful when you update Canvas and what to have a fresh installation.
 2. `ddev xb-ui-build`: This will build the `canvas/ui` javascript application. Required whenever you update Canvas.
 3. Tests and linting: The commands `xb-eslint`, `xb-fix`, `xb-phpcs`, `xb-phpstan` and `xb-phpunit` must be used before any commit to ensure code looks good and pass tests.
-4. More commands with `ddev | grep xb-` and in the [ddev-drupal-xb-dev repo usage](https://github.com/drupal-xb/ddev-xb-canvas-dev#usage).
+4. More commands with `ddev | grep xb-` and in the [ddev-drupal-xb-dev repo usage](https://github.com/drupal-canvas/ddev-drupal-xb-dev#usage).
 
 Tip: Use `ddev help <command>` for additional information about the command and arguments available.
 
@@ -98,14 +98,7 @@ You can then click (focus) outside the iFrame and tap the `V` key once more to r
 
 # Releases
 
-For now, Drupal Canvas does _not_ include the built UI in its `git` repository, because it is currently optimized
-for development.
-
-Therefore, every release must build the UI, commit the built UI, and revert it. Similar to Drupal core's releases.
-
-This has been semi-automated: use `sh scripts/tag-release.sh` to be asked what tag to create, and it'll create that tag
-in a (temporary) working directory without touching the Drupal Canvas `git` repository the command runs from. Prior
-to pushing, you'll be given the opportunity to inspect the result.
+See `docs/release-process.md`.
 
 # Frequent contributors: expert tips
 

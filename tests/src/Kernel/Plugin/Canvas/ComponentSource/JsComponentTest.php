@@ -43,6 +43,7 @@ use Drupal\canvas\PropSource\StaticPropSource;
 use Drupal\canvas\Render\ImportMapResponseAttachmentsProcessor;
 use Drupal\media\Entity\MediaType;
 use Drupal\canvas_test_code_components\Hook\IslandCastaway;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
  * Tests JsComponent.
@@ -54,6 +55,7 @@ use Drupal\canvas_test_code_components\Hook\IslandCastaway;
  *
  * @phpstan-import-type ComponentConfigEntityId from \Drupal\canvas\Entity\Component
  */
+#[RunTestsInSeparateProcesses]
 final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSourceBaseTestBase {
 
   use CiModulePathTrait;
@@ -78,8 +80,6 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
     'canvas_test_code_components',
     // For testing a code component using the "video" prop shape.
     'field',
-    'media_library',
-    'views',
     'canvas_test_video_fixture',
   ];
 
@@ -387,7 +387,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
     // ⚠️ The `'html'` expectations are tested separately for this very complex
     // rendering.
     // @see ::testRenderComponent()
-    $rendered_without_html = array_map(
+    $rendered_without_html = \array_map(
       fn($expectations) => array_diff_key($expectations, ['html' => NULL]),
       $rendered,
     );
@@ -442,6 +442,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
         '@/lib/drupal-utils' => \sprintf('%s/packages/astro-hydration/dist/drupal-utils.js?2.1.0-alpha3', $module_path),
         'swr' => \sprintf('%s/packages/astro-hydration/dist/swr.js?2.1.0-alpha3', $module_path),
         'drupal-canvas' => \sprintf('%s/packages/astro-hydration/dist/drupal-canvas.js?2.1.0-alpha3', $module_path),
+        '@tailwindcss/typography' => \sprintf('%s/packages/astro-hydration/dist/tailwindcss-typography.js?2.1.0-alpha3', $module_path),
       ],
     ];
 
@@ -749,7 +750,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
     $js_component = $source->getJavaScriptComponent();
     $expected_component_compiled_js = $js_component->getJs();
     $expected_component_compiled_css = $js_component->getCss();
-    $expected_component_props = array_map(
+    $expected_component_props = \array_map(
       fn (array $prop_json_schema) => new EvaluationResult($prop_json_schema['examples'][0]),
       $js_component->getProps() ?? [],
     );
@@ -767,7 +768,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       $css['original'] .= '/**/';
       $js_component->set('css', $css);
       $js_component->updateFromClientSide([
-        'importedJsComponents' => array_map(
+        'importedJsComponents' => \array_map(
           fn (string $config_name): string => str_replace('canvas.js_component.', '', $config_name),
           $js_component->toArray()['dependencies']['enforced']['config'] ?? []
         ),

@@ -7,12 +7,18 @@ namespace Drupal\Tests\canvas\Kernel;
 use Drupal\entity_test\Entity\EntityTest;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\KernelTests\KernelTestBase;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
  * Tests module installation.
  *
+ * Note this cannot use CanvasKernelTestBase because it needs to test
+ * installation and uninstallation of the module, which is not possible when the
+ * module is already installed for the test class.
+ *
  * @group canvas
  */
+#[RunTestsInSeparateProcesses]
 final class ModuleInstallationTest extends KernelTestBase {
 
   protected static $modules = ['system', 'user', 'entity_test'];

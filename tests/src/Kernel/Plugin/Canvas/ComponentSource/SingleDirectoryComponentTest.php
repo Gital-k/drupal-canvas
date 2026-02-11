@@ -39,7 +39,6 @@ use Drupal\Tests\canvas\Kernel\BrokenPluginManagerInterface;
 use Drupal\Tests\canvas\Kernel\Traits\CiModulePathTrait;
 use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
 use Drupal\Tests\canvas\Traits\SingleDirectoryComponentTreeTestTrait;
-use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\canvas\Traits\CrawlerTrait;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
 use Drupal\Tests\node\Traits\ContentTypeCreationTrait;
@@ -47,6 +46,7 @@ use Drupal\Tests\TestFileCreationTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use Twig\Error\Error;
 use Twig\Error\RuntimeError;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Twig\Error\SyntaxError;
 
 /**
@@ -57,10 +57,10 @@ use Twig\Error\SyntaxError;
  * @phpstan-import-type ComponentConfigEntityId from \Drupal\canvas\Entity\Component
  * @phpstan-import-type SingleComponentInputArray from \Drupal\canvas\Plugin\DataType\ComponentInputs
  */
+#[RunTestsInSeparateProcesses]
 final class SingleDirectoryComponentTest extends GeneratedFieldExplicitInputUxComponentSourceBaseTestBase {
 
   use ConstraintViolationsTestTrait;
-  use ContribStrictConfigSchemaTestTrait;
   use SingleDirectoryComponentTreeTestTrait;
   use CiModulePathTrait;
   use CrawlerTrait;
@@ -73,14 +73,8 @@ final class SingleDirectoryComponentTest extends GeneratedFieldExplicitInputUxCo
    * {@inheritdoc}
    */
   protected static $modules = [
-    'canvas_test_sdc',
-    'image',
-    'media',
     'node',
-    'path',
-    'user',
     'field',
-    'text',
   ];
 
   /**
@@ -1124,7 +1118,7 @@ HTML
     $this->assertInstanceOf(ComponentTreeItem::class, $canvas_field_item);
     $actual_props = array_combine(
       array_keys($expected_props_for_uuids),
-      array_map(
+      \array_map(
         fn (string $uuid) => $canvas_field_item->getComponent()?->getComponentSource()->getExplicitInput($uuid, $canvas_field_item)['resolved'],
         array_keys($expected_props_for_uuids)
       )
