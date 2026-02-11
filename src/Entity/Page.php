@@ -114,8 +114,7 @@ final class Page extends EditorialContentEntityBase implements EntityOwnerInterf
     return $this;
   }
 
-  public function label()
-  {
+  public function label() {
     if ($this->useStoredLabel) {
       return parent::label();
     }
@@ -134,7 +133,6 @@ final class Page extends EditorialContentEntityBase implements EntityOwnerInterf
     }
     return parent::label();
   }
-
 
   /**
    * {@inheritdoc}

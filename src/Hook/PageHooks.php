@@ -143,4 +143,22 @@ final class PageHooks {
     return ['canvas_page_form'];
   }
 
+  /**
+   * Implements hook_views_data_alter().
+   *
+   * Changes the title field handler for Page entities to use the custom
+   * EntityLabelField handler which calls $entity->label() instead of
+   * accessing the field value directly. This ensures that unpublished
+   * pages show their auto-save titles with "(Draft)" suffix in Views.
+   *
+   * @see \Drupal\canvas\Plugin\views\field\EntityLabelField
+   * @see \Drupal\canvas\Entity\Page::label()
+   */
+  #[Hook('views_data_alter')]
+  public function viewsDataAlter(array &$data): void {
+    if (isset($data['canvas_page_field_data']['title'])) {
+      $data['canvas_page_field_data']['title']['field']['id'] = 'canvas_entity_label_field';
+    }
+  }
+
 }
