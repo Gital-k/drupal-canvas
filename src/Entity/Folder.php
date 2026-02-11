@@ -34,7 +34,12 @@ use Drupal\canvas\ClientSideRepresentation;
     'items',
   ],
   constraints: [
-    'ImmutableProperties' => ['uuid', 'configEntityTypeId'],
+    'ImmutableProperties' => [
+      'properties' => [
+        'uuid',
+        'configEntityTypeId',
+      ],
+    ],
   ],
   additional: [
     // The client-side representation uses `id` as the identifier, not `uuid`.

@@ -39,9 +39,11 @@ use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
   ],
   constraints: [
     'ImmutableProperties' => [
-      'id',
-      'theme',
-      'region',
+      'properties' => [
+        'id',
+        'theme',
+        'region',
+      ],
     ],
   ],
 )]
