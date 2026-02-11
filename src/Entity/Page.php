@@ -7,7 +7,6 @@ namespace Drupal\canvas\Entity;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\Core\Entity\ContentEntityDeleteForm;
 use Drupal\Core\Entity\EditorialContentEntityBase;
-use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityListBuilder;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
@@ -99,6 +98,8 @@ final class Page extends EditorialContentEntityBase implements EntityOwnerInterf
   public const string EDIT_PERMISSION = 'edit canvas_page';
   public const string DELETE_PERMISSION = 'delete canvas_page';
 
+  private bool $isAutoSave = FALSE;
+
   /**
    * {@inheritdoc}
    */
@@ -114,8 +115,8 @@ final class Page extends EditorialContentEntityBase implements EntityOwnerInterf
   }
 
   public function get($field_name) {
-    if ($field_name !== 'title' || !empty($this->isAutoSave)) {
-      unset($this->isAutoSave);
+    if ($field_name !== 'title' || $this->isAutoSave) {
+      $this->isAutoSave = FALSE;
       return parent::get($field_name);
     }
     $autoSaveManager = \Drupal::service(AutoSaveManager::class);
@@ -129,7 +130,6 @@ final class Page extends EditorialContentEntityBase implements EntityOwnerInterf
     $autoSaveEntity->isAutoSave = TRUE;
     return $autoSaveEntity->get($field_name);
   }
-
 
   /**
    * {@inheritdoc}
