@@ -98,15 +98,7 @@ final class Page extends EditorialContentEntityBase implements EntityOwnerInterf
   public const string EDIT_PERMISSION = 'edit canvas_page';
   public const string DELETE_PERMISSION = 'delete canvas_page';
 
-  public bool $isAutoSave = TRUE;
-
-  public static function loadWithAutoSaveData(Page $original): Page
-  {
-    $new = clone $original;
-    $new->isAutoSave = FALSE;
-    $new->set('title', $new->get('title')->getValue());
-    return $new;
-  }
+  private bool $useStoredLabel = FALSE;
 
   /**
    * {@inheritdoc}
@@ -122,22 +114,27 @@ final class Page extends EditorialContentEntityBase implements EntityOwnerInterf
     return $this;
   }
 
-  public function get($field_name) {
-    if ($field_name !== 'title' || $this->isAutoSave) {
-      $this->isAutoSave = FALSE;
-      return parent::get($field_name);
+  public function label()
+  {
+    if ($this->useStoredLabel) {
+      return parent::label();
     }
-    $autoSaveManager = \Drupal::service(AutoSaveManager::class);
-    \assert($autoSaveManager instanceof AutoSaveManager);
-    $autoSave = $autoSaveManager->getAutoSaveEntity($this);
-    if ($autoSave->isEmpty()) {
-      return parent::get($field_name);
+    $this->useStoredLabel = TRUE;
+    if (AutoSaveManager::entityIsConsideredNew($this)) {
+      $autoSaveManager = \Drupal::service(AutoSaveManager::class);
+      \assert($autoSaveManager instanceof AutoSaveManager);
+      $autoSave = $autoSaveManager->getAutoSaveEntity($this);
+
+      if (!$autoSave->isEmpty()) {
+        $autoSaveEntity = $autoSave->entity;
+        \assert($autoSaveEntity instanceof self);
+        $autoSaveEntity->useStoredLabel = TRUE;
+        return $autoSaveEntity->label() . ' (Draft)';
+      }
     }
-    $autoSaveEntity = $autoSave->entity;
-    \assert($autoSaveEntity instanceof self);
-    $autoSaveEntity->isAutoSave = TRUE;
-    return $autoSaveEntity->get($field_name);
+    return parent::label();
   }
+
 
   /**
    * {@inheritdoc}
