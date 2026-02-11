@@ -26,6 +26,7 @@ use Drupal\Core\Field\Plugin\Field\FieldWidget\NumberWidget;
 use Drupal\Core\Field\Plugin\Field\FieldWidget\StringTextfieldWidget;
 use Drupal\Core\Field\Plugin\Field\FieldWidget\UriWidget;
 use Drupal\Core\File\FileExists;
+use Drupal\Core\Form\FormState;
 use Drupal\Core\Http\Exception\CacheableAccessDeniedHttpException;
 use Drupal\Core\Site\Settings;
 use Drupal\Core\StreamWrapper\PublicStream;
@@ -2194,6 +2195,128 @@ class PropSourceTest extends CanvasKernelTestBase {
       'expression' => "ℹ︎␜entity:user␝name␞␟value",
     ]);
     self::assertInstanceOf(EntityFieldPropSource::class, $prop_source);
+  }
+
+  /**
+   * Tests MediaLibraryWidget state initialization with existing items.
+   *
+   * @covers \Drupal\canvas\PropSource\StaticPropSource::formTemporaryRemoveThisExclamationExclamationExclamation
+   */
+  public function testMediaLibraryWidgetStateInitialization(): void {
+    $this->setUpCurrentUser(permissions: ['access content', 'view media']);
+
+    // Test with multiple media items (simulating image gallery with 3 images).
+    $prop_source_with_items = StaticPropSource::parse([
+      'sourceType' => 'static:field_item:entity_reference',
+      'value' => [
+        ['target_id' => 1],
+        ['target_id' => 2],
+        ['target_id' => 3],
+      ],
+      'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:image␝field_media_image␞␟src_with_alternate_widths,alt↝entity␜␜entity:media:image␝field_media_image␞␟alt,width↝entity␜␜entity:media:image␝field_media_image␞␟width,height↝entity␜␜entity:media:image␝field_media_image␞␟height}',
+      'sourceTypeSettings' => [
+        'cardinality' => 5,
+        'storage' => ['target_type' => 'media'],
+        'instance' => [
+          'handler' => 'default:media',
+          'handler_settings' => [
+            'target_bundles' => ['image' => 'image'],
+          ],
+        ],
+      ],
+    ]);
+
+    // Get the MediaLibraryWidget.
+    $widget = $prop_source_with_items->getWidget(
+      'test_entity_type',
+      'test_bundle',
+      'test_field',
+      'test_prop_name',
+      'media_library_widget'
+    );
+
+    $this->assertInstanceOf(MediaLibraryWidget::class, $widget);
+
+    // Simulate form building (initial page load).
+    $form = ['#parents' => []];
+    $form_state = new FormState();
+
+    // Generate the widget form using the method that contains the fix.
+    // This simulates what happens during page load.
+    $prop_source_with_items->formTemporaryRemoveThisExclamationExclamationExclamation(
+      $widget,
+      'test_prop_name',
+      FALSE,
+      User::create(),
+      $form,
+      $form_state
+    );
+
+    // Verify widget state was initialized with existing items.
+    $field_name = $prop_source_with_items->fieldItemList->getFieldDefinition()->getName();
+    $widget_state = MediaLibraryWidget::getWidgetState(
+      $form['#parents'],
+      $field_name,
+      $form_state
+    );
+
+    $this->assertArrayHasKey('items', $widget_state, 'Widget state should have items key initialized.');
+    $this->assertCount(3, $widget_state['items'], 'Widget state should contain all 3 existing media items.');
+    $this->assertEquals(
+      [
+        ['target_id' => 1],
+        ['target_id' => 2],
+        ['target_id' => 3],
+      ],
+      $widget_state['items'],
+      'Widget state items should match the field values.'
+    );
+
+    // Simulate form rebuild (AJAX interaction when adding a new image).
+    // This simulates clicking "Add media" button after already having 3 images.
+    $form_state->setRebuild(TRUE);
+
+    // Manually update the widget state to simulate the user adding a 4th image
+    // through the media library widget's AJAX callback. This is what happens
+    // when the user selects a new media item.
+    $widget_state['items'][] = ['target_id' => 4];
+    MediaLibraryWidget::setWidgetState(
+      $form['#parents'],
+      $field_name,
+      $form_state,
+      $widget_state
+    );
+
+    // Now rebuild the form - the critical test is that the widget state
+    // initialization does NOT overwrite the widget state
+    // that now contains 4 items, even though the field still only has 3.
+    $prop_source_with_items->formTemporaryRemoveThisExclamationExclamationExclamation(
+      $widget,
+      'test_prop_name',
+      FALSE,
+      User::create(),
+      $form,
+      $form_state
+    );
+
+    $widget_state_after_rebuild = MediaLibraryWidget::getWidgetState(
+      $form['#parents'],
+      $field_name,
+      $form_state
+    );
+
+    $this->assertArrayHasKey('items', $widget_state_after_rebuild, 'Widget state should persist after rebuild.');
+    $this->assertCount(4, $widget_state_after_rebuild['items'], 'All items should be preserved after rebuild, including the new one.');
+    $this->assertEquals(
+      [
+        ['target_id' => 1],
+        ['target_id' => 2],
+        ['target_id' => 3],
+        ['target_id' => 4],
+      ],
+      $widget_state_after_rebuild['items'],
+      'Widget state should contain all original items plus the newly added one, not be overwritten by field value.'
+    );
   }
 
 }
