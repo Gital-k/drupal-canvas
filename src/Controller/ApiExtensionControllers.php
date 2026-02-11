@@ -56,6 +56,7 @@ final class ApiExtensionControllers {
       'url' => $extension->getUrl(),
       'type' => $extension->getType()->value,
       'api_version' => $extension->getApiVersion(),
+      'placements' => $extension->getPlacements(),
       // NOTE: We don't expose permissions, that's a security risk.
       // @todo But we should filter the extensions the current account can access.
       //   Also applies to CanvasController.

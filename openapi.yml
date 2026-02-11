@@ -3040,6 +3040,33 @@ components:
           description: Permissions
           items:
             type: string
+        placements:
+          type: array
+          description: Extension Placements
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - id
+              - location
+              - label
+              - action
+            properties:
+              id:
+                type: string
+                description: Placement ID
+              location:
+                type: string
+                description: Placement Location
+              label:
+                type: string
+                description: Placement Label
+              action:
+                type: string
+                description: Placement Action
+              message_event:
+                type: string
+                description: Message Event (optional)
     ContentTemplate:
       title: ContentTemplate as it appears in ContentTemplateList
       type: object

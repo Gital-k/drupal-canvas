@@ -6,3 +6,13 @@ canvas_test_extension:
   api_version: "1.0"
   permissions:
     - access content
+  placements:
+    - id: publish-dropdown-link
+      location: publish-dropdown-menu
+      label: Sync with Github
+      action: open_modal
+    - id: replace-publish
+      location: publish-main-button
+      label: Extension Publish (not used)
+      action: post_message
+      message_event: CUSTOM_PUBLISH_FLOW
