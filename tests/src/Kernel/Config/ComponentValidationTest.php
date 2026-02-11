@@ -33,6 +33,7 @@ use Symfony\Component\Yaml\Yaml;
  */
 #[Group('canvas')]
 #[Group('canvas_component_sources')]
+#[Group('canvas_data_model')]
 #[RunTestsInSeparateProcesses]
 class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
 
