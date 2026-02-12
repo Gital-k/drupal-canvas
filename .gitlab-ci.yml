@@ -346,6 +346,9 @@ deprecations (php):
     SYMFONY_DEPRECATIONS_HELPER: "ignoreFile=$CI_PROJECT_DIR/$_WEB_ROOT/core/.deprecation-ignore.txt&max[total]=100&max[direct]=50&max[self]=0"
     # @todo 🚧 delete prior to merging
     _PHPUNIT_TESTGROUPS: 'canvas_data_model'
+  before_script:
+    - echo "Installed contrib modules, which might interfere (break) Canvas' deprecation testing"
+    - ls -al $CI_PROJECT_DIR/$_WEB_ROOT/modules/contrib
   needs:
     # TRICKY: this is unfixable in 11.2!
     # @see https://www.drupal.org/project/drupal/issues/3555534#comment-16458397
