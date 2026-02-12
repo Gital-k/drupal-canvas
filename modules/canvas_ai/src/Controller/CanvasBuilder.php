@@ -10,6 +10,8 @@ use Drupal\ai\OperationType\GenericType\ImageFile;
 use Drupal\ai_agents\Service\AgentStatus\Interfaces\AiAgentStatusPollerServiceInterface;
 use Drupal\ai_agents\Service\AgentStatus\UpdateItems\TextGenerated;
 use Drupal\canvas_ai\Plugin\AiFunctionCall\BuilderResponseFunctionCallInterface;
+use Drupal\canvas_ai\Plugin\AiFunctionCall\MoveComponentInPage;
+use Drupal\canvas_ai\Plugin\AiFunctionCall\UpdateComponentData;
 use Drupal\Component\Plugin\PluginManagerInterface;
 use Drupal\Component\Serialization\Json;
 use Drupal\Core\Access\CsrfTokenGenerator;
@@ -65,6 +67,8 @@ final class CanvasBuilder extends ControllerBase {
    *   The current request.
    */
   public function render(Request $request): JsonResponse {
+    // Clear all data in the temp store at the beginning of each request.
+    $this->canvasAiTempStore->deleteAll();
     $token = $request->headers->get('X-CSRF-Token') ?? '';
     if (!$this->csrfTokenGenerator->validate($token, 'canvas_ai.canvas_builder')) {
       throw new AccessDeniedHttpException('Invalid CSRF token');
@@ -231,6 +235,14 @@ final class CanvasBuilder extends ControllerBase {
       'verbose_context_for_orchestrator' => $this->canvasAiPageBuilderHelper->generateVerboseContextForOrchestrator($prompt),
       'custom_libraries' => $this->getSupportedLibraries(),
     ]);
+
+    // This holds the content added to the props of each component in the pagae.
+    $layout = $prompt['layout'] ?? [];
+    $this->canvasAiTempStore->setData(
+      CanvasAiTempStore::COMPONENTS_IN_PAGE_WITH_PROP_VALUES_KEY,
+      $layout
+    );
+
     try {
       $solvability = $agent->determineSolvability();
     }
@@ -256,15 +268,31 @@ final class CanvasBuilder extends ControllerBase {
     elseif ($solvability == AiAgentInterface::JOB_SOLVABLE) {
       $response['status'] = TRUE;
       $tools = $agent->getToolResults(TRUE);
+      $updateComponents = [];
+      $moveComponents = [];
       if (!empty($tools)) {
         foreach ($tools as $tool) {
           if ($tool instanceof BuilderResponseFunctionCallInterface) {
-            $response = array_merge($response, $tool->getStructuredOutput());
+            if ($tool instanceof UpdateComponentData) {
+              $updateComponents[] = $tool->getStructuredOutput();
+            }
+            elseif ($tool instanceof MoveComponentInPage) {
+              $moveComponents[] = $tool->getStructuredOutput();
+            }
+            else {
+              $response = array_merge($response, $tool->getStructuredOutput());
+            }
           }
           if (in_array($tool->getPluginId(), ['ai_agents::ai_agent::canvas_page_builder_agent', 'ai_agents::ai_agent::canvas_template_builder_agent'], TRUE)) {
             $this->canvasAiTempStore->deleteData(CanvasAiTempStore::CURRENT_LAYOUT_KEY);
           }
         }
+      }
+      if (!empty($updateComponents)) {
+        $response = $this->canvasAiPageBuilderHelper->includeUpdateOperations($updateComponents, $response);
+      }
+      if (!empty($moveComponents)) {
+        $response = $this->canvasAiPageBuilderHelper->includeMoveOperations($moveComponents, $response);
       }
       // The final message seen by the user should be the one from the orchestrator agent.
       $response['message'] = $agent->solve();
@@ -368,6 +396,10 @@ final class CanvasBuilder extends ControllerBase {
                 $items[$target_agent_id]['generated_text'] = !empty($items[$target_agent_id]['generated_text'])
                   ? $items[$target_agent_id]['generated_text'] . "\n\n" . $generated_text
                   : $generated_text;
+              }
+              if ($target_agent_id == 'canvas_ai_orchestrator') {
+                \Drupal::logger('canvas_ai')->debug('Generated text from orchestrator: @text', ['@text' => $generated_text]);
+                \Drupal::logger('canvas_ai')->debug('Current items state: @items', ['@items' => print_r($items, TRUE)]);
               }
             }
           }
