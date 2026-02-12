@@ -1,12 +1,16 @@
 import { useState } from 'react';
 import { Cross2Icon, DragHandleDots2Icon, TrashIcon } from '@radix-ui/react-icons';
-import { Box, Button, Flex, Popover, Text, TextField } from '@radix-ui/themes';
-
+import { Box, Button, Flex, Popover, Text } from '@radix-ui/themes';
 import InputBehaviors from '@/components/form/inputBehaviors';
-
+import TextField from '@/components/form/components/TextField';
 import type { Attributes } from '@/types/DrupalAttribute';
+import { a2p } from '@/local_packages/utils';
 
 import styles from './DrupalInputMultivalueForm.module.css';
+import clsx from 'clsx';
+
+// Create the wrapped TextField component with InputBehaviors HOC.
+const TextFieldWithBehaviors = InputBehaviors(TextField);
 
 /**
  * DrupalInputMultivalueForm component for inputs within multivalue widgets.
@@ -37,10 +41,6 @@ const DrupalInputMultivalueForm = ({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
     setDisplayValue(newValue);
-    // Call the original onChange handler if provided
-    if (attributes.onChange) {
-      attributes.onChange(e);
-    }
   };
 
 
@@ -80,18 +80,15 @@ const DrupalInputMultivalueForm = ({
 
         {/* Input Field */}
         <Box className={styles.inputWrapper}>
-          <TextField.Root
-            name={attributes.name}
-            id={attributes.id}
-            value={displayValue}
-            onChange={handleInputChange}
-            placeholder="Enter value..."
+          <TextFieldWithBehaviors
+            className={clsx(attributes.class)}
+            attributes={{...a2p(attributes, {}, { skipAttributes: ['class'] }), onPostChange: handleInputChange }}
           />
         </Box>
 
         {/* Remove Button */}
         <Flex justify="center" mt="3">
-          <Popover.Close asChild>
+          <Popover.Close>
             <Button
               variant="ghost"
               color="red"
@@ -117,5 +114,5 @@ const DrupalInputMultivalueForm = ({
   );
 };
 
-export default InputBehaviors(DrupalInputMultivalueForm);
+export default DrupalInputMultivalueForm;
 

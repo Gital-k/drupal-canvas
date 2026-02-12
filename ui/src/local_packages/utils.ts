@@ -26,6 +26,13 @@ export function a2p(
       return;
     }
 
+    // Pre and post event callbacks are not valid attributes, but are useful to
+    // pass around in the attributes object. Filter here for when the attributes
+    // are actually rendered.
+    if (name.startsWith('onPre') || name.startsWith('onPost')) {
+      return;
+    }
+
     let value;
     if (
       Array.isArray(attributesFromDrupal[name]) &&
