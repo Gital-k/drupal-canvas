@@ -347,8 +347,10 @@ deprecations (php):
     # @todo 🚧 delete prior to merging
     _PHPUNIT_TESTGROUPS: 'canvas_data_model'
   before_script:
-    - echo "Installed contrib modules, which might interfere (break) Canvas' deprecation testing"
+    # This CI job cares only about *upstream* not *sidestream*: core + core dependencies, not contrib modules.
+    - echo "Delete all installed contrib modules to avoid them interfering (breaking) Canvas' deprecation testing."
     - ls -al $CI_PROJECT_DIR/$_WEB_ROOT/modules/contrib
+    - rm -rf $CI_PROJECT_DIR/$_WEB_ROOT/modules/contrib/*
   needs:
     # TRICKY: this is unfixable in 11.2!
     # @see https://www.drupal.org/project/drupal/issues/3555534#comment-16458397
