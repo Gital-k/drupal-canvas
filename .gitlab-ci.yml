@@ -342,7 +342,8 @@ deprecations (php):
   variables:
     _PHPUNIT_CONCURRENT: 1
     # @see https://git.drupalcode.org/project/gitlab_templates/-/blob/main/docs/jobs/phpunit.md#deprecations
-    SYMFONY_DEPRECATIONS_HELPER: "ignoreFile=$CI_PROJECT_DIR/$_WEB_ROOT/core/.deprecation-ignore.txt"
+    # @see https://symfony.com/doc/current/components/phpunit_bridge.html#making-tests-fail
+    SYMFONY_DEPRECATIONS_HELPER: "ignoreFile=$CI_PROJECT_DIR/$_WEB_ROOT/core/.deprecation-ignore.txt&max[total]=100&max[direct]=50&max[self]=0"
     # @todo 🚧 delete prior to merging
     _PHPUNIT_EXTRA: '--group canvas_data_model'
   needs:
