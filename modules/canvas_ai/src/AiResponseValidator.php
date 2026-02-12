@@ -216,14 +216,14 @@ class AiResponseValidator {
     $propSources = $clientNormalized['propSources'] ?? [];
 
     // Validate media props: if the tool provided an array of values (e.g.
-    // src, alt, width, height) for an entity_reference prop, reject it and
-    // instruct to provide the media ID instead.
+    // src, alt, width, height) for a media prop, reject it and instruct to
+    // provide the media ID instead.
     foreach ($propSources as $propName => $propDefinition) {
       if (!array_key_exists($propName, $props)) {
         continue;
       }
-      $sourceType = $propDefinition['sourceType'] ?? '';
-      if (str_contains($sourceType, 'entity_reference') && is_array($props[$propName])) {
+      $targetType = $propDefinition['sourceTypeSettings']['storage']['target_type'] ?? '';
+      if ($targetType === 'media' && is_array($props[$propName])) {
         throw new \InvalidArgumentException(
           sprintf(
             'The prop "%s" is a media reference. To update it, provide the media ID instead of an array of values like src, alt, width, height.',

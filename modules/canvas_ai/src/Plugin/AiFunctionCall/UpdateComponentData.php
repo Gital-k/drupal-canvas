@@ -96,6 +96,10 @@ final class UpdateComponentData extends FunctionCallBase implements ExecutableFu
       $parsed_props = Yaml::parse($prop_values);
       $this->responseValidator->validateComponentPropUpdate($component_id, $parsed_props);
 
+      // Populate media prop values with their current media entity IDs
+      // if not explicitly provided by the tool.
+      $parsed_props = $this->pageBuilderHelper->populateMediaPropIfNeeded($component_id, $component_uuid, $parsed_props);
+
       // Return the uuid and parsed prop values as structured output.
       $this->setStructuredOutput([
         'uuid' => $component_uuid,

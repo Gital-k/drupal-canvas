@@ -22,6 +22,8 @@ use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent;
+use Drupal\Core\StreamWrapper\PublicStream;
+use Drupal\file\FileRepositoryInterface;
 
 /**
  * Provides helper methods for AI page builder.
@@ -60,6 +62,8 @@ class CanvasAiPageBuilderHelper {
    *   The theme handler.
    * @param \Drupal\canvas\Component\Schema\PropMetadataNormalizer $propMetadataNormalizer
    *   The prop metadata normalizer.
+   * @param \Drupal\file\FileRepositoryInterface $fileRepository
+   *   The file repository.
    */
   public function __construct(
     private readonly ComponentPluginManager $componentPluginManager,
@@ -73,6 +77,7 @@ class CanvasAiPageBuilderHelper {
     private readonly ApiConfigControllers $apiConfigControllers,
     private readonly ThemeHandlerInterface $themeHandler,
     private readonly PropMetadataNormalizer $propMetadataNormalizer,
+    private readonly FileRepositoryInterface $fileRepository,
   ) {
   }
 
@@ -1714,6 +1719,125 @@ class CanvasAiPageBuilderHelper {
     }
 
     return $response;
+  }
+
+  /**
+   * Populates media prop values for component updates when not provided.
+   *
+   * If a component has a media prop and a media is added to it other than the
+   * default image, Canvas throws render errors when updating the component. So
+   * we check if the component to be updated has any media props, and then check
+   * if the agent is trying to update the media prop. If not, we try to load
+   * the media entity corresponding to the image uploaded in the prop and if it
+   * exists, we append it to the current prop values to prevent the render
+   * error.
+   *
+   * @param string $componentId
+   *   The component ID (e.g., "sdc.byte_theme.card").
+   * @param string $uuid
+   *   The UUID of the component instance in the page.
+   * @param array $propValuesGivenByAgent
+   *   The prop values from the update tool after validation.
+   *
+   * @return array
+   *   The prop values with media entity IDs populated where needed.
+   */
+  public function populateMediaPropIfNeeded(string $componentId, string $uuid, array $propValuesGivenByAgent): array {
+    $component = Component::load($componentId);
+    if (!$component instanceof Component) {
+      return $propValuesGivenByAgent;
+    }
+
+    $clientNormalized = $component->normalizeForClientSide()->values;
+    $propSources = $clientNormalized['propSources'] ?? [];
+
+    // Collect media prop names that need population.
+    $mediaPropsToPopulate = [];
+    foreach ($propSources as $propName => $propDefinition) {
+      $targetType = $propDefinition['sourceTypeSettings']['storage']['target_type'] ?? '';
+      if ($targetType !== 'media') {
+        continue;
+      }
+
+      // If the tool already provided a value for this prop, skip.
+      if (array_key_exists($propName, $propValuesGivenByAgent)) {
+        continue;
+      }
+
+      $mediaPropsToPopulate[] = $propName;
+    }
+
+    if (empty($mediaPropsToPopulate)) {
+      return $propValuesGivenByAgent;
+    }
+
+    // Get the current component contents to resolve media URLs.
+    $componentContents = $this->getComponentContents($uuid);
+    if (empty($componentContents)) {
+      return $propValuesGivenByAgent;
+    }
+
+    foreach ($mediaPropsToPopulate as $propName) {
+      $mediaPropValue = $componentContents[$propName] ?? NULL;
+      if (!is_array($mediaPropValue) || empty($mediaPropValue['src'])) {
+        continue;
+      }
+
+      $mediaId = $this->getMediaIdFromSrc($mediaPropValue['src']);
+      if ($mediaId !== NULL) {
+        $propValuesGivenByAgent[$propName] = $mediaId;
+      }
+    }
+
+    return $propValuesGivenByAgent;
+  }
+
+  /**
+   * Resolves a file URL to its corresponding media entity ID.
+   *
+   * @param string $src
+   *   The file URL path (e.g.,
+   *   "/sites/default/files/2025-07/person_3.png?alternateWidths=...").
+   *
+   * @return int|null
+   *   The media entity ID, or NULL if no matching media entity was found.
+   */
+  protected function getMediaIdFromSrc(string $src): ?int {
+    // Strip query string from the src URL.
+    $path = \parse_url($src, PHP_URL_PATH);
+    if (empty($path)) {
+      return NULL;
+    }
+
+    // Convert the public file URL path to a stream URI.
+    $publicFilesPath = PublicStream::basePath();
+    $pos = \strpos($path, $publicFilesPath);
+    if ($pos === FALSE) {
+      return NULL;
+    }
+
+    // Extract the relative path after the public files directory.
+    $relativePath = \substr($path, $pos + \strlen($publicFilesPath));
+    $relativePath = ltrim($relativePath, '/');
+    $uri = 'public://' . $relativePath;
+
+    // Load the file entity by URI.
+    $file = $this->fileRepository->loadByUri($uri);
+    if ($file === NULL) {
+      return NULL;
+    }
+
+    // Query media entities that reference this file via field_media_image.
+    $mediaIds = $this->entityTypeManager->getStorage('media')->getQuery()
+      ->accessCheck(FALSE)
+      ->condition('field_media_image.target_id', $file->id())
+      ->execute();
+
+    if (!empty($mediaIds)) {
+      return (int) reset($mediaIds);
+    }
+
+    return NULL;
   }
 
 }

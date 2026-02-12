@@ -397,10 +397,6 @@ final class CanvasBuilder extends ControllerBase {
                   ? $items[$target_agent_id]['generated_text'] . "\n\n" . $generated_text
                   : $generated_text;
               }
-              if ($target_agent_id == 'canvas_ai_orchestrator') {
-                \Drupal::logger('canvas_ai')->debug('Generated text from orchestrator: @text', ['@text' => $generated_text]);
-                \Drupal::logger('canvas_ai')->debug('Current items state: @items', ['@items' => print_r($items, TRUE)]);
-              }
             }
           }
         }
