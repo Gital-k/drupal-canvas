@@ -114,6 +114,9 @@ class SemiCoupledThemeEngineForceTwigHooks {
     if ($ml_ajax || $ml_form) {
       $suggestions[] = 'input__media_library';
     }
+    if (isset($variables['element']['#is_multivalue_form']) && $variables['element']['#is_multivalue_form']) {
+      $suggestions[] = 'input__multivalue_form';
+    }
     return $suggestions;
   }
 

@@ -1,0 +1,151 @@
+/* Item Row - Contains drag handle + text box */
+.itemRow {
+  width: 100%;
+}
+
+/* List Item Styles - The bordered text box */
+.listItem {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  padding: var(--space-3) var(--space-3);
+  background-color: white;
+  border: 1px solid var(--gray-5);
+  border-bottom: none;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.itemRow:first-of-type .listItem {
+  border-radius: var(--radius-2) var(--radius-2) 0 0;
+}
+
+.itemRow:last-of-type .listItem {
+  border-bottom: 1px solid var(--gray-5);
+}
+
+.itemRow:only-of-type .listItem {
+  border-radius: var(--radius-2);
+  border-bottom: 1px solid var(--gray-5);
+}
+
+.listItem:hover {
+  background-color: var(--gray-2);
+}
+
+.listItem:focus {
+  outline: 2px solid var(--blue-8);
+  outline-offset: -2px;
+}
+
+/* Drag Handle - Outside the box */
+.dragHandle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: grab;
+  color: var(--blue-9);
+}
+
+.dragHandle:active {
+  cursor: grabbing;
+}
+
+.itemText {
+  color: var(--gray-12);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Popover Styles */
+.popoverContent {
+  background-color: white;
+  border-radius: var(--radius-3);
+  box-shadow: var(--shadow-4);
+  padding: var(--space-4);
+  min-width: 250px;
+  max-width: 320px;
+  width: 100%;
+}
+
+.popoverHeader {
+  margin-bottom: var(--space-3);
+}
+
+.popoverLabel {
+  color: var(--gray-11);
+}
+
+.closeButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--gray-11);
+  cursor: pointer;
+  border-radius: var(--radius-2);
+}
+
+.closeButton:hover {
+  color: var(--gray-12);
+  background-color: var(--gray-3);
+}
+
+.inputWrapper {
+  width: 100%;
+}
+
+.inputWrapper input {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--gray-6);
+  border-radius: var(--radius-2);
+  font-size: var(--font-size-2);
+  line-height: 1.5;
+}
+
+.inputWrapper input:focus {
+  outline: none;
+  border-color: var(--blue-8);
+  box-shadow: 0 0 0 1px var(--blue-8);
+}
+
+.removeButton {
+  font-weight: 500;
+}
+
+/* Add New Button - to be used by parent component */
+.addNewButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  background-color: var(--blue-2);
+  border: 1px solid var(--blue-4);
+  border-top: none;
+  border-radius: 0 0 var(--radius-2) var(--radius-2);
+  color: var(--blue-11);
+  font-size: var(--font-size-2);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.addNewButton:hover {
+  background-color: var(--blue-3);
+}
+
+.addNewButton:focus {
+  outline: 2px solid var(--blue-8);
+  outline-offset: -2px;
+}
+

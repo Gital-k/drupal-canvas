@@ -176,6 +176,65 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
   }
 
   /**
+   * Implements hook_preprocess_field_multiple_value_form().
+   */
+  #[Hook('preprocess_field_multiple_value_form')]
+  public static function canvasStarkPreprocessFieldMultipleValueForm(array &$variables): void {
+    // Apply 'hidden' class to columns 0 and 2 for all table rows.
+    // The remove button and the drag icon that loads from older versions of Drupal core
+    // are hidden with CSS, but they still exist in the DOM and can be interacted with.
+    if (isset($variables['table']['#rows'])) {
+      foreach ($variables['table']['#rows'] as $key => &$row) {
+        if (isset($row['data'][0])) {
+          $row['data'][0]['class'] = 'hidden';
+        }
+        if (isset($row['data'][2])) {
+          $row['data'][2]['class'] = 'hidden';
+        }
+      }
+    }
+  }
+
+  /**
+   * Implements hook_field_widget_complete_form_alter().
+   *
+   * Marks elements within multivalue forms to enable specialized rendering.
+   * This allows the DrupalInputMultivalueForm component to handle inputs
+   * specifically within multivalue widgets.
+   */
+  #[Hook('field_widget_complete_form_alter')]
+  public function fieldWidgetCompleteFormAlter(array &$widget, FormStateInterface $form_state, array $context): void {
+    // Check if this is a multivalue field.
+    $field_definition = $context['items']->getFieldDefinition();
+    $is_multiple = $field_definition->getFieldStorageDefinition()->isMultiple();
+
+    if ($is_multiple && $this->themeManager->getActiveTheme()->getName() === 'canvas_stark') {
+      // Mark all input elements within multivalue widgets.
+      $this->markMultivalueFormElements($widget);
+    }
+  }
+
+  /**
+   * Recursively marks form elements as part of a multivalue form.
+   *
+   * @param array &$element
+   *   The form element to process.
+   */
+  private function markMultivalueFormElements(array &$element): void {
+    foreach (Element::children($element) as $key) {
+      // Mark input elements.
+      if (isset($element[$key]['#type']) &&
+          in_array($element[$key]['#type'], ['textfield', 'number'], TRUE)) {
+        $element[$key]['#is_multivalue_form'] = TRUE;
+      }
+      // Recursively process child elements.
+      if (is_array($element[$key])) {
+        $this->markMultivalueFormElements($element[$key]);
+      }
+    }
+  }
+
+  /**
    * Implements hook_field_widget_info_alter().
    */
   #[Hook('field_widget_info_alter')]

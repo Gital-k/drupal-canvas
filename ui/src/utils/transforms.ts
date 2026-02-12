@@ -44,12 +44,25 @@ const mainProperty: Transformer<{
     return null;
   }
   const { name = 'value', list = true } = options;
-  let first = value as PropsValues;
+  const first = value as PropsValues;
   if (isList(value, list)) {
     if (value.length === 0) {
       return null;
     }
-    first = value.shift() as PropsValues;
+    // Sort by weight to maintain correct order
+    const sorted = [...value]
+      .sort((a, b) => {
+        const weightA = a?._weight !== undefined ? parseInt(a._weight, 10) : 0;
+        const weightB = b?._weight !== undefined ? parseInt(b._weight, 10) : 0;
+        return weightA - weightB;
+      })
+      .filter((item: PropsValues) => {
+        const val = item && name in item ? item[name] : null;
+        return val !== null && val !== '';
+      });
+    return sorted.map((item: PropsValues) =>
+      item && name in item ? item[name] : null,
+    );
   }
   if (first && name in first) {
     return first[name];
