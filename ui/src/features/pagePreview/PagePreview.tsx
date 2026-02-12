@@ -11,7 +11,7 @@ import {
 } from '@/features/layout/layoutModelSlice';
 import { selectPageData } from '@/features/pageData/pageDataSlice';
 import { selectPreviewHtml } from '@/features/pagePreview/previewSlice';
-import { usePostPreviewMutation } from '@/services/preview';
+import { useQueuedPostPreviewMutation } from '@/services/preview';
 import { getViewportSizes } from '@/utils/viewports';
 
 import styles from './PagePreview.module.css';
@@ -22,7 +22,7 @@ const PagePreview = () => {
   const model = useAppSelector(selectModel);
   const entity_form_fields = useAppSelector(selectPageData);
   const frameSrcDoc = useAppSelector(selectPreviewHtml);
-  const [postPreview] = usePostPreviewMutation();
+  const [postPreview] = useQueuedPostPreviewMutation();
   const { showBoundary } = useErrorBoundary();
   const [widthVal, setWidthVal] = useState('100%');
   const { width } = useParams();
@@ -38,7 +38,7 @@ const PagePreview = () => {
           layout,
           model,
           entity_form_fields,
-        }).unwrap();
+        });
       } catch (err) {
         showBoundary(err);
       }

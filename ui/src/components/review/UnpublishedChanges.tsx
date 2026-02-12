@@ -27,7 +27,7 @@ import {
   usePublishAllPendingChangesMutation,
 } from '@/services/pendingChangesApi';
 import {
-  usePostPreviewMutation,
+  useQueuedPostPreviewMutation,
   useUpdateComponentMutation,
 } from '@/services/preview';
 import { findInChanges } from '@/utils/function-utils';
@@ -49,7 +49,7 @@ const UnpublishedChanges = () => {
   const [, { isLoading: isUpdatingComponent }] = useUpdateComponentMutation({
     fixedCacheKey: selectedComponent,
   });
-  const [, { isLoading: isUpdatingPreview }] = usePostPreviewMutation({
+  const [, { isLoading: isUpdatingPreview }] = useQueuedPostPreviewMutation({
     fixedCacheKey: 'editorFramePreview',
   });
   const [pollingInterval, setPollingInterval] =

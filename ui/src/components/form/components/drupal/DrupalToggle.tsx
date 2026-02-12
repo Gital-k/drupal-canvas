@@ -20,11 +20,15 @@ const DrupalToggle = ({
   };
   element?: DrupalElement;
 }) => {
-  const [isChecked, setIsChecked] = useState(
-    Object.prototype.hasOwnProperty.call(Object(element), '#value')
-      ? element['#value']
-      : element?.['#default_value'] || false,
-  );
+  // Always prioritize element-based defaults over attributes.checked for initial state
+  const initialValue = Object.prototype.hasOwnProperty.call(
+    Object(element),
+    '#value',
+  )
+    ? element['#value']
+    : element?.['#default_value'] || false;
+
+  const [isChecked, setIsChecked] = useState(initialValue);
 
   return (
     <Toggle

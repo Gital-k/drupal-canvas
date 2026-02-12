@@ -83,7 +83,7 @@ export const edit = (cy) => {
   };
   Object.entries(newValues).forEach(([key, value]) => {
     cy.get(`@${key}`).select(String(value));
-    cy.wait(50); // eslint-disable-line cypress/no-unnecessary-waiting
+    cy.reasonableWait();
     cy.get(`@${key}`).should('have.value', String(value));
   });
 };

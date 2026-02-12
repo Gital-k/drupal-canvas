@@ -21,6 +21,84 @@ import type { EditorFrameContext } from '@/features/ui/uiSlice';
 import type { ConflictError } from '@/services/pendingChangesApi';
 import type { AutoSavesHash } from '@/types/AutoSaves';
 
+/**
+ * Request Queue Manager
+ *
+ * Prevents parallel requests to the same endpoint by queuing them.
+ * Only the most recent request is executed after the current one completes.
+ * This prevents lock contention (429 errors) on the backend.
+ *
+ * Usage:
+ *   const queuedRequest = createRequestQueue();
+ *   const result = await queuedRequest(() => postPreview(data));
+ */
+export function createRequestQueue<T>() {
+  let activePromise: Promise<T> | null = null;
+  let queuedRequest: (() => Promise<T>) | null = null;
+
+  return async function queuedExecute(requestFn: () => Promise<T>): Promise<T> {
+    // If there's an active request, queue this one (replacing any previously queued request)
+    if (activePromise) {
+      // Store this request to execute after the active one completes
+      queuedRequest = requestFn;
+
+      // Wait for the active request to complete, then execute the queued one
+      await activePromise;
+
+      // After waiting, check if we're the queued request that should execute
+      // (another request might have queued after us)
+      if (queuedRequest === requestFn) {
+        queuedRequest = null;
+        return queuedExecute(requestFn); // Execute now that nothing is active
+      } else {
+        // Another request was queued after us, so we're superseded
+        // Return a resolved promise (our data is stale anyway)
+        return Promise.resolve(null as T);
+      }
+    }
+
+    // CRITICAL: Set activePromise synchronously BEFORE calling requestFn()
+    // This prevents race conditions when multiple requests come in the same tick
+    let resolver: (value: T) => void;
+    let rejecter: (error: any) => void;
+
+    activePromise = new Promise<T>((resolve, reject) => {
+      resolver = resolve;
+      rejecter = reject;
+    });
+
+    // Now execute the actual request
+    try {
+      const result = await requestFn();
+      resolver!(result);
+      return result;
+    } catch (error) {
+      rejecter!(error);
+      throw error;
+    } finally {
+      activePromise = null;
+
+      // If there's a queued request, execute it immediately (non-recursive)
+      if (queuedRequest) {
+        const nextRequest = queuedRequest;
+        queuedRequest = null;
+
+        // Re-invoke queuedExecute properly to maintain the queue state
+        // This ensures proper promise chain management without unbounded recursion
+        queuedExecute(nextRequest).catch((error) => {
+          console.error('Queued request failed:', error);
+        });
+      }
+    }
+  };
+}
+
+// Global queue for postPreview requests
+const queuedPostPreview = createRequestQueue<{
+  html: string;
+  autoSaves: AutoSavesHash;
+}>();
+
 export type UpdateComponentResultType = {
   html: string;
   layout: any;
@@ -36,14 +114,6 @@ export type UpdateComponentQueryArg = {
   model: Omit<ComponentModel, 'name'> | Omit<EvaluatedComponentModel, 'name'>;
 };
 
-// Queue management for postPreview to prevent race conditions
-let activePreviewPromise: Promise<any> | null = null;
-let queuedPreviewRequest: {
-  layout: any;
-  model: any;
-  entity_form_fields: any;
-} | null = null;
-
 export const previewApi = createApi({
   reducerPath: 'previewApi',
   baseQuery: baseQueryWithAutoSaves,
@@ -57,138 +127,43 @@ export const previewApi = createApi({
         method: 'POST',
         body,
       }),
-      async onQueryStarted(arg, { dispatch, queryFulfilled, requestId }) {
-        const generateRandomString = (length: number) => {
-          let result = '';
-          const characters =
-            'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-          const charactersLength = characters.length;
-          for (let i = 0; i < length; i++) {
-            result += characters.charAt(
-              Math.floor(Math.random() * charactersLength),
-            );
-          }
-          return result;
-        };
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        pushCanvasLayoutRequest();
 
-        const timeStr = () => {
-          const now = new Date();
-          const timeString = now.toLocaleTimeString();
-          const ms = now.getMilliseconds().toString().padStart(3, '0');
-          return `${timeString}.${ms}`;
-        };
+        try {
+          const { data, meta } = await queryFulfilled;
+          const { html, autoSaves } = data;
 
-        const executePreview = async () => {
-          const id = generateRandomString(8);
-          pushCanvasLayoutRequest();
-          // console.log(
-          //   `[${id}] (RTK-ID: ${requestId.substring(0, 8)}) preview requested`,
-          //   timeStr(),
-          // );
+          dispatch(
+            pendingChangesApi.util.invalidateTags([
+              { type: 'PendingChanges', id: 'LIST' },
+            ]),
+          );
+          dispatch(setHtml(html));
+          handleAutoSavesHashUpdate(dispatch, autoSaves, meta);
+          dispatch(setPostPreviewCompleted(true));
+        } catch (error: any) {
+          // Log all errors
+          const status = error?.error?.status || 'unknown';
+          console.error(`Preview request FAILED (${status}):`, error);
 
-          try {
-            const { data, meta } = await queryFulfilled;
-            // @ts-ignore
-            // console.log(
-            //   // @ts-ignore
-            //   `[${id}] (${meta?.response?.status}) preview`,
-            //   timeStr(),
-            // );
-            const { html, autoSaves } = data;
-            dispatch(
-              pendingChangesApi.util.invalidateTags([
-                { type: 'PendingChanges', id: 'LIST' },
-              ]),
-            );
-            dispatch(setHtml(html));
-            handleAutoSavesHashUpdate(dispatch, autoSaves, meta);
-            popCanvasLayoutRequest();
-            dispatch(setPostPreviewCompleted(true));
-          } catch (error: any) {
-            popCanvasLayoutRequest();
-
-            // Log all errors
-            const status = error?.error?.status || 'unknown';
-            console.error(
-              `[${id}] (${status}) preview FAILED`,
-              timeStr(),
-              error,
-            );
-
-            if (error?.error?.status === 500) {
-              const errorMessage =
-                error?.error?.data?.message ||
-                error?.error?.data ||
-                'Unknown error';
-              console.error(
-                `[${id}] 500 Server Error - Message:`,
-                errorMessage,
-              );
-              console.error(`[${id}] 500 Server Error - Full error details:`, {
-                status: error.error.status,
-                data: error.error.data,
-                error: error.error,
-              });
-            }
-
-            // Don't re-throw errors - swallow them to prevent error boundary
-            // console.log(`[${id}] Error swallowed to prevent error boundary`);
-          }
-        };
-
-        if (activePreviewPromise) {
-          // If replacing a previously queued request, balance the tracking
-          if (queuedPreviewRequest) {
-            popCanvasLayoutRequest(); // Remove tracking for replaced request
+          if (error?.error?.status === 500) {
+            const errorMessage =
+              error?.error?.data?.message ||
+              error?.error?.data ||
+              'Unknown error';
+            console.error(`500 Server Error - Message:`, errorMessage);
+            console.error(`500 Server Error - Full error details:`, {
+              status: error.error.status,
+              data: error.error.data,
+              error: error.error,
+            });
           }
 
-          // Queue this request, and track it for AJAX coordination
-          queuedPreviewRequest = arg;
-          pushCanvasLayoutRequest();
-
-          // console.log(
-          //   'Preview request queued, will use latest after current completes',
-          // );
-          return;
+          // Don't re-throw errors - swallow them to prevent error boundary
+        } finally {
+          popCanvasLayoutRequest();
         }
-
-        // Execute the request
-        activePreviewPromise = executePreview()
-          .catch((error) => {
-            // Log error but don't re-throw to prevent error boundary
-            console.error(
-              'Preview request error in promise chain (swallowed):',
-              error,
-            );
-          })
-          .finally(async () => {
-            activePreviewPromise = null;
-
-            // If there's a queued request, execute it
-            if (queuedPreviewRequest) {
-              const nextRequest = queuedPreviewRequest;
-              queuedPreviewRequest = null;
-
-              // Balance the push/pop: the queued request was already tracked,
-              // but execution will track it again, so pop first
-              popCanvasLayoutRequest();
-
-              // console.log('Executing queued preview request');
-
-              // Trigger the mutation again with the queued request
-              // We need to await this and handle errors properly
-              const result = await dispatch(
-                previewApi.endpoints.postPreview.initiate(nextRequest),
-              );
-
-              // Check for errors in the dispatched result
-              if ('error' in result && result.error) {
-                console.error('Queued preview request failed:', result.error);
-              }
-            }
-          });
-
-        await activePreviewPromise;
       },
     }),
     updateComponent: builder.mutation<
@@ -233,6 +208,39 @@ export const previewApi = createApi({
 
 export const { usePostPreviewMutation, useUpdateComponentMutation } =
   previewApi;
+
+/**
+ * Queued version of usePostPreviewMutation that prevents parallel requests.
+ * Use this instead of usePostPreviewMutation to avoid 429 errors from backend lock contention.
+ *
+ * Usage:
+ *   const [postPreview, { isLoading }] = useQueuedPostPreviewMutation({ fixedCacheKey: 'myKey' });
+ *   const result = await postPreview({ layout, model, entity_form_fields });
+ */
+export function useQueuedPostPreviewMutation(
+  options?: Parameters<typeof usePostPreviewMutation>[0],
+): [
+  (arg: {
+    layout: any;
+    model: any;
+    entity_form_fields: any;
+  }) => Promise<{ html: string; autoSaves: AutoSavesHash }>,
+  ReturnType<typeof usePostPreviewMutation>[1],
+] {
+  const [postPreview, mutationState] = usePostPreviewMutation(options);
+
+  const queuedPostPreviewWrapper = (arg: {
+    layout: any;
+    model: any;
+    entity_form_fields: any;
+  }): Promise<{ html: string; autoSaves: AutoSavesHash }> => {
+    // Queue the entire mutation call to prevent RTK Query from dispatching
+    // the HTTP request until the queue allows it
+    return queuedPostPreview(() => postPreview(arg).unwrap());
+  };
+
+  return [queuedPostPreviewWrapper, mutationState];
+}
 
 // A selector that returns the current updateComponent mutation loading state
 // given a component ID.

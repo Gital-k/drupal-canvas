@@ -35,6 +35,7 @@ export const edit = (cy) => {
   };
   Object.entries(newValues).forEach(([key, value]) => {
     cy.get(`@${key}`).select(String(value));
+    cy.reasonableWait();
     cy.get(`@${key}`).should('have.value', String(value));
   });
 };

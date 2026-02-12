@@ -23,7 +23,7 @@ import { usePostTemplateLayoutMutation } from '@/services/componentAndLayout';
 import { contentApi } from '@/services/content';
 import {
   selectUpdateComponentLoadingState,
-  usePostPreviewMutation,
+  useQueuedPostPreviewMutation,
 } from '@/services/preview';
 import { isAjaxing } from '@/utils/isAjaxing';
 
@@ -47,9 +47,11 @@ const Preview: React.FC<PreviewProps> = () => {
   const pendingTemplatePreviewRequest = useRef<boolean>(false);
   const shouldInvalidatePageList = useRef<boolean>(false);
   const priorPayloadRef = useRef('');
-  const [postPreview, { isLoading: isFetching }] = usePostPreviewMutation({
-    fixedCacheKey: 'editorFramePreview',
-  });
+  const [postPreview, { isLoading: isFetching }] = useQueuedPostPreviewMutation(
+    {
+      fixedCacheKey: 'editorFramePreview',
+    },
+  );
   const [postTemplatePreview, { isLoading: isTemplateFetching }] =
     usePostTemplateLayoutMutation({
       fixedCacheKey: 'editorFrameTemplatePreview',
@@ -74,7 +76,7 @@ const Preview: React.FC<PreviewProps> = () => {
           layout: currentLayout,
           model: currentModel,
           entity_form_fields: currentEntityFormFields,
-        }).unwrap();
+        });
       } catch (err) {
         showBoundary(err);
       }

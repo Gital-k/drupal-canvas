@@ -233,6 +233,7 @@ export const applyEnhancedProps = <P extends Record<string, any>>(
     enhancedProps.attributes?.type ||
     enhancedProps.attributes?.['data-canvas-type'];
   const isRadioElement = elementType === 'radios' || elementType === 'radio';
+  const isCheckboxElement = elementType === 'checkbox';
 
   if (enhancedProps.attributes) {
     const baseAttributes = {
@@ -241,8 +242,24 @@ export const applyEnhancedProps = <P extends Record<string, any>>(
       onBlur: enhancedOnBlur,
     };
 
-    // Don't override value for radio elements - each radio needs its own value
-    if (!isRadioElement) {
+    if (isCheckboxElement) {
+      // For checkboxes: only override if RHF value represents actual change
+      const originalChecked = enhancedProps.attributes?.checked;
+      const rhfChecked = !!field.value;
+
+      // Convert original to boolean for comparison
+      const originalAsBool =
+        originalChecked === 'checked' ||
+        originalChecked === 'true' ||
+        originalChecked === true;
+
+      // Only set checked if RHF value differs from original default
+      if (rhfChecked !== originalAsBool) {
+        baseAttributes.checked = rhfChecked;
+      }
+      // Don't override the static value attribute
+    } else if (!isRadioElement) {
+      // For text inputs and others: set value
       // Safety check: Only set value if we have an onChange handler
       // This prevents React warnings about controlled inputs without onChange
       baseAttributes.value = field.value;

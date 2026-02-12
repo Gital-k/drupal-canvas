@@ -36,6 +36,7 @@ const twigToJSXComponentMap = {
   'drupal-form-element': DrupalFormElement,
   'drupal-form-element-label': DrupalFormElementLabel,
   'drupal-input': DrupalInput,
+  'drupal-input--checkbox': DrupalInput,
   'drupal-input--checkbox--inwidget-boolean-checkbox': DrupalToggle,
   'drupal-input--url': DrupalInput,
   'drupal-input--textfield--inwidget-path': DrupalPathWidget,

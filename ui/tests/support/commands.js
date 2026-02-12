@@ -1378,3 +1378,12 @@ Cypress.Commands.add('insertComponent', (identifier, options = {}) => {
     }
   });
 });
+
+// Represents a wait that does not exceed how long it would take for a real
+// user to proceed with a subsequent action. Intended to be used for actions
+// that would only fail if they occur faster than a user could reasonably
+// perform them.
+Cypress.Commands.add('reasonableWait', () => {
+  // eslint-disable-next-line cypress/no-unnecessary-waiting
+  cy.wait(100);
+});

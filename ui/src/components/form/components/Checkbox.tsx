@@ -38,7 +38,8 @@ const Checkbox = ({
     onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   };
 }) => {
-  const [checked, setChecked] = useState(castBoolean(attributes?.checked));
+  const initialChecked = castBoolean(attributes?.checked);
+  const [checked, setChecked] = useState(initialChecked);
 
   const changeCallback = (
     e: CheckboxEvent | JQueryProxyCheckboxEvent,
@@ -48,6 +49,7 @@ const Checkbox = ({
     const syntheticEvent = {
       target: {
         checked: e.target.checked,
+        value: e.target.checked,
         name: attributes?.name || 'noop',
       },
     } as unknown as React.ChangeEvent<HTMLInputElement>;
@@ -64,9 +66,9 @@ const Checkbox = ({
 
   return (
     <input
-      {...a2p(attributes, {}, { skipAttributes: ['checked'] })}
-      checked={checked}
-      value={checked}
+      {...a2p(attributes, {}, { skipAttributes: ['checked', 'value'] })}
+      defaultChecked={checked}
+      // value="1"
       className={clsx(attributes.class, styles.base, checked && styles.checked)}
       onChange={changeCallback}
       ref={(node) => {

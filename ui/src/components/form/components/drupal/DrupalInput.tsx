@@ -12,14 +12,24 @@ import type { Attributes } from '@/types/DrupalAttribute';
 
 const DrupalInput = ({
   attributes = {},
+  element,
 }: {
   attributes?: Attributes & {
     onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   };
+  element: any;
 }) => {
   switch (attributes?.type) {
     case 'checkbox': {
-      return <Checkbox attributes={attributes} />;
+      return (
+        <Checkbox
+          attributes={{
+            ...attributes,
+            checked: element['#checked'],
+            'data-canvas-form': true,
+          }}
+        />
+      );
     }
     case 'number':
       // The a2p() process converts 'value to 'defaultValue', which is typically
