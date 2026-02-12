@@ -345,7 +345,7 @@ deprecations (php):
     # @see https://symfony.com/doc/current/components/phpunit_bridge.html#making-tests-fail
     SYMFONY_DEPRECATIONS_HELPER: "ignoreFile=$CI_PROJECT_DIR/$_WEB_ROOT/core/.deprecation-ignore.txt&max[total]=100&max[direct]=50&max[self]=0"
     # @todo 🚧 delete prior to merging
-    _PHPUNIT_EXTRA: '--group canvas_data_model'
+    _PHPUNIT_TESTGROUPS: 'canvas_data_model'
   needs:
     # TRICKY: this is unfixable in 11.2!
     # @see https://www.drupal.org/project/drupal/issues/3555534#comment-16458397
