@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Entity;
 
+use Drupal\canvas\AutoSave\AutoSaveManager;
+use Drupal\canvas\Controller\ApiContentControllers;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
@@ -171,6 +173,138 @@ final class PageTest extends CanvasKernelTestBase {
     $this->assertSame([], $dependencies['content']);
     $this->assertSame([], $dependencies['module']);
     $this->assertSame([], $dependencies['theme']);
+  }
+
+  /**
+   * Tests that getCacheTags() includes label cache tag for "new" pages.
+   *
+   * A page is considered "new" when it has the default title ("Untitled page")
+   * or a title ending with " (Copy)".
+   */
+  public function testGetCacheTagsForNewPage(): void {
+    $entity_type = $this->container->get('entity_type.manager')
+      ->getDefinition(Page::ENTITY_TYPE_ID);
+    $default_title = (string) ApiContentControllers::defaultTitle($entity_type);
+
+    // Create a page with the default title (considered "new").
+    $page = Page::create(['title' => $default_title]);
+    self::assertSaveWithoutViolations($page);
+
+    $cache_tags = $page->getCacheTags();
+    $expected_label_tag = AutoSaveManager::getEntityLabelCacheTag($page);
+
+    self::assertContains($expected_label_tag, $cache_tags);
+    // Verify the standard entity cache tag is also present.
+    self::assertContains('canvas_page:' . $page->id(), $cache_tags);
+  }
+
+  /**
+   * Tests that getCacheTags() includes label cache tag for duplicated pages.
+   *
+   * Pages with titles ending in " (Copy)" are considered "new".
+   */
+  public function testGetCacheTagsForDuplicatedPage(): void {
+    $page = Page::create(['title' => 'My Page (Copy)']);
+    self::assertSaveWithoutViolations($page);
+
+    $cache_tags = $page->getCacheTags();
+    $expected_label_tag = AutoSaveManager::getEntityLabelCacheTag($page);
+
+    self::assertContains($expected_label_tag, $cache_tags);
+  }
+
+  /**
+   * Tests that getCacheTags() excludes label cache tag for published pages.
+   *
+   * Pages with custom titles (not default, not ending in " (Copy)") should
+   * not include the auto-save label cache tag.
+   */
+  public function testGetCacheTagsForPublishedPage(): void {
+    $page = Page::create(['title' => 'My Custom Page Title']);
+    self::assertSaveWithoutViolations($page);
+
+    $cache_tags = $page->getCacheTags();
+    $label_tag = AutoSaveManager::getEntityLabelCacheTag($page);
+
+    self::assertNotContains($label_tag, $cache_tags);
+    // Verify the standard entity cache tag is still present.
+    self::assertContains('canvas_page:' . $page->id(), $cache_tags);
+  }
+
+  /**
+   * Tests that label() returns auto-save title for "new" pages with auto-save.
+   */
+  public function testLabelWithAutoSave(): void {
+    $entity_type = $this->container->get('entity_type.manager')
+      ->getDefinition(Page::ENTITY_TYPE_ID);
+    $default_title = (string) ApiContentControllers::defaultTitle($entity_type);
+
+    // Create a page with the default title.
+    $page = Page::create(['title' => $default_title]);
+    self::assertSaveWithoutViolations($page);
+
+    // Verify the label is the default title before auto-save.
+    self::assertEquals($default_title, $page->label());
+
+    // Create an auto-save with a different title.
+    $auto_save_manager = $this->container->get(AutoSaveManager::class);
+    \assert($auto_save_manager instanceof AutoSaveManager);
+
+    // Clone the page and change its title to simulate an auto-save.
+    $auto_save_page = clone $page;
+    $auto_save_page->set('title', 'My Draft Title');
+    $auto_save_manager->saveEntity($auto_save_page);
+
+    // Reload the page from storage to get a fresh instance.
+    $reloaded_page = $this->container->get('entity_type.manager')
+      ->getStorage(Page::ENTITY_TYPE_ID)
+      ->load($page->id());
+    \assert($reloaded_page instanceof Page);
+
+    // The label should now show the auto-save title with " (Draft)" suffix.
+    self::assertEquals('My Draft Title (Draft)', $reloaded_page->label());
+  }
+
+  /**
+   * Tests that label() returns stored title when no auto-save exists.
+   */
+  public function testLabelWithoutAutoSave(): void {
+    $entity_type = $this->container->get('entity_type.manager')
+      ->getDefinition(Page::ENTITY_TYPE_ID);
+    $default_title = (string) ApiContentControllers::defaultTitle($entity_type);
+
+    // Create a page with the default title.
+    $page = Page::create(['title' => $default_title]);
+    self::assertSaveWithoutViolations($page);
+
+    // Without an auto-save, the label should be the stored title.
+    self::assertEquals($default_title, $page->label());
+  }
+
+  /**
+   * Tests that label() returns stored title for non-new pages even with auto-save.
+   */
+  public function testLabelForNonNewPageWithAutoSave(): void {
+    // Create a page with a custom title (not considered "new").
+    $page = Page::create(['title' => 'Published Page']);
+    self::assertSaveWithoutViolations($page);
+
+    // Create an auto-save with a different title.
+    $auto_save_manager = $this->container->get(AutoSaveManager::class);
+    \assert($auto_save_manager instanceof AutoSaveManager);
+
+    $auto_save_page = clone $page;
+    $auto_save_page->set('title', 'Draft Title');
+    $auto_save_manager->saveEntity($auto_save_page);
+
+    // Reload the page.
+    $reloaded_page = $this->container->get('entity_type.manager')
+      ->getStorage(Page::ENTITY_TYPE_ID)
+      ->load($page->id());
+    \assert($reloaded_page instanceof Page);
+
+    // For non-new pages, the label should be the stored title, not the auto-save.
+    self::assertEquals('Published Page', $reloaded_page->label());
   }
 
 }
