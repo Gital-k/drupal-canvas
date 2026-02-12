@@ -158,6 +158,12 @@ jquery.overrides:
   dependencies:
     - core/jquery
 
+tabledrag.canvas.override:
+  js:
+    js/tabledrag.overrides.js: {}
+  dependencies:
+    - core/drupal
+
 # @see \Drupal\canvas\Entity\JavaScriptComponent::getAssetLibraryDependencies()
 # @see \Drupal\canvas\Hook\ComponentSourceHooks::jsSettingsAlter()
 canvasData.v0:

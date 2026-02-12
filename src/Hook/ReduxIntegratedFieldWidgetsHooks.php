@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Hook;
 
+use Drupal\Core\Asset\AttachedAssetsInterface;
 use Drupal\Component\Serialization\Json;
 use Drupal\Core\Asset\LibraryDiscoveryInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
@@ -71,6 +72,19 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
       // contains the default CSS of the admin theme.
       // @see \Drupal\canvas\Hook\LibraryHooks::customizeDialogLibrary()
       $libraries['ui']['dependencies'][] = 'canvas/canvas.scoped.admin.css';
+    }
+  }
+
+  /**
+   * Implements hook_js_alter().
+   */
+  #[Hook('js_alter')]
+  public function jsAlter(array &$javascript, AttachedAssetsInterface $assets): void {
+    // Replace core media library widget JS with Canvas override.
+    $media_library_widget_key = 'core/modules/media_library/js/media_library.widget.js';
+    if (isset($javascript[$media_library_widget_key])) {
+      $canvas_path = \Drupal::service('extension.list.module')->getPath('canvas');
+      $javascript[$media_library_widget_key]['data'] = $canvas_path . '/js/media_library.widget.overrides.js';
     }
   }
 

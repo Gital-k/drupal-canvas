@@ -4,6 +4,7 @@ import useMutationObserver from '@/hooks/useMutationObserver';
 import { a2p } from '@/local_packages/utils';
 import { VALUE_THAT_MEANS_REMOVE } from '@/utils/function-utils';
 import { isAjaxing } from '@/utils/isAjaxing';
+import { isReordering } from '@/utils/isReordering';
 
 import type { Attributes } from '@/types/DrupalAttribute';
 
@@ -39,7 +40,10 @@ const Hidden = ({ attributes }: { attributes?: Attributes }) => {
               typeof attributes.onChange === 'function' &&
               // Ajaxing also removes the VALUE_THAT_MEANS_REMOVE and the
               // observer thinks the user is removing the image, which is wrong
-              !isAjaxing()
+              !isAjaxing() &&
+              // Drag-and-drop reordering temporarily removes and re-adds DOM
+              // elements, which should not be treated as a true removal.
+              !isReordering()
             ) {
               const event = new Event('change');
               ref.current!.value = VALUE_THAT_MEANS_REMOVE;

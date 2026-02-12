@@ -65,11 +65,11 @@
       </div>
     {% endif %}
 
+    {{ children }}
     {% if suffix %}
       {#  The suffix is the "add media" button    #}
       {{ suffix }}
     {% endif %}
-    {{ children }}
     {% if description.content %}
       <canvas-description description="{{ description.content }}" />
     {% endif %}
