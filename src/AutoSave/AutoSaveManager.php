@@ -53,7 +53,6 @@ use Symfony\Component\Validator\ConstraintViolationListInterface;
 class AutoSaveManager implements EventSubscriberInterface {
 
   public const CACHE_TAG = 'canvas__auto_save';
-  public const CACHE_TAG_LABEL = 'canvas__auto_save_label';
   public const string PUBLISH_PERMISSION = 'publish auto-saves';
   public const string AUTO_SAVE_STORE = 'canvas.auto_save';
   public const string FORM_VIOLATIONS_STORE = 'canvas.form_violations';
@@ -136,9 +135,6 @@ class AutoSaveManager implements EventSubscriberInterface {
     $this->cache->delete($key);
     $this->cacheTagsInvalidator->invalidateTags([self::CACHE_TAG]);
 
-    // Only invalidate the label cache tag when the label actually changed.
-    // This provides more precise cache invalidation since component changes
-    // happen frequently but don't affect the label.
     if ($label_changed) {
       $this->cacheTagsInvalidator->invalidateTags([
         self::getEntityLabelCacheTag($entity),
@@ -268,21 +264,8 @@ class AutoSaveManager implements EventSubscriberInterface {
     return $entity->getEntityTypeId() . ':' . $entity->id();
   }
 
-  /**
-   * Gets the cache tag for a specific entity's auto-save label.
-   *
-   * This tag is invalidated only when the auto-save label changes, not on
-   * every auto-save. This provides more precise cache invalidation since
-   * component changes happen frequently but don't affect the label.
-   *
-   * @param \Drupal\Core\Entity\EntityInterface $entity
-   *   The entity.
-   *
-   * @return string
-   *   The cache tag for the entity's auto-save label.
-   */
   public static function getEntityLabelCacheTag(EntityInterface $entity): string {
-    return self::CACHE_TAG_LABEL . ':' . self::getAutoSaveKey($entity);
+    return 'canvas__auto_save_label:' . self::getAutoSaveKey($entity);
   }
 
   /**
