@@ -47,6 +47,12 @@ const Preview: React.FC<PreviewProps> = () => {
   const pendingTemplatePreviewRequest = useRef<boolean>(false);
   const shouldInvalidatePageList = useRef<boolean>(false);
   const priorPayloadRef = useRef('');
+
+  // Track the actual values that should trigger preview updates
+  const previousLayoutRef = useRef(layout);
+  const previousModelRef = useRef(model);
+  const previousEntityFormFieldsRef = useRef(entity_form_fields);
+
   const [postPreview, { isLoading: isFetching }] = useQueuedPostPreviewMutation(
     {
       fixedCacheKey: 'editorFramePreview',
@@ -65,6 +71,38 @@ const Preview: React.FC<PreviewProps> = () => {
   const editorFrameContext = useAppSelector(selectEditorFrameContext);
 
   useEffect(() => {
+    // Check if the data that actually matters for preview has changed
+    const layoutChanged = previousLayoutRef.current !== layout;
+    const modelChanged = previousModelRef.current !== model;
+    const entityFormFieldsChanged =
+      previousEntityFormFieldsRef.current !== entity_form_fields;
+
+    const dataChanged =
+      layoutChanged || modelChanged || entityFormFieldsChanged;
+
+    console.log('[Preview useEffect] Triggered', {
+      updatePreview,
+      dataChanged,
+      layoutChanged,
+      modelChanged,
+      entityFormFieldsChanged,
+    });
+
+    // Only proceed if updatePreview is true AND the actual data has changed
+    if (!updatePreview || !dataChanged) {
+      console.log(
+        '[Preview useEffect] Skipping - updatePreview:',
+        updatePreview,
+        'dataChanged:',
+        dataChanged,
+      );
+      return;
+    }
+
+    // Update refs to track new values
+    previousLayoutRef.current = layout;
+    previousModelRef.current = model;
+    previousEntityFormFieldsRef.current = entity_form_fields;
     const sendPreviewRequest = async (
       currentLayout: typeof layout,
       currentModel: typeof model,
@@ -172,25 +210,28 @@ const Preview: React.FC<PreviewProps> = () => {
       }
     };
 
-    if (updatePreview) {
-      // Specifically when updating the Title or Alias, the page list used in the navigator must be re-fetched so that
-      // it can display those updated values.
-      if (
-        title !== previousEntityFormTitle.current ||
-        // @todo stop hardcoding `path` after https://drupal.org/i/3503446.
-        entity_form_fields['path[0][alias]'] !== previousEntityFormAlias.current
-      ) {
-        shouldInvalidatePageList.current = true;
-        previousEntityFormTitle.current = title;
-        // @todo stop hardcoding `path` after https://drupal.org/i/3503446.
-        previousEntityFormAlias.current = entity_form_fields['path[0][alias]'];
-      }
+    // Specifically when updating the Title or Alias, the page list used in the navigator must be re-fetched so that
+    // it can display those updated values.
+    if (
+      title !== previousEntityFormTitle.current ||
+      // @todo stop hardcoding `path` after https://drupal.org/i/3503446.
+      entity_form_fields['path[0][alias]'] !== previousEntityFormAlias.current
+    ) {
+      shouldInvalidatePageList.current = true;
+      previousEntityFormTitle.current = title;
+      // @todo stop hardcoding `path` after https://drupal.org/i/3503446.
+      previousEntityFormAlias.current = entity_form_fields['path[0][alias]'];
+    }
 
-      if (editorFrameContext === 'template') {
-        scheduleTemplatePreviewRequest();
-      } else if (editorFrameContext === 'entity') {
-        schedulePreviewRequest();
-      }
+    console.log(
+      '[Preview useEffect] Scheduling preview request for context:',
+      editorFrameContext,
+    );
+
+    if (editorFrameContext === 'template') {
+      scheduleTemplatePreviewRequest();
+    } else if (editorFrameContext === 'entity') {
+      schedulePreviewRequest();
     }
   }, [
     layout,
