@@ -144,7 +144,7 @@ final class Page extends EditorialContentEntityBase implements EntityOwnerInterf
     // content displaying this page's label gets invalidated when the auto-save
     // label changes.
     if (AutoSaveManager::entityIsConsideredNew($this)) {
-      $tags[] = AutoSaveManager::getEntityLabelCacheTag($this->getEntityTypeId(), $this->id());
+      $tags[] = AutoSaveManager::getEntityLabelCacheTag($this);
     }
 
     return $tags;

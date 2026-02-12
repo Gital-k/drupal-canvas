@@ -141,7 +141,7 @@ class AutoSaveManager implements EventSubscriberInterface {
     // happen frequently but don't affect the label.
     if ($label_changed) {
       $this->cacheTagsInvalidator->invalidateTags([
-        self::getEntityLabelCacheTag($entity->getEntityTypeId(), $entity->id()),
+        self::getEntityLabelCacheTag($entity),
       ]);
     }
   }
@@ -275,16 +275,14 @@ class AutoSaveManager implements EventSubscriberInterface {
    * every auto-save. This provides more precise cache invalidation since
    * component changes happen frequently but don't affect the label.
    *
-   * @param string $entity_type
-   *   The entity type ID.
-   * @param string|int $entity_id
-   *   The entity ID.
+   * @param \Drupal\Core\Entity\EntityInterface $entity
+   *   The entity.
    *
    * @return string
    *   The cache tag for the entity's auto-save label.
    */
-  public static function getEntityLabelCacheTag(string $entity_type, string|int $entity_id): string {
-    return self::CACHE_TAG_LABEL . ':' . $entity_type . ':' . $entity_id;
+  public static function getEntityLabelCacheTag(EntityInterface $entity): string {
+    return self::CACHE_TAG_LABEL . ':' . self::getAutoSaveKey($entity);
   }
 
   /**
@@ -379,7 +377,7 @@ class AutoSaveManager implements EventSubscriberInterface {
   public function delete(EntityInterface $entity): void {
     $this->cacheTagsInvalidator->invalidateTags([
       self::CACHE_TAG,
-      self::getEntityLabelCacheTag($entity->getEntityTypeId(), $entity->id()),
+      self::getEntityLabelCacheTag($entity),
     ]);
     $key = $this->getAutoSaveKey($entity);
     $this->autoSaveStore->delete($key);
