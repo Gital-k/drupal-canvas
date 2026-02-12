@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Plugin\views\field;
 
+use Drupal\Core\Cache\CacheableDependencyInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\views\Attribute\ViewsField;
@@ -34,6 +35,12 @@ class EntityLabelField extends FieldPluginBase {
 
     $label = $entity->label();
 
+    // Get entity cache tags - this includes the label cache tag from
+    // Page::getCacheTags() when entity is "new".
+    $cache_tags = $entity instanceof CacheableDependencyInterface
+      ? $entity->getCacheTags()
+      : [];
+
     // Support linking to the entity.
     if (!empty($this->options['link_to_entity'])) {
       try {
@@ -42,15 +49,16 @@ class EntityLabelField extends FieldPluginBase {
           '#type' => 'link',
           '#title' => $label,
           '#url' => $url,
+          '#cache' => ['tags' => $cache_tags],
         ];
       }
       catch (\Exception) {
         // If the entity doesn't have a canonical URL, just return the label.
-        return ['#markup' => $label];
+        return ['#markup' => $label, '#cache' => ['tags' => $cache_tags]];
       }
     }
 
-    return ['#markup' => $label];
+    return ['#markup' => $label, '#cache' => ['tags' => $cache_tags]];
   }
 
   /**

@@ -137,6 +137,22 @@ final class Page extends EditorialContentEntityBase implements EntityOwnerInterf
   /**
    * {@inheritdoc}
    */
+  public function getCacheTags(): array {
+    $tags = parent::getCacheTags();
+
+    // Add label-specific auto-save cache tag for "new" pages so any cached
+    // content displaying this page's label gets invalidated when the auto-save
+    // label changes.
+    if (AutoSaveManager::entityIsConsideredNew($this)) {
+      $tags[] = AutoSaveManager::getEntityLabelCacheTag($this->getEntityTypeId(), $this->id());
+    }
+
+    return $tags;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   public static function baseFieldDefinitions(EntityTypeInterface $entity_type): array {
     /** @var \Drupal\Core\Field\BaseFieldDefinition[] $fields */
     $fields = parent::baseFieldDefinitions($entity_type);

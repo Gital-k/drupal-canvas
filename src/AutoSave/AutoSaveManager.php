@@ -53,6 +53,7 @@ use Symfony\Component\Validator\ConstraintViolationListInterface;
 class AutoSaveManager implements EventSubscriberInterface {
 
   public const CACHE_TAG = 'canvas__auto_save';
+  public const CACHE_TAG_LABEL = 'canvas__auto_save_label';
   public const string PUBLISH_PERMISSION = 'publish auto-saves';
   public const string AUTO_SAVE_STORE = 'canvas.auto_save';
   public const string FORM_VIOLATIONS_STORE = 'canvas.form_violations';
@@ -114,12 +115,18 @@ class AutoSaveManager implements EventSubscriberInterface {
       return;
     }
 
+    // Before setting the new auto-save data, check if the label changed.
+    $existing_auto_save = $this->autoSaveStore->get($key);
+    $new_label = $entity->label();
+    $label_changed = $existing_auto_save === NULL
+      || ($existing_auto_save['label'] ?? NULL) !== $new_label;
+
     $auto_save_data = [
       'entity_type' => $entity->getEntityTypeId(),
       'entity_id' => $entity->id(),
       'data' => $entity->toArray(),
       'langcode' => $entity->language()->getId(),
-      'label' => $entity->label(),
+      'label' => $new_label,
       'data_hash' => $data_hash,
       'client_id' => $clientId,
       'owner' => (int) $this->currentUser->id(),
@@ -128,6 +135,15 @@ class AutoSaveManager implements EventSubscriberInterface {
     $this->autoSaveStore->set($key, $auto_save_data);
     $this->cache->delete($key);
     $this->cacheTagsInvalidator->invalidateTags([self::CACHE_TAG]);
+
+    // Only invalidate the label cache tag when the label actually changed.
+    // This provides more precise cache invalidation since component changes
+    // happen frequently but don't affect the label.
+    if ($label_changed) {
+      $this->cacheTagsInvalidator->invalidateTags([
+        self::getEntityLabelCacheTag($entity->getEntityTypeId(), $entity->id()),
+      ]);
+    }
   }
 
   /**
@@ -253,6 +269,25 @@ class AutoSaveManager implements EventSubscriberInterface {
   }
 
   /**
+   * Gets the cache tag for a specific entity's auto-save label.
+   *
+   * This tag is invalidated only when the auto-save label changes, not on
+   * every auto-save. This provides more precise cache invalidation since
+   * component changes happen frequently but don't affect the label.
+   *
+   * @param string $entity_type
+   *   The entity type ID.
+   * @param string|int $entity_id
+   *   The entity ID.
+   *
+   * @return string
+   *   The cache tag for the entity's auto-save label.
+   */
+  public static function getEntityLabelCacheTag(string $entity_type, string|int $entity_id): string {
+    return self::CACHE_TAG_LABEL . ':' . $entity_type . ':' . $entity_id;
+  }
+
+  /**
    * @param \Drupal\Core\Entity\EntityInterface $entity
    * @return array{autoSaveStartingPoint: int|string|null, hash: string|null}
    */
@@ -342,7 +377,10 @@ class AutoSaveManager implements EventSubscriberInterface {
    * @see ::onCanvasConfigEntitySave()
    */
   public function delete(EntityInterface $entity): void {
-    $this->cacheTagsInvalidator->invalidateTags([self::CACHE_TAG]);
+    $this->cacheTagsInvalidator->invalidateTags([
+      self::CACHE_TAG,
+      self::getEntityLabelCacheTag($entity->getEntityTypeId(), $entity->id()),
+    ]);
     $key = $this->getAutoSaveKey($entity);
     $this->autoSaveStore->delete($key);
     $this->formViolationsStore->delete($key);
