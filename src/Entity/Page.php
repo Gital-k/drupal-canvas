@@ -87,6 +87,9 @@ use Drupal\Core\Entity\Routing\RevisionHtmlRouteProvider;
       "revision_created" => "revision_created",
       "revision_log_message" => "revision_log",
     ],
+    constraints: [
+      "HomepageCannotBeUnpublished" => NULL,
+    ],
   )
 ]
 final class Page extends EditorialContentEntityBase implements EntityOwnerInterface, ComponentTreeEntityInterface {
