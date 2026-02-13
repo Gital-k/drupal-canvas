@@ -201,7 +201,7 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
    *   @see \Drupal\Core\Theme\ComponentPluginManager::$defaults
    */
   public static function getClasses(array $ids): array {
-    return array_values(array_unique(array_filter(array_map(
+    return array_values(array_unique(array_filter(\array_map(
       static fn (Component $component): ?string => $component->getComponentSource()->getReferencedPluginClass(),
       Component::loadMultiple($ids)
     ))));
@@ -490,11 +490,23 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
   /**
    * {@inheritdoc}
    */
-  public function getSettings(): array {
+  public function getSettings(?string $version = NULL): array {
+    if ($version !== NULL) {
+      self::assertVersionExists($version);
+      // The version key is the given version string, except in one case.
+      $version_key = $version === $this->active_version ? self::ACTIVE_VERSION : $version;
+      return $this->versioned_properties[$version_key]['settings'] ?? [];
+    }
     return $this->get('settings') ?? [];
   }
 
-  public function getSlotDefinitions(): array {
+  public function getSlotDefinitions(?string $version = NULL): array {
+    if ($version !== NULL) {
+      self::assertVersionExists($version);
+      // The version key is the given version string, except in one case.
+      $version_key = $version === $this->active_version ? self::ACTIVE_VERSION : $version;
+      return $this->versioned_properties[$version_key]['fallback_metadata']['slot_definitions'] ?? [];
+    }
     return $this->get('fallback_metadata')['slot_definitions'] ?? [];
   }
 

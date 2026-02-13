@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace Drupal\Tests\canvas\Kernel;
 
 use Drupal\canvas\AutoSave\AutoSaveManager;
+use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Plugin\DataType\ComputedUrlWithQueryString;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Plugin\Field\FieldTypeOverride\ImageItemOverride;
+use Drupal\canvas\PropSource\PropSource;
 use Drupal\canvas\Storage\ComponentTreeLoader;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\file\FileInterface;
@@ -25,6 +27,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
@@ -32,6 +35,7 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
  * @group canvas
  * @group #slow
  */
+#[RunTestsInSeparateProcesses]
 final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
 
   use CanvasFieldTrait;
@@ -104,7 +108,7 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
           'cta1href' => ['uri' => 'https://drupal.org'],
         ],
       ],
-      // Add a component with a pre-existing dynamic property source to ensure
+      // Add a component with a pre-existing entity field prop source to ensure
       // it also is rendered and resolved correctly.
       [
         'uuid' => $uuid2,
@@ -112,7 +116,7 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
         'component_version' => '8c01a2bdb897a810',
         'inputs' => [
           'text' => [
-            'sourceType' => 'dynamic',
+            'sourceType' => PropSource::EntityField->value,
             'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
           ],
           'element' => 'h1',
@@ -149,15 +153,15 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
     self::assertIsArray($data['model']);
     $new_model = $data['model'][$uuid1];
     $new_model['source']['heading'] = [
-      'sourceType' => 'dynamic',
+      'sourceType' => PropSource::EntityField->value,
       'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
     ];
     $new_model['source']['subheading'] = [
-      'sourceType' => 'dynamic',
+      'sourceType' => PropSource::EntityField->value,
       'expression' => 'ℹ︎␜entity:node:article␝revision_log␞␟value',
     ];
-    // The client should set the `resolved` value of a dynamic prop sources to
-    // NULL because it cannot resolve them.
+    // The client should set the `resolved` value of a entity field prop sources
+    // to NULL because it cannot resolve them.
     $new_model['resolved']['subheading'] = NULL;
     $new_model['resolved']['heading'] = NULL;
     $updatedHeroClientData = [
@@ -180,7 +184,7 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
     self::assertIsArray($data['model']);
     $new_model = $data['model'][$uuid1];
     $new_model['source']['subheading'] = [
-      'sourceType' => 'dynamic',
+      'sourceType' => PropSource::EntityField->value,
       'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
     ];
     $new_model['resolved']['subheading'] = NULL;
@@ -458,10 +462,11 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
         'model' => [
           'resolved' => [
             'label' => $new_label,
-            'label_display' => '',
+            'label_display' => '0',
           ],
         ],
-        'componentType' => 'block.system_messages_block@b92f802cf68eb83e',
+        // The component version may vary depending on upstream changes in core.
+        'componentType' => 'block.system_messages_block@' . Component::load('block.system_messages_block')?->getActiveVersion(),
         'componentInstanceUuid' => $globalComponentUuid,
       ] + $this->getPatchContentsDefaults([$entity]);
       $response = $this->request(Request::create($url, method: 'PATCH', content: \json_encode($updateRegionClientData, JSON_THROW_ON_ERROR)));
@@ -548,10 +553,11 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
       'model' => [
         'resolved' => [
           'label' => $new_label,
-          'label_display' => '',
+          'label_display' => '0',
         ],
       ],
-      'componentType' => 'block.system_messages_block@b92f802cf68eb83e',
+      // The component version may vary depending on upstream changes in core.
+      'componentType' => 'block.system_messages_block@' . Component::load('block.system_messages_block')?->getActiveVersion(),
       'componentInstanceUuid' => $globalComponentUuid,
     ] + $this->getPatchContentsDefaults([$entity], FALSE), JSON_THROW_ON_ERROR)));
   }

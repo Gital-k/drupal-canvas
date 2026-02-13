@@ -7,48 +7,31 @@ namespace Drupal\Tests\canvas\Kernel\Config;
 use Drupal\canvas\InvalidComponentInputsPropSourceException;
 use Drupal\Core\Config\Schema\SchemaIncompleteException;
 use Drupal\field\Entity\FieldConfig;
-use Drupal\KernelTests\KernelTestBase;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Traits\SingleDirectoryComponentTreeTestTrait;
-use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
+
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 // cspell:ignore elink estring
 
 /**
  * @group canvas
  */
-class DefaultFieldValueTest extends KernelTestBase {
+#[RunTestsInSeparateProcesses]
+class DefaultFieldValueTest extends CanvasKernelTestBase {
 
   use SingleDirectoryComponentTreeTestTrait;
-  use ContribStrictConfigSchemaTestTrait;
   use GenerateComponentConfigTrait;
 
   /**
    * {@inheritdoc}
    */
   protected static $modules = [
-    'user',
-    'block',
-    'canvas',
-    'system',
-    'canvas_test_sdc',
     'canvas_test_config_node_article',
     // All of `canvas_test_config_node_article`'s dependencies.
     'node',
     'field',
-    'link',
-    'text',
-    // Canvas's dependencies.
-    'datetime',
-    'file',
-    'image',
-    'options',
-    'path',
-    'media',
-    'filter',
-    'ckeditor5',
-    'editor',
-    'datetime',
   ];
 
   /**
@@ -56,7 +39,6 @@ class DefaultFieldValueTest extends KernelTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
-    $this->installConfig('canvas');
     $this->generateComponentConfig();
     $this->installEntitySchema('user');
     $this->installEntitySchema('node');
@@ -73,13 +55,13 @@ class DefaultFieldValueTest extends KernelTestBase {
       'Schema errors for field.field.node.article.field_canvas_test with the following errors: 0 [default_value.0] The array must contain a &quot;component_id&quot; key.',
     );
     array_push(
-      $test_cases['invalid values using dynamic inputs'],
+      $test_cases['prop source type disallowed in this component tree: EntityFieldPropSource'],
       SchemaIncompleteException::class,
-      'Schema errors for field.field.node.article.field_canvas_test with the following errors: 0 [default_value.0] The &#039;dynamic&#039; prop source type must be absent.',
+      'Schema errors for field.field.node.article.field_canvas_test with the following errors: 0 [default_value.0] The &#039;entity-field&#039; prop source type must be absent.',
     );
     // Ensure the input validation is enforced even if the root is invalid.
     array_push(
-      $test_cases['inputs invalid, using only static inputs'],
+      $test_cases['inputs invalid, using only static prop sources'],
       \OutOfRangeException::class,
       '\'heading-x\' is not a prop on this version of the Component \'Single-directory component: <em class="placeholder">Canvas test SDC with props but no slots</em>\'.',
     );
@@ -93,19 +75,20 @@ class DefaultFieldValueTest extends KernelTestBase {
       SchemaIncompleteException::class,
       'Schema errors for field.field.node.article.field_canvas_test with the following errors: 0 [default_value.0] The array must contain an &quot;inputs&quot; key.',
     );
-    // If dynamic prop sources are used the validation cannot be performed for the default value.
+    // If entity field prop sources are used the validation cannot be performed
+    // for the default value.
     array_push(
-      $test_cases['missing components, using dynamic inputs'],
+      $test_cases['missing components, using entity field prop sources'],
       SchemaIncompleteException::class,
-      'Schema errors for field.field.node.article.field_canvas_test with the following errors: 0 [default_value.0.component_id] The &#039;canvas.component.sdc.sdc_test.missing&#039; config does not exist., 1 [default_value.1.component_id] The &#039;canvas.component.sdc.sdc_test.missing-also&#039; config does not exist., 2 [default_value.0] The &#039;dynamic&#039; prop source type must be absent., 3 [default_value.1] The &#039;dynamic&#039; prop source type must be absent., 4 [default_value.2] The &#039;dynamic&#039; prop source type must be absent.'
+      'Schema errors for field.field.node.article.field_canvas_test with the following errors: 0 [default_value.0.component_id] The &#039;canvas.component.sdc.sdc_test.missing&#039; config does not exist., 1 [default_value.1.component_id] The &#039;canvas.component.sdc.sdc_test.missing-also&#039; config does not exist., 2 [default_value.0] The &#039;entity-field&#039; prop source type must be absent., 3 [default_value.1] The &#039;entity-field&#039; prop source type must be absent., 4 [default_value.2] The &#039;entity-field&#039; prop source type must be absent.'
     );
     array_push(
-      $test_cases['inputs invalid, using dynamic inputs'],
+      $test_cases['inputs invalid, using entity field prop sources'],
       SchemaIncompleteException::class,
-      'Schema errors for field.field.node.article.field_canvas_test with the following errors: 0 [default_value.0] The &#039;dynamic&#039; prop source type must be absent.',
+      'Schema errors for field.field.node.article.field_canvas_test with the following errors: 0 [default_value.0] The &#039;entity-field&#039; prop source type must be absent.',
     );
     array_push(
-      $test_cases['missing components, using only static inputs'],
+      $test_cases['missing components, using only static prop sources'],
       SchemaIncompleteException::class,
       'Schema errors for field.field.node.article.field_canvas_test with the following errors: 0 [default_value.0.component_id] The &#039;canvas.component.sdc.sdc_test.missing&#039; config does not exist.'
     );

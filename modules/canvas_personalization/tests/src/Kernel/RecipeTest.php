@@ -22,6 +22,9 @@ use Drupal\canvas_personalization\Entity\Segment;
  * @group canvas
  * @group canvas_personalization
  * @covers \Drupal\canvas\EventSubscriber\RecipeSubscriber
+ *
+ * Note this cannot use CanvasKernelTestBase because that would pre-install the
+ * Canvas module: this test is installing Canvas via a recipe.
  */
 final class RecipeTest extends KernelTestBase {
 
@@ -40,7 +43,7 @@ final class RecipeTest extends KernelTestBase {
     // Demo content should have been created.
     $this->assertSame([
       1 => ['Personalization demo', '/personalization-test'],
-    ], array_map(
+    ], \array_map(
       // @phpstan-ignore-next-line
       fn (Page $page) => [$page->label(), $page->get('path')->alias],
       Page::loadMultiple()

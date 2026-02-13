@@ -6,17 +6,23 @@ namespace Drupal\Tests\canvas\Kernel\Config;
 
 // cspell:ignore thisisatestpattern
 
+use Drupal\canvas\Entity\Component;
+use Drupal\canvas\Entity\ComponentTreeEntityInterface;
 use Drupal\canvas\Entity\Pattern;
+use Drupal\canvas\PropSource\PropSource;
 use Drupal\Tests\canvas\Traits\BetterConfigDependencyManagerTrait;
+use Drupal\Tests\canvas\Traits\DataProviderWithCoreSpecificComponentActiveVersionTrait;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\TestTools\Random;
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
-/**
- * @group canvas
- */
+#[Group('canvas')]
+#[RunTestsInSeparateProcesses]
 class PatternValidationTest extends BetterConfigEntityValidationTestBase {
 
   use BetterConfigDependencyManagerTrait;
+  use DataProviderWithCoreSpecificComponentActiveVersionTrait;
   use GenerateComponentConfigTrait;
 
   /**
@@ -29,6 +35,7 @@ class PatternValidationTest extends BetterConfigEntityValidationTestBase {
     // Canvas's dependencies (modules providing field types + widgets).
     'datetime',
     'file',
+    'field',
     'image',
     'options',
     'path',
@@ -36,6 +43,7 @@ class PatternValidationTest extends BetterConfigEntityValidationTestBase {
     'text',
     'filter',
     'datetime',
+    'user',
   ];
 
   /**
@@ -80,9 +88,9 @@ class PatternValidationTest extends BetterConfigEntityValidationTestBase {
         [
           'uuid' => '56031f0f-a073-471d-8298-4ecf757ff0e7',
           'component_id' => 'block.local_tasks_block',
-          'component_version' => '7ce07cbe2a7fa7ce',
+          'component_version' => Component::load('block.local_tasks_block')?->getActiveVersion(),
           'inputs' => [
-            'label_display' => FALSE,
+            'label_display' => '0',
             'primary' => TRUE,
             'secondary' => TRUE,
             'label' => '',
@@ -165,7 +173,7 @@ class PatternValidationTest extends BetterConfigEntityValidationTestBase {
       'This is a test pattern',
       'This is a test pattern',
       'This is a test pattern',
-    ], array_map(
+    ], \array_map(
       fn (Pattern $p): string => (string) $p->label(),
       array_values(Pattern::loadMultiple())
     ));
@@ -177,12 +185,14 @@ class PatternValidationTest extends BetterConfigEntityValidationTestBase {
    */
   public function testInvalidComponentTree(array $component_tree, array $expected_messages): void {
     \assert($this->entity instanceof Pattern);
+    self::addMissingBlockComponentVersions($component_tree);
+    \assert($this->entity instanceof ComponentTreeEntityInterface);
     $this->entity->setComponentTree($component_tree);
     $this->assertValidationErrors($expected_messages);
   }
 
   public static function providerInvalidComponentTree(): \Generator {
-    yield "using DynamicPropSource" => [
+    yield "using EntityFieldPropSource" => [
       'component_tree' => [
         [
           'uuid' => '8c59b08a-59f7-4c33-b1b6-06af8f153e73',
@@ -190,14 +200,14 @@ class PatternValidationTest extends BetterConfigEntityValidationTestBase {
           'component_version' => 'b1e991f726a2a266',
           'inputs' => [
             'heading' => [
-              'sourceType' => 'dynamic',
+              'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
             ],
           ],
         ],
       ],
       'expected_messages' => [
-        'component_tree' => 'The \'dynamic\' prop source type must be absent.',
+        'component_tree' => 'The \'entity-field\' prop source type must be absent.',
       ],
     ];
 
@@ -212,7 +222,7 @@ class PatternValidationTest extends BetterConfigEntityValidationTestBase {
               'value' => 'Visit sunny Vienna',
             ],
             'href' => [
-              'sourceType' => 'host-entity-url',
+              'sourceType' => PropSource::HostEntityUrl->value,
               'absolute' => TRUE,
             ],
           ],
@@ -234,19 +244,19 @@ class PatternValidationTest extends BetterConfigEntityValidationTestBase {
         [
           'uuid' => '7f91aa44-c672-454f-8ed0-417d0de76b14',
           'component_id' => 'block.system_branding_block',
-          'component_version' => '247a23298360adb2',
+          'component_version' => '::ACTIVE_VERSION_IN_SUT::',
           'inputs' => [
             'use_site_logo' => TRUE,
             'use_site_name' => TRUE,
             'use_site_slogan' => TRUE,
             'label' => '',
-            'label_display' => FALSE,
+            'label_display' => '0',
           ],
         ],
         [
           'uuid' => 'block-invalid',
           'component_id' => 'block.page_title_block',
-          'component_version' => '62af221149ae4887',
+          'component_version' => '::ACTIVE_VERSION_IN_SUT::',
           'inputs' => [],
         ],
       ],

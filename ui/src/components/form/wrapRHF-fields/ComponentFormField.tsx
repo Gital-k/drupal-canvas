@@ -33,8 +33,9 @@ import { flaggedForRemoval, parseValue } from '@/utils/function-utils';
 
 import type { ComponentType } from 'react';
 import type * as React from 'react';
+import type { PropsValues } from '@drupal-canvas/types';
 import type { ComponentModels } from '@/features/layout/layoutModelSlice';
-import type { InputUIData, PropsValues } from '@/types/Form';
+import type { InputUIData } from '@/types/Form';
 
 interface ComponentFormFieldProps<P> {
   props: P;
@@ -213,7 +214,7 @@ export const ComponentFormField = <P extends Record<string, any>>({
     }
   };
 
-  const propsOverrides: { options?: Object[] } = {};
+  const propsOverrides: { options?: object[] } = {};
 
   const { multipleInputsSingleValue } = propInputData(
     formState,

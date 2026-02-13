@@ -8,8 +8,9 @@ use Drupal\Component\Uuid\UuidInterface;
 use Drupal\Core\Render\RendererInterface;
 use Drupal\canvas\Element\AstroIsland;
 use Drupal\canvas\Entity\JavaScriptComponent;
-use Drupal\KernelTests\KernelTestBase;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\user\Traits\UserCreationTrait;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\DomCrawler\Crawler;
 
 /**
@@ -18,30 +19,10 @@ use Symfony\Component\DomCrawler\Crawler;
  * @group canvas
  * @group Twig
  */
-final class CanvasTwigExtensionTest extends KernelTestBase {
+#[RunTestsInSeparateProcesses]
+final class CanvasTwigExtensionTest extends CanvasKernelTestBase {
 
   use UserCreationTrait;
-
-  /**
-   * {@inheritdoc}
-   */
-  protected static $modules = [
-    'canvas',
-    'canvas_test_sdc',
-    'user',
-    'system',
-    'block',
-    // Canvas's dependencies (modules providing field types + widgets).
-    'datetime',
-    'file',
-    'image',
-    'media',
-    'options',
-    'path',
-    'link',
-    'text',
-    'filter',
-  ];
 
   /**
    * {@inheritdoc}
@@ -49,7 +30,6 @@ final class CanvasTwigExtensionTest extends KernelTestBase {
   protected function setUp(): void {
     parent::setUp();
     $this->installEntitySchema('user');
-    $this->installConfig(['system']);
   }
 
   /**
@@ -72,6 +52,7 @@ final class CanvasTwigExtensionTest extends KernelTestBase {
         'machineName' => $component_id,
         'name' => $this->getRandomGenerator()->sentences(5),
         'status' => TRUE,
+        'required' => [],
         'props' => [
           'heading' => [
             'type' => 'string',
@@ -88,8 +69,8 @@ final class CanvasTwigExtensionTest extends KernelTestBase {
             ],
           ],
         ],
-        'css' => [],
-        'js' => [],
+        'js' => ['original' => '', 'compiled' => ''],
+        'css' => ['original' => '', 'compiled' => ''],
         'dataDependencies' => [],
       ])->save(),
       default => fn() => NULL,

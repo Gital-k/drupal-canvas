@@ -22,7 +22,7 @@ import {
 
 import type { ComponentType } from 'react';
 import type * as React from 'react';
-import type { PropsValues } from '@/types/Form';
+import type { PropsValues } from '@drupal-canvas/types';
 
 interface PageDataFormFieldProps<P> {
   props: P;

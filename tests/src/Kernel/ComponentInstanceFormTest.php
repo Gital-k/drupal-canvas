@@ -17,11 +17,11 @@ use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\Core\Url;
 use Drupal\Tests\canvas\Kernel\Traits\CiModulePathTrait;
 use Drupal\Tests\canvas\TestSite\CanvasTestSetup;
-use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\node\Traits\NodeCreationTrait;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\TestWith;
 use Symfony\Component\DomCrawler\Crawler;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
@@ -29,10 +29,10 @@ use Symfony\Component\HttpFoundation\Request;
  * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::buildConfigurationForm()
  * @group canvas
  */
+#[RunTestsInSeparateProcesses]
 final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
 
   use CiModulePathTrait;
-  use ContribStrictConfigSchemaTestTrait;
   use NodeCreationTrait;
 
   /**
@@ -44,6 +44,7 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
     $this->container->get('module_installer')->install(['system', 'canvas_test_sdc', 'canvas_test_block']);
     $this->container->get('config.factory')->getEditable('system.theme')->set('default', 'stark')->save();
 
+    // @todo Refactor this away in https://www.drupal.org/project/canvas/issues/3531679
     (new CanvasTestSetup())->setup();
     $this->setUpCurrentUser(permissions: ['edit any article content', 'administer themes', Page::EDIT_PERMISSION]);
   }
@@ -353,11 +354,11 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
     )->toString();
 
     $crawler = $this->getCrawlerForFormRequest($form_url, $component_entity, $form_canvas_props);
-    // Confirm the `heading` and `subheading` props are not yet linked to DynamicPropSources.
+    // Confirm the `heading` and `subheading` props are not yet linked to EntityFieldPropSources.
     self::assertCount(0, $crawler->filter('.canvas-linked-prop-wrapper[data-drupal-selector*="-heading-"]'));
     self::assertCount(0, $crawler->filter('.canvas-linked-prop-wrapper[data-drupal-selector*="-subheading-"]'));
 
-    // Second request: with a valid expression in DynamicPropSource.
+    // Second request: with a valid expression in EntityFieldPropSource.
     // 💡 These are the ones provided by the API response at the start of the
     // test (…/suggestions/prop-sources/…).
     $form_canvas_props['source']['heading'] = self::findSuggestionByLabel('Title', 'heading', $fieldSuggestions)['source'];
@@ -376,7 +377,7 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
     self::assertCount(2, $crawler->filter('.canvas-linked-prop-wrapper[data-drupal-selector*="-heading-"]'));
     self::assertCount(2, $crawler->filter('.canvas-linked-prop-wrapper[data-drupal-selector*="-subheading-"]'));
 
-    // Third request: with an invalid expression in DynamicPropSource.
+    // Third request: with an invalid expression in EntityFieldPropSource.
     // ⚠️ This cannot happen in the UI, but component trees could be manipulated
     // outside the UI. This shows what would happen when editing such
     // out-of-band manipulated component trees in the Canvas UI.

@@ -4,18 +4,21 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Functional\Config;
 
+use Drupal\canvas\PropSource\PropSource;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\Tests\canvas\Functional\FunctionalTestBase;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
  * @covers \Drupal\canvas\Entity\ContentTemplate::onDependencyRemoval
  *
  * @group canvas
  */
+#[RunTestsInSeparateProcesses]
 final class ContentTemplateOnDependencyRemovalTest extends FunctionalTestBase {
 
   /**
@@ -115,7 +118,7 @@ final class ContentTemplateOnDependencyRemovalTest extends FunctionalTestBase {
           'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
           'inputs' => [
             'heading' => [
-              'sourceType' => 'dynamic',
+              'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:node:article␝field_motto␞␟value',
             ],
           ],
@@ -125,11 +128,11 @@ final class ContentTemplateOnDependencyRemovalTest extends FunctionalTestBase {
           'component_id' => 'sdc.canvas_test_sdc.my-cta',
           'inputs' => [
             'text' => [
-              'sourceType' => 'dynamic',
+              'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:node:article␝field_slogan␞␟value',
             ],
             'href' => [
-              'sourceType' => 'dynamic',
+              'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:node:article␝field_more_info␞␟uri',
             ],
             'target' => '_blank',

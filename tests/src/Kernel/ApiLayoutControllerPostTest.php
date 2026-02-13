@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupal\Tests\canvas\Kernel;
 
 use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\canvas\PropSource\PropSource;
 use Drupal\Component\Serialization\Json;
 use Drupal\Core\Cache\MemoryCache\MemoryCacheInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
@@ -26,6 +27,7 @@ use Drupal\Tests\canvas\Traits\CanvasFieldTrait;
 use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 /**
@@ -33,6 +35,7 @@ use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
  * @group canvas
  * @group #slow
  */
+#[RunTestsInSeparateProcesses]
 final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
 
   use AutoSaveRequestTestTrait;
@@ -47,6 +50,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
     $this->container->get('theme_installer')->install(['stark']);
     $this->container->get('config.factory')->getEditable('system.theme')->set('default', 'stark')->save();
 
+    // @todo Refactor this away in https://www.drupal.org/project/canvas/issues/3531679
     (new CanvasTestSetup())->setup(TRUE);
     $this->setUpCurrentUser([], [
       'administer url aliases',
@@ -266,7 +270,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
       $preview_entity_title = (string) $this->previewEntity->label();
       self::assertNotSame($static_heading_text, $preview_entity_title);
       $json['model'][$uuid]['source']['text'] = [
-        'sourceType' => 'dynamic',
+        'sourceType' => PropSource::EntityField->value,
         'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
       ];
       $json['model'][$uuid]['resolved']['text'] = NULL;
@@ -303,7 +307,7 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
     $this->assertRequestAutoSaveConflict(Request::create($url, method: 'POST', content: $this->filterLayoutForPost($original_content)));
 
     if ($entity_type === ContentTemplate::ENTITY_TYPE_ID) {
-      // Ensure we can update the dynamic prop source to a static source.
+      // Ensure we can update the entity field prop source to a static source.
       $json['model'][$uuid] = self::getNewHeadingComponentModel();
       $json += $this->getPostContentsDefaults($entity);
       $response = $this->request(Request::create($url, method: 'POST', content: \json_encode($json, JSON_THROW_ON_ERROR)));

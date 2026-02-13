@@ -433,7 +433,6 @@
       if (beginsWithTopLevel.length) {
         const selector = beginsWithTopLevel[0].match(/[^\s]+/);
         return (
-          // eslint-disable-next-line prefer-template
           cssText.replace(selector, `@scope(${selector}) { ${scopeSelector}`) +
           ' } '
         );
@@ -445,7 +444,6 @@
 
     // Make the dialog-scoped CSS the contents of the style element.
     styleElement.innerHTML = [...stylesheet.cssRules].reduce(
-      // eslint-disable-next-line prefer-template
       (accumulated, rule) => accumulated + processRule(rule) + ' ',
       '',
     );

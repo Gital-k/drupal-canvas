@@ -9,7 +9,6 @@ import {
   useDeleteFolderMutation,
   useUpdateFolderMutation,
 } from '@/services/componentAndLayout';
-import { getCanvasSettings } from '@/utils/drupal-globals';
 
 import UnifiedMenu from '../UnifiedMenu';
 
@@ -55,7 +54,6 @@ const FolderList = ({
   ] = useDeleteFolderMutation();
   const inputRef = useRef<HTMLInputElement>(null);
   const isSubmittingRef = useRef(false);
-  const canvasSettings = getCanvasSettings();
 
   useEffect(() => {
     if (isRenaming && inputRef.current) {
@@ -175,12 +173,12 @@ const FolderList = ({
   );
 
   const handleNameDoubleClick = useCallback(() => {
-    // Only enable rename on double-click if devMode
-    // is enabled and not already renaming.
-    if (canvasSettings.devMode && !isRenaming) {
+    // Only enable rename on double-click if
+    // not already renaming.
+    if (!isRenaming) {
       setIsRenaming(true);
     }
-  }, [canvasSettings.devMode, isRenaming]);
+  }, [isRenaming]);
 
   const hasItems = getItemsLength() > 0;
 
@@ -280,10 +278,11 @@ const FolderList = ({
       nameSlot={nameSlot}
       errorSlot={errorSlot}
       count={getItemsLength()}
-      menuItems={isRenaming || !canvasSettings.devMode ? undefined : menuItems}
+      menuItems={isRenaming ? undefined : menuItems}
       isOpen={isFolderOpen}
       onOpenChange={setIsFolderOpen}
       onNameDoubleClick={handleNameDoubleClick}
+      weight={folder.weight}
     >
       {children}
     </SidebarFolder>
@@ -348,12 +347,13 @@ export const folderfyComponents = (
 export const sortFolderList = (
   folderComponents: Record<string, FolderInList>,
 ): FoldersInList => {
-  // Sorts the folders first by weight, then by name within the weights.
+  // Sorts the folders first by weight (ascending), then by name alphabetically.
+  // Folders without a weight are treated as weight 0.
   return folderComponents
     ? (Object.values(folderComponents).sort(
         (a: FolderInList, b: FolderInList) => {
-          const aWeight = a?.weight || 0;
-          const bWeight = b?.weight || 0;
+          const aWeight = a?.weight ?? 0;
+          const bWeight = b?.weight ?? 0;
           if (aWeight !== bWeight) {
             return aWeight - bWeight;
           }

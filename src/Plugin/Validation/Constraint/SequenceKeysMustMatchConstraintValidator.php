@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\canvas\Plugin\Validation\Constraint;
 
@@ -34,7 +34,9 @@ final class SequenceKeysMustMatchConstraintValidator extends SequenceDependentCo
 
     // Reuse the messages from the ValidKeysConstraint when missing or invalid
     // keys are found.
-    $valid_keys_constraint = new ValidKeysConstraint('<infer>');
+    $valid_keys_constraint = new ValidKeysConstraint([
+      'allowedKeys' => '<infer>',
+    ]);
     foreach ($missing_keys as $key) {
       $this->context->addViolation($valid_keys_constraint->missingRequiredKeyMessage, ['@key' => $key]);
     }

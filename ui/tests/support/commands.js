@@ -1,7 +1,6 @@
 import '@testing-library/cypress/add-commands.js';
 
-import { realType } from 'cypress-real-events'; // eslint-disable-line  @typescript-eslint/no-unused-vars
-
+import { realType } from 'cypress-real-events';
 import { queries } from '@testing-library/dom';
 
 import { realDnd } from './realDnd.js';
@@ -1384,6 +1383,5 @@ Cypress.Commands.add('insertComponent', (identifier, options = {}) => {
 // that would only fail if they occur faster than a user could reasonably
 // perform them.
 Cypress.Commands.add('reasonableWait', () => {
-  // eslint-disable-next-line cypress/no-unnecessary-waiting
   cy.wait(100);
 });

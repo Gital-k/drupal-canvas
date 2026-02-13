@@ -43,7 +43,7 @@ final class FieldPropExpression implements EntityFieldBasedPropExpressionInterfa
   ) {
     $bundles = $entityType->getBundles();
     if (is_array($bundles) && count($bundles) > 1) {
-      @trigger_error('Creating ' . __CLASS__ . ' that targets multiple bundles is deprecated in canvas:1.0.5 and will be removed from canvas:2.0.0. See https://www.drupal.org/node/3563451', E_USER_DEPRECATED);
+      @trigger_error('Creating ' . __CLASS__ . ' that targets multiple bundles is deprecated in canvas:1.1.0 and will be removed from canvas:2.0.0. See https://www.drupal.org/node/3563451', E_USER_DEPRECATED);
     }
     if (($bundles === NULL || count($bundles) <= 1) && is_array($fieldName) && count($fieldName) > 1) {
       throw new \InvalidArgumentException('When targeting a (single bundle of) an entity type, only a single field name can be specified.');
@@ -118,7 +118,7 @@ final class FieldPropExpression implements EntityFieldBasedPropExpressionInterfa
         // times (if different bundles use the same field). Ensure that every
         // bundle's field has a field property listed, even if the same field
         // (and hence field property) occurs multiple times.
-        TRUE => implode('|', array_map(
+        TRUE => implode('|', \array_map(
           fn (string $field_name): string => $this->propName[$field_name],
           // @phpstan-ignore-next-line argument.type
           $this->fieldName,
@@ -238,7 +238,7 @@ final class FieldPropExpression implements EntityFieldBasedPropExpressionInterfa
       $storage_deps,
     );
     ksort($dependencies);
-    return array_map(static function ($values) {
+    return \array_map(static function ($values) {
       $values = array_unique($values);
       sort($values);
       return $values;

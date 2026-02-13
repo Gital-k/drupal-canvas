@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
+use Drupal\canvas\Entity\Component;
+use Drupal\canvas\PropSource\PropSource;
 use Drupal\Core\Access\CsrfRequestHeaderAccessCheck;
 use Drupal\Core\Access\CsrfTokenGenerator;
 use Drupal\Core\Cache\CacheableJsonResponse;
@@ -34,11 +36,11 @@ use Drupal\Tests\canvas\Traits\AutoSaveManagerTestTrait;
 use Drupal\Tests\canvas\Traits\AutoSaveRequestTestTrait;
 use Drupal\Tests\canvas\Traits\CanvasFieldCreationTrait;
 use Drupal\Tests\canvas\Traits\CanvasFieldTrait;
-use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\canvas\Traits\OpenApiSpecTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use Drupal\user\Entity\User;
 use Drupal\user\UserInterface;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
@@ -47,10 +49,11 @@ use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
  * @coversDefaultClass \Drupal\canvas\Controller\ApiAutoSaveController
  * @group canvas
  * @group #slow
+ * @todo Refactor this to start using CanvasKernelTestBase and stop using CanvasTestSetup in https://www.drupal.org/project/canvas/issues/3531679
  */
+#[RunTestsInSeparateProcesses]
 final class ApiAutoSaveControllerTest extends KernelTestBase {
 
-  use ContribStrictConfigSchemaTestTrait;
   use AutoSaveManagerTestTrait;
   use AutoSaveRequestTestTrait;
   use UserCreationTrait;
@@ -65,7 +68,6 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
    * {@inheritdoc}
    */
   protected static $modules = [
-    'system',
     'path_alias',
     'path',
     'test_user_config',
@@ -77,8 +79,8 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
-    $this->installConfig('system');
     $this->installEntitySchema('path_alias');
+    // @todo Refactor this away in https://www.drupal.org/project/canvas/issues/3531679
     (new CanvasTestSetup())->setup();
   }
 
@@ -123,7 +125,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
         [
           "nodeType" => "component",
           "slots" => [],
-          "type" => "block.page_title_block@62af221149ae4887",
+          "type" => "block.page_title_block@" . Component::load('block.page_title_block')?->getActiveVersion(),
           "uuid" => "c3f3c22c-c22e-4bb6-ad16-635f069148e4",
         ],
       ],
@@ -399,7 +401,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
         [
           "nodeType" => "component",
           "slots" => [],
-          "type" => "block.page_title_block@62af221149ae4887",
+          "type" => "block.page_title_block@" . Component::load('block.page_title_block')?->getActiveVersion(),
           "uuid" => "c3f3c22c-c22e-4bb6-ad16-635f069148e4",
         ],
       ],
@@ -510,8 +512,8 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
           'heading' => 'Canvas is large and in charge!',
         ],
       ],
-      // The node body, which needs to be using a dynamic prop source
-      // because all content templates require at least one dynamic prop
+      // The node body, which needs to be using a entity field prop source
+      // because all content templates require at least one entity field prop
       // source.
       [
         'uuid' => '6cf8297a-fc60-4019-be81-c336fd828c39',
@@ -519,7 +521,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
         'component_version' => 'b1e991f726a2a266',
         'inputs' => [
           'heading' => [
-            'sourceType' => 'dynamic',
+            'sourceType' => PropSource::EntityField->value,
             'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
           ],
         ],
@@ -629,7 +631,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
           [
             "nodeType" => "component",
             "slots" => [],
-            "type" => "block.page_title_block@62af221149ae4887",
+            "type" => "block.page_title_block@" . Component::load('block.page_title_block')?->getActiveVersion(),
             "uuid" => "c3f3c22c-c22e-4bb6-ad16-635f069148e4",
           ],
         ],
@@ -765,7 +767,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
       ],
     ];
     $errors[] = [
-      'detail' => 'Unable to find class/interface "unknown" specified in the prop "mixed_up_prop" for the component "canvas:test-component".',
+      'detail' => "In component canvas:test-component:\nUnable to find class/interface \"unknown\" specified in the prop \"mixed_up_prop\" for the component \"canvas:test-component\".",
       'source' => [
         'pointer' => '',
       ],
@@ -777,6 +779,12 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
         ApiAutoSaveController::AUTO_SAVE_KEY => $autoSave->getAutoSaveKey($code_component),
       ],
     ];
+    // Strip out the prefix added by https://www.drupal.org/node/3549909. This
+    // can be removed when 11.3 is the minimum supported version of core.
+    if (version_compare(\Drupal::VERSION, '11.3', '<')) {
+      $index = count($errors) - 1;
+      $errors[$index]['detail'] = substr($errors[$index]['detail'], 36);
+    }
     $errors[] = [
       'detail' => "'enum' is an unknown key because props.mixed_up_prop.type is unknown (see config schema type canvas.json_schema.prop.*).",
       'source' => [
@@ -1299,7 +1307,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     $auto_save_data = $this->getAutoSaveStatesFromServer();
     $publish_data = array_combine(
       $auto_save_keys_to_publish,
-      array_map(
+      \array_map(
         fn (string $auto_save_key) => $auto_save_data[$auto_save_key],
         $auto_save_keys_to_publish
       ),

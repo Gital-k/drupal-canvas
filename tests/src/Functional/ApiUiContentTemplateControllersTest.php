@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Functional;
 
+use Drupal\canvas\PropSource\PropSource;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Url;
 use Drupal\canvas\Entity\ContentTemplate;
@@ -12,11 +13,13 @@ use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\canvas\Traits\OpenApiSpecTrait;
 use Drupal\user\UserInterface;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
  * @group canvas
  */
+#[RunTestsInSeparateProcesses]
 final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
 
   use GenerateComponentConfigTrait;
@@ -153,51 +156,51 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
 
   public static function providerSuggestPropSources(): \Generator {
     $choice_article_title = [
-      'source' => ['sourceType' => 'dynamic', 'expression' => 'ℹ︎␜entity:node:article␝title␞␟value'],
+      'source' => ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:article␝title␞␟value'],
       'label' => "Title",
     ];
     $choice_article_image = [
-      'source' => ['sourceType' => 'dynamic', 'expression' => 'ℹ︎␜entity:node:article␝field_silly_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}'],
+      'source' => ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:article␝field_silly_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}'],
       'label' => "Silly image 🤡",
     ];
     $choice_article_author_name = [
       'source' => [
-        'sourceType' => 'dynamic',
+        'sourceType' => PropSource::EntityField->value,
         'expression' => 'ℹ︎␜entity:node:article␝uid␞␟entity␜␜entity:user␝name␞␟value',
       ],
       'label' => 'Name',
     ];
     $choice_article_author_picture_alt = [
       'source' => [
-        'sourceType' => 'dynamic',
+        'sourceType' => PropSource::EntityField->value,
         'expression' => 'ℹ︎␜entity:node:article␝uid␞␟entity␜␜entity:user␝user_picture␞␟alt',
       ],
       'label' => 'Alternative text',
     ];
     $choice_article_author_picture_title = [
       'source' => [
-        'sourceType' => 'dynamic',
+        'sourceType' => PropSource::EntityField->value,
         'expression' => 'ℹ︎␜entity:node:article␝uid␞␟entity␜␜entity:user␝user_picture␞␟title',
       ],
       'label' => 'Title',
     ];
     $choice_article_revision_user_name = [
       'source' => [
-        'sourceType' => 'dynamic',
+        'sourceType' => PropSource::EntityField->value,
         'expression' => 'ℹ︎␜entity:node:article␝revision_uid␞␟entity␜␜entity:user␝name␞␟value',
       ],
       'label' => 'Name',
     ];
     $choice_article_revision_user_picture_alt = [
       'source' => [
-        'sourceType' => 'dynamic',
+        'sourceType' => PropSource::EntityField->value,
         'expression' => 'ℹ︎␜entity:node:article␝revision_uid␞␟entity␜␜entity:user␝user_picture␞␟alt',
       ],
       'label' => 'Alternative text',
     ];
     $choice_article_revision_user_picture_title = [
       'source' => [
-        'sourceType' => 'dynamic',
+        'sourceType' => PropSource::EntityField->value,
         'expression' => 'ℹ︎␜entity:node:article␝revision_uid␞␟entity␜␜entity:user␝user_picture␞␟title',
       ],
       'label' => 'Title',
@@ -225,7 +228,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
           [
             'id' => '67f45d35294a49e0',
             'source' => [
-              'sourceType' => 'dynamic',
+              'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:user␝name␞␟value',
             ],
             'label' => 'Name',
@@ -273,7 +276,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
                   [
                     'id' => '0bded99fb661deb7',
                     'source' => [
-                      'sourceType' => 'dynamic',
+                      'sourceType' => PropSource::EntityField->value,
                       'expression' => 'ℹ︎␜entity:node:article␝uid␞␟entity␜␜entity:user␝user_picture␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
                     ],
                     'label' => 'Picture',
@@ -291,7 +294,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
                   [
                     'id' => '32b7fa7b2bad34a6',
                     'source' => [
-                      'sourceType' => 'dynamic',
+                      'sourceType' => PropSource::EntityField->value,
                       'expression' => 'ℹ︎␜entity:node:article␝revision_uid␞␟entity␜␜entity:user␝user_picture␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
                     ],
                     'label' => 'Picture',
@@ -322,7 +325,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
           [
             'id' => '57e3db5a8919b50e',
             'source' => [
-              'sourceType' => 'dynamic',
+              'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:user␝user_picture␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
             ],
             'label' => 'Picture',
@@ -342,7 +345,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
               [
                 'id' => '6f972dac9b3e8954',
                 'source' => [
-                  'sourceType' => 'dynamic',
+                  'sourceType' => PropSource::EntityField->value,
                   'expression' => 'ℹ︎␜entity:node:article␝field_screenshots␞␟alt',
                 ],
                 'label' => 'Alternative text',
@@ -350,7 +353,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
               [
                 'id' => '1138e38cc9e6b7dd',
                 'source' => [
-                  'sourceType' => 'dynamic',
+                  'sourceType' => PropSource::EntityField->value,
                   'expression' => 'ℹ︎␜entity:node:article␝field_screenshots␞␟title',
                 ],
                 'label' => 'Title',
@@ -365,7 +368,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
                   [
                     'id' => '563f6a4e0001da4c',
                     'source' => [
-                      'sourceType' => 'dynamic',
+                      'sourceType' => PropSource::EntityField->value,
                       'expression' => 'ℹ︎␜entity:node:article␝field_tags␞␟entity␜␜entity:node␝title␞␟value',
                     ],
                     'label' => 'Title',
@@ -392,7 +395,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
               [
                 'id' => '82ec95693bc89080',
                 'source' => [
-                  'sourceType' => 'dynamic',
+                  'sourceType' => PropSource::EntityField->value,
                   'expression' => 'ℹ︎␜entity:node:article␝field_silly_image␞␟alt',
                 ],
                 'label' => "Alternative text",
@@ -400,7 +403,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
               [
                 'id' => '1409e675864fd2e6',
                 'source' => [
-                  'sourceType' => 'dynamic',
+                  'sourceType' => PropSource::EntityField->value,
                   'expression' => 'ℹ︎␜entity:node:article␝field_silly_image␞␟title',
                 ],
                 'label' => "Title",
@@ -449,7 +452,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
           [
             'id' => '441f35fe6e2feefd',
             "source" => [
-              'sourceType' => 'dynamic',
+              'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:node:article␝field_screenshots␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
             ],
             'label' => "field_screenshots",
@@ -470,7 +473,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
               [
                 'id' => '82ec95693bc89080',
                 'source' => [
-                  'sourceType' => 'dynamic',
+                  'sourceType' => PropSource::EntityField->value,
                   'expression' => 'ℹ︎␜entity:node:article␝field_silly_image␞␟alt',
                 ],
                 'label' => "Alternative text",
@@ -478,7 +481,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
               [
                 'id' => '1409e675864fd2e6',
                 'source' => [
-                  'sourceType' => 'dynamic',
+                  'sourceType' => PropSource::EntityField->value,
                   'expression' => 'ℹ︎␜entity:node:article␝field_silly_image␞␟title',
                 ],
                 'label' => "Title",
@@ -527,7 +530,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
           [
             'id' => '4999dcb72722c69a',
             'source' => [
-              'sourceType' => 'dynamic',
+              'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:node:article␝field_silly_image␞␟src_with_alternate_widths',
             ],
             'label' => 'Silly image 🤡',
@@ -539,7 +542,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
                   [
                     'id' => '134a8de6cbb83338',
                     'source' => [
-                      'sourceType' => 'dynamic',
+                      'sourceType' => PropSource::EntityField->value,
                       'expression' => 'ℹ︎␜entity:node:article␝uid␞␟entity␜␜entity:user␝user_picture␞␟src_with_alternate_widths',
                     ],
                     'label' => 'Picture',
@@ -550,7 +553,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
               [
                 'id' => '40aec6943bb1f70a',
                 'source' => [
-                  'sourceType' => 'dynamic',
+                  'sourceType' => PropSource::EntityField->value,
                   'expression' => 'ℹ︎␜entity:node:article␝uid␞␟url',
                 ],
                 'label' => 'URL',
@@ -565,7 +568,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
                   [
                     'id' => '5b16c0771fff7364',
                     'source' => [
-                      'sourceType' => 'dynamic',
+                      'sourceType' => PropSource::EntityField->value,
                       'expression' => 'ℹ︎␜entity:node:article␝revision_uid␞␟entity␜␜entity:user␝user_picture␞␟src_with_alternate_widths',
                     ],
                     'label' => 'Picture',
@@ -576,7 +579,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
               [
                 'id' => 'f406165063d98f55',
                 'source' => [
-                  'sourceType' => 'dynamic',
+                  'sourceType' => PropSource::EntityField->value,
                   'expression' => 'ℹ︎␜entity:node:article␝revision_uid␞␟url',
                 ],
                 'label' => 'URL',
@@ -587,7 +590,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
           [
             'id' => '51af7eb3ee57c3a5',
             'source' => [
-              'sourceType' => 'host-entity-url',
+              'sourceType' => PropSource::HostEntityUrl->value,
               'absolute' => FALSE,
             ],
             'label' => 'Relative URL',

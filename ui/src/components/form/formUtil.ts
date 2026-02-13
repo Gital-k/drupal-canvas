@@ -8,6 +8,7 @@ import { getDrupal } from '@/utils/drupal-globals';
 import transforms from '@/utils/transforms';
 
 import type * as React from 'react';
+import type { PropsValues } from '@drupal-canvas/types';
 import type { SchemaObject, ValidateFunction } from 'ajv';
 import type { ParsedQs } from 'qs';
 import type {
@@ -21,7 +22,7 @@ import type {
   FieldDataItem,
   PropSourceComponent,
 } from '@/types/Component';
-import type { InputUIData, PropsValues } from '@/types/Form';
+import type { InputUIData } from '@/types/Form';
 import type { TransformConfig, Transforms } from '@/utils/transforms';
 
 const ajv = new Ajv();

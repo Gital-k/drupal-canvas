@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
+use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ComponentTreeEntityInterface;
 use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\canvas\PropSource\PropSource;
 use Drupal\canvas\Storage\ComponentTreeLoader;
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\EntityInterface;
@@ -27,6 +29,7 @@ use Drupal\user\Entity\User;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 /**
@@ -34,6 +37,7 @@ use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
  * @group canvas
  * @group #slow
  */
+#[RunTestsInSeparateProcesses]
 class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
 
   /**
@@ -84,7 +88,8 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
 
     $top_level_component_uuid = '5f71027b-d9d3-4f3d-8990-a6502c0ba676';
     $nested_component_uuid = '8caf6e23-8fb4-4524-bdb6-f57a2a6e7859';
-    // Add a heading populated by a dynamic prop source using the `title` field.
+    // Add a heading populated by an entity field prop source using the `title`
+    // field.
     $components = [
       [
         'uuid' => $top_level_component_uuid,
@@ -92,7 +97,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
         'component_version' => '85a5c0c7dd53e0bb',
         'inputs' => [
           'heading' => [
-            'sourceType' => 'dynamic',
+            'sourceType' => PropSource::EntityField->value,
             'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
           ],
         ],
@@ -103,7 +108,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
         'component_version' => 'b1e991f726a2a266',
         'inputs' => [
           'heading' => [
-            'sourceType' => 'dynamic',
+            'sourceType' => PropSource::EntityField->value,
             'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
           ],
         ],
@@ -137,7 +142,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
       self::assertSame($expected_title, (string) $this->cssSelect('[data-component-id="canvas_test_sdc:props-slots"] [data-component-id="canvas_test_sdc:props-no-slots"] > h1')[0]);
     };
 
-    // Assert the original resolved dynamic prop source + resulting HTML.
+    // Assert the original resolved entity field prop source + resulting HTML.
     $response = $this->request($get_layout_api_request);
     self::assertInstanceOf(JsonResponse::class, $response);
     $title_matches_resolved_and_html('Canvas Needs This For The Time Being', $response);
@@ -188,7 +193,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
         [
           "nodeType" => "component",
           "slots" => [],
-          "type" => "block.page_title_block@62af221149ae4887",
+          "type" => "block.page_title_block@" . Component::load('block.page_title_block')?->getActiveVersion(),
           "uuid" => "c3f3c22c-c22e-4bb6-ad16-635f069148e4",
         ],
       ],
@@ -225,7 +230,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
       [
         "nodeType" => "component",
         "slots" => [],
-        "type" => "block.page_title_block@62af221149ae4887",
+        "type" => "block.page_title_block@" . Component::load('block.page_title_block')?->getActiveVersion(),
         "uuid" => "c3f3c22c-c22e-4bb6-ad16-635f069148e4",
         'name' => NULL,
       ],
@@ -274,7 +279,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
       [
         "nodeType" => "component",
         "slots" => [],
-        "type" => "block.page_title_block@62af221149ae4887",
+        "type" => "block.page_title_block@" . Component::load('block.page_title_block')?->getActiveVersion(),
         "uuid" => "c3f3c22c-c22e-4bb6-ad16-635f069148e4",
         'name' => NULL,
       ],
@@ -302,7 +307,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
       [
         "nodeType" => "component",
         "slots" => [],
-        "type" => "block.page_title_block@62af221149ae4887",
+        "type" => "block.page_title_block@" . Component::load('block.page_title_block')?->getActiveVersion(),
         'name' => NULL,
       ],
     ],
@@ -347,7 +352,9 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
             "nodeType" => "component",
             'name' => NULL,
             "slots" => [],
-            "type" => "block.page_title_block@62af221149ae4887",
+            // The component version may vary depending on upstream changes in
+            // core.
+            "type" => "block.page_title_block@" . Component::load('block.page_title_block')?->getActiveVersion(),
           ],
         ],
           // Filter out the UUID as that is added randomly by creating the block
@@ -361,7 +368,9 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
         $this->assertSame([
           [
             "nodeType" => "component",
-            "type" => "block.system_messages_block@b92f802cf68eb83e",
+            // The component version may vary depending on upstream changes in
+            // core.
+            "type" => "block.system_messages_block@" . Component::load('block.system_messages_block')?->getActiveVersion(),
             'name' => NULL,
             "slots" => [],
           ],

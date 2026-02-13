@@ -5,31 +5,31 @@ declare(strict_types=1);
 namespace Drupal\Tests\canvas\Kernel;
 
 use ColinODell\PsrTestLogger\TestLogger;
+use Drupal\canvas\PropSource\PropSource;
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\EntityHandlers\ContentTemplateAwareViewBuilder;
 use Drupal\filter\Entity\FilterFormat;
-use Drupal\KernelTests\KernelTestBase;
 use Drupal\node\NodeInterface;
 use Drupal\Tests\canvas\Traits\CanvasFieldCreationTrait;
-use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\canvas\Traits\SingleDirectoryComponentTreeTestTrait;
 use Drupal\Tests\canvas\Traits\CrawlerTrait;
 use Drupal\Tests\node\Traits\ContentTypeCreationTrait;
 use Drupal\Tests\node\Traits\NodeCreationTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\Attributes\TestWith;
 
 /**
  * @covers \Drupal\canvas\EntityHandlers\ContentTemplateAwareViewBuilder
  * @group canvas
  */
-final class NodeTemplatesTest extends KernelTestBase {
+#[RunTestsInSeparateProcesses]
+final class NodeTemplatesTest extends CanvasKernelTestBase {
 
-  use ContribStrictConfigSchemaTestTrait;
   use SingleDirectoryComponentTreeTestTrait;
   use GenerateComponentConfigTrait;
   use ContentTypeCreationTrait;
@@ -51,23 +51,9 @@ final class NodeTemplatesTest extends KernelTestBase {
    * {@inheritdoc}
    */
   protected static $modules = [
-    'canvas',
-    'system',
-    'ckeditor5',
-    'editor',
-    'filter',
-    'options',
-    'text',
-    'field',
-    'image',
-    'file',
-    'user',
     'node',
-    'datetime',
+    'field',
     'canvas_test_rendering',
-    'canvas_test_sdc',
-    'media',
-    'link',
   ];
 
   /**
@@ -75,11 +61,11 @@ final class NodeTemplatesTest extends KernelTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
-    $this->container->get('theme_installer')->install(['stark']);
     $this->installEntitySchema('user');
     $this->installEntitySchema('media');
     $this->installEntitySchema('node');
-    $this->installConfig(['node', 'system', 'filter']);
+    $this->installEntitySchema('path_alias');
+    $this->installConfig(['node', 'filter']);
     $this->installConfig(['canvas']);
     $this->createContentType(['type' => 'article']);
     $this->generateComponentConfig();
@@ -117,7 +103,7 @@ final class NodeTemplatesTest extends KernelTestBase {
     FALSE,
     [
       // Components in the component tree — minus the ones whose props failed to
-      // resolve because they were inaccessible: DynamicPropSources populated by
+      // resolve because they were inaccessible: EntityFieldPropSources populated by
       // the host entity.
       'config:canvas.component.sdc.canvas_test_sdc.my-hero',
       // @todo Stop expecting this cache tag in https://www.drupal.org/i/3559820
@@ -144,35 +130,35 @@ final class NodeTemplatesTest extends KernelTestBase {
             // Tests static prop source end-to-end.
             // @see \Drupal\canvas\PropSource\StaticPropSource
             'heading' => 'Canvas is large and in charge!',
-            // Tests adapted dynamic prop source end-to-end.
-            // @see \Drupal\canvas\PropSource\DynamicPropSource::__construct(adapter)
+            // Tests adapted entity field prop source end-to-end.
+            // @see \Drupal\canvas\PropSource\EntityFieldPropSource::__construct(adapter)
             'subheading' => [
-              'sourceType' => 'dynamic',
+              'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:node:article␝created␞␟value',
               'adapter' => 'unix_to_date',
             ],
-            // Tests dynamic prop source end-to-end.
-            // @see \Drupal\canvas\PropSource\DynamicPropSource
+            // Tests entity field prop source end-to-end.
+            // @see \Drupal\canvas\PropSource\EntityFieldPropSource
             'cta1' => [
-              'sourceType' => 'dynamic',
+              'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
             ],
             // Tests host entity URL prop source end-to-end.
             // @see \Drupal\canvas\PropSource\HostEntityUrlPropSource
             'cta1href' => [
-              'sourceType' => 'host-entity-url',
+              'sourceType' => PropSource::HostEntityUrl->value,
             ],
           ],
         ],
-        // The node body, which needs to be using a dynamic prop source
-        // because all content templates require at least one dynamic prop
+        // The node body, which needs to be using a entity field prop source
+        // because all content templates require at least one entity field prop
         // source.
         [
           'uuid' => '6cf8297a-fc60-4019-be81-c336fd828c39',
           'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
           'inputs' => [
             'heading' => [
-              'sourceType' => 'dynamic',
+              'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:node:article␝body␞␟processed',
             ],
           ],
@@ -321,7 +307,7 @@ HTML;
           'component_version' => '85a5c0c7dd53e0bb',
           'inputs' => [
             'heading' => [
-              'sourceType' => 'dynamic',
+              'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
             ],
           ],
@@ -385,8 +371,7 @@ HTML;
       // Components in the component tree.
       'config:canvas.component.sdc.canvas_test_sdc.props-slots',
       'config:canvas.component.sdc.canvas_test_sdc.props-no-slots',
-      // Dynamic prop sources that pulled data from the entity should propagate the entity's
-      // cache tags.
+      // Entity field prop sources should propagate the entity's cache tags.
       'node:1',
     ], $build['#cache']['tags']);
     self::assertEqualsCanonicalizing(self::REQUIRED_CACHE_CONTEXTS, $build['#cache']['contexts']);

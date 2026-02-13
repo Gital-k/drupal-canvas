@@ -135,7 +135,7 @@ final class PageRegion extends ComponentTreeConfigEntityBase {
   public function getComponentTree(): ComponentTreeItemList {
     \assert(is_array($this->component_tree));
 
-    $field_items = $this->createDanglingComponentTreeItemList();
+    $field_items = $this->createDanglingComponentTreeItemList($this);
     $field_items->setValue(\array_values($this->component_tree ?? []));
 
     return $field_items;
@@ -180,7 +180,7 @@ final class PageRegion extends ComponentTreeConfigEntityBase {
   public static function loadForActiveThemeByClientSideId(): array {
     $regions = self::loadForActiveTheme();
     return array_combine(
-      array_map(fn(PageRegion $r) => $r->get('region'), $regions),
+      \array_map(fn(PageRegion $r) => $r->get('region'), $regions),
       $regions,
     );
   }
@@ -229,7 +229,7 @@ final class PageRegion extends ComponentTreeConfigEntityBase {
       fn ($s) => $s !== CanvasPageVariant::MAIN_CONTENT_REGION,
     );
 
-    $blocks = \Drupal::service('entity_type.manager')->getStorage('block')->loadByProperties(['theme' => $theme]);
+    $blocks = \Drupal::service('entity_type.manager')->getStorage('block')->loadByProperties(['theme' => $theme, 'status' => TRUE]);
 
     $regions = [];
     foreach ($blocks as $block) {
@@ -262,7 +262,7 @@ final class PageRegion extends ComponentTreeConfigEntityBase {
     foreach ($region_names as $region_name) {
       $items = [];
       if (isset($regions[$region_name])) {
-        $items = array_map(
+        $items = \array_map(
           static fn(array $block) => \array_intersect_key($block, \array_flip([
             'component_id',
             'component_version',

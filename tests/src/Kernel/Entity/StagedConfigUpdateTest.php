@@ -11,39 +11,34 @@ use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
 use Drupal\Core\DependencyInjection\ServiceModifierInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\Core\Recipe\InvalidConfigException;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Entity\StagedConfigUpdate;
 use Drupal\canvas\EntityHandlers\StagedConfigUpdateStorage;
-use Drupal\KernelTests\KernelTestBase;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 #[Group('canvas')]
 #[CoversClass(StagedConfigUpdate::class)]
 #[CoversClass(StagedConfigUpdateStorage::class)]
-final class StagedConfigUpdateTest extends KernelTestBase implements ServiceModifierInterface {
+#[RunTestsInSeparateProcesses]
+final class StagedConfigUpdateTest extends CanvasKernelTestBase implements ServiceModifierInterface {
 
   use UserCreationTrait;
 
-  protected bool $usesSuperUserAccessPolicy = FALSE;
+  /**
+   * {@inheritdoc}
+   *
+   * @see ::testSavingWhichLeadsToInvalidSchema()
+   */
+  protected $strictConfigSchema = FALSE;
 
-  protected static $modules = [
-    'canvas',
-    'user',
-    'system',
-    'datetime',
-    'file',
-    'image',
-    'options',
-    'path',
-    'link',
-    'text',
-    'media',
-    'system',
-  ];
+  protected bool $usesSuperUserAccessPolicy = FALSE;
 
   private bool $markSystemSiteFullyValidated = FALSE;
 
@@ -54,8 +49,13 @@ final class StagedConfigUpdateTest extends KernelTestBase implements ServiceModi
    *
    * @see testSavingWhichLeadsToInvalidSchema()
    * @see makeSystemSiteValidated()
+   *
+   * @todo Remove this alter hook once Drupal 11.3 is the minimum supported version, as kernel tests implementing hooks is only supported in Drupal 11.3 and later.
    */
   public function alter(ContainerBuilder $container): void {
+    if (version_compare(\Drupal::VERSION, '11.3', '>=')) {
+      return;
+    }
     $container->register(self::class)
       ->setClass(self::class)
       ->addTag('kernel.event_listener', [
@@ -79,6 +79,7 @@ final class StagedConfigUpdateTest extends KernelTestBase implements ServiceModi
    * @see testSavingWhichLeadsToInvalidSchema()
    * @see https://www.drupal.org/project/drupal/issues/3443432
    */
+  #[Hook('config_schema_info_alter')]
   public function makeSystemSiteValidated(array &$definitions): void {
     if ($this->markSystemSiteFullyValidated === TRUE) {
       $definitions['system.site']['constraints']['FullyValidatable'] = NULL;
@@ -277,7 +278,6 @@ final class StagedConfigUpdateTest extends KernelTestBase implements ServiceModi
   }
 
   public function testSavingUpdatesConfig(): void {
-    $this->installConfig(['system']);
     $this->assertSiteConfig([]);
 
     $sut = $this->container->get('entity_type.manager')
@@ -323,10 +323,11 @@ final class StagedConfigUpdateTest extends KernelTestBase implements ServiceModi
    * This test proves this case and the need for ApiAutoSaveController::post to
    * use a database transaction to roll back the changes if an exception is
    * thrown.
+   *
+   * @see \Drupal\Core\Config\Action\ConfigActionManager::applyAction()
    */
   public function testSavingWhichLeadsToInvalidSchema(): void {
     $this->markSystemSiteFullyValidated = TRUE;
-    $this->installConfig(['system']);
     $this->assertSiteConfig([]);
 
     $sut = $this->container->get('entity_type.manager')
@@ -392,8 +393,7 @@ final class StagedConfigUpdateTest extends KernelTestBase implements ServiceModi
 
   #[DataProvider('accessProvider')]
   public function testAccess(array $data, array $permissions, string $op, bool $allowed, string $reason): void {
-    $this->installConfig(['system']);
-
+    $this->installEntitySchema('path_alias');
     $this->installEntitySchema('user');
     $account = $this->createUser($permissions);
     self::assertNotFalse($account);

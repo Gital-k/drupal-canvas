@@ -327,7 +327,7 @@ export const layoutModelSlice = createSlice({
         }
 
         let updatedModel: ComponentModels = { ...state.model };
-        let newLayout: Array<RegionNode> = JSON.parse(
+        const newLayout: Array<RegionNode> = JSON.parse(
           JSON.stringify(state.layout),
         );
         const components = layoutModel.layout;
@@ -438,6 +438,9 @@ export const layoutModelSlice = createSlice({
     ),
     setInitialized: create.reducer((state, action: PayloadAction<boolean>) => {
       state.isInitialized = action.payload;
+      if (!action.payload) {
+        state.updatePreview = false;
+      }
     }),
     setLayoutModel: create.reducer(
       (state, action: PayloadAction<LayoutModelSliceState>) => {

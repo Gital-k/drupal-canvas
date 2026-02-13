@@ -14,7 +14,6 @@ use Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource\ComponentSourceTest
 use Drupal\Tests\canvas\Kernel\Traits\CiModulePathTrait;
 use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
 use Drupal\Tests\canvas\Traits\SingleDirectoryComponentTreeTestTrait;
-use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\canvas\Traits\CrawlerTrait;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
@@ -31,7 +30,6 @@ use Drupal\canvas_personalization\Plugin\Canvas\ComponentSource\Personalization;
 final class PersonalizationTest extends ComponentSourceTestBase {
 
   use ConstraintViolationsTestTrait;
-  use ContribStrictConfigSchemaTestTrait;
   use SingleDirectoryComponentTreeTestTrait;
   use GenerateComponentConfigTrait;
   use CiModulePathTrait;
@@ -45,14 +43,8 @@ final class PersonalizationTest extends ComponentSourceTestBase {
    */
   protected static $modules = [
     'canvas_personalization',
-    'canvas_test_sdc',
-    'image',
-    'media',
     'node',
-    'path',
-    'user',
     'field',
-    'text',
     // @todo Remove once ComponentSourceInterface is a public API, i.e. after https://www.drupal.org/i/3520484#stable is done.
     'canvas_dev_mode',
   ];

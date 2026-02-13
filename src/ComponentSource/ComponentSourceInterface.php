@@ -35,15 +35,25 @@ use Symfony\Component\Validator\ConstraintViolationListInterface;
  * Not all component sources support slots. A source that supports slots should
  * implement \Drupal\canvas\ComponentSource\ComponentSourceWithSlotsInterface.
  *
- * @phpstan-import-type PropSourceArray from \Drupal\canvas\PropSource\PropSourceBase
- * @phpstan-import-type SingleComponentInputArray from \Drupal\canvas\Plugin\DataType\ComponentInputs
- * @phpstan-import-type OptimizedExplicitInput from \Drupal\canvas\Plugin\DataType\ComponentInputs
- * @phpstan-import-type OptimizedSingleComponentInputArray from \Drupal\canvas\Plugin\DataType\ComponentInputs
+ * This interface handles all component instance concerns besides updating. Some
+ * concerns are optional, and have explicit handlers:
+ * - discovery: a ComponentCandidatesDiscoveryInterface — handles discovering
+ *   components in this source
+ * - updater: a ComponentInstanceUpdaterInterface — handles updating existing
+ *   component instances to the active (aka latest) version of the Component
+ *   config entity
  *
  * @see \Drupal\canvas\Attribute\ComponentSource
  * @see \Drupal\canvas\ComponentSource\ComponentSourceBase
  * @see \Drupal\canvas\ComponentSource\ComponentSourceManager
  * @see \Drupal\canvas\ComponentSource\ComponentSourceWithSlotsInterface
+ * @see \Drupal\canvas\ComponentSource\ComponentCandidatesDiscoveryInterface
+ * @see \Drupal\canvas\ComponentSource\ComponentInstanceUpdaterInterface
+ *
+ * @phpstan-import-type PropSourceArray from \Drupal\canvas\PropSource\PropSourceBase
+ * @phpstan-import-type SingleComponentInputArray from \Drupal\canvas\Plugin\DataType\ComponentInputs
+ * @phpstan-import-type OptimizedExplicitInput from \Drupal\canvas\Plugin\DataType\ComponentInputs
+ * @phpstan-import-type OptimizedSingleComponentInputArray from \Drupal\canvas\Plugin\DataType\ComponentInputs
  */
 interface ComponentSourceInterface extends PluginInspectionInterface, DerivativeInspectionInterface, ConfigurableInterface, DependentPluginInterface, ContextAwarePluginInterface {
 
@@ -139,9 +149,9 @@ interface ComponentSourceInterface extends PluginInspectionInterface, Derivative
    *
    * @param \Drupal\Core\Entity\FieldableEntityInterface|null $host_entity
    *   Host entity. Required when a component instance has inputs populated by
-   *   DynamicPropSources AND the parent entity of $item is not the host entity
-   *   to use during evaluation of the DynamicPropSources. (Typically: when
-   *   this is a component instance in a ContentTemplate.)
+   *   EntityFieldPropSources AND the parent entity of $item is not the host
+   *   entity to use during evaluation of the EntityFieldPropSources.
+   *   (Typically: when this is a component instance in a ContentTemplate.)
    *
    * @todo Add ::getImplicitInput() in https://www.drupal.org/project/canvas/issues/3485502 — SDCs don't have implicit inputs, but Block plugins do: contexts
    */
@@ -253,7 +263,7 @@ interface ComponentSourceInterface extends PluginInspectionInterface, Derivative
    *   Client model for this component.
    * @param \Drupal\Core\Entity\FieldableEntityInterface|null $host_entity
    *   Host entity. Required when a component instance has inputs populated by
-   *   DynamicPropSources.
+   *   EntityFieldPropSources.
    * @param \Symfony\Component\Validator\ConstraintViolationListInterface|null $violations
    *   If validation should be performed, a violation constraint list, or NULL
    *   otherwise. Use ::addViolation to add violations detected during
@@ -264,7 +274,7 @@ interface ComponentSourceInterface extends PluginInspectionInterface, Derivative
    *
    * @see ::inputToClientModel()
    * @see \Drupal\canvas\AutoSave\AutoSaveManager::saveComponentInstanceFormViolations
-   * @see \Drupal\canvas\PropSource\DynamicPropSource
+   * @see \Drupal\canvas\PropSource\EntityFieldPropSource
    * @todo Refactor to use the Symfony denormalizer infrastructure?
    */
   public function clientModelToInput(string $component_instance_uuid, Component $component, array $client_model, ?FieldableEntityInterface $host_entity, ?ConstraintViolationListInterface $violations = NULL): array;

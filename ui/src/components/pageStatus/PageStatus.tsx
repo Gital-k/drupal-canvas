@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router';
 import { Badge } from '@radix-ui/themes';
+import { skipToken } from '@reduxjs/toolkit/query';
 
 import { useAppDispatch } from '@/app/hooks';
 import { HOMEPAGE_CONFIG_ID } from '@/components/pageInfo/PageInfo';
@@ -56,7 +57,11 @@ const PageStatus = () => {
     useGetAllPendingChangesQuery();
   const { entityType, entityId } = useParams();
   const [hasAutoSave, setHasAutoSave] = useState(false);
-  const { data: fetchedLayout, isError } = useGetPageLayoutQuery();
+  // skipToken prevents the query from running until both args are defined.
+  // "Pass skipToken to a query selector to have that selector return an uninitialized state."
+  const { data: fetchedLayout, isError } = useGetPageLayoutQuery(
+    entityId && entityType ? { entityId, entityType } : skipToken,
+  );
   const dispatch = useAppDispatch();
 
   useEffect(() => {

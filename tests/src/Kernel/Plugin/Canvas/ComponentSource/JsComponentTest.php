@@ -43,6 +43,7 @@ use Drupal\canvas\PropSource\StaticPropSource;
 use Drupal\canvas\Render\ImportMapResponseAttachmentsProcessor;
 use Drupal\media\Entity\MediaType;
 use Drupal\canvas_test_code_components\Hook\IslandCastaway;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
  * Tests JsComponent.
@@ -54,6 +55,7 @@ use Drupal\canvas_test_code_components\Hook\IslandCastaway;
  *
  * @phpstan-import-type ComponentConfigEntityId from \Drupal\canvas\Entity\Component
  */
+#[RunTestsInSeparateProcesses]
 final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSourceBaseTestBase {
 
   use CiModulePathTrait;
@@ -78,8 +80,6 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
     'canvas_test_code_components',
     // For testing a code component using the "video" prop shape.
     'field',
-    'media_library',
-    'views',
     'canvas_test_video_fixture',
   ];
 
@@ -387,7 +387,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
     // ⚠️ The `'html'` expectations are tested separately for this very complex
     // rendering.
     // @see ::testRenderComponent()
-    $rendered_without_html = array_map(
+    $rendered_without_html = \array_map(
       fn($expectations) => array_diff_key($expectations, ['html' => NULL]),
       $rendered,
     );
@@ -411,37 +411,38 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
         [
           'rel' => 'modulepreload',
           'fetchpriority' => 'high',
-          'href' => \sprintf('%s/ui/lib/astro-hydration/dist/signals.module.js?2.1.0-alpha3', $module_path),
+          'href' => \sprintf('%s/packages/astro-hydration/dist/signals.module.js?2.1.0-alpha3', $module_path),
         ],
       ],
       [
         [
           'rel' => 'modulepreload',
           'fetchpriority' => 'high',
-          'href' => \sprintf('%s/ui/lib/astro-hydration/dist/preload-helper.js?2.1.0-alpha3', $module_path),
+          'href' => \sprintf('%s/packages/astro-hydration/dist/preload-helper.js?2.1.0-alpha3', $module_path),
         ],
       ],
     ];
     $default_imports = [
       ImportMapResponseAttachmentsProcessor::GLOBAL_IMPORTS => [
-        'preact' => \sprintf('%s/ui/lib/astro-hydration/dist/preact.module.js?2.1.0-alpha3', $module_path),
-        'preact/hooks' => \sprintf('%s/ui/lib/astro-hydration/dist/hooks.module.js?2.1.0-alpha3', $module_path),
-        'react/jsx-runtime' => \sprintf('%s/ui/lib/astro-hydration/dist/jsx-runtime-default.js?2.1.0-alpha3', $module_path),
-        'react' => \sprintf('%s/ui/lib/astro-hydration/dist/compat.module.js?2.1.0-alpha3', $module_path),
-        'react-dom' => \sprintf('%s/ui/lib/astro-hydration/dist/compat.module.js?2.1.0-alpha3', $module_path),
-        'react-dom/client' => \sprintf('%s/ui/lib/astro-hydration/dist/compat.module.js?2.1.0-alpha3', $module_path),
-        'clsx' => \sprintf('%s/ui/lib/astro-hydration/dist/clsx.js?2.1.0-alpha3', $module_path),
-        'class-variance-authority' => \sprintf('%s/ui/lib/astro-hydration/dist/class-variance-authority.js?2.1.0-alpha3', $module_path),
-        'tailwind-merge' => \sprintf('%s/ui/lib/astro-hydration/dist/tailwind-merge.js?2.1.0-alpha3', $module_path),
-        '@/lib/FormattedText' => \sprintf('%s/ui/lib/astro-hydration/dist/FormattedText.js?2.1.0-alpha3', $module_path),
-        'next-image-standalone' => \sprintf('%s/ui/lib/astro-hydration/dist/next-image-standalone.js?2.1.0-alpha3', $module_path),
-        '@/lib/utils' => \sprintf('%s/ui/lib/astro-hydration/dist/utils.js?2.1.0-alpha3', $module_path),
-        '@drupal-api-client/json-api-client' => \sprintf('%s/ui/lib/astro-hydration/dist/jsonapi-client.js?2.1.0-alpha3', $module_path),
-        'drupal-jsonapi-params' => \sprintf('%s/ui/lib/astro-hydration/dist/jsonapi-params.js?2.1.0-alpha3', $module_path),
-        '@/lib/jsonapi-utils' => \sprintf('%s/ui/lib/astro-hydration/dist/jsonapi-utils.js?2.1.0-alpha3', $module_path),
-        '@/lib/drupal-utils' => \sprintf('%s/ui/lib/astro-hydration/dist/drupal-utils.js?2.1.0-alpha3', $module_path),
-        'swr' => \sprintf('%s/ui/lib/astro-hydration/dist/swr.js?2.1.0-alpha3', $module_path),
-        'drupal-canvas' => \sprintf('%s/ui/lib/astro-hydration/dist/drupal-canvas.js?2.1.0-alpha3', $module_path),
+        'preact' => \sprintf('%s/packages/astro-hydration/dist/preact.module.js?2.1.0-alpha3', $module_path),
+        'preact/hooks' => \sprintf('%s/packages/astro-hydration/dist/hooks.module.js?2.1.0-alpha3', $module_path),
+        'react/jsx-runtime' => \sprintf('%s/packages/astro-hydration/dist/jsx-runtime-default.js?2.1.0-alpha3', $module_path),
+        'react' => \sprintf('%s/packages/astro-hydration/dist/compat.module.js?2.1.0-alpha3', $module_path),
+        'react-dom' => \sprintf('%s/packages/astro-hydration/dist/compat.module.js?2.1.0-alpha3', $module_path),
+        'react-dom/client' => \sprintf('%s/packages/astro-hydration/dist/compat.module.js?2.1.0-alpha3', $module_path),
+        'clsx' => \sprintf('%s/packages/astro-hydration/dist/clsx.js?2.1.0-alpha3', $module_path),
+        'class-variance-authority' => \sprintf('%s/packages/astro-hydration/dist/class-variance-authority.js?2.1.0-alpha3', $module_path),
+        'tailwind-merge' => \sprintf('%s/packages/astro-hydration/dist/tailwind-merge.js?2.1.0-alpha3', $module_path),
+        '@/lib/FormattedText' => \sprintf('%s/packages/astro-hydration/dist/FormattedText.js?2.1.0-alpha3', $module_path),
+        'next-image-standalone' => \sprintf('%s/packages/astro-hydration/dist/next-image-standalone.js?2.1.0-alpha3', $module_path),
+        '@/lib/utils' => \sprintf('%s/packages/astro-hydration/dist/utils.js?2.1.0-alpha3', $module_path),
+        '@drupal-api-client/json-api-client' => \sprintf('%s/packages/astro-hydration/dist/jsonapi-client.js?2.1.0-alpha3', $module_path),
+        'drupal-jsonapi-params' => \sprintf('%s/packages/astro-hydration/dist/jsonapi-params.js?2.1.0-alpha3', $module_path),
+        '@/lib/jsonapi-utils' => \sprintf('%s/packages/astro-hydration/dist/jsonapi-utils.js?2.1.0-alpha3', $module_path),
+        '@/lib/drupal-utils' => \sprintf('%s/packages/astro-hydration/dist/drupal-utils.js?2.1.0-alpha3', $module_path),
+        'swr' => \sprintf('%s/packages/astro-hydration/dist/swr.js?2.1.0-alpha3', $module_path),
+        'drupal-canvas' => \sprintf('%s/packages/astro-hydration/dist/drupal-canvas.js?2.1.0-alpha3', $module_path),
+        '@tailwindcss/typography' => \sprintf('%s/packages/astro-hydration/dist/tailwindcss-typography.js?2.1.0-alpha3', $module_path),
       ],
     ];
 
@@ -749,7 +750,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
     $js_component = $source->getJavaScriptComponent();
     $expected_component_compiled_js = $js_component->getJs();
     $expected_component_compiled_css = $js_component->getCss();
-    $expected_component_props = array_map(
+    $expected_component_props = \array_map(
       fn (array $prop_json_schema) => new EvaluationResult($prop_json_schema['examples'][0]),
       $js_component->getProps() ?? [],
     );
@@ -767,7 +768,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       $css['original'] .= '/**/';
       $js_component->set('css', $css);
       $js_component->updateFromClientSide([
-        'importedJsComponents' => array_map(
+        'importedJsComponents' => \array_map(
           fn (string $config_name): string => str_replace('canvas.js_component.', '', $config_name),
           $js_component->toArray()['dependencies']['enforced']['config'] ?? []
         ),
@@ -1307,7 +1308,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       'js.canvas_test_code_components_captioned_video' => [
         'expected_output_selectors' => [
           'canvas-island[opts*="Captioned video"][props*="bird_vertical"]',
-          'script[blocking="render"][src*="/ui/lib/astro-hydration/dist/client.js"]',
+          'script[blocking="render"][src*="/packages/astro-hydration/dist/client.js"]',
         ],
         'source' => 'Code component',
         'metadata' => ['slots' => []],
@@ -1401,7 +1402,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       'js.canvas_test_code_components_interactive' => [
         'expected_output_selectors' => [
           'canvas-island[opts*="Interactive"][props*="name"][props*="Count"]',
-          'script[blocking="render"][src*="/ui/lib/astro-hydration/dist/client.js"]',
+          'script[blocking="render"][src*="/packages/astro-hydration/dist/client.js"]',
         ],
         'source' => 'Code component',
         'metadata' => [
@@ -1433,7 +1434,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       'js.canvas_test_code_components_using_drupalsettings_get_site_data' => [
         'expected_output_selectors' => [
           'canvas-island[opts*="Using drupalSettings getSiteData"][props="{}"]',
-          'script[blocking="render"][src*="/ui/lib/astro-hydration/dist/client.js"]',
+          'script[blocking="render"][src*="/packages/astro-hydration/dist/client.js"]',
         ],
         'source' => 'Code component',
         'metadata' => ['slots' => []],
@@ -1443,7 +1444,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       'js.canvas_test_code_components_using_get_page_data' => [
         'expected_output_selectors' => [
           'canvas-island[opts*="Using drupalSettings getPageData"][props="{}"]',
-          'script[blocking="render"][src*="/ui/lib/astro-hydration/dist/client.js"]',
+          'script[blocking="render"][src*="/packages/astro-hydration/dist/client.js"]',
         ],
         'source' => 'Code component',
         'metadata' => ['slots' => []],
@@ -1453,7 +1454,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       'js.canvas_test_code_components_using_imports' => [
         'expected_output_selectors' => [
           'canvas-island[opts*="using imports"]',
-          'script[blocking="render"][src*="/ui/lib/astro-hydration/dist/client.js"]',
+          'script[blocking="render"][src*="/packages/astro-hydration/dist/client.js"]',
         ],
         'source' => 'Code component',
         'metadata' => ['slots' => []],
@@ -1463,7 +1464,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       'js.canvas_test_code_components_vanilla_image' => [
         'expected_output_selectors' => [
           'canvas-island[opts*="Vanilla Image"][props*="placehold.co"]',
-          'script[blocking="render"][src*="/ui/lib/astro-hydration/dist/client.js"]',
+          'script[blocking="render"][src*="/packages/astro-hydration/dist/client.js"]',
         ],
         'source' => 'Code component',
         'metadata' => ['slots' => []],
@@ -1518,7 +1519,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       'js.canvas_test_code_components_with_enums' => [
         'expected_output_selectors' => [
           'canvas-island[opts*="With enums"][props*="red"]',
-          'script[blocking="render"][src*="/ui/lib/astro-hydration/dist/client.js"]',
+          'script[blocking="render"][src*="/packages/astro-hydration/dist/client.js"]',
         ],
         'source' => 'Code component',
         'metadata' => [
@@ -1583,7 +1584,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       'js.canvas_test_code_components_with_link_prop' => [
         'expected_output_selectors' => [
           'canvas-island[opts*="My Code Component Link"]',
-          'script[blocking="render"][src*="/ui/lib/astro-hydration/dist/client.js"]',
+          'script[blocking="render"][src*="/packages/astro-hydration/dist/client.js"]',
         ],
         'source' => 'Code component',
         'metadata' => ['slots' => []],
@@ -1632,7 +1633,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       'js.canvas_test_code_components_with_no_props' => [
         'expected_output_selectors' => [
           'canvas-island[opts*="With no props"][props="{}"]',
-          'script[blocking="render"][src*="/ui/lib/astro-hydration/dist/client.js"]',
+          'script[blocking="render"][src*="/packages/astro-hydration/dist/client.js"]',
         ],
         'source' => 'Code component',
         'metadata' => ['slots' => []],
@@ -1642,7 +1643,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       'js.canvas_test_code_components_with_props' => [
         'expected_output_selectors' => [
           'canvas-island[opts*="With props"][props*="name"][props*="Canvas"][props*="age"][props*="40"]',
-          'script[blocking="render"][src*="/ui/lib/astro-hydration/dist/client.js"]',
+          'script[blocking="render"][src*="/packages/astro-hydration/dist/client.js"]',
         ],
         'source' => 'Code component',
         'metadata' => ['slots' => []],
@@ -1681,7 +1682,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       'js.canvas_test_code_components_with_slots' => [
         'expected_output_selectors' => [
           'canvas-island[opts*="With slot"][props*="name"][props*="Name"]',
-          'script[blocking="render"][src*="/ui/lib/astro-hydration/dist/client.js"]',
+          'script[blocking="render"][src*="/packages/astro-hydration/dist/client.js"]',
         ],
         'source' => 'Code component',
         'metadata' => [

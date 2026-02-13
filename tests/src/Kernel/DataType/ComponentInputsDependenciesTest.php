@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\DataType;
 
+use Drupal\canvas\PropSource\PropSource;
 use Drupal\Component\Uuid\UuidInterface;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
@@ -12,55 +13,40 @@ use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\file\Entity\File;
 use Drupal\image\Plugin\Field\FieldType\ImageItem;
-use Drupal\KernelTests\KernelTestBase;
 use Drupal\media\Entity\Media;
 use Drupal\node\Entity\Node;
 use Drupal\node\Entity\NodeType;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
-use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\image\Kernel\ImageFieldCreationTrait;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
  * @covers \Drupal\canvas\Plugin\DataType\ComponentInputs::calculateDependencies()
  * @see \Drupal\Tests\canvas\Unit\DataType\ComponentInputsTest
  * @group canvas
  */
-class ComponentInputsDependenciesTest extends KernelTestBase {
+#[RunTestsInSeparateProcesses]
+class ComponentInputsDependenciesTest extends CanvasKernelTestBase {
 
   use ComponentTreeItemListInstantiatorTrait;
   use ConstraintViolationsTestTrait;
-  use ContribStrictConfigSchemaTestTrait;
   use GenerateComponentConfigTrait;
   use ImageFieldCreationTrait;
   use MediaTypeCreationTrait;
   use UserCreationTrait;
 
-  private const TEST_IMAGE_UUID = 'd650b614-3219-4842-9a1f-f9976bdc20be';
+  private const string TEST_IMAGE_UUID = 'd650b614-3219-4842-9a1f-f9976bdc20be';
 
   /**
    * {@inheritdoc}
    */
   protected static $modules = [
     'node',
-    'ckeditor5',
-    'editor',
     'field',
-    'filter',
-    'text',
-    'file',
-    'image',
-    'media',
-    'user',
-    'system',
-    'path',
-    'canvas',
-    'link',
-    'options',
-    'datetime',
-    'canvas_test_sdc',
   ];
 
   /**
@@ -68,15 +54,13 @@ class ComponentInputsDependenciesTest extends KernelTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
-    $this->installConfig([
-      'canvas',
-      'filter',
-    ]);
+    $this->installConfig('filter');
     $this->installEntitySchema('user');
     $this->installEntitySchema('node_type');
     $this->installEntitySchema('node');
     $this->installEntitySchema('file');
     $this->installEntitySchema('media');
+    $this->installEntitySchema('path_alias');
     $this->installEntitySchema(Page::ENTITY_TYPE_ID);
     $this->installSchema('file', ['file_usage']);
   }
@@ -163,7 +147,7 @@ class ComponentInputsDependenciesTest extends KernelTestBase {
       'component_id' => 'sdc.canvas_test_sdc.heading',
       'inputs' => [
         'heading' => [
-          'sourceType' => 'dynamic',
+          'sourceType' => PropSource::EntityField->value,
           'expression' => 'ℹ︎␜entity:node:alpha␝body␞␟value',
         ],
       ],
@@ -173,23 +157,23 @@ class ComponentInputsDependenciesTest extends KernelTestBase {
       'component_id' => 'sdc.canvas_test_sdc.image',
       'inputs' => [
         'image' => [
-          'sourceType' => 'dynamic',
+          'sourceType' => PropSource::EntityField->value,
           'expression' => 'ℹ︎␜entity:node:alpha␝field_hero␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
         ],
       ],
     ]);
-    // The component tree's structure is valid, but this test is using
-    // DynamicPropSources, which are NOT considered valid in component trees'
+    // The component tree's structure is valid, but this test is using >1
+    // EntityFieldPropSource, which are NOT considered valid in component trees'
     // default validation constraints (only ContentTemplates allow these).
     // That doesn't matter for testing dependency calculation, so we can ignore
     // these validation errors.
     // @see \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait::staticallyCreateDanglingComponentTreeItemList()
     self::assertSame([
       "0.inputs.$uuid_of_component_instance_with_invalid_static_prop_source" => 'Using a static prop source that deviates from the configuration for Component <em class="placeholder">sdc.canvas_test_sdc.heading</em> at version <em class="placeholder">8c01a2bdb897a810</em>.',
-      2 => "The 'dynamic' prop source type must be absent.",
-      3 => "The 'dynamic' prop source type must be absent.",
+      2 => "The 'entity-field' prop source type must be absent.",
+      3 => "The 'entity-field' prop source type must be absent.",
     ], self::violationsToArray($item_list->validate()));
-    self::assertContains('dynamic', $item_list->getItemDefinition()->getConstraints()['ComponentTreeMeetRequirements']['inputs']['absence']);
+    self::assertContains('entity-field', $item_list->getItemDefinition()->getConstraints()['ComponentTreeMeetRequirements']['inputs']['absence']);
 
     \assert($item_list->get(0) instanceof ComponentTreeItem);
     \assert($item_list->get(1) instanceof ComponentTreeItem);
@@ -249,11 +233,11 @@ class ComponentInputsDependenciesTest extends KernelTestBase {
     // given component tree; this is necessary for e.g. default content.
     $component_instances = iterator_to_array($item_list->componentTreeItemsIterator());
     $component_instance_deps_by_uuid = array_filter(array_combine(
-      array_map(
+      \array_map(
         fn (ComponentTreeItem $item) => $item->getUuid(),
         $component_instances
       ),
-      array_map(
+      \array_map(
         fn (ComponentTreeItem $item) => $item->calculateFieldItemValueDependencies($node)['content'] ?? [],
         $component_instances
       ),

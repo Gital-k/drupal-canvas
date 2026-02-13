@@ -6,12 +6,12 @@ namespace Drupal\canvas\Plugin\Canvas\ComponentSource;
 
 use Drupal\canvas\InvalidComponentInputsPropSourceException;
 use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\canvas\PropSource\EntityFieldPropSource;
 use Drupal\canvas\PropExpressions\StructuredData\ObjectPropExpressionInterface;
 use Drupal\canvas\PropExpressions\StructuredData\ReferencePropExpressionInterface;
 use Drupal\canvas\PropShape\PropShapeRepositoryInterface;
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
-use Drupal\canvas\PropSource\DynamicPropSource;
 use Drupal\canvas\ShapeMatcher\PropSourceSuggester;
 use Drupal\canvas\PropSource\HostEntityUrlPropSource;
 use Drupal\canvas\Utility\ComponentMetadataHelper;
@@ -23,6 +23,7 @@ use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
+use Drupal\Core\Entity\Plugin\DataType\EntityAdapter;
 use Drupal\Core\Field\WidgetPluginManager;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Http\Exception\CacheableAccessDeniedHttpException;
@@ -173,7 +174,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     }
 
     ksort($dependencies);
-    return array_map(static function ($values) {
+    return \array_map(static function ($values) {
       $values = array_unique($values);
       sort($values);
       return $values;
@@ -261,8 +262,8 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     return [
       'required' => $required,
       'shapes' => array_combine(
-        array_map(fn (string $cpe) => ComponentPropExpression::fromString($cpe)->propName, array_keys($prop_shapes)),
-        array_map(fn (PropShape $shape) => $shape->schema, $prop_shapes),
+        \array_map(fn (string $cpe) => ComponentPropExpression::fromString($cpe)->propName, array_keys($prop_shapes)),
+        \array_map(fn (PropShape $shape) => $shape->schema, $prop_shapes),
       ),
     ];
   }
@@ -326,21 +327,30 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       ];
     }
 
-    // A component instance can be part of a dangling component tree if it is
-    // contained by a config entity. If that config entity's component tree
-    // uses DynamicPropSources, it needs a (fieldable) host entity to evaluate
-    // DynamicPropSources.
-    // @see \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait::createDanglingComponentTreeItemList()
-    // @see \Drupal\canvas\Entity\ContentTemplate
-    $is_dangling = $item->getRoot() === $item->getParent();
-    $entity = $is_dangling ? $host_entity : $item->getEntity();
+    // Prop sources can only evaluate structured data from fieldable entities,
+    // but the component tree may be contained by a config entity.
+    // It is up to the code using/rendering that config entity to provide a
+    // fieldable host entity if EntityFieldPropSources are used, which currently
+    // is only the case for ContentTemplate component trees.
+    // @see \Drupal\canvas\PropSource\PropSourceBase::evaluate()
+    $root = $item->getRoot();
+    $fieldable_host_entity = match (TRUE) {
+      // Prioritize using the given host entity, if any.
+      $host_entity instanceof FieldableEntityInterface => $host_entity,
+      // Next, use the component instance's tree's host entity, if fieldable.
+      $root instanceof EntityAdapter && $root->getEntity() instanceof FieldableEntityInterface => $root->getEntity(),
+      // Otherwise, fall back to no host entity. This implies no
+      // DynamicPropSource can be evaluated.
+      default => NULL,
+    };
+
     $values = $item->getInputs() ?? [];
     $resolved_values = [];
     foreach ($values as $prop => $input) {
       $values[$prop] = $this->uncollapse($input, $prop)->toArray();
       try {
         $resolved_values[$prop] = PropSource::parse($values[$prop])
-          ->evaluate($entity, is_required: FALSE);
+          ->evaluate($fieldable_host_entity, is_required: FALSE);
       }
       catch (CacheableAccessDeniedHttpException $e) {
         $this->logger->warning('Access denied when evaluating prop source for prop %prop of component instance %uuid with input `%input`. Original error: %error', [
@@ -399,7 +409,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       // logic but still results in an empty slot.
       // @see https://www.drupal.org/node/3391702
       // @see \Drupal\Core\Render\Element\ComponentElement::generateComponentTemplate()
-      $hydrated['slots'] = array_map(fn($slot) => $slot['examples'][0] ?? '', $slot_definitions);
+      $hydrated['slots'] = \array_map(fn($slot) => $slot['examples'][0] ?? '', $slot_definitions);
     }
 
     return $hydrated;
@@ -432,7 +442,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     $model = [
       'source' => $explicit_input['source'],
       // The client model doesn't need cacheability metadata.
-      'resolved' => array_map(fn (EvaluationResult $r) => $r->value, $explicit_input['resolved']),
+      'resolved' => \array_map(fn (EvaluationResult $r) => $r->value, $explicit_input['resolved']),
     ];
     \assert(Inspector::assertAll(fn ($r) => !$r instanceof EvaluationResult, $model['resolved']));
 
@@ -533,7 +543,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       }
     }
     try {
-      $resolvedInputValues = array_map(
+      $resolvedInputValues = \array_map(
       // @phpstan-ignore-next-line
         fn(array $prop_source): mixed => PropSource::parse($prop_source)
           ->evaluate($entity, is_required: FALSE)->value,
@@ -541,10 +551,10 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       );
     }
     catch (MissingHostEntityException $e) {
-      // DynamicPropSources cannot be validated in isolation, only in the
+      // EntityFieldPropSources cannot be validated in isolation, only in the
       // context of a host content entity.
       if ($entity === NULL) {
-        // This case can only be hit when using a DynamicPropSource
+        // This case can only be hit when using a EntityFieldPropSource
         // inappropriately, which is validated elsewhere.
         // @see \Drupal\canvas\Plugin\Validation\Constraint\ComponentTreeMeetsRequirementsConstraintValidator
         return $violations;
@@ -706,9 +716,9 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
         ));
       }
       $disabled = FALSE;
-      $linked_prop_source = ($source instanceof DynamicPropSource || $source instanceof HostEntityUrlPropSource) ? $source : NULL;
+      $linked_prop_source = ($source instanceof EntityFieldPropSource || $source instanceof HostEntityUrlPropSource) ? $source : NULL;
       if (!$source instanceof StaticPropSource) {
-        // @todo Build DynamicPropSource UX in https://www.drupal.org/i/3541037. Related: https://www.drupal.org/project/canvas/issues/3459234
+        // @todo Build EntityFieldPropSource UX in https://www.drupal.org/i/3541037. Related: https://www.drupal.org/project/canvas/issues/3459234
         // @todo Design is undefined for the AdaptedPropSource UX.
         // Fall back to the static version, disabled for now where the design is
         // undefined.
@@ -1211,9 +1221,9 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
           $prop_source['value'] = $prop_value;
         }
         $source = PropSource::parse($prop_source);
-        if ($source instanceof DynamicPropSource) {
+        if ($source instanceof EntityFieldPropSource) {
           if ($host_entity === NULL) {
-            throw new \InvalidArgumentException('A host entity is required to set dynamic prop sources.');
+            throw new \InvalidArgumentException('A host entity is required to set entity field prop sources.');
           }
           $source->expression->validateSupport($host_entity);
           $props[$prop] = $this->collapse($source, $prop);

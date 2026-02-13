@@ -13,9 +13,10 @@ use Drupal\Core\Extension\ExtensionPathResolver;
 use Drupal\canvas\Element\AstroIsland;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Render\ImportMapResponseAttachmentsProcessor;
-use Drupal\KernelTests\KernelTestBase;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Traits\CrawlerTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
  * Tests Island.
@@ -24,7 +25,8 @@ use Drupal\Tests\user\Traits\UserCreationTrait;
  * @group JavaScriptComponents
  * @group canvas
  */
-final class AstroIslandTest extends KernelTestBase {
+#[RunTestsInSeparateProcesses]
+final class AstroIslandTest extends CanvasKernelTestBase {
 
   use CrawlerTrait;
   use UserCreationTrait;
@@ -32,15 +34,9 @@ final class AstroIslandTest extends KernelTestBase {
   /**
    * {@inheritdoc}
    */
-  protected static $modules = ['canvas', 'user', 'system', 'media'];
-
-  /**
-   * {@inheritdoc}
-   */
   protected function setUp(): void {
     parent::setUp();
     $this->installEntitySchema('user');
-    $this->installConfig(['system']);
   }
 
   /**
@@ -151,7 +147,7 @@ final class AstroIslandTest extends KernelTestBase {
     self::assertEquals($component_url, $element->attr('component-url'));
 
     $canvas_directory = $this->container->get(ExtensionPathResolver::class)->getPath('module', 'canvas');
-    self::assertEquals(\sprintf('/%s/ui/lib/astro-hydration/dist/client.js', $canvas_directory), $element->attr('renderer-url'));
+    self::assertEquals(\sprintf('/%s/packages/astro-hydration/dist/client.js', $canvas_directory), $element->attr('renderer-url'));
 
     $slots = $element->filter('template[data-astro-template]');
     self::assertCount(2, $slots);

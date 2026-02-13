@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Controller;
 
+use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\canvas\Entity\Pattern;
 use Drupal\Core\Access\AccessManagerInterface;
 use Drupal\Core\Access\AccessResultInterface;
 use Drupal\Core\Cache\Cache;
@@ -55,6 +57,7 @@ final class ApiConfigControllers extends ApiControllerBase {
     private readonly AccountSwitcherInterface $accountSwitcher,
     private readonly AccessManagerInterface $accessManager,
     private readonly AccountProxyInterface $currentUser,
+    private readonly ComponentSourceManager $componentSourceManager,
   ) {}
 
   /**
@@ -86,6 +89,13 @@ final class ApiConfigControllers extends ApiControllerBase {
     if ($canvas_config_entity_type->hasKey('weight')) {
       $query->sort('weight');
     }
+
+    // Always sort by ID as a secondary sort to ensure deterministic ordering
+    // across databases.
+    // @todo Uncomment the next line once https://www.drupal.org/project/drupal/issues/2862699#comment-16461888 is fixed in Drupal core.
+    $id_key = $canvas_config_entity_type->getKey('id');
+    \assert(\is_string($id_key));
+    $query->sort($id_key);
 
     $query_cacheability = (new CacheableMetadata())
       ->addCacheContexts($canvas_config_entity_type->getListCacheContexts())
@@ -354,6 +364,16 @@ final class ApiConfigControllers extends ApiControllerBase {
    * those previews are highly dynamic.
    */
   private function normalize(CanvasHttpApiEligibleConfigEntityInterface $entity): ClientSideRepresentation {
+    // Auto-update Pattern's component instances before serving them, which will
+    // make the preview accurate with what the editor would see when adding the
+    // Pattern to the component tree being edited.
+    // @todo Refine in https://www.drupal.org/project/canvas/issues/3571366
+    if ($entity instanceof Pattern) {
+      $tree = $entity->getComponentTree();
+      $this->componentSourceManager->updateComponentInstances($tree);
+      $entity->setComponentTree($tree->getValue());
+    }
+
     // TRICKY: some components may (erroneously!) bubble cacheability even
     // when just constructing a render array. For maximum ecosystem
     // compatibility, account for this, and catch the bubbled cacheability.

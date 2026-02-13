@@ -227,7 +227,7 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
    * {@inheritdoc}
    */
   public function getComponentTree(?FieldableEntityInterface $parent = NULL): ComponentTreeItemList {
-    $item = $this->createDanglingComponentTreeItemList($parent);
+    $item = $this->createDanglingComponentTreeItemList($parent ?? $this);
     $item->setValue(\array_values($this->component_tree ?? []));
     return $item;
   }
@@ -376,7 +376,7 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
    * {@inheritdoc}
    */
   public function buildMultiple(array $entities): array {
-    return array_map($this->build(...), $entities);
+    return \array_map($this->build(...), $entities);
   }
 
   /**

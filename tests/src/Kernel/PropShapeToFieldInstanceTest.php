@@ -25,11 +25,10 @@ use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaType;
 use Drupal\canvas\ShapeMatcher\JsonSchemaFieldInstanceMatcher;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
-use Drupal\KernelTests\KernelTestBase;
 use Drupal\link\LinkItemInterface;
 use Drupal\node\Entity\NodeType;
-use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
  * Tests matching prop shapes against field instances & adapters.
@@ -47,9 +46,9 @@ use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
  *
  * @phpstan-type ShapeMatchingResults array{'SDC props': non-empty-list<string>, 'static prop source': null|string, instances: string[], adapter_matches_field_type: string[], adapter_matches_instance: string[]}
  */
-class PropShapeToFieldInstanceTest extends KernelTestBase {
+#[RunTestsInSeparateProcesses]
+class PropShapeToFieldInstanceTest extends CanvasKernelTestBase {
 
-  use ContribStrictConfigSchemaTestTrait;
   use MediaTypeCreationTrait;
 
   protected static $configSchemaCheckerExclusions = [
@@ -62,27 +61,6 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
   /**
    * {@inheritdoc}
    */
-  protected static $modules = [
-    // The two only modules Drupal truly requires.
-    'system',
-    'user',
-    // The module being tested.
-    'canvas',
-    // The dependent modules.
-    'sdc',
-    'file',
-    'image',
-    'media',
-    'filter',
-    'ckeditor5',
-    'editor',
-    'datetime',
-    'canvas_test_sdc',
-  ];
-
-  /**
-   * {@inheritdoc}
-   */
   protected function setUp(): void {
     parent::setUp();
     // Necessary for uninstalling modules.
@@ -90,7 +68,6 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
     $this->installEntitySchema(Page::ENTITY_TYPE_ID);
     $this->installEntitySchema('media');
     $this->installEntitySchema('file');
-    $this->installConfig('canvas');
   }
 
   /**
@@ -313,7 +290,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
     // Ensure the consistent sorting that ComponentPluginManager should have
     // already guaranteed.
     $components = array_combine(
-      array_map(fn (Component $c) => $c->getPluginId(), $components),
+      \array_map(fn (Component $c) => $c->getPluginId(), $components),
       $components
     );
     ksort($components);
@@ -383,7 +360,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
         $storable_prop_shape = $prop_shape_repository->getStorablePropShape($prop_shape);
         $primitive_type = JsonSchemaType::from($schema['type']);
         // 2. find matching field instances
-        // @see \Drupal\canvas\PropSource\DynamicPropSource
+        // @see \Drupal\canvas\PropSource\EntityFieldPropSource
         $instance_candidates = [];
         foreach ($entity_types_and_bundles as ['type' => $entity_type_id, 'bundle' => $bundle]) {
           $instance_candidates = [
@@ -417,7 +394,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
             $adapter_matches_field_type[$match->getPluginId()][$input_name] = $storable_prop_shape_for_adapter_input
               ? (string) $storable_prop_shape_for_adapter_input->fieldTypeProp
               : NULL;
-            $adapter_matches_instance[$match->getPluginId()][$input_name] = array_map(fn (EntityFieldBasedPropExpressionInterface $e): string => (string) $e, $instance_matches);
+            $adapter_matches_instance[$match->getPluginId()][$input_name] = \array_map(fn (EntityFieldBasedPropExpressionInterface $e): string => (string) $e, $instance_matches);
           }
           ksort($adapter_matches_field_type);
           ksort($adapter_matches_instance);
@@ -431,7 +408,7 @@ class PropShapeToFieldInstanceTest extends KernelTestBase {
         $matches[$unique_match_key]['static prop source'] = $storable_prop_shape
           ? (string) $storable_prop_shape->fieldTypeProp
           : NULL;
-        $matches[$unique_match_key]['instances'] = array_map(fn (EntityFieldBasedPropExpressionInterface $e): string => (string) $e, $instance_candidates);
+        $matches[$unique_match_key]['instances'] = \array_map(fn (EntityFieldBasedPropExpressionInterface $e): string => (string) $e, $instance_candidates);
         $matches[$unique_match_key]['adapter_matches_field_type'] = $adapter_matches_field_type;
         $matches[$unique_match_key]['adapter_matches_instance'] = $adapter_matches_instance;
       }

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Drupal\Tests\canvas\Kernel;
 
 use Drupal\canvas\ComponentIncompatibilityReasonRepository;
-use Drupal\KernelTests\KernelTestBase;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
  * Tests ComponentIncompatibilityReasonRepository.
@@ -14,12 +14,8 @@ use Drupal\KernelTests\KernelTestBase;
  * @group JavaScriptComponents
  * @group canvas
  */
-final class ComponentIncompatibilityReasonRepositoryTest extends KernelTestBase {
-
-  /**
-   * {@inheritdoc}
-   */
-  protected static $modules = ['canvas'];
+#[RunTestsInSeparateProcesses]
+final class ComponentIncompatibilityReasonRepositoryTest extends CanvasKernelTestBase {
 
   /**
    * Covers ComponentIncompatibilityReasonRepository.

@@ -180,6 +180,23 @@ export class CanvasEditor {
     }
   }
 
+  async openPagesPanel() {
+    await this.page.getByTestId('canvas-side-menu').getByLabel('Pages').click();
+    try {
+      await expect(
+        this.page.getByRole('heading', { name: 'Pages' }),
+      ).toBeVisible();
+      await expect(
+        this.page.locator('[data-testid="canvas-page-list"]'),
+      ).toBeVisible();
+    } catch (error) {
+      throw new Error(
+        'openPagesPanel: Pages panel did not open - was it already open?\n' +
+          (error instanceof Error ? error.message : String(error)),
+      );
+    }
+  }
+
   async openComponent(title: string) {
     await this.page
       .locator(
@@ -316,7 +333,6 @@ export class CanvasEditor {
     // Force a layout recalculation in headless mode, this is only needed for
     // webkit.
     await this.page.evaluate(() => {
-      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
       document.body.offsetHeight; // Forces reflow
     });
     await dropzone.hover({ force: true });
@@ -325,7 +341,6 @@ export class CanvasEditor {
       // Again, only needed for webkit.
       const dropzone = document.querySelector(locator);
       if (dropzone) {
-        // eslint-disable-next-line @typescript-eslint/no-unused-expressions
         dropzone.offsetHeight; // Forces reflow on the drop zone
       }
     }, dropzoneLocator);

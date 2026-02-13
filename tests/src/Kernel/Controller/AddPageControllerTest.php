@@ -10,25 +10,25 @@ use Drupal\Core\Http\Exception\CacheableAccessDeniedHttpException;
 use Drupal\Core\Render\BubbleableMetadata;
 use Drupal\Core\Render\RenderContext;
 use Drupal\Core\Url;
-use Drupal\KernelTests\KernelTestBase;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Kernel\Traits\PageTrait;
 use Drupal\Tests\canvas\Kernel\Traits\RequestTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\Request;
 
 #[Group('canvas')]
 #[CoversClass(AddPageController::class)]
-final class AddPageControllerTest extends KernelTestBase {
+#[RunTestsInSeparateProcesses]
+final class AddPageControllerTest extends CanvasKernelTestBase {
 
   use PageTrait;
   use RequestTrait;
   use UserCreationTrait;
 
   protected static $modules = [
-    'system',
-    'canvas',
     ...self::PAGE_TEST_MODULES,
   ];
 

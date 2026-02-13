@@ -29,7 +29,7 @@ final class ReferenceFieldTypePropExpression implements FieldTypeBasedPropExpres
       // Note this cannot be an exception, because that would prevent the update
       // path from working.
       // @see \canvas_post_update_0011_multi_bundle_reference_prop_expressions()
-      @trigger_error('Creating ' . __CLASS__ . ' that contains references targeting multiple bundles is deprecated in canvas:1.0.5 and will be removed from canvas:2.0.0. Instead, create a ' . ReferenceFieldTypePropExpression::class . ', then use its ::withAdditionalBranch() to create multiple expression branches, each pointing to a single-bundle ' . __CLASS__ . '. See https://www.drupal.org/node/3563451', E_USER_DEPRECATED);
+      @trigger_error('Creating ' . __CLASS__ . ' that contains references targeting multiple bundles is deprecated in canvas:1.1.0 and will be removed from canvas:2.0.0. Instead, create a ' . ReferenceFieldTypePropExpression::class . ', then use its ::withAdditionalBranch() to create multiple expression branches, each pointing to a single-bundle ' . __CLASS__ . '. See https://www.drupal.org/node/3563451', E_USER_DEPRECATED);
     }
   }
 
@@ -210,7 +210,7 @@ final class ReferenceFieldTypePropExpression implements FieldTypeBasedPropExpres
       \assert(Inspector::assertAllObjects($referenced_content_entities, FieldableEntityInterface::class));
       $dependencies['content'] = [
         ...$dependencies['content'] ?? [],
-        ...array_map(
+        ...\array_map(
           fn (FieldableEntityInterface $entity) => $entity->getConfigDependencyName(),
           $referenced_content_entities,
         ),
@@ -238,7 +238,7 @@ final class ReferenceFieldTypePropExpression implements FieldTypeBasedPropExpres
       $closing_last_branch = mb_strrpos($representation, self::SUFFIX_BRANCH);
       \assert(is_int($closing_last_branch));
       $branches = self::parseBranches(mb_substr($representation, $opening_first_branch, $closing_last_branch));
-      $referenced_branches = array_map(
+      $referenced_branches = \array_map(
         // Each of the branch expressions MUST be starting with an entity field,
         // because that is the only way to branch. Therefore, parse each as its
         // own stand-alone prop expression.
@@ -249,7 +249,7 @@ final class ReferenceFieldTypePropExpression implements FieldTypeBasedPropExpres
       $parts = explode(self::PREFIX_ENTITY_LEVEL . self::PREFIX_BRANCH . self::PREFIX_ENTITY_LEVEL, $representation, 2);
       $referencer = FieldTypePropExpression::fromString($parts[0]);
       $referenced = new ReferencedBundleSpecificBranches(array_combine(
-        array_map(
+        \array_map(
           fn (EntityFieldBasedPropExpressionInterface $expr) => $expr->getHostEntityDataDefinition()->getDataType(),
           $referenced_branches,
         ),
