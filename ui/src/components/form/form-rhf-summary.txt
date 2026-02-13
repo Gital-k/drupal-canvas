@@ -1,0 +1,28 @@
+We have two special forms in the Canvas page editor that are rendered in React but are based on Drupal render arrays.
+Each input within this form is integrated with our Redux store, so changes are propagated to the back end for storage and
+for updating the preview.
+
+The first form is the "Component Instance Form", for configuring individual instances of components in the layout.
+The second form is the "Page Data Form", which is essentially the Drupal node (or page entity) edit form, but within Canvas.
+
+When a given input type (select, text, boolean, etc.) is in one of these forms, it is mapped to a corresponding `Drupal` prefixed component in
+ui/src/components/form/components/drupal
+- these inputs are integrated with Redux by being wrapped in the wrapRHF HOC.
+- the majority of these inputs ultimately render a corresponding component from ui/src/components/form/components
+for example, the `DrupalCheckbox` component renders the `Checkbox` component from ui/src/components/form/components
+this allows other forms in Canvas (such as the Site Settings form) to reuse these same base components without the non-applicable
+Redux integration.
+
+* Note that many of the these non-Drupal-prefixed components have additional logic beyond just display.
+The most common addition is ref-based logic that allows them to respond to normal DOM and even jQuery events
+in the manner one would expect. This makes it possible for these React components to integrate with
+Drupal's vanilla JS behaviors.
+
+wrapRHF is located in ui/src/components/form/wrapRHF.js and is a higher-order component (HOC) that connects form inputs to
+the Redux store using React Hook Form (RHF). It begins with base logic applicable to all uses before splitting into
+form specific <PageDataFormField> and <ComponentFormField> components specific to either the Component Instance Form or the Page Data Form.
+
+Within those sub components, there is form-type-specific logic for
+- validating the input values
+- converting value to what the back end expects
+- making the back end aware of value changes via API requests.

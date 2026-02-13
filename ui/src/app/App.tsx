@@ -1,10 +1,15 @@
 import { useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
-import { DndContext, PointerSensor, pointerWithin, rectIntersection, useSensor, useSensors } from '@dnd-kit/core';
+import {
+  DndContext,
+  PointerSensor,
+  pointerWithin,
+  rectIntersection,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
 import { InfoCircledIcon } from '@radix-ui/react-icons';
 import { Box, Callout, Flex } from '@radix-ui/themes';
-
-
 
 import AiPanel from '@/components/aiExtension/AiPanel';
 import DevTools from '@/components/devTools/DevTools';
@@ -17,15 +22,10 @@ import DragEventsHandler from '@/features/layout/previewOverlay/DragEventsHandle
 import useNavigationListener from '@/hooks/useNavigationListener';
 import useRouteSync from '@/hooks/useRouteSync';
 
-
-
 import type React from 'react';
 import type { CollisionDetection } from '@dnd-kit/core';
 
-
-
 import styles from '@/features/editor/App.module.css';
-
 
 // This uses the suggested composition here https://docs.dndkit.com/api-documentation/context-provider/collision-detection-algorithms#composition-of-existing-algorithms
 // the collision will use the mouse cursor's position, but if the mouse cursor is not in a valid dropzone it will fallback
