@@ -145,12 +145,29 @@ const DrupalPathWidget = ({
 
     let shouldGenerate = false;
 
-    if (pathMatchesGenerated && pathValue) {
-      // Path matches what we generated, so keep auto-generating
-      shouldGenerate = true;
-    } else if (!pathValue && titleHasChanged) {
-      // No path exists and title has changed from initial
-      shouldGenerate = true;
+    // Only generate if the new path would be different from current
+    if (generatedPath !== pathValue) {
+      if (pathMatchesGenerated && pathValue) {
+        // Path matches what we last generated, so keep auto-generating
+        console.log(
+          '[DrupalPathWidget] Should generate: path matches previously generated and new path differs',
+        );
+        shouldGenerate = true;
+      } else if (!pathValue && titleHasChanged) {
+        // No path exists and title has changed from initial
+        console.log(
+          '[DrupalPathWidget] Should generate: no path and title changed',
+        );
+        shouldGenerate = true;
+      }
+    } else {
+      console.log(
+        '[DrupalPathWidget] Should NOT generate: generated path matches current path',
+        {
+          generatedPath,
+          pathValue,
+        },
+      );
     }
 
     if (shouldGenerate) {

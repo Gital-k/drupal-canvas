@@ -16,15 +16,14 @@ export const edit = (cy) => {
     'Marshmallow Coast',
   );
   items.forEach((item, ix) => {
-    cy.findByLabelText(`Canvas Unlimited Text (value ${ix + 2})`).type(item);
+    cy.findByLabelText(`Canvas Unlimited Text (value ${ix + 2})`, {timeout: 10000}).type(item);
     cy.findByLabelText(`Canvas Unlimited Text (value ${ix + 2})`).should(
       'have.value',
       item,
     );
     // Wait for the preview to finish loading.
     // cy.wait('@updatePreview');
-    cy.wait(100); // eslint-disable-line cypress/no-unnecessary-waiting
-
+    cy.reasonableWait();
     // Queue another intercept for the wait in the main test and/or the next
     // iteration in the loop.
     cy.intercept({
@@ -37,6 +36,7 @@ export const edit = (cy) => {
 
     cy.get('@add-another-text').click();
     cy.wait('@updatePreview');
+    cy.reasonableWait();
 
     cy.waitForAjax().then(() => {
       console.log(`[Iteration ${ix + 1}] waitForAjax after click completed`);
