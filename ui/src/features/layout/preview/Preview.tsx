@@ -80,22 +80,22 @@ const Preview: React.FC<PreviewProps> = () => {
     const dataChanged =
       layoutChanged || modelChanged || entityFormFieldsChanged;
 
-    console.log('[Preview useEffect] Triggered', {
-      updatePreview,
-      dataChanged,
-      layoutChanged,
-      modelChanged,
-      entityFormFieldsChanged,
-    });
+    // console.log('[Preview useEffect] Triggered', {
+    //   updatePreview,
+    //   dataChanged,
+    //   layoutChanged,
+    //   modelChanged,
+    //   entityFormFieldsChanged,
+    // });
 
     // Only proceed if updatePreview is true AND the actual data has changed
     if (!updatePreview || !dataChanged) {
-      console.log(
-        '[Preview useEffect] Skipping - updatePreview:',
-        updatePreview,
-        'dataChanged:',
-        dataChanged,
-      );
+      // console.log(
+      //   '[Preview useEffect] Skipping - updatePreview:',
+      //   updatePreview,
+      //   'dataChanged:',
+      //   dataChanged,
+      // );
       return;
     }
 
@@ -132,7 +132,7 @@ const Preview: React.FC<PreviewProps> = () => {
       const stringPayload: string = JSON.stringify(payload);
       try {
         if (priorPayloadRef.current === stringPayload) {
-          console.log('Skipping template preview request, payload unchanged.');
+          // console.log('Skipping template preview request, payload unchanged.');
           //Skip sending the request if the payload hasn't changed.
           return;
         }
@@ -223,10 +223,10 @@ const Preview: React.FC<PreviewProps> = () => {
       previousEntityFormAlias.current = entity_form_fields['path[0][alias]'];
     }
 
-    console.log(
-      '[Preview useEffect] Scheduling preview request for context:',
-      editorFrameContext,
-    );
+    // console.log(
+    //   '[Preview useEffect] Scheduling preview request for context:',
+    //   editorFrameContext,
+    // );
 
     if (editorFrameContext === 'template') {
       scheduleTemplatePreviewRequest();

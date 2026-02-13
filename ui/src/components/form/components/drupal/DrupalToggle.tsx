@@ -38,6 +38,7 @@ const DrupalToggle = ({
           target: {
             checked: value,
             name: attributes.name,
+            type: 'checkbox',
           },
         } as unknown as React.ChangeEvent<HTMLInputElement>;
         attributes?.onChange?.(syntheticEvent);

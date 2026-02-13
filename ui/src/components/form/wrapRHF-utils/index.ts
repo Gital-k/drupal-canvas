@@ -55,10 +55,11 @@ export const extractPageDataValue = (e: any): any => {
   if (!target) return null;
 
   if (
-    target instanceof HTMLInputElement &&
-    (target.type === 'checkbox' || target.type === 'radio')
+    // target instanceof HTMLInputElement &&
+    target.type === 'checkbox' ||
+    target.type === 'radio'
   ) {
-    return target.checked;
+    return target.checked ? '1' : '0';
   }
   if ('value' in target) {
     return target.value === '_none' ? null : target.value;
