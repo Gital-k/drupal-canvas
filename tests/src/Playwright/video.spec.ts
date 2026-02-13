@@ -2,14 +2,8 @@ import { readFile } from 'fs/promises';
 import { getModuleDir } from '@drupal-canvas/test-utils';
 import { expect } from '@playwright/test';
 
-
-
 import { test } from './fixtures/DrupalSite';
 import { Drupal } from './objects/Drupal';
-
-
-
-
 
 // cspell:ignore videomedia
 

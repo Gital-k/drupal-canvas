@@ -1,3 +1,4 @@
+import React, { useCallback } from 'react';
 import Ajv from 'ajv';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
@@ -12,7 +13,6 @@ import {
 import { useSafeFormContext, useSafeRHFContext } from '@/contexts/FormContext';
 import { selectFieldError } from '@/features/form/formStateSlice';
 
-import type * as React from 'react';
 import type { FormId } from '@/features/form/formStateSlice';
 
 const ajv = new Ajv();
@@ -93,24 +93,28 @@ export const wrapRHF = <P extends Record<string, any>>(
           const { value, ...restAttributes } = props.attributes;
 
           // Create enhanced onChange that dispatches to Redux even when uncontrolled
-          const enhancedOnChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-            const newValue = e.target.value;
+          // Memoize it to prevent recreating on every render
+          const enhancedOnChange = useCallback(
+            (e: React.ChangeEvent<HTMLInputElement>) => {
+              const newValue = e.target.value;
 
-            // Dispatch to Redux so the value is tracked
-            if (formContext?.formId) {
-              dispatchFieldValue(
-                dispatch,
-                formContext.formId,
-                fieldName,
-                newValue,
-              );
-            }
+              // Dispatch to Redux so the value is tracked
+              if (formContext?.formId) {
+                dispatchFieldValue(
+                  dispatch,
+                  formContext.formId,
+                  fieldName,
+                  newValue,
+                );
+              }
 
-            // Call original onChange if it exists
-            if (props.attributes?.onChange) {
-              props.attributes.onChange(e);
-            }
-          };
+              // Call original onChange if it exists
+              if (props.attributes?.onChange) {
+                props.attributes.onChange(e);
+              }
+            },
+            [dispatch, formContext, fieldName, props.attributes],
+          );
 
           const uncontrolledProps = {
             ...props,
@@ -154,7 +158,66 @@ export const wrapRHF = <P extends Record<string, any>>(
 
   WrapRHF.displayName = `wrapRHF(${WrappedComponent.displayName || WrappedComponent.name || 'Component'})`;
 
-  return WrapRHF;
+  // Wrap with React.memo to prevent re-renders when props haven't actually changed
+  // Use deep comparison since props objects are often recreated with same values
+  return React.memo(WrapRHF, (prevProps, nextProps) => {
+    // Quick reference check first
+    if (prevProps === nextProps) {
+      return true; // Skip re-render
+    }
+
+    // Deep compare props
+    const prevKeys = Object.keys(prevProps);
+    const nextKeys = Object.keys(nextProps);
+
+    if (prevKeys.length !== nextKeys.length) {
+      return false; // Allow re-render
+    }
+
+    // Compare each top-level prop
+    for (const key of prevKeys) {
+      const prevValue = prevProps[key];
+      const nextValue = nextProps[key];
+
+      // Reference equality check
+      if (prevValue === nextValue) {
+        continue;
+      }
+
+      // Special handling for attributes object - deep compare
+      if (
+        key === 'attributes' &&
+        typeof prevValue === 'object' &&
+        typeof nextValue === 'object'
+      ) {
+        if (prevValue === null || nextValue === null) {
+          return false; // Allow re-render
+        }
+
+        const prevAttrKeys = Object.keys(prevValue);
+        const nextAttrKeys = Object.keys(nextValue);
+
+        if (prevAttrKeys.length !== nextAttrKeys.length) {
+          return false; // Allow re-render
+        }
+
+        // Compare each attribute
+        for (const attrKey of prevAttrKeys) {
+          if (prevValue[attrKey] !== nextValue[attrKey]) {
+            return false; // Allow re-render
+          }
+        }
+
+        continue; // Attributes are equal, check next prop
+      }
+
+      // For other props, simple inequality means re-render
+      return false; // Allow re-render
+    }
+
+    // All props are equal
+    return true; // Skip re-render
+  }) as unknown as React.ComponentType<P>;
 };
 
 export default wrapRHF;

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { debounce } from 'lodash';
 import { Controller } from 'react-hook-form';
 
@@ -32,7 +32,7 @@ import { setPreviewBackgroundUpdate } from '@/features/pagePreview/previewSlice'
 import { flaggedForRemoval, parseValue } from '@/utils/function-utils';
 
 import type { ComponentType } from 'react';
-import type * as React from 'react';
+import type * as ReactType from 'react';
 import type { PropsValues } from '@drupal-canvas/types';
 import type { ComponentModels } from '@/features/layout/layoutModelSlice';
 import type { InputUIData } from '@/types/Form';
@@ -57,6 +57,48 @@ export const ComponentFormField = <P extends Record<string, any>>({
   const rhfContext = useSafeRHFContext();
   const getCurrentValue = () => getCurrentValueFromProps(props);
   const { attributes } = props;
+
+  // Memoize props to prevent passing new reference when values haven't changed
+  const memoizedPropsRef = useRef<P>(props);
+  const propsStringified = JSON.stringify(props);
+  const prevPropsStringified = useRef(propsStringified);
+
+  if (prevPropsStringified.current !== propsStringified) {
+    // Props actually changed, update the memoized version
+    memoizedPropsRef.current = props;
+    prevPropsStringified.current = propsStringified;
+  }
+  // Use memoized props for all operations
+  const stableProps = memoizedPropsRef.current;
+
+  // Create a memoized version of WrappedComponent with deep comparison
+  // This prevents re-renders when attributes have same values but different reference
+  const MemoizedWrappedComponent = useMemo(
+    () =>
+      React.memo(WrappedComponent, (prevProps, nextProps) => {
+        // Quick reference check
+        if (prevProps === nextProps) return true;
+
+        // Deep compare attributes
+        const prevAttrs = (prevProps.attributes || {}) as Record<string, any>;
+        const nextAttrs = (nextProps.attributes || {}) as Record<string, any>;
+
+        const prevKeys = Object.keys(prevAttrs);
+        const nextKeys = Object.keys(nextAttrs);
+
+        if (prevKeys.length !== nextKeys.length) return false;
+
+        for (const key of prevKeys) {
+          if (prevAttrs[key] !== nextAttrs[key]) {
+            return false;
+          }
+        }
+
+        return true; // All attributes same, skip re-render
+      }),
+    [WrappedComponent],
+  ) as unknown as React.ComponentType<P>;
+
   // Get all component form data and utilities from the hook
   // Note: Currently unused variables are available for component-specific logic
   const {
@@ -221,7 +263,7 @@ export const ComponentFormField = <P extends Record<string, any>>({
     inputAndUiData,
   );
 
-  const parseNewValue = (e: React.ChangeEvent) => {
+  const parseNewValue = (e: ReactType.ChangeEvent) => {
     const schemas = getPropSchemas(inputAndUiData);
     const rawValue = parseValue(
       (e.target as HTMLInputElement | HTMLSelectElement).value,
@@ -252,7 +294,7 @@ export const ComponentFormField = <P extends Record<string, any>>({
     return propName in values ? values[propName] : rawValue;
   };
 
-  const validateNewValue = (e: React.ChangeEvent, newValue: any) => {
+  const validateNewValue = (e: ReactType.ChangeEvent, newValue: any) => {
     const target = e.target as HTMLInputElement;
     if (
       !shouldSkipPropValidation(fieldName, target, inputAndUiData, newValue)
@@ -297,6 +339,92 @@ export const ComponentFormField = <P extends Record<string, any>>({
     propName,
   );
 
+  // Create stable callback references using refs
+  const latestPropsRef = useRef({
+    props: stableProps,
+    formState,
+    dispatch,
+    formContext,
+    parseNewValue,
+    validateNewValue,
+    errorsText,
+    commitFormState,
+    field: null as any,
+  });
+  latestPropsRef.current = {
+    ...latestPropsRef.current,
+    props: stableProps,
+    formState,
+    dispatch,
+    formContext,
+    parseNewValue,
+    validateNewValue,
+    errorsText,
+    commitFormState,
+  };
+
+  // Track props changes for debugging
+  const prevPropsForLogging = useRef<any>(null);
+  const propsRenderCount = useRef(0);
+  propsRenderCount.current += 1;
+
+  if (
+    propsRenderCount.current > 1 &&
+    prevPropsForLogging.current !== stableProps
+  ) {
+    // console.log(`[ComponentFormField ${fieldName}] Props reference changed on render #${propsRenderCount.current}`);
+
+    // Check if it's just reference or actual values
+    if (
+      JSON.stringify(prevPropsForLogging.current) ===
+      JSON.stringify(stableProps)
+    ) {
+      // console.log(`[ComponentFormField ${fieldName}]   → ⚠️ PROPS: SAME VALUES, NEW REFERENCE`);
+    } else {
+      // console.log(`[ComponentFormField ${fieldName}]   → Props values actually changed`);
+    }
+  }
+  prevPropsForLogging.current = stableProps;
+
+  // Create stable onChange handler that won't change reference
+  const stableOnChange = useCallback(
+    (e: any) => {
+      const latest = latestPropsRef.current;
+      const handler = createEnhancedOnChange({
+        field: latest.field,
+        props: latest.props,
+        dispatch: latest.dispatch,
+        formId: latest.formContext?.formId,
+        fieldName,
+        formState: latest.formState,
+        commitFormState: latest.commitFormState,
+        extractNewValue: latest.parseNewValue,
+        validateNewValue: latest.validateNewValue,
+        errorsText: latest.errorsText,
+      });
+      handler(e);
+    },
+    [fieldName],
+  );
+
+  // Create stable onBlur handler that won't change reference
+  const stableOnBlur = useCallback(
+    (e: any) => {
+      const latest = latestPropsRef.current;
+      const handler = createEnhancedOnBlur({
+        field: latest.field,
+        props: latest.props,
+        dispatch: latest.dispatch,
+        formId: latest.formContext?.formId,
+        fieldName,
+        validateNewValue: latest.validateNewValue,
+        errorsText: latest.errorsText,
+      });
+      handler(e);
+    },
+    [fieldName],
+  );
+
   if (!rhfContext) {
     return <WrappedComponent {...props} />;
   }
@@ -307,37 +435,44 @@ export const ComponentFormField = <P extends Record<string, any>>({
       control={rhfContext.control}
       defaultValue={getCurrentValue()}
       render={({ field }) => {
-        const enhancedOnChange = createEnhancedOnChange({
-          field,
-          props,
-          dispatch,
-          formId: formContext?.formId,
-          fieldName,
-          formState,
-          commitFormState,
-          extractNewValue: parseNewValue,
-          validateNewValue,
-          errorsText,
-        });
+        // Store the field in the ref so stable callbacks can access it
+        latestPropsRef.current.field = field;
 
-        const enhancedOnBlur = createEnhancedOnBlur({
-          field,
-          props,
-          dispatch,
-          formId: formContext?.formId,
-          fieldName,
-          validateNewValue,
-          errorsText,
-        });
+        // Track if memoization is working
 
-        const enhancedProps = applyEnhancedProps(
-          props,
-          field,
-          enhancedOnChange,
-          enhancedOnBlur,
-        );
+        const prevEnhancedPropsRef = useRef<any>(null);
 
-        return <WrappedComponent {...enhancedProps} />;
+        // Memoize the enhanced props to prevent creating new attributes object on every render
+
+        const enhancedProps = useMemo(() => {
+          const newEnhancedProps = applyEnhancedProps(
+            stableProps,
+            field,
+            stableOnChange,
+            stableOnBlur,
+          );
+
+          if (
+            prevEnhancedPropsRef.current &&
+            prevEnhancedPropsRef.current !== newEnhancedProps
+          ) {
+            // console.log(`[ComponentFormField ${fieldName}] useMemo created NEW enhancedProps`);
+            if (
+              prevEnhancedPropsRef.current.attributes !==
+              newEnhancedProps.attributes
+            ) {
+              // console.log(`[ComponentFormField ${fieldName}]   → attributes object is different`);
+            }
+          } else if (prevEnhancedPropsRef.current === newEnhancedProps) {
+            // console.log(`[ComponentFormField ${fieldName}] useMemo returned SAME enhancedProps`);
+          }
+
+          prevEnhancedPropsRef.current = newEnhancedProps;
+          return newEnhancedProps;
+          // eslint-disable-next-line react-hooks/exhaustive-deps
+        }, [field, field.value, stableOnChange, stableOnBlur]);
+
+        return <MemoizedWrappedComponent {...(enhancedProps as any)} />;
       }}
     />
   );

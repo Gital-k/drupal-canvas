@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { debounce } from 'lodash';
 import { Controller } from 'react-hook-form';
 
@@ -21,7 +21,7 @@ import {
 } from '@/features/pageData/pageDataSlice';
 
 import type { ComponentType } from 'react';
-import type * as React from 'react';
+import type * as ReactType from 'react';
 import type { PropsValues } from '@drupal-canvas/types';
 
 interface PageDataFormFieldProps<P> {
@@ -49,6 +49,33 @@ export const PageDataFormField = <P extends Record<string, any>>({
   const { attributes } = props;
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const formId = 'page_data_form';
+
+  // Create a memoized version of WrappedComponent with deep comparison
+  const MemoizedWrappedComponent = useMemo(
+    () =>
+      React.memo(WrappedComponent, (prevProps, nextProps) => {
+        // Quick reference check
+        if (prevProps === nextProps) return true;
+
+        // Deep compare attributes
+        const prevAttrs = (prevProps.attributes || {}) as Record<string, any>;
+        const nextAttrs = (nextProps.attributes || {}) as Record<string, any>;
+
+        const prevKeys = Object.keys(prevAttrs);
+        const nextKeys = Object.keys(nextAttrs);
+
+        if (prevKeys.length !== nextKeys.length) return false;
+
+        for (const key of prevKeys) {
+          if (prevAttrs[key] !== nextAttrs[key]) {
+            return false;
+          }
+        }
+
+        return true; // All attributes same, skip re-render
+      }),
+    [WrappedComponent],
+  ) as unknown as React.ComponentType<P>;
 
   // Override getCurrentValue to use pageData from Redux instead of props
   // This ensures undo/redo updates are properly reflected
@@ -100,7 +127,7 @@ export const PageDataFormField = <P extends Record<string, any>>({
     };
   }, [debounceFormStateToStore]);
 
-  const validateNewValue = (e: React.ChangeEvent, newValue: any) => {
+  const validateNewValue = (e: ReactType.ChangeEvent, newValue: any) => {
     if (!(e.target instanceof HTMLInputElement)) {
       return { valid: true, errors: null };
     }
@@ -156,8 +183,67 @@ export const PageDataFormField = <P extends Record<string, any>>({
     }
   };
 
+  // Create stable callback references using refs
+  const latestPropsRef = useRef({
+    props,
+    formState,
+    dispatch,
+    formContext,
+    validateNewValue,
+    errorsText,
+    commitFormState,
+    field: null as any,
+  });
+  latestPropsRef.current = {
+    ...latestPropsRef.current,
+    props,
+    formState,
+    dispatch,
+    formContext,
+    validateNewValue,
+    errorsText,
+    commitFormState,
+  };
+
+  // Create stable onChange handler that won't change reference
+  const stableOnChange = useCallback(
+    (e: any) => {
+      const latest = latestPropsRef.current;
+      const handler = createEnhancedOnChange({
+        field: latest.field,
+        props: latest.props,
+        dispatch: latest.dispatch,
+        formId: latest.formContext?.formId,
+        fieldName,
+        formState: latest.formState,
+        commitFormState: latest.commitFormState,
+        extractNewValue: extractPageDataValue,
+      });
+      handler(e);
+    },
+    [fieldName],
+  );
+
+  // Create stable onBlur handler that won't change reference
+  const stableOnBlur = useCallback(
+    (e: any) => {
+      const latest = latestPropsRef.current;
+      const handler = createEnhancedOnBlur({
+        field: latest.field,
+        props: latest.props,
+        dispatch: latest.dispatch,
+        formId: latest.formContext?.formId,
+        fieldName,
+        validateNewValue: latest.validateNewValue,
+        errorsText: latest.errorsText,
+      });
+      handler(e);
+    },
+    [fieldName],
+  );
+
   if (!rhfContext) {
-    return <WrappedComponent {...props} />;
+    return <MemoizedWrappedComponent {...(props as any)} />;
   }
 
   return (
@@ -166,35 +252,18 @@ export const PageDataFormField = <P extends Record<string, any>>({
       control={rhfContext.control}
       defaultValue={getCurrentValueFromRedux()}
       render={({ field }) => {
-        const enhancedOnChange = createEnhancedOnChange({
-          field,
-          props,
-          dispatch,
-          formId: formContext?.formId,
-          fieldName,
-          formState,
-          commitFormState,
-          extractNewValue: extractPageDataValue,
-        });
+        // Store the field in the ref so stable callbacks can access it
+        latestPropsRef.current.field = field;
 
-        const enhancedOnBlur = createEnhancedOnBlur({
-          field,
-          props,
-          dispatch,
-          formId: formContext?.formId,
-          fieldName,
-          validateNewValue,
-          errorsText,
-        });
+        // Memoize the enhanced props to prevent creating new attributes object on every render
 
-        const enhancedProps = applyEnhancedProps(
-          props,
-          field,
-          enhancedOnChange,
-          enhancedOnBlur,
+        const enhancedProps = useMemo(
+          () => applyEnhancedProps(props, field, stableOnChange, stableOnBlur),
+          // eslint-disable-next-line react-hooks/exhaustive-deps
+          [field, field.value, stableOnChange, stableOnBlur],
         );
 
-        return <WrappedComponent {...enhancedProps} />;
+        return <MemoizedWrappedComponent {...(enhancedProps as any)} />;
       }}
     />
   );
