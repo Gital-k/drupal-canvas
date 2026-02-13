@@ -137,6 +137,7 @@ export const wrapRHF = <P extends Record<string, any>>(
       props,
       WrappedComponent,
       fieldName,
+      hasError: !!fieldError,
     };
 
     return (

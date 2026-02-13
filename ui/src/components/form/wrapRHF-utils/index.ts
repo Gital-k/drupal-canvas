@@ -117,9 +117,9 @@ export const createEnhancedOnBlur = ({
     const validationResult = validateNewValue(e as any, field.value);
     if (!validationResult.valid) {
       if (formId) {
-        if (props.attributes) {
-          props.attributes['data-invalid-prop-value'] = 'true';
-        }
+        // Dispatch validation error to Redux store
+        // (Mutation of props.attributes removed as it doesn't work with memoization
+        // and the attribute wasn't being used anywhere in the codebase)
         dispatchFieldError(
           dispatch,
           formId as FormId,
@@ -228,6 +228,7 @@ export const applyEnhancedProps = <P extends Record<string, any>>(
   field: { value: any },
   enhancedOnChange: (e: any) => void,
   enhancedOnBlur: (e: any) => void,
+  hasError?: boolean,
 ): P => {
   const enhancedProps = { ...props };
   const elementType =
@@ -241,6 +242,7 @@ export const applyEnhancedProps = <P extends Record<string, any>>(
       ...enhancedProps.attributes,
       onChange: enhancedOnChange,
       onBlur: enhancedOnBlur,
+      ...(hasError ? { 'data-invalid-prop-value': 'true' } : {}),
     };
 
     if (isCheckboxElement) {

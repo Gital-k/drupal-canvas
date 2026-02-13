@@ -109,7 +109,7 @@ class ClientDataToEntityConverter {
     $total_lock_wait = 0;
     $max_retries = 3;
     $base_delay = 100;
-
+    $retry = 0;
     for ($retry = 0; $retry <= $max_retries; $retry++) {
       $lock_start_time = microtime(TRUE);
 
@@ -482,16 +482,10 @@ class ClientDataToEntityConverter {
       $ajax_submitted_form = $this->formBuilder->getCache($ajax_form_build_id, $form_state);
       $cache_load_duration = round((microtime(TRUE) - $cache_start_time) * 1000, 2);
 
+      // @phpstan-ignore-next-line
       if ($ajax_submitted_form) {
-        // @phpstan-ignore-next-line
-        \Drupal::logger('canvas_race_condition')->info('✅ FORM CACHE HIT: @method_id successfully loaded cached form in @duration ms', [
-          '@method_id' => $method_request_id,
-          '@duration' => $cache_load_duration,
-          'cache_size' => strlen(serialize($ajax_submitted_form)),
-        ]);
-
         // Check for cache corruption indicators
-        if (empty($ajax_submitted_form) || !is_array($ajax_submitted_form)) {
+        if (!is_array($ajax_submitted_form)) {
           // @phpstan-ignore-next-line
           \Drupal::logger('canvas_race_condition')->error('🚨 CACHE CORRUPTION: @method_id loaded empty or invalid cache structure', [
             '@method_id' => $method_request_id,
@@ -545,14 +539,6 @@ class ClientDataToEntityConverter {
       // ::buildForm. When we're finished submitting the form to build the
       // entity, we will put back the cache entry the way it was.
       if (!$form_state->isProgrammed()) {
-        // @phpstan-ignore-next-line
-        \Drupal::logger('canvas_race_condition')->warning('⚠️ FORM STATE CONFLICT: @method_id found non-programmed cached form state, fixing...', [
-          '@method_id' => $method_request_id,
-          '@build_id' => $ajax_form_build_id,
-          'was_programmed' => $form_state->isProgrammed() ? 'TRUE' : 'FALSE',
-          'was_processing_input' => $form_state->isProcessingInput() ? 'TRUE' : 'FALSE',
-        ]);
-
         // Make note of the cached values so we can reinstate them after
         // submitting the form.
         $was_programmed = $form_state->isProgrammed();
@@ -640,7 +626,6 @@ class ClientDataToEntityConverter {
         'form_id' => $form['#form_id'] ?? 'unknown',
       ]);
     }
-    // @phpstan-ignore-next-line catch.neverThrown
     catch (\TypeError $e) {
       // Handle situation where #element_validate does not appear to be called,
       // such as the options_buttons widget not converting the string value into

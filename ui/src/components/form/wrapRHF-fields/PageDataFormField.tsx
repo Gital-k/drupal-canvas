@@ -29,6 +29,7 @@ interface PageDataFormFieldProps<P> {
   WrappedComponent: ComponentType<P>;
   fieldName: string;
   errorsText: (errors?: any) => string;
+  hasError?: boolean;
 }
 
 /**
@@ -39,6 +40,7 @@ export const PageDataFormField = <P extends Record<string, any>>({
   WrappedComponent,
   fieldName,
   errorsText,
+  hasError,
 }: PageDataFormFieldProps<P>) => {
   const formContext = useSafeFormContext();
   const rhfContext = useSafeRHFContext();
@@ -258,9 +260,16 @@ export const PageDataFormField = <P extends Record<string, any>>({
         // Memoize the enhanced props to prevent creating new attributes object on every render
 
         const enhancedProps = useMemo(
-          () => applyEnhancedProps(props, field, stableOnChange, stableOnBlur),
+          () =>
+            applyEnhancedProps(
+              props,
+              field,
+              stableOnChange,
+              stableOnBlur,
+              hasError,
+            ),
           // eslint-disable-next-line react-hooks/exhaustive-deps
-          [field, field.value, stableOnChange, stableOnBlur],
+          [field, field.value, stableOnChange, stableOnBlur, hasError],
         );
 
         return <MemoizedWrappedComponent {...(enhancedProps as any)} />;

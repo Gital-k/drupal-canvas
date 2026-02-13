@@ -42,6 +42,7 @@ interface ComponentFormFieldProps<P> {
   WrappedComponent: ComponentType<P>;
   fieldName: string;
   errorsText: (errors?: any) => string;
+  hasError?: boolean;
 }
 
 /**
@@ -52,6 +53,7 @@ export const ComponentFormField = <P extends Record<string, any>>({
   WrappedComponent,
   fieldName,
   errorsText,
+  hasError,
 }: ComponentFormFieldProps<P>) => {
   const formContext = useSafeFormContext();
   const rhfContext = useSafeRHFContext();
@@ -450,6 +452,7 @@ export const ComponentFormField = <P extends Record<string, any>>({
             field,
             stableOnChange,
             stableOnBlur,
+            hasError,
           );
 
           if (
@@ -470,7 +473,7 @@ export const ComponentFormField = <P extends Record<string, any>>({
           prevEnhancedPropsRef.current = newEnhancedProps;
           return newEnhancedProps;
           // eslint-disable-next-line react-hooks/exhaustive-deps
-        }, [field, field.value, stableOnChange, stableOnBlur]);
+        }, [field, field.value, stableOnChange, stableOnBlur, hasError]);
 
         return <MemoizedWrappedComponent {...(enhancedProps as any)} />;
       }}
