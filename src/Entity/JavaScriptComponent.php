@@ -286,6 +286,10 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
       'slots',
       'dataDependencies',
     ])) as $key => $value) {
+      // Normalize props: move enum/meta:enum from array level to items level.
+      if ($key === 'props' && is_array($value)) {
+        $value = $this->normalizePropsSchema($value);
+      }
       $this->set($key, $value);
     }
 
@@ -574,6 +578,55 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
    */
   public function getAssetLibraryDependencies(): array {
     return \array_map(static fn (string $dependency): string => \sprintf('canvas/canvasData.%s', $dependency), $this->dataDependencies['drupalSettings'] ?? []);
+  }
+
+  /**
+   * Normalizes the props schema by moving enum/meta:enum from array to items.
+   *
+   * For array types, enum and meta:enum should be defined on the items schema,
+   * not on the array itself. This method ensures compatibility with the
+   * canvas.json_schema.yml config schema.
+   *
+   * @param array $props
+   *   The props schema to normalize.
+   *
+   * @return array
+   *   The normalized props schema.
+   */
+  private function normalizePropsSchema(array $props): array {
+    foreach ($props as $prop_name => &$prop_schema) {
+      if (!is_array($prop_schema)) {
+        continue;
+      }
+
+      // Determine the type (handle both string and array forms).
+      $type = is_array($prop_schema['type'] ?? '')
+        ? $prop_schema['type'][0]
+        : ($prop_schema['type'] ?? '');
+
+      // For array types with items, move enum/meta:enum to items level.
+      if ($type === 'array' && isset($prop_schema['items'])) {
+        // Move enum from array level to items level if present.
+        if (isset($prop_schema['enum'])) {
+          $prop_schema['items']['enum'] = $prop_schema['enum'];
+          unset($prop_schema['enum']);
+        }
+
+        // Move meta:enum from array level to items level if present.
+        if (isset($prop_schema['meta:enum'])) {
+          $prop_schema['items']['meta:enum'] = $prop_schema['meta:enum'];
+          unset($prop_schema['meta:enum']);
+        }
+
+        // Move x-translation-context from array level to items level if present.
+        if (isset($prop_schema['x-translation-context'])) {
+          $prop_schema['items']['x-translation-context'] = $prop_schema['x-translation-context'];
+          unset($prop_schema['x-translation-context']);
+        }
+      }
+    }
+
+    return $props;
   }
 
 }
