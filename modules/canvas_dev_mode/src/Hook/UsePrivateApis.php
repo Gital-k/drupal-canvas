@@ -15,9 +15,13 @@ use Drupal\Core\Hook\Order\Order;
  * mean you agree to chasing API changes until they become public!
  *
  * This module also feature-flags array type support for JSON Schema props.
- * The 'array' type and canvas.json_schema.prop.array definition are dynamically
- * added via hook_config_schema_info_alter() to prevent side effects when the
- * feature is disabled. Once stable, these will be moved to canvas.json_schema.yml.
+ * The 'array' type and canvas.json_schema.prop.array definition are
+ * dynamically added via hook_config_schema_info_alter() to prevent side
+ * effects when the feature is disabled. Once stable, these will be moved to
+ * canvas.json_schema.yml.
+ */
+/**
+ *
  */
 readonly final class UsePrivateApis {
 
@@ -52,7 +56,7 @@ readonly final class UsePrivateApis {
     // Add 'array' to the allowed type choices.
     if (isset($definitions['canvas.json_schema.prop.*']['mapping']['type']['constraints']['Choice']['choices'])) {
       $choices = &$definitions['canvas.json_schema.prop.*']['mapping']['type']['constraints']['Choice']['choices'];
-      if (!in_array('array', $choices)) {
+      if (!in_array('array', $choices, TRUE)) {
         $choices[] = 'array';
       }
     }

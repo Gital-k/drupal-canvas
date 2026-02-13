@@ -594,7 +594,7 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
    *   The normalized props schema.
    */
   private function normalizePropsSchema(array $props): array {
-    foreach ($props as $prop_name => &$prop_schema) {
+    foreach ($props as &$prop_schema) {
       if (!is_array($prop_schema)) {
         continue;
       }
@@ -618,9 +618,10 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
           unset($prop_schema['meta:enum']);
         }
 
-        // Move x-translation-context from array level to items level if present.
+        // Move x-translation-context from array level to items level.
         if (isset($prop_schema['x-translation-context'])) {
-          $prop_schema['items']['x-translation-context'] = $prop_schema['x-translation-context'];
+          $prop_schema['items']['x-translation-context'] =
+            $prop_schema['x-translation-context'];
           unset($prop_schema['x-translation-context']);
         }
       }
