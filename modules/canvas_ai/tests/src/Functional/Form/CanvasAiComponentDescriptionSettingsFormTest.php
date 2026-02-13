@@ -31,6 +31,11 @@ final class CanvasAiComponentDescriptionSettingsFormTest extends BrowserTestBase
   /**
    * {@inheritdoc}
    */
+  protected $strictConfigSchema = TRUE;
+
+  /**
+   * {@inheritdoc}
+   */
   protected static $modules = [
     'canvas',
     'canvas_ai',

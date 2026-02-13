@@ -8,6 +8,7 @@ use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Cache\CacheBackendInterface;
 use Drupal\Core\Cache\Context\CacheContextsManager;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Template\Attribute as TemplateAttribute;
 use Drupal\Core\Theme\ComponentPluginManager;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Symfony\Component\Yaml\Yaml;
@@ -276,8 +277,8 @@ class CanvasAiPageBuilderHelper {
     }
     $output = [];
 
-    // Call the controller method directly instead of making a subrequest.
-    // This avoids the subrequest overhead that was interfering with form rendering.
+    // Call the controller directly to avoid mutating request-stack route context.
+    // Subrequests were causing the settings form submit redirect/title regressions.
     try {
       $available_components_response = $this->apiConfigControllers->list(Component::ENTITY_TYPE_ID);
       $available_components = Json::decode((string) $available_components_response->getContent());
@@ -317,8 +318,8 @@ class CanvasAiPageBuilderHelper {
         ];
       }
     }
+    $available_components_response->addCacheableDependency($base_cacheability);
     $response_cacheability = $available_components_response->getCacheableMetadata();
-    $response_cacheability->addCacheableDependency($base_cacheability);
 
     $max_age = $response_cacheability->getCacheMaxAge();
     if ($max_age !== 0) {
@@ -561,7 +562,7 @@ class CanvasAiPageBuilderHelper {
       $output[$source_id]['components'][$component_id]['props'] = [];
       foreach ($props as $prop_name => $prop_details) {
         // Skip Drupal attributes prop.
-        if ($prop_details['type'] === 'Drupal\Core\Template\Attribute') {
+        if (($prop_details['type'] ?? NULL) === TemplateAttribute::class) {
           continue;
         }
         $default_value = $client_normalized["propSources"][$prop_name]["default_values"]["resolved"] ?? $prop_details['default'] ?? $prop_details['examples'][0] ?? NULL;
@@ -569,7 +570,7 @@ class CanvasAiPageBuilderHelper {
         // Convert it to string so that it can be safely YAML encoded when saving
         // the CanvasAiComponentDescriptionSettingsForm config.
         if ($default_value instanceof MarkupInterface) {
-          $default_value = $default_value->__toString();
+          $default_value = (string) $default_value;
         }
         $output[$source_id]['components'][$component_id]['props'][$prop_name] = [
           'name' => $prop_details['title'] ?? $prop_name,
