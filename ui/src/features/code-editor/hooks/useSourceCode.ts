@@ -31,7 +31,10 @@ import {
 } from '@/features/code-editor/codeEditorSlice';
 import useCompileCss from '@/features/code-editor/hooks/useCompileCss';
 import useCompileJavaScript from '@/features/code-editor/hooks/useCompileJavaScript';
-import { upsertClassNameCandidatesInComment } from '@/features/code-editor/utils/classNameCandidates';
+import {
+  extractClassNameCandidatesFromCss,
+  upsertClassNameCandidatesInComment,
+} from '@/features/code-editor/utils/classNameCandidates';
 import {
   detectValidPropOrSlotChange,
   getJsForSlotsPreview,
@@ -169,12 +172,19 @@ const useSourceCode = (requestedComponentId: string): void => {
           componentId,
           classNameCandidates,
         );
+      // Extract class name candidates from @apply directives in global CSS
+      // so that utilities like `p-1.5` are recognized during the build.
+      const globalCssCandidates =
+        extractClassNameCandidatesFromCss(globalSourceCodeCSS);
+      const allClassNameCandidates = [
+        ...new Set([...nextClassNameCandidates, ...globalCssCandidates]),
+      ];
       // Build Tailwind CSS from the class name candidates. This will be our
       // global CSS. The global CSS source is the Tailwind CSS configuration, but
       // it can also contain arbitrary CSS.
       const { css: globalCompiledCss, error: compiledTailwindError } =
         await buildTailwindCssFromClassNameCandidates(
-          nextClassNameCandidates,
+          allClassNameCandidates,
           globalSourceCodeCSS,
         );
       // Compile the component's JS code.

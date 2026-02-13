@@ -1,7 +1,10 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import { compileCss, extractClassNameCandidates } from 'tailwindcss-in-browser';
-import { upsertClassNameCandidatesInComment } from '@drupal-canvas/ui/features/code-editor/utils/classNameCandidates';
+import {
+  extractClassNameCandidatesFromCss,
+  upsertClassNameCandidatesInComment,
+} from '@drupal-canvas/ui/features/code-editor/utils/classNameCandidates';
 
 import { getConfig } from '../config';
 import { transformCss } from '../lib/transform-css';
@@ -86,8 +89,15 @@ export async function buildTailwindCss(
   globalSourceCodeCss: string,
   distDir: string,
 ) {
+  // Extract class name candidates from @apply directives in global CSS
+  // so that utilities like `p-1.5` are recognized during the build.
+  const globalCssCandidates =
+    extractClassNameCandidatesFromCss(globalSourceCodeCss);
+  const allCandidates = [
+    ...new Set([...classNameCandidates, ...globalCssCandidates]),
+  ];
   const compiledTwCss = await compileCss(
-    classNameCandidates,
+    allCandidates,
     globalSourceCodeCss,
   );
   const transformedTwCss = await transformCss(compiledTwCss);
