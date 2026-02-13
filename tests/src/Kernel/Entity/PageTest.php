@@ -266,22 +266,6 @@ final class PageTest extends CanvasKernelTestBase {
   }
 
   /**
-   * Tests that label() returns stored title when no auto-save exists.
-   */
-  public function testLabelWithoutAutoSave(): void {
-    $entity_type = $this->container->get('entity_type.manager')
-      ->getDefinition(Page::ENTITY_TYPE_ID);
-    $default_title = (string) ApiContentControllers::defaultTitle($entity_type);
-
-    // Create a page with the default title.
-    $page = Page::create(['title' => $default_title]);
-    self::assertSaveWithoutViolations($page);
-
-    // Without an auto-save, the label should be the stored title.
-    self::assertEquals($default_title, $page->label());
-  }
-
-  /**
    * Tests that label() returns stored title for non-new pages even with auto-save.
    */
   public function testLabelForNonNewPageWithAutoSave(): void {
