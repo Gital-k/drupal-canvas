@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Plugin\search_api\processor;
 
+use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\Page;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Form\FormStateInterface;
@@ -106,6 +107,12 @@ final class ComponentTreeInputs extends ProcessorPluginBase implements PluginFor
       if ($datasource->getEntityTypeId() === Page::ENTITY_TYPE_ID) {
         return TRUE;
       }
+      // Support indexing component tree inputs for content entities that are
+      // displayed using Canvas content templates.
+      // @todo Remove the node restriction after https://drupal.org/i/3498525.
+      if ($datasource->getEntityTypeId() === 'node') {
+        return TRUE;
+      }
     }
     return FALSE;
   }
@@ -140,11 +147,23 @@ final class ComponentTreeInputs extends ProcessorPluginBase implements PluginFor
     if (!$entity instanceof FieldableEntityInterface) {
       return;
     }
+
+    $ignored_prop_names = $this->getConfiguration()['ignored_prop_names'];
+    $inputs = [];
+
     try {
-      $inputs = $this->componentTreeInputExtractor->extract($entity, $this->getConfiguration()['ignored_prop_names']);
+      $inputs = $this->componentTreeInputExtractor->extract($entity, $ignored_prop_names);
     }
     catch (\LogicException) {
-      return;
+      // The entity does not have a Canvas field. Try to find a content
+      // template for this entity and extract inputs from its component tree.
+    }
+
+    if (empty($inputs)) {
+      $template = ContentTemplate::loadForEntity($entity, 'default');
+      if ($template !== NULL && $template->status()) {
+        $inputs = $this->componentTreeInputExtractor->extract($template, $ignored_prop_names);
+      }
     }
 
     $fields = $item->getFields();
