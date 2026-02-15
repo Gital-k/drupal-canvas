@@ -40,6 +40,7 @@ use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Entity\Pattern;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
+use Psr\Container\ContainerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 final class CanvasController {
@@ -59,7 +60,8 @@ final class CanvasController {
     private readonly EntityFieldManagerInterface $entityFieldManager,
     private readonly EntityTypeBundleInfoInterface $entityTypeBundleInfo,
     private readonly UrlGeneratorInterface $urlGenerator,
-    private readonly AliasManagerInterface $pathAliasManager,
+    #[Autowire(service: 'service_container')]
+    private readonly ContainerInterface $container,
     private readonly CanvasExtensionPluginManager $extensionPluginManager,
     private readonly ThemeSettingsDiscovery $themeSettingsDiscovery,
     private readonly GlobalImports $globalImports,
@@ -129,7 +131,12 @@ HTML;
     $system_site_config = $this->configFactory->get('system.site');
     $homepage_path = $system_site_config->get('page.front');
     \assert(\is_string($homepage_path));
-    $homepage_internal_path = $this->pathAliasManager->getPathByAlias($homepage_path);
+    $homepage_internal_path = $homepage_path;
+    if ($this->container->has('path_alias.manager')) {
+      $path_alias_manager = $this->container->get('path_alias.manager');
+      \assert($path_alias_manager instanceof AliasManagerInterface);
+      $homepage_internal_path = $path_alias_manager->getPathByAlias($homepage_path);
+    }
     $entity_types_with_keys = [];
     $entity_type_labels = [];
     foreach ($this->entityTypeManager->getDefinitions() as $entity_type_id => $entity_type_definition) {
