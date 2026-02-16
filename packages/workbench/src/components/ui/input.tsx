@@ -4,7 +4,12 @@ import { cn } from '@/lib/utils';
 
 import type * as React from 'react';
 
-function Input({ className, type, ...props }: React.ComponentProps<'input'>) {
+type InputProps = Omit<
+  React.ComponentPropsWithoutRef<typeof InputPrimitive>,
+  'children'
+>;
+
+function Input({ className, type, ...props }: InputProps) {
   return (
     <InputPrimitive
       type={type}

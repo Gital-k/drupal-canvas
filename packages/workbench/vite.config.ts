@@ -1,10 +1,10 @@
 import path from 'path';
 import { defineConfig } from 'vite';
-import { discoverCodeComponents } from '@drupal-canvas/component-discovery';
+import { discoverCodeComponents } from '../component-discovery/src/discover.ts';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 
-import type { DiscoveryResult } from '@drupal-canvas/component-discovery';
+import type { DiscoveryResult } from '../component-discovery/src/types.ts';
 import type { Plugin } from 'vite';
 
 const hostProjectRoot = process.cwd();
