@@ -193,6 +193,9 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
         }
       }
     }
+    if (isset($variables['button']['#value'])) {
+      $variables['button']['#value'] = t('+ Add new');
+    }
   }
 
   /**
