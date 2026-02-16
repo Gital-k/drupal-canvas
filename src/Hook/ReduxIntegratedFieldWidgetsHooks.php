@@ -7,6 +7,7 @@ namespace Drupal\canvas\Hook;
 use Drupal\Core\Asset\AttachedAssetsInterface;
 use Drupal\Component\Serialization\Json;
 use Drupal\Core\Asset\LibraryDiscoveryInterface;
+use Drupal\Core\Extension\ModuleExtensionList;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Hook\Order\OrderAfter;
 use Drupal\Core\Security\TrustedCallbackInterface;
@@ -34,6 +35,7 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
     private readonly LibraryDiscoveryInterface $libraryDiscovery,
     private readonly RequestStack $requestStack,
     private readonly ThemeManagerInterface $themeManager,
+    private readonly ModuleExtensionList $extensionList,
   ) {
   }
 
@@ -83,7 +85,7 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
     // Replace core media library widget JS with Canvas override.
     $media_library_widget_key = 'core/modules/media_library/js/media_library.widget.js';
     if (isset($javascript[$media_library_widget_key])) {
-      $canvas_path = \Drupal::service('extension.list.module')->getPath('canvas');
+      $canvas_path = $this->extensionList->getPath('canvas');
       $javascript[$media_library_widget_key]['data'] = $canvas_path . '/js/media_library.widget.overrides.js';
     }
   }
