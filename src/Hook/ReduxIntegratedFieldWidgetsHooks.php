@@ -224,7 +224,7 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
     foreach (Element::children($element) as $key) {
       // Mark input elements.
       if (isset($element[$key]['#type']) &&
-          in_array($element[$key]['#type'], ['textfield', 'number'], TRUE)) {
+          in_array($element[$key]['#type'], ['textfield'], TRUE)) {
         $element[$key]['#is_multivalue_form'] = TRUE;
       }
       // Recursively process child elements.
