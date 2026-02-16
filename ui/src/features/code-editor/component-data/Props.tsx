@@ -249,7 +249,8 @@ export default function Props() {
               return (
                 <FormPropTypeImage
                   id={prop.id}
-                  example={prop.example as CodeComponentPropImageExample}
+                  example={prop.example as CodeComponentPropImageExample | CodeComponentPropImageExample[]}
+                  isDisabled={componentStatus}
                   required={required.includes(propName)}
                 />
               );
@@ -257,7 +258,8 @@ export default function Props() {
               return (
                 <FormPropTypeVideo
                   id={prop.id}
-                  example={prop.example as CodeComponentPropVideoExample}
+                  example={prop.example as CodeComponentPropVideoExample | CodeComponentPropVideoExample[]}
+                  isDisabled={componentStatus}
                   required={required.includes(propName)}
                 />
               );

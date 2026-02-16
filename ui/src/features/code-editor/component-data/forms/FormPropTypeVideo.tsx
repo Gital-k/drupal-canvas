@@ -79,14 +79,26 @@ export default function FormPropTypeVideo({
   isDisabled = false,
   required,
 }: Pick<CodeComponentProp, 'id'> & {
-  example: CodeComponentPropVideoExample;
+  example: CodeComponentPropVideoExample | CodeComponentPropVideoExample[];
   isDisabled?: boolean;
   required: boolean;
 }) {
-  const exampleAspectRatio = parseExampleSrc(example.poster);
+  // Handle both single video and array (when allowMultiple is enabled)
+  // If it's an array, use the first element for display
+  const videoExample = Array.isArray(example)
+    ? (example[0] || { src: '', poster: '', width: 0, height: 0 })
+    : example;
+
+  const exampleAspectRatio = parseExampleSrc(videoExample.poster);
   const dispatch = useAppDispatch();
   const [aspectRatio, setAspectRatio] = useState(exampleAspectRatio);
   const [localRequired, setLocalRequired] = useState(required);
+
+  // Sync state with incoming example prop (for pre-population on reload)
+  useEffect(() => {
+    const parsedAspectRatio = parseExampleSrc(videoExample.poster);
+    setAspectRatio(parsedAspectRatio);
+  }, [videoExample.poster]);
 
   useEffect(() => {
     // Track changes to the required prop, update aspect ratio if needed.
@@ -113,18 +125,26 @@ export default function FormPropTypeVideo({
         (ratio) => ratio.value === aspectRatio,
       ) || EXAMPLE_ASPECT_RATIO_VALUES[0];
 
+    const newVideoExample = {
+      // ⚠️ @todo This uses the SAME URL for both the live preview and to send to the server at `canvas/api/v0/config/auto-save/js_component/…`.
+      // This needs to send different values for either:
+      // - one of CONFIG_EXAMPLE_URLS to the server
+      // - one of VIDEO_SERVICE_URLS for the live preview
+      src: aspectRatioData.exampleSrc.substring(moduleBaseUrl.length),
+      poster: `${POSTER_SERVICE_URL}${aspectRatioData.width}x${aspectRatioData.height}.png?text=${aspectRatioData.label}`,
+    };
+
+    // If example is an array (allowMultiple enabled), update first element
+    // Otherwise, replace with single object
+    const updatedExample = Array.isArray(example)
+      ? [newVideoExample, ...example.slice(1)]
+      : newVideoExample;
+
     dispatch(
       updateProp({
         id,
         updates: {
-          example: {
-            // ⚠️ @todo This uses the SAME URL for both the live preview and to send to the server at `canvas/api/v0/config/auto-save/js_component/…`.
-            // This needs to send different values for either:
-            // - one of CONFIG_EXAMPLE_URLS to the server
-            // - one of VIDEO_SERVICE_URLS for the live preview
-            src: aspectRatioData.exampleSrc.substring(moduleBaseUrl.length),
-            poster: `${POSTER_SERVICE_URL}${aspectRatioData.width}x${aspectRatioData.height}.png?text=${aspectRatioData.label}`,
-          },
+          example: updatedExample,
         },
       }),
     );

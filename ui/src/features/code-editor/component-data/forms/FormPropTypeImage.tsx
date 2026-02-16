@@ -86,16 +86,29 @@ export default function FormPropTypeImage({
   isDisabled = false,
   required,
 }: Pick<CodeComponentProp, 'id'> & {
-  example: CodeComponentPropImageExample;
+  example: CodeComponentPropImageExample | CodeComponentPropImageExample[];
   isDisabled?: boolean;
   required: boolean;
 }) {
+  // Handle both single image and array (when allowMultiple is enabled)
+  // If it's an array, use the first element for display
+  const imageExample = Array.isArray(example)
+    ? (example[0] || { src: '', width: 0, height: 0, alt: '' })
+    : example;
+
   const { aspectRatio: exampleAspectRatio, pixelDensity: examplePixelDensity } =
-    parseExampleSrc(example.src);
+    parseExampleSrc(imageExample.src);
   const dispatch = useAppDispatch();
   const [aspectRatio, setAspectRatio] = useState(exampleAspectRatio);
   const [pixelDensity, setPixelDensity] = useState(examplePixelDensity);
   const [localRequired, setLocalRequired] = useState(required);
+
+  // Sync state with incoming example prop (for pre-population on reload)
+  useEffect(() => {
+    const parsedValues = parseExampleSrc(imageExample.src);
+    setAspectRatio(parsedValues.aspectRatio);
+    setPixelDensity(parsedValues.pixelDensity);
+  }, [imageExample.src]);
 
   useEffect(() => {
     // Track changes to the required prop, update aspect ratio if needed.
