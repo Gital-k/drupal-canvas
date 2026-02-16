@@ -250,15 +250,13 @@ class ClientDataToEntityConverter {
       // ENTITY LOCKING CLEANUP - Comment out if entity locking is disabled
       // above
       // =============================================================================
-      if ($lock_acquired) {
-        $this->lock->release($lock_id);
-        // @phpstan-ignore-next-line
-        \Drupal::logger('canvas_race_condition')->info('🔓 LOCK RELEASED: @request_id released lock @lock_id', [
-          '@request_id' => $request_id,
-          '@lock_id' => $lock_id,
-        ]);
-      }
-      // =============================================================================
+      $this->lock->release($lock_id);
+      // @phpstan-ignore-next-line
+      \Drupal::logger('canvas_race_condition')->info('🔓 LOCK RELEASED: @request_id released lock @lock_id', [
+        '@request_id' => $request_id,
+        '@lock_id' => $lock_id,
+      ]);
+    // =============================================================================
 
       // Clean up concurrent processing tracker
       unset($active_requests[$request_id]);
@@ -481,8 +479,6 @@ class ClientDataToEntityConverter {
       $cache_start_time = microtime(TRUE);
       $ajax_submitted_form = $this->formBuilder->getCache($ajax_form_build_id, $form_state);
       $cache_load_duration = round((microtime(TRUE) - $cache_start_time) * 1000, 2);
-
-      // @phpstan-ignore-next-line
       if ($ajax_submitted_form) {
         // Check for cache corruption indicators
         if (!is_array($ajax_submitted_form)) {
