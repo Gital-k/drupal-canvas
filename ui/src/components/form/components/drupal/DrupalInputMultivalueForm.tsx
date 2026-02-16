@@ -67,6 +67,7 @@ const DrupalInputMultivalueForm = ({
         align="start"
         sideOffset={4}
         className={styles.popoverContent}
+        style={{ maxWidth: '232px' }}
       >
         {/* Popover Header */}
         <Flex justify="between" align="center" className={styles.popoverHeader}>
@@ -87,7 +88,7 @@ const DrupalInputMultivalueForm = ({
         </Box>
 
         {/* Remove Button */}
-        <Flex justify="center" mt="3">
+        <Flex justify="center">
           <Popover.Close>
             <Button
               variant="ghost"

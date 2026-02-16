@@ -36,3 +36,104 @@ a.tabledrag-handle .handle.handle {
 drupal-html-fragment {
   display: contents;
 }
+
+/* Multivalue Form Styles - Container with dashed blue border */
+.multivalue-container {
+  border: 1px solid #CDCED6;
+  border-radius: 6px;
+  overflow: hidden;
+  background-color: white;
+}
+
+.multivalue-container table {
+  border: none;
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0;
+}
+
+/* Hide table header (Tags label) */
+.multivalue-container table thead,
+.multivalue-container table caption {
+  display: none;
+}
+
+.multivalue-container table tr {
+  border-bottom: 1px solid #CDCED6;
+}
+
+.multivalue-container table tr:last-child {
+  border-bottom: none;
+}
+
+.multivalue-container table td {
+  width: 260px;
+  height: 40px;
+  border-width: 1px;
+  gap: 4px;
+  opacity: 1;
+  border-top-left-radius: 4px;
+  border-top-right-radius: 4px;
+
+}
+
+/* Hide weight column and show row weights link inside multivalue container */
+.multivalue-container .tabledrag-toggle-weight-wrapper,
+.multivalue-container .tabledrag-toggle-weight,
+.multivalue-container td.tabledrag-hide,
+.multivalue-container .field-weight {
+  display: none !important;
+}
+
+/* Position form-item container for absolute positioning of toggle */
+.form-item {
+  position: relative;
+}
+
+/* Style the tabledrag toggle wrapper outside the container */
+.tabledrag-toggle-wrapper {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
+/* Add new button wrapper */
+.add-new-wrapper {
+  border-top: 1px solid #CDCED6;
+}
+
+.add-new-wrapper button,
+.add-new-wrapper input[type="submit"] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  padding: 8px 12px;
+  background-color: white;
+  border: none;
+  color: #3B82F6;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.add-new-wrapper button:hover,
+.add-new-wrapper input[type="submit"]:hover {
+  background-color: #F3F4F6;
+}
+
+.add-new-wrapper button:focus,
+.add-new-wrapper input[type="submit"]:focus {
+  outline: 2px solid #3B82F6;
+  outline-offset: -2px;
+}
+
+.add-new-wrapper button::before,
+.add-new-wrapper input[type="submit"]::before {
+  content: "+";
+  font-size: 16px;
+  font-weight: 600;
+}
+
