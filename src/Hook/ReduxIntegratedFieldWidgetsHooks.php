@@ -79,9 +79,18 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
 
   /**
    * Implements hook_js_alter().
+   *
+   * Replaces core's media library widget JS with a Canvas override to support
+   * multi-cardinality fields with custom weight field naming patterns.
+   *
+   * @see js/media_library.widget.overrides.js
    */
   #[Hook('js_alter')]
   public function jsAlter(array &$javascript, AttachedAssetsInterface $assets): void {
+    // Only replace when in a Canvas context (canvas_stark theme active).
+    if ($this->themeManager->getActiveTheme()->getName() !== 'canvas_stark') {
+      return;
+    }
     // Replace core media library widget JS with Canvas override.
     $media_library_widget_key = 'core/modules/media_library/js/media_library.widget.js';
     if (isset($javascript[$media_library_widget_key])) {
