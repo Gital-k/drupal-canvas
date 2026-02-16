@@ -7,6 +7,7 @@ namespace Drupal\canvas\Entity;
 use Drupal\Core\Entity\ContentEntityForm;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
+use Drupal\Core\Render\Element;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -65,10 +66,10 @@ final class CanvasPageForm extends ContentEntityForm {
     // @see https://www.drupal.org/project/canvas/issues/3531991
     if (isset($form['metatags']['widget'][0])) {
       $form['metatags']['widget'][0]['#type'] = 'container';
-      foreach (\Drupal\Core\Render\Element::children($form['metatags']['widget'][0]) as $key) {
+      foreach (Element::children($form['metatags']['widget'][0]) as $key) {
         if ($key === 'basic') {
           $form['metatags']['widget'][0]['basic']['#type'] = 'container';
-          foreach (\Drupal\Core\Render\Element::children($form['metatags']['widget'][0]['basic']) as $basic_key) {
+          foreach (Element::children($form['metatags']['widget'][0]['basic']) as $basic_key) {
             if ($basic_key !== 'title') {
               $form['metatags']['widget'][0]['basic'][$basic_key]['#access'] = FALSE;
             }
