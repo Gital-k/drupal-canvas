@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Cross2Icon, DragHandleDots2Icon, TrashIcon } from '@radix-ui/react-icons';
+import { ArrowRightIcon, Cross2Icon, DragHandleDots2Icon, TrashIcon } from '@radix-ui/react-icons';
 import { Box, Button, Flex, Popover, Text } from '@radix-ui/themes';
 import InputBehaviors from '@/components/form/inputBehaviors';
 import TextField from '@/components/form/components/TextField';
@@ -57,13 +57,14 @@ const DrupalInputMultivalueForm = ({
             <Text size="2" className={styles.itemText}>
               {displayValue || 'Empty'}
             </Text>
+            <ArrowRightIcon className={styles.arrowIcon} />
           </Box>
         </Popover.Trigger>
       </Flex>
 
       {/* Edit Popover */}
       <Popover.Content
-        side="bottom"
+        side="left"
         align="start"
         sideOffset={4}
         className={styles.popoverContent}

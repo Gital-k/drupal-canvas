@@ -40,7 +40,7 @@ drupal-html-fragment {
 /* Multivalue Form Styles - Container with dashed blue border */
 .multivalue-container {
   border: 1px solid #CDCED6;
-  border-radius: 6px;
+  border-radius: 4px;
   overflow: hidden;
   background-color: white;
 }
@@ -55,15 +55,10 @@ drupal-html-fragment {
 /* Hide table header (Tags label) */
 .multivalue-container table thead,
 .multivalue-container table caption {
-  display: none;
 }
 
 .multivalue-container table tr {
   border-bottom: 1px solid #CDCED6;
-}
-
-.multivalue-container table tr:last-child {
-  border-bottom: none;
 }
 
 .multivalue-container table td {
@@ -74,7 +69,6 @@ drupal-html-fragment {
   opacity: 1;
   border-top-left-radius: 4px;
   border-top-right-radius: 4px;
-
 }
 
 /* Hide weight column and show row weights link inside multivalue container */
@@ -110,7 +104,7 @@ drupal-html-fragment {
   gap: 4px;
   width: 100%;
   padding: 8px 12px;
-  background-color: white;
+  background-color: #F3F4F6;
   border: none;
   color: #3B82F6;
   font-size: 14px;
@@ -119,10 +113,6 @@ drupal-html-fragment {
   transition: background-color 0.15s ease;
 }
 
-.add-new-wrapper button:hover,
-.add-new-wrapper input[type="submit"]:hover {
-  background-color: #F3F4F6;
-}
 
 .add-new-wrapper button:focus,
 .add-new-wrapper input[type="submit"]:focus {

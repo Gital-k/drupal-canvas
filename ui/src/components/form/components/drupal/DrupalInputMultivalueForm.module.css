@@ -9,22 +9,45 @@
 .itemRow {
   width: 100%;
   background-color: white;
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.itemRow:hover {
+  background-color: var(--blue-2);
+}
+
+.itemRow:hover .arrowIcon {
+  opacity: 1;
 }
 
 /* List Item Styles - Clean list style matching design */
 .listItem {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   flex: 1;
   padding: var(--space-3) var(--space-3);
-  background-color: white;
+  background-color: transparent;
   cursor: pointer;
   transition: background-color 0.15s ease;
+  gap: var(--space-2);
 }
 
 
-.listItem:hover {
-  background-color: var(--gray-2);
+.listItem:focus {
+  outline: 2px solid var(--blue-8);
+  outline-offset: -2px;
+}
+
+.arrowIcon {
+  opacity: 0;
+  color: var(--gray-11);
+  transition: opacity 0.15s ease;
+  flex-shrink: 0;
+  position: absolute;
+  right: var(--space-3);
 }
 
 .listItem:focus {
