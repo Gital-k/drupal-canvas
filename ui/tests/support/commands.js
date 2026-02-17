@@ -379,6 +379,27 @@ Cypress.Commands.add('setKeyValue', (collection, values) => {
 });
 
 Cypress.Commands.add('drupalSession', () => {
+  // Handle retry cleanup automatically - runs before setting up the session
+  if (Cypress.currentRetry > 0) {
+    console.log(
+      `🔄 RETRY ATTEMPT ${Cypress.currentRetry} - Performing Drupal cleanup before session setup`,
+    );
+
+    const prefix = Cypress.env('drupalDbPrefix');
+    if (prefix && prefix.length) {
+      console.log(
+        `Found Drupal installation with prefix: ${prefix}, cleaning up...`,
+      );
+      cy.drupalUninstall();
+      console.log(`✅ Pre-retry cleanup completed successfully`);
+      cy.wait(500);
+    } else {
+      console.log(
+        `ℹ️ No Drupal installation found to clean up (no prefix set)`,
+      );
+    }
+  }
+
   cy.visit('/', { failOnStatusCode: false }).then(() => {
     // With this cookie set, visits to the test site will be directed to a
     // version of the site running a test database.

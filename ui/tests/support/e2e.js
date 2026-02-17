@@ -23,37 +23,6 @@ import installLogsCollector from 'cypress-terminal-report/src/installLogsCollect
 
 installLogsCollector();
 
-// Global pre-retry cleanup for better test reliability
-Cypress.on('test:before:run', (test, runnable) => {
-  // Only run cleanup on retry attempts (not first run)
-  if (Cypress.currentRetry > 0) {
-    console.log(
-      `🔄 RETRY ATTEMPT ${Cypress.currentRetry} - Performing Drupal cleanup for test: ${test.title}`,
-    );
-
-    // Check if we have a Drupal installation to clean up
-    const prefix = Cypress.env('drupalDbPrefix');
-
-    if (prefix && prefix.length) {
-      try {
-        // Force uninstall any existing Drupal installation
-        cy.drupalUninstall();
-        console.log(`✅ Pre-retry cleanup completed successfully`);
-
-        // Small wait to ensure cleanup completes before proceeding
-        cy.wait(500);
-      } catch (error) {
-        // Log the failure but don't block the retry
-        console.error(`⚠️ Pre-retry cleanup failed: ${error.message}`);
-      }
-    } else {
-      console.log(
-        `ℹ️ No Drupal installation found to clean up (no prefix set)`,
-      );
-    }
-  }
-});
-
 // Alternatively you can use CommonJS syntax:
 // require('./commands')
 
