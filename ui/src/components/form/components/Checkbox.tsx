@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import clsx from 'clsx';
 
 import { a2p } from '@/local_packages/utils';
@@ -40,39 +40,7 @@ const Checkbox = ({
 }) => {
   const initialChecked = castBoolean(attributes?.checked);
   const [checked, setChecked] = useState(initialChecked);
-  const renderCountRef = useRef(0);
-  const prevAttributesRef = useRef<typeof attributes | null>(null);
-  renderCountRef.current += 1;
 
-  if (renderCountRef.current > 1) {
-    console.log(
-      `[Checkbox] Re-render #${renderCountRef.current} ${attributes.name}`,
-    );
-
-    // Check if attributes changed
-    if (prevAttributesRef.current !== attributes) {
-      console.log(`[Checkbox]   → attributes reference changed`);
-
-      // Check specific attribute keys
-      const prevAttrs = prevAttributesRef.current || {};
-      const changes: string[] = [];
-
-      if (prevAttrs.name !== attributes.name)
-        changes.push(`name: "${prevAttrs.name}" → "${attributes.name}"`);
-      if (prevAttrs.checked !== attributes.checked)
-        changes.push(`checked: ${prevAttrs.checked} → ${attributes.checked}`);
-      if (prevAttrs.onChange !== attributes.onChange)
-        changes.push('onChange function changed');
-
-      if (changes.length > 0) {
-        console.log(`[Checkbox]   → Specific changes:`, changes);
-      } else {
-        console.log(`[Checkbox]   → ⚠️ SAME VALUES, NEW REFERENCE`);
-      }
-    }
-  }
-
-  prevAttributesRef.current = attributes;
   const changeCallback = (
     e: CheckboxEvent | JQueryProxyCheckboxEvent,
     shimJquery = true,
