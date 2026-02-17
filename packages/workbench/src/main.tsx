@@ -3,8 +3,8 @@ import { createRoot } from 'react-dom/client';
 
 import './index.css';
 
-import App from './App.tsx';
-import PreviewFrameApp from './PreviewFrameApp.tsx';
+import App from './App';
+import PreviewFrameApp from './PreviewFrameApp';
 
 const isPreviewFrameRoute =
   window.location.pathname === '/__canvas/preview-frame';

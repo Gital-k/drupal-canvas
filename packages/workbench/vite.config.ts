@@ -11,11 +11,11 @@ import {
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 
-import { discoverCodeComponents } from '../component-discovery/src/discover.ts';
+import { discoverCodeComponents } from '../component-discovery/src/discover';
 import { buildPreviewManifest } from './src/lib/preview-contract';
 
 import type { Plugin } from 'vite';
-import type { DiscoveryResult } from '../component-discovery/src/types.ts';
+import type { DiscoveryResult } from '../component-discovery/src/types';
 
 const hostProjectRoot = process.cwd();
 const runningInsideWorkbenchPackage =
