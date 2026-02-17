@@ -148,7 +148,7 @@ export default function FormPropTypeVideo({
         },
       }),
     );
-  }, [aspectRatio, dispatch, id]);
+  }, [aspectRatio, dispatch, id, example]);
 
   return (
     <Flex direction="column" gap="4" flexGrow="1">
