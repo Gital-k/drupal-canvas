@@ -85,6 +85,11 @@ export interface CodeComponentProp {
     contentMediaType?: string;
     'x-formatting-context'?: string;
     $ref?: string;
+    enum?: (string | number)[];
+    'meta:enum'?: Record<
+      CodeComponentPropEnumItem['value'],
+      CodeComponentPropEnumItem['label']
+    >;
   };
 }
 
@@ -125,6 +130,11 @@ export interface CodeComponentPropSerialized {
     contentMediaType?: string;
     'x-formatting-context'?: string;
     $ref?: string;
+    enum?: (string | number)[];
+    'meta:enum'?: Record<
+      CodeComponentPropEnumItem['value'],
+      CodeComponentPropEnumItem['label']
+    >;
   };
 }
 

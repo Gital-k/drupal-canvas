@@ -152,7 +152,8 @@ export function serializeProps(props: CodeComponentProp[]) {
                   : example,
             ],
           }),
-          ...(enumValues && {
+          // Only add enum/meta:enum at root level if NOT an array
+          ...(!allowMultiple && enumValues && {
             enum: enumValues
               .filter(({ value }) => value !== '')
               .map(({ value }) => (isNumberType ? Number(value) : value)),
@@ -172,6 +173,17 @@ export function serializeProps(props: CodeComponentProp[]) {
         ...(contentMediaType && { contentMediaType }),
         ...(xFormattingContext && {
           'x-formatting-context': xFormattingContext,
+        }),
+        // Add enum/meta:enum inside items for array types
+        ...(enumValues && {
+          enum: enumValues
+            .filter(({ value }) => value !== '')
+            .map(({ value }) => (isNumberType ? Number(value) : value)),
+          'meta:enum': Object.fromEntries(
+            enumValues
+              .filter(({ value }) => value !== '')
+              .map(({ value, label }) => [value, label]),
+          ),
         }),
       };
       // Add maxItems when valueMode is 'limited'
@@ -226,6 +238,10 @@ export function deserializeProps(
     const allowMultiple = type === 'array' && items;
     const actualType = allowMultiple ? items.type : type;
 
+    // When it's an array, enum is inside items; otherwise at top level
+    const actualEnumValues = allowMultiple ? items?.enum : enumValues;
+    const actualMetaEnum = allowMultiple ? items?.['meta:enum'] : metaEnum;
+
     // When it's an array, metadata is inside items; otherwise at top level
     const actualRef = allowMultiple ? items?.$ref : $ref;
     const actualFormat = allowMultiple ? items?.format : format;
@@ -250,6 +266,8 @@ export function deserializeProps(
             format: items.format,
             contentMediaType: items.contentMediaType,
             'x-formatting-context': items['x-formatting-context'],
+            enum: items.enum,
+            'meta:enum': items['meta:enum'],
           }
         : prop;
 
@@ -281,14 +299,14 @@ export function deserializeProps(
         isVideo && typeof example === 'object' && !Array.isArray(example)
           ? deserializeVideoSrc(example as CodeComponentPropVideoExample)
           : example,
-      ...(enumValues && {
-        enum: enumValues.map((value) => ({
+      ...(actualEnumValues && {
+        enum: actualEnumValues.map((value) => ({
           value: isNumberType ? Number(value) : value,
           label: String(value),
         })),
       }),
-      ...(metaEnum && {
-        enum: Object.entries(metaEnum).map(([value, label]) => ({
+      ...(actualMetaEnum && {
+        enum: Object.entries(actualMetaEnum).map(([value, label]) => ({
           value: isNumberType ? Number(value) : value,
           label,
         })),
