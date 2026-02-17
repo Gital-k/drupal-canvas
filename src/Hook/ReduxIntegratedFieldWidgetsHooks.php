@@ -181,8 +181,9 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
   #[Hook('preprocess_field_multiple_value_form')]
   public static function canvasStarkPreprocessFieldMultipleValueForm(array &$variables): void {
     // Apply 'hidden' class to columns 0 and 2 for all table rows.
-    // The remove button and the drag icon that loads from older versions of Drupal core
-    // are hidden with CSS, but they still exist in the DOM and can be interacted with.
+    // The remove button and the drag icon that loads from older
+    // versions of Drupal core are hidden with CSS, but they still
+    // exist in the DOM and can be interacted with.
     if (isset($variables['table']['#rows'])) {
       foreach ($variables['table']['#rows'] as $key => &$row) {
         if (isset($row['data'][0])) {
