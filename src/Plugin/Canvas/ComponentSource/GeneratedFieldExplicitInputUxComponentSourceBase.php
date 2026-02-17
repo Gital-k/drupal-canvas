@@ -262,7 +262,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     return [
       'required' => $required,
       'shapes' => array_combine(
-        \array_map(fn (string $cpe) => ComponentPropExpression::fromString($cpe)->propName, array_keys($prop_shapes)),
+        \array_map(fn (string $cpe) => ComponentPropExpression::fromString($cpe)->propName, \array_keys($prop_shapes)),
         \array_map(fn (PropShape $shape) => $shape->schema, $prop_shapes),
       ),
     ];
@@ -492,7 +492,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
    */
   public function getDefaultExplicitInput(): array {
     $inputs = [];
-    foreach (array_keys($this->configuration['prop_field_definitions']) as $prop_name) {
+    foreach (\array_keys($this->configuration['prop_field_definitions']) as $prop_name) {
       \assert(is_string($prop_name));
       $inputs[$prop_name] = $this->getDefaultStaticPropSource($prop_name, validate_prop_name: FALSE)->toArray();
     }
@@ -822,6 +822,12 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     // data to label attributes.
     if (!empty($propLinkData) && isset($element['#title_display'])) {
       $element['#label_attributes']['prop_link_data'] = $propLinkData;
+    }
+
+    // Make the prop link data available to fieldsets.
+    $wrappers = $element['#theme_wrappers'] ?? [];
+    if (!empty($propLinkData) && in_array('fieldset', $wrappers, TRUE)) {
+      $element['#prop_link_data'] = $propLinkData;
     }
 
     foreach (Element::children($element) as $key) {

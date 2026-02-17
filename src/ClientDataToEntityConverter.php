@@ -22,14 +22,12 @@ use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\Core\Form\FormBuilderInterface;
 use Drupal\Core\Form\FormState;
-use Drupal\Core\Lock\LockBackendInterface;
 use Drupal\canvas\Controller\ClientServerConversionTrait;
 use Drupal\canvas\Exception\ConstraintViolationException;
 use Drupal\canvas\Storage\ComponentTreeLoader;
 use Drupal\file\Plugin\Field\FieldType\FileItem;
 use GuzzleHttp\Psr7\Query;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
-use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
 use Symfony\Component\Validator\ConstraintViolation;
 
 class ClientDataToEntityConverter {
@@ -44,233 +42,67 @@ class ClientDataToEntityConverter {
     private readonly CsrfTokenGenerator $csrfTokenGenerator,
     private readonly ComponentTreeLoader $componentTreeLoader,
     private readonly AutoSaveManager $autoSaveManager,
-    private readonly LockBackendInterface $lock,
   ) {}
 
   /**
    * @todo remove the validate flag in https://www.drupal.org/i/3505018.
    */
   public function convert(array $client_data, FieldableEntityInterface $entity, bool $validate = TRUE): void {
-    $entity_id = $entity->id();
-    $request_id = uniqid('canvas_convert_', TRUE);
-    $start_time = microtime(TRUE);
-
-    // Track concurrent processing (simple static tracker)
-    static $active_requests = [];
-    $concurrent_requests = [];
-    foreach ($active_requests as $existing_request_id => $existing_entity_id) {
-      if ($existing_entity_id === $entity_id) {
-        $concurrent_requests[] = $existing_request_id;
-      }
+    $expected_keys = ['layout', 'model', 'entity_form_fields'];
+    if (!empty(array_diff_key($client_data, array_flip($expected_keys)))) {
+      throw new \LogicException();
     }
-    $active_requests[$request_id] = $entity_id;
+    ['layout' => $layout, 'model' => $model, 'entity_form_fields' => $entity_form_fields] = $client_data;
 
-    // Log entry with race condition tracking
-    // @phpstan-ignore-next-line
-    \Drupal::logger('canvas_race_condition')->info('🚀 CONVERT START: Request @request_id for entity @entity_id (@entity_type)', [
-      '@request_id' => $request_id,
-      '@entity_id' => $entity_id,
-      '@entity_type' => $entity->getEntityTypeId(),
-      'validate' => $validate ? 'TRUE' : 'FALSE',
-      'has_layout' => !empty($client_data['layout']),
-      'has_model' => !empty($client_data['model']),
-      'has_form_fields' => !empty($client_data['entity_form_fields']),
-      'form_fields_count' => count($client_data['entity_form_fields'] ?? []),
-      'concurrent_requests' => count($concurrent_requests),
-      'concurrent_request_ids' => implode(', ', $concurrent_requests),
-    ]);
-
-    if (count($concurrent_requests) > 0) {
-      // @phpstan-ignore-next-line
-      \Drupal::logger('canvas_race_condition')->warning('⚠️ CONCURRENT ACCESS DETECTED: @count requests processing entity @entity_id simultaneously', [
-        '@request_id' => $request_id,
-        '@entity_id' => $entity_id,
-        '@count' => count($concurrent_requests) + 1,
-        'all_request_ids' => implode(', ', array_merge($concurrent_requests, [$request_id])),
-      ]);
-    }
-
-    // =============================================================================
-    // ENTITY LOCKING - Comment out this section to disable entity locking
-    // =============================================================================
-    $lock_id = "canvas_entity_conversion_{$entity_id}";
-    $lock_timeout = 5;
-    $lock_acquired = FALSE;
-
-    // @phpstan-ignore-next-line
-    \Drupal::logger('canvas_race_condition')->info('🔒 LOCK ATTEMPT: @request_id attempting to acquire lock @lock_id', [
-      '@request_id' => $request_id,
-      '@lock_id' => $lock_id,
-      'timeout_seconds' => $lock_timeout,
-    ]);
-
-    // Enhanced lock acquisition with retry mechanism
-    $lock_acquired = FALSE;
-    $total_lock_wait = 0;
-    $max_retries = 3;
-    $base_delay = 100;
-    $retry = 0;
-    for ($retry = 0; $retry <= $max_retries; $retry++) {
-      $lock_start_time = microtime(TRUE);
-
-      // Use shorter timeout per attempt, total time still reasonable
-      $attempt_timeout = $retry === 0 ? $lock_timeout : min(2.0, $lock_timeout / 2);
-      $lock_acquired = $this->lock->acquire($lock_id, $attempt_timeout);
-
-      $lock_wait_duration = round((microtime(TRUE) - $lock_start_time) * 1000, 2);
-      $total_lock_wait += $lock_wait_duration;
-
-      if ($lock_acquired) {
-        if ($retry > 0) {
-          // @phpstan-ignore-next-line
-          \Drupal::logger('canvas_race_condition')->info('✅ LOCK ACQUIRED: @request_id acquired lock @lock_id on retry @retry after @total_duration ms total', [
-            '@request_id' => $request_id,
-            '@lock_id' => $lock_id,
-            '@retry' => $retry,
-            '@total_duration' => $total_lock_wait,
-          ]);
-        }
-        break;
-      }
-
-      // Log retry attempt
-      if ($retry < $max_retries) {
-        $delay = $base_delay * (2 ** $retry);
-        // @phpstan-ignore-next-line
-        \Drupal::logger('canvas_race_condition')->warning('🔄 LOCK RETRY: @request_id failed attempt @attempt, retrying in @delay ms', [
-          '@request_id' => $request_id,
-          '@attempt' => $retry + 1,
-          '@delay' => $delay,
-        ]);
-
-        // Wait before retry (convert ms to microseconds)
-        usleep($delay * 1000);
-      }
-    }
-
-    if (!$lock_acquired) {
-      // @phpstan-ignore-next-line
-      \Drupal::logger('canvas_race_condition')->error('❌ LOCK EXHAUSTED: @request_id could not acquire lock @lock_id after @retries retries and @total_duration ms total', [
-        '@request_id' => $request_id,
-        '@lock_id' => $lock_id,
-        '@retries' => $max_retries,
-        '@total_duration' => $total_lock_wait,
-      ]);
-
-      // Clean up concurrent processing tracker before throwing
-      unset($active_requests[$request_id]);
-
-      // Use TooManyRequestsHttpException (429) for persistent lock contention
-      // This indicates multiple concurrent requests to the same entity
-      throw new TooManyRequestsHttpException(
-        2,
-        "Canvas is processing another operation for this content. Please wait a moment and try again."
-      );
-    }
-
-    if ($retry === 0) {
-      // @phpstan-ignore-next-line
-      \Drupal::logger('canvas_race_condition')->info('✅ LOCK ACQUIRED: @request_id acquired lock @lock_id immediately in @duration ms', [
-        '@request_id' => $request_id,
-        '@lock_id' => $lock_id,
-        '@duration' => $total_lock_wait,
-      ]);
-    }
-    // Note: retry case is logged above in the retry loop
-    // =============================================================================
-    // END ENTITY LOCKING
-    // =============================================================================
+    $item_list = $this->componentTreeLoader->load($entity);
     try {
-      $expected_keys = ['layout', 'model', 'entity_form_fields'];
-      if (!empty(array_diff_key($client_data, array_flip($expected_keys)))) {
-        throw new \LogicException();
-      }
-      ['layout' => $layout, 'model' => $model, 'entity_form_fields' => $entity_form_fields] = $client_data;
+      \assert(count(array_intersect(['nodeType', 'id', 'name', 'components'], \array_keys($layout))) === 4);
+      \assert($layout['nodeType'] === 'region');
+      \assert($layout['id'] === 'content');
+      \assert(is_array($layout['components']));
+      $item_list->setValue(self::convertClientToServer($layout['components'], $model, $entity, $validate));
+    }
+    catch (ConstraintViolationException $e) {
+      // @todo Remove iterator_to_array() after https://www.drupal.org/project/drupal/issues/3497677
+      throw new ConstraintViolationException(new EntityConstraintViolationList($entity, iterator_to_array($e->getConstraintViolationList())));
+    }
 
-      $item_list = $this->componentTreeLoader->load($entity);
+    // The current user may not have access any other fields on the entity or
+    // this function may have been called to only update the layout.
+    $form_validation = new EntityConstraintViolationList($entity);
+    if (\count($entity_form_fields) > 0) {
       try {
-        \assert(count(array_intersect(['nodeType', 'id', 'name', 'components'], array_keys($layout))) === 4);
-        \assert($layout['nodeType'] === 'region');
-        \assert($layout['id'] === 'content');
-        \assert(is_array($layout['components']));
-        $item_list->setValue(self::convertClientToServer($layout['components'], $model, $entity, $validate));
+        $this->setEntityFields($entity, $entity_form_fields);
+        $this->autoSaveManager->saveEntityFormViolations($entity);
       }
       catch (ConstraintViolationException $e) {
-        // @todo Remove iterator_to_array() after https://www.drupal.org/project/drupal/issues/3497677
-        throw new ConstraintViolationException(new EntityConstraintViolationList($entity, iterator_to_array($e->getConstraintViolationList())));
-      }
-
-      // The current user may not have access any other fields on the entity or
-      // this function may have been called to only update the layout.
-      $form_validation = new EntityConstraintViolationList($entity);
-      if (\count($entity_form_fields) > 0) {
-        // @phpstan-ignore-next-line
-        \Drupal::logger('canvas_race_condition')->info('📝 FORM FIELDS PROCESSING: @request_id processing @count form fields', [
-          '@request_id' => $request_id,
-          '@count' => count($entity_form_fields),
-          'field_keys' => implode(', ', array_keys($entity_form_fields)),
-        ]);
-
-        try {
-          $this->setEntityFields($entity, $entity_form_fields);
-          $this->autoSaveManager->saveEntityFormViolations($entity);
-
+        if (!$validate) {
+          // @todo Remove this in https://drupal.org/i/3505018
+          $this->autoSaveManager->saveEntityFormViolations($entity, $e->getConstraintViolationList());
         }
-        catch (ConstraintViolationException $e) {
-          if (!$validate) {
-            // @todo Remove this in https://drupal.org/i/3505018
-            $this->autoSaveManager->saveEntityFormViolations($entity, $e->getConstraintViolationList());
-          }
-          $form_validation->addAll($e->getConstraintViolationList());
-        }
-      }
-
-      // Validate the updated entity:
-      // - at minimum the component tree field has been updated based on
-      // `layout` and `model`
-      // - perhaps also other fields, if `entity_form_fields` was not empty
-      $updated_entity_violations = $entity->validate();
-      $updated_entity_violations->addAll($form_validation);
-      // Validation happens using the server-side representation, but the
-      // error message should use the client-side representation received in
-      // the request body.
-      // @see ::convertClientToServer()
-      if ($updated_entity_violations->count() && $validate) {
-        $field_name = $item_list->getFieldDefinition()->getName();
-        // @todo Remove iterator_to_array() after https://www.drupal.org/project/drupal/issues/3497677
-        throw (new ConstraintViolationException(new EntityConstraintViolationList($entity, iterator_to_array($updated_entity_violations))))->renamePropertyPaths([
-          "$field_name.0.tree[" . ComponentTreeItemList::ROOT_UUID . "]" => 'layout.children',
-          "$field_name.0.tree" => 'layout',
-          "$field_name.0.inputs" => 'model',
-        ]);
+        $form_validation->addAll($e->getConstraintViolationList());
       }
     }
-    finally {
-      // =============================================================================
-      // ENTITY LOCKING CLEANUP - Comment out if entity locking is disabled
-      // above
-      // =============================================================================
-      $this->lock->release($lock_id);
-      // @phpstan-ignore-next-line
-      \Drupal::logger('canvas_race_condition')->info('🔓 LOCK RELEASED: @request_id released lock @lock_id', [
-        '@request_id' => $request_id,
-        '@lock_id' => $lock_id,
+
+    // Validate the updated entity:
+    // - at minimum the component tree field has been updated based on `layout`
+    //   and `model`
+    // - perhaps also other fields, if `entity_form_fields` was not empty
+    $updated_entity_violations = $entity->validate();
+    $updated_entity_violations->addAll($form_validation);
+    // Validation happens using the server-side representation, but the
+    // error message should use the client-side representation received in
+    // the request body.
+    // @see ::convertClientToServer()
+    if ($updated_entity_violations->count() && $validate) {
+      $field_name = $item_list->getFieldDefinition()->getName();
+      // @todo Remove iterator_to_array() after https://www.drupal.org/project/drupal/issues/3497677
+      throw (new ConstraintViolationException(new EntityConstraintViolationList($entity, iterator_to_array($updated_entity_violations))))->renamePropertyPaths([
+        "$field_name.0.tree[" . ComponentTreeItemList::ROOT_UUID . "]" => 'layout.children',
+        "$field_name.0.tree" => 'layout',
+        "$field_name.0.inputs" => 'model',
       ]);
-    // =============================================================================
-
-      // Clean up concurrent processing tracker
-      unset($active_requests[$request_id]);
     }
-
-    // Log completion
-    $end_time = microtime(TRUE);
-    $duration = round(($end_time - $start_time) * 1000, 2);
-    // @phpstan-ignore-next-line
-    \Drupal::logger('canvas_race_condition')->info('✅ CONVERT COMPLETE: @request_id finished in @duration ms', [
-      '@request_id' => $request_id,
-      '@duration' => $duration,
-      'entity_changed' => $entity instanceof EntityChangedInterface ? $entity->getChangedTime() : 'N/A',
-    ]);
   }
 
   /**
@@ -318,84 +150,6 @@ class ClientDataToEntityConverter {
   }
 
   private function setEntityFields(FieldableEntityInterface $entity, array $entity_form_fields): array {
-    $entity_id = $entity->id();
-    $method_request_id = uniqid('set_fields_', TRUE);
-    $method_start_time = microtime(TRUE);
-
-    // =============================================================================
-    // COMPREHENSIVE REQUEST ANALYSIS - Compare working vs non-working cases
-    // =============================================================================
-
-    // Analyze all form field keys to understand request patterns
-    $form_field_keys = array_keys($entity_form_fields);
-    $button_keys = array_filter($form_field_keys, function ($key) {
-      return is_string($key) && (str_contains($key, '_add_more') || str_contains($key, 'submit') || str_contains($key, 'button'));
-    });
-    $field_keys = array_filter($form_field_keys, function ($key) {
-      return is_string($key) && str_starts_with($key, 'field_');
-    });
-    $other_keys = array_diff($form_field_keys, $button_keys, $field_keys);
-
-    // @phpstan-ignore-next-line
-    \Drupal::logger('canvas_request_analysis')->info('🔍 REQUEST ANALYSIS: @method_id analyzing request pattern', [
-      '@method_id' => $method_request_id,
-      '@entity_id' => $entity_id,
-      'total_keys' => count($form_field_keys),
-      'button_keys' => implode(', ', $button_keys),
-      'field_keys' => implode(', ', $field_keys),
-      'other_keys' => implode(', ', $other_keys),
-      'button_count' => count($button_keys),
-      'field_count' => count($field_keys),
-      'has_form_build_id' => array_key_exists('form_build_id', $entity_form_fields) ? 'YES' : 'NO',
-      'has_form_token' => array_key_exists('form_token', $entity_form_fields) ? 'YES' : 'NO',
-      'has_op' => array_key_exists('op', $entity_form_fields) ? 'YES: ' . $entity_form_fields['op'] : 'NO',
-    ]);
-
-    // Sample field values to understand content patterns
-    foreach ($field_keys as $field_key) {
-      $field_value = $entity_form_fields[$field_key];
-      $value_summary = 'unknown';
-
-      if (is_array($field_value)) {
-        $item_count = count($field_value);
-        $empty_count = 0;
-        $filled_count = 0;
-
-        foreach ($field_value as $item) {
-          if (is_array($item) && isset($item['value'])) {
-            $item_val = trim($item['value'] ?? '');
-            if (empty($item_val)) {
-              $empty_count++;
-            }
-            else {
-              $filled_count++;
-            }
-          }
-        }
-        $value_summary = "array({$item_count} items: {$filled_count} filled, {$empty_count} empty)";
-      }
-      elseif (is_string($field_value)) {
-        $value_summary = "string('" . substr($field_value, 0, 50) . "')";
-      }
-      else {
-        $value_summary = gettype($field_value);
-      }
-
-      // @phpstan-ignore-next-line
-      \Drupal::logger('canvas_request_analysis')->info('📋 FIELD CONTENT: @method_id @field = @summary', [
-        '@method_id' => $method_request_id,
-        '@field' => $field_key,
-        '@summary' => $value_summary,
-      ]);
-    }
-
-    // @phpstan-ignore-next-line
-    \Drupal::logger('canvas_race_condition')->info('🔧 SET_ENTITY_FIELDS START: @method_id for entity @entity_id', [
-      '@method_id' => $method_request_id,
-      '@entity_id' => $entity_id,
-      'field_count' => count($entity_form_fields),
-      'has_form_build_id' => array_key_exists('form_build_id', $entity_form_fields) ? 'YES: ' . $entity_form_fields['form_build_id'] : 'NO',
-    ]);
     $expect_form_to_update_changed = FALSE;
     if ($entity instanceof EntityChangedInterface && $entity->hasField('changed')) {
       // TRICKY: We call `$form_object->submitForm($form, $form_state);` which
@@ -463,60 +217,12 @@ class ClientDataToEntityConverter {
     $was_bypassing_programmed_access_checks = FALSE;
     $was_processing_input = TRUE;
     if (\array_key_exists('form_build_id', $entity_form_fields) && \is_string($entity_form_fields['form_build_id'])) {
-      $ajax_form_build_id = $entity_form_fields['form_build_id'];
-      // @phpstan-ignore-next-line
-      \Drupal::logger('canvas_race_condition')->info('🔄 FORM CACHE LOAD: @method_id loading cached form @build_id', [
-        '@method_id' => $method_request_id,
-        '@build_id' => $ajax_form_build_id,
-      ]);
-
       // If an AJAX form submission has modified the form state, and we've
       // recorded the form_build_id in entity form fields, load the cached form
       // state and form. Widgets like Media Library keep track of the selected
       // items in form state so we need to make sure we're using the updated
       // form state.
-      // Enhanced cache corruption detection
-      $cache_start_time = microtime(TRUE);
-      $ajax_submitted_form = $this->formBuilder->getCache($ajax_form_build_id, $form_state);
-      $cache_load_duration = round((microtime(TRUE) - $cache_start_time) * 1000, 2);
-      if ($ajax_submitted_form) {
-        // Check for cache corruption indicators
-        if (!is_array($ajax_submitted_form)) {
-          // @phpstan-ignore-next-line
-          \Drupal::logger('canvas_race_condition')->error('🚨 CACHE CORRUPTION: @method_id loaded empty or invalid cache structure', [
-            '@method_id' => $method_request_id,
-            '@build_id' => $ajax_form_build_id,
-            'cache_type' => gettype($ajax_submitted_form),
-          ]);
-        }
-      }
-      else {
-        // @phpstan-ignore-next-line
-        \Drupal::logger('canvas_race_condition')->warning('❌ FORM CACHE MISS: @method_id failed to load cached form @build_id in @duration ms', [
-          '@method_id' => $method_request_id,
-          '@build_id' => $ajax_form_build_id,
-          '@duration' => $cache_load_duration,
-        ]);
-
-        // Check if cache backend is having issues (using default cache instead
-        // of form cache)
-        try {
-          // @phpstan-ignore-next-line
-          $cache_backend_status = \Drupal::cache('default')->get('test_cache_health_' . time());
-          // @phpstan-ignore-next-line
-          \Drupal::logger('canvas_race_condition')->info('🔍 CACHE BACKEND STATUS: @method_id cache backend responding: @status', [
-            '@method_id' => $method_request_id,
-            '@status' => $cache_backend_status !== FALSE ? 'OK' : 'DEGRADED',
-          ]);
-        }
-        catch (\Exception $e) {
-          // @phpstan-ignore-next-line
-          \Drupal::logger('canvas_race_condition')->warning('⚠️ CACHE BACKEND CHECK FAILED: @method_id could not check cache status: @error', [
-            '@method_id' => $method_request_id,
-            '@error' => $e->getMessage(),
-          ]);
-        }
-      }
+      $ajax_submitted_form = $this->formBuilder->getCache($entity_form_fields['form_build_id'], $form_state);
       // We've retrieved a form state from the cache, but it might now no longer
       // be programmed - despite us flagging it as so above. When we call
       // ::buildForm below, it will attempt to load the form state from the
@@ -534,6 +240,7 @@ class ClientDataToEntityConverter {
       // form state cache with the programmed flag set before we call
       // ::buildForm. When we're finished submitting the form to build the
       // entity, we will put back the cache entry the way it was.
+      $ajax_form_build_id = $entity_form_fields['form_build_id'];
       if (!$form_state->isProgrammed()) {
         // Make note of the cached values so we can reinstate them after
         // submitting the form.
@@ -548,12 +255,6 @@ class ClientDataToEntityConverter {
         $form_state->setProcessInput()
           ->setProgrammed()
           ->setProgrammedBypassAccessCheck(FALSE);
-
-        // @phpstan-ignore-next-line
-        \Drupal::logger('canvas_race_condition')->info('🔧 FORM CACHE UPDATE: @method_id updating cached form state to programmed', [
-          '@method_id' => $method_request_id,
-        ]);
-
         // Update the form state cache so that the Form Builder picks up the
         // programmed version during ::buildForm.
         $this->formBuilder->setCache($ajax_form_build_id, $ajax_submitted_form, $form_state);
@@ -595,69 +296,7 @@ class ClientDataToEntityConverter {
     // buttons removed.
     $form_state->setUserInput($entity_form_fields);
 
-    // Capture debug info to log only if an error occurs.
-    $pre_build_debug_info = [
-      'validation_complete' => $form_state->isValidationComplete() ? 'TRUE' : 'FALSE',
-      'programmed' => $form_state->isProgrammed() ? 'TRUE' : 'FALSE',
-      'cache_loaded' => isset($ajax_submitted_form) ? 'TRUE' : 'FALSE',
-      'build_id' => $ajax_form_build_id ?? 'none',
-      'processing_input' => $form_state->isProcessingInput() ? 'TRUE' : 'FALSE',
-    ];
-
-    // @phpstan-ignore-next-line
-    \Drupal::logger('canvas_race_condition')->info('🏗️ FORM BUILD START: @method_id building form', [
-      '@method_id' => $method_request_id,
-      'pre_build_state' => json_encode($pre_build_debug_info),
-    ]);
-
-    $build_start_time = microtime(TRUE);
-    try {
-      $form = $this->formBuilder->buildForm($form_object, $form_state);
-      $build_duration = round((microtime(TRUE) - $build_start_time) * 1000, 2);
-
-      // @phpstan-ignore-next-line
-      \Drupal::logger('canvas_race_condition')->info('✅ FORM BUILD SUCCESS: @method_id completed in @duration ms', [
-        '@method_id' => $method_request_id,
-        '@duration' => $build_duration,
-        'form_id' => $form['#form_id'] ?? 'unknown',
-      ]);
-    }
-    catch (\TypeError $e) {
-      // Handle situation where #element_validate does not appear to be called,
-      // such as the options_buttons widget not converting the string value into
-      // the expected array in
-      // \Drupal\Core\Field\Plugin\Field\FieldWidget\OptionsWidgetBase::validateElement.
-      if (strpos($e->getMessage(), 'massageFormValues') !== FALSE &&
-        strpos($e->getMessage(), 'must be of type array, string given') !== FALSE) {
-
-        // Log the issue for debugging with captured state info
-        // @phpstan-ignore-next-line
-        \Drupal::logger('canvas_race_condition')->error('🚨 RACE CONDITION DETECTED: @method_id buildForm TypeError - @message', [
-          '@method_id' => $method_request_id,
-          '@message' => $e->getMessage(),
-          '@debug_info' => json_encode($pre_build_debug_info),
-          'build_duration_before_error' => round((microtime(TRUE) - $build_start_time) * 1000, 2),
-        ]);
-
-        // Clear any potentially corrupted cached form state and rebuild from
-        // scratch.
-        if ($ajax_form_build_id) {
-          $this->formBuilder->deleteCache($ajax_form_build_id);
-        }
-
-        // Create a fresh form state and try again
-        $form_state = ClientFormSubmissionHelper::prepareProgrammedFormStateForFormObject(
-          (new FormState()),
-          $form_object
-        )->setUserInput($entity_form_fields);
-
-        $form = $this->formBuilder->buildForm($form_object, $form_state);
-      }
-      else {
-        // Re-throw if it's a different TypeError
-        throw $e;
-      }
-    }
+    $form = $this->formBuilder->buildForm($form_object, $form_state);
     $violations_list = new EntityConstraintViolationList($entity);
     $errors = $form_state->getErrors();
     $invalid_fields = [];
@@ -683,123 +322,8 @@ class ClientDataToEntityConverter {
         $invalid_fields[$property_path] = $field_name;
       }
     }
-
-    // Capture debug info to log only if an error occurs during submitForm.
-    $pre_submit_debug_info = [
-      'validation_complete' => $form_state->isValidationComplete() ? 'TRUE' : 'FALSE',
-      'error_count' => count($form_state->getErrors()),
-      'values_keys_sample' => implode(',', array_slice(array_keys($form_state->getValues()), 0, 10)) . '...',
-      'has_form' => isset($form) ? 'TRUE' : 'FALSE',
-    ];
-
-    // Uncomment the following to force validation to re-run before submitForm.
-    // This ensures #element_validate callbacks always run regardless of cached
-    // state.
-    // $form_state->setValidationComplete(FALSE);
-    // $this->formBuilder->validateForm($form['#form_id'], $form, $form_state);
-
     // Now trigger the form level submit handler.
-    // @phpstan-ignore-next-line
-    \Drupal::logger('canvas_race_condition')->info('📤 FORM SUBMIT START: @method_id submitting form', [
-      '@method_id' => $method_request_id,
-      'pre_submit_state' => json_encode($pre_submit_debug_info),
-    ]);
-
-    $submit_start_time = microtime(TRUE);
-    try {
-      $form_object->submitForm($form, $form_state);
-      $submit_duration = round((microtime(TRUE) - $submit_start_time) * 1000, 2);
-
-      // @phpstan-ignore-next-line
-      \Drupal::logger('canvas_race_condition')->info('✅ FORM SUBMIT SUCCESS: @method_id completed in @duration ms', [
-        '@method_id' => $method_request_id,
-        '@duration' => $submit_duration,
-        'final_error_count' => count($form_state->getErrors()),
-      ]);
-
-      // =============================================================================
-      // POST-SUBMISSION ANALYSIS - See what changed during submitForm()
-      // =============================================================================
-      // @phpstan-ignore-next-line
-      \Drupal::logger('canvas_request_analysis')->info('📊 POST-SUBMIT STATE: @method_id analyzing entity state after submitForm()', [
-        '@method_id' => $method_request_id,
-        'form_rebuilt' => $form_state->isRebuilding() ? 'YES' : 'NO',
-        'validation_complete' => $form_state->isValidationComplete() ? 'YES' : 'NO',
-        'has_triggering_element' => $form_state->getTriggeringElement() ? 'YES' : 'NO',
-        'triggering_element_name' => $form_state->getTriggeringElement()['#name'] ?? 'N/A',
-        'triggering_element_value' => $form_state->getTriggeringElement()['#value'] ?? 'N/A',
-      ]);
-
-      // Check field states after submission for multi-value fields
-      foreach ($entity->getFields() as $field_name => $field_items) {
-        if (str_starts_with($field_name, 'field_') && $field_items->getFieldDefinition()->getFieldStorageDefinition()->isMultiple()) {
-          $current_count = $field_items->count();
-          $empty_count = 0;
-          $filled_count = 0;
-
-          foreach ($field_items as $item) {
-            if ($item->isEmpty()) {
-              $empty_count++;
-            }
-            else {
-              $filled_count++;
-            }
-          }
-
-          // @phpstan-ignore-next-line
-          \Drupal::logger('canvas_request_analysis')->info('📝 FIELD STATE POST-SUBMIT: @method_id @field has @total items (@filled filled, @empty empty)', [
-            '@method_id' => $method_request_id,
-            '@field' => $field_name,
-            '@total' => $current_count,
-            '@filled' => $filled_count,
-            '@empty' => $empty_count,
-          ]);
-        }
-      }
-      // =============================================================================
-    }
-    catch (\TypeError $e) {
-      // Handle situation where #element_validate does not appear to be called,
-      // such as the options_buttons widget not converting the string value
-      // into the expected array in
-      // \Drupal\Core\Field\Plugin\Field\FieldWidget\OptionsWidgetBase::validateElement.
-      if (strpos($e->getMessage(), 'massageFormValues') !== FALSE &&
-        strpos($e->getMessage(), 'must be of type array, string given') !== FALSE) {
-
-        // Log the issue for debugging
-        // @phpstan-ignore-next-line
-        \Drupal::logger('canvas_race_condition')->error('🚨 RACE CONDITION DETECTED: @method_id submitForm TypeError - @message', [
-          '@method_id' => $method_request_id,
-          '@message' => $e->getMessage(),
-          '@debug_info' => json_encode($pre_submit_debug_info),
-          'submit_duration_before_error' => round((microtime(TRUE) - $submit_start_time) * 1000, 2),
-        ]);
-
-        // Clear any potentially corrupted cached form state and rebuild from
-        // scratch.
-        if ($ajax_form_build_id) {
-          $this->formBuilder->deleteCache($ajax_form_build_id);
-        }
-
-        // Create a fresh form state and rebuild the form, then try submit again
-        $fresh_form_state = ClientFormSubmissionHelper::prepareProgrammedFormStateForFormObject(
-          (new FormState()),
-          $form_object
-        )->setUserInput($entity_form_fields);
-
-        $fresh_form = $this->formBuilder->buildForm($form_object, $fresh_form_state);
-        $form_object->submitForm($fresh_form, $fresh_form_state);
-
-        // Update our references to use the fresh versions
-        $form = $fresh_form;
-        $form_state = $fresh_form_state;
-      }
-      else {
-        // Re-throw if it's a different TypeError
-        throw $e;
-      }
-    }
-
+    $form_object->submitForm($form, $form_state);
     if ($ajax_form_build_id !== NULL && $ajax_submitted_form !== NULL) {
       // This conversion submitted the form and didn't trigger a form rebuild.
       // That means that the form cache entry will be deleted. The AJAX form in
@@ -816,7 +340,6 @@ class ClientDataToEntityConverter {
       $form_state->setProgrammedBypassAccessCheck($was_bypassing_programmed_access_checks)
         ->setProcessInput($was_processing_input)
         ->setProgrammed($was_programmed);
-
       $this->formBuilder->setCache($ajax_form_build_id, $ajax_submitted_form, $form_state);
     }
     // And retrieve the updated entity.
@@ -896,17 +419,6 @@ class ClientDataToEntityConverter {
       // Update the form ID.
       $values['form_id'] = $form['#form_id'];
     }
-
-    $method_end_time = microtime(TRUE);
-    $method_duration = round(($method_end_time - $method_start_time) * 1000, 2);
-    // @phpstan-ignore-next-line
-    \Drupal::logger('canvas_race_condition')->info('✅ SET_ENTITY_FIELDS COMPLETE: @method_id finished in @duration ms', [
-      '@method_id' => $method_request_id,
-      '@duration' => $method_duration,
-      'returned_values_count' => count($values),
-      'has_form_build_id_result' => array_key_exists('form_build_id', $values) ? 'YES: ' . $values['form_build_id'] : 'NO',
-    ]);
-
     return $values;
   }
 

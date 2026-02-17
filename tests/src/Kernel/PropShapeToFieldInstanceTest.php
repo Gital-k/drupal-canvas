@@ -76,7 +76,7 @@ class PropShapeToFieldInstanceTest extends CanvasKernelTestBase {
    * @dataProvider provider
    */
   public function test(array $modules, array $expected): void {
-    $missing_test_modules = array_diff($modules, array_keys(\Drupal::service('extension.list.module')->getList()));
+    $missing_test_modules = array_diff($modules, \array_keys(\Drupal::service('extension.list.module')->getList()));
     if (!empty($missing_test_modules)) {
       $this->markTestSkipped(\sprintf('The %s test modules are missing.', implode(',', $missing_test_modules)));
     }
@@ -311,7 +311,7 @@ class PropShapeToFieldInstanceTest extends CanvasKernelTestBase {
       if (!$entity_type->entityClassImplements(FieldableEntityInterface::class)) {
         continue;
       }
-      $bundles = array_keys($bundle_info->getBundleInfo($entity_type_id));
+      $bundles = \array_keys($bundle_info->getBundleInfo($entity_type_id));
       sort($bundles);
       foreach ($bundles as $bundle) {
         $entity_types_and_bundles[] = ['type' => $entity_type_id, 'bundle' => $bundle];
@@ -415,8 +415,8 @@ class PropShapeToFieldInstanceTest extends CanvasKernelTestBase {
     }
 
     ksort($matches);
-    self::assertSame(array_keys($expected), array_keys($matches));
-    foreach (array_keys($expected) as $key) {
+    self::assertSame(\array_keys($expected), \array_keys($matches));
+    foreach (\array_keys($expected) as $key) {
       $matches_instances_extraneous = array_diff($matches[$key]['instances'], $expected[$key]['instances']);
       $matches_instances_missing = array_diff($expected[$key]['instances'], $matches[$key]['instances']);
       self::assertSame([], $matches_instances_extraneous, "🐛 $key — either extraneous field instance matches found, or missing expectations");
@@ -1387,6 +1387,31 @@ class PropShapeToFieldInstanceTest extends CanvasKernelTestBase {
               ],
             ],
           ],
+        ],
+        'optional, type=string&$ref=json-schema-definitions://canvas.module/stream-wrapper-uri' => [
+          'SDC props' => [
+            '⿲sdc_test_all_props:all-props␟test_string_format_' . JsonSchemaStringFormat::Uri->value . '_public_stream_wrapper',
+            '⿲sdc_test_all_props:all-props␟test_string_format_' . JsonSchemaStringFormat::Uri->value . '_public_stream_wrapper_using_ref',
+          ],
+          'static prop source' => 'ℹ︎file␟entity␜␜entity:file␝uri␞␟value',
+          'instances' => [
+            'ℹ︎␜entity:canvas_page␝image␞␟entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:media:baby_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:media:press_releases␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:media:vacation_videos␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media:baby_videos␝field_media_video_file␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media:vacation_videos␝field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟value',
+            'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝thumbnail␞␟entity␜␜entity:file␝uri␞␟value',
+          ],
+          'adapter_matches_field_type' => [],
+          'adapter_matches_instance' => [],
         ],
         'optional, type=string&contentMediaType=text/html' => [
           'SDC props' => [
