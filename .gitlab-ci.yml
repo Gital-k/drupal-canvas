@@ -91,7 +91,7 @@ variables:
 
   # Enable Canvas contributors to change this from `true` to `false` to disable E2E (end-to-end) tests.
   # (Useful when early in an MR and/or developing low-level functionality that is unlikely to affect E2E tests.)
-  _CANVAS_E2E_TESTS: true
+  _CANVAS_E2E_TESTS: false
 
 # @todo Remove when https://www.drupal.org/project/gitlab_templates/issues/3452183 lands.
 .is-push-rule: &is-push-rule
@@ -336,6 +336,34 @@ phpunit:
     - *SDC-files-change-rule
     - *UI-fixtures-files-change-rule
     - *manual-rule
+
+deprecations (php):
+  extends: .phpunit-base
+  stage: validate
+  allow_failure: true
+  variables:
+    _PHPUNIT_CONCURRENT: 1
+    # @see https://git.drupalcode.org/project/gitlab_templates/-/blob/main/docs/jobs/phpunit.md#deprecations
+    # @see https://symfony.com/doc/current/components/phpunit_bridge.html#making-tests-fail
+    SYMFONY_DEPRECATIONS_HELPER: "ignoreFile=$CI_PROJECT_DIR/$_WEB_ROOT/core/.deprecation-ignore.txt&max[total]=100&max[direct]=50&max[self]=0"
+    # @todo 🚧 delete prior to merging
+    _PHPUNIT_TESTGROUPS: 'canvas_data_model'
+  before_script:
+    # This CI job cares only about *upstream* not *sidestream*: core + core dependencies, not contrib modules.
+    - echo "Delete all installed contrib modules to avoid them interfering (breaking) Canvas' deprecation testing."
+    - ls -al $CI_PROJECT_DIR/$_WEB_ROOT/modules/contrib
+    - rm -rf $CI_PROJECT_DIR/$_WEB_ROOT/modules/contrib/*
+  needs:
+    # TRICKY: this is unfixable in 11.2!
+    # @see https://www.drupal.org/project/drupal/issues/3555534#comment-16458397
+    - composer (next minor)
+    - UI
+  # @todo Remove when https://www.drupal.org/project/gitlab_templates/issues/3452183 lands.
+  rules:
+    - *is-push-rule
+    - *manual-rule
+    # @todo 🚧 delete prior to merging
+    - *php-files-change-rule
 
 phpunit (11.3):
   extends: phpunit

@@ -20,6 +20,7 @@ use Symfony\Component\Routing\Route;
  *
  * @coversDefaultClass \Drupal\canvas_oauth\Authentication\Provider\CanvasOauthAuthenticationProvider
  * @group canvas_oauth
+ * @requires module simple_oauth
  */
 class CanvasOauthAuthenticationProviderTest extends KernelTestBase {
 
