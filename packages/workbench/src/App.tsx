@@ -1,22 +1,61 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { fetchDiscoveryResult } from '@/lib/discovery-client';
+import {
+  fetchDiscoveryResult,
+  fetchPreviewManifest,
+} from '@wb/lib/discovery-client';
+import {
+  isPreviewFrameEvent,
+  type PreviewManifest,
+  type PreviewManifestComponent,
+  type PreviewRenderRequest,
+} from '@wb/lib/preview-contract';
 
-import type { DiscoveryResult } from '@/lib/discovery-client';
+import type { DiscoveryResult } from '@wb/lib/discovery-client';
+
+function pickInitialSelection(manifest: PreviewManifest): string | null {
+  const firstPreviewable = manifest.components.find((component) => component.previewable);
+  if (firstPreviewable) {
+    return firstPreviewable.id;
+  }
+
+  return manifest.components[0]?.id ?? null;
+}
 
 export function App() {
-  const [result, setResult] = useState<DiscoveryResult | null>(null);
+  const [discoveryResult, setDiscoveryResult] = useState<DiscoveryResult | null>(null);
+  const [previewManifest, setPreviewManifest] = useState<PreviewManifest | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
+  const [isFrameReady, setIsFrameReady] = useState(false);
+  const [frameStatus, setFrameStatus] = useState('Waiting for frame.');
+  const [iframeKey, setIframeKey] = useState(0);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+
+  const selectedComponent = useMemo<PreviewManifestComponent | null>(() => {
+    if (!previewManifest || !selectedComponentId) {
+      return null;
+    }
+
+    return (
+      previewManifest.components.find(
+        (component) => component.id === selectedComponentId,
+      ) ?? null
+    );
+  }, [previewManifest, selectedComponentId]);
 
   useEffect(() => {
     let isMounted = true;
 
-    void fetchDiscoveryResult()
-      .then((response) => {
+    void Promise.all([fetchDiscoveryResult(), fetchPreviewManifest()])
+      .then(([discovery, manifest]) => {
         if (!isMounted) {
           return;
         }
-        setResult(response);
+
+        setDiscoveryResult(discovery);
+        setPreviewManifest(manifest);
+        setSelectedComponentId(pickInitialSelection(manifest));
       })
       .catch((fetchError: unknown) => {
         if (!isMounted) {
@@ -26,7 +65,7 @@ export function App() {
         setError(
           fetchError instanceof Error
             ? fetchError.message
-            : 'Unknown discovery error.',
+            : 'Unknown workbench loading error.',
         );
       });
 
@@ -35,55 +74,184 @@ export function App() {
     };
   }, []);
 
+  useEffect(() => {
+    const handleFrameMessage = (event: MessageEvent<unknown>) => {
+      if (event.origin !== window.location.origin) {
+        return;
+      }
+
+      if (!isPreviewFrameEvent(event.data)) {
+        return;
+      }
+
+      if (event.data.type === 'preview:ready') {
+        setIsFrameReady(true);
+        setFrameStatus('Frame ready.');
+        return;
+      }
+
+      if (event.data.type === 'preview:rendered') {
+        setFrameStatus(`Rendered component ${event.data.payload.componentId}.`);
+        return;
+      }
+
+      if (event.data.type === 'preview:error') {
+        setFrameStatus(event.data.payload.message);
+      }
+    };
+
+    window.addEventListener('message', handleFrameMessage);
+    return () => {
+      window.removeEventListener('message', handleFrameMessage);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedComponent || !selectedComponent.previewable || !isFrameReady) {
+      return;
+    }
+
+    const frameWindow = iframeRef.current?.contentWindow;
+    if (!frameWindow || !selectedComponent.moduleUrl) {
+      return;
+    }
+
+    const message: PreviewRenderRequest = {
+      source: 'canvas-workbench-parent',
+      type: 'preview:render',
+      payload: {
+        componentId: selectedComponent.id,
+        moduleUrl: selectedComponent.moduleUrl,
+        cssUrl: selectedComponent.cssUrl,
+        globalCssUrl: previewManifest?.globalCssUrl ?? null,
+        props: selectedComponent.exampleProps,
+      },
+    };
+
+    setFrameStatus(`Rendering component ${selectedComponent.name}...`);
+    frameWindow.postMessage(message, window.location.origin);
+  }, [isFrameReady, previewManifest, selectedComponent]);
+
   if (error) {
-    return <div>Discovery failed: {error}</div>;
+    return <div>Workbench failed: {error}</div>;
   }
 
-  if (!result) {
-    return <div>Loading discovery...</div>;
+  if (!discoveryResult || !previewManifest) {
+    return <div>Loading Workbench preview data...</div>;
   }
 
   return (
-    <main>
-      <h1>Canvas Workbench discovery prototype</h1>
+    <main className="grid min-h-screen grid-cols-[320px_1fr]">
+      <aside className="border-r p-4">
+        <h1 className="text-xl font-semibold">Canvas Workbench</h1>
+        <p className="text-sm opacity-75">
+          {previewManifest.components.length} discovered components
+        </p>
+        <p className="text-sm opacity-75">
+          Scanned: {discoveryResult.stats.scannedFiles}, ignored:{' '}
+          {discoveryResult.stats.ignoredFiles}
+        </p>
 
-      <p>
-        Scan root: <code>{result.scanRoot}</code>
-      </p>
+        <div className="mt-4 flex flex-col gap-2">
+          {previewManifest.components.map((component) => (
+            <button
+              key={component.id}
+              type="button"
+              className="rounded border p-2 text-left"
+              data-selected={component.id === selectedComponentId}
+              onClick={() => setSelectedComponentId(component.id)}
+            >
+              <div className="font-medium">{component.name}</div>
+              <div className="text-xs opacity-70">{component.relativeDirectory}</div>
+              <div className="text-xs">
+                {component.previewable
+                  ? 'Previewable'
+                  : `Unsupported: ${component.ineligibilityReason}`}
+              </div>
+            </button>
+          ))}
+        </div>
 
-      <p>
-        Found {result.components.length} component
-        {result.components.length === 1 ? '' : 's'} and {result.warnings.length}{' '}
-        warning{result.warnings.length === 1 ? '' : 's'}.
-      </p>
+        {previewManifest.warnings.length > 0 ? (
+          <section className="mt-4">
+            <h2 className="text-sm font-semibold">Warnings</h2>
+            <ul className="mt-2 text-xs">
+              {previewManifest.warnings.map((warning, index) => (
+                <li key={`${warning.code}-${warning.path ?? 'none'}-${index}`}>
+                  <strong>{warning.code}</strong>: {warning.message}
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+      </aside>
 
-      <p>
-        Scanned metadata files: {result.stats.scannedFiles}. Ignored by
-        .gitignore: {result.stats.ignoredFiles}.
-      </p>
+      <section className="flex min-h-screen flex-col p-4">
+        <header className="mb-2 flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">
+              {selectedComponent ? selectedComponent.name : 'No selection'}
+            </h2>
+            <p className="text-sm opacity-70">{frameStatus}</p>
+          </div>
+          <button
+            type="button"
+            className="rounded border px-3 py-1"
+            onClick={() => {
+              setIsFrameReady(false);
+              setFrameStatus('Reloading frame...');
+              setIframeKey((value) => value + 1);
+            }}
+          >
+            Reload frame
+          </button>
+        </header>
 
-      <h2>Components</h2>
-      <ul>
-        {result.components.map((component) => (
-          <li key={component.id}>
-            <strong>{component.name}</strong> ({component.kind})
-            <div>Directory: {component.relativeDirectory}</div>
-            <div>Metadata: {component.metadataPath}</div>
-            <div>JS: {component.jsEntryPath ?? 'none'}</div>
-            <div>CSS: {component.cssEntryPath ?? 'none'}</div>
-          </li>
-        ))}
-      </ul>
+        {selectedComponent ? (
+          <section className="mb-3 rounded border p-3">
+            <h3 className="text-sm font-semibold">Example props (first examples)</h3>
+            <pre className="mt-2 overflow-auto rounded bg-black/5 p-2 text-xs">
+              {JSON.stringify(selectedComponent.exampleProps, null, 2)}
+            </pre>
+          </section>
+        ) : null}
 
-      <h2>Warnings</h2>
-      <ul>
-        {result.warnings.map((warning, index) => (
-          <li key={`${warning.code}-${warning.path ?? 'none'}-${index}`}>
-            <strong>{warning.code}</strong>: {warning.message}
-            {warning.path ? <div>Path: {warning.path}</div> : null}
-          </li>
-        ))}
-      </ul>
+        <section className="mb-3 rounded border p-3">
+          <h3 className="text-sm font-semibold">Preview runtime debug</h3>
+          <pre className="mt-2 overflow-auto rounded bg-black/5 p-2 text-xs">
+            {JSON.stringify(
+              {
+                globalCssUrl: previewManifest.globalCssUrl,
+                selectedComponentId: selectedComponent?.id ?? null,
+                selectedModuleUrl: selectedComponent?.moduleUrl ?? null,
+                selectedComponentCssUrl: selectedComponent?.cssUrl ?? null,
+                frameReady: isFrameReady,
+                frameStatus,
+              },
+              null,
+              2,
+            )}
+          </pre>
+        </section>
+
+        {!selectedComponent ? (
+          <div className="rounded border p-4">No components were discovered.</div>
+        ) : !selectedComponent.previewable ? (
+          <div className="rounded border p-4">
+            This component is not previewable in strict mode. Reason:{' '}
+            {selectedComponent.ineligibilityReason}
+          </div>
+        ) : (
+          <iframe
+            key={iframeKey}
+            ref={iframeRef}
+            title="Canvas component preview"
+            src="/__canvas/preview-frame"
+            className="h-[80vh] w-full rounded border"
+            sandbox="allow-scripts allow-same-origin"
+          />
+        )}
+      </section>
     </main>
   );
 }
