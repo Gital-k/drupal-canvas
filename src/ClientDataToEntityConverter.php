@@ -309,8 +309,8 @@ class ClientDataToEntityConverter {
         $property_path = \implode('.', $parents);
         $invalid_value = NestedArray::getValue($entity_form_fields, $parents);
         $violations_list->add(new ConstraintViolation(
-        // Some errors may contain markup from the user of % placeholders in
-        // TranslatableMarkup. We just want the plain text version.
+          // Some errors may contain markup from the user of % placeholders in
+          // TranslatableMarkup. We just want the plain text version.
           PlainTextOutput::renderFromHtml((string) $error),
           NULL,
           [],

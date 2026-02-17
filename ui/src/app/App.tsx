@@ -74,7 +74,6 @@ const App: React.FC = () => {
         (e.target as HTMLElement).tagName === 'INPUT' &&
         (e.target as HTMLElement).closest('[data-canvas-tabledrag="true"]')
       ) {
-        console.log('here we are!');
         document.body.setAttribute(
           'data-canvas-layout-request-in-progress',
           'true',

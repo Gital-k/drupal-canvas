@@ -1,10 +1,18 @@
 import { useState } from 'react';
 
+
+
 import Toggle from '@/components/form/components/Toggle';
 import { wrapRHF } from '@/components/form/wrapRHF';
 import { a2p } from '@/local_packages/utils.js';
 
+
+
 import type { Attributes } from '@/types/DrupalAttribute';
+
+
+
+
 
 interface DrupalElement {
   '#default_value'?: string | number;
@@ -20,15 +28,11 @@ const DrupalToggle = ({
   };
   element?: DrupalElement;
 }) => {
-  // Always prioritize element-based defaults over attributes.checked for initial state
-  const initialValue = Object.prototype.hasOwnProperty.call(
-    Object(element),
-    '#value',
-  )
-    ? element['#value']
-    : element?.['#default_value'] || false;
-
-  const [isChecked, setIsChecked] = useState(initialValue);
+  const [isChecked, setIsChecked] = useState(
+    Object.prototype.hasOwnProperty.call(Object(element), '#value')
+      ? element['#value']
+      : element?.['#default_value'] || false,
+  );
 
   return (
     <Toggle

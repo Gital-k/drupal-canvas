@@ -5,7 +5,6 @@
 
 /* global csstree */
 (function (Drupal, csstree, drupalSettings) {
-  const buildIdHistory = [];
 
   /**
    * A map to keep track of the association between form build ID and the
@@ -561,13 +560,8 @@
         const [, response] = args;
         const el = args[0].element;
         const domFormId = el.closest('form')?.getAttribute('id');
-        const commandId = `${domFormId} | old: ${response.old} | new: ${response.new}`;
-        if (!buildIdHistory.includes(commandId)) {
-          buildIdHistory.push(commandId);
-        }
         const formId = getFormId(response.old);
         if (!formId) {
-          console.log('no form id', domFormId);
           return;
         }
         if (!['page_data_form', 'component_instance_form'].includes(formId)) {
@@ -588,10 +582,7 @@
             formId,
           },
         });
-        if (!buildIdHistory.includes(`${commandId} event`)) {
-          buildIdHistory.push(`${commandId} event`);
-          document.dispatchEvent(event);
-        }
+        document.dispatchEvent(event);
       };
     },
   };

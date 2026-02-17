@@ -1,11 +1,18 @@
 import { useState } from 'react';
 import clsx from 'clsx';
 
+
+
 import { a2p } from '@/local_packages/utils';
+
+
 
 import type { Attributes } from '@/types/DrupalAttribute';
 
+
+
 import styles from './Checkbox.module.css';
+
 
 interface CheckboxTarget extends EventTarget {
   checked: boolean;
@@ -38,8 +45,7 @@ const Checkbox = ({
     onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   };
 }) => {
-  const initialChecked = castBoolean(attributes?.checked);
-  const [checked, setChecked] = useState(initialChecked);
+  const [checked, setChecked] = useState(castBoolean(attributes?.checked));
 
   const changeCallback = (
     e: CheckboxEvent | JQueryProxyCheckboxEvent,
@@ -68,7 +74,6 @@ const Checkbox = ({
     <input
       {...a2p(attributes, {}, { skipAttributes: ['checked', 'value'] })}
       defaultChecked={checked}
-      // value="1"
       className={clsx(attributes.class, styles.base, checked && styles.checked)}
       onChange={changeCallback}
       ref={(node) => {

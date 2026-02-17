@@ -154,9 +154,6 @@ const FormatSelect = ({
             changeEvent.skipOriginalOnChange = true;
 
             attributes.onChange(changeEvent);
-            console.log(
-              `[FormatSelect] Called enhancedOnChange for ${fieldName} => ${formatName}`,
-            );
           }
         }}
       >

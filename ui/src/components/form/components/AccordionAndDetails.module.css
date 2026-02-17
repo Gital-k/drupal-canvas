@@ -15,8 +15,6 @@
   height: 0;
   transition: height 200ms ease-in-out;
   height: var(--radix-collapsible-content-height);
-  /*&[data-state="open"] {*/
-  /*}*/
   &[data-state="closed"] {
     max-height: 0;
   }

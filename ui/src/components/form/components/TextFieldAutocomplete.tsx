@@ -89,11 +89,6 @@ const TextFieldAutocomplete = ({
           if (inputRef.current) {
             inputRef.current.setAttribute('data-canvas-no-update', 'true');
           }
-          // Call the onChange listener, which will update the UI but not the
-          // store or preview, due to the attribute set above.
-          // if (typeof attributes.onChange === 'function') {
-          //   attributes.onChange(e);
-          // }
 
           const autocompleteDelay =
             inputRef.current &&
