@@ -36,6 +36,7 @@ const DrupalInputMultivalueForm = ({
     value?: string;
     name?: string;
     id?: string;
+    'data-field-label'?: string;
   };
 }) => {
   // Get the initial value from attributes
@@ -45,7 +46,7 @@ const DrupalInputMultivalueForm = ({
     initialValue as string,
   );
   const inputWrapperRef = useRef<HTMLDivElement | null>(null);
-  const fieldLabel = 'Text';
+  const fieldLabel = attributes['data-field-label'] || '';
 
   // Handle input changes - update both local state and call original onChange
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {

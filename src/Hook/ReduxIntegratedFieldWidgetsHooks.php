@@ -213,8 +213,11 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
     $is_multiple = $field_definition->getFieldStorageDefinition()->isMultiple();
 
     if ($is_multiple && $this->themeManager->getActiveTheme()->getName() === 'canvas_stark') {
-      // Mark all input elements within multivalue widgets.
-      $this->markMultivalueFormElements($widget);
+      // Get the field label to add to all input elements.
+      $field_label = $field_definition->getLabel();
+      
+      // Mark all input elements within multivalue widgets and add field title.
+      $this->markMultivalueFormElements($widget, $field_label);
     }
   }
 
@@ -223,17 +226,20 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
    *
    * @param array &$element
    *   The form element to process.
+   * @param string $field_label
+   *   The field label to add to input elements.
    */
-  private function markMultivalueFormElements(array &$element): void {
+  private function markMultivalueFormElements(array &$element, string $field_label): void {
     foreach (Element::children($element) as $key) {
       // Mark input elements.
       if (isset($element[$key]['#type']) &&
           in_array($element[$key]['#type'], ['textfield'], TRUE)) {
         $element[$key]['#is_multivalue_form'] = TRUE;
+        $element[$key]['#attributes']['data-field-label'] = $field_label;
       }
       // Recursively process child elements.
       if (is_array($element[$key])) {
-        $this->markMultivalueFormElements($element[$key]);
+        $this->markMultivalueFormElements($element[$key], $field_label);
       }
     }
   }
