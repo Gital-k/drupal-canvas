@@ -92,9 +92,12 @@ export default function FormPropTypeImage({
 }) {
   // Handle both single image and array (when allowMultiple is enabled)
   // If it's an array, use the first element for display
+  // Handle edge case where example might be an empty string (when prop type is first created/changed)
   const imageExample = Array.isArray(example)
     ? example[0] || { src: '', width: 0, height: 0, alt: '' }
-    : example;
+    : typeof example === 'string' || !example
+      ? { src: '', width: 0, height: 0, alt: '' }
+      : example;
 
   const { aspectRatio: exampleAspectRatio, pixelDensity: examplePixelDensity } =
     parseExampleSrc(imageExample.src);
