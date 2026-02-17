@@ -73,7 +73,7 @@ const DrupalInputMultivalueForm = ({
           <DragHandleDots2Icon />
         </Box>
         {/* List Item View - Trigger */}
-        <Popover.Trigger asChild>
+        <Popover.Trigger>
           <Box className={styles.listItem}>
             <Text size="2" className={styles.itemText}>
               {displayValue || 'Empty'}
