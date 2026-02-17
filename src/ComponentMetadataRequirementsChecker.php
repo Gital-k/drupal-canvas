@@ -137,7 +137,7 @@ final class ComponentMetadataRequirementsChecker {
       if ($type === 'array' && isset($prop['items']['enum'], $prop['items']['meta:enum']) && !empty($forbidden_key_characters)) {
         foreach ($prop['items']['meta:enum'] as $meta_key => $meta_value) {
           $meta_key_with_replacements = str_replace(
-            array_keys($forbidden_key_characters),
+            \array_keys($forbidden_key_characters),
             array_values($forbidden_key_characters),
             (string) $meta_key,
           );
@@ -147,7 +147,7 @@ final class ComponentMetadataRequirementsChecker {
         }
 
         $meta_enum_valid_keys = \array_map(fn($key) => str_replace(
-          array_keys($forbidden_key_characters),
+          \array_keys($forbidden_key_characters),
           array_values($forbidden_key_characters),
           (string) $key,
         ), $prop['items']['enum']);

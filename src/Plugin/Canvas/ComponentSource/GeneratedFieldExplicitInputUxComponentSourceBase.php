@@ -300,7 +300,8 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     // Retrieve the JSON schema for this explicit input prop.
     $schema = (new PropShape($explicit_input_definitions['shapes'][$prop_name]))->resolvedSchema;
 
-    // For array types, enum is inside items; for non-array types, enum is at root
+    // For array types, enum is inside items; for non-array types,
+    // enum is at root.
     $is_array_type = ($schema['type'] ?? NULL) === 'array' && \array_key_exists('items', $schema);
     $enum_schema = $is_array_type ? $schema['items'] : $schema;
 

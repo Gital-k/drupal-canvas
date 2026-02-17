@@ -134,8 +134,8 @@ final class DefaultRelativeUrlPropSource extends PropSourceBase {
 
   private static function recurse(array $json_schema, mixed $value, UrlRewriteInterface $component_source): mixed {
     if ($json_schema['type'] === 'array') {
-      // Ensure value is an array. If it's not (e.g., empty string or other scalar),
-      // convert it to an empty array to prevent type errors.
+      // Ensure value is an array. If it's not (e.g., empty string or
+      // other scalar), convert it to an empty array to prevent type errors.
       if (!is_array($value)) {
         $value = [];
       }

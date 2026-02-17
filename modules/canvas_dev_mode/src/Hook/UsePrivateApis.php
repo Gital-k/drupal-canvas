@@ -20,9 +20,6 @@ use Drupal\Core\Hook\Order\Order;
  * effects when the feature is disabled. Once stable, these will be moved to
  * canvas.json_schema.yml.
  */
-/**
- *
- */
 readonly final class UsePrivateApis {
 
   /**
