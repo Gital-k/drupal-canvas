@@ -69,9 +69,9 @@ final class ApiLayoutController {
       fn (string $region_name): string => $region_name === CanvasPageVariant::MAIN_CONTENT_REGION
         ? CanvasPageVariant::MAIN_CONTENT_REGION
         : "$theme.$region_name",
-      array_keys($theme_regions)
+      \array_keys($theme_regions)
     );
-    $this->regionsClientSideIds = array_combine($server_side_ids, array_keys($theme_regions));
+    $this->regionsClientSideIds = array_combine($server_side_ids, \array_keys($theme_regions));
     $this->regions = array_combine($server_side_ids, $theme_regions);
     \assert(array_key_exists(CanvasPageVariant::MAIN_CONTENT_REGION, $this->regions));
   }
@@ -133,7 +133,19 @@ final class ApiLayoutController {
       // Auto-update component instances before serving them, which will make
       // the preview accurate with what the editor would see when editing the
       // component tree.
-      $this->componentSourceManager->updateComponentInstances($items);
+      $wasModified = $this->componentSourceManager->updateComponentInstances($items);
+
+      // If the tree was modified (e.g., orphaned children removed due to
+      // component evolution), create an auto-save so later PATCH requests
+      // load the updated tree instead of the published version.
+      if ($wasModified) {
+        $entity = $items->getParent()?->getValue();
+        \assert($entity instanceof ComponentTreeEntityInterface || $entity instanceof FieldableEntityInterface);
+        if ($entity instanceof ComponentTreeEntityInterface) {
+          $entity->setComponentTree($items->getValue());
+        }
+        $this->autoSaveManager->saveEntity($entity);
+      }
 
       $built = $items->getClientSideRepresentation($preview_entity);
       $model += $built['model'];
@@ -286,7 +298,7 @@ final class ApiLayoutController {
 
     // Inform the UI of the updated reality.
     $data = $this->buildLayoutAndModel($entity, $regions, preview_entity: $preview_entity);
-    \assert(['layout', 'model'] === array_keys($data));
+    \assert(['layout', 'model'] === \array_keys($data));
     if ($entity instanceof FieldableEntityInterface) {
       $data['entity_form_fields'] = $this->getFilteredEntityData($entity);
     }
@@ -347,9 +359,9 @@ final class ApiLayoutController {
     unset($region_layouts[CanvasPageVariant::MAIN_CONTENT_REGION]);
     $missing_regions = array_diff_key($region_layouts, $regions);
     if ($missing_regions) {
-      throw new NotFoundHttpException('Unknown regions: ' . implode(', ', array_keys($missing_regions)));
+      throw new NotFoundHttpException('Unknown regions: ' . implode(', ', \array_keys($missing_regions)));
     }
-    foreach (array_keys($region_layouts) as $client_side_region_id) {
+    foreach (\array_keys($region_layouts) as $client_side_region_id) {
       // Check access to regions if any component was added or removed.
       if (!$regions[$client_side_region_id]->access('edit')) {
         throw new AccessDeniedHttpException(\sprintf('Access denied for region %s', $client_side_region_id));
