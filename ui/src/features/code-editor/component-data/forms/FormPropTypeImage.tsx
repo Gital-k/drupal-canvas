@@ -105,10 +105,19 @@ export default function FormPropTypeImage({
 
   // Sync state with incoming example prop (for pre-population on reload)
   useEffect(() => {
+    // If example is empty string, it means user selected "None", so set to NONE_VALUE
+    if (typeof example === 'string' && example === '') {
+      setAspectRatio(NONE_VALUE);
+      return;
+    }
+    // If example is empty array, keep current aspectRatio (don't reset to default)
+    if (Array.isArray(example) && example.length === 0) {
+      return;
+    }
     const parsedValues = parseExampleSrc(imageExample.src);
     setAspectRatio(parsedValues.aspectRatio);
     setPixelDensity(parsedValues.pixelDensity);
-  }, [imageExample.src]);
+  }, [imageExample.src, example]);
 
   useEffect(() => {
     // Track changes to the required prop, update aspect ratio if needed.

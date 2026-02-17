@@ -431,7 +431,9 @@ describe('props in code editor', () => {
         expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
       });
       // The pixel density should now be hidden.
-      expect(screen.queryByLabelText('Pixel density')).not.toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.queryByLabelText('Pixel density')).not.toBeInTheDocument();
+      });
 
       await waitFor(() => {
         const prop = selectCodeComponentProperty('props')(store.getState())[0];

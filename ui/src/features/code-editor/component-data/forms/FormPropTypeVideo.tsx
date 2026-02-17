@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Flex, Select } from '@radix-ui/themes';
 
 import { useAppDispatch } from '@/app/hooks';
@@ -94,11 +94,24 @@ export default function FormPropTypeVideo({
   const [aspectRatio, setAspectRatio] = useState(exampleAspectRatio);
   const [localRequired, setLocalRequired] = useState(required);
 
+  // Use ref to track the previous aspect ratio to prevent infinite loops
+  // Initialize to null so the first render will set the example
+  const prevAspectRatioRef = useRef<string | null>(null);
+
   // Sync state with incoming example prop (for pre-population on reload)
   useEffect(() => {
+    // If example is empty string, it means user selected "None", so set to NONE_VALUE
+    if (typeof example === 'string' && example === '') {
+      setAspectRatio(NONE_VALUE);
+      return;
+    }
+    // If example is empty array, keep current aspectRatio (don't reset to default)
+    if (Array.isArray(example) && example.length === 0) {
+      return;
+    }
     const parsedAspectRatio = parseExampleSrc(videoExample.poster);
     setAspectRatio(parsedAspectRatio);
-  }, [videoExample.poster]);
+  }, [videoExample.poster, example]);
 
   useEffect(() => {
     // Track changes to the required prop, update aspect ratio if needed.
@@ -109,6 +122,20 @@ export default function FormPropTypeVideo({
   }, [required, localRequired, aspectRatio]);
 
   useEffect(() => {
+    // Check if we need to initialize with a default value on first mount
+    // This handles the case where example is an empty string when the prop is first created
+    const isEmptyExample =
+      (typeof example === 'string' && example === '') ||
+      (Array.isArray(example) && example.length === 0);
+
+    const isFirstRender = prevAspectRatioRef.current === null;
+
+    // Only run if aspect ratio actually changed OR if this is first render with empty example
+    if (aspectRatio === prevAspectRatioRef.current && !(isFirstRender && isEmptyExample)) {
+      return;
+    }
+    prevAspectRatioRef.current = aspectRatio;
+
     if (aspectRatio === NONE_VALUE) {
       dispatch(
         updateProp({
@@ -137,7 +164,7 @@ export default function FormPropTypeVideo({
     // If example is an array (allowMultiple enabled), update first element
     // Otherwise, replace with single object
     const updatedExample = Array.isArray(example)
-      ? [newVideoExample, ...example.slice(1)]
+      ? [newVideoExample, ...(example.slice(1) || [])]
       : newVideoExample;
 
     dispatch(
