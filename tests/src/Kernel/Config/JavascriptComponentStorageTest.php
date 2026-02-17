@@ -130,6 +130,7 @@ final class JavascriptComponentStorageTest extends AssetLibraryStorageTest {
     $js_component->setProps($props);
     $this->assertSame([
       '' => 'Prop "title" has invalid example value: [] String value found, but an array or an object is required',
+      'props.title' => ''items' is a required key because props.title.type is array (see config schema type canvas.json_schema.prop.array).',
       'props.title.type' => 'The value you selected is not a valid choice.',
     ], self::violationsToArray($js_component->getTypedData()->validate()));
 
