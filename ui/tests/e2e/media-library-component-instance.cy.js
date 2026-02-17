@@ -27,9 +27,9 @@ const testMediaLibraryInComponentInstanceForm = (
     'not.be.checked',
   );
   cy.findByLabelText('Select The bones are their money').check();
-  // cy.pause();
+
   cy.get('button[data-once="drupal-ajax"]:contains("Insert selected")').click();
-  // cy.waitForAjax();
+
   cy.get('div[role="dialog"]').should('not.exist');
   cy.get(
     '[class*="contextualPanel"] input[aria-label="Remove The bones are their money"]',
@@ -72,11 +72,8 @@ const testMediaLibraryInComponentInstanceForm = (
     );
 
     const removeIt = `[class*="contextualPanel"] .js-media-library-selection  [aria-label="${step.removeText}"][data-once="drupal-ajax"]`;
-    // eslint-disable-next-line cypress/no-unnecessary-waiting
-    cy.wait(100);
+    cy.reasonableWait();
     cy.get(removeIt).realClick();
-    // cy.waitForAjax();
-    // cy.pause();
 
     cy.get(removeIt).should('not.exist');
     cy.selectorShouldHaveUpdatedFormBuildId(
@@ -89,16 +86,14 @@ const testMediaLibraryInComponentInstanceForm = (
     // Waiting for the preview (the last request after clicking remove) does not
     // appear to work reliably either. Hence, the fixed wait. Presumably there is
     // something that can be waited on, but it is not clear what.
-    // eslint-disable-next-line cypress/no-unnecessary-waiting
-    cy.wait(100);
+    cy.reasonableWait();
     const addIt = `[class*="contextualPanel"] .js-media-library-widget .js-media-library-open-button[data-once="drupal-ajax"]`;
     cy.get(addIt).first().click();
-    // cy.waitForAjax();
 
     cy.get('div[role="dialog"]').should('exist');
     cy.findByLabelText(step.selectNewText).check();
     cy.get('button:contains("Insert selected")').click();
-    // cy.waitForAjax();
+
     cy.wait('@patch');
     cy.get('div[role="dialog"]').should('not.exist');
     cy.selectorShouldHaveUpdatedFormBuildId(
@@ -202,7 +197,6 @@ describe('Media Library component instance', () => {
         '.previewOverlay [data-canvas-component-id="sdc.canvas_test_sdc.image"]',
       ).should('have.length', 2);
       cy.clickComponentInPreview('Test SDC Image', 0);
-      // cy.waitForAjax();
 
       cy.get(
         '[class*="contextualPanel"] .js-media-library-open-button[data-once="drupal-ajax"]',
@@ -210,7 +204,6 @@ describe('Media Library component instance', () => {
         .first()
         .click();
 
-      // cy.waitForAjax();
       testMediaLibraryInComponentInstanceForm(cy, 'canvas_page');
     },
   );

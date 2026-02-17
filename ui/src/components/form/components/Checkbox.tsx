@@ -46,9 +46,9 @@ const Checkbox = ({
 
   if (renderCountRef.current > 1) {
     console
-      .log
-      // `[Checkbox] Re-render #${renderCountRef.current}`,
-      ();
+      .log(
+      `[Checkbox] Re-render #${renderCountRef.current} ${attributes.name}`,
+  );
 
     // Check if attributes changed
     if (prevAttributesRef.current !== attributes) {

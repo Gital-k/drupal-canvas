@@ -1,4 +1,3 @@
-import { useRef } from 'react';
 import clsx from 'clsx';
 
 import Checkbox from '@/components/form/components/Checkbox';
@@ -20,14 +19,6 @@ const DrupalInput = ({
   };
   element: any;
 }) => {
-  const renderCountRef = useRef(0);
-
-  renderCountRef.current += 1;
-
-  if (renderCountRef.current > 1) {
-    console.log(`[DrupalInput] Re-render #${renderCountRef.current}`);
-  }
-
   switch (attributes?.type) {
     case 'checkbox': {
       return (

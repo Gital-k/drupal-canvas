@@ -40,25 +40,12 @@ export const edit = (cy) => {
     cy.wait('@updatePreview');
     cy.reasonableWait();
 
-    cy.waitForAjax().then(() => {
-      console.log(`[Iteration ${ix + 1}] waitForAjax after click completed`);
-    });
-
     cy.selectorShouldHaveUpdatedFormBuildId(
       '[data-testid="canvas-page-data-form"]',
       15000,
     ).then(() => {
       console.log(`[Iteration ${ix + 1}] Form build ID updated`);
     });
-
-    // cy.intercept({
-    //   url: '**/canvas/api/v0/layout/node/2',
-    //   times: 1,
-    //   method: 'POST',
-    // }).as('updatePreview');
-    // @todo this wait is a temp fix. We shouldn't merge this, but instead
-    // find the underlying cause.
-    // cy.wait(4000); // eslint-disable-line cypress/no-unnecessary-waiting
   });
 };
 export const assertData = (response) => {

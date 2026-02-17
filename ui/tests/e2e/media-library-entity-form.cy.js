@@ -54,15 +54,14 @@ const testMediaLibraryInEntityForm = (cy, loadOptions = {}, title) => {
       //   .should('exist')
       //   .click();
       const removeIt = `[class*="contextualPanel"] .js-media-library-selection  [aria-label="${step.removeText}"][data-form-id="page_data_form"][data-once="drupal-ajax"][data-ajax="true"]:not(.visually-hidden)`;
-      // eslint-disable-next-line cypress/no-unnecessary-waiting
-      cy.wait(400);
+      cy.reasonableWait();
       cy.get(removeIt).click();
       cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
 
       // Wait for the preview to finish loading.
       cy.wait('@updatePreview');
       cy.findByLabelText('Loading Preview').should('not.exist');
-      // cy.waitForAjax();
+
       cy.get(removeIt).should('not.exist', { timeout: 10000 });
       cy.log(`Iteration ${ix + 1}: ${step.removeText} complete`);
     }
@@ -79,17 +78,16 @@ const testMediaLibraryInEntityForm = (cy, loadOptions = {}, title) => {
     // eslint-disable-next-line cypress/no-unnecessary-waiting
     cy.wait(200);
     cy.get(addIt).first().click();
-    // cy.waitForAjax();
 
     //   .click();
     // The first time the media dialog opens there are a lot of CSS files to
     // load, and it can take more than the default timeout of 4s.
     cy.findByRole('dialog', { timeout: 10000 }).as('dialog');
     cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
-    cy.wait(100); // eslint-disable-line cypress/no-unnecessary-waiting
+    cy.reasonableWait();
     cy.get('@dialog').findByLabelText(step.selectNewText).check();
     cy.intercept('POST', '**/canvas/api/v0/layout/**').as('updatePreview');
-    cy.wait(100); // eslint-disable-line cypress/no-unnecessary-waiting
+    cy.reasonableWait();
     cy.get('@dialog')
       .findByRole('button', {
         name: 'Insert selected',
@@ -100,13 +98,13 @@ const testMediaLibraryInEntityForm = (cy, loadOptions = {}, title) => {
     cy.wait('@updatePreview', { timeout: 10000 });
     // cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
     cy.findByLabelText('Loading Preview').should('not.exist');
-    // cy.waitForAjax();
+
     cy.get('@entityForm').findByAltText(step.expectedAlt).should('exist');
     cy.get('@entityForm')
       .findByRole('button', { name: step.removeAriaLabel })
       .should('exist');
     cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
-    // cy.waitForAjax();
+
     cy.log(`Iteration ${ix + 1}: Adding ${step.expectedAlt} complete`);
   });
 

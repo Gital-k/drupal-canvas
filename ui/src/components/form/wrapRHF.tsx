@@ -47,12 +47,6 @@ export const wrapRHF = <P extends Record<string, any>>(
       props.name ||
       props.attributes?.id;
 
-    const fieldError = useAppSelector((state) =>
-      selectFieldError(state, {
-        formId: formContext?.formId as FormId,
-        fieldName,
-      }),
-    );
     // Get the current value from various possible sources
     const getCurrentValue = () => getCurrentValueFromProps(props);
 

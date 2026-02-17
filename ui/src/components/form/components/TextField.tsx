@@ -1,4 +1,3 @@
-import { useRef } from 'react';
 import clsx from 'clsx';
 
 import type { Attributes } from '@/types/DrupalAttribute';
@@ -12,13 +11,6 @@ const TextField = ({
   className?: string;
   attributes?: Attributes;
 }) => {
-  const renderCountRef = useRef(0);
-
-  renderCountRef.current += 1;
-
-  if (renderCountRef.current > 1) {
-    console.log(`[TextField] Re-render #${renderCountRef.current}`);
-  }
   return (
     <div className={styles.wrap}>
       <input

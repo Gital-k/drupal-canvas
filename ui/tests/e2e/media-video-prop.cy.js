@@ -33,9 +33,9 @@ describe('Media Library', () => {
     cy.get('.media-library-item__name').should('have.length', 2);
     cy.findByLabelText('Select Duck Landscape').check();
     cy.get('button:contains("Insert selected")').realClick({ force: true });
-    // cy.waitForAjax();
+
     cy.get('div[role="dialog"]').should('not.exist');
-    // cy.waitForAjax();
+
     cy.selectorShouldHaveUpdatedFormBuildId(canvasFormSelector);
     cy.get('[aria-label="Remove Duck Landscape"]').should('exist');
     cy.waitForElementInIframe('video > source[src*="duck.mp4"]');
@@ -66,7 +66,7 @@ describe('Media Library', () => {
         expect(videoRect.width).to.be.closeTo(500, 1);
       });
     cy.clickComponentInPreview('Video', 1);
-    // cy.waitForAjax();
+
     cy.get(
       '[class*="contextualPanel"] .js-media-library-open-button[data-once="drupal-ajax"]',
     )
@@ -75,9 +75,9 @@ describe('Media Library', () => {
     cy.get('.media-library-item__name').should('have.length', 2);
     cy.findByLabelText('Select Waterfall Portrait').check();
     cy.get('button:contains("Insert selected")').realClick({ force: true });
-    // cy.waitForAjax();
+
     cy.get('div[role="dialog"]').should('not.exist');
-    // cy.waitForAjax();
+
     cy.waitForElementInIframe('video > source[src*="waterfall.mp4"]');
     cy.get('[aria-label="Remove Waterfall Portrait"]').should('exist');
     cy.get('[aria-label="Remove Duck Landscape"]').should('not.exist');

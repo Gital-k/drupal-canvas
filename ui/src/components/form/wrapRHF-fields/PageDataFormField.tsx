@@ -223,6 +223,8 @@ export const PageDataFormField = <P extends Record<string, any>>({
         formState: latest.formState,
         commitFormState: latest.commitFormState,
         extractNewValue: extractPageDataValue,
+        validateNewValue: latest.validateNewValue,
+        errorsText: latest.errorsText,
       });
       handler(e);
     },
@@ -262,29 +264,25 @@ export const PageDataFormField = <P extends Record<string, any>>({
           html5Validation: (value) => {
             // Create a temporary input element to leverage HTML5 validation
             const tempInput = document.createElement('input');
-            const inputType = props.attributes?.type;
+            const attrs = props.attributes || {};
 
-            if (inputType) {
-              tempInput.type = inputType;
-            }
-            if (props.attributes?.required) {
-              tempInput.required = true;
-            }
-            if (props.attributes?.pattern) {
-              tempInput.pattern = props.attributes.pattern;
-            }
-            if (props.attributes?.min) {
-              tempInput.min = props.attributes.min;
-            }
-            if (props.attributes?.max) {
-              tempInput.max = props.attributes.max;
-            }
-            if (props.attributes?.minLength) {
-              tempInput.minLength = props.attributes.minLength;
-            }
-            if (props.attributes?.maxLength) {
-              tempInput.maxLength = props.attributes.maxLength;
-            }
+            // HTML5 validation attributes to copy
+            const validationAttrs = [
+              'type',
+              'required',
+              'pattern',
+              'min',
+              'max',
+              'minLength',
+              'maxLength',
+            ];
+
+            // Apply all relevant HTML5 validation attributes
+            validationAttrs.forEach((attr) => {
+              if (attrs[attr] !== undefined) {
+                (tempInput as any)[attr] = attrs[attr];
+              }
+            });
 
             tempInput.value = value || '';
 
@@ -297,28 +295,8 @@ export const PageDataFormField = <P extends Record<string, any>>({
       }}
       shouldUnregister={false} // Prevent RHF from interfering with auto-save logic
       render={({ field, fieldState }) => {
-        const enhancedOnChange = createEnhancedOnChange({
-          field,
-          props,
-          dispatch,
-          formId: formContext?.formId,
-          fieldName,
-          formState,
-          commitFormState,
-          extractNewValue: extractPageDataValue,
-          validateNewValue, // Keep for auto-save gating
-          errorsText,
-        });
-
-        const enhancedOnBlur = createEnhancedOnBlur({
-          field,
-          props,
-          dispatch,
-          formId: formContext?.formId,
-          fieldName,
-          validateNewValue,
-          errorsText,
-        });
+        // Store the field in the ref so stable callbacks can access it
+        latestPropsRef.current.field = field;
 
         // Get Redux blocking error (takes priority over RHF display errors)
         const blockingError = useAppSelector((state) =>
@@ -331,17 +309,23 @@ export const PageDataFormField = <P extends Record<string, any>>({
         // Show RHF error if no blocking error exists
         const displayError = blockingError || fieldState.error;
 
-        const enhancedProps = applyEnhancedProps(
-          props,
-          field,
-          enhancedOnChange,
-          enhancedOnBlur,
-          !!displayError,
+        // Memoize the enhanced props to prevent creating new attributes object on every render
+        const enhancedProps = useMemo(
+          () =>
+            applyEnhancedProps(
+              props,
+              field,
+              stableOnChange,
+              stableOnBlur,
+              !!displayError,
+            ),
+          // eslint-disable-next-line react-hooks/exhaustive-deps
+          [field, field.value, stableOnChange, stableOnBlur, !!displayError],
         );
 
         return (
           <>
-            <WrappedComponent {...enhancedProps} />
+            <MemoizedWrappedComponent {...(enhancedProps as any)} />
             {displayError && (
               <span
                 data-prop-message

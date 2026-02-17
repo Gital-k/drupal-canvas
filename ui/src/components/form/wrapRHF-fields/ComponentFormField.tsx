@@ -367,29 +367,6 @@ export const ComponentFormField = <P extends Record<string, any>>({
     commitFormState,
   };
 
-  // Track props changes for debugging
-  const prevPropsForLogging = useRef<any>(null);
-  const propsRenderCount = useRef(0);
-  propsRenderCount.current += 1;
-
-  if (
-    propsRenderCount.current > 1 &&
-    prevPropsForLogging.current !== stableProps
-  ) {
-    // console.log(`[ComponentFormField ${fieldName}] Props reference changed on render #${propsRenderCount.current}`);
-
-    // Check if it's just reference or actual values
-    if (
-      JSON.stringify(prevPropsForLogging.current) ===
-      JSON.stringify(stableProps)
-    ) {
-      // console.log(`[ComponentFormField ${fieldName}]   → ⚠️ PROPS: SAME VALUES, NEW REFERENCE`);
-    } else {
-      // console.log(`[ComponentFormField ${fieldName}]   → Props values actually changed`);
-    }
-  }
-  prevPropsForLogging.current = stableProps;
-
   // Create stable onChange handler that won't change reference
   const stableOnChange = useCallback(
     (e: any) => {
@@ -430,7 +407,7 @@ export const ComponentFormField = <P extends Record<string, any>>({
   );
 
   if (!rhfContext) {
-    return <WrappedComponent {...props} />;
+    return <MemoizedWrappedComponent {...(stableProps as any)} />;
   }
 
   return (
@@ -473,28 +450,8 @@ export const ComponentFormField = <P extends Record<string, any>>({
       }}
       shouldUnregister={false} // Prevent RHF from interfering with auto-save logic
       render={({ field, fieldState }) => {
-        const enhancedOnChange = createEnhancedOnChange({
-          field,
-          props,
-          dispatch,
-          formId: formContext?.formId,
-          fieldName,
-          formState,
-          commitFormState,
-          extractNewValue: parseNewValue,
-          validateNewValue, // Keep for auto-save gating
-          errorsText,
-        });
-
-        const enhancedOnBlur = createEnhancedOnBlur({
-          field,
-          props,
-          dispatch,
-          formId: formContext?.formId,
-          fieldName,
-          validateNewValue,
-          errorsText,
-        });
+        // Store the field in the ref so stable callbacks can access it
+        latestPropsRef.current.field = field;
 
         // Get Redux blocking error (takes priority over RHF display errors)
         const blockingError = useAppSelector((state) =>
@@ -507,17 +464,42 @@ export const ComponentFormField = <P extends Record<string, any>>({
         // Show RHF error if no blocking error exists
         const displayError = blockingError || fieldState.error;
 
-        const enhancedProps = applyEnhancedProps(
-          { ...props, ...propsOverrides },
-          field,
-          enhancedOnChange,
-          enhancedOnBlur,
-          !!displayError,
-        );
+        // Track if memoization is working
+        const prevEnhancedPropsRef = useRef<any>(null);
+
+        // Memoize the enhanced props to prevent creating new attributes object on every render
+        const enhancedProps = useMemo(() => {
+          const newEnhancedProps = applyEnhancedProps(
+            { ...stableProps, ...propsOverrides },
+            field,
+            stableOnChange,
+            stableOnBlur,
+            !!displayError,
+          );
+
+          if (
+            prevEnhancedPropsRef.current &&
+            prevEnhancedPropsRef.current !== newEnhancedProps
+          ) {
+            // console.log(`[ComponentFormField ${fieldName}] useMemo created NEW enhancedProps`);
+            if (
+              prevEnhancedPropsRef.current.attributes !==
+              newEnhancedProps.attributes
+            ) {
+              // console.log(`[ComponentFormField ${fieldName}]   → attributes object is different`);
+            }
+          } else if (prevEnhancedPropsRef.current === newEnhancedProps) {
+            // console.log(`[ComponentFormField ${fieldName}] useMemo returned SAME enhancedProps`);
+          }
+
+          prevEnhancedPropsRef.current = newEnhancedProps;
+          return newEnhancedProps;
+          // eslint-disable-next-line react-hooks/exhaustive-deps
+        }, [field, field.value, stableOnChange, stableOnBlur, !!displayError]);
 
         return (
           <>
-            <WrappedComponent {...enhancedProps} />
+            <MemoizedWrappedComponent {...(enhancedProps as any)} />
             {displayError && (
               <span
                 data-prop-message
