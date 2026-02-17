@@ -2,8 +2,7 @@ import { Component, useEffect, useRef, useState } from 'react';
 import { resolvePreviewComponent } from '@wb/lib/preview-component-resolver';
 import { isPreviewRenderRequest } from '@wb/lib/preview-contract';
 
-import type { ErrorInfo, ReactNode } from 'react';
-import type { ComponentType } from 'react';
+import type { ComponentType, ErrorInfo, ReactNode } from 'react';
 import type {
   PreviewFrameError,
   PreviewFrameReady,

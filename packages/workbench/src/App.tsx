@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { fetchDiscoveryResult } from '@wb/lib/discovery-client';
 import { fetchPreviewManifest } from '@wb/lib/preview-client';
 import { isPreviewFrameEvent } from '@wb/lib/preview-contract';
@@ -22,27 +23,41 @@ function pickInitialSelection(manifest: PreviewManifest): string | null {
 }
 
 export function App() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [discoveryResult, setDiscoveryResult] =
     useState<DiscoveryResult | null>(null);
   const [previewManifest, setPreviewManifest] =
     useState<PreviewManifest | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [selectedComponentId, setSelectedComponentId] = useState<string | null>(
-    null,
-  );
   const [isFrameReady, setIsFrameReady] = useState(false);
   const [frameStatus, setFrameStatus] = useState('Waiting for frame.');
   const [iframeKey, setIframeKey] = useState(0);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
+  const selectedComponentId = searchParams.get('id');
+
   const selectedComponent = useMemo<PreviewManifestComponent | null>(() => {
-    if (!previewManifest || !selectedComponentId) {
+    if (!previewManifest) {
+      return null;
+    }
+
+    if (selectedComponentId) {
+      const routedComponent = previewManifest.components.find(
+        (component) => component.id === selectedComponentId,
+      );
+      if (routedComponent) {
+        return routedComponent;
+      }
+    }
+
+    const fallbackId = pickInitialSelection(previewManifest);
+    if (!fallbackId) {
       return null;
     }
 
     return (
       previewManifest.components.find(
-        (component) => component.id === selectedComponentId,
+        (component) => component.id === fallbackId,
       ) ?? null
     );
   }, [previewManifest, selectedComponentId]);
@@ -58,7 +73,6 @@ export function App() {
 
         setDiscoveryResult(discovery);
         setPreviewManifest(manifest);
-        setSelectedComponentId(pickInitialSelection(manifest));
       })
       .catch((fetchError: unknown) => {
         if (!isMounted) {
@@ -76,6 +90,35 @@ export function App() {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!previewManifest) {
+      return;
+    }
+
+    const hasSelectedRoute = Boolean(
+      selectedComponentId &&
+      previewManifest.components.some(
+        (component) => component.id === selectedComponentId,
+      ),
+    );
+    if (hasSelectedRoute) {
+      return;
+    }
+
+    const fallbackId = pickInitialSelection(previewManifest);
+    const nextParams = new URLSearchParams(searchParams);
+    if (!fallbackId) {
+      if (nextParams.has('id')) {
+        nextParams.delete('id');
+        setSearchParams(nextParams, { replace: true });
+      }
+      return;
+    }
+
+    nextParams.set('id', fallbackId);
+    setSearchParams(nextParams, { replace: true });
+  }, [previewManifest, searchParams, selectedComponentId, setSearchParams]);
 
   useEffect(() => {
     const handleFrameMessage = (event: MessageEvent<unknown>) => {
@@ -161,8 +204,12 @@ export function App() {
               key={component.id}
               type="button"
               className="rounded border p-2 text-left"
-              data-selected={component.id === selectedComponentId}
-              onClick={() => setSelectedComponentId(component.id)}
+              data-selected={component.id === selectedComponent?.id}
+              onClick={() => {
+                const nextParams = new URLSearchParams(searchParams);
+                nextParams.set('id', component.id);
+                setSearchParams(nextParams);
+              }}
             >
               <div className="font-medium">{component.name}</div>
               <div className="text-xs opacity-70">

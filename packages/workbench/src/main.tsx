@@ -1,5 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
 
 import './index.css';
 
@@ -11,6 +12,16 @@ const isPreviewFrameRoute =
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    {isPreviewFrameRoute ? <PreviewFrameApp /> : <App />}
+    {isPreviewFrameRoute ? (
+      <PreviewFrameApp />
+    ) : (
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Navigate to="/component" replace />} />
+          <Route path="/component" element={<App />} />
+          <Route path="*" element={<Navigate to="/component" replace />} />
+        </Routes>
+      </BrowserRouter>
+    )}
   </StrictMode>,
 );
