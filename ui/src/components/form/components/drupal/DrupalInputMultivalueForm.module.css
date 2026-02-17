@@ -60,7 +60,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
+  margin-top: 6px;
   cursor: grab;
   color: var(--blue-9);
 }
@@ -70,7 +70,7 @@
 }
 
 .itemText {
-  color: var(--gray-12);
+  color: #1C2024;
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
