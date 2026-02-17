@@ -1,13 +1,20 @@
 import { useRef, useState } from 'react';
-import { ArrowRightIcon, Cross2Icon, DragHandleDots2Icon, TrashIcon } from '@radix-ui/react-icons';
+import clsx from 'clsx';
+import {
+  ArrowRightIcon,
+  Cross2Icon,
+  DragHandleDots2Icon,
+  TrashIcon,
+} from '@radix-ui/react-icons';
 import { Box, Button, Flex, Popover, Text } from '@radix-ui/themes';
-import InputBehaviors from '@/components/form/inputBehaviors';
+
 import TextField from '@/components/form/components/TextField';
-import type { Attributes } from '@/types/DrupalAttribute';
+import InputBehaviors from '@/components/form/inputBehaviors';
 import { a2p } from '@/local_packages/utils';
 
+import type { Attributes } from '@/types/DrupalAttribute';
+
 import styles from './DrupalInputMultivalueForm.module.css';
-import clsx from 'clsx';
 
 // Create the wrapped TextField component with InputBehaviors HOC.
 const TextFieldWithBehaviors = InputBehaviors(TextField);
@@ -34,7 +41,9 @@ const DrupalInputMultivalueForm = ({
   // Get the initial value from attributes
   const initialValue = attributes.value || attributes.defaultValue || '';
   // Manage local state to sync display value with input changes
-  const [displayValue, setDisplayValue] = useState<string>(initialValue as string);
+  const [displayValue, setDisplayValue] = useState<string>(
+    initialValue as string,
+  );
   const inputWrapperRef = useRef<HTMLDivElement | null>(null);
   const fieldLabel = 'Text';
 
@@ -50,12 +59,14 @@ const DrupalInputMultivalueForm = ({
     // Find the input element within the wrapper and trigger change through it
     if (!inputWrapperRef.current) return;
 
-    const inputElement = inputWrapperRef.current.querySelector('input') as HTMLInputElement | null;
+    const inputElement = inputWrapperRef.current.querySelector(
+      'input',
+    ) as HTMLInputElement | null;
     if (inputElement) {
       // Set the native value using the native setter to properly trigger React's onChange
       const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
         HTMLInputElement.prototype,
-        'value'
+        'value',
       )?.set;
       nativeInputValueSetter?.call(inputElement, '');
       // Dispatch input event to trigger the InputBehaviors onChange handler
@@ -63,7 +74,6 @@ const DrupalInputMultivalueForm = ({
       inputElement.dispatchEvent(event);
     }
   };
-
 
   return (
     <Popover.Root>
@@ -105,7 +115,12 @@ const DrupalInputMultivalueForm = ({
         <Box className={styles.inputWrapper} ref={inputWrapperRef}>
           <TextFieldWithBehaviors
             {...{ className: clsx(attributes.class) }}
-            {...{ attributes: {...a2p(attributes, {}, { skipAttributes: ['class'] }), onPostChange: handleInputChange } }}
+            {...{
+              attributes: {
+                ...a2p(attributes, {}, { skipAttributes: ['class'] }),
+                onPostChange: handleInputChange,
+              },
+            }}
           />
         </Box>
 
@@ -130,4 +145,3 @@ const DrupalInputMultivalueForm = ({
 };
 
 export default DrupalInputMultivalueForm;
-
