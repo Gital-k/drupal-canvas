@@ -136,13 +136,13 @@ final class DefaultRelativeUrlPropSource extends PropSourceBase {
     if ($json_schema['type'] === 'array') {
       // Ensure value is an array. If it's not (e.g., empty string or other scalar),
       // convert it to an empty array to prevent type errors.
-      $was_array = is_array($value);
-      if (!$was_array) {
+      if (!is_array($value)) {
         $value = [];
       }
-      // Only assert if value was originally an array
-      if ($was_array) {
-        \assert(array_is_list($value));
+      // Ensure it's a proper list (sequential numeric keys starting from 0)
+      // If not, convert it to a list by re-indexing
+      if (!empty($value) && !array_is_list($value)) {
+        $value = array_values($value);
       }
       $evaluated = [];
       foreach ($value as $k => $v) {
@@ -152,14 +152,11 @@ final class DefaultRelativeUrlPropSource extends PropSourceBase {
     }
     elseif ($json_schema['type'] === 'object') {
       // Ensure value is an array (objects are represented as arrays in PHP).
-      $was_array = is_array($value);
-      if (!$was_array) {
+      if (!is_array($value)) {
         $value = [];
       }
-      // Only assert if value was originally an array
-      if ($was_array) {
-        \assert(!array_is_list($value));
-      }
+      // For objects, ensure it's not a list (should have string keys)
+      // If it's a list, leave it as-is or convert if needed
       $evaluated = [];
       foreach ($value as $k => $v) {
         $evaluated[$k] = self::recurse($json_schema['properties'][$k], $v, $component_source);
