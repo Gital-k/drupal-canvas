@@ -63,8 +63,9 @@ npx canvas-workbench dev
 - Uses `@drupal-canvas/vite-compat` for shared compatibility behavior — see
   [`packages/vite-compat/README.md`](../vite-compat/README.md).
 - Watches the host project for relevant file changes (`component.yml`,
-  `*.component.yml`, and JS(X)/TS(X)/CSS files), refreshes discovery, and
-  triggers a full reload.
+  `*.component.yml`, and JS(X)/TS(X)/CSS files), sends targeted HMR update
+  events, refreshes discovery when needed, and reloads only the preview iframe
+  for source-only changes.
 
 ## Strict preview MVP contract
 

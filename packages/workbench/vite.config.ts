@@ -21,13 +21,17 @@ const hostProjectRoot = process.cwd();
 const runningInsideWorkbenchPackage =
   path.resolve(hostProjectRoot) === path.resolve(__dirname);
 
-function isDiscoveryRelevantPath(filePath: string): boolean {
+function isComponentMetadataPath(filePath: string): boolean {
   const normalizedPath = filePath.replaceAll('\\', '/');
   return (
     /(^|\/)component\.yml$/.test(normalizedPath) ||
-    /(^|\/)[^/]+\.component\.yml$/.test(normalizedPath) ||
-    /\.(js|jsx|ts|tsx|css)$/.test(normalizedPath)
+    /(^|\/)[^/]+\.component\.yml$/.test(normalizedPath)
   );
+}
+
+function isPreviewSourcePath(filePath: string): boolean {
+  const normalizedPath = filePath.replaceAll('\\', '/');
+  return /\.(js|jsx|ts|tsx|css)$/.test(normalizedPath);
 }
 
 function canvasWorkbenchDiscovery(): Plugin {
@@ -164,13 +168,38 @@ function canvasWorkbenchDiscovery(): Plugin {
           return;
         }
 
-        if (!isDiscoveryRelevantPath(filePath)) {
+        const metadataChanged = isComponentMetadataPath(filePath);
+        const sourceChanged = isPreviewSourcePath(filePath);
+        if (!metadataChanged && !sourceChanged) {
+          return;
+        }
+
+        const requiresManifestRefresh =
+          metadataChanged || (sourceChanged && event !== 'change');
+        if (!requiresManifestRefresh) {
+          server.ws.send({
+            type: 'custom',
+            event: 'canvas:workbench:update',
+            data: {
+              reloadFrameOnly: true,
+              filePath,
+              event,
+            },
+          });
           return;
         }
 
         void refresh()
           .then(() => {
-            server.ws.send({ type: 'full-reload' });
+            server.ws.send({
+              type: 'custom',
+              event: 'canvas:workbench:update',
+              data: {
+                reloadFrameOnly: false,
+                filePath,
+                event,
+              },
+            });
           })
           .catch((error) => {
             server.config.logger.error(

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { fetchDiscoveryResult } from '@wb/lib/discovery-client';
 import { fetchPreviewManifest } from '@wb/lib/preview-client';
@@ -36,6 +36,21 @@ export function App() {
 
   const selectedComponentId = searchParams.get('id');
 
+  const loadWorkbenchData = useCallback(async (): Promise<{
+    discovery: DiscoveryResult;
+    manifest: PreviewManifest;
+  }> => {
+    const [discovery, manifest] = await Promise.all([
+      fetchDiscoveryResult(),
+      fetchPreviewManifest(),
+    ]);
+
+    return {
+      discovery,
+      manifest,
+    };
+  }, []);
+
   const selectedComponent = useMemo<PreviewManifestComponent | null>(() => {
     if (!previewManifest) {
       return null;
@@ -65,8 +80,8 @@ export function App() {
   useEffect(() => {
     let isMounted = true;
 
-    void Promise.all([fetchDiscoveryResult(), fetchPreviewManifest()])
-      .then(([discovery, manifest]) => {
+    void loadWorkbenchData()
+      .then(({ discovery, manifest }) => {
         if (!isMounted) {
           return;
         }
@@ -89,7 +104,49 @@ export function App() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [loadWorkbenchData]);
+
+  useEffect(() => {
+    if (!import.meta.hot) {
+      return;
+    }
+
+    const onWorkbenchUpdate = (
+      payload:
+        | {
+            reloadFrameOnly?: boolean;
+          }
+        | undefined,
+    ) => {
+      if (payload?.reloadFrameOnly) {
+        setIsFrameReady(false);
+        setFrameStatus('Detected source change. Reloading frame...');
+        setIframeKey((value) => value + 1);
+        return;
+      }
+
+      setFrameStatus('Detected metadata change. Refreshing Workbench...');
+      void loadWorkbenchData()
+        .then(({ discovery, manifest }) => {
+          setDiscoveryResult(discovery);
+          setPreviewManifest(manifest);
+          setIsFrameReady(false);
+          setIframeKey((value) => value + 1);
+        })
+        .catch((refreshError: unknown) => {
+          setError(
+            refreshError instanceof Error
+              ? refreshError.message
+              : 'Unknown workbench loading error.',
+          );
+        });
+    };
+
+    import.meta.hot.on('canvas:workbench:update', onWorkbenchUpdate);
+    return () => {
+      import.meta.hot?.off('canvas:workbench:update', onWorkbenchUpdate);
+    };
+  }, [loadWorkbenchData]);
 
   useEffect(() => {
     if (!previewManifest) {
