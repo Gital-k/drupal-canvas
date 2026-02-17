@@ -25,6 +25,7 @@ use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
  * Tests API endpoints where the Canvas OAuth authentication provider is applied.
  *
  * @group canvas_oauth
+ * @requires module simple_oauth
  */
 class CanvasOauthAuthenticationProviderHttpTest extends AuthorizedRequestBase {
 
