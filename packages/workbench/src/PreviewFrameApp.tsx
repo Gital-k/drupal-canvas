@@ -107,7 +107,6 @@ export function PreviewFrameApp() {
   const [activeRender, setActiveRender] = useState<RenderableState | null>(
     null,
   );
-  const [status, setStatus] = useState('Waiting for component selection...');
   const loadedGlobalCssUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -138,7 +137,6 @@ export function PreviewFrameApp() {
     request: PreviewRenderRequest,
   ): Promise<void> {
     try {
-      setStatus(`Loading ${request.payload.componentId}...`);
       if (
         request.payload.globalCssUrl &&
         loadedGlobalCssUrlRef.current !== request.payload.globalCssUrl
@@ -164,13 +162,11 @@ export function PreviewFrameApp() {
         component: renderableComponent,
         props: request.payload.props,
       });
-      setStatus(`Loaded ${request.payload.componentId}, rendering...`);
     } catch (error) {
       const message =
         error instanceof Error
           ? error.message
           : `Unknown render error: ${String(error)}`;
-      setStatus(message);
       setActiveRender(null);
       postFrameMessage({
         source: 'canvas-workbench-frame',
@@ -187,7 +183,6 @@ export function PreviewFrameApp() {
 
   return (
     <main style={{ padding: '1rem' }}>
-      <p style={{ opacity: 0.75, fontSize: '0.875rem' }}>{status}</p>
       <FrameRenderBoundary
         componentId={activeRender?.componentId ?? null}
         onError={(message, componentId) => {
@@ -199,7 +194,6 @@ export function PreviewFrameApp() {
               message,
             },
           });
-          setStatus(message);
         }}
       >
         {ActiveComponent && activeRender ? (
@@ -207,7 +201,6 @@ export function PreviewFrameApp() {
             <RenderSignal
               componentId={activeRender.componentId}
               onRendered={(componentId) => {
-                setStatus(`Rendered ${componentId}.`);
                 postFrameMessage({
                   source: 'canvas-workbench-frame',
                   type: 'preview:rendered',

@@ -295,26 +295,50 @@ export function App() {
         ) : null}
       </aside>
 
-      <section className="flex min-h-screen flex-col p-4">
-        <header className="mb-2 flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold">
-              {selectedComponent ? selectedComponent.name : 'No selection'}
-            </h2>
-            <p className="text-sm opacity-70">{frameStatus}</p>
-          </div>
-          <button
-            type="button"
-            className="rounded border px-3 py-1"
-            onClick={() => {
-              setIsFrameReady(false);
-              setFrameStatus('Reloading frame...');
-              setIframeKey((value) => value + 1);
-            }}
-          >
-            Reload frame
-          </button>
-        </header>
+      <section className="flex h-screen flex-col overflow-y-auto p-4">
+        <div className="mb-3 flex min-h-[calc(100dvh-2rem)] flex-col">
+          <header className="mb-2 flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">
+                {selectedComponent ? selectedComponent.name : 'No selection'}
+              </h2>
+              <p className="text-sm opacity-70">{frameStatus}</p>
+            </div>
+            <button
+              type="button"
+              className="rounded border px-3 py-1"
+              onClick={() => {
+                setIsFrameReady(false);
+                setFrameStatus('Reloading frame...');
+                setIframeKey((value) => value + 1);
+              }}
+            >
+              Reload frame
+            </button>
+          </header>
+
+          {!selectedComponent ? (
+            <div className="rounded border p-4">
+              No components were discovered.
+            </div>
+          ) : !selectedComponent.previewable ? (
+            <div className="rounded border p-4">
+              This component is not previewable in strict mode. Reason:{' '}
+              {selectedComponent.ineligibilityReason}
+            </div>
+          ) : (
+            <div className="min-h-0 flex-1 rounded border">
+              <iframe
+                key={iframeKey}
+                ref={iframeRef}
+                title="Canvas component preview"
+                src="/__canvas/preview-frame"
+                className="h-full w-full rounded"
+                sandbox="allow-scripts allow-same-origin"
+              />
+            </div>
+          )}
+        </div>
 
         {selectedComponent ? (
           <section className="mb-3 rounded border p-3">
@@ -344,26 +368,6 @@ export function App() {
             )}
           </pre>
         </section>
-
-        {!selectedComponent ? (
-          <div className="rounded border p-4">
-            No components were discovered.
-          </div>
-        ) : !selectedComponent.previewable ? (
-          <div className="rounded border p-4">
-            This component is not previewable in strict mode. Reason:{' '}
-            {selectedComponent.ineligibilityReason}
-          </div>
-        ) : (
-          <iframe
-            key={iframeKey}
-            ref={iframeRef}
-            title="Canvas component preview"
-            src="/__canvas/preview-frame"
-            className="h-[80vh] w-full rounded border"
-            sandbox="allow-scripts allow-same-origin"
-          />
-        )}
       </section>
     </main>
   );
