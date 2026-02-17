@@ -26,7 +26,10 @@ import {
 } from '@/components/form/wrapRHF-utils';
 import { useSafeFormContext, useSafeRHFContext } from '@/contexts/FormContext';
 import { FORM_TYPES } from '@/features/form/constants';
-import { selectFormValues } from '@/features/form/formStateSlice';
+import {
+  selectFieldError,
+  selectFormValues,
+} from '@/features/form/formStateSlice';
 import { isEvaluatedComponentModel } from '@/features/layout/layoutModelSlice';
 import { setPreviewBackgroundUpdate } from '@/features/pagePreview/previewSlice';
 import { flaggedForRemoval, parseValue } from '@/utils/function-utils';
@@ -34,6 +37,7 @@ import { flaggedForRemoval, parseValue } from '@/utils/function-utils';
 import type { ComponentType } from 'react';
 import type * as ReactType from 'react';
 import type { PropsValues } from '@drupal-canvas/types';
+import type { FormId } from '@/features/form/formStateSlice';
 import type { ComponentModels } from '@/features/layout/layoutModelSlice';
 import type { InputUIData } from '@/types/Form';
 
@@ -42,7 +46,6 @@ interface ComponentFormFieldProps<P> {
   WrappedComponent: ComponentType<P>;
   fieldName: string;
   errorsText: (errors?: any) => string;
-  hasError?: boolean;
 }
 
 /**
@@ -53,7 +56,6 @@ export const ComponentFormField = <P extends Record<string, any>>({
   WrappedComponent,
   fieldName,
   errorsText,
-  hasError,
 }: ComponentFormFieldProps<P>) => {
   const formContext = useSafeFormContext();
   const rhfContext = useSafeRHFContext();
@@ -436,46 +438,98 @@ export const ComponentFormField = <P extends Record<string, any>>({
       name={fieldName}
       control={rhfContext.control}
       defaultValue={getCurrentValue()}
-      render={({ field }) => {
-        // Store the field in the ref so stable callbacks can access it
-        latestPropsRef.current.field = field;
+      rules={{
+        // RHF validation for immediate UI feedback (doesn't block auto-save)
+        validate: {
+          jsonSchemaValidation: (value) => {
+            // Create a mock target for shouldSkipPropValidation check
+            const mockTarget = document.createElement('input');
+            mockTarget.value = value || '';
+            mockTarget.required = !!props.attributes?.required;
 
-        // Track if memoization is working
-
-        const prevEnhancedPropsRef = useRef<any>(null);
-
-        // Memoize the enhanced props to prevent creating new attributes object on every render
-
-        const enhancedProps = useMemo(() => {
-          const newEnhancedProps = applyEnhancedProps(
-            stableProps,
-            field,
-            stableOnChange,
-            stableOnBlur,
-            hasError,
-          );
-
-          if (
-            prevEnhancedPropsRef.current &&
-            prevEnhancedPropsRef.current !== newEnhancedProps
-          ) {
-            // console.log(`[ComponentFormField ${fieldName}] useMemo created NEW enhancedProps`);
             if (
-              prevEnhancedPropsRef.current.attributes !==
-              newEnhancedProps.attributes
+              shouldSkipPropValidation(
+                fieldName,
+                mockTarget,
+                inputAndUiData,
+                value,
+              )
             ) {
-              // console.log(`[ComponentFormField ${fieldName}]   → attributes object is different`);
+              return true;
             }
-          } else if (prevEnhancedPropsRef.current === newEnhancedProps) {
-            // console.log(`[ComponentFormField ${fieldName}] useMemo returned SAME enhancedProps`);
-          }
 
-          prevEnhancedPropsRef.current = newEnhancedProps;
-          return newEnhancedProps;
-          // eslint-disable-next-line react-hooks/exhaustive-deps
-        }, [field, field.value, stableOnChange, stableOnBlur, hasError]);
+            const [valid, validate] = validateProp(
+              toPropName(fieldName, selectedComponent),
+              value,
+              inputAndUiData,
+            );
 
-        return <MemoizedWrappedComponent {...(enhancedProps as any)} />;
+            if (!valid) {
+              return errorsText(validate?.errors || null);
+            }
+            return true;
+          },
+        },
+      }}
+      shouldUnregister={false} // Prevent RHF from interfering with auto-save logic
+      render={({ field, fieldState }) => {
+        const enhancedOnChange = createEnhancedOnChange({
+          field,
+          props,
+          dispatch,
+          formId: formContext?.formId,
+          fieldName,
+          formState,
+          commitFormState,
+          extractNewValue: parseNewValue,
+          validateNewValue, // Keep for auto-save gating
+          errorsText,
+        });
+
+        const enhancedOnBlur = createEnhancedOnBlur({
+          field,
+          props,
+          dispatch,
+          formId: formContext?.formId,
+          fieldName,
+          validateNewValue,
+          errorsText,
+        });
+
+        // Get Redux blocking error (takes priority over RHF display errors)
+        const blockingError = useAppSelector((state) =>
+          selectFieldError(state, {
+            formId: formContext?.formId as FormId,
+            fieldName,
+          }),
+        );
+
+        // Show RHF error if no blocking error exists
+        const displayError = blockingError || fieldState.error;
+
+        const enhancedProps = applyEnhancedProps(
+          { ...props, ...propsOverrides },
+          field,
+          enhancedOnChange,
+          enhancedOnBlur,
+          !!displayError,
+        );
+
+        return (
+          <>
+            <WrappedComponent {...enhancedProps} />
+            {displayError && (
+              <span
+                data-prop-message
+                className={blockingError ? 'error-blocking' : 'error-display'}
+              >
+                {blockingError
+                  ? `${blockingError.type === 'error' ? '❌ ' : ''}${blockingError.message}`
+                  : fieldState.error?.message}
+              </span>
+            )}
+          </>
+        );
       }}
     />
   );

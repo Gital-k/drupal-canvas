@@ -162,10 +162,10 @@ export const createEnhancedOnChange = ({
   return (e: ChangeEvent) => {
     const newValue = extractNewValue(e);
 
-    // Update react-hook-form state
+    // Always update react-hook-form state (for UI consistency and RHF validation)
     field.onChange(newValue);
 
-    // Update Redux store
+    // Always update Redux display state
     if (formId) {
       dispatchFieldValue(dispatch, formId as FormId, fieldName, newValue);
     }
@@ -178,17 +178,18 @@ export const createEnhancedOnChange = ({
     //   originalOnChange(e);
     // }
 
-    // Component form validation logic (optional)
+    // VALIDATION GATES AUTO-SAVE (preserve existing auto-save blocking logic)
     if (validateNewValue && errorsText) {
       const validationResult = validateNewValue(e, newValue);
 
-      // Check if we should skip form state update
-      const shouldSkip =
+      // Check if we should skip auto-save to backend
+      const shouldSkipAutoSave =
         (typeof e?.target?.hasAttribute === 'function' &&
           e.target.hasAttribute('data-canvas-no-update')) ||
         (!validationResult.valid && !validationResult.skipEarlyReturn);
 
-      if (shouldSkip) {
+      if (shouldSkipAutoSave) {
+        // Show blocking error but don't auto-save to backend
         if (formId && validationResult?.valid !== true) {
           dispatchFieldError(
             dispatch,
@@ -198,18 +199,17 @@ export const createEnhancedOnChange = ({
             errorsText,
           );
         }
-        return;
+        return; // Block auto-save
       }
     }
 
-    // If no AJAX operations are in progress, update the form state and store.
+    // Validation passed or no validation - proceed with auto-save
     if (!isAjaxing()) {
       commitFormState({ ...formState, [fieldName]: newValue });
       return;
     }
 
-    // This is only reached if AJAX operations are in progress. Add an event
-    // listener to update the form state once ajax is complete.
+    // AJAX in progress - queue auto-save for after AJAX completion
     const stopListener = () => {
       commitFormState({ ...formState, [fieldName]: newValue });
     };

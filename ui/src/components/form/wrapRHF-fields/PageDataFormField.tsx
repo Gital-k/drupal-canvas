@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { debounce } from 'lodash';
 import { Controller } from 'react-hook-form';
 
+import { useAppSelector } from '@/app/hooks';
 import { DEBOUNCE_TIMEOUT } from '@/components/form/formUtil';
 import { usePageDataFormInputInfo } from '@/components/form/wrapRHF-hooks/usePageDataFormInputInfo';
 import { usePageDataInitialValue } from '@/components/form/wrapRHF-hooks/usePageDataInitialValue';
@@ -14,6 +15,7 @@ import {
   getCurrentValueFromProps,
 } from '@/components/form/wrapRHF-utils';
 import { useSafeFormContext, useSafeRHFContext } from '@/contexts/FormContext';
+import { selectFieldError } from '@/features/form/formStateSlice';
 import { setUpdatePreview } from '@/features/layout/layoutModelSlice';
 import {
   externalUpdateComplete,
@@ -23,6 +25,7 @@ import {
 import type { ComponentType } from 'react';
 import type * as ReactType from 'react';
 import type { PropsValues } from '@drupal-canvas/types';
+import type { FormId } from '@/features/form/formStateSlice';
 
 interface PageDataFormFieldProps<P> {
   props: P;
@@ -253,26 +256,104 @@ export const PageDataFormField = <P extends Record<string, any>>({
       name={fieldName}
       control={rhfContext.control}
       defaultValue={getCurrentValueFromRedux()}
-      render={({ field }) => {
-        // Store the field in the ref so stable callbacks can access it
-        latestPropsRef.current.field = field;
+      rules={{
+        // RHF validation for immediate UI feedback (doesn't block auto-save)
+        validate: {
+          html5Validation: (value) => {
+            // Create a temporary input element to leverage HTML5 validation
+            const tempInput = document.createElement('input');
+            const inputType = props.attributes?.type;
 
-        // Memoize the enhanced props to prevent creating new attributes object on every render
+            if (inputType) {
+              tempInput.type = inputType;
+            }
+            if (props.attributes?.required) {
+              tempInput.required = true;
+            }
+            if (props.attributes?.pattern) {
+              tempInput.pattern = props.attributes.pattern;
+            }
+            if (props.attributes?.min) {
+              tempInput.min = props.attributes.min;
+            }
+            if (props.attributes?.max) {
+              tempInput.max = props.attributes.max;
+            }
+            if (props.attributes?.minLength) {
+              tempInput.minLength = props.attributes.minLength;
+            }
+            if (props.attributes?.maxLength) {
+              tempInput.maxLength = props.attributes.maxLength;
+            }
 
-        const enhancedProps = useMemo(
-          () =>
-            applyEnhancedProps(
-              props,
-              field,
-              stableOnChange,
-              stableOnBlur,
-              hasError,
-            ),
-          // eslint-disable-next-line react-hooks/exhaustive-deps
-          [field, field.value, stableOnChange, stableOnBlur, hasError],
+            tempInput.value = value || '';
+
+            if (!tempInput.checkValidity()) {
+              return tempInput.validationMessage;
+            }
+            return true;
+          },
+        },
+      }}
+      shouldUnregister={false} // Prevent RHF from interfering with auto-save logic
+      render={({ field, fieldState }) => {
+        const enhancedOnChange = createEnhancedOnChange({
+          field,
+          props,
+          dispatch,
+          formId: formContext?.formId,
+          fieldName,
+          formState,
+          commitFormState,
+          extractNewValue: extractPageDataValue,
+          validateNewValue, // Keep for auto-save gating
+          errorsText,
+        });
+
+        const enhancedOnBlur = createEnhancedOnBlur({
+          field,
+          props,
+          dispatch,
+          formId: formContext?.formId,
+          fieldName,
+          validateNewValue,
+          errorsText,
+        });
+
+        // Get Redux blocking error (takes priority over RHF display errors)
+        const blockingError = useAppSelector((state) =>
+          selectFieldError(state, {
+            formId: formContext?.formId as FormId,
+            fieldName,
+          }),
         );
 
-        return <MemoizedWrappedComponent {...(enhancedProps as any)} />;
+        // Show RHF error if no blocking error exists
+        const displayError = blockingError || fieldState.error;
+
+        const enhancedProps = applyEnhancedProps(
+          props,
+          field,
+          enhancedOnChange,
+          enhancedOnBlur,
+          !!displayError,
+        );
+
+        return (
+          <>
+            <WrappedComponent {...enhancedProps} />
+            {displayError && (
+              <span
+                data-prop-message
+                className={blockingError ? 'error-blocking' : 'error-display'}
+              >
+                {blockingError
+                  ? `${blockingError.type === 'error' ? '❌ ' : ''}${blockingError.message}`
+                  : fieldState.error?.message}
+              </span>
+            )}
+          </>
+        );
       }}
     />
   );

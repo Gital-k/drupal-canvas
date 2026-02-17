@@ -137,7 +137,6 @@ export const wrapRHF = <P extends Record<string, any>>(
       props,
       WrappedComponent,
       fieldName,
-      hasError: !!fieldError,
     };
 
     return (
@@ -147,11 +146,6 @@ export const wrapRHF = <P extends Record<string, any>>(
         )}
         {formContext?.formId === 'component_instance_form' && (
           <ComponentFormField {...sharedProps} errorsText={errorsText} />
-        )}
-        {fieldError && (
-          <span data-prop-message>
-            {`${fieldError.type === 'error' ? '❌ ' : ''}${fieldError.message}`}
-          </span>
         )}
       </>
     );
