@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  fetchDiscoveryResult,
-  fetchPreviewManifest,
-} from '@wb/lib/discovery-client';
+import { fetchDiscoveryResult } from '@wb/lib/discovery-client';
+import { fetchPreviewManifest } from '@wb/lib/preview-client';
 import { isPreviewFrameEvent } from '@wb/lib/preview-contract';
 
 import type { DiscoveryResult } from '@wb/lib/discovery-client';
