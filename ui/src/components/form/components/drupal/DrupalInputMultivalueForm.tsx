@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ArrowRightIcon, Cross2Icon, DragHandleDots2Icon, TrashIcon } from '@radix-ui/react-icons';
 import { Box, Button, Flex, Popover, Text } from '@radix-ui/themes';
 import InputBehaviors from '@/components/form/inputBehaviors';
@@ -35,12 +35,33 @@ const DrupalInputMultivalueForm = ({
   const initialValue = attributes.value || attributes.defaultValue || '';
   // Manage local state to sync display value with input changes
   const [displayValue, setDisplayValue] = useState<string>(initialValue as string);
+  const inputWrapperRef = useRef<HTMLDivElement | null>(null);
   const fieldLabel = 'Text';
 
   // Handle input changes - update both local state and call original onChange
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
     setDisplayValue(newValue);
+  };
+
+  // Handle remove - triggers change through the input element to use InputBehaviors
+  const handleRemove = () => {
+    setDisplayValue('');
+    // Find the input element within the wrapper and trigger change through it
+    if (!inputWrapperRef.current) return;
+
+    const inputElement = inputWrapperRef.current.querySelector('input') as HTMLInputElement | null;
+    if (inputElement) {
+      // Set the native value using the native setter to properly trigger React's onChange
+      const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        'value'
+      )?.set;
+      nativeInputValueSetter?.call(inputElement, '');
+      // Dispatch input event to trigger the InputBehaviors onChange handler
+      const event = new Event('input', { bubbles: true });
+      inputElement.dispatchEvent(event);
+    }
   };
 
 
@@ -81,10 +102,10 @@ const DrupalInputMultivalueForm = ({
         </Flex>
 
         {/* Input Field */}
-        <Box className={styles.inputWrapper}>
+        <Box className={styles.inputWrapper} ref={inputWrapperRef}>
           <TextFieldWithBehaviors
-            className={clsx(attributes.class)}
-            attributes={{...a2p(attributes, {}, { skipAttributes: ['class'] }), onPostChange: handleInputChange }}
+            {...{ className: clsx(attributes.class) }}
+            {...{ attributes: {...a2p(attributes, {}, { skipAttributes: ['class'] }), onPostChange: handleInputChange } }}
           />
         </Box>
 
@@ -95,15 +116,7 @@ const DrupalInputMultivalueForm = ({
               variant="ghost"
               color="red"
               size="1"
-              onClick={() => {
-                setDisplayValue('');
-                if (attributes.onChange) {
-                  const syntheticEvent = {
-                    target: { value: '', name: attributes.name },
-                  } as React.ChangeEvent<HTMLInputElement>;
-                  attributes.onChange(syntheticEvent);
-                }
-              }}
+              onClick={handleRemove}
               className={styles.removeButton}
             >
               <TrashIcon />
