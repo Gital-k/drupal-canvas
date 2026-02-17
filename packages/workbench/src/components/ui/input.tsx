@@ -1,5 +1,4 @@
 import { Input as InputPrimitive } from '@base-ui/react/input';
-
 import { cn } from '@wb/lib/utils';
 
 import type * as React from 'react';

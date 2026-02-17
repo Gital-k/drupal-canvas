@@ -183,9 +183,7 @@ export async function extractFirstExamplePropsFromComponentYaml(
   }
 }
 
-export function drupalCanvasCompat(
-  options: CanvasViteCompatOptions,
-): Plugin[] {
+export function drupalCanvasCompat(options: CanvasViteCompatOptions): Plugin[] {
   const hostAliasPrefix = '@/';
   const hostAliasBaseDir = options.hostAliasBaseDir ?? 'src';
 

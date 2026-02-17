@@ -1,8 +1,9 @@
-import type { DiscoveryResult, DiscoveryWarning } from './discovery-client';
 import {
   isSupportedPreviewModulePath,
   toViteFsUrl,
 } from '@drupal-canvas/vite-compat/runtime';
+
+import type { DiscoveryResult, DiscoveryWarning } from './discovery-client';
 
 export type PreviewIneligibilityReason =
   | 'missing_js_entry'
@@ -125,12 +126,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-export function isPreviewRenderRequest(value: unknown): value is PreviewRenderRequest {
+export function isPreviewRenderRequest(
+  value: unknown,
+): value is PreviewRenderRequest {
   if (!isRecord(value)) {
     return false;
   }
 
-  if (value.source !== 'canvas-workbench-parent' || value.type !== 'preview:render') {
+  if (
+    value.source !== 'canvas-workbench-parent' ||
+    value.type !== 'preview:render'
+  ) {
     return false;
   }
 
@@ -149,7 +155,9 @@ export function isPreviewRenderRequest(value: unknown): value is PreviewRenderRe
   );
 }
 
-export function isPreviewFrameEvent(value: unknown): value is PreviewFrameEvent {
+export function isPreviewFrameEvent(
+  value: unknown,
+): value is PreviewFrameEvent {
   if (!isRecord(value) || value.source !== 'canvas-workbench-frame') {
     return false;
   }

@@ -6,7 +6,8 @@ import './index.css';
 import App from './App.tsx';
 import PreviewFrameApp from './PreviewFrameApp.tsx';
 
-const isPreviewFrameRoute = window.location.pathname === '/__canvas/preview-frame';
+const isPreviewFrameRoute =
+  window.location.pathname === '/__canvas/preview-frame';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

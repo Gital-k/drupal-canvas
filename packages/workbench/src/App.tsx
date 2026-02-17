@@ -1,20 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-
 import {
   fetchDiscoveryResult,
   fetchPreviewManifest,
 } from '@wb/lib/discovery-client';
-import {
-  isPreviewFrameEvent,
-  type PreviewManifest,
-  type PreviewManifestComponent,
-  type PreviewRenderRequest,
-} from '@wb/lib/preview-contract';
+import { isPreviewFrameEvent } from '@wb/lib/preview-contract';
 
 import type { DiscoveryResult } from '@wb/lib/discovery-client';
+import type {
+  PreviewManifest,
+  PreviewManifestComponent,
+  PreviewRenderRequest,
+} from '@wb/lib/preview-contract';
 
 function pickInitialSelection(manifest: PreviewManifest): string | null {
-  const firstPreviewable = manifest.components.find((component) => component.previewable);
+  const firstPreviewable = manifest.components.find(
+    (component) => component.previewable,
+  );
   if (firstPreviewable) {
     return firstPreviewable.id;
   }
@@ -23,10 +24,14 @@ function pickInitialSelection(manifest: PreviewManifest): string | null {
 }
 
 export function App() {
-  const [discoveryResult, setDiscoveryResult] = useState<DiscoveryResult | null>(null);
-  const [previewManifest, setPreviewManifest] = useState<PreviewManifest | null>(null);
+  const [discoveryResult, setDiscoveryResult] =
+    useState<DiscoveryResult | null>(null);
+  const [previewManifest, setPreviewManifest] =
+    useState<PreviewManifest | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
+  const [selectedComponentId, setSelectedComponentId] = useState<string | null>(
+    null,
+  );
   const [isFrameReady, setIsFrameReady] = useState(false);
   const [frameStatus, setFrameStatus] = useState('Waiting for frame.');
   const [iframeKey, setIframeKey] = useState(0);
@@ -162,7 +167,9 @@ export function App() {
               onClick={() => setSelectedComponentId(component.id)}
             >
               <div className="font-medium">{component.name}</div>
-              <div className="text-xs opacity-70">{component.relativeDirectory}</div>
+              <div className="text-xs opacity-70">
+                {component.relativeDirectory}
+              </div>
               <div className="text-xs">
                 {component.previewable
                   ? 'Previewable'
@@ -209,7 +216,9 @@ export function App() {
 
         {selectedComponent ? (
           <section className="mb-3 rounded border p-3">
-            <h3 className="text-sm font-semibold">Example props (first examples)</h3>
+            <h3 className="text-sm font-semibold">
+              Example props (first examples)
+            </h3>
             <pre className="mt-2 overflow-auto rounded bg-black/5 p-2 text-xs">
               {JSON.stringify(selectedComponent.exampleProps, null, 2)}
             </pre>
@@ -235,7 +244,9 @@ export function App() {
         </section>
 
         {!selectedComponent ? (
-          <div className="rounded border p-4">No components were discovered.</div>
+          <div className="rounded border p-4">
+            No components were discovered.
+          </div>
         ) : !selectedComponent.previewable ? (
           <div className="rounded border p-4">
             This component is not previewable in strict mode. Reason:{' '}

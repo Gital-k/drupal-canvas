@@ -1,10 +1,11 @@
+import type { DiscoveryResult } from '@drupal-canvas/component-discovery';
+import type { PreviewManifest } from './preview-contract';
+
 export type {
   DiscoveredComponent,
   DiscoveryResult,
   DiscoveryWarning,
 } from '@drupal-canvas/component-discovery';
-import type { DiscoveryResult } from '@drupal-canvas/component-discovery';
-import type { PreviewManifest } from './preview-contract';
 
 export async function fetchDiscoveryResult(): Promise<DiscoveryResult> {
   const response = await fetch('/__canvas/discovery');

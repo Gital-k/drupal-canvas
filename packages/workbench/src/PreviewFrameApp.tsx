@@ -1,14 +1,14 @@
-import { Component, type ErrorInfo, type ReactNode } from 'react';
-import { useEffect, useRef, useState } from 'react';
-import type { ComponentType } from 'react';
-
+import { Component, useEffect, useRef, useState } from 'react';
 import { resolvePreviewComponent } from '@wb/lib/preview-component-resolver';
-import {
-  isPreviewRenderRequest,
-  type PreviewFrameError,
-  type PreviewFrameReady,
-  type PreviewFrameRendered,
-  type PreviewRenderRequest,
+import { isPreviewRenderRequest } from '@wb/lib/preview-contract';
+
+import type { ErrorInfo, ReactNode } from 'react';
+import type { ComponentType } from 'react';
+import type {
+  PreviewFrameError,
+  PreviewFrameReady,
+  PreviewFrameRendered,
+  PreviewRenderRequest,
 } from '@wb/lib/preview-contract';
 
 function postFrameMessage(
@@ -82,15 +82,22 @@ class FrameRenderBoundary extends Component<
     );
   }
 
-  componentDidUpdate(prevProps: Readonly<{ componentId: string | null }>): void {
-    if (prevProps.componentId !== this.props.componentId && this.state.hasError) {
+  componentDidUpdate(
+    prevProps: Readonly<{ componentId: string | null }>,
+  ): void {
+    if (
+      prevProps.componentId !== this.props.componentId &&
+      this.state.hasError
+    ) {
       this.setState({ hasError: false });
     }
   }
 
   render(): ReactNode {
     if (this.state.hasError) {
-      return <div>Component rendering failed. See parent status for details.</div>;
+      return (
+        <div>Component rendering failed. See parent status for details.</div>
+      );
     }
 
     return this.props.children;
@@ -98,7 +105,9 @@ class FrameRenderBoundary extends Component<
 }
 
 export function PreviewFrameApp() {
-  const [activeRender, setActiveRender] = useState<RenderableState | null>(null);
+  const [activeRender, setActiveRender] = useState<RenderableState | null>(
+    null,
+  );
   const [status, setStatus] = useState('Waiting for component selection...');
   const loadedGlobalCssUrlRef = useRef<string | null>(null);
 
@@ -126,16 +135,16 @@ export function PreviewFrameApp() {
     };
   }, []);
 
-  async function handleRenderRequest(request: PreviewRenderRequest): Promise<void> {
+  async function handleRenderRequest(
+    request: PreviewRenderRequest,
+  ): Promise<void> {
     try {
       setStatus(`Loading ${request.payload.componentId}...`);
       if (
         request.payload.globalCssUrl &&
         loadedGlobalCssUrlRef.current !== request.payload.globalCssUrl
       ) {
-        await import(
-          /* @vite-ignore */ request.payload.globalCssUrl
-        );
+        await import(/* @vite-ignore */ request.payload.globalCssUrl);
         loadedGlobalCssUrlRef.current = request.payload.globalCssUrl;
       }
       applyComponentStylesheet(request.payload.cssUrl);
@@ -146,7 +155,9 @@ export function PreviewFrameApp() {
       const { component: renderableComponent, reason } =
         resolvePreviewComponent(loadedModule);
       if (!renderableComponent) {
-        throw new Error(reason ?? 'Module does not export a renderable component.');
+        throw new Error(
+          reason ?? 'Module does not export a renderable component.',
+        );
       }
 
       setActiveRender({
@@ -157,7 +168,9 @@ export function PreviewFrameApp() {
       setStatus(`Loaded ${request.payload.componentId}, rendering...`);
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : `Unknown render error: ${String(error)}`;
+        error instanceof Error
+          ? error.message
+          : `Unknown render error: ${String(error)}`;
       setStatus(message);
       setActiveRender(null);
       postFrameMessage({

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { toViteFsUrl } from '@drupal-canvas/vite-compat/runtime';
 
 import {
   buildPreviewManifest,
@@ -6,7 +7,6 @@ import {
   isPreviewRenderRequest,
   toPreviewManifestComponent,
 } from './preview-contract';
-import { toViteFsUrl } from '@drupal-canvas/vite-compat/runtime';
 
 describe('preview-contract', () => {
   it('creates Vite fs URLs from absolute paths', () => {

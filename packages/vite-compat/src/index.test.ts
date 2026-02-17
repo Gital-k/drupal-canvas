@@ -1,6 +1,6 @@
+import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { promises as fs } from 'node:fs';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
@@ -65,7 +65,9 @@ describe('vite-compat', () => {
   });
 
   it('converts absolute paths to Vite @fs URLs', () => {
-    expect(toViteFsUrl('/tmp/example/file.tsx')).toBe('/@fs/tmp/example/file.tsx');
+    expect(toViteFsUrl('/tmp/example/file.tsx')).toBe(
+      '/@fs/tmp/example/file.tsx',
+    );
   });
 
   it('checks supported preview module extensions', () => {
@@ -95,7 +97,8 @@ describe('vite-compat', () => {
       'utf-8',
     );
 
-    const result = await extractFirstExamplePropsFromComponentYaml(metadataPath);
+    const result =
+      await extractFirstExamplePropsFromComponentYaml(metadataPath);
     expect(result).toEqual({
       title: 'Hello',
       count: 5,
@@ -131,7 +134,9 @@ describe('vite-compat', () => {
 
   it('builds @fs URL for hardcoded host css path', () => {
     const resolvedPath = resolveHardcodedHostGlobalCssPath('/tmp/host');
-    expect(toViteFsUrl(resolvedPath)).toBe('/@fs/tmp/host/src/components/global.css');
+    expect(toViteFsUrl(resolvedPath)).toBe(
+      '/@fs/tmp/host/src/components/global.css',
+    );
   });
 
   it('returns stable virtual module URL for host global css', () => {
@@ -209,16 +214,23 @@ describe('vite-compat', () => {
     const resolveId = getResolveIdHook(resolverPlugin);
     expect(resolveId).not.toBeNull();
 
-    expect(resolveId?.('@/lib/utils', '/tmp/host/components/card/index.tsx')).toBe(
-      '/tmp/host/lib/utils',
-    );
+    expect(
+      resolveId?.('@/lib/utils', '/tmp/host/components/card/index.tsx'),
+    ).toBe('/tmp/host/lib/utils');
   });
 
   it('resolves extensionless host alias directories to index files', async () => {
     const hostRoot = await makeTempDir();
-    const componentEntry = path.join(hostRoot, 'src/components/button/index.jsx');
+    const componentEntry = path.join(
+      hostRoot,
+      'src/components/button/index.jsx',
+    );
     await fs.mkdir(path.dirname(componentEntry), { recursive: true });
-    await fs.writeFile(componentEntry, 'export default function Button() {}', 'utf-8');
+    await fs.writeFile(
+      componentEntry,
+      'export default function Button() {}',
+      'utf-8',
+    );
 
     const [resolverPlugin] = drupalCanvasCompat({
       hostRoot,
@@ -226,9 +238,12 @@ describe('vite-compat', () => {
     const resolveId = getResolveIdHook(resolverPlugin);
     expect(resolveId).not.toBeNull();
 
-    expect(resolveId?.('@/components/button', `${hostRoot}/src/components/card/index.jsx`)).toBe(
-      componentEntry,
-    );
+    expect(
+      resolveId?.(
+        '@/components/button',
+        `${hostRoot}/src/components/card/index.jsx`,
+      ),
+    ).toBe(componentEntry);
   });
 
   it('does not intercept third-party imports', () => {
@@ -239,16 +254,10 @@ describe('vite-compat', () => {
     expect(resolveId).not.toBeNull();
 
     expect(
-      resolveId?.(
-        'motion/react',
-        '/tmp/host/components/card/index.tsx',
-      ),
+      resolveId?.('motion/react', '/tmp/host/components/card/index.tsx'),
     ).toBeNull();
     expect(
-      resolveId?.(
-        '@fontsource/inter',
-        '/tmp/host/components/card/index.tsx',
-      ),
+      resolveId?.('@fontsource/inter', '/tmp/host/components/card/index.tsx'),
     ).toBeNull();
   });
 
@@ -270,8 +279,8 @@ describe('vite-compat', () => {
     expect(pluginNames.some((name) => name.includes('svgr'))).toBe(true);
 
     const resolveId = getResolveIdHook(plugins[0]);
-    expect(resolveId?.('@/lib/utils', '/tmp/host/components/card/index.tsx')).toBe(
-      '/tmp/host/src/lib/utils',
-    );
+    expect(
+      resolveId?.('@/lib/utils', '/tmp/host/components/card/index.tsx'),
+    ).toBe('/tmp/host/src/lib/utils');
   });
 });

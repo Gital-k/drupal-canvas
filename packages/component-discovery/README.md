@@ -5,8 +5,10 @@ Shared filesystem discovery for Drupal Canvas code components.
 ## What it does
 
 - Scans a `scanRoot` for `component.yml` and `*.component.yml` files.
-- Applies root `.gitignore` rules. Ignores common build and dependency folders (`node_modules`, `dist`, `.git`, `.next`, `.turbo`, `coverage`).
-- Resolves JavaScript entries in extension priority: `.ts`, `.tsx`, `.js`, `.jsx`.
+- Applies root `.gitignore` rules. Ignores common build and dependency folders
+  (`node_modules`, `dist`, `.git`, `.next`, `.turbo`, `coverage`).
+- Resolves JavaScript entries in extension priority: `.ts`, `.tsx`, `.js`,
+  `.jsx`.
 - Attaches optional `.css` entries when present.
 
 ## File conventions
@@ -29,7 +31,8 @@ components/icons/
   alert.css (optional)
 ```
 
-When both `component.yml` and `*.component.yml` exist in the same directory, named metadata files are used.
+When both `component.yml` and `*.component.yml` exist in the same directory,
+named metadata files are used.
 
 ## API
 
@@ -43,7 +46,8 @@ const result = await discoverCodeComponents({
 
 `result` includes:
 
-- `components`: discovered component records (`id`, `kind`, paths, and optional CSS path).
+- `components`: discovered component records (`id`, `kind`, paths, and optional
+  CSS path).
 - `warnings`: discovery warnings.
 - `stats`: `{ scannedFiles, ignoredFiles }`.
 

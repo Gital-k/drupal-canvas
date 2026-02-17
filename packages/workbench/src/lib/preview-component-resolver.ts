@@ -55,10 +55,12 @@ export function resolvePreviewComponent(
     return { component: namedExport, reason: null };
   }
 
-  const probableNamedExport = Object.entries(moduleRecord).find(([name, value]) => {
-    const startsWithUpper = /^[A-Z]/.test(name);
-    return startsWithUpper && isComponentCandidate(value);
-  });
+  const probableNamedExport = Object.entries(moduleRecord).find(
+    ([name, value]) => {
+      const startsWithUpper = /^[A-Z]/.test(name);
+      return startsWithUpper && isComponentCandidate(value);
+    },
+  );
 
   if (probableNamedExport && isComponentCandidate(probableNamedExport[1])) {
     return { component: probableNamedExport[1], reason: null };

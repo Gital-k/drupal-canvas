@@ -1,10 +1,6 @@
-import path from 'path';
 import { promises as fs } from 'node:fs';
+import path from 'path';
 import { defineConfig } from 'vite';
-import { discoverCodeComponents } from '../component-discovery/src/discover.ts';
-import tailwindcss from '@tailwindcss/vite';
-import react from '@vitejs/plugin-react';
-import { buildPreviewManifest } from './src/lib/preview-contract';
 import {
   drupalCanvasCompat,
   drupalCanvasCompatServer,
@@ -12,9 +8,14 @@ import {
   extractFirstExamplePropsFromComponentYaml,
   getWorkbenchHostGlobalCssVirtualUrl,
 } from '@drupal-canvas/vite-compat';
+import tailwindcss from '@tailwindcss/vite';
+import react from '@vitejs/plugin-react';
 
-import type { DiscoveryResult } from '../component-discovery/src/types.ts';
+import { discoverCodeComponents } from '../component-discovery/src/discover.ts';
+import { buildPreviewManifest } from './src/lib/preview-contract';
+
 import type { Plugin } from 'vite';
+import type { DiscoveryResult } from '../component-discovery/src/types.ts';
 
 const hostProjectRoot = process.cwd();
 const runningInsideWorkbenchPackage =
@@ -77,9 +78,8 @@ function canvasWorkbenchDiscovery(): Plugin {
     },
     async configureServer(server) {
       if (!runningInsideWorkbenchPackage) {
-        hostGlobalCssPath = await ensureHardcodedHostGlobalCssExists(
-          hostProjectRoot,
-        );
+        hostGlobalCssPath =
+          await ensureHardcodedHostGlobalCssExists(hostProjectRoot);
       }
       await refresh();
 
@@ -208,7 +208,12 @@ export default defineConfig({
     canvasWorkbenchDiscovery(),
   ] as any,
   resolve: {
-    dedupe: ['react', 'react-dom', 'react/jsx-runtime', 'react/jsx-dev-runtime'],
+    dedupe: [
+      'react',
+      'react-dom',
+      'react/jsx-runtime',
+      'react/jsx-dev-runtime',
+    ],
     alias: {
       '@wb': path.resolve(__dirname, './src'),
     },
