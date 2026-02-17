@@ -10,29 +10,20 @@ describe('resolvePreviewComponent', () => {
     expect(result.reason).toBeNull();
   });
 
-  it('falls back to default.Component when default is object metadata', () => {
-    const Component = () => null;
+  it('uses default React object export when available', () => {
+    const MemoComponent = { $$typeof: Symbol.for('react.memo') };
+    const result = resolvePreviewComponent({ default: MemoComponent });
+    expect(result.component).toBe(MemoComponent);
+    expect(result.reason).toBeNull();
+  });
+
+  it('returns failure reason when default export is not renderable', () => {
     const result = resolvePreviewComponent({
-      default: { id: 'meta', Component },
+      default: { id: 'meta' },
+      Component: () => null,
+      HeroCard: () => null,
     });
-    expect(result.component).toBe(Component);
-  });
-
-  it('falls back to named Component export', () => {
-    const Component = () => null;
-    const result = resolvePreviewComponent({ Component });
-    expect(result.component).toBe(Component);
-  });
-
-  it('finds PascalCase named exports', () => {
-    const HeroCard = () => null;
-    const result = resolvePreviewComponent({ heroCard: 1, HeroCard });
-    expect(result.component).toBe(HeroCard);
-  });
-
-  it('returns failure reason when no export is renderable', () => {
-    const result = resolvePreviewComponent({ default: { id: 'meta' } });
     expect(result.component).toBeNull();
-    expect(result.reason).toContain('No renderable React export found');
+    expect(result.reason).toContain('No renderable default export found');
   });
 });

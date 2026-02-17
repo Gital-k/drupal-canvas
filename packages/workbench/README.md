@@ -75,9 +75,8 @@ Workbench preview currently uses a strict compatibility contract.
   supported extension (`.js`, `.jsx`, `.ts`, or `.tsx`).
 - Workbench imports component modules through Vite `@fs` URLs, from the
   Workbench Vite process.
-- The preview iframe tries component exports in this order:
-  1. `default`
-  2. `Component`
+- The preview iframe requires a renderable `default` export from each component
+  module.
 - Optional component CSS entries are loaded in the iframe document when present.
 
 ## Compatibility notes
