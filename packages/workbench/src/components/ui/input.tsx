@@ -1,14 +1,7 @@
 import { Input as InputPrimitive } from '@base-ui/react/input';
 import { cn } from '@wb/lib/utils';
 
-import type * as React from 'react';
-
-type InputProps = Omit<
-  React.ComponentPropsWithoutRef<typeof InputPrimitive>,
-  'children'
->;
-
-function Input({ className, type, ...props }: InputProps) {
+function Input({ className, type, ...props }: InputPrimitive.Props) {
   return (
     <InputPrimitive
       type={type}

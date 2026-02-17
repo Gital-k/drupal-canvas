@@ -1,5 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
+import { Badge } from '@wb/components/ui/badge';
+import { Button } from '@wb/components/ui/button';
+import { Separator } from '@wb/components/ui/separator';
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarRail,
+  SidebarTrigger,
+} from '@wb/components/ui/sidebar';
 import { fetchDiscoveryResult } from '@wb/lib/discovery-client';
 import { fetchPreviewManifest } from '@wb/lib/preview-client';
 import { isPreviewFrameEvent } from '@wb/lib/preview-contract';
@@ -10,6 +28,23 @@ import type {
   PreviewManifestComponent,
   PreviewRenderRequest,
 } from '@wb/lib/preview-contract';
+
+const SIDEBAR_COOKIE_NAME = 'sidebar_state';
+
+function getSidebarDefaultOpen(): boolean {
+  if (typeof document === 'undefined') {
+    return true;
+  }
+
+  const cookieEntry = document.cookie
+    .split('; ')
+    .find((entry) => entry.startsWith(`${SIDEBAR_COOKIE_NAME}=`));
+  if (!cookieEntry) {
+    return true;
+  }
+
+  return cookieEntry.split('=')[1] !== 'false';
+}
 
 function pickInitialSelection(manifest: PreviewManifest): string | null {
   const firstPreviewable = manifest.components.find(
@@ -33,6 +68,7 @@ export function App() {
   const [frameStatus, setFrameStatus] = useState('Waiting for frame.');
   const [iframeKey, setIframeKey] = useState(0);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const [sidebarDefaultOpen] = useState(getSidebarDefaultOpen);
 
   const selectedComponentId = searchParams.get('id');
 
@@ -76,6 +112,16 @@ export function App() {
       ) ?? null
     );
   }, [previewManifest, selectedComponentId]);
+
+  const sortedComponents = useMemo<PreviewManifestComponent[]>(() => {
+    if (!previewManifest) {
+      return [];
+    }
+
+    return [...previewManifest.components].sort((componentA, componentB) =>
+      componentA.name.localeCompare(componentB.name),
+    );
+  }, [previewManifest]);
 
   useEffect(() => {
     let isMounted = true;
@@ -244,132 +290,148 @@ export function App() {
   }
 
   return (
-    <main className="grid min-h-screen grid-cols-[320px_1fr]">
-      <aside className="border-r p-4">
-        <h1 className="text-xl font-semibold">Canvas Workbench</h1>
-        <p className="text-sm opacity-75">
-          {previewManifest.components.length} discovered components
-        </p>
-        <p className="text-sm opacity-75">
-          Scanned: {discoveryResult.stats.scannedFiles}, ignored:{' '}
-          {discoveryResult.stats.ignoredFiles}
-        </p>
+    <SidebarProvider defaultOpen={sidebarDefaultOpen}>
+      <Sidebar>
+        <SidebarHeader className="border-b">
+          <h1 className="px-2 text-sm font-semibold">Canvas Workbench</h1>
+          <p className="px-2 text-xs text-muted-foreground">
+            {previewManifest.components.length} discovered components
+          </p>
+          <p className="px-2 text-xs text-muted-foreground">
+            Scanned: {discoveryResult.stats.scannedFiles}, ignored:{' '}
+            {discoveryResult.stats.ignoredFiles}
+          </p>
+        </SidebarHeader>
 
-        <div className="mt-4 flex flex-col gap-2">
-          {previewManifest.components.map((component) => (
-            <button
-              key={component.id}
-              type="button"
-              className="rounded border p-2 text-left"
-              data-selected={component.id === selectedComponent?.id}
-              onClick={() => {
-                const nextParams = new URLSearchParams(searchParams);
-                nextParams.set('id', component.id);
-                setSearchParams(nextParams);
-              }}
-            >
-              <div className="font-medium">{component.name}</div>
-              <div className="text-xs opacity-70">
-                {component.relativeDirectory}
-              </div>
-              <div className="text-xs">
-                {component.previewable
-                  ? 'Previewable'
-                  : `Unsupported: ${component.ineligibilityReason}`}
-              </div>
-            </button>
-          ))}
-        </div>
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarGroupLabel>Components</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {sortedComponents.map((component) => (
+                  <SidebarMenuItem key={component.id}>
+                    <SidebarMenuButton
+                      isActive={component.id === selectedComponent?.id}
+                      onClick={() => {
+                        const nextParams = new URLSearchParams(searchParams);
+                        nextParams.set('id', component.id);
+                        setSearchParams(nextParams);
+                      }}
+                    >
+                      <span>{component.name}</span>
+                      {!component.previewable ? (
+                        <Badge variant="destructive">No preview</Badge>
+                      ) : null}
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
 
-        {previewManifest.warnings.length > 0 ? (
-          <section className="mt-4">
-            <h2 className="text-sm font-semibold">Warnings</h2>
-            <ul className="mt-2 text-xs">
-              {previewManifest.warnings.map((warning, index) => (
-                <li key={`${warning.code}-${warning.path ?? 'none'}-${index}`}>
-                  <strong>{warning.code}</strong>: {warning.message}
-                </li>
-              ))}
-            </ul>
-          </section>
-        ) : null}
-      </aside>
+          {previewManifest.warnings.length > 0 ? (
+            <SidebarGroup>
+              <SidebarGroupLabel>Warnings</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <ul className="space-y-1 px-2 text-xs text-muted-foreground">
+                  {previewManifest.warnings.map((warning, index) => (
+                    <li
+                      key={`${warning.code}-${warning.path ?? 'none'}-${index}`}
+                    >
+                      <strong>{warning.code}</strong>: {warning.message}
+                    </li>
+                  ))}
+                </ul>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          ) : null}
+        </SidebarContent>
 
-      <section className="flex h-screen flex-col overflow-y-auto p-4">
-        <div className="mb-3 flex min-h-[calc(100dvh-2rem)] flex-col">
-          <header className="mb-2 flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold">
+        <SidebarRail />
+      </Sidebar>
+
+      <SidebarInset className="min-w-0">
+        <header className="flex h-14 shrink-0 items-center justify-between border-b px-4">
+          <div className="flex min-w-0 items-center gap-2">
+            <SidebarTrigger className="-ml-1" />
+            <Separator orientation="vertical" className="h-4" />
+            <div className="min-w-0">
+              <h2 className="truncate text-sm font-semibold">
                 {selectedComponent ? selectedComponent.name : 'No selection'}
               </h2>
-              <p className="text-sm opacity-70">{frameStatus}</p>
+              <p className="truncate text-xs text-muted-foreground">
+                {frameStatus}
+              </p>
             </div>
-            <button
-              type="button"
-              className="rounded border px-3 py-1"
-              onClick={() => {
-                setIsFrameReady(false);
-                setFrameStatus('Reloading frame...');
-                setIframeKey((value) => value + 1);
-              }}
-            >
-              Reload frame
-            </button>
-          </header>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setIsFrameReady(false);
+              setFrameStatus('Reloading frame...');
+              setIframeKey((value) => value + 1);
+            }}
+          >
+            Reload frame
+          </Button>
+        </header>
 
+        <section className="flex min-w-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
           {!selectedComponent ? (
-            <div className="rounded border p-4">
+            <div className="rounded-none border p-4">
               No components were discovered.
             </div>
           ) : !selectedComponent.previewable ? (
-            <div className="rounded border p-4">
+            <div className="rounded-none border p-4">
               This component is not previewable in strict mode. Reason:{' '}
               {selectedComponent.ineligibilityReason}
             </div>
           ) : (
-            <div className="min-h-0 flex-1 rounded border">
+            <div className="min-h-[50vh] rounded-none border">
               <iframe
                 key={iframeKey}
                 ref={iframeRef}
                 title="Canvas component preview"
                 src="/__canvas/preview-frame"
-                className="h-full w-full rounded"
+                className="h-full w-full"
                 sandbox="allow-scripts allow-same-origin"
               />
             </div>
           )}
-        </div>
 
-        {selectedComponent ? (
-          <section className="mb-3 rounded border p-3">
-            <h3 className="text-sm font-semibold">
-              Example props (first examples)
-            </h3>
-            <pre className="mt-2 overflow-auto rounded bg-black/5 p-2 text-xs">
-              {JSON.stringify(selectedComponent.exampleProps, null, 2)}
+          {selectedComponent ? (
+            <section className="rounded-none border p-3">
+              <h3 className="text-sm font-semibold">
+                Example props (first examples)
+              </h3>
+              <pre className="mt-2 overflow-auto rounded-none bg-black/5 p-2 text-xs">
+                {JSON.stringify(selectedComponent.exampleProps, null, 2)}
+              </pre>
+            </section>
+          ) : null}
+
+          <section className="rounded-none border p-3">
+            <h3 className="text-sm font-semibold">Preview runtime debug</h3>
+            <pre className="mt-2 overflow-auto rounded-none bg-black/5 p-2 text-xs">
+              {JSON.stringify(
+                {
+                  globalCssUrl: previewManifest.globalCssUrl,
+                  selectedComponentId: selectedComponent?.id ?? null,
+                  selectedModuleUrl: selectedComponent?.moduleUrl ?? null,
+                  selectedComponentCssUrl: selectedComponent?.cssUrl ?? null,
+                  frameReady: isFrameReady,
+                  frameStatus,
+                },
+                null,
+                2,
+              )}
             </pre>
           </section>
-        ) : null}
-
-        <section className="mb-3 rounded border p-3">
-          <h3 className="text-sm font-semibold">Preview runtime debug</h3>
-          <pre className="mt-2 overflow-auto rounded bg-black/5 p-2 text-xs">
-            {JSON.stringify(
-              {
-                globalCssUrl: previewManifest.globalCssUrl,
-                selectedComponentId: selectedComponent?.id ?? null,
-                selectedModuleUrl: selectedComponent?.moduleUrl ?? null,
-                selectedComponentCssUrl: selectedComponent?.cssUrl ?? null,
-                frameReady: isFrameReady,
-                frameStatus,
-              },
-              null,
-              2,
-            )}
-          </pre>
         </section>
-      </section>
-    </main>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }
 
