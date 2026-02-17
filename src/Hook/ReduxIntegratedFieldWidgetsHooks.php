@@ -185,7 +185,7 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
     // versions of Drupal core are hidden with CSS, but they still
     // exist in the DOM and can be interacted with.
     if (isset($variables['table']['#rows'])) {
-      foreach ($variables['table']['#rows'] as $key => &$row) {
+      foreach ($variables['table']['#rows'] as &$row) {
         if (isset($row['data'][0])) {
           $row['data'][0]['class'] = 'hidden';
         }
