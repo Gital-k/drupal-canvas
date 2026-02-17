@@ -103,17 +103,19 @@ export default function FormPropTypeVideo({
 
   // Sync state with incoming example prop (for pre-population on reload)
   useEffect(() => {
-    // If example is empty string, it means user selected "None", so set to NONE_VALUE
-    if (typeof example === 'string' && example === '') {
-      setAspectRatio(NONE_VALUE);
-      return;
-    }
     // If example is empty array, keep current aspectRatio (don't reset to default)
     if (Array.isArray(example) && example.length === 0) {
       return;
     }
-    const parsedAspectRatio = parseExampleSrc(videoExample.poster);
-    setAspectRatio(parsedAspectRatio);
+    // If example has valid content, parse and update state
+    if (videoExample.poster) {
+      const parsedAspectRatio = parseExampleSrc(videoExample.poster);
+      setAspectRatio(parsedAspectRatio);
+    }
+    // If example is empty string, it could mean:
+    // 1. Initial mount - let the main useEffect initialize with defaults
+    // 2. User explicitly selected None - aspectRatio would already be NONE_VALUE
+    // We don't need to do anything here; the main useEffect will handle initialization
   }, [videoExample.poster, example]);
 
   useEffect(() => {
@@ -134,7 +136,10 @@ export default function FormPropTypeVideo({
     const isFirstRender = prevAspectRatioRef.current === null;
 
     // Only run if aspect ratio actually changed OR if this is first render with empty example
-    if (aspectRatio === prevAspectRatioRef.current && !(isFirstRender && isEmptyExample)) {
+    if (
+      aspectRatio === prevAspectRatioRef.current &&
+      !(isFirstRender && isEmptyExample)
+    ) {
       return;
     }
     prevAspectRatioRef.current = aspectRatio;

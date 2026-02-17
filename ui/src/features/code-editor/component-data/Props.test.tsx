@@ -432,7 +432,9 @@ describe('props in code editor', () => {
       });
       // The pixel density should now be hidden.
       await waitFor(() => {
-        expect(screen.queryByLabelText('Pixel density')).not.toBeInTheDocument();
+        expect(
+          screen.queryByLabelText('Pixel density'),
+        ).not.toBeInTheDocument();
       });
 
       await waitFor(() => {

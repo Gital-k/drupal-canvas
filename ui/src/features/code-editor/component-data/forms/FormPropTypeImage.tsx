@@ -108,18 +108,19 @@ export default function FormPropTypeImage({
 
   // Sync state with incoming example prop (for pre-population on reload)
   useEffect(() => {
-    // If example is empty string, it means user selected "None", so set to NONE_VALUE
-    if (typeof example === 'string' && example === '') {
-      setAspectRatio(NONE_VALUE);
-      return;
-    }
     // If example is empty array, keep current aspectRatio (don't reset to default)
     if (Array.isArray(example) && example.length === 0) {
       return;
     }
-    const parsedValues = parseExampleSrc(imageExample.src);
-    setAspectRatio(parsedValues.aspectRatio);
-    setPixelDensity(parsedValues.pixelDensity);
+    // If example has valid content, parse and update state
+    if (imageExample.src) {
+      const parsedValues = parseExampleSrc(imageExample.src);
+      setAspectRatio(parsedValues.aspectRatio);
+      setPixelDensity(parsedValues.pixelDensity);
+    }
+    // If example is empty string AND aspectRatio is not NONE_VALUE, it means we're initializing
+    // Let the main useEffect handle initialization with defaults
+    // Only set to NONE_VALUE if aspectRatio was already NONE_VALUE (user explicitly selected None)
   }, [imageExample.src, example]);
 
   useEffect(() => {
