@@ -84,18 +84,15 @@ const mainProperty: Transformer<{
       records = Object.values(value);
     }
   }
-  const returnValue = records.reduce(
-    (carry: Array<any>, record: PropsValues) => {
-      if (record === null || record === undefined) {
-        return carry.concat(null);
-      }
-      if (name in record) {
-        return carry.concat(record[name]);
-      }
-      return carry.concat(null);
-    },
-    [],
-  );
+  const returnValue = records.map((record: PropsValues) => {
+    if (record === null || record === undefined) {
+      return null;
+    }
+    if (name in record) {
+      return record[name];
+    }
+    return null;
+  });
   if (multiple) {
     return returnValue;
   }
@@ -136,41 +133,38 @@ const link: Transformer<
   LinkPropShape
 > = (value, options, propSource) => {
   const records: Array<PropsValues> = Array.isArray(value) ? value : [value];
-  const returnValue = records.reduce(
-    (carry: Array<null | string | PropsValues>, record: PropsValues) => {
-      // `1` corresponds to `DRUPAL_OPTIONAL` and `2` to DRUPAL_REQUIRED on the
-      // server side.
-      if (![1, 2].includes(propSource?.sourceTypeSettings?.instance?.title)) {
-        const uri = mainProperty(
-          [record],
-          { name: 'uri', multiple: false },
-          propSource,
-        );
-        const match = uri.match(ENTITY_AUTOCOMPLETE_MATCH);
-        if (match !== null) {
-          // LinkWidget with autocomplete support only supports matching on node
-          // entities.
-          // @todo Add support for other entity types once core does -
-          // https://www.drupal.org/i/2423093
-          return carry.concat(`entity:node/${match[1]}`);
-        }
-        return carry.concat(uri);
-      }
-      if (record === null) {
-        return carry.concat(record);
-      }
-      const match = record.uri.match(ENTITY_AUTOCOMPLETE_MATCH);
+  const returnValue = records.map((record: PropsValues) => {
+    // `1` corresponds to `DRUPAL_OPTIONAL` and `2` to DRUPAL_REQUIRED on the
+    // server side.
+    if (![1, 2].includes(propSource?.sourceTypeSettings?.instance?.title)) {
+      const uri = mainProperty(
+        [record],
+        { name: 'uri', multiple: false },
+        propSource,
+      );
+      const match = uri.match(ENTITY_AUTOCOMPLETE_MATCH);
       if (match !== null) {
         // LinkWidget with autocomplete support only supports matching on node
         // entities.
         // @todo Add support for other entity types once core does -
         // https://www.drupal.org/i/2423093
-        return carry.concat({ ...record, uri: `entity:node/${match[1]}` });
+        return `entity:node/${match[1]}`;
       }
-      return carry.concat(record);
-    },
-    [],
-  );
+      return uri;
+    }
+    if (record === null) {
+      return record;
+    }
+    const match = record.uri.match(ENTITY_AUTOCOMPLETE_MATCH);
+    if (match !== null) {
+      // LinkWidget with autocomplete support only supports matching on node
+      // entities.
+      // @todo Add support for other entity types once core does -
+      // https://www.drupal.org/i/2423093
+      return { ...record, uri: `entity:node/${match[1]}` };
+    }
+    return record;
+  });
   if (options.multiple) {
     return returnValue;
   }
@@ -191,24 +185,21 @@ const cast: Transformer<
 > = (value, options) => {
   const { to = 'number', multiple = false } = options;
   const records: Array<null | string> = Array.isArray(value) ? value : [value];
-  const returnValue = records.reduce(
-    (carry: Array<null | number | boolean>, value: null | string) => {
-      if (value === null) {
-        return carry.concat(null);
-      }
-      if (to === 'number') {
-        return carry.concat(Number(value));
-      }
-      if (to === 'integer') {
-        return carry.concat(parseInt(value));
-      }
-      if (value === 'false') {
-        return carry.concat(false);
-      }
-      return carry.concat(Boolean(value));
-    },
-    [],
-  );
+  const returnValue = records.map((value: null | string) => {
+    if (value === null) {
+      return null;
+    }
+    if (to === 'number') {
+      return Number(value);
+    }
+    if (to === 'integer') {
+      return parseInt(value);
+    }
+    if (value === 'false') {
+      return false;
+    }
+    return Boolean(value);
+  });
   if (multiple) {
     return returnValue;
   }
@@ -245,29 +236,24 @@ const dateTime: Transformer<
   // @see \Drupal\Component\Datetime\DateTimePlus::setDefaultDateTime
   const records: Array<PropsValues> = Array.isArray(value) ? value : [value];
 
-  const returnValue = records.reduce(
-    (carry: Array<null | string>, record: PropsValues) => {
-      if (record === null) {
-        return carry.concat(null);
-      }
-      let timeString = '12:00:00';
-      if (!('date' in record)) {
-        return carry.concat(null);
-      }
-      const dateString = record.date;
-      if (type === 'date') {
-        return carry.concat(dateString);
-      }
-      if ('time' in record) {
-        timeString = record.time;
-      }
-      // @todo Update this in https://www.drupal.org/project/canvas/issues/3501281, which will allow removing the FE-special casing in \Drupal\canvas\PropExpressions\StructuredData\Evaluator::evaluate()
-      return carry.concat(
-        new Date(`${dateString} ${timeString}+0000`).toISOString(),
-      );
-    },
-    [],
-  );
+  const returnValue = records.map((record: PropsValues) => {
+    if (record === null) {
+      return null;
+    }
+    let timeString = '12:00:00';
+    if (!('date' in record)) {
+      return null;
+    }
+    const dateString = record.date;
+    if (type === 'date') {
+      return dateString;
+    }
+    if ('time' in record) {
+      timeString = record.time;
+    }
+    // @todo Update this in https://www.drupal.org/project/canvas/issues/3501281, which will allow removing the FE-special casing in \Drupal\canvas\PropExpressions\StructuredData\Evaluator::evaluate()
+    return new Date(`${dateString} ${timeString}+0000`).toISOString();
+  });
   if (options.multiple) {
     return returnValue;
   }
