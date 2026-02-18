@@ -159,8 +159,9 @@ jquery.overrides:
     - core/jquery
 
 tabledrag.canvas.override:
-  js:
-    js/tabledrag.overrides.js: {}
+  css:
+    theme:
+      css/tabledrag-overrides.css: {}
   dependencies:
     - core/drupal
 
