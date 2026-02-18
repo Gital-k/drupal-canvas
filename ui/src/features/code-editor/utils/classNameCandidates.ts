@@ -112,6 +112,28 @@ export function upsertClassNameCandidatesInComment(
 }
 
 /**
+ * Extracts class name candidates from @apply directives in a CSS string.
+ *
+ * When @apply is used in global CSS, the referenced utility classes need to be
+ * included as class name candidates for the Tailwind CSS build. Without this,
+ * utilities with dots in their names (e.g. `p-1.5`) cause the build to fail
+ * because the dot is misinterpreted as a class selector separator.
+ *
+ * @param css - The CSS string to extract @apply class names from.
+ * @returns An array of unique class name candidates.
+ */
+export function extractClassNameCandidatesFromCss(css: string): string[] {
+  const candidates: string[] = [];
+  const applyRegex = /@apply\s+([^;}]+)/g;
+  let match;
+  while ((match = applyRegex.exec(css)) !== null) {
+    const classNames = match[1].trim().split(/\s+/);
+    candidates.push(...classNames);
+  }
+  return [...new Set(candidates)];
+}
+
+/**
  * Deletes class name candidates for a component in the source string.
  *
  * @param source - The source string to update.
