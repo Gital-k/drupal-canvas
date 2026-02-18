@@ -86,7 +86,7 @@ export default function FormPropTypeVideo({
   // Handle both single video and array (when allowMultiple is enabled)
   // If it's an array, use the first element for display
   const videoExample = Array.isArray(example)
-    ? (example[0] || { src: '', poster: '', width: 0, height: 0 })
+    ? example[0] || { src: '', poster: '', width: 0, height: 0 }
     : example;
 
   const exampleAspectRatio = parseExampleSrc(videoExample.poster);

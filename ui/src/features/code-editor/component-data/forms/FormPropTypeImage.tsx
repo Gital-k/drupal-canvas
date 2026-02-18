@@ -93,7 +93,7 @@ export default function FormPropTypeImage({
   // Handle both single image and array (when allowMultiple is enabled)
   // If it's an array, use the first element for display
   const imageExample = Array.isArray(example)
-    ? (example[0] || { src: '', width: 0, height: 0, alt: '' })
+    ? example[0] || { src: '', width: 0, height: 0, alt: '' }
     : example;
 
   const { aspectRatio: exampleAspectRatio, pixelDensity: examplePixelDensity } =

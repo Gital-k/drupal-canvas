@@ -44,12 +44,15 @@ export default function FormPropTypeArray({
   // Ensure we always have at least one item to display in unlimited mode
   const defaultValue = itemType === 'integer' || itemType === 'number' ? 0 : '';
   const displayArray =
-    exampleArray.length === 0 ? ([defaultValue] as (string | number)[]) : exampleArray;
+    exampleArray.length === 0
+      ? ([defaultValue] as (string | number)[])
+      : exampleArray;
 
   const handleDragEnd = createArrayDragEndHandler(displayArray, dispatch, id);
 
   const handleAdd = () => {
-    const defaultValue = itemType === 'integer' || itemType === 'number' ? 0 : '';
+    const defaultValue =
+      itemType === 'integer' || itemType === 'number' ? 0 : '';
     handleArrayAdd(displayArray, dispatch, id, defaultValue);
   };
 

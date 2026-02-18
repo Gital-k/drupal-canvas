@@ -113,26 +113,26 @@ export function serializeProps(props: CodeComponentProp[]) {
     .filter((prop) => prop.name)
     .reduce(
       (acc, prop) => {
-    const {
-      name,
-      type,
-      example,
-      enum: enumValues,
-      $ref,
-      format,
-      contentMediaType,
-      'x-formatting-context': xFormattingContext,
-      derivedType,
-      allowMultiple,
-      items,
-      valueMode,
-      limitedCount,
-    } = prop;
-    const isNumberType = ['integer', 'number'].includes(type);
-    const isVideo = derivedType === 'video';
+        const {
+          name,
+          type,
+          example,
+          enum: enumValues,
+          $ref,
+          format,
+          contentMediaType,
+          'x-formatting-context': xFormattingContext,
+          derivedType,
+          allowMultiple,
+          items,
+          valueMode,
+          limitedCount,
+        } = prop;
+        const isNumberType = ['integer', 'number'].includes(type);
+        const isVideo = derivedType === 'video';
 
-    // Determine the actual type for serialization
-    const serializedType = allowMultiple && items ? 'array' : type;
+        // Determine the actual type for serialization
+        const serializedType = allowMultiple && items ? 'array' : type;
 
         const processed: CodeComponentPropSerialized = {
           title: name,
@@ -153,51 +153,52 @@ export function serializeProps(props: CodeComponentProp[]) {
             ],
           }),
           // Only add enum/meta:enum at root level if NOT an array
-          ...(!allowMultiple && enumValues && {
-            enum: enumValues
-              .filter(({ value }) => value !== '')
-              .map(({ value }) => (isNumberType ? Number(value) : value)),
-            'meta:enum': Object.fromEntries(
-              enumValues
+          ...(!allowMultiple &&
+            enumValues && {
+              enum: enumValues
                 .filter(({ value }) => value !== '')
-                .map(({ value, label }) => [value, label]),
-            ),
-          }),
+                .map(({ value }) => (isNumberType ? Number(value) : value)),
+              'meta:enum': Object.fromEntries(
+                enumValues
+                  .filter(({ value }) => value !== '')
+                  .map(({ value, label }) => [value, label]),
+              ),
+            }),
         };
-    // When allowMultiple is true, metadata goes INSIDE items
-    if (allowMultiple && items) {
-      processed.items = {
-        type: items.type,
-        ...($ref && { $ref }),
-        ...(format && { format }),
-        ...(contentMediaType && { contentMediaType }),
-        ...(xFormattingContext && {
-          'x-formatting-context': xFormattingContext,
-        }),
-        // Add enum/meta:enum inside items for array types
-        ...(enumValues && {
-          enum: enumValues
-            .filter(({ value }) => value !== '')
-            .map(({ value }) => (isNumberType ? Number(value) : value)),
-          'meta:enum': Object.fromEntries(
-            enumValues
-              .filter(({ value }) => value !== '')
-              .map(({ value, label }) => [value, label]),
-          ),
-        }),
-      };
-      // Add maxItems when valueMode is 'limited'
-      if (valueMode === 'limited' && limitedCount) {
-        processed.maxItems = limitedCount;
-      }
-    } else {
-      // When not an array, metadata goes at top level
-      if ($ref) processed.$ref = $ref;
-      if (format) processed.format = format;
-      if (contentMediaType) processed.contentMediaType = contentMediaType;
-      if (xFormattingContext)
-        processed['x-formatting-context'] = xFormattingContext;
-    }
+        // When allowMultiple is true, metadata goes INSIDE items
+        if (allowMultiple && items) {
+          processed.items = {
+            type: items.type,
+            ...($ref && { $ref }),
+            ...(format && { format }),
+            ...(contentMediaType && { contentMediaType }),
+            ...(xFormattingContext && {
+              'x-formatting-context': xFormattingContext,
+            }),
+            // Add enum/meta:enum inside items for array types
+            ...(enumValues && {
+              enum: enumValues
+                .filter(({ value }) => value !== '')
+                .map(({ value }) => (isNumberType ? Number(value) : value)),
+              'meta:enum': Object.fromEntries(
+                enumValues
+                  .filter(({ value }) => value !== '')
+                  .map(({ value, label }) => [value, label]),
+              ),
+            }),
+          };
+          // Add maxItems when valueMode is 'limited'
+          if (valueMode === 'limited' && limitedCount) {
+            processed.maxItems = limitedCount;
+          }
+        } else {
+          // When not an array, metadata goes at top level
+          if ($ref) processed.$ref = $ref;
+          if (format) processed.format = format;
+          if (contentMediaType) processed.contentMediaType = contentMediaType;
+          if (xFormattingContext)
+            processed['x-formatting-context'] = xFormattingContext;
+        }
         return { ...acc, [getPropMachineName(name)]: processed };
       },
       {} as Record<string, CodeComponentPropSerialized>,
@@ -321,14 +322,16 @@ export function deserializeProps(
       }),
       derivedType,
       ...(allowMultiple && { allowMultiple: true, items }),
-      ...(allowMultiple && maxItems && {
-        valueMode: 'limited' as const,
-        limitedCount: maxItems,
-      }),
-      ...(allowMultiple && !maxItems && {
-        valueMode: 'unlimited' as const,
-        limitedCount: 1,
-      }),
+      ...(allowMultiple &&
+        maxItems && {
+          valueMode: 'limited' as const,
+          limitedCount: maxItems,
+        }),
+      ...(allowMultiple &&
+        !maxItems && {
+          valueMode: 'unlimited' as const,
+          limitedCount: 1,
+        }),
     };
 
     // Backwards compatibility
