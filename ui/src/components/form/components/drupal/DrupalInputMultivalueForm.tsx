@@ -107,13 +107,13 @@ const DrupalInputMultivalueForm = ({
           <Text size="1" weight="medium" className={styles.popoverLabel}>
             {fieldLabel}
           </Text>
-          <Popover.Close aria-label="Close" className={styles.closeButton}>
+          <Popover.Close aria-label="Close">
             <Cross2Icon />
           </Popover.Close>
         </Flex>
 
         {/* Input Field */}
-        <Box className={styles.inputWrapper} ref={inputWrapperRef}>
+        <Box ref={inputWrapperRef}>
           <TextFieldWithBehaviors
             {...{ className: clsx(attributes.class) }}
             {...{
@@ -133,7 +133,6 @@ const DrupalInputMultivalueForm = ({
               color="red"
               size="1"
               onClick={handleRemove}
-              className={styles.removeButton}
             >
               <TrashIcon />
               Remove

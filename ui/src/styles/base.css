@@ -103,17 +103,12 @@ drupal-html-fragment {
 
 .add-new-wrapper button,
 .add-new-wrapper input[type="submit"] {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
   width: 100%;
   padding: 8px 12px;
   background-color: #F3F4F6;
   border: none;
-  color: #3B82F6;
+  color: #0090FF;
   font-size: 14px;
-  font-weight: 500;
   cursor: pointer;
   transition: background-color 0.15s ease;
 }

@@ -30,7 +30,6 @@
   flex: 1;
   padding: var(--space-3) var(--space-3);
   background-color: transparent;
-  cursor: pointer;
   transition: background-color 0.15s ease;
   gap: var(--space-2);
 }
@@ -48,6 +47,7 @@
   flex-shrink: 0;
   position: absolute;
   right: var(--space-3);
+  margin-top: 5px;
 }
 
 .listItem:focus {
@@ -98,82 +98,3 @@
 .popoverLabel {
   color: var(--gray-11);
 }
-
-.closeButton {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: var(--gray-11);
-  cursor: pointer;
-  border-radius: var(--radius-2);
-}
-
-.closeButton:hover {
-  color: var(--gray-12);
-  background-color: var(--gray-3);
-}
-
-.inputWrapper {
-  width: 100%;
-}
-
-.inputWrapper input {
-  width: 100%;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--gray-6);
-  border-radius: var(--radius-2);
-  font-size: var(--font-size-2);
-  line-height: 1.5;
-}
-
-.inputWrapper input:focus {
-  outline: none;
-  border-color: var(--blue-8);
-  box-shadow: 0 0 0 1px var(--blue-8);
-}
-
-.removeButton {
-  font-weight: 500;
-  width: 216px;
-  height: 24px;
-  border-radius: var(--radius-1);
-  gap: 4px;
-  padding-left: var(--space-2);
-  padding-right: var(--space-2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Add New Button - Styled as per design inside the dashed container */
-.addNewButton {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-1);
-  width: 100%;
-  padding: var(--space-2) var(--space-3);
-  background-color: white;
-  border: none;
-  border-top: 1px solid var(--gray-4);
-  color: var(--blue-9);
-  font-size: var(--font-size-2);
-  font-weight: 500;
-  cursor: pointer;
-  transition: background-color 0.15s ease;
-}
-
-.addNewButton:hover {
-  background-color: var(--gray-2);
-}
-
-.addNewButton:focus {
-  outline: 2px solid var(--blue-8);
-  outline-offset: -2px;
-}
-
