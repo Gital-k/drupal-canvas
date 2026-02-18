@@ -97,7 +97,7 @@
       }
 
       const updatedInputElements = allJSXComponentInstances.filter((el) =>
-        el.hasAttribute('attributes'),
+        el.hasAttribute('attributes') && !el.hasAttribute('data-drupal-scriptified'),
       );
 
       // Keeps track of if behaviors have been attached.
