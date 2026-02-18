@@ -160,7 +160,7 @@ final class PropSourceSuggester {
       )->getComponents();
       uasort($expected_order, SortArray::sortByWeightElement(...));
       $bucketed_by_field = array_fill_keys(
-        array_keys($expected_order),
+        \array_keys($expected_order),
         [],
       );
       // Push each expression into the right (field) bucket, but only if
@@ -277,7 +277,7 @@ final class PropSourceSuggester {
     }
 
     $schema = $shape->resolvedSchema;
-    if (!array_key_exists('format', $schema)) {
+    if (!\array_key_exists('format', $schema)) {
       return NULL;
     }
 
@@ -301,7 +301,7 @@ final class PropSourceSuggester {
     // allow HTTP nor HTTPS, then no viable HostEntityUrlPropSource can exist.
     // @see \Drupal\canvas\Validation\JsonSchema\UriSchemeAwareFormatConstraint
     if (
-      array_key_exists('x-allowed-schemes', $schema)
+      \array_key_exists('x-allowed-schemes', $schema)
       && empty(array_intersect($schema['x-allowed-schemes'], ['http', 'https']))
     ) {
       return NULL;
@@ -310,7 +310,7 @@ final class PropSourceSuggester {
     // If any `contentMediaType` shape restriction is present, then no viable
     // HostEntityUrlPropSource can exist (because these always point to
     // `text/html` resources).
-    if (array_key_exists('contentMediaType', $schema)) {
+    if (\array_key_exists('contentMediaType', $schema)) {
       return NULL;
     }
 
@@ -331,7 +331,7 @@ final class PropSourceSuggester {
       // Top-level keys: the prop names of the targeted component.
       \array_map(
         fn (string $key): string => ComponentPropExpression::fromString($key)->propName,
-        array_keys($suggestions),
+        \array_keys($suggestions),
       ),
       \array_map(
         // Second level keys: opaque identifiers for the suggestions to
@@ -354,7 +354,7 @@ final class PropSourceSuggester {
                 'source' => $prop_source->toArray(),
               ];
             },
-            array_keys($prop_sources),
+            \array_keys($prop_sources),
             array_values($prop_sources),
           ),
         ),
@@ -364,10 +364,10 @@ final class PropSourceSuggester {
   }
 
   private static function enrichSuggestion(array $suggestion): array {
-    \assert(array_key_exists('label', $suggestion));
-    \assert(array_key_exists('source', $suggestion));
+    \assert(\array_key_exists('label', $suggestion));
+    \assert(\array_key_exists('source', $suggestion));
     \assert(is_array($suggestion['source']));
-    \assert(array_key_exists('sourceType', $suggestion['source']));
+    \assert(\array_key_exists('sourceType', $suggestion['source']));
     $label = $suggestion['label'];
 
     $label_parts = explode(' → ', $label);
@@ -399,7 +399,7 @@ final class PropSourceSuggester {
 
   private static function walkAndPopulateHierarchicalSuggestions(array &$hierarchical_suggestions): void {
     foreach ($hierarchical_suggestions as $key => $value) {
-      if (array_key_exists('items', $value)) {
+      if (\array_key_exists('items', $value)) {
         self::walkAndPopulateHierarchicalSuggestions($value['items']);
       }
       unset($hierarchical_suggestions[$key]);

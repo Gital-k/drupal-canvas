@@ -48,7 +48,7 @@ class BetterConfigEntityValidationTestBase extends ConfigEntityValidationTestBas
       function (string $schema_error_message, string $property_path) use ($expected_messages, $config_entity_prefix, &$nonsensical_subtrees): bool {
         $relative_property_path = substr($property_path, strlen($config_entity_prefix));
         // Ignore when there is a validation error for exactly this property.
-        if (array_key_exists($relative_property_path, $expected_messages)) {
+        if (\array_key_exists($relative_property_path, $expected_messages)) {
           return FALSE;
         }
         // Ignore when this is a validation error about typecasting, because the
@@ -67,7 +67,7 @@ class BetterConfigEntityValidationTestBase extends ConfigEntityValidationTestBas
         $parts = explode('.', $relative_property_path);
         $popped = array_pop($parts);
         $parent_property_path = implode('.', $parts);
-        $validation_error_message = match (array_key_exists($parent_property_path, $expected_messages)) {
+        $validation_error_message = match (\array_key_exists($parent_property_path, $expected_messages)) {
           TRUE => is_array($expected_messages[$parent_property_path])
             ? reset($expected_messages[$parent_property_path])
             : $expected_messages[$parent_property_path],
@@ -117,11 +117,11 @@ class BetterConfigEntityValidationTestBase extends ConfigEntityValidationTestBas
   public function testRequiredPropertyValuesMissing(?array $additional_expected_validation_errors_when_missing = NULL): void {
     \assert($this->entity->getEntityType() instanceof ConfigEntityTypeInterface);
     \assert(\is_array($this->entity->getEntityType()->getPropertiesToExport()));
-    $config_entity_properties = array_keys($this->entity->getEntityType()->getPropertiesToExport());
+    $config_entity_properties = \array_keys($this->entity->getEntityType()->getPropertiesToExport());
 
     // Guide developers when $additional_expected_validation_errors_when_missing
     // does not contain sensible values.
-    $non_existing_properties = array_diff(array_keys($additional_expected_validation_errors_when_missing ?? []), $config_entity_properties);
+    $non_existing_properties = array_diff(\array_keys($additional_expected_validation_errors_when_missing ?? []), $config_entity_properties);
     if ($non_existing_properties) {
       throw new \LogicException(\sprintf('The test %s lists `%s` in $additional_expected_validation_errors_when_missing but it is not a property of the `%s` config entity type.',
         __METHOD__,
@@ -141,7 +141,7 @@ class BetterConfigEntityValidationTestBase extends ConfigEntityValidationTestBas
     // @see \Drupal\Core\Config\Entity\ConfigEntityBase::set()
     // @see \Drupal\Core\Config\Entity\ConfigEntityBase::preSave()
     $plugin_collection_properties = $this->entity instanceof EntityWithPluginCollectionInterface
-      ? array_keys($this->entity->getPluginCollections())
+      ? \array_keys($this->entity->getPluginCollections())
       : [];
 
     // To test properties with missing required values, $this->entity must be
