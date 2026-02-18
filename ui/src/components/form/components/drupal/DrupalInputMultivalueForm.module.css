@@ -98,3 +98,6 @@
 .popoverLabel {
   color: var(--gray-11);
 }
+.itemRow{
+  gap: 0 !important;
+}
