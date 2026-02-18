@@ -271,28 +271,9 @@ export function useQueuedPostPreviewMutation(
     entityId: string;
     entityType: string;
   }): Promise<{ html: string; autoSaves: AutoSavesHash }> => {
-    // const callId = ++callCounter;
-    // const timestamp = new Date().toISOString().split('T')[1];
-
-    // Get stack trace to see what triggered this
-    // const stackLines = new Error().stack?.split('\n').slice(2, 6) || [];
-    // const callerInfo = stackLines.join('\n    ');
-
-    // console.log(`[PostPreview ${callId}] Called at ${timestamp}`);
-    // console.log(`[PostPreview ${callId}] Caller stack:\n    ${callerInfo}`);
-    // console.log(
-    //   `[PostPreview ${callId}] Form fields count: ${Object.keys(arg.entity_form_fields || {}).length}`,
-    // );
-    // console.log(
-    //   `[PostPreview ${callId}] Layout components: ${JSON.stringify(arg.layout).substring(0, 100)}...`,
-    // );
-
     // Queue the entire mutation call to prevent RTK Query from dispatching
     // the HTTP request until the queue allows it
     return queuedPostPreview(() => {
-      // console.log(
-      //   `[PostPreview ${callId}] Actually executing HTTP request now`,
-      // );
       return postPreview(arg).unwrap();
     });
   };

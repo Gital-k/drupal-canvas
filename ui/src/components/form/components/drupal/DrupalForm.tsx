@@ -63,7 +63,7 @@ const DrupalForm = ({
 
     // When AJAX adds elements to the form, they are automatically in the
     // expected location within the DOM. They are not, however
-    // descendents of this form within the React component tree. This process
+    // descendants of this form within the React component tree. This process
     // identifies the newly added content and creates a React portal to
     // ensure it descends from this form, thus giving it access to the
     // FormProvider context.

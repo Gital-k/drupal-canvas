@@ -102,12 +102,6 @@ const PageDataFormRenderer = () => {
 
         // Flag that we need to update the preview.
         dispatch(setUpdatePreview(true));
-        // @todo - the dispatches below seemed necessary at one point -
-        // once DrupalCI is fixed we'll need to confirm that commenting /
-        // removing this isn't a problem.
-        // Object.entries(updates).forEach(([fieldName, value]) => {
-        //   dispatch(setFieldValue({ formId, fieldName, value }));
-        // });
         dispatch(setPageData({ ...formState, ...updates }));
       }
     };
