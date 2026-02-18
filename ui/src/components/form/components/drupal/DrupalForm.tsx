@@ -16,8 +16,8 @@ interface AjaxContent {
   context: HTMLElement;
   settings: { doNotReinvoke?: boolean };
   id: string;
-  wrapperId?: string;
-  fieldName?: string;
+  targetElement: HTMLElement;
+  fieldIdentifier?: string;
 }
 
 const DrupalForm = ({
@@ -43,33 +43,10 @@ const DrupalForm = ({
             processedIdsRef.current.add(ajaxContent.id);
             ajaxContent.context.remove();
 
-            // Find the wrapper element that contains the AJAX button
-            // The wrapper might be the container itself, inside it, or the parent
-            let wrapper = ajaxContent.container.querySelector(
-              '[id*="-add-more-wrapper"]',
-            ) as HTMLElement;
-
-            // If not found inside, check if container itself is the wrapper
-            if (
-              !wrapper &&
-              ajaxContent.container.id?.includes('-add-more-wrapper')
-            ) {
-              wrapper = ajaxContent.container;
-            }
-
-            // If still not found, check parent
-            if (!wrapper) {
-              wrapper = ajaxContent.container.closest(
-                '[id*="-add-more-wrapper"]',
-              ) as HTMLElement;
-            }
-
-            const targetElement = wrapper || ajaxContent.container;
-
-            // Attach Drupal behaviors to the wrapper (or container as fallback)
+            // Attach Drupal behaviors to the target element
             if (window.Drupal?.attachBehaviors) {
               window.Drupal.attachBehaviors(
-                targetElement,
+                ajaxContent.targetElement,
                 ajaxContent.settings as { doNotReinvoke?: boolean },
               );
             }
@@ -93,31 +70,21 @@ const DrupalForm = ({
       }>;
       const { container, application, context, settings } = customEvent.detail;
 
-      // Find the closest wrapper div (has id ending with -add-more-wrapper)
-      // This wrapper gets completely replaced by Drupal's InsertCommand
-      const wrapper = context.closest('[id*="-add-more-wrapper"]');
-      const wrapperId = wrapper?.id;
+      // The context parent is the AJAX wrapper.
+      const targetElement = context.parentElement || container;
 
-      // Extract field name from wrapper ID (before the unique suffix)
-      // e.g., "field-cvt-unlimited-text-add-more-wrapper--5TDIhF-vAfQ" -> "field-cvt-unlimited-text"
-      const fieldNameFromWrapper = wrapperId?.match(
-        /^(.*?)-add-more-wrapper/,
-      )?.[1];
-
+      // Extract the stable part of the ID (before Drupal's hash suffix)
+      // e.g., "field-name--Q1pTo5xBlOo" -> "field-name"
+      const fieldIdentifier = targetElement.id
+        ? targetElement.id.split('--')[0]
+        : undefined;
       setAjaxContents((prev) => {
-        // Drupal regenerates wrapper IDs with unique suffixes on each rebuild,
-        // so we need to match by field name (the stable part) instead of exact ID
+        // Remove previous content for the same wrapper.
         let filtered = prev;
-        if (fieldNameFromWrapper) {
+        if (fieldIdentifier) {
           filtered = prev.filter((content) => {
-            const contentWrapper = content.container.closest(
-              '[id*="-add-more-wrapper"]',
-            );
-            const contentFieldName = contentWrapper?.id.match(
-              /^(.*?)-add-more-wrapper/,
-            )?.[1];
-            // Portal remains if true.
-            return contentFieldName !== fieldNameFromWrapper;
+            // Portal remains if true - keep content from different fields
+            return content.fieldIdentifier !== fieldIdentifier;
           });
         }
 
@@ -127,12 +94,12 @@ const DrupalForm = ({
           context,
           settings,
           id: `ajax-${Date.now()}-${Math.random()}`,
-          wrapperId,
-          fieldName: fieldNameFromWrapper,
+          targetElement,
+          fieldIdentifier,
         };
+        console.log('Adding AJAX content:', newContent);
 
-        const result = [...filtered, newContent];
-        return result;
+        return [...filtered, newContent];
       });
     };
 

@@ -1,18 +1,10 @@
 import { useState } from 'react';
 
-
-
 import Toggle from '@/components/form/components/Toggle';
 import { wrapRHF } from '@/components/form/wrapRHF';
 import { a2p } from '@/local_packages/utils.js';
 
-
-
 import type { Attributes } from '@/types/DrupalAttribute';
-
-
-
-
 
 interface DrupalElement {
   '#default_value'?: string | number;
