@@ -1558,7 +1558,6 @@ describe('props in code editor', () => {
       });
     });
 
-<<<<<<< HEAD
     it('adds multiple example values in unlimited mode', async () => {
       await addProp('Text', 'Tags');
       const checkbox = await screen.findByRole('checkbox', {
@@ -2174,7 +2173,9 @@ describe('props in code editor', () => {
         expect(prop.allowMultiple).toBe(true);
         expect(prop.items).toEqual({ type: 'string', format: 'date' });
         expect(prop.example).toEqual([]);
-=======
+      });
+    });
+
     it('enables multiple values for video prop', async () => {
       await addProp('Video', 'VideoGallery');
       const checkbox = await screen.findByRole('checkbox', {
