@@ -97,9 +97,11 @@ export default function Props() {
         id: propId,
         updates: {
           limitedCount: newCount,
-          example: createArrayWithCount(currentExample, newCount, defaultValue) as
-            | string[]
-            | number[],
+          example: createArrayWithCount(
+            currentExample,
+            newCount,
+            defaultValue,
+          ) as string[] | number[],
         },
       }),
     );
@@ -215,7 +217,12 @@ export default function Props() {
                 <FormPropTypeArray
                   id={prop.id}
                   example={prop.example as string[] | number[]}
-                  itemType={(prop.type === 'array' ? prop.items?.type : prop.type) as 'string' | 'integer' | 'number'}
+                  itemType={
+                    (prop.type === 'array' ? prop.items?.type : prop.type) as
+                      | 'string'
+                      | 'integer'
+                      | 'number'
+                  }
                   isDisabled={componentStatus}
                   valueMode={prop.valueMode}
                   limitedCount={prop.limitedCount}
@@ -250,7 +257,11 @@ export default function Props() {
               return (
                 <FormPropTypeImage
                   id={prop.id}
-                  example={prop.example as CodeComponentPropImageExample | CodeComponentPropImageExample[]}
+                  example={
+                    prop.example as
+                      | CodeComponentPropImageExample
+                      | CodeComponentPropImageExample[]
+                  }
                   isDisabled={componentStatus}
                   required={required.includes(propName)}
                 />
@@ -259,7 +270,11 @@ export default function Props() {
               return (
                 <FormPropTypeVideo
                   id={prop.id}
-                  example={prop.example as CodeComponentPropVideoExample | CodeComponentPropVideoExample[]}
+                  example={
+                    prop.example as
+                      | CodeComponentPropVideoExample
+                      | CodeComponentPropVideoExample[]
+                  }
                   isDisabled={componentStatus}
                   required={required.includes(propName)}
                 />
@@ -337,7 +352,9 @@ export default function Props() {
                         updates.example = [];
                         updates.valueMode = VALUE_MODE_UNLIMITED;
                         updates.limitedCount = 1;
-                      } else if (['string', 'integer', 'number'].includes(prop.type)) {
+                      } else if (
+                        ['string', 'integer', 'number'].includes(prop.type)
+                      ) {
                         // Convert to array type - for primitive types.
                         updates.type = 'array';
                         updates.items = {
@@ -404,9 +421,12 @@ export default function Props() {
                       if (value === VALUE_MODE_LIMITED) {
                         // When switching to limited mode, ensure we have exactly limitedCount items
                         const count = prop.limitedCount ?? 1;
-                        const itemType = prop.type === 'array' ? prop.items?.type : prop.type;
+                        const itemType =
+                          prop.type === 'array' ? prop.items?.type : prop.type;
                         const defaultValue =
-                          itemType === 'integer' || itemType === 'number' ? 0 : '';
+                          itemType === 'integer' || itemType === 'number'
+                            ? 0
+                            : '';
                         updates.example = createArrayWithCount(
                           prop.example,
                           count,
@@ -467,10 +487,20 @@ export default function Props() {
                             maxLimit,
                             Math.max(1, Number(e.target.value)),
                           );
-                          const itemType = prop.type === 'array' ? prop.items?.type : prop.type;
+                          const itemType =
+                            prop.type === 'array'
+                              ? prop.items?.type
+                              : prop.type;
                           const defaultValue =
-                            itemType === 'integer' || itemType === 'number' ? 0 : '';
-                          updateLimitedCount(prop.id, prop.example, newCount, defaultValue);
+                            itemType === 'integer' || itemType === 'number'
+                              ? 0
+                              : '';
+                          updateLimitedCount(
+                            prop.id,
+                            prop.example,
+                            newCount,
+                            defaultValue,
+                          );
                         }}
                         disabled={componentStatus}
                       >
@@ -482,9 +512,15 @@ export default function Props() {
                                 const currentCount = prop.limitedCount ?? 1;
                                 if (currentCount <= 1) return;
                                 const newCount = currentCount - 1;
-                                const itemType = prop.type === 'array' ? prop.items?.type : prop.type;
+                                const itemType =
+                                  prop.type === 'array'
+                                    ? prop.items?.type
+                                    : prop.type;
                                 const defaultValue =
-                                  itemType === 'integer' || itemType === 'number' ? 0 : '';
+                                  itemType === 'integer' ||
+                                  itemType === 'number'
+                                    ? 0
+                                    : '';
                                 updateLimitedCount(
                                   prop.id,
                                   prop.example,
@@ -527,9 +563,15 @@ export default function Props() {
                                   : Infinity;
                                 if (currentCount >= maxLimit) return;
                                 const newCount = currentCount + 1;
-                                const itemType = prop.type === 'array' ? prop.items?.type : prop.type;
+                                const itemType =
+                                  prop.type === 'array'
+                                    ? prop.items?.type
+                                    : prop.type;
                                 const defaultValue =
-                                  itemType === 'integer' || itemType === 'number' ? 0 : '';
+                                  itemType === 'integer' ||
+                                  itemType === 'number'
+                                    ? 0
+                                    : '';
                                 updateLimitedCount(
                                   prop.id,
                                   prop.example,
