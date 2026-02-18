@@ -2,23 +2,28 @@
 
 namespace Drupal\canvas_ai;
 
+use Drupal\canvas\Component\Schema\PropMetadataNormalizer;
+use Drupal\Component\Datetime\TimeInterface;
 use Drupal\Component\Serialization\Json;
+use Drupal\Component\Utility\NestedArray;
+use Drupal\Core\Cache\CacheableMetadata;
+use Drupal\Core\Cache\CacheBackendInterface;
+use Drupal\Core\Cache\Context\CacheContextsManager;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Extension\ThemeHandlerInterface;
 use Drupal\Core\Theme\ComponentPluginManager;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
-use Drupal\Core\Url;
-use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\RequestStack;
-use Symfony\Component\HttpKernel\HttpKernelInterface;
 use Symfony\Component\Yaml\Yaml;
 use Drupal\Component\Utility\DiffArray;
+use Drupal\Component\Render\MarkupInterface;
 use Drupal\Component\Uuid\UuidInterface;
+use Drupal\canvas\Controller\ApiConfigControllers;
 use Drupal\Core\Config\ConfigFactoryInterface;
-use Drupal\Core\Extension\ThemeHandlerInterface;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent;
-use Drupal\Component\Utility\NestedArray;
+use Drupal\Core\StreamWrapper\PublicStream;
+use Drupal\file\FileRepositoryInterface;
 
 /**
  * Provides helper methods for AI page builder.
@@ -26,6 +31,11 @@ use Drupal\Component\Utility\NestedArray;
 class CanvasAiPageBuilderHelper {
 
   use StringTranslationTrait;
+
+  /**
+   * Cache key for storing all components keyed by source.
+   */
+  public const CACHE_KEY_ALL_COMPONENTS_BY_SOURCE = 'canvas_ai:all_components_by_source';
 
   /**
    * Constructor.
@@ -36,26 +46,38 @@ class CanvasAiPageBuilderHelper {
    *   The entity type manager.
    * @param \Drupal\Core\Config\ConfigFactoryInterface $configFactory
    *   The config factory.
-   * @param \Symfony\Component\HttpKernel\HttpKernelInterface $httpKernel
-   *   The HTTP kernel.
-   * @param \Symfony\Component\HttpFoundation\RequestStack $requestStack
-   *   The stack of requests.
    * @param \Drupal\Component\Uuid\UuidInterface $uuidService
    *   The UUID service.
    * @param \Drupal\canvas_ai\CanvasAiTempStore $canvasAiTempstore
    *   The Canvas AI tempstore.
+   * @param \Drupal\Core\Cache\Context\CacheContextsManager $cacheContextsManager
+   *   The cache contexts manager.
+   * @param \Drupal\Core\Cache\CacheBackendInterface $cacheBackend
+   *   The cache backend.
+   * @param \Drupal\Component\Datetime\TimeInterface $time
+   *   The time service.
+   * @param \Drupal\canvas\Controller\ApiConfigControllers $apiConfigControllers
+   *   The API config controllers service.
    * @param \Drupal\Core\Extension\ThemeHandlerInterface $themeHandler
    *   The theme handler.
+   * @param \Drupal\canvas\Component\Schema\PropMetadataNormalizer $propMetadataNormalizer
+   *   The prop metadata normalizer.
+   * @param \Drupal\file\FileRepositoryInterface $fileRepository
+   *   The file repository.
    */
   public function __construct(
     private readonly ComponentPluginManager $componentPluginManager,
     private readonly EntityTypeManagerInterface $entityTypeManager,
     private readonly ConfigFactoryInterface $configFactory,
-    private readonly HttpKernelInterface $httpKernel,
-    private readonly RequestStack $requestStack,
     private readonly UuidInterface $uuidService,
     private readonly CanvasAiTempStore $canvasAiTempstore,
+    private readonly CacheContextsManager $cacheContextsManager,
+    private readonly CacheBackendInterface $cacheBackend,
+    private readonly TimeInterface $time,
+    private readonly ApiConfigControllers $apiConfigControllers,
     private readonly ThemeHandlerInterface $themeHandler,
+    private readonly PropMetadataNormalizer $propMetadataNormalizer,
+    private readonly FileRepositoryInterface $fileRepository,
   ) {
   }
 
@@ -64,22 +86,18 @@ class CanvasAiPageBuilderHelper {
    *
    * The output will be used as the context for the AI agent.
    */
-  public function getComponentContextForAi(): string {
+  public function getComponentContextForAi(): array {
     $component_context = [];
     $component_context_from_config = $this->getComponentContextFromConfig();
     $available_components = !empty($component_context_from_config) ? $component_context_from_config : $this->getAllComponentsKeyedBySource();
     foreach ($available_components as $components) {
-      // Component info would be under 'components' key, when not loaded from
-      // config.
+      // Component info would be under 'components' key.
       if (isset($components['components'])) {
-        $component_context += $components['components'];
-      }
-      else {
-        $component_context += $components;
+        $component_context[$components['label']] = $components['components'];
       }
 
     }
-    return Yaml::dump($component_context, 4, 2);
+    return $component_context;
   }
 
   /**
@@ -243,21 +261,19 @@ class CanvasAiPageBuilderHelper {
    *   The components keyed by source.
    */
   public function getAllComponentsKeyedBySource(): array {
+    $base_cacheability = $this->getComponentListCacheability();
+    $cache_id = $this->buildCacheId($base_cacheability);
+    $cache = $this->cacheBackend->get($cache_id);
+    if ($cache) {
+      return $cache->data ?? [];
+    }
     $output = [];
-    $current_request = $this->requestStack->getCurrentRequest();
-    $sub_request = Request::create(
-      Url::fromRoute('canvas.api.config.list', ['canvas_config_entity_type_id' => Component::ENTITY_TYPE_ID])->toString(),
-      'GET',
-      [],
-      $current_request?->cookies->all() ?? [],
-      [],
-      $current_request?->server->all() ?? []
-    );
-    $sub_request->attributes->set('_format', 'json');
+
+    // Call the controller method directly instead of making a subrequest.
+    // This avoids the subrequest overhead that was interfering with form rendering.
     try {
-      $available_components_response = $this->httpKernel->handle($sub_request, HttpKernelInterface::SUB_REQUEST);
-      $available_components = (string) $available_components_response->getContent();
-      $available_components = Json::decode($available_components);
+      $available_components_response = $this->apiConfigControllers->list(Component::ENTITY_TYPE_ID);
+      $available_components = Json::decode((string) $available_components_response->getContent());
     }
     catch (\Exception) {
       return [];
@@ -294,7 +310,48 @@ class CanvasAiPageBuilderHelper {
         ];
       }
     }
+    $response_cacheability = $available_components_response->getCacheableMetadata();
+    $response_cacheability->addCacheableDependency($base_cacheability);
+
+    $max_age = $response_cacheability->getCacheMaxAge();
+    if ($max_age !== 0) {
+      $expire = $max_age === CacheBackendInterface::CACHE_PERMANENT
+        ? CacheBackendInterface::CACHE_PERMANENT
+        : $this->time->getRequestTime() + $max_age;
+      $this->cacheBackend->set(
+        $cache_id,
+        $output,
+        $expire,
+        $response_cacheability->getCacheTags()
+      );
+    }
+
     return $output;
+  }
+
+  /**
+   * Builds cacheable metadata for the component listing.
+   */
+  private function getComponentListCacheability(): CacheableMetadata {
+    $component_entity_type = $this->entityTypeManager->getDefinition(Component::ENTITY_TYPE_ID);
+    $cacheability = new CacheableMetadata();
+    $cacheability->setCacheContexts($component_entity_type->getListCacheContexts());
+    $cacheability->setCacheTags($component_entity_type->getListCacheTags());
+    $cacheability->addCacheContexts(['user.permissions']);
+    return $cacheability;
+  }
+
+  /**
+   * Builds a cache ID that varies by cache contexts.
+   */
+  private function buildCacheId(CacheableMetadata $cacheability): string {
+    $keys = [self::CACHE_KEY_ALL_COMPONENTS_BY_SOURCE];
+    if ($contexts = $cacheability->getCacheContexts()) {
+      $context_cache_keys = $this->cacheContextsManager->convertTokensToKeys($contexts);
+      $keys = array_merge($keys, $context_cache_keys->getKeys());
+      $cacheability->addCacheableDependency($context_cache_keys);
+    }
+    return implode(':', $keys);
   }
 
   /**
@@ -317,7 +374,8 @@ class CanvasAiPageBuilderHelper {
     // Provide only the components from enabled sources.
     foreach ($component_context as $source => $components) {
       if ($components['enabled']) {
-        $enabled_sources[$source] = Yaml::parse($components['data']);
+        $enabled_sources[$source]['label'] = $components['label'];
+        $enabled_sources[$source]['components'] = Yaml::parse($components['data']);
       }
     }
 
@@ -496,23 +554,32 @@ class CanvasAiPageBuilderHelper {
       $client_normalized = $component->normalizeForClientSide()->values;
       $output[$source_id]['components'][$component_id]['props'] = [];
       foreach ($props as $prop_name => $prop_details) {
-        if ($prop_name === 'attributes') {
+        // Skip Drupal attributes prop.
+        if ($prop_details['type'] === 'Drupal\Core\Template\Attribute') {
           continue;
         }
-        $output[$source_id]['components'][$component_id]['props'][$prop_name] = [
+        $default_value = $client_normalized["propSources"][$prop_name]["default_values"]["resolved"] ?? $prop_details['default'] ?? $prop_details['examples'][0] ?? NULL;
+        // Default values of some props may have HTML markup as default value.
+        // Convert it to string so that it can be safely YAML encoded when saving
+        // the CanvasAiComponentDescriptionSettingsForm config.
+        if ($default_value instanceof MarkupInterface) {
+          $default_value = $default_value->__toString();
+        }
+        $prop_metadata = [
           'name' => $prop_details['title'] ?? $prop_name,
           'description' => $prop_details['description'] ?? 'No description available',
           'type' => $prop_details['type'],
-          'default' => $client_normalized["propSources"][$prop_name]["default_values"]["resolved"] ?? $prop_details['default'] ?? $prop_details['examples'][0] ?? NULL,
+          'default' => $default_value,
         ];
 
         // Mark required props.
         if (isset($sdc_definition['props']['required']) && in_array($prop_name, $sdc_definition['props']['required'], TRUE)) {
-          $output[$source_id]['components'][$component_id]['props'][$prop_name]['required'] = TRUE;
+          $prop_metadata['required'] = TRUE;
         }
         if (isset($prop_details['enum'])) {
-          $output[$source_id]['components'][$component_id]['props'][$prop_name]['enum'] = $prop_details['enum'];
+          $prop_metadata['enum'] = $prop_details['enum'];
         }
+        $output[$source_id]['components'][$component_id]['props'][$prop_name] = $this->propMetadataNormalizer->normalize($prop_metadata, $prop_details);
       }
     }
   }
@@ -1322,6 +1389,455 @@ class CanvasAiPageBuilderHelper {
 
     // For any other entity_type.
     return 'User has not created any entities';
+  }
+
+  /**
+   * Gets component data (name and nodePath) from a UUID in the current layout.
+   *
+   * @param string $uuid
+   *   The UUID of the component.
+   *
+   * @return array
+   *   An array with 'name' and 'nodePath' keys, or an empty array if not
+   *   found.
+   */
+  public function getComponentDataFromCurrentLayout(string $uuid): array {
+    $current_layout = $this->canvasAiTempstore->getData(CanvasAiTempStore::CURRENT_LAYOUT_KEY) ?? '';
+    $current_layout = Json::decode($current_layout);
+    if (!is_array($current_layout) || !isset($current_layout['regions'])) {
+      return [];
+    }
+
+    foreach ($current_layout['regions'] as $region_data) {
+      $components = $region_data['components'] ?? [];
+      if (!is_array($components)) {
+        continue;
+      }
+      $result = $this->findComponentDataByUuid($components, $uuid);
+      if (!empty($result)) {
+        return $result;
+      }
+    }
+
+    return [];
+  }
+
+  /**
+   * Recursively searches components for a matching UUID.
+   *
+   * @param array $components
+   *   The components array to search.
+   * @param string $uuid
+   *   The UUID to find.
+   *
+   * @return array
+   *   An array with 'name' and 'nodePath' keys, or an empty array if not
+   *   found.
+   */
+  private function findComponentDataByUuid(array $components, string $uuid): array {
+    foreach ($components as $component) {
+      if (!is_array($component)) {
+        continue;
+      }
+      if (isset($component['uuid']) && $component['uuid'] === $uuid) {
+        return [
+          'name' => $component['name'],
+          'nodePath' => $component['nodePath'],
+        ];
+      }
+      // Search in slots.
+      if (isset($component['slots']) && is_array($component['slots'])) {
+        foreach ($component['slots'] as $slot_data) {
+          $slot_components = $slot_data['components'] ?? [];
+          if (!is_array($slot_components)) {
+            continue;
+          }
+          $result = $this->findComponentDataByUuid($slot_components, $uuid);
+          if (!empty($result)) {
+            return $result;
+          }
+        }
+      }
+    }
+
+    return [];
+  }
+
+  /**
+   * Calculates the nodePath for moving a component.
+   *
+   * @param string|null $region
+   *   The target region name, if moving to an empty region.
+   * @param string|null $reference_uuid
+   *   The UUID of the reference component, if positioning relative to it.
+   * @param string|null $placement
+   *   The placement relative to the reference ('above' or 'below').
+   *
+   * @return array
+   *   The calculated nodePath.
+   */
+  public function calculateNodepathToMoveComponent(?string $region = NULL, ?string $reference_uuid = NULL, ?string $placement = NULL): array {
+    if (!empty($region)) {
+      $current_layout = $this->canvasAiTempstore->getData(CanvasAiTempStore::CURRENT_LAYOUT_KEY) ?? '';
+      $region_indices = $this->getRegionIndex($current_layout);
+      return [$region_indices[$region], 0];
+    }
+
+    if (!empty($reference_uuid)) {
+      $reference_data = $this->getComponentDataFromCurrentLayout($reference_uuid);
+      $nodePath = $reference_data['nodePath'];
+      if ($placement === 'below') {
+        $nodePath[count($nodePath) - 1]++;
+      }
+      return $nodePath;
+    }
+
+    return [];
+  }
+
+  /**
+   * Gets the content of components from the page.
+   *
+   * @param string|null $uuid
+   *   The UUID of the component to get content for. If NULL, returns all
+   *   component contents.
+   *
+   * @return array
+   *   The component content(s). Returns an empty array if no components are
+   *   stored.
+   */
+  public function getComponentContents(?string $uuid = NULL): array {
+    $components_json = $this->canvasAiTempstore->getData(
+      CanvasAiTempStore::COMPONENTS_IN_PAGE_WITH_PROP_VALUES_KEY
+    );
+
+    $components = !empty($components_json) ? Json::decode($components_json) : [];
+
+    if ($uuid === NULL) {
+      return $components;
+    }
+
+    $result = $components[$uuid] ?? [];
+    if (empty($result)) {
+      return $result;
+    }
+
+    // Find the component in the current layout to check for child components.
+    $current_layout_json = $this->canvasAiTempstore->getData(CanvasAiTempStore::CURRENT_LAYOUT_KEY) ?? '';
+    $current_layout = Json::decode($current_layout_json);
+    if (!is_array($current_layout) || !isset($current_layout['regions'])) {
+      return $result;
+    }
+
+    // Search for the component node in the layout tree.
+    $component_node = NULL;
+    foreach ($current_layout['regions'] as $region_data) {
+      $layout_components = $region_data['components'] ?? [];
+      if (!is_array($layout_components)) {
+        continue;
+      }
+      $component_node = $this->findComponentNodeByUuid($layout_components, $uuid);
+      if ($component_node !== NULL) {
+        break;
+      }
+    }
+
+    // If the component has slots, recursively collect child component contents.
+    if (!empty($component_node['slots'])) {
+      $result['slots'] = $this->collectSlotChildContents($component_node['slots'], $components, $current_layout);
+    }
+
+    return $result;
+  }
+
+  /**
+   * Finds a component node in the layout tree by UUID.
+   *
+   * @param array $components
+   *   The components array from the layout.
+   * @param string $uuid
+   *   The UUID to find.
+   *
+   * @return array|null
+   *   The full component node from the layout, or NULL if not found.
+   */
+  private function findComponentNodeByUuid(array $components, string $uuid): ?array {
+    foreach ($components as $component) {
+      if (!is_array($component)) {
+        continue;
+      }
+      if (isset($component['uuid']) && $component['uuid'] === $uuid) {
+        return $component;
+      }
+      if (isset($component['slots']) && is_array($component['slots'])) {
+        foreach ($component['slots'] as $slot_data) {
+          $slot_components = $slot_data['components'] ?? [];
+          if (!is_array($slot_components)) {
+            continue;
+          }
+          $found = $this->findComponentNodeByUuid($slot_components, $uuid);
+          if ($found !== NULL) {
+            return $found;
+          }
+        }
+      }
+    }
+    return NULL;
+  }
+
+  /**
+   * Recursively collects child component contents from slots.
+   *
+   * @param array $slots
+   *   The slots array from the layout component node.
+   * @param array $all_components
+   *   The full components prop values keyed by UUID.
+   * @param array $current_layout
+   *   The decoded current layout array.
+   *
+   * @return array
+   *   An array keyed by slot name, containing child component contents
+   *   with recursive slot data.
+   */
+  private function collectSlotChildContents(array $slots, array $all_components, array $current_layout): array {
+    $slot_contents = [];
+    foreach ($slots as $slot_name => $slot_data) {
+      $children = [];
+      $slot_components = $slot_data['components'] ?? [];
+      if (!is_array($slot_components)) {
+        continue;
+      }
+      foreach ($slot_components as $child_component) {
+        if (!is_array($child_component) || !isset($child_component['uuid'])) {
+          continue;
+        }
+        $child_uuid = $child_component['uuid'];
+        $child_contents = $all_components[$child_uuid] ?? [];
+        // Recursively collect nested slot children.
+        if (!empty($child_component['slots'])) {
+          $child_contents['slots'] = $this->collectSlotChildContents($child_component['slots'], $all_components, $current_layout);
+        }
+        $children[$child_uuid] = $child_contents;
+      }
+      $slot_contents[$slot_name] = $children;
+    }
+    return $slot_contents;
+  }
+
+  /**
+   * Includes UPDATE operations in the response alongside any existing ADD ops.
+   *
+   * @param array $updateComponents
+   *   An array of component update entries, each containing 'uuid' and
+   *   'fieldValues' keys.
+   * @param array $response
+   *   The current response array, which may already contain 'operations' with
+   *   ADD entries from SetAIGeneratedComponentStructure.
+   *
+   * @return array
+   *   The response array with the UPDATE operation included.
+   */
+  public function includeUpdateOperations(array $updateComponents, array $response): array {
+    $updateOperation = [
+      'operation' => 'UPDATE',
+      'components' => $updateComponents,
+    ];
+
+    if (isset($response['operations']) && $this->hasAddOperation($response['operations'])) {
+      // Operations with ADD already exist. Append the UPDATE operation.
+      $response['operations'][] = $updateOperation;
+    }
+    else {
+      // No operations or no ADD operation present. Create operations with
+      // the UPDATE entry.
+      $response['operations'] = [$updateOperation];
+    }
+
+    return $response;
+  }
+
+  /**
+   * Checks if any operation in the array has the ADD type.
+   *
+   * @param array $operations
+   *   The operations array to check.
+   *
+   * @return bool
+   *   TRUE if an ADD operation exists, FALSE otherwise.
+   */
+  private function hasAddOperation(array $operations): bool {
+    foreach ($operations as $operation) {
+      if (isset($operation['operation']) && $operation['operation'] === 'ADD') {
+        return TRUE;
+      }
+    }
+    return FALSE;
+  }
+
+  /**
+   * Checks if any operation in the array has the UPDATE type.
+   *
+   * @param array $operations
+   *   The operations array to check.
+   *
+   * @return bool
+   *   TRUE if an UPDATE operation exists, FALSE otherwise.
+   */
+  private function hasUpdateOperation(array $operations): bool {
+    foreach ($operations as $operation) {
+      if (isset($operation['operation']) && $operation['operation'] === 'UPDATE') {
+        return TRUE;
+      }
+    }
+    return FALSE;
+  }
+
+  /**
+   * Includes MOVE operations in the response alongside any existing operations.
+   *
+   * @param array $moveComponents
+   *   An array of component move entries, each containing 'uuid' and
+   *   'nodePath' keys.
+   * @param array $response
+   *   The current response array, which may already contain 'operations' with
+   *   ADD and/or UPDATE entries.
+   *
+   * @return array
+   *   The response array with the MOVE operation appended.
+   */
+  public function includeMoveOperations(array $moveComponents, array $response): array {
+    $moveOperation = [
+      'operation' => 'MOVE',
+      'components' => $moveComponents,
+    ];
+
+    if (isset($response['operations']) && ($this->hasAddOperation($response['operations']) || $this->hasUpdateOperation($response['operations']))) {
+      $response['operations'][] = $moveOperation;
+    }
+    else {
+      $response['operations'] = [$moveOperation];
+    }
+
+    return $response;
+  }
+
+  /**
+   * Populates media prop values for component updates when not provided.
+   *
+   * If a component has a media prop and a media is added to it other than the
+   * default image, Canvas throws render errors when updating the component. So
+   * we check if the component to be updated has any media props, and then check
+   * if the agent is trying to update the media prop. If not, we try to load
+   * the media entity corresponding to the image uploaded in the prop and if it
+   * exists, we append it to the current prop values to prevent the render
+   * error.
+   *
+   * @param string $componentId
+   *   The component ID (e.g., "sdc.byte_theme.card").
+   * @param string $uuid
+   *   The UUID of the component instance in the page.
+   * @param array $propValuesGivenByAgent
+   *   The prop values from the update tool after validation.
+   *
+   * @return array
+   *   The prop values with media entity IDs populated where needed.
+   */
+  public function populateMediaPropIfNeeded(string $componentId, string $uuid, array $propValuesGivenByAgent): array {
+    $component = Component::load($componentId);
+    if (!$component instanceof Component) {
+      return $propValuesGivenByAgent;
+    }
+
+    $clientNormalized = $component->normalizeForClientSide()->values;
+    $propSources = $clientNormalized['propSources'] ?? [];
+
+    // Collect media prop names that need population.
+    $mediaPropsToPopulate = [];
+    foreach ($propSources as $propName => $propDefinition) {
+      $targetType = $propDefinition['sourceTypeSettings']['storage']['target_type'] ?? '';
+      if ($targetType !== 'media') {
+        continue;
+      }
+
+      // If the tool already provided a value for this prop, skip.
+      if (array_key_exists($propName, $propValuesGivenByAgent)) {
+        continue;
+      }
+
+      $mediaPropsToPopulate[] = $propName;
+    }
+
+    if (empty($mediaPropsToPopulate)) {
+      return $propValuesGivenByAgent;
+    }
+
+    // Get the current component contents to resolve media URLs.
+    $componentContents = $this->getComponentContents($uuid);
+    if (empty($componentContents)) {
+      return $propValuesGivenByAgent;
+    }
+
+    foreach ($mediaPropsToPopulate as $propName) {
+      $mediaPropValue = $componentContents[$propName] ?? NULL;
+      if (!is_array($mediaPropValue) || empty($mediaPropValue['src'])) {
+        continue;
+      }
+
+      $mediaId = $this->getMediaIdFromSrc($mediaPropValue['src']);
+      if ($mediaId !== NULL) {
+        $propValuesGivenByAgent[$propName] = $mediaId;
+      }
+    }
+
+    return $propValuesGivenByAgent;
+  }
+
+  /**
+   * Resolves a file URL to its corresponding media entity ID.
+   *
+   * @param string $src
+   *   The file URL path (e.g.,
+   *   "/sites/default/files/2025-07/person_3.png?alternateWidths=...").
+   *
+   * @return int|null
+   *   The media entity ID, or NULL if no matching media entity was found.
+   */
+  protected function getMediaIdFromSrc(string $src): ?int {
+    // Strip query string from the src URL.
+    $path = \parse_url($src, PHP_URL_PATH);
+    if (empty($path)) {
+      return NULL;
+    }
+
+    // Convert the public file URL path to a stream URI.
+    $publicFilesPath = PublicStream::basePath();
+    $pos = \strpos($path, $publicFilesPath);
+    if ($pos === FALSE) {
+      return NULL;
+    }
+
+    // Extract the relative path after the public files directory.
+    $relativePath = \substr($path, $pos + \strlen($publicFilesPath));
+    $relativePath = ltrim($relativePath, '/');
+    $uri = 'public://' . $relativePath;
+
+    // Load the file entity by URI.
+    $file = $this->fileRepository->loadByUri($uri);
+    if ($file === NULL) {
+      return NULL;
+    }
+
+    // Query media entities that reference this file via field_media_image.
+    $mediaIds = $this->entityTypeManager->getStorage('media')->getQuery()
+      ->accessCheck(FALSE)
+      ->condition('field_media_image.target_id', $file->id())
+      ->execute();
+
+    if (!empty($mediaIds)) {
+      return (int) reset($mediaIds);
+    }
+
+    return NULL;
   }
 
 }

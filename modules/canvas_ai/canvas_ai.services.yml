@@ -13,3 +13,11 @@ services:
       - '@Drupal\Core\Validation\BasicRecursiveValidatorFactory'
       - '@uuid'
   Drupal\canvas_ai\CanvasAiTempStore: '@canvas_ai.tempstore'
+  canvas_ai.component_context_helper:
+    class: Drupal\canvas_ai\CanvasAiComponentContextHelper
+    arguments:
+      - '@canvas_ai.page_builder_helper'
+  canvas_ai.page_builder_agent_pre_execute_subscriber:
+    class: Drupal\canvas_ai\EventSubscriber\PageBuilderAgentPreExecuteSubscriber
+    tags:
+      - { name: event_subscriber }

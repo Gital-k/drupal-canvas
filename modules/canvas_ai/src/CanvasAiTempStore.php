@@ -16,6 +16,12 @@ class CanvasAiTempStore {
   public const CURRENT_LAYOUT_KEY = 'current_layout';
 
   /**
+   * Storage key for components in the page with their prop values.
+   * This holds the content added to the props of each component in the pagae.
+   */
+  public const COMPONENTS_IN_PAGE_WITH_PROP_VALUES_KEY = 'components_in_page_with_prop_values';
+
+  /**
    * The private tempstore object.
    *
    * @var \Drupal\Core\TempStore\PrivateTempStore
@@ -71,6 +77,14 @@ class CanvasAiTempStore {
    */
   public function deleteData(string $key): void {
     $this->tempStore->delete($key);
+  }
+
+  /**
+   * Deletes all data for the defined keys.
+   */
+  public function deleteAll(): void {
+    $this->deleteData(self::CURRENT_LAYOUT_KEY);
+    $this->deleteData(self::COMPONENTS_IN_PAGE_WITH_PROP_VALUES_KEY);
   }
 
 }

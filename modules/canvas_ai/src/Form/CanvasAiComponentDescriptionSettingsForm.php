@@ -93,12 +93,17 @@ final class CanvasAiComponentDescriptionSettingsForm extends ConfigFormBase {
   public function submitForm(array &$form, FormStateInterface $form_state): void {
     $component_context = $form_state->getValue('component_context');
     $available_components = $this->pageBuilderHelper->getAllComponentsKeyedBySource();
+    $config_data = [];
+
     foreach ($component_context as $source => $components) {
       // Replace descriptions with the submitted descriptions.
       foreach ($components['components'] as $component_id => $component_data_from_form) {
         if (isset($available_components[$source]['components'][$component_id])) {
           // Replace the component description.
           $available_components[$source]['components'][$component_id]['description'] = $component_data_from_form['description'];
+
+          // Replace the component detailed description.
+          $available_components[$source]['components'][$component_id]['detailed_description'] = $component_data_from_form['detailed_description'];
 
           // Replace the props descriptions.
           if (isset($available_components[$source]['components'][$component_id]['props']) && is_array($available_components[$source]['components'][$component_id]['props'])) {
@@ -116,11 +121,16 @@ final class CanvasAiComponentDescriptionSettingsForm extends ConfigFormBase {
         }
       }
 
-      $this->config('canvas_ai.component_description.settings')
-        ->set('component_context.' . $source . '.enabled', $components['enabled'])
-        ->set('component_context.' . $source . '.data', Yaml::encode($available_components[$source]['components']))
-        ->save();
+      $config_data[$source] = [
+        'enabled' => $components['enabled'],
+        'label' => $available_components[$source]['label'],
+        'data' => Yaml::encode($available_components[$source]['components']),
+      ];
     }
+
+    $this->config('canvas_ai.component_description.settings')
+      ->set('component_context', $config_data)
+      ->save();
     parent::submitForm($form, $form_state);
   }
 
@@ -134,7 +144,21 @@ final class CanvasAiComponentDescriptionSettingsForm extends ConfigFormBase {
       '#tree' => TRUE,
     ];
     $form['description'] = [
-      '#markup' => $this->t('Use this form to customize the descriptions of available components, including their props and slots. These descriptions will help the AI better understand and utilize components when building pages.'),
+      '#markup' => $this->t('
+        <p>Use this form to customize the descriptions of available components, including their props and slots. These descriptions will help the AI better understand and utilize components when building pages.</p>
+        <p><strong>Description:</strong> Write one clear sentence that briefly explains what this component is and its primary purpose, so AI can quickly understand it.</p>
+        <p><strong>Detailed description:</strong> Provide a concise, structured explanation describing when to use this component, how it should be used, and any important constraints, so AI understands the correct context and usage.</p>
+        <p><strong>Example: For an accordion component</strong></p>
+        <p><strong>Description:</strong> A collapsible accordion component that groups related content into expandable panels to save space and let users reveal details on demand.</p>
+        <p><strong>Detailed description:</strong> Use this component to organize large or dense content into clearly labeled sections that users can expand or collapse.</p>
+        <ul>
+          <li>Best suited for FAQs, help content, or overview-plus-details patterns where not all information must be visible at once.</li>
+          <li>Helps reduce vertical clutter while keeping all content accessible through user interaction.</li>
+          <li>Panels should have clear, descriptive titles that indicate what content will be revealed.</li>
+          <li>Avoid using when users must compare multiple sections at the same time or read content sequentially.</li>
+          <li>Works best with a limited number of panels (roughly 3–7) and well-structured, scannable content inside each panel.</li>
+        </ul>
+      '),
     ];
 
     foreach ($usable_components as $source => $source_data) {
@@ -160,7 +184,14 @@ final class CanvasAiComponentDescriptionSettingsForm extends ConfigFormBase {
         $form[$source]['components'][$component_id]['description'] = [
           '#type' => 'textarea',
           '#title' => $this->t('Description'),
+          '#rows' => 2,
           '#default_value' => $this->getDefaultValue($source, $component_id) ?? $component_data['description'],
+        ];
+        // Component Detailed description element.
+        $form[$source]['components'][$component_id]['detailed_description'] = [
+          '#type' => 'textarea',
+          '#title' => $this->t('Detailed description'),
+          '#default_value' => $this->getDefaultValue($source, $component_id, '', '', TRUE) ?? $component_data['description'],
         ];
 
         // Description elements for each prop.
@@ -237,11 +268,13 @@ final class CanvasAiComponentDescriptionSettingsForm extends ConfigFormBase {
    *   The id of the prop or slot.
    * @param string $type
    *   The type: 'props' or 'slots'.
+   * @param bool $detailed
+   *   Whether to get the detailed description. Defaults to FALSE.
    *
    * @return string|null
    *   The default description value for the component, prop, or slot.
    */
-  private function getDefaultValue(string $source, string $component_id, string $identifier = '', string $type = ''): ?string {
+  private function getDefaultValue(string $source, string $component_id, string $identifier = '', string $type = '', bool $detailed = FALSE): ?string {
     $component_context_decoded = $this->getComponentContextData($source);
     if ($component_context_decoded) {
       if ($type && $identifier) {
@@ -254,8 +287,21 @@ final class CanvasAiComponentDescriptionSettingsForm extends ConfigFormBase {
       else {
         // If type and identifier are not provided, return the description for
         // the component.
-        if (isset($component_context_decoded[$component_id]['description'])) {
-          return $component_context_decoded[$component_id]['description'];
+        if ($detailed) {
+          // First try to get the detailed description.
+          if (isset($component_context_decoded[$component_id]['detailed_description'])) {
+            return $component_context_decoded[$component_id]['detailed_description'];
+          }
+          // Fall back to the regular description if detailed description is not found.
+          if (isset($component_context_decoded[$component_id]['description'])) {
+            return $component_context_decoded[$component_id]['description'];
+          }
+        }
+        else {
+          // Return the regular description.
+          if (isset($component_context_decoded[$component_id]['description'])) {
+            return $component_context_decoded[$component_id]['description'];
+          }
         }
       }
     }

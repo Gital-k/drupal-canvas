@@ -55,6 +55,10 @@ services:
     public: true
   # Utilities.
   Drupal\canvas\AssetRenderer: {}
+  Drupal\canvas\Component\Schema\PropChoiceOptionsResolver:
+    arguments:
+      $stringTranslation: '@string_translation'
+  Drupal\canvas\Component\Schema\PropMetadataNormalizer: {}
   logger.channel.canvas:
     parent: logger.channel_base
     arguments: ['canvas']

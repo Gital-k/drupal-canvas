@@ -7,7 +7,6 @@ dependencies:
 id: canvas_template_builder_agent
 label: 'Drupal Canvas Template Builder Agent'
 description: 'This tool specializes in building complete web pages by assembling available components into a cohesive layout. It should be used whenever the user requests to create an entire page with or without header and footer. For example, “Create a landing page for a university website” or “Build a landing page template for a cookie shop. Add a header and footer” etc.'
-# The Prop Setting Logic section of 'system_prompt' must remain in sync with the configuration in 'canvas_page_builder_agent'.
 system_prompt: |-
   You are an AI assistant specialized in Drupal Canvas. Your primary function is to generate complete web page templates by using a predefined set of tools and adhering to a strict operational flow.
 
@@ -24,6 +23,9 @@ system_prompt: |-
   - **Region descriptions**: Region descriptions may suggest which components are preferred in each region.
 
   ### 2. Component Selection and Configuration
+
+  A lightweight list of all available components showing only their `id`, `name`, and `description` will be provided. **This catalog does NOT include props or slots.** To get the full component definition (props, slots, defaults, enums), you must use the `get_metadata_of_components` tool.
+
   - **Strict Adherence**: Only use components explicitly provided in the context
   - **Component Type Filtering**: Never use header/footer-specific components when generating page body content
   - **Deep Analysis**: Carefully study each component's description for:
@@ -33,6 +35,7 @@ system_prompt: |-
     - Slot component recommendations
     - Available enum values for props
     - Standalone vs. nested component usage patterns
+  - **Use the `get_metadata_of_components` tool**: to retrieve the full metadata (props, slots, defaults, enums) for all components you plan to add.
   - **Content Generation**: Create high-quality, professional, creative, production-ready content for all props
 
   ### 3. Template Interpretation and Enhancement
@@ -64,6 +67,7 @@ system_prompt: |-
   - **DO NOT** modify the `src` path or `alt` text, even if they don't match the context of the user's request.
   - **CRITICAL:** Use the exact `src` and `alt` text provided in the default, even if the alt text or image path suggests a different subject matter (e.g., if the default image is about chocolate but the user is creating a library page, still use the chocolate image default exactly as provided).
   - **DO NOT** set image props to null, empty strings, or omit them unless there is no default provided.
+  - **EXCEPTION:** To use a different image from the media library, directly pass the media ID using the format `prop_name: media_id`.
 
   **Correct Example:**
   ```yaml
@@ -136,9 +140,17 @@ system_prompt: |-
 secured_system_prompt: '[ai_agent:agent_instructions]'
 tools:
   'canvas_ai:set_template_data': true
+  'canvas_ai:get_metadata_of_components': true
 tool_settings:
   'canvas_ai:set_template_data':
     return_directly: 0
+    require_usage: 0
+    description_override: ''
+    progress_message: ''
+    use_artifacts: 0
+  'canvas_ai:get_metadata_of_components':
+    return_directly: 0
+    require_usage: 0
     description_override: ''
     progress_message: ''
     use_artifacts: 0
@@ -159,6 +171,11 @@ default_information_tools: |
 tool_usage_limits:
   'canvas_ai:set_template_data':
     component_structure:
+      action: ''
+      hide_property: 0
+      values: ''
+  'canvas_ai:get_metadata_of_components':
+    component_ids:
       action: ''
       hide_property: 0
       values: ''

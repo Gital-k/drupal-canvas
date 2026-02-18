@@ -23,6 +23,7 @@ import { deserializeProps } from '@/features/code-editor/utils/utils';
 import {
   selectModel,
   setUpdatePreview,
+  moveNode,
 } from '@/features/layout/layoutModelSlice';
 import {
   selectPageData,
@@ -195,26 +196,6 @@ const metadataHandler = {
   },
 };
 
-// Filters out 'media' fields from a js component instance's fieldValues based on the
-// component definition's propSources, forcing the component to use the example
-// image from its definition.
-// @todo Refactor this after https://www.drupal.org/i/3552000 is fixed.
-function removeMediaFields(componentDef: CanvasComponent, componentInst: any) {
-  const newFieldValues = {} as any;
-  const fieldValues = componentInst.fieldValues || {};
-  for (const [key, value] of Object.entries(fieldValues)) {
-    const prop = (componentDef as PropSourceComponent).propSources[key];
-    const isMedia =
-      (prop?.sourceTypeSettings?.storage as any)?.target_type === 'media';
-    if (!isMedia) {
-      newFieldValues[key] = value;
-    }
-  }
-  return {
-    ...componentInst,
-    fieldValues: newFieldValues,
-  };
-}
 
 // Helper to delay the placement of components.
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -240,7 +221,7 @@ const operationsHandler = {
   }) => {
     // Logic for placing components (SDCs/Blocks/Code components) to the editor frame.
     for (const op of message.operations) {
-      // Only 'Add' operation is supported for now.
+      // Handle ADD operation - adds new components to the layout.
       if (
         op.operation === 'ADD' &&
         op.components &&
@@ -251,15 +232,11 @@ const operationsHandler = {
           if (component.id && availableComponents[component.id]) {
             const componentToUse: CanvasComponent =
               availableComponents[component.id];
-            const componentAfterFilteringImageProps = removeMediaFields(
-              componentToUse,
-              component,
-            );
             dispatch(
               layoutUtils.addNewComponentToLayout(
                 {
                   component: componentToUse,
-                  withValues: componentAfterFilteringImageProps.fieldValues,
+                  withValues: component.fieldValues,
                   to: component.nodePath,
                 },
                 componentSelectionUtils.setSelectedComponent,
@@ -267,6 +244,45 @@ const operationsHandler = {
             );
             // Wait for a second before placing the next component, for the UI to render the component.
             await delay(1000);
+          }
+        }
+      }
+
+      // Handle UPDATE operation - updates prop values of existing components.
+      if (
+        op.operation === 'UPDATE' &&
+        op.components &&
+        Array.isArray(op.components)
+      ) {
+        for (const component of op.components) {
+          if (component.uuid && component.fieldValues) {
+            console.log('here');
+            await dispatch(
+              layoutUtils.updateExistingComponentValues({
+                componentToUpdateId: component.uuid,
+                values: component.fieldValues,
+              }),
+            );
+          }
+        }
+      }
+
+      // Handle MOVE operation - moves components to a new position.
+      if (
+        op.operation === 'MOVE' &&
+        op.components &&
+        Array.isArray(op.components)
+      ) {
+        for (const component of op.components) {
+          if (component.uuid && component.nodePath) {
+            dispatch(
+              moveNode({
+                uuid: component.uuid,
+                to: component.nodePath,
+              }),
+            );
+            // Wait for a short duration to allow the move to complete/render if necessary.
+            await delay(500);
           }
         }
       }
@@ -790,7 +806,7 @@ const AiWizard = () => {
           }}
           // @todo Revisit once https://www.drupal.org/node/3528730 is in.
           requestBodyLimits={{
-            maxMessages: 3,
+            maxMessages: 5,
           }}
           connect={{
             // Defining a handler instead of an object to ensure we can work with
