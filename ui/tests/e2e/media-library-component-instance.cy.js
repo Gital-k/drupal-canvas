@@ -77,8 +77,8 @@ const testMediaLibraryInComponentInstanceForm = (
 
     cy.get(removeIt).should('not.exist');
     // cy.selectorShouldHaveUpdatedFormBuildId(
-      '[data-testid*="canvas-component-form-"]',
-    );
+    //   '[data-testid*="canvas-component-form-"]',
+    // );
     // The default image should appear because the prop is required.
     cy.waitForElementInIframe(defaultPlaceholder);
     cy.reasonableWait();
@@ -92,8 +92,8 @@ const testMediaLibraryInComponentInstanceForm = (
     cy.wait('@patch');
     cy.get('div[role="dialog"]').should('not.exist');
     // cy.selectorShouldHaveUpdatedFormBuildId(
-      '[data-testid*="canvas-component-form-"]',
-    );
+    //   '[data-testid*="canvas-component-form-"]',
+    // );
     cy.get(
       `[class*="contextualPanel"] input[aria-label="${step.removeAriaLabel}"]`,
     ).should('exist');

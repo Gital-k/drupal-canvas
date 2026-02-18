@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React from 'react';
 import Ajv from 'ajv';
 
 import { useAppDispatch } from '@/app/hooks';
@@ -6,10 +6,7 @@ import { ComponentFormField } from '@/components/form/wrapRHF-fields/ComponentFo
 import { PageDataFormField } from '@/components/form/wrapRHF-fields/PageDataFormField';
 import { useAjaxFieldRegistration } from '@/components/form/wrapRHF-hooks/useAjaxFieldRegistration';
 import { useFormBuildIdSync } from '@/components/form/wrapRHF-hooks/useFormBuildIdSync';
-import {
-  dispatchFieldValue,
-  getCurrentValueFromProps,
-} from '@/components/form/wrapRHF-utils';
+import { getCurrentValueFromProps } from '@/components/form/wrapRHF-utils';
 import { useSafeFormContext, useSafeRHFContext } from '@/contexts/FormContext';
 
 const ajv = new Ajv();
@@ -37,7 +34,8 @@ export const wrapRHF = <P extends Record<string, any>>(
     const rhfContext = useSafeRHFContext();
 
     // Extract field name from various possible prop structures
-    // Note: data-canvas-name is used by component instance forms
+    // Note: data-canvas-name is used for radios and potentially other inputs
+    // where value management is not specific to one form field.
     const fieldName =
       props.attributes?.name ||
       props.attributes?.['data-canvas-name'] ||
@@ -47,79 +45,18 @@ export const wrapRHF = <P extends Record<string, any>>(
     // Get the current value from various possible sources
     const getCurrentValue = () => getCurrentValueFromProps(props);
 
-    // Special handling for the form_build_id which can be updated by an ajax
-    // callback without using hyperscriptify to render a new React component.
+    // Special handling for the form_build_id which can be updated by a core
+    // AJAX callback.
     useFormBuildIdSync(fieldName, formContext?.formId, rhfContext, dispatch);
 
+    // Checks for fields added via AJAX, thus not registered with
+    // react-hook-form on intitialization.
     useAjaxFieldRegistration(fieldName, rhfContext, getCurrentValue);
-    // If no react-hook-form context, the form isn't using RHF - render without enhancement
-    // If no field name, we can't register it - render without enhancement
+
+    // If there's no react-hook-form context, then the input should be rendered
+    // without enhancement. Also, if there's no field name, it can't be
+    // registered either.
     if (!rhfContext || !fieldName) {
-      // For inputs that have lost RHF context (e.g., tabledrag rebuild), convert to uncontrolled
-      // This prevents React warnings about controlled inputs without onChange handlers
-      if (props.attributes && 'value' in props.attributes) {
-        const inputType = props.attributes.type as string;
-
-        // Only convert text-like inputs to defaultValue
-        // Submit, button, radio, checkbox, hidden need to keep their value prop
-        const shouldConvertToDefaultValue =
-          !inputType || // No type means text input
-          [
-            'text',
-            'email',
-            'password',
-            'tel',
-            'url',
-            'search',
-            'number',
-            'date',
-            'time',
-            'datetime-local',
-            'month',
-            'week',
-            'textarea',
-          ].includes(inputType);
-
-        if (shouldConvertToDefaultValue) {
-          const { value, ...restAttributes } = props.attributes;
-
-          // Create enhanced onChange that dispatches to Redux even when uncontrolled
-          // Memoize it to prevent recreating on every render
-          const enhancedOnChange = useCallback(
-            (e: React.ChangeEvent<HTMLInputElement>) => {
-              const newValue = e.target.value;
-
-              // Dispatch to Redux so the value is tracked
-              if (formContext?.formId) {
-                dispatchFieldValue(
-                  dispatch,
-                  formContext.formId,
-                  fieldName,
-                  newValue,
-                );
-              }
-
-              // Call original onChange if it exists
-              if (props.attributes?.onChange) {
-                props.attributes.onChange(e);
-              }
-            },
-            [dispatch, formContext, fieldName, props.attributes],
-          );
-
-          const uncontrolledProps = {
-            ...props,
-            attributes: {
-              ...restAttributes,
-              defaultValue: value,
-              onChange: enhancedOnChange,
-            },
-          };
-
-          return <WrappedComponent {...uncontrolledProps} />;
-        }
-      }
-
       return <WrappedComponent {...props} />;
     }
 

@@ -41,11 +41,11 @@ export const edit = (cy) => {
     cy.reasonableWait();
 
     // cy.selectorShouldHaveUpdatedFormBuildId(
-      '[data-testid="canvas-page-data-form"]',
-      15000,
-    ).then(() => {
-      console.log(`[Iteration ${ix + 1}] Form build ID updated`);
-    });
+    //   '[data-testid="canvas-page-data-form"]',
+    //   15000,
+    // ).then(() => {
+    //   console.log(`[Iteration ${ix + 1}] Form build ID updated`);
+    // });
   });
 };
 export const assertData = (response) => {
