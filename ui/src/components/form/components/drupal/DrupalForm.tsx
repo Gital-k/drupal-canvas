@@ -56,11 +56,17 @@ const DrupalForm = ({
     }
   }, [ajaxContents, formId]);
 
-  // Listen for AJAX content being added to this form
+  // Listen for AJAX content being added to this form.
   useEffect(() => {
     const formElement = formRef.current;
     if (!formElement) return;
 
+    // When AJAX adds elements to the form, they are automatically in the
+    // expected location within the DOM. They are not, however
+    // descendents of this form within the React component tree. This process
+    // identifies the newly added content and creates a React portal to
+    // ensure it descends from this form, thus giving it access to the
+    // FormProvider context.
     const handleAjaxContent = (event: Event) => {
       const customEvent = event as CustomEvent<{
         container: HTMLElement;
@@ -83,7 +89,6 @@ const DrupalForm = ({
         let filtered = prev;
         if (fieldIdentifier) {
           filtered = prev.filter((content) => {
-            // Portal remains if true - keep content from different fields
             return content.fieldIdentifier !== fieldIdentifier;
           });
         }
@@ -97,7 +102,6 @@ const DrupalForm = ({
           targetElement,
           fieldIdentifier,
         };
-        console.log('Adding AJAX content:', newContent);
 
         return [...filtered, newContent];
       });

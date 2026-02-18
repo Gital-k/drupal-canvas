@@ -35,25 +35,12 @@ import type { AutoSavesHash } from '@/types/AutoSaves';
 export function createRequestQueue<T>() {
   let activePromise: Promise<T> | null = null;
   let queuedRequest: (() => Promise<T>) | null = null;
-  let requestCounter = 0;
-  // let executionCounter = 0;
 
   return async function queuedExecute(requestFn: () => Promise<T>): Promise<T> {
-    const requestId = ++requestCounter;
-    // console.log(
-    //   `[Queue ${requestId}] Request received. Active: ${!!activePromise}, Queued: ${!!queuedRequest}`,
-    // );
-
     // If there's an active request, queue this one (replacing any previously queued request)
     if (activePromise) {
-      if (queuedRequest) {
-        console.log(`[Queue ${requestId}] Replacing previously queued request`);
-      }
       // Store this request to execute after the active one completes
       queuedRequest = requestFn;
-      // console.log(
-      //   `[Queue ${requestId}] Queued, waiting for active request to complete`,
-      // );
 
       // Wait for the active request to complete, then execute the queued one
       await activePromise;
@@ -61,17 +48,9 @@ export function createRequestQueue<T>() {
       // After waiting, check if we're the queued request that should execute
       // (another request might have queued after us)
       if (queuedRequest === requestFn) {
-        // console.log(
-        //   `[Queue ${requestId}] Woke up and still queued, executing now`,
-        // );
         queuedRequest = null;
         return queuedExecute(requestFn); // Execute now that nothing is active
       } else {
-        // Another request was queued after us, so we're superseded
-        // Return a resolved promise (our data is stale anyway)
-        // console.log(
-        //   `[Queue ${requestId}] Superseded by newer request, dropping`,
-        // );
         return Promise.resolve(null as T);
       }
     }
@@ -86,22 +65,12 @@ export function createRequestQueue<T>() {
       rejecter = reject;
     });
 
-    // const executionId = ++executionCounter;
-    // console.log(`[Queue ${requestId}] Executing (execution #${executionId})`);
-
     // Now execute the actual request
     try {
       const result = await requestFn();
-      // console.log(
-      //   `[Queue ${requestId}] Completed successfully (execution #${executionId})`,
-      // );
       resolver!(result);
       return result;
     } catch (error) {
-      // console.error(
-      //   `[Queue ${requestId}] Failed (execution #${executionId}):`,
-      //   error,
-      // );
       rejecter!(error);
       throw error;
     } finally {
@@ -109,9 +78,6 @@ export function createRequestQueue<T>() {
 
       // If there's a queued request, execute it immediately (non-recursive)
       if (queuedRequest) {
-        // console.log(
-        //   `[Queue ${requestId}] Has queued request, scheduling next execution`,
-        // );
         const nextRequest = queuedRequest;
         queuedRequest = null;
 
@@ -120,10 +86,6 @@ export function createRequestQueue<T>() {
         queuedExecute(nextRequest).catch((error) => {
           console.error('Queued request failed:', error);
         });
-      } else {
-        // console.log(
-        //   `[Queue ${requestId}] No queued requests, queue is now idle`,
-        // );
       }
     }
   };
@@ -183,33 +145,15 @@ export const previewApi = createApi({
         body,
       }),
       async onQueryStarted(arg, { dispatch, queryFulfilled, getState }) {
-        // const requestTimestamp = Date.now();
-        // console.log(
-        //   `[onQueryStarted] Preview request started at ${requestTimestamp}`,
-        // );
-
         pushCanvasLayoutRequest();
 
         try {
           const { data, meta } = await queryFulfilled;
           const { html, autoSaves } = data;
 
-          // console.log(
-          //   `[onQueryStarted] Request fulfilled after ${Date.now() - requestTimestamp}ms`,
-          // );
-
           // Calculate hash of HTML to prevent infinite loops
           const currentHtmlHash = simpleHash(html);
           const htmlChanged = currentHtmlHash !== lastHtmlHash;
-
-          // console.log(
-          //   `[onQueryStarted] HTML changed: ${htmlChanged} (hash: ${currentHtmlHash} vs ${lastHtmlHash})`,
-          // );
-          //
-          // console.log(
-          //   `[onQueryStarted] Dispatching actions: invalidateTags${htmlChanged ? ', setHtml' : ''}, handleAutoSaves, setPostPreviewCompleted`,
-          // );
-
           dispatch(
             pendingChangesApi.util.invalidateTags([
               { type: 'PendingChanges', id: 'LIST' },
@@ -221,18 +165,11 @@ export const previewApi = createApi({
           if (htmlChanged) {
             lastHtmlHash = currentHtmlHash;
             dispatch(setHtml(html));
-            // console.log(`[onQueryStarted] setHtml dispatched (HTML changed)`);
-          } else {
-            // console.log(`[onQueryStarted] setHtml SKIPPED (HTML unchanged)`);
           }
 
           handleAutoSavesHashUpdate(dispatch, autoSaves, meta);
-          // console.log(`[onQueryStarted] handleAutoSavesHashUpdate completed`);
 
           dispatch(setPostPreviewCompleted(true));
-          // console.log(
-          //   `[onQueryStarted] setPostPreviewCompleted dispatched - ALL ACTIONS COMPLETE`,
-          // );
         } catch (error: any) {
           // Log all errors
           const status = error?.error?.status || 'unknown';

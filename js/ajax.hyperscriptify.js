@@ -96,6 +96,9 @@
         topLevelComponents = [...commonParents, ...topLevelComponents];
       }
 
+      // Component instances with attributes mean they are likely a form field,
+      // so add it to the list of updated input elements so the store can be
+      // updated accordingly after any component rendering occurs.
       const updatedInputElements = allJSXComponentInstances.filter((el) =>
         el.hasAttribute('attributes') && !el.hasAttribute('data-drupal-scriptified'),
       );
