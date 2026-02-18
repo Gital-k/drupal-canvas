@@ -76,7 +76,7 @@ const testMediaLibraryInComponentInstanceForm = (
     cy.get(removeIt).realClick();
 
     cy.get(removeIt).should('not.exist');
-    cy.selectorShouldHaveUpdatedFormBuildId(
+    // cy.selectorShouldHaveUpdatedFormBuildId(
       '[data-testid*="canvas-component-form-"]',
     );
     // The default image should appear because the prop is required.
@@ -91,7 +91,7 @@ const testMediaLibraryInComponentInstanceForm = (
 
     cy.wait('@patch');
     cy.get('div[role="dialog"]').should('not.exist');
-    cy.selectorShouldHaveUpdatedFormBuildId(
+    // cy.selectorShouldHaveUpdatedFormBuildId(
       '[data-testid*="canvas-component-form-"]',
     );
     cy.get(

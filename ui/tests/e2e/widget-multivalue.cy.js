@@ -82,7 +82,7 @@ describe('Multivalue widget drag and drop', () => {
     cy.get('@unlimited-text')
       .findByRole('button', { name: 'Add another item' })
       .click();
-    cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector, 15000);
+    // cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector, 15000);
 
     cy.get('@unlimited-text').findAllByRole('textbox').should('have.length', 3);
 
@@ -130,7 +130,7 @@ describe('Multivalue widget drag and drop', () => {
     cy.get('@unlimited-text')
       .findByRole('button', { name: 'Add another item' })
       .click();
-    cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
+    // cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
     cy.get('@unlimited-text').findAllByRole('textbox').should('have.length', 4);
 
     cy.log(

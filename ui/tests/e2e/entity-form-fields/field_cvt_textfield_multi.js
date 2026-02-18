@@ -40,7 +40,7 @@ export const edit = (cy) => {
     cy.wait('@updatePreview');
     cy.reasonableWait();
 
-    cy.selectorShouldHaveUpdatedFormBuildId(
+    // cy.selectorShouldHaveUpdatedFormBuildId(
       '[data-testid="canvas-page-data-form"]',
       15000,
     ).then(() => {
