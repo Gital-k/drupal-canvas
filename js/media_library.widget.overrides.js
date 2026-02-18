@@ -31,142 +31,161 @@
           draggable: '.js-media-library-item',
           handle: '.js-media-library-item-preview',
           onStart: () => {
-            $(widget).attr('data-canvas-reordering', 'true');
-            preReorderData = [];
-            $(widget).children('.js-media-library-item').each((_, el) => {
-              const $el = $(el);
-              const delta = $el.attr('data-media-library-item-delta');
-              const targetIdField = $el.find('input[name*="[target_id]"]')[0];
-              const targetId = targetIdField ? targetIdField.value : null;
-              preReorderData.push({ delta, targetId, element: el });
-            });
+            try {
+              $(widget).attr('data-canvas-reordering', 'true');
+              preReorderData = [];
+              $(widget).children('.js-media-library-item').each((_, el) => {
+                const $el = $(el);
+                const delta = $el.attr('data-media-library-item-delta');
+                const targetIdField = $el.find('input[name*="[target_id]"]')[0];
+                const targetId = targetIdField ? targetIdField.value : null;
+                preReorderData.push({ delta, targetId, element: el });
+              });
+            } catch (error) {
+              console.error('Error starting media reorder:', error);
+            }
           },
           onEnd: () => {
-            const elementsInNewOrder = $(widget).children('.js-media-library-item').get();
+            try {
+              const elementsInNewOrder = $(widget).children('.js-media-library-item').get();
 
-            // Restore the correct target_id values after Sortable moves elements
-            elementsInNewOrder.forEach((el) => {
-              const $el = $(el);
-              const delta = $el.attr('data-media-library-item-delta');
-              const originalData = preReorderData.find(d => d.delta === delta);
-              if (originalData && originalData.targetId !== null) {
-                const targetIdField = $el.find('input[name*="[target_id]"]')[0];
-                if (targetIdField && targetIdField.value !== originalData.targetId) {
-                  targetIdField.value = originalData.targetId;
-                  targetIdField.setAttribute('value', originalData.targetId);
+              // Restore the correct target_id values after Sortable moves elements
+              elementsInNewOrder.forEach((el) => {
+                const $el = $(el);
+                const delta = $el.attr('data-media-library-item-delta');
+                const originalData = preReorderData.find(d => d.delta === delta);
+                if (originalData && originalData.targetId !== null) {
+                  const targetIdField = $el.find('input[name*="[target_id]"]')[0];
+                  if (targetIdField && targetIdField.value !== originalData.targetId) {
+                    targetIdField.value = originalData.targetId;
+                    targetIdField.setAttribute('value', originalData.targetId);
+                  }
                 }
-              }
-            });
-
-            // Rename all fields to temporary names to avoid collisions
-            $(widget)
-              .children('.js-media-library-item')
-              .each((index, child) => {
-                const $child = $(child);
-                const oldDelta = $child.attr('data-media-library-item-delta');
-
-                $child.find('input, select, textarea').each((_, field) => {
-                  const $field = $(field);
-                  const oldName = $field.attr('name');
-                  if (oldName && oldName.includes('[selection][' + oldDelta + ']')) {
-                    const tempName = oldName.replace(
-                      '[selection][' + oldDelta + ']',
-                      '[selection][TEMP_' + oldDelta + ']'
-                    );
-                    $field.attr('name', tempName);
-
-                    const oldSelector = $field.attr('data-drupal-selector');
-                    if (oldSelector) {
-                      const tempSelector = oldSelector.replace(
-                        '-selection-' + oldDelta + '-',
-                        '-selection-TEMP_' + oldDelta + '-'
-                      );
-                      $field.attr('data-drupal-selector', tempSelector);
-                    }
-                  }
-                });
-
-                $child.find('[data-canvas-media-remove-button]').each((_, button) => {
-                  const $button = $(button);
-                  const oldName = $button.attr('name');
-                  if (oldName && oldName.includes('-' + oldDelta + '-')) {
-                    const tempName = oldName.replace('-' + oldDelta + '-', '-TEMP_' + oldDelta + '-');
-                    $button.attr('name', tempName);
-                  }
-                });
               });
+            } catch (error) {
+              console.error('Error restoring target_id values:', error);
+            }
 
-            // Rename from temporary names to final names
-            $(widget)
-              .children('.js-media-library-item')
-              .each((index, child) => {
-                const $child = $(child);
-                const oldDelta = $child.attr('data-media-library-item-delta');
+            try {
+              // Rename all fields to temporary names to avoid collisions
+              $(widget)
+                .children('.js-media-library-item')
+                .each((index, child) => {
+                  const $child = $(child);
+                  const oldDelta = $child.attr('data-media-library-item-delta');
 
-                $child.attr('data-media-library-item-delta', index);
-
-                $child.find('input, select, textarea').each((_, field) => {
-                  const $field = $(field);
-                  const tempName = $field.attr('name');
-                  if (tempName && tempName.includes('[selection][TEMP_' + oldDelta + ']')) {
-                    const newName = tempName.replace(
-                      '[selection][TEMP_' + oldDelta + ']',
-                      '[selection][' + index + ']'
-                    );
-                    $field.attr('name', newName);
-
-                    const tempSelector = $field.attr('data-drupal-selector');
-                    if (tempSelector) {
-                      const newSelector = tempSelector.replace(
-                        '-selection-TEMP_' + oldDelta + '-',
-                        '-selection-' + index + '-'
+                  $child.find('input, select, textarea').each((_, field) => {
+                    const $field = $(field);
+                    const oldName = $field.attr('name');
+                    if (oldName && oldName.includes('[selection][' + oldDelta + ']')) {
+                      const tempName = oldName.replace(
+                        '[selection][' + oldDelta + ']',
+                        '[selection][TEMP_' + oldDelta + ']'
                       );
-                      $field.attr('data-drupal-selector', newSelector);
+                      $field.attr('name', tempName);
+
+                      const oldSelector = $field.attr('data-drupal-selector');
+                      if (oldSelector) {
+                        const tempSelector = oldSelector.replace(
+                          '-selection-' + oldDelta + '-',
+                          '-selection-TEMP_' + oldDelta + '-'
+                        );
+                        $field.attr('data-drupal-selector', tempSelector);
+                      }
                     }
+                  });
+
+                  $child.find('[data-canvas-media-remove-button]').each((_, button) => {
+                    const $button = $(button);
+                    const oldName = $button.attr('name');
+                    if (oldName && oldName.includes('-' + oldDelta + '-')) {
+                      const tempName = oldName.replace('-' + oldDelta + '-', '-TEMP_' + oldDelta + '-');
+                      $button.attr('name', tempName);
+                    }
+                  });
+                });
+
+              // Rename from temporary names to final names
+              $(widget)
+                .children('.js-media-library-item')
+                .each((index, child) => {
+                  const $child = $(child);
+                  const oldDelta = $child.attr('data-media-library-item-delta');
+
+                  $child.attr('data-media-library-item-delta', index);
+
+                  $child.find('input, select, textarea').each((_, field) => {
+                    const $field = $(field);
+                    const tempName = $field.attr('name');
+                    if (tempName && tempName.includes('[selection][TEMP_' + oldDelta + ']')) {
+                      const newName = tempName.replace(
+                        '[selection][TEMP_' + oldDelta + ']',
+                        '[selection][' + index + ']'
+                      );
+                      $field.attr('name', newName);
+
+                      const tempSelector = $field.attr('data-drupal-selector');
+                      if (tempSelector) {
+                        const newSelector = tempSelector.replace(
+                          '-selection-TEMP_' + oldDelta + '-',
+                          '-selection-' + index + '-'
+                        );
+                        $field.attr('data-drupal-selector', newSelector);
+                      }
+                    }
+                  });
+
+                  $child.find('[data-canvas-media-remove-button]').each((_, button) => {
+                    const $button = $(button);
+                    const tempName = $button.attr('name');
+                    if (tempName && tempName.includes('-TEMP_' + oldDelta + '-')) {
+                      const newName = tempName.replace('-TEMP_' + oldDelta + '-', '-' + index + '-');
+                      $button.attr('name', newName);
+                    }
+                  });
+
+                  let weightField = $child.find('.js-media-library-item-weight')[0];
+                  if (!weightField) {
+                    weightField = $child.find('input[name*="[weight]"]')[0];
+                  }
+                  if (weightField) {
+                    weightField.setAttribute('data-pending-weight', index);
                   }
                 });
 
-                $child.find('[data-canvas-media-remove-button]').each((_, button) => {
-                  const $button = $(button);
-                  const tempName = $button.attr('name');
-                  if (tempName && tempName.includes('-TEMP_' + oldDelta + '-')) {
-                    const newName = tempName.replace('-TEMP_' + oldDelta + '-', '-' + index + '-');
-                    $button.attr('name', newName);
-                  }
-                });
-
-                let weightField = $child.find('.js-media-library-item-weight')[0];
-                if (!weightField) {
-                  weightField = $child.find('input[name*="[weight]"]')[0];
-                }
+              $(widget).children().each((_, child) => {
+                const $child = $(child);
+                const weightField = $child.find('input[name*="[weight]"]')[0];
                 if (weightField) {
-                  weightField.setAttribute('data-pending-weight', index);
+                  const pendingWeight = weightField.getAttribute('data-pending-weight');
+                  if (pendingWeight !== null) {
+                    weightField.value = pendingWeight;
+                    weightField.setAttribute('value', pendingWeight);
+                    weightField.removeAttribute('data-pending-weight');
+                  }
                 }
               });
+            } catch (error) {
+              console.error('Error renaming fields during reorder:', error);
+            }
 
-            $(widget).children().each((_, child) => {
-              const $child = $(child);
-              const weightField = $child.find('input[name*="[weight]"]')[0];
-              if (weightField) {
-                const pendingWeight = weightField.getAttribute('data-pending-weight');
-                if (pendingWeight !== null) {
-                  weightField.value = pendingWeight;
-                  weightField.setAttribute('value', pendingWeight);
-                  weightField.removeAttribute('data-pending-weight');
-                }
-              }
-            });
+            // Handle post-reorder updates asynchronously
+            (async () => {
+              try {
+                await new Promise(resolve => setTimeout(resolve, 10));
 
-            setTimeout(() => {
-              const weightFields = $(widget).find('input[name*="[weight]"]').get();
-              weightFields.forEach((weightField) => {
-                const inputEvent = new Event('input', { bubbles: true, composed: true });
-                const changeEvent = new Event('change', { bubbles: true, composed: true });
-                weightField.dispatchEvent(inputEvent);
-                weightField.dispatchEvent(changeEvent);
-              });
+                // Dispatch weight field events
+                const weightFields = $(widget).find('input[name*="[weight]"]').get();
+                weightFields.forEach((weightField) => {
+                  const inputEvent = new Event('input', { bubbles: true, composed: true });
+                  const changeEvent = new Event('change', { bubbles: true, composed: true });
+                  weightField.dispatchEvent(inputEvent);
+                  weightField.dispatchEvent(changeEvent);
+                });
 
-              setTimeout(() => {
+                await new Promise(resolve => setTimeout(resolve, 50));
+
+                // Dispatch target_id field events
                 const targetIdFields = $(widget).find('input[name*="[target_id]"]').get();
                 targetIdFields.forEach((targetIdField) => {
                   const inputEvent = new Event('input', { bubbles: true, composed: true });
@@ -175,24 +194,32 @@
                   targetIdField.dispatchEvent(changeEvent);
                 });
 
-                setTimeout(() => {
-                  const items = $(widget).children('.js-media-library-item').get();
-                  items.sort((a, b) => {
-                    const weightA = parseInt($(a).find('input[name*="[weight]"]').val() || '0', 10);
-                    const weightB = parseInt($(b).find('input[name*="[weight]"]').val() || '0', 10);
-                    return weightA - weightB;
-                  });
-                  items.forEach((item) => {
-                    $(widget).append(item);
-                  });
+                await new Promise(resolve => setTimeout(resolve, 100));
 
-                  setTimeout(() => {
-                    $(widget).removeAttr('data-canvas-reordering');
-                    $(widget).attr('data-last-reorder-time', Date.now().toString());
-                  }, 10000);
-                }, 100);
-              }, 50);
-            }, 10);
+                // Re-sort items by weight
+                const items = $(widget).children('.js-media-library-item').get();
+                items.sort((a, b) => {
+                  const weightA = parseInt($(a).find('input[name*="[weight]"]').val() || '0', 10);
+                  const weightB = parseInt($(b).find('input[name*="[weight]"]').val() || '0', 10);
+                  return weightA - weightB;
+                });
+                items.forEach((item) => {
+                  $(widget).append(item);
+                });
+
+                await new Promise(resolve => setTimeout(resolve, 10000));
+
+                // Clean up reordering flag
+                $(widget).removeAttr('data-canvas-reordering');
+                $(widget).attr('data-last-reorder-time', Date.now().toString());
+
+              } catch (error) {
+                console.error('Error dispatching events during reorder:', error);
+                // Clean up reordering flag even if there's an error
+                $(widget).removeAttr('data-canvas-reordering');
+                $(widget).attr('data-last-reorder-time', Date.now().toString());
+              }
+            })();
 
           },
         });
