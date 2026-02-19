@@ -149,10 +149,6 @@ const FormatSelect = ({
               writable: false,
               value: e.target,
             });
-
-            // Add flag to prevent cascade
-            changeEvent.skipOriginalOnChange = true;
-
             attributes.onChange(changeEvent);
           }
         }}

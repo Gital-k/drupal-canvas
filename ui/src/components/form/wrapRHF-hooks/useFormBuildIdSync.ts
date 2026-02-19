@@ -46,6 +46,11 @@ export const useFormBuildIdSync = (
       }
     };
 
+    // Listen for the event triggered in js/ajax.command.customizations.js.
+    // It's triggered from an override that intercepts core AJAX update_build_id
+    // commands and skips the default in favor of sending a custom event. This
+    // allow us to manage the build id changes fully in React, which prevents
+    // issues where jQuery is confused by a perpetually re-rendering form.
     document.addEventListener(
       AJAX_UPDATE_FORM_BUILD_ID_EVENT,
       formBuildIdListener as unknown as EventListener,

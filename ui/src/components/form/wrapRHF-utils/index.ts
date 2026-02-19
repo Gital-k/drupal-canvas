@@ -170,15 +170,6 @@ export const createEnhancedOnChange = ({
       dispatchFieldValue(dispatch, formId as FormId, fieldName, newValue);
     }
 
-    // Call original onChange (unless skipOriginalOnChange is set)
-    // This allows nested components like FormatSelect to call enhancedOnChange
-    // without creating a cascade
-    // const originalOnChange = props.attributes?.onChange || props.onChange;
-    // if (originalOnChange && !e?.skipOriginalOnChange) {
-    //   originalOnChange(e);
-    // }
-
-    // VALIDATION GATES AUTO-SAVE (preserve existing auto-save blocking logic)
     if (validateNewValue && errorsText) {
       const validationResult = validateNewValue(e, newValue);
 
