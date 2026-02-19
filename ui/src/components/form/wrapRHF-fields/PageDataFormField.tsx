@@ -52,8 +52,6 @@ export const PageDataFormField = <P extends Record<string, any>>({
   const { dispatch, pageData, formState } = usePageDataFormInputInfo();
 
   const { attributes } = props;
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const formId = 'page_data_form';
 
   // Create a memoized version of WrappedComponent with deep comparison
   const MemoizedWrappedComponent = useMemo(

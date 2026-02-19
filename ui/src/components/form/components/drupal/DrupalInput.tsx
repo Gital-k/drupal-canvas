@@ -7,7 +7,7 @@ import TextField from '@/components/form/components/TextField';
 import TextFieldAutocomplete from '@/components/form/components/TextFieldAutocomplete';
 import { wrapRHF } from '@/components/form/wrapRHF';
 import { a2p } from '@/local_packages/utils.js';
-
+import { useRef } from 'react';
 import type { Attributes } from '@/types/DrupalAttribute';
 
 const DrupalInput = ({
@@ -19,6 +19,14 @@ const DrupalInput = ({
   };
   element: any;
 }) => {
+  const renderCountRef = useRef(0);
+
+  renderCountRef.current += 1;
+
+  if (renderCountRef.current > 1) {
+    console.log(`[DrupalInput] Re-render #${renderCountRef.current}`);
+  }
+
   switch (attributes?.type) {
     case 'checkbox': {
       return (

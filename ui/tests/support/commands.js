@@ -732,18 +732,9 @@ Cypress.Commands.add('loadURLandWaitForCanvasLoaded', (options = {}) => {
 let formBuildId = {};
 
 Cypress.Commands.add('recordFormBuildId', { prevSubject: true }, (subject) => {
-  let subjectId = subject.attr('id');
-  if (!subjectId) {
-    const form = subject.find('form');
-    expect(form).to.exist;
-    subjectId = form[0].id;
-  }
-  if (!subjectId) {
-    throw new Error(
-      'recordFormBuildId: Unable to determine form ID to record form_build_id against.',
-    );
-  }
-  formBuildId[subjectId] = subject.find('input[name="form_build_id"]').val();
+  formBuildId[subject.attr('id')] = subject
+    .find('input[name="form_build_id"]')
+    .val();
 });
 
 Cypress.Commands.add(
@@ -754,12 +745,9 @@ Cypress.Commands.add(
     }).should((body) => {
       const subject = body.find(selector);
       expect(subject).to.exist;
-      const form = subject.find('form');
-      expect(form).to.exist;
-      const formKey = form[0].id;
       const newFormBuildId = subject.find('input[name="form_build_id"]').val();
-      expect(newFormBuildId).not.to.equal(formBuildId[formKey]);
-      formBuildId[formKey] = newFormBuildId;
+      expect(newFormBuildId).not.to.equal(formBuildId[subject.attr('id')]);
+      formBuildId[subject.attr('id')] = newFormBuildId;
     });
   },
 );

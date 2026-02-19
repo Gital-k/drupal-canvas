@@ -62,19 +62,6 @@ export const ComponentFormField = <P extends Record<string, any>>({
   const getCurrentValue = () => getCurrentValueFromProps(props);
   const { attributes } = props;
 
-  // Memoize props to prevent passing new reference when values haven't changed
-  const memoizedPropsRef = useRef<P>(props);
-  const propsStringified = JSON.stringify(props);
-  const prevPropsStringified = useRef(propsStringified);
-
-  if (prevPropsStringified.current !== propsStringified) {
-    // Props actually changed, update the memoized version
-    memoizedPropsRef.current = props;
-    prevPropsStringified.current = propsStringified;
-  }
-  // Use memoized props for all operations
-  const stableProps = memoizedPropsRef.current;
-
   // Create a memoized version of WrappedComponent with deep comparison
   // This prevents re-renders when attributes have same values but different reference
   const MemoizedWrappedComponent = useMemo(
@@ -345,7 +332,7 @@ export const ComponentFormField = <P extends Record<string, any>>({
 
   // Create stable callback references using refs
   const latestPropsRef = useRef({
-    props: stableProps,
+    props,
     formState,
     dispatch,
     formContext,
@@ -357,7 +344,7 @@ export const ComponentFormField = <P extends Record<string, any>>({
   });
   latestPropsRef.current = {
     ...latestPropsRef.current,
-    props: stableProps,
+    props,
     formState,
     dispatch,
     formContext,
@@ -407,7 +394,7 @@ export const ComponentFormField = <P extends Record<string, any>>({
   );
 
   if (!rhfContext) {
-    return <MemoizedWrappedComponent {...(stableProps as any)} />;
+    return <MemoizedWrappedComponent {...props} />;
   }
 
   return (
@@ -470,7 +457,7 @@ export const ComponentFormField = <P extends Record<string, any>>({
         // Memoize the enhanced props to prevent creating new attributes object on every render
         const enhancedProps = useMemo(() => {
           const newEnhancedProps = applyEnhancedProps(
-            { ...stableProps, ...propsOverrides },
+            { ...props, ...propsOverrides },
             field,
             stableOnChange,
             stableOnBlur,
