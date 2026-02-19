@@ -21,10 +21,6 @@ describe(
       cy.drupalSession();
     });
 
-    // beforeEach(() => {
-    //   cy.drupalSession();
-    // });
-
     afterEach(() => {
       cy.drupalUninstall();
     });
@@ -164,8 +160,6 @@ describe(
             method: 'POST',
           }).as('updatePreview');
           value.edit(cy);
-          // Wait for the preview to finish loading.
-          // cy.wait('@updatePreview');
           cy.findByLabelText('Loading Preview').should('not.exist');
         });
 

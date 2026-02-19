@@ -89,9 +89,7 @@ describe('Media Library', () => {
       .click();
     cy.get('div[role="dialog"]').should('exist');
     cy.findByLabelText('Select The bones are their money').check();
-
     cy.get('button:contains("Insert selected")').click();
-
     cy.get('div[role="dialog"]').should('not.exist');
     cy.waitForElementInIframe('img[alt="The bones equal dollars"]');
     cy.waitForElementNotInIframe(

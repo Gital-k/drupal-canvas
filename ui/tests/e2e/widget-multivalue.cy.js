@@ -91,7 +91,6 @@ describe('Multivalue widget drag and drop', () => {
       .type('The Olivia Tremor Control');
     confirmWeightSelectCount(3);
     waitForPreview();
-    cy.waitForAjax();
 
     confirmTextInputs([
       'Marshmallow Coast',
@@ -139,7 +138,6 @@ describe('Multivalue widget drag and drop', () => {
       .eq(3)
       .type('The Music Tapes');
     waitForPreview();
-    cy.waitForAjax();
 
     confirmTextInputs([
       'Marshmallow Coast',

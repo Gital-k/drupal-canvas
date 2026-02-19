@@ -68,11 +68,9 @@ const testMediaLibraryInEntityForm = (cy, loadOptions = {}, title) => {
         disabled !== undefined && disabled !== false && disabled !== 'false';
       expect(isDisabled, 'Button should not be disabled').to.be.false;
     });
-    // eslint-disable-next-line cypress/no-unnecessary-waiting
-    cy.wait(200);
+    cy.reasonableWait();
     cy.get(addIt).first().click();
 
-    //   .click();
     // The first time the media dialog opens there are a lot of CSS files to
     // load, and it can take more than the default timeout of 4s.
     cy.findByRole('dialog', { timeout: 10000 }).as('dialog');
@@ -94,7 +92,6 @@ const testMediaLibraryInEntityForm = (cy, loadOptions = {}, title) => {
     cy.get('@entityForm')
       .findByRole('button', { name: step.removeAriaLabel })
       .should('exist');
-
     cy.log(`Iteration ${ix + 1}: Adding ${step.expectedAlt} complete`);
   });
 

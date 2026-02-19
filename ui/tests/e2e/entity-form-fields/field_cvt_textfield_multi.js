@@ -24,7 +24,6 @@ export const edit = (cy) => {
       item,
     );
     // Wait for the preview to finish loading.
-    // cy.wait('@updatePreview');
     cy.reasonableWait();
     // Queue another intercept for the wait in the main test and/or the next
     // iteration in the loop.
