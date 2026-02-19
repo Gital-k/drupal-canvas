@@ -36,7 +36,6 @@ const MediaLibraryWidgetContainer = memo(
       if (selection?.hasAttribute('data-canvas-reordering')) {
         return true;
       }
-
     }
     return (
       prevProps.renderChildren === nextProps.renderChildren &&
