@@ -39,27 +39,55 @@ drupal-html-fragment {
 
 /* Multivalue Form Styles - Container with dashed blue border */
 .multivalue-container {
-  border: 1px solid #CDCED6;
+  border: none !important;
   border-radius: 4px;
-  overflow: hidden;
+  overflow: visible;
   background-color: white;
 }
 
 .multivalue-container .field-label {
   display: flex;
-  margin-left: 5px;
+  margin-left: 0 !important;
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+  padding-left: 0 !important;
 }
 
 .multivalue-container table {
   border: none;
   border-collapse: collapse;
   width: 100%;
-  margin: 0;
+  margin: 0 !important;
 }
 
 /* Hide table header (Tags label) */
 .multivalue-container table thead,
 .multivalue-container table caption {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.multivalue-container table thead tr {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.multivalue-container table thead tr th.field-label {
+  border: none !important;
+  background: white;
+  margin: 0 !important;
+  padding: 8px 0 8px 0 !important;
+}
+
+.multivalue-container table thead tr th.field-label h4.label {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Apply border only to tbody */
+.multivalue-container table tbody {
+  border: 1px solid #CDCED6;
+  border-radius: 4px;
 }
 
 .multivalue-container table tr {
