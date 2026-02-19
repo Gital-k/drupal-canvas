@@ -459,14 +459,24 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
       \assert($component instanceof Component);
       $component->loadVersion($item->getComponentVersion());
 
+      // Rendering always happens using the live implementation of a component,
+      // so load the active version to determine the required props.
+      $required_props_with_default_values_in_current_implementation = $component
+        ->loadVersion($component->getActiveVersion())
+        ->getComponentSource()
+        ->getDefaultExplicitInput(only_required: TRUE);
+      // Avoid side effects.
+      $component->loadVersion($item->getComponentVersion());
+
       $source = $component->getComponentSource();
       $hydrated[$uuid] = [
         'component' => $component_id,
       ] + $source->hydrateComponent(
         $source->getExplicitInput($uuid, $item),
         $component->getSlotDefinitions(),
+        $required_props_with_default_values_in_current_implementation,
       );
-      \assert(!array_key_exists('slots', $hydrated[$uuid]) || is_array($hydrated[$uuid]['slots']));
+      \assert(!\array_key_exists('slots', $hydrated[$uuid]) || is_array($hydrated[$uuid]['slots']));
     }
 
     // Transform the flat list of hydrated components into a hydrated component
@@ -477,7 +487,7 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
       if ($parent_uuid === self::ROOT_UUID) {
         continue;
       }
-      \assert(array_key_exists('slots', $hydrated[$parent_uuid]) && is_array($hydrated[$parent_uuid]['slots']));
+      \assert(\array_key_exists('slots', $hydrated[$parent_uuid]) && is_array($hydrated[$parent_uuid]['slots']));
 
       // Remove default slot value: this slot is populated.
       if (\array_key_exists($slot, $hydrated[$parent_uuid]['slots']) && \is_string($hydrated[$parent_uuid]['slots'][$slot])) {
@@ -485,7 +495,7 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
       }
 
       // @phpstan-ignore-next-line
-      \assert(!array_key_exists($uuid, $hydrated[$parent_uuid]['slots'][$slot]));
+      \assert(!\array_key_exists($uuid, $hydrated[$parent_uuid]['slots'][$slot]));
       // @phpstan-ignore-next-line
       $hydrated[$parent_uuid]['slots'][$slot][$uuid] = $hydrated[$uuid];
       unset($hydrated[$uuid]);

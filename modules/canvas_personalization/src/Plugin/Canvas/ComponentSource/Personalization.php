@@ -69,7 +69,7 @@ final class Personalization extends ComponentSourceBase implements
     array $plugin_definition,
     private readonly BasicRecursiveValidatorFactory $validatorFactory,
   ) {
-    \assert(array_key_exists('local_source_id', $configuration));
+    \assert(\array_key_exists('local_source_id', $configuration));
     parent::__construct($configuration, $plugin_id, $plugin_definition);
   }
 
@@ -184,7 +184,7 @@ final class Personalization extends ComponentSourceBase implements
     }
   }
 
-  public function hydrateComponent(array $explicit_input, array $slot_definitions): array {
+  public function hydrateComponent(array $explicit_input, array $slot_definitions, array $active_required_explicit_inputs): array {
     $hydrated = $explicit_input;
     // Set the slots.
     if (!empty($slot_definitions)) {
@@ -286,7 +286,7 @@ final class Personalization extends ComponentSourceBase implements
    * @return PersonalizationInputArray
    * @phpstan-ignore-next-line method.childReturnType
    */
-  public function getDefaultExplicitInput(): array {
+  public function getDefaultExplicitInput(bool $only_required = FALSE): array {
     return match($this->getType()) {
       self::SWITCH => [
         'variants' => [Segment::DEFAULT_ID],
