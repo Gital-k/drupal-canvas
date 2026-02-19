@@ -94,7 +94,7 @@ const DrupalInputMultivalueForm = ({
       <Popover.Content
         side="left"
         align="start"
-        sideOffset={4}
+        sideOffset={6}
         className={styles.popoverContent}
         style={{ maxWidth: '232px' }}
         onOpenAutoFocus={(e) => e.preventDefault()}

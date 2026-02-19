@@ -169,13 +169,13 @@ drupal-html-fragment {
 
 /* Style the drag handle cell */
 .multivalue-container .canvas-drag-handle {
-  position: relative;
-  padding: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  padding: 0 0 0 8px;
+  width: 10%;
 }
 
+.multivalue-container .tabledrag-changed {
+  display: none;
+}
 /* Style the tabledrag anchor to display the custom SVG icon */
 .multivalue-container .canvas-drag-handle a.tabledrag-handle {
   display: flex;
@@ -204,11 +204,7 @@ drupal-html-fragment {
 
 /* Style the custom trash/remove action column */
 .multivalue-container .canvas-remove-action {
-  cursor: pointer;
-  padding: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  width: 10%;
 }
 
 .multivalue-container .canvas-remove-action .canvas-trash-icon-wrapper {
