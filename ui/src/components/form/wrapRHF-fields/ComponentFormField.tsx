@@ -3,13 +3,10 @@ import { Controller } from 'react-hook-form';
 
 import { useAppSelector } from '@/app/hooks';
 import {
-  ComponentPreviewUpdateEvent,
   getPropSchemas,
   getPropsValues,
-  POLLED_BACKGROUND_TIMEOUT,
   propInputData,
   shouldSkipPropValidation,
-  syncPropSourcesToResolvedValues,
   toPropName,
   validateProp,
 } from '@/components/form/formUtil';
@@ -29,10 +26,9 @@ import {
   selectFieldError,
   selectFormValues,
 } from '@/features/form/formStateSlice';
-import { isEvaluatedComponentModel } from '@/features/layout/layoutModelSlice';
-import { setPreviewBackgroundUpdate } from '@/features/pagePreview/previewSlice';
-import { flaggedForRemoval, parseValue } from '@/utils/function-utils';
+import { parseValue } from '@/utils/function-utils';
 
+import { createComponentFormStateHandler } from './componentFormHandlers';
 import { FieldErrorDisplay, useDebouncedFormState } from './shared-utilities';
 
 import type { ComponentType } from 'react';
@@ -40,7 +36,6 @@ import type * as ReactType from 'react';
 import type { PropsValues } from '@drupal-canvas/types';
 import type { FormId } from '@/features/form/formStateSlice';
 import type { ComponentModels } from '@/features/layout/layoutModelSlice';
-import type { InputUIData } from '@/types/Form';
 
 interface ComponentFormFieldProps<P> {
   props: P;
@@ -92,117 +87,26 @@ export const ComponentFormField = <P extends Record<string, any>>({
     selectFormValues(state, FORM_TYPES.COMPONENT_INSTANCE_FORM),
   );
 
-  const formStateToStore = (
-    newFormState: PropsValues,
-    newInputAndUiData: InputUIData,
-    currFormState: PropsValues,
-  ) => {
-    // Apply (client-side) transforms for form state.
-    const { propsValues: values, selectedModel } = getPropsValues(
-      { ...currFormState, ...newFormState },
-      newInputAndUiData,
-      // If transforms are not available (typically because TransformsContext is
-      // not available to the input), fall back to the transforms stored in the
-      // global window object.
-      Object.keys(transforms || {}).length > 0
-        ? transforms
-        : (window as any)._canvasTransforms[selectedComponentType],
-    );
-    // And then send data to backend - this will:
-    // a) Trigger server-side validation/transformation (massaging of widget values)
-    // b) Update both the preview and the model - see the pessimistic update
-    //    in onQueryStarted in preview.ts
-    // @see \Drupal\Core\Field\WidgetInterface::massageFormValues()
-    const resolved = { ...selectedModel.resolved, ...values };
+  // Create the form state handler with all dependencies
+  const formStateToLayoutModelStore = createComponentFormStateHandler({
+    dispatch,
+    transforms,
+    selectedComponentType,
+    selectedComponent,
+    propName,
+    isScalarProp,
+    polledBackgroundUpdate,
+    component,
+    patchComponent,
+    editorFrameContext,
+    version,
+  });
 
-    // Check the object for any values that are flagged for removal. Note that
-    // removal flagging is not necessary for all prop types. It is used for
-    // props with complex prop shapes where the empty-indicating value is nested
-    // with the structure.
-    Object.keys(values).forEach((prop) => {
-      if (flaggedForRemoval(values[prop]) && component?.propSources?.[prop]) {
-        // If the prop is optional, it can be removed.
-        if (!component.propSources[prop]?.required) {
-          if (isEvaluatedComponentModel(selectedModel)) {
-            // The source value can also be updated to empty when permitted.
-            if (!Object.isFrozen(selectedModel.source[prop])) {
-              selectedModel.source[prop].value = [];
-            }
-          }
-          resolved[prop] = [];
-        } else {
-          // If the prop is required, we need to set it back to the default.
-          resolved[prop] = component.propSources[prop].default_values.resolved;
-        }
-      }
-    });
+  const debounceFormStateToLayoutModelStore = useDebouncedFormState(
+    formStateToLayoutModelStore,
+  );
 
-    let backgroundPreviewUpdate = false;
-    if (isScalarProp) {
-      // Fire an event to allow listeners to attempt real-time updates.
-      const PreviewUpdateEvent = new ComponentPreviewUpdateEvent(
-        selectedComponent,
-        propName,
-        resolved[propName],
-      );
-      document.dispatchEvent(PreviewUpdateEvent);
-      dispatch(
-        // Flag if any listeners were able to perform a real-time update.
-        setPreviewBackgroundUpdate(
-          PreviewUpdateEvent.getPreviewBackgroundUpdate(),
-        ),
-      );
-      backgroundPreviewUpdate = PreviewUpdateEvent.getPreviewBackgroundUpdate();
-    }
-
-    if (isEvaluatedComponentModel(selectedModel) && component) {
-      const updateBackend = () => {
-        patchComponent({
-          type: editorFrameContext,
-          componentInstanceUuid: selectedComponent,
-          componentType: `${selectedComponentType}@${version}`,
-          model: {
-            source: syncPropSourcesToResolvedValues(
-              selectedModel.source,
-              component,
-              resolved,
-            ),
-            resolved,
-          },
-        });
-      };
-      if (backgroundPreviewUpdate) {
-        if (polledBackgroundUpdate.current !== null) {
-          clearTimeout(polledBackgroundUpdate.current);
-        }
-        // If we're doing a background update, debounce that so we don't make
-        // multiple requests for a single update. If we're not doing a
-        // background preview update, we should schedule this immediately -
-        // debouncing in InputBehaviors will handle preventing this firing too
-        // many times in succession.
-        polledBackgroundUpdate.current = setTimeout(
-          updateBackend,
-          POLLED_BACKGROUND_TIMEOUT,
-        ) as any as number;
-        return;
-      }
-      updateBackend();
-      return;
-    }
-    patchComponent({
-      type: editorFrameContext,
-      componentInstanceUuid: selectedComponent,
-      componentType: `${selectedComponentType}@${version}`,
-      model: {
-        ...selectedModel,
-        resolved,
-      },
-    });
-  };
-
-  const debounceFormStateToStore = useDebouncedFormState(formStateToStore);
-
-  const commitFormState = (newFormState: PropsValues) => {
+  const updateLayoutModelStore = (newFormState: PropsValues) => {
     const elementType = attributes.type || attributes['data-canvas-type'];
 
     // We don't debounce updates for code components where the prop is scalar -
@@ -213,9 +117,13 @@ export const ComponentFormField = <P extends Record<string, any>>({
       components?.[selectedComponentType]?.source !== 'Code component' ||
       !['checkbox', 'radio'].includes(elementType as string);
     if (shouldDebounce) {
-      debounceFormStateToStore(newFormState, inputAndUiData, formState);
+      debounceFormStateToLayoutModelStore(
+        newFormState,
+        inputAndUiData,
+        formState,
+      );
     } else {
-      formStateToStore(newFormState, inputAndUiData, formState);
+      formStateToLayoutModelStore(newFormState, inputAndUiData, formState);
     }
   };
 
@@ -311,7 +219,7 @@ export const ComponentFormField = <P extends Record<string, any>>({
     parseNewValue,
     validateNewValue,
     errorsText,
-    commitFormState,
+    updateLayoutModelStore,
     field: null as any,
   });
   latestPropsRef.current = {
@@ -323,7 +231,7 @@ export const ComponentFormField = <P extends Record<string, any>>({
     parseNewValue,
     validateNewValue,
     errorsText,
-    commitFormState,
+    updateLayoutModelStore,
   };
 
   // Create stable onChange handler that won't change reference
@@ -337,7 +245,7 @@ export const ComponentFormField = <P extends Record<string, any>>({
         formId: latest.formContext?.formId,
         fieldName,
         formState: latest.formState,
-        commitFormState: latest.commitFormState,
+        updateStore: latest.updateLayoutModelStore,
         extractNewValue: latest.parseNewValue,
         validateNewValue: latest.validateNewValue,
         errorsText: latest.errorsText,

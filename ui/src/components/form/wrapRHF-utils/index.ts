@@ -141,7 +141,7 @@ type CreateEnhancedOnChangeParams = {
   formId: string | null | undefined;
   fieldName: string;
   formState: Record<string, any>;
-  commitFormState: (newFormState: Record<string, any>) => void;
+  updateStore: (newFormState: Record<string, any>) => void;
   extractNewValue: (e: any) => any;
   validateNewValue?: (e: any, value: any) => ValidationResult;
   errorsText?: ErrorsText;
@@ -154,7 +154,7 @@ export const createEnhancedOnChange = ({
   formId,
   fieldName,
   formState,
-  commitFormState,
+  updateStore,
   extractNewValue,
   validateNewValue,
   errorsText,
@@ -205,13 +205,13 @@ export const createEnhancedOnChange = ({
 
     // Validation passed or no validation - proceed with auto-save
     if (!isAjaxing()) {
-      commitFormState({ ...formState, [fieldName]: newValue });
+      updateStore({ ...formState, [fieldName]: newValue });
       return;
     }
 
     // AJAX in progress - queue auto-save for after AJAX completion
     const stopListener = () => {
-      commitFormState({ ...formState, [fieldName]: newValue });
+      updateStore({ ...formState, [fieldName]: newValue });
     };
     document.addEventListener('drupalAjaxStop', stopListener, {
       once: true,

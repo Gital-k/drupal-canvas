@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useMemo, useRef } from 'react';
 import { Controller } from 'react-hook-form';
 
 import { useAppSelector } from '@/app/hooks';
@@ -15,12 +15,11 @@ import {
 } from '@/components/form/wrapRHF-utils';
 import { useSafeFormContext, useSafeRHFContext } from '@/contexts/FormContext';
 import { selectFieldError } from '@/features/form/formStateSlice';
-import { setUpdatePreview } from '@/features/layout/layoutModelSlice';
-import {
-  externalUpdateComplete,
-  setPageData,
-} from '@/features/pageData/pageDataSlice';
 
+import {
+  createPageDataFormStateHandler,
+  useRespondToPageDataStoreUpdates,
+} from './pageDataFormHandlers';
 import { FieldErrorDisplay, useDebouncedFormState } from './shared-utilities';
 
 import type { ComponentType } from 'react';
@@ -35,6 +34,36 @@ interface PageDataFormFieldProps<P> {
   errorsText: (errors?: any) => string;
   hasError?: boolean;
 }
+
+/**
+ * Validates form input using HTML5 validation API.
+ * For the page data form, we use native HTML5 validation, but the messages
+ * are displayed by the same component that renders JSON Schema errors in
+ * the component instance form.
+ */
+const validateNewValue = (e: ReactType.ChangeEvent, newValue: any) => {
+  if (!(e.target instanceof HTMLInputElement)) {
+    return { valid: true, errors: null };
+  }
+
+  if (!e.target.checkValidity()) {
+    const inputElement = e.target;
+    const requiredAndOnlyProblemIsEmpty =
+      inputElement.required &&
+      Object.keys(inputElement.validity).every((validityProperty: string) =>
+        ['valueMissing'].includes(validityProperty)
+          ? inputElement.validity[validityProperty as keyof ValidityState]
+          : !inputElement.validity[validityProperty as keyof ValidityState],
+      );
+    return {
+      valid: false,
+      errorMessage: e.target.validationMessage,
+      skipEarlyReturn: requiredAndOnlyProblemIsEmpty,
+    };
+  }
+
+  return { valid: true, errors: null };
+};
 
 /**
  * Page data form field - handles entity/page form inputs
@@ -74,7 +103,7 @@ export const PageDataFormField = <P extends Record<string, any>>({
   // Watch for undo/redo actions and sync react-hook-form
   useUndoRedoSync(fieldName, getCurrentValueFromRedux, rhfContext, 'pageData');
 
-  // Page data form specific hooks
+  // Set the initial value on mount.
   usePageDataInitialValue(
     dispatch,
     fieldName,
@@ -83,78 +112,22 @@ export const PageDataFormField = <P extends Record<string, any>>({
     WrappedComponent,
   );
 
-  const formStateToStore = (newFormState: PropsValues) => {
-    const values = Object.keys(newFormState).reduce(
-      (acc: Record<string, any>, key) => {
-        if (
-          !['changed', 'formId', 'formType', 'externalUpdates'].includes(key)
-        ) {
-          return { ...acc, [key]: newFormState[key] };
-        }
-        return acc;
-      },
-      {},
-    );
-    // Flag that we need to update the preview.
-    dispatch(setUpdatePreview(true));
-    dispatch(setPageData(values));
-  };
-
-  const debounceFormStateToStore = useDebouncedFormState(formStateToStore);
-
-  const validateNewValue = (e: ReactType.ChangeEvent, newValue: any) => {
-    if (!(e.target instanceof HTMLInputElement)) {
-      return { valid: true, errors: null };
-    }
-
-    // For the page data form, we use native HTML5 validation, but the messages
-    // are displayed by the same component that renders JSON Schema errors in
-    // the component instance form.
-    if (!e.target.checkValidity()) {
-      const inputElement = e.target;
-      const requiredAndOnlyProblemIsEmpty =
-        inputElement.required &&
-        Object.keys(inputElement.validity).every((validityProperty: string) =>
-          ['valueMissing'].includes(validityProperty)
-            ? inputElement.validity[validityProperty as keyof ValidityState]
-            : !inputElement.validity[validityProperty as keyof ValidityState],
-        );
-      return {
-        valid: false,
-        errorMessage: e.target.validationMessage,
-        skipEarlyReturn: requiredAndOnlyProblemIsEmpty,
-      };
-    }
-
-    return { valid: true, errors: null };
-  };
+  // Create the form state to Redux handler.
+  const formStateToPageDataStore = createPageDataFormStateHandler(dispatch);
+  // Create a debounced version of the above handler.
+  const debounceFormStateToPageDataStore = useDebouncedFormState(
+    formStateToPageDataStore,
+  );
 
   // Watch for external updates to pageData and sync to RHF
-  useEffect(() => {
-    if (!rhfContext || !pageData) return;
+  useRespondToPageDataStoreUpdates(fieldName, pageData, rhfContext, dispatch);
 
-    // If this field was updated externally, sync it to RHF
-    if (
-      pageData.externalUpdates?.includes(fieldName) &&
-      fieldName in pageData
-    ) {
-      rhfContext.setValue(fieldName, pageData[fieldName], {
-        shouldValidate: false,
-        shouldDirty: true,
-        shouldTouch: false,
-      });
-
-      // Clear the external update flag for this field
-      dispatch(externalUpdateComplete(fieldName));
-    }
-  }, [pageData, pageData?.externalUpdates, fieldName, rhfContext, dispatch]);
-
-  const commitFormState = (newFormState: PropsValues) => {
+  const updatePageDataStore = (newFormState: PropsValues) => {
     const elementType = attributes.type || attributes['data-canvas-type'];
     if (['checkbox', 'radio'].includes(elementType as string)) {
-      formStateToStore(newFormState);
+      formStateToPageDataStore(newFormState);
     } else {
-      debounceFormStateToStore(newFormState);
+      debounceFormStateToPageDataStore(newFormState);
     }
   };
 
@@ -166,7 +139,7 @@ export const PageDataFormField = <P extends Record<string, any>>({
     formContext,
     validateNewValue,
     errorsText,
-    commitFormState,
+    updatePageDataStore,
     field: null as any,
   });
   latestPropsRef.current = {
@@ -177,7 +150,7 @@ export const PageDataFormField = <P extends Record<string, any>>({
     formContext,
     validateNewValue,
     errorsText,
-    commitFormState,
+    updatePageDataStore,
   };
 
   // Create stable onChange handler that won't change reference
@@ -191,7 +164,7 @@ export const PageDataFormField = <P extends Record<string, any>>({
         formId: latest.formContext?.formId,
         fieldName,
         formState: latest.formState,
-        commitFormState: latest.commitFormState,
+        updateStore: latest.updatePageDataStore,
         extractNewValue: extractPageDataValue,
         validateNewValue: latest.validateNewValue,
         errorsText: latest.errorsText,
