@@ -24,9 +24,10 @@ import type { AutoSavesHash } from '@/types/AutoSaves';
 /**
  * Request Queue Manager
  *
- * Prevents parallel requests to the same endpoint them.
+ * Prevents parallel requests to the endpoint.
  * Only the most recent request is executed after the current one completes.
- * This prevents lock contention (429 errors) on the backend.
+ * In addition to eliminating unnecessary requests and undo history bloating,
+ * this prevents entity lock contention on the backend.
  *
  * Usage:
  *   const queuedRequest = createRequestQueue();
@@ -55,8 +56,9 @@ export function createRequestQueue<T>() {
       }
     }
 
-    // CRITICAL: Set activePromise synchronously BEFORE calling requestFn()
-    // This prevents race conditions when multiple requests come in the same tick
+    // Set activePromise synchronously BEFORE calling requestFn()
+    // This prevents race conditions when multiple requests arrive
+    // in the same tick.
     let resolver: (value: T) => void;
     let rejecter: (error: any) => void;
 
@@ -257,8 +259,6 @@ export function useQueuedPostPreviewMutation(
   ReturnType<typeof usePostPreviewMutation>[1],
 ] {
   const [postPreview, mutationState] = usePostPreviewMutation(options);
-
-  // let callCounter = 0;
 
   const queuedPostPreviewWrapper = (arg: {
     layout: any;
