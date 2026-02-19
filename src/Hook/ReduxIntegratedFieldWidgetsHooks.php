@@ -196,7 +196,9 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
       }
 
       // Attach the library that replaces tabledrag icons.
-      $variables['table']['#attached']['library'][] = 'canvas_stark/canvas.tabledrag-icons';
+      $variables['table']['#attached']['library'][] = 'canvas/tabledrag-icons';
+      // Attach the library for multivalue form styles.
+      $variables['table']['#attached']['library'][] = 'canvas/multivalue-form';
     }
     if (isset($variables['button']['#value'])) {
       $variables['button']['#value'] = t('+ Add new');

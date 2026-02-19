@@ -2,11 +2,3 @@ canvas.internal.drupal.ckeditor5:
   js:
     js/ckeditor5.js: {}
 
-canvas.tabledrag-icons:
-  js:
-    js/tabledrag-icons.js: {}
-  dependencies:
-    - core/drupal
-    - core/once
-    - core/drupal.tabledrag
-
