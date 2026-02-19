@@ -1,19 +1,6 @@
-/* Container wrapper - surrounds all items with dashed blue border */
-.multivalueContainer {
-  border: 2px dashed var(--blue-6);
-  border-radius: var(--radius-2);
-  overflow: hidden;
+.itemRow{
+  gap: 0 !important;
 }
-
-/* Item Row - Contains drag handle + text box */
-.itemRow {
-  width: 100%;
-  background-color: white;
-  display: flex;
-  align-items: center;
-  position: relative;
-}
-
 .itemRow:hover {
   background-color: var(--blue-2);
 }
@@ -24,14 +11,10 @@
 
 /* List Item Styles - Clean list style matching design */
 .listItem {
-  display: flex;
   align-items: center;
-  justify-content: space-between;
-  flex: 1;
   padding: var(--space-3) var(--space-3);
   background-color: transparent;
   transition: background-color 0.15s ease;
-  gap: var(--space-2);
 }
 
 
@@ -53,20 +36,6 @@
 .listItem:focus {
   outline: 2px solid var(--blue-8);
   outline-offset: -2px;
-}
-
-/* Drag Handle - Outside the box */
-.dragHandle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-top: 6px;
-  cursor: grab;
-  color: var(--blue-9);
-}
-
-.dragHandle:active {
-  cursor: grabbing;
 }
 
 .itemText {
@@ -97,7 +66,4 @@
 
 .popoverLabel {
   color: var(--gray-11);
-}
-.itemRow{
-  gap: 0 !important;
 }

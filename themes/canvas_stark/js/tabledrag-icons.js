@@ -67,10 +67,6 @@
         const trashIconWrapper = document.createElement('span');
         trashIconWrapper.className = 'canvas-trash-icon-wrapper';
         trashIconWrapper.innerHTML = trashIconSvg;
-        trashIconWrapper.style.cursor = 'pointer';
-        trashIconWrapper.style.display = 'flex';
-        trashIconWrapper.style.alignItems = 'center';
-        trashIconWrapper.style.justifyContent = 'center';
 
         // Insert the trash icon before the hidden button
         cell.insertBefore(trashIconWrapper, cell.firstChild);
