@@ -37,20 +37,6 @@ const MediaLibraryWidgetContainer = memo(
         return true;
       }
 
-      // After reordering completes, only block re-renders if props haven't changed
-      // This prevents auto-save from causing re-renders, but allows remove button to work
-      const lastReorderTime = selection?.getAttribute('data-last-reorder-time');
-      if (lastReorderTime) {
-        const elapsed = Date.now() - parseInt(lastReorderTime, 10);
-        if (elapsed < 15000) {
-          // Only block if props are the same (auto-save scenario)
-          // If props changed (user removed item), allow re-render
-          return (
-            prevProps.renderChildren === nextProps.renderChildren &&
-            prevProps.attributes === nextProps.attributes
-          );
-        }
-      }
     }
     return (
       prevProps.renderChildren === nextProps.renderChildren &&
