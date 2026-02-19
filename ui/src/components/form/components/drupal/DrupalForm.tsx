@@ -3,7 +3,7 @@ import clsx from 'clsx';
 import { createPortal } from 'react-dom';
 
 import Form from '@/components/form/components/Form';
-import { FormProvider } from '@/contexts/FormContext';
+import { FormProvider } from '@/components/form/contexts/FormContext';
 import { a2p } from '@/local_packages/utils.js';
 
 import type { ReactNode } from 'react';
