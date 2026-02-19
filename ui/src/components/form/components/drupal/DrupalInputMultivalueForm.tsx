@@ -101,6 +101,7 @@ const DrupalInputMultivalueForm = ({
         sideOffset={4}
         className={styles.popoverContent}
         style={{ maxWidth: '232px' }}
+        onOpenAutoFocus={(e) => e.preventDefault()}
       >
         {/* Popover Header */}
         <Flex justify="between" align="center" className={styles.popoverHeader}>
