@@ -3,7 +3,6 @@ import clsx from 'clsx';
 import {
   ArrowRightIcon,
   Cross2Icon,
-  DragHandleDots2Icon,
   TrashIcon,
 } from '@radix-ui/react-icons';
 import { Box, Button, Flex, Popover, Text } from '@radix-ui/themes';
@@ -97,7 +96,6 @@ const DrupalInputMultivalueForm = ({
         sideOffset={6}
         className={styles.popoverContent}
         style={{ maxWidth: '232px' }}
-        onOpenAutoFocus={(e) => e.preventDefault()}
       >
         {/* Popover Header */}
         <Flex justify="between" align="center" className={styles.popoverHeader}>

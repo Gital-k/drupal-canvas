@@ -214,14 +214,9 @@ drupal-html-fragment {
 }
 
 .multivalue-container .canvas-remove-action .trash-icon {
-  color: var(--gray-11, #60646C);
+  color: var(--red-9, #E5484D);
   width: 15px;
   height: 15px;
   transition: color 0.15s ease;
-}
-
-.multivalue-container .canvas-remove-action:hover .trash-icon,
-.multivalue-container .canvas-remove-action .canvas-trash-icon-wrapper:hover .trash-icon {
-  color: var(--red-9, #E5484D);
 }
 
