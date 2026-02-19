@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import clsx from 'clsx';
 
 import Checkbox from '@/components/form/components/Checkbox';
@@ -7,7 +8,7 @@ import TextField from '@/components/form/components/TextField';
 import TextFieldAutocomplete from '@/components/form/components/TextFieldAutocomplete';
 import { wrapRHF } from '@/components/form/wrapRHF';
 import { a2p } from '@/local_packages/utils.js';
-import { useRef } from 'react';
+
 import type { Attributes } from '@/types/DrupalAttribute';
 
 const DrupalInput = ({

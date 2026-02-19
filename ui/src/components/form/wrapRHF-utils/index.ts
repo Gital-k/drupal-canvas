@@ -281,3 +281,36 @@ export const applyEnhancedProps = <P extends Record<string, any>>(
 
   return enhancedProps;
 };
+
+/**
+ * Comparison function for React.memo that deep compares the attributes object.
+ * Used to prevent unnecessary re-renders when props objects are recreated with same values.
+ *
+ * @param prevProps - Previous props object
+ * @param nextProps - Next props object
+ * @returns true if props are equal (skip re-render), false otherwise (allow re-render)
+ */
+export const comparePropsWithAttributes = <P extends Record<string, any>>(
+  prevProps: P,
+  nextProps: P,
+): boolean => {
+  // Quick reference check
+  if (prevProps === nextProps) return true;
+
+  // Deep compare attributes
+  const prevAttrs = (prevProps.attributes || {}) as Record<string, any>;
+  const nextAttrs = (nextProps.attributes || {}) as Record<string, any>;
+
+  const prevKeys = Object.keys(prevAttrs);
+  const nextKeys = Object.keys(nextAttrs);
+
+  if (prevKeys.length !== nextKeys.length) return false;
+
+  for (const key of prevKeys) {
+    if (prevAttrs[key] !== nextAttrs[key]) {
+      return false;
+    }
+  }
+
+  return true; // All attributes same, skip re-render
+};

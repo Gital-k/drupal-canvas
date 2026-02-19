@@ -9,6 +9,7 @@ import { usePageDataInitialValue } from '@/components/form/wrapRHF-hooks/usePage
 import { useUndoRedoSync } from '@/components/form/wrapRHF-hooks/useUndoRedoSync';
 import {
   applyEnhancedProps,
+  comparePropsWithAttributes,
   createEnhancedOnBlur,
   createEnhancedOnChange,
   extractPageDataValue,
@@ -55,28 +56,7 @@ export const PageDataFormField = <P extends Record<string, any>>({
 
   // Create a memoized version of WrappedComponent with deep comparison
   const MemoizedWrappedComponent = useMemo(
-    () =>
-      React.memo(WrappedComponent, (prevProps, nextProps) => {
-        // Quick reference check
-        if (prevProps === nextProps) return true;
-
-        // Deep compare attributes
-        const prevAttrs = (prevProps.attributes || {}) as Record<string, any>;
-        const nextAttrs = (nextProps.attributes || {}) as Record<string, any>;
-
-        const prevKeys = Object.keys(prevAttrs);
-        const nextKeys = Object.keys(nextAttrs);
-
-        if (prevKeys.length !== nextKeys.length) return false;
-
-        for (const key of prevKeys) {
-          if (prevAttrs[key] !== nextAttrs[key]) {
-            return false;
-          }
-        }
-
-        return true; // All attributes same, skip re-render
-      }),
+    () => React.memo(WrappedComponent, comparePropsWithAttributes),
     [WrappedComponent],
   ) as unknown as React.ComponentType<P>;
 

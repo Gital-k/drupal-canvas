@@ -20,6 +20,7 @@ import { useComponentInitialValue } from '@/components/form/wrapRHF-hooks/useCom
 import { useUndoRedoSync } from '@/components/form/wrapRHF-hooks/useUndoRedoSync';
 import {
   applyEnhancedProps,
+  comparePropsWithAttributes,
   createEnhancedOnBlur,
   createEnhancedOnChange,
   getCurrentValueFromProps,
@@ -65,28 +66,7 @@ export const ComponentFormField = <P extends Record<string, any>>({
   // Create a memoized version of WrappedComponent with deep comparison
   // This prevents re-renders when attributes have same values but different reference
   const MemoizedWrappedComponent = useMemo(
-    () =>
-      React.memo(WrappedComponent, (prevProps, nextProps) => {
-        // Quick reference check
-        if (prevProps === nextProps) return true;
-
-        // Deep compare attributes
-        const prevAttrs = (prevProps.attributes || {}) as Record<string, any>;
-        const nextAttrs = (nextProps.attributes || {}) as Record<string, any>;
-
-        const prevKeys = Object.keys(prevAttrs);
-        const nextKeys = Object.keys(nextAttrs);
-
-        if (prevKeys.length !== nextKeys.length) return false;
-
-        for (const key of prevKeys) {
-          if (prevAttrs[key] !== nextAttrs[key]) {
-            return false;
-          }
-        }
-
-        return true; // All attributes same, skip re-render
-      }),
+    () => React.memo(WrappedComponent, comparePropsWithAttributes),
     [WrappedComponent],
   ) as unknown as React.ComponentType<P>;
 
@@ -463,22 +443,6 @@ export const ComponentFormField = <P extends Record<string, any>>({
             stableOnBlur,
             !!displayError,
           );
-
-          if (
-            prevEnhancedPropsRef.current &&
-            prevEnhancedPropsRef.current !== newEnhancedProps
-          ) {
-            // console.log(`[ComponentFormField ${fieldName}] useMemo created NEW enhancedProps`);
-            if (
-              prevEnhancedPropsRef.current.attributes !==
-              newEnhancedProps.attributes
-            ) {
-              // console.log(`[ComponentFormField ${fieldName}]   → attributes object is different`);
-            }
-          } else if (prevEnhancedPropsRef.current === newEnhancedProps) {
-            // console.log(`[ComponentFormField ${fieldName}] useMemo returned SAME enhancedProps`);
-          }
-
           prevEnhancedPropsRef.current = newEnhancedProps;
           return newEnhancedProps;
           // eslint-disable-next-line react-hooks/exhaustive-deps
