@@ -128,12 +128,7 @@ const DrupalInputMultivalueForm = ({
         {/* Remove Button */}
         <Flex justify="center">
           <Popover.Close>
-            <Button
-              variant="ghost"
-              color="red"
-              size="1"
-              onClick={handleRemove}
-            >
+            <Button variant="ghost" color="red" size="1" onClick={handleRemove}>
               <TrashIcon />
               Remove
             </Button>
