@@ -180,19 +180,23 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
    */
   #[Hook('preprocess_field_multiple_value_form')]
   public static function canvasStarkPreprocessFieldMultipleValueForm(array &$variables): void {
-    // Apply 'hidden' class to columns 0 and 2 for all table rows.
-    // The remove button and the drag icon that loads from older
-    // versions of Drupal core are hidden with CSS, but they still
-    // exist in the DOM and can be interacted with.
+    // Set up classes for the drag handle and remove action columns.
+    // The JavaScript in tabledrag-icons.js will replace the anchor content
+    // with custom SVG icons matching the Radix UI DragHandleDots2Icon and TrashIcon.
     if (isset($variables['table']['#rows'])) {
       foreach ($variables['table']['#rows'] as &$row) {
+        // Add class to column 0 (drag handle).
         if (isset($row['data'][0])) {
-          $row['data'][0]['class'] = 'hidden';
+          $row['data'][0]['class'] = ['field-multiple-drag', 'canvas-drag-handle'];
         }
+        // Add class to column 2 (actions/remove button).
         if (isset($row['data'][2])) {
-          $row['data'][2]['class'] = 'hidden';
+          $row['data'][2]['class'] = ['canvas-remove-action'];
         }
       }
+
+      // Attach the library that replaces tabledrag icons.
+      $variables['table']['#attached']['library'][] = 'canvas_stark/canvas.tabledrag-icons';
     }
     if (isset($variables['button']['#value'])) {
       $variables['button']['#value'] = t('+ Add new');

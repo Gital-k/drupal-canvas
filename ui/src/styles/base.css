@@ -67,7 +67,6 @@ drupal-html-fragment {
 }
 
 .multivalue-container table td {
-  width: 260px;
   height: 40px;
   border-width: 1px;
   gap: 4px;
@@ -129,3 +128,66 @@ drupal-html-fragment {
 .field-multiple-table td .js-form-type-textfield {
   margin-bottom: 0 !important;
 }
+
+/* Style the drag handle cell */
+.multivalue-container .canvas-drag-handle {
+  position: relative;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Style the tabledrag anchor to display the custom SVG icon */
+.multivalue-container .canvas-drag-handle a.tabledrag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  color: var(--blue-9, #0090FF);
+  padding: 0;
+  margin: 0;
+}
+
+.multivalue-container .canvas-drag-handle a.tabledrag-handle:active {
+  cursor: grabbing;
+}
+
+/* Hide the default .handle div inside the anchor */
+.multivalue-container .canvas-drag-handle a.tabledrag-handle .handle {
+  display: none;
+}
+
+/* Style the custom SVG icon inside the anchor */
+.multivalue-container .canvas-drag-handle a.tabledrag-handle .drag-handle-icon {
+  width: 15px;
+  height: 15px;
+}
+
+/* Style the custom trash/remove action column */
+.multivalue-container .canvas-remove-action {
+  cursor: pointer;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.multivalue-container .canvas-remove-action .canvas-trash-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.multivalue-container .canvas-remove-action .trash-icon {
+  color: var(--gray-11, #60646C);
+  width: 15px;
+  height: 15px;
+  transition: color 0.15s ease;
+}
+
+.multivalue-container .canvas-remove-action:hover .trash-icon,
+.multivalue-container .canvas-remove-action .canvas-trash-icon-wrapper:hover .trash-icon {
+  color: var(--red-9, #E5484D);
+}
+

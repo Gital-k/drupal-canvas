@@ -79,10 +79,6 @@ const DrupalInputMultivalueForm = ({
   return (
     <Popover.Root>
       <Flex align="center" gap="2" className={styles.itemRow}>
-        {/* Drag Handle - Outside the clickable text area */}
-        <Box className={styles.dragHandle}>
-          <DragHandleDots2Icon />
-        </Box>
         {/* List Item View - Trigger */}
         <Popover.Trigger>
           <Box className={styles.listItem}>
