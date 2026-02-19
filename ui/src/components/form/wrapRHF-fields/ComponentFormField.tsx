@@ -1,11 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import { debounce } from 'lodash';
+import React, { useCallback, useMemo, useRef } from 'react';
 import { Controller } from 'react-hook-form';
 
 import { useAppSelector } from '@/app/hooks';
 import {
   ComponentPreviewUpdateEvent,
-  DEBOUNCE_TIMEOUT,
   getPropSchemas,
   getPropsValues,
   POLLED_BACKGROUND_TIMEOUT,
@@ -34,6 +32,8 @@ import {
 import { isEvaluatedComponentModel } from '@/features/layout/layoutModelSlice';
 import { setPreviewBackgroundUpdate } from '@/features/pagePreview/previewSlice';
 import { flaggedForRemoval, parseValue } from '@/utils/function-utils';
+
+import { FieldErrorDisplay, useDebouncedFormState } from './shared-utilities';
 
 import type { ComponentType } from 'react';
 import type * as ReactType from 'react';
@@ -200,15 +200,7 @@ export const ComponentFormField = <P extends Record<string, any>>({
     });
   };
 
-  const debounceFormStateToStore = useRef(
-    debounce(formStateToStore, DEBOUNCE_TIMEOUT),
-  ).current;
-  useEffect(() => {
-    return () => {
-      // Cancel any pending debounced calls when the component unmounts.
-      debounceFormStateToStore.cancel();
-    };
-  }, [debounceFormStateToStore]);
+  const debounceFormStateToStore = useDebouncedFormState(formStateToStore);
 
   const commitFormState = (newFormState: PropsValues) => {
     const elementType = attributes.type || attributes['data-canvas-type'];
@@ -451,16 +443,10 @@ export const ComponentFormField = <P extends Record<string, any>>({
         return (
           <>
             <MemoizedWrappedComponent {...(enhancedProps as any)} />
-            {displayError && (
-              <span
-                data-prop-message
-                className={blockingError ? 'error-blocking' : 'error-display'}
-              >
-                {blockingError
-                  ? `${blockingError.type === 'error' ? '❌ ' : ''}${blockingError.message}`
-                  : fieldState.error?.message}
-              </span>
-            )}
+            <FieldErrorDisplay
+              blockingError={blockingError}
+              fieldState={fieldState}
+            />
           </>
         );
       }}

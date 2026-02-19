@@ -1,9 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import { debounce } from 'lodash';
 import { Controller } from 'react-hook-form';
 
 import { useAppSelector } from '@/app/hooks';
-import { DEBOUNCE_TIMEOUT } from '@/components/form/formUtil';
 import { usePageDataFormInputInfo } from '@/components/form/wrapRHF-hooks/usePageDataFormInputInfo';
 import { usePageDataInitialValue } from '@/components/form/wrapRHF-hooks/usePageDataInitialValue';
 import { useUndoRedoSync } from '@/components/form/wrapRHF-hooks/useUndoRedoSync';
@@ -22,6 +20,8 @@ import {
   externalUpdateComplete,
   setPageData,
 } from '@/features/pageData/pageDataSlice';
+
+import { FieldErrorDisplay, useDebouncedFormState } from './shared-utilities';
 
 import type { ComponentType } from 'react';
 import type * as ReactType from 'react';
@@ -100,15 +100,7 @@ export const PageDataFormField = <P extends Record<string, any>>({
     dispatch(setPageData(values));
   };
 
-  const debounceFormStateToStore = useRef(
-    debounce(formStateToStore, DEBOUNCE_TIMEOUT),
-  ).current;
-  useEffect(() => {
-    return () => {
-      // Cancel any pending debounced calls when the component unmounts.
-      debounceFormStateToStore.cancel();
-    };
-  }, [debounceFormStateToStore]);
+  const debounceFormStateToStore = useDebouncedFormState(formStateToStore);
 
   const validateNewValue = (e: ReactType.ChangeEvent, newValue: any) => {
     if (!(e.target instanceof HTMLInputElement)) {
@@ -304,16 +296,10 @@ export const PageDataFormField = <P extends Record<string, any>>({
         return (
           <>
             <MemoizedWrappedComponent {...(enhancedProps as any)} />
-            {displayError && (
-              <span
-                data-prop-message
-                className={blockingError ? 'error-blocking' : 'error-display'}
-              >
-                {blockingError
-                  ? `${blockingError.type === 'error' ? '❌ ' : ''}${blockingError.message}`
-                  : fieldState.error?.message}
-              </span>
-            )}
+            <FieldErrorDisplay
+              blockingError={blockingError}
+              fieldState={fieldState}
+            />
           </>
         );
       }}
