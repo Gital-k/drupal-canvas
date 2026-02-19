@@ -50,7 +50,7 @@ export const wrapRHF = <P extends Record<string, any>>(
     useFormBuildIdSync(fieldName, formContext?.formId, rhfContext, dispatch);
 
     // Checks for fields added via AJAX, thus not registered with
-    // react-hook-form on intitialization.
+    // react-hook-form on initialization.
     useAjaxFieldRegistration(fieldName, rhfContext, getCurrentValue);
 
     // If there's no react-hook-form context, then the input should be rendered
