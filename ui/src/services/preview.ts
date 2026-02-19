@@ -159,7 +159,6 @@ export const previewApi = createApi({
               { type: 'PendingChanges', id: 'LIST' },
             ]),
           );
-          // console.log(`[onQueryStarted] invalidateTags dispatched`);
 
           // Only dispatch setHtml if the HTML actually changed
           if (htmlChanged) {
@@ -191,9 +190,6 @@ export const previewApi = createApi({
           // Don't re-throw errors - swallow them to prevent error boundary
         } finally {
           popCanvasLayoutRequest();
-          // console.log(
-          //   `[onQueryStarted] Request complete, canvas layout request popped`,
-          // );
         }
       },
     }),

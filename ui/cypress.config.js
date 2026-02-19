@@ -70,7 +70,6 @@ export default defineConfig({
           launchOptions.args.push('--disable-background-timer-throttling');
           launchOptions.args.push('--disable-renderer-backgrounding');
           launchOptions.args.push('--disable-backgrounding-occluded-windows');
-
         }
 
         if (browser.name === 'electron' && browser.isHeadless) {
@@ -85,7 +84,9 @@ export default defineConfig({
           if (!launchOptions.preferences.additionalArgs) {
             launchOptions.preferences.additionalArgs = [];
           }
-          launchOptions.preferences.additionalArgs.push('--js-flags=--max-old-space-size=4096');
+          launchOptions.preferences.additionalArgs.push(
+            '--js-flags=--max-old-space-size=4096',
+          );
         }
 
         if (browser.family === 'firefox' && browser.isHeadless) {
