@@ -20,11 +20,8 @@ describe('Media Library', () => {
     cy.insertComponent({ name: 'Video' });
     const canvasFormSelector = '[data-testid*="canvas-component-form-"]';
     cy.get('[data-testid*="canvas-component-form-"]').as('inputForm');
-    cy.get('@inputForm').recordFormBuildId();
     cy.insertComponent({ name: 'Video' });
-    // cy.selectorShouldHaveUpdatedFormBuildId(canvasFormSelector);
     cy.clickComponentInPreview('Video', 0);
-    // cy.selectorShouldHaveUpdatedFormBuildId(canvasFormSelector);
     cy.get(
       '[class*="contextualPanel"] .js-media-library-open-button[data-once="drupal-ajax"]',
     )
@@ -36,7 +33,6 @@ describe('Media Library', () => {
 
     cy.get('div[role="dialog"]').should('not.exist');
 
-    // cy.selectorShouldHaveUpdatedFormBuildId(canvasFormSelector);
     cy.get('[aria-label="Remove Duck Landscape"]').should('exist');
     cy.waitForElementInIframe('video > source[src*="duck.mp4"]');
 

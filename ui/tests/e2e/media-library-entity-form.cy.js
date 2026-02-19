@@ -39,8 +39,6 @@ const testMediaLibraryInEntityForm = (cy, loadOptions = {}, title) => {
   cy.findByTestId('canvas-page-data-form').as('entityForm');
   // Log all ajax form requests to help with debugging.
   cy.intercept('POST', '**/canvas/api/v0/form/content-entity/**');
-  // Make a record of the starting form build ID for the form
-  cy.get('@entityForm').recordFormBuildId();
 
   // Perform media operations.
   iterations.forEach((step, ix) => {
@@ -49,14 +47,9 @@ const testMediaLibraryInEntityForm = (cy, loadOptions = {}, title) => {
     cy.get('@entityForm').findByRole(step.expectedAlt).should('not.exist');
     if (ix > 0) {
       cy.intercept('POST', '**/canvas/api/v0/layout/**').as('updatePreview');
-      // cy.get('@entityForm')
-      //   .findByRole('button', { name: step.removeText })
-      //   .should('exist')
-      //   .click();
       const removeIt = `[class*="contextualPanel"] .js-media-library-selection  [aria-label="${step.removeText}"][data-form-id="page_data_form"][data-once="drupal-ajax"][data-ajax="true"]:not(.visually-hidden)`;
       cy.reasonableWait();
       cy.get(removeIt).click();
-      // cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
 
       // Wait for the preview to finish loading.
       cy.wait('@updatePreview');
@@ -83,7 +76,6 @@ const testMediaLibraryInEntityForm = (cy, loadOptions = {}, title) => {
     // The first time the media dialog opens there are a lot of CSS files to
     // load, and it can take more than the default timeout of 4s.
     cy.findByRole('dialog', { timeout: 10000 }).as('dialog');
-    // cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
     cy.reasonableWait();
     cy.get('@dialog').findByLabelText(step.selectNewText).check();
     cy.intercept('POST', '**/canvas/api/v0/layout/**').as('updatePreview');
@@ -96,14 +88,12 @@ const testMediaLibraryInEntityForm = (cy, loadOptions = {}, title) => {
     cy.findByRole('dialog').should('not.exist');
     // Wait for the preview to finish loading.
     cy.wait('@updatePreview', { timeout: 10000 });
-    // // cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
     cy.findByLabelText('Loading Preview').should('not.exist');
 
     cy.get('@entityForm').findByAltText(step.expectedAlt).should('exist');
     cy.get('@entityForm')
       .findByRole('button', { name: step.removeAriaLabel })
       .should('exist');
-    // cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
 
     cy.log(`Iteration ${ix + 1}: Adding ${step.expectedAlt} complete`);
   });

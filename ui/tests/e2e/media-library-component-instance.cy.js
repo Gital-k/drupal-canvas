@@ -49,7 +49,6 @@ const testMediaLibraryInComponentInstanceForm = (
   cy.get('.js-media-library-item-preview img').should('exist');
 
   cy.get('[data-testid*="canvas-component-form-"]').as('inputForm');
-  cy.get('@inputForm').recordFormBuildId();
   cy.intercept('PATCH', '**/canvas/api/v0/form/component-instance/**').as(
     'patch',
   );
@@ -74,11 +73,8 @@ const testMediaLibraryInComponentInstanceForm = (
     const removeIt = `[class*="contextualPanel"] .js-media-library-selection  [aria-label="${step.removeText}"][data-once="drupal-ajax"]`;
     cy.reasonableWait();
     cy.get(removeIt).realClick();
-
     cy.get(removeIt).should('not.exist');
-    // cy.selectorShouldHaveUpdatedFormBuildId(
-    //   '[data-testid*="canvas-component-form-"]',
-    // );
+
     // The default image should appear because the prop is required.
     cy.waitForElementInIframe(defaultPlaceholder);
     cy.reasonableWait();
@@ -91,9 +87,6 @@ const testMediaLibraryInComponentInstanceForm = (
 
     cy.wait('@patch');
     cy.get('div[role="dialog"]').should('not.exist');
-    // cy.selectorShouldHaveUpdatedFormBuildId(
-    //   '[data-testid*="canvas-component-form-"]',
-    // );
     cy.get(
       `[class*="contextualPanel"] input[aria-label="${step.removeAriaLabel}"]`,
     ).should('exist');

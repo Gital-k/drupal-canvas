@@ -41,9 +41,6 @@ describe(
       cy.findByTestId('canvas-page-data-form').as('entityForm');
       // Log all ajax form requests to help with debugging.
       cy.intercept('POST', '**/canvas/api/v0/form/content-entity/**');
-      // Make a record of the starting form build ID for the form
-      cy.get('@entityForm').recordFormBuildId();
-
       cy.intercept({
         url: '**/canvas/api/v0/layout/node/2',
         times: 1,
@@ -98,9 +95,6 @@ describe(
       cy.findByTestId('canvas-page-data-form').as('entityForm');
       // Log all ajax form requests to help with debugging.
       cy.intercept('POST', '**/canvas/api/v0/form/content-entity/**');
-      // Make a record of the starting form build ID for the form
-      cy.get('@entityForm').recordFormBuildId();
-
       cy.intercept({
         url: '**/canvas/api/v0/layout/node/2',
         times: 1,
@@ -155,9 +149,6 @@ describe(
         cy.findByTestId('canvas-page-data-form').as('entityForm');
         // Log all ajax form requests to help with debugging.
         cy.intercept('POST', '**/canvas/api/v0/form/content-entity/**');
-        // Make a record of the starting form build ID for the form
-        cy.get('@entityForm').recordFormBuildId();
-
         cy.task('countFiles', './tests/e2e/entity-form-fields/field_*.js').then(
           (count) => {
             expect(count).to.equal(Object.entries(fields).length);
