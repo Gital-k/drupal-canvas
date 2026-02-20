@@ -182,7 +182,8 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
   public static function canvasStarkPreprocessFieldMultipleValueForm(array &$variables): void {
     // Set up classes for the drag handle and remove action columns.
     // The JavaScript in tabledrag-icons.js will replace the anchor content
-    // with custom SVG icons matching the Radix UI DragHandleDots2Icon and TrashIcon.
+    // with custom SVG icons matching the Radix UI DragHandleDots2Icon
+    // and TrashIcon.
     if (isset($variables['table']['#rows'])) {
       foreach ($variables['table']['#rows'] as &$row) {
         // Add class to column 0 (drag handle).
