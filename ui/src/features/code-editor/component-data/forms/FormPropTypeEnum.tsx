@@ -1,6 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { PlusIcon, TrashIcon } from '@radix-ui/react-icons';
-import { Box, Button, Flex, Select, Text, TextField } from '@radix-ui/themes';
+import { ChevronDownIcon, PlusIcon, TrashIcon } from '@radix-ui/react-icons';
+import {
+  Box,
+  Button,
+  Checkbox,
+  Flex,
+  Popover,
+  Select,
+  Text,
+  TextField,
+} from '@radix-ui/themes';
+
+import './FormPropTypeEnum.css';
 
 import { useAppDispatch } from '@/app/hooks';
 import { updateProp } from '@/features/code-editor/codeEditorSlice';
@@ -9,10 +20,15 @@ import {
   FormElement,
   Label,
 } from '@/features/code-editor/component-data/FormElement';
+import {
+  VALUE_MODE_LIMITED,
+  VALUE_MODE_UNLIMITED,
+} from '@/types/CodeComponent';
 
 import type {
   CodeComponentProp,
   CodeComponentPropEnumItem,
+  ValueMode,
 } from '@/types/CodeComponent';
 
 const NONE_VALUE = '_none_';
@@ -39,11 +55,17 @@ export default function FormPropTypeEnum({
   required,
   type,
   isDisabled = false,
+  allowMultiple = false,
+  valueMode = VALUE_MODE_UNLIMITED,
+  limitedCount = 1,
 }: Pick<CodeComponentProp, 'id' | 'enum'> & {
-  example: string;
+  example: string | string[];
   required: boolean;
   type: 'string' | 'integer' | 'number';
   isDisabled?: boolean;
+  allowMultiple?: boolean;
+  valueMode?: ValueMode;
+  limitedCount?: number;
 }) {
   const dispatch = useAppDispatch();
   const [localRequired, setLocalRequired] = useState(required);
@@ -51,6 +73,23 @@ export default function FormPropTypeEnum({
   const validEnumValues = useMemo(() => {
     return enumValues.filter((item) => validateValue(item));
   }, [enumValues]);
+
+  // Normalize defaultValue to always work with arrays internally when allowMultiple is true
+  const selectedValues = useMemo(() => {
+    if (!allowMultiple) {
+      return [];
+    }
+    if (Array.isArray(defaultValue)) {
+      return defaultValue.map((v) => String(v));
+    }
+    return defaultValue ? [String(defaultValue)] : [];
+  }, [allowMultiple, defaultValue]);
+
+  // Filter selectedValues to only include values that exist in validEnumValues
+  const validSelectedValues = useMemo(() => {
+    const validValueStrings = validEnumValues.map((item) => String(item.value));
+    return selectedValues.filter((v) => validValueStrings.includes(v));
+  }, [selectedValues, validEnumValues]);
 
   useEffect(() => {
     // Whether the prop is required is tracked in a local state, so we can update
@@ -129,28 +168,125 @@ export default function FormPropTypeEnum({
         <>
           <Divider />
           <FormElement>
-            <Label htmlFor={`prop-enum-default-${id}`}>Default value</Label>
-            <Select.Root
-              value={defaultValue === '' ? NONE_VALUE : defaultValue}
-              onValueChange={handleDefaultValueChange}
-              size="1"
-              disabled={isDisabled}
-            >
-              <Select.Trigger id={`prop-enum-default-${id}`} />
-              <Select.Content>
-                {!required && (
-                  <Select.Item value={NONE_VALUE}>- None -</Select.Item>
-                )}
-                {validEnumValues.map((item, index) => (
-                  <Select.Item
-                    key={`${item.value}-${index}`}
-                    value={String(item.value)}
+            <Label htmlFor={`prop-enum-default-${id}`}>
+              Default value
+              {allowMultiple &&
+                valueMode === VALUE_MODE_LIMITED &&
+                ` (max ${limitedCount})`}
+            </Label>
+            {allowMultiple ? (
+              <Popover.Root>
+                <Popover.Trigger>
+                  <Button
+                    variant="outline"
+                    size="1"
+                    color="gray"
+                    className="fpe-btn-popover-trigger"
+                    disabled={isDisabled}
                   >
-                    {item.label}
-                  </Select.Item>
-                ))}
-              </Select.Content>
-            </Select.Root>
+                    <Text size="1" truncate>
+                      {validSelectedValues.length > 0
+                        ? `${validSelectedValues.length} selected`
+                        : '- None -'}
+                    </Text>
+                    <ChevronDownIcon />
+                  </Button>
+                </Popover.Trigger>
+                <Popover.Content
+                  className="fpe-popover-content"
+                  style={{ width: 'var(--radix-popover-trigger-width)' }}
+                  side="bottom"
+                  align="start"
+                >
+                  <Flex direction="column" gap="2">
+                    {validEnumValues.map((item, index) => {
+                      const isSelected = validSelectedValues.includes(
+                        String(item.value),
+                      );
+                      const isAtLimit =
+                        valueMode === VALUE_MODE_LIMITED &&
+                        validSelectedValues.length >= limitedCount &&
+                        !isSelected;
+                      return (
+                        <Text
+                          as="label"
+                          key={`${item.value}-${index}`}
+                          size="2"
+                        >
+                          <Flex gap="2" align="center">
+                            <Checkbox
+                              size="1"
+                              checked={isSelected}
+                              disabled={isAtLimit || isDisabled}
+                              onCheckedChange={(checked) => {
+                                let newSelected: string[];
+                                if (checked) {
+                                  newSelected = [
+                                    ...validSelectedValues,
+                                    String(item.value),
+                                  ];
+                                } else {
+                                  newSelected = validSelectedValues.filter(
+                                    (v) => v !== String(item.value),
+                                  );
+                                }
+
+                                // Convert back to proper type for backend
+                                const typedExample =
+                                  type === 'integer' || type === 'number'
+                                    ? newSelected.map((v) => Number(v))
+                                    : newSelected;
+
+                                dispatch(
+                                  updateProp({
+                                    id,
+                                    updates: { example: typedExample },
+                                  }),
+                                );
+                              }}
+                            />
+                            {item.label}
+                          </Flex>
+                        </Text>
+                      );
+                    })}
+                    {valueMode === VALUE_MODE_LIMITED && (
+                      <>
+                        <Box className="fpe-divider" />
+                        <Text size="1" color="gray">
+                          Selected: {validSelectedValues.length} /{' '}
+                          {limitedCount}
+                        </Text>
+                      </>
+                    )}
+                  </Flex>
+                </Popover.Content>
+              </Popover.Root>
+            ) : (
+              <Select.Root
+                value={
+                  defaultValue === '' ? NONE_VALUE : (defaultValue as string)
+                }
+                onValueChange={handleDefaultValueChange}
+                size="1"
+                disabled={isDisabled}
+              >
+                <Select.Trigger id={`prop-enum-default-${id}`} />
+                <Select.Content>
+                  {!required && (
+                    <Select.Item value={NONE_VALUE}>- None -</Select.Item>
+                  )}
+                  {validEnumValues.map((item, index) => (
+                    <Select.Item
+                      key={`${item.value}-${index}`}
+                      value={String(item.value)}
+                    >
+                      {item.label}
+                    </Select.Item>
+                  ))}
+                </Select.Content>
+              </Select.Root>
+            )}
           </FormElement>
         </>
       )}

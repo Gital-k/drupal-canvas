@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Box, Flex, Select } from '@radix-ui/themes';
 
 import { useAppDispatch } from '@/app/hooks';
@@ -12,6 +12,7 @@ import {
 import type {
   CodeComponentProp,
   CodeComponentPropImageExample,
+  ValueMode,
 } from '@/types/CodeComponent';
 
 const IMAGE_SERVICE_URL = 'https://placehold.co/';
@@ -85,17 +86,23 @@ export default function FormPropTypeImage({
   example,
   isDisabled = false,
   required,
+  allowMultiple = false,
+  valueMode = 'unlimited',
+  limitedCount = 1,
 }: Pick<CodeComponentProp, 'id'> & {
   example: CodeComponentPropImageExample | CodeComponentPropImageExample[];
   isDisabled?: boolean;
   required: boolean;
+  allowMultiple?: boolean;
+  valueMode?: ValueMode;
+  limitedCount?: number;
 }) {
   // Handle both single image and array (when allowMultiple is enabled)
   // If it's an array, use the first element for display
   // Handle edge case where example might be an empty string (when prop type is first created/changed)
   const imageExample = Array.isArray(example)
     ? example[0] || { src: '', width: 0, height: 0, alt: '' }
-    : typeof example === 'string' || !example
+    : !example
       ? { src: '', width: 0, height: 0, alt: '' }
       : example;
 
@@ -105,6 +112,15 @@ export default function FormPropTypeImage({
   const [aspectRatio, setAspectRatio] = useState(exampleAspectRatio);
   const [pixelDensity, setPixelDensity] = useState(examplePixelDensity);
   const [localRequired, setLocalRequired] = useState(required);
+
+  // Use ref to track previous values and prevent infinite loops
+  const prevValuesRef = useRef({
+    aspectRatio: exampleAspectRatio,
+    pixelDensity: examplePixelDensity,
+    allowMultiple,
+    valueMode,
+    limitedCount,
+  });
 
   // Sync state with incoming example prop (for pre-population on reload)
   useEffect(() => {
@@ -132,12 +148,33 @@ export default function FormPropTypeImage({
   }, [required, localRequired, aspectRatio]);
 
   useEffect(() => {
+    // Check if any relevant values have changed
+    const hasChanged =
+      prevValuesRef.current.aspectRatio !== aspectRatio ||
+      prevValuesRef.current.pixelDensity !== pixelDensity ||
+      prevValuesRef.current.allowMultiple !== allowMultiple ||
+      prevValuesRef.current.valueMode !== valueMode ||
+      prevValuesRef.current.limitedCount !== limitedCount;
+
+    if (!hasChanged) {
+      return;
+    }
+
+    // Update ref with new values
+    prevValuesRef.current = {
+      aspectRatio,
+      pixelDensity,
+      allowMultiple,
+      valueMode,
+      limitedCount,
+    };
+
     if (aspectRatio === NONE_VALUE) {
       dispatch(
         updateProp({
           id,
           updates: {
-            example: '',
+            example: allowMultiple ? [] : '',
           },
         }),
       );
@@ -151,20 +188,63 @@ export default function FormPropTypeImage({
       ) || EXAMPLE_ASPECT_RATIO_VALUES[0];
 
     const alternateWidths = `${IMAGE_SERVICE_URL}{width}x{height}${pixelDensitySuffix}.png`;
-    dispatch(
-      updateProp({
-        id,
-        updates: {
-          example: {
-            src: `${IMAGE_SERVICE_URL}${aspectRatioData.width}x${aspectRatioData.height}${pixelDensitySuffix}.png?alternateWidths=${encodeURIComponent(alternateWidths)}`,
-            width: aspectRatioData.width,
-            height: aspectRatioData.height,
-            alt: 'Example image placeholder',
+    const imageObject: CodeComponentPropImageExample = {
+      src: `${IMAGE_SERVICE_URL}${aspectRatioData.width}x${aspectRatioData.height}${pixelDensitySuffix}.png?alternateWidths=${encodeURIComponent(alternateWidths)}`,
+      width: aspectRatioData.width,
+      height: aspectRatioData.height,
+      alt: 'Example image placeholder',
+    };
+
+    // For multi-value mode, create an array
+    if (allowMultiple) {
+      const currentArray = Array.isArray(example) ? example : [];
+
+      // For limited mode, ensure we have exactly limitedCount items
+      if (valueMode === 'limited') {
+        const newArray = Array.from(
+          { length: limitedCount },
+          (_, i) => currentArray[i] || imageObject,
+        );
+        dispatch(
+          updateProp({
+            id,
+            updates: {
+              example: newArray,
+            },
+          }),
+        );
+      } else {
+        // For unlimited mode, keep existing array or create one with single item
+        dispatch(
+          updateProp({
+            id,
+            updates: {
+              example: currentArray.length > 0 ? currentArray : [imageObject],
+            },
+          }),
+        );
+      }
+    } else {
+      // Single value mode
+      dispatch(
+        updateProp({
+          id,
+          updates: {
+            example: imageObject,
           },
-        },
-      }),
-    );
-  }, [aspectRatio, pixelDensity, dispatch, id]);
+        }),
+      );
+    }
+  }, [
+    aspectRatio,
+    pixelDensity,
+    dispatch,
+    id,
+    allowMultiple,
+    valueMode,
+    limitedCount,
+    example,
+  ]);
 
   return (
     <Flex direction="column" gap="4" flexGrow="1">

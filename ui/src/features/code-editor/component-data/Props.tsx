@@ -232,6 +232,7 @@ export default function Props() {
                   id={prop.id}
                   type={prop.type as 'string' | 'number' | 'integer'}
                   example={prop.example as string}
+                  isDisabled={componentStatus}
                 />
               );
             case 'formattedText':
@@ -239,6 +240,7 @@ export default function Props() {
                 <FormPropTypeFormattedText
                   id={prop.id}
                   example={prop.example}
+                  isDisabled={componentStatus}
                 />
               );
             case 'link':
@@ -264,6 +266,9 @@ export default function Props() {
                   }
                   isDisabled={componentStatus}
                   required={required.includes(propName)}
+                  allowMultiple={prop.allowMultiple}
+                  valueMode={prop.valueMode}
+                  limitedCount={prop.limitedCount}
                 />
               );
             case 'video':
@@ -277,6 +282,9 @@ export default function Props() {
                   }
                   isDisabled={componentStatus}
                   required={required.includes(propName)}
+                  allowMultiple={prop.allowMultiple}
+                  valueMode={prop.valueMode}
+                  limitedCount={prop.limitedCount}
                 />
               );
             case 'boolean':
@@ -284,6 +292,7 @@ export default function Props() {
                 <FormPropTypeBoolean
                   id={prop.id}
                   example={prop.example as string}
+                  isDisabled={componentStatus}
                 />
               );
             case 'listText':
@@ -353,6 +362,20 @@ export default function Props() {
                         updates.valueMode = VALUE_MODE_UNLIMITED;
                         updates.limitedCount = 1;
                       } else if (
+                        ['listText', 'listInteger'].includes(
+                          prop.derivedType ?? '',
+                        )
+                      ) {
+                        // Convert to array type - for list types (preserve enum).
+                        updates.type = 'array';
+                        updates.items = {
+                          type: prop.type as 'string' | 'integer',
+                          enum: prop.enum?.map((item) => item.value),
+                        };
+                        updates.example = [];
+                        updates.valueMode = 'unlimited';
+                        updates.limitedCount = 1;
+                      } else if (
                         ['string', 'integer', 'number'].includes(prop.type)
                       ) {
                         // Convert to array type - for primitive types.
@@ -390,6 +413,28 @@ export default function Props() {
                       }
                     } else {
                       // Convert back to single value.
+                      // Restore the original type from items or derivedType
+                      if (prop.type === 'array' && prop.items?.type) {
+                        updates.type = prop.items.type;
+                      } else if (
+                        ['text', 'link', 'date'].includes(
+                          prop.derivedType ?? '',
+                        )
+                      ) {
+                        updates.type = 'string';
+                      } else if (prop.derivedType === 'integer') {
+                        updates.type = 'integer';
+                      } else if (prop.derivedType === 'number') {
+                        updates.type = 'number';
+                      } else if (
+                        ['image', 'video'].includes(prop.derivedType ?? '')
+                      ) {
+                        updates.type = 'object';
+                      } else if (prop.derivedType === 'listText') {
+                        updates.type = 'string';
+                      } else if (prop.derivedType === 'listInteger') {
+                        updates.type = 'integer';
+                      }
                       updates.items = undefined;
                       updates.example = '';
                       updates.valueMode = undefined;

@@ -128,7 +128,9 @@ export function serializeProps(props: CodeComponentProp[]) {
           valueMode,
           limitedCount,
         } = prop;
-        const isNumberType = ['integer', 'number'].includes(type);
+        // Check if the base type (or items type for arrays) is numeric
+        const baseType = allowMultiple && items ? items.type : type;
+        const isNumberType = ['integer', 'number'].includes(baseType);
         const isVideo = derivedType === 'video';
 
         // Determine the actual type for serialization
@@ -145,11 +147,15 @@ export function serializeProps(props: CodeComponentProp[]) {
             examples: [
               isNumberType && !allowMultiple
                 ? Number(example)
-                : isVideo &&
-                    typeof example === 'object' &&
-                    !Array.isArray(example)
-                  ? serializeVideoSrc(example as CodeComponentPropVideoExample)
-                  : example,
+                : isNumberType && allowMultiple && Array.isArray(example)
+                  ? example.map((v) => Number(v))
+                  : isVideo &&
+                      typeof example === 'object' &&
+                      !Array.isArray(example)
+                    ? serializeVideoSrc(
+                        example as CodeComponentPropVideoExample,
+                      )
+                    : example,
             ],
           }),
           // Only add enum/meta:enum at root level if NOT an array
