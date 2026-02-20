@@ -1,23 +1,23 @@
 /* Multivalue Form Styles - Container with dashed blue border */
 .multivalue-container {
+  overflow: visible;
   border: none !important;
   border-radius: 4px;
-  overflow: visible;
   background-color: white;
 }
 
 .multivalue-container .field-label {
   display: flex;
-  margin-left: 0 !important;
   margin-bottom: 0 !important;
+  margin-left: 0 !important;
   padding-bottom: 0 !important;
   padding-left: 0 !important;
 }
 
 .multivalue-container table {
+  width: 100%;
   border: none;
   border-collapse: collapse;
-  width: 100%;
   margin: 0 !important;
 }
 
@@ -34,10 +34,10 @@
 }
 
 .multivalue-container table thead tr th.field-label {
-  border: none !important;
-  background: white;
   margin: 0 !important;
   padding: 8px 0 8px 0 !important;
+  border: none !important;
+  background: white;
 }
 
 .multivalue-container table thead tr th.field-label h4.label {
@@ -48,8 +48,8 @@
 /* Apply border only to tbody */
 .multivalue-container table tbody {
   border-top: 1px solid #CDCED6;
-  border-left: 1px solid #CDCED6;
   border-right: 1px solid #CDCED6;
+  border-left: 1px solid #CDCED6;
 }
 
 .multivalue-container table tbody tr {
@@ -89,26 +89,26 @@
 
 /* Add new button wrapper */
 .add-new-wrapper {
-  border-left: 1px solid #CDCED6;
+  overflow: hidden;
   border-right: 1px solid #CDCED6;
   border-bottom: 1px solid #CDCED6;
-  border-bottom-left-radius: 4px;
+  border-left: 1px solid #CDCED6;
   border-bottom-right-radius: 4px;
-  overflow: hidden;
+  border-bottom-left-radius: 4px;
 }
 
 .add-new-wrapper button,
 .add-new-wrapper input[type="submit"] {
   width: 100%;
   padding: 8px 12px;
-  background-color: #F3F4F6;
+  cursor: pointer;
   border: none;
+  border-bottom-right-radius: 4px;
+  border-bottom-left-radius: 4px;
+  background-color: #F3F4F6;
   color: #0090FF;
   font-size: 14px;
-  cursor: pointer;
   transition: background-color 0.15s ease;
-  border-bottom-left-radius: 4px;
-  border-bottom-right-radius: 4px;
 }
 
 
@@ -130,8 +130,8 @@
 
 /* Style the drag handle cell */
 .multivalue-container .canvas-drag-handle {
-  padding: 0 0 0 8px;
   width: 10%;
+  padding: 0 0 0 8px;
 }
 
 .multivalue-container .tabledrag-changed {
@@ -142,10 +142,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  margin: 0;
+  padding: 0;
   cursor: grab;
   color: #0090FF;
-  padding: 0;
-  margin: 0;
 }
 
 .multivalue-container .canvas-drag-handle a.tabledrag-handle:active {
@@ -175,8 +175,8 @@
 }
 
 .multivalue-container .canvas-remove-action .trash-icon {
-  color: #E5484D;
   width: 15px;
   height: 15px;
+  color: #E5484D;
   transition: color 0.15s ease;
 }
