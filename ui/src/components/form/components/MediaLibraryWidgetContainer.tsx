@@ -1,6 +1,8 @@
 import { memo } from 'react';
 import clsx from 'clsx';
 
+import { useAppSelector } from '@/app/hooks';
+import { selectIsReordering } from '@/features/mediaLibrary/mediaLibrarySlice';
 import { a2p } from '@/local_packages/utils';
 
 import styles from './MediaLibraryWidgetContainer.module.css';
@@ -13,8 +15,12 @@ interface MediaLibraryWidgetContainerProps {
   renderChildren: React.ReactNode;
 }
 
-const MediaLibraryWidgetContainer = memo(
-  ({ attributes, renderChildren }: MediaLibraryWidgetContainerProps) => {
+interface MediaLibraryWidgetContainerInnerProps extends MediaLibraryWidgetContainerProps {
+  isReordering: boolean;
+}
+
+const MediaLibraryWidgetContainerInner = memo(
+  ({ attributes, renderChildren }: MediaLibraryWidgetContainerInnerProps) => {
     const classes = clsx(attributes.class, styles.container);
 
     return (
@@ -26,16 +32,13 @@ const MediaLibraryWidgetContainer = memo(
       </div>
     );
   },
-  (prevProps, nextProps) => {
-    if (typeof document !== 'undefined') {
-      const selection = document.querySelector(
-        '[data-canvas-media-library-selection]',
-      );
-
-      // Always block re-renders during active reordering
-      if (selection?.hasAttribute('data-canvas-reordering')) {
-        return true;
-      }
+  (
+    prevProps: MediaLibraryWidgetContainerInnerProps,
+    nextProps: MediaLibraryWidgetContainerInnerProps,
+  ) => {
+    // Always block re-renders during active reordering.
+    if (nextProps.isReordering) {
+      return true;
     }
     return (
       prevProps.renderChildren === nextProps.renderChildren &&
@@ -43,6 +46,24 @@ const MediaLibraryWidgetContainer = memo(
     );
   },
 );
+
+MediaLibraryWidgetContainerInner.displayName =
+  'MediaLibraryWidgetContainerInner';
+
+const MediaLibraryWidgetContainer = ({
+  attributes,
+  renderChildren,
+}: MediaLibraryWidgetContainerProps) => {
+  const isReordering = useAppSelector(selectIsReordering);
+
+  return (
+    <MediaLibraryWidgetContainerInner
+      attributes={attributes}
+      renderChildren={renderChildren}
+      isReordering={isReordering}
+    />
+  );
+};
 
 MediaLibraryWidgetContainer.displayName = 'MediaLibraryWidgetContainer';
 

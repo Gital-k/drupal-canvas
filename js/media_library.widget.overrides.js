@@ -32,7 +32,7 @@
           handle: '.js-media-library-item-preview',
           onStart: () => {
             try {
-              $(widget).attr('data-canvas-reordering', 'true');
+              drupalSettings?.canvas?.store?.dispatch({ type: 'mediaLibrary/setReorderingStart' });
               preReorderData = [];
               $(widget).children('.js-media-library-item').each((_, el) => {
                 const $el = $(el);
@@ -210,13 +210,13 @@
                 await new Promise(resolve => setTimeout(resolve, 10000));
 
                 // Clean up reordering flag
-                $(widget).removeAttr('data-canvas-reordering');
+                drupalSettings?.canvas?.store?.dispatch({ type: 'mediaLibrary/setReorderingEnd' });
                 $(widget).attr('data-last-reorder-time', Date.now().toString());
 
               } catch (error) {
                 console.error('Error dispatching events during reorder:', error);
                 // Clean up reordering flag even if there's an error
-                $(widget).removeAttr('data-canvas-reordering');
+                drupalSettings?.canvas?.store?.dispatch({ type: 'mediaLibrary/setReorderingEnd' });
                 $(widget).attr('data-last-reorder-time', Date.now().toString());
               }
             })();
