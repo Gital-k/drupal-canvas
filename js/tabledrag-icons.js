@@ -18,7 +18,7 @@
    * Behavior to replace tabledrag handle icons with custom SVGs.
    */
   Drupal.behaviors.canvasTableDragIcons = {
-    attach: function (context, settings) { // eslint-disable-line no-unused-vars
+    attach: function (context, settings) {
       // Find all tabledrag handles within multivalue containers and replace their content.
       // Use 'once' to ensure we only process each element once, even after AJAX updates.
       const handles = once('canvas-drag-handle', '.multivalue-container .tabledrag-handle', context);
@@ -53,11 +53,6 @@
         cell.style.display = 'none';
       });
     },
-
-    detach: function (context, settings, trigger) {
-      // No custom event handlers to clean up — the popover's Remove button
-      // triggers the hidden Drupal remove button directly.
-    }
   };
 
 })(Drupal, once);
