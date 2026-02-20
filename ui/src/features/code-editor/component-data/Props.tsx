@@ -223,7 +223,6 @@ export default function Props() {
                       | 'integer'
                       | 'number'
                   }
-                  isDisabled={componentStatus}
                   valueMode={prop.valueMode}
                   limitedCount={prop.limitedCount}
                 />
@@ -247,7 +246,6 @@ export default function Props() {
                   id={prop.id}
                   example={prop.example as string | string[]}
                   format={prop.format as string}
-                  isDisabled={disabledPropIds.has(prop.id)}
                   allowMultiple={prop.allowMultiple}
                   valueMode={prop.valueMode}
                   limitedCount={prop.limitedCount}
@@ -301,7 +299,6 @@ export default function Props() {
                   required={required.includes(propName)}
                   enum={prop.enum || []}
                   example={prop.example as string | string[]}
-                  isDisabled={componentStatus}
                   allowMultiple={prop.allowMultiple}
                   valueMode={prop.valueMode}
                   limitedCount={prop.limitedCount}
@@ -313,7 +310,6 @@ export default function Props() {
                   id={prop.id}
                   example={prop.example as string | string[]}
                   format={prop.format as string}
-                  isDisabled={disabledPropIds.has(prop.id)}
                   allowMultiple={prop.allowMultiple}
                   valueMode={prop.valueMode}
                   limitedCount={prop.limitedCount}

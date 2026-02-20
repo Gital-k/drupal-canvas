@@ -1314,6 +1314,179 @@ describe('props in code editor', () => {
         screen.queryByRole('textbox', { name: 'Prop name' }),
       ).not.toBeInTheDocument();
     });
+
+    it('allows editing multi-value example fields on exposed component', async () => {
+      const multiValuePropId = 'existing-multi-value-prop-id';
+      const exposedStore = makeStore({
+        codeEditor: {
+          ...initialState,
+          codeComponent: {
+            ...initialState.codeComponent,
+            status: true, // Exposed component
+            props: [
+              {
+                id: multiValuePropId,
+                name: 'tags',
+                type: 'array',
+                items: { type: 'string' },
+                example: ['tag1', 'tag2'],
+                allowMultiple: true,
+                valueMode: 'unlimited',
+                derivedType: 'text',
+              },
+            ],
+          },
+          initialPropIds: [multiValuePropId], // Mark as existing prop
+        },
+      });
+
+      render(<Wrapper store={exposedStore} />);
+
+      // Name and Type should be disabled for existing props
+      const nameField = screen.getByRole('textbox', { name: 'Prop name' });
+      expect(nameField).toBeDisabled();
+      const typeSelect = screen.getByRole('combobox', { name: 'Type' });
+      expect(typeSelect).toBeDisabled();
+
+      // But multi-value example fields should be editable
+      const exampleFields =
+        screen.getAllByPlaceholderText(/Enter a text value/i);
+      expect(exampleFields).toHaveLength(2); // Two example values
+      exampleFields.forEach((field) => {
+        expect(field).not.toBeDisabled();
+      });
+    });
+
+    it('allows editing list enum example fields on exposed component', async () => {
+      const listPropId = 'existing-list-prop-id';
+      const exposedStore = makeStore({
+        codeEditor: {
+          ...initialState,
+          codeComponent: {
+            ...initialState.codeComponent,
+            status: true, // Exposed component
+            props: [
+              {
+                id: listPropId,
+                name: 'ratings',
+                type: 'array',
+                items: { type: 'integer' },
+                example: [1, 2],
+                enum: [
+                  { value: 1, label: '1 star' },
+                  { value: 2, label: '2 stars' },
+                  { value: 3, label: '3 stars' },
+                ],
+                allowMultiple: true,
+                valueMode: 'unlimited',
+                derivedType: 'listInteger',
+              },
+            ],
+          },
+          initialPropIds: [listPropId], // Mark as existing prop
+        },
+      });
+
+      render(<Wrapper store={exposedStore} />);
+
+      // Name and Type should be disabled
+      const nameField = screen.getByRole('textbox', { name: 'Prop name' });
+      expect(nameField).toBeDisabled();
+      const typeSelect = screen.getByRole('combobox', { name: 'Type' });
+      expect(typeSelect).toBeDisabled();
+
+      // But the default value selection should be editable
+      const defaultValueButton = screen.getByRole('button', {
+        name: /2 selected/i,
+      });
+      expect(defaultValueButton).not.toBeDisabled();
+    });
+
+    it('allows editing link multi-value example fields on exposed component', async () => {
+      const linkPropId = 'existing-link-prop-id';
+      const exposedStore = makeStore({
+        codeEditor: {
+          ...initialState,
+          codeComponent: {
+            ...initialState.codeComponent,
+            status: true, // Exposed component
+            props: [
+              {
+                id: linkPropId,
+                name: 'relatedLinks',
+                type: 'array',
+                items: { type: 'string', format: 'uri-reference' },
+                example: ['/page1', '/page2'],
+                format: 'uri-reference',
+                allowMultiple: true,
+                valueMode: 'unlimited',
+                derivedType: 'link',
+              },
+            ],
+          },
+          initialPropIds: [linkPropId], // Mark as existing prop
+        },
+      });
+
+      render(<Wrapper store={exposedStore} />);
+
+      // Name and Type should be disabled for existing props
+      const nameField = screen.getByRole('textbox', { name: 'Prop name' });
+      expect(nameField).toBeDisabled();
+      const typeSelect = screen.getByRole('combobox', { name: 'Type' });
+      expect(typeSelect).toBeDisabled();
+
+      // But link example fields should be editable
+      const linkFields = screen.getAllByPlaceholderText(
+        /Enter a path|Enter a URL/i,
+      );
+      expect(linkFields).toHaveLength(2); // Two example values
+      linkFields.forEach((field) => {
+        expect(field).not.toBeDisabled();
+      });
+    });
+
+    it('allows editing date multi-value example fields on exposed component', async () => {
+      const datePropId = 'existing-date-prop-id';
+      const exposedStore = makeStore({
+        codeEditor: {
+          ...initialState,
+          codeComponent: {
+            ...initialState.codeComponent,
+            status: true, // Exposed component
+            props: [
+              {
+                id: datePropId,
+                name: 'eventDates',
+                type: 'array',
+                items: { type: 'string', format: 'date' },
+                example: ['2024-01-01', '2024-12-31'],
+                format: 'date',
+                allowMultiple: true,
+                valueMode: 'unlimited',
+                derivedType: 'date',
+              },
+            ],
+          },
+          initialPropIds: [datePropId], // Mark as existing prop
+        },
+      });
+
+      render(<Wrapper store={exposedStore} />);
+
+      // Name and Type should be disabled
+      const nameField = screen.getByRole('textbox', { name: 'Prop name' });
+      expect(nameField).toBeDisabled();
+      const typeSelect = screen.getByRole('combobox', { name: 'Type' });
+      expect(typeSelect).toBeDisabled();
+
+      // But date example fields should be editable
+      const dateFields = screen.getAllByDisplayValue(/2024/);
+      expect(dateFields.length).toBeGreaterThanOrEqual(2); // At least two example values
+      dateFields.forEach((field) => {
+        expect(field).not.toBeDisabled();
+      });
+    });
   });
 
   describe('allow multiple values', () => {
