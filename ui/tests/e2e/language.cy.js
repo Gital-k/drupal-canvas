@@ -48,7 +48,7 @@ const testCanvasPagesCanBeCreatedInMultilingualSites = (
 };
 
 describe('Canvas pages can be created in any language', () => {
-  before(() => {
+  beforeEach(() => {
     cy.drupalCanvasInstall(['canvas_test_language']);
   });
 
@@ -72,7 +72,7 @@ describe('Canvas pages can be created in any language', () => {
     );
   });
 
-  after(() => {
+  afterEach(() => {
     cy.drupalUninstall();
   });
 });
