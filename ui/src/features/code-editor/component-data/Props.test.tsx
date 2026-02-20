@@ -1349,8 +1349,7 @@ describe('props in code editor', () => {
       expect(typeSelect).toBeDisabled();
 
       // But multi-value example fields should be editable
-      const exampleFields =
-        screen.getAllByPlaceholderText(/Enter a text value/i);
+      const exampleFields = screen.getAllByPlaceholderText('Placeholder');
       expect(exampleFields).toHaveLength(2); // Two example values
       exampleFields.forEach((field) => {
         expect(field).not.toBeDisabled();
