@@ -232,7 +232,6 @@ export default function Props() {
                   id={prop.id}
                   type={prop.type as 'string' | 'number' | 'integer'}
                   example={prop.example as string}
-                  isDisabled={componentStatus}
                 />
               );
             case 'formattedText':
@@ -240,7 +239,6 @@ export default function Props() {
                 <FormPropTypeFormattedText
                   id={prop.id}
                   example={prop.example}
-                  isDisabled={componentStatus}
                 />
               );
             case 'link':
@@ -292,7 +290,6 @@ export default function Props() {
                 <FormPropTypeBoolean
                   id={prop.id}
                   example={prop.example as string}
-                  isDisabled={componentStatus}
                 />
               );
             case 'listText':
