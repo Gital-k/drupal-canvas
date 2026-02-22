@@ -642,7 +642,7 @@ class CanvasConfigUpdater {
     // If this would update oldest to newest, it'd fail to update the newly
     // created past version.
     $new_past_version = $component->getActiveVersion();
-    $component->loadVersion($new_past_version);
+    $component = $component->loadVersion($new_past_version);
     $settings = $component->getSettings();
     \assert(\array_key_exists('prop_field_definitions', $settings));
     $active_version_updated = FALSE;
@@ -688,7 +688,7 @@ class CanvasConfigUpdater {
         // The active version has already been updated above.
         continue;
       }
-      $component->loadVersion($version);
+      $component = $component->loadVersion($version);
       \assert(!$component->isLoadedVersionActiveVersion());
       $settings = $component->getSettings();
       \assert(\array_key_exists('prop_field_definitions', $settings));
