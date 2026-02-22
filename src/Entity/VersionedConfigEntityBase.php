@@ -54,11 +54,13 @@ abstract class VersionedConfigEntityBase extends ConfigEntityBase implements Ver
     if ($version !== $this->loadedVersion) {
       \assert(isset($this->versioned_properties));
       $this->assertVersionExists($version);
-      $this->loadedVersion = $version;
-    }
       $versioned = clone $this;
       $versioned->loadedVersion = $version;
+
       return $versioned;
+    }
+
+    return $this;
   }
 
   /**
