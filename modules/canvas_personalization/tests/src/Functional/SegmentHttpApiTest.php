@@ -53,7 +53,7 @@ class SegmentHttpApiTest extends HttpApiTestBase {
       Page::EDIT_PERMISSION,
       Segment::ADMIN_PERMISSION,
     ]);
-    assert($user instanceof UserInterface);
+    \assert($user instanceof UserInterface);
     $this->httpApiUser = $user;
 
     $this->expectedDefaultSegment = [
@@ -68,7 +68,7 @@ class SegmentHttpApiTest extends HttpApiTestBase {
     // Create a user with an arbitrary permission that is not related to
     // accessing any Canvas resources.
     $user2 = $this->createUser(['view own unpublished content']);
-    assert($user2 instanceof UserInterface);
+    \assert($user2 instanceof UserInterface);
     $this->limitedPermissionsUser = $user2;
   }
 
@@ -202,7 +202,7 @@ class SegmentHttpApiTest extends HttpApiTestBase {
     /** @var \Drupal\Core\Entity\EntityStorageInterface $segment_storage */
     $segment_storage = \Drupal::service('entity_type.manager')->getStorage(Segment::ENTITY_TYPE_ID);
     $segment = $segment_storage->loadUnchanged('my_segment');
-    assert($segment instanceof Segment);
+    \assert($segment instanceof Segment);
     self::assertFalse($segment->status());
 
     // Creating a segment with an already-in-use ID: 409.
@@ -440,8 +440,14 @@ class SegmentHttpApiTest extends HttpApiTestBase {
     ])->save();
 
     Segment::create([
-      'id' => 'test_segment_2',
+      'id' => 'another_test_segment',
       'label' => 'Test Segment 2',
+      'rules' => [],
+      'weight' => 1,
+    ])->save();
+    Segment::create([
+      'id' => 'boldly_another_test_segment',
+      'label' => 'Test Segment 3',
       'rules' => [],
       'weight' => 1,
     ])->save();
@@ -456,8 +462,16 @@ class SegmentHttpApiTest extends HttpApiTestBase {
     ];
 
     $test_segment_2_expected_data = [
-      'id' => 'test_segment_2',
+      'id' => 'another_test_segment',
       'label' => 'Test Segment 2',
+      'description' => NULL,
+      'rules' => [],
+      'weight' => 1,
+      'status' => TRUE,
+    ];
+    $test_segment_3_expected_data = [
+      'id' => 'boldly_another_test_segment',
+      'label' => 'Test Segment 3',
       'description' => NULL,
       'rules' => [],
       'weight' => 1,
@@ -468,7 +482,8 @@ class SegmentHttpApiTest extends HttpApiTestBase {
     // Check the order of the segments based on their weights.
     $this->assertSame([
       "test_segment" => $test_segment_1_expected_data,
-      "test_segment_2" => $test_segment_2_expected_data,
+      "another_test_segment" => $test_segment_2_expected_data,
+      "boldly_another_test_segment" => $test_segment_3_expected_data,
       Segment::DEFAULT_ID => $this->expectedDefaultSegment,
     ], $body);
 
@@ -488,7 +503,8 @@ class SegmentHttpApiTest extends HttpApiTestBase {
     $body = $this->assertExpectedResponse('GET', $list_url, [], 200, ['user.permissions'], ['config:segment_list', 'http_response'], 'UNCACHEABLE (request policy)', 'MISS');
     // Re-check the order of the segments based on the updated weight.
     $this->assertSame([
-      "test_segment_2" => $test_segment_2_expected_data,
+      "another_test_segment" => $test_segment_2_expected_data,
+      "boldly_another_test_segment" => $test_segment_3_expected_data,
       "test_segment" => [
         'id' => 'test_segment',
         'label' => 'Test Segment',

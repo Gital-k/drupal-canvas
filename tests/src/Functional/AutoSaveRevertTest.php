@@ -12,12 +12,14 @@ use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\node\Entity\Node;
 use Drupal\Tests\BrowserTestBase;
 use Drupal\Tests\node\Traits\ContentTypeCreationTrait;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
  * Tests that auto-saved changes are deleted when reverting a page revision.
  *
  * @group canvas
  */
+#[RunTestsInSeparateProcesses]
 class AutoSaveRevertTest extends BrowserTestBase {
 
   use ContentTypeCreationTrait;
@@ -37,7 +39,7 @@ class AutoSaveRevertTest extends BrowserTestBase {
    */
   public function testRevisionAccess(): void {
     $user = $this->drupalCreateUser(['edit canvas_page']);
-    assert($user instanceof AccountInterface);
+    \assert($user instanceof AccountInterface);
     $this->drupalLogin($user);
 
     $page = Page::create(['title' => 'Test Page']);
@@ -89,7 +91,7 @@ class AutoSaveRevertTest extends BrowserTestBase {
       'view article revisions',
       'revert article revisions',
     ]);
-    assert($user instanceof AccountInterface);
+    \assert($user instanceof AccountInterface);
     $this->drupalLogin($user);
 
     $node = Node::create(['title' => 'Test Article', 'type' => 'article']);

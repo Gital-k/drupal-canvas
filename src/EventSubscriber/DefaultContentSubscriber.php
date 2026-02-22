@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupal\canvas\EventSubscriber;
 
 use Drupal\canvas\ComponentSource\ComponentSourceInterface;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase;
 use Drupal\canvas\PropSource\PropSource;
 use Drupal\canvas\PropSource\StaticPropSource;
 use Drupal\Core\DefaultContent\ExportMetadata;
@@ -78,10 +79,17 @@ final class DefaultContentSubscriber implements EventSubscriberInterface {
         \assert($component_source instanceof ComponentSourceInterface);
         $inputs = $component_source->getDefaultExplicitInput();
         foreach ($inputs as $prop_name => $input) {
+          // @todo Per https://www.drupal.org/i/3560543#comment-16406290,
+          //   considering refactoring this to use
+          //   ComponentInputs::getPropSourcesUsingExpressionClass(), but only
+          //   once https://www.drupal.org/i/3566720 is resolved.
+          if (!$component_source instanceof GeneratedFieldExplicitInputUxComponentSourceBase) {
+            continue;
+          }
           $prop_source = PropSource::parse($input);
           // Only a static prop source will store a reference to a specific
-          // entity. Dynamic prop sources would store a reference to field on
-          // the host entity where the actual entity would depend on the host
+          // entity. Entity field prop sources would store a reference to field
+          // on the host entity where the actual entity would depend on the host
           // entity.
           if (!$prop_source instanceof StaticPropSource) {
             continue;
@@ -123,8 +131,8 @@ final class DefaultContentSubscriber implements EventSubscriberInterface {
   }
 
   public function preEntityImport(PreEntityImportEvent $event): void {
-    assert(isset($event->metadata['entity_type']));
-    assert(is_string($event->metadata['entity_type']));
+    \assert(isset($event->metadata['entity_type']));
+    \assert(is_string($event->metadata['entity_type']));
 
     if (!isset($this->componentTreeFieldMap[$event->metadata['entity_type']])) {
       // If the entity type does not have any component tree fields then no
@@ -132,7 +140,7 @@ final class DefaultContentSubscriber implements EventSubscriberInterface {
       return;
     }
 
-    $componentTreeFields = array_keys($this->componentTreeFieldMap[$event->metadata['entity_type']]);
+    $componentTreeFields = \array_keys($this->componentTreeFieldMap[$event->metadata['entity_type']]);
     foreach ($event->data as &$translation_data) {
       foreach ($componentTreeFields as $field_name) {
         // Skip if field not present.
@@ -160,10 +168,10 @@ final class DefaultContentSubscriber implements EventSubscriberInterface {
     if (!isset($prop_input[self::EXPORT_ENTITY_REFERENCE_KEY])) {
       return $prop_input;
     }
-    assert(is_array($prop_input[self::EXPORT_ENTITY_REFERENCE_KEY]));
+    \assert(is_array($prop_input[self::EXPORT_ENTITY_REFERENCE_KEY]));
     $export_data = $prop_input[self::EXPORT_ENTITY_REFERENCE_KEY];
-    assert(array_key_exists('target_uuid', $export_data));
-    assert(array_key_exists('target_type', $export_data));
+    \assert(\array_key_exists('target_uuid', $export_data));
+    \assert(\array_key_exists('target_type', $export_data));
     $entity = $this->entityRepository->loadEntityByUuid($export_data['target_type'], $export_data['target_uuid']);
     \assert($entity instanceof EntityInterface);
     $prop_input['target_id'] = $entity->id();

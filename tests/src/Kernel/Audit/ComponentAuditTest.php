@@ -15,6 +15,8 @@ use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Entity\Pattern;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
+use Drupal\node\Entity\NodeType;
 
 /**
  * @coversDefaultClass \Drupal\canvas\Audit\ComponentAudit
@@ -22,6 +24,7 @@ use Drupal\canvas\Entity\Pattern;
  * @todo Improve in
  *   https://www.drupal.org/project/canvas/issues/3522953
  */
+#[RunTestsInSeparateProcesses]
 class ComponentAuditTest extends ComponentAuditTestBase {
 
   /**
@@ -46,11 +49,11 @@ class ComponentAuditTest extends ComponentAuditTestBase {
     $page->set('components', [])->save();
     $page->save();
 
-    // Now enable the 'canvas_test_storage_prop_shape_alter' module to change the
+    // Now enable the 'canvas_test_storable_prop_shape_alter' module to change the
     // field type used for populating the href prop.
-    // @see \Drupal\canvas_test_storage_prop_shape_alter\Hook\CanvasTestStoragePropShapeAlterHooks::storagePropShapeAlter()
+    // @see \Drupal\canvas_test_storable_prop_shape_alter\Hook\CanvasTestStorablePropShapeAlterHooks::storablePropShapeAlter()
     \Drupal::service(ModuleInstallerInterface::class)
-      ->install(['canvas_test_storage_prop_shape_alter']);
+      ->install(['canvas_test_storable_prop_shape_alter']);
     $component = Component::load('sdc.canvas_test_sdc.my-cta');
     \assert($component instanceof ComponentInterface);
     self::assertCount(2, $component->getVersions());
@@ -93,17 +96,23 @@ class ComponentAuditTest extends ComponentAuditTestBase {
   }
 
   protected function createTestContentTemplate(array $tree): ContentTemplate {
-    $entity_type_id = Page::ENTITY_TYPE_ID;
+    $entity_type_id = 'node';
+    $bundle = 'foo';
     $view_mode = 'reverse';
+
     EntityViewMode::create([
       'id' => \implode('.', [$entity_type_id, $view_mode]),
       'label' => 'Reverse',
       'targetEntityType' => $entity_type_id,
     ])->save();
+    NodeType::create([
+      'type' => $bundle,
+      'name' => $this->randomString(),
+    ])->save();
     $content_template = ContentTemplate::create([
-      'id' => \implode('.', [$entity_type_id, $entity_type_id, $view_mode]),
+      'id' => \implode('.', [$entity_type_id, $bundle, $view_mode]),
       'content_entity_type_id' => $entity_type_id,
-      'content_entity_type_bundle' => $entity_type_id,
+      'content_entity_type_bundle' => $bundle,
       'content_entity_type_view_mode' => $view_mode,
       'component_tree' => $tree,
     ]);
@@ -130,11 +139,11 @@ class ComponentAuditTest extends ComponentAuditTestBase {
       default => throw new \InvalidArgumentException()
     };
 
-    // Now enable the 'canvas_test_storage_prop_shape_alter' module to change the
+    // Now enable the 'canvas_test_storable_prop_shape_alter' module to change the
     // field type used for populating the href prop.
-    // @see \Drupal\canvas_test_storage_prop_shape_alter\Hook\CanvasTestStoragePropShapeAlterHooks::storagePropShapeAlter()
+    // @see \Drupal\canvas_test_storable_prop_shape_alter\Hook\CanvasTestStorablePropShapeAlterHooks::storablePropShapeAlter()
     \Drupal::service(ModuleInstallerInterface::class)
-      ->install(['canvas_test_storage_prop_shape_alter']);
+      ->install(['canvas_test_storable_prop_shape_alter']);
     $component = Component::load('sdc.canvas_test_sdc.my-cta');
     \assert($component instanceof ComponentInterface);
     self::assertCount(2, $component->getVersions());
@@ -146,7 +155,7 @@ class ComponentAuditTest extends ComponentAuditTestBase {
     self::assertEquals([$entity->id()], \array_values(\array_map(static fn(ConfigEntityInterface $entity): string|int|null => $entity->id(), $config)));
 
     // @todo Uncomment this in https://www.drupal.org/i/3530051.
-    assert($new_version != $old_version);
+    \assert($new_version != $old_version);
     /*
     // 2. Active (i.e. new) version: no uses yet.
     $config = $audit->getConfigEntityDependenciesUsingComponent($component, $config_entity_type_id, [$new_version]);

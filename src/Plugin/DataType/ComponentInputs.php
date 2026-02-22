@@ -35,6 +35,14 @@ use Drupal\canvas\PropSource\StaticPropSource;
   id: "component_inputs",
   label: new TranslatableMarkup("Component inputs"),
   description: new TranslatableMarkup("The input values for the components in a component tree: without structure"),
+  // TRICKY: this does not provide validation constraints, because this is
+  // validated at the component instance level. Component (instance) inputs can
+  // only be validated by the ComponentSource plugin providing this component
+  // that powers this component instance (and is referenced using the Component
+  // ID and version).
+  // @see \Drupal\canvas\ComponentSource\ComponentSourceInterface::validateComponentInput()
+  // @see \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem
+  // @see \Drupal\canvas\Plugin\Validation\Constraint\ValidComponentTreeItemConstraintValidator
 )]
 final class ComponentInputs extends TypedData implements ContentAwareDependentInterface {
 
@@ -91,13 +99,13 @@ final class ComponentInputs extends TypedData implements ContentAwareDependentIn
   public function setValue($value, $notify = TRUE): void {
     if (is_string($value)) {
       // If there are no inputs, an empty array is a valid value.
-      assert(str_starts_with($value, '{') || $value === '[]');
+      \assert(str_starts_with($value, '{') || $value === '[]');
       // @todo Delete next line; update this code to ONLY do the JSON-to-PHP-object parsing after https://www.drupal.org/project/drupal/issues/2232427 lands — that will allow specifying the "json" serialization strategy rather than only PHP's serialize().
       $this->value = $value;
       $this->inputs = Json::decode($value);
     }
     else {
-      assert(is_array($value));
+      \assert(is_array($value));
       $this->inputs = $value;
       $this->value = Json::encode($value);
     }
@@ -116,7 +124,7 @@ final class ComponentInputs extends TypedData implements ContentAwareDependentIn
    *   values, for this component tree.
    */
   public function getPropSourceTypes(): array {
-    return array_unique(array_map(
+    return array_unique(\array_map(
       PropSource::getTypePrefix(...),
       iterator_to_array($this->getPropSources()),
     ));
@@ -156,12 +164,12 @@ final class ComponentInputs extends TypedData implements ContentAwareDependentIn
    *   The keys will be strings in the form of "INSTANCE_UUID:PROP_NAME".
    */
   public function getPropSourcesUsingExpressionClass(string $expression_class): iterable {
-    assert(is_a($expression_class, StructuredDataPropExpression::class, TRUE));
+    \assert(is_a($expression_class, StructuredDataPropExpression::class, TRUE));
     foreach ($this->getPropSources() as $key => $prop_source) {
       if ($prop_source instanceof AdaptedPropSource) {
         throw new \LogicException('@todo as soon as adapted prop sources are actually used');
       }
-      if (isset($prop_source->expression) && is_a($prop_source->expression, $expression_class)) {
+      if (property_exists($prop_source, 'expression') && is_a($prop_source->expression, $expression_class)) {
         yield $key => $prop_source;
       }
     }
@@ -186,7 +194,7 @@ final class ComponentInputs extends TypedData implements ContentAwareDependentIn
         // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::collapse()
         // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::uncollapse()
         try {
-          $parsed_default_prop_source = array_key_exists($name, $default_prop_sources) && is_array($default_prop_sources[$name]) && array_key_exists('sourceType', $default_prop_sources[$name])
+          $parsed_default_prop_source = \array_key_exists($name, $default_prop_sources) && is_array($default_prop_sources[$name]) && \array_key_exists('sourceType', $default_prop_sources[$name])
             ? PropSource::parse($default_prop_sources[$name])
             : NULL;
           // If it indeed was a collapsed StaticPropSource, un-collapse it.
@@ -229,7 +237,7 @@ final class ComponentInputs extends TypedData implements ContentAwareDependentIn
    */
   public function getValues(): array {
     $item = $this->getParent();
-    assert($item instanceof ComponentTreeItem);
+    \assert($item instanceof ComponentTreeItem);
     $component_instance_uuid = $item->getUuid();
     $source = $item->getComponent()?->getComponentSource();
     if ($source === NULL) {

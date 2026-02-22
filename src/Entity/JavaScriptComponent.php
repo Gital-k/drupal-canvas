@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Entity;
 
+use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\CanvasUriDefinitions;
+use Drupal\canvas\ComponentSource\ComponentSourceManager;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
+use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
 use Drupal\canvas\Resource\CanvasResourceLink;
 use Drupal\canvas\Resource\CanvasResourceLinkCollection;
 use Drupal\Core\Access\AccessResult;
@@ -97,6 +101,20 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
   protected ?array $dataDependencies;
 
   /**
+   * Shared instance of the ComponentSource plugin manager, for previews.
+   *
+   * @see ::buildPreview()
+   */
+  private static ComponentSourceManager $componentSourceManagerForPreviews;
+
+  /**
+   * Shared instance of the AutoSaveManager, for previews.
+   *
+   * @see ::buildPreview()
+   */
+  private static AutoSaveManager $autoSaveManagerForPreviews;
+
+  /**
    * {@inheritdoc}
    */
   public function id(): string {
@@ -112,7 +130,7 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
     ];
     foreach ($possible_operations as $link_rel => ['route_name' => $route_name, 'op' => $entity_operation]) {
       $access = $this->access(operation: $entity_operation, return_as_object: TRUE);
-      assert($access instanceof AccessResult);
+      \assert($access instanceof AccessResult);
       if ($access->isAllowed()) {
         $route_params = [
           'canvas_config_entity_type_id' => self::ENTITY_TYPE_ID,
@@ -141,8 +159,8 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
     // TRICKY: config entity properties may allow NULL, but only valid, saved
     // config entities are ever normalized: those that have passed validation
     // against config schema.
-    assert(is_array($this->js));
-    assert(is_array($this->css));
+    \assert(is_array($this->js));
+    \assert(is_array($this->css));
     $linkCollection = $this->getEntityOperations();
     return ClientSideRepresentation::create(
       values: [
@@ -160,11 +178,82 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
         // @see https://jsonapi.org/format/#document-links
         'links' => $linkCollection->asArray(),
       ],
-      preview: [
-        '#markup' => '@todo Make something 🆒 in https://www.drupal.org/project/canvas/issues/3498889',
-      ],
+      preview: $this->buildPreview(),
     )->addCacheableDependency($this)
       ->addCacheableDependency($linkCollection);
+  }
+
+  /**
+   * Renders a preview of a (saved) code component, regardless of `status`.
+   *
+   * Reuses the render infrastructure of the JsComponent ComponentSource plugin.
+   *
+   * @return array
+   *   A render array.
+   *
+   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::renderComponent()
+   */
+  private function buildPreview(): array {
+    // TRICKY: config entity properties may allow NULL, but only valid, saved
+    // config entities are ever normalized: those that have passed validation
+    // against config schema.
+    \assert(is_array($this->props));
+    \assert(is_array($this->slots));
+    \assert(is_string($this->uuid));
+
+    // If there's an auto-saved version of this code component, load that
+    // instead to generate the preview. JsComponent::renderComponent() *already*
+    // does this for the auto-saved JS + CSS; this ensures the auto-saved props
+    // and slots are used, too.
+    self::$autoSaveManagerForPreviews ??= \Drupal::service(AutoSaveManager::class);
+    $autoSavedIfAny = self::$autoSaveManagerForPreviews->getAutoSaveEntity($this)->entity;
+    \assert($autoSavedIfAny === NULL || $autoSavedIfAny instanceof JavaScriptComponent);
+
+    // Instantiate a minimally viable JsComponent source plugin instance subset.
+    self::$componentSourceManagerForPreviews ??= \Drupal::service(ComponentSourceManager::class);
+    $js_component_source = self::$componentSourceManagerForPreviews->createInstance(JsComponent::SOURCE_PLUGIN_ID, [
+      'local_source_id' => $this->id(),
+      // 💡This is left empty because this code is instantiating the JS
+      // ComponentSource plugin to be able to call its `::renderComponent()`
+      // method, to provide an accurate preview of the code component, even if
+      // it's never been exposed (and hence has no `Component` config entity).
+      // IOW: the sole purpose here is to render a preview of a code component,
+      // so not specifying the field definitions to generate StaticPropSources
+      // is fine.
+      'prop_field_definitions' => [],
+    ]);
+    \assert($js_component_source instanceof JsComponent);
+
+    // Retrieve all props' example values, prefer auto-saved ones.
+    $example_inputs = array_filter(\array_map(
+      // Note that an example is optional!
+      // @see `type: canvas.json_schema.prop.*`
+      fn (array $prop_definition) : null|bool|int|float|string|\Stringable|array => $prop_definition['examples'][0] ?? NULL,
+      $autoSavedIfAny->props ?? $this->props,
+    ));
+
+    // TRICKY: unlike \Drupal\canvas\Entity\Component::normalizeForClientSide(),
+    // this is not getting wrapped in a render-safe container, because the only
+    // failure modes for code components at the server-side rendering stage are:
+    // 1. the code component's config entity does not exist. But this is a
+    //    method on that config entity type, so that cannot happen.
+    // 2. the code props' example values may violate the JSON schema for props:
+    //    core's `ComponentValidator` would then trigger an exception … except
+    //    that JsComponent::renderComponent() does not perform validation.
+    // So, no render-safe container is necessary here: the only crash that can
+    // happen is on the client side, or if there's a logic bug.
+    $build = $js_component_source->renderComponent(
+      inputs: [
+        JsComponent::EXPLICIT_INPUT_NAME => \array_map(
+          fn (bool|int|float|string|\Stringable|array $v) => new EvaluationResult($v),
+          $example_inputs,
+        ),
+      ],
+      slot_definitions: $autoSavedIfAny->slots ?? $this->slots,
+      componentUuid: $this->uuid,
+      isPreview: TRUE,
+    );
+    return $build;
   }
 
   /**
@@ -200,7 +289,7 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
       $this->set($key, $value);
     }
 
-    if (array_key_exists('sourceCodeCss', $data) || array_key_exists('compiledCss', $data)) {
+    if (\array_key_exists('sourceCodeCss', $data) || \array_key_exists('compiledCss', $data)) {
       $this->set('css', [
         'original' => $data['sourceCodeCss'] ?? '',
         'compiled' => $data['compiledCss'] ?? '',
@@ -208,8 +297,8 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
     }
 
     $violation_list = new EntityConstraintViolationList($this);
-    if (array_key_exists('sourceCodeJs', $data) || array_key_exists('compiledJs', $data)) {
-      if (!array_key_exists('importedJsComponents', $data)) {
+    if (\array_key_exists('sourceCodeJs', $data) || \array_key_exists('compiledJs', $data)) {
+      if (!\array_key_exists('importedJsComponents', $data)) {
         $violation_list->add(new ConstraintViolation(
           "The 'importedJsComponents' field is required when 'sourceCodeJs' or 'compiledJs' is provided",
           "The 'importedJsComponents' field is required when 'sourceCodeJs' or 'compiledJs' is provided",
@@ -317,6 +406,11 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
    */
   public function setProps(array $props): self {
     $this->props = $props;
+    // If a required prop was removed, we need to remove it from the list of
+    // required props.
+    if (!is_null($this->required)) {
+      $this->required = \array_intersect(\array_keys($props), $this->required);
+    }
     return $this;
   }
 
@@ -394,7 +488,7 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
     if ($violation_list->count() > 0) {
       throw new ConstraintViolationException($violation_list);
     }
-    $imported_js_component_dependency_names = array_values(array_map(
+    $imported_js_component_dependency_names = array_values(\array_map(
       fn(string $component_name) => $this->getConfigPrefix() . ".$component_name",
       $imported_js_components
     ));
@@ -418,7 +512,7 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
 
   protected function getConfigPrefix(): string {
     $entity_type = $this->getEntityType();
-    assert($entity_type instanceof ConfigEntityTypeInterface);
+    \assert($entity_type instanceof ConfigEntityTypeInterface);
     return $entity_type->getConfigPrefix();
   }
 
@@ -461,14 +555,14 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
       $instance->getDependencies()['config'] ?? [],
       static fn(string $dependency) => \str_starts_with($dependency, $instance->getConfigPrefix())
     );
-    $js_component_ids = array_map(fn($dependency) => mb_substr($dependency, mb_strlen($this->getConfigPrefix()) + 1), $js_dependencies);
+    $js_component_ids = \array_map(fn($dependency) => mb_substr($dependency, mb_strlen($this->getConfigPrefix()) + 1), $js_dependencies);
     return self::loadMultiple($js_component_ids);
   }
 
   public function getCacheTags() {
     $cache_tags = parent::getCacheTags();
     if ($dependencies = $this->getDependencies()) {
-      $cache_tags = array_merge($cache_tags, array_map(fn($dependency) => "config:$dependency", $dependencies['config'] ?? []));
+      $cache_tags = array_merge($cache_tags, \array_map(fn($dependency) => "config:$dependency", $dependencies['config'] ?? []));
     }
     return \array_values($cache_tags);
   }

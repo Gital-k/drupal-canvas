@@ -121,7 +121,10 @@ export class CanvasEditor {
   }
 
   async openLibraryPanel() {
-    await this.page.getByTestId('canvas-side-menu').getByLabel('Add').click();
+    await this.page
+      .getByTestId('canvas-side-menu')
+      .getByLabel('Library')
+      .click();
 
     await expect(
       this.page.getByTestId('canvas-components-library-loading'),
@@ -138,9 +141,7 @@ export class CanvasEditor {
     }
 
     // Ensure we are on the Components tab.
-    await this.page
-      .getByTestId('canvas-manage-library-components-tab-select')
-      .click();
+    await this.page.getByTestId('canvas-library-components-tab-select').click();
   }
 
   async openLayersPanel() {
@@ -161,26 +162,39 @@ export class CanvasEditor {
     }
   }
 
-  async openManageLibraryPanel() {
-    await this.page
-      .getByTestId('canvas-side-menu')
-      .getByLabel('Manage library')
-      .click();
+  async openCodePanel() {
+    await this.page.getByTestId('canvas-side-menu').getByLabel('Code').click();
 
     try {
       await expect(
-        this.page.getByRole('heading', { name: 'Manage library' }),
+        this.page.getByRole('heading', { name: 'Code' }),
+      ).toBeVisible();
+      await expect(
+        this.page.locator('[data-testid="canvas-code-panel-content"]'),
       ).toBeVisible();
     } catch (error) {
       throw new Error(
-        'openManageLibraryPanel: Manage library panel did not open - was it already open?\n' +
+        'openCodePanel: Code panel did not open - was it already open?\n' +
           (error instanceof Error ? error.message : String(error)),
       );
     }
-    // Ensure we are on the Components tab.
-    await this.page
-      .getByTestId('canvas-manage-library-components-tab-select')
-      .click();
+  }
+
+  async openPagesPanel() {
+    await this.page.getByTestId('canvas-side-menu').getByLabel('Pages').click();
+    try {
+      await expect(
+        this.page.getByRole('heading', { name: 'Pages' }),
+      ).toBeVisible();
+      await expect(
+        this.page.locator('[data-testid="canvas-page-list"]'),
+      ).toBeVisible();
+    } catch (error) {
+      throw new Error(
+        'openPagesPanel: Pages panel did not open - was it already open?\n' +
+          (error instanceof Error ? error.message : String(error)),
+      );
+    }
   }
 
   async openComponent(title: string) {
@@ -319,7 +333,6 @@ export class CanvasEditor {
     // Force a layout recalculation in headless mode, this is only needed for
     // webkit.
     await this.page.evaluate(() => {
-      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
       document.body.offsetHeight; // Forces reflow
     });
     await dropzone.hover({ force: true });
@@ -328,7 +341,6 @@ export class CanvasEditor {
       // Again, only needed for webkit.
       const dropzone = document.querySelector(locator);
       if (dropzone) {
-        // eslint-disable-next-line @typescript-eslint/no-unused-expressions
         dropzone.offsetHeight; // Forces reflow on the drop zone
       }
     }, dropzoneLocator);
@@ -453,7 +465,7 @@ export class CanvasEditor {
   }
 
   async createCodeComponent(componentName: string, code: string) {
-    await this.openManageLibraryPanel();
+    await this.openCodePanel();
     await this.page.getByTestId('canvas-page-list-new-button').click();
 
     await this.page

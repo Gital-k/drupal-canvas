@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource;
 
+use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\Core\File\FileExists;
 use Drupal\Core\StreamWrapper\PublicStream;
 use Drupal\Core\Url;
@@ -11,7 +12,6 @@ use Drupal\canvas\Controller\ApiAutoSaveController;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\canvas\Entity\Page;
-use Drupal\canvas\Plugin\ComponentPluginManager;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent;
 use Drupal\file\Entity\File;
 use Drupal\media\Entity\Media;
@@ -23,6 +23,7 @@ use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\HttpFoundation\Request;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -30,7 +31,9 @@ use Symfony\Component\HttpFoundation\Response;
  *
  * @coversDefaultClass \Drupal\canvas\Plugin\Canvas\ComponentSource\Fallback
  * @group canvas
+ * @group canvas_component_sources
  */
+#[RunTestsInSeparateProcesses]
 final class FallbackInputTest extends ApiLayoutControllerTestBase {
 
   use MediaTypeCreationTrait;
@@ -65,6 +68,7 @@ final class FallbackInputTest extends ApiLayoutControllerTestBase {
     // Our module!
     'canvas',
     // Test components we can force fallback and recovery on.
+    'datetime',
     'canvas_test_sdc',
   ];
 
@@ -99,8 +103,7 @@ final class FallbackInputTest extends ApiLayoutControllerTestBase {
       'access content',
     ]);
 
-    // Force generation of component config entities.
-    $this->container->get(ComponentPluginManager::class)->getDefinitions();
+    $this->container->get(ComponentSourceManager::class)->generateComponents();
   }
 
   /**
@@ -154,7 +157,8 @@ final class FallbackInputTest extends ApiLayoutControllerTestBase {
             'sourceType' => 'static:field_item:entity_reference',
             'value' => ['target_id' => $image->id()],
             // This expression resolves `src` to the image's public URL.
-            'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:image␝field_media_image␞␟src_with_alternate_widths,alt↝entity␜␜entity:media:image␝field_media_image␞␟alt,width↝entity␜␜entity:media:image␝field_media_image␞␟width,height↝entity␜␜entity:media:image␝field_media_image␞␟height}',
+            // @see \Drupal\canvas\Hook\ShapeMatchingHooks::mediaLibraryStorablePropShapeAlter()
+            'expression' => 'ℹ︎entity_reference␟entity␜␜entity:media:image␝field_media_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
             'sourceTypeSettings' => [
               'storage' => ['target_type' => 'media'],
               'instance' => [
@@ -276,10 +280,8 @@ final class FallbackInputTest extends ApiLayoutControllerTestBase {
     // fallback.
     $this->createMediaType('image', ['id' => 'image', 'label' => 'Image']);
 
-    // Rebuild component entities.
-    $component_plugin_manager = $this->container->get(ComponentPluginManager::class);
-    $component_plugin_manager->clearCachedDefinitions();
-    $component_plugin_manager->getDefinitions();
+    // Rebuild Component entities.
+    $this->container->get(ComponentSourceManager::class)->generateComponents();
     /** @var \Drupal\canvas\Entity\ComponentInterface $component_to_recover */
     $component_to_recover = Component::load($component_to_recover->id());
     self::assertFalse($component_to_recover->status());

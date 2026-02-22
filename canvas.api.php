@@ -5,102 +5,27 @@
  * Documentation related to Drupal Canvas.
  */
 
+use Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\FieldTypePropExpression;
+use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\canvas\PropShape\CandidateStorablePropShape;
+use Drupal\canvas\TypedData\BetterEntityDataDefinition;
 
 /**
- * @defgroup canvas_architecture Drupal Canvas Architecture
+ * @addtogroup hooks
  * @{
- *
- * @section prop_expressions Prop Expressions
- *
- * Since instantiated components in:
- * - content type templates
- * - content entities
- * must be able to map values from structured data (field props) into component
- * props, and many APIs and layers are involved in doing this:
- * - correctly
- * - securely
- * - performant
- * It seems sensible to use a strongly typed approach to representing these
- * expressions.
- *
- * Furthermore, the Drupal Canvas UX must make it easy to surface viable
- * matches from the structured data that can fit in the components, as well as
- * the other way around.
- *
- * Therefore a base expression interface is provided, which guarantees a
- * stringable representation (simplifying both debugging as well as storing
- * these expressions), *and* the conversion back.
- * In other words: every possible expression used by Drupal Canvas can
- * always be converted from string to PHP object and vice versa.
- *
- * String representations of prop expressions probing into:
- * - components will always start with the symbol `⿲`
- * - structured data will always start with the symbol `ℹ`
- *
- *
- * String and storage representation of expressions referencing field types,
- * field instances, fields aka field item lists, field deltas aka field items,
- * field item properties:
- * - `␟` is the field item VS property name separator, because a field property
- *   is the smallest unit
- * - `␞` then is the field item list vs field item separator
- * - `␝` then is the field item list vs field item separator
- * - `␜` then is the entity vs field item list separator
- *
- * @see \Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpressionInterface
- * @see https://github.com/SixArm/usv
- *
- *
- * @section canvas_extensions Canvas Extensions
- *
- * Canvas Extensions makes additional functionalities and customization points
- * available for extending the Drupal Canvas module.
- *
- * Canvas Extensions can only be defined in modules. Themes are not supported.
- *
- * Any library with `drupalSettings.canvasExtension` will be identified as an
- * Drupal Canvas extension and will be loaded with the UI. Be sure
- * to add `canvas/ui` as a dependency.
- * So, your `*.libraries.yml` file should contain an entry that looks similar to
- * this:
- * @code
- * app:
- *  header: true
- *  js:
- *    path/to/your/canvas/extension/something.js:
- *      attributes: { type: module }
- *  drupalSettings:
- *    canvasExtension:
- *      testExtension: {
- *        id: 'canvas-test-extension',
- *        name: 'Canvas Test Extension',
- *        description: 'A test extension for Drupal Canvas.',
- *        imgSrc: 'relative/path/from/your/module/optionalImage.png'
- *      }
- *  dependencies:
- *    - canvas/canvas-ui
- *
- * @see tests/modules/canvas_test_extension_legacy/ui/index.jsx for how to wrap your
- * React Application so it has access to Drupal Canvas UI APIs
- * @see tests/modules/canvas_test_extension_legacy/ui/components/ConceptProver.jsx for
- * examples of how these APIs can be used to access info about and make
- * changes to content in the UI.
- *
- * This functionality is currently experimental and a more formal API will be
- * available in future versions.
- *
- * @}
  */
 
 /**
- * Implements hook_storage_prop_shape_alter().
+ * Implements hook_canvas_storable_prop_shape_alter().
+ *
+ * @see docs/shape-matching.md#3.1.2.b
+ * @see docs/diagrams/components.md
  */
-function hook_storage_prop_shape_alter(CandidateStorablePropShape $storable_prop_shape): void {
+function hook_canvas_storable_prop_shape_alter(CandidateStorablePropShape $storable_prop_shape): void {
   // Override the default widget for prop shapes constrained by `enum`.
-  if (array_key_exists('enum', $storable_prop_shape->shape->schema)) {
+  if (\array_key_exists('enum', $storable_prop_shape->shape->schema)) {
     $storable_prop_shape->fieldWidget = 'options_buttons';
   }
 
@@ -129,49 +54,53 @@ function hook_storage_prop_shape_alter(CandidateStorablePropShape $storable_prop
     $storable_prop_shape->fieldTypeProp = new FieldTypePropExpression('contrib_duration_field', 'value');
     $storable_prop_shape->fieldWidget = 'fancy_duration_widget';
   }
-}
 
-/**
- * Implements hook_field_widget_info_alter().
- *
- * Any field widgets defined to be used in hook_storage_prop_shape_alter() MUST
- * have a corresponding `canvas.transforms` defined in their plugin definition.
- *
- * These "transforms" allow a field widget's value to be extracted on the client
- * side, resulting in the instantaneous previews Canvas users expect.
- *
- * Canvas's list of available field widget transforms:
- * - mainProperty
- * - firstRecord
- * - dateTime
- * - mediaSelection
- * - link
- *
- * @see docs/redux-integrated-field-widgets.md
- * @see \Drupal\canvas\Hook\ReduxIntegratedFieldWidgetsHooks::fieldWidgetInfoAlter()
- */
-function mymodule_field_widget_info_alter(array &$info): void {
-  $info['options_buttons']['canvas'] = [
-    'transforms' => [
-      // @todo Analyze the field widget PHP code, assign appropriate transforms.
-    ],
-  ];
-  $info['link_default']['canvas'] = [
-    'transforms' => [
-      // @todo Analyze the field widget PHP code, assign appropriate transforms.
-    ],
-  ];
-  $info['fancy_duration_widget']['canvas'] = [
-    'transforms' => [
-      // @todo Analyze the field widget PHP code, assign appropriate transforms.
-    ],
-  ];
-}
+  // The `type: object, $ref: json-schema-definitions://canvas.module/image`
+  // shape allows picking any media of a media type powered by the "image" media
+  // source by default.
+  // Some sites may want to exclude certain media types, and/or add other media
+  // types that use a different media source (with a different expression).
+  // @see \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression::hasBranch()
+  // @see \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression::withoutBranch()
+  // @see \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression::withAdditionalBranch()
+  if (
+    // "image" object shape?
+    $storable_prop_shape->shape->schema['type'] === 'object'
+    && isset($storable_prop_shape->shape->schema['$ref'])
+    && $storable_prop_shape->shape->schema['$ref'] === 'json-schema-definitions://canvas.module/image'
+    // Currently using media types?
+    // @see \Drupal\canvas\Hook\ShapeMatchingHooks::mediaLibraryStorablePropShapeAlter()
+    && $storable_prop_shape->fieldTypeProp instanceof ReferenceFieldTypePropExpression
+    && $storable_prop_shape->fieldTypeProp->getFieldType() === 'entity_reference'
+    && $storable_prop_shape->fieldTypeProp->getTargetExpression()->getHostEntityDataDefinition()->getEntityTypeId() === 'media'
+  ) {
+    $expr = $storable_prop_shape->fieldTypeProp;
+    $target_bundles = $storable_prop_shape->fieldInstanceSettings['handler_settings']['target_bundles'];
 
-/**
- * @addtogroup hooks
- * @{
- */
+    // Exclude the "vacation_photos" media type: don't allow it to be stored in
+    // the field, and update the expression.
+    if ($expr->hasBranch('entity:media:vacation_photos')) {
+      $target_bundles = array_diff_key($target_bundles, array_flip(['vacation_photos']));
+      $expr = $expr->withoutBranch('entity:media:vacation_photos');
+    }
+
+    // Add the "remote_image" media type, which uses the oEmbed media source.
+    // Allow it to be stored in the field, and update the expression.
+    // @see https://www.drupal.org/project/media_remote_image
+    $target_bundles = $target_bundles + ['remote_image' => 'remote_image'];
+    $expr->withAdditionalBranch(new FieldPropExpression(
+      entityType: BetterEntityDataDefinition::create('media', ['remote_image']),
+      fieldName: 'field_media_remote_image',
+      delta: NULL,
+      // @todo Update this to use the relevant computed property instead of "non_existent_computed_property" after Canvas depends on a Drupal core version that includes https://www.drupal.org/project/drupal/issues/3567249
+      propName: 'non_existent_computed_property',
+    ));
+
+    // Apply the updated changes.
+    $storable_prop_shape->fieldTypeProp = $expr;
+    $storable_prop_shape->fieldInstanceSettings['handler_settings']['target_bundles'] = $target_bundles;
+  }
+}
 
 /**
  * @} End of "addtogroup hooks".

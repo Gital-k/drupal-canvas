@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\CanvasConfigUpdater;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ContentTemplate;
@@ -9,6 +10,7 @@ use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Entity\Pattern;
 use Drupal\Core\Config\Entity\ConfigEntityUpdater;
 use Drupal\field\Entity\FieldConfig;
+use Drupal\image\Entity\ImageStyle;
 
 /**
  * Track that props have the required flag in component config entities.
@@ -160,4 +162,125 @@ function canvas_post_update_0007_respect_prop_ordering(array &$sandbox): void {
   $canvasConfigUpdater->setDeprecationsEnabled(FALSE);
   \Drupal::classResolver(ConfigEntityUpdater::class)
     ->update($sandbox, Component::ENTITY_TYPE_ID, static fn(Component $component): bool => $canvasConfigUpdater->needsPropReordering($component));
+}
+
+/**
+ * Retrigger SDC component discovery.
+ *
+ * Two reasons:
+ * 1. added support for well-known prop shape matching even if not referencing
+ *    the well-known prop shape in the JSON schema for the SDC prop
+ * 2. using a dot in a `meta:enum` key is no longer forbidden for SDCs
+ *
+ * @see https://www.drupal.org/node/2960601
+ * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::getComponentInputsForMetadata()
+ * @see \Drupal\canvas\PropShape\PropShape::standardize()
+ * @see \Drupal\canvas\ComponentMetadataRequirementsChecker)
+ */
+function canvas_post_update_0008_rediscover_sdcs(): void {
+  // Empty update to trigger cache wipe, which will re-trigger SDC discovery.
+}
+
+/**
+ * Remove "category" property from existing instances of Component entities.
+ */
+function canvas_post_update_0009_unset_category_property_on_components(array &$sandbox): void {
+  $canvasConfigUpdater = \Drupal::service(CanvasConfigUpdater::class);
+  \assert($canvasConfigUpdater instanceof CanvasConfigUpdater);
+  $canvasConfigUpdater->setDeprecationsEnabled(FALSE);
+  \Drupal::classResolver(ConfigEntityUpdater::class)
+    ->update($sandbox, Component::ENTITY_TYPE_ID, static fn(Component $component): bool => $canvasConfigUpdater->unsetComponentCategoryProperty($component));
+}
+
+/**
+ * Migrate auto-save data from tempstore to key-value store.
+ */
+function canvas_post_update_0010_migrate_auto_save(): void {
+  $keyvalue_factory = \Drupal::service('keyvalue');
+  $tempstore_factory = \Drupal::service('tempstore.shared');
+
+  $collections = [
+    AutoSaveManager::AUTO_SAVE_STORE,
+    AutoSaveManager::FORM_VIOLATIONS_STORE,
+    AutoSaveManager::COMPONENT_INSTANCE_FORM_VIOLATIONS_STORE,
+  ];
+
+  foreach ($collections as $collection) {
+    $tempstore = $tempstore_factory->get($collection);
+    $keyvalue_store = $keyvalue_factory->get($collection);
+
+    // SharedTempStore doesn't expose getAll() publicly. Use reflection to
+    // access the protected $storage property which has the getAll() method.
+    // The underlying key-value expirable storage has getAll() but it's not
+    // part of the SharedTempStore public API.
+    $reflection = new \ReflectionObject($tempstore);
+    $storage_property = $reflection->getProperty('storage');
+    $storage_property->setAccessible(TRUE);
+    $tempstore_storage = $storage_property->getValue($tempstore);
+
+    foreach ($tempstore_storage->getAll() as $key => $value) {
+      if (is_object($value) && isset($value->data)) {
+        $data = $value->data;
+        if ($collection === AutoSaveManager::AUTO_SAVE_STORE && isset($value->owner, $value->updated)) {
+          $data['owner'] = (int) ($value->owner ?? 0);
+          $data['updated'] = (int) ($value->updated ?? 0);
+        }
+        $keyvalue_store->set($key, $data);
+      }
+    }
+  }
+}
+
+/**
+ * Updates multi-bundle reference prop expressions to the improved format.
+ *
+ * (Also updates single-bundle reference prop expressions that are repeated in
+ * every bundle of a multi-bundle reference prop, to keep things consistent.)
+ *
+ * @see https://www.drupal.org/node/3563451
+ * @see \Drupal\canvas\CanvasConfigUpdater::expressionUsesDeprecatedReference()
+ * @see \Drupal\canvas\Hook\ShapeMatchingHooks::mediaLibraryStorablePropShapeAlter()
+ */
+function canvas_post_update_0011_multi_bundle_reference_prop_expressions(array &$sandbox): void {
+  $canvasConfigUpdater = \Drupal::service(CanvasConfigUpdater::class);
+  \assert($canvasConfigUpdater instanceof CanvasConfigUpdater);
+  $canvasConfigUpdater->setDeprecationsEnabled(FALSE);
+  \Drupal::classResolver(ConfigEntityUpdater::class)
+    ->update($sandbox, Component::ENTITY_TYPE_ID, static fn(Component $component): bool => $canvasConfigUpdater->needsMultiBundleReferencePropExpressionUpdate($component));
+}
+
+/**
+ * Updates Canvas-provided image style to use AVIF with WebP fallback.
+ */
+function canvas_post_update_0012_canvas_image_style_avif(array &$sandbox): void {
+  $image_style = ImageStyle::load('canvas_parametrized_width');
+  $effect_id = '249b8926-f421-4d60-8453-fb5d9265c731';
+  if (!$image_style) {
+    return;
+  }
+  $effects = $image_style->getEffects();
+  $effects_data = $image_style->get('effects');
+  if ($effects->has($effect_id) && $effects->get($effect_id)->getPluginId() === 'image_convert') {
+    $effects_data[$effect_id]['id'] = 'image_convert_avif';
+    $image_style->set('effects', $effects_data);
+    $image_style->save();
+  }
+}
+
+/**
+ * Updates content templates' DynamicPropSources to EntityFieldPropSources.
+ */
+function canvas_post_update_0013_update_dynamic_prop_sources_to_entity_field_prop_sources(array &$sandbox): void {
+  $canvasConfigUpdater = \Drupal::service(CanvasConfigUpdater::class);
+  \assert($canvasConfigUpdater instanceof CanvasConfigUpdater);
+  $canvasConfigUpdater->setDeprecationsEnabled(FALSE);
+  // Loading and re-saving automatically triggers a just-in-time update path.
+  // @see \Drupal\canvas\PropSource\PropSource::parse()
+  \Drupal::classResolver(ConfigEntityUpdater::class)
+    // We might not need to update every single ContentTemplate, because
+    // entity-field prop source presence is allowed, but not enforced via config
+    // schema. But the chances a content template won't have an entity-field
+    // prop source is quite low and irrelevant.
+    ->update($sandbox, ContentTemplate::ENTITY_TYPE_ID, static fn(ContentTemplate $template): bool => TRUE);
+
 }

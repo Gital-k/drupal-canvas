@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Drupal\canvas\Plugin\DataType;
 
 use Drupal\Core\StringTranslation\TranslatableMarkup;
@@ -101,6 +103,7 @@ final class ParentComponentReference extends DataReferenceBase {
   /**
    * {@inheritdoc}
    */
+  // @phpstan-ignore-next-line method.childReturnType
   public function getString(): ?string {
     return $this->parentUuid;
   }

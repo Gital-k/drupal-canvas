@@ -1,5 +1,6 @@
 - tabpanel "Components":
-  - textbox "Search content"
+  - textbox "Search content":
+    - /placeholder: Search…
   - img
   - button "New":
     - img
@@ -12,6 +13,7 @@
     - listitem:
       - img
       - text: Video
+      - button "Open contextual menu"
   - img
   - button "Atom/Tabs"
   - button "Collapse Atom/Tabs folder" [expanded]:
@@ -20,9 +22,11 @@
     - listitem:
       - img
       - text: Shoe Tab
+      - button "Open contextual menu"
     - listitem:
       - img
       - text: Shoe Tab Panel
+      - button "Open contextual menu"
   - img
   - button "Atom/Text"
   - button "Collapse Atom/Text folder" [expanded]:
@@ -30,10 +34,16 @@
   - list:
     - listitem:
       - img
+      - text: Date
+      - button "Open contextual menu"
+    - listitem:
+      - img
       - text: Heading
+      - button "Open contextual menu"
     - listitem:
       - img
       - text: Shoe Badge
+      - button "Open contextual menu"
   - img
   - button "Container"
   - button "Collapse Container folder" [expanded]:
@@ -41,13 +51,20 @@
   - list:
     - listitem:
       - img
+      - text: Columns
+      - button "Open contextual menu"
+    - listitem:
+      - img
       - text: Grid Container
+      - button "Open contextual menu"
     - listitem:
       - img
       - text: One Column
+      - button "Open contextual menu"
     - listitem:
       - img
       - text: Two Column
+      - button "Open contextual menu"
   - img
   - button "Container/Special"
   - button "Collapse Container/Special folder" [expanded]:
@@ -56,6 +73,7 @@
     - listitem:
       - img
       - text: Shoe Tab Group
+      - button "Open contextual menu"
   - img
   - button "Empty Components"
   - button "Collapse Empty Components folder" [expanded]:
@@ -69,9 +87,11 @@
     - listitem:
       - img
       - text: Footer
+      - button "Open contextual menu"
     - listitem:
       - img
       - text: Main navigation
+      - button "Open contextual menu"
   - img
   - button "Other"
   - button "Collapse Other folder" [expanded]:
@@ -79,100 +99,99 @@
   - list:
     - listitem:
       - img
+      - text: Banner
+      - button "Open contextual menu"
+    - listitem:
+      - img
       - text: Call to Absolute Action
+      - button "Open contextual menu"
     - listitem:
       - img
       - text: Canvas test SDC for image gallery (>1 image)
+      - button "Open contextual menu"
     - listitem:
       - img
       - text: /Canvas test SDC for sparkline \(>1 integers between -\d+ and \d+\)/
+      - button "Open contextual menu"
+    - listitem:
+      - img
+      - text: Canvas test SDC for tags
+      - button "Open contextual menu"
     - listitem:
       - img
       - text: "Canvas test SDC for testing type: `Drupal\\Core\\Template\\Attribute` special casing"
+      - button "Open contextual menu"
     - listitem:
       - img
       - text: Canvas test SDC that crashes when 'crash' prop is TRUE
+      - button "Open contextual menu"
+    - listitem:
+      - img
+      - text: Canvas test SDC with missing image $ref schema
+      - button "Open contextual menu"
     - listitem:
       - img
       - text: Canvas test SDC with optional image and heading
+      - button "Open contextual menu"
     - listitem:
       - img
       - text: Canvas test SDC with optional image, with example
+      - button "Open contextual menu"
     - listitem:
       - img
       - text: Canvas test SDC with optional image, without example
+      - button "Open contextual menu"
     - listitem:
       - img
       - text: Canvas test SDC with props and slots
+      - button "Open contextual menu"
     - listitem:
       - img
       - text: Canvas test SDC with props but no slots
+      - button "Open contextual menu"
     - listitem:
       - img
       - text: Canvas test SDC with required image, with example
-    - listitem:
-      - img
-      - text: Card
-    - listitem:
-      - img
-      - text: Card with local image
-    - listitem:
-      - img
-      - text: Card with remote image
-    - listitem:
-      - img
-      - text: Card with stream wrapper image
-    - listitem:
-      - img
-      - text: Component no meta:enum
-    - listitem:
-      - img
-      - text: Druplicon
-    - listitem:
-      - img
-      - text: Hero
-    - listitem:
-      - img
-      - text: Section
-    - listitem:
-      - img
-      - text: Test SDC Image
-  - img
-  - button "Status"
-  - button "Collapse Status folder" [expanded]:
-    - img
-  - list:
-    - listitem:
-      - img
-      - text: Deprecated SDC
-    - listitem:
-      - img
-      - text: Experimental SDC
-  - img
-  - button "System"
-  - button "Collapse System folder" [expanded]:
-    - img
-  - list:
-    - listitem:
-      - img
-      - text: Breadcrumbs
-    - listitem:
-      - img
-      - text: Messages
-    - listitem:
-      - img
-      - text: Powered by Drupal
-    - listitem:
-      - img
-      - text: Site branding
-  - list:
+      - button "Open contextual menu"
     - listitem:
       - img
       - text: Captioned video
       - button "Open contextual menu"
     - listitem:
       - img
+      - text: Card
+      - button "Open contextual menu"
+    - listitem:
+      - img
+      - text: Card with local image
+      - button "Open contextual menu"
+    - listitem:
+      - img
+      - text: Card with remote image
+      - button "Open contextual menu"
+    - listitem:
+      - img
+      - text: Card with stream wrapper image
+      - button "Open contextual menu"
+    - listitem:
+      - img
+      - text: /Component mismatch meta:enum, but still operational thanks to https:\/\/www\.drupal\.org\/i\/\d+/
+      - button "Open contextual menu"
+    - listitem:
+      - img
+      - text: Component no meta:enum
+      - button "Open contextual menu"
+    - listitem:
+      - img
       - text: Component using imports
+      - button "Open contextual menu"
+    - listitem:
+      - img
+      - text: Druplicon
+      - button "Open contextual menu"
+    - listitem:
+      - img
+      - text: Hero
       - button "Open contextual menu"
     - listitem:
       - img
@@ -181,6 +200,18 @@
     - listitem:
       - img
       - text: My Code Component Link
+      - button "Open contextual menu"
+    - listitem:
+      - img
+      - text: Section
+      - button "Open contextual menu"
+    - listitem:
+      - img
+      - text: Test SDC Image
+      - button "Open contextual menu"
+    - listitem:
+      - img
+      - text: Using drupalSettings getPageData
       - button "Open contextual menu"
     - listitem:
       - img
@@ -206,3 +237,38 @@
       - img
       - text: With slot
       - button "Open contextual menu"
+  - img
+  - button "Status"
+  - button "Collapse Status folder" [expanded]:
+    - img
+  - list:
+    - listitem:
+      - img
+      - text: Deprecated SDC
+      - button "Open contextual menu"
+    - listitem:
+      - img
+      - text: Experimental SDC
+      - button "Open contextual menu"
+  - img
+  - button "System"
+  - button "Collapse System folder" [expanded]:
+    - img
+  - list:
+    - listitem:
+      - img
+      - text: Breadcrumbs
+      - button "Open contextual menu"
+    - listitem:
+      - img
+      - text: Messages
+      - button "Open contextual menu"
+    - listitem:
+      - img
+      - text: Powered by Drupal
+      - button "Open contextual menu"
+    - listitem:
+      - img
+      - text: Site branding
+      - button "Open contextual menu"
+  - list

@@ -24,6 +24,8 @@ use Symfony\Component\Validator\ConstraintViolationListInterface;
   id: self::PLUGIN_ID,
   label: new TranslatableMarkup('Fallback'),
   supportsImplicitInputs: FALSE,
+  discovery: FALSE,
+  updater: FALSE,
 )]
 final class Fallback extends ComponentSourceBase implements ComponentSourceWithSlotsInterface {
   public const string PLUGIN_ID = 'fallback';
@@ -86,7 +88,7 @@ final class Fallback extends ComponentSourceBase implements ComponentSourceWithS
   /**
    * {@inheritdoc}
    */
-  public function getDefaultExplicitInput(): array {
+  public function getDefaultExplicitInput(bool $only_required = FALSE): array {
     return [];
   }
 
@@ -94,9 +96,9 @@ final class Fallback extends ComponentSourceBase implements ComponentSourceWithS
     return $item->getInputs() ?? [];
   }
 
-  public function hydrateComponent(array $explicit_input, array $slot_definitions): array {
+  public function hydrateComponent(array $explicit_input, array $slot_definitions, array $active_required_explicit_inputs): array {
     return [
-      'slots' => array_map(fn($slot) => $slot['examples'][0] ?? '', $slot_definitions),
+      'slots' => \array_map(fn($slot) => $slot['examples'][0] ?? '', $slot_definitions),
     ];
   }
 
@@ -115,7 +117,7 @@ final class Fallback extends ComponentSourceBase implements ComponentSourceWithS
     ];
   }
 
-  public function buildComponentInstanceForm(array $form, FormStateInterface $form_state, ?Component $component = NULL, string $component_instance_uuid = '', array $inputValues = [], ?EntityInterface $entity = NULL, array $settings = []): array {
+  public function buildComponentInstanceForm(array $form, FormStateInterface $form_state, Component $component, string $component_instance_uuid = '', array $inputValues = [], ?EntityInterface $entity = NULL, array $settings = []): array {
     // @todo Improve this in https://drupal.org/i/3524299.
     $form['warning'] = [
       '#type' => 'html_tag',

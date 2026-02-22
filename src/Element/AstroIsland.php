@@ -97,7 +97,7 @@ final class AstroIsland extends RenderElementBase {
     }
 
     $client = \Drupal::service(LibraryDiscoveryInterface::class)->getLibraryByName('canvas', 'astro.client');
-    assert(isset($client['js'][0]['data']) && count($client['js']) === 1);
+    \assert(isset($client['js'][0]['data']) && count($client['js']) === 1);
     $renderer_url = base_path() . $client['js'][0]['data'];
 
     $mapped_props = \array_map(static fn(mixed $prop_value): array => [
@@ -189,7 +189,7 @@ final class AstroIsland extends RenderElementBase {
     foreach ($slot_names as $slot_name) {
       // Prevent XSS via malicious render array.
       $escaped_slot_name = Html::escape((string) $slot_name);
-      if ($slot_name === 'default') {
+      if ($slot_name === 'default' || $slot_name === 'children') {
         $template .= \sprintf('<template data-astro-template>{{ %s }}</template>', $escaped_slot_name);
         continue;
       }

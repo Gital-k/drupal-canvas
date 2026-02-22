@@ -47,6 +47,12 @@ use Symfony\Component\Yaml\Yaml;
       description: new TranslatableMarkup("The machine name of the component to edit."),
       required: TRUE
     ),
+    'selected_component_required_props' => new ContextDefinition(
+      data_type: 'list',
+      label: new TranslatableMarkup("Selected Component Required Props"),
+      description: new TranslatableMarkup("The existing required props of the selected component."),
+      required: FALSE
+    ),
   ],
 )]
 final class EditComponentJs extends FunctionCallBase implements ExecutableFunctionCallInterface, AiAgentContextInterface, BuilderResponseFunctionCallInterface {
@@ -93,7 +99,11 @@ final class EditComponentJs extends FunctionCallBase implements ExecutableFuncti
       if (!$component) {
         throw new \Exception("Could not find component $machine_name.");
       }
+
+      $existing_required_props = $this->getContextValue('selected_component_required_props');
       $transformed_props = [];
+      $required_props = [];
+      $explicitly_marked_required_props = [];
       if (is_array($props_array)) {
         foreach ($props_array as $prop) {
           if (!empty($prop['id']) && !empty($prop['name']) && !empty($prop['type']) && !empty($prop['example'])) {
@@ -108,9 +118,27 @@ final class EditComponentJs extends FunctionCallBase implements ExecutableFuncti
               }
             }
             $transformed_props[$prop['id']] = $transformed;
+
+            if (isset($prop['required'])) {
+              $explicitly_marked_required_props[$prop['id']] = $prop['required'];
+              if ($prop['required'] === TRUE) {
+                $required_props[] = $prop['id'];
+              }
+            }
           }
         }
       }
+
+      // Retain existing required props that were not explicitly marked.
+      if (!empty($existing_required_props)) {
+        foreach ($existing_required_props as $existing_prop) {
+          if (!isset($explicitly_marked_required_props[$existing_prop])) {
+            $required_props[] = $existing_prop;
+          }
+        }
+      }
+
+      $required_props = array_unique($required_props);
 
       $output = [
         'name' => $component->get('name'),
@@ -124,6 +152,7 @@ final class EditComponentJs extends FunctionCallBase implements ExecutableFuncti
         'compiledCss' => '',
         'importedJsComponents' => [],
         'props' => $transformed_props,
+        'required' => $required_props,
         'dataDependencies' => [],
       ];
       $violations = JavaScriptComponent::createFromClientSide($output)->getTypedData()->validate();
@@ -143,13 +172,16 @@ final class EditComponentJs extends FunctionCallBase implements ExecutableFuncti
       $this->logger->error($e->getMessage());
       // \Drupal\canvas_ai\Controller\CanvasBuilder::render() also YAML parsable output.
       // @see \Drupal\canvas_ai\Controller\CanvasBuilder::render()
-      $this->setOutput(Yaml::dump(['error' => sprintf('Failed to process Javascript component data: %s', $e->getMessage())], 10, 2));
+      $this->setOutput(Yaml::dump(['error' => \sprintf('Failed to process Javascript component data: %s', $e->getMessage())], 10, 2));
       return;
     }
-    $this->setStructuredOutput([
+    $output = [
       'js_structure' => $js,
-      'props_metadata' => $props,
-    ]);
+      'props_metadata' => Json::encode($transformed_props),
+      'required_props' => $required_props,
+    ];
+    $this->setStructuredOutput($output);
+    $this->setOutput('Component with id "' . $machine_name . '" has been successfully updated.');
   }
 
 }

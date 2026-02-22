@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useErrorBoundary } from 'react-error-boundary';
 import { useParams } from 'react-router';
 import { AlertDialog, Button, Flex } from '@radix-ui/themes';
@@ -12,7 +12,7 @@ import {
 import { selectPageData } from '@/features/pageData/pageDataSlice';
 import { selectPreviewHtml } from '@/features/pagePreview/previewSlice';
 import { usePostPreviewMutation } from '@/services/preview';
-import { viewportSizes } from '@/types/Preview';
+import { getViewportSizes } from '@/utils/viewports';
 
 import styles from './PagePreview.module.css';
 
@@ -23,19 +23,27 @@ const PagePreview = () => {
   const entity_form_fields = useAppSelector(selectPageData);
   const frameSrcDoc = useAppSelector(selectPreviewHtml);
   const [postPreview] = usePostPreviewMutation();
+  const { entityId, entityType } = useParams();
   const { showBoundary } = useErrorBoundary();
   const [widthVal, setWidthVal] = useState('100%');
   const { width } = useParams();
   const [linkIntercepted, setLinkIntercepted] = useState('');
   const [submissionIntercepted, setSubmissionIntercepted] = useState(false);
+  // Get viewport sizes (supports theme-level customization).
+  const viewportSizes = useMemo(() => getViewportSizes(), []);
 
   useEffect(() => {
     const sendPreviewRequest = async () => {
+      if (!entityType || !entityId) {
+        return;
+      }
       try {
         await postPreview({
           layout,
           model,
           entity_form_fields,
+          entityId,
+          entityType,
         }).unwrap();
       } catch (err) {
         showBoundary(err);
@@ -49,6 +57,8 @@ const PagePreview = () => {
     model,
     postPreview,
     entity_form_fields,
+    entityId,
+    entityType,
     updatePreview,
     showBoundary,
   ]);
@@ -64,7 +74,7 @@ const PagePreview = () => {
         }
       });
     }
-  }, [width]);
+  }, [width, viewportSizes]);
 
   useEffect(() => {
     function handlePreviewLinkClick(event: MessageEvent) {

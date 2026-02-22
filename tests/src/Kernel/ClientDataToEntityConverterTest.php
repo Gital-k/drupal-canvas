@@ -45,13 +45,16 @@ use Drupal\user\Entity\User;
 use Drupal\user\RoleInterface;
 use Drupal\canvas_test_article_fields\Hook\CanvasTestArticleFieldsHooks;
 use GuzzleHttp\Psr7\Query;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
  * @group canvas
  * @group #slow
+ * @todo Refactor this to start using CanvasKernelTestBase and stop using CanvasTestSetup in https://www.drupal.org/project/canvas/issues/3531679
  */
+#[RunTestsInSeparateProcesses]
 class ClientDataToEntityConverterTest extends KernelTestBase {
 
   use CanvasFieldTrait {
@@ -69,10 +72,11 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
   public function setUp(): void {
     parent::setUp();
     $this->container->get('module_installer')->install(['system']);
+    // @todo Refactor this away in https://www.drupal.org/project/canvas/issues/3531679
     (new CanvasTestSetup())->setup();
     $this->setUpImages();
     $other_user = $this->createUser();
-    assert($other_user instanceof User);
+    \assert($other_user instanceof User);
     $this->otherUser = $other_user;
   }
 
@@ -240,7 +244,7 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
     if ($with_content_moderation) {
       $permissions[] = 'use editorial transition create_new_draft';
     }
-    $this->setupCurrentUser([], $permissions);
+    $this->setUpCurrentUser([], $permissions);
     $limited_user = \Drupal::currentUser();
     $limited_user_id = $limited_user->id();
     $new_author = \sprintf('%s (%d)', $limited_user->getDisplayName(), $limited_user_id);
@@ -275,12 +279,21 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
     // The field value should remain unchanged.
     $this->assertFalse($test_node->isSticky());
 
+    // TRICKY! In Drupal 11.3 and later, the `sticky` field is hidden by
+    // default, which means it will not be updated because Canvas uses the form
+    // API to convert client data to entity data.
+    // @see https://www.drupal.org/node/3518643
+    \Drupal::service(EntityDisplayRepositoryInterface::class)
+      ->getFormDisplay('node', $test_node->getType())
+      ->setComponent('sticky', ['type' => 'boolean_checkbox'])
+      ->save();
+
     // If the client has elevated permissions, they can update protected fields.
     $permissions = ['administer nodes'];
     if ($with_content_moderation) {
       $permissions[] = 'use editorial transition create_new_draft';
     }
-    $this->setupCurrentUser([
+    $this->setUpCurrentUser([
       'timezone' => \date_default_timezone_get(),
     ], $permissions);
     $test_node = $this->createTestNode();
@@ -557,7 +570,7 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
         ],
       ],
     ] + $values);
-    assert($node instanceof Node);
+    \assert($node instanceof Node);
     $this->assertSame(SAVED_NEW, $node->save());
     return $node;
   }
@@ -567,7 +580,7 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
     \Drupal::keyValue(CanvasTestArticleFieldsHooks::CANVAS_STATE)->set(CanvasTestArticleFieldsHooks::GRAVY_STATE, TRUE);
     $autoSave = $this->container->get(AutoSaveManager::class);
     \assert($autoSave instanceof AutoSaveManager);
-    $this->setupCurrentUser(permissions: [
+    $this->setUpCurrentUser(permissions: [
       'access administration pages',
       'edit any article content',
       'use editorial transition create_new_draft',

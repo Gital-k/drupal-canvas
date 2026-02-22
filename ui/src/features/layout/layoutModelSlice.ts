@@ -6,7 +6,7 @@ import { getPropsValues } from '@/components/form/formUtil';
 import { syncPropSourcesToResolvedValues } from '@/components/form/InputBehaviorsComponentPropsForm';
 import { selectEditorFrameContext } from '@/features/ui/uiSlice';
 import { previewApi } from '@/services/preview';
-import { componentHasFieldData } from '@/types/Component';
+import { hasSlotDefinitions, isPropSourceComponent } from '@/types/Component';
 import {
   getCanvasSettings,
   setCanvasDrupalSetting,
@@ -25,7 +25,11 @@ import {
 import type { PayloadAction } from '@reduxjs/toolkit';
 import type { StateWithHistory } from 'redux-undo';
 import type { AppThunk, RootState } from '@/app/store';
-import type { CanvasComponent, ComponentsList } from '@/types/Component';
+import type {
+  CanvasComponent,
+  ComponentsList,
+  PropSourceComponent,
+} from '@/types/Component';
 import type { InputUIData } from '@/types/Form';
 import type { UUID } from '@/types/UUID';
 
@@ -82,14 +86,7 @@ export interface LayoutModelSliceState extends RootLayoutModel {
 }
 
 export const initialState: LayoutModelSliceState = {
-  layout: [
-    {
-      nodeType: NodeType.Region,
-      name: 'content',
-      components: [],
-      id: 'content',
-    },
-  ],
+  layout: [],
   model: {},
   updatePreview: false,
   isInitialized: false,
@@ -328,7 +325,7 @@ export const layoutModelSlice = createSlice({
         }
 
         let updatedModel: ComponentModels = { ...state.model };
-        let newLayout: Array<RegionNode> = JSON.parse(
+        const newLayout: Array<RegionNode> = JSON.parse(
           JSON.stringify(state.layout),
         );
         const components = layoutModel.layout;
@@ -439,6 +436,9 @@ export const layoutModelSlice = createSlice({
     ),
     setInitialized: create.reducer((state, action: PayloadAction<boolean>) => {
       state.isInitialized = action.payload;
+      if (!action.payload) {
+        state.updatePreview = false;
+      }
     }),
     setLayoutModel: create.reducer(
       (state, action: PayloadAction<LayoutModelSliceState>) => {
@@ -486,7 +486,7 @@ export const _addNewComponentToLayout =
     const { to, component, withValues } = payload;
     // Populate the model data with the default values
     const buildInitialData = (component: CanvasComponent): ComponentModel => {
-      if (componentHasFieldData(component)) {
+      if (isPropSourceComponent(component)) {
         const initialData: EvaluatedComponentModel = {
           resolved: {},
           source: {},
@@ -540,10 +540,11 @@ export const _addNewComponentToLayout =
     const slots: SlotNode[] = [];
     const uuid = uuidv4();
 
-    if (componentHasFieldData(component)) {
-      // Create empty slots in the layout data for each child slot the component
-      // has.
-      Object.keys(component.metadata.slots || []).forEach((name) => {
+    // Create empty slots in the layout data for each child slot the component
+    // has. Slot definitions can exist on any component that implements
+    // ComponentSourceWithSlotsInterface.
+    if (hasSlotDefinitions(component)) {
+      Object.keys(component.metadata.slots).forEach((name) => {
         slots.push({
           id: `${uuid}/${name}`,
           name: name,
@@ -666,7 +667,7 @@ export const updateExistingComponentValues =
     const componentMetadata = components[selectedComponentType];
     // Exit early if attempting to update a prop that does not exist.
     Object.keys(values).forEach((key) => {
-      if (!componentMetadata?.propSources?.[key]) {
+      if (!(componentMetadata as PropSourceComponent)?.propSources?.[key]) {
         console.warn(
           `Component ${selectedComponentType} does not have a prop named ${key}. Update cancelled.`,
         );
@@ -752,7 +753,7 @@ export const _updateExistingComponentValuesForLinking =
     const componentMetadata = components[selectedComponentType];
     // Exit early if attempting to update a prop that does not exist.
     Object.keys(values).forEach((key) => {
-      if (!componentMetadata?.propSources?.[key]) {
+      if (!(componentMetadata as PropSourceComponent)?.propSources?.[key]) {
         console.warn(
           `Component ${selectedComponentType} does not have a prop named ${key}. Update cancelled.`,
         );

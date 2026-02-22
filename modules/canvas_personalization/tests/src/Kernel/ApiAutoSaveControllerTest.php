@@ -58,6 +58,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
   protected function setUp(): void {
     parent::setUp();
     $this->installConfig('system');
+    // @todo Refactor this away in https://www.drupal.org/project/canvas/issues/3531679
     (new CanvasTestSetup())->setup();
   }
 
@@ -265,7 +266,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
 
     self::assertEquals($errors, $json['errors']);
     $stored_segment = $segment_storage->loadUnchanged($segment_id);
-    assert($stored_segment instanceof Segment);
+    \assert($stored_segment instanceof Segment);
     // Ensure the entity is not updated if is invalid.
     $this->assertEquals('New segment', $stored_segment->label());
 
@@ -328,7 +329,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     self::assertEquals(['message' => 'Successfully published 1 item.'], $json);
 
     $stored = $segment_storage->loadUnchanged($segment_id);
-    assert($stored instanceof Segment);
+    \assert($stored instanceof Segment);
     $this->assertSame($new_title, $stored->label());
     $this->assertSame($new_description, $stored->get('description'));
     $this->assertSame($data['rules'], $stored->get('rules'));

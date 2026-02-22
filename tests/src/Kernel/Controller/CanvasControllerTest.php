@@ -14,12 +14,14 @@ use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Entity\Pattern;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
-use Drupal\KernelTests\KernelTestBase;
+use Drupal\canvas\Entity\Folder;
 use Drupal\node\Entity\NodeType;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Kernel\Traits\PageTrait;
 use Drupal\Tests\canvas\Kernel\Traits\RequestTrait;
 use Drupal\Tests\canvas\Kernel\Traits\CanvasUiAssertionsTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
@@ -27,7 +29,8 @@ use Symfony\Component\HttpFoundation\Request;
  *
  * @group canvas
  */
-final class CanvasControllerTest extends KernelTestBase {
+#[RunTestsInSeparateProcesses]
+final class CanvasControllerTest extends CanvasKernelTestBase {
 
   use PageTrait;
   use RequestTrait;
@@ -38,30 +41,15 @@ final class CanvasControllerTest extends KernelTestBase {
    * {@inheritdoc}
    */
   protected static $modules = [
-    'canvas',
     'canvas_test_page',
     'entity_test',
     'canvas_entity_test',
-    ...self::PAGE_TEST_MODULES,
-    'block',
     'node',
-    // Canvas's dependencies (modules providing field types + widgets).
-    'datetime',
-    'file',
-    'image',
-    'media',
-    'options',
-    'path',
-    'link',
-    'text',
-    'system',
-    'user',
+    ...self::PAGE_TEST_MODULES,
   ];
 
   protected function setUp(): void {
     parent::setUp();
-    // Needed for date formats.
-    $this->installConfig(['system']);
     $this->installConfig(['node']);
     $this->installEntitySchema('path_alias');
     $this->installEntitySchema('node_type');
@@ -219,6 +207,7 @@ final class CanvasControllerTest extends KernelTestBase {
           'codeComponents' => FALSE,
           'contentTemplates' => FALSE,
           'publishChanges' => FALSE,
+          'folders' => FALSE,
         ],
       ],
       [
@@ -233,6 +222,7 @@ final class CanvasControllerTest extends KernelTestBase {
           'codeComponents' => TRUE,
           'contentTemplates' => FALSE,
           'publishChanges' => TRUE,
+          'folders' => FALSE,
         ],
       ],
       [
@@ -247,6 +237,7 @@ final class CanvasControllerTest extends KernelTestBase {
           'codeComponents' => FALSE,
           'contentTemplates' => FALSE,
           'publishChanges' => FALSE,
+          'folders' => FALSE,
         ],
       ],
       [
@@ -262,6 +253,7 @@ final class CanvasControllerTest extends KernelTestBase {
           'codeComponents' => TRUE,
           'contentTemplates' => FALSE,
           'publishChanges' => FALSE,
+          'folders' => FALSE,
         ],
       ],
       [
@@ -272,6 +264,7 @@ final class CanvasControllerTest extends KernelTestBase {
           JavaScriptComponent::ADMIN_PERMISSION,
           ContentTemplate::ADMIN_PERMISSION,
           AutoSaveManager::PUBLISH_PERMISSION,
+          Folder::ADMIN_PERMISSION,
         ],
         [
           'globalRegions' => TRUE,
@@ -279,6 +272,7 @@ final class CanvasControllerTest extends KernelTestBase {
           'codeComponents' => TRUE,
           'contentTemplates' => TRUE,
           'publishChanges' => TRUE,
+          'folders' => TRUE,
         ],
       ],
     ];

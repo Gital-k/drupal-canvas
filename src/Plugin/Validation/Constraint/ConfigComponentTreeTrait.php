@@ -7,6 +7,9 @@ namespace Drupal\canvas\Plugin\Validation\Constraint;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Utility\TypedDataHelper;
 
+/**
+ * @internal
+ */
 trait ConfigComponentTreeTrait {
 
   /**
@@ -16,7 +19,7 @@ trait ConfigComponentTreeTrait {
    */
   private function conjureFieldItemObject(array $value): ComponentTreeItem {
     $field_item = TypedDataHelper::conjureFieldItemObject(ComponentTreeItem::PLUGIN_ID);
-    assert($field_item instanceof ComponentTreeItem);
+    \assert($field_item instanceof ComponentTreeItem);
     $field_item->setValue($value);
     return $field_item;
   }

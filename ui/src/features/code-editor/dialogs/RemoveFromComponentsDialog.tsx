@@ -13,11 +13,19 @@ import {
   selectDialogStates,
   selectSelectedCodeComponent,
 } from '@/features/ui/codeComponentDialogSlice';
-import {
-  setActivePanel,
-  setManageLibraryTab,
-} from '@/features/ui/primaryPanelSlice';
+import { setActivePanel } from '@/features/ui/primaryPanelSlice';
 import { useUpdateCodeComponentMutation } from '@/services/componentAndLayout';
+
+// Helper function to get the machine name from a component.
+// Handles both JSComponent (with 'id') and CodeComponentSerialized (with 'machineName').
+function getComponentMachineName(component: any): string {
+  // Get the id or machineName
+  const componentId = component.machineName || component.id;
+  // Remove 'js.' prefix if present
+  return componentId?.startsWith('js.')
+    ? componentId.substring(3)
+    : componentId;
+}
 
 // This handles the dialog for removing a JS component from components. This changes
 // the component from being "exposed" to "internal".
@@ -37,8 +45,9 @@ const RemoveFromComponentsDialog = () => {
   const handleSave = async () => {
     if (!selectedComponent) return;
 
+    const machineName = getComponentMachineName(selectedComponent);
     await updateCodeComponent({
-      id: selectedComponent.machineName,
+      id: machineName,
       changes: {
         status: false,
       },
@@ -48,7 +57,7 @@ const RemoveFromComponentsDialog = () => {
       // The code editor typically won't check auto-save updates if the component
       // being edited is the same as the one being updated. Force a refresh to
       // avoid auto-save mismatch errors.
-      if (selectedComponent.machineName === codeComponentBeingEditedId) {
+      if (machineName === codeComponentBeingEditedId) {
         dispatch(setForceRefresh(true));
       }
       // If the code editor is open when the component is being set to internal,
@@ -57,7 +66,7 @@ const RemoveFromComponentsDialog = () => {
       // data, the code editor won't refetch while it's open.
       dispatch(setCodeComponentProperty(['status', false]));
       // Navigate to the code editor route that handles internal code components.
-      setNavigateTo(`/code-editor/code/${selectedComponent.machineName}`);
+      setNavigateTo(`/code-editor/component/${machineName}`);
     }
   };
 
@@ -72,8 +81,7 @@ const RemoveFromComponentsDialog = () => {
     if (navigateTo) {
       navigate(navigateTo);
       setNavigateTo(null);
-      dispatch(setActivePanel('manageLibrary'));
-      dispatch(setManageLibraryTab('code'));
+      dispatch(setActivePanel('code'));
     }
   }, [navigateTo, navigate, dispatch]);
 

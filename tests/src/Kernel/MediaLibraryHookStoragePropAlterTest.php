@@ -8,12 +8,16 @@ use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\canvas\PropShape\PropShape;
 use Drupal\canvas\PropShape\StorablePropShape;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
  * @covers \Drupal\canvas\Hook\ShapeMatchingHooks::mediaLibraryStoragePropShapeAlter()
  * @covers \Drupal\canvas\Hook\ReduxIntegratedFieldWidgetsHooks::mediaLibraryFieldWidgetInfoAlter()
  * @group canvas
+ * @group canvas_data_model
+ * @group canvas_data_model__prop_expressions
  */
+#[RunTestsInSeparateProcesses]
 class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
 
   use MediaTypeCreationTrait;
@@ -22,17 +26,7 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
    * {@inheritdoc}
    */
   protected static $modules = [
-    // @see \Drupal\media\Entity\Media
-    'media',
-    // @see \Drupal\media_library\Plugin\Field\FieldWidget\MediaLibraryWidget
-    'media_library',
-    // Without this module installed, the media source fields can't be created,
-    // because the FieldConfig entity type would not exist.
     'field',
-    // The Media Library widget uses Views.
-    'views',
-    // @see \Drupal\media_library\MediaLibraryEditorOpener::__construct()
-    'filter',
   ];
 
   /**
@@ -43,6 +37,7 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
 
     // @see \Drupal\Core\Field\Plugin\Field\FieldType\EntityReferenceItem::generateSampleValue()
     $this->installEntitySchema('media');
+    $this->installEntitySchema('path_alias');
 
     // @see \Drupal\media_library\Plugin\Field\FieldWidget\MediaLibraryWidget
     $this->installEntitySchema('user');
@@ -92,7 +87,7 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
         cardinality: $image_shape->cardinality,
         fieldWidget: 'media_library_widget',
         // @phpstan-ignore-next-line
-        fieldTypeProp: StructuredDataPropExpression::fromString("ℹ︎entity_reference␟{src↝entity␜␜entity:media:baby_photos|vacation_photos␝field_media_image|field_media_image_1␞␟src_with_alternate_widths,alt↝entity␜␜entity:media:baby_photos|vacation_photos␝field_media_image|field_media_image_1␞␟alt,width↝entity␜␜entity:media:baby_photos|vacation_photos␝field_media_image|field_media_image_1␞␟width,height↝entity␜␜entity:media:baby_photos|vacation_photos␝field_media_image|field_media_image_1␞␟height}"),
+        fieldTypeProp: StructuredDataPropExpression::fromString("ℹ︎entity_reference␟entity␜[␜entity:media:baby_photos␝field_media_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}][␜entity:media:vacation_photos␝field_media_image_1␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}]"),
         fieldStorageSettings: [
           'target_type' => 'media',
         ],
@@ -111,7 +106,7 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
     $storable_prop_shapes['type=object&$ref=json-schema-definitions://canvas.module/video'] = new StorablePropShape(
       shape: new PropShape(['type' => 'object', '$ref' => 'json-schema-definitions://canvas.module/video']),
       // @phpstan-ignore-next-line
-      fieldTypeProp: StructuredDataPropExpression::fromString('ℹ︎entity_reference␟{src↝entity␜␜entity:media:baby_videos|vacation_videos␝field_media_video_file|field_media_video_file_1␞␟entity␜␜entity:file␝uri␞␟url}'),
+      fieldTypeProp: StructuredDataPropExpression::fromString('ℹ︎entity_reference␟entity␜[␜entity:media:baby_videos␝field_media_video_file␞␟{src↝entity␜␜entity:file␝uri␞␟url}][␜entity:media:vacation_videos␝field_media_video_file_1␞␟{src↝entity␜␜entity:file␝uri␞␟url}]'),
       fieldWidget: 'media_library_widget',
       fieldStorageSettings: [
         'target_type' => 'media',
@@ -130,7 +125,7 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
     $storable_prop_shapes['type=string&$ref=json-schema-definitions://canvas.module/stream-wrapper-image-uri'] = new StorablePropShape(
       shape: new PropShape(['type' => 'string', 'contentMediaType' => 'image/*', 'format' => 'uri', 'x-allowed-schemes' => ['public']]),
       // @phpstan-ignore-next-line
-      fieldTypeProp: StructuredDataPropExpression::fromString('ℹ︎entity_reference␟entity␜␜entity:media:baby_photos|vacation_photos␝field_media_image|field_media_image_1␞␟entity␜␜entity:file␝uri␞␟value'),
+      fieldTypeProp: StructuredDataPropExpression::fromString('ℹ︎entity_reference␟entity␜[␜entity:media:baby_photos␝field_media_image␞␟entity␜␜entity:file␝uri␞␟value][␜entity:media:vacation_photos␝field_media_image_1␞␟entity␜␜entity:file␝uri␞␟value]'),
       fieldWidget: 'media_library_widget',
       fieldStorageSettings: [
         'target_type' => 'media',

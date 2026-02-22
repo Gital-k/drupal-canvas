@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Config;
 
+use Drupal\canvas\PropSource\PropSource;
 use Drupal\Core\Entity\Entity\EntityViewMode;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\canvas\Entity\Component;
@@ -11,19 +12,23 @@ use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\Tests\canvas\Traits\BetterConfigDependencyManagerTrait;
+use Drupal\Tests\canvas\Traits\DataProviderWithCoreSpecificComponentActiveVersionTrait;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\canvas\Traits\CreateTestJsComponentTrait;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\node\Traits\ContentTypeCreationTrait;
 use Drupal\TestTools\Random;
 use Drupal\canvas_test_validation\Plugin\Canvas\ComponentSource\InvalidSlots;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
  * @group canvas
  */
+#[RunTestsInSeparateProcesses]
 final class ContentTemplateValidationTest extends BetterConfigEntityValidationTestBase {
 
   use BetterConfigDependencyManagerTrait;
+  use DataProviderWithCoreSpecificComponentActiveVersionTrait;
   use ContentTypeCreationTrait;
   use ContribStrictConfigSchemaTestTrait;
   use CreateTestJsComponentTrait;
@@ -58,6 +63,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
     'filter',
     'ckeditor5',
     'editor',
+    'datetime',
   ];
 
   /**
@@ -105,16 +111,8 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
           'component_id' => 'sdc.canvas_test_sdc.my-cta',
           'component_version' => '89881c04a0fde367',
           'inputs' => [
-            'text' => [
-              'sourceType' => 'static:field_item:string',
-              'value' => 'This is really tricky for a first-timer',
-              'expression' => 'ℹ︎string␟value',
-            ],
-            'href' => [
-              'sourceType' => 'static:field_item:uri',
-              'value' => 'https://drupal.org',
-              'expression' => 'ℹ︎uri␟value',
-            ],
+            'text' => 'This is really tricky for a first-timer',
+            'href' => 'https://drupal.org',
           ],
           'label' => Random::string(255),
         ],
@@ -125,7 +123,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
           'component_version' => '89881c04a0fde367',
           'inputs' => [
             'text' => [
-              'sourceType' => 'dynamic',
+              'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:node:alpha␝title␞␟value',
             ],
           ],
@@ -137,7 +135,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
           'component_version' => 'b1e991f726a2a266',
           'inputs' => [
             'heading' => [
-              'sourceType' => 'dynamic',
+              'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:node:alpha␝field_test␞␟value',
             ],
           ],
@@ -148,13 +146,9 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
           'component_id' => 'sdc.canvas_test_sdc.my-cta',
           'component_version' => '89881c04a0fde367',
           'inputs' => [
-            'text' => [
-              'sourceType' => 'static:field_item:string',
-              'value' => 'Behold this node in all its glory',
-              'expression' => 'ℹ︎string␟value',
-            ],
+            'text' => 'Behold this node in all its glory',
             'href' => [
-              'sourceType' => 'host-entity-url',
+              'sourceType' => PropSource::HostEntityUrl->value,
             ],
           ],
         ],
@@ -162,10 +156,10 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
         [
           'uuid' => 'b7f36452-ecd9-4c7c-a73c-492b81538512',
           'component_id' => 'block.system_branding_block',
-          'component_version' => '247a23298360adb2',
+          'component_version' => Component::load('block.system_branding_block')?->getActiveVersion(),
           'inputs' => [
             'label' => '',
-            'label_display' => FALSE,
+            'label_display' => '0',
             'use_site_logo' => FALSE,
             'use_site_name' => TRUE,
             'use_site_slogan' => TRUE,
@@ -177,11 +171,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
           'component_id' => 'sdc.canvas_test_sdc.props-slots',
           'component_version' => '85a5c0c7dd53e0bb',
           'inputs' => [
-            'heading' => [
-              'sourceType' => 'static:field_item:string',
-              'value' => 'There be a slot here',
-              'expression' => 'ℹ︎string␟value',
-            ],
+            'heading' => 'There be a slot here',
           ],
         ],
       ],
@@ -210,9 +200,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
           'field.field.node.alpha.field_test',
           'node.type.alpha',
         ],
-        'module' => [
-          'node',
-        ],
+        'module' => ['link', 'node'],
       ],
       $this->entity->getDependencies()
     );
@@ -230,10 +218,10 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
         'field.storage.node.field_test',
       ],
       'module' => [
+        'link',
         'node',
         'canvas',
         'system',
-        'link',
         'options',
         'canvas_test_sdc',
         'core',
@@ -247,6 +235,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
    * @dataProvider providerInvalidComponentTree
    */
   public function testInvalidComponentTree(array $component_tree, array $expected_messages): void {
+    self::addMissingBlockComponentVersions($component_tree);
     \assert($this->entity instanceof ContentTemplate);
     $this->entity->setComponentTree($component_tree);
     $this->assertValidationErrors($expected_messages);
@@ -258,7 +247,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
       'expected_messages' => [],
     ];
 
-    yield "no DynamicPropSource, so no structured data from the content entity" => [
+    yield "no EntityFieldPropSource, so no structured data from the content entity" => [
       'component_tree' => [
         [
           'uuid' => '19ff9a18-54a2-422a-bf68-49d65a5d53ac',
@@ -278,7 +267,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
           'component_version' => 'b1e991f726a2a266',
           'inputs' => [
             'heading' => [
-              'sourceType' => 'dynamic',
+              'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
             ],
           ],
@@ -286,31 +275,31 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
         [
           'uuid' => '08a60f2c-4737-47d3-9c34-956f33d5627e',
           'component_id' => 'block.system_branding_block',
-          'component_version' => '247a23298360adb2',
+          'component_version' => '::ACTIVE_VERSION_IN_SUT::',
           'inputs' => [
             'use_site_logo' => TRUE,
             'use_site_name' => TRUE,
             'use_site_slogan' => TRUE,
             'label' => '',
-            'label_display' => FALSE,
+            'label_display' => '0',
           ],
         ],
         [
           'uuid' => 'ea2459e3-248d-4a0a-bdbc-1d982f729959',
           'component_id' => 'block.page_title_block',
-          'component_version' => '62af221149ae4887',
+          'component_version' => '::ACTIVE_VERSION_IN_SUT::',
           'inputs' => [
             'label' => '',
-            'label_display' => FALSE,
+            'label_display' => '0',
           ],
         ],
         [
           'uuid' => '90804335-d16d-4799-9e80-ddb11692530a',
           'component_id' => 'block.system_messages_block',
-          'component_version' => 'b92f802cf68eb83e',
+          'component_version' => '::ACTIVE_VERSION_IN_SUT::',
           'inputs' => [
             'label' => '',
-            'label_display' => FALSE,
+            'label_display' => '0',
           ],
         ],
       ],
@@ -330,7 +319,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
           'component_version' => 'b1e991f726a2a266',
           'inputs' => [
             'heading' => [
-              'sourceType' => 'dynamic',
+              'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
             ],
           ],
@@ -344,7 +333,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
               'sourceType' => 'adapter:image_apply_style',
               'adapterInputs' => [
                 'image' => [
-                  'sourceType' => 'dynamic',
+                  'sourceType' => PropSource::EntityField->value,
                   'expression' => 'ℹ︎␜entity:node:article␝field_hero␞␟{src↝entity␜␜entity:file␝uri␞0␟value,alt↠alt,width↠width,height↠height}',
                 ],
                 'imageStyle' => [
@@ -370,7 +359,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
           'component_version' => '85a5c0c7dd53e0bb',
           'inputs' => [
             'heading' => [
-              'sourceType' => 'dynamic',
+              'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
             ],
           ],
@@ -381,7 +370,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
           'component_version' => '85a5c0c7dd53e0bb',
           'inputs' => [
             'heading' => [
-              'sourceType' => 'dynamic',
+              'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
             ],
           ],
@@ -400,7 +389,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
           'component_version' => '85a5c0c7dd53e0bb',
           'inputs' => [
             'heading' => [
-              'sourceType' => 'dynamic',
+              'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
             ],
           ],
@@ -413,7 +402,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
           'component_version' => '85a5c0c7dd53e0bb',
           'inputs' => [
             'heading' => [
-              'sourceType' => 'dynamic',
+              'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
             ],
           ],
@@ -432,7 +421,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
           'component_version' => '85a5c0c7dd53e0bb',
           'inputs' => [
             'heading' => [
-              'sourceType' => 'dynamic',
+              'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
             ],
           ],
@@ -445,7 +434,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
           'component_version' => '85a5c0c7dd53e0bb',
           'inputs' => [
             'heading' => [
-              'sourceType' => 'dynamic',
+              'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
             ],
           ],
@@ -464,7 +453,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
           'component_version' => '85a5c0c7dd53e0bb',
           'inputs' => [
             'heading' => [
-              'sourceType' => 'dynamic',
+              'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
             ],
           ],
@@ -492,7 +481,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
           'component_version' => 'b1e991f726a2a266',
           'inputs' => [
             'heading' => [
-              'sourceType' => 'dynamic',
+              'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
             ],
           ],
@@ -576,7 +565,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
   }
 
   public function testExposedSlotMustBeEmpty(): void {
-    assert($this->entity instanceof ContentTemplate);
+    \assert($this->entity instanceof ContentTemplate);
 
     // Add a component in one of the open slots.
     $items = $this->entity->getComponentTree();
@@ -587,7 +576,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
       'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
       'inputs' => [
         'heading' => [
-          'sourceType' => 'dynamic',
+          'sourceType' => PropSource::EntityField->value,
           'expression' => 'ℹ︎␜entity:node:alpha␝title␞␟value',
         ],
       ],
@@ -675,12 +664,11 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
       'label' => 'Component with an invalid source-defined slot',
       'source' => InvalidSlots::PLUGIN_ID,
       'source_local_id' => InvalidSlots::PLUGIN_ID,
-      'category' => 'Test',
       'active_version' => 'ccab0b28617f1f56',
     ])->save();
 
     $tree = $this->entity->get('component_tree');
-    assert(is_array($tree));
+    \assert(is_array($tree));
     $tree[] = [
       'uuid' => '1870f74a-2611-4864-8fc0-639f0d125d7f',
       'component_id' => InvalidSlots::PLUGIN_ID . '.' . InvalidSlots::PLUGIN_ID,

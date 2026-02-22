@@ -10,6 +10,7 @@ use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Url;
 use Drupal\node\Entity\Node;
 use Drupal\Tests\canvas\Kernel\ApiLayoutControllerTestBase;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
@@ -19,6 +20,7 @@ use Symfony\Component\HttpFoundation\Request;
  * @covers \Drupal\canvas\Controller\ApiLayoutController::get()
  * @group canvas
  */
+#[RunTestsInSeparateProcesses]
 class AutoSaveConflictContentTemplateLayoutTest extends ApiLayoutControllerTestBase {
 
   use AutoSaveConflictTestTrait;
@@ -58,7 +60,7 @@ class AutoSaveConflictContentTemplateLayoutTest extends ApiLayoutControllerTestB
 
   protected function modifyJsonToSendAsAutoSave(array &$json, string $text): void {
     self::assertCount(1, $json['model']);
-    $uuid = array_keys($json['model'])[0];
+    $uuid = \array_keys($json['model'])[0];
     $json['model'][$uuid]['resolved']['heading'] = $text;
   }
 

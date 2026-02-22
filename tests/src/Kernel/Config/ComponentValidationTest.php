@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Config;
 
+use Drupal\canvas\ComponentDoesNotMeetRequirementsException;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponentDiscovery;
 use Drupal\Core\Config\Schema\SchemaIncompleteException;
-use Drupal\Core\Theme\ComponentPluginManager as CoreComponentPluginManager;
 use Drupal\canvas\ComponentSource\ComponentSourceInterface;
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\canvas\Entity\Component;
@@ -14,22 +15,25 @@ use Drupal\canvas\Entity\Folder;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Entity\VersionedConfigEntityBase;
 use Drupal\canvas\Entity\VersionedConfigEntityInterface;
-use Drupal\canvas\Plugin\ComponentPluginManager;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent;
+use Drupal\Core\Theme\ComponentPluginManager;
 use Drupal\Tests\canvas\Kernel\Traits\CiModulePathTrait;
 use Drupal\Tests\canvas\Traits\BetterConfigDependencyManagerTrait;
 use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\Yaml\Yaml;
 
 /**
  * Tests validation of component entities.
- *
- * @group canvas
  */
+#[Group('canvas')]
+#[Group('canvas_component_sources')]
+#[RunTestsInSeparateProcesses]
 class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
 
   use BetterConfigDependencyManagerTrait;
@@ -37,8 +41,6 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
   use ContribStrictConfigSchemaTestTrait;
   use GenerateComponentConfigTrait;
   use CiModulePathTrait;
-
-  protected CoreComponentPluginManager $componentPluginManager;
 
   /**
    * {@inheritdoc}
@@ -50,6 +52,7 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
     // Canvas's dependencies (modules providing field types + widgets).
     'datetime',
     'file',
+    'field',
     'image',
     'options',
     'path',
@@ -58,13 +61,13 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
     'filter',
     'ckeditor5',
     'editor',
+    'user',
   ];
 
   /**
    * {@inheritdoc}
    */
   protected static array $propertiesWithOptionalValues = [
-    'category',
     'provider',
   ];
 
@@ -103,10 +106,9 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
 
     $this->entity = Component::create([
       'id' => 'sdc.canvas_test_sdc.my-cta',
-      'category' => 'Test',
       'source' => SingleDirectoryComponent::SOURCE_PLUGIN_ID,
       'source_local_id' => 'canvas_test_sdc:my-cta',
-      'active_version' => '5c4a2f6c852fec27',
+      'active_version' => 'c3aed5021bdabae0',
       'versioned_properties' => [
         VersionedConfigEntityBase::ACTIVE_VERSION => [
           'settings' => [
@@ -121,7 +123,7 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
                 'expression' => 'ℹ︎string␟value',
               ],
               'href' => [
-                'required' => FALSE,
+                'required' => TRUE,
                 // @see \Drupal\Core\Field\Plugin\Field\FieldType\UriItem
                 'field_type' => 'uri',
                 // @see \Drupal\Core\Field\Plugin\Field\FieldWidget\UriWidget
@@ -167,7 +169,6 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
       'label' => 'Test',
     ]);
     $this->entity->save();
-    $this->componentPluginManager = $this->container->get(ComponentPluginManager::class);
   }
 
   /**
@@ -214,7 +215,7 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
    */
   public function testComponentSourceSpecificSettings(): void {
     // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent
-    assert($this->entity instanceof Component);
+    \assert($this->entity instanceof Component);
     $invalid_settings_due_to_extraneous_prop_field_definition = $invalid_settings_due_to_missing_prop_field_definition = $this->entity->getSettings();
 
     // Too much.
@@ -245,7 +246,7 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
     catch (SchemaIncompleteException $e) {
       // We can't use ::assertValidationErrors here because we need to make use
       // of ::save to set fallback metadata.
-      self::assertEquals('Schema errors for canvas.component.sdc.canvas_test_sdc.my-cta with the following errors: 0 [active_version] The version abcdef12343fa3dc does not match the hash of the settings for this version, expected 0e61ac44183cad1c., 1 [versioned_properties.active.settings.prop_field_definitions] Configuration present for a non-existent SDC prop: &lt;em class=&quot;placeholder&quot;&gt;image&lt;/em&gt;.', $e->getMessage());
+      self::assertEquals('Schema errors for canvas.component.sdc.canvas_test_sdc.my-cta with the following errors: 0 [active_version] The version abcdef12343fa3dc does not match the hash of the settings for this version, expected c81cc60fb82d7011., 1 [versioned_properties.active.settings.prop_field_definitions] Configuration present for a non-existent SDC prop: &lt;em class=&quot;placeholder&quot;&gt;image&lt;/em&gt;.', $e->getMessage());
     }
 
     // Too little.
@@ -260,13 +261,13 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
     catch (SchemaIncompleteException $e) {
       // We can't use ::assertValidationErrors here because we need to make use
       // of ::save to set fallback metadata.
-      self::assertEquals('Schema errors for canvas.component.sdc.canvas_test_sdc.my-cta with the following errors: 0 [active_version] The version abcdef12343fa3dc does not match the hash of the settings for this version, expected 7ff5230cdcc4e404., 1 [versioned_properties.active.settings.prop_field_definitions] Configuration for the SDC prop &quot;&lt;em class=&quot;placeholder&quot;&gt;Target&lt;/em&gt;&quot; (&lt;em class=&quot;placeholder&quot;&gt;target&lt;/em&gt;) is missing.', $e->getMessage());
+      self::assertEquals('Schema errors for canvas.component.sdc.canvas_test_sdc.my-cta with the following errors: 0 [active_version] The version abcdef12343fa3dc does not match the hash of the settings for this version, expected c6f70e26b5325b9c., 1 [versioned_properties.active.settings.prop_field_definitions] Configuration for the SDC prop &quot;&lt;em class=&quot;placeholder&quot;&gt;Target&lt;/em&gt;&quot; (&lt;em class=&quot;placeholder&quot;&gt;target&lt;/em&gt;) is missing.', $e->getMessage());
     }
     // But an invalid version hash doesn't matter for old versions.
     $invalid_settings_due_to_missing_prop_field_definition['prop_field_definitions']['target'] = $target;
     \assert($this->entity instanceof ComponentInterface);
     $this->entity->createVersion(
-      '5c4a2f6c852fec27'
+      'c3aed5021bdabae0'
     )->setSettings($invalid_settings_due_to_missing_prop_field_definition)->save();
     // No validation errors even though the old 'abcdef12343fa3dc'
     // version is invalid.
@@ -286,26 +287,22 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
     $props['target']['examples'][] = '_blank';
     // @todo Consider supporting this in https://www.drupal.org/i/3514672
     unset($props['target']['default']);
-    // @todo Remove these 2 in https://www.drupal.org/i/3516602
-    unset($props['target']['meta:enum']);
-    unset($props['target']['x-translation-context']);
     JavaScriptComponent::create([
       'machineName' => 'my-cta',
       'name' => $this->getRandomGenerator()->sentences(5),
-      'status' => FALSE,
+      'status' => TRUE,
       'props' => $props,
       'required' => $sdc_yaml['props']['required'],
       'js' => ['original' => '', 'compiled' => ''],
       'css' => ['original' => '', 'compiled' => ''],
       'dataDependencies' => [],
     ])->save();
-    assert($this->entity instanceof Component);
+    \assert($this->entity instanceof Component);
     $this->entity = Component::create([
       'id' => 'js.my-cta',
-      'category' => 'Test',
       'source' => JsComponent::SOURCE_PLUGIN_ID,
       'source_local_id' => 'my-cta',
-      'active_version' => '7ff5230cdcc4e404',
+      'active_version' => 'c6f70e26b5325b9c',
       'versioned_properties' => [
         VersionedConfigEntityBase::ACTIVE_VERSION => [
           'settings' => [
@@ -332,7 +329,6 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
 
     $this->entity = Component::create([
       'id' => 'block.system_branding_block',
-      'category' => 'Test',
       'source' => BlockComponent::SOURCE_PLUGIN_ID,
       'source_local_id' => 'system_branding_block',
       'active_version' => '7a2bdba02d8b7911',
@@ -360,8 +356,12 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
       ],
       'label' => 'Test',
     ]);
+    // We can't know the active version ahead of time, because block versions
+    // can vary depending on upstream changes in core.
+    $version = $this->entity->getComponentSource()->generateVersionHash();
+
     $this->assertValidationErrors([
-      'active_version' => 'The version 7a2bdba02d8b7911 does not match the hash of the settings for this version, expected f80ad196f2c2cc64.',
+      'active_version' => "The version 7a2bdba02d8b7911 does not match the hash of the settings for this version, expected $version.",
       \sprintf('versioned_properties.%s.settings.default_settings', VersionedConfigEntityInterface::ACTIVE_VERSION) => "'use_site_slogan' is a required key because source_local_id is system_branding_block (see config schema type block.settings.system_branding_block).",
       // @see \Drupal\canvas\Entity\Component::preSave()
       \sprintf('versioned_properties.%s', VersionedConfigEntityInterface::ACTIVE_VERSION) => "'fallback_metadata' is a required key because versioned_properties.%key is active (see config schema type canvas.component.versioned.active.*).",
@@ -453,23 +453,37 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
   }
 
   /**
-   * @dataProvider providerTestCategory
+   * @covers \Drupal\canvas\Plugin\Validation\Constraint\ComponentStatusConstraintValidator
+   * @todo Consider moving this (and its sibling ::testStatusWithBlock()) to
+   *   \Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource\ComponentSourceTestBase in https://www.drupal.org/project/canvas/issues/3561271.
+   * @see \Drupal\canvas\ComponentSource\ComponentSourceManager::generateComponentsForSource())
    */
-  public function testCategory(?string $category, array $errors): void {
-    $this->entity->set('category', $category);
-    $this->assertValidationErrors($errors);
-  }
-
-  public static function providerTestCategory(): \Generator {
-    yield 'valid string' => ['foo', []];
-    yield 'empty string' => ['', ['category' => 'This value should not be blank.']];
-    yield 'null' => [NULL, []];
-  }
-
   public function testStatusWithSdc(): void {
-    $component = Component::load('sdc.canvas_test_sdc.image-required-without-example');
-    $this->assertNull($component);
-    $component = SingleDirectoryComponent::createConfigEntity($this->componentPluginManager->find('canvas_test_sdc:image-required-without-example'));
+    $source_specific_component_id = 'canvas_test_sdc:image-required-without-example';
+    // Manually create a Component config entity that this source's discovery
+    // would not have created because it does not meet requirements. This is
+    // considered valid as long as the Component is disabled (`status=FALSE`).
+    $discovery = new SingleDirectoryComponentDiscovery($this->container->get(ComponentPluginManager::class));
+    try {
+      $discovery->checkRequirements($source_specific_component_id);
+      $this->fail("$source_specific_component_id should not meet requirements for the purposes of this test.");
+    }
+    catch (ComponentDoesNotMeetRequirementsException) {
+      // No-op.
+    }
+    $component = Component::create([
+      'id' => SingleDirectoryComponentDiscovery::getComponentConfigEntityId($source_specific_component_id),
+      'label' => 'Test',
+      'category' => 'test',
+      'source' => SingleDirectoryComponent::SOURCE_PLUGIN_ID,
+      'source_local_id' => $source_specific_component_id,
+      'active_version' => 'f4d1c916802ab8db',
+      'versioned_properties' => [
+        VersionedConfigEntityBase::ACTIVE_VERSION => [
+          'settings' => $discovery->computeComponentSettings($source_specific_component_id),
+        ],
+      ],
+    ]);
     $component->setStatus(FALSE);
     $this->assertEquals(SAVED_NEW, $component->save());
     $component->setStatus(TRUE);
@@ -482,18 +496,22 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
     ]);
   }
 
+  /**
+   * @covers \Drupal\canvas\Plugin\Validation\Constraint\ComponentStatusConstraintValidator
+   */
   public function testStatusWithBlock(): void {
     $this->enableModules(['node', 'block']);
-    $this->generateComponentConfig();
 
+    // Manually create a Component config entity that this source's discovery
+    // would not have created because it does not meet requirements. This is
+    // considered valid as long as the Component is disabled (`status=FALSE`).
     $component = Component::create([
       'id' => 'block.node_syndicate_block',
       'status' => FALSE,
       'label' => 'Test',
-      'category' => 'test',
       'source' => BlockComponent::SOURCE_PLUGIN_ID,
       'source_local_id' => 'node_syndicate_block',
-      'active_version' => '8d6f197567cc882e',
+      'active_version' => 'random',
       'versioned_properties' => [
         VersionedConfigEntityBase::ACTIVE_VERSION => [
           'settings' => [
@@ -510,6 +528,11 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
         ],
       ],
     ]);
+    // We can't know the active version ahead of time, because block versions
+    // can vary depending on upstream changes in core.
+    $version = $component->getComponentSource()->generateVersionHash();
+    $component->set('active_version', $version);
+    $component->resetToActiveVersion();
 
     $this->assertTrue($component instanceof Component);
     $this->assertFalse($component->status());
@@ -527,28 +550,11 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
     ]);
   }
 
-  // cspell:ignore eird
-
   /**
    * @testWith ["valid", false, "102d161a6069b0bf"]
-   *   ["even_more-valid", false, "b89b9f874769d01e"]
-   *   ["-", true, "cd4019731175e414"]
-   *   ["--", true, "e6507bfbf8ab4de5"]
-   *   ["_", true, "d424855d70852377"]
-   *   ["__", true, "823c8d2eb2d05352"]
-   *   ["-not_valid", true, "67baf46859e91b91"]
-   *   ["_not_valid", true, "3972480bc11893e9"]
-   *   ["not_valid-", true, "2af87d83152ee878"]
-   *   ["not_valid_", true, "31cc78f610f8147a"]
-   *   ["a", true, "86e65a63d5c64c96"]
-   *   ["aa", true, "06841b5c562fd150"]
-   *   ["aaa", false, "45d801ed93ec2876"]
-   *   ["n😈t_valid", true, "95bb0e4d0d0c208b"]
-   *   ["spaces aren't okay", true, "b911692027992e7a"]
-   *   ["newline\nnot_allowed", true, "c413270ad235c44c"]
-   *   ["rm -rf /", true, "d4b25a8c7fa2617c"]
-   *   ["slot_\u03E2eird", true, "c33062b3a4641476"]
-   *   ["children", true, "1cea66d0113298ef"]
+   *           ["rm -rf /", true, "d4b25a8c7fa2617c"]
+   *
+   * @see \Drupal\Tests\canvas\Unit\Plugin\Validation\Constraint\ValidSlotNameConstraintValidatorTest
    */
   public function testSlotNameValidation(string $slot_name, bool $is_invalid, string $expected_version): void {
     // For every "code component" (JavaScriptComponent) with `status: true`, a
@@ -587,8 +593,13 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
       // @see core/assets/schemas/v1/metadata-full.schema.json
       if (\preg_match('/^[a-zA-Z0-9_-]+$/', $slot_name) !== 1) {
         $expected_violations = [
-          '' => \sprintf('[slots] The property %s is not defined and the definition does not allow additional properties', $slot_name),
+          '' => \sprintf("In component canvas:invalid_slot:\n[slots] The property %s is not defined and the definition does not allow additional properties", $slot_name),
         ] + $expected_violations;
+      }
+      // Strip out the prefix added by https://www.drupal.org/node/3549909. This
+      // can be removed when 11.3 is the minimum supported version of core.
+      if (version_compare(\Drupal::VERSION, '11.3', '<')) {
+        $expected_violations[''] = substr($expected_violations[''], 34);
       }
       self::assertSame($expected_violations, self::violationsToArray($violations));
     }
@@ -600,7 +611,7 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
     // slot names in the fallback metadata for a Component are validated.
     $js_component_with_invalid_slot->enable()->save();
     $corresponding_component = Component::load(JsComponent::SOURCE_PLUGIN_ID . '.invalid_slot');
-    assert($corresponding_component instanceof Component);
+    \assert($corresponding_component instanceof Component);
 
     // Assert that the slot name indeed is present in the auto-generated
     // fallback metadata.
@@ -612,7 +623,7 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
     self::assertSame([$expected_version], $this->entity->getVersions());
     $expected_errors = [];
     if ($is_invalid) {
-      $expected_errors["versioned_properties.active.fallback_metadata.slot_definitions.$slot_name"] = sprintf('<em class="placeholder">&quot;%s&quot;</em> is not a valid slot name.', htmlentities($slot_name));
+      $expected_errors["versioned_properties.active.fallback_metadata.slot_definitions.$slot_name"] = \sprintf('<em class="placeholder">&quot;%s&quot;</em> is not a valid slot name.', htmlentities($slot_name));
     }
     $this->assertValidationErrors($expected_errors);
 
@@ -622,51 +633,83 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
     // for the new version.
     $js_component_with_invalid_slot->set('slots', [])->save();
     $updated_corresponding_component = Component::load(JsComponent::SOURCE_PLUGIN_ID . '.invalid_slot');
-    assert($updated_corresponding_component instanceof Component);
+    \assert($updated_corresponding_component instanceof Component);
     $this->entity = $updated_corresponding_component;
     self::assertSame(['8fe3be948e0194e1', $expected_version], $this->entity->getVersions());
     $expected_errors = [];
     if ($is_invalid) {
-      $expected_errors["versioned_properties.$expected_version.fallback_metadata.slot_definitions.$slot_name"] = sprintf('<em class="placeholder">&quot;%s&quot;</em> is not a valid slot name.', htmlentities($slot_name));
+      $expected_errors["versioned_properties.$expected_version.fallback_metadata.slot_definitions.$slot_name"] = \sprintf('<em class="placeholder">&quot;%s&quot;</em> is not a valid slot name.', htmlentities($slot_name));
     }
     $this->assertValidationErrors($expected_errors);
   }
 
   /**
-   * @see \Drupal\canvas\ComponentMetadataRequirementsChecker::check()
+   * @covers \Drupal\canvas\ComponentMetadataRequirementsChecker::check()
    */
   public function testUnmatchedEnumAndMetaEnum(): void {
-    $component = Component::load('sdc.canvas_test_sdc:component-mismatch-meta-enum');
-    $this->assertNull($component);
-    $component = SingleDirectoryComponent::createConfigEntity($this->componentPluginManager->find('canvas_test_sdc:component-mismatch-meta-enum'));
-    $component->setStatus(FALSE);
-    $this->assertEquals(SAVED_NEW, $component->save());
-    $component->setStatus(TRUE);
+    // In an SDC, periods are valid `meta:enum` keys.
+    $component = Component::load('sdc.canvas_test_sdc.component-mismatch-meta-enum');
+    self::assertNotNull($component);
     $this->entity = $component;
-    $this->assertValidationErrors([
-      'status' => [
-        'The component \'<em class="placeholder">sdc.canvas_test_sdc.component-mismatch-meta-enum</em>\' cannot be enabled because it does not meet the requirements of Drupal Canvas.',
-        'The "meta:enum" keys for the "style" prop enum cannot contain a dot. Offending key: "contains.dots"',
-        'The "meta:enum" keys for the "numbers" prop enum cannot contain a dot. Offending key: "3.14"',
-        'The values for the "numbers" prop enum must be defined in "meta:enum". Missing keys: "3_14"',
-      ],
+    $this->assertValidationErrors([]);
+
+    // Create a code component" that has the same schema, where this is NOT
+    // allowed, due to config (schema) limitations.
+    $sdc_yaml = Yaml::parseFile($this->root . self::getCiModulePath() . '/tests/modules/canvas_test_sdc/components/component-mismatch-meta-enum/component-mismatch-meta-enum.component.yml');
+    $component = Component::load('js.component-mismatch-meta-enum');
+    self::assertNull($component);
+    $code_component = JavaScriptComponent::create([
+      'machineName' => 'component-mismatch-meta-enum',
+      'name' => $this->getRandomGenerator()->sentences(5),
+      'status' => FALSE,
+      'props' => $sdc_yaml['props']['properties'],
+      'required' => $sdc_yaml['props']['required'] ?? [],
+      'js' => ['original' => '', 'compiled' => ''],
+      'css' => ['original' => '', 'compiled' => ''],
+      'dataDependencies' => [],
     ]);
+    $this->entity = $code_component;
+    try {
+      $this->assertValidationErrors([
+        '' => [
+          'The "meta:enum" keys for the "style" prop enum cannot contain a dot. Offending key: "contains.dots"',
+          'The values for the "style" prop enum must be defined in "meta:enum". Missing keys: "contains_dots"',
+          'The "meta:enum" keys for the "numbers" prop enum cannot contain a dot. Offending key: "3.14"',
+          'The values for the "numbers" prop enum must be defined in "meta:enum". Missing keys: "3_14"',
+        ],
+      ]);
+    }
+    catch (\InvalidArgumentException $e) {
+      // The ::assertValidationErrors() call above did in fact confirm that the
+      // listed validation errors occurred. However, it then checks whether the
+      // config schema checker finds additional problems. And in this case, it
+      // does, precisely because it is using dots in keys, which is not allowed
+      // by the config (schema) system.
+      // In other words: this demonstrates exactly why we need to special-case
+      // code components' metadata!
+      self::assertSame("The configuration property contains doesn't exist.", $e->getMessage());
+    }
   }
 
-  public function testInvalidWidgetSettings(): void {
-    assert($this->entity instanceof Component);
+  public function testInvalidPropFieldDefinition(): void {
+    \assert($this->entity instanceof Component);
     $settings = $this->entity->getSettings();
-    assert($settings['prop_field_definitions']['text']['default_value'] !== NULL);
+    \assert($settings['prop_field_definitions']['text']['default_value'] !== NULL);
+    \assert($settings['prop_field_definitions']['href']['required'] === TRUE);
     $settings['prop_field_definitions']['text']['default_value'] = NULL;
+    $settings['prop_field_definitions']['href']['required'] = FALSE;
 
     try {
       $this->entity->createVersion(
-        'f6cfaf1b3cf58a77'
+        '9a4bf4b2813868dd'
       )->setSettings($settings)->save();
 
     }
     catch (SchemaIncompleteException $e) {
-      self::assertEquals('Schema errors for canvas.component.sdc.canvas_test_sdc.my-cta with the following errors: 0 [versioned_properties.active.settings.prop_field_definitions] The required SDC prop &quot;&lt;em class=&quot;placeholder&quot;&gt;Title&lt;/em&gt;&quot; (&lt;em class=&quot;placeholder&quot;&gt;text&lt;/em&gt;) must not be null.', $e->getMessage());
+      // Assert the validation errors we forced:
+      // 1. text is required, so default_value cannot be null.
+      // 2. href is not required in the Component version, but it is on the actual SDC metadata.
+      self::assertEquals('Schema errors for canvas.component.sdc.canvas_test_sdc.my-cta with the following errors: 0 [versioned_properties.active.settings.prop_field_definitions.text.default_value] The required component prop &quot;&lt;em class=&quot;placeholder&quot;&gt;Title&lt;/em&gt;&quot; (&lt;em class=&quot;placeholder&quot;&gt;text&lt;/em&gt;) must not be null., 1 [versioned_properties.active.settings.prop_field_definitions.href.required] The requiredness of the prop &quot;&lt;em class=&quot;placeholder&quot;&gt;URL&lt;/em&gt;&quot; (&lt;em class=&quot;placeholder&quot;&gt;href&lt;/em&gt;) must match its implementation.', $e->getMessage());
     }
   }
 
@@ -686,7 +729,7 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
       ? ['versioned_properties.active.settings.prop_field_definitions.text.expression' => $expected_message]
       : [];
 
-    assert($this->entity instanceof Component);
+    \assert($this->entity instanceof Component);
     $settings = $this->entity->getSettings();
     $settings['prop_field_definitions']['text']['expression'] = $expression;
 
@@ -696,7 +739,7 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
         'local_source_id' => $this->entity->get('source_local_id'),
         ...$settings,
       ]);
-    assert($source instanceof ComponentSourceInterface);
+    \assert($source instanceof ComponentSourceInterface);
     $this->entity
       ->createVersion($source->generateVersionHash())
       ->setSettings($settings);

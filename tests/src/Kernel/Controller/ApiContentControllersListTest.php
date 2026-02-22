@@ -13,8 +13,9 @@ use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Controller\ApiContentControllers;
 use Drupal\canvas\Entity\Page;
-use Drupal\KernelTests\KernelTestBase;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\user\Traits\UserCreationTrait;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
@@ -23,7 +24,9 @@ use Symfony\Component\HttpFoundation\Request;
  * @group canvas
  * @coversDefaultClass \Drupal\canvas\Controller\ApiContentControllers
  */
-class ApiContentControllersListTest extends KernelTestBase {
+#[RunTestsInSeparateProcesses]
+class ApiContentControllersListTest extends CanvasKernelTestBase {
+
   use UserCreationTrait;
 
   /**
@@ -31,23 +34,14 @@ class ApiContentControllersListTest extends KernelTestBase {
    *
    * @todo Strip `canvas_page` in https://www.drupal.org/i/3498525, and add test coverage for other content entity types.
    */
-  private const API_BASE_PATH = '/api/canvas/content/canvas_page';
+  private const string API_BASE_PATH = '/api/canvas/content/canvas_page';
 
   /**
    * {@inheritdoc}
    */
   protected static $modules = [
-    'canvas',
-    'system',
     'canvas_test_page',
-    'user',
     'field',
-    'text',
-    'filter',
-    'path_alias',
-    'path',
-    'media',
-    'image',
   ];
 
   /**
@@ -364,7 +358,7 @@ class ApiContentControllersListTest extends KernelTestBase {
 
     // Update the pages in reverse order to change their revision timestamps
     // This ensures page1 is most recently updated, followed by page2, then page3
-    $update_order = array_reverse(array_keys($pages_data));
+    $update_order = array_reverse(\array_keys($pages_data));
     foreach ($update_order as $key) {
       $this->pages[$key]->set('title', "{$pages_data[$key]} Updated");
       $this->pages[$key]->save();
@@ -374,11 +368,11 @@ class ApiContentControllersListTest extends KernelTestBase {
     self::assertCount(3, $data, 'Search should return all three matching pages');
 
     // Get the IDs in order they appear in the results
-    $result_ids = array_map(function ($item) {
+    $result_ids = \array_map(function ($item) {
       return $item['id'];
     }, $data);
 
-    $result_ids = array_keys($result_ids);
+    $result_ids = \array_keys($result_ids);
 
     // Verify the order is by most recently updated (page1, page2, page3)
     self::assertSame($page_ids['page1'], $result_ids[2]);

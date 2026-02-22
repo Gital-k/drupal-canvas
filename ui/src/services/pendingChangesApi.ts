@@ -7,6 +7,7 @@ import {
   setPreviousPendingChanges,
 } from '@/components/review/PublishReview.slice';
 import { baseQuery } from '@/services/baseQuery';
+import { componentAndLayoutApi } from '@/services/componentAndLayout';
 
 interface Owner {
   name: string;
@@ -50,6 +51,10 @@ export interface ConflictError {
 export interface ErrorResponse {
   errors: Array<ConflictError>;
 }
+
+type DiscardPendingChangeArg = PendingChange & {
+  pointer?: string;
+};
 
 export enum STATUS_CODE {
   CONFLICT = 409,
@@ -97,6 +102,15 @@ export const pendingChangesApi = createApi({
               },
             ),
           );
+
+          // Invalidate the layout query cache of the current entity to ensure that the autoSaves hash is updated
+          // ALSO, For example Drupal has hook_entity_presave which allows altering an entity before it is saved.
+          // Canvas will not be aware of any changes made in custom code here, therefore if Canvas doesn't re-request
+          // after publishing, the auto-save request could wipe out any changes that were made in
+          // any hook_entity_presave code
+          dispatch(
+            componentAndLayoutApi.util.invalidateTags([{ type: 'Layout' }]),
+          );
           dispatch(setPreviousPendingChanges());
           dispatch(setErrors());
         } catch (error: any) {
@@ -115,7 +129,7 @@ export const pendingChangesApi = createApi({
     }),
     discardPendingChange: builder.mutation<
       SuccessResponse | ErrorResponse,
-      PendingChange
+      DiscardPendingChangeArg
     >({
       query: (change: PendingChange) => ({
         url: `/canvas/api/v0/auto-saves/${change.entity_type}/${change.entity_id}`,
@@ -124,16 +138,26 @@ export const pendingChangesApi = createApi({
       async onQueryStarted(change, { dispatch, queryFulfilled }) {
         try {
           await queryFulfilled;
-
-          // Given the nature of the discard operation, we need to
-          // reload the page here to ensure that the UI reflects the discarded
-          // changes if the operation was successful.
-          // This is a temporary solution to ensure the UI is in sync with the
-          // server state after publishing changes.
-          // A better solution will be implemented in the future.
-          window.location.reload();
+          if (change.pointer) {
+            dispatch(
+              pendingChangesApi.util.updateQueryData(
+                'getAllPendingChanges',
+                undefined,
+                (draft) => {
+                  delete draft[change.pointer as string];
+                },
+              ),
+            );
+          }
+          dispatch(
+            pendingChangesApi.util.invalidateTags([
+              { type: 'PendingChanges', id: 'LIST' },
+            ]),
+          );
 
           // Reset errors
+          dispatch(setConflicts());
+          dispatch(setPreviousPendingChanges());
           dispatch(setErrors());
         } catch (error: any) {
           dispatch(

@@ -1,10 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Drupal\canvas\Plugin\DisplayVariant;
 
 use Drupal\Core\Block\MessagesBlockPluginInterface;
 use Drupal\Core\Block\TitleBlockPluginInterface;
-use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Display\Attribute\PageDisplayVariant;
 use Drupal\Core\Display\PageVariantInterface;
 use Drupal\Core\Display\VariantBase;
@@ -131,11 +132,11 @@ final class CanvasPageVariant extends VariantBase implements PageVariantInterfac
     if (empty($regions)) {
       throw new \LogicException('This page display variant needs Drupal Canvas PageRegion config entities.');
     }
-    assert(is_bool($this->configuration[self::PREVIEW_KEY]) || is_null($this->configuration[self::PREVIEW_KEY]));
+    \assert(is_bool($this->configuration[self::PREVIEW_KEY]) || is_null($this->configuration[self::PREVIEW_KEY]));
     $is_preview = $this->configuration[self::PREVIEW_KEY] === TRUE;
 
-    assert(!empty($this->title));
-    assert(!empty($this->mainContent));
+    \assert(!empty($this->title));
+    \assert(!empty($this->mainContent));
 
     // Track whether a block showing the messages is displayed.
     $messages_block_displayed = FALSE;
@@ -177,13 +178,13 @@ final class CanvasPageVariant extends VariantBase implements PageVariantInterfac
             $messages_block_displayed = TRUE;
             return $fiber->resume();
           })(),
-          // No other page-level information exists in Drupal at this time.
-          default => new \LogicException(),
+          // If fiber was suspended in some other context (e.g. while loading
+          // entities) resume it to continue component tree rendering.
+          default => $fiber->resume(),
         };
       }
-      assert($fiber->isTerminated());
+      \assert($fiber->isTerminated());
       $build[$region->get('region')] = $fiber->getReturn();
-      CacheableMetadata::createFromObject($region)->applyTo($build);
     }
 
     // Now render the special "content" region.

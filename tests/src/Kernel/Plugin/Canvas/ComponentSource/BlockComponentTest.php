@@ -7,8 +7,8 @@ namespace Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\canvas\Entity\Page;
-use Drupal\canvas\Plugin\BlockManager;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponentDiscovery;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas_test_block\Plugin\Block\CanvasTestBlockInputNone;
 use Drupal\canvas_test_block\Plugin\Block\CanvasTestBlockInputSchemaChangePoc;
@@ -16,6 +16,7 @@ use Drupal\canvas_test_block\Plugin\Block\CanvasTestBlockInputValidatable;
 use Drupal\canvas_test_block\Plugin\Block\CanvasTestBlockInputValidatableCrash;
 use Drupal\canvas_test_block\Plugin\Block\CanvasTestBlockOptionalContexts;
 use Drupal\canvas_test_block_form\Plugin\Block\CanvasTestBlockForm;
+use Drupal\Core\Block\BlockManagerInterface;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Config\TypedConfigManagerInterface;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
@@ -29,13 +30,17 @@ use Drupal\Tests\canvas\Traits\CrawlerTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use Drupal\user\Entity\User;
 use Drupal\views\Entity\View;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\Validator\ConstraintViolationInterface;
 
 /**
  * @coversDefaultClass \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent
+ * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponentDiscovery
  * @group canvas
+ * @group canvas_component_sources
  * @phpstan-import-type ComponentConfigEntityId from \Drupal\canvas\Entity\Component
  */
+#[RunTestsInSeparateProcesses]
 final class BlockComponentTest extends ComponentSourceTestBase {
 
   use BlockComponentTreeTestTrait;
@@ -47,10 +52,8 @@ final class BlockComponentTest extends ComponentSourceTestBase {
    * {@inheritdoc}
    */
   protected static $modules = [
-    'block',
     'canvas_test_block',
     'node',
-    'views',
   ];
 
   /**
@@ -65,14 +68,14 @@ final class BlockComponentTest extends ComponentSourceTestBase {
   /**
    * All test module blocks must either have a Component or a reason why not.
    *
-   * @covers ::checkRequirements()
-   * @covers \Drupal\canvas\Plugin\BlockManager::setCachedDefinitions()
+   * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponentDiscovery::discover()
+   * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponentDiscovery::checkRequirements()
    */
   public function testDiscovery(): array {
     $components = Component::loadMultiple();
     foreach ($components as $component) {
       if ($component->getComponentSource() instanceof BlockComponent) {
-        self::assertSame(in_array($component->get('source_local_id'), BlockManager::BLOCKS_TO_KEEP_ENABLED, TRUE), $component->status());
+        self::assertSame(in_array($component->get('source_local_id'), BlockComponentDiscovery::BLOCKS_TO_KEEP_ENABLED, TRUE), $component->status());
       }
     }
 
@@ -117,7 +120,7 @@ final class BlockComponentTest extends ComponentSourceTestBase {
     $this->generateComponentConfig();
 
     $view_block_component = Component::load('block.views_block.test_view-test_block');
-    assert($view_block_component instanceof Component);
+    \assert($view_block_component instanceof Component);
     $this->assertTrue($view_block_component->status());
 
     return array_combine($auto_created_components, $auto_created_components);
@@ -195,12 +198,12 @@ final class BlockComponentTest extends ComponentSourceTestBase {
   }
 
   /**
-   * @covers ::componentIdFromBlockPluginId()
+   * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponentDiscovery::getComponentConfigEntityId
    * @testWith ["foo", "block.foo"]
    *           ["system_menu_block:footer", "block.system_menu_block.footer"]
    */
   public function testComponentIdFromBlockPluginId(string $input, string $expected_output): void {
-    self::assertSame($expected_output, BlockComponent::componentIdFromBlockPluginId($input));
+    self::assertSame($expected_output, BlockComponentDiscovery::getComponentConfigEntityId($input));
   }
 
   /**
@@ -336,7 +339,7 @@ HTML,
     $this->assertInstanceOf(ComponentTreeItem::class, $canvas_field_item);
 
     $component = $canvas_field_item->getComponent();
-    assert($component instanceof Component);
+    \assert($component instanceof Component);
 
     $explicit = $component->getComponentSource()->getExplicitInput($canvas_field_item->getUuid(), $canvas_field_item);
     $componentSettings = $explicit;
@@ -348,7 +351,7 @@ HTML,
   public static function providerRenderComponentFailure(): \Generator {
     $block_settings = [
       'label' => 'crash dummy',
-      'label_display' => FALSE,
+      'label_display' => '0',
       'name' => 'Canvas',
     ];
 
@@ -394,7 +397,6 @@ HTML,
   }
 
   protected function createAndSaveInUseComponentForFallbackTesting(): ComponentInterface {
-    $this->installConfig(['system']);
     $this->generateComponentConfig();
     /** @var \Drupal\canvas\Entity\ComponentInterface */
     return Component::load('block.system_menu_block.footer');
@@ -408,7 +410,7 @@ HTML,
   protected static function getPropsForComponentFallbackTesting(): array {
     return [
       'label' => 'Main navigation',
-      'label_display' => '',
+      'label_display' => '0',
       'level' => 1,
       'depth' => NULL,
       'expand_all_items' => TRUE,
@@ -436,18 +438,16 @@ HTML,
   }
 
   /**
-   * @covers \Drupal\canvas\Plugin\BlockManager::setCachedDefinitions()
+   * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponentDiscovery::computeCurrentComponentMetadata()
    */
   public function testDependencyUpdate(): void {
-    // Install the default menus provided by system.module.
-    $this->installConfig(['system']);
     $this->generateComponentConfig();
 
     $config = 'canvas.component.block.system_menu_block.footer';
     $this->assertSame('Footer', $this->config($config)->get('label'));
 
     $menu = Menu::load('footer');
-    assert($menu instanceof Menu);
+    \assert($menu instanceof Menu);
     $label = 'Old footer menu';
     $menu->set('label', $label)->save();
 
@@ -459,7 +459,7 @@ HTML,
   public function testVersionDeterminability(): void {
     $this->generateComponentConfig();
     $original_component = Component::load('block.canvas_test_block_input_validatable');
-    assert($original_component instanceof Component);
+    \assert($original_component instanceof Component);
     $original_version = $original_component->getActiveVersion();
 
     // Trigger an alter to the schema which should result in a new version as
@@ -470,7 +470,7 @@ HTML,
     $this->generateComponentConfig();
 
     $new_component = Component::load('block.canvas_test_block_input_validatable');
-    assert($new_component instanceof Component);
+    \assert($new_component instanceof Component);
 
     $new_version = $new_component->getActiveVersion();
     self::assertNotEquals($new_version, $original_version);
@@ -602,14 +602,14 @@ HTML,
 
   protected function triggerBrokenComponent(ComponentInterface $component): BrokenPluginManagerInterface {
     /** @var \Drupal\Tests\canvas\Kernel\BrokenPluginManagerInterface */
-    return \Drupal::service(BlockManager::class);
+    return \Drupal::service(BlockManagerInterface::class);
   }
 
   public function alter(ContainerBuilder $container): void {
     // Swap in the broken version of this class.
     // @see ::triggerBrokenComponent()
     // @see ::testIsBroken()
-    $container->getDefinition(BlockManager::class)->setClass(BrokenBlockManager::class);
+    $container->getDefinition('plugin.manager.block')->setClass(BrokenBlockManager::class);
   }
 
   protected function getExpectedVerboseErrorMessage(): string {

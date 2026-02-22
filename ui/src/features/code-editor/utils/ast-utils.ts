@@ -31,14 +31,15 @@ export const getDataDependenciesFromAst = (ast: File): DataDependencies =>
       if (
         // Only consider imports from these two modules.
         source !== '@/lib/drupal-utils' &&
-        source !== '@drupal-api-client/json-api-client'
+        source !== '@drupal-api-client/json-api-client' &&
+        source !== 'drupal-canvas'
       ) {
         return carry;
       }
       const map = {
         JsonApiClient: ['v0.baseUrl', 'v0.jsonapiSettings'],
         getSiteData: ['v0.baseUrl', 'v0.branding'],
-        getPageData: ['v0.breadcrumbs', 'v0.pageTitle'],
+        getPageData: ['v0.breadcrumbs', 'v0.pageTitle', 'v0.mainEntity'],
       };
       const drupalSettingsDependencies = carry.drupalSettings || [];
       const computedSettings = drupalSettingsDependencies

@@ -15,6 +15,8 @@ use Drupal\Core\TypedData\DataDefinition;
 use Drupal\Core\TypedData\DataReferenceDefinitionInterface;
 
 /**
+ * @internal
+ *
  * Adds properties to entity reference field implementations.
  *
  * It adds:
@@ -73,7 +75,9 @@ trait CoreFeatureEntityReferenceItemAddPropertiesTrait {
         // accessible URL (root-relative, absolute using HTTP, absolute using
         // HTTPs or relative).
         ->addConstraint(UriConstraint::PLUGIN_ID, ['allowReferences' => TRUE])
-        ->addConstraint(UriSchemeConstraint::PLUGIN_ID, ['http', 'https'])
+        ->addConstraint(UriSchemeConstraint::PLUGIN_ID, [
+          'allowedSchemes' => ['http', 'https'],
+        ])
         ->setClass(ComputedEntityCanonicalRelativeUrl::class);
     }
 

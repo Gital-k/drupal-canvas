@@ -140,9 +140,12 @@ export const componentAndLayoutApi = createApi({
     >({
       query: (id) => `/canvas/api/v0/usage/component/${id}/details`,
     }),
-    getPageLayout: builder.query<LayoutApiResponse, void>({
-      query: () => {
-        return `canvas/api/v0/layout/{entity_type}/{entity_id}`;
+    getPageLayout: builder.query<
+      LayoutApiResponse,
+      { entityId: string; entityType: string }
+    >({
+      query: ({ entityId, entityType }) => {
+        return `canvas/api/v0/layout/${entityType}/${entityId}`;
       },
       providesTags: () => [{ type: 'Layout' }],
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
@@ -159,9 +162,17 @@ export const componentAndLayoutApi = createApi({
         }
       },
     }),
-    getTemplateLayout: builder.query<LayoutApiResponse, void>({
-      query: () => {
-        return `canvas/api/v0/layout-content-template/{entity_type}.{template_bundle}.{template_view_mode}/{entity_id}`;
+    getTemplateLayout: builder.query<
+      LayoutApiResponse,
+      {
+        entityType: string;
+        bundle: string;
+        viewMode: string;
+        previewEntityId: string;
+      }
+    >({
+      query: ({ bundle, viewMode, entityType, previewEntityId }) => {
+        return `canvas/api/v0/layout-content-template/${entityType}.${bundle}.${viewMode}/${previewEntityId}`;
       },
       providesTags: () => [{ type: 'Layout' }],
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
@@ -232,31 +243,6 @@ export const componentAndLayoutApi = createApi({
     >({
       query: () => 'canvas/api/v0/config/js_component',
       providesTags: () => [{ type: 'CodeComponents', id: 'LIST' }],
-      transformResponse: (
-        response: Record<string, CodeComponentSerialized>,
-        meta,
-        arg,
-      ) => {
-        if (!arg || typeof arg !== 'object') {
-          // If no filter is provided or arg is undefined, return all components.
-          return response;
-        }
-
-        const { status } = arg;
-
-        return Object.entries(response).reduce(
-          (filtered, [key, component]) => {
-            // Only filter by status if it's provided (internal=false, exposed=true)
-            const statusMatch =
-              status === undefined ? true : component.status === status;
-            if (statusMatch) {
-              filtered[key] = component;
-            }
-            return filtered;
-          },
-          {} as Record<string, CodeComponentSerialized>,
-        );
-      },
     }),
     getCodeComponent: builder.query<CodeComponentSerialized, string>({
       query: (id) => `canvas/api/v0/config/js_component/${id}`,
@@ -334,9 +320,57 @@ export const componentAndLayoutApi = createApi({
           type: body.type,
         },
       }),
+      async onQueryStarted(body, { getState }) {
+        // If weight is not explicitly provided, calculate it to place the folder at the top.
+        if (body.weight === undefined || body.weight === 0) {
+          const state = getState() as any;
+          const foldersData =
+            state.componentAndLayoutApi?.queries?.['getFolders(undefined)']
+              ?.data;
+
+          if (foldersData?.folders) {
+            const folders = Object.values(foldersData.folders);
+            if (folders.length > 0) {
+              // Find the minimum weight among existing folders
+              const minWeight = Math.min(
+                ...folders.map((folder: any) => folder.weight || 0),
+              );
+              // Set new folder weight to be less than minimum to appear at top
+              body.weight = minWeight - 1;
+            }
+          }
+        }
+      },
       invalidatesTags: [{ type: 'Folders', id: 'LIST' }],
     }),
-    getFolders: builder.query<any, any>({
+    updateFolder: builder.mutation<any, any>({
+      query: ({ id, changes }) => ({
+        url: `canvas/api/v0/config/folder/${id}`,
+        method: 'PATCH',
+        body: changes,
+      }),
+      invalidatesTags: () => [
+        { type: 'Folders', id: 'LIST' },
+        { type: 'Layout' },
+      ],
+    }),
+    deleteFolder: builder.mutation<void, string>({
+      query: (id) => ({
+        url: `canvas/api/v0/config/folder/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: [
+        { type: 'Folders', id: 'LIST' },
+        { type: 'Components', id: 'LIST' },
+      ],
+    }),
+    getFolders: builder.query<
+      {
+        folders: Record<string, any>;
+        componentIndexedFolders: Record<string, string>;
+      },
+      void
+    >({
       query: () => 'canvas/api/v0/config/folder',
       providesTags: () => [{ type: 'Folders', id: 'LIST' }],
       transformResponse: (response: any) => {
@@ -454,6 +488,8 @@ export const {
   useUpdateCodeComponentMutation,
   useDeleteCodeComponentMutation,
   useCreateFolderMutation,
+  useUpdateFolderMutation,
+  useDeleteFolderMutation,
   useGetFoldersQuery,
   useGetAutoSaveQuery,
   useUpdateAutoSaveMutation,

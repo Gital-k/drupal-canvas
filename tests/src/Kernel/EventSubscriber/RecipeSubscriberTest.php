@@ -24,13 +24,18 @@ use Drupal\Tests\canvas\Kernel\Traits\VfsPublicStreamUrlTrait;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\canvas\Traits\CrawlerTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
  * @group canvas
  * @group #slow
  * @covers \Drupal\canvas\EventSubscriber\RecipeSubscriber
  * @covers \Drupal\canvas\Plugin\Field\FieldTypeOverride\EntityReferenceItemOverride
+ *
+ * Note this cannot use CanvasKernelTestBase because that would pre-install the
+ * Canvas module: this test is installing Canvas via a recipe.
  */
+#[RunTestsInSeparateProcesses]
 final class RecipeSubscriberTest extends KernelTestBase {
 
   use ContribStrictConfigSchemaTestTrait;
@@ -78,7 +83,7 @@ final class RecipeSubscriberTest extends KernelTestBase {
       1 => ['Homepage', '/homepage'],
       2 => ['Empty Page', '/test-page'],
       3 => ['Page without a path', NULL],
-    ], array_map(
+    ], \array_map(
       // @phpstan-ignore-next-line
       fn (Page $page) => [$page->label(), $page->get('path')->alias],
       Page::loadMultiple()
@@ -110,7 +115,7 @@ final class RecipeSubscriberTest extends KernelTestBase {
       ->loadEntityByUuid('node', 'c66664af-53b9-42f4-a0ca-8ecc9edacb8c');
     $this->assertInstanceOf(FieldableEntityInterface::class, $node);
     $canvas_field = $node->get('field_canvas_demo');
-    assert($canvas_field instanceof ComponentTreeItemList);
+    \assert($canvas_field instanceof ComponentTreeItemList);
     $inputs = $canvas_field
       ->getComponentTreeItemByUuid('348bfa10-af72-49cd-900b-084d617c87df')
       ?->getInputs();

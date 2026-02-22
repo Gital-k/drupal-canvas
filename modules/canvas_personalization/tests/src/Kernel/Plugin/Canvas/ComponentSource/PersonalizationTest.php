@@ -14,7 +14,6 @@ use Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource\ComponentSourceTest
 use Drupal\Tests\canvas\Kernel\Traits\CiModulePathTrait;
 use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
 use Drupal\Tests\canvas\Traits\SingleDirectoryComponentTreeTestTrait;
-use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\canvas\Traits\CrawlerTrait;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
@@ -31,7 +30,6 @@ use Drupal\canvas_personalization\Plugin\Canvas\ComponentSource\Personalization;
 final class PersonalizationTest extends ComponentSourceTestBase {
 
   use ConstraintViolationsTestTrait;
-  use ContribStrictConfigSchemaTestTrait;
   use SingleDirectoryComponentTreeTestTrait;
   use GenerateComponentConfigTrait;
   use CiModulePathTrait;
@@ -45,14 +43,8 @@ final class PersonalizationTest extends ComponentSourceTestBase {
    */
   protected static $modules = [
     'canvas_personalization',
-    'canvas_test_sdc',
-    'image',
-    'media',
     'node',
-    'path',
-    'user',
     'field',
-    'text',
     // @todo Remove once ComponentSourceInterface is a public API, i.e. after https://www.drupal.org/i/3520484#stable is done.
     'canvas_dev_mode',
   ];
@@ -233,7 +225,7 @@ HTML,
 
     $rendered = [];
     foreach ($this->componentStorage->loadMultiple($component_ids) as $component_id => $component) {
-      assert($component instanceof ComponentInterface);
+      \assert($component instanceof ComponentInterface);
       $source = $component->getComponentSource();
       \assert($source instanceof ComponentSourceWithSlotsInterface);
       $build = $source->renderComponent(
@@ -246,7 +238,7 @@ HTML,
       $html = (string) $this->renderer->renderInIsolation($build);
       // Strip trailing whitespace to make heredocs easier to write.
       $html = preg_replace('/ +$/m', '', $html);
-      assert(is_string($html));
+      \assert(is_string($html));
       // Make it easier to write expectations containing root-relative URLs
       // pointing somewhere into the site-specific directory.
       $html = str_replace(base_path() . $this->siteDirectory, '::SITE_DIR_BASE_URL::', $html);

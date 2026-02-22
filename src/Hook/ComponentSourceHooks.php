@@ -4,19 +4,16 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Hook;
 
+use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Asset\AttachedAssetsInterface;
 use Drupal\Core\Asset\LibraryDependencyResolverInterface;
-use Drupal\Core\Block\BlockManagerInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
-use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
 use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\Core\Routing\RouteMatchInterface;
-use Drupal\Core\Theme\ComponentPluginManager;
 use Drupal\Core\Theme\ThemeManagerInterface;
 use Drupal\canvas\CodeComponentDataProvider;
 use Drupal\canvas\Entity\AssetLibrary;
-use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\Routing\Route;
@@ -28,9 +25,10 @@ use Symfony\Component\Routing\Route;
  * @see https://www.drupal.org/project/issues/canvas?component=Component+sources
  * @see docs/components.md
  */
-readonly final class ComponentSourceHooks implements ContainerInjectionInterface {
+readonly final class ComponentSourceHooks {
 
   public function __construct(
+    private ComponentSourceManager $componentSourceManager,
     private RouteMatchInterface $routeMatch,
     private CodeComponentDataProvider $codeComponentDataProvider,
     private LibraryDependencyResolverInterface $libraryDependencyResolver,
@@ -39,21 +37,11 @@ readonly final class ComponentSourceHooks implements ContainerInjectionInterface
     private RequestStack $requestStack,
   ) {}
 
-  public static function create(ContainerInterface $container): self {
-    return new static(
-      $container->get('current_route_match'),
-      $container->get(CodeComponentDataProvider::class),
-      $container->get(LibraryDependencyResolverInterface::class),
-      $container->get(ThemeManagerInterface::class),
-      $container->get(ConfigFactoryInterface::class),
-      $container->get(RequestStack::class),
-    );
-  }
-
   const ASSET_LIBRARY_METHOD_MAPPING = [
     'canvas/canvasData.v0.baseUrl' => 'getCanvasDataBaseUrlV0',
     'canvas/canvasData.v0.branding' => 'getCanvasDataBrandingV0',
     'canvas/canvasData.v0.breadcrumbs' => 'getCanvasDataBreadcrumbsV0',
+    'canvas/canvasData.v0.mainEntity' => 'getCanvasDataMainEntityV0',
     'canvas/canvasData.v0.pageTitle' => 'getCanvasDataPageTitleV0',
     'canvas/canvasData.v0.jsonapiSettings' => 'getCanvasDataJsonApiSettingsV0',
   ];
@@ -63,14 +51,7 @@ readonly final class ComponentSourceHooks implements ContainerInjectionInterface
    */
   #[Hook('rebuild')]
   public function rebuild(): void {
-    // The module installer cleared all plugin caches. Create/update Component
-    // config entities for all Canvas Component source plugins.
-    // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent
-    // @phpstan-ignore-next-line
-    \Drupal::service(BlockManagerInterface::class)->getDefinitions();
-    // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent
-    // @phpstan-ignore-next-line
-    \Drupal::service(ComponentPluginManager::class)->getDefinitions();
+    $this->componentSourceManager->generateComponents();
   }
 
   /**
@@ -113,7 +94,7 @@ readonly final class ComponentSourceHooks implements ContainerInjectionInterface
     }
 
     $route = $this->routeMatch->getRouteObject();
-    assert($route instanceof Route);
+    \assert($route instanceof Route);
     $is_preview = $route->getOption('_canvas_use_template_draft') === TRUE;
     // TRICKY: the `route` cache context varies also by route parameters, that
     // is unnecessary here, because this only varies by route definition.
@@ -165,6 +146,12 @@ readonly final class ComponentSourceHooks implements ContainerInjectionInterface
         $canvasData = array_replace_recursive($canvasData, $this->memoize($request, 'canvas/canvasData.v0.pageTitle'));
       }
     }
+    if ($all || in_array('canvas/canvasData.v0.mainEntity', $all_attached_asset_libraries, TRUE)) {
+      // Allow overrides: only set if still NULL.
+      if (NestedArray::getValue($settings, [...$path, 'mainEntity']) === NULL) {
+        $canvasData = array_replace_recursive($canvasData, $this->memoize($request, 'canvas/canvasData.v0.mainEntity'));
+      }
+    }
     if ($all || in_array('canvas/canvasData.v0.jsonapiSettings', $all_attached_asset_libraries, TRUE)) {
       // Allow overrides: only set if still NULL.
       if (NestedArray::getValue($settings, [...$path, 'jsonapiSettings']) === NULL) {
@@ -183,7 +170,7 @@ readonly final class ComponentSourceHooks implements ContainerInjectionInterface
    * @see \Drupal\canvas\CodeComponentDataProvider
    */
   private function memoize(Request $request, string $asset_library): array {
-    assert(str_starts_with($asset_library, 'canvas/canvasData.v0.'));
+    \assert(str_starts_with($asset_library, 'canvas/canvasData.v0.'));
 
     static $cached;
     if (!isset($cached)) {
@@ -194,7 +181,7 @@ readonly final class ComponentSourceHooks implements ContainerInjectionInterface
     }
     if (!isset($cached[$asset_library][$request])) {
       $method = self::ASSET_LIBRARY_METHOD_MAPPING[$asset_library];
-      assert(method_exists($this->codeComponentDataProvider, $method));
+      \assert(method_exists($this->codeComponentDataProvider, $method));
       $cached[$asset_library][$request] = $this->codeComponentDataProvider->$method();
     }
 

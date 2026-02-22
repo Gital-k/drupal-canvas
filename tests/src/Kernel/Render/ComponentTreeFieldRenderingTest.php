@@ -8,8 +8,9 @@ use Drupal\canvas\Entity\Page;
 use Drupal\Core\Render\HtmlResponse;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Url;
-use Drupal\KernelTests\KernelTestBase;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Kernel\Traits\RequestTrait;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Drupal\Tests\canvas\TestSite\CanvasTestSetup;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
@@ -21,7 +22,8 @@ use Symfony\Component\HttpFoundation\Request;
  *
  * @group canvas
  */
-final class ComponentTreeFieldRenderingTest extends KernelTestBase {
+#[RunTestsInSeparateProcesses]
+final class ComponentTreeFieldRenderingTest extends CanvasKernelTestBase {
 
   use RequestTrait;
   use UserCreationTrait;
@@ -31,37 +33,16 @@ final class ComponentTreeFieldRenderingTest extends KernelTestBase {
    * {@inheritdoc}
    */
   protected static $modules = [
-    'canvas',
     'big_pipe',
-    // Canvas's dependencies (modules providing field types + widgets).
-    'ckeditor5',
-    'editor',
-    'field',
-    'file',
-    'filter',
-    'image',
-    'link',
-    'path_alias',
-    'path',
-    'media',
-    'options',
-    'text',
-    'user',
-    'system',
-    'canvas_test_sdc',
   ];
 
   protected function setUp(): void {
     parent::setUp();
-    // Drupal Canvas configuration (creates the global AssetLibrary).
-    $this->installConfig('canvas');
-    $this->installConfig('system');
     $this->installEntitySchema('user');
     $this->installEntitySchema('path_alias');
-    $this->installEntitySchema('canvas_page');
-    $this->installConfig('canvas');
+    $this->installEntitySchema(Page::ENTITY_TYPE_ID);
 
-    $themes = ['olivero', 'stark', 'claro'];
+    $themes = ['olivero', 'claro'];
     \Drupal::service('theme_installer')->install($themes);
     $this->config('system.theme')->set('default', 'olivero')->save();
 
@@ -107,16 +88,16 @@ final class ComponentTreeFieldRenderingTest extends KernelTestBase {
 
     $request = Request::create($live_url->toString());
     $response = $this->request($request);
-    assert($response instanceof HtmlResponse);
+    \assert($response instanceof HtmlResponse);
     $this->assertCount(0, $this->cssSelect('.field--type-component-tree'));
     $this->assertText('Welcome to the site!');
 
     $request = Request::create($preview_url->toString());
     // As in this case we get a JsonResponse, we need to set the contents.
     $response = $this->request($request);
-    assert($response instanceof JsonResponse);
+    \assert($response instanceof JsonResponse);
     $contents = $this->decodeResponse($response);
-    assert(\array_key_exists('html', $contents));
+    \assert(\array_key_exists('html', $contents));
     $this->setRawContent($contents['html']);
     $this->assertCount(0, $this->cssSelect('.field--type-component-tree'));
     $this->assertText('Welcome to the site!');

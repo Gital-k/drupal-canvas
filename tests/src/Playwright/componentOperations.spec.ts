@@ -26,7 +26,6 @@ test.describe('Perform CRUD operations on components', () => {
         if (args.length > 0) {
           try {
             error = await args[0].jsonValue();
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
           } catch (e) {
             // If it's not JSON serializable, get the text
             error = await args[0].evaluate((arg) => arg.toString());
@@ -55,32 +54,24 @@ test.describe('Perform CRUD operations on components', () => {
     await canvasEditor.goToEditor();
     await expect(page.locator('[data-testid="canvas-side-menu"]'))
       .toMatchAriaSnapshot(`
-        - button "Add":
+        - button "Library":
           - img
         - button "Layers":
           - img
         - separator
-        - button "Manage library":
+        - button "Code":
           - img
       `);
-    await page
-      .locator('[data-testid="canvas-side-menu"]')
-      .locator('[aria-label="Add"]')
-      .click();
-    await expect(
-      page.locator(
-        '[data-testid="canvas-primary-panel"] h4:has-text("Library")',
-      ),
-    ).toBeVisible();
-    const collapsedButtons = page.locator(
-      '[data-testid="canvas-primary-panel"] button[aria-expanded="false"]',
-    );
+    await canvasEditor.openLibraryPanel();
+
+    const collapsedFolderButtonsSelector =
+      '[data-testid="canvas-primary-panel"] button[aria-label^="Expand"][aria-label$="folder"]';
+
+    const collapsedButtons = page.locator(collapsedFolderButtonsSelector);
     const buttonCount = await collapsedButtons.count();
     for (let i = 0; i < buttonCount; i++) {
       const collapsedButton = page
-        .locator(
-          '[data-testid="canvas-primary-panel"] button[aria-expanded="false"]',
-        )
+        .locator(collapsedFolderButtonsSelector)
         .first();
       await collapsedButton.click();
     }

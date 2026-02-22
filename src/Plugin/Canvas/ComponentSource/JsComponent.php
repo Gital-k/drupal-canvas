@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Plugin\Canvas\ComponentSource;
 
-use Drupal\Core\Asset\AssetQueryStringInterface;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Config\Entity\ConfigEntityStorageInterface;
 use Drupal\Core\Extension\ExtensionPathResolver;
@@ -12,23 +11,16 @@ use Drupal\Core\File\FileUrlGeneratorInterface;
 use Drupal\Core\GeneratedUrl;
 use Drupal\Core\Plugin\Component as ComponentPlugin;
 use Drupal\Core\Render\Component\Exception\ComponentNotFoundException;
-use Drupal\Core\Render\Component\Exception\InvalidComponentException;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\Url;
 use Drupal\canvas\Attribute\ComponentSource;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\AutoSaveEntity;
-use Drupal\canvas\ComponentDoesNotMeetRequirementsException;
-use Drupal\canvas\ComponentMetadataRequirementsChecker;
-use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\canvas\Entity\AssetLibrary;
-use Drupal\canvas\Entity\Component as ComponentEntity;
-use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\canvas\Entity\JavaScriptComponent;
+use Drupal\canvas\GlobalImports;
 use Drupal\canvas\ComponentSource\UrlRewriteInterface;
-use Drupal\canvas\Entity\VersionedConfigEntityBase;
 use Drupal\canvas\Render\ImportMapResponseAttachmentsProcessor;
-use Drupal\canvas\Version;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -38,6 +30,8 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
   id: self::SOURCE_PLUGIN_ID,
   label: new TranslatableMarkup('Code Components'),
   supportsImplicitInputs: FALSE,
+  discovery: JsComponentDiscovery::class,
+  updater: GeneratedFieldExplicitInputUxComponentInstanceUpdater::class,
   // @see \Drupal\canvas\EntityHandlers\JavascriptComponentStorage::doPostSave()
   discoveryCacheTags: ['config:js_component_list'],
 )]
@@ -51,17 +45,15 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
   protected ExtensionPathResolver $extensionPathResolver;
   protected AutoSaveManager $autoSaveManager;
   protected FileUrlGeneratorInterface $fileUrlGenerator;
-  protected Version $version;
-  protected AssetQueryStringInterface $assetQueryString;
   protected ?JavaScriptComponent $jsComponent = NULL;
+  protected GlobalImports $globalImports;
 
   public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
     $instance = parent::create($container, $configuration, $plugin_id, $plugin_definition);
     $instance->extensionPathResolver = $container->get(ExtensionPathResolver::class);
     $instance->autoSaveManager = $container->get(AutoSaveManager::class);
     $instance->fileUrlGenerator = $container->get(FileUrlGeneratorInterface::class);
-    $instance->version = $container->get(Version::class);
-    $instance->assetQueryString = $container->get(AssetQueryStringInterface::class);
+    $instance->globalImports = $container->get(GlobalImports::class);
     return $instance;
   }
 
@@ -74,7 +66,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
     // possible to bypass both `delete` access checks and config system
     // integrity checks, so perform the necessary confirmation.
     $js_component_storage = $this->entityTypeManager->getStorage(JavaScriptComponent::ENTITY_TYPE_ID);
-    assert($js_component_storage instanceof ConfigEntityStorageInterface);
+    \assert($js_component_storage instanceof ConfigEntityStorageInterface);
     return $js_component_storage->load($this->getSourceSpecificComponentId()) === NULL;
   }
 
@@ -84,7 +76,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
   protected function getComponentPlugin(): ComponentPlugin {
     if ($this->componentPlugin === NULL) {
       // Statically cache the loaded plugin.
-      $this->componentPlugin = self::buildEphemeralSdcPluginInstance($this->getJavaScriptComponent());
+      $this->componentPlugin = JsComponentDiscovery::buildEphemeralSdcPluginInstance($this->getJavaScriptComponent(), $this->configuration['prop_field_definitions']);
     }
     return $this->componentPlugin;
   }
@@ -112,11 +104,11 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
   public function getJavaScriptComponent(): JavaScriptComponent {
     if ($this->jsComponent === NULL) {
       $js_component_storage = $this->entityTypeManager->getStorage(JavaScriptComponent::ENTITY_TYPE_ID);
-      assert($js_component_storage instanceof ConfigEntityStorageInterface);
+      \assert($js_component_storage instanceof ConfigEntityStorageInterface);
       $id = $this->getSourceSpecificComponentId();
       $js_component = $js_component_storage->load($id);
       if (!$js_component instanceof JavaScriptComponent) {
-        throw new ComponentNotFoundException(sprintf('The JavaScript Component with ID `%s` does not exist.', $id));
+        throw new ComponentNotFoundException(\sprintf('The JavaScript Component with ID `%s` does not exist.', $id));
       }
       $this->jsComponent = $js_component;
     }
@@ -162,36 +154,8 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
     $build['#attached']['library'][] = $component->getAssetLibrary($isPreview);
 
     $canvas_path = $this->extensionPathResolver->getPath('module', 'canvas');
-    // Build base import map
-    $import_maps[ImportMapResponseAttachmentsProcessor::GLOBAL_IMPORTS] = [
-      'preact' => \sprintf('%s%s/ui/lib/astro-hydration/dist/preact.module.js', $base_path, $canvas_path),
-      'preact/hooks' => \sprintf('%s%s/ui/lib/astro-hydration/dist/hooks.module.js', $base_path, $canvas_path),
-      'react/jsx-runtime' => \sprintf('%s%s/ui/lib/astro-hydration/dist/jsx-runtime-default.js', $base_path, $canvas_path),
-      'react' => \sprintf('%s%s/ui/lib/astro-hydration/dist/compat.module.js', $base_path, $canvas_path),
-      'react-dom' => \sprintf('%s%s/ui/lib/astro-hydration/dist/compat.module.js', $base_path, $canvas_path),
-      'react-dom/client' => \sprintf('%s%s/ui/lib/astro-hydration/dist/compat.module.js', $base_path, $canvas_path),
-      'clsx' => \sprintf('%s%s/ui/lib/astro-hydration/dist/clsx.js', $base_path, $canvas_path),
-      'class-variance-authority' => \sprintf('%s%s/ui/lib/astro-hydration/dist/class-variance-authority.js', $base_path, $canvas_path),
-      'tailwind-merge' => \sprintf('%s%s/ui/lib/astro-hydration/dist/tailwind-merge.js', $base_path, $canvas_path),
-      '@/lib/FormattedText' => \sprintf('%s%s/ui/lib/astro-hydration/dist/FormattedText.js', $base_path, $canvas_path),
-      'next-image-standalone' => \sprintf('%s%s/ui/lib/astro-hydration/dist/next-image-standalone.js', $base_path, $canvas_path),
-      '@/lib/utils' => \sprintf('%s%s/ui/lib/astro-hydration/dist/utils.js', $base_path, $canvas_path),
-      '@drupal-api-client/json-api-client' => \sprintf('%s%s/ui/lib/astro-hydration/dist/jsonapi-client.js', $base_path, $canvas_path),
-      'drupal-jsonapi-params' => \sprintf('%s%s/ui/lib/astro-hydration/dist/jsonapi-params.js', $base_path, $canvas_path),
-      '@/lib/jsonapi-utils' => \sprintf('%s%s/ui/lib/astro-hydration/dist/jsonapi-utils.js', $base_path, $canvas_path),
-      '@/lib/drupal-utils' => \sprintf('%s%s/ui/lib/astro-hydration/dist/drupal-utils.js', $base_path, $canvas_path),
-      'swr' => \sprintf('%s%s/ui/lib/astro-hydration/dist/swr.js', $base_path, $canvas_path),
-    ];
-    // We need a cache-busting query string for the browser to not use cached
-    // files after installing an update.
-    $version = $this->version->getVersion();
-    // If version is 0.0.0, use the AssetQueryStringInterface service to improve
-    // DX: avoid the need to do a hard refresh or wipe the browser cache.
-    $query_string = $version === '0.0.0' ? $this->assetQueryString->get() : $version;
-    foreach ($import_maps[ImportMapResponseAttachmentsProcessor::GLOBAL_IMPORTS] as &$asset) {
-      $asset .= '?' . $query_string;
-    }
-
+    // Build base import map.
+    $import_maps[ImportMapResponseAttachmentsProcessor::GLOBAL_IMPORTS] = $this->globalImports->getGlobalImports();
     // For scoped dependencies we don't need cache-busting query strings, as
     // those are already busted by its content-dependent filename: when the
     // code component changes, so does the filename.
@@ -208,15 +172,15 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
     }
     // Resource hints.
     $resource_hints = [
-      'preact/signals' => \sprintf('%s%s/ui/lib/astro-hydration/dist/signals.module.js', $base_path, $canvas_path),
-      '@/lib/preload-helper' => \sprintf('%s%s/ui/lib/astro-hydration/dist/preload-helper.js', $base_path, $canvas_path),
+      'preact/signals' => \sprintf('%s%s/packages/astro-hydration/dist/signals.module.js', $base_path, $canvas_path),
+      '@/lib/preload-helper' => \sprintf('%s%s/packages/astro-hydration/dist/preload-helper.js', $base_path, $canvas_path),
     ];
     foreach ($resource_hints as $url) {
       $build['#attached']['html_head_link'][] = [
         [
           'rel' => 'modulepreload',
           'fetchpriority' => 'high',
-          'href' => $url . '?' . $query_string,
+          'href' => $url . '?' . $this->globalImports->getQueryString(),
         ],
       ];
     }
@@ -238,6 +202,9 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
     $valid_props = $component->getProps() ?? [];
 
     [$props, $props_cacheability] = self::getResolvedPropsAndCacheability(\array_intersect_key($inputs[self::EXPLICIT_INPUT_NAME] ?? [], $valid_props));
+    // Match SDC's developer-only validation of props.
+    // @see \Drupal\Core\Template\ComponentsTwigExtension::validateProps()
+    \assert($this->componentValidator->validateProps($props, $this->getComponentPlugin()));
     CacheableMetadata::createFromRenderArray($build)
       ->addCacheableDependency($component)
       ->addCacheableDependency($props_cacheability)
@@ -275,146 +242,10 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
   }
 
   /**
-   * Creates the Component config entity for a "code component" config entity.
-   *
-   * @param \Drupal\canvas\Entity\JavaScriptComponent $js_component
-   *   A Canvas "code component" config entity.
-   *
-   * @return \Drupal\canvas\Entity\ComponentInterface
-   *   The component config entity.
-   *
-   * @throws \Drupal\canvas\ComponentDoesNotMeetRequirementsException
-   *    When the component does not meet requirements.
-   */
-  public static function createConfigEntity(JavaScriptComponent $js_component): ComponentInterface {
-    try {
-      // Create a new instance and bypass the statically cached componentPlugin
-      // property.
-      $ephemeral_sdc_component = self::buildEphemeralSdcPluginInstance($js_component);
-    }
-    catch (InvalidComponentException $e) {
-      throw new ComponentDoesNotMeetRequirementsException([$e->getMessage()]);
-    }
-    ComponentMetadataRequirementsChecker::check((string) $js_component->id(), $ephemeral_sdc_component->metadata, $js_component->getRequiredProps());
-    $props = self::getPropsForComponentPlugin($ephemeral_sdc_component);
-    $settings = [
-      'prop_field_definitions' => $props,
-    ];
-    $js_source = \Drupal::service(ComponentSourceManager::class)->createInstance(self::SOURCE_PLUGIN_ID, [
-      'local_source_id' => (string) $js_component->id(),
-      ...$settings,
-    ]);
-    assert($js_source instanceof self);
-    // The JS Component config entity may not be saved yet. Set it on the source
-    // plugin so that it doesn't try to load it.
-    $js_source->setJavaScriptComponent($js_component);
-    $version = $js_source->generateVersionHash();
-    return ComponentEntity::create([
-      'id' => self::SOURCE_PLUGIN_ID . '.' . $js_component->id(),
-      'label' => $js_component->label(),
-      // @todo Update in https://www.drupal.org/project/canvas/issues/3541364.
-      'category' => NULL,
-      'provider' => NULL,
-      'source' => self::SOURCE_PLUGIN_ID,
-      'source_local_id' => $js_component->id(),
-      'active_version' => $version,
-      'versioned_properties' => [
-        VersionedConfigEntityBase::ACTIVE_VERSION => ['settings' => $settings],
-      ],
-      'status' => $js_component->status(),
-    ]);
-  }
-
-  /**
-   * Updates the Component config entity for a "code component" config entity.
-   *
-   * @param \Drupal\canvas\Entity\JavaScriptComponent $js_component
-   *   A Canvas "code component" config entity.
-   *
-   * @return \Drupal\canvas\Entity\ComponentInterface
-   *   The component config entity.
-   *
-   * @throws \Drupal\canvas\ComponentDoesNotMeetRequirementsException
-   *    When the component does not meet requirements.
-   */
-  public static function updateConfigEntity(JavaScriptComponent $js_component, ComponentInterface $component): ComponentInterface {
-    $label_key = $component->getEntityType()->getKey('label');
-    assert(is_string($label_key));
-    $component->set($label_key, $js_component->label());
-    $component->setStatus($js_component->status());
-    try {
-      // Create a new instance and bypass the statically cached componentPlugin
-      // property.
-      $ephemeral_sdc_component = self::buildEphemeralSdcPluginInstance($js_component);
-    }
-    catch (InvalidComponentException $e) {
-      throw new ComponentDoesNotMeetRequirementsException([$e->getMessage()]);
-    }
-    ComponentMetadataRequirementsChecker::check((string) $js_component->id(), $ephemeral_sdc_component->metadata, $js_component->getRequiredProps());
-    $settings = [
-      'prop_field_definitions' => self::getPropsForComponentPlugin($ephemeral_sdc_component),
-    ];
-    $js_source = \Drupal::service(ComponentSourceManager::class)->createInstance(self::SOURCE_PLUGIN_ID, [
-      'local_source_id' => (string) $js_component->id(),
-      ...$settings,
-    ]);
-    assert($js_source instanceof self);
-    $version = $js_source->generateVersionHash();
-    $component
-      ->createVersion($version)
-      ->deleteVersionIfExists(ComponentInterface::FALLBACK_VERSION)
-      ->setSettings($settings);
-    return $component;
-  }
-
-  /**
-   * Generate a component ID given a Javascript Component ID.
-   *
-   * @param string $javaScriptComponentId
-   *   Component ID.
-   *
-   * @return string
-   *   Generated component ID.
+   * @todo Remove in clean-up follow-up; minimize non-essential changes.
    */
   public static function componentIdFromJavascriptComponentId(string $javaScriptComponentId): string {
-    return \sprintf('%s.%s', self::SOURCE_PLUGIN_ID, $javaScriptComponentId);
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function checkRequirements(): void {
-    $js_component = $this->getJavaScriptComponent();
-    try {
-      // Create a new instance and bypass the statically cached componentPlugin
-      // property.
-      $ephemeral_sdc_component = self::buildEphemeralSdcPluginInstance($js_component);
-    }
-    catch (InvalidComponentException $e) {
-      throw new ComponentDoesNotMeetRequirementsException([$e->getMessage()]);
-    }
-    ComponentMetadataRequirementsChecker::check((string) $js_component->id(), $ephemeral_sdc_component->metadata, $js_component->getRequiredProps());
-  }
-
-  /**
-   * Any valid JavaScript Component config entity can be mapped to SDC metadata.
-   *
-   * Bypasses the statically cached componentPlugin property. Should be called
-   * during config entity creation and updating to ensure a fresh version is
-   * generated. For run-time code, use ::getComponentPlugin instead.
-   *
-   * @see \Drupal\canvas\Plugin\Validation\Constraint\JsComponentHasValidAndSupportedSdcMetadataConstraintValidator::validate
-   */
-  private static function buildEphemeralSdcPluginInstance(JavaScriptComponent $component): ComponentPlugin {
-    $definition = $component->toSdcDefinition();
-    return new ComponentPlugin(
-      [
-        'app_root' => '',
-        'enforce_schemas' => TRUE,
-      ],
-      $definition['id'],
-      $definition,
-    );
+    return JsComponentDiscovery::getComponentConfigEntityId($javaScriptComponentId);
   }
 
   /**
@@ -452,7 +283,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
         continue;
       }
       $seen[] = $js_component_dependency_name;
-      assert($js_component_dependency instanceof JavaScriptComponent);
+      \assert($js_component_dependency instanceof JavaScriptComponent);
       $dependencyAutoSave = $this->autoSaveManager->getAutoSaveEntity($js_component_dependency);
       $dependency_component_url = $js_component_dependency->getComponentUrl($this->fileUrlGenerator, $isPreview);
       $scoped_dependencies[$component_url]["@/components/{$js_component_dependency_name}"] = $js_component_dependency->getComponentUrl($this->fileUrlGenerator, $isPreview);
@@ -474,7 +305,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
         continue;
       }
       $seen[] = $js_component_dependency_name;
-      assert($js_component_dependency instanceof JavaScriptComponent);
+      \assert($js_component_dependency instanceof JavaScriptComponent);
       $dependencyAutoSave = $this->autoSaveManager->getAutoSaveEntity($js_component_dependency);
       $libraries[] = $js_component_dependency->getAssetLibrary($isPreview);
       $libraries = array_merge($libraries, $this->getDependencyLibraries($js_component_dependency, $dependencyAutoSave, $isPreview, $seen));

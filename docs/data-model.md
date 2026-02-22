@@ -58,7 +58,7 @@ to one of us! 😊 🙏
 - `prop expression`: see [`Canvas Shape Matching into Field Types` doc](shape-matching-into-field-types.md)
 - `prop source`: see [`Canvas Shape Matching into Field Types` doc](shape-matching-into-field-types.md)
 - `static prop source`: see [`Canvas Shape Matching into Field Types` doc](shape-matching-into-field-types.md)
-- `dynamic prop source`: see [`Canvas Shape Matching into Field Types` doc](shape-matching-into-field-types.md)
+- `entity field prop source`: see [`Canvas Shape Matching into Field Types` doc](shape-matching-into-field-types.md)
 - `region node`: one of the node types in the UI data model, representing a `theme region`'s `component tree`
 - `slot node`: one of the node types in the UI data model, representing a `component instance`'s `component slot`
 - `Canvas field`: an instance of the `component tree field type`
@@ -101,6 +101,7 @@ See `\Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem` + its validation c
 Canvas defines a new `Canvas field type` with the following `field prop`s:
 - _uuid_ — A unique ID for this `component instance`
 - _component_id_ — This is the ID of the `Component config entity` this `component instance` references
+- _component_version_ — This is the version of the `Component config entity` this `component instance` uses.
 - _parent_uuid_ — If this `component instance` is placed inside another `component instance` in the tree, the UUID of the parent `component instance`
 - _slot_ — If this `component instance` is placed inside another `component instance` in the tree, the machine name of the `component slot` in which it is placed. This slot must exist in the parent `component instance`.
 - _inputs_ — see 3.2.2
@@ -214,7 +215,52 @@ Example: A simple tree showing a root item (`41595148-e5c1-4873-b373-be3ae6e2134
     // Note how much simpler the stored information is, because it uses the Block system's native input UX:
     'inputs' => [
       'label' => '',
-      'label_display' => FALSE,
+      'label_display' => '0',
+      'use_site_logo' => TRUE,
+      'use_site_name' => TRUE,
+      'use_site_slogan' => TRUE,
+    ],
+  ],
+],
+```
+
+The above is the _runtime_ representation.
+
+The _stored_ representation is optimized for compactness, and each `ComponentSource` is the authority for how to
+optimize the stored data. For example:
+- `ComponentSource`s whose explicit inputs are populated by `StaticPropSource`s can decide that all instances of some
+  `component version` must use the exact same `StaticPropSource`. That enables them to store only the value inside the
+  `StaticPropSource`, and load the metadata when needed. Result: see below.
+- The `Block` `ComponentSource` _could_ (but does not yet at the time of writing) choose to omit `label` and
+  `label_display` settings (which exist for _every_ block plugin), because it's forcing it to not have a label anyway.
+
+```php
+[
+  'uuid' => '41595148-e5c1-4873-b373-be3ae6e21340',
+  'component_id' => 'sdc.canvas_test_sdc.props-slots',
+  'component_version' => '85a5c0c7dd53e0bb',
+  'inputs' => [
+    // Note how much simpler this is compared to the runtime representation above.
+    'heading' => "Hello, world!",
+  ],
+],
+[
+  'uuid' => '3b305d86-86a7-4684-8664-7ef1fc2be070',
+  'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+  'component_version' => 'b1e991f726a2a266',
+  'parent_uuid' => '41595148-e5c1-4873-b373-be3ae6e21340',
+  'slot' => 'the_body',
+  'inputs' => [
+    // Note how much simpler this is compared to the runtime representation above.
+    'heading' => "It's me!",
+  ],
+  [
+    'uuid' => '41595148-e5c1-4873-b373-be3ae6e21340',
+    'component_id' => 'block.system_branding_block',
+    'component_version' => '247a23298360adb2',
+    'inputs' => [
+      'label' => '',
+      'label_display' => '0',
       'use_site_logo' => TRUE,
       'use_site_name' => TRUE,
       'use_site_slogan' => TRUE,
@@ -507,3 +553,39 @@ A complete example, with three `region node`s:
   }
 }
 ```
+
+### 3.5 Data Model: dealing with `component`s evolution
+
+The stored `component tree`s contain `component instance`s tied with specific versions of the associated `Component config entity`. But every `component` can evolve, which will result in new versions.
+
+Each `component source` is able to specify an updater class (see `\Drupal\canvas\ComponentSource\ComponentInstanceUpdaterInterface`).
+This updater will be responsible for:
+
+* Checking if a `component instance` is using the active version.
+* Deciding if a `component instance` not using the active version can be updated automatically without any data loss.
+* Performing that update.
+
+This update of the `component tree`'s`component instance`s will happen automatically
+as soon as we attempt to edit a component tree (see `\Drupal\canvas\Controller\ApiLayoutController::buildRegion()` and
+`\Drupal\canvas\Controller\ApiConfigControllers::normalize()`).
+
+For those `component source`s not providing an input UX (see [`Canvas Components` doc](components.md)), the scenarios
+where such an update is possible without any risk are:
+
+- Adding optional props
+- Adding slots
+- Changing props from required to optional
+- Changing a prop matched prop shape field widget (but only the widget!)
+- Changing default values in prop_field_definitions
+- Changing slot examples
+- Removing props (required or optional)
+- Removing slots
+- Adding a new required prop.
+- Changing props from optional to required
+
+Unsafe changes (that prevent auto-update) include:
+
+- Changing prop shapes
+
+See
+- `\Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentInstanceUpdater::canUpdate`

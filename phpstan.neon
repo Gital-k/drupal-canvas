@@ -1,5 +1,8 @@
 parameters:
   level: 8
+  strictRules:
+    allRules: false
+    strictFunctionCalls: true
   fileExtensions:
     - php
     - module
@@ -12,10 +15,13 @@ parameters:
     # Sometimes npm packages include PHP files
     - '**/node_modules/**'
     # These are 1:1 copies from Drupal core, with trivial additions that cannot have significant PHPStan impact. PHPStan compliance should happen upstream.
+    - src/CoreBugFix/**
     - src/Plugin/Field/FieldTypeOverride
     - src/TypedData/BetterEntityDataDefinition.php
     # This trait decorates core's \Drupal\Core\Test\FunctionalTestSetupTrait::prepareSettings(), which itself triggers a PHPStan warning that core ignores. Match that.
     - tests/src/Traits/ContribStrictConfigSchemaTestTrait.php
+    # PHPCS rules are not executed in production, no need to comply.
+    - coding_standards/**
   treatPhpDocTypesAsCertain: false
   drupal:
     entityMapping:
@@ -36,10 +42,36 @@ parameters:
   ignoreErrors:
     - identifier: missingType.iterableValue
     - identifier: missingType.generics
+    # Impossible to make this pass on <=11.2.
+    -
+      message: '#^Attribute class Drupal\\Core\\Hook\\Attribute\\LegacyRequirementsHook does not exist\.$#'
+      identifier: attribute.notFound
+      count: 1
+      path: canvas.install
     # Ignore invalid phpunit methods/covers
     # @todo Remove in https://drupal.org/i/3533845
     - identifier: phpunit.coversMethod
+    # PHPStan finds many false positives for this, specifically when using the DIC or Typed Data.
+    - identifier: varTag.type
+    -
+      identifier: deadCode.unreachable
+      path: tests/src/Kernel/Plugin/Canvas/ComponentSource/JsComponentEvolutionTest.php
     - identifier: phpunit.covers
+    -
+      message: '#^Access to an undefined property object\:\:\$data\.$#'
+      identifier: property.notFound
+      count: 1
+      path: canvas.post_update.php
+    -
+      message: '#^Access to an undefined property object\:\:\$owner\.$#'
+      identifier: property.notFound
+      count: 1
+      path: canvas.post_update.php
+    -
+      message: '#^Access to an undefined property object\:\:\$updated\.$#'
+      identifier: property.notFound
+      count: 1
+      path: canvas.post_update.php
     -
       message: "#^Class .* extends @internal class#"
       count: 1
@@ -48,12 +80,6 @@ parameters:
       message: "#^Access to an undefined property#"
       count: 1
       path: src/PropSource/StaticPropSource.php
-    -
-      messages:
-        - "#^Missing cache backend declaration for performance\\.$#"
-      paths:
-        - src/Plugin/BlockManager.php
-        - src/Plugin/ComponentPluginManager.php
     -
       message: "#^Method Drupal\\\\canvas\\\\Entity\\\\Pattern\\:\\:preCreate\\(\\) has no return type specified\\.$#"
       count: 1

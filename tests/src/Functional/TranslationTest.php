@@ -6,6 +6,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Functional;
 
+use Drupal\Core\Config\TypedConfigManagerInterface;
 use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\Core\Url;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
@@ -14,15 +15,17 @@ use Drupal\node\Entity\Node;
 use Drupal\node\NodeInterface;
 use Drupal\Tests\ApiRequestTrait;
 use Drupal\Tests\content_translation\Traits\ContentTranslationTestTrait;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
- * @todo Add test coverage for dynamic prop sources used in the content type
+ * @todo Add test coverage for entity field prop sources used in the content
  *   templates in https://drupal.org/i/3455629. This will most likely require
  *   adding back `canvas_entity_prepare_view()` which was removed in
  *   https://www.drupal.org/i/3481720.
  * @see https://www.drupal.org/project/canvas/issues/3455629#comment-15831060
  * @group canvas
  */
+#[RunTestsInSeparateProcesses]
 class TranslationTest extends FunctionalTestBase {
 
   use ApiRequestTrait;
@@ -81,6 +84,51 @@ class TranslationTest extends FunctionalTestBase {
   }
 
   /**
+   * Tests that component_tree is translatable in config entities when canvas_dev_translation is enabled.
+   */
+  public function testComponentTreeTranslatableInConfigEntities(): void {
+    // First test that component_tree is not translatable when canvas_dev_translation is disabled.
+    $typed_config = $this->container->get('config.typed');
+    \assert($typed_config instanceof TypedConfigManagerInterface);
+    // Test canvas.page_region.* schema.
+    $page_region_schema = $typed_config->getDefinition('canvas.page_region.*');
+    $this->assertIsArray($page_region_schema);
+    $this->assertArrayHasKey('mapping', $page_region_schema);
+    $this->assertArrayHasKey('component_tree', $page_region_schema['mapping']);
+    $this->assertArrayNotHasKey('translatable', $page_region_schema['mapping']['component_tree'], 'component_tree should not be translatable for canvas.page_region.* without canvas_dev_translation');
+
+    // Test canvas.content_template.*.*.* schema.
+    $content_template_schema = $typed_config->getDefinition('canvas.content_template.*.*.*');
+    $this->assertIsArray($content_template_schema);
+    $this->assertArrayHasKey('mapping', $content_template_schema);
+    $this->assertArrayHasKey('component_tree', $content_template_schema['mapping']);
+    $this->assertArrayNotHasKey('translatable', $content_template_schema['mapping']['component_tree'], 'component_tree should not be translatable for canvas.content_template.*.*.* without canvas_dev_translation');
+
+    // Enable the canvas_dev_translation module and test that component_tree is now translatable.
+    $module_installer = $this->container->get('module_installer');
+    \assert($module_installer instanceof ModuleInstallerInterface);
+    $module_installer->install(['canvas_dev_translation']);
+    $this->rebuildContainer();
+    $typed_config = $this->container->get('config.typed');
+
+    // Test canvas.page_region.* schema.
+    $page_region_schema = $typed_config->getDefinition('canvas.page_region.*');
+    $this->assertIsArray($page_region_schema);
+    $this->assertArrayHasKey('mapping', $page_region_schema);
+    $this->assertArrayHasKey('component_tree', $page_region_schema['mapping']);
+    $this->assertArrayHasKey('translatable', $page_region_schema['mapping']['component_tree']);
+    $this->assertTrue($page_region_schema['mapping']['component_tree']['translatable'], 'component_tree should be translatable for canvas.page_region.*');
+
+    // Test canvas.content_template.*.*.* schema.
+    $content_template_schema = $typed_config->getDefinition('canvas.content_template.*.*.*');
+    $this->assertIsArray($content_template_schema);
+    $this->assertArrayHasKey('mapping', $content_template_schema);
+    $this->assertArrayHasKey('component_tree', $content_template_schema['mapping']);
+    $this->assertArrayHasKey('translatable', $content_template_schema['mapping']['component_tree']);
+    $this->assertTrue($content_template_schema['mapping']['component_tree']['translatable'], 'component_tree should be translatable for canvas.content_template.*.*.*');
+  }
+
+  /**
    * Data provider for testTranslation().
    *
    * @return array<array{0: array, 1: bool}>
@@ -126,7 +174,7 @@ class TranslationTest extends FunctionalTestBase {
     if ($field_is_translatable) {
       $page->checkField('settings[node][article][fields][field_canvas_test]');
       foreach (['tree', 'inputs'] as $field_property) {
-        in_array($field_property, $translatable_properties)
+        in_array($field_property, $translatable_properties, TRUE)
           ? $page->checkField("settings[node][article][columns][field_canvas_test][$field_property]")
           : $page->uncheckField("settings[node][article][columns][field_canvas_test][$field_property]");
       }
@@ -184,7 +232,7 @@ class TranslationTest extends FunctionalTestBase {
     // information provided to the client for the UI.
     $get_name = function (NodeInterface $node): ?string {
       $component_tree = $node->get('field_canvas_test');
-      assert($component_tree instanceof ComponentTreeItemList);
+      \assert($component_tree instanceof ComponentTreeItemList);
       return $component_tree->getComponentTreeItemByUuid('208452de-10d6-4fb8-89a1-10e340b3744c')?->getLabel();
     };
     // If the field is not translatable updating inputs in the French
@@ -211,7 +259,7 @@ class TranslationTest extends FunctionalTestBase {
   protected function createCanvasNodeWithTranslation(): Node {
     $node = $this->createTestNode();
     $list = $node->get('field_canvas_test');
-    assert($list instanceof ComponentTreeItemList);
+    \assert($list instanceof ComponentTreeItemList);
     // There are five items in the default values for this field.
     self::assertEquals(5, $list->count());
 
@@ -224,7 +272,7 @@ class TranslationTest extends FunctionalTestBase {
     $translation->save();
     $translation = $node->getTranslation('fr');
     $updated_item = $list->getComponentTreeItemByUuid('208452de-10d6-4fb8-89a1-10e340b3744c');
-    assert($updated_item instanceof ComponentTreeItem);
+    \assert($updated_item instanceof ComponentTreeItem);
     $updated_item_inputs = $updated_item->getInputs();
 
     // In both the Symmetric and Asymmetric translation cases, the `inputs` and
@@ -233,9 +281,9 @@ class TranslationTest extends FunctionalTestBase {
     $french_inputs = $updated_item_inputs;
     $french_inputs['heading'] = 'bonjour, monde!';
     $french_list = $translation->get('field_canvas_test');
-    assert($french_list instanceof ComponentTreeItemList);
+    \assert($french_list instanceof ComponentTreeItemList);
     $french_item = $french_list->getComponentTreeItemByUuid('208452de-10d6-4fb8-89a1-10e340b3744c');
-    assert($french_item instanceof ComponentTreeItem);
+    \assert($french_item instanceof ComponentTreeItem);
     $french_item->setInput($french_inputs)
       ->setLabel("Drupal, c'est magnifique !");
     $translation->save();

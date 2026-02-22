@@ -9,6 +9,7 @@ export interface DraggingStatus {
   treeDragging: boolean;
   listDragging: boolean;
   previewDragging: boolean;
+  codeDragging: boolean;
 }
 
 export interface EditorViewPort {
@@ -91,6 +92,7 @@ export const initialState: uiSliceState = {
     treeDragging: false,
     listDragging: false,
     previewDragging: false,
+    codeDragging: false,
   },
   panning: false,
   hoveredComponent: undefined,
@@ -186,6 +188,11 @@ export const uiSlice = createAppSlice({
         state.redoStack = [];
       },
     ),
+    clearUndoRedoHistory: create.reducer((state) => {
+      state.undoStack = [];
+      state.redoStack = [];
+      state.latestUndoRedoActionId = '';
+    }),
     performUndoOrRedo: create.reducer(
       // Take care of moving undo/redo items:
       // * from the undo stack to the redo stack in the case of an UNDO action;
@@ -232,6 +239,10 @@ export const uiSlice = createAppSlice({
     setListDragging: create.reducer((state, action: PayloadAction<boolean>) => {
       state.dragging.isDragging = action.payload;
       state.dragging.listDragging = action.payload;
+    }),
+    setCodeDragging: create.reducer((state, action: PayloadAction<boolean>) => {
+      state.dragging.isDragging = action.payload;
+      state.dragging.codeDragging = action.payload;
     }),
     setIsPanning: create.reducer((state, action: PayloadAction<boolean>) => {
       state.panning = action.payload;
@@ -451,6 +462,7 @@ export const {
   setTreeDragging,
   setPreviewDragging,
   setListDragging,
+  setCodeDragging,
   setIsPanning,
   setIsZooming,
   setHoveredComponent,
@@ -472,6 +484,7 @@ export const {
   unsetEditorFrameContext,
   pushUndo,
   performUndoOrRedo,
+  clearUndoRedoHistory,
   clearSelection,
   setSelection,
   setPreviouslyEdited,
@@ -570,4 +583,7 @@ export const uiSliceReducer = uiSlice.reducer;
 export const UndoRedoActionCreators = {
   undo: (type: UndoRedoType) => ({ type: `@@redux-undo/${type}_UNDO` }),
   redo: (type: UndoRedoType) => ({ type: `@@redux-undo/${type}_REDO` }),
+  clearHistory: (type: UndoRedoType) => ({
+    type: `@@redux-undo/${type}_CLEAR_HISTORY`,
+  }),
 };

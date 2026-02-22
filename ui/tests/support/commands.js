@@ -1,7 +1,6 @@
 import '@testing-library/cypress/add-commands.js';
 
-import { realType } from 'cypress-real-events'; // eslint-disable-line  @typescript-eslint/no-unused-vars
-
+import { realType } from 'cypress-real-events';
 import { queries } from '@testing-library/dom';
 
 import { realDnd } from './realDnd.js';
@@ -643,7 +642,7 @@ Cypress.Commands.add(
 );
 
 Cypress.Commands.add('openLibraryPanel', () => {
-  cy.findByTestId('canvas-side-menu').findByLabelText('Add').click();
+  cy.findByTestId('canvas-side-menu').findByLabelText('Library').click();
 
   cy.findByText('Library', { selector: 'h4' }).should(($el) => {
     expect(

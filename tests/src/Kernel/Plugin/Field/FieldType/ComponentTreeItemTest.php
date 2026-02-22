@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Plugin\Field\FieldType;
 
+use Drupal\canvas\PropSource\PropSource;
 use Drupal\Core\Field\BaseFieldDefinition;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ComponentInterface;
@@ -12,27 +13,27 @@ use Drupal\canvas\Entity\VersionedConfigEntityBase;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
-use Drupal\KernelTests\KernelTestBase;
 use Drupal\node\Entity\Node;
 use Drupal\node\Entity\NodeType;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Kernel\Traits\CiModulePathTrait;
 use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
-use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\canvas\Traits\SingleDirectoryComponentTreeTestTrait;
 use Drupal\Tests\image\Kernel\ImageFieldCreationTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
  * @coversDefaultClass \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem
  * @group canvas
  */
-class ComponentTreeItemTest extends KernelTestBase {
+#[RunTestsInSeparateProcesses]
+class ComponentTreeItemTest extends CanvasKernelTestBase {
 
   use SingleDirectoryComponentTreeTestTrait;
   use ComponentTreeItemListInstantiatorTrait;
   use ConstraintViolationsTestTrait;
-  use ContribStrictConfigSchemaTestTrait;
   use GenerateComponentConfigTrait;
   use CiModulePathTrait;
   use UserCreationTrait;
@@ -42,27 +43,11 @@ class ComponentTreeItemTest extends KernelTestBase {
    * {@inheritdoc}
    */
   protected static $modules = [
-    'canvas',
-    'sdc',
-    'sdc_test',
-    'canvas_test_sdc',
-    // Dependencies must actually exist.
     'field',
-    'user',
     'node',
-    // Modules providing field types + widgets for the SDC Components'
-    // `prop_field_definitions`.
-    'file',
-    'image',
-    'options',
-    'link',
-    'text',
-    'system',
-    'media',
+    // Test components.
     'canvas_test_code_components',
-    'filter',
-    'ckeditor5',
-    'editor',
+    'sdc_test',
   ];
 
   /**
@@ -71,7 +56,6 @@ class ComponentTreeItemTest extends KernelTestBase {
   protected function setUp(): void {
     parent::setUp();
 
-    $this->installConfig('canvas');
     $this->generateComponentConfig();
     $this->installEntitySchema('user');
     $this->installEntitySchema('node_type');
@@ -85,7 +69,7 @@ class ComponentTreeItemTest extends KernelTestBase {
   public function testSetValue(): void {
     $this->generateComponentConfig();
     $component = Component::load('sdc.canvas_test_sdc.props-slots');
-    assert($component !== NULL);
+    \assert($component !== NULL);
 
     // The test Component has a single version; create a second version.
     self::assertCount(1, $component->getVersions());
@@ -297,7 +281,7 @@ class ComponentTreeItemTest extends KernelTestBase {
 
     // Call all convenience methods on the root component instance.
     $root = $item_list->get(0);
-    assert($root instanceof ComponentTreeItem);
+    \assert($root instanceof ComponentTreeItem);
     $this->assertNull($root->getParentUuid());
     $this->assertNull($root->getParentComponentTreeItem());
     $this->assertNull($root->getSlot());
@@ -310,7 +294,7 @@ class ComponentTreeItemTest extends KernelTestBase {
 
     // Call all convenience methods on the child component instance.
     $child = $item_list->get(1);
-    assert($child instanceof ComponentTreeItem);
+    \assert($child instanceof ComponentTreeItem);
     $this->assertSame($root_uuid, $child->getParentUuid());
     $this->assertSame($root, $child->getParentComponentTreeItem());
     $this->assertSame('the_body', $child->getSlot());
@@ -410,7 +394,7 @@ class ComponentTreeItemTest extends KernelTestBase {
               'component_id' => 'sdc.canvas_test_sdc.image',
               'inputs' => [
                 'image' => [
-                  'sourceType' => 'dynamic',
+                  'sourceType' => PropSource::EntityField->value,
                   'expression' => 'ℹ︎␜entity:node:article␝field_hero␞␟{src↝entity␜␜entity:file␝uri␞␟value,alt↠alt,width↠width,height↠height}',
                 ],
               ],
@@ -432,7 +416,7 @@ class ComponentTreeItemTest extends KernelTestBase {
               'component_id' => 'sdc.canvas_test_sdc.my-cta',
               'inputs' => [
                 'text' => [
-                  'sourceType' => 'dynamic',
+                  'sourceType' => PropSource::EntityField->value,
                   'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
                 ],
                 'href' => [
@@ -447,11 +431,11 @@ class ComponentTreeItemTest extends KernelTestBase {
               'component_id' => 'sdc.canvas_test_sdc.my-cta',
               'inputs' => [
                 'text' => [
-                  'sourceType' => 'dynamic',
+                  'sourceType' => PropSource::EntityField->value,
                   'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
                 ],
                 'href' => [
-                  'sourceType' => 'dynamic',
+                  'sourceType' => PropSource::EntityField->value,
                   'expression' => 'ℹ︎␜entity:node:article␝field_hero␞␟entity␜␜entity:file␝uri␞␟value',
                 ],
               ],
@@ -464,7 +448,7 @@ class ComponentTreeItemTest extends KernelTestBase {
                   'sourceType' => 'adapter:image_apply_style',
                   'adapterInputs' => [
                     'image' => [
-                      'sourceType' => 'dynamic',
+                      'sourceType' => PropSource::EntityField->value,
                       'expression' => 'ℹ︎␜entity:node:article␝field_hero␞␟{src↝entity␜␜entity:file␝uri␞0␟value,alt↠alt,width↠width,height↠height}',
                     ],
                     'imageStyle' => [
@@ -485,36 +469,45 @@ class ComponentTreeItemTest extends KernelTestBase {
     $test_cases = static::getValidTreeTestCases();
     array_walk($test_cases, fn(array &$test_case) => $test_case[] = []);
     $test_cases = array_merge($test_cases, static::getInvalidTreeTestCases());
-    $test_cases['invalid values using dynamic inputs'][] = [
-      'field_canvas_test.0' => "The 'dynamic' prop source type must be absent.",
+    $test_cases['prop source type disallowed in this component tree: EntityFieldPropSource'][] = [
+      'field_canvas_test.0' => "The 'entity-field' prop source type must be absent.",
     ];
-    $test_cases['invalid values using dynamic inputs'][] = ['access content'];
+    $test_cases['prop source type disallowed in this component tree: EntityFieldPropSource'][] = ['access content'];
     $test_cases['invalid UUID, missing component_id key'][] = [
       'field_canvas_test.0.uuid' => 'This is not a valid UUID.',
       'field_canvas_test.0.component_id' => 'This value should not be blank.',
       'field_canvas_test.0.component_version' => 'This value should not be blank.',
     ];
-    $test_cases['missing components, using dynamic inputs'][] = [
+    $test_cases['missing components, using entity field prop sources'][] = [
       'field_canvas_test.0.component_id' => "The 'canvas.component.sdc.sdc_test.missing' config does not exist.",
       'field_canvas_test.1.component_id' => "The 'canvas.component.sdc.sdc_test.missing-also' config does not exist.",
-      'field_canvas_test.0' => "The 'dynamic' prop source type must be absent.",
-      'field_canvas_test.1' => "The 'dynamic' prop source type must be absent.",
-      'field_canvas_test.2' => "The 'dynamic' prop source type must be absent.",
+      'field_canvas_test.0' => "The 'entity-field' prop source type must be absent.",
+      'field_canvas_test.1' => "The 'entity-field' prop source type must be absent.",
+      'field_canvas_test.2' => "The 'entity-field' prop source type must be absent.",
     ];
-    $test_cases['missing components, using dynamic inputs'][] = ['access content'];
-    $test_cases['missing components, using only static inputs'][] = [
+    $test_cases['missing components, using entity field prop sources'][] = ['access content'];
+    $test_cases['missing components, using only static prop sources'][] = [
       'field_canvas_test.0.component_id' => "The 'canvas.component.sdc.sdc_test.missing' config does not exist.",
     ];
-    $test_cases['inputs invalid, using dynamic inputs'][] = [
+    $test_cases['inputs invalid, using entity field prop sources'][] = [
       \sprintf('field_canvas_test.0.inputs.%s.heading', self::UUID_DYNAMIC_STATIC_CARD_2) => 'The property heading is required.',
-      'field_canvas_test.0' => "The 'dynamic' prop source type must be absent.",
+      'field_canvas_test.0.inputs.9145b0da-85a1-4ee7-ad1d-b1b63614aed6.heading-2' => 'Component `9145b0da-85a1-4ee7-ad1d-b1b63614aed6`: the `heading-2` prop is not defined.',
+      'field_canvas_test.0' => "The 'entity-field' prop source type must be absent.",
       \sprintf('field_canvas_test.1.inputs.%s.heading', self::UUID_DYNAMIC_STATIC_CARD_3) => 'The property heading is required.',
-      'field_canvas_test.1' => "The 'dynamic' prop source type must be absent.",
-      'field_canvas_test.2' => "The 'dynamic' prop source type must be absent.",
+      'field_canvas_test.1.inputs.dab1145b-c5d5-4779-9be8-0a41c2d8ed29.heading-1' => 'Component `dab1145b-c5d5-4779-9be8-0a41c2d8ed29`: the `heading-1` prop is not defined.',
+      'field_canvas_test.1' => "The 'entity-field' prop source type must be absent.",
+      'field_canvas_test.2' => "The 'entity-field' prop source type must be absent.",
     ];
-    $test_cases['inputs invalid, using dynamic inputs'][] = ['access content'];
-    $test_cases['inputs invalid, using only static inputs'][] = [
-      \sprintf('field_canvas_test.0.inputs.%s.heading', self::UUID_DYNAMIC_STATIC_CARD_2) => 'The property heading is required.',
+    $test_cases['inputs invalid, using entity field prop sources'][] = ['access content'];
+
+    // If inputs are invalid, we get an OutOfRangeException thrown.
+    $test_cases['inputs invalid, using only static prop sources'][] = [];
+    $test_cases['inputs invalid, using only static prop sources'][] = [];
+    $test_cases['inputs invalid, using only static prop sources'][] = \OutOfRangeException::class;
+    $test_cases['inputs invalid, using only static prop sources'][] = "'heading-x' is not a prop on this version of the Component 'Single-directory component: <em class=\"placeholder\">Canvas test SDC with props but no slots</em>'.";
+
+    $test_cases['inputs invalid, using only static inputs with a StaticPropSource deviating from that defined in the referenced Component entity version'][] = [
+      \sprintf('field_canvas_test.0.inputs.%s', self::UUID_DYNAMIC_STATIC_CARD_2) => 'Using a static prop source that deviates from the configuration for Component <em class="placeholder">sdc.canvas_test_sdc.props-no-slots</em> at version <em class="placeholder">b1e991f726a2a266</em>.',
     ];
     $test_cases['missing inputs key'][] = [
       \sprintf('field_canvas_test.0.inputs.%s', self::UUID_DYNAMIC_STATIC_CARD_2) => 'The required properties are missing.',
@@ -537,10 +530,14 @@ class ComponentTreeItemTest extends KernelTestBase {
    * @coversClass \Drupal\canvas\Plugin\Validation\Constraint\ValidComponentTreeItemConstraintValidator
    * @param array $field_values
    * @param array $expected_violations
+   * @param list<string> $permissions
+   * @param ?class-string<\Throwable> $expected_exception
+   * @param ?string $exception_message
    *
    * @dataProvider providerInvalidField
    */
-  public function testInvalidField(array $field_values, array $expected_violations, array $permissions = []): void {
+  public function testInvalidField(array $field_values, array $expected_violations, array $permissions = [], ?string $expected_exception = NULL, ?string $exception_message = NULL): void {
+    $this->installEntitySchema('path_alias');
     $this->setUpCurrentUser(permissions: $permissions);
     $this->container->get('module_installer')->install(['canvas_test_config_node_article']);
     $node = Node::create([
@@ -548,6 +545,11 @@ class ComponentTreeItemTest extends KernelTestBase {
       'type' => 'article',
       'field_canvas_test' => $field_values,
     ]);
+    if ($expected_exception !== NULL) {
+      $this->expectException($expected_exception);
+      \assert(is_string($exception_message));
+      $this->expectExceptionMessage($exception_message);
+    }
     $violations = $node->validate();
     $this->assertSame($expected_violations, self::violationsToArray($violations));
   }

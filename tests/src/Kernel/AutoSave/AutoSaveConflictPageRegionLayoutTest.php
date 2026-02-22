@@ -10,6 +10,7 @@ use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\Tests\canvas\Kernel\ApiLayoutControllerTestBase;
 use Symfony\Component\HttpFoundation\Request;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -19,6 +20,7 @@ use Symfony\Component\HttpFoundation\Response;
  * @covers \Drupal\canvas\Controller\ApiLayoutController::get()
  * @group canvas
  */
+#[RunTestsInSeparateProcesses]
 final class AutoSaveConflictPageRegionLayoutTest extends ApiLayoutControllerTestBase {
 
   use AutoSaveConflictTestTrait;
@@ -37,7 +39,7 @@ final class AutoSaveConflictPageRegionLayoutTest extends ApiLayoutControllerTest
       $region->save();
     }
     $sideBarRegion = PageRegion::load('stark.sidebar_first');
-    assert($sideBarRegion instanceof PageRegion);
+    \assert($sideBarRegion instanceof PageRegion);
     $this->entity = $sideBarRegion;
   }
 

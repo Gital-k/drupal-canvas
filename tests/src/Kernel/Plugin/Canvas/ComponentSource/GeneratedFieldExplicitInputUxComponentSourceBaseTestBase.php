@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource;
 
+use Drupal\canvas\ComponentSource\ComponentCandidatesDiscoveryInterface;
+use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase;
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
+use Drupal\canvas\PropSource\PropSource;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 
 /**
@@ -81,7 +84,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBaseTestBase extends 
     // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::getExplicitInputDefinitions()
     $resolved = array_intersect_key($resolved, $component_with_optional_image_object_shape->getSettings()['prop_field_definitions']);
 
-    // TRICKY: DynamicPropSources can only be used in ContentTemplates and hence
+    // TRICKY: EntityFieldPropSources can only be used in ContentTemplates and hence
     // no host entity is known, which in turn causes the detailed validation for
     // it to be skipped thanks to MissingHostEntityException
     // being thrown.
@@ -89,7 +92,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBaseTestBase extends 
     self::assertCount(0, $source->validateComponentInput(
       [
         'image' => [
-          'sourceType' => 'dynamic',
+          'sourceType' => PropSource::EntityField->value,
           'expression' => 'ℹ︎␜entity:user␝user_picture␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
         ],
       ] + $resolved,
@@ -99,9 +102,16 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBaseTestBase extends 
 
     // Rendering MUST always succeed. It will only succeed if hydration is
     // smart enough to omit both optional props that are NULL(ish).
-    $hydrated = $source->hydrateComponent(['resolved' => $resolved], []);
+    // Hydration needs values for required props in the active version, to ensure
+    // rendering of live implementation component instances using old Component
+    // versions succeeds.
+    $active_required_explicit_inputs = $component_with_optional_image_object_shape
+      ->loadVersion($component_with_optional_image_object_shape->getActiveVersion())
+      ->getComponentSource()
+      ->getDefaultExplicitInput(only_required: TRUE);
+    $hydrated = $source->hydrateComponent(['resolved' => $resolved], [], $active_required_explicit_inputs);
     // @phpstan-ignore-next-line offsetAccess.notFound
-    self::assertSame($is_object_prop_present_in_hydration, array_key_exists('image', $hydrated[GeneratedFieldExplicitInputUxComponentSourceBase::EXPLICIT_INPUT_NAME]));
+    self::assertSame($is_object_prop_present_in_hydration, \array_key_exists('image', $hydrated[GeneratedFieldExplicitInputUxComponentSourceBase::EXPLICIT_INPUT_NAME]));
     $build = $source->renderComponent($hydrated, [], $this->randomString(), FALSE);
     $html = (string) $this->renderer->renderInIsolation($build);
     if (str_starts_with($expected_html, '<')) {
@@ -110,6 +120,81 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBaseTestBase extends 
     else {
       self::assertStringContainsString($expected_html, $html);
     }
+  }
+
+  /**
+   * Data provider for ::testValidateComponentInputRejectsUnexpectedProps().
+   *
+   * @return array<string, array{source_id: string, source_specific_id: string, valid_prop_name: string, valid_prop_input: array<string, mixed>}>
+   *   Returns an array of test cases containing:
+   *   - source_id: The component source plugin ID (e.g., 'js', 'sdc')
+   *   - source_specific_id: The source-specific component ID
+   *   - valid_prop_name: Name of a valid prop that exists on the component
+   *   - valid_prop_input: A complete, valid input array for that prop
+   */
+  abstract public static function providerComponentForValidateInputRejectsUnexpectedProps(): array;
+
+  /**
+   * Tests that validateComponentInput() rejects unexpected props (garbage values).
+   *
+   * @covers ::validateComponentInput
+   * @dataProvider providerComponentForValidateInputRejectsUnexpectedProps
+   */
+  public function testValidateComponentInputRejectsUnexpectedProps(string $source_id, string $source_specific_id, string $valid_prop_name, array $valid_prop_input): void {
+    $this->generateComponentConfig();
+
+    $component_source_manager = $this->container->get(ComponentSourceManager::class);
+    \assert($component_source_manager instanceof ComponentSourceManager);
+    $component_source_definition = $component_source_manager->getDefinition($source_id);
+    \assert(\array_key_exists('discovery', $component_source_definition));
+    $discovery = $this->container->get('class_resolver')->getInstanceFromDefinition($component_source_definition['discovery']);
+    \assert($discovery instanceof ComponentCandidatesDiscoveryInterface);
+    $component_id = $discovery::getComponentConfigEntityId($source_specific_id);
+
+    $component = Component::load($component_id);
+    $this->assertInstanceOf(Component::class, $component);
+
+    $source = $component->getComponentSource();
+    $this->assertInstanceOf(GeneratedFieldExplicitInputUxComponentSourceBase::class, $source);
+
+    $uuid = '07875b1b-b68c-4b90-955c-d6136ff8af93';
+
+    // Test with unexpected prop - should fail validation.
+    $input_with_garbage = [
+      $valid_prop_name => $valid_prop_input,
+      'textUnwanted' => [
+        'sourceType' => 'static:field_item:string',
+        'value' => [['value' => 'Unwanted value']],
+        'expression' => 'ℹ︎string␟value',
+      ],
+    ];
+    $violations = $source->validateComponentInput($input_with_garbage, $uuid, NULL);
+    $this->assertCount(1, $violations, 'Input with one unexpected prop should produce one violation');
+
+    $violation = $violations->get(0);
+    $this->assertSame("Component `$uuid`: the `textUnwanted` prop is not defined.", $violation->getMessage());
+    $this->assertSame("inputs.$uuid.textUnwanted", $violation->getPropertyPath());
+
+    // Test with multiple unexpected props.
+    $input_with_multiple_garbage = [
+      $valid_prop_name => $valid_prop_input,
+      'textUnwanted' => [
+        'sourceType' => 'static:field_item:string',
+        'value' => [['value' => 'Unwanted value']],
+        'expression' => 'ℹ︎string␟value',
+      ],
+      'anotherBadProp' => [
+        'sourceType' => 'static:field_item:string',
+        'value' => [['value' => 'Another unwanted value']],
+        'expression' => 'ℹ︎string␟value',
+      ],
+    ];
+    $violations = $source->validateComponentInput($input_with_multiple_garbage, $uuid, NULL);
+    $this->assertCount(2, $violations, 'Input with two unexpected props should produce two violations');
+
+    $violation_messages = \array_map(fn($v) => $v->getMessage(), iterator_to_array($violations));
+    $this->assertContains("Component `$uuid`: the `textUnwanted` prop is not defined.", $violation_messages);
+    $this->assertContains("Component `$uuid`: the `anotherBadProp` prop is not defined.", $violation_messages);
   }
 
 }

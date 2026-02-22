@@ -10,19 +10,16 @@ use Drupal\Core\StreamWrapper\PublicStream;
 use Drupal\canvas\Entity\ParametrizedImageStyle;
 use Drupal\canvas\Routing\ParametrizedImageStyleConverter;
 use Drupal\file\FileRepositoryInterface;
-use Drupal\image\Entity\ImageStyle;
-use Drupal\KernelTests\KernelTestBase;
-use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\TestFileCreationTrait;
-use Symfony\Component\Yaml\Yaml;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
  * @coversDefaultClass \Drupal\canvas\Entity\ParametrizedImageStyle
  * @group canvas
  */
-class ParametrizedImageStyleTest extends KernelTestBase {
+#[RunTestsInSeparateProcesses]
+class ParametrizedImageStyleTest extends CanvasKernelTestBase {
 
-  use ContribStrictConfigSchemaTestTrait;
   use TestFileCreationTrait {
     getTestFiles as drupalGetTestFiles;
   }
@@ -30,23 +27,8 @@ class ParametrizedImageStyleTest extends KernelTestBase {
   /**
    * {@inheritdoc}
    */
-  protected static $modules = [
-    'system',
-    'user',
-    'canvas',
-    'image',
-    'file',
-  ];
-
-  /**
-   * {@inheritdoc}
-   */
   protected function setUp(): void {
     parent::setUp();
-
-    ImageStyle::create(
-      Yaml::parseFile(__DIR__ . '/../../../config/install/image.style.canvas_parametrized_width.yml')
-    )->save();
 
     // Fixate the private key & hash salt to get predictable `itok`.
     $this->container->get('state')->set('system.private_key', 'dynamic_image_style_private_key');
@@ -65,16 +47,16 @@ class ParametrizedImageStyleTest extends KernelTestBase {
     // ::buildUrlTemplate() returns an absolute URL, just like ::buildUrl().
     $parametrized_image_style_url = ParametrizedImageStyle::load('canvas_parametrized_width')?->buildUrlTemplate('public://2025-04/cat.jpg');
     self::assertSame(
-      PublicStream::baseUrl() . '/styles/canvas_parametrized_width--{width}/public/2025-04/cat.jpg.webp?itok=DnW_VIs-',
+      PublicStream::baseUrl() . '/styles/canvas_parametrized_width--{width}/public/2025-04/cat.jpg.avif?itok=Kyw8-Hxx',
       $parametrized_image_style_url
     );
 
     // Transform to relative URL.
     $file_url_generator = \Drupal::service(FileUrlGeneratorInterface::class);
-    assert($file_url_generator instanceof FileUrlGeneratorInterface);
+    \assert($file_url_generator instanceof FileUrlGeneratorInterface);
     $parametrized_image_style_relative_url = $file_url_generator->transformRelative($parametrized_image_style_url);
     self::assertSame(
-      \base_path() . $this->siteDirectory . '/files/styles/canvas_parametrized_width--{width}/public/2025-04/cat.jpg.webp?itok=DnW_VIs-',
+      \base_path() . $this->siteDirectory . '/files/styles/canvas_parametrized_width--{width}/public/2025-04/cat.jpg.avif?itok=Kyw8-Hxx',
       $parametrized_image_style_relative_url
     );
   }
@@ -114,6 +96,7 @@ class ParametrizedImageStyleTest extends KernelTestBase {
     $uris = [];
     \assert(\is_string($new_uri));
     self::assertFileExists($new_uri);
+    $style = NULL;
     foreach (ParametrizedImageStyleConverter::ALLOWED_WIDTHS as $width) {
       $style = ParametrizedImageStyle::loadWithParameters('canvas_parametrized_width', ['width' => $width]);
       \assert($style instanceof ParametrizedImageStyle);

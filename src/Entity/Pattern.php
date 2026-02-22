@@ -59,7 +59,7 @@ final class Pattern extends ComponentTreeConfigEntityBase implements CanvasHttpA
    * {@inheritdoc}
    */
   public function getComponentTree(): ComponentTreeItemList {
-    $component_tree = $this->createDanglingComponentTreeItemList();
+    $component_tree = $this->createDanglingComponentTreeItemList($this);
     $component_tree->setValue(\array_values($this->component_tree ?? []));
     return $component_tree;
   }
@@ -74,7 +74,7 @@ final class Pattern extends ComponentTreeConfigEntityBase implements CanvasHttpA
   }
 
   public static function preCreate(EntityStorageInterface $storage, array &$values) {
-    if (!array_key_exists('id', $values)) {
+    if (!\array_key_exists('id', $values)) {
       $values['id'] = self::generateId($values['label']);
     }
     parent::preCreate($storage, $values);
@@ -87,11 +87,11 @@ final class Pattern extends ComponentTreeConfigEntityBase implements CanvasHttpA
     $id = mb_strtolower($label);
 
     $id = preg_replace('@[^a-z0-9_.]+@', '', $id);
-    assert(is_string($id));
+    \assert(is_string($id));
     // Furthermore remove any characters that are not alphanumerical from the
     // beginning and end of the transliterated string.
     $id = preg_replace('@^([^a-z0-9]+)|([^a-z0-9]+)$@', '', $id);
-    assert(is_string($id));
+    \assert(is_string($id));
     if (strlen($id) > 23) {
       $id = substr($id, 0, 23);
     }

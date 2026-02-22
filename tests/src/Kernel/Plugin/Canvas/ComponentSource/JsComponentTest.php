@@ -6,7 +6,10 @@ namespace Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource;
 
 // cspell:ignore Tilly anzut nhsy sxnz Umso Dzyawdvr Mafgg Royu Cmsy Pmsg Lgfkq ergmkgy Ptgi Ltxk
 
+use Drupal\canvas\ComponentSource\ComponentSourceBase;
+use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\canvas\ComponentSource\ComponentSourceWithSlotsInterface;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponentDiscovery;
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
 use Drupal\Component\Serialization\Json;
 use Drupal\Component\Utility\Crypt;
@@ -21,6 +24,7 @@ use Drupal\Core\Config\StorageInterface;
 use Drupal\Core\Extension\ModuleExtensionList;
 use Drupal\Core\File\FileUrlGeneratorInterface;
 use Drupal\Core\GeneratedUrl;
+use Drupal\Core\Render\Component\Exception\InvalidComponentException;
 use Drupal\Core\StreamWrapper\StreamWrapperInterface;
 use Drupal\Core\StreamWrapper\StreamWrapperManagerInterface;
 use Drupal\Tests\canvas\Kernel\BrokenPluginManagerInterface;
@@ -36,21 +40,23 @@ use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
-use Drupal\canvas\PropExpressions\StructuredData\FieldTypePropExpression;
 use Drupal\canvas\PropSource\StaticPropSource;
 use Drupal\canvas\Render\ImportMapResponseAttachmentsProcessor;
 use Drupal\media\Entity\MediaType;
 use Drupal\canvas_test_code_components\Hook\IslandCastaway;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
  * Tests JsComponent.
  *
  * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent
  * @group canvas
+ * @group canvas_component_sources
  * @group JavaScriptComponents
  *
  * @phpstan-import-type ComponentConfigEntityId from \Drupal\canvas\Entity\Component
  */
+#[RunTestsInSeparateProcesses]
 final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSourceBaseTestBase {
 
   use CiModulePathTrait;
@@ -75,8 +81,6 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
     'canvas_test_code_components',
     // For testing a code component using the "video" prop shape.
     'field',
-    'media_library',
-    'views',
     'canvas_test_video_fixture',
   ];
 
@@ -122,7 +126,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
     // ⚠️ It is impossible to create ineligible JavaScriptComponent config entities!
     // @see \Drupal\Tests\canvas\Kernel\Config\JavaScriptComponentValidationTest::providerTestEntityShapes()
     self::assertSame([], $this->findIneligibleComponents(JsComponent::SOURCE_PLUGIN_ID, 'canvas_test_code_components'));
-    $expected_js_component_ids = array_keys(self::getExpectedSettings());
+    $expected_js_component_ids = \array_keys(self::getExpectedSettings());
     $js_components = $this->findCreatedComponentConfigEntities(JsComponent::SOURCE_PLUGIN_ID, 'canvas_test_code_components');
 
     self::assertSame($expected_js_component_ids, $js_components);
@@ -160,11 +164,11 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
     $components = $this->componentStorage->loadMultiple($component_ids);
     foreach ($components as $component_id => $component) {
       // Use reflection to test the private ::getDefaultStaticPropSource() method.
-      assert($component instanceof Component);
+      \assert($component instanceof Component);
       $source = $component->getComponentSource();
       $private_method = new \ReflectionMethod($source, 'getDefaultStaticPropSource');
       $private_method->setAccessible(TRUE);
-      foreach (array_keys($settings[$component_id]['prop_field_definitions']) as $prop) {
+      foreach (\array_keys($settings[$component_id]['prop_field_definitions']) as $prop) {
         $static_prop_source = $private_method->invoke($source, $prop, TRUE);
         $this->assertInstanceOf(StaticPropSource::class, $static_prop_source);
       }
@@ -193,7 +197,8 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
             // ⚠️ Empty default value.
             // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::exampleValueRequiresEntity()
             'default_value' => [],
-            'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:video␝field_media_video_file␞␟entity␜␜entity:file␝uri␞␟url}',
+            // @see \Drupal\canvas\Hook\ShapeMatchingHooks::mediaLibraryStorablePropShapeAlter()
+            'expression' => 'ℹ︎entity_reference␟entity␜␜entity:media:video␝field_media_video_file␞␟{src↝entity␜␜entity:file␝uri␞␟url}',
           ],
           'displayWidth' => [
             'required' => FALSE,
@@ -235,6 +240,9 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
         ],
       ],
       'js.canvas_test_code_components_using_drupalsettings_get_site_data' => [
+        'prop_field_definitions' => [],
+      ],
+      'js.canvas_test_code_components_using_get_page_data' => [
         'prop_field_definitions' => [],
       ],
       'js.canvas_test_code_components_using_imports' => [
@@ -380,7 +388,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
     // ⚠️ The `'html'` expectations are tested separately for this very complex
     // rendering.
     // @see ::testRenderComponent()
-    $rendered_without_html = array_map(
+    $rendered_without_html = \array_map(
       fn($expectations) => array_diff_key($expectations, ['html' => NULL]),
       $rendered,
     );
@@ -404,36 +412,38 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
         [
           'rel' => 'modulepreload',
           'fetchpriority' => 'high',
-          'href' => \sprintf('%s/ui/lib/astro-hydration/dist/signals.module.js?2.1.0-alpha3', $module_path),
+          'href' => \sprintf('%s/packages/astro-hydration/dist/signals.module.js?2.1.0-alpha3', $module_path),
         ],
       ],
       [
         [
           'rel' => 'modulepreload',
           'fetchpriority' => 'high',
-          'href' => \sprintf('%s/ui/lib/astro-hydration/dist/preload-helper.js?2.1.0-alpha3', $module_path),
+          'href' => \sprintf('%s/packages/astro-hydration/dist/preload-helper.js?2.1.0-alpha3', $module_path),
         ],
       ],
     ];
     $default_imports = [
       ImportMapResponseAttachmentsProcessor::GLOBAL_IMPORTS => [
-        'preact' => \sprintf('%s/ui/lib/astro-hydration/dist/preact.module.js?2.1.0-alpha3', $module_path),
-        'preact/hooks' => \sprintf('%s/ui/lib/astro-hydration/dist/hooks.module.js?2.1.0-alpha3', $module_path),
-        'react/jsx-runtime' => \sprintf('%s/ui/lib/astro-hydration/dist/jsx-runtime-default.js?2.1.0-alpha3', $module_path),
-        'react' => \sprintf('%s/ui/lib/astro-hydration/dist/compat.module.js?2.1.0-alpha3', $module_path),
-        'react-dom' => \sprintf('%s/ui/lib/astro-hydration/dist/compat.module.js?2.1.0-alpha3', $module_path),
-        'react-dom/client' => \sprintf('%s/ui/lib/astro-hydration/dist/compat.module.js?2.1.0-alpha3', $module_path),
-        'clsx' => \sprintf('%s/ui/lib/astro-hydration/dist/clsx.js?2.1.0-alpha3', $module_path),
-        'class-variance-authority' => \sprintf('%s/ui/lib/astro-hydration/dist/class-variance-authority.js?2.1.0-alpha3', $module_path),
-        'tailwind-merge' => \sprintf('%s/ui/lib/astro-hydration/dist/tailwind-merge.js?2.1.0-alpha3', $module_path),
-        '@/lib/FormattedText' => \sprintf('%s/ui/lib/astro-hydration/dist/FormattedText.js?2.1.0-alpha3', $module_path),
-        'next-image-standalone' => \sprintf('%s/ui/lib/astro-hydration/dist/next-image-standalone.js?2.1.0-alpha3', $module_path),
-        '@/lib/utils' => \sprintf('%s/ui/lib/astro-hydration/dist/utils.js?2.1.0-alpha3', $module_path),
-        '@drupal-api-client/json-api-client' => \sprintf('%s/ui/lib/astro-hydration/dist/jsonapi-client.js?2.1.0-alpha3', $module_path),
-        'drupal-jsonapi-params' => \sprintf('%s/ui/lib/astro-hydration/dist/jsonapi-params.js?2.1.0-alpha3', $module_path),
-        '@/lib/jsonapi-utils' => \sprintf('%s/ui/lib/astro-hydration/dist/jsonapi-utils.js?2.1.0-alpha3', $module_path),
-        '@/lib/drupal-utils' => \sprintf('%s/ui/lib/astro-hydration/dist/drupal-utils.js?2.1.0-alpha3', $module_path),
-        'swr' => \sprintf('%s/ui/lib/astro-hydration/dist/swr.js?2.1.0-alpha3', $module_path),
+        'preact' => \sprintf('%s/packages/astro-hydration/dist/preact.module.js?2.1.0-alpha3', $module_path),
+        'preact/hooks' => \sprintf('%s/packages/astro-hydration/dist/hooks.module.js?2.1.0-alpha3', $module_path),
+        'react/jsx-runtime' => \sprintf('%s/packages/astro-hydration/dist/jsx-runtime-default.js?2.1.0-alpha3', $module_path),
+        'react' => \sprintf('%s/packages/astro-hydration/dist/compat.module.js?2.1.0-alpha3', $module_path),
+        'react-dom' => \sprintf('%s/packages/astro-hydration/dist/compat.module.js?2.1.0-alpha3', $module_path),
+        'react-dom/client' => \sprintf('%s/packages/astro-hydration/dist/compat.module.js?2.1.0-alpha3', $module_path),
+        'clsx' => \sprintf('%s/packages/astro-hydration/dist/clsx.js?2.1.0-alpha3', $module_path),
+        'class-variance-authority' => \sprintf('%s/packages/astro-hydration/dist/class-variance-authority.js?2.1.0-alpha3', $module_path),
+        'tailwind-merge' => \sprintf('%s/packages/astro-hydration/dist/tailwind-merge.js?2.1.0-alpha3', $module_path),
+        '@/lib/FormattedText' => \sprintf('%s/packages/astro-hydration/dist/FormattedText.js?2.1.0-alpha3', $module_path),
+        'next-image-standalone' => \sprintf('%s/packages/astro-hydration/dist/next-image-standalone.js?2.1.0-alpha3', $module_path),
+        '@/lib/utils' => \sprintf('%s/packages/astro-hydration/dist/utils.js?2.1.0-alpha3', $module_path),
+        '@drupal-api-client/json-api-client' => \sprintf('%s/packages/astro-hydration/dist/jsonapi-client.js?2.1.0-alpha3', $module_path),
+        'drupal-jsonapi-params' => \sprintf('%s/packages/astro-hydration/dist/jsonapi-params.js?2.1.0-alpha3', $module_path),
+        '@/lib/jsonapi-utils' => \sprintf('%s/packages/astro-hydration/dist/jsonapi-utils.js?2.1.0-alpha3', $module_path),
+        '@/lib/drupal-utils' => \sprintf('%s/packages/astro-hydration/dist/drupal-utils.js?2.1.0-alpha3', $module_path),
+        'swr' => \sprintf('%s/packages/astro-hydration/dist/swr.js?2.1.0-alpha3', $module_path),
+        'drupal-canvas' => \sprintf('%s/packages/astro-hydration/dist/drupal-canvas.js?2.1.0-alpha3', $module_path),
+        '@tailwindcss/typography' => \sprintf('%s/packages/astro-hydration/dist/tailwindcss-typography.js?2.1.0-alpha3', $module_path),
       ],
     ];
 
@@ -648,6 +658,27 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
           'import_maps' => $default_imports,
         ],
       ],
+      'js.canvas_test_code_components_using_get_page_data' => [
+        'cacheability' => (clone $default_cacheability)
+          ->setCacheTags(['config:canvas.js_component.canvas_test_code_components_using_get_page_data']),
+        'attachments' => [
+          'library' => [
+            'canvas/astro_island.canvas_test_code_components_using_get_page_data',
+            ...$default_libraries,
+          ],
+          'html_head_link' => [
+            ...$default_html_head_links,
+            [
+              [
+                'rel' => 'modulepreload',
+                'fetchpriority' => 'high',
+                'href' => \sprintf('/%s/files/astro-island/xQS78lbNqAghM9-MAQpdZmGt_tTf-fB2CQJMVvxqLek.js', $site_path),
+              ],
+            ],
+          ],
+          'import_maps' => $default_imports,
+        ],
+      ],
       'js.canvas_test_code_components_using_drupalsettings_get_site_data' => [
         'cacheability' => (clone $default_cacheability)
           ->setCacheTags(['config:canvas.js_component.canvas_test_code_components_using_drupalsettings_get_site_data']),
@@ -687,7 +718,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
 
     $this->generateComponentConfig();
     foreach ($this->componentStorage->loadMultiple($component_ids) as $component) {
-      assert($component instanceof Component);
+      \assert($component instanceof Component);
       $source = $component->getComponentSource();
       \assert($source instanceof JsComponent);
       $expected_cacheability = (new CacheableMetadata())
@@ -720,7 +751,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
     $js_component = $source->getJavaScriptComponent();
     $expected_component_compiled_js = $js_component->getJs();
     $expected_component_compiled_css = $js_component->getCss();
-    $expected_component_props = array_map(
+    $expected_component_props = \array_map(
       fn (array $prop_json_schema) => new EvaluationResult($prop_json_schema['examples'][0]),
       $js_component->getProps() ?? [],
     );
@@ -738,7 +769,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       $css['original'] .= '/**/';
       $js_component->set('css', $css);
       $js_component->updateFromClientSide([
-        'importedJsComponents' => array_map(
+        'importedJsComponents' => \array_map(
           fn (string $config_name): string => str_replace('canvas.js_component.', '', $config_name),
           $js_component->toArray()['dependencies']['enforced']['config'] ?? []
         ),
@@ -911,6 +942,11 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
           'canvas.js_component.canvas_test_code_components_using_drupalsettings_get_site_data',
         ],
       ],
+      'js.canvas_test_code_components_using_get_page_data' => [
+        'config' => [
+          'canvas.js_component.canvas_test_code_components_using_get_page_data',
+        ],
+      ],
       'js.canvas_test_code_components_using_imports' => [
         'config' => [
           'canvas.js_component.canvas_test_code_components_using_imports',
@@ -968,6 +1004,30 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
     ], $this->callSourceMethodForEach('calculateDependencies', $component_ids));
   }
 
+  protected function alterEnvironmentForCrashTestDummyComponentTree(string $component_id, array $inputs): void {
+    // The test case that tries to pass a string where an integer is needed.
+    if (\array_key_exists('age', $inputs) && $inputs['age'] === "It's rude to ask") {
+      $component = Component::load($component_id);
+      self::assertInstanceOf(Component::class, $component);
+      self::assertCount(1, $component->getVersions());
+      $new_settings = $component->getSettings();
+      self::assertSame('integer', $new_settings['prop_field_definitions']['age']['field_type']);
+      $new_settings['prop_field_definitions']['age']['field_type'] = 'string';
+      $new_settings['prop_field_definitions']['age']['default_value'][0] = ['value' => 'Oh hi'];
+      $new_settings['prop_field_definitions']['age']['expression'] = 'ℹ︎string␟value';
+      $new_settings['prop_field_definitions']['age']['field_widget'] = 'string_textfield';
+      $source = $this->container->get(ComponentSourceManager::class)->createInstance(JsComponent::SOURCE_PLUGIN_ID, [
+        'local_source_id' => JsComponentDiscovery::getSourceSpecificComponentId($component_id),
+        ...$new_settings,
+      ]);
+      \assert($source instanceof ComponentSourceBase);
+      $component->createVersion($source->generateVersionHash())
+        ->setSettings($new_settings)
+        ->save();
+      self::assertCount(2, $component->getVersions());
+    }
+  }
+
   /**
    * {@inheritdoc}
    */
@@ -998,33 +1058,31 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       'expected_output_selector' => NULL,
     ];
 
-    yield "JS Component with invalid props, validation error" => [
+    yield "JS Component with invalid props (wrong shape: string instead of integer!), validation error" => [
       'component_id' => $component_id,
       'inputs' => [
-        'age' => [
-          'sourceType' => "static:field_item:string",
-          'value' => "It's rude to ask",
-          'expression' => (string) new FieldTypePropExpression('string', 'value'),
-        ],
+        'age' => "It's rude to ask",
         'name' => 'Tilly',
       ],
       'expected_validation_errors' => [
         \sprintf('2.inputs.%s.age', self::UUID_CRASH_TEST_DUMMY) => 'String value found, but an integer or an object is required. The provided value is: "It\'s rude to ask".',
       ],
-      'expected_exception' => NULL,
-      // JsComponents can recover from invalid inputs.
-      'expected_output_selector' => \sprintf('canvas-island[uid="%s"]', self::UUID_CRASH_TEST_DUMMY),
+      'expected_exception' => [
+        'class' => InvalidComponentException::class,
+        'message' => 'String value found, but an integer or an object is required.',
+      ],
+      'expected_output_selector' => NULL,
     ];
-
-    yield "JS Component with missing props, validation error" => [
+    // Missing required props from the active version will be assigned on
+    // hydration so no exception occurs.
+    yield "JS Component with missing required props, validation error without exception" => [
       'component_id' => $component_id,
       'inputs' => [],
       'expected_validation_errors' => [
         \sprintf('2.inputs.%s.name', self::UUID_CRASH_TEST_DUMMY) => 'The property name is required.',
       ],
       'expected_exception' => NULL,
-      // JsComponents can recover from invalid inputs.
-      'expected_output_selector' => \sprintf('canvas-island[uid="%s"]', self::UUID_CRASH_TEST_DUMMY),
+      'expected_output_selector' => \sprintf('canvas-island[uid="%s"][props*="Canvas"]', self::UUID_CRASH_TEST_DUMMY),
     ];
   }
 
@@ -1041,7 +1099,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
    *           [true, true, true, "draft"]
    */
   public function testImportMaps(bool $preview, bool $create_auto_save, bool $create_dependency_auto_save, string $dependencies_expected_result): void {
-    assert(in_array($dependencies_expected_result, ['draft', 'live'], TRUE));
+    \assert(in_array($dependencies_expected_result, ['draft', 'live'], TRUE));
     $file_generator = $this->container->get(FileUrlGeneratorInterface::class);
     \assert($file_generator instanceof FileUrlGeneratorInterface);
 
@@ -1127,6 +1185,8 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       ],
       'dataDependencies' => [],
     ]);
+    $js_component->save();
+
     // Add the dependency through client API.
     $js_component_data = $js_component->normalizeForClientSide()->values;
     $js_component_data['importedJsComponents'] = ['dependency_component', 'dependency_component_no_css'];
@@ -1134,7 +1194,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
     $js_component->save();
 
     $autoSave = $this->container->get(AutoSaveManager::class);
-    assert($autoSave instanceof AutoSaveManager);
+    \assert($autoSave instanceof AutoSaveManager);
     $touch_component = function (JavaScriptComponent $component) {
       $css = $component->get('css');
       // We need to make this different to the saved value.
@@ -1181,7 +1241,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
     \assert($component instanceof ComponentInterface);
     $source = $component->getComponentSource();
     \assert($source instanceof ComponentSourceWithSlotsInterface);
-    $rendered_component = $source->renderComponent([], $source->getSlotDefinitions(), 'test-uuid', $preview);
+    $rendered_component = $source->renderComponent(self::getDefaultInputForGeneratedInputUx($component), $source->getSlotDefinitions(), 'test-uuid', $preview);
     self::assertArrayHasKey('#import_maps', $rendered_component);
     self::assertArrayHasKey(ImportMapResponseAttachmentsProcessor::SCOPED_IMPORTS, $rendered_component['#import_maps']);
     $scoped_import_maps = $rendered_component['#import_maps']['scopes'];
@@ -1232,7 +1292,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       $autoSave->saveEntity(
         $js_component,
       );
-      $rendered_component = $source->renderComponent([], $source->getSlotDefinitions(), 'test-uuid', $preview);
+      $rendered_component = $source->renderComponent(self::getDefaultInputForGeneratedInputUx($component), $source->getSlotDefinitions(), 'test-uuid', $preview);
       self::assertArrayHasKey('#import_maps', $rendered_component);
       self::assertArrayNotHasKey(ImportMapResponseAttachmentsProcessor::SCOPED_IMPORTS, $rendered_component['#import_maps']);
       self::assertNotEmpty($rendered_component['#attached']['library']);
@@ -1251,7 +1311,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       'js.canvas_test_code_components_captioned_video' => [
         'expected_output_selectors' => [
           'canvas-island[opts*="Captioned video"][props*="bird_vertical"]',
-          'script[blocking="render"][src*="/ui/lib/astro-hydration/dist/client.js"]',
+          'script[blocking="render"][src*="/packages/astro-hydration/dist/client.js"]',
         ],
         'source' => 'Code component',
         'metadata' => ['slots' => []],
@@ -1259,8 +1319,8 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
           'video' => [
             'required' => TRUE,
             'jsonSchema' => [
-              'title' => 'video',
               'type' => 'object',
+              'title' => 'video',
               'required' => ['src'],
               'properties' => [
                 'src' => [
@@ -1271,16 +1331,19 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
                   'x-allowed-schemes' => ['http', 'https'],
                 ],
                 'poster' => [
-                  'title' => 'Image URL',
+                  'title' => 'Poster image URL',
                   'type' => 'string',
                   'format' => 'uri-reference',
                   'contentMediaType' => 'image/*',
                   'x-allowed-schemes' => ['http', 'https'],
+                  'id' => 'json-schema-definitions://canvas.module/image-uri',
                 ],
               ],
+              'id' => 'json-schema-definitions://canvas.module/video',
             ],
             'sourceType' => 'static:field_item:entity_reference',
-            'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:video␝field_media_video_file␞␟entity␜␜entity:file␝uri␞␟url}',
+            // @see \Drupal\canvas\Hook\ShapeMatchingHooks::mediaLibraryStorablePropShapeAlter()
+            'expression' => 'ℹ︎entity_reference␟entity␜␜entity:media:video␝field_media_video_file␞␟{src↝entity␜␜entity:file␝uri␞␟url}',
             'sourceTypeSettings' => [
               'storage' => [
                 'target_type' => 'media',
@@ -1342,7 +1405,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       'js.canvas_test_code_components_interactive' => [
         'expected_output_selectors' => [
           'canvas-island[opts*="Interactive"][props*="name"][props*="Count"]',
-          'script[blocking="render"][src*="/ui/lib/astro-hydration/dist/client.js"]',
+          'script[blocking="render"][src*="/packages/astro-hydration/dist/client.js"]',
         ],
         'source' => 'Code component',
         'metadata' => [
@@ -1374,7 +1437,17 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       'js.canvas_test_code_components_using_drupalsettings_get_site_data' => [
         'expected_output_selectors' => [
           'canvas-island[opts*="Using drupalSettings getSiteData"][props="{}"]',
-          'script[blocking="render"][src*="/ui/lib/astro-hydration/dist/client.js"]',
+          'script[blocking="render"][src*="/packages/astro-hydration/dist/client.js"]',
+        ],
+        'source' => 'Code component',
+        'metadata' => ['slots' => []],
+        'propSources' => [],
+        'transforms' => [],
+      ],
+      'js.canvas_test_code_components_using_get_page_data' => [
+        'expected_output_selectors' => [
+          'canvas-island[opts*="Using drupalSettings getPageData"][props="{}"]',
+          'script[blocking="render"][src*="/packages/astro-hydration/dist/client.js"]',
         ],
         'source' => 'Code component',
         'metadata' => ['slots' => []],
@@ -1384,7 +1457,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       'js.canvas_test_code_components_using_imports' => [
         'expected_output_selectors' => [
           'canvas-island[opts*="using imports"]',
-          'script[blocking="render"][src*="/ui/lib/astro-hydration/dist/client.js"]',
+          'script[blocking="render"][src*="/packages/astro-hydration/dist/client.js"]',
         ],
         'source' => 'Code component',
         'metadata' => ['slots' => []],
@@ -1394,7 +1467,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       'js.canvas_test_code_components_vanilla_image' => [
         'expected_output_selectors' => [
           'canvas-island[opts*="Vanilla Image"][props*="placehold.co"]',
-          'script[blocking="render"][src*="/ui/lib/astro-hydration/dist/client.js"]',
+          'script[blocking="render"][src*="/packages/astro-hydration/dist/client.js"]',
         ],
         'source' => 'Code component',
         'metadata' => ['slots' => []],
@@ -1402,8 +1475,8 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
           'image' => [
             'required' => FALSE,
             'jsonSchema' => [
-              'title' => 'image',
               'type' => 'object',
+              'title' => 'image',
               'required' => [
                 0 => 'src',
               ],
@@ -1414,6 +1487,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
                   'format' => 'uri-reference',
                   'contentMediaType' => 'image/*',
                   'x-allowed-schemes' => ['http', 'https'],
+                  'id' => 'json-schema-definitions://canvas.module/image-uri',
                 ],
                 'alt' => [
                   'title' => 'Alternative text',
@@ -1428,6 +1502,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
                   'type' => 'integer',
                 ],
               ],
+              'id' => 'json-schema-definitions://canvas.module/image',
             ],
             'sourceType' => 'static:field_item:image',
             'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
@@ -1447,7 +1522,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       'js.canvas_test_code_components_with_enums' => [
         'expected_output_selectors' => [
           'canvas-island[opts*="With enums"][props*="red"]',
-          'script[blocking="render"][src*="/ui/lib/astro-hydration/dist/client.js"]',
+          'script[blocking="render"][src*="/packages/astro-hydration/dist/client.js"]',
         ],
         'source' => 'Code component',
         'metadata' => [
@@ -1512,7 +1587,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       'js.canvas_test_code_components_with_link_prop' => [
         'expected_output_selectors' => [
           'canvas-island[opts*="My Code Component Link"]',
-          'script[blocking="render"][src*="/ui/lib/astro-hydration/dist/client.js"]',
+          'script[blocking="render"][src*="/packages/astro-hydration/dist/client.js"]',
         ],
         'source' => 'Code component',
         'metadata' => ['slots' => []],
@@ -1561,7 +1636,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       'js.canvas_test_code_components_with_no_props' => [
         'expected_output_selectors' => [
           'canvas-island[opts*="With no props"][props="{}"]',
-          'script[blocking="render"][src*="/ui/lib/astro-hydration/dist/client.js"]',
+          'script[blocking="render"][src*="/packages/astro-hydration/dist/client.js"]',
         ],
         'source' => 'Code component',
         'metadata' => ['slots' => []],
@@ -1571,7 +1646,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       'js.canvas_test_code_components_with_props' => [
         'expected_output_selectors' => [
           'canvas-island[opts*="With props"][props*="name"][props*="Canvas"][props*="age"][props*="40"]',
-          'script[blocking="render"][src*="/ui/lib/astro-hydration/dist/client.js"]',
+          'script[blocking="render"][src*="/packages/astro-hydration/dist/client.js"]',
         ],
         'source' => 'Code component',
         'metadata' => ['slots' => []],
@@ -1610,7 +1685,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       'js.canvas_test_code_components_with_slots' => [
         'expected_output_selectors' => [
           'canvas-island[opts*="With slot"][props*="name"][props*="Name"]',
-          'script[blocking="render"][src*="/ui/lib/astro-hydration/dist/client.js"]',
+          'script[blocking="render"][src*="/packages/astro-hydration/dist/client.js"]',
         ],
         'source' => 'Code component',
         'metadata' => [
@@ -1654,9 +1729,9 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
 
     // Grab one of the test components.
     $component = Component::load(JsComponent::componentIdFromJavascriptComponentId("canvas_test_code_components_with_props"));
-    assert($component instanceof ComponentInterface);
+    \assert($component instanceof ComponentInterface);
     $source = $component->getComponentSource();
-    assert($source instanceof JsComponent);
+    \assert($source instanceof JsComponent);
     $js_component = $source->getJavaScriptComponent();
     // Create an auto-save entry for this test code component.
     $js_component->set('name', 'With props - Draft');
@@ -1813,7 +1888,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
     // Save and enable to create a component.
     $js_component->enable()->save();
     $corresponding_component = Component::load(JsComponent::SOURCE_PLUGIN_ID . '.joy_is_everything');
-    assert($corresponding_component instanceof Component);
+    \assert($corresponding_component instanceof Component);
 
     $original_version = $corresponding_component->getActiveVersion();
     $versions = [$original_version];
@@ -1830,7 +1905,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       ],
     ])->save();
     $second_version_component = Component::load(JsComponent::SOURCE_PLUGIN_ID . '.joy_is_everything');
-    assert($second_version_component instanceof Component);
+    \assert($second_version_component instanceof Component);
 
     $second_version = $second_version_component->getActiveVersion();
     self::assertNotEquals($original_version, $second_version);
@@ -1856,7 +1931,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
     ])->save();
 
     $third_version_component = Component::load(JsComponent::SOURCE_PLUGIN_ID . '.joy_is_everything');
-    assert($third_version_component instanceof Component);
+    \assert($third_version_component instanceof Component);
 
     $third_version = $third_version_component->getActiveVersion();
     $versions[] = $third_version;
@@ -1881,7 +1956,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
     ])->save();
 
     $fourth_version_component = Component::load(JsComponent::SOURCE_PLUGIN_ID . '.joy_is_everything');
-    assert($fourth_version_component instanceof Component);
+    \assert($fourth_version_component instanceof Component);
 
     $fourth_version = $fourth_version_component->getActiveVersion();
     self::assertEquals($fourth_version, $third_version);
@@ -1897,7 +1972,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
     ])->save();
 
     $fifth_version_component = Component::load(JsComponent::SOURCE_PLUGIN_ID . '.joy_is_everything');
-    assert($fifth_version_component instanceof Component);
+    \assert($fifth_version_component instanceof Component);
 
     $fifth_version = $fifth_version_component->getActiveVersion();
     $versions[] = $fifth_version;
@@ -1950,9 +2025,9 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
 
   protected function triggerBrokenComponent(ComponentInterface $component): ?BrokenPluginManagerInterface {
     $config_storage = \Drupal::service('config.storage');
-    assert($config_storage instanceof StorageInterface);
+    \assert($config_storage instanceof StorageInterface);
     $js_component_source = $component->getComponentSource();
-    assert($js_component_source instanceof JsComponent);
+    \assert($js_component_source instanceof JsComponent);
 
     // Delete the JavaScriptComponent config WITHOUT triggering
     // Component::onDependencyRemoval(), hence simulating a bypassing of all
@@ -1975,10 +2050,138 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
     return $test_cases;
   }
 
+  /**
+   * Tests that validation always uses published prop definitions.
+   *
+   * IMPORTANT: This test covers a scenario that is impossible to trigger with
+   * the Canvas UI. When a JavaScript component has an auto-save entry with
+   * different props than the published version, the validation MUST still use
+   * the published version's props, not the auto-save version's props.
+   *
+   * This ensures that validation is consistent and predictable, regardless of
+   * whether an auto-save entry exists.
+   *
+   * @param bool $auto_save_existing
+   *   Whether an auto-save entry should exist for the test component.
+   *
+   * @covers ::validateComponentInput
+   * @testWith [false]
+   *           [true]
+   */
+  public function testValidateComponentInput(bool $auto_save_existing): void {
+    // Create a JavaScript component with initial props.
+    $js_component = JavaScriptComponent::create([
+      'machineName' => 'test_validation',
+      'name' => 'Test Validation Component',
+      'status' => TRUE,
+      'props' => [
+        'heading' => [
+          'type' => 'string',
+          'title' => 'Heading',
+          'examples' => ['Hello'],
+        ],
+      ],
+      'slots' => [],
+      'js' => [
+        'original' => 'console.log("test")',
+        'compiled' => 'console.log("test")',
+      ],
+      'css' => [
+        'original' => '',
+        'compiled' => '',
+      ],
+      'dataDependencies' => [],
+    ]);
+    $js_component->save();
+
+    $component_id = 'js.test_validation';
+    $component = Component::load($component_id);
+    $this->assertInstanceOf(Component::class, $component);
+
+    $source = $component->getComponentSource();
+    $this->assertInstanceOf(JsComponent::class, $source);
+    $uuid = 'test-uuid-123';
+
+    // If testing with an auto-save entry, create one with additional props that
+    // are NOT in the published version. We test this scenario for completeness
+    // to ensure the validation system is robust and always uses the published
+    // version's props.
+    if ($auto_save_existing) {
+      $js_component_for_auto_save = JavaScriptComponent::load('test_validation');
+      $this->assertInstanceOf(JavaScriptComponent::class, $js_component_for_auto_save);
+
+      $draft_props = $js_component_for_auto_save->get('props');
+      // Add a prop that only exists in the auto-save, not in the published version.
+      $draft_props['newProp'] = [
+        'type' => 'string',
+        'title' => 'New Prop (only in auto-save)',
+        'examples' => ['This should not affect validation'],
+      ];
+      $js_component_for_auto_save->set('props', $draft_props);
+      $js_component_for_auto_save->updateFromClientSide([
+        'importedJsComponents' => [],
+        'compiledJs' => $js_component_for_auto_save->getJs(),
+      ]);
+      $this->container->get(AutoSaveManager::class)->saveEntity($js_component_for_auto_save);
+    }
+
+    // Test 1: Published props are valid.
+    $valid_input = [
+      'heading' => [
+        'sourceType' => 'static:field_item:string',
+        'value' => [['value' => 'Valid heading']],
+        'expression' => 'ℹ︎string␟value',
+      ],
+    ];
+    $violations = $source->validateComponentInput($valid_input, $uuid, NULL);
+    $this->assertCount(0, $violations, 'Valid published prop should pass validation');
+
+    // Test 2: Unexpected props are ALWAYS rejected, regardless of whether
+    // they exist in an auto-save entry. Validation must use published props only.
+    $input_with_new_prop = [
+      'heading' => [
+        'sourceType' => 'static:field_item:string',
+        'value' => [['value' => 'Valid heading']],
+        'expression' => 'ℹ︎string␟value',
+      ],
+      'newProp' => [
+        'sourceType' => 'static:field_item:string',
+        'value' => [['value' => 'Should not be allowed']],
+        'expression' => 'ℹ︎string␟value',
+      ],
+    ];
+    $violations = $source->validateComponentInput($input_with_new_prop, $uuid, NULL);
+
+    // The 'newProp' should be rejected in BOTH cases:
+    // - When no auto-save exists: obvious - prop doesn't exist in published version
+    // - When auto-save exists with 'newProp': still rejected because validation
+    //   uses the published version, not the auto-save version
+    $this->assertCount(1, $violations, 'Unexpected prop should be rejected regardless of auto-save existence');
+    $this->assertSame("Component `$uuid`: the `newProp` prop is not defined.", $violations->get(0)->getMessage());
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function providerComponentForValidateInputRejectsUnexpectedProps(): array {
+    return [
+      'JS component with props' => [
+        'source_id' => 'js',
+        'source_specific_id' => 'canvas_test_code_components_with_props',
+        'valid_prop_name' => 'name',
+        'valid_prop_input' => [
+          'sourceType' => 'static:field_item:string',
+          'value' => [['value' => 'Valid name']],
+          'expression' => 'ℹ︎string␟value',
+        ],
+      ],
+    ];
+  }
+
   protected function getExpectedVerboseErrorMessage(): string {
     // The code component was deleted by bypassing lots of protections.
     // @see ::triggerBrokenComponent()
-    return sprintf('The JavaScript Component with ID `%s` does not exist.', self::PSEUDO_RANDOM_CODE_COMPONENT_ID);
+    return \sprintf('The JavaScript Component with ID `%s` does not exist.', self::PSEUDO_RANDOM_CODE_COMPONENT_ID);
   }
 
 }

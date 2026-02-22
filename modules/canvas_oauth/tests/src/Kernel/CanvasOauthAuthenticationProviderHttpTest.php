@@ -153,7 +153,7 @@ class CanvasOauthAuthenticationProviderHttpTest extends AuthorizedRequestBase {
       // Expect an exception because the user has no permissions.
       $exception_class = $method === 'GET' ? CacheableAccessDeniedHttpException::class : AccessDeniedHttpException::class;
       $this->expectException($exception_class);
-      $this->expectExceptionMessage(sprintf("The '%s' permission is required.", $required_permissions[0]));
+      $this->expectExceptionMessage(\sprintf("The '%s' permission is required.", $required_permissions[0]));
     }
     $response = $this->request($request);
     if (empty($required_permissions)) {
@@ -286,7 +286,7 @@ class CanvasOauthAuthenticationProviderHttpTest extends AuthorizedRequestBase {
       $method,
       content: json_encode($data) ?: NULL,
     );
-    if (in_array($method, ['POST', 'PATCH'])) {
+    if (in_array($method, ['POST', 'PATCH'], TRUE)) {
       $request->headers->set('Content-Type', 'application/json');
     }
     return $request;
@@ -327,7 +327,7 @@ class CanvasOauthAuthenticationProviderHttpTest extends AuthorizedRequestBase {
       'client_id' => $client->getClientId(),
       'client_secret' => $this->clientSecret,
       // The `scope` parameter is a space-separated list of scope names.
-      'scope' => implode(' ', array_map(fn($scope) => $scope->getName(), $scopes)),
+      'scope' => implode(' ', \array_map(fn($scope) => $scope->getName(), $scopes)),
     ];
     $request = Request::create($this->url->toString(), 'POST', $parameters);
     $response = $this->request($request);
@@ -386,7 +386,7 @@ class CanvasOauthAuthenticationProviderHttpTest extends AuthorizedRequestBase {
       'grant_types' => [
         'client_credentials',
       ],
-      'scopes' => array_map(fn($scope) => $scope->id(), $scopes),
+      'scopes' => \array_map(fn($scope) => $scope->id(), $scopes),
       'secret' => $this->clientSecret,
       'user_id' => $this->user,
     ]);

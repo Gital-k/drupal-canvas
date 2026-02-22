@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
+use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ComponentTreeEntityInterface;
 use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\canvas\PropSource\PropSource;
 use Drupal\canvas\Storage\ComponentTreeLoader;
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\EntityInterface;
@@ -18,6 +20,7 @@ use Drupal\canvas\Controller\ApiLayoutController;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Plugin\DisplayVariant\CanvasPageVariant;
+use Drupal\link\LinkItemInterface;
 use Drupal\node\Entity\Node;
 use Drupal\node\Entity\NodeType;
 use Drupal\node\NodeInterface;
@@ -26,6 +29,7 @@ use Drupal\user\Entity\User;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 /**
@@ -33,6 +37,7 @@ use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
  * @group canvas
  * @group #slow
  */
+#[RunTestsInSeparateProcesses]
 class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
 
   /**
@@ -40,7 +45,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
    */
   protected static $modules = [
     // Allows format=uri to be stored using URI field type.
-    'canvas_test_storage_prop_shape_alter',
+    'canvas_test_storable_prop_shape_alter',
     'sdc_test',
   ];
 
@@ -83,7 +88,8 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
 
     $top_level_component_uuid = '5f71027b-d9d3-4f3d-8990-a6502c0ba676';
     $nested_component_uuid = '8caf6e23-8fb4-4524-bdb6-f57a2a6e7859';
-    // Add a heading populated by a dynamic prop source using the `title` field.
+    // Add a heading populated by an entity field prop source using the `title`
+    // field.
     $components = [
       [
         'uuid' => $top_level_component_uuid,
@@ -91,7 +97,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
         'component_version' => '85a5c0c7dd53e0bb',
         'inputs' => [
           'heading' => [
-            'sourceType' => 'dynamic',
+            'sourceType' => PropSource::EntityField->value,
             'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
           ],
         ],
@@ -102,7 +108,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
         'component_version' => 'b1e991f726a2a266',
         'inputs' => [
           'heading' => [
-            'sourceType' => 'dynamic',
+            'sourceType' => PropSource::EntityField->value,
             'expression' => 'ℹ︎␜entity:node:article␝title␞␟value',
           ],
         ],
@@ -136,13 +142,13 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
       self::assertSame($expected_title, (string) $this->cssSelect('[data-component-id="canvas_test_sdc:props-slots"] [data-component-id="canvas_test_sdc:props-no-slots"] > h1')[0]);
     };
 
-    // Assert the original resolved dynamic prop source + resulting HTML.
+    // Assert the original resolved entity field prop source + resulting HTML.
     $response = $this->request($get_layout_api_request);
     self::assertInstanceOf(JsonResponse::class, $response);
     $title_matches_resolved_and_html('Canvas Needs This For The Time Being', $response);
 
     // Updating the title of the preview entity must propagate throughout.
-    assert($this->previewEntity instanceof Node);
+    \assert($this->previewEntity instanceof Node);
     $this->previewEntity->set('title', 'New title for preview')->save();
     $response = $this->request($get_layout_api_request);
     self::assertInstanceOf(JsonResponse::class, $response);
@@ -187,7 +193,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
         [
           "nodeType" => "component",
           "slots" => [],
-          "type" => "block.page_title_block@62af221149ae4887",
+          "type" => "block.page_title_block@" . Component::load('block.page_title_block')?->getActiveVersion(),
           "uuid" => "c3f3c22c-c22e-4bb6-ad16-635f069148e4",
         ],
       ],
@@ -224,7 +230,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
       [
         "nodeType" => "component",
         "slots" => [],
-        "type" => "block.page_title_block@62af221149ae4887",
+        "type" => "block.page_title_block@" . Component::load('block.page_title_block')?->getActiveVersion(),
         "uuid" => "c3f3c22c-c22e-4bb6-ad16-635f069148e4",
         'name' => NULL,
       ],
@@ -273,7 +279,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
       [
         "nodeType" => "component",
         "slots" => [],
-        "type" => "block.page_title_block@62af221149ae4887",
+        "type" => "block.page_title_block@" . Component::load('block.page_title_block')?->getActiveVersion(),
         "uuid" => "c3f3c22c-c22e-4bb6-ad16-635f069148e4",
         'name' => NULL,
       ],
@@ -301,7 +307,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
       [
         "nodeType" => "component",
         "slots" => [],
-        "type" => "block.page_title_block@62af221149ae4887",
+        "type" => "block.page_title_block@" . Component::load('block.page_title_block')?->getActiveVersion(),
         'name' => NULL,
       ],
     ],
@@ -312,7 +318,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
     // Test that saving the exact values as the stored/live node, no auto-saves
     // remain.
     $original_entity = $entity::load($entity->id());
-    assert($original_entity instanceof $entity);
+    \assert($original_entity instanceof $entity);
     $autoSave->saveEntity($original_entity);
     $response = $this->request(Request::create($url->toString()));
     $this->assertResponseAutoSaves($response, [$original_entity], TRUE);
@@ -346,7 +352,9 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
             "nodeType" => "component",
             'name' => NULL,
             "slots" => [],
-            "type" => "block.page_title_block@62af221149ae4887",
+            // The component version may vary depending on upstream changes in
+            // core.
+            "type" => "block.page_title_block@" . Component::load('block.page_title_block')?->getActiveVersion(),
           ],
         ],
           // Filter out the UUID as that is added randomly by creating the block
@@ -360,7 +368,9 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
         $this->assertSame([
           [
             "nodeType" => "component",
-            "type" => "block.system_messages_block@b92f802cf68eb83e",
+            // The component version may vary depending on upstream changes in
+            // core.
+            "type" => "block.system_messages_block@" . Component::load('block.system_messages_block')?->getActiveVersion(),
             'name' => NULL,
             "slots" => [],
           ],
@@ -390,7 +400,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
                 [
                   'uuid' => CanvasTestSetup::UUID_STATIC_IMAGE,
                   'nodeType' => 'component',
-                  'type' => 'sdc.canvas_test_sdc.image@abadf2538ecfdecc',
+                  'type' => 'sdc.canvas_test_sdc.image@fb40be57bd7e0973',
                   'name' => NULL,
                   'slots' => [],
                 ],
@@ -446,7 +456,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
                 [
                   'uuid' => CanvasTestSetup::UUID_ADAPTED_IMAGE,
                   'nodeType' => 'component',
-                  'type' => 'sdc.canvas_test_sdc.image@abadf2538ecfdecc',
+                  'type' => 'sdc.canvas_test_sdc.image@fb40be57bd7e0973',
                   'name' => 'Magnificent image!',
                   'slots' => [],
                 ],
@@ -475,8 +485,18 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
 
         ],
         'cta1href' => [
-          'sourceType' => 'static:field_item:uri',
-          'expression' => 'ℹ︎uri␟value',
+          'sourceType' => 'static:field_item:link',
+          'value' => [
+            'uri' => 'https://drupal.org',
+            'options' => [],
+          ],
+          'expression' => 'ℹ︎link␟url',
+          'sourceTypeSettings' => [
+            'instance' => [
+              'title' => \DRUPAL_DISABLED,
+              'link_type' => LinkItemInterface::LINK_GENERIC,
+            ],
+          ],
         ],
       ],
     ], $json['model'][CanvasTestSetup::UUID_STATIC_CARD2]);
@@ -535,12 +555,12 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
     // Set up the current user without access to path field.
     $authenticated_role = $this->createRole(['edit any article content']);
     $limited_user = $this->createUser([], NULL, FALSE, ['roles' => [$authenticated_role]]);
-    assert($limited_user instanceof User);
+    \assert($limited_user instanceof User);
     $this->setCurrentUser($limited_user);
 
     // Create an auto-save entry with a value for a field that the user doesn't have access to.
     $autoSave = $this->container->get(AutoSaveManager::class);
-    assert($autoSave instanceof AutoSaveManager);
+    \assert($autoSave instanceof AutoSaveManager);
 
     $node->set('path', ['alias' => '/test-path']);
     $autoSave->saveEntity($node);

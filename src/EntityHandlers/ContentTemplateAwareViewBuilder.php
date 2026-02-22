@@ -47,7 +47,7 @@ final class ContentTemplateAwareViewBuilder extends EntityViewBuilder {
     $instance->entityTypeManager = $container->get(EntityTypeManagerInterface::class);
     $original_view_builder = $instance->entityTypeManager
       ->getHandler($entity_type->id(), self::DECORATED_HANDLER_KEY);
-    assert($original_view_builder instanceof EntityViewBuilderInterface);
+    \assert($original_view_builder instanceof EntityViewBuilderInterface);
     $instance->decorated = $original_view_builder;
 
     return $instance;
@@ -69,9 +69,10 @@ final class ContentTemplateAwareViewBuilder extends EntityViewBuilder {
     // We need to ensure that as soon as a content template is added, we are
     // using it.
     else {
-      (new CacheableMetadata())->addCacheTags(
-        $this->entityTypeManager->getStorage(ContentTemplate::ENTITY_TYPE_ID)->getEntityType()->getListCacheTags()
-      )->applyTo($defaults);
+      CacheableMetadata::createFromRenderArray($defaults)
+        ->addCacheTags(
+          $this->entityTypeManager->getStorage(ContentTemplate::ENTITY_TYPE_ID)->getEntityType()->getListCacheTags()
+        )->applyTo($defaults);
     }
 
     $keys = NestedArray::getValue($defaults, ['#cache', 'keys']);
@@ -108,7 +109,7 @@ final class ContentTemplateAwareViewBuilder extends EntityViewBuilder {
       // See if we can find a template for this entity, in the requested view
       // mode. If we do, use that template to render the entity only if the
       // status is set to true.
-      assert($entity instanceof FieldableEntityInterface);
+      \assert($entity instanceof FieldableEntityInterface);
       $template = ContentTemplate::loadForEntity($entity, $view_mode);
       if ($template && $template->status()) {
         $displays[$bundle] = $template;

@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import clsx from 'clsx';
 import { useParams } from 'react-router';
 import { useNavigate } from 'react-router-dom';
 
@@ -17,23 +18,28 @@ import {
   setFirstLoadComplete,
   unsetEditorFrameContext,
 } from '@/features/ui/uiSlice';
+import useEditorNavigation from '@/hooks/useEditorNavigation';
 import useReturnableLocation from '@/hooks/useReturnableLocation';
 import { useUndoRedo } from '@/hooks/useUndoRedo';
 
 import type { EditorFrameContext } from '@/features/ui/uiSlice';
 
+import styles from '@/features/editor/Editor.module.css';
+
 interface EditorProps {
   context: EditorFrameContext;
+  disable?: boolean;
 }
 
-const Editor: React.FC<EditorProps> = ({ context }) => {
+const Editor: React.FC<EditorProps> = ({ context, disable = false }) => {
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
   useReturnableLocation();
   const { isUndoable, dispatchUndo } = useUndoRedo();
   const latestError = useAppSelector(selectLatestError);
   const editorFrameContext = useAppSelector(selectEditorFrameContext);
-  const params = useParams();
-  const navigate = useNavigate();
+  const { entityId, entityType, bundle, viewMode } = useParams();
+  const { navigateToTemplateEditor } = useEditorNavigation();
 
   useEffect(() => {
     dispatch(setEditorFrameContext(context));
@@ -47,7 +53,7 @@ const Editor: React.FC<EditorProps> = ({ context }) => {
     dispatch(setUpdatePreview(false));
     // When the entityId or entityType changes, we want to reset the first load complete state
     dispatch(setFirstLoadComplete(false));
-  }, [dispatch, params.entityId, params.entityType]);
+  }, [dispatch, entityId, entityType]);
 
   if (latestError) {
     if (latestError.status === '409') {
@@ -79,12 +85,22 @@ const Editor: React.FC<EditorProps> = ({ context }) => {
           <ErrorBoundary
             title="An error has occurred while fetching the template."
             variant="alert"
-            onReset={() =>
-              navigate(
-                `/template/${params.entityType}/${params.bundle}/${params.viewMode}`,
-                { replace: true },
-              )
-            }
+            onReset={() => {
+              if (entityType && bundle && viewMode) {
+                navigateToTemplateEditor(
+                  {
+                    entityType,
+                    bundle,
+                    viewMode,
+                  },
+                  {
+                    replace: true,
+                  },
+                );
+              } else {
+                navigate('/', { replace: true });
+              }
+            }}
             resetButtonText="Return to templates"
           >
             <TemplateLayout />
@@ -100,6 +116,11 @@ const Editor: React.FC<EditorProps> = ({ context }) => {
       {renderContextContent()}
       <EditorFrame />
       <ContextualPanel />
+      <div
+        className={clsx(styles.editorInactive, {
+          [styles.visible]: disable,
+        })}
+      ></div>
     </>
   );
 };

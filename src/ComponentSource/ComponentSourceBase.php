@@ -12,6 +12,8 @@ use Drupal\Core\Plugin\ContextAwarePluginTrait;
 use Drupal\Core\Plugin\PluginBase;
 
 /**
+ * @internal
+ *
  * Defines a base class for component source plugins.
  *
  * @see \Drupal\canvas\Attribute\ComponentSource
@@ -22,6 +24,10 @@ abstract class ComponentSourceBase extends PluginBase implements ComponentSource
 
   use ContextAwarePluginAssignmentTrait;
   use ContextAwarePluginTrait;
+
+  public function determineDefaultFolder(): string {
+    return 'Other';
+  }
 
   public function getSourceSpecificComponentId(): string {
     return $this->getConfiguration()['local_source_id'];
@@ -37,7 +43,7 @@ abstract class ComponentSourceBase extends PluginBase implements ComponentSource
       // @see `type: canvas.component_source_settings.*`
       array_diff_key($this->configuration, array_flip(['local_source_id'])),
     );
-    assert($typed_source_specific_settings instanceof Mapping);
+    \assert($typed_source_specific_settings instanceof Mapping);
     $normalized_data = [
       'settings' => $typed_source_specific_settings->toArray(),
       'slot_definitions' => $this instanceof ComponentSourceWithSlotsInterface
@@ -113,7 +119,7 @@ abstract class ComponentSourceBase extends PluginBase implements ComponentSource
    */
   public function getPluginDefinition(): array {
     $definition = parent::getPluginDefinition();
-    assert(is_array($definition));
+    \assert(is_array($definition));
     return $definition;
   }
 
@@ -143,11 +149,11 @@ abstract class ComponentSourceBase extends PluginBase implements ComponentSource
   protected function getPluginRemovedDependencies(array $plugin_dependencies, array $removed_dependencies) {
     $intersect = [];
     foreach ($plugin_dependencies as $type => $dependencies) {
-      if (array_key_exists($type, $removed_dependencies) && $removed_dependencies[$type]) {
+      if (\array_key_exists($type, $removed_dependencies) && $removed_dependencies[$type]) {
         // Config and content entities have the dependency names as keys while
         // module and theme dependencies are indexed arrays of dependency names.
         // @see \Drupal\Core\Config\ConfigManager::callOnDependencyRemoval()
-        if (in_array($type, ['config', 'content'])) {
+        if (in_array($type, ['config', 'content'], TRUE)) {
           $removed = array_intersect_key($removed_dependencies[$type], array_flip($dependencies));
         }
         else {
@@ -179,6 +185,18 @@ abstract class ComponentSourceBase extends PluginBase implements ComponentSource
   public function optimizeExplicitInput(array $values): array {
     // Nil-op.
     return $values;
+  }
+
+  /**
+   * @todo Remove in clean-up follow-up; minimize non-essential changes.
+   */
+  public function checkRequirements(): void {
+    $discovery_class = $this->getPluginDefinition()['discovery'];
+    // @phpstan-ignore globalDrupalDependencyInjection.useDependencyInjection
+    $discovery = \Drupal::classResolver($discovery_class);
+    \assert($discovery instanceof ComponentCandidatesDiscoveryInterface);
+
+    $discovery->checkRequirements($this->getSourceSpecificComponentId());
   }
 
 }
