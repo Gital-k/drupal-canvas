@@ -1,6 +1,7 @@
+import React from 'react';
 import { describe, expect, it } from 'vitest';
 
-import { canvasTreeToSpec, specToCanvasTree } from './json-render-utils';
+import { canvasTreeToSpec, renderCanvasTree, specToCanvasTree } from './json-render-utils';
 
 import type { Spec } from '@json-render/core';
 import type { CanvasComponentTree } from './json-render-utils';
@@ -612,5 +613,150 @@ describe('round-trip: canvasTreeToSpec → specToCanvasTree', () => {
     const text = result.find((n) => n.component_id === 'Text')!;
     expect(text.parent_uuid).toBeNull();
     expect(text.inputs).toEqual({ content: 'Info' });
+  });
+});
+
+describe('renderCanvasTree', () => {
+  it('should call the component with props from inputs', async () => {
+    const components: CanvasComponentTree = [
+      {
+        parent_uuid: null,
+        slot: null,
+        uuid: '69cb59d5-353f-43b0-9e90-a3e3c0960afe',
+        component_id: 'Button',
+        component_version: null,
+        inputs: { label: 'Click me', variant: 'primary' },
+        label: null,
+      },
+    ];
+
+    const result = await renderCanvasTree(components, {
+      Button: (props) => (
+        <button data-variant={props.variant as string}>{props.label as string}</button>
+      ),
+    });
+
+    expect(result).toEqual(
+      <button data-variant="primary">Click me</button>,
+    );
+  });
+
+  it('should return null for components not in the registry', async () => {
+    const components: CanvasComponentTree = [
+      {
+        parent_uuid: null,
+        slot: null,
+        uuid: '69cb59d5-353f-43b0-9e90-a3e3c0960afe',
+        component_id: 'Unknown',
+        component_version: null,
+        inputs: {},
+        label: null,
+      },
+    ];
+
+    const result = await renderCanvasTree(components, {});
+
+    expect(result).toBeNull();
+  });
+
+  it('should pass children as a prop', async () => {
+    const components: CanvasComponentTree = [
+      {
+        parent_uuid: null,
+        slot: null,
+        uuid: 'f221b7d5-7e9d-47fe-a80e-f2a7f003729d',
+        component_id: 'Wrapper',
+        component_version: null,
+        inputs: {},
+        label: null,
+      },
+      {
+        parent_uuid: 'f221b7d5-7e9d-47fe-a80e-f2a7f003729d',
+        slot: 'children',
+        uuid: '84e5e54d-0ba2-4cb1-aa5c-abed4efdd501',
+        component_id: 'Text',
+        component_version: null,
+        inputs: { content: 'Hello' },
+        label: null,
+      },
+    ];
+
+    const result = await renderCanvasTree(components, {
+      Wrapper: (props) => <div>{props.children as React.ReactNode}</div>,
+      Text: (props) => <p>{props.content as string}</p>,
+    });
+
+    expect(result).toEqual(
+      <div>{[<p>Hello</p>]}</div>,
+    );
+  });
+
+  it('should pass named slots as props', async () => {
+    const components: CanvasComponentTree = [
+      {
+        parent_uuid: null,
+        slot: null,
+        uuid: '26fe2511-4808-40df-8d90-6164ec3b5ac5',
+        component_id: 'Layout',
+        component_version: null,
+        inputs: {},
+        label: null,
+      },
+      {
+        parent_uuid: '26fe2511-4808-40df-8d90-6164ec3b5ac5',
+        slot: 'header',
+        uuid: '8abe4e58-75aa-4ffc-94fd-c9cefaa2f37c',
+        component_id: 'Heading',
+        component_version: null,
+        inputs: { text: 'Title' },
+        label: null,
+      },
+    ];
+
+    const result = await renderCanvasTree(components, {
+      Layout: (props) => (
+        <div className="layout">
+          <header>{props.header as React.ReactNode}</header>
+        </div>
+      ),
+      Heading: (props) => <h1>{props.text as string}</h1>,
+    });
+
+    expect(result).toEqual(
+      <div className="layout">
+        <header>{[<h1>Title</h1>]}</header>
+      </div>,
+    );
+  });
+
+  it('should render multiple root components wrapped transparently', async () => {
+    const components: CanvasComponentTree = [
+      {
+        parent_uuid: null,
+        slot: null,
+        uuid: 'f2fe5384-762a-43ca-abcb-f3632fc6ed45',
+        component_id: 'Button',
+        component_version: null,
+        inputs: { label: 'A' },
+        label: null,
+      },
+      {
+        parent_uuid: null,
+        slot: null,
+        uuid: 'e0d22200-78bf-43c1-a1ea-a37f1eceadb6',
+        component_id: 'Button',
+        component_version: null,
+        inputs: { label: 'B' },
+        label: null,
+      },
+    ];
+
+    const result = await renderCanvasTree(components, {
+      Button: (props) => <button>{props.label as string}</button>,
+    });
+
+    expect(result).toEqual(
+      <>{[<button>A</button>, <button>B</button>]}</>,
+    );
   });
 });

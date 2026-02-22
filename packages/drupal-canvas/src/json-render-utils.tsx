@@ -1,12 +1,5 @@
-// cspell:ignore JSONUI
-import { JSONUIProvider, Renderer } from '@json-render/react';
-
 import type React from 'react';
 import type { Spec, UIElement } from '@json-render/core';
-import type {
-  ComponentRegistry,
-  ComponentRenderProps,
-} from '@json-render/react';
 
 /**
  * Drupal Canvas component tree node.
@@ -202,30 +195,70 @@ export function specToCanvasTree(jsonRenderSpec: Spec): CanvasComponentTree {
 }
 
 /**
- * Renders a Drupal Canvas component tree using json-render.
- *
- * @param components - Flat Canvas component tree to render
- * @param registry - json-render component registry to use for rendering.
+ * Registry of components keyed by component_id.
  */
-export function renderCanvasTree(
+export type ComponentRegistry = Record<string, (props: Record<string, unknown>) => React.ReactNode>;
+
+/**
+ * Renders a single element from a json-render spec, recursively resolving
+ * children and named slots.
+ */
+async function renderSpecElement(
+  key: string,
+  elements: Spec['elements'],
+  registry: ComponentRegistry,
+): Promise<React.ReactNode> {
+  const element = elements[key];
+  if (!element) {
+    throw new Error(`Element key "${key}" not found in elements map.`);
+  }
+
+  // Transparent passthrough for the synthetic multi-root wrapper.
+  // @see canvasTreeToSpec()
+  if (element.type === 'canvas:component-tree') {
+    const children = await Promise.all(
+      (element.children ?? []).map((k) =>
+        renderSpecElement(k, elements, registry),
+      ),
+    );
+    return <>{children}</>;
+  }
+
+  const component = registry[element.type];
+  if (!component) {
+    return null;
+  }
+
+  const children = await Promise.all(
+    (element.children ?? []).map((k) =>
+      renderSpecElement(k, elements, registry),
+    ),
+  );
+
+  const slots: Record<string, React.ReactNode[]> = {};
+  for (const [slotName, childKeys] of Object.entries(element.slots ?? {})) {
+    slots[slotName] = await Promise.all(
+      childKeys.map((k) => renderSpecElement(k, elements, registry)),
+    );
+  }
+
+  return component({
+    ...element.props,
+    ...slots,
+    ...(children.length > 0 ? { children } : {}),
+  });
+}
+
+/**
+ * Renders a Drupal Canvas component tree.
+ *
+ * @param components - Canvas component tree to render
+ * @param registry - Component registry to use for rendering.
+ */
+export async function renderCanvasTree(
   components: CanvasComponentTree,
   registry: ComponentRegistry,
-): React.JSX.Element {
+): Promise<React.ReactNode> {
   const spec = canvasTreeToSpec(components);
-  // Fallback renders canvas:component-tree (the synthetic multi-root wrapper) transparently.
-  // All other unknown types log a warning and render nothing, matching the
-  // default json-render behavior.
-  // @see ElementRenderer in https://github.com/vercel-labs/json-render/blob/main/packages/react/src/renderer.tsx
-  const fallback = ({ element, children }: ComponentRenderProps) => {
-    if (element.type === 'canvas:component-tree') {
-      return <>{children}</>;
-    }
-    console.warn(`No renderer for component type: ${element.type}`);
-    return null;
-  };
-  return (
-    <JSONUIProvider registry={registry}>
-      <Renderer spec={spec} registry={registry} fallback={fallback} />
-    </JSONUIProvider>
-  );
+  return renderSpecElement(spec.root, spec.elements, registry);
 }

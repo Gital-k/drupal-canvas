@@ -175,7 +175,7 @@ Drupal Canvas component trees.
 
 Converts a flat Drupal Canvas component tree to a
 [json-render spec](https://json-render.dev/docs/specs). Canvas stores
-components as a flat array linked by `parent_uuid`; `@json-render/react` uses a
+components as a flat array linked by `parent_uuid`; json-render uses a
 spec object with a single root element and a flat map of elements linked by
 `children` and `slots`. This function builds the spec and, when there are
 multiple root components, wraps them in a synthetic `canvas:component-tree`
@@ -237,12 +237,15 @@ const canvasComponentTree = specToCanvasTree(jsonRenderSpec);
 
 #### `renderCanvasTree`
 
-Renders a flat Canvas component tree using `@json-render/react`. Requires a
-[`ComponentRegistry`](https://github.com/vercel-labs/json-render/tree/main/packages/react#usage)
-for mapping component IDs to React components. The synthetic
-`canvas:component-tree` wrapper used for multi-root trees is handled internally
-and renders transparently. Unknown component types log a warning and render
-nothing.
+Renders a Canvas component tree. Requires a `ComponentRegistry` for mapping
+component IDs to React components. The synthetic `canvas:component-tree`
+wrapper used for multi-root trees is handled internally and renders
+transparently. Unknown component types render nothing.
+
+Returns a `Promise<React.ReactNode>`, so it must be consumed appropriately
+depending on the rendering context.
+
+**Server Component:**
 
 ```jsx
 import { JsonApiClient, renderCanvasTree } from 'drupal-canvas';
@@ -253,6 +256,30 @@ const client = new JsonApiClient();
 export default async function Page({ id }) {
   const page = await client.getResource('canvas_page--canvas_page', id);
   return renderCanvasTree(page.components, registry);
+}
+```
+
+**Client Component (React 19+):**
+
+Use the [`use()`](https://react.dev/reference/react/use) hook. The component
+must be wrapped in a `<Suspense>` boundary by the caller.
+
+```jsx
+import { use } from 'react';
+import useSWR from 'swr';
+import { JsonApiClient, renderCanvasTree } from 'drupal-canvas';
+import registry from './registry';
+
+const client = new JsonApiClient();
+
+export function CanvasPage({ id }) {
+  const { data: page } = useSWR(['canvas_page--canvas_page', id], ([type, id]) =>
+    client.getResource(type, id),
+  );
+
+  if (!page) return null;
+
+  return use(renderCanvasTree(page.components, registry));
 }
 ```
 
