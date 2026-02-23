@@ -1371,5 +1371,6 @@ Cypress.Commands.add('drupalRecipeApply', (path) => {
     `cd ${Cypress.env('coreDir')}/.. && DRUPAL_DEV_SITE_PATH=${Cypress.env('drupalSitePath')} php core/scripts/drupal recipe ${path}`,
   );
   cy.task('log', `Installing recipe: ${path}`);
+  cy.task('log', `Recipe install Command: ${command}`);
   cy.exec(command);
 });
