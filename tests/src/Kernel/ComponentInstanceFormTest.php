@@ -310,6 +310,7 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
           \assert(\array_key_exists('label', $suggestion));
           return $suggestion;
         }
+        \assert(\is_array($label));
         return self::findSuggestionByLabel(array_slice($label, 1), $prop, $suggestion['items']);
       }
     }
