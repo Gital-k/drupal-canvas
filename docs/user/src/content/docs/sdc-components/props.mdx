@@ -121,6 +121,36 @@ spacing:
 </div>
 ```
 
+### Link
+
+URL input for internal or external links. Choose the format based on what you accept:
+
+- **`format: uri`** — Absolute URLs only. The value must include a scheme (e.g. `https://example.com`, `internal:/node/1`). Use when the link must always be a full URI.
+- **`format: uri-reference`** — Absolute or relative. The value may be a full URI or a path such as `/about` or `../page.html`. Use when relative paths or mixed link types are allowed.
+
+**Schema Definition (absolute only):**
+```yaml
+link:
+  type: string
+  format: uri
+  title: 'Link URL'
+  examples: ['https://example.com/path']
+```
+
+**Schema Definition (absolute or relative):**
+```yaml
+link:
+  type: string
+  format: uri-reference
+  title: 'Link URL'
+  examples: ['/about', 'https://example.com']
+```
+
+**Twig Usage:**
+```twig
+<a href="{{ link }}">Link text</a>
+```
+
 ### Enum (Dropdown)
 
 Renders as a dropdown with predefined options. Use `meta:enum` to customize display labels:
@@ -207,28 +237,6 @@ numbers:
   <span class="number">{{ number }}</span>
 {% endfor %}
 ```
-### Link
-
-How to create a link prop:
-
-The link prop allows you to correctly validate a URL and pass
-an object in order to create the link.
-
-Some common formats for a link prop include:
-
-link:
-  type: string
-  format: uri
-
-Ex: "http://example.com/path?qs=v&qs2[1]=3#fragment"
-
-link:
-  type: string
-  format: uri-reference
-
-ex: http://example.com or aaa/bbb.html
-
-
 
 ## Additional resources
 
