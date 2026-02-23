@@ -56,7 +56,8 @@ describe('Canvas pages can be created in any language', () => {
     );
   });
 
-/*  it('Using interface language', () => {
+  it('Using interface language', () => {
+    cy.drupalRecipeApply('modules/contrib/canvas/tests/fixtures/recipes/language/interface_negotiation')
     testCanvasPagesCanBeCreatedInMultilingualSites(
       cy,
       'current_interface',
@@ -65,7 +66,6 @@ describe('Canvas pages can be created in any language', () => {
       '/es',
     );
   });
-*/
 
   after(() => {
     cy.drupalUninstall();
