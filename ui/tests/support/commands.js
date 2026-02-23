@@ -1372,5 +1372,11 @@ Cypress.Commands.add('drupalRecipeApply', (path) => {
   );
   cy.task('log', `Installing recipe: ${path}`);
   cy.task('log', `Recipe install Command: ${command}`);
-  cy.exec(command);
+  try {
+    cy.exec(command);
+  }
+  catch(e) {
+    cy.task(e)
+    throw e;
+  }
 });
