@@ -3,6 +3,6 @@ description: 'Sets the language negotiation selected language to current interfa
 type: 'Canvas'
 config:
   actions:
-    language.negotiation:
+    language.content_settings.canvas_page.canvas_page:
       simpleConfigUpdate:
-        selected_langcode: current_interface
+        default_langcode: current_interface

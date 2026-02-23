@@ -20,6 +20,7 @@ config:
       entity_create:create:
         target_entity_type_id: canvas_page
         target_bundle: canvas_page
+        default_langcode: site_default
         third_party_settings:
           content_translation:
             enabled: true
