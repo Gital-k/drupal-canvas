@@ -1370,7 +1370,7 @@ Cypress.Commands.add(
   'drupalRecipeApply',
   (path) => {
     cy.task('log', `Recipe: ${path}`);
-    cy.task('log', `Command: drush --uri=${Cypress.env('host')} --root=${Cypress.env('coreDir')}/../ recipe ${path}`)
-    cy.exec(`drush --uri=${Cypress.env('host')} --root=${Cypress.env('coreDir')}/../ recipe ${path}`);
+    cy.task('log', `Command: drush --uri=${Cypress.env('baseUrl')} --root=${Cypress.env('coreDir')}/../ recipe ${path}`)
+    cy.exec(`drush --uri=${Cypress.env('baseUrl')} --root=${Cypress.env('coreDir')}/../ recipe ${path}`);
   },
 );
