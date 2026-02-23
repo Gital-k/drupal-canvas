@@ -6,6 +6,7 @@ import installLogsPrinter from 'cypress-terminal-report/src/installLogsPrinter.j
 import dotenv from 'dotenv';
 import glob from 'fast-glob';
 import minimist from 'minimist';
+import { exec } from 'child_process';
 import webpackPreprocessor from '@cypress/webpack-preprocessor';
 
 dotenv.config();
@@ -42,6 +43,7 @@ export default defineConfig({
     defaultTheme: 'olivero',
     adminTheme: 'claro',
     coreDir: process.env.DRUPAL_ROOT_CORE || getCoreDir(),
+    drupalRoot: path.resolve(__dirname, '../../../../'),
     testWebserverUser: process.env.DRUPAL_TEST_WEBSERVER_USER,
     args: minimist(process.argv),
     setupFile: path.resolve('../tests/src/TestSite/CanvasTestSetup.php'),
@@ -87,6 +89,19 @@ export default defineConfig({
         },
         countFiles(pattern) {
           return glob.sync(pattern).length;
+        },
+        execInDir({ command, cwd }) {
+          return new Promise((resolve, reject) => {
+            exec(command, { cwd }, (error, stdout, stderr) => {
+              if (error) {
+                error.stdout = stdout;
+                error.stderr = stderr;
+                reject(error);
+              } else {
+                resolve({ stdout, stderr });
+              }
+            });
+          });
         },
       });
 
