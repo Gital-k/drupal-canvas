@@ -44,6 +44,8 @@ Value`,
   'canvas_component_props[all-props][linkNoTitle][0][uri]':
     'http://example.com',
   'canvas_component_props[all-props][linkNoTitleEmpty][0][uri]': '',
+  'canvas_component_props[all-props][entityReferenceAutocomplete][0][target_id]':
+    'A node title (3)',
   'canvas_component_props[all-props][media][selection][0][target_id]': 3,
   'canvas_component_props[all-props][mediaMultiple][selection][0][target_id]': 3,
   'canvas_component_props[all-props][mediaMultiple][selection][1][target_id]': 4,
@@ -122,6 +124,7 @@ let inputAndUiData = {
             storage: {},
           },
         },
+        entityReferenceAutocomplete: {},
       },
     },
   },
@@ -205,6 +208,7 @@ let inputAndUiData = {
             storage: {},
           },
         },
+        entityReferenceAutocomplete: {},
       },
     },
   },
@@ -221,6 +225,10 @@ const transformConfig = {
   cta1href: { link: {} },
   linkNoTitle: { link: {} },
   linkNoTitleEmpty: { link: {} },
+  entityReferenceAutocomplete: {
+    mainProperty: { name: 'target_id' },
+    entityAutocompleteTargetId: {},
+  },
   cta2: { mainProperty: {} },
   textarea: { mainProperty: {} },
   number: { mainProperty: {} },
@@ -273,6 +281,7 @@ describe('Form state to object', () => {
       cta2: [{ value: '' }],
       linkNoTitle: [{ uri: 'http://example.com' }],
       linkNoTitleEmpty: [{ uri: '' }],
+      entityReferenceAutocomplete: [{ target_id: 'A node title (3)' }],
       a_boolean: { value: 'true' },
       unchecked_boolean: { value: 'false' },
       date: [
@@ -355,6 +364,7 @@ describe('Get prop values from form state', () => {
       cta1href: { uri: 'https://drupal.org', title: 'Do it' },
       linkNoTitle: 'http://example.com',
       linkNoTitleEmpty: '',
+      entityReferenceAutocomplete: '3',
       textarea: `Hi there
 Multiline
 Value`,

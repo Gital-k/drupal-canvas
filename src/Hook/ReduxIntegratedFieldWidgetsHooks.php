@@ -296,7 +296,10 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
       'datetime_default' => ['mainProperty' => [], 'dateTime' => []],
       'daterange_default' => ['dateRange' => []],
       'email_default' => ['mainProperty' => []],
-      'entity_reference_autocomplete' => ['mainProperty' => ['name' => 'target_id']],
+      'entity_reference_autocomplete' => [
+        'mainProperty' => ['name' => 'target_id'],
+        'entityAutocompleteTargetId' => [],
+      ],
       'file_generic' => ['mainProperty' => ['name' => 'fids']],
       'image_image' => ['mainProperty' => ['name' => 'fids']],
       'link_default' => ['link' => []],

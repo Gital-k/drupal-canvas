@@ -18,6 +18,14 @@ export interface TransformConfig {
 
 export const ENTITY_AUTOCOMPLETE_MATCH = /.+\s\(([^)]+)\)/;
 
+const parseEntityAutocompleteSelection = (value: unknown): string | null => {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const match = value.match(ENTITY_AUTOCOMPLETE_MATCH);
+  return match !== null ? match[1] : null;
+};
+
 type PropsValuesOrArrayOfPropsValues =
   | Array<PropsValues>
   | PropsValues
@@ -153,12 +161,12 @@ export interface LinkPropShape extends StaticPropSource {
 }
 
 const resolveEntityUri = (uri: string): string => {
-  const match = uri.match(ENTITY_AUTOCOMPLETE_MATCH);
+  const id = parseEntityAutocompleteSelection(uri);
   // LinkWidget with autocomplete support only supports matching on node
   // entities.
   // @todo Add support for other entity types once core does -
   // https://www.drupal.org/i/2423093
-  return match !== null ? `entity:node/${match[1]}` : uri;
+  return id !== null ? `entity:node/${id}` : uri;
 };
 
 const hasStringUri = (
@@ -206,6 +214,16 @@ const link: Transformer<
     return trimTrailingNulls(returnValue);
   }
   return returnValue[0] ?? null;
+};
+
+const entityAutocompleteTargetId: Transformer<void, null | string, null | string> = (
+  value,
+) => {
+  if (value === null) {
+    return null;
+  }
+  const id = parseEntityAutocompleteSelection(value);
+  return id ?? value;
 };
 
 const cast: Transformer<
@@ -391,6 +409,7 @@ const transforms = {
   mediaSelection,
   cast,
   link,
+  entityAutocompleteTargetId,
 };
 
 export type Transforms = typeof transforms;

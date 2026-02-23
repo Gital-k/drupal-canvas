@@ -446,6 +446,24 @@ describe('Transforms - firstRecord', () => {
   });
 });
 
+describe('Transforms - entityAutocompleteTargetId', () => {
+  it('Should return target ID from autocomplete value', () => {
+    expect(transforms.entityAutocompleteTargetId('A node title (3)')).to.equal(
+      '3',
+    );
+  });
+
+  it('Should return original value when no autocomplete ID is present', () => {
+    expect(transforms.entityAutocompleteTargetId('A node title')).to.equal(
+      'A node title',
+    );
+  });
+
+  it('Should return null for null input', () => {
+    expect(transforms.entityAutocompleteTargetId(null)).to.equal(null);
+  });
+});
+
 describe('Transforms - dateTime', () => {
   const datePropSource = {
     sourceType: 'static:field_item:datetime',
