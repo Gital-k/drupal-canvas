@@ -1368,15 +1368,10 @@ Cypress.Commands.add('insertComponent', (identifier, options = {}) => {
 
 Cypress.Commands.add('drupalRecipeApply', (path) => {
   let command = commandAsWebserver(
-    `cd ../../../../ && DRUPAL_DEV_SITE_PATH=${Cypress.env('drupalSitePath')} php core/scripts/drupal recipe ${path}`,
+    `DRUPAL_DEV_SITE_PATH=${Cypress.env('drupalSitePath')} php core/scripts/drupal recipe ${path}`,
   );
+  command = `cd ../../../../ && ${command}`
   cy.task('log', `Installing recipe: ${path}`);
   cy.task('log', `Recipe install Command: ${command}`);
-  try {
-    cy.exec(command);
-  }
-  catch(e) {
-    cy.task(e)
-    throw e;
-  }
+  cy.exec(command);
 });
