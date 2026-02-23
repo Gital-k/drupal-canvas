@@ -80,7 +80,7 @@ describe('Multivalue widget drag and drop', () => {
     // Add another item.
     waitForPreview();
     cy.get('@unlimited-text')
-      .findByRole('button', { name: 'Add another item' })
+      .findByRole('button', { name: '+ Add new' })
       .click();
     cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
     // Wait for ajax behaviors to finish.
@@ -132,7 +132,7 @@ describe('Multivalue widget drag and drop', () => {
     ]);
     confirmWeightSelectCount(3);
     cy.get('@unlimited-text')
-      .findByRole('button', { name: 'Add another item' })
+      .findByRole('button', { name: '+ Add new' })
       .click();
     cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
     // Wait for ajax behaviors to finish.

@@ -9,7 +9,7 @@ export const edit = (cy) => {
     .parents('.js-form-wrapper')
     .as('textfield_multi');
   cy.get('@textfield_multi')
-    .findByRole('button', { name: 'Add another item' })
+    .findByRole('button', { name: '+ Add new' })
     .as('add-another-text');
   cy.findByLabelText('Canvas Unlimited Text (value 1)').should(
     'have.value',
