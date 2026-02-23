@@ -8,6 +8,7 @@ namespace Drupal\Tests\canvas\Kernel\Config;
 
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Exception\ConstraintViolationException;
+use Drupal\Core\Config\Schema\SchemaIncompleteException;
 use Drupal\Tests\canvas\Traits\BetterConfigDependencyManagerTrait;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
@@ -990,6 +991,94 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
       }
     }
     parent::assertValidationErrors($expected_messages);
+  }
+
+  /**
+   * Tests array props schema validation with canvas_dev_mode enabled.
+   *
+   * @param array $prop_definition
+   *   The array prop definition to test.
+   * @param array $expected_errors
+   *   Expected validation errors.
+   * @param string|null $expected_schema_exception
+   *   Expected schema incomplete exception message pattern, or NULL if none.
+   *
+   * @dataProvider providerArrayPropSchemaValidation
+   */
+  public function testArrayPropSchemaValidation(array $prop_definition, array $expected_errors, ?string $expected_schema_exception = NULL): void {
+    // Enable canvas_dev_mode to unlock array type support.
+    $this->enableModules(['canvas_dev_mode']);
+
+    $this->entity = JavaScriptComponent::create([
+      'machineName' => 'array-test',
+      'name' => 'Array Test Component',
+      'status' => TRUE,
+      'props' => [
+        'array_prop' => $prop_definition,
+      ],
+      'slots' => [],
+      'js' => ['original' => 'console.log("test")', 'compiled' => 'console.log("test")'],
+      'css' => ['original' => '', 'compiled' => ''],
+      'dataDependencies' => [],
+    ]);
+
+    if ($expected_schema_exception !== NULL) {
+      $this->expectException(SchemaIncompleteException::class);
+      $this->expectExceptionMessageMatches($expected_schema_exception);
+    }
+
+    $this->assertValidationErrors($expected_errors);
+  }
+
+  public static function providerArrayPropSchemaValidation(): \Generator {
+    // @todo Fix schema issues in https://www.drupal.org/i/3572553 then update
+    //   these test cases to expect no exceptions.
+    yield 'Valid: string array prop' => [
+      [
+        'type' => 'array',
+        'title' => 'Tags',
+        'items' => ['type' => 'string'],
+        'examples' => [['tag1', 'tag2']],
+      ],
+      [],
+      '/props\.array_prop\.examples\.0\.\d+ missing schema/',
+    ];
+
+    yield 'Valid: integer array prop' => [
+      [
+        'type' => 'array',
+        'title' => 'Scores',
+        'items' => ['type' => 'integer'],
+        'examples' => [[1, 2, 3]],
+      ],
+      [],
+      '/props\.array_prop\.examples\.0\.\d+ missing schema/',
+    ];
+
+    yield 'Valid: limited cardinality (maxItems)' => [
+      [
+        'type' => 'array',
+        'title' => 'Limited',
+        'items' => ['type' => 'string'],
+        'maxItems' => 5,
+        'examples' => [['a', 'b']],
+      ],
+      [],
+      '/props\.array_prop\.examples\.0\.\d+ missing schema/',
+    ];
+
+    yield 'Invalid: missing items schema' => [
+      [
+        'type' => 'array',
+        'title' => 'Missing Items',
+        'examples' => [['a', 'b']],
+      ],
+      [
+        '' => 'Drupal Canvas does not know of a field type/widget to allow populating the <code>array_prop</code> prop, with the shape <code>{"type":"array"}</code>.',
+        'props.array_prop' => "'items' is a required key because props.array_prop.type is array (see config schema type canvas.json_schema.prop.array).",
+      ],
+      '/props\.array_prop\.examples\.0\.\d+ missing schema/',
+    ];
   }
 
 }
