@@ -114,12 +114,18 @@ class AutoSaveManager implements EventSubscriberInterface {
       return;
     }
 
+    // Before setting the new auto-save data, check if the label changed.
+    $existing_auto_save = $this->autoSaveStore->get($key);
+    $new_label = $entity->label();
+    $label_changed = $existing_auto_save === NULL
+      || ($existing_auto_save['label'] ?? NULL) !== $new_label;
+
     $auto_save_data = [
       'entity_type' => $entity->getEntityTypeId(),
       'entity_id' => $entity->id(),
       'data' => $entity->toArray(),
       'langcode' => $entity->language()->getId(),
-      'label' => $entity->label(),
+      'label' => $new_label,
       'data_hash' => $data_hash,
       'client_id' => $clientId,
       'owner' => (int) $this->currentUser->id(),
@@ -128,6 +134,12 @@ class AutoSaveManager implements EventSubscriberInterface {
     $this->autoSaveStore->set($key, $auto_save_data);
     $this->cache->delete($key);
     $this->cacheTagsInvalidator->invalidateTags([self::CACHE_TAG]);
+
+    if ($label_changed) {
+      $this->cacheTagsInvalidator->invalidateTags([
+        self::getEntityLabelCacheTag($entity),
+      ]);
+    }
   }
 
   /**
@@ -252,6 +264,10 @@ class AutoSaveManager implements EventSubscriberInterface {
     return $entity->getEntityTypeId() . ':' . $entity->id();
   }
 
+  public static function getEntityLabelCacheTag(EntityInterface $entity): string {
+    return 'canvas__auto_save_label:' . self::getAutoSaveKey($entity);
+  }
+
   /**
    * @param \Drupal\Core\Entity\EntityInterface $entity
    * @return array{autoSaveStartingPoint: int|string|null, hash: string|null}
@@ -342,7 +358,10 @@ class AutoSaveManager implements EventSubscriberInterface {
    * @see ::onCanvasConfigEntitySave()
    */
   public function delete(EntityInterface $entity): void {
-    $this->cacheTagsInvalidator->invalidateTags([self::CACHE_TAG]);
+    $this->cacheTagsInvalidator->invalidateTags([
+      self::CACHE_TAG,
+      self::getEntityLabelCacheTag($entity),
+    ]);
     $key = $this->getAutoSaveKey($entity);
     $this->autoSaveStore->delete($key);
     $this->formViolationsStore->delete($key);

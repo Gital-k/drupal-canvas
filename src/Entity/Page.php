@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Entity;
 
+use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\Core\Entity\ContentEntityDeleteForm;
 use Drupal\Core\Entity\EditorialContentEntityBase;
 use Drupal\Core\Entity\EntityListBuilder;
@@ -97,6 +98,8 @@ final class Page extends EditorialContentEntityBase implements EntityOwnerInterf
   public const string EDIT_PERMISSION = 'edit canvas_page';
   public const string DELETE_PERMISSION = 'delete canvas_page';
 
+  private bool $useStoredLabel = FALSE;
+
   /**
    * {@inheritdoc}
    */
@@ -109,6 +112,42 @@ final class Page extends EditorialContentEntityBase implements EntityOwnerInterf
   public function setComponentTree(array $values): self {
     $this->getComponentTree()->setValue($values);
     return $this;
+  }
+
+  public function label() {
+    if ($this->useStoredLabel) {
+      return parent::label();
+    }
+    $this->useStoredLabel = TRUE;
+    if (AutoSaveManager::entityIsConsideredNew($this)) {
+      $autoSaveManager = \Drupal::service(AutoSaveManager::class);
+      \assert($autoSaveManager instanceof AutoSaveManager);
+      $autoSave = $autoSaveManager->getAutoSaveEntity($this);
+
+      if (!$autoSave->isEmpty()) {
+        $autoSaveEntity = $autoSave->entity;
+        \assert($autoSaveEntity instanceof self);
+        $autoSaveEntity->useStoredLabel = TRUE;
+        return $autoSaveEntity->label() . ' (Draft)';
+      }
+    }
+    return parent::label();
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getCacheTags(): array {
+    $tags = parent::getCacheTags();
+
+    // Add label-specific auto-save cache tag for "new" pages so any cached
+    // content displaying this page's label gets invalidated when the auto-save
+    // label changes.
+    if (AutoSaveManager::entityIsConsideredNew($this)) {
+      $tags[] = AutoSaveManager::getEntityLabelCacheTag($this);
+    }
+
+    return $tags;
   }
 
   /**

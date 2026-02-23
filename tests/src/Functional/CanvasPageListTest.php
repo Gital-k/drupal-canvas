@@ -68,7 +68,7 @@ class CanvasPageListTest extends FunctionalTestBase {
 
     $assert->linkByHrefExists('/admin/content/pages/add?token=');
 
-    $assert->linkByHrefExists($page->toUrl('canonical')->toString());
+    // The title links to the edit form (not the canonical URL).
     $assert->linkByHrefExists($page->toUrl('edit-form')->toString());
     $assert->linkByHrefExists($page->toUrl('delete-form')->toString());
   }
