@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace Drupal\canvas\Controller;
 
 use Drupal\canvas\CanvasUriDefinitions;
+use Drupal\canvas\GlobalImports;
 use Drupal\canvas\Config\ThemeSettingsDiscovery;
 use Drupal\canvas\Entity\ComponentTreeEntityInterface;
 use Drupal\canvas\Entity\Folder;
 use Drupal\canvas\Extension\CanvasExtensionPluginManager;
+use Drupal\canvas\Render\ImportMapResponseAttachmentsProcessor;
 use Drupal\canvas\Resource\CanvasResourceLink;
 use Drupal\canvas\Resource\CanvasResourceLinkCollection;
 use Drupal\Component\Utility\Html;
@@ -58,12 +60,14 @@ final class CanvasController {
     private readonly UrlGeneratorInterface $urlGenerator,
     private readonly CanvasExtensionPluginManager $extensionPluginManager,
     private readonly ThemeSettingsDiscovery $themeSettingsDiscovery,
+    private readonly GlobalImports $globalImports,
   ) {}
 
   private const HTML = <<<HTML
 <!doctype html>
 <html {{ html_attributes }}>
 <head>
+  <head-placeholder token="HEAD-HERE-PLEASE">
   <meta charset="UTF-8">
   <meta name="viewport"
         content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
@@ -128,7 +132,7 @@ HTML;
         $entity_types_with_keys[$entity_type_id] = $entity_type_definition->getKeys();
         if ($entity_type_definition->getBundleEntityType()) {
           $bundles = $this->entityTypeBundleInfo->getBundleInfo($entity_type_id);
-          $entity_type_labels[$entity_type_id] = array_map(fn($bundle) => $bundle['label'], $bundles);
+          $entity_type_labels[$entity_type_id] = \array_map(fn($bundle) => $bundle['label'], $bundles);
         }
         else {
           $entity_type_labels[$entity_type_id] = $entity_type_definition->getLabel();
@@ -232,8 +236,12 @@ HTML;
         // Note: the tokens here are under our control, and this accepts no user
         // input. Hence these hardcoded tokens are fine.
         'html_response_attachment_placeholders' => [
+          'head' => '<head-placeholder token="HEAD-HERE-PLEASE">',
           'styles' => '<css-placeholder token="CSS-HERE-PLEASE">',
           'scripts' => '<js-placeholder token="JS-HERE-PLEASE">',
+        ],
+        'import_maps' => [
+          ImportMapResponseAttachmentsProcessor::GLOBAL_IMPORTS => $this->globalImports->getGlobalImports(),
         ],
       ]);
   }
@@ -315,7 +323,7 @@ HTML;
       $module_transforms = \array_filter(\array_keys($this->libraryDiscovery->getLibrariesByExtension($module)), static fn (string $library_name) => \str_starts_with($library_name, 'canvas.transform.'));
       $libraries = [
         ...$libraries,
-        ...array_map(fn ($lib_name) => "$module/$lib_name", $module_transforms),
+        ...\array_map(fn ($lib_name) => "$module/$lib_name", $module_transforms),
       ];
     }
     return $libraries;
@@ -331,12 +339,12 @@ HTML;
       if (!isset($definition['canvas']['transforms']) || !is_array($definition['canvas']['transforms'])) {
         continue;
       }
-      $transforms = [...$transforms, ...array_keys($definition['canvas']['transforms'])];
+      $transforms = [...$transforms, ...\array_keys($definition['canvas']['transforms'])];
     }
     $transforms = array_unique($transforms);
 
     // Detect used client-side transforms without a corresponding asset library.
-    $encountered_transform_asset_libraries = array_map(
+    $encountered_transform_asset_libraries = \array_map(
       fn (string $asset_library): string => substr($asset_library, strpos($asset_library, '/') + strlen('/canvas.transform.')),
       $this->getTransformAssetLibraries(),
     );

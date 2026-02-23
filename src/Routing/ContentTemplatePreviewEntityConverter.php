@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Drupal\canvas\Routing;
 
 use Drupal\canvas\Entity\ContentTemplate;
@@ -22,7 +24,7 @@ final class ContentTemplatePreviewEntityConverter implements ParamConverterInter
    */
   public function convert($value, $definition, $name, array $defaults) {
     // The ContentTemplate {entity} parameter must have already been upcast.
-    \assert(array_key_exists('entity', $defaults));
+    \assert(\array_key_exists('entity', $defaults));
     $content_template = $defaults['entity'];
     \assert($content_template instanceof ContentTemplate);
 

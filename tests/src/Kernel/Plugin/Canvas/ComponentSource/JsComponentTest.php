@@ -24,6 +24,7 @@ use Drupal\Core\Config\StorageInterface;
 use Drupal\Core\Extension\ModuleExtensionList;
 use Drupal\Core\File\FileUrlGeneratorInterface;
 use Drupal\Core\GeneratedUrl;
+use Drupal\Core\Render\Component\Exception\InvalidComponentException;
 use Drupal\Core\StreamWrapper\StreamWrapperInterface;
 use Drupal\Core\StreamWrapper\StreamWrapperManagerInterface;
 use Drupal\Tests\canvas\Kernel\BrokenPluginManagerInterface;
@@ -43,6 +44,7 @@ use Drupal\canvas\PropSource\StaticPropSource;
 use Drupal\canvas\Render\ImportMapResponseAttachmentsProcessor;
 use Drupal\media\Entity\MediaType;
 use Drupal\canvas_test_code_components\Hook\IslandCastaway;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
  * Tests JsComponent.
@@ -54,6 +56,7 @@ use Drupal\canvas_test_code_components\Hook\IslandCastaway;
  *
  * @phpstan-import-type ComponentConfigEntityId from \Drupal\canvas\Entity\Component
  */
+#[RunTestsInSeparateProcesses]
 final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSourceBaseTestBase {
 
   use CiModulePathTrait;
@@ -78,8 +81,6 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
     'canvas_test_code_components',
     // For testing a code component using the "video" prop shape.
     'field',
-    'media_library',
-    'views',
     'canvas_test_video_fixture',
   ];
 
@@ -125,7 +126,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
     // ⚠️ It is impossible to create ineligible JavaScriptComponent config entities!
     // @see \Drupal\Tests\canvas\Kernel\Config\JavaScriptComponentValidationTest::providerTestEntityShapes()
     self::assertSame([], $this->findIneligibleComponents(JsComponent::SOURCE_PLUGIN_ID, 'canvas_test_code_components'));
-    $expected_js_component_ids = array_keys(self::getExpectedSettings());
+    $expected_js_component_ids = \array_keys(self::getExpectedSettings());
     $js_components = $this->findCreatedComponentConfigEntities(JsComponent::SOURCE_PLUGIN_ID, 'canvas_test_code_components');
 
     self::assertSame($expected_js_component_ids, $js_components);
@@ -167,7 +168,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       $source = $component->getComponentSource();
       $private_method = new \ReflectionMethod($source, 'getDefaultStaticPropSource');
       $private_method->setAccessible(TRUE);
-      foreach (array_keys($settings[$component_id]['prop_field_definitions']) as $prop) {
+      foreach (\array_keys($settings[$component_id]['prop_field_definitions']) as $prop) {
         $static_prop_source = $private_method->invoke($source, $prop, TRUE);
         $this->assertInstanceOf(StaticPropSource::class, $static_prop_source);
       }
@@ -387,7 +388,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
     // ⚠️ The `'html'` expectations are tested separately for this very complex
     // rendering.
     // @see ::testRenderComponent()
-    $rendered_without_html = array_map(
+    $rendered_without_html = \array_map(
       fn($expectations) => array_diff_key($expectations, ['html' => NULL]),
       $rendered,
     );
@@ -442,6 +443,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
         '@/lib/drupal-utils' => \sprintf('%s/packages/astro-hydration/dist/drupal-utils.js?2.1.0-alpha3', $module_path),
         'swr' => \sprintf('%s/packages/astro-hydration/dist/swr.js?2.1.0-alpha3', $module_path),
         'drupal-canvas' => \sprintf('%s/packages/astro-hydration/dist/drupal-canvas.js?2.1.0-alpha3', $module_path),
+        '@tailwindcss/typography' => \sprintf('%s/packages/astro-hydration/dist/tailwindcss-typography.js?2.1.0-alpha3', $module_path),
       ],
     ];
 
@@ -749,7 +751,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
     $js_component = $source->getJavaScriptComponent();
     $expected_component_compiled_js = $js_component->getJs();
     $expected_component_compiled_css = $js_component->getCss();
-    $expected_component_props = array_map(
+    $expected_component_props = \array_map(
       fn (array $prop_json_schema) => new EvaluationResult($prop_json_schema['examples'][0]),
       $js_component->getProps() ?? [],
     );
@@ -767,7 +769,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       $css['original'] .= '/**/';
       $js_component->set('css', $css);
       $js_component->updateFromClientSide([
-        'importedJsComponents' => array_map(
+        'importedJsComponents' => \array_map(
           fn (string $config_name): string => str_replace('canvas.js_component.', '', $config_name),
           $js_component->toArray()['dependencies']['enforced']['config'] ?? []
         ),
@@ -1065,20 +1067,22 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       'expected_validation_errors' => [
         \sprintf('2.inputs.%s.age', self::UUID_CRASH_TEST_DUMMY) => 'String value found, but an integer or an object is required. The provided value is: "It\'s rude to ask".',
       ],
-      'expected_exception' => NULL,
-      // JsComponents can recover from invalid inputs.
-      'expected_output_selector' => \sprintf('canvas-island[uid="%s"][props*="Tilly"]', self::UUID_CRASH_TEST_DUMMY),
+      'expected_exception' => [
+        'class' => InvalidComponentException::class,
+        'message' => 'String value found, but an integer or an object is required.',
+      ],
+      'expected_output_selector' => NULL,
     ];
-
-    yield "JS Component with missing props, validation error" => [
+    // Missing required props from the active version will be assigned on
+    // hydration so no exception occurs.
+    yield "JS Component with missing required props, validation error without exception" => [
       'component_id' => $component_id,
       'inputs' => [],
       'expected_validation_errors' => [
         \sprintf('2.inputs.%s.name', self::UUID_CRASH_TEST_DUMMY) => 'The property name is required.',
       ],
       'expected_exception' => NULL,
-      // JsComponents can recover from invalid inputs.
-      'expected_output_selector' => \sprintf('canvas-island[uid="%s"]', self::UUID_CRASH_TEST_DUMMY),
+      'expected_output_selector' => \sprintf('canvas-island[uid="%s"][props*="Canvas"]', self::UUID_CRASH_TEST_DUMMY),
     ];
   }
 
@@ -1237,7 +1241,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
     \assert($component instanceof ComponentInterface);
     $source = $component->getComponentSource();
     \assert($source instanceof ComponentSourceWithSlotsInterface);
-    $rendered_component = $source->renderComponent([], $source->getSlotDefinitions(), 'test-uuid', $preview);
+    $rendered_component = $source->renderComponent(self::getDefaultInputForGeneratedInputUx($component), $source->getSlotDefinitions(), 'test-uuid', $preview);
     self::assertArrayHasKey('#import_maps', $rendered_component);
     self::assertArrayHasKey(ImportMapResponseAttachmentsProcessor::SCOPED_IMPORTS, $rendered_component['#import_maps']);
     $scoped_import_maps = $rendered_component['#import_maps']['scopes'];
@@ -1288,7 +1292,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       $autoSave->saveEntity(
         $js_component,
       );
-      $rendered_component = $source->renderComponent([], $source->getSlotDefinitions(), 'test-uuid', $preview);
+      $rendered_component = $source->renderComponent(self::getDefaultInputForGeneratedInputUx($component), $source->getSlotDefinitions(), 'test-uuid', $preview);
       self::assertArrayHasKey('#import_maps', $rendered_component);
       self::assertArrayNotHasKey(ImportMapResponseAttachmentsProcessor::SCOPED_IMPORTS, $rendered_component['#import_maps']);
       self::assertNotEmpty($rendered_component['#attached']['library']);

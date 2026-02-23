@@ -45,7 +45,7 @@ final class ComponentMetadataRequirementsChecker {
 
     // Every slot must have a title.
     foreach ($metadata->slots as $slot_name => $slot_definition) {
-      if (!array_key_exists('title', $slot_definition)) {
+      if (!\array_key_exists('title', $slot_definition)) {
         $messages[] = \sprintf('Slot "%s" must have title', $slot_name);
       }
     }
@@ -58,7 +58,7 @@ final class ComponentMetadataRequirementsChecker {
       }
 
       // Enums must not have empty values.
-      if (array_key_exists('enum', $prop) && in_array('', $prop['enum'], TRUE)) {
+      if (\array_key_exists('enum', $prop) && in_array('', $prop['enum'], TRUE)) {
         $messages[] = \sprintf('Prop "%s" has an empty enum value.', $prop_name);
         continue;
       }
@@ -79,7 +79,7 @@ final class ComponentMetadataRequirementsChecker {
         $validator->reset();
         $validator->validate($example, $prop);
         if (!$validator->isValid()) {
-          $messages[] = \sprintf('Prop "%s" has invalid example value: %s', $prop_name, implode("\n", array_map(
+          $messages[] = \sprintf('Prop "%s" has invalid example value: %s', $prop_name, implode("\n", \array_map(
             static fn(array $error): string => \sprintf("[%s] %s", $error['property'], $error['message']),
             $validator->getErrors()
           )));
@@ -89,7 +89,7 @@ final class ComponentMetadataRequirementsChecker {
       // Validation for the additional functionality overlaid on top of the SDC
       // JSON Schema.
       // @see docs/shape-matching-into-field-types.md#3.2
-      if (array_key_exists('contentMediaType', $prop) && $prop['contentMediaType'] === 'text/html' && isset($prop['x-formatting-context'])) {
+      if (\array_key_exists('contentMediaType', $prop) && $prop['contentMediaType'] === 'text/html' && isset($prop['x-formatting-context'])) {
         if (!in_array($prop['x-formatting-context'], ['inline', 'block'], TRUE)) {
           $messages[] = \sprintf('Invalid value "%s" for "x-formatting-context". Valid values are "inline" and "block".', $prop['x-formatting-context']);
           continue;
@@ -103,7 +103,7 @@ final class ComponentMetadataRequirementsChecker {
       if (isset($prop['enum'], $prop['meta:enum']) && !empty($forbidden_key_characters)) {
         foreach ($prop['meta:enum'] as $meta_key => $meta_value) {
           $meta_key_with_replacements = str_replace(
-            array_keys($forbidden_key_characters),
+            \array_keys($forbidden_key_characters),
             array_values($forbidden_key_characters),
             (string) $meta_key,
           );
@@ -113,8 +113,8 @@ final class ComponentMetadataRequirementsChecker {
         }
 
         // Ensure we replace dots with underscores when checking meta:enums.
-        $meta_enum_valid_keys = array_map(fn($key) => str_replace(
-          array_keys($forbidden_key_characters),
+        $meta_enum_valid_keys = \array_map(fn($key) => str_replace(
+          \array_keys($forbidden_key_characters),
           array_values($forbidden_key_characters),
           (string) $key,
         ), $prop['enum']);

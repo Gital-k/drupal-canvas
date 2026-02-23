@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Drupal\canvas\Plugin\Validation\Constraint;
 
 use Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase;
@@ -37,7 +39,7 @@ final class NotNullIfRequiredComponentPropConstraintValidator extends Constraint
     // Avoid triggering a PHP warning if the 'required' key does not exist yet;
     // that absence will itself already trigger a validation error.
     // @see \canvas_post_update_0001_track_props_have_required_flag_in_components()
-    if (!array_key_exists('required', $prop_field_definition)) {
+    if (!\array_key_exists('required', $prop_field_definition)) {
       return;
     }
     $is_required_component_prop = $context_parent->getValue()['required'];

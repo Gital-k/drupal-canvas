@@ -30,14 +30,13 @@ use Drupal\canvas\PropShape\PropShape;
 use Drupal\canvas\PropShape\StorablePropShape;
 use Drupal\canvas\PropSource\StaticPropSource;
 use Drupal\canvas\TypedData\BetterEntityDataDefinition;
-use Drupal\KernelTests\KernelTestBase;
 use Drupal\link\LinkItemInterface;
 use Drupal\Tests\canvas\Kernel\Traits\VfsPublicStreamUrlTrait;
-use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use Drupal\user\Entity\User;
 use JsonSchema\Constraints\Constraint;
 use JsonSchema\Validator;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\DependencyInjection\Reference;
 
 /**
@@ -47,9 +46,9 @@ use Symfony\Component\DependencyInjection\Reference;
  * @group canvas_data_model
  * @group canvas_data_model__prop_expressions
  */
-class PropShapeRepositoryTest extends KernelTestBase {
+#[RunTestsInSeparateProcesses]
+class PropShapeRepositoryTest extends CanvasKernelTestBase {
 
-  use ContribStrictConfigSchemaTestTrait;
   use UserCreationTrait;
   use VfsPublicStreamUrlTrait;
 
@@ -57,29 +56,9 @@ class PropShapeRepositoryTest extends KernelTestBase {
    * {@inheritdoc}
    */
   protected static $modules = [
-    // The two only modules Drupal truly requires.
-    'system',
-    'user',
-    // The module being tested.
-    'canvas',
-    // The dependent modules.
-    'sdc',
     // Modules providing additional SDCs.
     'sdc_test',
     'sdc_test_all_props',
-    'canvas_test_sdc',
-    // Modules providing field types and widgets that the PropShapes are using.
-    'ckeditor5',
-    'datetime',
-    'editor',
-    'image',
-    'file',
-    'filter',
-    'link',
-    'media',
-    'options',
-    'text',
-    'datetime',
   ];
 
   protected static $configSchemaCheckerExclusions = [
@@ -95,21 +74,14 @@ class PropShapeRepositoryTest extends KernelTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
+    $this->installEntitySchema('path_alias');
     $this->container->get('theme_installer')->install([
-      // Needed by Canvas.
-      'stark',
       // To test $ref handling in themes.
       // @see \Drupal\canvas\JsonSchemaDefinitionsStreamwrapper
       'test_theme_base',
       'test_theme_child',
       'test_theme_without_ref',
     ]);
-    // @see core/modules/system/config/install/core.date_format.html_date.yml
-    // @see core/modules/system/config/install/core.date_format.html_datetime.yml
-    // @see \Drupal\datetime\Plugin\Field\FieldWidget\DateTimeDefaultWidget::formElement()
-    $this->installConfig(['system']);
-    // @see config/install/image.style.canvas_parametrized_width.yml
-    $this->installConfig(['canvas']);
     // @see \Drupal\file\Plugin\Field\FieldType\FileItem::generateSampleValue()
     $this->installEntitySchema('file');
   }
@@ -199,6 +171,7 @@ class PropShapeRepositoryTest extends KernelTestBase {
       new PropShape(['type' => 'string', '$ref' => 'json-schema-definitions://canvas.module/heading-element']),
       new PropShape(['type' => 'string', '$ref' => 'json-schema-definitions://canvas.module/image-uri']),
       new PropShape(['type' => 'string', '$ref' => 'json-schema-definitions://canvas.module/stream-wrapper-image-uri']),
+      new PropShape(['type' => 'string', '$ref' => 'json-schema-definitions://canvas.module/stream-wrapper-uri']),
       new PropShape(['type' => 'string', '$ref' => 'json-schema-definitions://test_theme_base.theme/organization-logo-url']),
       new PropShape(['type' => 'string', 'contentMediaType' => 'text/html']),
       new PropShape(['type' => 'string', 'contentMediaType' => 'text/html', 'x-formatting-context' => 'block']),
@@ -317,6 +290,14 @@ class PropShapeRepositoryTest extends KernelTestBase {
           referenced: new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'uri', NULL, 'value'),
         ),
         fieldWidget: 'image_image',
+      ),
+      'type=string&$ref=json-schema-definitions://canvas.module/stream-wrapper-uri' => new StorablePropShape(
+        shape: new PropShape(['type' => 'string', 'format' => 'uri', 'x-allowed-schemes' => ['public']]),
+        fieldTypeProp: new ReferenceFieldTypePropExpression(
+          referencer: new FieldTypePropExpression('file', 'entity'),
+          referenced: new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'uri', NULL, 'value'),
+        ),
+        fieldWidget: 'file_generic',
       ),
       'type=string&$ref=json-schema-definitions://test_theme_base.theme/organization-logo-url' => new StorablePropShape(
         shape: new PropShape([

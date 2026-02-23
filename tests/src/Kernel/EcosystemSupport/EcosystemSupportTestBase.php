@@ -7,35 +7,15 @@ namespace Drupal\Tests\canvas\Kernel\EcosystemSupport;
 use Drupal\Core\Extension\Extension;
 use Drupal\Core\Extension\ExtensionLifecycle;
 use Drupal\Core\Extension\ModuleExtensionList;
-use Drupal\KernelTests\KernelTestBase;
-use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 
 /**
  * Base class for testing Canvas support for some aspect of the Drupal ecosystem.
  */
-abstract class EcosystemSupportTestBase extends KernelTestBase {
-
-  use ContribStrictConfigSchemaTestTrait;
-
-  /**
-   * {@inheritdoc}
-   */
-  protected static $modules = [
-    'system',
-    'user',
-    'filter',
-    'ckeditor5',
-    'editor',
-    'canvas',
-  ];
-
-  protected function setUp(): void {
-    parent::setUp();
-    $this->installConfig('canvas');
-  }
+abstract class EcosystemSupportTestBase extends CanvasKernelTestBase {
 
   public static function getUninstalledStableModulesWithPlugin(string $plugin_type_subdir): array {
-    return array_keys(array_filter(
+    return \array_keys(array_filter(
       \Drupal::service(ModuleExtensionList::class)->getList(),
       // Filter out contrib, hidden, testing, experimental, and deprecated
       // modules. We also don't need to enable modules that are already enabled.

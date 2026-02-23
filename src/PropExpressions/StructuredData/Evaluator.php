@@ -17,6 +17,7 @@ use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Http\Exception\CacheableAccessDeniedHttpException;
 use Drupal\Core\TypedData\DataReferenceInterface;
 use Drupal\Core\TypedData\PrimitiveInterface;
+use Drupal\datetime\Plugin\Field\FieldType\DateTimeFieldItemList;
 use Drupal\datetime\Plugin\Field\FieldType\DateTimeItem;
 
 /**
@@ -56,12 +57,13 @@ final class Evaluator {
     // @see \Drupal\datetime\Plugin\Field\FieldType\DateTimeItem::DATETIME_TYPE_DATETIME
     // @see \Drupal\datetime\Plugin\Field\FieldType\DateTimeItemInterface::DATETIME_STORAGE_FORMAT
     // @see https://ijmacd.github.io/rfc3339-iso8601/
+    // @todo Remove this in https://www.drupal.org/project/canvas/issues/3573934.
     if ($expr instanceof FieldTypePropExpression &&
       $expr->fieldType === 'datetime' &&
       $entity_or_field instanceof FieldItemInterface &&
       $entity_or_field->getFieldDefinition()->getFieldStorageDefinition()->getSetting('datetime_type') === DateTimeItem::DATETIME_TYPE_DATETIME &&
       is_string($result->value) &&
-      // Don't intervene if the result is already in iso8601 format - this
+      // Don't intervene if the result is already in iso8601 format: this
       // includes a trailing offset, or using the Z flag.
       !\preg_match('/(Z|[+-](?:2[0-3]|[01][0-9])(?::?[0-5][0-9])?)$/', $result->value)) {
 
@@ -110,7 +112,7 @@ final class Evaluator {
     // @see \Drupal\canvas\PropSource\StaticPropSource::evaluate()
     if ($entity_or_field instanceof FieldItemListInterface) {
       return new EvaluationResult(
-        array_map(
+        \array_map(
           fn (FieldItemInterface $item) => self::evaluate($item, $expr, $is_required),
           iterator_to_array($entity_or_field),
         ),
@@ -135,7 +137,7 @@ final class Evaluator {
             self::permanentCacheabilityUnlessSpecified($prop->getValue())
           );
         })(),
-        FieldTypeObjectPropsExpression::class => array_map(
+        FieldTypeObjectPropsExpression::class => \array_map(
           fn ((ScalarPropExpressionInterface&FieldTypeBasedPropExpressionInterface)|(ReferencePropExpressionInterface&FieldTypeBasedPropExpressionInterface) $sub_expr) => self::evaluate($field, $sub_expr, $is_required),
           $expr->getObjectExpressions(),
         ),
@@ -224,6 +226,23 @@ final class Evaluator {
               $result[$delta] = $prop instanceof PrimitiveInterface
                 ? $prop->getCastedValue()
                 : $raw_result[$delta];
+            }
+          }
+
+          // @see ::evaluate()
+          // @todo Remove this in https://www.drupal.org/project/canvas/issues/3573934.
+          if ($field_item_list instanceof DateTimeFieldItemList && $field_item_list->getSetting('datetime_type') === DateTimeItem::DATETIME_TYPE_DATETIME) {
+            foreach ($result as $delta => $value) {
+              // Nothing to do if NULL.
+              if ($value === NULL) {
+                continue;
+              }
+              // Don't intervene if the result is already in iso8601 format:
+              // this includes a trailing offset, or using the Z flag.
+              if (\preg_match('/(Z|[+-](?:2[0-3]|[01][0-9])(?::?[0-5][0-9])?)$/', $value)) {
+                continue;
+              }
+              $result[$delta] = $value . 'Z';
             }
           }
 
@@ -316,7 +335,7 @@ final class Evaluator {
           }
           return new EvaluationResult($evaluated_references, $referencer_result);
         })(),
-        FieldObjectPropsExpression::class => array_map(
+        FieldObjectPropsExpression::class => \array_map(
           fn((ScalarPropExpressionInterface&EntityFieldBasedPropExpressionInterface)|(ReferencePropExpressionInterface&EntityFieldBasedPropExpressionInterface) $sub_expr): EvaluationResult => self::evaluate($entity_or_field, $sub_expr, $is_required),
           $expr->getObjectExpressions(),
         ),

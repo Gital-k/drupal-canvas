@@ -142,7 +142,11 @@ class ShapeMatchingHooks {
     // @see \Drupal\user\Entity\User::baseFieldDefinitions()
     // @todo Remove when \Drupal\canvas\Plugin\Field\FieldTypeOverride\StringItemOverride is merged into core.
     if ($entity_type->id() === 'user') {
-      $fields['name']->addPropertyConstraints('value', ['StringSemantics' => StringSemanticsConstraint::PROSE]);
+      $fields['name']->addPropertyConstraints('value', [
+        'StringSemantics' => [
+          'semantic' => StringSemanticsConstraint::PROSE,
+        ],
+      ]);
     }
 
     // The File entity type's `filename` and `filemime` base fields use the
@@ -152,8 +156,16 @@ class ShapeMatchingHooks {
     if ($entity_type->id() === 'file') {
       // Override the default string semantics of the "string" field type.
       // @see \Drupal\canvas\Plugin\Field\FieldTypeOverride\StringItemOverride::propertyDefinitions()
-      $fields['filename']->addPropertyConstraints('value', ['StringSemantics' => StringSemanticsConstraint::STRUCTURED]);
-      $fields['filemime']->addPropertyConstraints('value', ['StringSemantics' => StringSemanticsConstraint::STRUCTURED]);
+      $fields['filename']->addPropertyConstraints('value', [
+        'StringSemantics' => [
+          'semantic' => StringSemanticsConstraint::STRUCTURED,
+        ],
+      ]);
+      $fields['filemime']->addPropertyConstraints('value', [
+        'StringSemantics' => [
+          'semantic' => StringSemanticsConstraint::STRUCTURED,
+        ],
+      ]);
       $fields['uri']->setRequired(\TRUE);
     }
   }
@@ -279,21 +291,21 @@ class ShapeMatchingHooks {
 
       $media_types = self::getMediaTypesForSource(Image::class);
       if (!empty($media_types)) {
-        $source_field_names = array_map(
+        $source_field_names = \array_map(
           // @phpstan-ignore method.nonObject
           fn (MediaTypeInterface $type): string => $type->getSource()->getSourceFieldDefinition($type)->getName(),
           $media_types,
         );
-        $branch_names = array_map(
+        $branch_names = \array_map(
           fn (MediaTypeInterface $type): string => \sprintf('entity:media:%s', $type->id()),
           $media_types,
         );
-        $bundle_specific_expressions = array_map(
+        $bundle_specific_expressions = \array_map(
           fn (string $media_type_id, string $source_field_name) => new ReferenceFieldPropExpression(
             new FieldPropExpression(BetterEntityDataDefinition::create('media', $media_type_id), $source_field_name, NULL, 'entity'),
             new FieldPropExpression(BetterEntityDataDefinition::create('file'), 'uri', NULL, 'value'),
           ),
-          array_keys($media_types),
+          \array_keys($media_types),
           $source_field_names,
         );
         $branches = array_combine($branch_names, $bundle_specific_expressions);
@@ -309,7 +321,7 @@ class ShapeMatchingHooks {
 
     if ($storable_prop_shape->shape->schema['type'] === 'object' &&
       isset($storable_prop_shape->shape->schema['$ref']) &&
-      array_key_exists($storable_prop_shape->shape->schema['$ref'], self::SCHEMA_TO_MEDIA_SOURCE)
+      \array_key_exists($storable_prop_shape->shape->schema['$ref'], self::SCHEMA_TO_MEDIA_SOURCE)
     ) {
       // This alter hook won't have any effect unless MediaTypes exist that use
       // a particular MediaSource plugin. So, whenever the list of MediaTypes
@@ -355,7 +367,7 @@ class ShapeMatchingHooks {
     }
 
     if (!empty($media_types)) {
-      $media_type_ids = array_keys($media_types);
+      $media_type_ids = \array_keys($media_types);
       $storable_prop_shape->fieldStorageSettings = ['target_type' => 'media'];
       $storable_prop_shape->fieldInstanceSettings = [
         'handler' => 'default:media',
@@ -404,7 +416,7 @@ class ShapeMatchingHooks {
       fn (MediaTypeInterface $type): bool => is_a($type->getSource(), $media_source_class)
     );
     ksort($media_types);
-    $media_type_ids = array_map(
+    $media_type_ids = \array_map(
     // @phpstan-ignore-next-line
       fn (MediaTypeInterface $type): string => $type->id(),
       $media_types

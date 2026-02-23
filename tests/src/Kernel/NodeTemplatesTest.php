@@ -12,25 +12,24 @@ use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\EntityHandlers\ContentTemplateAwareViewBuilder;
 use Drupal\filter\Entity\FilterFormat;
-use Drupal\KernelTests\KernelTestBase;
 use Drupal\node\NodeInterface;
 use Drupal\Tests\canvas\Traits\CanvasFieldCreationTrait;
-use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\canvas\Traits\SingleDirectoryComponentTreeTestTrait;
 use Drupal\Tests\canvas\Traits\CrawlerTrait;
 use Drupal\Tests\node\Traits\ContentTypeCreationTrait;
 use Drupal\Tests\node\Traits\NodeCreationTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\Attributes\TestWith;
 
 /**
  * @covers \Drupal\canvas\EntityHandlers\ContentTemplateAwareViewBuilder
  * @group canvas
  */
-final class NodeTemplatesTest extends KernelTestBase {
+#[RunTestsInSeparateProcesses]
+final class NodeTemplatesTest extends CanvasKernelTestBase {
 
-  use ContribStrictConfigSchemaTestTrait;
   use SingleDirectoryComponentTreeTestTrait;
   use GenerateComponentConfigTrait;
   use ContentTypeCreationTrait;
@@ -52,23 +51,9 @@ final class NodeTemplatesTest extends KernelTestBase {
    * {@inheritdoc}
    */
   protected static $modules = [
-    'canvas',
-    'system',
-    'ckeditor5',
-    'editor',
-    'filter',
-    'options',
-    'text',
-    'field',
-    'image',
-    'file',
-    'user',
     'node',
-    'datetime',
+    'field',
     'canvas_test_rendering',
-    'canvas_test_sdc',
-    'media',
-    'link',
   ];
 
   /**
@@ -76,11 +61,11 @@ final class NodeTemplatesTest extends KernelTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
-    $this->container->get('theme_installer')->install(['stark']);
     $this->installEntitySchema('user');
     $this->installEntitySchema('media');
     $this->installEntitySchema('node');
-    $this->installConfig(['node', 'system', 'filter']);
+    $this->installEntitySchema('path_alias');
+    $this->installConfig(['node', 'filter']);
     $this->installConfig(['canvas']);
     $this->createContentType(['type' => 'article']);
     $this->generateComponentConfig();

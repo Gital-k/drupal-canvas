@@ -11,12 +11,14 @@ use Drupal\canvas\Entity\Page;
 use Drupal\Core\Url;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\user\UserInterface;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
  * @covers \Drupal\canvas\Controller\ApiUsageControllers
  * @group canvas
  * @internal
  */
+#[RunTestsInSeparateProcesses]
 class ApiUsageControllersTest extends HttpApiTestBase {
 
   use ContribStrictConfigSchemaTestTrait;
@@ -112,13 +114,13 @@ class ApiUsageControllersTest extends HttpApiTestBase {
     \assert($to_delete > 0);
     // Delete some Components, to end up at 50 exactly for testing purposes (to
     // make sure no `next` link is generated).
-    array_map(fn (Component $c) => $c->delete(), array_slice($components, ApiUsageControllers::MAX_PER_PAGE));
+    \array_map(fn (Component $c) => $c->delete(), array_slice($components, ApiUsageControllers::MAX_PER_PAGE));
 
     $listing_url = Url::fromRoute('canvas.api.usage.component.list')->setOption('absolute', FALSE);
     $body = $this->assertExpectedResponse('GET', $listing_url, [], 200, NULL, NULL, 'UNCACHEABLE (request policy)', 'UNCACHEABLE (no cacheability)');
     \assert(is_array($body));
     $this->assertCount(50, $body['data']);
-    $expected_usage = array_fill_keys(array_keys(Component::loadMultiple()), FALSE);
+    $expected_usage = array_fill_keys(\array_keys(Component::loadMultiple()), FALSE);
     $expected_usage['sdc.canvas_test_sdc.props-no-slots'] = TRUE;
     ksort($expected_usage);
     $this->assertSame($expected_usage, $body['data']);
@@ -146,7 +148,7 @@ class ApiUsageControllersTest extends HttpApiTestBase {
     // This has triggered re-discovery, so the components we deleted are back,
     // as they are probably SDC components. We need to delete the same
     // components again.
-    array_map(fn (Component $c) => $c->delete(), array_slice($components, ApiUsageControllers::MAX_PER_PAGE));
+    \array_map(fn (Component $c) => $c->delete(), array_slice($components, ApiUsageControllers::MAX_PER_PAGE));
 
     $body = $this->assertExpectedResponse('GET', $listing_url, [], 200, NULL, NULL, 'UNCACHEABLE (request policy)', 'UNCACHEABLE (no cacheability)');
     \assert(is_array($body));
@@ -165,7 +167,7 @@ class ApiUsageControllersTest extends HttpApiTestBase {
     $this->assertNull($body['links']['next']);
     $this->assertCount(1, $body['data']);
     $this->assertSame([
-      array_keys($components)[ApiUsageControllers::MAX_PER_PAGE - 1] => FALSE,
+      \array_keys($components)[ApiUsageControllers::MAX_PER_PAGE - 1] => FALSE,
     ], $body['data']);
   }
 

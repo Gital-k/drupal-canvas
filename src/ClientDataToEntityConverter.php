@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Drupal\canvas;
 
 use Drupal\Component\Render\PlainTextOutput;
@@ -54,7 +56,7 @@ class ClientDataToEntityConverter {
 
     $item_list = $this->componentTreeLoader->load($entity);
     try {
-      \assert(count(array_intersect(['nodeType', 'id', 'name', 'components'], array_keys($layout))) === 4);
+      \assert(count(array_intersect(['nodeType', 'id', 'name', 'components'], \array_keys($layout))) === 4);
       \assert($layout['nodeType'] === 'region');
       \assert($layout['id'] === 'content');
       \assert(is_array($layout['components']));

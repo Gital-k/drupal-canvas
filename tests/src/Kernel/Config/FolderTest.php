@@ -7,38 +7,19 @@ namespace Drupal\Tests\canvas\Kernel\Config;
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\Folder;
-use Drupal\KernelTests\KernelTestBase;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\ConfigTestTrait;
-use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
-class FolderTest extends KernelTestBase {
+#[RunTestsInSeparateProcesses]
+class FolderTest extends CanvasKernelTestBase {
 
   use ConfigTestTrait;
-  use ContribStrictConfigSchemaTestTrait;
 
   protected Folder $entity;
 
-  protected static $modules = [
-    'canvas',
-    'sdc',
-    // Canvas's dependencies (modules providing field types + widgets).
-    'datetime',
-    'file',
-    'image',
-    'options',
-    'path',
-    'link',
-    'system',
-    'user',
-    'text',
-    'filter',
-    'ckeditor5',
-    'editor',
-  ];
-
   protected function setUp(): void {
     parent::setUp();
-    $this->installConfig('canvas');
     $this->entity = Folder::create([
       'name' => 'Test folder, please ignore',
       'configEntityTypeId' => Component::ENTITY_TYPE_ID,
@@ -49,7 +30,7 @@ class FolderTest extends KernelTestBase {
   public function testFolderAutoCreationValidation(): void {
     $folders = Folder::loadMultiple();
     // 1. At the start, only the ::setUp()-created Folder exists.
-    $this->assertEquals([$this->entity->id()], array_keys($folders));
+    $this->assertEquals([$this->entity->id()], \array_keys($folders));
     $this->enableModules(['canvas_test_sdc']);
 
     // 2. Generate Component config entities, this will create additional Folder
@@ -70,6 +51,7 @@ class FolderTest extends KernelTestBase {
       'Container',
       'Container/Special',
       'Forms',
+      'Menus',
       'Other',
       'Status',
       'System',
@@ -111,6 +93,7 @@ class FolderTest extends KernelTestBase {
       'Container',
       'Container/Special',
       'Forms',
+      'Menus',
       'Other',
       'Status',
       'System',

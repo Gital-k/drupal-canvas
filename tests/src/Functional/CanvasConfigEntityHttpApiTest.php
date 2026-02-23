@@ -32,6 +32,7 @@ use Drupal\Tests\canvas\Traits\OpenApiSpecTrait;
 use Drupal\Tests\system\Functional\Cache\AssertPageCacheContextsAndTagsTrait;
 use Drupal\user\UserInterface;
 use GuzzleHttp\RequestOptions;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -40,6 +41,7 @@ use Symfony\Component\HttpFoundation\Response;
  * @group canvas
  * @internal
  */
+#[RunTestsInSeparateProcesses]
 class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
 
   use ContribStrictConfigSchemaTestTrait;
@@ -843,10 +845,10 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     ];
     $request_options[RequestOptions::JSON] = $code_component_to_send;
     $body = $this->assertExpectedResponse('POST', $list_url, $request_options, 422, NULL, NULL, NULL, NULL);
-    $this->assertSame([
+    $expected_body = [
       'errors' => [
         [
-          'detail' => 'Unable to find class/interface "nonsense" specified in the prop "incorrect" for the component "canvas:test".',
+          'detail' => "In component canvas:test:\nUnable to find class/interface \"nonsense\" specified in the prop \"incorrect\" for the component \"canvas:test\".",
           'source' => ['pointer' => ''],
         ],
         [
@@ -854,7 +856,13 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
           'source' => ['pointer' => 'props.incorrect.type'],
         ],
       ],
-    ], $body);
+    ];
+    // Strip out the prefix added by https://www.drupal.org/node/3549909. This
+    // can be removed when 11.3 is the minimum supported version of core.
+    if (version_compare(\Drupal::VERSION, '11.3', '<')) {
+      $expected_body['errors'][0]['detail'] = substr($expected_body['errors'][0]['detail'], 26);
+    }
+    $this->assertSame($expected_body, $body);
 
     // Meet data shape requirements, but provide missing component as a
     // dependency in `importedJsComponents`: 422
@@ -1652,7 +1660,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     $expected_cache_tags = \array_values(Cache::mergeTags($expected_cache_tags, \array_values($additional_expected_cache_tags)));
     $body = $this->assertExpectedResponse('GET', Url::fromUri('base:/canvas/api/v0/config/component'), $request_options, 200, $expected_contexts, $expected_cache_tags, 'UNCACHEABLE (request policy)', $expected_dynamic_page_cache);
     self::assertNotNull($body);
-    $component_config_entity_ids = array_keys($body);
+    $component_config_entity_ids = \array_keys($body);
     self::assertSame(
       $expected,
       array_values(array_filter($component_config_entity_ids, fn (string $id) => str_starts_with($id, 'js.'))),
@@ -1793,7 +1801,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     $this->assertSame([
       'sdc.canvas_broken_sdcs.invalid-filter',
       'sdc.canvas_broken_sdcs.malformed-image',
-    ], array_keys($broken_sdcs));
+    ], \array_keys($broken_sdcs));
   }
 
   private function assertDynamicPageCacheAccelerated(?string $maxAge = NULL): void {
@@ -1900,7 +1908,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     // Create a Folder with BE generated id: 201.
     $new_folder_to_send = $folder_to_send;
     $new_folder_to_send['name'] = 'Unique test name, please ignore.';
-    // Create folder with weight of -1 to place at the bottom of the list.
+    // Create folder with weight of -1 to place at the top of the list.
     $new_folder_to_send['weight'] = -1;
     $request_options[RequestOptions::JSON] = $new_folder_to_send;
     $body = $this->assertExpectedResponse('POST', $list_url, $request_options, 201, NULL, NULL, NULL, NULL);
@@ -1923,8 +1931,8 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     $body = $this->assertExpectedResponse('GET', $list_url, [], 200, ['user.permissions'], ['config:folder_list', 'http_response'], 'UNCACHEABLE (request policy)', 'MISS');
     \assert(is_array($body));
     $this->assertCount(count($this->defaultFolders) + 3, $body);
-    $this->assertEquals($new_folder_id, array_keys($body)[0]);
-    $this->assertEquals($temp_folder->id(), array_keys($body)[count($body) - 1]);
+    $this->assertEquals($new_folder_id, \array_keys($body)[0]);
+    $this->assertEquals($temp_folder->id(), \array_keys($body)[count($body) - 1]);
     $temp_folder->delete();
 
     // Delete Folder via the Canvas HTTP API: 204.
@@ -1934,7 +1942,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     // Use the individual URL in the list response body.
     $body = $this->assertExpectedResponse('GET', $list_url, [], 200, ['user.permissions'], ['config:folder_list', 'http_response'], 'UNCACHEABLE (request policy)', 'MISS');
     self::assertNotNull($body);
-    $this->assertEquals(array_keys(Folder::loadMultiple()), array_keys($body));
+    $this->assertEquals(\array_keys(Folder::loadMultiple()), \array_keys($body));
     $this->assertArrayHasKey($id, $body);
     $this->assertEquals($folder_to_send + ['id' => $id], $body[$id]);
     $individual_body = $this->assertExpectedResponse('GET', Url::fromUri('base:/canvas/api/v0/config/folder/' . $id), [], 200, ['user.permissions'], ['config:canvas.folder.' . $id, 'http_response'], 'UNCACHEABLE (request policy)', 'MISS');
@@ -1998,7 +2006,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     // Re-retrieve list: 200, non-empty list. Dynamic Page Cache miss.
     $body = $this->assertExpectedResponse('GET', $list_url, [], 200, ['user.permissions'], ['config:folder_list', 'http_response'], 'UNCACHEABLE (request policy)', 'MISS');
     self::assertNotNull($body);
-    $this->assertEquals(array_keys(Folder::loadMultiple()), array_keys($body));
+    $this->assertEquals(\array_keys(Folder::loadMultiple()), \array_keys($body));
     $this->assertArrayHasKey($id, $body);
     $this->assertEquals($folder_to_send + ['id' => $id], $body[$id]);
 

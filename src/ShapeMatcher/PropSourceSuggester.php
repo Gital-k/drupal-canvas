@@ -160,7 +160,7 @@ final class PropSourceSuggester {
       )->getComponents();
       uasort($expected_order, SortArray::sortByWeightElement(...));
       $bucketed_by_field = array_fill_keys(
-        array_keys($expected_order),
+        \array_keys($expected_order),
         [],
       );
       // Push each expression into the right (field) bucket, but only if
@@ -173,7 +173,7 @@ final class PropSourceSuggester {
         $bucketed_by_field[$expr->getFieldName()][] = $s;
       }
       // Keep only non-empty (field) buckets.
-      $bucketed_by_field = array_map('array_filter', $bucketed_by_field);
+      $bucketed_by_field = \array_map('array_filter', $bucketed_by_field);
       $processed_matches[$cpe]['instances'] = $bucketed_by_field;
 
       // @todo filtering
@@ -197,7 +197,7 @@ final class PropSourceSuggester {
       if (!empty($m['instances'])) {
         $dynamic_prop_sources_in_entity_form_display_order = NestedArray::mergeDeep(...$m['instances']);
         $suggestions[$cpe]['instances'] = array_combine(
-          array_map(
+          \array_map(
             fn (EntityFieldPropSource $s) => (string) Labeler::flatten($this->labeler->label($s->expression, $host_entity_type)),
             $dynamic_prop_sources_in_entity_form_display_order
           ),
@@ -209,7 +209,7 @@ final class PropSourceSuggester {
       $suggestions[$cpe]['adapters'] = array_combine(
       // @todo Introduce a plugin definition class that provides a guaranteed label, which will allow removing the PHPStan ignore instruction.
       // @phpstan-ignore-next-line
-        array_map(fn (AdapterInterface $a): string => (string) $a->getPluginDefinition()['label'], $m['adapters']),
+        \array_map(fn (AdapterInterface $a): string => (string) $a->getPluginDefinition()['label'], $m['adapters']),
         $m['adapters']
       );
       // Sort alphabetically by label.
@@ -217,7 +217,7 @@ final class PropSourceSuggester {
 
       // Host entity URLs: generate labels, retain match order.
       $suggestions[$cpe]['host_entity_urls'] = array_combine(
-        array_map(
+        \array_map(
           fn (HostEntityUrlPropSource $s): string => (string) $s->label(),
           $m['host_entity_urls'],
         ),
@@ -245,7 +245,7 @@ final class PropSourceSuggester {
 
       $instance_candidates = $this->propMatcher->findFieldInstanceFormatMatches($primitive_type, $is_required, $schema, $host_entity_type, $host_entity_bundle);
       $adapter_candidates = $this->propMatcher->findAdaptersByMatchingOutput($schema);
-      $raw_matches[(string) $cpe]['instances'] = array_map(fn ($expr): EntityFieldPropSource => new EntityFieldPropSource($expr), $instance_candidates);
+      $raw_matches[(string) $cpe]['instances'] = \array_map(fn ($expr): EntityFieldPropSource => new EntityFieldPropSource($expr), $instance_candidates);
       // @todo Remove these hard-coded bits with generic logic in https://www.drupal.org/project/canvas/issues/3563960
       if ($schema === ['type' => 'string', 'format' => 'date'] && $host_entity_type === 'node') {
         $created_as_date_string = (new EntityFieldPropSource(
@@ -277,7 +277,7 @@ final class PropSourceSuggester {
     }
 
     $schema = $shape->resolvedSchema;
-    if (!array_key_exists('format', $schema)) {
+    if (!\array_key_exists('format', $schema)) {
       return NULL;
     }
 
@@ -301,7 +301,7 @@ final class PropSourceSuggester {
     // allow HTTP nor HTTPS, then no viable HostEntityUrlPropSource can exist.
     // @see \Drupal\canvas\Validation\JsonSchema\UriSchemeAwareFormatConstraint
     if (
-      array_key_exists('x-allowed-schemes', $schema)
+      \array_key_exists('x-allowed-schemes', $schema)
       && empty(array_intersect($schema['x-allowed-schemes'], ['http', 'https']))
     ) {
       return NULL;
@@ -310,7 +310,7 @@ final class PropSourceSuggester {
     // If any `contentMediaType` shape restriction is present, then no viable
     // HostEntityUrlPropSource can exist (because these always point to
     // `text/html` resources).
-    if (array_key_exists('contentMediaType', $schema)) {
+    if (\array_key_exists('contentMediaType', $schema)) {
       return NULL;
     }
 
@@ -329,15 +329,15 @@ final class PropSourceSuggester {
 
     return array_combine(
       // Top-level keys: the prop names of the targeted component.
-      array_map(
+      \array_map(
         fn (string $key): string => ComponentPropExpression::fromString($key)->propName,
-        array_keys($suggestions),
+        \array_keys($suggestions),
       ),
-      array_map(
+      \array_map(
         // Second level keys: opaque identifiers for the suggestions to
         // populate the component prop.
         fn (array $prop_sources): array => array_combine(
-          array_map(
+          \array_map(
             fn (EntityFieldPropSource|HostEntityUrlPropSource $prop_source): string => \hash('xxh64', $prop_source->asChoice()),
             array_values($prop_sources),
           ),
@@ -347,14 +347,14 @@ final class PropSourceSuggester {
           // - "source": the array representation of the prop source that, if
           //   selected by the human, the client should use verbatim as the
           //   source to populate this component instance's prop.
-          array_map(
+          \array_map(
             function (string $label, EntityFieldPropSource|HostEntityUrlPropSource $prop_source) {
               return [
                 'label' => $label,
                 'source' => $prop_source->toArray(),
               ];
             },
-            array_keys($prop_sources),
+            \array_keys($prop_sources),
             array_values($prop_sources),
           ),
         ),
@@ -364,10 +364,10 @@ final class PropSourceSuggester {
   }
 
   private static function enrichSuggestion(array $suggestion): array {
-    \assert(array_key_exists('label', $suggestion));
-    \assert(array_key_exists('source', $suggestion));
+    \assert(\array_key_exists('label', $suggestion));
+    \assert(\array_key_exists('source', $suggestion));
     \assert(is_array($suggestion['source']));
-    \assert(array_key_exists('sourceType', $suggestion['source']));
+    \assert(\array_key_exists('sourceType', $suggestion['source']));
     $label = $suggestion['label'];
 
     $label_parts = explode(' → ', $label);
@@ -399,7 +399,7 @@ final class PropSourceSuggester {
 
   private static function walkAndPopulateHierarchicalSuggestions(array &$hierarchical_suggestions): void {
     foreach ($hierarchical_suggestions as $key => $value) {
-      if (array_key_exists('items', $value)) {
+      if (\array_key_exists('items', $value)) {
         self::walkAndPopulateHierarchicalSuggestions($value['items']);
       }
       unset($hierarchical_suggestions[$key]);
@@ -414,7 +414,7 @@ final class PropSourceSuggester {
     foreach ($flat_response_structure as $prop_name => &$suggestions) {
       // 1. Enrich this prop's suggestions. The sorting is already correct based
       // on the form display.
-      $enriched_suggestions = array_map(
+      $enriched_suggestions = \array_map(
         [self::class, 'enrichSuggestion'],
         $suggestions,
       );

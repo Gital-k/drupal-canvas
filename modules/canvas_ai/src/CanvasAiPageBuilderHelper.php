@@ -14,9 +14,11 @@ use Symfony\Component\Yaml\Yaml;
 use Drupal\Component\Utility\DiffArray;
 use Drupal\Component\Uuid\UuidInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\Extension\ThemeHandlerInterface;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent;
+use Drupal\Component\Utility\NestedArray;
 
 /**
  * Provides helper methods for AI page builder.
@@ -42,6 +44,8 @@ class CanvasAiPageBuilderHelper {
    *   The UUID service.
    * @param \Drupal\canvas_ai\CanvasAiTempStore $canvasAiTempstore
    *   The Canvas AI tempstore.
+   * @param \Drupal\Core\Extension\ThemeHandlerInterface $themeHandler
+   *   The theme handler.
    */
   public function __construct(
     private readonly ComponentPluginManager $componentPluginManager,
@@ -51,6 +55,7 @@ class CanvasAiPageBuilderHelper {
     private readonly RequestStack $requestStack,
     private readonly UuidInterface $uuidService,
     private readonly CanvasAiTempStore $canvasAiTempstore,
+    private readonly ThemeHandlerInterface $themeHandler,
   ) {
   }
 
@@ -154,23 +159,6 @@ class CanvasAiPageBuilderHelper {
         }
       }
     }
-  }
-
-  /**
-   * Process components for 'below' placement.
-   *
-   * @param array $components
-   *   The components to process.
-   * @param array $reference_path
-   *   The reference nodePath.
-   * @param array &$result_components
-   *   The array to store processed components.
-   */
-  protected function processComponentsBelow(array $components, array $reference_path, array &$result_components): void {
-    $first_node_path = $reference_path;
-    $first_node_path[count($first_node_path) - 1]++;
-
-    $this->processComponents($components, $first_node_path, $result_components);
   }
 
   /**
@@ -279,7 +267,7 @@ class CanvasAiPageBuilderHelper {
     }
 
     /** @var \Drupal\canvas\Entity\Component[] $component_entities */
-    $component_entities = $this->entityTypeManager->getStorage(Component::ENTITY_TYPE_ID)->loadMultiple(array_keys($available_components));
+    $component_entities = $this->entityTypeManager->getStorage(Component::ENTITY_TYPE_ID)->loadMultiple(\array_keys($available_components));
     $sdc_definitions = $this->componentPluginManager->getDefinitions();
 
     foreach ($component_entities as $component) {
@@ -397,7 +385,7 @@ class CanvasAiPageBuilderHelper {
         $previous_props = is_array($component_data['props']) ? $component_data['props'] : [];
         $current_props = is_array($latest_components_under_source[$component_id]['props']) ? $latest_components_under_source[$component_id]['props'] : [];
 
-        if (array_keys($previous_props) != array_keys($current_props)) {
+        if (\array_keys($previous_props) != \array_keys($current_props)) {
           // If the keys of the previous props and current props are different,
           // then there are changes.
           $has_changes = TRUE;
@@ -435,7 +423,7 @@ class CanvasAiPageBuilderHelper {
         $previous_slots = is_array($component_data['slots']) ? $component_data['slots'] : [];
         $current_slots = is_array($latest_components_under_source[$component_id]['slots']) ? $latest_components_under_source[$component_id]['slots'] : [];
 
-        if (array_keys($previous_slots) != array_keys($current_slots)) {
+        if (\array_keys($previous_slots) != \array_keys($current_slots)) {
           // If the keys of the previous slots and current slots are different,
           // then there are changes.
           $has_changes = TRUE;
@@ -597,7 +585,7 @@ class CanvasAiPageBuilderHelper {
 
     foreach ($component_context as $source_info) {
       if (isset($source_info['components'][$component_id]['slots'][$slot_name])) {
-        $index = array_search($slot_name, array_keys($source_info['components'][$component_id]['slots']), TRUE);
+        $index = array_search($slot_name, \array_keys($source_info['components'][$component_id]['slots']), TRUE);
         return ($index === FALSE) ? 0 : (int) $index;
       }
     }
@@ -1009,7 +997,7 @@ class CanvasAiPageBuilderHelper {
 
     // Get the position of the reference component.
     $reference_key = end($path);
-    $keys = array_keys($reference);
+    $keys = \array_keys($reference);
     $reference_position = array_search($reference_key, $keys, TRUE);
 
     if ($reference_position !== FALSE) {
@@ -1116,7 +1104,7 @@ class CanvasAiPageBuilderHelper {
       }
       $path = $findPath($layout[$region], $uuid);
       if (!empty($path)) {
-        $regionIndex = array_search($region, array_keys($layout), TRUE);
+        $regionIndex = array_search($region, \array_keys($layout), TRUE);
         if ($regionIndex !== FALSE) {
           array_unshift($path, $regionIndex);
         }
@@ -1192,6 +1180,90 @@ class CanvasAiPageBuilderHelper {
   }
 
   /**
+   * Gets the region indices from the current layout.
+   *
+   * @param string $current_layout
+   *   The current layout JSON string.
+   *
+   * @return array
+   *   An array with region names as keys and their nodePathPrefix values.
+   */
+  public function getRegionIndex(string $current_layout): array {
+    $layout_array = Json::decode($current_layout);
+    $regions = [];
+
+    if (isset($layout_array['regions']) && is_array($layout_array['regions'])) {
+      foreach ($layout_array['regions'] as $region_name => $region_data) {
+        if (isset($region_data['nodePathPrefix'])) {
+          $regions[$region_name] = $region_data['nodePathPrefix'][0];
+        }
+      }
+    }
+
+    return $regions;
+  }
+
+  /**
+   * Gets the available regions from the current layout along with their descriptions, if configured.
+   *
+   * @param string $current_layout
+   *   The current layout JSON string.
+   *
+   * @return array
+   *   An array with region names as keys and their nodePathPrefix values and descriptions.
+   */
+  public function getAvailableRegions(string $current_layout) : array {
+    $region_index_mapping = $this->getRegionIndex($current_layout);
+    $region_descriptions = $this->configFactory->get('canvas_ai.theme_region.settings')->get('region_descriptions') ?? [];
+    $available_regions = [];
+    $active_theme = $this->themeHandler->getDefault();
+    foreach ($region_index_mapping as $region_name => $region_index) {
+      $available_regions[$region_name] = [
+        'nodePathPrefix' => $region_index,
+        'info' => NestedArray::getValue($region_descriptions, [$active_theme, $region_name]),
+      ];
+    }
+    return $available_regions;
+  }
+
+  /**
+   * Processes the component structure array obtained from the set_template_data tool.
+   *
+   * Calculates the nodePath for each component suggested by the template
+   * builder agent.
+   *
+   * @param array $parsed_array
+   *   The parsed YAML array.
+   * @param string $current_layout
+   *   The current layout of the page.
+   *
+   * @return array
+   *   The processed operations array with calculated nodePaths for components.
+   */
+  public function processSetTemplateDataToolInput(array $parsed_array, string $current_layout): array {
+    $result = [
+      'operations' => [
+        [
+          'operation' => 'ADD',
+          'components' => [],
+        ],
+      ],
+    ];
+    foreach ($parsed_array as $region => $components) {
+      if (!is_array($components)) {
+        continue;
+      }
+
+      $region_index_mapping = $this->getRegionIndex($current_layout);
+
+      $region_index = $region_index_mapping[$region] ?? 0;
+      $this->processComponents($components, [$region_index, 0], $result['operations'][0]['components']);
+    }
+
+    return $result;
+  }
+
+  /**
    * Generate verbose context for Orchestrator.
    *
    * @param array $prompt
@@ -1231,7 +1303,7 @@ class CanvasAiPageBuilderHelper {
 
       // Add page title.
       if (empty($prompt['page_title']) || $prompt['page_title'] === 'Untitled page') {
-        $base_message .= 'Page title is empty. GENERATE THE TITLE FOR THE PAGE. ';
+        $base_message .= 'Page title is empty. GENERATE THE TITLE FOR THE PAGE using canvas_title_generation_agent. This is a **CRITICAL** step to ensure that request is successful. ';
       }
       else {
         $base_message .= 'Page title: ' . $prompt['page_title'] . '. ';
@@ -1242,7 +1314,7 @@ class CanvasAiPageBuilderHelper {
         $base_message .= 'Page description: ' . $prompt['page_description'];
       }
       else {
-        $base_message .= 'Page description is empty. GENERATE THE DESCRIPTION FOR THE PAGE.';
+        $base_message .= 'Page description is empty. GENERATE THE DESCRIPTION FOR THE PAGE using canvas_metadata_generation_agent. This is a **CRITICAL** step to ensure that request is successful.';
       }
 
       return $base_message;

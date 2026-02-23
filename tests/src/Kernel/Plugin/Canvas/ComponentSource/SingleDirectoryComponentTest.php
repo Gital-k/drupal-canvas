@@ -39,7 +39,6 @@ use Drupal\Tests\canvas\Kernel\BrokenPluginManagerInterface;
 use Drupal\Tests\canvas\Kernel\Traits\CiModulePathTrait;
 use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
 use Drupal\Tests\canvas\Traits\SingleDirectoryComponentTreeTestTrait;
-use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\canvas\Traits\CrawlerTrait;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
 use Drupal\Tests\node\Traits\ContentTypeCreationTrait;
@@ -47,6 +46,7 @@ use Drupal\Tests\TestFileCreationTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use Twig\Error\Error;
 use Twig\Error\RuntimeError;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Twig\Error\SyntaxError;
 
 /**
@@ -57,10 +57,10 @@ use Twig\Error\SyntaxError;
  * @phpstan-import-type ComponentConfigEntityId from \Drupal\canvas\Entity\Component
  * @phpstan-import-type SingleComponentInputArray from \Drupal\canvas\Plugin\DataType\ComponentInputs
  */
+#[RunTestsInSeparateProcesses]
 final class SingleDirectoryComponentTest extends GeneratedFieldExplicitInputUxComponentSourceBaseTestBase {
 
   use ConstraintViolationsTestTrait;
-  use ContribStrictConfigSchemaTestTrait;
   use SingleDirectoryComponentTreeTestTrait;
   use CiModulePathTrait;
   use CrawlerTrait;
@@ -73,14 +73,8 @@ final class SingleDirectoryComponentTest extends GeneratedFieldExplicitInputUxCo
    * {@inheritdoc}
    */
   protected static $modules = [
-    'canvas_test_sdc',
-    'image',
-    'media',
     'node',
-    'path',
-    'user',
     'field',
-    'text',
   ];
 
   /**
@@ -276,7 +270,7 @@ final class SingleDirectoryComponentTest extends GeneratedFieldExplicitInputUxCo
       $source = $component->getComponentSource();
       $private_method = new \ReflectionMethod($source, 'getDefaultStaticPropSource');
       $private_method->setAccessible(TRUE);
-      foreach (array_keys($settings[$component_id]['prop_field_definitions']) as $prop) {
+      foreach (\array_keys($settings[$component_id]['prop_field_definitions']) as $prop) {
         $static_prop_source = $private_method->invoke($source, $prop, TRUE);
         $this->assertInstanceOf(StaticPropSource::class, $static_prop_source);
       }
@@ -1123,10 +1117,10 @@ HTML
 
     $this->assertInstanceOf(ComponentTreeItem::class, $canvas_field_item);
     $actual_props = array_combine(
-      array_keys($expected_props_for_uuids),
-      array_map(
+      \array_keys($expected_props_for_uuids),
+      \array_map(
         fn (string $uuid) => $canvas_field_item->getComponent()?->getComponentSource()->getExplicitInput($uuid, $canvas_field_item)['resolved'],
-        array_keys($expected_props_for_uuids)
+        \array_keys($expected_props_for_uuids)
       )
     );
     self::assertEquals($expected_props_for_uuids, $actual_props);
@@ -1346,17 +1340,16 @@ HTML
       'expected_output_selector' => NULL,
     ];
 
-    yield "SDC with missing prop, with exception" => [
+    // Missing required props from the active version will be assigned on
+    // hydration so no exception occurs.
+    yield "SDC with missing prop, validation error without exception" => [
       'component_id' => 'sdc.canvas_test_sdc.crash',
       'inputs' => [],
       'expected_validation_errors' => [
         \sprintf('2.inputs.%s.crash', self::UUID_CRASH_TEST_DUMMY) => 'The property crash is required.',
       ],
-      'expected_exception' => [
-        'class' => RuntimeError::class,
-        'message' => 'An exception has been thrown during the rendering of a template ("[canvas_test_sdc:crash/crash] The property crash is required.") in "canvas_test_sdc:crash" at line 1.',
-      ],
-      'expected_output_selector' => NULL,
+      'expected_exception' => NULL,
+      'expected_output_selector' => 'h1:contains("test")',
     ];
 
     yield "SDC with invalid Twig (due to filter)" => [

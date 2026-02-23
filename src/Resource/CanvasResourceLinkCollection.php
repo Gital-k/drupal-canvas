@@ -46,7 +46,7 @@ final class CanvasResourceLinkCollection implements \IteratorAggregate, Cacheabl
   public function __construct(array $links) {
     \assert(Inspector::assertAll(function ($key) {
       return static::validKey($key);
-    }, array_keys($links)));
+    }, \array_keys($links)));
     \assert(Inspector::assertAll(function ($link) {
       return $link instanceof CanvasResourceLink;
     }, $links));
@@ -110,7 +110,7 @@ final class CanvasResourceLinkCollection implements \IteratorAggregate, Cacheabl
    *   TRUE if a link with the given key exist, FALSE otherwise.
    */
   public function hasLinkWithKey($key): bool {
-    return array_key_exists($key, $this->links);
+    return \array_key_exists($key, $this->links);
   }
 
   /**
@@ -128,7 +128,7 @@ final class CanvasResourceLinkCollection implements \IteratorAggregate, Cacheabl
    */
   public function filter(callable $f): CanvasResourceLinkCollection {
     $links = iterator_to_array($this);
-    $filtered = array_reduce(array_keys($links), function ($filtered, $key) use ($links, $f) {
+    $filtered = array_reduce(\array_keys($links), function ($filtered, $key) use ($links, $f) {
       if ($f($key, $links[$key])) {
         $filtered[$key] = $links[$key];
       }

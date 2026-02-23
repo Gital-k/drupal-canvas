@@ -17,11 +17,11 @@ use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\Core\Url;
 use Drupal\Tests\canvas\Kernel\Traits\CiModulePathTrait;
 use Drupal\Tests\canvas\TestSite\CanvasTestSetup;
-use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\node\Traits\NodeCreationTrait;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\TestWith;
 use Symfony\Component\DomCrawler\Crawler;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
@@ -29,10 +29,10 @@ use Symfony\Component\HttpFoundation\Request;
  * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::buildConfigurationForm()
  * @group canvas
  */
+#[RunTestsInSeparateProcesses]
 final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
 
   use CiModulePathTrait;
-  use ContribStrictConfigSchemaTestTrait;
   use NodeCreationTrait;
 
   /**
@@ -44,6 +44,7 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
     $this->container->get('module_installer')->install(['system', 'canvas_test_sdc', 'canvas_test_block']);
     $this->container->get('config.factory')->getEditable('system.theme')->set('default', 'stark')->save();
 
+    // @todo Refactor this away in https://www.drupal.org/project/canvas/issues/3531679
     (new CanvasTestSetup())->setup();
     $this->setUpCurrentUser(permissions: ['edit any article content', 'administer themes', Page::EDIT_PERMISSION]);
   }
@@ -68,8 +69,8 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
   #[DataProvider('providerOptionalImages')]
   public function testOptionalImageAndHeading(string $component, array $values_to_set, array $expected_form_canvas_props): void {
     $actual_form_canvas_props = $this->getFormCanvasPropsForComponent($component);
-    foreach (array_keys($actual_form_canvas_props['resolved']) as $sdc_prop_name) {
-      if (array_key_exists($sdc_prop_name, $values_to_set)) {
+    foreach (\array_keys($actual_form_canvas_props['resolved']) as $sdc_prop_name) {
+      if (\array_key_exists($sdc_prop_name, $values_to_set)) {
         $actual_form_canvas_props['resolved'][$sdc_prop_name] = $values_to_set[$sdc_prop_name]['resolved'];
         $actual_form_canvas_props['source'][$sdc_prop_name]['value'] = $values_to_set[$sdc_prop_name]['source'];
       }
@@ -299,14 +300,14 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
     $is_final_level = is_string($label) || count($label) === 1;
     $needle = is_array($label) ? reset($label) : $label;
     // When recursing, the $prop key won't exist.
-    $haystack = array_key_exists($prop, $suggestions) ? $suggestions[$prop] : $suggestions;
+    $haystack = \array_key_exists($prop, $suggestions) ? $suggestions[$prop] : $suggestions;
     \assert(array_is_list($haystack));
     foreach ($haystack as $suggestion) {
       if ($suggestion['label'] === $needle) {
         if ($is_final_level) {
-          \assert(array_key_exists('id', $suggestion));
-          \assert(array_key_exists('source', $suggestion));
-          \assert(array_key_exists('label', $suggestion));
+          \assert(\array_key_exists('id', $suggestion));
+          \assert(\array_key_exists('source', $suggestion));
+          \assert(\array_key_exists('label', $suggestion));
           return $suggestion;
         }
         return self::findSuggestionByLabel(array_slice($label, 1), $prop, $suggestion['items']);

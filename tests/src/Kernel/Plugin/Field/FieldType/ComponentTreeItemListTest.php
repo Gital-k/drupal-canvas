@@ -11,23 +11,27 @@ use Drupal\canvas\Entity\AssetLibrary;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Entity\Pattern;
 use Drupal\canvas\Exception\SubtreeInjectionException;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
 use Drupal\canvas\Render\ImportMapResponseAttachmentsProcessor;
 use Drupal\Component\Utility\NestedArray;
+use Drupal\Component\Uuid\Php;
 use Drupal\Core\Access\AccessResultAllowed;
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Render\Markup;
 use Drupal\Core\Render\RendererInterface;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\TypedData\TypedDataManagerInterface;
-use Drupal\KernelTests\KernelTestBase;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Kernel\Traits\CacheBustingTrait;
 use Drupal\Tests\canvas\Kernel\Traits\CiModulePathTrait;
 use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
@@ -35,12 +39,14 @@ use Drupal\Tests\canvas\Traits\CreateTestJsComponentTrait;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use Drupal\user\Entity\User;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
  * @coversDefaultClass \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList
  * @group canvas
  */
-class ComponentTreeItemListTest extends KernelTestBase {
+#[RunTestsInSeparateProcesses]
+class ComponentTreeItemListTest extends CanvasKernelTestBase {
 
   use ConstraintViolationsTestTrait;
   use CreateTestJsComponentTrait;
@@ -54,21 +60,6 @@ class ComponentTreeItemListTest extends KernelTestBase {
    * {@inheritdoc}
    */
   protected static $modules = [
-    'canvas',
-    'canvas_test_sdc',
-    'block',
-    // Canvas's dependencies (modules providing field types + widgets).
-    'datetime',
-    'file',
-    'image',
-    'media',
-    'options',
-    'path',
-    'link',
-    'text',
-    'filter',
-    'system',
-    'user',
     'serialization',
     'canvas_test_entity_reference_shape_alter',
   ];
@@ -82,6 +73,7 @@ class ComponentTreeItemListTest extends KernelTestBase {
       ->set('name', 'Canvas Test Site')
       ->set('slogan', 'Drupal Canvas Test Site')
       ->save();
+    $this->installEntitySchema('path_alias');
     $this->generateComponentConfig();
     $this->createMyCtaComponentFromSdc();
     $this->createMyCtaAutoSaveComponentFromSdc();
@@ -493,8 +485,8 @@ HTML,
               'content' => [
                 'site_logo' => [
                   '#theme' => "image",
-                  '#uri' => NULL,
-                  '#alt' => 'Home',
+                  '#uri' => '/core/themes/stark/logo.svg',
+                  '#alt' => new TranslatableMarkup('Home'),
                   '#access' => TRUE,
                 ],
                 'site_name' => [
@@ -527,8 +519,9 @@ HTML,
       ],
       'expected_html' => <<<HTML
 <!-- canvas-start-41595148-e5c1-4873-b373-be3ae6e21340 --><div id="block-41595148-e5c1-4873-b373-be3ae6e21340">
-
-
+<a href="/" rel="home">
+<img src="/core/themes/stark/logo.svg" alt="Home" fetchpriority="high" />
+</a>
           <a href="/" rel="home">Canvas Test Site</a>
     Drupal Canvas Test Site
 </div>
@@ -1071,8 +1064,8 @@ HTML,
                                       'content' => [
                                         'site_logo' => [
                                           '#theme' => 'image',
-                                          '#uri' => NULL,
-                                          '#alt' => 'Home',
+                                          '#uri' => '/core/themes/stark/logo.svg',
+                                          '#alt' => new TranslatableMarkup('Home'),
                                           '#access' => TRUE,
                                         ],
                                         'site_name' => [
@@ -1131,6 +1124,7 @@ HTML,
                                           '@/lib/drupal-utils' => \sprintf('%s/packages/astro-hydration/dist/drupal-utils.js?2.1.0-alpha3', $path),
                                           'swr' => \sprintf('%s/packages/astro-hydration/dist/swr.js?2.1.0-alpha3', $path),
                                           'drupal-canvas' => \sprintf('%s/packages/astro-hydration/dist/drupal-canvas.js?2.1.0-alpha3', $path),
+                                          '@tailwindcss/typography' => \sprintf('%s/packages/astro-hydration/dist/tailwindcss-typography.js?2.1.0-alpha3', $path),
                                         ],
                                       ],
                                       '#attached' => [
@@ -1204,6 +1198,7 @@ HTML,
                                           '@/lib/drupal-utils' => \sprintf('%s/packages/astro-hydration/dist/drupal-utils.js?2.1.0-alpha3', $path),
                                           'swr' => \sprintf('%s/packages/astro-hydration/dist/swr.js?2.1.0-alpha3', $path),
                                           'drupal-canvas' => \sprintf('%s/packages/astro-hydration/dist/drupal-canvas.js?2.1.0-alpha3', $path),
+                                          '@tailwindcss/typography' => \sprintf('%s/packages/astro-hydration/dist/tailwindcss-typography.js?2.1.0-alpha3', $path),
                                         ],
                                       ],
                                       '#attached' => [
@@ -1345,8 +1340,9 @@ HTML,
   <h1 style="font-size: 3em; margin: 0.5em 0; color: #333;"><!-- canvas-prop-start-81c63cac-187d-4f05-8acc-1c38fb2489d3/heading -->Hello, from slot level 3!<!-- canvas-prop-end-81c63cac-187d-4f05-8acc-1c38fb2489d3/heading --></h1>
 </div>
 <!-- canvas-end-81c63cac-187d-4f05-8acc-1c38fb2489d3 --><!-- canvas-start-68167e4a-9245-41be-b564-f1e1dcad1dec --><div id="block-68167e4a-9245-41be-b564-f1e1dcad1dec">
-
-
+<a href="/" rel="home">
+<img src="/core/themes/stark/logo.svg" alt="Home" fetchpriority="high" />
+</a>
           <a href="/" rel="home">Canvas Test Site</a>
     Drupal Canvas Test Site
 </div>
@@ -1498,8 +1494,9 @@ HTML,
       <h1 style="font-size: 3em; margin: 0.5em 0; color: #333;"><!-- canvas-prop-start-81c63cac-187d-4f05-8acc-1c38fb2489d3/heading -->Hello, from slot level 3!<!-- canvas-prop-end-81c63cac-187d-4f05-8acc-1c38fb2489d3/heading --></h1>
      </div>
      <!-- canvas-end-81c63cac-187d-4f05-8acc-1c38fb2489d3 --><!-- canvas-start-68167e4a-9245-41be-b564-f1e1dcad1dec --><div id="block-68167e4a-9245-41be-b564-f1e1dcad1dec">
-
-
+     <a href="/" rel="home">
+     <img src="/core/themes/stark/logo.svg" alt="Home" fetchpriority="high" />
+     </a>
               <a href="/" rel="home">Canvas Test Site</a>
         Drupal Canvas Test Site
      </div>
@@ -1726,6 +1723,172 @@ HTML,
     catch (SubtreeInjectionException $e) {
       $this->assertSame($expected_tree_or_exception, $e->getMessage());
     }
+  }
+
+  /**
+   * Tests that hydration doesn't break with component evolution.
+   *
+   * It must:
+   * - Filter out props/slots removed from the active version.
+   * - Provide the default value for props required in the active version that
+   *   didn't exist before, or were not required and did not yet have a stored value.
+   */
+  public function testHydrationOnComponentEvolution(): void {
+    $this->config('system.logging')->set('error_level', ERROR_REPORTING_DISPLAY_VERBOSE)->save();
+
+    $test_code_component_id = 'evolution-test';
+    $test_component_id = JsComponent::componentIdFromJavascriptComponentId($test_code_component_id);
+    $js_component = JavaScriptComponent::create([
+      'machineName' => $test_code_component_id,
+      'name' => 'Evolution Test Component',
+      'status' => TRUE,
+      'props' => [
+        'required_text' => [
+          'title' => 'Required Text',
+          'type' => 'string',
+          'examples' => ['Required example'],
+        ],
+        'optional_text' => [
+          'title' => 'Optional Text',
+          'type' => 'string',
+          'examples' => ['Optional example'],
+        ],
+        'removable_prop' => [
+          'title' => 'Removable Prop',
+          'type' => 'string',
+          'examples' => ['Removable example'],
+        ],
+      ],
+      'required' => ['required_text'],
+      'slots' => [
+        'main_slot' => [
+          'title' => 'Main Slot',
+          'examples' => ['<p>Main content</p>'],
+        ],
+        'removable_slot' => [
+          'title' => 'Removable Slot',
+          'examples' => ['<p>Removable content</p>'],
+        ],
+      ],
+      'js' => [
+        'original' => 'export default function() { return null; }',
+        'compiled' => 'export default function() { return null; }',
+      ],
+      'css' => ['original' => '', 'compiled' => ''],
+    ]);
+    $js_component->save();
+
+    $component = Component::load($test_component_id);
+    $this->assertInstanceOf(ComponentInterface::class, $component);
+    $original_version = $component->getActiveVersion();
+
+    $item_list = self::staticallyCreateDanglingComponentTreeItemList(\Drupal::typedDataManager());
+    $parent_uuid = (new Php())->generate();
+    $main_slot_child_uuid = (new Php())->generate();
+    $removable_slot_child_uuid = (new Php())->generate();
+    $item_list->setValue([
+      [
+        'uuid' => $parent_uuid,
+        'component_id' => $test_component_id,
+        // `optional_text` omitted as it is optional, but will become required.
+        'inputs' => [
+          'required_text' => 'Required value',
+          'removable_prop' => 'This prop will be removed',
+        ],
+      ],
+      [
+        'uuid' => $main_slot_child_uuid,
+        'component_id' => 'sdc.canvas_test_sdc.my-cta',
+        'inputs' => [
+          'text' => 'Main slot child',
+          'href' => 'https://example.com/main',
+        ],
+        'parent_uuid' => $parent_uuid,
+        'slot' => 'main_slot',
+      ],
+      [
+        'uuid' => $removable_slot_child_uuid,
+        'component_id' => 'sdc.canvas_test_sdc.my-cta',
+        'inputs' => [
+          'text' => 'Removable slot child',
+          'href' => 'https://example.com/removable',
+        ],
+        'parent_uuid' => $parent_uuid,
+        'slot' => 'removable_slot',
+      ],
+    ]);
+    self::assertCount(0, $item_list->validate(), (string) $item_list->validate());
+    $stored_values = $item_list->getValue();
+    self::assertSame($original_version, $stored_values[0]['component_version']);
+
+    // Update the component: remove removable_prop and removable_slot and make
+    // optional_text required (it was never provided, so validation will fail).
+    $js_component = \Drupal::entityTypeManager()
+      ->getStorage(JavaScriptComponent::ENTITY_TYPE_ID)
+      ->loadUnchanged($test_code_component_id);
+    self::assertInstanceOf(JavaScriptComponent::class, $js_component);
+    $js_component->setProps([
+      'required_text' => [
+        'title' => 'Required Text',
+        'type' => 'string',
+        'examples' => ['Required example'],
+      ],
+      'optional_text' => [
+        'title' => 'Optional Text',
+        'type' => 'string',
+        'examples' => ['Optional example'],
+      ],
+    ]);
+    $js_component->set('required', [
+      'required_text',
+      'optional_text',
+    ]);
+    $js_component->set('slots', [
+      'main_slot' => [
+        'title' => 'Main Slot',
+        'examples' => ['<p>Main content</p>'],
+      ],
+    ]);
+    $js_component->save();
+
+    $component = \Drupal::entityTypeManager()
+      ->getStorage(Component::ENTITY_TYPE_ID)
+      ->loadUnchanged($test_component_id);
+    $this->assertInstanceOf(ComponentInterface::class, $component);
+    $new_version = $component->getActiveVersion();
+    $this->assertNotSame($original_version, $new_version);
+
+    $hydrated_value = \Closure::bind(function () {
+      return $this->getHydratedTree();
+    }, $item_list, $item_list)();
+    $tree = $hydrated_value->getTree();
+
+    $this->assertArrayHasKey(ComponentTreeItemList::ROOT_UUID, $tree);
+    $this->assertArrayHasKey($parent_uuid, $tree[ComponentTreeItemList::ROOT_UUID]);
+    $hydrated_parent = $tree[ComponentTreeItemList::ROOT_UUID][$parent_uuid];
+    $this->assertSame($test_component_id, $hydrated_parent['component']);
+
+    $this->assertArrayHasKey('props', $hydrated_parent);
+    $props = $hydrated_parent['props'];
+    $this->assertArrayHasKey('required_text', $props);
+    $this->assertArrayHasKey('removable_prop', $props, 'Removed prop kept but will be ignored by the component');
+    // The optional_text prop has input and is the default value.
+    $this->assertArrayHasKey('optional_text', $props);
+
+    $this->assertArrayHasKey('slots', $hydrated_parent);
+    $slots = $hydrated_parent['slots'];
+    $this->assertArrayHasKey('main_slot', $slots);
+    $this->assertIsArray($slots['main_slot']);
+    $this->assertArrayHasKey($main_slot_child_uuid, $slots['main_slot']);
+    $this->assertArrayHasKey('removable_slot', $slots, 'Removed slot kept but will be ignored by the component');
+
+    $entity = Page::create([])->enforceIsNew(FALSE);
+    $build = $item_list->toRenderable($entity);
+    $this->render($build);
+
+    // Prop validation fails because optional_text is now required but missing.
+    // The error is caught by renderify and handled gracefully.
+    $this->assertNoText('[canvas:evolution-test/optional_text] The property optional_text is required.');
   }
 
 }

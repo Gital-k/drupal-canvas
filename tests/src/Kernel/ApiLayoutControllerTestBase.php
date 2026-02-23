@@ -21,8 +21,9 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * @phpstan-import-type ComponentConfigEntityId from \Drupal\canvas\Entity\Component
+ * @todo Refactor this in https://www.drupal.org/project/canvas/issues/3531679 to use CanvasKernelTestBase
  */
-class ApiLayoutControllerTestBase extends KernelTestBase {
+abstract class ApiLayoutControllerTestBase extends KernelTestBase {
 
   use AutoSaveManagerTestTrait;
 
@@ -106,7 +107,7 @@ class ApiLayoutControllerTestBase extends KernelTestBase {
     }
 
     \preg_match_all(\sprintf(self::REGION_PATTERN, $region), $content, $matches);
-    return array_key_exists(0, $matches[1]) ? $matches[1][0] : NULL;
+    return \array_key_exists(0, $matches[1]) ? $matches[1][0] : NULL;
   }
 
   /**

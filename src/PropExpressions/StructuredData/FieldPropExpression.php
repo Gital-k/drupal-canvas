@@ -82,7 +82,7 @@ final class FieldPropExpression implements EntityFieldBasedPropExpressionInterfa
 
       // Ensure that the $fieldName ordering matches that of the bundles.
       // @see \Drupal\canvas\TypedData\BetterEntityDataDefinition::create()
-      if ($bundles !== array_keys($fieldName)) {
+      if ($bundles !== \array_keys($fieldName)) {
         throw new \InvalidArgumentException('A field name must be specified for every bundle, and in the same order.');
       }
     }
@@ -92,7 +92,7 @@ final class FieldPropExpression implements EntityFieldBasedPropExpressionInterfa
       // TRICKY: ⚠️ It is possible that the same field name occurs multiple
       // times (if different bundles use the same field).
       \assert(is_array($fieldName));
-      if (array_values(array_unique($fieldName)) !== array_keys($propName)) {
+      if (array_values(array_unique($fieldName)) !== \array_keys($propName)) {
         throw new \InvalidArgumentException('A field property name must be specified for every field name, and in the same order.');
       }
       if (array_values(array_unique($propName)) === [StructuredDataPropExpressionInterface::SYMBOL_OBJECT_MAPPED_OPTIONAL_PROP]) {
@@ -118,7 +118,7 @@ final class FieldPropExpression implements EntityFieldBasedPropExpressionInterfa
         // times (if different bundles use the same field). Ensure that every
         // bundle's field has a field property listed, even if the same field
         // (and hence field property) occurs multiple times.
-        TRUE => implode('|', array_map(
+        TRUE => implode('|', \array_map(
           fn (string $field_name): string => $this->propName[$field_name],
           // @phpstan-ignore-next-line argument.type
           $this->fieldName,
@@ -189,7 +189,7 @@ final class FieldPropExpression implements EntityFieldBasedPropExpressionInterfa
     $dependencies = [];
 
     $property_definitions = $field_definition->getFieldStorageDefinition()->getPropertyDefinitions();
-    if (!array_key_exists($prop_name, $property_definitions)) {
+    if (!\array_key_exists($prop_name, $property_definitions)) {
       // @phpcs:ignore Drupal.Semantics.FunctionTriggerError.TriggerErrorTextLayoutRelaxed
       @trigger_error(\sprintf('Property %s does not exist', $prop_name), E_USER_DEPRECATED);
     }
@@ -238,7 +238,7 @@ final class FieldPropExpression implements EntityFieldBasedPropExpressionInterfa
       $storage_deps,
     );
     ksort($dependencies);
-    return array_map(static function ($values) {
+    return \array_map(static function ($values) {
       $values = array_unique($values);
       sort($values);
       return $values;

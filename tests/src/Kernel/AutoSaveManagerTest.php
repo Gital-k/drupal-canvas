@@ -9,7 +9,6 @@ use Drupal\Core\Config\ConfigManagerInterface;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
-use Drupal\Core\Extension\ThemeInstallerInterface;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\ClientDataToEntityConverter;
 use Drupal\canvas\Controller\ApiLayoutController;
@@ -21,27 +20,26 @@ use Drupal\canvas\Entity\StagedConfigUpdate;
 use Drupal\canvas\Entity\CanvasHttpApiEligibleConfigEntityInterface;
 use Drupal\canvas\Plugin\DisplayVariant\CanvasPageVariant;
 use Drupal\canvas\Render\PreviewEnvelope;
-use Drupal\KernelTests\KernelTestBase;
 use Drupal\language\Entity\ConfigurableLanguage;
 use Drupal\node\Entity\Node;
 use Drupal\Tests\canvas\Traits\CanvasFieldCreationTrait;
-use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\canvas\Traits\CanvasFieldTrait;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
 use Drupal\Tests\node\Traits\ContentTypeCreationTrait;
 use Symfony\Component\Validator\ConstraintViolation;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\Validator\ConstraintViolationInterface;
 
 /**
  * @coversDefaultClass \Drupal\canvas\AutoSave\AutoSaveManager
  * @group canvas.
  */
-class AutoSaveManagerTest extends KernelTestBase {
+#[RunTestsInSeparateProcesses]
+class AutoSaveManagerTest extends CanvasKernelTestBase {
 
   use CanvasFieldCreationTrait;
   use CanvasFieldTrait;
-  use ContribStrictConfigSchemaTestTrait;
   use GenerateComponentConfigTrait;
   use ContentTypeCreationTrait;
   use MediaTypeCreationTrait;
@@ -49,25 +47,9 @@ class AutoSaveManagerTest extends KernelTestBase {
   private const string UUID_IN_ROOT = '78c73c1d-4988-4f9b-ad17-f7e337d40c29';
 
   protected static $modules = [
-    'canvas_test_sdc',
-    'system',
-    'canvas',
-    'file',
-    'image',
     'language',
-    'link',
-    'path',
-    'path_alias',
-    'media',
-    'user',
-    'text',
-    'options',
     'node',
-    'filter',
     'field',
-    'editor',
-    'ckeditor5',
-    'datetime',
   ];
 
   private static function recursiveReverseSort(array $data): array {
@@ -98,9 +80,7 @@ class AutoSaveManagerTest extends KernelTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
-    $this->container->get(ThemeInstallerInterface::class)->install(['stark']);
     $this->config('system.theme')->set('default', 'stark')->save();
-    $this->installConfig('canvas');
     // URLs are generated during some of these kernel tests. Canvas depends on
     // the `path` module, so the PathAlias entity type must be installed. URL
     // generation fails without this.
@@ -284,7 +264,7 @@ class AutoSaveManagerTest extends KernelTestBase {
 
     // Verify only English auto-save is in the list.
     $list = $auto_save_manager->getAllAutoSaveList();
-    self::assertEquals([$key_en], array_keys($list));
+    self::assertEquals([$key_en], \array_keys($list));
     self::assertEquals('Modified English title', $list[$key_en]['label']);
 
     // Make a change to the French page and save auto-save.
@@ -297,7 +277,7 @@ class AutoSaveManagerTest extends KernelTestBase {
 
     // Verify both auto-saves are in the list with correct labels.
     $list = $auto_save_manager->getAllAutoSaveList();
-    $keys = array_keys($list);
+    $keys = \array_keys($list);
     asort($keys);
     self::assertEquals([$key_en, $key_fr], $keys);
     self::assertEquals('Modified English title', $list[$key_en]['label']);
@@ -316,7 +296,7 @@ class AutoSaveManagerTest extends KernelTestBase {
     self::assertFalse($auto_save_manager->getAutoSaveEntity($page_fr)->isEmpty());
 
     $list = $auto_save_manager->getAllAutoSaveList();
-    self::assertEquals([$key_fr], array_keys($list));
+    self::assertEquals([$key_fr], \array_keys($list));
 
     // Delete the French auto-save.
     $auto_save_manager->delete($page_fr);
@@ -391,7 +371,6 @@ class AutoSaveManagerTest extends KernelTestBase {
   }
 
   public function testAssetLibrary(): void {
-    $this->installConfig('canvas');
     $asset_library = AssetLibrary::load('global');
     \assert($asset_library instanceof AssetLibrary);
     $asset_library_matching_client_data = $asset_library->normalizeForClientSide()->values;
@@ -409,7 +388,6 @@ class AutoSaveManagerTest extends KernelTestBase {
     $this->installEntitySchema('media');
     $this->installSchema('file', 'file_usage');
     $this->installConfig('node');
-    $this->installConfig('system');
     $this->createContentType(['type' => 'article']);
     $this->createMediaType('image', ['id' => 'image', 'label' => 'Image']);
     $this->createComponentTreeField('node', 'article', 'field_component_tree');
@@ -450,8 +428,6 @@ class AutoSaveManagerTest extends KernelTestBase {
   }
 
   public function testStagedConfigUpdate(): void {
-    $this->installConfig(['system']);
-
     $sut = $this->container->get(AutoSaveManager::class);
     self::assertInstanceOf(AutoSaveManager::class, $sut);
     StagedConfigUpdate::createFromClientSide([

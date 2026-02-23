@@ -69,10 +69,10 @@ abstract class VersionedConfigEntityBase extends ConfigEntityBase implements Ver
    */
   protected function assertVersionExists(string $version): void {
     \assert(isset($this->versioned_properties));
-    if ($version !== $this->active_version && !array_key_exists($version, $this->versioned_properties)) {
+    if ($version !== $this->active_version && !\array_key_exists($version, $this->versioned_properties)) {
       throw new \OutOfRangeException(\sprintf('The requested version `%s` is not available. Available versions: %s.',
         (string) $version,
-        implode(', ', array_map(
+        implode(', ', \array_map(
           fn (string $v): string => \sprintf('`%s`', (string) $v),
           $this->getVersions(),
         )),
@@ -108,7 +108,7 @@ abstract class VersionedConfigEntityBase extends ConfigEntityBase implements Ver
     if ($version === $this->active_version) {
       throw new \LogicException('Cannot delete the active version.');
     }
-    if (!array_key_exists($version, $this->versioned_properties)) {
+    if (!\array_key_exists($version, $this->versioned_properties)) {
       throw new \OutOfRangeException();
     }
     unset($this->versioned_properties[$version]);
@@ -119,7 +119,7 @@ abstract class VersionedConfigEntityBase extends ConfigEntityBase implements Ver
     if ($version === $this->active_version) {
       throw new \LogicException('Cannot delete the active version.');
     }
-    if (array_key_exists($version, $this->versioned_properties)) {
+    if (\array_key_exists($version, $this->versioned_properties)) {
       unset($this->versioned_properties[$version]);
     }
     return $this;
@@ -131,11 +131,28 @@ abstract class VersionedConfigEntityBase extends ConfigEntityBase implements Ver
     return $this;
   }
 
+  /**
+   * @return non-empty-list<string>
+   */
   public function getVersions(): array {
-    return [
+    $versions = [
       $this->active_version,
-      ...array_diff(array_keys($this->versioned_properties), [self::ACTIVE_VERSION]),
+      ...array_diff(\array_keys($this->versioned_properties), [self::ACTIVE_VERSION]),
     ];
+    // Ensure all versions are strings.
+    $versions = \array_map(
+      // TRICKY: the version hash is a hexadecimal string (0–9, A–F). There is a
+      // tiny probability that the entire string consists of digits (10 of the
+      // 16 possible characters are digits (probability: 10/16), and a 64-bit
+      // hash can be represented by a 16-character string. So the probability of
+      // an all-digit hexadecimal string is (10/16)^16 or about 1 in 4 million.
+      // PHP automatically converts all-digit strings to integers when used as
+      // array keys, which can cause problems. To prevent this, explicitly cast
+      // versions (which are hashes) to strings.
+      fn (string|int $version) => (string) $version,
+      $versions
+    );
+    return $versions;
   }
 
   /**
@@ -168,7 +185,7 @@ abstract class VersionedConfigEntityBase extends ConfigEntityBase implements Ver
    */
   public function set($property_name, $value) {
     if (!$this->isLoadedVersionActiveVersion() && !$this->isSyncing()) {
-      if (array_key_exists($this->getLoadedVersion(), $this->versioned_properties)) {
+      if (\array_key_exists($this->getLoadedVersion(), $this->versioned_properties)) {
         throw new \LogicException('Can only set values on the active version');
       }
       else {
@@ -264,7 +281,7 @@ abstract class VersionedConfigEntityBase extends ConfigEntityBase implements Ver
    * {@inheritdoc}
    */
   public function isVersionedProperty(string $property_name): bool {
-    return array_key_exists($property_name, $this->versioned_properties);
+    return \array_key_exists($property_name, $this->versioned_properties);
   }
 
 }

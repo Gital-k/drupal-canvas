@@ -13,7 +13,6 @@ use Drupal\Component\Render\MarkupInterface;
 use Drupal\Component\Utility\Html;
 use Drupal\Component\Uuid\UuidInterface;
 use Drupal\Core\Cache\CacheableMetadata;
-use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
 use Drupal\Core\DependencyInjection\ServiceModifierInterface;
 use Drupal\Core\Entity\EntityStorageInterface;
@@ -34,12 +33,11 @@ use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Drupal\canvas\PropSource\StaticPropSource;
 use Drupal\canvas\Storage\ComponentTreeLoader;
-use Drupal\KernelTests\KernelTestBase;
 use Drupal\Tests\canvas\Kernel\BrokenPluginManagerInterface;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Kernel\Traits\CiModulePathTrait;
 use Drupal\Tests\canvas\Kernel\Traits\VfsPublicStreamUrlTrait;
 use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
-use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\canvas\Traits\CrawlerTrait;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\canvas\Traits\UninstallValidatorTestTrait;
@@ -69,7 +67,7 @@ use Symfony\Component\HttpFoundation\Session\Storage\MockArraySessionStorage;
  *
  * @phpstan-import-type ComponentConfigEntityId from \Drupal\canvas\Entity\Component
  */
-abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerInterface, ServiceModifierInterface {
+abstract class ComponentSourceTestBase extends CanvasKernelTestBase implements LoggerInterface, ServiceModifierInterface {
 
   use RfcLoggerTrait;
   use UninstallValidatorTestTrait;
@@ -103,37 +101,12 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
   use CrawlerTrait;
   use ComponentTreeItemListInstantiatorTrait;
   use ConstraintViolationsTestTrait;
-  use ContribStrictConfigSchemaTestTrait;
   use GenerateComponentConfigTrait;
 
   protected readonly EntityStorageInterface $componentStorage;
   protected readonly ComponentIncompatibilityReasonRepository $componentReasonRepository;
-  protected readonly ConfigFactoryInterface $configFactory;
   protected readonly ComponentTreeLoader $componentTreeLoader;
   protected readonly RendererInterface $renderer;
-
-  /**
-   * {@inheritdoc}
-   */
-  protected static $modules = [
-    'canvas',
-    'file',
-    'image',
-    'link',
-    'options',
-    'text',
-    'system',
-    'media',
-    'path',
-    'canvas_test_sdc',
-    'block',
-    'datetime',
-    'user',
-    'filter',
-    'ckeditor5',
-    'editor',
-    'path_alias',
-  ];
 
   /**
    * {@inheritdoc}
@@ -142,13 +115,11 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
     parent::setUp();
     $this->componentReasonRepository = $this->container->get(ComponentIncompatibilityReasonRepository::class);
     $this->componentStorage = $this->container->get(EntityTypeManagerInterface::class)->getStorage(Component::ENTITY_TYPE_ID);
-    $this->configFactory = $this->container->get(ConfigFactoryInterface::class);
     $this->componentTreeLoader = $this->container->get(ComponentTreeLoader::class);
     $this->renderer = $this->container->get(RendererInterface::class);
     $this->installEntitySchema('user');
     $this->installEntitySchema('path_alias');
     $this->installSchema('user', 'users_data');
-    $this->installConfig('canvas');
   }
 
   /**
@@ -234,8 +205,8 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
     );
 
     // Transform from `canvas.component.<ID>` to just `<ID>`.
-    $discovered_component_config_names = $this->configFactory->listAll($prefix);
-    $discovered_component_entity_ids = array_map(
+    $discovered_component_config_names = \Drupal::configFactory()->listAll($prefix);
+    $discovered_component_entity_ids = \array_map(
       fn(string $config_name) => str_replace("$component_config_entity_type_prefix.", '', $config_name),
       $discovered_component_config_names
     );
@@ -335,7 +306,7 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
           ->getClientSideInfo($component)['propSources'][$sdc_prop_name];
 
         // The prop might be optional without a default value.
-        if (!array_key_exists('default_values', $client_side_info_for_prop)) {
+        if (!\array_key_exists('default_values', $client_side_info_for_prop)) {
           continue;
         }
 
@@ -514,7 +485,7 @@ abstract class ComponentSourceTestBase extends KernelTestBase implements LoggerI
 
     // Test `build` using `expected_output_selectors`.
     foreach ($component_ids as $component_id) {
-      if (!array_key_exists($component_id, $expected_client_side_info)) {
+      if (!\array_key_exists($component_id, $expected_client_side_info)) {
         throw new \OutOfRangeException(\sprintf('Test expectations missing for %s.', $component_id));
       }
       $expected_output_selectors = $expected_client_side_info[$component_id]['expected_output_selectors'];

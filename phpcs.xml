@@ -40,10 +40,24 @@ core.phpcs.xml.dist -> /PATH/TO/DRUPAL/ROOT/core/phpcs.xml.dist
   </rule>
 
   <!-- Canvas' additional coding standards. -->
+  <rule ref="SlevomatCodingStandard.TypeHints.DeclareStrictTypes">
+    <properties>
+      <property name="spacesCountAroundEqualsSign" value="0"></property>
+    </properties>
+    <exclude-pattern>*.api.php</exclude-pattern>
+    <exclude-pattern>*/tests/fixtures/update/*</exclude-pattern>
+    <!-- @todo eventually apply stricter rules to canvas_ai, too. -->
+    <exclude-pattern>*/canvas_ai/*</exclude-pattern>
+  </rule>
   <rule ref="SlevomatCodingStandard.Namespaces.FullyQualifiedGlobalFunctions">
     <properties>
       <!-- @todo Keep expanding this list until it applies to all global functions. -->
-      <property name="include" type="array" value="assert,sprintf" />
+      <property name="include" type="array" value="assert,sprintf,array_map,array_keys,array_key_exists" />
     </properties>
+  </rule>
+  <rule ref="./coding_standards/Canvas">
+    <!-- @todo eventually apply stricter rules to canvas_ai and canvas_oauth too. -->
+    <exclude-pattern>*/canvas_ai/*</exclude-pattern>
+    <exclude-pattern>*/canvas_oauth/tests/src/Kernel/CanvasOauthAuthenticationProviderTest.php</exclude-pattern>
   </rule>
 </ruleset>

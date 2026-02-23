@@ -15,12 +15,11 @@ use Drupal\Core\Plugin\Component;
 use Drupal\Core\Theme\ComponentPluginManager;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
-use Drupal\KernelTests\KernelTestBase;
 use Drupal\link\LinkItemInterface;
 use Drupal\node\Entity\NodeType;
 use Drupal\taxonomy\Entity\Vocabulary;
-use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\field\Traits\EntityReferenceFieldCreationTrait;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
  * @coversClass \Drupal\canvas\ShapeMatcher\PropSourceSuggester
@@ -28,47 +27,27 @@ use Drupal\Tests\field\Traits\EntityReferenceFieldCreationTrait;
  *
  * @phpstan-import-type HostEntityUrlPropSourceArray from \Drupal\canvas\PropSource\PropSourceBase
  */
-class PropSourceSuggesterTest extends KernelTestBase {
+#[RunTestsInSeparateProcesses]
+class PropSourceSuggesterTest extends CanvasKernelTestBase {
 
-  use ContribStrictConfigSchemaTestTrait;
   use EntityReferenceFieldCreationTrait;
 
   /**
    * {@inheritdoc}
    */
   protected static $modules = [
-    // The two only modules Drupal truly requires.
-    'system',
-    'user',
-    // The module being tested.
-    'canvas',
-    // The dependent modules.
-    'sdc',
-    'media',
-    // The module providing realistic test SDCs.
-    'canvas_test_sdc',
     // The module providing the sample SDC to test all JSON schema types.
     'sdc_test_all_props',
     'canvas_test_sdc',
-    // All other core modules providing field types.
+    // All other core modules providing field types (in addition to the ones
+    // installed by CanvasKernelTestBase).
     'comment',
-    'datetime',
     'datetime_range',
-    'file',
-    'image',
-    'link',
-    'options',
-    'path',
     'telephone',
-    'text',
     // Create sample configurable fields on the `node` entity type.
     'node',
     'field',
     'taxonomy',
-    // Modules that field type-providing modules depend on.
-    'filter',
-    'ckeditor5',
-    'editor',
   ];
 
   /**
@@ -76,7 +55,6 @@ class PropSourceSuggesterTest extends KernelTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
-    $this->installConfig('canvas');
     $this->installEntitySchema('node');
     $this->installEntitySchema('user');
     $this->installEntitySchema('field_storage_config');
@@ -230,21 +208,21 @@ class PropSourceSuggesterTest extends KernelTestBase {
       );
 
     // All expectations that are present must be correct.
-    foreach (array_keys($expected) as $prop_name) {
+    foreach (\array_keys($expected) as $prop_name) {
       $this->assertSame(
         $expected[$prop_name],
         [
           'required' => $suggestions[$prop_name]['required'],
-          'instances' => array_map(fn (EntityFieldPropSource $s): array => $s->toArray(), $suggestions[$prop_name]['instances']),
-          'adapters' => array_map(fn (AdapterInterface $a): string => $a->getPluginId(), $suggestions[$prop_name]['adapters']),
-          'host_entity_urls' => array_map(fn (HostEntityUrlPropSource $s): array => $s->toArray(), $suggestions[$prop_name]['host_entity_urls']),
+          'instances' => \array_map(fn (EntityFieldPropSource $s): array => $s->toArray(), $suggestions[$prop_name]['instances']),
+          'adapters' => \array_map(fn (AdapterInterface $a): string => $a->getPluginId(), $suggestions[$prop_name]['adapters']),
+          'host_entity_urls' => \array_map(fn (HostEntityUrlPropSource $s): array => $s->toArray(), $suggestions[$prop_name]['host_entity_urls']),
         ],
         "Unexpected prop source suggestion for $prop_name"
       );
     }
 
     // Finally, the set of expectations must be complete.
-    $this->assertSame(array_keys($expected), array_keys($suggestions));
+    $this->assertSame(\array_keys($expected), \array_keys($suggestions));
   }
 
   public static function provider(): \Generator {
@@ -898,6 +876,44 @@ class PropSourceSuggesterTest extends KernelTestBase {
           'adapters' => [
             'Extract image URL' => 'image_extract_url',
           ],
+          'host_entity_urls' => [],
+        ],
+        '⿲sdc_test_all_props:all-props␟test_string_format_uri_public_stream_wrapper' => [
+          'required' => FALSE,
+          'instances' => [
+            'Authored by → User → Picture → URI' => [
+              'sourceType' => PropSource::EntityField->value,
+              'expression' => 'ℹ︎␜entity:node:foo␝uid␞␟entity␜␜entity:user␝user_picture␞␟entity␜␜entity:file␝uri␞␟value',
+            ],
+            "Silly image 🤡 → URI" => [
+              'sourceType' => PropSource::EntityField->value,
+              'expression' => 'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝uri␞␟value',
+            ],
+            'Revision user → User → Picture → URI' => [
+              'sourceType' => PropSource::EntityField->value,
+              'expression' => 'ℹ︎␜entity:node:foo␝revision_uid␞␟entity␜␜entity:user␝user_picture␞␟entity␜␜entity:file␝uri␞␟value',
+            ],
+          ],
+          'adapters' => [],
+          'host_entity_urls' => [],
+        ],
+        '⿲sdc_test_all_props:all-props␟test_string_format_uri_public_stream_wrapper_using_ref' => [
+          'required' => FALSE,
+          'instances' => [
+            'Authored by → User → Picture → URI' => [
+              'sourceType' => PropSource::EntityField->value,
+              'expression' => 'ℹ︎␜entity:node:foo␝uid␞␟entity␜␜entity:user␝user_picture␞␟entity␜␜entity:file␝uri␞␟value',
+            ],
+            "Silly image 🤡 → URI" => [
+              'sourceType' => PropSource::EntityField->value,
+              'expression' => 'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝uri␞␟value',
+            ],
+            'Revision user → User → Picture → URI' => [
+              'sourceType' => PropSource::EntityField->value,
+              'expression' => 'ℹ︎␜entity:node:foo␝revision_uid␞␟entity␜␜entity:user␝user_picture␞␟entity␜␜entity:file␝uri␞␟value',
+            ],
+          ],
+          'adapters' => [],
           'host_entity_urls' => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_string_format_uri_reference' => [

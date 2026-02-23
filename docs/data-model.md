@@ -215,7 +215,7 @@ Example: A simple tree showing a root item (`41595148-e5c1-4873-b373-be3ae6e2134
     // Note how much simpler the stored information is, because it uses the Block system's native input UX:
     'inputs' => [
       'label' => '',
-      'label_display' => FALSE,
+      'label_display' => '0',
       'use_site_logo' => TRUE,
       'use_site_name' => TRUE,
       'use_site_slogan' => TRUE,
@@ -260,7 +260,7 @@ optimize the stored data. For example:
     'component_version' => '247a23298360adb2',
     'inputs' => [
       'label' => '',
-      'label_display' => FALSE,
+      'label_display' => '0',
       'use_site_logo' => TRUE,
       'use_site_name' => TRUE,
       'use_site_slogan' => TRUE,
@@ -578,13 +578,13 @@ where such an update is possible without any risk are:
 - Changing a prop matched prop shape field widget (but only the widget!)
 - Changing default values in prop_field_definitions
 - Changing slot examples
+- Removing props (required or optional)
+- Removing slots
+- Adding a new required prop.
+- Changing props from optional to required
 
 Unsafe changes (that prevent auto-update) include:
 
-- Adding a new required prop. (@todo We should be able to auto-update when adding a new required prop. Fix it in https://www.drupal.org/i/3568602 and move to the safe changes section.)
-- Removing props (required or optional)
-- Removing slots
-- Changing props from optional to required
 - Changing prop shapes
 
 See

@@ -73,7 +73,7 @@ final class PageRegion extends ComponentTreeConfigEntityBase {
    * {@inheritdoc}
    */
   public function __construct(array $values, $entity_type) {
-    $non_existent_properties = array_keys(array_diff_key($values, get_class_vars(__CLASS__)));
+    $non_existent_properties = \array_keys(array_diff_key($values, get_class_vars(__CLASS__)));
     if (!empty($non_existent_properties)) {
       throw new \LogicException(\sprintf(
         'Trying to set non-existent config entity properties: %s.',
@@ -180,7 +180,7 @@ final class PageRegion extends ComponentTreeConfigEntityBase {
   public static function loadForActiveThemeByClientSideId(): array {
     $regions = self::loadForActiveTheme();
     return array_combine(
-      array_map(fn(PageRegion $r) => $r->get('region'), $regions),
+      \array_map(fn(PageRegion $r) => $r->get('region'), $regions),
       $regions,
     );
   }
@@ -224,12 +224,12 @@ final class PageRegion extends ComponentTreeConfigEntityBase {
   public static function createFromBlockLayout(string $theme): array {
     $theme_info = \Drupal::service('theme_handler')->getTheme($theme);
     $region_names = array_filter(
-      array_keys($theme_info->info['regions']),
+      \array_keys($theme_info->info['regions']),
       // No PageRegion config entity is allowed for the `content` region.
       fn ($s) => $s !== CanvasPageVariant::MAIN_CONTENT_REGION,
     );
 
-    $blocks = \Drupal::service('entity_type.manager')->getStorage('block')->loadByProperties(['theme' => $theme]);
+    $blocks = \Drupal::service('entity_type.manager')->getStorage('block')->loadByProperties(['theme' => $theme, 'status' => TRUE]);
 
     $regions = [];
     foreach ($blocks as $block) {
@@ -262,7 +262,7 @@ final class PageRegion extends ComponentTreeConfigEntityBase {
     foreach ($region_names as $region_name) {
       $items = [];
       if (isset($regions[$region_name])) {
-        $items = array_map(
+        $items = \array_map(
           static fn(array $block) => \array_intersect_key($block, \array_flip([
             'component_id',
             'component_version',

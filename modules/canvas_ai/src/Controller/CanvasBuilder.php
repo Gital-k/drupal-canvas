@@ -4,7 +4,6 @@ namespace Drupal\canvas_ai\Controller;
 
 use Drupal\ai\AiProviderPluginManager;
 use Drupal\ai_agents\Enum\AiAgentStatusItemTypes;
-use Drupal\ai_agents\Plugin\AiFunctionCall\AiAgentWrapper;
 use Drupal\ai\OperationType\Chat\ChatInput;
 use Drupal\ai\OperationType\Chat\ChatMessage;
 use Drupal\ai\OperationType\GenericType\ImageFile;
@@ -228,6 +227,7 @@ final class CanvasBuilder extends ControllerBase {
       'active_component_uuid' => $prompt['active_component_uuid'] ?? 'None',
       'menu_fetch_source' => $this->getMenuFetchSource(),
       'json_api_module_status' => $this->moduleHandler()->moduleExists('jsonapi') ? 'enabled' : 'disabled',
+      'available_regions' => Json::encode($this->canvasAiPageBuilderHelper->getAvailableRegions(Json::encode($prompt['current_layout']))) ?? NULL,
       'verbose_context_for_orchestrator' => $this->canvasAiPageBuilderHelper->generateVerboseContextForOrchestrator($prompt),
       'custom_libraries' => $this->getSupportedLibraries(),
     ]);
@@ -261,17 +261,13 @@ final class CanvasBuilder extends ControllerBase {
           if ($tool instanceof BuilderResponseFunctionCallInterface) {
             $response = array_merge($response, $tool->getStructuredOutput());
           }
-          if ($tool instanceof AiAgentWrapper) {
-            $response['message'] = $tool->getReadableOutput();
-          }
-          if ($tool->getPluginId() === 'ai_agents::ai_agent::canvas_page_builder_agent') {
+          if (in_array($tool->getPluginId(), ['ai_agents::ai_agent::canvas_page_builder_agent', 'ai_agents::ai_agent::canvas_template_builder_agent'], TRUE)) {
             $this->canvasAiTempStore->deleteData(CanvasAiTempStore::CURRENT_LAYOUT_KEY);
           }
         }
       }
-      else {
-        $response['message'] = $agent->solve();
-      }
+      // The final message seen by the user should be the one from the orchestrator agent.
+      $response['message'] = $agent->solve();
       return new JsonResponse(
         $response,
       );
@@ -416,7 +412,8 @@ final class CanvasBuilder extends ControllerBase {
       'canvas_title_generation_agent' => $this->t('Generate a title'),
       'canvas_component_agent' => $this->t('Generate a component'),
       'canvas_metadata_generation_agent' => $this->t('Generate metadata'),
-      'canvas_page_builder_agent' => $this->t('Building the page'),
+      'canvas_page_builder_agent' => $this->t('Finding components to place'),
+      'canvas_template_builder_agent' => $this->t('Designing the page'),
     ];
     return $descriptions[$agent_id] ?? $this->t('@agentName working', ['@agentName' => $agent_name]);
   }
@@ -470,6 +467,12 @@ final class CanvasBuilder extends ControllerBase {
         "type" => "Bundled npm package",
         "description" => "A utility function to efficiently merge Tailwind CSS classes in JS without style conflicts.",
         "code" => "```js\nimport { twMerge } from 'tailwind-merge';\n\ntwMerge('px-2 py-1 bg-red hover:bg-dark-red', 'p-3 bg-[#B91C1C]');\n// → 'hover:bg-dark-red p-3 bg-[#B91C1C]'\n```",
+      ],
+      [
+        "name" => 'tailwindcss_typography',
+        "type" => "Bundled npm package",
+        "description" => "A Tailwind CSS plugin that provides a set of pre-configured typography classes for consistent and readable text styles.",
+        "code" => "```js\n<FormattedText className=\"prose md:prose-lg lg:prose-xl\">\n  {body}\n</FormattedText>\n```",
       ],
     ];
   }

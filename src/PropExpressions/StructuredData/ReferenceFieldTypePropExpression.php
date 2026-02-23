@@ -173,7 +173,7 @@ final class ReferenceFieldTypePropExpression implements FieldTypeBasedPropExpres
     \assert($this->referenced instanceof ReferencedBundleSpecificBranches);
     $existing_branches = $this->referenced->bundleSpecificReferencedExpressions;
     if (!$this->hasBranch($branch_to_remove)) {
-      throw new \InvalidArgumentException(\sprintf("The branch `%s` was not found. Existing branches: `%s`.", $branch_to_remove, implode('`, `', array_keys($existing_branches))));
+      throw new \InvalidArgumentException(\sprintf("The branch `%s` was not found. Existing branches: `%s`.", $branch_to_remove, implode('`, `', \array_keys($existing_branches))));
     }
 
     unset($existing_branches[$branch_to_remove]);
@@ -210,7 +210,7 @@ final class ReferenceFieldTypePropExpression implements FieldTypeBasedPropExpres
       \assert(Inspector::assertAllObjects($referenced_content_entities, FieldableEntityInterface::class));
       $dependencies['content'] = [
         ...$dependencies['content'] ?? [],
-        ...array_map(
+        ...\array_map(
           fn (FieldableEntityInterface $entity) => $entity->getConfigDependencyName(),
           $referenced_content_entities,
         ),
@@ -238,7 +238,7 @@ final class ReferenceFieldTypePropExpression implements FieldTypeBasedPropExpres
       $closing_last_branch = mb_strrpos($representation, self::SUFFIX_BRANCH);
       \assert(is_int($closing_last_branch));
       $branches = self::parseBranches(mb_substr($representation, $opening_first_branch, $closing_last_branch));
-      $referenced_branches = array_map(
+      $referenced_branches = \array_map(
         // Each of the branch expressions MUST be starting with an entity field,
         // because that is the only way to branch. Therefore, parse each as its
         // own stand-alone prop expression.
@@ -249,7 +249,7 @@ final class ReferenceFieldTypePropExpression implements FieldTypeBasedPropExpres
       $parts = explode(self::PREFIX_ENTITY_LEVEL . self::PREFIX_BRANCH . self::PREFIX_ENTITY_LEVEL, $representation, 2);
       $referencer = FieldTypePropExpression::fromString($parts[0]);
       $referenced = new ReferencedBundleSpecificBranches(array_combine(
-        array_map(
+        \array_map(
           fn (EntityFieldBasedPropExpressionInterface $expr) => $expr->getHostEntityDataDefinition()->getDataType(),
           $referenced_branches,
         ),

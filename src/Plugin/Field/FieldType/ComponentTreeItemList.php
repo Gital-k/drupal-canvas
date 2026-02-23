@@ -113,7 +113,7 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
         // preventing the preview to become unusable if the real time definition
         // is missing. So use the known slots at the time of the component
         // config entity creation.
-        TRUE => $item->getComponent() ? array_keys($item->getComponent()->getSlotDefinitions()) : [],
+        TRUE => $item->getComponent() ? \array_keys($item->getComponent()->getSlotDefinitions()) : [],
       };
       foreach ($known_slot_names_for_component as $slot_name) {
         $component_instance_slot = [
@@ -200,7 +200,7 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
     $renderable_component_tree = $this->getHydratedTree();
     $hydrated = $renderable_component_tree->getTree();
 
-    \assert(array_keys($hydrated) === [self::ROOT_UUID]);
+    \assert(\array_keys($hydrated) === [self::ROOT_UUID]);
     $build = self::renderify(self::buildRenderingContext($this, $entity), $hydrated, $isPreview);
 
     // @see \Drupal\Core\Entity\EntityViewBuilder::getBuildDefaults()
@@ -430,7 +430,7 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
       }
       // For each vertex (after the filtering above), all edges represent
       // child component instances placed in this slot.
-      foreach (array_keys($vertex['edges']) as $component_instance_uuid) {
+      foreach (\array_keys($vertex['edges']) as $component_instance_uuid) {
         \assert(is_string($component_instance_uuid));
         yield $parent_uuid => [
           'slot' => $slot_map[$component_instance_uuid],
@@ -459,14 +459,24 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
       \assert($component instanceof Component);
       $component->loadVersion($item->getComponentVersion());
 
+      // Rendering always happens using the live implementation of a component,
+      // so load the active version to determine the required props.
+      $required_props_with_default_values_in_current_implementation = $component
+        ->loadVersion($component->getActiveVersion())
+        ->getComponentSource()
+        ->getDefaultExplicitInput(only_required: TRUE);
+      // Avoid side effects.
+      $component->loadVersion($item->getComponentVersion());
+
       $source = $component->getComponentSource();
       $hydrated[$uuid] = [
         'component' => $component_id,
       ] + $source->hydrateComponent(
         $source->getExplicitInput($uuid, $item),
         $component->getSlotDefinitions(),
+        $required_props_with_default_values_in_current_implementation,
       );
-      \assert(!array_key_exists('slots', $hydrated[$uuid]) || is_array($hydrated[$uuid]['slots']));
+      \assert(!\array_key_exists('slots', $hydrated[$uuid]) || is_array($hydrated[$uuid]['slots']));
     }
 
     // Transform the flat list of hydrated components into a hydrated component
@@ -477,7 +487,7 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
       if ($parent_uuid === self::ROOT_UUID) {
         continue;
       }
-      \assert(array_key_exists('slots', $hydrated[$parent_uuid]) && is_array($hydrated[$parent_uuid]['slots']));
+      \assert(\array_key_exists('slots', $hydrated[$parent_uuid]) && is_array($hydrated[$parent_uuid]['slots']));
 
       // Remove default slot value: this slot is populated.
       if (\array_key_exists($slot, $hydrated[$parent_uuid]['slots']) && \is_string($hydrated[$parent_uuid]['slots'][$slot])) {
@@ -485,7 +495,7 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
       }
 
       // @phpstan-ignore-next-line
-      \assert(!array_key_exists($uuid, $hydrated[$parent_uuid]['slots'][$slot]));
+      \assert(!\array_key_exists($uuid, $hydrated[$parent_uuid]['slots'][$slot]));
       // @phpstan-ignore-next-line
       $hydrated[$parent_uuid]['slots'][$slot][$uuid] = $hydrated[$uuid];
       unset($hydrated[$uuid]);
