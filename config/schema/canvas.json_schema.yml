@@ -252,8 +252,8 @@ canvas.json_schema.prop.array:
         type: sequence
         label: 'Array example value'
         sequence:
-          # Each example is an array, and each item in that array can be of any basic type
-          type: undefined
+          # Dynamically resolve type based on items.type value.
+          type: canvas.array_example_item.[%parent.%parent.%parent.items.type]
     maxItems:
       requiredKey: false
       type: integer
@@ -333,4 +333,30 @@ canvas.json_schema.prop.array:
               choices:
                 - 'json-schema-definitions://canvas.module/image'
                 - 'json-schema-definitions://canvas.module/video'
+
+# Dynamic type definitions for array example items based on items.type.
+# @see canvas.json_schema.prop.array
+canvas.array_example_item.string:
+  type: string
+  constraints:
+    NotNull: ~
+
+canvas.array_example_item.integer:
+  type: integer
+  constraints:
+    NotNull: ~
+
+canvas.array_example_item.number:
+  type: float
+  constraints:
+    NotNull: ~
+
+# Object array examples use canvas.json_schema.object which now handles both
+# regular prop examples and array item examples by finding $ref in items.
+canvas.array_example_item.object:
+  type: canvas.json_schema.object
+  constraints:
+    NotNull: ~
+    NotBlank:
+      allowNull: true
 

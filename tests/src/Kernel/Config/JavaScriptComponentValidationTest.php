@@ -8,7 +8,6 @@ namespace Drupal\Tests\canvas\Kernel\Config;
 
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Exception\ConstraintViolationException;
-use Drupal\Core\Config\Schema\SchemaIncompleteException;
 use Drupal\Tests\canvas\Traits\BetterConfigDependencyManagerTrait;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
@@ -1000,12 +999,10 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
    *   The array prop definition to test.
    * @param array $expected_errors
    *   Expected validation errors.
-   * @param string|null $expected_schema_exception
-   *   Expected schema incomplete exception message pattern, or NULL if none.
    *
    * @dataProvider providerArrayPropSchemaValidation
    */
-  public function testArrayPropSchemaValidation(array $prop_definition, array $expected_errors, ?string $expected_schema_exception = NULL): void {
+  public function testArrayPropSchemaValidation(array $prop_definition, array $expected_errors): void {
     // Enable canvas_dev_mode to unlock array type support.
     $this->enableModules(['canvas_dev_mode']);
 
@@ -1022,17 +1019,10 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
       'dataDependencies' => [],
     ]);
 
-    if ($expected_schema_exception !== NULL) {
-      $this->expectException(SchemaIncompleteException::class);
-      $this->expectExceptionMessageMatches($expected_schema_exception);
-    }
-
     $this->assertValidationErrors($expected_errors);
   }
 
   public static function providerArrayPropSchemaValidation(): \Generator {
-    // @todo Fix schema issues in https://www.drupal.org/i/3572553 then update
-    //   these test cases to expect no exceptions.
     yield 'Valid: string array prop' => [
       [
         'type' => 'array',
@@ -1041,7 +1031,6 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
         'examples' => [['tag1', 'tag2']],
       ],
       [],
-      '/props\.array_prop\.examples\.0\.\d+ missing schema/',
     ];
 
     yield 'Valid: integer array prop' => [
@@ -1052,7 +1041,6 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
         'examples' => [[1, 2, 3]],
       ],
       [],
-      '/props\.array_prop\.examples\.0\.\d+ missing schema/',
     ];
 
     yield 'Valid: limited cardinality (maxItems)' => [
@@ -1064,21 +1052,99 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
         'examples' => [['a', 'b']],
       ],
       [],
-      '/props\.array_prop\.examples\.0\.\d+ missing schema/',
     ];
 
     yield 'Invalid: missing items schema' => [
       [
         'type' => 'array',
         'title' => 'Missing Items',
-        'examples' => [['a', 'b']],
+        // No examples - when items is missing, examples can't be validated
+        // since the type resolution depends on items.type.
       ],
       [
         '' => 'Drupal Canvas does not know of a field type/widget to allow populating the <code>array_prop</code> prop, with the shape <code>{"type":"array"}</code>.',
         'props.array_prop' => "'items' is a required key because props.array_prop.type is array (see config schema type canvas.json_schema.prop.array).",
       ],
-      '/props\.array_prop\.examples\.0\.\d+ missing schema/',
     ];
+
+    yield 'Invalid: integer array with string examples' => [
+      [
+        'type' => 'array',
+        'title' => 'Scores',
+        'items' => ['type' => 'integer'],
+        'examples' => [['not', 'integers']],
+      ],
+      [
+        'props.array_prop.examples.0.0' => 'This value should be of the correct primitive type.',
+        'props.array_prop.examples.0.1' => 'This value should be of the correct primitive type.',
+      ],
+    ];
+
+    yield 'Invalid: number array with string examples' => [
+      [
+        'type' => 'array',
+        'title' => 'Prices',
+        'items' => ['type' => 'number'],
+        'examples' => [['not', 'numbers']],
+      ],
+      [
+        'props.array_prop.examples.0.0' => 'This value should be of the correct primitive type.',
+        'props.array_prop.examples.0.1' => 'This value should be of the correct primitive type.',
+      ],
+    ];
+
+    yield 'Valid: object array prop' => [
+      [
+        'type' => 'array',
+        'title' => 'Images',
+        'items' => [
+          'type' => 'object',
+          '$ref' => 'json-schema-definitions://canvas.module/image',
+        ],
+        'examples' => [
+          [
+            [
+              'src' => 'https://example.com/image1.png',
+              'alt' => 'First image',
+              'width' => 800,
+              'height' => 600,
+            ],
+            [
+              'src' => 'https://example.com/image2.png',
+              'alt' => 'Second image',
+              'width' => 1200,
+              'height' => 900,
+            ],
+          ],
+        ],
+      ],
+      [],
+    ];
+
+    yield 'Invalid: object array with wrong keys' => [
+      [
+        'type' => 'array',
+        'title' => 'Images',
+        'items' => [
+          'type' => 'object',
+          '$ref' => 'json-schema-definitions://canvas.module/image',
+        ],
+        'examples' => [
+          [
+            [
+              // Missing required 'src', has invalid key 'url'.
+              'url' => 'https://example.com/image.png',
+              'alt' => 'Image',
+            ],
+          ],
+        ],
+      ],
+      [
+        'props.array_prop.examples.0.0' => "'src' is a required key.",
+        'props.array_prop.examples.0.0.url' => "'url' is not a supported key.",
+      ],
+    ];
+
   }
 
 }
