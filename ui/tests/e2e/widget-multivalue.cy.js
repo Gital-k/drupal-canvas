@@ -53,7 +53,7 @@ describe('Multivalue widget drag and drop', () => {
           expect(items).to.deep.equal(inputContent);
         });
     };
-    
+
     // Helper function to open popover for a specific row and type text.
     const typeInRow = (rowIndex, text) => {
       // Click the list item to open the popover.
