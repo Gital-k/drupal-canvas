@@ -39,6 +39,10 @@ export function parsePropValueForPreview(
       return Number(prop.example);
     case 'boolean':
       return String(prop.example) === 'true';
+    case 'array':
+      // For multi-value props, return the array as-is
+      // It should already be an array of the correct type (string[] | number[])
+      return Array.isArray(prop.example) ? prop.example : [];
     default:
       return prop.example as string;
   }

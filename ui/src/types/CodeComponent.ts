@@ -149,7 +149,14 @@ export interface CodeComponentSlotSerialized {
   examples?: string[];
 }
 
-export type CodeComponentPropPreviewValue = string | number | boolean;
+export type CodeComponentPropPreviewValue =
+  | string
+  | number
+  | boolean
+  | string[]
+  | number[]
+  | CodeComponentPropImageExample[]
+  | CodeComponentPropVideoExample[];
 
 export interface AssetLibrary {
   id: string;
