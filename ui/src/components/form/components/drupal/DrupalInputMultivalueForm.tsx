@@ -40,6 +40,8 @@ const DrupalInputMultivalueForm = ({
   const [displayValue, setDisplayValue] = useState<string>(
     initialValue as string,
   );
+  // Temporary value for the popover input (only committed on Enter).
+  const [tempValue, setTempValue] = useState<string>(initialValue as string);
   const inputWrapperRef = useRef<HTMLDivElement | null>(null);
   // Ref for the trigger area that lives inside the actual table row.
   const triggerRowRef = useRef<HTMLDivElement | null>(null);
@@ -51,14 +53,20 @@ const DrupalInputMultivalueForm = ({
   useEffect(() => {
     const newValue = attributes.value || attributes.defaultValue || '';
     setDisplayValue(newValue as string);
+    setTempValue(newValue as string);
   }, [attributes.value, attributes.defaultValue]);
 
-  // Handle input changes - update local state and sync with hidden input
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value;
+  // Handle temporary input changes in popover (not committed until Enter).
+  const handleTempInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setTempValue(e.target.value);
+  };
+
+  // Commit the temporary value to the actual input and display.
+  const handleCommitValue = () => {
+    const newValue = tempValue;
     setDisplayValue(newValue);
 
-    // Update the hidden real input field to keep it in sync
+    // Update the hidden real input field to keep it in sync.
     if (inputWrapperRef.current) {
       const realInput = inputWrapperRef.current.querySelector(
         'input',
@@ -69,13 +77,35 @@ const DrupalInputMultivalueForm = ({
           'value',
         )?.set;
         nativeInputValueSetter?.call(realInput, newValue);
-        // Trigger both input and change events so React and Drupal handlers are notified
+        // Trigger both input and change events so React and Drupal handlers are notified.
         const inputEvent = new Event('input', { bubbles: true });
         const changeEvent = new Event('change', { bubbles: true });
         realInput.dispatchEvent(inputEvent);
         realInput.dispatchEvent(changeEvent);
       }
     }
+  };
+
+  // Handle Enter key press in popover input.
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleCommitValue();
+      setPopoverOpen(false);
+    }
+  };
+
+  // Handle popover open/close - reset tempValue when opening, 
+  // revert when closing without commit.
+  const handlePopoverOpenChange = (open: boolean) => {
+    if (open) {
+      // When opening, set tempValue to current displayValue.
+      setTempValue(displayValue);
+    } else {
+      // When closing, revert tempValue to displayValue (discards uncommitted changes).
+      setTempValue(displayValue);
+    }
+    setPopoverOpen(open);
   };
 
   const handleRemove = () => {
@@ -148,7 +178,7 @@ const DrupalInputMultivalueForm = ({
         />
       </Box>
 
-      <Popover.Root open={popoverOpen} onOpenChange={setPopoverOpen}>
+      <Popover.Root open={popoverOpen} onOpenChange={handlePopoverOpenChange}>
         <Flex
           ref={triggerRowRef}
           align="center"
@@ -196,8 +226,9 @@ const DrupalInputMultivalueForm = ({
                 : {})}
               {...{
                 attributes: {
-                  value: displayValue,
-                  onChange: handleInputChange,
+                  value: tempValue,
+                  onChange: handleTempInputChange,
+                  onKeyDown: handleKeyDown,
                   type: 'text',
                   placeholder: attributes.placeholder,
                 },
