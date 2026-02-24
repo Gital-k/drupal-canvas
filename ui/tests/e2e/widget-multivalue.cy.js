@@ -38,25 +38,41 @@ describe('Multivalue widget drag and drop', () => {
         });
     };
 
-    // Confirms the contents of every text input in the table.
+    // Confirms the contents of every text input in the table by checking
+    // the list item text content (visible in the collapsed state).
     const confirmTextInputs = (inputContent) => {
       cy.get('@unlimited-text')
-        .findAllByRole('textbox')
-        .then(($items) => {
+        .find('tbody tr')
+        .then(($rows) => {
           const items = [];
-          $items.each((ix, el) => {
-            items.push(el.value);
+          $rows.each((ix, row) => {
+            // Get the text content from the list item (excluding the empty state).
+            const text = Cypress.$(row).find('.itemText').text().trim();
+            items.push(text === 'Empty' ? '' : text);
           });
           expect(items).to.deep.equal(inputContent);
         });
     };
-    cy.get('@unlimited-text').findAllByRole('textbox').should('have.length', 2);
+    
+    // Helper function to open popover for a specific row and type text.
+    const typeInRow = (rowIndex, text) => {
+      // Click the list item to open the popover.
+      cy.get('@unlimited-text')
+        .find('tbody tr')
+        .eq(rowIndex)
+        .find('.listItem')
+        .click();
+      // Type in the input field that appears in the popover.
+      cy.get('[role="dialog"]').find('input[type="text"]').clear();
+      cy.get('[role="dialog"]').find('input[type="text"]').type(text);
+      // Close the popover by clicking outside or pressing Escape.
+      cy.get('body').type('{esc}');
+    };
+
+    cy.get('@unlimited-text').find('tbody tr').should('have.length', 2);
     confirmTextInputs(['Marshmallow Coast', '']);
     // Populate the empty second item.
-    cy.get('@unlimited-text')
-      .findAllByRole('textbox')
-      .eq(1)
-      .type('Neutral Milk Hotel');
+    typeInRow(1, 'Neutral Milk Hotel');
     confirmTextInputs(['Marshmallow Coast', 'Neutral Milk Hotel']);
 
     // Adding another item puts the focus on the last added item. Blurring this
@@ -85,13 +101,10 @@ describe('Multivalue widget drag and drop', () => {
     cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
     // Wait for ajax behaviors to finish.
     cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
-    cy.get('@unlimited-text').findAllByRole('textbox').should('have.length', 3);
+    cy.get('@unlimited-text').find('tbody tr').should('have.length', 3);
 
     // Populate the new item.
-    cy.get('@unlimited-text')
-      .findAllByRole('textbox')
-      .eq(2)
-      .type('The Olivia Tremor Control');
+    typeInRow(2, 'The Olivia Tremor Control');
     confirmWeightSelectCount(3);
     waitForPreview();
     cy.waitForAjax();
@@ -104,7 +117,7 @@ describe('Multivalue widget drag and drop', () => {
 
     cy.log('Move "item 3" to position 2');
     // Ensure the drop target is in the viewport.
-    cy.get('@unlimited-text').findAllByRole('textbox').eq(0).scrollIntoView();
+    cy.get('@unlimited-text').find('tbody tr').eq(0).scrollIntoView();
 
     const dndDefaults = {
       position: 'topLeft',
@@ -120,7 +133,10 @@ describe('Multivalue widget drag and drop', () => {
     };
     cy.get(
       '[data-drupal-selector="edit-field-cvt-unlimited-text"] tr.draggable:nth-child(3) [title="Change order"]',
-    ).realDnd('input[value="Neutral Milk Hotel"]', dndDefaults);
+    ).realDnd(
+      '[data-drupal-selector="edit-field-cvt-unlimited-text"] tr.draggable:nth-child(2)',
+      dndDefaults,
+    );
     // Wait for table drag AJAX to complete before asserting the new order.
     cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
     cy.waitForAjax();
@@ -137,16 +153,13 @@ describe('Multivalue widget drag and drop', () => {
     cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
     // Wait for ajax behaviors to finish.
     cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
-    cy.get('@unlimited-text').findAllByRole('textbox').should('have.length', 4);
+    cy.get('@unlimited-text').find('tbody tr').should('have.length', 4);
 
     cy.log(
       'Move an item that has been entered but "Add new item" is not clicked yet',
     );
 
-    cy.get('@unlimited-text')
-      .findAllByRole('textbox')
-      .eq(3)
-      .type('The Music Tapes');
+    typeInRow(3, 'The Music Tapes');
     waitForPreview();
     cy.waitForAjax();
 
@@ -171,16 +184,21 @@ describe('Multivalue widget drag and drop', () => {
     ]);
 
     // Ensure the drop target is in the viewport.
-    cy.get('@unlimited-text').findAllByRole('textbox').eq(0).scrollIntoView();
+    cy.get('@unlimited-text').find('tbody tr').eq(0).scrollIntoView();
     cy.get(
       '[data-drupal-selector="edit-field-cvt-unlimited-text"] tr.draggable:nth-child(4) [title="Change order"]',
-    ).realDnd('input[value="Neutral Milk Hotel"]', dndDefaults);
+    ).realDnd(
+      '[data-drupal-selector="edit-field-cvt-unlimited-text"] tr.draggable:nth-child(3)',
+      dndDefaults,
+    );
     cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
     cy.waitForAjax();
+    // Verify the new order by checking the text at position 2 (zero-indexed).
     cy.get('@unlimited-text')
-      .findAllByRole('textbox')
+      .find('tbody tr')
       .eq(2)
-      .should('have.value', 'The Music Tapes');
+      .find('.itemText')
+      .should('have.text', 'The Music Tapes');
 
     confirmTextInputs([
       'Marshmallow Coast',
