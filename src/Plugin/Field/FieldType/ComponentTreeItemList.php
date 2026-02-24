@@ -457,7 +457,7 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
       $uuid = $item->getUuid();
       $component = $components[$component_id];
       \assert($component instanceof Component);
-      $component->loadVersion($item->getComponentVersion());
+      $component = $component->loadVersion($item->getComponentVersion());
 
       // Rendering always happens using the live implementation of a component,
       // so load the active version to determine the required props.
@@ -466,7 +466,7 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
         ->getComponentSource()
         ->getDefaultExplicitInput(only_required: TRUE);
       // Avoid side effects.
-      $component->loadVersion($item->getComponentVersion());
+      $component = $component->loadVersion($item->getComponentVersion());
 
       $source = $component->getComponentSource();
       $hydrated[$uuid] = [

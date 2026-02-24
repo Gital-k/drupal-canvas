@@ -129,7 +129,7 @@ class ComponentTest extends CanvasKernelTestBase {
         'media',
         'media_library',
       ],
-    ], $updated_component->getDependencies());
+    ], $updated_component->calculateDependencies()->getDependencies());
     self::assertSame([
       'config' => [
         'image.style.canvas_parametrized_width',
@@ -154,7 +154,7 @@ class ComponentTest extends CanvasKernelTestBase {
     // ::calculateDependencies() again causes ::getDependencies() to return only
     // the dependencies of THAT version. ⚠️
     self::assertTrue($updated_component->isLoadedVersionActiveVersion());
-    $updated_component->loadVersion('f4d1c916802ab8db');
+    $updated_component = $updated_component->loadVersion('f4d1c916802ab8db');
     self::assertFalse($updated_component->isLoadedVersionActiveVersion());
     $this->assertSame('image', $updated_component->getSettings()['prop_field_definitions']['image']['field_type']);
     self::assertSame([
@@ -185,7 +185,7 @@ class ComponentTest extends CanvasKernelTestBase {
         'media_library',
       ],
     ], $updated_component->calculateDependencies()->getDependencies());
-    $updated_component->loadVersion($updated_expected_version);
+    $updated_component = $updated_component->loadVersion($updated_expected_version);
     self::assertTrue($updated_component->isLoadedVersionActiveVersion());
 
     // Finally, because no component instances exist that use the old version,

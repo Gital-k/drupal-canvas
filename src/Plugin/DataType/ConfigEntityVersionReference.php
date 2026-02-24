@@ -95,7 +95,7 @@ final class ConfigEntityVersionReference extends EntityReference {
       ) {
         // A non-default version is referenced, so load that one.
         try {
-          $entity->loadVersion($this->version);
+          $entity = $entity->loadVersion($this->version);
         }
         catch (\OutOfRangeException) {
           // Validation will catch this.

@@ -666,7 +666,7 @@ class ComponentTreeItem extends FieldItemBase {
     // @see \Drupal\canvas\Entity\Component::save()
     $version = $this->get('component_version')->getValue();
     if ($version && in_array($version, $component?->getVersions() ?? [], TRUE)) {
-      $component?->loadVersion($version);
+      $component = $component?->loadVersion($version);
     }
     $source = $component?->getComponentSource();
     if ($source === NULL) {

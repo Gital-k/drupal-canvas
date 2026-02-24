@@ -28,7 +28,7 @@ final class ComponentWithRichTextShouldUseProcessedUpdateTest extends CanvasUpda
     $component = Component::load($component_id);
     self::assertInstanceOf(Component::class, $component);
     foreach ($component->getVersions() as $version) {
-      $component->loadVersion($version);
+      $component = $component->loadVersion($version);
       self::assertSame($expected_expression, $component->getSettings()['prop_field_definitions'][$prop_name]['expression']);
     }
   }

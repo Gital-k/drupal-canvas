@@ -43,7 +43,7 @@ function canvas_load_allowed_values_for_component_prop(FieldStorageDefinitionInt
     return [];
   }
 
-  $component->loadVersion($component_version);
+  $component = $component->loadVersion($component_version);
 
   // StaticPropSources are only used for ComponentSources with a generated input
   // UX using fields.

@@ -47,7 +47,7 @@ final class ComponentMultiBundleReferencePropExpressionsUpdateTest extends Canva
     $component = Component::load($component_id);
     self::assertInstanceOf(Component::class, $component);
     foreach ($component->getVersions() as $version) {
-      $component->loadVersion($version);
+      $component = $component->loadVersion($version);
       self::assertSame($expected_expression, $component->getSettings()['prop_field_definitions'][$prop_name]['expression'], \sprintf("Expected expression not found for version %s", $version));
     }
   }
@@ -145,11 +145,13 @@ final class ComponentMultiBundleReferencePropExpressionsUpdateTest extends Canva
     $sdc_with_image_object_prop_shape = Component::load('sdc.canvas_test_sdc.image');
     self::assertNotNull($sdc_with_image_object_prop_shape);
     self::assertSame([self::EXPECTED_ORIGINAL_SINGLE_BUNDLE_IMAGE_OBJECT_VERSION], $sdc_with_image_object_prop_shape->getVersions());
-    self::assertSame(self::EXPECTED_ORIGINAL_SINGLE_BUNDLE_IMAGE_OBJECT_EXPRESSION, $sdc_with_image_object_prop_shape->loadVersion(self::EXPECTED_ORIGINAL_SINGLE_BUNDLE_IMAGE_OBJECT_VERSION)->getSettings()['prop_field_definitions']['image']['expression']);
+    $sdc_with_image_object_prop_shape = $sdc_with_image_object_prop_shape->loadVersion(self::EXPECTED_ORIGINAL_SINGLE_BUNDLE_IMAGE_OBJECT_VERSION);
+    self::assertSame(self::EXPECTED_ORIGINAL_SINGLE_BUNDLE_IMAGE_OBJECT_EXPRESSION, $sdc_with_image_object_prop_shape->getSettings()['prop_field_definitions']['image']['expression']);
     $sdc_with_image_uri_shape = Component::load('sdc.canvas_test_sdc.card-with-stream-wrapper-image');
     self::assertNotNull($sdc_with_image_uri_shape);
     self::assertSame([self::EXPECTED_ORIGINAL_SINGLE_BUNDLE_IMAGE_URI_VERSION], $sdc_with_image_uri_shape->getVersions());
-    self::assertSame(self::EXPECTED_ORIGINAL_SINGLE_BUNDLE_IMAGE_URI_EXPRESSION, $sdc_with_image_uri_shape->loadVersion(self::EXPECTED_ORIGINAL_SINGLE_BUNDLE_IMAGE_URI_VERSION)->getSettings()['prop_field_definitions']['src']['expression']);
+    $sdc_with_image_uri_shape = $sdc_with_image_uri_shape->loadVersion(self::EXPECTED_ORIGINAL_SINGLE_BUNDLE_IMAGE_URI_VERSION);
+    self::assertSame(self::EXPECTED_ORIGINAL_SINGLE_BUNDLE_IMAGE_URI_EXPRESSION, $sdc_with_image_uri_shape->getSettings()['prop_field_definitions']['src']['expression']);
 
     // To test a multi-bundle scenario, create a second "image" media type, and
     // update both test SDCs to use multi-bundle expressions as they would have

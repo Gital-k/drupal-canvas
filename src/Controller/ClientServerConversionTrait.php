@@ -148,7 +148,7 @@ trait ClientServerConversionTrait {
         continue;
       }
       \assert($component instanceof ComponentInterface);
-      $component->loadVersion($version);
+      $component = $component->loadVersion($version);
       $source = $component->getComponentSource();
       $useFallback = $component->getComponentSource()->isBroken();
       // First we transform the incoming client model into input values using

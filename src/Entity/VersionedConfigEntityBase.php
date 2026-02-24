@@ -54,6 +54,7 @@ abstract class VersionedConfigEntityBase extends ConfigEntityBase implements Ver
     if ($version !== $this->loadedVersion) {
       \assert(isset($this->versioned_properties));
       $this->assertVersionExists($version);
+
       $versioned = clone $this;
       $versioned->loadedVersion = $version;
 
@@ -262,23 +263,20 @@ abstract class VersionedConfigEntityBase extends ConfigEntityBase implements Ver
     return $this;
   }
 
+  public function calculateParentDependencies(): static {
+    parent::calculateDependencies();
+    return $this;
+  }
+
   /**
    * {@inheritdoc}
    */
   public function getVersionSpecificDependencies(string $version): array {
-    $current_dependencies = $this->dependencies;
-    $current_version = $this->getLoadedVersion();
-
-    $this->loadVersion($version);
-    parent::calculateDependencies();
-    $dependencies = $this->dependencies;
-
-    // Restore original state.
-    $this->loadVersion($current_version);
-    $this->dependencies = $current_dependencies;
+    $versioned = $this->loadVersion($version);
+    $versioned->calculateParentDependencies();
 
     /** @var ConfigDependenciesArray */
-    return $dependencies;
+    return $versioned->dependencies;
   }
 
   /**

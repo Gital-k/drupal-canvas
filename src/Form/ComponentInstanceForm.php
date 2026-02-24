@@ -93,7 +93,7 @@ final class ComponentInstanceForm extends FormBase {
     // allows older component instances to continue to use older/previous
     // component-source specific settings, such as the field type/widget for a
     // particular SDC or code component prop.
-    $component->loadVersion($version);
+    $component = $component->loadVersion($version);
     if ($request->query->has('form_canvas_selected')) {
       $component_instance_uuid = $request->query->getString('form_canvas_selected');
     }
