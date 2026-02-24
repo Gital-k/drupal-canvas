@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource;
 
+use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
+use Drupal\canvas\Controller\ApiConfigControllers;
 use Drupal\canvas\Controller\ClientServerConversionTrait;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ComponentInterface;
@@ -65,7 +67,7 @@ final class JsComponentEvolutionTest extends CanvasKernelTestBase {
     'canvas_test_code_components',
   ];
 
-  protected function reloadJavascriptComponent(): JavascriptComponent {
+  protected function reloadJavascriptComponent(): JavaScriptComponent {
     /** @var \Drupal\canvas\Entity\JavaScriptComponent */
     return \Drupal::entityTypeManager()->getStorage(JavaScriptComponent::ENTITY_TYPE_ID)->loadUnchanged(self::JAVASCRIPT_COMPONENT_ID);
   }
@@ -461,6 +463,26 @@ final class JsComponentEvolutionTest extends CanvasKernelTestBase {
         ],
       ],
     ], canAutoUpdate: TRUE, withChild: TRUE);
+  }
+
+  public function testCodeComponentCanRemoveRequiredPropAndStillRenderPreviews(): void {
+    $js_component = $this->reloadJavascriptComponent();
+    $props = $js_component->getProps();
+    \assert(\is_array($props));
+    self::assertArrayHasKey('name', $props);
+    $required = $js_component->getRequiredProps();
+    self::assertContains('name', $required);
+    unset($props['name']);
+    $js_component->set('required', []);
+    $js_component->setProps($props);
+    self::assertCount(0, $js_component->getTypedData()->validate());
+
+    $autoSaveManager = \Drupal::service(AutoSaveManager::class);
+    \assert($autoSaveManager instanceof AutoSaveManager);
+    $autoSaveManager->saveEntity($js_component);
+
+    // Component previews will still work.
+    \Drupal::classResolver(ApiConfigControllers::class)->list(Component::ENTITY_TYPE_ID);
   }
 
   protected function removeNamePropAndAddAgeProp(bool $usingHttpRequest = FALSE, bool $required = FALSE): void {

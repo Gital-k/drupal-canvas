@@ -26,7 +26,7 @@ use Symfony\Component\HttpFoundation\Request;
 
 /**
  * @coversClass \Drupal\canvas\Form\ComponentInstanceForm
- * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::buildConfigurationForm()
+ * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::buildComponentInstanceForm
  * @group canvas
  */
 #[RunTestsInSeparateProcesses]
@@ -310,6 +310,8 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
           \assert(\array_key_exists('label', $suggestion));
           return $suggestion;
         }
+        \assert(\is_array($label));
+        \assert(\array_key_exists('items', $suggestion) && \is_array($suggestion['items']));
         return self::findSuggestionByLabel(array_slice($label, 1), $prop, $suggestion['items']);
       }
     }

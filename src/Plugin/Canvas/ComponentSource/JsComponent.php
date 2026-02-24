@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Plugin\Canvas\ComponentSource;
 
+use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
+use Drupal\Component\Assertion\Inspector;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Config\Entity\ConfigEntityStorageInterface;
+use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Extension\ExtensionPathResolver;
 use Drupal\Core\File\FileUrlGeneratorInterface;
 use Drupal\Core\GeneratedUrl;
@@ -146,7 +149,20 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
   public function renderComponent(array $inputs, array $slot_definitions, string $componentUuid, bool $isPreview = FALSE): array {
     $component = $this->getJavaScriptComponent();
 
-    $autoSave = $this->autoSaveManager->getAutoSaveEntity($component);
+    // Rendering will validate the props against the version that is published,
+    // but on preview the auto-saved version will be used for those components
+    // whose implementation lives in config entities (e.g. for JS Components,
+    // but not SDCs). This means that required props might be mismatched, so we
+    // need to ensure there are explicit inputs for the set of props that are
+    // required in any of those.
+    if ($isPreview) {
+      $published_required_props = $this->getDefaultExplicitInput(only_required: TRUE);
+      \assert(Inspector::assertAllHaveKey($published_required_props, 'value'));
+      $published_required_props = \array_map(fn(array $prop_source) => new EvaluationResult($prop_source['value']), $published_required_props);
+      [$published_required_props, $published_required_props_cacheability] = self::getResolvedPropsAndCacheability(\array_intersect_key($inputs[self::EXPLICIT_INPUT_NAME] ?? [], $published_required_props));
+    }
+
+    $autoSave = $this->loadAutoSaveEntity($component, $isPreview);
     $component_url = $component->getComponentUrl($this->fileUrlGenerator, $isPreview);
 
     $build = [];
@@ -202,6 +218,14 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
     $valid_props = $component->getProps() ?? [];
 
     [$props, $props_cacheability] = self::getResolvedPropsAndCacheability(\array_intersect_key($inputs[self::EXPLICIT_INPUT_NAME] ?? [], $valid_props));
+
+    // Explicit inputs for required props for both the auto-saved version and
+    // the live versions, including cacheability.
+    if ($isPreview) {
+      $props += $published_required_props;
+      $props_cacheability->merge($published_required_props_cacheability);
+    }
+
     // Match SDC's developer-only validation of props.
     // @see \Drupal\Core\Template\ComponentsTwigExtension::validateProps()
     \assert($this->componentValidator->validateProps($props, $this->getComponentPlugin()));
@@ -284,7 +308,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
       }
       $seen[] = $js_component_dependency_name;
       \assert($js_component_dependency instanceof JavaScriptComponent);
-      $dependencyAutoSave = $this->autoSaveManager->getAutoSaveEntity($js_component_dependency);
+      $dependencyAutoSave = $this->loadAutoSaveEntity($js_component_dependency, $isPreview);
       $dependency_component_url = $js_component_dependency->getComponentUrl($this->fileUrlGenerator, $isPreview);
       $scoped_dependencies[$component_url]["@/components/{$js_component_dependency_name}"] = $js_component_dependency->getComponentUrl($this->fileUrlGenerator, $isPreview);
       $scoped_dependencies = array_merge($scoped_dependencies, $this->getScopedDependencies($js_component_dependency, $dependencyAutoSave, $isPreview, $seen));
@@ -306,7 +330,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
       }
       $seen[] = $js_component_dependency_name;
       \assert($js_component_dependency instanceof JavaScriptComponent);
-      $dependencyAutoSave = $this->autoSaveManager->getAutoSaveEntity($js_component_dependency);
+      $dependencyAutoSave = $this->loadAutoSaveEntity($js_component_dependency, $isPreview);
       $libraries[] = $js_component_dependency->getAssetLibrary($isPreview);
       $libraries = array_merge($libraries, $this->getDependencyLibraries($js_component_dependency, $dependencyAutoSave, $isPreview, $seen));
     }
@@ -316,6 +340,11 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
   public function setJavaScriptComponent(?JavaScriptComponent $jsComponent): static {
     $this->jsComponent = $jsComponent;
     return $this;
+  }
+
+  private function loadAutoSaveEntity(EntityInterface $entity, bool $isPreview): AutoSaveEntity {
+    // If we are not previewing then we never need to load the auto-save data.
+    return $isPreview ? $this->autoSaveManager->getAutoSaveEntity($entity) : AutoSaveEntity::empty();
   }
 
 }
