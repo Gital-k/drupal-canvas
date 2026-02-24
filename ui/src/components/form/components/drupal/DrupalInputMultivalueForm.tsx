@@ -95,7 +95,7 @@ const DrupalInputMultivalueForm = ({
     }
   };
 
-  // Handle popover open/close - reset tempValue when opening, 
+  // Handle popover open/close - reset tempValue when opening,
   // revert when closing without commit.
   const handlePopoverOpenChange = (open: boolean) => {
     if (open) {
