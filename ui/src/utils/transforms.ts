@@ -216,9 +216,11 @@ const link: Transformer<
   return returnValue[0] ?? null;
 };
 
-const entityAutocompleteTargetId: Transformer<void, null | string, null | string> = (
-  value,
-) => {
+const entityAutocompleteTargetId: Transformer<
+  void,
+  null | string,
+  null | string
+> = (value) => {
   if (value === null) {
     return null;
   }
