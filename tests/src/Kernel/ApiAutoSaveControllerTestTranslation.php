@@ -14,6 +14,7 @@ use Drupal\KernelTests\KernelTestBase;
 use Drupal\Tests\block\Traits\BlockCreationTrait;
 use Drupal\Tests\canvas\Kernel\Traits\RequestTrait;
 use Drupal\Tests\canvas\Kernel\Traits\VfsPublicStreamUrlTrait;
+use Drupal\Tests\canvas\TestSite\CanvasTestSetup;
 use Drupal\Tests\canvas\Traits\AutoSaveManagerTestTrait;
 use Drupal\Tests\canvas\Traits\AutoSaveRequestTestTrait;
 use Drupal\Tests\canvas\Traits\CanvasFieldCreationTrait;
@@ -61,21 +62,20 @@ final class ApiAutoSaveControllerTestTranslation extends KernelTestBase {
     parent::setUp();
     $this->installEntitySchema('path_alias');
     // @todo Remove this setup once refactored https://www.drupal.org/project/canvas/issues/3531679
-    (new \Drupal\Tests\canvas\TestSite\CanvasTestSetup())->setup();
+    (new CanvasTestSetup())->setup();
   }
 
   /**
-   * @covers ::get
-   *
    * Verify GET returns auto-saved Page translations with the correct langcode.
    */
   public function testGetTranslations(): void {
     $this->installConfig(['test_user_config']);
 
-    /** @var AutoSaveManager $autoSave */
+    /** @var \Drupal\canvas\AutoSave\AutoSaveManager $autoSave */
     $autoSave = $this->container->get(AutoSaveManager::class);
 
     $account = $this->createUser([Page::EDIT_PERMISSION]);
+    \assert($account !== FALSE);
     $this->setCurrentUser($account);
 
     // Create a Page with an English source and a French translation.
@@ -121,12 +121,10 @@ final class ApiAutoSaveControllerTestTranslation extends KernelTestBase {
   }
 
   /**
-   * @covers ::post
-   *
    * Verify POST publishes the correct auto-saved Page translation.
    */
   public function testPostTranslations(): void {
-    /** @var AutoSaveManager $autoSave */
+    /** @var \Drupal\canvas\AutoSave\AutoSaveManager $autoSave */
     $autoSave = $this->container->get(AutoSaveManager::class);
 
     $this->setUpCurrentUser(permissions: [
@@ -188,12 +186,10 @@ final class ApiAutoSaveControllerTestTranslation extends KernelTestBase {
   }
 
   /**
-   * @covers ::delete
-   *
-   * Verify DELETE at language-prefixed URL deletes only the specified translation auto-save.
+   * Verify DELETE deletes only the specified translation auto-save.
    */
   public function testDeleteTranslations(): void {
-    /** @var AutoSaveManager $autoSave */
+    /** @var \Drupal\canvas\AutoSave\AutoSaveManager $autoSave */
     $autoSave = $this->container->get(AutoSaveManager::class);
 
     $this->setUpCurrentUser(permissions: [
