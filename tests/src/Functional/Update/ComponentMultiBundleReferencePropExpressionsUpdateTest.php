@@ -47,8 +47,7 @@ final class ComponentMultiBundleReferencePropExpressionsUpdateTest extends Canva
     $component = Component::load($component_id);
     self::assertInstanceOf(Component::class, $component);
     foreach ($component->getVersions() as $version) {
-      $component = $component->loadVersion($version);
-      self::assertSame($expected_expression, $component->getSettings()['prop_field_definitions'][$prop_name]['expression'], \sprintf("Expected expression not found for version %s", $version));
+      self::assertSame($expected_expression, $component->loadVersion($version)->getSettings()['prop_field_definitions'][$prop_name]['expression'], \sprintf("Expected expression not found for version %s", $version));
     }
   }
 
