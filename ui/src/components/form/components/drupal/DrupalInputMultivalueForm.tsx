@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { ArrowRightIcon, Cross2Icon, TrashIcon } from '@radix-ui/react-icons';
 import { Box, Button, Flex, Popover, Text } from '@radix-ui/themes';
@@ -47,10 +47,33 @@ const DrupalInputMultivalueForm = ({
   const [popoverOpen, setPopoverOpen] = useState(false);
   const fieldLabel = attributes['data-field-label'] || '';
 
-  // Handle input changes - update both local state and call original onChange
+  // Sync displayValue with attributes.value when it changes (e.g., after AJAX updates)
+  useEffect(() => {
+    const newValue = attributes.value || attributes.defaultValue || '';
+    setDisplayValue(newValue as string);
+  }, [attributes.value, attributes.defaultValue]);
+
+  // Handle input changes - update local state and sync with hidden input
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
     setDisplayValue(newValue);
+
+    // Update the hidden real input field to keep it in sync
+    if (inputWrapperRef.current) {
+      const realInput = inputWrapperRef.current.querySelector('input') as HTMLInputElement | null;
+      if (realInput && realInput.value !== newValue) {
+        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+          HTMLInputElement.prototype,
+          'value',
+        )?.set;
+        nativeInputValueSetter?.call(realInput, newValue);
+        // Trigger both input and change events so React and Drupal handlers are notified
+        const inputEvent = new Event('input', { bubbles: true });
+        const changeEvent = new Event('change', { bubbles: true });
+        realInput.dispatchEvent(inputEvent);
+        realInput.dispatchEvent(changeEvent);
+      }
+    }
   };
 
   const handleRemove = () => {
@@ -107,64 +130,80 @@ const DrupalInputMultivalueForm = ({
   };
 
   return (
-    <Popover.Root open={popoverOpen} onOpenChange={setPopoverOpen}>
-      <Flex
-        ref={triggerRowRef}
-        align="center"
-        gap="2"
-        className={styles.itemRow}
-      >
-        {/* List Item View - Trigger */}
-        <Popover.Trigger>
-          <Box className={styles.listItem}>
-            <Text size="2" className={styles.itemText}>
-              {displayValue || 'Empty'}
+    <>
+      {/* Hidden input field for accessibility and form functionality */}
+      <Box ref={inputWrapperRef} style={{ position: 'absolute', left: '-9999px' }}>
+        <TextFieldWithBehaviors
+          {...(attributes.class ? { className: clsx(attributes.class) } : {})}
+          {...{
+            attributes: {
+              ...a2p(attributes, {}, { skipAttributes: ['class'] }),
+            },
+          }}
+        />
+      </Box>
+
+      <Popover.Root open={popoverOpen} onOpenChange={setPopoverOpen}>
+        <Flex
+          ref={triggerRowRef}
+          align="center"
+          gap="2"
+          className={styles.itemRow}
+        >
+          {/* List Item View - Trigger */}
+          <Popover.Trigger>
+            <Box className={styles.listItem}>
+              <Text size="2" className={styles.itemText}>
+                {displayValue || 'Empty'}
+              </Text>
+              <ArrowRightIcon className={styles.arrowIcon} />
+            </Box>
+          </Popover.Trigger>
+        </Flex>
+
+        {/* Edit Popover */}
+        <Popover.Content
+          side="left"
+          align="start"
+          sideOffset={6}
+          className={styles.popoverContent}
+          style={{ maxWidth: '232px' }}
+        >
+          {/* Popover Header */}
+          <Flex justify="between" align="center" className={styles.popoverHeader}>
+            <Text size="1" weight="medium" className={styles.popoverLabel}>
+              {fieldLabel}
             </Text>
-            <ArrowRightIcon className={styles.arrowIcon} />
+            <Popover.Close aria-label="Close">
+              <Cross2Icon />
+            </Popover.Close>
+          </Flex>
+
+          {/* Input Field - Visual duplicate for popover editing */}
+          <Box>
+            <TextField
+              {...(attributes.class ? { className: clsx(attributes.class) } : {})}
+              {...{
+                attributes: {
+                  value: displayValue,
+                  onChange: handleInputChange,
+                  type: 'text',
+                  placeholder: attributes.placeholder,
+                },
+              }}
+            />
           </Box>
-        </Popover.Trigger>
-      </Flex>
 
-      {/* Edit Popover */}
-      <Popover.Content
-        side="left"
-        align="start"
-        sideOffset={6}
-        className={styles.popoverContent}
-        style={{ maxWidth: '232px' }}
-      >
-        {/* Popover Header */}
-        <Flex justify="between" align="center" className={styles.popoverHeader}>
-          <Text size="1" weight="medium" className={styles.popoverLabel}>
-            {fieldLabel}
-          </Text>
-          <Popover.Close aria-label="Close">
-            <Cross2Icon />
-          </Popover.Close>
-        </Flex>
-
-        {/* Input Field */}
-        <Box ref={inputWrapperRef}>
-          <TextFieldWithBehaviors
-            {...{ className: clsx(attributes.class) }}
-            {...{
-              attributes: {
-                ...a2p(attributes, {}, { skipAttributes: ['class'] }),
-                onPostChange: handleInputChange,
-              },
-            }}
-          />
-        </Box>
-
-        {/* Remove Button */}
-        <Flex justify="center">
-          <Button variant="ghost" color="red" size="1" onClick={handleRemove}>
-            <TrashIcon />
-            Remove
-          </Button>
-        </Flex>
-      </Popover.Content>
-    </Popover.Root>
+          {/* Remove Button */}
+          <Flex justify="center">
+            <Button variant="ghost" color="red" size="1" onClick={handleRemove}>
+              <TrashIcon />
+              Remove
+            </Button>
+          </Flex>
+        </Popover.Content>
+      </Popover.Root>
+    </>
   );
 };
 
