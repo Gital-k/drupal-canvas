@@ -73,7 +73,7 @@ final class ApiLayoutController {
     );
     $this->regionsClientSideIds = array_combine($server_side_ids, \array_keys($theme_regions));
     $this->regions = array_combine($server_side_ids, $theme_regions);
-    \assert(array_key_exists(CanvasPageVariant::MAIN_CONTENT_REGION, $this->regions));
+    \assert(\array_key_exists(CanvasPageVariant::MAIN_CONTENT_REGION, $this->regions));
   }
 
   /**
@@ -142,6 +142,7 @@ final class ApiLayoutController {
         $entity = $items->getParent()?->getValue();
         \assert($entity instanceof ComponentTreeEntityInterface || $entity instanceof FieldableEntityInterface);
         if ($entity instanceof ComponentTreeEntityInterface) {
+          // @todo https://www.drupal.org/i/3498525 should generalize this to all eligible content entity types (aka FieldableEntityInterface)
           $entity->setComponentTree($items->getValue());
         }
         $this->autoSaveManager->saveEntity($entity);
