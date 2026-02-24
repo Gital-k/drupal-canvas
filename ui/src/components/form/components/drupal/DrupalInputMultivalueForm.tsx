@@ -60,7 +60,9 @@ const DrupalInputMultivalueForm = ({
 
     // Update the hidden real input field to keep it in sync
     if (inputWrapperRef.current) {
-      const realInput = inputWrapperRef.current.querySelector('input') as HTMLInputElement | null;
+      const realInput = inputWrapperRef.current.querySelector(
+        'input',
+      ) as HTMLInputElement | null;
       if (realInput && realInput.value !== newValue) {
         const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
           HTMLInputElement.prototype,
@@ -132,7 +134,10 @@ const DrupalInputMultivalueForm = ({
   return (
     <>
       {/* Hidden input field for accessibility and form functionality */}
-      <Box ref={inputWrapperRef} style={{ position: 'absolute', left: '-9999px' }}>
+      <Box
+        ref={inputWrapperRef}
+        style={{ position: 'absolute', left: '-9999px' }}
+      >
         <TextFieldWithBehaviors
           {...(attributes.class ? { className: clsx(attributes.class) } : {})}
           {...{
@@ -170,7 +175,11 @@ const DrupalInputMultivalueForm = ({
           style={{ maxWidth: '232px' }}
         >
           {/* Popover Header */}
-          <Flex justify="between" align="center" className={styles.popoverHeader}>
+          <Flex
+            justify="between"
+            align="center"
+            className={styles.popoverHeader}
+          >
             <Text size="1" weight="medium" className={styles.popoverLabel}>
               {fieldLabel}
             </Text>
@@ -182,7 +191,9 @@ const DrupalInputMultivalueForm = ({
           {/* Input Field - Visual duplicate for popover editing */}
           <Box>
             <TextField
-              {...(attributes.class ? { className: clsx(attributes.class) } : {})}
+              {...(attributes.class
+                ? { className: clsx(attributes.class) }
+                : {})}
               {...{
                 attributes: {
                   value: displayValue,
