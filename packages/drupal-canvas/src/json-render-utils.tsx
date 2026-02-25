@@ -246,6 +246,19 @@ function renderSpecElement(
 }
 
 /**
+ * Renders a json-render spec using the given component registry.
+ *
+ * @param spec - json-render spec to render
+ * @param registry - Component registry to use for rendering.
+ */
+export function renderSpec(
+  spec: Spec,
+  registry: ComponentRegistry,
+): React.ReactNode {
+  return renderSpecElement(spec.root, spec.elements, registry);
+}
+
+/**
  * Renders a Drupal Canvas component tree.
  *
  * @param components - Canvas component tree to render
@@ -256,5 +269,5 @@ export function renderCanvasTree(
   registry: ComponentRegistry,
 ): React.ReactNode {
   const spec = canvasTreeToSpec(components);
-  return renderSpecElement(spec.root, spec.elements, registry);
+  return renderSpec(spec, registry);
 }

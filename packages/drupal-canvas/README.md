@@ -237,37 +237,42 @@ const canvasComponentTree = specToCanvasTree(jsonRenderSpec);
 
 #### `renderCanvasTree`
 
-Renders a Canvas component tree. Requires a `ComponentRegistry` for mapping
-component IDs to React components. The synthetic `canvas:component-tree`
-wrapper used for multi-root trees is handled internally and renders
-transparently. Unknown component types render nothing.
-
-Returns a `Promise<React.ReactNode>`, so it must be consumed appropriately
-depending on the rendering context.
-
-**Server Component:**
+Renders a json-render spec generated from canvas component tree using `canvasTreeToSpec`. The synthetic `canvas:component-tree` wrapper
+used for multi-root trees is handled internally and renders transparently.
+Unknown component types render nothing.
 
 ```jsx
-import { JsonApiClient, renderCanvasTree } from 'drupal-canvas';
+import { renderSpec } from 'drupal-canvas';
 import registry from './registry';
 
-const client = new JsonApiClient();
+const spec = {
+  root: 'card',
+  elements: {
+    card: {
+      type: 'js.card',
+      props: { title: 'Hello' },
+      children: ['text'],
+    },
+    text: {
+      type: 'js.text',
+      props: { content: 'World' },
+    },
+  },
+};
 
-export default async function Page({ id }) {
-  const page = await client.getResource('canvas_page--canvas_page', id);
-  return renderCanvasTree(page.components, registry);
-}
+const rendered = renderSpec(spec, registry);
 ```
 
-**Client Component (React 19+):**
+### `renderCanvasTree`
 
-Use the [`use()`](https://react.dev/reference/react/use) hook. The component
-must be wrapped in a `<Suspense>` boundary by the caller.
+Renders a Canvas component tree. Requires a `ComponentRegistry` for mapping
+component IDs to React components. Converts the tree to a json-render spec
+internally using `canvasTreeToSpec` and delegates to `renderSpec`. Unknown
+component types render nothing.
 
 ```jsx
-import { use } from 'react';
-import useSWR from 'swr';
 import { JsonApiClient, renderCanvasTree } from 'drupal-canvas';
+import useSWR from 'swr';
 import registry from './registry';
 
 const client = new JsonApiClient();
@@ -279,7 +284,7 @@ export function CanvasPage({ id }) {
 
   if (!page) return null;
 
-  return use(renderCanvasTree(page.components, registry));
+  return renderCanvasTree(page.components, registry);
 }
 ```
 
