@@ -44,14 +44,36 @@ drupal-html-fragment {
 [data-canvas-layout-request-in-progress] [data-once="drupal-ajax"],
 [data-canvas-layout-request-in-progress] .use-ajax,
 [data-canvas-layout-request-in-progress] .use-ajax-submit{
+  /*background-color: #f8f9ff;*/
+  background: linear-gradient(
+    90deg,
+    #dfebf3 0%,
+    #b3d9ff 30%,
+    #a3c4ef 50%,
+    #b3d9ff 70%,
+    #cee4ef 100%
+  );
+  background-size: 200% 70%;
+  overflow: hidden;
+  animation: wave-gradient 1.6s ease-in-out infinite;
+  color: #575454;
   pointer-events: none;
   user-select: none;
-  opacity: 0.5;
+  opacity: .6;
+  &[type="submit"] {
+    border: 2px rgba(0,0,0,0.4) solid;
+    border-radius: 3px;
+  }
 }
 
 [data-canvas-layout-request-in-progress] [data-canvas-tabledrag="true"] {
   pointer-events: none;
   user-select: none;
+}
+
+@keyframes wave-gradient {
+  0%, 100% { background-position: 0% 15%; }
+  50% { background-position: 100% 15%; }
 }
 
 [data-invalid-prop-value][data-invalid-prop-value] {
