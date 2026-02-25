@@ -1,6 +1,7 @@
 export { discoverCodeComponents } from './discover';
-export { buildComponentRegistry } from './registry';
+export { loadComponentsMetadata } from './metadata';
 export type {
+  ComponentMetadata,
   DiscoveredComponent,
   DiscoveryOptions,
   DiscoveryResult,

@@ -33,3 +33,16 @@ export interface DiscoveryResult {
     ignoredFiles: number;
   };
 }
+
+/**
+ * Parsed component metadata from a component.yml file.
+ */
+export interface ComponentMetadata {
+  name: string;
+  machineName: string;
+  status: boolean;
+  description: string;
+  props: Record<string, unknown>;
+  required: string[];
+  slots: Record<string, { title: string; description?: string }>;
+}
