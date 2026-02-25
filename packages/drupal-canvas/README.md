@@ -182,7 +182,7 @@ multiple root components, wraps them in a synthetic `canvas:component-tree`
 element. Throws an error if the tree contains no root component.
 
 ```js
-import { canvasTreeToSpec } from 'drupal-canvas';
+import { canvasTreeToSpec } from 'drupal-canvas/json-render-utils';
 
 const components = [
   {
@@ -211,11 +211,11 @@ const jsonRenderSpec = canvasTreeToSpec(components);
 #### `specToCanvasTree`
 
 Converts a json-render spec back to a flat Drupal Canvas component tree.
-Generates new UUIDs for each node. Strips the synthetic `canvas:component-tree`
+Strips the synthetic `canvas:component-tree`
 wrapper if present, so multi-root trees round-trip cleanly.
 
 ```js
-import { specToCanvasTree } from 'drupal-canvas';
+import { specToCanvasTree } from 'drupal-canvas/json-render-utils';
 
 const jsonRenderSpec = {
   root: 'card',
@@ -235,14 +235,14 @@ const jsonRenderSpec = {
 const canvasComponentTree = specToCanvasTree(jsonRenderSpec);
 ```
 
-#### `renderCanvasTree`
+#### `renderSpec`
 
 Renders a json-render spec generated from canvas component tree using `canvasTreeToSpec`. The synthetic `canvas:component-tree` wrapper
 used for multi-root trees is handled internally and renders transparently.
 Unknown component types render nothing.
 
 ```jsx
-import { renderSpec } from 'drupal-canvas';
+import { renderSpec } from 'drupal-canvas/json-render-utils';
 import registry from './registry';
 
 const spec = {
@@ -263,7 +263,7 @@ const spec = {
 const rendered = renderSpec(spec, registry);
 ```
 
-### `renderCanvasTree`
+#### `renderCanvasTree`
 
 Renders a Canvas component tree. Requires a `ComponentRegistry` for mapping
 component IDs to React components. Converts the tree to a json-render spec
@@ -271,7 +271,8 @@ internally using `canvasTreeToSpec` and delegates to `renderSpec`. Unknown
 component types render nothing.
 
 ```jsx
-import { JsonApiClient, renderCanvasTree } from 'drupal-canvas';
+import { renderCanvasTree } from 'drupal-canvas/json-render-utils';
+import { JsonApiClient } from 'drupal-canvas';
 import useSWR from 'swr';
 import registry from './registry';
 
@@ -286,6 +287,44 @@ export function CanvasPage({ id }) {
 
   return renderCanvasTree(page.components, registry);
 }
+```
+
+#### `defineComponentRegistry`
+
+Defines a component registry by dynamically importing each component's
+JavaScript entry file. Accepts an array of objects with `name` and
+`jsEntryPath` — compatible with `DiscoveryResult.components` from
+`@drupal-canvas/component-discovery`. Each module's default export is
+expected to be a render function. Components without a JS entry or without
+a default function export are skipped.
+
+```js
+import { discoverCodeComponents } from '@drupal-canvas/component-discovery';
+import { defineComponentRegistry } from 'drupal-canvas/json-render-utils';
+
+const discovery = await discoverCodeComponents({ scanRoot: './src' });
+const registry = await defineComponentRegistry(discovery.components);
+```
+
+#### `defineComponentCatalog`
+
+Defines a complete [json-render](https://json-render.dev) catalog from
+component metadata. Converts props from JSON Schema (as defined in
+`component.yml`) to Zod schemas. The returned catalog can be used with
+`catalog.prompt()` for AI prompt generation, `catalog.validate()` for
+spec validation, etc.
+
+```js
+import {
+  discoverCodeComponents,
+  loadComponentsMetadata,
+} from '@drupal-canvas/component-discovery';
+import { defineComponentCatalog } from 'drupal-canvas/json-render-utils';
+
+const discovery = await discoverCodeComponents({ scanRoot: './src' });
+const metadata = await loadComponentsMetadata(discovery);
+const catalog = defineComponentCatalog(metadata);
+const systemPrompt = catalog.prompt();
 ```
 
 ## Base Components
