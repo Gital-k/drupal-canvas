@@ -101,7 +101,7 @@ export function canvasTreeToSpec(components: CanvasComponentTree): Spec {
 
   // A canvas component tree may have multiple top-level components.
   // Wrap them in a synthetic wrapper element so the spec has a single root.
-  // @see renderCanvasTree()
+  // @see renderSpec
   if (rootUuids.length > 1) {
     elements['canvas:component-tree'] = {
       type: 'canvas:component-tree',
@@ -218,7 +218,7 @@ function renderSpecElement(
   }
 
   // Transparent passthrough for the synthetic multi-root wrapper.
-  // @see canvasTreeToSpec()
+  // @see renderSpec
   if (element.type === 'canvas:component-tree') {
     const children = (element.children ?? []).map((k) =>
       renderSpecElement(k, elements, registry),
@@ -254,6 +254,7 @@ function renderSpecElement(
  *
  * @param spec - json-render spec to render
  * @param registry - Component registry to use for rendering.
+ * @see {@link defineComponentRegistry}
  */
 export function renderSpec(
   spec: Spec,
@@ -267,6 +268,7 @@ export function renderSpec(
  *
  * @param components - Canvas component tree to render
  * @param registry - Component registry to use for rendering.
+ * @see {@link defineComponentRegistry}
  */
 export function renderCanvasTree(
   components: CanvasComponentTree,
@@ -307,6 +309,43 @@ function metadataToCatalogEntry(metadata: ComponentMetadata) {
     slots: slotNames,
     description: metadata.description,
   };
+}
+
+/**
+ * Defines a component registry by dynamically importing each component's
+ * JavaScript entry file from the discovery results.
+ *
+ * @param components - Array of discovered components from `discoverCodeComponents()`
+ * @returns A component registry that can be passed to `renderCanvasTree()`
+ */
+export async function defineComponentRegistry(
+  components: { name: string; jsEntryPath: string | null }[],
+): Promise<ComponentRegistry> {
+  const registry: ComponentRegistry = {};
+
+  const entries = await Promise.all(
+    components
+      .filter(
+        (c): c is { name: string; jsEntryPath: string } =>
+          c.jsEntryPath !== null,
+      )
+      .map(async (c) => {
+        const mod: Record<string, unknown> = await import(c.jsEntryPath);
+        const renderFn = mod.default;
+        if (typeof renderFn !== 'function') {
+          return null;
+        }
+        return { name: c.name, renderFn } as const;
+      }),
+  );
+
+  for (const entry of entries) {
+    if (entry !== null) {
+      registry[entry.name] = entry.renderFn as ComponentRegistry[string];
+    }
+  }
+
+  return registry;
 }
 
 /**

@@ -22,7 +22,6 @@
     "type-check": "tsc --noEmit --pretty"
   },
   "dependencies": {
-    "drupal-canvas": "^0.2.0",
     "glob": "^13.0.1",
     "ignore": "^7.0.5",
     "yaml": "^2.8.0"

@@ -1,9 +1,10 @@
 import React from 'react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   canvasTreeToSpec,
   defineComponentCatalog,
+  defineComponentRegistry,
   renderCanvasTree,
   renderSpec,
   specToCanvasTree,
@@ -767,6 +768,66 @@ describe('renderCanvasTree', () => {
     );
   });
 });
+
+describe('defineComponentRegistry', () => {
+  it('should build a registry from components with JS entry paths', async () => {
+    const MyButton = (props: Record<string, unknown>) => (
+      <button>{props.label as string}</button>
+    );
+
+    vi.doMock('/fake/Button.js', () => ({ default: MyButton }));
+
+    const registry = await defineComponentRegistry([
+      { name: 'Button', jsEntryPath: '/fake/Button.js' },
+    ]);
+
+    expect(registry.Button).toBe(MyButton);
+
+    vi.doUnmock('/fake/Button.js');
+  });
+
+  it('should skip components with null jsEntryPath', async () => {
+    const registry = await defineComponentRegistry([
+      { name: 'NoEntry', jsEntryPath: null },
+    ]);
+
+    expect(registry).toEqual({});
+  });
+
+  it('should skip modules whose default export is not a function', async () => {
+    vi.doMock('/fake/NotAComponent.js', () => ({
+      default: 'not a function',
+    }));
+
+    const registry = await defineComponentRegistry([
+      { name: 'Bad', jsEntryPath: '/fake/NotAComponent.js' },
+    ]);
+
+    expect(registry).toEqual({});
+
+    vi.doUnmock('/fake/NotAComponent.js');
+  });
+
+  it('should handle a mix of valid and invalid components', async () => {
+    const ValidComp = () => <span>valid</span>;
+
+    vi.doMock('/fake/Valid.js', () => ({ default: ValidComp }));
+    vi.doMock('/fake/Invalid.js', () => ({ default: 42 }));
+
+    const registry = await defineComponentRegistry([
+      { name: 'Valid', jsEntryPath: '/fake/Valid.js' },
+      { name: 'Invalid', jsEntryPath: '/fake/Invalid.js' },
+      { name: 'NoPath', jsEntryPath: null },
+    ]);
+
+    expect(Object.keys(registry)).toEqual(['Valid']);
+    expect(registry.Valid).toBe(ValidComp);
+
+    vi.doUnmock('/fake/Valid.js');
+    vi.doUnmock('/fake/Invalid.js');
+  });
+});
+
 describe('defineComponentCatalog', () => {
   it('should create a catalog from component metadata', () => {
     const metadata: ComponentMetadata[] = [
