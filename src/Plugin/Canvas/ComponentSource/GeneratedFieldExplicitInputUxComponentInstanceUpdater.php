@@ -131,8 +131,7 @@ final class GeneratedFieldExplicitInputUxComponentInstanceUpdater implements Com
       if ($def['required'] !== TRUE) {
         continue;
       }
-      $component = $component->loadVersion($to_version);
-      $default_explicit_input = $component->getComponentSource()->getDefaultExplicitInput();
+      $default_explicit_input = $component->loadVersion($to_version)->getComponentSource()->getDefaultExplicitInput();
       // Required props must have an example value and hence a value in this
       // component's default explicit input.
       // @see \Drupal\canvas\ComponentMetadataRequirementsChecker
