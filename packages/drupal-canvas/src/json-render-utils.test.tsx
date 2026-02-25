@@ -526,6 +526,24 @@ describe('specToCanvasTree', () => {
 
     expect(new Set(uuids).size).toBe(uuids.length);
   });
+
+  it('should resolve $state prop expressions to literal values', () => {
+    const spec: Spec = {
+      root: 'heading',
+      elements: {
+        heading: {
+          type: 'Heading',
+          props: { text: { $state: '/title' }, level: 2 },
+        },
+      },
+      state: { title: 'Resolved Title' },
+    };
+
+    const result = specToCanvasTree(spec);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].inputs).toEqual({ text: 'Resolved Title', level: 2 });
+  });
 });
 
 describe('round-trip: canvasTreeToSpec → specToCanvasTree', () => {
@@ -715,6 +733,85 @@ describe('renderSpec', () => {
     expect(result).toEqual(
       <>{[<button>A</button>, <button>B</button>]}</>,
     );
+  });
+});
+
+describe('renderSpec state resolving', () => {
+  it('should resolve $state prop expressions from spec.state', () => {
+    const spec: Spec = {
+      root: 'heading',
+      elements: {
+        heading: {
+          type: 'Heading',
+          props: { text: { $state: '/title' } },
+        },
+      },
+      state: { title: 'Hello from state' },
+    };
+
+    const result = renderSpec(spec, {
+      Heading: (props) => <h1>{props.text as string}</h1>,
+    });
+
+    expect(result).toEqual(<h1>Hello from state</h1>);
+  });
+
+  it('should resolve $cond/$then/$else expressions', () => {
+    const spec: Spec = {
+      root: 'badge',
+      elements: {
+        badge: {
+          type: 'Badge',
+          props: {
+            variant: {
+              $cond: { $state: '/active' },
+              $then: 'success',
+              $else: 'muted',
+            },
+          },
+        },
+      },
+      state: { active: true },
+    };
+
+    let receivedProps: Record<string, unknown> = {};
+    renderSpec(spec, {
+      Badge: (props) => {
+        receivedProps = props;
+        return <span />;
+      },
+    });
+
+    expect(receivedProps.variant).toBe('success');
+
+    // With active = false, should resolve to $else.
+    const specInactive: Spec = { ...spec, state: { active: false } };
+    renderSpec(specInactive, {
+      Badge: (props) => {
+        receivedProps = props;
+        return <span />;
+      },
+    });
+
+    expect(receivedProps.variant).toBe('muted');
+  });
+
+  it('should work unchanged for specs without state', () => {
+    const spec: Spec = {
+      root: 'btn',
+      elements: {
+        btn: {
+          type: 'Button',
+          props: { label: 'Go' },
+        },
+      },
+    };
+
+    const result = renderSpec(spec, {
+      Button: (props) => <button>{props.label as string}</button>,
+    });
+
+    expect(result).toEqual(<button>Go</button>);
   });
 });
 

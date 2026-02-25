@@ -1,7 +1,7 @@
 import type React from 'react';
-import type { Spec, UIElement } from '@json-render/core';
+import type { Spec, UIElement, PropResolutionContext } from '@json-render/core';
 import type { ComponentMetadata } from '@drupal-canvas/component-discovery';
-import { defineCatalog } from '@json-render/core';
+import { defineCatalog, resolveElementProps } from '@json-render/core';
 import { schema } from '@json-render/react/schema';
 import { fromJSONSchema } from 'zod';
 
@@ -129,6 +129,7 @@ function convertSpecElement(
   result: CanvasComponentTree,
   parentUuid: string | null,
   slot: string | null,
+  ctx: PropResolutionContext,
 ): void {
   const element = elements[key];
   if (!element) {
@@ -149,18 +150,18 @@ function convertSpecElement(
     component_id: element.type,
     // Component version has no equivalent in the json-render spec - set to null.
     component_version: null,
-    inputs: element.props,
+    inputs: resolveElementProps(element.props, ctx),
     label: null,
   });
 
   // json-render's children array has no Canvas equivalent — map to 'children' slot.
   for (const childKey of element.children ?? []) {
-    convertSpecElement(childKey, elements, result, uuid, 'children');
+    convertSpecElement(childKey, elements, result, uuid, 'children', ctx);
   }
 
   for (const [slotName, childKeys] of Object.entries(element.slots ?? {})) {
     for (const childKey of childKeys) {
-      convertSpecElement(childKey, elements, result, uuid, slotName);
+      convertSpecElement(childKey, elements, result, uuid, slotName, ctx);
     }
   }
 }
@@ -181,11 +182,15 @@ export function specToCanvasTree(jsonRenderSpec: Spec): CanvasComponentTree {
     );
   }
 
+  const ctx: PropResolutionContext = {
+    stateModel: jsonRenderSpec.state ?? {},
+  };
+
   // Unwrap the synthetic canvas:component-tree wrapper added by canvasTreeToSpec
   // for multi-root trees — it has no Canvas equivalent and must not appear in output.
   if (rootElement.type === 'canvas:component-tree') {
     for (const childKey of rootElement.children ?? []) {
-      convertSpecElement(childKey, jsonRenderSpec.elements, result, null, null);
+      convertSpecElement(childKey, jsonRenderSpec.elements, result, null, null, ctx);
     }
     return result;
   }
@@ -196,6 +201,7 @@ export function specToCanvasTree(jsonRenderSpec: Spec): CanvasComponentTree {
     result,
     null,
     null,
+    ctx,
   );
   return result;
 }
@@ -213,6 +219,7 @@ function renderSpecElement(
   key: string,
   elements: Spec['elements'],
   registry: ComponentRegistry,
+  ctx: PropResolutionContext,
 ): React.ReactNode {
   const element = elements[key];
   if (!element) {
@@ -223,7 +230,7 @@ function renderSpecElement(
   // @see renderSpec
   if (element.type === 'canvas:component-tree') {
     const children = (element.children ?? []).map((k) =>
-      renderSpecElement(k, elements, registry),
+      renderSpecElement(k, elements, registry, ctx),
     );
     return <>{children}</>;
   }
@@ -232,20 +239,21 @@ function renderSpecElement(
   if (!component) {
     return null;
   }
+  const resolvedProps = resolveElementProps(element.props, ctx);
 
   const children = (element.children ?? []).map((k) =>
-    renderSpecElement(k, elements, registry),
+    renderSpecElement(k, elements, registry, ctx),
   );
 
   const slots: Record<string, React.ReactNode[]> = {};
   for (const [slotName, childKeys] of Object.entries(element.slots ?? {})) {
     slots[slotName] = childKeys.map((k) =>
-      renderSpecElement(k, elements, registry),
+      renderSpecElement(k, elements, registry, ctx),
     );
   }
 
   return component({
-    ...element.props,
+    ...resolvedProps,
     ...slots,
     ...(children.length > 0 ? { children } : {}),
   });
@@ -262,7 +270,10 @@ export function renderSpec(
   spec: Spec,
   registry: ComponentRegistry,
 ): React.ReactNode {
-  return renderSpecElement(spec.root, spec.elements, registry);
+  const ctx: PropResolutionContext = {
+    stateModel: spec.state ?? {},
+  };
+  return renderSpecElement(spec.root, spec.elements, registry, ctx);
 }
 
 /**
