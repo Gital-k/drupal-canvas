@@ -1,4 +1,5 @@
 import { promises as fs } from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'path';
 import { defineConfig } from 'vite';
 import {
@@ -17,9 +18,14 @@ import { buildPreviewManifest } from './src/lib/preview-contract';
 import type { Plugin } from 'vite';
 import type { DiscoveryResult } from '../component-discovery/src/types';
 
+const require = createRequire(import.meta.url);
 const hostProjectRoot = process.cwd();
 const runningInsideWorkbenchPackage =
   path.resolve(hostProjectRoot) === path.resolve(__dirname);
+const workbenchNodeModulesPath = path.resolve(__dirname, 'node_modules');
+const geistPackageRoot = path.dirname(
+  require.resolve('@fontsource-variable/geist/package.json'),
+);
 
 function isComponentMetadataPath(filePath: string): boolean {
   const normalizedPath = filePath.replaceAll('\\', '/');
@@ -32,6 +38,11 @@ function isComponentMetadataPath(filePath: string): boolean {
 function isPreviewSourcePath(filePath: string): boolean {
   const normalizedPath = filePath.replaceAll('\\', '/');
   return /\.(js|jsx|ts|tsx|css)$/.test(normalizedPath);
+}
+
+function isTopLevelPageSpecPath(filePath: string): boolean {
+  const normalizedPath = filePath.replaceAll('\\', '/');
+  return /(^|\/)pages\/[^/]+\.json$/.test(normalizedPath);
 }
 
 function canvasWorkbenchDiscovery(): Plugin {
@@ -170,12 +181,15 @@ function canvasWorkbenchDiscovery(): Plugin {
 
         const metadataChanged = isComponentMetadataPath(filePath);
         const sourceChanged = isPreviewSourcePath(filePath);
-        if (!metadataChanged && !sourceChanged) {
+        const pageChanged = isTopLevelPageSpecPath(filePath);
+        if (!metadataChanged && !sourceChanged && !pageChanged) {
           return;
         }
 
         const requiresManifestRefresh =
-          metadataChanged || (sourceChanged && event !== 'change');
+          metadataChanged ||
+          pageChanged ||
+          (sourceChanged && event !== 'change');
         if (!requiresManifestRefresh) {
           server.ws.send({
             type: 'custom',
@@ -203,7 +217,7 @@ function canvasWorkbenchDiscovery(): Plugin {
           })
           .catch((error) => {
             server.config.logger.error(
-              `Failed to refresh component discovery: ${String(error)}`,
+              `Failed to refresh discovery: ${String(error)}`,
             );
           });
       });
@@ -219,7 +233,7 @@ export default defineConfig({
       hostRoot: hostProjectRoot,
     }),
     fs: {
-      allow: [hostProjectRoot, __dirname],
+      allow: [hostProjectRoot, __dirname, geistPackageRoot],
     },
   },
   optimizeDeps: {
@@ -245,6 +259,16 @@ export default defineConfig({
     ],
     alias: {
       '@wb': path.resolve(__dirname, './src'),
+      react: path.join(workbenchNodeModulesPath, 'react'),
+      'react-dom': path.join(workbenchNodeModulesPath, 'react-dom'),
+      'react/jsx-runtime': path.join(
+        workbenchNodeModulesPath,
+        'react/jsx-runtime.js',
+      ),
+      'react/jsx-dev-runtime': path.join(
+        workbenchNodeModulesPath,
+        'react/jsx-dev-runtime.js',
+      ),
     },
   },
 });

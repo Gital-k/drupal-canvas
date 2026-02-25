@@ -83,6 +83,7 @@ describe('preview-contract', () => {
           cssEntryPath: '/tmp/workspace/src/card/index.css',
         },
       ],
+      pages: [],
       warnings: [
         {
           code: 'duplicate_definition',
@@ -110,6 +111,7 @@ describe('preview-contract', () => {
         source: 'canvas-workbench-parent',
         type: 'preview:render',
         payload: {
+          mode: 'component',
           componentId: 'id-1',
           moduleUrl: '/@fs/tmp/file.tsx',
           cssUrl: '/@fs/tmp/file.css',
@@ -124,6 +126,7 @@ describe('preview-contract', () => {
         source: 'canvas-workbench-parent',
         type: 'preview:render',
         payload: {
+          mode: 'component',
           componentId: 1,
           moduleUrl: '/@fs/tmp/file.tsx',
           cssUrl: null,
@@ -132,6 +135,26 @@ describe('preview-contract', () => {
         },
       }),
     ).toBe(false);
+
+    expect(
+      isPreviewRenderRequest({
+        source: 'canvas-workbench-parent',
+        type: 'preview:render',
+        payload: {
+          mode: 'page',
+          pageSlug: 'home',
+          pageSpecUrl: '/@fs/tmp/pages/home.json',
+          globalCssUrl: null,
+          components: [
+            {
+              name: 'hero',
+              jsEntryUrl: '/@fs/tmp/src/components/hero/index.tsx',
+              cssEntryUrl: null,
+            },
+          ],
+        },
+      }),
+    ).toBe(true);
   });
 
   it('validates frame-to-parent event payloads', () => {
@@ -147,7 +170,7 @@ describe('preview-contract', () => {
         source: 'canvas-workbench-frame',
         type: 'preview:error',
         payload: {
-          componentId: null,
+          renderId: null,
           message: 'failed',
         },
       }),
@@ -158,7 +181,8 @@ describe('preview-contract', () => {
         source: 'canvas-workbench-frame',
         type: 'preview:rendered',
         payload: {
-          componentId: 123,
+          kind: 'component',
+          renderId: 123,
         },
       }),
     ).toBe(false);

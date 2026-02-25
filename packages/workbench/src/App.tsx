@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router';
+import { useLocation, useNavigate, useParams } from 'react-router';
+import { toViteFsUrl } from '@drupal-canvas/vite-compat/runtime';
 import { Badge } from '@wb/components/ui/badge';
 import { Button } from '@wb/components/ui/button';
 import { Separator } from '@wb/components/ui/separator';
@@ -22,10 +23,16 @@ import { fetchDiscoveryResult } from '@wb/lib/discovery-client';
 import { fetchPreviewManifest } from '@wb/lib/preview-client';
 import { isPreviewFrameEvent } from '@wb/lib/preview-contract';
 
-import type { DiscoveryResult } from '@wb/lib/discovery-client';
 import type {
+  DiscoveredComponent,
+  DiscoveredPage,
+  DiscoveryResult,
+} from '@wb/lib/discovery-client';
+import type {
+  PreviewComponentRenderRequest,
   PreviewManifest,
   PreviewManifestComponent,
+  PreviewPageRenderRequest,
   PreviewRenderRequest,
 } from '@wb/lib/preview-contract';
 
@@ -57,8 +64,14 @@ function pickInitialSelection(manifest: PreviewManifest): string | null {
   return manifest.components[0]?.id ?? null;
 }
 
+function pickInitialPage(pages: DiscoveredPage[]): DiscoveredPage | null {
+  return pages[0] ?? null;
+}
+
 export function App() {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const params = useParams<{ slug?: string; componentId?: string }>();
   const [discoveryResult, setDiscoveryResult] =
     useState<DiscoveryResult | null>(null);
   const [previewManifest, setPreviewManifest] =
@@ -70,7 +83,13 @@ export function App() {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [sidebarDefaultOpen] = useState(getSidebarDefaultOpen);
 
-  const selectedComponentId = searchParams.get('id');
+  const selectedComponentId = params.componentId ?? null;
+  const selectedPageSlug = params.slug ?? null;
+  const isComponentRoute =
+    location.pathname === '/component' ||
+    location.pathname.startsWith('/component/');
+  const isPageRoute =
+    location.pathname === '/page' || location.pathname.startsWith('/page/');
 
   const loadWorkbenchData = useCallback(async (): Promise<{
     discovery: DiscoveryResult;
@@ -87,8 +106,28 @@ export function App() {
     };
   }, []);
 
-  const selectedComponent = useMemo<PreviewManifestComponent | null>(() => {
+  const sortedComponents = useMemo<PreviewManifestComponent[]>(() => {
     if (!previewManifest) {
+      return [];
+    }
+
+    return [...previewManifest.components].sort((componentA, componentB) =>
+      componentA.name.localeCompare(componentB.name),
+    );
+  }, [previewManifest]);
+
+  const sortedPages = useMemo<DiscoveredPage[]>(() => {
+    if (!discoveryResult) {
+      return [];
+    }
+
+    return [...discoveryResult.pages].sort((pageA, pageB) =>
+      pageA.name.localeCompare(pageB.name),
+    );
+  }, [discoveryResult]);
+
+  const selectedComponent = useMemo<PreviewManifestComponent | null>(() => {
+    if (!previewManifest || isPageRoute || !isComponentRoute) {
       return null;
     }
 
@@ -101,27 +140,19 @@ export function App() {
       }
     }
 
-    const fallbackId = pickInitialSelection(previewManifest);
-    if (!fallbackId) {
+    return null;
+  }, [isComponentRoute, isPageRoute, previewManifest, selectedComponentId]);
+
+  const selectedPage = useMemo<DiscoveredPage | null>(() => {
+    if (!isPageRoute) {
+      return null;
+    }
+    if (!selectedPageSlug) {
       return null;
     }
 
-    return (
-      previewManifest.components.find(
-        (component) => component.id === fallbackId,
-      ) ?? null
-    );
-  }, [previewManifest, selectedComponentId]);
-
-  const sortedComponents = useMemo<PreviewManifestComponent[]>(() => {
-    if (!previewManifest) {
-      return [];
-    }
-
-    return [...previewManifest.components].sort((componentA, componentB) =>
-      componentA.name.localeCompare(componentB.name),
-    );
-  }, [previewManifest]);
+    return sortedPages.find((page) => page.slug === selectedPageSlug) ?? null;
+  }, [isPageRoute, selectedPageSlug, sortedPages]);
 
   useEffect(() => {
     let isMounted = true;
@@ -195,7 +226,23 @@ export function App() {
   }, [loadWorkbenchData]);
 
   useEffect(() => {
-    if (!previewManifest) {
+    if (!previewManifest || !discoveryResult) {
+      return;
+    }
+
+    if (isPageRoute) {
+      if (selectedPage) {
+        setFrameStatus(`Selected page ${selectedPage.name}.`);
+        return;
+      }
+
+      const fallbackPage = pickInitialPage(sortedPages);
+      if (fallbackPage) {
+        navigate(`/page/${fallbackPage.slug}`, { replace: true });
+        return;
+      }
+
+      navigate('/component', { replace: true });
       return;
     }
 
@@ -210,18 +257,21 @@ export function App() {
     }
 
     const fallbackId = pickInitialSelection(previewManifest);
-    const nextParams = new URLSearchParams(searchParams);
     if (!fallbackId) {
-      if (nextParams.has('id')) {
-        nextParams.delete('id');
-        setSearchParams(nextParams, { replace: true });
-      }
       return;
     }
 
-    nextParams.set('id', fallbackId);
-    setSearchParams(nextParams, { replace: true });
-  }, [previewManifest, searchParams, selectedComponentId, setSearchParams]);
+    navigate(`/component/${fallbackId}`, { replace: true });
+  }, [
+    discoveryResult,
+    isComponentRoute,
+    isPageRoute,
+    navigate,
+    previewManifest,
+    selectedComponentId,
+    selectedPage,
+    sortedPages,
+  ]);
 
   useEffect(() => {
     const handleFrameMessage = (event: MessageEvent<unknown>) => {
@@ -240,7 +290,11 @@ export function App() {
       }
 
       if (event.data.type === 'preview:rendered') {
-        setFrameStatus(`Rendered component ${event.data.payload.componentId}.`);
+        setFrameStatus(
+          event.data.payload.kind === 'component'
+            ? `Rendered component ${event.data.payload.renderId}.`
+            : `Rendered page ${event.data.payload.renderId}.`,
+        );
         return;
       }
 
@@ -256,30 +310,81 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    if (!selectedComponent || !selectedComponent.previewable || !isFrameReady) {
+    if (!isFrameReady || !previewManifest) {
       return;
     }
 
     const frameWindow = iframeRef.current?.contentWindow;
-    if (!frameWindow || !selectedComponent.moduleUrl) {
+    if (!frameWindow) {
       return;
     }
 
-    const message: PreviewRenderRequest = {
-      source: 'canvas-workbench-parent',
-      type: 'preview:render',
-      payload: {
-        componentId: selectedComponent.id,
-        moduleUrl: selectedComponent.moduleUrl,
-        cssUrl: selectedComponent.cssUrl,
-        globalCssUrl: previewManifest?.globalCssUrl ?? null,
-        props: selectedComponent.exampleProps,
-      },
-    };
+    if (
+      !isPageRoute &&
+      selectedComponent?.previewable &&
+      selectedComponent.moduleUrl
+    ) {
+      const message: PreviewComponentRenderRequest = {
+        source: 'canvas-workbench-parent',
+        type: 'preview:render',
+        payload: {
+          mode: 'component',
+          componentId: selectedComponent.id,
+          moduleUrl: selectedComponent.moduleUrl,
+          cssUrl: selectedComponent.cssUrl,
+          globalCssUrl: previewManifest.globalCssUrl,
+          props: selectedComponent.exampleProps,
+        },
+      };
+      setFrameStatus(`Rendering component ${selectedComponent.name}...`);
+      frameWindow.postMessage(
+        message as PreviewRenderRequest,
+        window.location.origin,
+      );
+      return;
+    }
 
-    setFrameStatus(`Rendering component ${selectedComponent.name}...`);
-    frameWindow.postMessage(message, window.location.origin);
-  }, [isFrameReady, previewManifest, selectedComponent]);
+    if (isPageRoute && selectedPage && discoveryResult) {
+      const pageMessage: PreviewPageRenderRequest = {
+        source: 'canvas-workbench-parent',
+        type: 'preview:render',
+        payload: {
+          mode: 'page',
+          pageSlug: selectedPage.slug,
+          pageSpecUrl: toViteFsUrl(selectedPage.path),
+          globalCssUrl: previewManifest.globalCssUrl,
+          components: discoveryResult.components
+            .filter(
+              (
+                component,
+              ): component is DiscoveredComponent & { jsEntryPath: string } =>
+                component.jsEntryPath !== null,
+            )
+            .map(
+              (component: DiscoveredComponent & { jsEntryPath: string }) => ({
+                name: component.name,
+                jsEntryUrl: toViteFsUrl(component.jsEntryPath),
+                cssEntryUrl: component.cssEntryPath
+                  ? toViteFsUrl(component.cssEntryPath)
+                  : null,
+              }),
+            ),
+        },
+      };
+      setFrameStatus(`Rendering page ${selectedPage.name}...`);
+      frameWindow.postMessage(
+        pageMessage as PreviewRenderRequest,
+        window.location.origin,
+      );
+    }
+  }, [
+    discoveryResult,
+    isFrameReady,
+    isPageRoute,
+    previewManifest,
+    selectedComponent,
+    selectedPage,
+  ]);
 
   if (error) {
     return <div>Workbench failed: {error}</div>;
@@ -289,6 +394,14 @@ export function App() {
     return <div>Loading Workbench preview data...</div>;
   }
 
+  const selectedKind = selectedPage
+    ? 'page'
+    : selectedComponent
+      ? 'component'
+      : null;
+  const selectedName =
+    selectedPage?.name ?? selectedComponent?.name ?? 'No selection';
+
   return (
     <SidebarProvider defaultOpen={sidebarDefaultOpen}>
       <Sidebar>
@@ -296,6 +409,9 @@ export function App() {
           <h1 className="px-2 text-sm font-semibold">Canvas Workbench</h1>
           <p className="px-2 text-xs text-muted-foreground">
             {previewManifest.components.length} discovered components
+          </p>
+          <p className="px-2 text-xs text-muted-foreground">
+            {sortedPages.length} discovered pages
           </p>
           <p className="px-2 text-xs text-muted-foreground">
             Scanned: {discoveryResult.stats.scannedFiles}, ignored:{' '}
@@ -313,15 +429,33 @@ export function App() {
                     <SidebarMenuButton
                       isActive={component.id === selectedComponent?.id}
                       onClick={() => {
-                        const nextParams = new URLSearchParams(searchParams);
-                        nextParams.set('id', component.id);
-                        setSearchParams(nextParams);
+                        navigate(`/component/${component.id}`);
                       }}
                     >
                       <span>{component.name}</span>
                       {!component.previewable ? (
                         <Badge variant="destructive">No preview</Badge>
                       ) : null}
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+
+          <SidebarGroup>
+            <SidebarGroupLabel>Pages</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {sortedPages.map((page) => (
+                  <SidebarMenuItem key={page.path}>
+                    <SidebarMenuButton
+                      isActive={page.slug === selectedPage?.slug}
+                      onClick={() => {
+                        navigate(`/page/${page.slug}`);
+                      }}
+                    >
+                      <span>{page.name}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 ))}
@@ -356,9 +490,7 @@ export function App() {
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="h-4" />
             <div className="min-w-0">
-              <h2 className="truncate text-sm font-semibold">
-                {selectedComponent ? selectedComponent.name : 'No selection'}
-              </h2>
+              <h2 className="truncate text-sm font-semibold">{selectedName}</h2>
               <p className="truncate text-xs text-muted-foreground">
                 {frameStatus}
               </p>
@@ -379,11 +511,13 @@ export function App() {
         </header>
 
         <section className="flex min-w-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
-          {!selectedComponent ? (
+          {selectedKind === null ? (
             <div className="rounded-none border p-4">
-              No components were discovered.
+              No components or pages were discovered.
             </div>
-          ) : !selectedComponent.previewable ? (
+          ) : selectedKind === 'component' &&
+            selectedComponent &&
+            !selectedComponent.previewable ? (
             <div className="rounded-none border p-4">
               This component is not previewable in strict mode. Reason:{' '}
               {selectedComponent.ineligibilityReason}
@@ -418,7 +552,10 @@ export function App() {
               {JSON.stringify(
                 {
                   globalCssUrl: previewManifest.globalCssUrl,
+                  selectedKind,
                   selectedComponentId: selectedComponent?.id ?? null,
+                  selectedPageSlug: selectedPage?.slug ?? null,
+                  routePath: location.pathname,
                   selectedModuleUrl: selectedComponent?.moduleUrl ?? null,
                   selectedComponentCssUrl: selectedComponent?.cssUrl ?? null,
                   frameReady: isFrameReady,

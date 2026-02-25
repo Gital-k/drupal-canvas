@@ -3,6 +3,7 @@ export { loadComponentsMetadata } from './metadata';
 export type {
   ComponentMetadata,
   DiscoveredComponent,
+  DiscoveredPage,
   DiscoveryOptions,
   DiscoveryResult,
   DiscoveryWarning,

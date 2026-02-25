@@ -26,9 +26,17 @@ export interface DiscoveredComponent {
   cssEntryPath: string | null;
 }
 
+export interface DiscoveredPage {
+  name: string;
+  slug: string;
+  path: string;
+  relativePath: string;
+}
+
 export interface DiscoveryResult {
   scanRoot: string;
   components: DiscoveredComponent[];
+  pages: DiscoveredPage[];
   warnings: DiscoveryWarning[];
   stats: {
     scannedFiles: number;

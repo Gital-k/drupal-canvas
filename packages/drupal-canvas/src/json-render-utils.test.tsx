@@ -1,4 +1,3 @@
-import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -10,8 +9,9 @@ import {
   specToCanvasTree,
 } from './json-render-utils';
 
-import type { Spec } from '@json-render/core';
+import type React from 'react';
 import type { ComponentMetadata } from '@drupal-canvas/component-discovery';
+import type { Spec } from '@json-render/core';
 import type { CanvasComponentTree } from './json-render-utils';
 
 const UUID_PATTERN =
@@ -654,11 +654,13 @@ describe('renderSpec', () => {
       },
     };
 
-    const result = renderSpec(spec, {
-      Button: (props) => <button>{props.label as string}</button>,
-    });
+    const Button = (props: Record<string, unknown>) => (
+      <button>{props.label as string}</button>
+    );
+    const result = renderSpec(spec, { Button });
 
-    expect(result).toEqual(<button>Go</button>);
+    expect((result as React.ReactElement).type).toBe(Button);
+    expect((result as React.ReactElement).props.label).toBe('Go');
   });
 
   it('should render a spec with children and slots', () => {
@@ -682,22 +684,28 @@ describe('renderSpec', () => {
       },
     };
 
-    const result = renderSpec(spec, {
-      Layout: (props) => (
-        <div>
-          <main>{props.children as React.ReactNode}</main>
-          <footer>{props.footer as React.ReactNode}</footer>
-        </div>
-      ),
-      Text: (props) => <p>{props.content as string}</p>,
-      Button: (props) => <button>{props.label as string}</button>,
-    });
-
-    expect(result).toEqual(
+    const Layout = (props: Record<string, unknown>) => (
       <div>
-        <main>{[<p>Hello</p>]}</main>
-        <footer>{[<button>OK</button>]}</footer>
-      </div>,
+        <main>{props.children as React.ReactNode}</main>
+        <footer>{props.footer as React.ReactNode}</footer>
+      </div>
+    );
+    const Text = (props: Record<string, unknown>) => (
+      <p>{props.content as string}</p>
+    );
+    const Button = (props: Record<string, unknown>) => (
+      <button>{props.label as string}</button>
+    );
+    const result = renderSpec(spec, { Layout, Text, Button });
+
+    expect((result as React.ReactElement).type).toBe(Layout);
+    expect((result as React.ReactElement).props.children[0].type).toBe(Text);
+    expect((result as React.ReactElement).props.children[0].props.content).toBe(
+      'Hello',
+    );
+    expect((result as React.ReactElement).props.footer[0].type).toBe(Button);
+    expect((result as React.ReactElement).props.footer[0].props.label).toBe(
+      'OK',
     );
   });
 
@@ -726,13 +734,18 @@ describe('renderSpec', () => {
       },
     };
 
-    const result = renderSpec(spec, {
-      Button: (props) => <button>{props.label as string}</button>,
-    });
-
-    expect(result).toEqual(
-      <>{[<button>A</button>, <button>B</button>]}</>,
+    const Button = (props: Record<string, unknown>) => (
+      <button>{props.label as string}</button>
     );
+    const result = renderSpec(spec, { Button });
+    const children = (result as React.ReactElement).props
+      .children as React.ReactElement[];
+
+    expect(children).toHaveLength(2);
+    expect(children[0].type).toBe(Button);
+    expect(children[0].props.label).toBe('A');
+    expect(children[1].type).toBe(Button);
+    expect(children[1].props.label).toBe('B');
   });
 });
 
@@ -749,11 +762,13 @@ describe('renderSpec state resolving', () => {
       state: { title: 'Hello from state' },
     };
 
-    const result = renderSpec(spec, {
-      Heading: (props) => <h1>{props.text as string}</h1>,
-    });
+    const Heading = (props: Record<string, unknown>) => (
+      <h1>{props.text as string}</h1>
+    );
+    const result = renderSpec(spec, { Heading });
 
-    expect(result).toEqual(<h1>Hello from state</h1>);
+    expect((result as React.ReactElement).type).toBe(Heading);
+    expect((result as React.ReactElement).props.text).toBe('Hello from state');
   });
 
   it('should resolve $cond/$then/$else expressions', () => {
@@ -774,26 +789,16 @@ describe('renderSpec state resolving', () => {
       state: { active: true },
     };
 
-    let receivedProps: Record<string, unknown> = {};
-    renderSpec(spec, {
-      Badge: (props) => {
-        receivedProps = props;
-        return <span />;
-      },
-    });
+    const Badge = (_props: Record<string, unknown>) => <span />;
+    const resultActive = renderSpec(spec, { Badge });
 
-    expect(receivedProps.variant).toBe('success');
+    expect((resultActive as React.ReactElement).type).toBe(Badge);
+    expect((resultActive as React.ReactElement).props.variant).toBe('success');
 
     // With active = false, should resolve to $else.
     const specInactive: Spec = { ...spec, state: { active: false } };
-    renderSpec(specInactive, {
-      Badge: (props) => {
-        receivedProps = props;
-        return <span />;
-      },
-    });
-
-    expect(receivedProps.variant).toBe('muted');
+    const resultInactive = renderSpec(specInactive, { Badge });
+    expect((resultInactive as React.ReactElement).props.variant).toBe('muted');
   });
 
   it('should work unchanged for specs without state', () => {
@@ -807,11 +812,13 @@ describe('renderSpec state resolving', () => {
       },
     };
 
-    const result = renderSpec(spec, {
-      Button: (props) => <button>{props.label as string}</button>,
-    });
+    const Button = (props: Record<string, unknown>) => (
+      <button>{props.label as string}</button>
+    );
+    const result = renderSpec(spec, { Button });
 
-    expect(result).toEqual(<button>Go</button>);
+    expect((result as React.ReactElement).type).toBe(Button);
+    expect((result as React.ReactElement).props.label).toBe('Go');
   });
 });
 
@@ -829,15 +836,81 @@ describe('renderCanvasTree', () => {
       },
     ];
 
-    const result = renderCanvasTree(components, {
-      Button: (props) => (
-        <button data-variant={props.variant as string}>{props.label as string}</button>
-      ),
-    });
-
-    expect(result).toEqual(
-      <button data-variant="primary">Click me</button>,
+    const Button = (props: Record<string, unknown>) => (
+      <button data-variant={props.variant as string}>
+        {props.label as string}
+      </button>
     );
+    const result = renderCanvasTree(components, { Button });
+
+    expect(result).toEqual(<Button label="Click me" variant="primary" />);
+  });
+
+  it('should normalize rich text objects to plain string props', async () => {
+    const components: CanvasComponentTree = [
+      {
+        parent_uuid: null,
+        slot: null,
+        uuid: '91f69efe-3b49-4b74-82bf-ce70bb35f9c7',
+        component_id: 'Paragraph',
+        component_version: null,
+        inputs: {
+          text: {
+            value: '<p>Hello <em>world</em>.</p>',
+            format: 'canvas_html_block',
+          },
+        },
+        label: null,
+      },
+    ];
+
+    const Paragraph = (props: Record<string, unknown>) => (
+      <p>{props.text as string}</p>
+    );
+    const result = await renderCanvasTree(components, { Paragraph });
+
+    expect((result as React.ReactElement).type).toBe(Paragraph);
+    expect((result as React.ReactElement).props.text).toBe(
+      '<p>Hello <em>world</em>.</p>',
+    );
+  });
+
+  it('should normalize wrapped image objects to flattened image props', async () => {
+    const components: CanvasComponentTree = [
+      {
+        parent_uuid: null,
+        slot: null,
+        uuid: 'f770f017-7ec8-4f52-a259-4dcb9b1a0b6f',
+        component_id: 'Hero',
+        component_version: null,
+        inputs: {
+          image: {
+            sourceType: 'default-relative-url',
+            value: {
+              src: 'https://example.com/hero.jpg',
+              alt: 'Hero image',
+              width: 1200,
+              height: 800,
+            },
+            componentId: 'js.hero',
+          },
+        },
+        label: null,
+      },
+    ];
+
+    const Hero = (props: Record<string, unknown>) => (
+      <img src={(props.image as Record<string, unknown>).src as string} />
+    );
+    const result = await renderCanvasTree(components, { Hero });
+
+    expect((result as React.ReactElement).type).toBe(Hero);
+    expect((result as React.ReactElement).props.image).toEqual({
+      src: 'https://example.com/hero.jpg',
+      alt: 'Hero image',
+      width: 1200,
+      height: 800,
+    });
   });
 
   it('should return null for components not in the registry', () => {
@@ -880,14 +953,20 @@ describe('renderCanvasTree', () => {
       },
     ];
 
-    const result = renderCanvasTree(components, {
-      Wrapper: (props) => <div>{props.children as React.ReactNode}</div>,
-      Text: (props) => <p>{props.content as string}</p>,
-    });
-
-    expect(result).toEqual(
-      <div>{[<p>Hello</p>]}</div>,
+    const Wrapper = (props: Record<string, unknown>) => (
+      <div>{props.children as React.ReactNode}</div>
     );
+    const Text = (props: Record<string, unknown>) => (
+      <p>{props.content as string}</p>
+    );
+    const result = renderCanvasTree(components, { Wrapper, Text });
+
+    expect((result as React.ReactElement).type).toBe(Wrapper);
+    const children = (result as React.ReactElement).props
+      .children as React.ReactElement[];
+    expect(children).toHaveLength(1);
+    expect(children[0].type).toBe(Text);
+    expect(children[0].props.content).toBe('Hello');
   });
 
   it('should pass named slots as props', () => {
@@ -912,20 +991,22 @@ describe('renderCanvasTree', () => {
       },
     ];
 
-    const result = renderCanvasTree(components, {
-      Layout: (props) => (
-        <div className="layout">
-          <header>{props.header as React.ReactNode}</header>
-        </div>
-      ),
-      Heading: (props) => <h1>{props.text as string}</h1>,
-    });
-
-    expect(result).toEqual(
+    const Layout = (props: Record<string, unknown>) => (
       <div className="layout">
-        <header>{[<h1>Title</h1>]}</header>
-      </div>,
+        <header>{props.header as React.ReactNode}</header>
+      </div>
     );
+    const Heading = (props: Record<string, unknown>) => (
+      <h1>{props.text as string}</h1>
+    );
+    const result = renderCanvasTree(components, { Layout, Heading });
+
+    expect((result as React.ReactElement).type).toBe(Layout);
+    const header = (result as React.ReactElement).props
+      .header as React.ReactElement[];
+    expect(header).toHaveLength(1);
+    expect(header[0].type).toBe(Heading);
+    expect(header[0].props.text).toBe('Title');
   });
 
   it('should render multiple root components wrapped transparently', () => {
@@ -950,13 +1031,18 @@ describe('renderCanvasTree', () => {
       },
     ];
 
-    const result = renderCanvasTree(components, {
-      Button: (props) => <button>{props.label as string}</button>,
-    });
-
-    expect(result).toEqual(
-      <>{[<button>A</button>, <button>B</button>]}</>,
+    const Button = (props: Record<string, unknown>) => (
+      <button>{props.label as string}</button>
     );
+    const result = renderCanvasTree(components, { Button });
+
+    const fragmentChildren = (result as React.ReactElement).props
+      .children as React.ReactElement[];
+    expect(fragmentChildren).toHaveLength(2);
+    expect(fragmentChildren[0].type).toBe(Button);
+    expect(fragmentChildren[0].props.label).toBe('A');
+    expect(fragmentChildren[1].type).toBe(Button);
+    expect(fragmentChildren[1].props.label).toBe('B');
   });
 });
 
@@ -1011,7 +1097,8 @@ describe('defineComponentRegistry', () => {
       { name: 'NoPath', jsEntryPath: null },
     ]);
 
-    expect(Object.keys(registry)).toEqual(['js.valid']);
+    expect(Object.keys(registry)).toEqual(['Valid', 'js.valid']);
+    expect(registry.Valid).toBe(ValidComp);
     expect(registry['js.valid']).toBe(ValidComp);
 
     vi.doUnmock('/fake/Valid.js');

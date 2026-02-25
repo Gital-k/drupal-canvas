@@ -6,6 +6,7 @@ import ignore from 'ignore';
 
 import type {
   DiscoveredComponent,
+  DiscoveredPage,
   DiscoveryOptions,
   DiscoveryResult,
   DiscoveryWarning,
@@ -23,6 +24,7 @@ const ALWAYS_IGNORED_PATTERNS = [
 ] as const;
 const METADATA_PATTERNS = ['**/component.yml', '**/*.component.yml'] as const;
 const NAMED_SUFFIX = '.component.yml';
+const PAGE_PATTERN = 'pages/*.json';
 
 // Normalize to POSIX-style separators for glob and ignore matching.
 // Example: "components\\button\\component.yml" -> "components/button/component.yml".
@@ -80,6 +82,16 @@ async function getCandidateMetadataFiles(scanRoot: string): Promise<string[]> {
   return [...discovered].sort();
 }
 
+async function getCandidatePageFiles(scanRoot: string): Promise<string[]> {
+  return glob(PAGE_PATTERN, {
+    cwd: scanRoot,
+    nodir: true,
+    dot: true,
+    posix: true,
+    ignore: [...ALWAYS_IGNORED_PATTERNS],
+  });
+}
+
 /**
  * Discovers code components under a scan root by pairing metadata files with
  * JavaScript entries.
@@ -103,8 +115,10 @@ export async function discoverCodeComponents(
   const gitignoreMatcher = await readGitignore(scanRoot);
 
   const allCandidates = await getCandidateMetadataFiles(scanRoot);
+  const pageCandidates = await getCandidatePageFiles(scanRoot);
   const warnings: DiscoveryWarning[] = [];
   const components: DiscoveredComponent[] = [];
+  const pages: DiscoveredPage[] = [];
 
   let ignoredFiles = 0;
 
@@ -122,6 +136,23 @@ export async function discoverCodeComponents(
     const current = byDirectory.get(directory) ?? [];
     current.push(path.posix.basename(normalizedRelativePath));
     byDirectory.set(directory, current);
+  }
+
+  for (const pageRelativePath of pageCandidates) {
+    const normalizedRelativePath = toPosixPath(pageRelativePath);
+    if (gitignoreMatcher.ignores(normalizedRelativePath)) {
+      ignoredFiles += 1;
+      continue;
+    }
+
+    const pageFilename = path.posix.basename(normalizedRelativePath);
+    const slug = pageFilename.replace(/\.json$/, '');
+    pages.push({
+      name: slug,
+      slug,
+      path: path.resolve(scanRoot, normalizedRelativePath),
+      relativePath: normalizedRelativePath,
+    });
   }
 
   const sortedDirectories = [...byDirectory.keys()].sort();
@@ -223,13 +254,15 @@ export async function discoverCodeComponents(
   }
 
   components.sort((a, b) => a.metadataPath.localeCompare(b.metadataPath));
+  pages.sort((a, b) => a.path.localeCompare(b.path));
 
   return {
     scanRoot,
     components,
+    pages,
     warnings,
     stats: {
-      scannedFiles: allCandidates.length,
+      scannedFiles: allCandidates.length + pageCandidates.length,
       ignoredFiles,
     },
   };

@@ -14,6 +14,10 @@ export default defineConfig({
   ],
   sourcemap: process.env.NODE_ENV === 'development',
   platform: 'browser',
-  external: ['react', 'react/jsx-runtime', '@drupal-canvas/component-discovery'],
+  external: [
+    'react',
+    'react/jsx-runtime',
+    '@drupal-canvas/component-discovery',
+  ],
   dts: true,
 });

@@ -19,6 +19,9 @@ createRoot(document.getElementById('root')!).render(
         <Routes>
           <Route path="/" element={<Navigate to="/component" replace />} />
           <Route path="/component" element={<App />} />
+          <Route path="/component/:componentId" element={<App />} />
+          <Route path="/page" element={<App />} />
+          <Route path="/page/:slug" element={<App />} />
           <Route path="*" element={<Navigate to="/component" replace />} />
         </Routes>
       </BrowserRouter>

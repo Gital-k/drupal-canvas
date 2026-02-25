@@ -31,10 +31,11 @@ export interface PreviewManifest {
   globalCssUrl: string | null;
 }
 
-export interface PreviewRenderRequest {
+export interface PreviewComponentRenderRequest {
   source: 'canvas-workbench-parent';
   type: 'preview:render';
   payload: {
+    mode: 'component';
     componentId: string;
     moduleUrl: string;
     cssUrl: string | null;
@@ -42,6 +43,26 @@ export interface PreviewRenderRequest {
     props: Record<string, unknown>;
   };
 }
+
+export interface PreviewPageRenderRequest {
+  source: 'canvas-workbench-parent';
+  type: 'preview:render';
+  payload: {
+    mode: 'page';
+    pageSlug: string;
+    pageSpecUrl: string;
+    globalCssUrl: string | null;
+    components: Array<{
+      name: string;
+      jsEntryUrl: string;
+      cssEntryUrl: string | null;
+    }>;
+  };
+}
+
+export type PreviewRenderRequest =
+  | PreviewComponentRenderRequest
+  | PreviewPageRenderRequest;
 
 export interface PreviewFrameReady {
   source: 'canvas-workbench-frame';
@@ -52,7 +73,8 @@ export interface PreviewFrameRendered {
   source: 'canvas-workbench-frame';
   type: 'preview:rendered';
   payload: {
-    componentId: string;
+    kind: 'component' | 'page';
+    renderId: string;
   };
 }
 
@@ -60,7 +82,7 @@ export interface PreviewFrameError {
   source: 'canvas-workbench-frame';
   type: 'preview:error';
   payload: {
-    componentId: string | null;
+    renderId: string | null;
     message: string;
   };
 }
@@ -144,15 +166,38 @@ export function isPreviewRenderRequest(
     return false;
   }
 
-  const { componentId, moduleUrl, cssUrl, globalCssUrl, props } = value.payload;
-  return (
-    typeof componentId === 'string' &&
-    typeof moduleUrl === 'string' &&
-    (typeof cssUrl === 'string' || cssUrl === null) &&
-    (typeof globalCssUrl === 'string' || globalCssUrl === null) &&
-    typeof props === 'object' &&
-    props !== null
-  );
+  if (value.payload.mode === 'component') {
+    const { componentId, moduleUrl, cssUrl, globalCssUrl, props } =
+      value.payload;
+    return (
+      typeof componentId === 'string' &&
+      typeof moduleUrl === 'string' &&
+      (typeof cssUrl === 'string' || cssUrl === null) &&
+      (typeof globalCssUrl === 'string' || globalCssUrl === null) &&
+      typeof props === 'object' &&
+      props !== null
+    );
+  }
+
+  if (value.payload.mode === 'page') {
+    const { pageSlug, pageSpecUrl, globalCssUrl, components } = value.payload;
+    return (
+      typeof pageSlug === 'string' &&
+      typeof pageSpecUrl === 'string' &&
+      (typeof globalCssUrl === 'string' || globalCssUrl === null) &&
+      Array.isArray(components) &&
+      components.every(
+        (component) =>
+          isRecord(component) &&
+          typeof component.name === 'string' &&
+          typeof component.jsEntryUrl === 'string' &&
+          (typeof component.cssEntryUrl === 'string' ||
+            component.cssEntryUrl === null),
+      )
+    );
+  }
+
+  return false;
 }
 
 export function isPreviewFrameEvent(
@@ -168,15 +213,17 @@ export function isPreviewFrameEvent(
 
   if (value.type === 'preview:rendered') {
     return (
-      isRecord(value.payload) && typeof value.payload.componentId === 'string'
+      isRecord(value.payload) &&
+      (value.payload.kind === 'component' || value.payload.kind === 'page') &&
+      typeof value.payload.renderId === 'string'
     );
   }
 
   if (value.type === 'preview:error') {
     return (
       isRecord(value.payload) &&
-      (typeof value.payload.componentId === 'string' ||
-        value.payload.componentId === null) &&
+      (typeof value.payload.renderId === 'string' ||
+        value.payload.renderId === null) &&
       typeof value.payload.message === 'string'
     );
   }

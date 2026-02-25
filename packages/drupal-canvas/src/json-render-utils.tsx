@@ -1,9 +1,11 @@
-import type React from 'react';
-import type { Spec, UIElement, PropResolutionContext } from '@json-render/core';
-import type { ComponentMetadata } from '@drupal-canvas/component-discovery';
+import { createElement } from 'react';
+import { fromJSONSchema } from 'zod';
 import { defineCatalog, resolveElementProps } from '@json-render/core';
 import { schema } from '@json-render/react/schema';
-import { fromJSONSchema } from 'zod';
+
+import type { ComponentType, ReactNode } from 'react';
+import type { ComponentMetadata } from '@drupal-canvas/component-discovery';
+import type { Spec, UIElement, PropResolutionContext } from '@json-render/core';
 
 /**
  * Drupal Canvas component tree node.
@@ -209,7 +211,62 @@ export function specToCanvasTree(jsonRenderSpec: Spec): CanvasComponentTree {
 /**
  * Registry of components keyed by component_id.
  */
-export type ComponentRegistry = Record<string, (props: Record<string, unknown>) => React.ReactNode>;
+export type ComponentRegistry = Record<
+  string,
+  ComponentType<Record<string, unknown>>
+>;
+
+/**
+ * Normalizes Canvas prop payloads into component-friendly values.
+ *
+ * Current special cases for prop values:
+ * - Rich text wrappers like `{ value, format }` are reduced to `value` string.
+ * - Image wrappers with metadata (for example `sourceType`) are unwrapped from
+ *   `{ sourceType, value: { src, ... } }` to the inner image object.
+ */
+function normalizeCanvasProps(value: unknown): unknown {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return value;
+  }
+
+  const record = value as Record<string, unknown>;
+  return Object.fromEntries(
+    Object.entries(record).map(([key, item]) => {
+      // Normalize top-level props only. Primitive values pass through untouched.
+      if (!item || typeof item !== 'object' || Array.isArray(item)) {
+        return [key, item];
+      }
+
+      const nestedRecord = item as Record<string, unknown>;
+      const nestedKeys = Object.keys(nestedRecord);
+
+      // Rich text values are provided as `{ value, format }` wrappers.
+      if (
+        nestedKeys.length > 0 &&
+        nestedKeys.every(
+          (nestedKey) => nestedKey === 'value' || nestedKey === 'format',
+        ) &&
+        typeof nestedRecord.value === 'string' &&
+        typeof nestedRecord.format === 'string'
+      ) {
+        return [key, nestedRecord.value];
+      }
+
+      // Image values may include source metadata and the actual image under `value`.
+      if (
+        typeof nestedRecord.sourceType === 'string' &&
+        nestedRecord.value &&
+        typeof nestedRecord.value === 'object' &&
+        typeof (nestedRecord.value as Record<string, unknown>).src === 'string'
+      ) {
+        return [key, nestedRecord.value];
+      }
+
+      // Leave unknown object-shaped props unchanged.
+      return [key, item];
+    }),
+  );
+}
 
 /**
  * Renders a single element from a json-render spec, recursively resolving
@@ -240,20 +297,24 @@ function renderSpecElement(
     return null;
   }
   const resolvedProps = resolveElementProps(element.props, ctx);
+  const normalizedProps = normalizeCanvasProps(resolvedProps) as Record<
+    string,
+    unknown
+  >;
 
   const children = (element.children ?? []).map((k) =>
     renderSpecElement(k, elements, registry, ctx),
   );
 
-  const slots: Record<string, React.ReactNode[]> = {};
+  const slots: Record<string, ReactNode[]> = {};
   for (const [slotName, childKeys] of Object.entries(element.slots ?? {})) {
     slots[slotName] = childKeys.map((k) =>
       renderSpecElement(k, elements, registry, ctx),
     );
   }
 
-  return component({
-    ...resolvedProps,
+  return createElement(component, {
+    ...normalizedProps,
     ...slots,
     ...(children.length > 0 ? { children } : {}),
   });
@@ -301,9 +362,21 @@ function metadataToCatalogEntry(metadata: ComponentMetadata) {
     jsonSchema.required = metadata.required;
   }
 
+  const slotNames = Object.keys(metadata.slots);
+
+  // Add slots as additional properties accepting any value.
+  if (slotNames.length > 0) {
+    const properties = (jsonSchema.properties ?? {}) as Record<string, unknown>;
+    for (const [slotName, slot] of Object.entries(metadata.slots)) {
+      properties[slotName] = {
+        description: slot.title ?? `${slotName} slot`,
+      };
+    }
+    jsonSchema.properties = properties;
+  }
   return {
     props: fromJSONSchema(jsonSchema),
-    slots: Object.keys(metadata.slots),
+    slots: slotNames,
   };
 }
 
@@ -338,19 +411,25 @@ export async function defineComponentRegistry(
           c.jsEntryPath !== null,
       )
       .map(async (c) => {
-        const mod: Record<string, unknown> = await import(c.jsEntryPath);
+        const mod: Record<string, unknown> = await import(
+          /* @vite-ignore */ c.jsEntryPath
+        );
         const renderFn = mod.default;
         if (typeof renderFn !== 'function') {
           return null;
         }
-        const machineName = c.name.replace(/-/g, '_').toLowerCase();
-        return { componentId: toComponentId(machineName), renderFn } as const;
+        const names = c.name.startsWith('js.')
+          ? [c.name]
+          : [c.name, toComponentId(c.name.replace(/-/g, '_').toLowerCase())];
+        return { names, renderFn } as const;
       }),
   );
 
   for (const entry of entries) {
     if (entry !== null) {
-      registry[entry.componentId] = entry.renderFn as ComponentRegistry[string];
+      for (const name of entry.names) {
+        registry[name] = entry.renderFn as ComponentRegistry[string];
+      }
     }
   }
 

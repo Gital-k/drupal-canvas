@@ -55,11 +55,16 @@ npx canvas-workbench dev
 
 - Sets `root` to the workbench package, but allows Vite file access to both the
   workbench code and the host project directory.
-- Registers a custom discovery plugin that runs
+- Registers a custom discovery plugin (from
+  `@drupal-canvas/component-discovery`) that runs
   `discoverCodeComponents({ scanRoot: process.cwd() })` and caches results.
 - Exposes discovery data at `/__canvas/discovery` as JSON for the UI.
 - Exposes preview manifest data at `/__canvas/preview-manifest` as JSON for
   preview runtime decisions.
+- Uses routes:
+  - `/component/<component-id>` for component previews.
+  - `/page/<slug>` for discovered pages, where `slug` comes from
+    `pages/<slug>.json`.
 - Uses `@drupal-canvas/vite-compat` for shared compatibility behavior — see
   [`packages/vite-compat/README.md`](../vite-compat/README.md).
 - Watches the host project for relevant file changes (`component.yml`,

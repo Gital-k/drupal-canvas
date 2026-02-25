@@ -1,5 +1,6 @@
 import { promises as fs } from 'node:fs';
 import { parse as parseYaml } from 'yaml';
+
 import type { ComponentMetadata, DiscoveryResult } from './types';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -60,7 +61,10 @@ function validateRawMetadata(
         );
       }
 
-      if (slotValue.description !== undefined && typeof slotValue.description !== 'string') {
+      if (
+        slotValue.description !== undefined &&
+        typeof slotValue.description !== 'string'
+      ) {
         throw new Error(
           `Invalid "description" in slot "${slotName}" in ${metadataPath}: expected a string, got ${typeof slotValue.description}.`,
         );

@@ -24,6 +24,46 @@ afterEach(async () => {
 });
 
 describe('discoverCodeComponents', () => {
+  it('discovers top-level pages/*.json files and excludes nested page files', async () => {
+    const root = await makeTempDir();
+    tempDirs.push(root);
+
+    await writeFile(path.join(root, 'pages/home.json'), '{"root":"home"}');
+    await writeFile(path.join(root, 'pages/about-us.json'), '{"root":"about"}');
+    await writeFile(
+      path.join(root, 'pages/nested/ignored.json'),
+      '{"root":"ignored"}',
+    );
+
+    const result = await discoverCodeComponents({ scanRoot: root });
+
+    expect(result.pages).toHaveLength(2);
+    expect(result.pages.map((page) => page.slug)).toEqual(['about-us', 'home']);
+    expect(
+      result.pages.some(
+        (page) => page.relativePath === 'pages/nested/ignored.json',
+      ),
+    ).toBe(false);
+  });
+
+  it('returns pages and components together in one discovery result', async () => {
+    const root = await makeTempDir();
+    tempDirs.push(root);
+
+    await writeFile(path.join(root, 'pages/home.json'), '{"root":"home"}');
+    await writeFile(path.join(root, 'src/card/component.yml'), 'name: Card');
+    await writeFile(
+      path.join(root, 'src/card/index.tsx'),
+      'export default function Card() { return null; }',
+    );
+
+    const result = await discoverCodeComponents({ scanRoot: root });
+
+    expect(result.components).toHaveLength(1);
+    expect(result.pages).toHaveLength(1);
+    expect(result.pages[0].slug).toBe('home');
+  });
+
   it('discovers index and named metadata variants with expected entries', async () => {
     const root = await makeTempDir();
     tempDirs.push(root);
