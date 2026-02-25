@@ -1,5 +1,9 @@
 import type React from 'react';
 import type { Spec, UIElement } from '@json-render/core';
+import type { ComponentMetadata } from '@drupal-canvas/component-discovery';
+import { defineCatalog } from '@json-render/core';
+import { schema } from '@json-render/react/schema';
+import { fromJSONSchema } from 'zod';
 
 /**
  * Drupal Canvas component tree node.
@@ -270,4 +274,53 @@ export function renderCanvasTree(
 ): React.ReactNode {
   const spec = canvasTreeToSpec(components);
   return renderSpec(spec, registry);
+}
+
+function metadataToCatalogEntry(metadata: ComponentMetadata) {
+  const jsonSchema: Record<string, unknown> = {
+    type: 'object',
+    ...metadata.props,
+  };
+
+  if (metadata.required.length > 0) {
+    jsonSchema.required = metadata.required;
+  }
+
+  const slotNames = Object.keys(metadata.slots);
+
+  // Add slots as additional properties accepting any value.
+  if (slotNames.length > 0) {
+    const properties = (jsonSchema.properties ?? {}) as Record<
+      string,
+      unknown
+    >;
+    for (const [slotName, slot] of Object.entries(metadata.slots)) {
+      properties[slotName] = {
+        description: slot.description ?? slot.title ?? `${slotName} slot`,
+      };
+    }
+    jsonSchema.properties = properties;
+  }
+
+  return {
+    props: fromJSONSchema(jsonSchema),
+    slots: slotNames,
+    description: metadata.description,
+  };
+}
+
+/**
+ * Defines a complete json-render catalog from component metadata using the
+ * `@json-render/react` schema. Converts props from JSON Schema (as defined
+ * in component.yml) to Zod schemas.
+ *
+ * @param metadata - Array of component metadata from `loadComponentsMetadata()`
+ * @returns A json-render `Catalog` instance
+ */
+export function defineComponentCatalog(metadata: ComponentMetadata[]) {
+  const components = Object.fromEntries(
+    metadata.map((m) => [m.name, metadataToCatalogEntry(m)]),
+  );
+
+  return defineCatalog(schema, { components, actions: {} });
 }

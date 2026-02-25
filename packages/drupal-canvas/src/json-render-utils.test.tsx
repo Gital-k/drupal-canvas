@@ -1,9 +1,16 @@
 import React from 'react';
 import { describe, expect, it } from 'vitest';
 
-import { canvasTreeToSpec, renderCanvasTree, specToCanvasTree } from './json-render-utils';
+import {
+  canvasTreeToSpec,
+  defineComponentCatalog,
+  renderCanvasTree,
+  renderSpec,
+  specToCanvasTree,
+} from './json-render-utils';
 
 import type { Spec } from '@json-render/core';
+import type { ComponentMetadata } from '@drupal-canvas/component-discovery';
 import type { CanvasComponentTree } from './json-render-utils';
 
 const UUID_PATTERN =
@@ -758,5 +765,142 @@ describe('renderCanvasTree', () => {
     expect(result).toEqual(
       <>{[<button>A</button>, <button>B</button>]}</>,
     );
+  });
+});
+describe('defineComponentCatalog', () => {
+  it('should create a catalog from component metadata', () => {
+    const metadata: ComponentMetadata[] = [
+      {
+        name: 'Button',
+        machineName: 'button',
+        status: true,
+        description: 'A button component',
+        props: {
+          properties: {
+            label: { type: 'string' },
+            variant: { type: 'string' },
+          },
+        },
+        required: ['label'],
+        slots: {},
+      },
+    ];
+
+    const catalog = defineComponentCatalog(metadata);
+
+    expect(catalog).toBeDefined();
+    expect(catalog.componentNames).toEqual(['Button']);
+    expect(catalog.data.components.Button).toBeDefined();
+    expect(catalog.data.components.Button.description).toBe('A button component');
+  });
+
+  it('should include slots in the catalog entry', () => {
+    const metadata: ComponentMetadata[] = [
+      {
+        name: 'Card',
+        machineName: 'card',
+        status: true,
+        description: 'A card component',
+        props: {
+          properties: {
+            title: { type: 'string' },
+          },
+        },
+        required: [],
+        slots: {
+          header: { title: 'Header', description: 'The header slot' },
+          body: { title: 'Body' },
+        },
+      },
+    ];
+
+    const catalog = defineComponentCatalog(metadata);
+
+    expect(catalog.data.components.Card).toBeDefined();
+    expect(catalog.data.components.Card.slots).toEqual(['header', 'body']);
+  });
+
+  it('should handle metadata with no props or slots', () => {
+    const metadata: ComponentMetadata[] = [
+      {
+        name: 'Divider',
+        machineName: 'divider',
+        status: true,
+        description: 'A divider',
+        props: {},
+        required: [],
+        slots: {},
+      },
+    ];
+
+    const catalog = defineComponentCatalog(metadata);
+
+    expect(catalog.componentNames).toEqual(['Divider']);
+    expect(catalog.data.components.Divider.slots).toEqual([]);
+  });
+
+  it('should handle multiple components', () => {
+    const metadata: ComponentMetadata[] = [
+      {
+        name: 'Button',
+        machineName: 'button',
+        status: true,
+        description: 'A button',
+        props: { properties: { label: { type: 'string' } } },
+        required: [],
+        slots: {},
+      },
+      {
+        name: 'Text',
+        machineName: 'text',
+        status: true,
+        description: 'A text block',
+        props: { properties: { content: { type: 'string' } } },
+        required: ['content'],
+        slots: {},
+      },
+    ];
+
+    const catalog = defineComponentCatalog(metadata);
+
+    expect(catalog.componentNames).toEqual(['Button', 'Text']);
+  });
+
+  it('should produce a catalog that can generate a prompt', () => {
+    const metadata: ComponentMetadata[] = [
+      {
+        name: 'Button',
+        machineName: 'button',
+        status: true,
+        description: 'A button',
+        props: { properties: { label: { type: 'string' } } },
+        required: ['label'],
+        slots: {},
+      },
+    ];
+
+    const catalog = defineComponentCatalog(metadata);
+    const prompt = catalog.prompt();
+
+    expect(prompt).toContain('Button');
+  });
+
+  it('should expose a zodSchema for validation', () => {
+    const metadata: ComponentMetadata[] = [
+      {
+        name: 'Button',
+        machineName: 'button',
+        status: true,
+        description: 'A button',
+        props: { properties: { label: { type: 'string' } } },
+        required: [],
+        slots: {},
+      },
+    ];
+
+    const catalog = defineComponentCatalog(metadata);
+
+    expect(typeof catalog.zodSchema).toBe('function');
+    expect(catalog.zodSchema()).toBeDefined();
   });
 });
