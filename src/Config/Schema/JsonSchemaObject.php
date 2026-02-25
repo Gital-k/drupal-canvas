@@ -22,7 +22,7 @@ final class JsonSchemaObject extends Mapping {
    */
   public function __construct(DataDefinitionInterface $definition, $name = NULL, ?TypedDataInterface $parent = NULL) {
     \assert($definition instanceof MapDataDefinition);
-    $ref = $parent?->getParent()?->getValue()['$ref'] ?? NULL;
+    $ref = $this->findRef($parent);
     if ($ref === NULL) {
       // This will be caught by the parent constraint that requires a $ref key.
       parent::__construct($definition, $name, $parent);
@@ -81,6 +81,40 @@ final class JsonSchemaObject extends Mapping {
       }
     }
     parent::__construct($definition, $name, $parent);
+  }
+
+  /**
+   * Finds the $ref value from the parent context.
+   *
+   * Handles two cases:
+   * 1. Regular object prop: $ref is at parent->parent (the prop definition)
+   * 2. Array example item: $ref is at items.$ref in the prop definition.
+   *
+   * @param \Drupal\Core\TypedData\TypedDataInterface|null $parent
+   *   The parent typed data object.
+   *
+   * @return string|null
+   *   The $ref URI, or NULL if not found.
+   */
+  private function findRef(?TypedDataInterface $parent): ?string {
+    // Case 1: Regular object prop example - $ref is sibling of examples.
+    // Structure: props.some_prop.$ref, props.some_prop.examples.0
+    // Parent chain: example item -> examples sequence -> prop definition.
+    $ref = $parent?->getParent()?->getValue()['$ref'] ?? NULL;
+    if ($ref !== NULL) {
+      return $ref;
+    }
+
+    // Case 2: Array example item - $ref is in items.
+    // Structure: props.array_prop.items.$ref, props.array_prop.examples.0.0
+    // Parent chain: item -> inner sequence (examples.0) -> outer sequence
+    // (examples) -> prop definition.
+    $propDefinition = $parent?->getParent()?->getParent()?->getValue();
+    if (is_array($propDefinition) && ($propDefinition['type'] ?? NULL) === 'array') {
+      return $propDefinition['items']['$ref'] ?? NULL;
+    }
+
+    return NULL;
   }
 
 }

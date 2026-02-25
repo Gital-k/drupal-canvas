@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Flex, Select } from '@radix-ui/themes';
 
 import { useAppDispatch } from '@/app/hooks';
@@ -13,6 +13,7 @@ import { getCanvasModuleBaseUrl } from '@/utils/drupal-globals';
 import type {
   CodeComponentProp,
   CodeComponentPropVideoExample,
+  ValueMode,
 } from '@/types/CodeComponent';
 
 const moduleBaseUrl = getCanvasModuleBaseUrl() || '';
@@ -78,15 +79,55 @@ export default function FormPropTypeVideo({
   example,
   isDisabled = false,
   required,
+  allowMultiple = false,
+  valueMode = 'unlimited',
+  limitedCount = 1,
 }: Pick<CodeComponentProp, 'id'> & {
-  example: CodeComponentPropVideoExample;
+  example: CodeComponentPropVideoExample | CodeComponentPropVideoExample[];
   isDisabled?: boolean;
   required: boolean;
+  allowMultiple?: boolean;
+  valueMode?: ValueMode;
+  limitedCount?: number;
 }) {
-  const exampleAspectRatio = parseExampleSrc(example.poster);
+  // Handle both single video and array (when allowMultiple is enabled)
+  // If it's an array, use the first element for display
+  // Handle edge case where example might be an empty string (when prop type is first created/changed)
+  const videoExample = Array.isArray(example)
+    ? example[0] || { src: '', poster: '', width: 0, height: 0 }
+    : !example
+      ? { src: '', poster: '', width: 0, height: 0 }
+      : example;
+
+  const exampleAspectRatio = parseExampleSrc(videoExample.poster);
   const dispatch = useAppDispatch();
   const [aspectRatio, setAspectRatio] = useState(exampleAspectRatio);
   const [localRequired, setLocalRequired] = useState(required);
+
+  // Use ref to track the previous values to prevent infinite loops
+  const prevValuesRef = useRef({
+    aspectRatio: exampleAspectRatio,
+    allowMultiple,
+    valueMode,
+    limitedCount,
+  });
+
+  // Sync state with incoming example prop (for pre-population on reload)
+  useEffect(() => {
+    // If example is empty array, keep current aspectRatio (don't reset to default)
+    if (Array.isArray(example) && example.length === 0) {
+      return;
+    }
+    // If example has valid content, parse and update state
+    if (videoExample.poster) {
+      const parsedAspectRatio = parseExampleSrc(videoExample.poster);
+      setAspectRatio(parsedAspectRatio);
+    }
+    // If example is empty string, it could mean:
+    // 1. Initial mount - let the main useEffect initialize with defaults
+    // 2. User explicitly selected None - aspectRatio would already be NONE_VALUE
+    // We don't need to do anything here; the main useEffect will handle initialization
+  }, [videoExample.poster, example]);
 
   useEffect(() => {
     // Track changes to the required prop, update aspect ratio if needed.
@@ -97,12 +138,36 @@ export default function FormPropTypeVideo({
   }, [required, localRequired, aspectRatio]);
 
   useEffect(() => {
+    // Check if any relevant values have changed
+    const hasChanged =
+      prevValuesRef.current.aspectRatio !== aspectRatio ||
+      prevValuesRef.current.allowMultiple !== allowMultiple ||
+      prevValuesRef.current.valueMode !== valueMode ||
+      prevValuesRef.current.limitedCount !== limitedCount;
+
+    // Check if we need to initialize with a default value on first mount
+    const isEmptyExample = Array.isArray(example) && example.length === 0;
+    const isFirstRender = prevValuesRef.current.aspectRatio === null;
+
+    // Only run if values actually changed OR if this is first render with empty example
+    if (!hasChanged && !(isFirstRender && isEmptyExample)) {
+      return;
+    }
+
+    // Update ref with new values
+    prevValuesRef.current = {
+      aspectRatio,
+      allowMultiple,
+      valueMode,
+      limitedCount,
+    };
+
     if (aspectRatio === NONE_VALUE) {
       dispatch(
         updateProp({
           id,
           updates: {
-            example: '',
+            example: allowMultiple ? [] : '',
           },
         }),
       );
@@ -113,22 +178,65 @@ export default function FormPropTypeVideo({
         (ratio) => ratio.value === aspectRatio,
       ) || EXAMPLE_ASPECT_RATIO_VALUES[0];
 
-    dispatch(
-      updateProp({
-        id,
-        updates: {
-          example: {
-            // ⚠️ @todo This uses the SAME URL for both the live preview and to send to the server at `canvas/api/v0/config/auto-save/js_component/…`.
-            // This needs to send different values for either:
-            // - one of CONFIG_EXAMPLE_URLS to the server
-            // - one of VIDEO_SERVICE_URLS for the live preview
-            src: aspectRatioData.exampleSrc.substring(moduleBaseUrl.length),
-            poster: `${POSTER_SERVICE_URL}${aspectRatioData.width}x${aspectRatioData.height}.png?text=${aspectRatioData.label}`,
+    const newVideoExample: CodeComponentPropVideoExample = {
+      // ⚠️ @todo This uses the SAME URL for both the live preview and to send to the server at `canvas/api/v0/config/auto-save/js_component/…`.
+      // This needs to send different values for either:
+      // - one of CONFIG_EXAMPLE_URLS to the server
+      // - one of VIDEO_SERVICE_URLS for the live preview
+      src: aspectRatioData.exampleSrc.substring(moduleBaseUrl.length),
+      poster: `${POSTER_SERVICE_URL}${aspectRatioData.width}x${aspectRatioData.height}.png?text=${aspectRatioData.label}`,
+    };
+
+    // For multi-value mode, create an array
+    if (allowMultiple) {
+      const currentArray = Array.isArray(example) ? example : [];
+
+      // For limited mode, ensure we have exactly limitedCount items
+      if (valueMode === 'limited') {
+        const newArray = Array.from(
+          { length: limitedCount },
+          (_, i) => currentArray[i] || newVideoExample,
+        );
+        dispatch(
+          updateProp({
+            id,
+            updates: {
+              example: newArray,
+            },
+          }),
+        );
+      } else {
+        // For unlimited mode, keep existing array or create one with single item
+        dispatch(
+          updateProp({
+            id,
+            updates: {
+              example:
+                currentArray.length > 0 ? currentArray : [newVideoExample],
+            },
+          }),
+        );
+      }
+    } else {
+      // Single value mode
+      dispatch(
+        updateProp({
+          id,
+          updates: {
+            example: newVideoExample,
           },
-        },
-      }),
-    );
-  }, [aspectRatio, dispatch, id]);
+        }),
+      );
+    }
+  }, [
+    aspectRatio,
+    dispatch,
+    id,
+    example,
+    allowMultiple,
+    valueMode,
+    limitedCount,
+  ]);
 
   return (
     <Flex direction="column" gap="4" flexGrow="1">

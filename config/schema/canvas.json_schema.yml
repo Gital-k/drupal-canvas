@@ -36,7 +36,8 @@ canvas.json_schema.prop.*:
             - 'integer'
             - 'boolean'
             - 'object'
-            # @todo Consider adding `array` after https://www.drupal.org/i/3467870 is fixed.
+            # 'array' is added by canvas_dev_mode module when enabled.
+            # @see \Drupal\canvas_dev_mode\Hook\UsePrivateApis::addArrayTypeChoice()
     description:
       requiredKey: false
       type: label
@@ -236,3 +237,126 @@ canvas.json_schema.object:
   type: mapping
   constraints:
     FullyValidatable: ~
+
+# @see https://json-schema.org/understanding-json-schema/reference/array
+canvas.json_schema.prop.array:
+  type: canvas.json_schema.prop.*
+  constraints:
+    FullyValidatable: ~
+  mapping:
+    examples:
+      requiredKey: false
+      type: sequence
+      label: 'Array of values'
+      sequence:
+        type: sequence
+        label: 'Array example value'
+        sequence:
+          # Dynamically resolve type based on items.type value.
+          type: canvas.array_example_item.[%parent.%parent.%parent.items.type]
+    maxItems:
+      requiredKey: false
+      type: integer
+      label: 'Maximum number of items'
+      constraints:
+        Range:
+          min: 1
+    items:
+      # items is required for array type - defines the schema for array elements
+      type: mapping
+      label: 'Array items schema'
+      mapping:
+        type:
+          type: string
+          label: 'Item type'
+          constraints:
+            Choice:
+              choices:
+                - 'string'
+                - 'number'
+                - 'integer'
+                - 'object'
+        enum:
+          requiredKey: false
+          type: sequence
+          sequence:
+            type: string
+            constraints:
+              NotNull: ~
+        meta:enum:
+          requiredKey: false
+          type: sequence
+          sequence:
+            type: label
+            constraints:
+              NotNull: ~
+        x-translation-context:
+          requiredKey: false
+          type: string
+          label: 'Translation context'
+        format:
+          requiredKey: false
+          type: string
+          label: 'Format'
+          constraints:
+            Choice:
+              choices:
+                - date-time
+                - date
+                - email
+                - idn-email
+                - uri
+                - uri-reference
+                - iri
+                - iri-reference
+        contentMediaType:
+          requiredKey: false
+          type: string
+          label: 'Content media type'
+          constraints:
+            Choice:
+              choices:
+                - 'text/html'
+        'x-formatting-context':
+          requiredKey: false
+          type: string
+          label: 'Formatting context'
+          constraints:
+            Choice:
+              choices:
+                - 'block'
+        '$ref':
+          requiredKey: false
+          type: string
+          constraints:
+            Choice:
+              choices:
+                - 'json-schema-definitions://canvas.module/image'
+                - 'json-schema-definitions://canvas.module/video'
+
+# Dynamic type definitions for array example items based on items.type.
+# @see canvas.json_schema.prop.array
+canvas.array_example_item.string:
+  type: string
+  constraints:
+    NotNull: ~
+
+canvas.array_example_item.integer:
+  type: integer
+  constraints:
+    NotNull: ~
+
+canvas.array_example_item.number:
+  type: float
+  constraints:
+    NotNull: ~
+
+# Object array examples use canvas.json_schema.object which now handles both
+# regular prop examples and array item examples by finding $ref in items.
+canvas.array_example_item.object:
+  type: canvas.json_schema.object
+  constraints:
+    NotNull: ~
+    NotBlank:
+      allowNull: true
+

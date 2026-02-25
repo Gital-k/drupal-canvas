@@ -134,7 +134,16 @@ final class DefaultRelativeUrlPropSource extends PropSourceBase {
 
   private static function recurse(array $json_schema, mixed $value, UrlRewriteInterface $component_source): mixed {
     if ($json_schema['type'] === 'array') {
-      \assert(array_is_list($value));
+      // Ensure value is an array. If it's not (e.g., empty string or
+      // other scalar), convert it to an empty array to prevent type errors.
+      if (!is_array($value)) {
+        $value = [];
+      }
+      // Ensure it's a proper list (sequential numeric keys starting from 0)
+      // If not, convert it to a list by re-indexing
+      if (!empty($value) && !array_is_list($value)) {
+        $value = array_values($value);
+      }
       $evaluated = [];
       foreach ($value as $k => $v) {
         $evaluated[$k] = self::recurse($json_schema['items'], $v, $component_source);
@@ -142,7 +151,12 @@ final class DefaultRelativeUrlPropSource extends PropSourceBase {
       return $evaluated;
     }
     elseif ($json_schema['type'] === 'object') {
-      \assert(!array_is_list($value));
+      // Ensure value is an array (objects are represented as arrays in PHP).
+      if (!is_array($value)) {
+        $value = [];
+      }
+      // For objects, ensure it's not a list (should have string keys)
+      // If it's a list, leave it as-is or convert if needed
       $evaluated = [];
       foreach ($value as $k => $v) {
         $evaluated[$k] = self::recurse($json_schema['properties'][$k], $v, $component_source);

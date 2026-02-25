@@ -113,4 +113,60 @@ class JavascriptComponentTest extends CanvasKernelTestBase {
     ], $js_component->getCacheTags());
   }
 
+  /**
+   * Tests that array prop enum/meta:enum are normalized from array to items level.
+   *
+   * @covers ::createFromClientSide
+   * @covers ::updateFromClientSide
+   */
+  public function testArrayPropEnumNormalization(): void {
+    // Enable canvas_dev_mode to unlock array type support.
+    $this->enableModules(['canvas_dev_mode']);
+
+    // Create component with enum/meta:enum at array level (as client sends).
+    $client_data = [
+      'machineName' => 'enum_array_test',
+      'name' => 'Enum Array Test',
+      'status' => TRUE,
+      'required' => [],
+      'props' => [
+        'tags' => [
+          'type' => 'array',
+          'title' => 'Tags',
+          'items' => ['type' => 'string'],
+          // These are at array level (incorrect, but what client sends).
+          'enum' => ['option1', 'option2'],
+          'meta:enum' => ['option1' => 'Option 1', 'option2' => 'Option 2'],
+          'x-translation-context' => 'Tag selection',
+          'examples' => [['option1']],
+        ],
+      ],
+      'slots' => [],
+      'sourceCodeJs' => 'console.log("test")',
+      'sourceCodeCss' => '',
+      'compiledJs' => 'console.log("test")',
+      'compiledCss' => '',
+      'importedJsComponents' => [],
+      'dataDependencies' => [],
+    ];
+
+    $js_component = JavaScriptComponent::createFromClientSide($client_data);
+    $this->assertSame(SAVED_NEW, $js_component->save());
+
+    // Verify enum/meta:enum/x-translation-context were moved to items level.
+    $this->assertSame([
+      'tags' => [
+        'title' => 'Tags',
+        'type' => 'array',
+        'examples' => [['option1']],
+        'items' => [
+          'type' => 'string',
+          'enum' => ['option1', 'option2'],
+          'meta:enum' => ['option1' => 'Option 1', 'option2' => 'Option 2'],
+          'x-translation-context' => 'Tag selection',
+        ],
+      ],
+    ], $js_component->get('props'));
+  }
+
 }

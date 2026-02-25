@@ -1,5 +1,8 @@
 import { useMemo } from 'react';
-import { InfoCircledIcon } from '@radix-ui/react-icons';
+import {
+  InfoCircledIcon,
+  QuestionMarkCircledIcon,
+} from '@radix-ui/react-icons';
 import {
   Box,
   Callout,
@@ -7,6 +10,7 @@ import {
   Select,
   Switch,
   TextField,
+  Tooltip,
 } from '@radix-ui/themes';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
@@ -24,6 +28,7 @@ import {
   FormElement,
   Label,
 } from '@/features/code-editor/component-data/FormElement';
+import FormPropTypeArray from '@/features/code-editor/component-data/forms/FormPropTypeArray';
 import FormPropTypeBoolean from '@/features/code-editor/component-data/forms/FormPropTypeBoolean';
 import FormPropTypeDate from '@/features/code-editor/component-data/forms/FormPropTypeDate';
 import FormPropTypeEnum from '@/features/code-editor/component-data/forms/FormPropTypeEnum';
@@ -34,12 +39,20 @@ import FormPropTypeTextField from '@/features/code-editor/component-data/forms/F
 import FormPropTypeVideo from '@/features/code-editor/component-data/forms/FormPropTypeVideo';
 import SortableList from '@/features/code-editor/component-data/SortableList';
 import { getPropMachineName } from '@/features/code-editor/utils/utils';
+import {
+  VALUE_MODE_LIMITED,
+  VALUE_MODE_UNLIMITED,
+} from '@/types/CodeComponent';
+import { getCanvasSettings } from '@/utils/drupal-globals';
 
 import type {
   CodeComponentProp,
   CodeComponentPropImageExample,
   CodeComponentPropVideoExample,
+  ValueMode,
 } from '@/types/CodeComponent';
+
+import './Props.css';
 
 export default function Props() {
   const dispatch = useAppDispatch();
@@ -53,6 +66,46 @@ export default function Props() {
     if (!componentStatus) return new Set<string>();
     return new Set(initialPropIds);
   }, [componentStatus, initialPropIds]);
+
+  /**
+   * Helper function to create a new array with the specified count,
+   * preserving existing values and filling new slots with default value.
+   */
+  const createArrayWithCount = (
+    currentExample: unknown,
+    newCount: number,
+    defaultValue: string | number = '',
+  ): (string | number)[] => {
+    const exampleArray = Array.isArray(currentExample) ? currentExample : [];
+    return Array.from(
+      { length: newCount },
+      (_, i) => exampleArray[i] ?? defaultValue,
+    );
+  };
+
+  /**
+   * Helper function to update both limitedCount and example array for a prop.
+   */
+  const updateLimitedCount = (
+    propId: string,
+    currentExample: unknown,
+    newCount: number,
+    defaultValue: string | number = '',
+  ) => {
+    dispatch(
+      updateProp({
+        id: propId,
+        updates: {
+          limitedCount: newCount,
+          example: createArrayWithCount(
+            currentExample,
+            newCount,
+            defaultValue,
+          ) as string[] | number[],
+        },
+      }),
+    );
+  };
 
   const handleAddProp = () => {
     dispatch(addProp());
@@ -112,6 +165,10 @@ export default function Props() {
                           enum: undefined,
                           $ref: undefined,
                           format: undefined,
+                          allowMultiple: false,
+                          items: undefined,
+                          valueMode: undefined,
+                          limitedCount: undefined,
                           ...selectedPropType.init,
                         } as Partial<CodeComponentProp>,
                       }),
@@ -156,7 +213,20 @@ export default function Props() {
             case 'text':
             case 'integer':
             case 'number':
-              return (
+              return prop.allowMultiple ? (
+                <FormPropTypeArray
+                  id={prop.id}
+                  example={prop.example as string[] | number[]}
+                  itemType={
+                    (prop.type === 'array' ? prop.items?.type : prop.type) as
+                      | 'string'
+                      | 'integer'
+                      | 'number'
+                  }
+                  valueMode={prop.valueMode}
+                  limitedCount={prop.limitedCount}
+                />
+              ) : (
                 <FormPropTypeTextField
                   id={prop.id}
                   type={prop.type as 'string' | 'number' | 'integer'}
@@ -174,25 +244,43 @@ export default function Props() {
               return (
                 <FormPropTypeLink
                   id={prop.id}
-                  example={prop.example as string}
+                  example={prop.example as string | string[]}
                   format={prop.format as string}
-                  isDisabled={disabledPropIds.has(prop.id)}
+                  allowMultiple={prop.allowMultiple}
+                  valueMode={prop.valueMode}
+                  limitedCount={prop.limitedCount}
                 />
               );
             case 'image':
               return (
                 <FormPropTypeImage
                   id={prop.id}
-                  example={prop.example as CodeComponentPropImageExample}
+                  example={
+                    prop.example as
+                      | CodeComponentPropImageExample
+                      | CodeComponentPropImageExample[]
+                  }
+                  isDisabled={componentStatus}
                   required={required.includes(propName)}
+                  allowMultiple={prop.allowMultiple}
+                  valueMode={prop.valueMode}
+                  limitedCount={prop.limitedCount}
                 />
               );
             case 'video':
               return (
                 <FormPropTypeVideo
                   id={prop.id}
-                  example={prop.example as CodeComponentPropVideoExample}
+                  example={
+                    prop.example as
+                      | CodeComponentPropVideoExample
+                      | CodeComponentPropVideoExample[]
+                  }
+                  isDisabled={componentStatus}
                   required={required.includes(propName)}
+                  allowMultiple={prop.allowMultiple}
+                  valueMode={prop.valueMode}
+                  limitedCount={prop.limitedCount}
                 />
               );
             case 'boolean':
@@ -210,20 +298,389 @@ export default function Props() {
                   id={prop.id}
                   required={required.includes(propName)}
                   enum={prop.enum || []}
-                  example={prop.example as string}
+                  example={prop.example as string | string[]}
+                  allowMultiple={prop.allowMultiple}
+                  valueMode={prop.valueMode}
+                  limitedCount={prop.limitedCount}
                 />
               );
             case 'date':
               return (
                 <FormPropTypeDate
                   id={prop.id}
-                  example={prop.example as string}
+                  example={prop.example as string | string[]}
                   format={prop.format as string}
-                  isDisabled={disabledPropIds.has(prop.id)}
+                  allowMultiple={prop.allowMultiple}
+                  valueMode={prop.valueMode}
+                  limitedCount={prop.limitedCount}
                 />
               );
           }
         })()}
+
+        {/* Allow multiple values checkbox - shown for types that support it and only in dev mode */}
+        {getCanvasSettings()?.devMode &&
+          [
+            'text',
+            'link',
+            'integer',
+            'number',
+            'image',
+            'video',
+            'date',
+            'listText',
+            'listInteger',
+          ].includes(prop.derivedType ?? '') && (
+            <Flex direction="column" gap="2" mt="3">
+              <Flex align="center" gap="2" mt="3">
+                <input
+                  type="checkbox"
+                  id={`prop-allow-multiple-${prop.id}`}
+                  checked={prop.allowMultiple ?? false}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    const updates: Partial<CodeComponentProp> = {
+                      allowMultiple: checked,
+                    };
+
+                    if (checked) {
+                      // Convert to array type - for date and link types.
+                      if (['date', 'link'].includes(prop.derivedType ?? '')) {
+                        updates.type = 'array';
+                        updates.items = {
+                          type: 'string',
+                          format: prop.format,
+                        };
+                        updates.example = [];
+                        updates.valueMode = VALUE_MODE_UNLIMITED;
+                        updates.limitedCount = 1;
+                      } else if (
+                        ['listText', 'listInteger'].includes(
+                          prop.derivedType ?? '',
+                        )
+                      ) {
+                        // Convert to array type - for list types (preserve enum).
+                        updates.type = 'array';
+                        updates.items = {
+                          type: prop.type as 'string' | 'integer',
+                          enum: prop.enum?.map((item) => item.value),
+                        };
+                        updates.example = [];
+                        updates.valueMode = 'unlimited';
+                        updates.limitedCount = 1;
+                      } else if (
+                        ['string', 'integer', 'number'].includes(prop.type)
+                      ) {
+                        // Convert to array type - for primitive types.
+                        updates.type = 'array';
+                        updates.items = {
+                          type: prop.type as 'string' | 'integer' | 'number',
+                        };
+                        updates.example = [];
+                        updates.valueMode = VALUE_MODE_UNLIMITED;
+                        updates.limitedCount = 1;
+                      } else if (prop.type === 'object') {
+                        // Convert to array type - for object types (image/video).
+                        updates.type = 'array';
+                        updates.items = {
+                          type: 'object',
+                          $ref: prop.$ref,
+                        };
+                        // Convert single object to array with that object
+                        // Handle both valid objects and empty strings (which is the initial state)
+                        if (
+                          prop.example &&
+                          typeof prop.example === 'object' &&
+                          !Array.isArray(prop.example) &&
+                          (prop.example as CodeComponentPropImageExample).src
+                        ) {
+                          updates.example = [prop.example] as
+                            | CodeComponentPropImageExample[]
+                            | CodeComponentPropVideoExample[];
+                        } else {
+                          // Start with empty array - FormPropTypeImageArray will handle initialization
+                          updates.example = [];
+                        }
+                        updates.valueMode = 'unlimited';
+                        updates.limitedCount = 1;
+                      }
+                    } else {
+                      // Convert back to single value.
+                      // Restore the original type from items or derivedType
+                      if (prop.type === 'array' && prop.items?.type) {
+                        updates.type = prop.items.type;
+                      } else if (
+                        ['text', 'link', 'date'].includes(
+                          prop.derivedType ?? '',
+                        )
+                      ) {
+                        updates.type = 'string';
+                      } else if (prop.derivedType === 'integer') {
+                        updates.type = 'integer';
+                      } else if (prop.derivedType === 'number') {
+                        updates.type = 'number';
+                      } else if (
+                        ['image', 'video'].includes(prop.derivedType ?? '')
+                      ) {
+                        updates.type = 'object';
+                      } else if (prop.derivedType === 'listText') {
+                        updates.type = 'string';
+                      } else if (prop.derivedType === 'listInteger') {
+                        updates.type = 'integer';
+                      }
+                      updates.items = undefined;
+                      updates.example = '';
+                      updates.valueMode = undefined;
+                      updates.limitedCount = undefined;
+                    }
+
+                    dispatch(updateProp({ id: prop.id, updates }));
+                  }}
+                  disabled={componentStatus}
+                />
+                <Label htmlFor={`prop-allow-multiple-${prop.id}`}>
+                  Allow multiple values
+                </Label>
+                <Tooltip content="Stores a list of values instead of a single value">
+                  <QuestionMarkCircledIcon />
+                </Tooltip>
+              </Flex>
+              {/* Limited/Unlimited dropdown - only shown when allowMultiple is true */}
+              {prop.allowMultiple && (
+                <Flex align="center" gap="2">
+                  <Select.Root
+                    value={prop.valueMode ?? VALUE_MODE_UNLIMITED}
+                    size="1"
+                    onValueChange={(value: ValueMode) => {
+                      const updates: Partial<CodeComponentProp> = {
+                        valueMode: value,
+                      };
+
+                      if (value === VALUE_MODE_LIMITED) {
+                        // When switching to limited mode, ensure we have exactly limitedCount items
+                        const count = prop.limitedCount ?? 1;
+                        const itemType =
+                          prop.type === 'array' ? prop.items?.type : prop.type;
+                        const defaultValue =
+                          itemType === 'integer' || itemType === 'number'
+                            ? 0
+                            : '';
+                        updates.example = createArrayWithCount(
+                          prop.example,
+                          count,
+                          defaultValue,
+                        ) as string[] | number[];
+                      }
+
+                      dispatch(updateProp({ id: prop.id, updates }));
+                    }}
+                    disabled={componentStatus}
+                  >
+                    <Select.Trigger
+                      id={`prop-value-mode-${prop.id}`}
+                      className="props-select-trigger"
+                    />
+                    <Select.Content>
+                      <Select.Item value={VALUE_MODE_LIMITED}>
+                        Limited
+                      </Select.Item>
+                      <Select.Item value={VALUE_MODE_UNLIMITED}>
+                        Unlimited
+                      </Select.Item>
+                    </Select.Content>
+                  </Select.Root>
+
+                  {/* Counter for limited mode */}
+                  {prop.valueMode === VALUE_MODE_LIMITED && (
+                    <Box className="props-limited-box">
+                      <TextField.Root
+                        autoComplete="off"
+                        id={`prop-limited-count-${prop.id}`}
+                        type="number"
+                        value={prop.limitedCount ?? 1}
+                        size="1"
+                        min={1}
+                        max={
+                          ['listText', 'listInteger'].includes(
+                            prop.derivedType ?? '',
+                          )
+                            ? (prop.enum?.filter(
+                                (item) =>
+                                  item.value !== '' && item.label !== '',
+                              ).length ?? undefined)
+                            : undefined
+                        }
+                        className="props-textfield-root"
+                        onChange={(e) => {
+                          // For list types, max limit is the number of enum options
+                          const maxLimit = ['listText', 'listInteger'].includes(
+                            prop.derivedType ?? '',
+                          )
+                            ? (prop.enum?.filter(
+                                (item) =>
+                                  item.value !== '' && item.label !== '',
+                              ).length ?? Infinity)
+                            : Infinity;
+                          const newCount = Math.min(
+                            maxLimit,
+                            Math.max(1, Number(e.target.value)),
+                          );
+                          const itemType =
+                            prop.type === 'array'
+                              ? prop.items?.type
+                              : prop.type;
+                          const defaultValue =
+                            itemType === 'integer' || itemType === 'number'
+                              ? 0
+                              : '';
+                          updateLimitedCount(
+                            prop.id,
+                            prop.example,
+                            newCount,
+                            defaultValue,
+                          );
+                        }}
+                        disabled={componentStatus}
+                      >
+                        <TextField.Slot side="right">
+                          <Flex gap="0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const currentCount = prop.limitedCount ?? 1;
+                                if (currentCount <= 1) return;
+                                const newCount = currentCount - 1;
+                                const itemType =
+                                  prop.type === 'array'
+                                    ? prop.items?.type
+                                    : prop.type;
+                                const defaultValue =
+                                  itemType === 'integer' ||
+                                  itemType === 'number'
+                                    ? 0
+                                    : '';
+                                updateLimitedCount(
+                                  prop.id,
+                                  prop.example,
+                                  newCount,
+                                  defaultValue,
+                                );
+                              }}
+                              disabled={
+                                componentStatus || (prop.limitedCount ?? 1) <= 1
+                              }
+                              aria-label="Decrease count"
+                              style={{
+                                border: 'none',
+                                background: 'transparent',
+                                cursor:
+                                  (prop.limitedCount ?? 1) <= 1
+                                    ? 'not-allowed'
+                                    : 'pointer',
+                                padding: '2px 6px',
+                                opacity:
+                                  (prop.limitedCount ?? 1) <= 1 ? 0.5 : 1,
+                              }}
+                            >
+                              −
+                            </button>
+                            <span className="props-divider" />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const currentCount = prop.limitedCount ?? 1;
+                                // For list types, max limit is the number of enum options
+                                const maxLimit = [
+                                  'listText',
+                                  'listInteger',
+                                ].includes(prop.derivedType ?? '')
+                                  ? (prop.enum?.filter(
+                                      (item) =>
+                                        item.value !== '' && item.label !== '',
+                                    ).length ?? Infinity)
+                                  : Infinity;
+                                if (currentCount >= maxLimit) return;
+                                const newCount = currentCount + 1;
+                                const itemType =
+                                  prop.type === 'array'
+                                    ? prop.items?.type
+                                    : prop.type;
+                                const defaultValue =
+                                  itemType === 'integer' ||
+                                  itemType === 'number'
+                                    ? 0
+                                    : '';
+                                updateLimitedCount(
+                                  prop.id,
+                                  prop.example,
+                                  newCount,
+                                  defaultValue,
+                                );
+                              }}
+                              disabled={(() => {
+                                const maxLimit = [
+                                  'listText',
+                                  'listInteger',
+                                ].includes(prop.derivedType ?? '')
+                                  ? (prop.enum?.filter(
+                                      (item) =>
+                                        item.value !== '' && item.label !== '',
+                                    ).length ?? Infinity)
+                                  : Infinity;
+                                return (
+                                  componentStatus ||
+                                  (prop.limitedCount ?? 1) >= maxLimit
+                                );
+                              })()}
+                              aria-label="Increase count"
+                              style={{
+                                border: 'none',
+                                background: 'transparent',
+                                cursor: (() => {
+                                  const maxLimit = [
+                                    'listText',
+                                    'listInteger',
+                                  ].includes(prop.derivedType ?? '')
+                                    ? (prop.enum?.filter(
+                                        (item) =>
+                                          item.value !== '' &&
+                                          item.label !== '',
+                                      ).length ?? Infinity)
+                                    : Infinity;
+                                  return componentStatus ||
+                                    (prop.limitedCount ?? 1) >= maxLimit
+                                    ? 'not-allowed'
+                                    : 'pointer';
+                                })(),
+                                padding: '2px 6px',
+                                opacity: (() => {
+                                  const maxLimit = [
+                                    'listText',
+                                    'listInteger',
+                                  ].includes(prop.derivedType ?? '')
+                                    ? (prop.enum?.filter(
+                                        (item) =>
+                                          item.value !== '' &&
+                                          item.label !== '',
+                                      ).length ?? Infinity)
+                                    : Infinity;
+                                  return (prop.limitedCount ?? 1) >= maxLimit
+                                    ? 0.5
+                                    : 1;
+                                })(),
+                              }}
+                            >
+                              +
+                            </button>
+                          </Flex>
+                        </TextField.Slot>
+                      </TextField.Root>
+                    </Box>
+                  )}
+                </Flex>
+              )}
+            </Flex>
+          )}
       </Flex>
     );
   };
