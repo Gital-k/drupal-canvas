@@ -38,6 +38,7 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Validator\ConstraintViolation;
 use Symfony\Component\Validator\ConstraintViolationList;
 use Symfony\Component\Validator\ConstraintViolationListInterface;
 
@@ -295,6 +296,23 @@ final class ApiAutoSaveController extends ApiControllerBase {
           }
         }
         $use_existing_revision_id = AutoSaveManager::entityIsConsideredNew($entity);
+
+        // Prevent publishing entities that are considered "new" (e.g., still
+        // have the default "Untitled page" title). These should be renamed
+        // before publishing.
+        // @see https://drupal.org/i/3562185
+        if ($use_existing_revision_id) {
+          $violation = new ConstraintViolation(
+            ErrorCodesEnum::EntityConsideredNew->getMessage(),
+            '',
+            [],
+            $entity,
+            '',
+            $entity->label(),
+          );
+          $violationSets[] = new EntityConstraintViolationList($entity, [$violation]);
+          continue;
+        }
 
         if ($entity instanceof EntityPublishedInterface) {
           $entity->setPublished();
