@@ -50,6 +50,8 @@ export function canvasTreeToSpec(components: CanvasComponentTree): Spec {
       inputs = component.inputs;
     }
 
+    // @todo: Convert Canvas content template prop expressions to json-render data bindings and reverse in specToCanvasTree.
+
     if (component.parent_uuid === null) {
       elements[component.uuid] = {
         type: component.component_id,
