@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Drupal\canvas_dev_translation\EventSubscriber;
 
 use Drupal\Core\Entity\ContentEntityInterface;
-use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\Core\Session\AccountInterface;
@@ -40,15 +39,12 @@ class TranslationNotFoundSubscriber implements EventSubscriberInterface {
    *   The current route match.
    * @param \Drupal\Core\Language\LanguageManagerInterface $languageManager
    *   The language manager.
-   * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entityTypeManager
-   *   The entity type manager.
    * @param \Drupal\Core\Session\AccountInterface $currentUser
    *   The current user.
    */
   public function __construct(
     private readonly RouteMatchInterface $routeMatch,
     private readonly LanguageManagerInterface $languageManager,
-    private readonly EntityTypeManagerInterface $entityTypeManager,
     private readonly AccountInterface $currentUser,
   ) {}
 
@@ -96,7 +92,7 @@ class TranslationNotFoundSubscriber implements EventSubscriberInterface {
         || $this->currentUser->hasPermission('edit canvas_page');
 
       $message = $is_editor
-        ? sprintf(
+        ? \sprintf(
             "No translation exists for '%s' in language '%s'. Create one via the translations panel.",
             $entity->label(),
             $langcode

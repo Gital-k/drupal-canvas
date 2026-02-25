@@ -9,8 +9,10 @@ use Drupal\Core\Cache\CacheTagsInvalidatorInterface;
 use Drupal\Core\Config\ConfigFactoryOverrideInterface;
 use Drupal\Core\Controller\ControllerBase;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Entity\TranslatableInterface;
 use Drupal\Core\KeyValueStore\KeyValueFactoryInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
+use Drupal\language\Config\LanguageConfigFactoryOverride;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -55,8 +57,6 @@ class ApiTranslationController extends ControllerBase {
    *   The language manager.
    * @param \Drupal\Core\Config\ConfigFactoryOverrideInterface $configLanguageOverride
    *   The language config factory override.
-   * @param \Drupal\canvas\AutoSave\AutoSaveManager $autoSaveManager
-   *   The auto-save manager.
    * @param \Drupal\Core\KeyValueStore\KeyValueFactoryInterface $keyValueFactory
    *   The key-value factory.
    * @param \Drupal\Core\Cache\CacheTagsInvalidatorInterface $cacheTagsInvalidator
@@ -66,7 +66,6 @@ class ApiTranslationController extends ControllerBase {
     EntityTypeManagerInterface $entityTypeManager,
     LanguageManagerInterface $languageManager,
     ConfigFactoryOverrideInterface $configLanguageOverride,
-    private readonly AutoSaveManager $autoSaveManager,
     private readonly KeyValueFactoryInterface $keyValueFactory,
     private readonly CacheTagsInvalidatorInterface $cacheTagsInvalidator,
   ) {
@@ -78,12 +77,11 @@ class ApiTranslationController extends ControllerBase {
   /**
    * {@inheritdoc}
    */
-  public static function create(ContainerInterface $container): static {
-    return new static(
+  public static function create(ContainerInterface $container): self {
+    return new self(
       $container->get('entity_type.manager'),
       $container->get('language_manager'),
       $container->get('language.config_factory_override'),
-      $container->get(AutoSaveManager::class),
       $container->get('keyvalue'),
       $container->get('cache_tags.invalidator'),
     );
@@ -202,6 +200,9 @@ class ApiTranslationController extends ControllerBase {
     if (!$entity) {
       throw new NotFoundHttpException("Entity $drupal_entity_type:$id not found.");
     }
+    if (!$entity instanceof TranslatableInterface) {
+      throw new NotFoundHttpException("Entity $drupal_entity_type:$id is not translatable.");
+    }
 
     $default_langcode = $entity->getUntranslated()->language()->getId();
     $autoSaveStore = $this->keyValueFactory->get(AutoSaveManager::AUTO_SAVE_STORE);
@@ -293,6 +294,9 @@ class ApiTranslationController extends ControllerBase {
     if (!$entity) {
       throw new NotFoundHttpException("Entity $drupal_entity_type:$id not found.");
     }
+    if (!$entity instanceof TranslatableInterface) {
+      throw new NotFoundHttpException("Entity $drupal_entity_type:$id is not translatable.");
+    }
 
     if (!$entity->hasTranslation($source_langcode)) {
       return new JsonResponse(
@@ -379,6 +383,7 @@ class ApiTranslationController extends ControllerBase {
     $config_name = $entity->getConfigDependencyName();
     $default_langcode = $this->languageManager->getDefaultLanguage()->getId();
     $autoSaveStore = $this->keyValueFactory->get(AutoSaveManager::AUTO_SAVE_STORE);
+    \assert($this->configLanguageOverride instanceof LanguageConfigFactoryOverride);
     $result = [];
 
     foreach ($languages as $langcode => $language) {
@@ -461,6 +466,7 @@ class ApiTranslationController extends ControllerBase {
 
     $config_name = $entity->getConfigDependencyName();
     $default_langcode = $this->languageManager->getDefaultLanguage()->getId();
+    \assert($this->configLanguageOverride instanceof LanguageConfigFactoryOverride);
 
     if ($source_langcode === $default_langcode) {
       $source_component_tree = $entity->toArray()['component_tree'] ?? [];

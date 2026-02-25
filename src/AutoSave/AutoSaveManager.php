@@ -38,6 +38,7 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\Validator\ConstraintViolationList;
 use Symfony\Component\Validator\ConstraintViolationListInterface;
+use Drupal\Core\Extension\ModuleHandlerInterface;
 
 /**
  * Defines a class for storing and retrieving auto-save data.
@@ -112,6 +113,8 @@ class AutoSaveManager implements EventSubscriberInterface {
    *   The time service.
    * @param \Drupal\Core\Language\LanguageManagerInterface $languageManager
    *   The language manager.
+   * @param \Drupal\Core\Extension\ModuleHandlerInterface $moduleHandler
+   *   The module handler service.
    */
   public function __construct(
     private readonly ConfigManagerInterface $configManager,
@@ -124,6 +127,7 @@ class AutoSaveManager implements EventSubscriberInterface {
     private readonly AccountProxyInterface $currentUser,
     private readonly TimeInterface $time,
     private readonly LanguageManagerInterface $languageManager,
+    private readonly ModuleHandlerInterface $moduleHandler,
   ) {
     $this->autoSaveStore = $keyValueFactory->get(self::AUTO_SAVE_STORE);
     $this->formViolationsStore = $keyValueFactory->get(self::FORM_VIOLATIONS_STORE);
@@ -246,7 +250,7 @@ class AutoSaveManager implements EventSubscriberInterface {
       return FALSE;
     }
     // Config entity translation requires the config_translation module.
-    if (!\Drupal::moduleHandler()->moduleExists('config_translation')) {
+    if (!$this->moduleHandler->moduleExists('config_translation')) {
       return FALSE;
     }
     $defaultLangcode = $this->languageManager->getDefaultLanguage()->getId();
@@ -560,8 +564,9 @@ class AutoSaveManager implements EventSubscriberInterface {
    * @param bool $with_entities
    *   Whether to hydrate entity objects into the result.
    *
-   * @return array<string, array{data: array, owner: int, updated: int, entity_type: string, entity_id: string|int, label: string, data_hash: string, client_id: ?string, langcode: ?string, entity: ?EntityInterface}>
-   *   All auto-save data entries.
+   * @return array<string, array<string, mixed>>
+   *   The auto-save data keyed by store keys, each value an array
+   *    containing metadata and optionally hydrated entity objects.
    */
   public function getAllAutoSaveList(bool $with_entities = FALSE): array {
     $entries = $this->autoSaveStore->getAll();

@@ -20,6 +20,7 @@ use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\Core\File\FileUrlGeneratorInterface;
 use Drupal\Core\Http\Exception\CacheableAccessDeniedHttpException;
+use Drupal\Core\KeyValueStore\KeyValueFactoryInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\StringTranslation\PluralTranslatableMarkup;
@@ -75,6 +76,8 @@ final class ApiAutoSaveController extends ApiControllerBase {
    *   The language manager.
    * @param \Drupal\Core\Config\ConfigFactoryOverrideInterface $configLanguageOverride
    *   The language config factory override.
+   * @param \Drupal\Core\KeyValueStore\KeyValueFactoryInterface $keyValueFactory
+   *   The key-value factory service.
    */
   public function __construct(
     private readonly Connection $database,
@@ -88,6 +91,8 @@ final class ApiAutoSaveController extends ApiControllerBase {
     private readonly LanguageManagerInterface $languageManager,
     #[Autowire(service: 'language.config_factory_override')]
     private readonly ConfigFactoryOverrideInterface $configLanguageOverride,
+    #[Autowire(service: 'keyvalue')]
+    private readonly KeyValueFactoryInterface $keyValueFactory,
   ) {}
 
   /**
@@ -323,7 +328,7 @@ final class ApiAutoSaveController extends ApiControllerBase {
 
     // Delete published config override auto-save entries.
     foreach ($config_override_keys as $key) {
-      \Drupal::keyValue(AutoSaveManager::AUTO_SAVE_STORE)->delete($key);
+      $this->keyValueFactory->get(AutoSaveManager::AUTO_SAVE_STORE)->delete($key);
       unset($publish_auto_saves[$key]);
     }
 
@@ -404,18 +409,20 @@ final class ApiAutoSaveController extends ApiControllerBase {
         }
 
         $translation->setNewRevision();
-        $revision_id_key = $original->getEntityType()->getKey('revision');
+        $original_entity_type = $original->getEntityType();
+        \assert($original_entity_type instanceof ContentEntityTypeInterface);
+        $revision_id_key = $original_entity_type->getKey('revision');
         if ($revision_id_key) {
           $translation->set($revision_id_key, NULL);
         }
-        if ($revision_user = $original->getEntityType()->getRevisionMetadataKey('revision_user')) {
+        if ($revision_user = $original_entity_type->getRevisionMetadataKey('revision_user')) {
           $translation->set($revision_user, $this->currentUser->id());
         }
 
         $original->save();
 
         // Delete the auto-save entry.
-        \Drupal::keyValue(AutoSaveManager::AUTO_SAVE_STORE)->delete($autoSaveKey);
+        $this->keyValueFactory->get(AutoSaveManager::AUTO_SAVE_STORE)->delete($autoSaveKey);
         $translation_keys[] = $autoSaveKey;
         unset($publish_auto_saves[$autoSaveKey]);
       }
