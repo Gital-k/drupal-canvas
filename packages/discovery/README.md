@@ -1,4 +1,4 @@
-# @drupal-canvas/component-discovery
+# @drupal-canvas/discovery
 
 Filesystem discovery for Drupal Canvas Code Components and pages.
 
@@ -38,7 +38,7 @@ named metadata files are used.
 ## API
 
 ```ts
-import { discoverCodeComponents } from '@drupal-canvas/component-discovery';
+import { discoverCodeComponents } from '@drupal-canvas/discovery';
 
 const result = await discoverCodeComponents({
   scanRoot: '/absolute/path/to/project',

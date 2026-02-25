@@ -1,7 +1,7 @@
 {
-  "name": "@drupal-canvas/component-discovery",
+  "name": "@drupal-canvas/discovery",
   "version": "0.0.0",
-  "description": "Shared filesystem discovery for Drupal Canvas Code Components",
+  "description": "Filesystem discovery for Drupal Canvas Code Components and pages",
   "private": true,
   "license": "MIT",
   "repository": {

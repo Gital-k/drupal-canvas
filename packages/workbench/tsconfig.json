@@ -3,7 +3,9 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@wb/*": ["./src/*"]
+      "@wb/*": ["./src/*"],
+      "@drupal-canvas/ui/*": ["../../ui/src/*"],
+      "@/*": ["../../ui/src/*"]
     },
     "types": ["node", "vite/client"],
     "allowImportingTsExtensions": true,

@@ -298,14 +298,13 @@ export function CanvasPage({ id }) {
 
 Defines a component registry by dynamically importing each component's
 JavaScript entry file. Accepts an array of objects with `name` and `jsEntryPath`
-— compatible with `DiscoveryResult.components` from
-`@drupal-canvas/component-discovery`. Each module's default export is expected
-to be a render function. Components without a JS entry or without a default
-function export are skipped.
+— compatible with `DiscoveryResult.components` from `@drupal-canvas/discovery`.
+Each module's default export is expected to be a render function. Components
+without a JS entry or without a default function export are skipped.
 
 ```js
 import { defineComponentRegistry } from 'drupal-canvas/json-render-utils';
-import { discoverCodeComponents } from '@drupal-canvas/component-discovery';
+import { discoverCodeComponents } from '@drupal-canvas/discovery';
 
 const discovery = await discoverCodeComponents({ scanRoot: './src' });
 const registry = await defineComponentRegistry(discovery.components);
@@ -323,7 +322,7 @@ import { defineComponentCatalog } from 'drupal-canvas/json-render-utils';
 import {
   discoverCodeComponents,
   loadComponentsMetadata,
-} from '@drupal-canvas/component-discovery';
+} from '@drupal-canvas/discovery';
 
 const discovery = await discoverCodeComponents({ scanRoot: './src' });
 const metadata = await loadComponentsMetadata(discovery);

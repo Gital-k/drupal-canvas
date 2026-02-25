@@ -1,11 +1,11 @@
-import type { DiscoveryResult } from '@drupal-canvas/component-discovery';
+import type { DiscoveryResult } from '@drupal-canvas/discovery';
 
 export type {
   DiscoveredComponent,
   DiscoveredPage,
   DiscoveryResult,
   DiscoveryWarning,
-} from '@drupal-canvas/component-discovery';
+} from '@drupal-canvas/discovery';
 
 export async function fetchDiscoveryResult(): Promise<DiscoveryResult> {
   const response = await fetch('/__canvas/discovery');

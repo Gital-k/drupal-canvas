@@ -4,8 +4,8 @@ import { defineCatalog, resolveElementProps } from '@json-render/core';
 import { schema } from '@json-render/react/schema';
 
 import type { ComponentType, ReactNode } from 'react';
-import type { ComponentMetadata } from '@drupal-canvas/component-discovery';
-import type { Spec, UIElement, PropResolutionContext } from '@json-render/core';
+import type { ComponentMetadata } from '@drupal-canvas/discovery';
+import type { PropResolutionContext, Spec, UIElement } from '@json-render/core';
 
 /**
  * Drupal Canvas component tree node.
@@ -192,7 +192,14 @@ export function specToCanvasTree(jsonRenderSpec: Spec): CanvasComponentTree {
   // for multi-root trees — it has no Canvas equivalent and must not appear in output.
   if (rootElement.type === 'canvas:component-tree') {
     for (const childKey of rootElement.children ?? []) {
-      convertSpecElement(childKey, jsonRenderSpec.elements, result, null, null, ctx);
+      convertSpecElement(
+        childKey,
+        jsonRenderSpec.elements,
+        result,
+        null,
+        null,
+        ctx,
+      );
     }
     return result;
   }
@@ -446,7 +453,10 @@ export async function defineComponentRegistry(
  */
 export function defineComponentCatalog(metadata: ComponentMetadata[]) {
   const components = Object.fromEntries(
-    metadata.map((m) => [toComponentId(m.machineName), metadataToCatalogEntry(m)]),
+    metadata.map((m) => [
+      toComponentId(m.machineName),
+      metadataToCatalogEntry(m),
+    ]),
   );
 
   return defineCatalog(schema, { components, actions: {} });

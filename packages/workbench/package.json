@@ -21,7 +21,7 @@
   "type": "module",
   "dependencies": {
     "@base-ui/react": "^1.2.0",
-    "@drupal-canvas/component-discovery": "*",
+    "@drupal-canvas/discovery": "*",
     "@drupal-canvas/vite-compat": "*",
     "@fontsource-variable/geist": "^5.2.8",
     "@tailwindcss/vite": "^4.1.17",

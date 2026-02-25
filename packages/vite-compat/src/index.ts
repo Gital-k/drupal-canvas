@@ -12,7 +12,7 @@ export interface CanvasViteCompatOptions {
   hostAliasBaseDir?: string;
 }
 
-// @todo Implement automatic discovery of the Tailwind CSS entrypoint in @drupal-canvas/component-discovery.
+// @todo Implement automatic discovery of the Tailwind CSS entrypoint in @drupal-canvas/discovery.
 // Idea: Search for the following strings in files:
 // - '@import "tailwindcss"' — note that this is optional in the in-browser code editor
 // - '@theme

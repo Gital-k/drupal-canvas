@@ -70,7 +70,10 @@ function validateRawMetadata(
         );
       }
 
-      if (slotValue.examples !== undefined && !Array.isArray(slotValue.examples)) {
+      if (
+        slotValue.examples !== undefined &&
+        !Array.isArray(slotValue.examples)
+      ) {
         throw new Error(
           `Invalid "examples" in slot "${slotName}" in ${metadataPath}: expected an array, got ${typeof slotValue.examples}.`,
         );
@@ -96,9 +99,10 @@ export async function loadComponentsMetadata(
 
       validateRawMetadata(raw, component.metadataPath);
 
-      const rawProps = isRecord(raw.props) && isRecord(raw.props.properties)
-        ? raw.props.properties as ComponentMetadata['props']['properties']
-        : {};
+      const rawProps =
+        isRecord(raw.props) && isRecord(raw.props.properties)
+          ? (raw.props.properties as ComponentMetadata['props']['properties'])
+          : {};
 
       const metadata: ComponentMetadata = {
         name: component.name,

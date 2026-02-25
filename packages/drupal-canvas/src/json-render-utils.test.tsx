@@ -10,7 +10,7 @@ import {
 } from './json-render-utils';
 
 import type React from 'react';
-import type { ComponentMetadata } from '@drupal-canvas/component-discovery';
+import type { ComponentMetadata } from '@drupal-canvas/discovery';
 import type { Spec } from '@json-render/core';
 import type { CanvasComponentTree } from './json-render-utils';
 
@@ -1153,7 +1153,10 @@ describe('defineComponentCatalog', () => {
     const catalog = defineComponentCatalog(metadata);
 
     expect(catalog.data.components['js.card']).toBeDefined();
-    expect(catalog.data.components['js.card'].slots).toEqual(['header', 'body']);
+    expect(catalog.data.components['js.card'].slots).toEqual([
+      'header',
+      'body',
+    ]);
   });
 
   it('should handle metadata with no props or slots', () => {
@@ -1188,7 +1191,9 @@ describe('defineComponentCatalog', () => {
         name: 'Text',
         machineName: 'text',
         status: true,
-        props: { properties: { content: { title: 'Content', type: 'string' } } },
+        props: {
+          properties: { content: { title: 'Content', type: 'string' } },
+        },
         required: ['content'],
         slots: {},
       },
