@@ -617,7 +617,7 @@ describe('round-trip: canvasTreeToSpec → specToCanvasTree', () => {
 });
 
 describe('renderCanvasTree', () => {
-  it('should call the component with props from inputs', async () => {
+  it('should call the component with props from inputs', () => {
     const components: CanvasComponentTree = [
       {
         parent_uuid: null,
@@ -630,7 +630,7 @@ describe('renderCanvasTree', () => {
       },
     ];
 
-    const result = await renderCanvasTree(components, {
+    const result = renderCanvasTree(components, {
       Button: (props) => (
         <button data-variant={props.variant as string}>{props.label as string}</button>
       ),
@@ -641,7 +641,7 @@ describe('renderCanvasTree', () => {
     );
   });
 
-  it('should return null for components not in the registry', async () => {
+  it('should return null for components not in the registry', () => {
     const components: CanvasComponentTree = [
       {
         parent_uuid: null,
@@ -654,12 +654,12 @@ describe('renderCanvasTree', () => {
       },
     ];
 
-    const result = await renderCanvasTree(components, {});
+    const result = renderCanvasTree(components, {});
 
     expect(result).toBeNull();
   });
 
-  it('should pass children as a prop', async () => {
+  it('should pass children as a prop', () => {
     const components: CanvasComponentTree = [
       {
         parent_uuid: null,
@@ -681,7 +681,7 @@ describe('renderCanvasTree', () => {
       },
     ];
 
-    const result = await renderCanvasTree(components, {
+    const result = renderCanvasTree(components, {
       Wrapper: (props) => <div>{props.children as React.ReactNode}</div>,
       Text: (props) => <p>{props.content as string}</p>,
     });
@@ -691,7 +691,7 @@ describe('renderCanvasTree', () => {
     );
   });
 
-  it('should pass named slots as props', async () => {
+  it('should pass named slots as props', () => {
     const components: CanvasComponentTree = [
       {
         parent_uuid: null,
@@ -713,7 +713,7 @@ describe('renderCanvasTree', () => {
       },
     ];
 
-    const result = await renderCanvasTree(components, {
+    const result = renderCanvasTree(components, {
       Layout: (props) => (
         <div className="layout">
           <header>{props.header as React.ReactNode}</header>
@@ -729,7 +729,7 @@ describe('renderCanvasTree', () => {
     );
   });
 
-  it('should render multiple root components wrapped transparently', async () => {
+  it('should render multiple root components wrapped transparently', () => {
     const components: CanvasComponentTree = [
       {
         parent_uuid: null,
@@ -751,7 +751,7 @@ describe('renderCanvasTree', () => {
       },
     ];
 
-    const result = await renderCanvasTree(components, {
+    const result = renderCanvasTree(components, {
       Button: (props) => <button>{props.label as string}</button>,
     });
 

@@ -203,11 +203,11 @@ export type ComponentRegistry = Record<string, (props: Record<string, unknown>) 
  * Renders a single element from a json-render spec, recursively resolving
  * children and named slots.
  */
-async function renderSpecElement(
+function renderSpecElement(
   key: string,
   elements: Spec['elements'],
   registry: ComponentRegistry,
-): Promise<React.ReactNode> {
+): React.ReactNode {
   const element = elements[key];
   if (!element) {
     throw new Error(`Element key "${key}" not found in elements map.`);
@@ -216,10 +216,8 @@ async function renderSpecElement(
   // Transparent passthrough for the synthetic multi-root wrapper.
   // @see canvasTreeToSpec()
   if (element.type === 'canvas:component-tree') {
-    const children = await Promise.all(
-      (element.children ?? []).map((k) =>
-        renderSpecElement(k, elements, registry),
-      ),
+    const children = (element.children ?? []).map((k) =>
+      renderSpecElement(k, elements, registry),
     );
     return <>{children}</>;
   }
@@ -229,16 +227,14 @@ async function renderSpecElement(
     return null;
   }
 
-  const children = await Promise.all(
-    (element.children ?? []).map((k) =>
-      renderSpecElement(k, elements, registry),
-    ),
+  const children = (element.children ?? []).map((k) =>
+    renderSpecElement(k, elements, registry),
   );
 
   const slots: Record<string, React.ReactNode[]> = {};
   for (const [slotName, childKeys] of Object.entries(element.slots ?? {})) {
-    slots[slotName] = await Promise.all(
-      childKeys.map((k) => renderSpecElement(k, elements, registry)),
+    slots[slotName] = childKeys.map((k) =>
+      renderSpecElement(k, elements, registry),
     );
   }
 
@@ -255,10 +251,10 @@ async function renderSpecElement(
  * @param components - Canvas component tree to render
  * @param registry - Component registry to use for rendering.
  */
-export async function renderCanvasTree(
+export function renderCanvasTree(
   components: CanvasComponentTree,
   registry: ComponentRegistry,
-): Promise<React.ReactNode> {
+): React.ReactNode {
   const spec = canvasTreeToSpec(components);
   return renderSpecElement(spec.root, spec.elements, registry);
 }
