@@ -26,6 +26,24 @@ const parseEntityAutocompleteSelection = (value: unknown): string | null => {
   return match !== null ? match[1] : null;
 };
 
+const parseEntityAutocompleteSelections = (value: unknown): string[] | null => {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const selections = value
+    .split(',')
+    .map((selection) => selection.trim())
+    .filter(Boolean);
+  if (selections.length === 0) {
+    return null;
+  }
+  const ids = selections.map(parseEntityAutocompleteSelection);
+  if (ids.some((id) => id === null)) {
+    return null;
+  }
+  return ids as string[];
+};
+
 type PropsValuesOrArrayOfPropsValues =
   | Array<PropsValues>
   | PropsValues
@@ -218,14 +236,17 @@ const link: Transformer<
 
 const entityAutocompleteTargetId: Transformer<
   void,
-  null | string,
+  null | string | string[],
   null | string
 > = (value) => {
   if (value === null) {
     return null;
   }
-  const id = parseEntityAutocompleteSelection(value);
-  return id ?? value;
+  const ids = parseEntityAutocompleteSelections(value);
+  if (ids === null) {
+    return value;
+  }
+  return ids.length === 1 ? ids[0] : ids;
 };
 
 const cast: Transformer<

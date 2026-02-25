@@ -383,6 +383,22 @@ Value`,
       mediaMultiple: ['3', '4'],
     });
   });
+
+  it('Should transform multiple entity autocomplete values', () => {
+    const multiCardinalityFormState = {
+      ...formState,
+      'canvas_component_props[all-props][entityReferenceAutocomplete][0][target_id]':
+        'A 😎 node title (3), Another node title (42)',
+    };
+
+    const { propsValues } = getPropsValues(
+      multiCardinalityFormState,
+      inputAndUiData,
+      transformConfig,
+    );
+
+    expect(propsValues.entityReferenceAutocomplete).to.deep.equal(['3', '42']);
+  });
 });
 
 describe('coerceValueForSchema', () => {

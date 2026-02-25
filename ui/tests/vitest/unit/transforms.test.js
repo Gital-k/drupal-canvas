@@ -447,10 +447,24 @@ describe('Transforms - firstRecord', () => {
 });
 
 describe('Transforms - entityAutocompleteTargetId', () => {
-  it('Should return target ID from autocomplete value', () => {
+  it('Should return target ID from single autocomplete value', () => {
     expect(transforms.entityAutocompleteTargetId('A node title (3)')).to.equal(
       '3',
     );
+  });
+
+  it('Should return target IDs from multiple autocomplete values', () => {
+    expect(
+      transforms.entityAutocompleteTargetId(
+        'A node title (3), Another node title (42)',
+      ),
+    ).to.deep.equal(['3', '42']);
+  });
+
+  it('Should parse emoji titles from autocomplete values', () => {
+    expect(
+      transforms.entityAutocompleteTargetId('A 😎 node title (7)'),
+    ).to.equal('7');
   });
 
   it('Should return original value when no autocomplete ID is present', () => {
