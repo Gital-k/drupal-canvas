@@ -1040,7 +1040,7 @@ describe('defineComponentCatalog', () => {
     expect(prompt).toContain('Button');
   });
 
-  it('should expose a zodSchema for validation', () => {
+  it('should produce a catalog that can validate a spec', () => {
     const metadata: ComponentMetadata[] = [
       {
         name: 'Button',
@@ -1055,7 +1055,27 @@ describe('defineComponentCatalog', () => {
 
     const catalog = defineComponentCatalog(metadata);
 
-    expect(typeof catalog.zodSchema).toBe('function');
-    expect(catalog.zodSchema()).toBeDefined();
+    const validSpec = {
+      root: 'btn',
+      elements: {
+        btn: {
+          type: 'Button',
+          props: { label: 'Click me' },
+          children: [],
+          slots: {},
+        },
+      },
+    };
+    expect(catalog.validate(validSpec).success).toBe(true);
+
+    const invalidSpec = {
+      root: 'btn',
+      elements: {
+        btn: {
+          type: 'Button',
+        },
+      },
+    };
+    expect(catalog.validate(invalidSpec).success).toBe(false);
   });
 });
