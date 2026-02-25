@@ -268,7 +268,7 @@ final class ApiAutoSaveController extends ApiControllerBase {
         \assert($entity_definition instanceof ContentEntityTypeInterface);
         \assert(!is_null($entity->id()));
         $original_entity = $this->entityTypeManager->getStorage($entity->getEntityTypeId())->loadUnchanged($entity->id());
-        \assert($original_entity instanceof FieldableEntityInterface);
+        \assert($original_entity instanceof ContentEntityInterface);
         foreach ($fields as $field_name => $field) {
           $field_access = $entity->get($field_name)->access(operation: 'edit', return_as_object: TRUE);
           $original_field = $original_entity->get($field_name);
@@ -295,13 +295,12 @@ final class ApiAutoSaveController extends ApiControllerBase {
             );
           }
         }
-        $use_existing_revision_id = AutoSaveManager::entityIsConsideredNew($entity);
 
         // Prevent publishing entities that are considered "new" (e.g., still
         // have the default "Untitled page" title). These should be renamed
         // before publishing.
         // @see https://drupal.org/i/3562185
-        if ($use_existing_revision_id) {
+        if (AutoSaveManager::entityIsConsideredNew($entity)) {
           $violation = new ConstraintViolation(
             ErrorCodesEnum::EntityConsideredNew->getMessage(),
             '',
@@ -313,6 +312,8 @@ final class ApiAutoSaveController extends ApiControllerBase {
           $violationSets[] = new EntityConstraintViolationList($entity, [$violation]);
           continue;
         }
+
+        $use_existing_revision_id = AutoSaveManager::entityIsConsideredNew($original_entity);
 
         if ($entity instanceof EntityPublishedInterface) {
           $entity->setPublished();
