@@ -17,7 +17,6 @@ use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\CoversMethod;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
-use Symfony\Component\Yaml\Yaml;
 
 // cspell:ignore itok MIOT
 /**
@@ -145,6 +144,7 @@ class CanvasTwigExtensionFiltersTest extends CanvasKernelTestBase {
     $style->addImageEffect([
       'id' => 'image_scale',
       'data' => ['width' => 200, 'height' => NULL, 'upscale' => FALSE],
+      'weight' => 0,
     ]);
     $style->save();
 
