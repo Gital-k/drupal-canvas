@@ -624,6 +624,100 @@ describe('round-trip: canvasTreeToSpec → specToCanvasTree', () => {
   });
 });
 
+describe('renderSpec', () => {
+  it('should render a single-root spec', () => {
+    const spec: Spec = {
+      root: 'btn',
+      elements: {
+        btn: {
+          type: 'Button',
+          props: { label: 'Go' },
+        },
+      },
+    };
+
+    const result = renderSpec(spec, {
+      Button: (props) => <button>{props.label as string}</button>,
+    });
+
+    expect(result).toEqual(<button>Go</button>);
+  });
+
+  it('should render a spec with children and slots', () => {
+    const spec: Spec = {
+      root: 'layout',
+      elements: {
+        layout: {
+          type: 'Layout',
+          props: {},
+          children: ['text'],
+          slots: { footer: ['btn'] },
+        },
+        text: {
+          type: 'Text',
+          props: { content: 'Hello' },
+        },
+        btn: {
+          type: 'Button',
+          props: { label: 'OK' },
+        },
+      },
+    };
+
+    const result = renderSpec(spec, {
+      Layout: (props) => (
+        <div>
+          <main>{props.children as React.ReactNode}</main>
+          <footer>{props.footer as React.ReactNode}</footer>
+        </div>
+      ),
+      Text: (props) => <p>{props.content as string}</p>,
+      Button: (props) => <button>{props.label as string}</button>,
+    });
+
+    expect(result).toEqual(
+      <div>
+        <main>{[<p>Hello</p>]}</main>
+        <footer>{[<button>OK</button>]}</footer>
+      </div>,
+    );
+  });
+
+  it('should return null for unknown component types', () => {
+    const spec: Spec = {
+      root: 'x',
+      elements: {
+        x: { type: 'Missing', props: {} },
+      },
+    };
+
+    expect(renderSpec(spec, {})).toBeNull();
+  });
+
+  it('should render multi-root spec transparently', () => {
+    const spec: Spec = {
+      root: 'canvas:component-tree',
+      elements: {
+        'canvas:component-tree': {
+          type: 'canvas:component-tree',
+          props: {},
+          children: ['a', 'b'],
+        },
+        a: { type: 'Button', props: { label: 'A' } },
+        b: { type: 'Button', props: { label: 'B' } },
+      },
+    };
+
+    const result = renderSpec(spec, {
+      Button: (props) => <button>{props.label as string}</button>,
+    });
+
+    expect(result).toEqual(
+      <>{[<button>A</button>, <button>B</button>]}</>,
+    );
+  });
+});
+
 describe('renderCanvasTree', () => {
   it('should call the component with props from inputs', () => {
     const components: CanvasComponentTree = [
