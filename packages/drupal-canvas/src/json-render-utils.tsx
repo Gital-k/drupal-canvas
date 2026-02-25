@@ -304,7 +304,6 @@ function metadataToCatalogEntry(metadata: ComponentMetadata) {
   return {
     props: fromJSONSchema(jsonSchema),
     slots: Object.keys(metadata.slots),
-    description: metadata.description,
   };
 }
 

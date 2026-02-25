@@ -22,12 +22,6 @@ function validateRawMetadata(
     );
   }
 
-  if (raw.description !== undefined && typeof raw.description !== 'string') {
-    throw new Error(
-      `Invalid "description" in ${metadataPath}: expected a string, got ${typeof raw.description}.`,
-    );
-  }
-
   if (raw.props !== undefined && !isRecord(raw.props)) {
     throw new Error(
       `Invalid "props" in ${metadataPath}: expected an object, got ${typeof raw.props}.`,
@@ -71,6 +65,12 @@ function validateRawMetadata(
           `Invalid "description" in slot "${slotName}" in ${metadataPath}: expected a string, got ${typeof slotValue.description}.`,
         );
       }
+
+      if (slotValue.examples !== undefined && !Array.isArray(slotValue.examples)) {
+        throw new Error(
+          `Invalid "examples" in slot "${slotName}" in ${metadataPath}: expected an array, got ${typeof slotValue.examples}.`,
+        );
+      }
     }
   }
 }
@@ -92,18 +92,17 @@ export async function loadComponentsMetadata(
 
       validateRawMetadata(raw, component.metadataPath);
 
+      const rawProps = isRecord(raw.props) && isRecord(raw.props.properties)
+        ? raw.props.properties as ComponentMetadata['props']['properties']
+        : {};
+
       const metadata: ComponentMetadata = {
         name: component.name,
         machineName: (raw.machineName as string) ?? component.name,
         status: (raw.status as boolean) ?? true,
-        props: (raw.props as Record<string, unknown>) ?? {},
+        props: { properties: rawProps },
         required: (raw.required as string[]) ?? [],
-        description: (raw.description as string) ?? '',
-        slots:
-          (raw.slots as Record<
-            string,
-            { title: string; description?: string }
-          >) ?? {},
+        slots: (raw.slots as ComponentMetadata['slots']) ?? {},
       };
 
       return metadata;

@@ -1026,11 +1026,10 @@ describe('defineComponentCatalog', () => {
         name: 'Button',
         machineName: 'button',
         status: true,
-        description: 'A button component',
         props: {
           properties: {
-            label: { type: 'string' },
-            variant: { type: 'string' },
+            label: { title: 'Label', type: 'string' },
+            variant: { title: 'Variant', type: 'string' },
           },
         },
         required: ['label'],
@@ -1043,7 +1042,6 @@ describe('defineComponentCatalog', () => {
     expect(catalog).toBeDefined();
     expect(catalog.componentNames).toEqual(['js.button']);
     expect(catalog.data.components['js.button']).toBeDefined();
-    expect(catalog.data.components['js.button'].description).toBe('A button component');
   });
 
   it('should include slots in the catalog entry', () => {
@@ -1052,15 +1050,14 @@ describe('defineComponentCatalog', () => {
         name: 'Card',
         machineName: 'card',
         status: true,
-        description: 'A card component',
         props: {
           properties: {
-            title: { type: 'string' },
+            title: { title: 'Title', type: 'string' },
           },
         },
         required: [],
         slots: {
-          header: { title: 'Header', description: 'The header slot' },
+          header: { title: 'Header' },
           body: { title: 'Body' },
         },
       },
@@ -1078,8 +1075,7 @@ describe('defineComponentCatalog', () => {
         name: 'Divider',
         machineName: 'divider',
         status: true,
-        description: 'A divider',
-        props: {},
+        props: { properties: {} },
         required: [],
         slots: {},
       },
@@ -1097,8 +1093,7 @@ describe('defineComponentCatalog', () => {
         name: 'Button',
         machineName: 'button',
         status: true,
-        description: 'A button',
-        props: { properties: { label: { type: 'string' } } },
+        props: { properties: { label: { title: 'Label', type: 'string' } } },
         required: [],
         slots: {},
       },
@@ -1106,8 +1101,7 @@ describe('defineComponentCatalog', () => {
         name: 'Text',
         machineName: 'text',
         status: true,
-        description: 'A text block',
-        props: { properties: { content: { type: 'string' } } },
+        props: { properties: { content: { title: 'Content', type: 'string' } } },
         required: ['content'],
         slots: {},
       },
@@ -1124,8 +1118,7 @@ describe('defineComponentCatalog', () => {
         name: 'Button',
         machineName: 'button',
         status: true,
-        description: 'A button',
-        props: { properties: { label: { type: 'string' } } },
+        props: { properties: { label: { title: 'Label', type: 'string' } } },
         required: ['label'],
         slots: {},
       },
@@ -1143,8 +1136,7 @@ describe('defineComponentCatalog', () => {
         name: 'Button',
         machineName: 'button',
         status: true,
-        description: 'A button',
-        props: { properties: { label: { type: 'string' } } },
+        props: { properties: { label: { title: 'Label', type: 'string' } } },
         required: [],
         slots: {},
       },

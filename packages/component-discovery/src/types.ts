@@ -1,3 +1,5 @@
+import type { CodeComponentSerialized } from '@drupal-canvas/ui/types/CodeComponent';
+
 export type DiscoveryWarningCode =
   | 'missing_js_entry'
   | 'duplicate_definition'
@@ -34,15 +36,11 @@ export interface DiscoveryResult {
   };
 }
 
-/**
- * Parsed component metadata from a component.yml file.
- */
-export interface ComponentMetadata {
-  name: string;
-  machineName: string;
-  status: boolean;
-  description: string;
-  props: Record<string, unknown>;
-  required: string[];
-  slots: Record<string, { title: string; description?: string }>;
+export interface ComponentMetadata extends Pick<
+  CodeComponentSerialized,
+  'name' | 'machineName' | 'status' | 'required' | 'slots'
+> {
+  props: {
+    properties: CodeComponentSerialized['props'];
+  };
 }
