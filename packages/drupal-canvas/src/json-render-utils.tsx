@@ -290,25 +290,9 @@ function metadataToCatalogEntry(metadata: ComponentMetadata) {
     jsonSchema.required = metadata.required;
   }
 
-  const slotNames = Object.keys(metadata.slots);
-
-  // Add slots as additional properties accepting any value.
-  if (slotNames.length > 0) {
-    const properties = (jsonSchema.properties ?? {}) as Record<
-      string,
-      unknown
-    >;
-    for (const [slotName, slot] of Object.entries(metadata.slots)) {
-      properties[slotName] = {
-        description: slot.description ?? slot.title ?? `${slotName} slot`,
-      };
-    }
-    jsonSchema.properties = properties;
-  }
-
   return {
     props: fromJSONSchema(jsonSchema),
-    slots: slotNames,
+    slots: Object.keys(metadata.slots),
     description: metadata.description,
   };
 }
