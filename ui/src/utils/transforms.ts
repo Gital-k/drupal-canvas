@@ -16,17 +16,21 @@ export interface TransformConfig {
   [key: keyof PropsValues]: Partial<Transform>;
 }
 
-export const ENTITY_AUTOCOMPLETE_MATCH = /.+\s\(([^)]+)\)/;
+export const ENTITY_AUTOCOMPLETE_MATCH = /.+\s\(([^)]+)\)\s*$/;
 
-const parseEntityAutocompleteSelection = (value: unknown): string | null => {
+const parseSingleEntityAutocompleteSelection = (
+  value: unknown,
+): string | null => {
   if (typeof value !== 'string') {
     return null;
   }
-  const match = value.match(ENTITY_AUTOCOMPLETE_MATCH);
+  const match = value.trim().match(ENTITY_AUTOCOMPLETE_MATCH);
   return match !== null ? match[1] : null;
 };
 
-const parseEntityAutocompleteSelections = (value: unknown): string[] | null => {
+const parseEntityAutocompleteValue = (
+  value: unknown,
+): string | string[] | null => {
   if (typeof value !== 'string') {
     return null;
   }
@@ -34,10 +38,10 @@ const parseEntityAutocompleteSelections = (value: unknown): string[] | null => {
     .split(',')
     .map((selection) => selection.trim())
     .filter(Boolean);
-  if (selections.length === 0) {
-    return null;
+  if (selections.length <= 1) {
+    return parseSingleEntityAutocompleteSelection(value);
   }
-  const ids = selections.map(parseEntityAutocompleteSelection);
+  const ids = selections.map(parseSingleEntityAutocompleteSelection);
   if (ids.some((id) => id === null)) {
     return null;
   }
@@ -179,7 +183,7 @@ export interface LinkPropShape extends StaticPropSource {
 }
 
 const resolveEntityUri = (uri: string): string => {
-  const id = parseEntityAutocompleteSelection(uri);
+  const id = parseSingleEntityAutocompleteSelection(uri);
   // LinkWidget with autocomplete support only supports matching on node
   // entities.
   // @todo Add support for other entity types once core does -
@@ -237,16 +241,22 @@ const link: Transformer<
 const entityAutocompleteTargetId: Transformer<
   void,
   null | string | string[],
-  null | string
+  null | string | string[]
 > = (value) => {
   if (value === null) {
     return null;
   }
-  const ids = parseEntityAutocompleteSelections(value);
-  if (ids === null) {
+  if (Array.isArray(value)) {
+    return value.map(
+      (selection) =>
+        parseSingleEntityAutocompleteSelection(selection) ?? selection,
+    );
+  }
+  const parsed = parseEntityAutocompleteValue(value);
+  if (parsed === null) {
     return value;
   }
-  return ids.length === 1 ? ids[0] : ids;
+  return parsed;
 };
 
 const cast: Transformer<

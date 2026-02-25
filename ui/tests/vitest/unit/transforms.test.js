@@ -463,8 +463,17 @@ describe('Transforms - entityAutocompleteTargetId', () => {
 
   it('Should parse emoji titles from autocomplete values', () => {
     expect(
-      transforms.entityAutocompleteTargetId('A 😎 node title (7)'),
+      transforms.entityAutocompleteTargetId('😎 A node title (7)'),
     ).to.equal('7');
+  });
+
+  it('Should map array values when upstream provides arrays', () => {
+    expect(
+      transforms.entityAutocompleteTargetId([
+        'A node title (3)',
+        'Another node title (42)',
+      ]),
+    ).to.deep.equal(['3', '42']);
   });
 
   it('Should return original value when no autocomplete ID is present', () => {
