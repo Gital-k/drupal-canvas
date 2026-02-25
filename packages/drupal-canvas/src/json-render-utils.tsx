@@ -43,7 +43,7 @@ export function canvasTreeToSpec(components: CanvasComponentTree): Spec {
         inputs = JSON.parse(component.inputs) as Record<string, unknown>;
       } catch {
         throw new Error(
-          `Canvas component tree: component "${component.uuid}" has malformed JSON inputs: ${component.inputs}`,
+          `Component "${component.uuid}" has malformed JSON inputs: ${component.inputs}`,
         );
       }
     } else {
