@@ -309,8 +309,20 @@ function metadataToCatalogEntry(metadata: ComponentMetadata) {
 }
 
 /**
+ * Derives the Drupal Canvas component_id from a component's machineName.
+ *
+ * Canvas component_ids for JS components follow the format `js.<machineName>`.
+ */
+function toComponentId(machineName: string): string {
+  return `js.${machineName}`;
+}
+
+/**
  * Defines a component registry by dynamically importing each component's
  * JavaScript entry file from the discovery results.
+ *
+ * Components are keyed by their Drupal Canvas component_id (`js.<machineName>`)
+ * to match the `component_id` used in Canvas component trees.
  *
  * @param components - Array of discovered components from `discoverCodeComponents()`
  * @returns A component registry that can be passed to `renderCanvasTree()`
@@ -332,13 +344,14 @@ export async function defineComponentRegistry(
         if (typeof renderFn !== 'function') {
           return null;
         }
-        return { name: c.name, renderFn } as const;
+        const machineName = c.name.replace(/-/g, '_').toLowerCase();
+        return { componentId: toComponentId(machineName), renderFn } as const;
       }),
   );
 
   for (const entry of entries) {
     if (entry !== null) {
-      registry[entry.name] = entry.renderFn as ComponentRegistry[string];
+      registry[entry.componentId] = entry.renderFn as ComponentRegistry[string];
     }
   }
 
@@ -355,7 +368,7 @@ export async function defineComponentRegistry(
  */
 export function defineComponentCatalog(metadata: ComponentMetadata[]) {
   const components = Object.fromEntries(
-    metadata.map((m) => [m.name, metadataToCatalogEntry(m)]),
+    metadata.map((m) => [toComponentId(m.machineName), metadataToCatalogEntry(m)]),
   );
 
   return defineCatalog(schema, { components, actions: {} });

@@ -972,7 +972,7 @@ describe('defineComponentRegistry', () => {
       { name: 'Button', jsEntryPath: '/fake/Button.js' },
     ]);
 
-    expect(registry.Button).toBe(MyButton);
+    expect(registry['js.button']).toBe(MyButton);
 
     vi.doUnmock('/fake/Button.js');
   });
@@ -1011,8 +1011,8 @@ describe('defineComponentRegistry', () => {
       { name: 'NoPath', jsEntryPath: null },
     ]);
 
-    expect(Object.keys(registry)).toEqual(['Valid']);
-    expect(registry.Valid).toBe(ValidComp);
+    expect(Object.keys(registry)).toEqual(['js.valid']);
+    expect(registry['js.valid']).toBe(ValidComp);
 
     vi.doUnmock('/fake/Valid.js');
     vi.doUnmock('/fake/Invalid.js');
@@ -1041,9 +1041,9 @@ describe('defineComponentCatalog', () => {
     const catalog = defineComponentCatalog(metadata);
 
     expect(catalog).toBeDefined();
-    expect(catalog.componentNames).toEqual(['Button']);
-    expect(catalog.data.components.Button).toBeDefined();
-    expect(catalog.data.components.Button.description).toBe('A button component');
+    expect(catalog.componentNames).toEqual(['js.button']);
+    expect(catalog.data.components['js.button']).toBeDefined();
+    expect(catalog.data.components['js.button'].description).toBe('A button component');
   });
 
   it('should include slots in the catalog entry', () => {
@@ -1068,8 +1068,8 @@ describe('defineComponentCatalog', () => {
 
     const catalog = defineComponentCatalog(metadata);
 
-    expect(catalog.data.components.Card).toBeDefined();
-    expect(catalog.data.components.Card.slots).toEqual(['header', 'body']);
+    expect(catalog.data.components['js.card']).toBeDefined();
+    expect(catalog.data.components['js.card'].slots).toEqual(['header', 'body']);
   });
 
   it('should handle metadata with no props or slots', () => {
@@ -1087,8 +1087,8 @@ describe('defineComponentCatalog', () => {
 
     const catalog = defineComponentCatalog(metadata);
 
-    expect(catalog.componentNames).toEqual(['Divider']);
-    expect(catalog.data.components.Divider.slots).toEqual([]);
+    expect(catalog.componentNames).toEqual(['js.divider']);
+    expect(catalog.data.components['js.divider'].slots).toEqual([]);
   });
 
   it('should handle multiple components', () => {
@@ -1115,7 +1115,7 @@ describe('defineComponentCatalog', () => {
 
     const catalog = defineComponentCatalog(metadata);
 
-    expect(catalog.componentNames).toEqual(['Button', 'Text']);
+    expect(catalog.componentNames).toEqual(['js.button', 'js.text']);
   });
 
   it('should produce a catalog that can generate a prompt', () => {
@@ -1134,7 +1134,7 @@ describe('defineComponentCatalog', () => {
     const catalog = defineComponentCatalog(metadata);
     const prompt = catalog.prompt();
 
-    expect(prompt).toContain('Button');
+    expect(prompt).toContain('js.button');
   });
 
   it('should produce a catalog that can validate a spec', () => {
@@ -1156,7 +1156,7 @@ describe('defineComponentCatalog', () => {
       root: 'btn',
       elements: {
         btn: {
-          type: 'Button',
+          type: 'js.button',
           props: { label: 'Click me' },
           children: [],
           slots: {},
@@ -1169,7 +1169,7 @@ describe('defineComponentCatalog', () => {
       root: 'btn',
       elements: {
         btn: {
-          type: 'Button',
+          type: 'js.button',
         },
       },
     };
