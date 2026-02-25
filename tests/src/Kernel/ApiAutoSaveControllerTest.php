@@ -17,6 +17,7 @@ use Drupal\Core\Session\SessionConfigurationInterface;
 use Drupal\Core\Url;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Controller\ApiAutoSaveController;
+use Drupal\canvas\Controller\ApiContentControllers;
 use Drupal\canvas\Controller\ErrorCodesEnum;
 use Drupal\canvas\Entity\AssetLibrary;
 use Drupal\canvas\Entity\ContentTemplate;
@@ -1344,6 +1345,103 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
 
   private function assertSiteHomepage(string $path): void {
     self::assertEquals($path, $this->config('system.site')->get('page.front'));
+  }
+
+  /**
+   * Tests that publishing is prevented for entities considered "new".
+   *
+   * Entities with default titles (e.g., "Untitled page") are considered "new"
+   * and should not be publishable until they are renamed.
+   *
+   * @see https://drupal.org/i/3562185
+   */
+  public function testCannotPublishEntityConsideredNew(): void {
+    $this->setUpCurrentUser(permissions: [
+      Page::EDIT_PERMISSION,
+      AutoSaveManager::PUBLISH_PERMISSION,
+    ]);
+
+    /** @var \Drupal\canvas\AutoSave\AutoSaveManager $autoSave */
+    $autoSave = $this->container->get(AutoSaveManager::class);
+    $entity_type_manager = $this->container->get(EntityTypeManagerInterface::class);
+    $page_entity_type = $entity_type_manager->getDefinition(Page::ENTITY_TYPE_ID);
+    \assert($page_entity_type !== NULL);
+
+    // Create a page with the default "Untitled page" title.
+    $default_title = (string) ApiContentControllers::defaultTitle($page_entity_type);
+    $page = Page::create([
+      'title' => $default_title,
+      'status' => FALSE,
+      'components' => [],
+    ]);
+    $this->assertSame(SAVED_NEW, $page->save());
+    $this->assertFalse($page->isPublished());
+    $this->assertTrue(AutoSaveManager::entityIsConsideredNew($page));
+
+    // Make a change and save to autosave. We just need any change to create
+    // autosave data - updating the description is simpler than adding components.
+    $page->set('description', 'Test description for autosave');
+    $autoSave->saveEntity($page);
+
+    // Get autosave data and verify the page is in the autosave.
+    $auto_save_data = $this->getAutoSaveStatesFromServer();
+    $page_auto_save_key = AutoSaveManager::getAutoSaveKey($page);
+    self::assertArrayHasKey($page_auto_save_key, $auto_save_data);
+
+    // Try to publish only the page with the default title.
+    $page_auto_save = [$page_auto_save_key => $auto_save_data[$page_auto_save_key]];
+    $response = $this->makePublishAllRequest($page_auto_save);
+
+    // Assert the response is an error with EntityConsideredNew message.
+    self::assertSame(Response::HTTP_UNPROCESSABLE_ENTITY, $response->getStatusCode());
+    self::assertEquals([
+      'errors' => [
+        [
+          'detail' => ErrorCodesEnum::EntityConsideredNew->getMessage(),
+          'source' => [
+            'pointer' => '',
+          ],
+          'meta' => [
+            'entity_type' => Page::ENTITY_TYPE_ID,
+            'entity_id' => $page->id(),
+            'label' => $default_title,
+            ApiAutoSaveController::AUTO_SAVE_KEY => $page_auto_save_key,
+          ],
+        ],
+      ],
+    ], \json_decode($response->getContent() ?: '', TRUE, flags: JSON_THROW_ON_ERROR));
+
+    // Verify the page remains unpublished.
+    $page_storage = $entity_type_manager->getStorage(Page::ENTITY_TYPE_ID);
+    $page_storage->resetCache([$page->id()]);
+    $reloaded_page = $page_storage->load($page->id());
+    \assert($reloaded_page instanceof Page);
+    self::assertFalse($reloaded_page->isPublished());
+
+    // Verify the autosave data was not removed.
+    $auto_save_data = $this->getAutoSaveStatesFromServer();
+    self::assertArrayHasKey($page_auto_save_key, $auto_save_data);
+
+    // Now rename the page and verify it can be published.
+    $page->set('title', 'My renamed page');
+    $autoSave->saveEntity($page);
+    $this->assertFalse(AutoSaveManager::entityIsConsideredNew($page));
+
+    $auto_save_data = $this->getAutoSaveStatesFromServer();
+    $page_auto_save = [$page_auto_save_key => $auto_save_data[$page_auto_save_key]];
+    $response = $this->makePublishAllRequest($page_auto_save);
+
+    // Assert the page was successfully published.
+    self::assertSame(Response::HTTP_OK, $response->getStatusCode());
+    $json = \json_decode($response->getContent() ?: '', TRUE, flags: JSON_THROW_ON_ERROR);
+    self::assertEquals(['message' => 'Successfully published 1 item.'], $json);
+
+    // Verify the page is now published.
+    $page_storage->resetCache([$page->id()]);
+    $reloaded_page = $page_storage->load($page->id());
+    \assert($reloaded_page instanceof Page);
+    self::assertTrue($reloaded_page->isPublished());
+    self::assertEquals('My renamed page', $reloaded_page->label());
   }
 
 }
