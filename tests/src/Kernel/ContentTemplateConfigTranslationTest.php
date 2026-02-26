@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Drupal\Tests\canvas\Kernel;
 
 use Drupal\canvas\Entity\ContentTemplate;
-use Drupal\KernelTests\KernelTestBase;
 use Drupal\language\Entity\ConfigurableLanguage;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
@@ -21,7 +20,7 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
  * @group canvas_dev_translation
  */
 #[RunTestsInSeparateProcesses]
-final class ContentTemplateConfigTranslationTest extends KernelTestBase {
+final class ContentTemplateConfigTranslationTest extends CanvasKernelTestBase {
 
   /**
    * {@inheritdoc}
@@ -84,6 +83,10 @@ final class ContentTemplateConfigTranslationTest extends KernelTestBase {
    * Tests that a French LanguageConfigOverride replaces the component tree.
    */
   public function testFrenchOverrideReplacesComponentTree(): void {
+    // Grab the concrete language manager once and tell PHPStan about it.
+    /** @var \Drupal\Core\Language\LanguageManagerInterface|\Drupal\Core\Language\LanguageManager $language_manager */
+    $language_manager = \Drupal::languageManager();
+
     $definitions = \Drupal::service('config.typed')->getDefinitions();
     $translatable = $definitions['canvas.content_template.*.*.*']['mapping']['component_tree']['translatable'] ?? FALSE;
     self::assertTrue($translatable, 'component_tree must be marked translatable by canvas_dev_translation schema alter.');
@@ -108,13 +111,13 @@ final class ContentTemplateConfigTranslationTest extends KernelTestBase {
     );
 
     // 2. Programmatically create a French LanguageConfigOverride.
-    \Drupal::languageManager()
+    $language_manager
       ->getLanguageConfigOverride('fr', 'canvas.content_template.node.article.full')
       ->set('component_tree', self::FRENCH_COMPONENT_TREE)
       ->save();
 
     // 3. Read the French override back directly and assert its contents.
-    $frenchTree = \Drupal::languageManager()
+    $frenchTree = $language_manager
       ->getLanguageConfigOverride('fr', 'canvas.content_template.node.article.full')
       ->get('component_tree');
 
@@ -123,6 +126,9 @@ final class ContentTemplateConfigTranslationTest extends KernelTestBase {
       $frenchTree,
       'The French language config override must contain the French component tree.'
     );
+    // @phpstan-ignore-next-line staticMethod.alreadyNarrowedType: the
+    // two constant arrays are obviously different, this assertion exists for
+    // documentation/clarity rather than runtime safety.
     self::assertNotSame(
       self::ENGLISH_COMPONENT_TREE,
       $frenchTree,
@@ -131,9 +137,9 @@ final class ContentTemplateConfigTranslationTest extends KernelTestBase {
 
     // 4. Switch the active language to French and verify the config factory
     //    transparently returns the French override.
-    $french = \Drupal::languageManager()->getLanguage('fr');
+    $french = $language_manager->getLanguage('fr');
     self::assertNotNull($french, 'French language must be available.');
-    $originalLanguage = \Drupal::languageManager()->getCurrentLanguage();
+    $originalLanguage = $language_manager->getCurrentLanguage();
     \Drupal::service('language.default')->set($french);
     \Drupal::configFactory()->reset('canvas.content_template.node.article.full');
 
@@ -179,7 +185,10 @@ final class ContentTemplateConfigTranslationTest extends KernelTestBase {
     ]);
     $template->save();
 
-    $frenchOverride = \Drupal::languageManager()
+    /** @var \Drupal\Core\Language\LanguageManagerInterface|\Drupal\Core\Language\LanguageManager $language_manager */
+    $language_manager = \Drupal::languageManager();
+
+    $frenchOverride = $language_manager
       ->getLanguageConfigOverride('fr', 'canvas.content_template.node.article.full');
 
     self::assertNull(
@@ -209,16 +218,19 @@ final class ContentTemplateConfigTranslationTest extends KernelTestBase {
     ]);
     $template->save();
 
-    \Drupal::languageManager()
+    /** @var \Drupal\Core\Language\LanguageManagerInterface|\Drupal\Core\Language\LanguageManager $language_manager */
+    $language_manager = \Drupal::languageManager();
+
+    $language_manager
       ->getLanguageConfigOverride('fr', 'canvas.content_template.node.article.full')
       ->set('component_tree', self::FRENCH_COMPONENT_TREE)
       ->save();
 
-    \Drupal::languageManager()
+    $language_manager
       ->getLanguageConfigOverride('fr', 'canvas.content_template.node.article.full')
       ->delete();
 
-    $frenchTree = \Drupal::languageManager()
+    $frenchTree = $language_manager
       ->getLanguageConfigOverride('fr', 'canvas.content_template.node.article.full')
       ->get('component_tree');
 
@@ -253,6 +265,9 @@ final class ContentTemplateConfigTranslationTest extends KernelTestBase {
       ],
     ];
 
+    /** @var \Drupal\Core\Language\LanguageManagerInterface|\Drupal\Core\Language\LanguageManager $language_manager */
+    $language_manager = \Drupal::languageManager();
+
     $template = ContentTemplate::create([
       'id' => 'node.article.full',
       'content_entity_type_id' => 'node',
@@ -262,26 +277,28 @@ final class ContentTemplateConfigTranslationTest extends KernelTestBase {
     ]);
     $template->save();
 
-    \Drupal::languageManager()
+    $language_manager
       ->getLanguageConfigOverride('fr', 'canvas.content_template.node.article.full')
       ->set('component_tree', self::FRENCH_COMPONENT_TREE)
       ->save();
 
-    \Drupal::languageManager()
+    $language_manager
       ->getLanguageConfigOverride('de', 'canvas.content_template.node.article.full')
       ->set('component_tree', $germanComponentTree)
       ->save();
 
-    $frenchTree = \Drupal::languageManager()
+    $frenchTree = $language_manager
       ->getLanguageConfigOverride('fr', 'canvas.content_template.node.article.full')
       ->get('component_tree');
 
-    $germanTree = \Drupal::languageManager()
+    $germanTree = $language_manager
       ->getLanguageConfigOverride('de', 'canvas.content_template.node.article.full')
       ->get('component_tree');
 
     self::assertSame(self::FRENCH_COMPONENT_TREE, $frenchTree, 'French override must return the French tree.');
     self::assertSame($germanComponentTree, $germanTree, 'German override must return the German tree.');
+    // @phpstan-ignore-next-line staticMethod.alreadyNarrowedType: values are
+    // obviously distinct; this is to guard against accidental changes.
     self::assertNotSame($frenchTree, $germanTree, 'French and German overrides must be independent.');
 
     $defaultTree = \Drupal::config('canvas.content_template.node.article.full')

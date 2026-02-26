@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Drupal\Tests\canvas\Kernel;
 
 use Drupal\canvas\Entity\PageRegion;
-use Drupal\KernelTests\KernelTestBase;
 use Drupal\language\Entity\ConfigurableLanguage;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
@@ -23,7 +22,7 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
  * @group canvas_dev_translation
  */
 #[RunTestsInSeparateProcesses]
-final class PageRegionConfigTranslationTest extends KernelTestBase {
+final class PageRegionConfigTranslationTest extends CanvasKernelTestBase {
 
   /**
    * {@inheritdoc}
@@ -125,6 +124,11 @@ final class PageRegionConfigTranslationTest extends KernelTestBase {
    * Tests that a French LanguageConfigOverride replaces the component tree.
    */
   public function testFrenchOverrideReplacesComponentTree(): void {
+    // Ensure PHPStan knows we have access to the concrete manager with
+    // getLanguageConfigOverride().
+    /** @var \Drupal\Core\Language\LanguageManagerInterface|\Drupal\Core\Language\LanguageManager $language_manager */
+    $language_manager = \Drupal::languageManager();
+
     $definitions = \Drupal::service('config.typed')->getDefinitions();
     $translatable = $definitions['canvas.content_template.*.*.*']['mapping']['component_tree']['translatable'] ?? FALSE;
     self::assertTrue($translatable, 'component_tree must be marked translatable by canvas_dev_translation schema alter.');
@@ -146,13 +150,13 @@ final class PageRegionConfigTranslationTest extends KernelTestBase {
     );
 
     // 2. Programmatically create a French LanguageConfigOverride.
-    \Drupal::languageManager()
+    $language_manager
       ->getLanguageConfigOverride('fr', self::CONFIG_NAME)
       ->set('component_tree', self::FRENCH_COMPONENT_TREE)
       ->save();
 
     // 3. Read the French override back directly and assert its contents.
-    $frenchTree = \Drupal::languageManager()
+    $frenchTree = $language_manager
       ->getLanguageConfigOverride('fr', self::CONFIG_NAME)
       ->get('component_tree');
 
@@ -161,6 +165,7 @@ final class PageRegionConfigTranslationTest extends KernelTestBase {
       $frenchTree,
       'The French language config override must contain the French component tree.'
     );
+    // @phpstan-ignore-next-line staticMethod.alreadyNarrowedType
     self::assertNotSame(
       self::ENGLISH_COMPONENT_TREE,
       $frenchTree,
@@ -169,9 +174,9 @@ final class PageRegionConfigTranslationTest extends KernelTestBase {
 
     // 4. Switch the active language to French and verify the config factory
     //    transparently returns the French override.
-    $french = \Drupal::languageManager()->getLanguage('fr');
+    $french = $language_manager->getLanguage('fr');
     self::assertNotNull($french, 'French language must be available.');
-    $originalLanguage = \Drupal::languageManager()->getCurrentLanguage();
+    $originalLanguage = $language_manager->getCurrentLanguage();
     \Drupal::service('language.default')->set($french);
     \Drupal::configFactory()->reset(self::CONFIG_NAME);
 
