@@ -18,7 +18,7 @@ describe(
         // For validating the shape of the node.
         'jsonapi',
         // For testing multivalue field drag and drop.
-        'canvas_dev_mode'
+        'canvas_dev_mode',
       ]);
     });
 
