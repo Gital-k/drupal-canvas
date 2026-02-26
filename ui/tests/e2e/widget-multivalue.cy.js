@@ -42,7 +42,9 @@ describe('Multivalue widget drag and drop', () => {
     // the list item text content (visible in the collapsed state).
     const confirmTextInputs = (inputContent) => {
       // First, wait for the list items to be present (using CSS module class prefix)
-      cy.get('@unlimited-text').find('[class*="_listItem_"]').should('have.length', inputContent.length);
+      cy.get('@unlimited-text')
+        .find('[class*="_listItem_"]')
+        .should('have.length', inputContent.length);
 
       cy.get('@unlimited-text')
         .find('tbody tr')
@@ -224,6 +226,5 @@ describe('Multivalue widget drag and drop', () => {
       'Neutral Milk Hotel',
       '',
     ]);
-
   });
 });
