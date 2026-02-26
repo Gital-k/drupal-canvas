@@ -1,22 +1,28 @@
-.itemRow{
+.itemRow {
   gap: 0 !important;
-}
-.itemRow:hover {
-  background-color: var(--blue-2);
-}
-
-.itemRow:hover .arrowIcon {
-  opacity: 1;
 }
 
 /* List Item Styles - Clean list style matching design */
 .listItem {
+  display: flex;
+  width: 100%;
   align-items: center;
   padding: var(--space-3) var(--space-3);
   background-color: transparent;
+  border: none;
+  text-align: left;
+  cursor: pointer;
   transition: background-color 0.15s ease;
+  position: relative;
 }
 
+.listItem:hover {
+  background-color: var(--blue-2);
+}
+
+.listItem:hover .arrowIcon {
+  opacity: 1;
+}
 
 .listItem:focus {
   outline: 2px solid var(--blue-8);
@@ -33,10 +39,6 @@
   margin-top: 5px;
 }
 
-.listItem:focus {
-  outline: 2px solid var(--blue-8);
-  outline-offset: -2px;
-}
 
 .itemText {
   color: #1C2024;
@@ -44,6 +46,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
 }
 
 /* Popover Styles */

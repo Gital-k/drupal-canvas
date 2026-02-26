@@ -48,6 +48,10 @@ const DrupalInputMultivalueForm = ({
   // Controlled popover state so we can close it programmatically on remove.
   const [popoverOpen, setPopoverOpen] = useState(false);
   const fieldLabel = attributes['data-field-label'] || '';
+  // Ref for the popover trigger to restore focus after closing.
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  // Ref for the popover input to focus it when opening.
+  const popoverInputRef = useRef<HTMLInputElement | null>(null);
 
   // Sync displayValue with attributes.value when it changes (e.g., after AJAX updates)
   useEffect(() => {
@@ -101,9 +105,22 @@ const DrupalInputMultivalueForm = ({
     if (open) {
       // When opening, set tempValue to current displayValue.
       setTempValue(displayValue);
+      // Focus the input field in the popover.
+      setTimeout(() => {
+        if (popoverInputRef.current) {
+          popoverInputRef.current.focus();
+          popoverInputRef.current.select();
+        }
+      }, 0);
     } else {
       // When closing, revert tempValue to displayValue (discards uncommitted changes).
       setTempValue(displayValue);
+      // Restore focus to the trigger button after closing.
+      setTimeout(() => {
+        if (triggerRef.current) {
+          triggerRef.current.focus();
+        }
+      }, 0);
     }
     setPopoverOpen(open);
   };
@@ -167,12 +184,14 @@ const DrupalInputMultivalueForm = ({
       <Box
         ref={inputWrapperRef}
         style={{ position: 'absolute', left: '-9999px' }}
+        aria-hidden="true"
       >
         <TextFieldWithBehaviors
           {...(attributes.class ? { className: clsx(attributes.class) } : {})}
           {...{
             attributes: {
               ...a2p(attributes, {}, { skipAttributes: ['class'] }),
+              tabIndex: -1,
             },
           }}
         />
@@ -187,12 +206,17 @@ const DrupalInputMultivalueForm = ({
         >
           {/* List Item View - Trigger */}
           <Popover.Trigger>
-            <Box className={styles.listItem}>
+            <button
+              ref={triggerRef}
+              className={styles.listItem}
+              type="button"
+              aria-label={`Edit ${fieldLabel}: ${displayValue || 'Empty'}`}
+            >
               <Text size="2" className={styles.itemText}>
                 {displayValue || 'Empty'}
               </Text>
               <ArrowRightIcon className={styles.arrowIcon} />
-            </Box>
+            </button>
           </Popover.Trigger>
         </Flex>
 
@@ -231,6 +255,9 @@ const DrupalInputMultivalueForm = ({
                   onKeyDown: handleKeyDown,
                   type: 'text',
                   placeholder: attributes.placeholder,
+                  ref: (el: HTMLInputElement | null) => {
+                    popoverInputRef.current = el;
+                  },
                 },
               }}
             />
