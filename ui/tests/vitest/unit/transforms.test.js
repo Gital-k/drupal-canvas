@@ -467,6 +467,12 @@ describe('Transforms - entityAutocompleteTargetId', () => {
     ).to.equal('7');
   });
 
+  it('Should handle a trailing comma in single-value tags input', () => {
+    expect(
+      transforms.entityAutocompleteTargetId('A node title (3), '),
+    ).to.equal('3');
+  });
+
   it('Should map array values when upstream provides arrays', () => {
     expect(
       transforms.entityAutocompleteTargetId([

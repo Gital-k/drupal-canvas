@@ -39,7 +39,7 @@ const parseEntityAutocompleteValue = (
     .map((selection) => selection.trim())
     .filter(Boolean);
   if (selections.length <= 1) {
-    return parseSingleEntityAutocompleteSelection(value);
+    return parseSingleEntityAutocompleteSelection(selections[0] ?? value);
   }
   const ids = selections.map(parseSingleEntityAutocompleteSelection);
   if (ids.some((id) => id === null)) {
