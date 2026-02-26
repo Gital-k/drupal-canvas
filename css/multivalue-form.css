@@ -1,8 +1,8 @@
 /* Multivalue Form Styles */
 .multivalue-container {
   overflow: visible;
-  border: none;
   margin-bottom: 16px;
+  border: none;
   border-radius: 4px;
   background-color: white;
 }
@@ -15,8 +15,8 @@
 
 .multivalue-container table {
   width: 100%;
-  border: none;
   margin: 0;
+  border: none;
   border-collapse: collapse;
 }
 
@@ -33,17 +33,17 @@
 }
 
 .multivalue-container table thead tr th.field-label {
+  width: 100%;
   margin: 0;
   padding: 8px 0;
   border: none;
-  width: 100%;
   text-align: left;
   background: white;
 }
 
 .multivalue-container table thead tr th.field-label h4.label {
-  margin: 0;
   width: 100%;
+  margin: 0;
   padding: 0;
 }
 
