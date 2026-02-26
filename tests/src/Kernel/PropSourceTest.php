@@ -1735,8 +1735,8 @@ class PropSourceTest extends CanvasKernelTestBase {
   }
 
   /**
-   * @covers \Drupal\canvas\PropSource\EntityFieldPropSource::withAdapter()
-   * @covers \Drupal\canvas\PropSource\EntityFieldPropSource::parse())
+   * @covers \Drupal\canvas\PropSource\EntityFieldPropSource::withAdapter
+   * @covers \Drupal\canvas\PropSource\EntityFieldPropSource::parse
    */
   public function testInvalidEntityFieldPropSourceDueToMissingAdapter(): void {
     $this->expectException(PluginNotFoundException::class);
@@ -2187,7 +2187,8 @@ class PropSourceTest extends CanvasKernelTestBase {
   }
 
   /**
-   * @covers PropSource::Dynamic
+   * @covers \Drupal\canvas\PropSource\PropSource::parse
+   * @see \Drupal\canvas\PropSource\PropSource::Dynamic
    * @group legacy
    */
   public function testDynamicPrefixIsTransformedOnLoad(): void {
