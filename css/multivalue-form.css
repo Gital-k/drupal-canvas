@@ -3,8 +3,8 @@
   overflow: visible;
   border: none;
   border-radius: 4px;
-  background-color: white;
   margin-bottom: 16px;
+  background-color: white;
 }
 
 .multivalue-container .field-label {
@@ -36,15 +36,15 @@
   margin: 0;
   padding: 8px 0;
   border: none;
-  background: white;
   width: 100%;
+  background: white;
   text-align: left;
 }
 
 .multivalue-container table thead tr th.field-label h4.label {
   margin: 0;
-  padding: 0;
   width: 100%;
+  padding: 0;
 }
 
 /* Apply border only to tbody */
