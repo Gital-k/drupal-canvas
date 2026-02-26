@@ -1,0 +1,24 @@
+canvas_dev_translation.api.translations:
+  path: '/canvas/api/v0/{entity_type}/{id}/translations'
+  defaults:
+    _controller: '\Drupal\canvas_dev_translation\Controller\ApiTranslationController::getTranslations'
+  requirements:
+    _permission: 'access content'
+    entity_type: 'canvas_page|canvas_content_template|canvas_page_region'
+  options:
+    _auth:
+      - cookie
+      - basic_auth
+
+canvas_dev_translation.api.translations.create:
+  path: '/canvas/api/v0/{entity_type}/{id}/translations/{target_langcode}'
+  defaults:
+    _controller: '\Drupal\canvas_dev_translation\Controller\ApiTranslationController::createTranslation'
+  methods: [POST]
+  requirements:
+    _permission: 'access content'
+    entity_type: 'canvas_page|canvas_content_template|canvas_page_region'
+  options:
+    _auth:
+      - cookie
+      - basic_auth

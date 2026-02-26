@@ -7,6 +7,7 @@ namespace Drupal\canvas\Controller;
 use Drupal\Core\Cache\CacheableJsonResponse;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\Config\ConfigFactoryOverrideInterface;
 use Drupal\Core\Config\Entity\ConfigEntityInterface;
 use Drupal\Core\Database\Connection;
 use Drupal\Core\Entity\ContentEntityInterface;
@@ -19,6 +20,8 @@ use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\Core\File\FileUrlGeneratorInterface;
 use Drupal\Core\Http\Exception\CacheableAccessDeniedHttpException;
+use Drupal\Core\KeyValueStore\KeyValueFactoryInterface;
+use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\StringTranslation\PluralTranslatableMarkup;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
@@ -32,6 +35,7 @@ use Drupal\canvas\Exception\ConstraintViolationException;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Validation\ConstraintPropertyPathTranslatorTrait;
 use Drupal\image\Entity\ImageStyle;
+use Drupal\language\Config\LanguageConfigFactoryOverride;
 use Drupal\user\UserInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -51,6 +55,30 @@ final class ApiAutoSaveController extends ApiControllerBase {
   public const AUTO_SAVE_KEY = 'api_auto_save_key';
   public const AVATAR_IMAGE_STYLE = 'canvas_avatar';
 
+  /**
+   * Constructs an ApiAutoSaveController object.
+   *
+   * @param \Drupal\Core\Database\Connection $database
+   *   The database connection.
+   * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entityTypeManager
+   *   The entity type manager.
+   * @param \Drupal\Core\Config\ConfigFactoryInterface $configFactory
+   *   The config factory.
+   * @param \Drupal\Core\File\FileUrlGeneratorInterface $fileUrlGenerator
+   *   The file URL generator.
+   * @param \Drupal\canvas\AutoSave\AutoSaveManager $autoSaveManager
+   *   The auto-save manager.
+   * @param \Psr\Log\LoggerInterface $logger
+   *   The canvas logger channel.
+   * @param \Drupal\Core\Session\AccountInterface $currentUser
+   *   The current user.
+   * @param \Drupal\Core\Language\LanguageManagerInterface $languageManager
+   *   The language manager.
+   * @param \Drupal\Core\Config\ConfigFactoryOverrideInterface $configLanguageOverride
+   *   The language config factory override.
+   * @param \Drupal\Core\KeyValueStore\KeyValueFactoryInterface $keyValueFactory
+   *   The key-value factory service.
+   */
   public function __construct(
     private readonly Connection $database,
     private readonly EntityTypeManagerInterface $entityTypeManager,
@@ -60,8 +88,24 @@ final class ApiAutoSaveController extends ApiControllerBase {
     #[Autowire(service: 'logger.channel.canvas')]
     private readonly LoggerInterface $logger,
     private readonly AccountInterface $currentUser,
+    private readonly LanguageManagerInterface $languageManager,
+    #[Autowire(service: 'language.config_factory_override')]
+    private readonly ConfigFactoryOverrideInterface $configLanguageOverride,
+    #[Autowire(service: 'keyvalue')]
+    private readonly KeyValueFactoryInterface $keyValueFactory,
   ) {}
 
+  /**
+   * Validates that the client's expected auto-saves match the stored ones.
+   *
+   * @param array $expected_auto_saves
+   *   The auto-saves submitted by the client, keyed by auto-save key.
+   * @param array $all_auto_saves
+   *   All auto-saves currently in the store, keyed by auto-save key.
+   *
+   * @return \Symfony\Component\HttpFoundation\JsonResponse|null
+   *   A JSON error response if validation fails, or NULL if valid.
+   */
   private static function validateExpectedAutoSaves(array $expected_auto_saves, array $all_auto_saves): ?JsonResponse {
     $unexpected_keys = \array_diff_key($expected_auto_saves, $all_auto_saves);
     if ($unexpected_keys) {
@@ -105,7 +149,9 @@ final class ApiAutoSaveController extends ApiControllerBase {
     $global_asset = AssetLibrary::load(AssetLibrary::GLOBAL_ID);
     if ($global_asset !== NULL) {
       $global_asset_key = AutoSaveManager::getAutoSaveKey($global_asset);
-      if (\array_key_exists($global_asset_key, $all_auto_saves) && !\array_key_exists($global_asset_key, $expected_auto_saves)) {
+      $in_all = \array_key_exists($global_asset_key, $all_auto_saves);
+      $in_expected = \array_key_exists($global_asset_key, $expected_auto_saves);
+      if ($in_all && !$in_expected) {
         // There are changes to the global asset library, but it is not being
         // published. We need to ensure there are not code components being
         // published.
@@ -145,13 +191,15 @@ final class ApiAutoSaveController extends ApiControllerBase {
 
     // Filter those the user has access to.
     $filtered = \array_filter($this->autoSaveManager->getAllAutoSaveList(TRUE), function (array $item) use ($cache) {
+      // Config override translation entries have no hydrated entity — they are
+      // published via LanguageConfigFactoryOverride and do not go through the
+      // normal entity access check. Always include them.
+      if (!empty($item['is_config_override'])) {
+        return TRUE;
+      }
+
       \assert($item['entity'] instanceof EntityInterface);
       $access = $item['entity']->access('view label', return_as_object: TRUE);
-      // @todo This will result in the cache tag for this entity being returned
-      //   in the response even though the user does not have access to view the
-      //   entity. A less privileged user could still be able to determine that
-      //   the entity exists and has pending changes. Determine if we should
-      //   prevent this in https://drupal.org/i/3535355.
       $cache->addCacheableDependency($item['entity']);
       $cache->addCacheableDependency($access);
       return $access->isAllowed();
@@ -198,6 +246,12 @@ final class ApiAutoSaveController extends ApiControllerBase {
   /**
    * Publishes the auto-saved changes.
    *
+   * Handles two cases:
+   * - Config entity translation auto-saves (config overrides): applied via
+   *   LanguageConfigFactoryOverride and deleted from auto-save storage.
+   * - All other auto-saves (content entities, default language config entities)
+   *   use the existing publishing logic unchanged.
+   *
    * @throws \Exception
    */
   public function post(Request $request): JsonResponse {
@@ -212,15 +266,194 @@ final class ApiAutoSaveController extends ApiControllerBase {
       return new JsonResponse(data: ['message' => 'No items to publish.'], status: Response::HTTP_NO_CONTENT);
     }
 
-    // We keep these in an array instead of making use of a collection like
-    // ConstraintViolationList, so we can keep violations grouped by each
-    // entity.
     $violationSets = [];
     $entities = [];
     // The client auto-saves do not contain the 'data' key, so we need to use
     // the versions from the auto-save manager.
     $publish_auto_saves = array_intersect_key($all_auto_saves, $client_auto_saves);
 
+    // -----------------------------------------------------------------------
+    // Phase 1: Separate config override translation auto-saves from regular
+    // auto-saves and publish them immediately via LanguageConfigFactoryOverride
+    // These do not go through the regular entity save loop below.
+    // -----------------------------------------------------------------------
+    $config_override_keys = [];
+    $default_langcode = $this->languageManager->getDefaultLanguage()->getId();
+
+    foreach ($publish_auto_saves as $autoSaveKey => $auto_save_data) {
+      // Detect config override entries by the flag set in AutoSaveManager.
+      if (empty($auto_save_data['is_config_override'])) {
+        continue;
+      }
+
+      $langcode = $auto_save_data['langcode'] ?? NULL;
+      $config_name = $auto_save_data['config_name'] ?? NULL;
+      $component_tree = $auto_save_data['data']['component_tree'] ?? NULL;
+
+      // Only process non-default language config overrides.
+      if (!$langcode || !$config_name || $langcode === $default_langcode) {
+        continue;
+      }
+
+      try {
+        // Apply the component_tree override to the live config entity.
+        // LanguageConfigFactoryOverride::getOverride() returns a mutable
+        // override object that can be saved independently of the base config.
+        \assert($this->configLanguageOverride instanceof LanguageConfigFactoryOverride);
+        $this->configLanguageOverride
+          ->getOverride($langcode, $config_name)
+          ->setData(['component_tree' => $component_tree])
+          ->save();
+
+        $config_override_keys[] = $autoSaveKey;
+      }
+      catch (\Exception $e) {
+        Error::logException($this->logger, $e);
+        return new JsonResponse(data: [
+          'errors' => [
+            [
+              'detail' => $e->getMessage(),
+              'source' => ['pointer' => 'error'],
+              'meta' => [
+                'entity_type' => $auto_save_data['entity_type'] ?? NULL,
+                'entity_id' => $auto_save_data['entity_id'] ?? NULL,
+                'label' => $auto_save_data['label'] ?? NULL,
+                self::AUTO_SAVE_KEY => $autoSaveKey,
+              ],
+            ],
+          ],
+        ], status: 500);
+      }
+    }
+
+    // Delete published config override auto-save entries.
+    foreach ($config_override_keys as $key) {
+      $this->keyValueFactory->get(AutoSaveManager::AUTO_SAVE_STORE)->delete($key);
+      unset($publish_auto_saves[$key]);
+    }
+
+    // If all entries were config overrides, return success immediately.
+    if (empty($publish_auto_saves)) {
+      return new JsonResponse(data: ['message' => new PluralTranslatableMarkup(\count($config_override_keys), 'Successfully published 1 item.', 'Successfully published @count items.')], status: 200);
+    }
+
+    // -----------------------------------------------------------------------
+    // Phase 1.5: Handle content entity translation auto-saves.
+    // These are auto-saves where langcode differs from the entity's default
+    // language. Instead of saving the reconstructed entity directly (which
+    // would corrupt the base entity's default langcode), we load the original
+    // entity and add the translation to it.
+    // -----------------------------------------------------------------------
+    $translation_keys = [];
+    foreach ($publish_auto_saves as $autoSaveKey => $auto_save_data) {
+      // Skip config overrides — already handled above.
+      if (!empty($auto_save_data['is_config_override'])) {
+        continue;
+      }
+
+      $langcode = $auto_save_data['langcode'] ?? NULL;
+      $entity_type_id = $auto_save_data['entity_type'] ?? NULL;
+      $entity_id = $auto_save_data['entity_id'] ?? NULL;
+
+      if (!$langcode || !$entity_type_id || !$entity_id) {
+        continue;
+      }
+
+      // Check if this is a translation (langcode differs from default).
+      if ($langcode === $default_langcode) {
+        continue;
+      }
+
+      // Only handle content entities — config entities go through Phase 2.
+      $entity_type_definition = $this->entityTypeManager->getDefinition($entity_type_id, FALSE);
+      if (!$entity_type_definition || !$entity_type_definition->entityClassImplements(ContentEntityInterface::class)) {
+        continue;
+      }
+
+      try {
+        $storage = $this->entityTypeManager->getStorage($entity_type_id);
+        $original = $storage->loadUnchanged($entity_id);
+        if (!$original instanceof ContentEntityInterface) {
+          continue;
+        }
+
+        $data = $auto_save_data['data'];
+
+        // If translation already exists, update it. Otherwise add it.
+        if ($original->hasTranslation($langcode)) {
+          $translation = $original->getTranslation($langcode);
+        }
+        else {
+          $translation = $original->addTranslation($langcode);
+        }
+
+        // Copy all fields from the stored data into the translation,
+        // skipping fields that should not be overwritten.
+        $skip_fields = ['langcode', 'default_langcode', 'id', 'uuid', 'revision_id'];
+        foreach ($data as $field_name => $field_value) {
+          if (in_array($field_name, $skip_fields, TRUE)) {
+            continue;
+          }
+          if ($translation->hasField($field_name)) {
+            try {
+              $translation->set($field_name, $field_value);
+            }
+            catch (\Exception) {
+              // Skip fields that cannot be set.
+            }
+          }
+        }
+
+        if ($translation instanceof EntityPublishedInterface) {
+          $translation->setPublished();
+        }
+
+        $translation->setNewRevision();
+        $original_entity_type = $original->getEntityType();
+        \assert($original_entity_type instanceof ContentEntityTypeInterface);
+        $revision_id_key = $original_entity_type->getKey('revision');
+        if ($revision_id_key) {
+          $translation->set($revision_id_key, NULL);
+        }
+        if ($revision_user = $original_entity_type->getRevisionMetadataKey('revision_user')) {
+          $translation->set($revision_user, $this->currentUser->id());
+        }
+
+        $original->save();
+
+        // Delete the auto-save entry.
+        $this->keyValueFactory->get(AutoSaveManager::AUTO_SAVE_STORE)->delete($autoSaveKey);
+        $translation_keys[] = $autoSaveKey;
+        unset($publish_auto_saves[$autoSaveKey]);
+      }
+      catch (\Exception $e) {
+        Error::logException($this->logger, $e);
+        return new JsonResponse(data: [
+          'errors' => [
+            [
+              'detail' => $e->getMessage(),
+              'source' => ['pointer' => 'error'],
+              'meta' => [
+                'entity_type' => $entity_type_id,
+                'entity_id' => $entity_id,
+                self::AUTO_SAVE_KEY => $autoSaveKey,
+              ],
+            ],
+          ],
+        ], status: 500);
+      }
+    }
+
+    // If everything was handled in phases 1 and 1.5, return early.
+    if (empty($publish_auto_saves)) {
+      $total = \count($config_override_keys) + \count($translation_keys);
+      return new JsonResponse(data: ['message' => new PluralTranslatableMarkup($total, 'Successfully published 1 item.', 'Successfully published @count items.')], status: 200);
+    }
+
+    // -----------------------------------------------------------------------
+    // Phase 2: Original publishing logic for content entities and default
+    // language config entities — completely unchanged.
+    // -----------------------------------------------------------------------
     // We want to report all access errors at one, so keeping the labels.
     $access_error_labels = [];
     $access_error_cache = new CacheableMetadata();
@@ -398,9 +631,19 @@ final class ApiAutoSaveController extends ApiControllerBase {
       ], status: 500);
     }
 
-    return new JsonResponse(data: ['message' => new PluralTranslatableMarkup(\count($publish_auto_saves), 'Successfully published 1 item.', 'Successfully published @count items.')], status: 200);
+    $total_published = \count($config_override_keys) + \count($publish_auto_saves);
+    return new JsonResponse(data: ['message' => new PluralTranslatableMarkup($total_published, 'Successfully published 1 item.', 'Successfully published @count items.')], status: 200);
   }
 
+  /**
+   * Deletes the auto-save entry for an entity.
+   *
+   * @param \Drupal\Core\Entity\EntityInterface $entity
+   *   The entity whose auto-save entry to delete.
+   *
+   * @return \Symfony\Component\HttpFoundation\JsonResponse
+   *   A JSON response indicating success or failure.
+   */
   public function delete(EntityInterface $entity): JsonResponse {
     if ($this->autoSaveManager->getAutoSaveEntity($entity)->isEmpty()) {
       return new JsonResponse(data: ['error' => 'No auto-save data found for this entity.'], status: Response::HTTP_NOT_FOUND);
@@ -410,11 +653,13 @@ final class ApiAutoSaveController extends ApiControllerBase {
   }
 
   /**
-   * Gets URL to avatar.
+   * Gets the URL to a user's avatar image.
    *
    * @param \Drupal\user\UserInterface $owner
+   *   The user whose avatar URL to build.
    *
    * @return string|null
+   *   The avatar URL, or NULL if no picture is set.
    */
   private function buildAvatarUrl(UserInterface $owner): ?string {
     if (!$owner->hasField('user_picture') || $owner->get('user_picture')->isEmpty()) {
@@ -457,6 +702,17 @@ final class ApiAutoSaveController extends ApiControllerBase {
     }
   }
 
+  /**
+   * Translates violation property paths and root for Canvas field inputs.
+   *
+   * @param \Drupal\Core\Entity\FieldableEntityInterface|\Drupal\Core\Config\Entity\ConfigEntityInterface $entity
+   *   The entity the violations belong to.
+   * @param \Symfony\Component\Validator\ConstraintViolationListInterface|\Drupal\Core\Entity\EntityConstraintViolationListInterface $violations
+   *   The violations to translate.
+   *
+   * @return \Symfony\Component\Validator\ConstraintViolationListInterface
+   *   The violations with translated property paths.
+   */
   public static function getViolationSetsFromPropertyPathsAndRoot(
     FieldableEntityInterface|ConfigEntityInterface $entity,
     ConstraintViolationListInterface|EntityConstraintViolationListInterface $violations,
@@ -482,7 +738,7 @@ final class ApiAutoSaveController extends ApiControllerBase {
         ...$carry,
         ...\array_combine(
           // Key the map by the field name for each delta.
-          // e.g. field_canvas_demo.0.inputs
+          // e.g. field_canvas_demo.0.inputs.
           \array_map(static fn (int|string $delta) => \sprintf('%s.%d.inputs', $field_name, (int) $delta), \array_keys($entity->get($field_name)->getValue())),
           // And map this to 'model'.
           \array_fill(0, $entity->get($field_name)->count(), 'model'),
