@@ -59,7 +59,7 @@ final class PageRegionConfigTranslationTest extends CanvasKernelTestBase {
       'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
       'component_version' => 'b1e991f726a2a266',
       'inputs' => [
-        'heading' => 'Contenu de la région en-tête en français',
+        'heading' => 'French header region content',
       ],
     ],
   ];
@@ -70,7 +70,7 @@ final class PageRegionConfigTranslationTest extends CanvasKernelTestBase {
       'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
       'component_version' => 'b1e991f726a2a266',
       'inputs' => [
-        'heading' => 'Premier composant français',
+        'heading' => 'French component one',
       ],
     ],
     [
@@ -78,7 +78,7 @@ final class PageRegionConfigTranslationTest extends CanvasKernelTestBase {
       'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
       'component_version' => 'b1e991f726a2a266',
       'inputs' => [
-        'heading' => 'Deuxième composant français',
+        'heading' => 'French component two',
       ],
     ],
   ];
@@ -228,7 +228,7 @@ final class PageRegionConfigTranslationTest extends CanvasKernelTestBase {
         'uuid' => 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
         'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
         'component_version' => 'b1e991f726a2a266',
-        'inputs' => ['heading' => 'Deutscher Kopfzeilenbereich'],
+        'inputs' => ['heading' => 'German header region content'],
       ],
     ];
 

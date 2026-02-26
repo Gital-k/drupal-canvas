@@ -56,7 +56,7 @@ final class ContentTemplateConfigTranslationTest extends CanvasKernelTestBase {
       'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
       'component_version' => 'b1e991f726a2a266',
       'inputs' => [
-        'heading' => 'Bonjour depuis le français !',
+        'heading' => 'French content template heading',
       ],
     ],
   ];
@@ -193,7 +193,7 @@ final class ContentTemplateConfigTranslationTest extends CanvasKernelTestBase {
         'uuid' => 'cccccccc-cccc-cccc-cccc-cccccccccccc',
         'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
         'component_version' => 'b1e991f726a2a266',
-        'inputs' => ['heading' => 'Hallo auf Deutsch!'],
+        'inputs' => ['heading' => 'German content template heading'],
       ],
     ];
 
