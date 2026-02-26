@@ -98,7 +98,7 @@ final class PageRegionConfigTranslationTest extends CanvasKernelTestBase {
    * Tests that a French LanguageConfigOverride replaces the component tree.
    */
   public function testFrenchOverrideReplacesComponentTree(): void {
-    /** @var \Drupal\config_translation\LanguageConfigOverrideFactoryInterface $overrideFactory */
+    /** @var \Drupal\language\Config\LanguageConfigFactoryOverrideInterface $overrideFactory */
     $overrideFactory = \Drupal::service('config_translation.language_config_override_factory');
 
     $region = PageRegion::create([
@@ -117,10 +117,12 @@ final class PageRegionConfigTranslationTest extends CanvasKernelTestBase {
 
     $frenchTree = $overrideFactory->getOverride('fr', self::CONFIG_NAME)->get('component_tree');
     self::assertSame(self::FRENCH_COMPONENT_TREE, $frenchTree, 'French override must contain the French component tree.');
-    self::assertNotSame(self::ENGLISH_COMPONENT_TREE, $frenchTree, 'French override must differ from English default.');
+    self::assertNotEquals(self::ENGLISH_COMPONENT_TREE, $frenchTree, 'French override must differ from English default.');
 
     $originalLanguage = \Drupal::languageManager()->getCurrentLanguage();
-    \Drupal::service('language.default')->set(\Drupal::languageManager()->getLanguage('fr'));
+    $frenchLanguage = \Drupal::languageManager()->getLanguage('fr');
+    self::assertNotNull($frenchLanguage, 'French language must be available.');
+    \Drupal::service('language.default')->set($frenchLanguage);
     \Drupal::configFactory()->reset(self::CONFIG_NAME);
 
     try {
@@ -139,7 +141,7 @@ final class PageRegionConfigTranslationTest extends CanvasKernelTestBase {
    * Tests that a structurally different French tree replaces the English tree.
    */
   public function testFrenchOverrideWithDifferentTreeStructure(): void {
-    /** @var \Drupal\config_translation\LanguageConfigOverrideFactoryInterface $overrideFactory */
+    /** @var \Drupal\language\Config\LanguageConfigFactoryOverrideInterface $overrideFactory */
     $overrideFactory = \Drupal::service('config_translation.language_config_override_factory');
 
     $region = PageRegion::create([
@@ -168,7 +170,7 @@ final class PageRegionConfigTranslationTest extends CanvasKernelTestBase {
    * Tests that the English default is served when no French override exists.
    */
   public function testDefaultTreeServedWhenNoOverrideExists(): void {
-    /** @var \Drupal\config_translation\LanguageConfigOverrideFactoryInterface $overrideFactory */
+    /** @var \Drupal\language\Config\LanguageConfigFactoryOverrideInterface $overrideFactory */
     $overrideFactory = \Drupal::service('config_translation.language_config_override_factory');
 
     $region = PageRegion::create([
@@ -189,7 +191,7 @@ final class PageRegionConfigTranslationTest extends CanvasKernelTestBase {
    * Tests that deleting a language override restores the default tree.
    */
   public function testDeletingOverrideRestoresDefault(): void {
-    /** @var \Drupal\config_translation\LanguageConfigOverrideFactoryInterface $overrideFactory */
+    /** @var \Drupal\language\Config\LanguageConfigFactoryOverrideInterface $overrideFactory */
     $overrideFactory = \Drupal::service('config_translation.language_config_override_factory');
 
     $region = PageRegion::create([
@@ -216,7 +218,7 @@ final class PageRegionConfigTranslationTest extends CanvasKernelTestBase {
    * Tests that two languages can have independent overrides simultaneously.
    */
   public function testMultipleLanguageOverridesAreIndependent(): void {
-    /** @var \Drupal\config_translation\LanguageConfigOverrideFactoryInterface $overrideFactory */
+    /** @var \Drupal\language\Config\LanguageConfigFactoryOverrideInterface $overrideFactory */
     $overrideFactory = \Drupal::service('config_translation.language_config_override_factory');
 
     ConfigurableLanguage::createFromLangcode('de')->save();
@@ -245,7 +247,7 @@ final class PageRegionConfigTranslationTest extends CanvasKernelTestBase {
 
     self::assertSame(self::FRENCH_COMPONENT_TREE, $frenchTree);
     self::assertSame($germanComponentTree, $germanTree);
-    self::assertNotSame($frenchTree, $germanTree);
+    self::assertNotEquals($frenchTree, $germanTree);
 
     $defaultTree = \Drupal::config(self::CONFIG_NAME)->get('component_tree');
     self::assertSame(self::ENGLISH_COMPONENT_TREE, $defaultTree);
@@ -255,7 +257,7 @@ final class PageRegionConfigTranslationTest extends CanvasKernelTestBase {
    * Tests that updating an existing override replaces the previous override.
    */
   public function testUpdatingOverrideReplacesItCompletely(): void {
-    /** @var \Drupal\config_translation\LanguageConfigOverrideFactoryInterface $overrideFactory */
+    /** @var \Drupal\language\Config\LanguageConfigFactoryOverrideInterface $overrideFactory */
     $overrideFactory = \Drupal::service('config_translation.language_config_override_factory');
 
     $region = PageRegion::create([
