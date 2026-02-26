@@ -120,7 +120,8 @@ class SemiCoupledThemeEngineForceTwigHooks {
     if ($ml_ajax || $ml_form) {
       $suggestions[] = 'input__media_library';
     }
-    // Only apply multivalue form input suggestion if canvas_dev_mode is enabled.
+    // Only apply multivalue form input suggestion if canvas_dev_mode is
+    // enabled.
     if ($this->moduleHandler->moduleExists('canvas_dev_mode') &&
         isset($variables['element']['#is_multivalue_form']) &&
         $variables['element']['#is_multivalue_form']) {
