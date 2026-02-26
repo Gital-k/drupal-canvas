@@ -37,17 +37,17 @@ export const edit = (cy) => {
   cy.get('@textfield_multi')
     .findByRole('button', { name: '+ Add new' })
     .as('add-another-text');
-  
+
   // Verify the first item has the default value.
   verifyRowText(cy, 0, 'Marshmallow Coast');
-  
+
   items.forEach((item, ix) => {
     // Type into the row (ix + 1 because index 0 is the first item with default value).
     typeInRow(cy, ix + 1, item);
-    
+
     // Verify the value was set.
     verifyRowText(cy, ix + 1, item);
-    
+
     // Wait for the preview to finish loading.
     cy.wait('@updatePreview');
     // Queue another intercept for the wait in the main test and/or the next
