@@ -3,6 +3,8 @@ import clsx from 'clsx';
 
 import { a2p } from '@/local_packages/utils';
 
+import { propagateValueChange } from './propagateValueChange';
+
 import type { Attributes } from '@/types/DrupalAttribute';
 
 import styles from './Checkbox.module.css';
@@ -85,39 +87,20 @@ const Checkbox = ({
           }
         }) as EventListener);
 
-        // Below is logic that overrides the native setter for the checked
-        // property, so any programmatic changes to it trigger a change event -
-        // something that is needed to update the Redux store and the preview.
-        const elementProto = Object.getPrototypeOf(node);
-        const descriptor = Object.getOwnPropertyDescriptor(
-          elementProto,
-          'checked',
-        );
-        if (!descriptor || !descriptor.set) {
-          return;
-        }
-        const originalSetter = descriptor.set;
-        Object.defineProperty(node, 'checked', {
-          get: descriptor.get,
-          set: function (newValue) {
-            // Exit the setter early if the new value represents the same state,
-            // but with different types or values (e.g., string vs. boolean).
-            if (castBoolean(this.checked) === castBoolean(newValue)) {
-              return;
-            }
-
-            // Call the original setter to update the value
-            originalSetter.call(this, newValue);
-
-            // Invoke the onChange callback with a synthetic event.
+        // Override the native setter for the checked property using our utility
+        propagateValueChange(node, {
+          property: 'checked',
+          skipSet: (newValue) =>
+            castBoolean(node.checked) === castBoolean(newValue),
+          afterSet: (element) => {
             const changeEvent = new Event('change');
             Object.defineProperty(changeEvent, 'target', {
               writable: false,
-              value: node,
+              value: element,
             });
             changeCallback(changeEvent as CheckboxEvent);
           },
-          configurable: true,
+          fireJQueryChange: false, // We handle jQuery in changeCallback
         });
       }}
     />

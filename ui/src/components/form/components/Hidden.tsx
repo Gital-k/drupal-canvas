@@ -5,6 +5,8 @@ import useMutationObserver from '@/hooks/useMutationObserver';
 import { a2p } from '@/local_packages/utils';
 import { VALUE_THAT_MEANS_REMOVE } from '@/utils/function-utils';
 
+import { propagateOnChange } from './propagateValueChange';
+
 import type { Attributes } from '@/types/DrupalAttribute';
 
 const Hidden = ({ attributes }: { attributes?: Attributes }) => {
@@ -60,17 +62,10 @@ const Hidden = ({ attributes }: { attributes?: Attributes }) => {
               });
             }
 
-            if (
-              attributes?.onChange &&
-              typeof attributes.onChange === 'function'
-            ) {
-              const event = new Event('change');
-              ref.current!.value = VALUE_THAT_MEANS_REMOVE;
-              Object.defineProperty(event, 'target', {
-                writable: false,
-                value: ref.current,
+            if (attributes?.onChange && ref.current) {
+              propagateOnChange(ref.current, {
+                value: VALUE_THAT_MEANS_REMOVE,
               });
-              attributes.onChange(event);
             }
           }
         });
