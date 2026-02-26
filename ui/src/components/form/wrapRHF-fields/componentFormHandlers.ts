@@ -10,6 +10,7 @@ import { flaggedForRemoval } from '@/utils/function-utils';
 
 import type { PropsValues } from '@drupal-canvas/types';
 import type { Dispatch } from '@reduxjs/toolkit';
+import type { Sources } from '@/features/layout/layoutModelSlice';
 import type { InputUIData } from '@/types/Form';
 
 /**
@@ -60,6 +61,11 @@ export const createComponentFormStateHandler = (
     //    in onQueryStarted in preview.ts
     // @see \Drupal\Core\Field\WidgetInterface::massageFormValues()
     const resolved = { ...selectedModel.resolved, ...values };
+    // Use JSON parse/stringify to create a deep clone of the source data
+    // that is mutable.
+    const source: Sources = isEvaluatedComponentModel(selectedModel)
+      ? JSON.parse(JSON.stringify(selectedModel.source))
+      : {};
 
     // Check the object for any values that are flagged for removal. Note that
     // removal flagging is not necessary for all prop types. It is used for
@@ -73,10 +79,7 @@ export const createComponentFormStateHandler = (
         // If the prop is optional, it can be removed.
         if (!deps.component.propSources[prop]?.required) {
           if (isEvaluatedComponentModel(selectedModel)) {
-            // The source value can also be updated to empty when permitted.
-            if (!Object.isFrozen(selectedModel.source[prop])) {
-              selectedModel.source[prop].value = [];
-            }
+            source[prop].value = [];
           }
           resolved[prop] = [];
         } else {
@@ -113,7 +116,7 @@ export const createComponentFormStateHandler = (
           componentType: `${deps.selectedComponentType}@${deps.version}`,
           model: {
             source: syncPropSourcesToResolvedValues(
-              selectedModel.source,
+              source,
               deps.component,
               resolved,
             ),

@@ -1,3 +1,14 @@
+// Utilities for propagating value changes and triggering onChange events
+//
+// propagateValueChange: Override native property setter to intercept all programmatic changes
+// Usage: propagateValueChange(element, { property: 'value', afterSet: (el, newValue) => { ... } });
+//
+// propagateOnChange: Trigger native change event (and optional jQuery event) on element
+// Usage: propagateOnChange(element, { value: newValue });
+//
+// triggerStoreChange: Trigger React prop onChange handlers with proper event creation
+// Usage: triggerStoreChange(attributes, { value: newValue, target: element });
+
 export type PropagateValueChangeOptions<T = any> = {
   property: keyof T;
   afterSet?: (el: T, newValue: any) => void;
@@ -8,6 +19,11 @@ export type PropagateValueChangeOptions<T = any> = {
 export type PropagateOnChangeOptions = {
   fireJQueryChange?: boolean;
   value?: any; // Optional value to set before firing event
+};
+
+export type TriggerStoreChangeOptions = {
+  value?: any;
+  target?: HTMLElement;
 };
 
 // Enhances an element's property setter so programmatic changes result in
@@ -76,4 +92,35 @@ export function propagateOnChange<T extends HTMLElement>(
       $target.trigger('change');
     }
   }
+}
+
+// Directly triggers the RHF onChange handler when available.
+export function triggerStoreChange(
+  attributes?: { onChange?: (e: Event) => void },
+  options: TriggerStoreChangeOptions = {},
+) {
+  // Built-in falsy check - no need for components to check
+  if (!attributes?.onChange || typeof attributes.onChange !== 'function') {
+    return;
+  }
+
+  const { value, target } = options;
+
+  // Create synthetic change event.
+  const syntheticEvent = new Event('change', { bubbles: true });
+
+  // Set up target with value if provided
+  if (target) {
+    if (value !== undefined) {
+      (target as any).value = value;
+    }
+
+    Object.defineProperty(syntheticEvent, 'target', {
+      writable: false,
+      value: target,
+    });
+  }
+
+  // Call the onChange handler
+  attributes.onChange(syntheticEvent);
 }

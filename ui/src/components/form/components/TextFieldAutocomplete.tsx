@@ -4,6 +4,8 @@ import clsx from 'clsx';
 import useMutationObserver from '@/hooks/useMutationObserver';
 import { a2p } from '@/local_packages/utils';
 
+import { triggerStoreChange } from './propagateValueChange';
+
 import type { Attributes } from '@/types/DrupalAttribute';
 
 import styles from './TextField.module.css';
@@ -50,15 +52,10 @@ const TextFieldAutocomplete = ({
             // Remove the attribute to prevent multiple attempts to update the
             // store with the same value.
             record.target.removeAttribute('data-canvas-autocomplete-selected');
-            const changeEvent = new Event('change');
-            Object.defineProperty(changeEvent, 'target', {
-              writable: false,
-              value: record.target,
-            });
 
-            if (typeof attributes.onChange === 'function') {
-              attributes.onChange(changeEvent);
-            }
+            triggerStoreChange(attributes, {
+              target: record.target,
+            });
           }
         }
       });
@@ -106,10 +103,9 @@ const TextFieldAutocomplete = ({
           setTimeout(() => {
             if (
               inputRef.current &&
-              !inputRef.current.hasAttribute('data-canvas-no-update') &&
-              typeof attributes.onChange === 'function'
+              !inputRef.current.hasAttribute('data-canvas-no-update')
             ) {
-              attributes.onChange(e);
+              triggerStoreChange(attributes, { target: inputRef.current });
             }
           }, autocompleteDelay * 3);
         }}
@@ -120,8 +116,8 @@ const TextFieldAutocomplete = ({
           // As an additional assurance the value is sent to the store, an
           // additional onChange is triggered immediately after the store
           // preventing attribute is removed.
-          if (typeof attributes.onChange === 'function') {
-            attributes.onChange(e);
+          if (inputRef.current) {
+            triggerStoreChange(attributes, { target: inputRef.current });
           }
           if (typeof attributes.onBlur === 'function') {
             attributes.onBlur(e);

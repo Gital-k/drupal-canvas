@@ -5,7 +5,7 @@ import useMutationObserver from '@/hooks/useMutationObserver';
 import { a2p } from '@/local_packages/utils';
 import { VALUE_THAT_MEANS_REMOVE } from '@/utils/function-utils';
 
-import { propagateOnChange } from './propagateValueChange';
+import { triggerStoreChange } from './propagateValueChange';
 
 import type { Attributes } from '@/types/DrupalAttribute';
 
@@ -40,19 +40,6 @@ const Hidden = ({ attributes }: { attributes?: Attributes }) => {
           ) {
             ref.current.value = '';
 
-            // Dispatch custom event to trigger form state update in wrapRHF
-            // This triggers the full commitFormState -> formStateToStore flow
-            if (fieldName) {
-              const fieldUpdateEvent = new CustomEvent('canvas:fieldUpdate', {
-                detail: {
-                  fieldName: String(fieldName),
-                  value: VALUE_THAT_MEANS_REMOVE,
-                },
-                bubbles: true,
-              });
-              document.dispatchEvent(fieldUpdateEvent);
-            }
-
             // Also update react-hook-form state if context is available
             if (rhfMethods && fieldName) {
               rhfMethods.setValue(String(fieldName), VALUE_THAT_MEANS_REMOVE, {
@@ -62,11 +49,10 @@ const Hidden = ({ attributes }: { attributes?: Attributes }) => {
               });
             }
 
-            if (attributes?.onChange && ref.current) {
-              propagateOnChange(ref.current, {
-                value: VALUE_THAT_MEANS_REMOVE,
-              });
-            }
+            triggerStoreChange(attributes, {
+              value: VALUE_THAT_MEANS_REMOVE,
+              target: ref.current!,
+            });
           }
         });
       });
