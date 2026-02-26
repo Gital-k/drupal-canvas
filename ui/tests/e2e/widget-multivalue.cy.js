@@ -3,7 +3,7 @@ describe('Multivalue widget drag and drop', () => {
   // entity-form-field-types-test.cy.js and this test is only about drag and
   // drop support.
   before(() => {
-    cy.drupalCanvasInstall(['canvas_test_article_fields']);
+    cy.drupalCanvasInstall(['canvas_test_article_fields', 'canvas_dev_mode']);
   });
 
   beforeEach(() => {
