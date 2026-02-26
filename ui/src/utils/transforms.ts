@@ -94,7 +94,7 @@ const mainProperty: Transformer<{
     return null;
   });
   if (multiple) {
-    return returnValue;
+    return returnValue.filter((v) => v !== null && v !== '');
   }
   return returnValue.shift();
 };

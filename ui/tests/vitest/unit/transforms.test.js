@@ -170,6 +170,26 @@ describe('Transforms - main property', () => {
       ),
     ).toEqual(['4', '3']);
   });
+
+  it('Should filter out empty strings from multi-value fields', () => {
+    expect(
+      transforms.mainProperty(
+        { 0: { value: 'tag1' }, 1: { value: '' } },
+        { name: 'value', multiple: true },
+        fieldData,
+      ),
+    ).toEqual(['tag1']);
+  });
+
+  it('Should return empty array when all values are empty strings', () => {
+    expect(
+      transforms.mainProperty(
+        { 0: { value: '' } },
+        { name: 'value', multiple: true },
+        fieldData,
+      ),
+    ).toEqual([]);
+  });
 });
 
 describe('Transforms - dateTime', () => {
