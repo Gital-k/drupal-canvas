@@ -2,8 +2,8 @@
 .multivalue-container {
   overflow: visible;
   border: none;
-  border-radius: 4px;
   margin-bottom: 16px;
+  border-radius: 4px;
   background-color: white;
 }
 
@@ -15,8 +15,8 @@
 
 .multivalue-container table {
   width: 100%;
-  margin: 0;
   border: none;
+  margin: 0;
   border-collapse: collapse;
 }
 
@@ -37,8 +37,8 @@
   padding: 8px 0;
   border: none;
   width: 100%;
-  background: white;
   text-align: left;
+  background: white;
 }
 
 .multivalue-container table thead tr th.field-label h4.label {
@@ -195,4 +195,3 @@
 .multivalue-container .canvas-remove-action:has([data-drupal-selector*="remove-button"]) {
   display: none;
 }
-
