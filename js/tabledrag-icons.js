@@ -26,7 +26,7 @@
         // Replace the inner content (the .handle div) with our custom SVG
         handle.innerHTML = dragHandleSvg;
         // Add ARIA label for accessibility
-        handle.setAttribute('aria-label', Drupal.t('Drag to reorder'));
+        handle.setAttribute('aria-label', Drupal.t('Change order'));
       });
 
       // Find all remove action cells and hide them. The original Drupal remove

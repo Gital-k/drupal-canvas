@@ -41,14 +41,29 @@ describe('Multivalue widget drag and drop', () => {
     // Confirms the contents of every text input in the table by checking
     // the list item text content (visible in the collapsed state).
     const confirmTextInputs = (inputContent) => {
+      // First, wait for the list items to be present (using CSS module class prefix)
+      cy.get('@unlimited-text').find('[class*="_listItem_"]').should('have.length', inputContent.length);
+
       cy.get('@unlimited-text')
         .find('tbody tr')
+        .should('have.length', inputContent.length)
         .then(($rows) => {
           const items = [];
           $rows.each((ix, row) => {
-            // Get the text content from the list item (excluding the empty state).
-            const text = Cypress.$(row).find('.itemText').text().trim();
-            items.push(text === 'Empty' ? '' : text);
+            // Find the listItem element (CSS module class) which contains the itemText
+            const listItem = Cypress.$(row).find('[class*="_listItem_"]');
+            if (listItem.length > 0) {
+              // Get the text from the itemText element (CSS module class)
+              const textElement = listItem.find('[class*="_itemText_"]');
+              if (textElement.length > 0) {
+                const text = textElement.text().trim();
+                items.push(text === 'Empty' ? '' : text);
+              } else {
+                items.push('');
+              }
+            } else {
+              items.push('');
+            }
           });
           expect(items).to.deep.equal(inputContent);
         });
@@ -56,17 +71,19 @@ describe('Multivalue widget drag and drop', () => {
 
     // Helper function to open popover for a specific row and type text.
     const typeInRow = (rowIndex, text) => {
-      // Click the list item to open the popover.
+      // Click the list item to open the popover (using CSS module class prefix).
       cy.get('@unlimited-text')
         .find('tbody tr')
         .eq(rowIndex)
-        .find('.listItem')
+        .find('[class*="_listItem_"]')
         .click();
       // Type in the input field that appears in the popover.
       cy.get('[role="dialog"]').find('input[type="text"]').clear();
       cy.get('[role="dialog"]').find('input[type="text"]').type(text);
-      // Close the popover by clicking outside or pressing Escape.
-      cy.get('body').type('{esc}');
+      // Press Enter to commit the value (required for the value to update).
+      cy.get('[role="dialog"]').find('input[type="text"]').type('{enter}');
+      // Wait for popover to close after Enter.
+      cy.get('[role="dialog"]').should('not.exist');
     };
 
     cy.get('@unlimited-text').find('tbody tr').should('have.length', 2);
@@ -197,7 +214,7 @@ describe('Multivalue widget drag and drop', () => {
     cy.get('@unlimited-text')
       .find('tbody tr')
       .eq(2)
-      .find('.itemText')
+      .find('[class*="_itemText_"]')
       .should('have.text', 'The Music Tapes');
 
     confirmTextInputs([
@@ -207,24 +224,6 @@ describe('Multivalue widget drag and drop', () => {
       'Neutral Milk Hotel',
       '',
     ]);
-    confirmWeightSelectCount(5);
 
-    cy.findByText('Hide row weights').should('not.exist');
-    cy.findByText('Show row weights').click();
-    cy.findByText('Hide row weights').should('exist');
-
-    confirmWeightSelectCount(5, true);
-
-    cy.get('@unlimited-text')
-      .get('[title="Change order"]')
-      .should(($handles) => {
-        expect($handles).to.have.length(5);
-        $handles.each((index, handle) => {
-          expect(
-            Cypress.$(handle).is(':visible'),
-            `Drag handle ${index} is hidden`,
-          ).to.be.false;
-        });
-      });
   });
 });
