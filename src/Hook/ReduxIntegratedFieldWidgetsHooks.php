@@ -180,6 +180,12 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
    */
   #[Hook('preprocess_field_multiple_value_form')]
   public static function canvasStarkPreprocessFieldMultipleValueForm(array &$variables): void {
+    // Only apply custom multivalue form styling if canvas_dev_mode is enabled.
+    $module_handler = \Drupal::moduleHandler();
+    if (!$module_handler->moduleExists('canvas_dev_mode')) {
+      return;
+    }
+
     // Set up classes for the drag handle and remove action columns.
     // The tabledrag-icons library overrides Drupal's tableDragHandle theme
     // function to render custom SVG icons matching the Radix UI
@@ -215,6 +221,11 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
    */
   #[Hook('field_widget_complete_form_alter')]
   public function fieldWidgetCompleteFormAlter(array &$widget, FormStateInterface $form_state, array $context): void {
+    // Only apply custom multivalue form behavior if canvas_dev_mode is enabled.
+    if (!$this->moduleHandler->moduleExists('canvas_dev_mode')) {
+      return;
+    }
+
     // Check if this is a multivalue field.
     $field_definition = $context['items']->getFieldDefinition();
     $is_multiple = $field_definition->getFieldStorageDefinition()->isMultiple();
