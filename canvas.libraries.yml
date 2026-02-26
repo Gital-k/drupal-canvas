@@ -225,10 +225,9 @@ canvasData.v0.jsonapiSettings:
 
 tabledrag-icons:
   js:
-    js/tabledrag-icons.js: {}
+    js/tabledrag.theme.js: {}
   dependencies:
     - core/drupal
-    - core/once
     - core/drupal.tabledrag
 
 multivalue-form:

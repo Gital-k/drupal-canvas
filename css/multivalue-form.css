@@ -153,10 +153,6 @@
   cursor: grabbing;
 }
 
-/* Hide the default .handle div inside the anchor */
-.multivalue-container .canvas-drag-handle a.tabledrag-handle .handle {
-  display: none;
-}
 
 /* Style the custom SVG icon inside the anchor */
 .multivalue-container .canvas-drag-handle a.tabledrag-handle .drag-handle-icon {
@@ -181,3 +177,22 @@
   transition: color 0.15s ease;
   color: #E5484D;
 }
+
+/* Hide original Drupal remove buttons and their parent cells.
+ * The buttons are kept in the DOM for AJAX functionality but hidden from view.
+ * The popover's Remove button triggers these hidden buttons. */
+.multivalue-container .canvas-remove-action input[type="submit"][name*="remove"],
+.multivalue-container .canvas-remove-action button[name*="remove"],
+.multivalue-container .canvas-remove-action .remove-button,
+.multivalue-container .canvas-remove-action [data-drupal-selector*="remove-button"] {
+  display: none;
+}
+
+/* Hide the entire cell to prevent empty columns from showing */
+.multivalue-container .canvas-remove-action:has(input[type="submit"][name*="remove"]),
+.multivalue-container .canvas-remove-action:has(button[name*="remove"]),
+.multivalue-container .canvas-remove-action:has(.remove-button),
+.multivalue-container .canvas-remove-action:has([data-drupal-selector*="remove-button"]) {
+  display: none;
+}
+
