@@ -270,12 +270,7 @@ export const InputBehaviorsCommon = ({
           return;
         }
       }
-      if (
-        attributes.onPostChange &&
-        typeof attributes.onPostChange === 'function'
-      ) {
-        attributes.onPostChange(e);
-      }
+
       // If no AJAX operations are in progress, update the form state and store.
       if (!isAjaxing()) {
         commitFormState({ ...formValues, [fieldName]: newValue });
