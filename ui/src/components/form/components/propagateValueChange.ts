@@ -16,11 +16,6 @@ export type PropagateValueChangeOptions<T = any> = {
   fireJQueryChange?: boolean;
 };
 
-export type PropagateOnChangeOptions = {
-  fireJQueryChange?: boolean;
-  value?: any; // Optional value to set before firing event
-};
-
 export type TriggerStoreChangeOptions = {
   value?: any;
   target?: HTMLElement;
@@ -65,34 +60,6 @@ export function propagateValueChange<T = any>(
   });
 }
 
-// Triggers a react-acknowledged change event in the provided element,
-// optionally setting a value before dispatching. Also triggers a jQuery change
-// event if jQuery is available and enabled via options.
-export function propagateOnChange<T extends HTMLElement>(
-  element: T,
-  options: PropagateOnChangeOptions = {},
-) {
-  if (!element) return;
-
-  const { fireJQueryChange = true, value } = options;
-
-  // Set value if provided
-  if (value !== undefined) {
-    (element as any).value = value;
-  }
-
-  // Dispatch native change event - this will trigger onChange handlers automatically
-  const changeEvent = new Event('change', { bubbles: true });
-  element.dispatchEvent(changeEvent);
-
-  // Fire jQuery change if enabled and available
-  if (fireJQueryChange && typeof window !== 'undefined' && window.jQuery) {
-    const $target = window.jQuery(element);
-    if ($target.length) {
-      $target.trigger('change');
-    }
-  }
-}
 
 // Directly triggers the RHF onChange handler when available.
 export function triggerStoreChange(
