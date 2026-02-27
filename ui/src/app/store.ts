@@ -245,7 +245,7 @@ export const makeStore = (preloadedState?: Partial<RootState>) => {
         pendingChangesApi.middleware,
         contentApi.middleware,
         languageApi.middleware,
-        rtkQueryErrorHandler, // Add the error handling middleware
+        rtkQueryErrorHandler,
       );
     },
     ...(import.meta.env.DEV && {

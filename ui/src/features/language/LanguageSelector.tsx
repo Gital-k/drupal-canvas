@@ -1,4 +1,3 @@
-import type React from 'react';
 import { GlobeIcon } from '@radix-ui/react-icons';
 import { Flex, Select, Text, Tooltip } from '@radix-ui/themes';
 
@@ -9,6 +8,8 @@ import {
   setCurrentLanguage,
 } from '@/features/language/languageSlice';
 import { useGetLanguagesQuery } from '@/services/languageApi';
+
+import type React from 'react';
 
 import styles from './LanguageSelector.module.css';
 
