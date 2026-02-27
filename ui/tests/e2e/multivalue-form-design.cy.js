@@ -154,7 +154,10 @@ describe('Multivalue Form Design (canvas_dev_mode)', () => {
 
     // Verify the value was set.
     verifyRowText('@unlimited-text', 1, 'Neutral Milk Hotel');
-    confirmTextInputs('@unlimited-text', ['Marshmallow Coast', 'Neutral Milk Hotel']);
+    confirmTextInputs('@unlimited-text', [
+      'Marshmallow Coast',
+      'Neutral Milk Hotel',
+    ]);
   });
 
   it('can add new items using "+ Add new" button', () => {
@@ -271,7 +274,7 @@ describe('Multivalue Form Design (canvas_dev_mode)', () => {
     cy.get('@unlimited-text')
       .find('.canvas-drag-handle a.tabledrag-handle .drag-handle-icon')
       .should('have.length', 3);
-    
+
     cy.get(
       '[data-drupal-selector="edit-field-cvt-unlimited-text"] tr.draggable:nth-child(3) [title="Change order"]',
     ).realDnd(
@@ -299,7 +302,7 @@ describe('Multivalue Form Design (canvas_dev_mode)', () => {
       .as('unlimited-text');
 
     const entityFormSelector = '[data-testid="canvas-page-data-form"]';
-    
+
     typeInRow('@unlimited-text', 1, 'Neutral Milk Hotel');
 
     const waitForPreview = () => {
@@ -336,22 +339,22 @@ describe('Multivalue Form Design (canvas_dev_mode)', () => {
       .eq(1)
       .find('[class*="_listItem_"]')
       .click();
-    
+
     cy.get('[role="dialog"]').should('be.visible');
-    
+
     cy.get('[role="dialog"]')
       .findByRole('button', { name: /Remove/i })
       .should('be.visible');
-    
+
     cy.get('[role="dialog"]')
       .findByRole('button', { name: /Remove/i })
       .click();
-    
+
     cy.get('[role="dialog"]').should('not.exist');
-    
+
     cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
     cy.waitForAjax();
-    
+
     cy.get('@unlimited-text').find('tbody tr').should('have.length', 2);
   });
 
@@ -369,9 +372,9 @@ describe('Multivalue Form Design (canvas_dev_mode)', () => {
       .eq(0)
       .find('[class*="_listItem_"]')
       .click();
-    
+
     cy.get('[role="dialog"]').should('be.visible');
-    
+
     cy.get('[role="dialog"]').should('contain', 'Canvas Unlimited Text');
 
     cy.get('[role="dialog"]')
@@ -395,24 +398,25 @@ describe('Multivalue Form Design (canvas_dev_mode)', () => {
       .as('unlimited-text');
 
     const originalText = 'Marshmallow Coast';
-    
+
     cy.get('@unlimited-text')
       .find('tbody tr')
       .eq(0)
       .find('[class*="_listItem_"]')
       .click();
-    
+
     cy.get('[role="dialog"]').find('input[type="text"]').clear();
-    cy.get('[role="dialog"]').find('input[type="text"]').type('This should not be saved');
-    
+    cy.get('[role="dialog"]')
+      .find('input[type="text"]')
+      .type('This should not be saved');
+
     cy.get('[role="dialog"]').find('[aria-label="Close"]');
     cy.get('[aria-label="Close"]').click();
-    
+
     cy.get('[role="dialog"]').should('not.exist');
-    
+
     verifyRowText('@unlimited-text', 0, originalText);
   });
-
 
   it('maintains form state across popover interactions', () => {
     cy.loadURLandWaitForCanvasLoaded({ url: 'canvas/editor/node/2' });
@@ -422,7 +426,7 @@ describe('Multivalue Form Design (canvas_dev_mode)', () => {
     cy.findByRole('heading', { name: 'Canvas Unlimited Text' })
       .parents('.js-form-wrapper')
       .as('unlimited-text');
-    
+
     cy.get('@unlimited-text')
       .find('tbody tr')
       .eq(0)
@@ -430,10 +434,12 @@ describe('Multivalue Form Design (canvas_dev_mode)', () => {
       .click();
 
     cy.get('[role="dialog"]').find('input[type="text"]').clear();
-    cy.get('[role="dialog"]').find('input[type="text"]').type('Modified Item 1{enter}');
+    cy.get('[role="dialog"]')
+      .find('input[type="text"]')
+      .type('Modified Item 1{enter}');
 
     cy.get('[role="dialog"]').should('not.exist');
-    
+
     cy.intercept({
       url: '**/canvas/api/v0/layout/node/2',
       times: 1,
@@ -455,4 +461,3 @@ describe('Multivalue Form Design (canvas_dev_mode)', () => {
     ]);
   });
 });
-
