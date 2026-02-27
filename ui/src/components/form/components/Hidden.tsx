@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 
+import { useFieldContext } from '@/components/form/contexts/FieldContext';
 import { useSafeRHFContext } from '@/components/form/contexts/FormContext';
 import useMutationObserver from '@/hooks/useMutationObserver';
 import { a2p } from '@/local_packages/utils';
 import { VALUE_THAT_MEANS_REMOVE } from '@/utils/function-utils';
-
-import { triggerAttributesOnChange } from './formChangeUtils';
 
 import type { Attributes } from '@/types/DrupalAttribute';
 
@@ -16,6 +15,7 @@ const Hidden = ({ attributes }: { attributes?: Attributes }) => {
   // Get react-hook-form context to update form state
   const rhfMethods = useSafeRHFContext();
   const fieldName = attributes?.name || attributes?.['data-canvas-name'];
+  const fieldContext = useFieldContext();
 
   useEffect(() => {
     // Add a mutation observer to the form element this input belongs to. This
@@ -39,10 +39,7 @@ const Hidden = ({ attributes }: { attributes?: Attributes }) => {
             ref.current
           ) {
             ref.current.value = '';
-            triggerAttributesOnChange(attributes, {
-              value: VALUE_THAT_MEANS_REMOVE,
-              target: ref.current!,
-            });
+            fieldContext?.triggerChange(VALUE_THAT_MEANS_REMOVE, ref.current);
           }
         });
       });
@@ -64,7 +61,7 @@ const Hidden = ({ attributes }: { attributes?: Attributes }) => {
         observer.disconnect();
       }
     };
-  }, [rhfMethods, fieldName, attributes]);
+  }, [rhfMethods, fieldName, fieldContext]);
 
   // Hidden field values might be updated by AJAX requests and those value
   // changes should persist on rerender instead of falling back to the initial

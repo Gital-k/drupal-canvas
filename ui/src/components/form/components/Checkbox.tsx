@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import clsx from 'clsx';
 
+import { useFieldContext } from '@/components/form/contexts/FieldContext';
 import { a2p } from '@/local_packages/utils';
 
 import { interceptNativeSetter } from './formChangeUtils';
@@ -33,28 +34,14 @@ const castBoolean = (value: unknown): boolean => {
   return !!value;
 };
 
-const Checkbox = ({
-  attributes = {},
-}: {
-  attributes?: Attributes & {
-    onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  };
-}) => {
+const Checkbox = ({ attributes = {} }: { attributes?: Attributes }) => {
   const [checked, setChecked] = useState(castBoolean(attributes?.checked));
+  const fieldContext = useFieldContext();
 
-  const changeCallback = (
-    e: CheckboxEvent | JQueryProxyCheckboxEvent,
-    shimJquery = true,
-  ) => {
-    setChecked(castBoolean(e.target.checked));
-    const syntheticEvent = {
-      target: {
-        checked: e.target.checked,
-        value: e.target.checked,
-        name: attributes?.name || 'noop',
-      },
-    } as unknown as React.ChangeEvent<HTMLInputElement>;
-    attributes?.onChange?.(syntheticEvent);
+  const handleChange = (e: CheckboxEvent, shimJquery = true) => {
+    const newChecked = castBoolean(e.target.checked);
+    setChecked(newChecked);
+    fieldContext?.triggerChange(newChecked);
     // If jQuery is available, and we haven't explicitly instructed otherwise,
     // trigger a jQuery change event.
     if (shimJquery && window.jQuery) {
@@ -70,7 +57,7 @@ const Checkbox = ({
       {...a2p(attributes, {}, { skipAttributes: ['checked', 'value'] })}
       defaultChecked={checked}
       className={clsx(attributes.class, styles.base, checked && styles.checked)}
-      onChange={changeCallback}
+      onChange={handleChange}
       ref={(node) => {
         if (!node) {
           return;
@@ -82,7 +69,7 @@ const Checkbox = ({
           // @see jquery.overrides.js
           if (e?.detail?.jqueryProxy && e.target) {
             if (e.target.checked !== checked) {
-              changeCallback(e, false);
+              handleChange(e, false);
             }
           }
         }) as EventListener);
@@ -98,9 +85,9 @@ const Checkbox = ({
               writable: false,
               value: element,
             });
-            changeCallback(changeEvent as CheckboxEvent);
+            handleChange(changeEvent as CheckboxEvent);
           },
-          fireJQueryChange: false, // We handle jQuery in changeCallback
+          fireJQueryChange: false, // We handle jQuery in handleChange
         });
       }}
     />

@@ -56,9 +56,7 @@ const getPathAlias = (titleValue: string) => {
 const DrupalPathWidget = ({
   attributes = {},
 }: {
-  attributes?: Attributes & {
-    onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  };
+  attributes?: Attributes;
   children?: React.ReactNode;
 }) => {
   const initialValue = attributes?.value || '';

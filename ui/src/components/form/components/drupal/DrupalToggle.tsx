@@ -16,9 +16,7 @@ const DrupalToggle = ({
   attributes = {},
   element = {},
 }: {
-  attributes?: Attributes & {
-    onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  };
+  attributes?: Attributes;
   element?: DrupalElement;
 }) => {
   const [isChecked, setIsChecked] = useState(
@@ -46,7 +44,7 @@ const DrupalToggle = ({
           // The `aria-checked` attribute needs to be set to "true" or "false".
           // @see https://w3c.github.io/aria/#aria-checked
           'aria-checked': isChecked ? 'true' : 'false',
-        } as unknown as Omit<typeof attributes, 'onChange'>,
+        },
         {},
         { skipAttributes: ['value', 'onChange', 'type', 'checked'] },
       )}

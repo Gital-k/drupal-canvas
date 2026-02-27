@@ -3,23 +3,15 @@
 // interceptNativeSetter: Override native property setter to intercept programmatic DOM changes
 // Usage: interceptNativeSetter(element, { property: 'value', afterSet: (el, newValue) => { ... } });
 //
-// triggerAttributesOnChange: Fallback for triggering attributes.onChange when FieldContext isn't available
-// Usage: triggerAttributesOnChange(attributes, { value: newValue, target: element });
-//
-// Note: Prefer using FieldContext.triggerChange() when available. These utilities are for:
-// - interceptNativeSetter: Base components that need to intercept vanilla JS/jQuery DOM manipulation
-// - triggerAttributesOnChange: Edge cases where FieldContext isn't available
+// Note: For triggering form state updates, use FieldContext.triggerChange() instead.
+// interceptNativeSetter is specifically for base components that need to intercept
+// vanilla JS/jQuery DOM manipulation.
 
 export type InterceptNativeSetterOptions<T = any> = {
   property: keyof T;
   afterSet?: (el: T, newValue: any) => void;
   skipSet?: (newValue: any) => boolean;
   fireJQueryChange?: boolean;
-};
-
-export type TriggerAttributesOnChangeOptions = {
-  value?: any;
-  target?: HTMLElement;
 };
 
 /**
@@ -65,42 +57,4 @@ export function interceptNativeSetter<T = any>(
     },
     configurable: true,
   });
-}
-
-/**
- * Fallback utility for directly triggering attributes.onChange when
- * FieldContext isn't available.
- *
- * Prefer using FieldContext.triggerChange() when possible. This is useful for:
- * - Components that may be used outside of wrapRHF context
- * - Edge cases where context isn't accessible
- */
-export function triggerAttributesOnChange(
-  attributes?: { onChange?: (e: Event) => void },
-  options: TriggerAttributesOnChangeOptions = {},
-) {
-  // Built-in falsy check - no need for components to check
-  if (!attributes?.onChange || typeof attributes.onChange !== 'function') {
-    return;
-  }
-
-  const { value, target } = options;
-
-  // Create synthetic change event
-  const syntheticEvent = new Event('change', { bubbles: true });
-
-  // Set up target with value if provided
-  if (target) {
-    if (value !== undefined) {
-      (target as any).value = value;
-    }
-
-    Object.defineProperty(syntheticEvent, 'target', {
-      writable: false,
-      value: target,
-    });
-  }
-
-  // Call the onChange handler
-  attributes.onChange(syntheticEvent);
 }

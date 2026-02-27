@@ -1,10 +1,9 @@
 import { useRef } from 'react';
 import clsx from 'clsx';
 
+import { useFieldContext } from '@/components/form/contexts/FieldContext';
 import useMutationObserver from '@/hooks/useMutationObserver';
 import { a2p } from '@/local_packages/utils';
-
-import { triggerAttributesOnChange } from './formChangeUtils';
 
 import type { Attributes } from '@/types/DrupalAttribute';
 
@@ -24,11 +23,10 @@ const TextFieldAutocomplete = ({
   // they appear due to the component rerendering on value change.
   // The attribute is removed when a suggestion is picked, or the input is
   // blurred.
-  // @see InputBehaviorsCommon in inputBehaviors.tsx where attributes.onChange
-  // is defined.
   attributes['data-canvas-no-update'] = '';
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const fieldContext = useFieldContext();
 
   // This mutation observer responds to the addition of a
   // 'data-canvas-autocomplete-selected' attribute, which will have the value of the
@@ -53,9 +51,7 @@ const TextFieldAutocomplete = ({
             // store with the same value.
             record.target.removeAttribute('data-canvas-autocomplete-selected');
 
-            triggerAttributesOnChange(attributes, {
-              target: record.target,
-            });
+            fieldContext?.triggerChange(selection, record.target);
           }
         }
       });
@@ -105,9 +101,10 @@ const TextFieldAutocomplete = ({
               inputRef.current &&
               !inputRef.current.hasAttribute('data-canvas-no-update')
             ) {
-              triggerAttributesOnChange(attributes, {
-                target: inputRef.current,
-              });
+              fieldContext?.triggerChange(
+                inputRef.current.value,
+                inputRef.current,
+              );
             }
           }, autocompleteDelay * 3);
         }}
@@ -115,11 +112,13 @@ const TextFieldAutocomplete = ({
           if (inputRef.current) {
             inputRef.current.removeAttribute('data-canvas-no-update');
           }
-          // As an additional assurance the value is sent to the store, an
-          // additional onChange is triggered immediately after the store
-          // preventing attribute is removed.
+          // As an additional assurance the value is sent to the store, trigger
+          // a change immediately after the store-preventing attribute is removed.
           if (inputRef.current) {
-            triggerAttributesOnChange(attributes, { target: inputRef.current });
+            fieldContext?.triggerChange(
+              inputRef.current.value,
+              inputRef.current,
+            );
           }
           if (typeof attributes.onBlur === 'function') {
             attributes.onBlur(e);

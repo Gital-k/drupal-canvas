@@ -14,9 +14,7 @@ const DrupalInput = ({
   attributes = {},
   element,
 }: {
-  attributes?: Attributes & {
-    onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  };
+  attributes?: Attributes;
   element: any;
 }) => {
   switch (attributes?.type) {
