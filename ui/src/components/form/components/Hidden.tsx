@@ -39,16 +39,6 @@ const Hidden = ({ attributes }: { attributes?: Attributes }) => {
             ref.current
           ) {
             ref.current.value = '';
-
-            // Also update react-hook-form state if context is available
-            if (rhfMethods && fieldName) {
-              rhfMethods.setValue(String(fieldName), VALUE_THAT_MEANS_REMOVE, {
-                shouldValidate: true,
-                shouldDirty: true,
-                shouldTouch: true,
-              });
-            }
-
             triggerStoreChange(attributes, {
               value: VALUE_THAT_MEANS_REMOVE,
               target: ref.current!,
