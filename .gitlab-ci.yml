@@ -808,5 +808,5 @@ release:
   artifacts:
     expose_as: 'Release archive'
     paths:
-      - '${CI_PROJECT_NAME}-${VERSION}.zip'
+      - '${CI_PROJECT_NAME}-*.zip'
     expire_in: never
