@@ -139,7 +139,7 @@
   display: none;
 }
 
-/* Hide the "You have unsaved changes" warning message for multivalue forms.*/
+/* Hide the "You have unsaved changes" warning message for multivalue forms. */
 .multivalue-container .tabledrag-changed-warning {
   display: none !important;
 }
