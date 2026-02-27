@@ -1,7 +1,6 @@
 import { createSlice } from '@reduxjs/toolkit';
 
 import type { PayloadAction } from '@reduxjs/toolkit';
-import type { RootState } from '@/app/store';
 
 export interface Language {
   id: string;
@@ -39,7 +38,7 @@ export const languageSlice = createSlice({
         try {
           sessionStorage.setItem(SESSION_KEY, action.payload);
         } catch {
-          // sessionStorage unavailable — silently ignore.
+          // sessionStorage unavailable, silently ignore.
         }
       },
     ),
@@ -54,7 +53,7 @@ export const languageSlice = createSlice({
             try {
               sessionStorage.setItem(SESSION_KEY, defaultLang.id);
             } catch {
-              // sessionStorage unavailable — silently ignore.
+              // sessionStorage unavailable, silently ignore.
             }
           }
         }
