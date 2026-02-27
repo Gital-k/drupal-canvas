@@ -12,7 +12,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 /**
  * Returns available content languages for the Canvas UI language selector.
  *
- * GET /canvas/api/v0/languages
+ * GET /canvas/api/v0/languages.
  *
  * Response:
  * {
@@ -28,10 +28,19 @@ final class LanguagesController extends ControllerBase {
     $this->languageManager = $languageManager;
   }
 
+  /**
+   * {@inheritdoc}
+   */
   public static function create(ContainerInterface $container): static {
     return new static($container->get('language_manager'));
   }
 
+  /**
+   * Returns available content languages for the Canvas UI language selector.
+   *
+   * @return \Symfony\Component\HttpFoundation\JsonResponse
+   *   A JSON response keyed by langcode with label and default flag.
+   */
   public function getLanguages(): JsonResponse {
     $defaultLangcode = $this->languageManager->getDefaultLanguage()->getId();
     $languages = $this->languageManager->getLanguages();
