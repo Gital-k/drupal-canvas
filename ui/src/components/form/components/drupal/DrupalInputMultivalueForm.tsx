@@ -226,7 +226,7 @@ const DrupalInputMultivalueForm = ({
           align="start"
           sideOffset={6}
           className={styles.popoverContent}
-          style={{ maxWidth: '232px' }}
+          style={{ maxWidth: '235px' }}
         >
           {/* Popover Header */}
           <Flex

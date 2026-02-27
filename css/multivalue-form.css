@@ -138,6 +138,12 @@
 .multivalue-container .tabledrag-changed {
   display: none;
 }
+
+/* Hide the "You have unsaved changes" warning message for multivalue forms.*/
+.multivalue-container .tabledrag-changed-warning {
+  display: none !important;
+}
+
 /* Style the tabledrag anchor to display the custom SVG icon */
 .multivalue-container .canvas-drag-handle a.tabledrag-handle {
   display: flex;

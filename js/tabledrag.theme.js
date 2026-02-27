@@ -26,7 +26,6 @@
     const title = dragOrientation === 'drag-y'
       ? Drupal.t('Change order')
       : Drupal.t('Move in any direction');
-    
     return `<a href="#" title="${title}" class="tabledrag-handle" aria-label="${title}">${dragHandleSvg}</a>`;
   };
 
