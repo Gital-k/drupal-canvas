@@ -32,6 +32,7 @@ import {
 } from '@/components/form/wrapRHF-utils';
 import { FORM_TYPES } from '@/features/form/constants';
 import {
+  clearFieldError,
   selectFieldError,
   selectFormValues,
 } from '@/features/form/formStateSlice';
@@ -245,6 +246,15 @@ export const ComponentFormField = <P extends Record<string, any>>({
   const stableOnChange = useCallback(
     (e: any) => {
       const latest = latestPropsRef.current;
+      // Clear Redux error before handling the new value
+      if (latest.dispatch && latest.formContext) {
+        latest.dispatch(
+          clearFieldError({
+            formId: latest.formContext.formId,
+            fieldName,
+          }),
+        );
+      }
       const handler = createEnhancedOnChange({
         field: latest.field,
         props: latest.props,

@@ -23,7 +23,10 @@ import {
   extractPageDataValue,
   getCurrentValueFromProps,
 } from '@/components/form/wrapRHF-utils';
-import { selectFieldError } from '@/features/form/formStateSlice';
+import {
+  clearFieldError,
+  selectFieldError,
+} from '@/features/form/formStateSlice';
 
 import {
   createPageDataFormStateHandler,
@@ -166,6 +169,15 @@ export const PageDataFormField = <P extends Record<string, any>>({
   const stableOnChange = useCallback(
     (e: any) => {
       const latest = latestPropsRef.current;
+      // Clear Redux error before handling the new value
+      if (latest.dispatch && latest.formContext) {
+        latest.dispatch(
+          clearFieldError({
+            formId: latest.formContext.formId,
+            fieldName,
+          }),
+        );
+      }
       const handler = createEnhancedOnChange({
         field: latest.field,
         props: latest.props,
