@@ -9,6 +9,7 @@ import { configurationSlice } from '@/features/configuration/configurationSlice'
 import { queryErrorSlice } from '@/features/error-handling/queryErrorSlice';
 import { extensionsSlice } from '@/features/extensions/extensionsSlice';
 import { formStateSlice } from '@/features/form/formStateSlice';
+import { languageSlice } from '@/features/language/languageSlice';
 import {
   layoutModelReducer,
   setInitialized,
@@ -36,6 +37,7 @@ import { componentAndLayoutApi } from '@/services/componentAndLayout';
 import { componentInstanceFormApi } from '@/services/componentInstanceForm';
 import { contentApi } from '@/services/content';
 import { extensionsApi } from '@/services/extensions';
+import { languageApi } from '@/services/languageApi';
 import { pageDataFormApi } from '@/services/pageDataForm';
 import { patternApi } from '@/services/patterns';
 import { pendingChangesApi } from '@/services/pendingChangesApi';
@@ -158,6 +160,8 @@ const rootReducer = combineSlices(
   previewSlice,
   queryErrorSlice,
   personalizationSlice,
+  languageSlice,
+  languageApi,
 );
 // Infer the `RootState` type from the root reducer
 export type RootState = ReturnType<typeof rootReducer>;
@@ -240,6 +244,7 @@ export const makeStore = (preloadedState?: Partial<RootState>) => {
         undoRedoActionIdMiddleware,
         pendingChangesApi.middleware,
         contentApi.middleware,
+        languageApi.middleware,
         rtkQueryErrorHandler, // Add the error handling middleware
       );
     },
