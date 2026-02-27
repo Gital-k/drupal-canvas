@@ -1,3 +1,4 @@
+import React from 'react';
 import { GlobeIcon } from '@radix-ui/react-icons';
 import { Flex, Select, Text, Tooltip } from '@radix-ui/themes';
 
@@ -77,7 +78,9 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
                     >
                       <span
                         className={
-                          isTranslated ? styles.dotTranslated : styles.dotMissing
+                          isTranslated
+                            ? styles.dotTranslated
+                            : styles.dotMissing
                         }
                         aria-label={
                           isTranslated
