@@ -4,7 +4,7 @@ import clsx from 'clsx';
 import useMutationObserver from '@/hooks/useMutationObserver';
 import { a2p } from '@/local_packages/utils';
 
-import { triggerStoreChange } from './propagateValueChange';
+import { triggerAttributesOnChange } from './formChangeUtils';
 
 import type { Attributes } from '@/types/DrupalAttribute';
 
@@ -53,7 +53,7 @@ const TextFieldAutocomplete = ({
             // store with the same value.
             record.target.removeAttribute('data-canvas-autocomplete-selected');
 
-            triggerStoreChange(attributes, {
+            triggerAttributesOnChange(attributes, {
               target: record.target,
             });
           }
@@ -105,7 +105,9 @@ const TextFieldAutocomplete = ({
               inputRef.current &&
               !inputRef.current.hasAttribute('data-canvas-no-update')
             ) {
-              triggerStoreChange(attributes, { target: inputRef.current });
+              triggerAttributesOnChange(attributes, {
+                target: inputRef.current,
+              });
             }
           }, autocompleteDelay * 3);
         }}
@@ -117,7 +119,7 @@ const TextFieldAutocomplete = ({
           // additional onChange is triggered immediately after the store
           // preventing attribute is removed.
           if (inputRef.current) {
-            triggerStoreChange(attributes, { target: inputRef.current });
+            triggerAttributesOnChange(attributes, { target: inputRef.current });
           }
           if (typeof attributes.onBlur === 'function') {
             attributes.onBlur(e);

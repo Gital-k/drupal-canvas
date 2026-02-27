@@ -3,6 +3,7 @@ import { useParams } from 'react-router';
 import { skipToken } from '@reduxjs/toolkit/query';
 
 import TextField from '@/components/form/components/TextField';
+import { useFieldContext } from '@/components/form/contexts/FieldContext';
 import { wrapRHF } from '@/components/form/wrapRHF';
 import { useEntityTitle } from '@/hooks/useEntityTitle';
 import { a2p } from '@/local_packages/utils.js';
@@ -68,6 +69,8 @@ const DrupalPathWidget = ({
   const [isInitialized, setIsInitialized] = useState(false);
   const isGeneratingRef = useRef(false);
 
+  const fieldContext = useFieldContext();
+
   const { entityId, entityType } = useParams();
   const titleInput = useEntityTitle();
   const { data: fetchedLayout } = useGetPageLayoutQuery(
@@ -105,12 +108,10 @@ const DrupalPathWidget = ({
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       setPathValue(e.target.value);
-
-      if (attributes.onChange) {
-        attributes.onChange(e);
-      }
+      // Pass through the event to trigger form state update
+      fieldContext?.triggerChange(e);
     },
-    [attributes],
+    [fieldContext],
   );
 
   const handleManualChange = useCallback(

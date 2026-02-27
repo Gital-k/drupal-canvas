@@ -5,7 +5,7 @@ import useMutationObserver from '@/hooks/useMutationObserver';
 import { a2p } from '@/local_packages/utils';
 import { VALUE_THAT_MEANS_REMOVE } from '@/utils/function-utils';
 
-import { triggerStoreChange } from './propagateValueChange';
+import { triggerAttributesOnChange } from './formChangeUtils';
 
 import type { Attributes } from '@/types/DrupalAttribute';
 
@@ -39,7 +39,7 @@ const Hidden = ({ attributes }: { attributes?: Attributes }) => {
             ref.current
           ) {
             ref.current.value = '';
-            triggerStoreChange(attributes, {
+            triggerAttributesOnChange(attributes, {
               value: VALUE_THAT_MEANS_REMOVE,
               target: ref.current!,
             });

@@ -2,7 +2,7 @@ import clsx from 'clsx';
 
 import { a2p } from '@/local_packages/utils';
 
-import { propagateValueChange } from './propagateValueChange';
+import { interceptNativeSetter } from './formChangeUtils';
 
 import type { Attributes } from '@/types/DrupalAttribute';
 
@@ -24,7 +24,7 @@ const Select: React.FC<SelectProps> = ({ attributes = {}, options = [] }) => {
       className={clsx(attributes.class || '', styles.select)}
       ref={(element) => {
         if (element) {
-          propagateValueChange(element, {
+          interceptNativeSetter(element, {
             property: 'value',
           });
         }

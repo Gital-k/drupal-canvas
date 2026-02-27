@@ -3,6 +3,7 @@ import { Flex } from '@radix-ui/themes';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import TextArea from '@/components/form/components/TextArea';
+import { useFieldContext } from '@/components/form/contexts/FieldContext';
 import { wrapRHF } from '@/components/form/wrapRHF';
 import {
   selectFormValues,
@@ -103,6 +104,7 @@ const FormatSelect = ({
   const formId = attributes['data-form-id'] as FormId;
   const defaultValue = format.format || defaultFormatName;
   const formState = useAppSelector((state) => selectFormValues(state, formId));
+  const fieldContext = useFieldContext();
 
   // On mount, if there's a default value, ensure it's set in the Redux store
   useEffect(() => {
@@ -141,16 +143,7 @@ const FormatSelect = ({
             format: formatName,
           };
           setFormat(newFormat);
-
-          if (typeof attributes?.onChange === 'function') {
-            // Create a synthetic event with the skipOriginalOnChange flag
-            const changeEvent = new Event('change') as any;
-            Object.defineProperty(changeEvent, 'target', {
-              writable: false,
-              value: e.target,
-            });
-            attributes.onChange(changeEvent);
-          }
+          fieldContext?.triggerChange(formatName, e.target);
         }}
       >
         {Object.entries(availableFormats).map(([key, value], index) => (

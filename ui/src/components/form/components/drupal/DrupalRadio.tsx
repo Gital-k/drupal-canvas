@@ -1,6 +1,7 @@
 import { createContext, useContext, useRef, useState } from 'react';
 
 import { RadioGroup, RadioItem } from '@/components/form/components/Radio';
+import { useFieldContext } from '@/components/form/contexts/FieldContext';
 import { wrapRHF } from '@/components/form/wrapRHF';
 import { a2p } from '@/local_packages/utils.js';
 
@@ -33,19 +34,12 @@ const DrupalRadioGroup = ({
     element['#default_value'] ?? null,
   );
 
+  const fieldContext = useFieldContext();
+
   // Callback provided to each radio item in the group, which will update the
   // selected value that is kept track of within this component.
   const updateSelected = (value: string | number | undefined) => {
-    const syntheticEvent = {
-      target: {
-        value,
-        name: attributes['data-canvas-name'],
-      },
-    } as unknown as React.ChangeEvent<HTMLInputElement>;
-
-    if (typeof attributes.onChange === 'function') {
-      attributes.onChange(syntheticEvent);
-    }
+    fieldContext?.triggerChange(value);
     setSelected(value ?? null);
   };
 

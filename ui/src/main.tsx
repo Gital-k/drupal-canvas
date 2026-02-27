@@ -255,7 +255,6 @@ if (container) {
    */
   Drupal.HyperscriptifyUpdateStore = (updatedInputs: Array<HTMLElement>) => {
     let formId: string | null = null;
-    // console.log('Updating store from AJAX-updated inputs', updatedInputs);
     const updates = updatedInputs
       .map((el) => {
         // For each element, parse out its attributes. These are JSON sent by
@@ -285,7 +284,6 @@ if (container) {
         }
         return carry;
       }, {});
-    // console.log('Parsed AJAX input updates', updates, formId);
     if (Object.values(updates).length > 0) {
       // At least one input name and value pair exists, so fire a custom event
       // so that any component in the tree can react to the ajax update.

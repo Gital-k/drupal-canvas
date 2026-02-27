@@ -1,6 +1,6 @@
 import clsx from 'clsx';
 
-import { propagateValueChange } from './propagateValueChange';
+import { interceptNativeSetter } from './formChangeUtils';
 
 import type { Attributes } from '@/types/DrupalAttribute';
 
@@ -21,9 +21,9 @@ const TextField = ({
         className={clsx(styles.root, className)}
         ref={(element) => {
           if (element) {
-            propagateValueChange(element, {
+            interceptNativeSetter(element, {
               property: 'value',
-              skipSet: (newValue) =>
+              skipSet: (newValue: string) =>
                 attributes?.type === 'number' && newValue === 'NaN',
             });
           }

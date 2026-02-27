@@ -1,6 +1,7 @@
 import { useState } from 'react';
 
 import Toggle from '@/components/form/components/Toggle';
+import { useFieldContext } from '@/components/form/contexts/FieldContext';
 import { wrapRHF } from '@/components/form/wrapRHF';
 import { a2p } from '@/local_packages/utils.js';
 
@@ -26,18 +27,13 @@ const DrupalToggle = ({
       : element?.['#default_value'] || false,
   );
 
+  const fieldContext = useFieldContext();
+
   return (
     <Toggle
       checked={!!isChecked}
       onCheckedChange={(value: boolean) => {
-        const syntheticEvent = {
-          target: {
-            checked: value,
-            name: attributes.name,
-            type: 'checkbox',
-          },
-        } as unknown as React.ChangeEvent<HTMLInputElement>;
-        attributes?.onChange?.(syntheticEvent);
+        fieldContext?.triggerChange(value);
         setIsChecked(value);
       }}
       attributes={a2p(

@@ -1,31 +1,38 @@
-// Utilities for propagating value changes and triggering onChange events
+// Utilities for handling form value changes in Canvas
 //
-// propagateValueChange: Override native property setter to intercept all programmatic changes
-// Usage: propagateValueChange(element, { property: 'value', afterSet: (el, newValue) => { ... } });
+// interceptNativeSetter: Override native property setter to intercept programmatic DOM changes
+// Usage: interceptNativeSetter(element, { property: 'value', afterSet: (el, newValue) => { ... } });
 //
-// propagateOnChange: Trigger native change event (and optional jQuery event) on element
-// Usage: propagateOnChange(element, { value: newValue });
+// triggerAttributesOnChange: Fallback for triggering attributes.onChange when FieldContext isn't available
+// Usage: triggerAttributesOnChange(attributes, { value: newValue, target: element });
 //
-// triggerStoreChange: Trigger React prop onChange handlers with proper event creation
-// Usage: triggerStoreChange(attributes, { value: newValue, target: element });
+// Note: Prefer using FieldContext.triggerChange() when available. These utilities are for:
+// - interceptNativeSetter: Base components that need to intercept vanilla JS/jQuery DOM manipulation
+// - triggerAttributesOnChange: Edge cases where FieldContext isn't available
 
-export type PropagateValueChangeOptions<T = any> = {
+export type InterceptNativeSetterOptions<T = any> = {
   property: keyof T;
   afterSet?: (el: T, newValue: any) => void;
   skipSet?: (newValue: any) => boolean;
   fireJQueryChange?: boolean;
 };
 
-export type TriggerStoreChangeOptions = {
+export type TriggerAttributesOnChangeOptions = {
   value?: any;
   target?: HTMLElement;
 };
 
-// Enhances an element's property setter so programmatic changes result in
-// React and jQuery handling the change as if it were user-initiated.
-export function propagateValueChange<T = any>(
+/**
+ * Intercepts an element's native property setter so programmatic changes
+ * (e.g., element.value = 'foo' from vanilla JS or jQuery) result in React
+ * and jQuery handling the change as if it were user-initiated.
+ *
+ * Used by base components (TextField, Select, Checkbox, Toggle) to ensure
+ * external code that manipulates DOM values triggers the form system.
+ */
+export function interceptNativeSetter<T = any>(
   element: T,
-  options: PropagateValueChangeOptions<T>,
+  options: InterceptNativeSetterOptions<T>,
 ) {
   if (!element) return;
   const { property, afterSet, skipSet, fireJQueryChange = true } = options;
@@ -60,11 +67,17 @@ export function propagateValueChange<T = any>(
   });
 }
 
-
-// Directly triggers the RHF onChange handler when available.
-export function triggerStoreChange(
+/**
+ * Fallback utility for directly triggering attributes.onChange when
+ * FieldContext isn't available.
+ *
+ * Prefer using FieldContext.triggerChange() when possible. This is useful for:
+ * - Components that may be used outside of wrapRHF context
+ * - Edge cases where context isn't accessible
+ */
+export function triggerAttributesOnChange(
   attributes?: { onChange?: (e: Event) => void },
-  options: TriggerStoreChangeOptions = {},
+  options: TriggerAttributesOnChangeOptions = {},
 ) {
   // Built-in falsy check - no need for components to check
   if (!attributes?.onChange || typeof attributes.onChange !== 'function') {
@@ -73,7 +86,7 @@ export function triggerStoreChange(
 
   const { value, target } = options;
 
-  // Create synthetic change event.
+  // Create synthetic change event
   const syntheticEvent = new Event('change', { bubbles: true });
 
   // Set up target with value if provided

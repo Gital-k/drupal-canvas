@@ -3,6 +3,11 @@ import { Controller } from 'react-hook-form';
 
 import { useAppSelector } from '@/app/hooks';
 import {
+  createSyntheticBlurEvent,
+  createSyntheticChangeEvent,
+  FieldContextProvider,
+} from '@/components/form/contexts/FieldContext';
+import {
   useSafeFormContext,
   useSafeRHFContext,
 } from '@/components/form/contexts/FormContext';
@@ -196,6 +201,33 @@ export const PageDataFormField = <P extends Record<string, any>>({
     [fieldName],
   );
 
+  // Create FieldContext value for child components to trigger form updates
+  const fieldContextValue = useMemo(
+    () => ({
+      fieldName,
+      triggerChange: (valueOrEvent: any, target?: HTMLElement) => {
+        // Check if first arg is an event (has 'target' property with 'value')
+        if (
+          valueOrEvent &&
+          typeof valueOrEvent === 'object' &&
+          'target' in valueOrEvent
+        ) {
+          // It's an event, pass it through directly
+          stableOnChange(valueOrEvent);
+        } else {
+          // It's a value, create synthetic event
+          const event = createSyntheticChangeEvent(valueOrEvent, target);
+          stableOnChange(event);
+        }
+      },
+      triggerBlur: (target?: HTMLElement) => {
+        const event = createSyntheticBlurEvent(target);
+        stableOnBlur(event);
+      },
+    }),
+    [fieldName, stableOnChange, stableOnBlur],
+  );
+
   if (!rhfContext) {
     return <MemoizedWrappedComponent {...(props as any)} />;
   }
@@ -271,13 +303,13 @@ export const PageDataFormField = <P extends Record<string, any>>({
         );
 
         return (
-          <>
+          <FieldContextProvider value={fieldContextValue}>
             <MemoizedWrappedComponent {...(enhancedProps as any)} />
             <FieldErrorDisplay
               blockingError={blockingError}
               fieldState={fieldState}
             />
-          </>
+          </FieldContextProvider>
         );
       }}
     />

@@ -3,7 +3,7 @@ import clsx from 'clsx';
 
 import { a2p } from '@/local_packages/utils';
 
-import { propagateValueChange } from './propagateValueChange';
+import { interceptNativeSetter } from './formChangeUtils';
 
 import type { Attributes } from '@/types/DrupalAttribute';
 
@@ -88,11 +88,11 @@ const Checkbox = ({
         }) as EventListener);
 
         // Override the native setter for the checked property using our utility
-        propagateValueChange(node, {
+        interceptNativeSetter(node, {
           property: 'checked',
-          skipSet: (newValue) =>
+          skipSet: (newValue: boolean) =>
             castBoolean(node.checked) === castBoolean(newValue),
-          afterSet: (element) => {
+          afterSet: (element: HTMLInputElement) => {
             const changeEvent = new Event('change');
             Object.defineProperty(changeEvent, 'target', {
               writable: false,

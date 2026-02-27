@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { Switch } from '@radix-ui/themes';
 
-import { propagateValueChange } from './propagateValueChange';
+import { interceptNativeSetter } from './formChangeUtils';
 
 import type { Attributes } from '@/types/DrupalAttribute';
 
@@ -23,7 +23,7 @@ const Toggle = ({
             node?.parentElement &&
             node.parentElement.querySelector('input[type="checkbox"]');
           if (checkboxRef.current && onCheckedChange) {
-            propagateValueChange(checkboxRef.current, {
+            interceptNativeSetter(checkboxRef.current, {
               property: 'checked' as keyof HTMLInputElement,
               afterSet: (el: HTMLInputElement, newValue: any) => {
                 onCheckedChange(newValue);
