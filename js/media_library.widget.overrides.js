@@ -207,7 +207,9 @@
                   $(widget).append(item);
                 });
 
-                await new Promise(resolve => setTimeout(resolve, 10000));
+                // Give time to the sorting algorithm to refresh the component before storing
+                // it to the store.
+                await new Promise(resolve => setTimeout(resolve, 500));
 
                 // Clean up reordering flag
                 drupalSettings?.canvas?.store?.dispatch({ type: 'mediaLibrary/setReorderingEnd' });
