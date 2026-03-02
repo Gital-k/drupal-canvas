@@ -70,21 +70,27 @@ const ViewportToolbar: React.FC<ViewportToolbarProps> = (props) => {
   // Track if initial auto-scale has been performed
   const hasAutoScaledOnMount = useRef(false);
 
-  const getViewportByWidth = (width: number): viewportSize => {
-    const viewportSize = viewportSizes.find((vw) => vw.width === width);
-    if (!viewportSize) {
-      throw new Error(`No viewport found with width: ${width}`);
-    }
-    return viewportSize;
-  };
+  const getViewportByWidth = useCallback(
+    (width: number): viewportSize => {
+      const viewport = viewportSizes.find((vw) => vw.width === width);
+      if (!viewport) {
+        throw new Error(`No viewport found with width: ${width}`);
+      }
+      return viewport;
+    },
+    [viewportSizes],
+  );
 
-  const getViewportById = (id: string): viewportSize => {
-    const viewportSize = viewportSizes.find((vw) => vw.id === id);
-    if (!viewportSize) {
-      throw new Error(`No viewport found with id: ${id}`);
-    }
-    return viewportSize;
-  };
+  const getViewportById = useCallback(
+    (id: string): viewportSize => {
+      const viewport = viewportSizes.find((vw) => vw.id === id);
+      if (!viewport) {
+        throw new Error(`No viewport found with id: ${id}`);
+      }
+      return viewport;
+    },
+    [viewportSizes],
+  );
 
   // Calculate the optimal scale for a given viewport width
   const calculateOptimalScale = useCallback(
@@ -119,8 +125,7 @@ const ViewportToolbar: React.FC<ViewportToolbarProps> = (props) => {
 
           // Calculate the center offset inside the editor frame
           const editorFrameHeight = editorPaneRef.current.scrollHeight;
-          const centerOffset =
-            (editorFrameHeight - newScaledPreviewHeight) / 2;
+          const centerOffset = (editorFrameHeight - newScaledPreviewHeight) / 2;
           y = centerOffset - 50;
         }
 
@@ -192,7 +197,7 @@ const ViewportToolbar: React.FC<ViewportToolbarProps> = (props) => {
     }
     dispatch(setViewportWidth(vs.width));
     dispatch(setViewportMinHeight(vs.height));
-  }, [currentWidth, dispatch]);
+  }, [currentWidth, dispatch, getViewportByWidth, getViewportById]);
 
   // Auto-scale to fit on initial load when enabled, scrolling to top of the page
   useEffect(() => {
