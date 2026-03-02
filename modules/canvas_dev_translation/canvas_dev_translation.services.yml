@@ -14,7 +14,6 @@ services:
     arguments:
       - '@current_route_match'
       - '@language_manager'
-      - '@entity_type.manager'
       - '@current_user'
     tags:
       - { name: event_subscriber, priority: 100 }
