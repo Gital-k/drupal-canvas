@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -19,8 +20,8 @@ import {
   setViewportMinHeight,
   setViewportWidth,
 } from '@/features/ui/uiSlice';
-import { viewportSizes } from '@/types/Preview';
 import { getHalfwayScrollPosition } from '@/utils/function-utils';
+import { getViewportSizes } from '@/utils/viewports';
 
 import type React from 'react';
 import type { RefObject } from 'react';
@@ -56,6 +57,8 @@ const ViewportToolbar: React.FC<ViewportToolbarProps> = (props) => {
   const { editorPaneRef, scalingContainerRef } = props;
   const dispatch = useAppDispatch();
   const currentWidth = useAppSelector(selectViewportWidth);
+  // Get viewport sizes (supports theme-level customization).
+  const viewportSizes = useMemo(() => getViewportSizes(), []);
 
   // Auto scale-to-fit preference from localStorage (defaults to true)
   const [autoScaleToFit, setAutoScaleToFit] = useState(() => {
