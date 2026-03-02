@@ -1,5 +1,5 @@
 import { GlobeIcon } from '@radix-ui/react-icons';
-import { Flex, Select, Text, Tooltip } from '@radix-ui/themes';
+import { Flex, Select, Text } from '@radix-ui/themes';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import {
@@ -11,7 +11,6 @@ import { useGetLanguagesQuery } from '@/services/languageApi';
 
 import type React from 'react';
 
-import styles from './LanguageSelector.module.css';
 interface LanguageSelectorProps {
   entityType: string;
   entityId: string;

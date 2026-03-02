@@ -1,5 +1,7 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+
 import { setAvailableLanguages } from '@/features/language/languageSlice';
+
 import type { Language } from '@/features/language/languageSlice';
 
 interface TranslationResponseItem {
@@ -36,26 +38,31 @@ export const languageApi = createApi({
   baseQuery: fetchBaseQuery({ baseUrl: '/canvas/api/v0/' }),
   tagTypes: ['Languages'],
   endpoints: (builder) => ({
-    getLanguages: builder.query<Language[], { entityType: string; id: string }>({
-      query: ({ entityType, id }) => `${entityType}/${id}/translations`,
-      providesTags: [{ type: 'Languages', id: 'LIST' }],
-      transformResponse: (response: GetTranslationsResponse): Language[] =>
-        response.data.map(({ langcode, label, is_default }) => ({
-          id: langcode,
-          label,
-          isDefault: is_default,
-        })),
-      async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
-        try {
-          const { data } = await queryFulfilled;
-          dispatch(setAvailableLanguages(data));
-        } catch {
-          // fail silently
-        }
+    getLanguages: builder.query<Language[], { entityType: string; id: string }>(
+      {
+        query: ({ entityType, id }) => `${entityType}/${id}/translations`,
+        providesTags: [{ type: 'Languages', id: 'LIST' }],
+        transformResponse: (response: GetTranslationsResponse): Language[] =>
+          response.data.map(({ langcode, label, is_default }) => ({
+            id: langcode,
+            label,
+            isDefault: is_default,
+          })),
+        async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
+          try {
+            const { data } = await queryFulfilled;
+            dispatch(setAvailableLanguages(data));
+          } catch {
+            // fail silently
+          }
+        },
       },
-    }),
+    ),
 
-    createTranslation: builder.mutation<CreateTranslationResponse, CreateTranslationRequest>({
+    createTranslation: builder.mutation<
+      CreateTranslationResponse,
+      CreateTranslationRequest
+    >({
       query: ({ entityType, id, targetLangcode, sourceLangcode }) => ({
         url: `${entityType}/${id}/translations/${targetLangcode}`,
         method: 'POST',
@@ -66,4 +73,5 @@ export const languageApi = createApi({
   }),
 });
 
-export const { useGetLanguagesQuery, useCreateTranslationMutation } = languageApi;
+export const { useGetLanguagesQuery, useCreateTranslationMutation } =
+  languageApi;
