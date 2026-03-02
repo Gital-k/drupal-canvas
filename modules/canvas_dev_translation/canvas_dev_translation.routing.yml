@@ -1,8 +1,0 @@
-canvas_dev_translation.languages:
-  path: '/canvas/api/v0/languages'
-  defaults:
-    _controller: '\Drupal\canvas_dev_translation\Controller\LanguagesController::getLanguages'
-    _format: json
-  requirements:
-    _permission: 'access content'
-  methods: [GET]

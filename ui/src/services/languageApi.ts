@@ -16,7 +16,7 @@ export const languageApi = createApi({
   tagTypes: ['Languages'],
   endpoints: (builder) => ({
     getLanguages: builder.query<Language[], void>({
-      query: () => 'canvas/api/v0/languages',
+      query: () => '/canvas/api/v0/{entity_type}/{id}/translations',
       providesTags: [{ type: 'Languages', id: 'LIST' }],
       transformResponse: (response: DrupalLanguagesResponse): Language[] =>
         Object.entries(response).map(([id, { label, isDefault }]) => ({
