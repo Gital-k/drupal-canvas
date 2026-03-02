@@ -411,13 +411,13 @@ final class ApiAutoSaveController extends ApiControllerBase {
         $original_entity_type = $original->getEntityType();
         \assert($original_entity_type instanceof ContentEntityTypeInterface);
 
-        // Révision ID
+        // Revision ID
         $revision_id_key = $original_entity_type->getKey('revision');
         if ($revision_id_key) {
           $translation->set($revision_id_key, NULL);
         }
 
-        // Révision user
+        // Revision user
         $revision_user = $original_entity_type->getRevisionMetadataKey('revision_user');
         if (\is_string($revision_user)) {
           $translation->set($revision_user, $this->currentUser->id());
