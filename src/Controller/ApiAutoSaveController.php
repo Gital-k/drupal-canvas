@@ -210,7 +210,7 @@ final class ApiAutoSaveController extends ApiControllerBase {
 
     $withUserDetails = \array_map(function (array $item) use ($users): array {
       $owner_id = $item['owner'];
-      \assert(is_int($owner_id) || is_string($owner_id));
+      \assert(\is_int($owner_id) || \is_string($owner_id));
       return [
         'owner' => \array_key_exists($owner_id, $users) ? [
           'name' => $users[$owner_id]->getDisplayName(),
