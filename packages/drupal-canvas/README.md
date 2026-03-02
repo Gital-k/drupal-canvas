@@ -43,9 +43,13 @@ import { getPageData } from 'drupal-canvas';
 const { pageTitle, breadcrumbs, mainEntity } = getPageData();
 const { bundle, entityTypeId, uuid } = mainEntity;
 ```
+
 #### Main entity metadata
-The main entity is the primary Drupal entity (e.g. article, canvas_page, blog) associated with the current page.
-Access main entity metadata of the page you are on with `getPageData`. This can be used to construct JSON:API parameters for requests.
+
+The main entity is the primary Drupal entity (e.g. article, canvas_page, blog)
+associated with the current page. Access main entity metadata of the page you
+are on with `getPageData`. This can be used to construct JSON:API parameters for
+requests.
 [View documentation and example here.](https://project.pages.drupalcode.org/canvas/code-components/data-fetching#main-entity-metadata)
 
 ### `getSiteData`
@@ -159,6 +163,172 @@ If working outside of Drupal Canvas, you can use the
 [`@drupal-canvas/vite-plugin`](https://www.npmjs.com/package/@drupal-api-client/json-api-client)
 to automatically configure the base URL for you. Otherwise you must explicitly
 provide a base URL.
+
+### json-render Utils
+
+Utilities for working with [json-render](https://json-render.dev) specs and
+Drupal Canvas component trees.
+
+> **Note:** These utilities currently depend on named slots support proposed for
+> json-render in <https://github.com/vercel-labs/json-render/pull/105>.
+
+#### `canvasTreeToSpec`
+
+Converts a flat Drupal Canvas component tree to a
+[json-render spec](https://json-render.dev/docs/specs). Canvas stores components
+as a flat array linked by `parent_uuid`; json-render uses a spec object with a
+single root element and a flat map of elements linked by `children` and `slots`.
+This function builds the spec and, when there are multiple root components,
+wraps them in a synthetic `canvas:component-tree` element. Throws an error if
+the tree contains no root component.
+
+```js
+import { canvasTreeToSpec } from 'drupal-canvas/json-render-utils';
+
+const components = [
+  {
+    uuid: '872cde09-809a-4f48-8bf5-88f37127cb55',
+    parent_uuid: null,
+    slot: null,
+    component_id: 'js.card',
+    component_version: 'a681ae184a8f6b7f',
+    inputs: { title: 'Hello' },
+    label: 'Card',
+  },
+  {
+    uuid: '87106237-b8d8-4e19-82f7-c780ad24feb5',
+    parent_uuid: '872cde09-809a-4f48-8bf5-88f37127cb55',
+    slot: 'body',
+    component_id: 'js.text',
+    component_version: 'b1e991f726a2a266',
+    inputs: { content: 'World' },
+    label: 'Text',
+  },
+];
+
+const jsonRenderSpec = canvasTreeToSpec(components);
+```
+
+#### `specToCanvasTree`
+
+Converts a json-render spec back to a flat Drupal Canvas component tree. Strips
+the synthetic `canvas:component-tree` wrapper if present, so multi-root trees
+round-trip cleanly.
+
+```js
+import { specToCanvasTree } from 'drupal-canvas/json-render-utils';
+
+const jsonRenderSpec = {
+  root: 'card',
+  elements: {
+    card: {
+      type: 'js.card',
+      props: { title: 'Hello' },
+      slots: { body: ['text'] },
+    },
+    text: {
+      type: 'js.text',
+      props: { content: 'World' },
+    },
+  },
+};
+
+const canvasComponentTree = specToCanvasTree(jsonRenderSpec);
+```
+
+#### `renderSpec`
+
+Renders a json-render spec generated from canvas component tree using
+`canvasTreeToSpec`. The synthetic `canvas:component-tree` wrapper used for
+multi-root trees is handled internally and renders transparently. Unknown
+component types render nothing.
+
+```jsx
+import { renderSpec } from 'drupal-canvas/json-render-utils';
+
+import registry from './registry';
+
+const spec = {
+  root: 'card',
+  elements: {
+    card: {
+      type: 'js.card',
+      props: { title: 'Hello' },
+      children: ['text'],
+    },
+    text: {
+      type: 'js.text',
+      props: { content: 'World' },
+    },
+  },
+};
+
+const rendered = renderSpec(spec, registry);
+```
+
+#### `renderCanvasTree`
+
+Renders a Canvas component tree. Requires a `ComponentRegistry` for mapping
+component IDs to React components. Converts the tree to a json-render spec
+internally using `canvasTreeToSpec` and delegates to `renderSpec`. Unknown
+component types render nothing.
+
+```jsx
+import { JsonApiClient } from 'drupal-canvas';
+import { renderCanvasTree } from 'drupal-canvas/json-render-utils';
+import useSWR from 'swr';
+
+import registry from './registry';
+
+const client = new JsonApiClient();
+
+export function CanvasPage({ id }) {
+  const { data: page } = useSWR(
+    ['canvas_page--canvas_page', id],
+    ([type, id]) => client.getResource(type, id),
+  );
+
+  if (!page) return null;
+
+  return renderCanvasTree(page.components, registry);
+}
+```
+
+#### `defineComponentRegistry`
+
+Defines a component registry by dynamically importing each component's
+JavaScript entry file. Accepts an array of objects with `name` and `jsEntryPath`
+— compatible with `DiscoveryResult.components` from `@drupal-canvas/discovery`.
+Each module's default export is expected to be a render function. Components
+without a JS entry or without a default function export are skipped.
+
+```js
+import { defineComponentRegistry } from 'drupal-canvas/json-render-utils';
+import { discoverCodeComponents } from '@drupal-canvas/discovery';
+
+const discovery = await discoverCodeComponents({ scanRoot: './src' });
+const registry = await defineComponentRegistry(discovery.components);
+```
+
+#### `defineComponentCatalog`
+
+Defines a complete [json-render](https://json-render.dev) catalog from component
+metadata. Converts props from JSON Schema (as defined in `component.yml`) to Zod
+schemas. The returned catalog can be used with `catalog.prompt()` for AI prompt
+generation, `catalog.validate()` for spec validation, etc.
+
+```js
+import { defineComponentCatalog } from 'drupal-canvas/json-render-utils';
+import {
+  discoverCodeComponents,
+  loadComponentsMetadata,
+} from '@drupal-canvas/discovery';
+
+const discovery = await discoverCodeComponents({ scanRoot: './src' });
+const metadata = await loadComponentsMetadata(discovery);
+const catalog = defineComponentCatalog(metadata);
+const systemPrompt = catalog.prompt();
+```
 
 ## Base Components
 

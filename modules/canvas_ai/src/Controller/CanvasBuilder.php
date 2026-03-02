@@ -88,7 +88,7 @@ final class CanvasBuilder extends ControllerBase {
     // by scanning for keys named 'message <number>', and
     // assembling them into an ordered 'messages' array, while cleaning up old keys
     // as we use $prompt['messages'] for further processing .
-    if (!isset($prompt['messages']) || !is_array($prompt['messages'])) {
+    if (!isset($prompt['messages']) || !\is_array($prompt['messages'])) {
       $messages = [];
       $keys_to_remove = [];
       foreach ($prompt as $key => $value) {
@@ -168,10 +168,9 @@ final class CanvasBuilder extends ControllerBase {
       if (!empty($message['files'])) {
         $images = [];
         foreach ($message['files'] as $file_info) {
-          if (!empty($file_info['src'])) {
-            $binary = @file_get_contents($file_info['src']);
-            preg_match('/^data:(.*?);base64,/', $file_info['src'], $matches);
-            $mime_type = $matches[1] ?? '';
+          if (!empty($file_info['src']) && preg_match('/^data:(image\/(?:jpeg|png));base64,(.+)$/i', $file_info['src'], $matches)) {
+            $mime_type = $matches[1];
+            $binary = base64_decode($matches[2], TRUE);
             if ($binary !== FALSE) {
               $images[] = new ImageFile($binary, $mime_type, 'temp');
             }
@@ -197,7 +196,7 @@ final class CanvasBuilder extends ControllerBase {
       AiAgentStatusItemTypes::Finished,
     ]);
     $default = $this->providerService->getDefaultProviderForOperationType('chat');
-    if (!is_array($default) || empty($default['provider_id']) || empty($default['model_id'])) {
+    if (!\is_array($default) || empty($default['provider_id']) || empty($default['model_id'])) {
       return new JsonResponse([
         'status' => FALSE,
         'message' => 'No default provider found.',

@@ -228,12 +228,12 @@ class ComponentTreeItemTest extends CanvasKernelTestBase {
   }
 
   /**
-   * @covers ::getParentUuid()
-   * @covers ::getParentComponentTreeItem()
-   * @covers ::getSlot()
-   * @covers ::getComponentId()
-   * @covers ::getComponent()
-   * @covers ::getUuid()
+   * @covers ::getParentUuid
+   * @covers ::getParentComponentTreeItem
+   * @covers ::getSlot
+   * @covers ::getComponentId
+   * @covers ::getComponent
+   * @covers ::getUuid
    */
   public function testConvenienceMethods(): void {
     $root_uuid = '947c196f-f108-43fd-a446-03a08100d579';
@@ -547,7 +547,7 @@ class ComponentTreeItemTest extends CanvasKernelTestBase {
     ]);
     if ($expected_exception !== NULL) {
       $this->expectException($expected_exception);
-      \assert(is_string($exception_message));
+      \assert(\is_string($exception_message));
       $this->expectExceptionMessage($exception_message);
     }
     $violations = $node->validate();

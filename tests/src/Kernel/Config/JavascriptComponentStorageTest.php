@@ -39,7 +39,7 @@ final class JavascriptComponentStorageTest extends AssetLibraryStorageTest {
   }
 
   /**
-   * @covers \Drupal\canvas\EntityHandlers\CanvasAssetStorage::generateFiles()
+   * @covers \Drupal\canvas\EntityHandlers\CanvasAssetStorage::generateFiles
    */
   public function testGeneratedFiles(): void {
     $js_component = JavaScriptComponent::create([
@@ -62,9 +62,6 @@ final class JavascriptComponentStorageTest extends AssetLibraryStorageTest {
     $this->assertGeneratedFiles($js_component);
   }
 
-  /**
-   * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::createConfigEntity()
-   */
   public function testComponentEntityCreation(): array {
     $js_component_id = $this->randomMachineName();
     $component_id = JsComponent::componentIdFromJavascriptComponentId($js_component_id);
@@ -178,7 +175,7 @@ final class JavascriptComponentStorageTest extends AssetLibraryStorageTest {
   public function testComponentEntityUpdate(array $js_component_values): void {
     $js_component = JavaScriptComponent::create($js_component_values);
     $js_component->save();
-    \assert(is_string($js_component->id()));
+    \assert(\is_string($js_component->id()));
     $component_id = JsComponent::componentIdFromJavascriptComponentId($js_component->id());
 
     // Name should carry over.

@@ -68,8 +68,8 @@ final class BlockComponentTest extends ComponentSourceTestBase {
   /**
    * All test module blocks must either have a Component or a reason why not.
    *
-   * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponentDiscovery::discover()
-   * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponentDiscovery::checkRequirements()
+   * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponentDiscovery::discover
+   * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponentDiscovery::checkRequirements
    */
   public function testDiscovery(): array {
     $components = Component::loadMultiple();
@@ -184,7 +184,7 @@ final class BlockComponentTest extends ComponentSourceTestBase {
 
   /**
    * @param array<ComponentConfigEntityId> $component_ids
-   * @covers ::getReferencedPluginClass()
+   * @covers ::getReferencedPluginClass
    * @depends testDiscovery
    */
   public function testGetReferencedPluginClass(array $component_ids): void {
@@ -208,7 +208,7 @@ final class BlockComponentTest extends ComponentSourceTestBase {
 
   /**
    * @param array<ComponentConfigEntityId> $component_ids
-   * @covers ::renderComponent()
+   * @covers ::renderComponent
    * @depends testDiscovery
    */
   public function testRenderComponentLive(array $component_ids): void {
@@ -321,7 +321,7 @@ HTML,
   }
 
   /**
-   * @covers ::getExplicitInput()
+   * @covers ::getExplicitInput
    * @dataProvider getValidTreeTestCases
    */
   public function testGetExplicitInput(array $componentItemValue): void {
@@ -380,7 +380,7 @@ HTML,
   }
 
   /**
-   * @covers ::calculateDependencies()
+   * @covers ::calculateDependencies
    * @depends testDiscovery
    */
   public function testCalculateDependencies(array $component_ids): void {
@@ -438,7 +438,7 @@ HTML,
   }
 
   /**
-   * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponentDiscovery::computeCurrentComponentMetadata()
+   * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponentDiscovery::computeCurrentComponentMetadata
    */
   public function testDependencyUpdate(): void {
     $this->generateComponentConfig();
@@ -544,7 +544,7 @@ HTML,
       'multiplier' => 3,
     ], $input);
     // @todo This is wrong (it does not conform to `type: block.settings.canvas_test_block_form`) and will be fixed in https://www.drupal.org/project/canvas/issues/3541125
-    self::assertFalse(is_int($input['canvas_page']));
+    self::assertFalse(\is_int($input['canvas_page']));
 
     // Confirm that validation errors from submitting the block plugin are
     // stored in the auto-save manager for a subsequent validation step.

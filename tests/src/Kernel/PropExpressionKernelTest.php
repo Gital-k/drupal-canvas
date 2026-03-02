@@ -340,12 +340,12 @@ class PropExpressionKernelTest extends CanvasKernelTestBase {
   }
 
   /**
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression::calculateDependencies()
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression::calculateDependencies()
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression::calculateDependencies()
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\FieldTypePropExpression::calculateDependencies()
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression::calculateDependencies()
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\FieldTypeObjectPropsExpression::calculateDependencies()
+   * @covers \Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression::calculateDependencies
+   * @covers \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression::calculateDependencies
+   * @covers \Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression::calculateDependencies
+   * @covers \Drupal\canvas\PropExpressions\StructuredData\FieldTypePropExpression::calculateDependencies
+   * @covers \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression::calculateDependencies
+   * @covers \Drupal\canvas\PropExpressions\StructuredData\FieldTypeObjectPropsExpression::calculateDependencies
    */
   #[IgnoreDeprecations]
   public function testCalculateDependencies(): void {
@@ -369,7 +369,7 @@ class PropExpressionKernelTest extends CanvasKernelTestBase {
       // content-unaware ones, just with the `content` key-value pair omitted,
       // if any.
       $expected_content_unaware_dependencies = $case[5] ?? (
-        is_array($expected_dependencies)
+        \is_array($expected_dependencies)
           ? array_diff_key($expected_dependencies, array_flip(['content']))
           : NULL
       );
@@ -481,7 +481,7 @@ class PropExpressionKernelTest extends CanvasKernelTestBase {
    * support, because they both use ReferencedBundleSpecificBranches in exactly
    * the same way.
    *
-   * @covers \Drupal\canvas\PropExpressions\StructuredData\ReferencedBundleSpecificBranches::__construct()
+   * @covers \Drupal\canvas\PropExpressions\StructuredData\ReferencedBundleSpecificBranches::__construct
    * @covers \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldPropExpression
    * @covers \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression
    * @see \Drupal\Tests\canvas\Unit\PropExpressionTest::testInvalidReferencePropExpressionDueToMismatchedLeafExpressionCardinality()

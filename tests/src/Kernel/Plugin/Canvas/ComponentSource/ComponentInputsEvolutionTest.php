@@ -76,8 +76,8 @@ final class ComponentInputsEvolutionTest extends CanvasKernelTestBase {
 
   /**
    * @see hook_canvas_storable_prop_shape_alter()
-   * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent::updateConfigEntity()
-   * @covers \Drupal\canvas\ComponentSource\ComponentSourceBase::generateVersionHash()
+   * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponentDiscovery
+   * @covers \Drupal\canvas\ComponentSource\ComponentSourceBase::generateVersionHash
    */
   public function testStorablePropShapeChanges(): void {
     $component = Component::load('sdc.canvas_test_sdc.my-cta');
@@ -281,12 +281,12 @@ final class ComponentInputsEvolutionTest extends CanvasKernelTestBase {
    * @todo Refactor after https://www.drupal.org/project/drupal/issues/3521221 is in.
    */
   private static function blockUpdatePathSampleForCoreIssue3521221(array $block_plugin_settings): array {
-    if (is_int($block_plugin_settings['foo']) || \array_key_exists('change', $block_plugin_settings)) {
+    if (\is_int($block_plugin_settings['foo']) || \array_key_exists('change', $block_plugin_settings)) {
       throw new \LogicException('Nothing to do; ideally this would then not be called at all.');
     }
 
     // Update the `foo` key-value pair from string to integer.
-    \assert(is_string($block_plugin_settings['foo']));
+    \assert(\is_string($block_plugin_settings['foo']));
     $block_plugin_settings['foo'] = match ($block_plugin_settings['foo']) {
       // Remap the old default to the new default.
       // @see \Drupal\canvas_test_block\Plugin\Block\CanvasTestBlockInputSchemaChangePoc::defaultConfiguration()
@@ -316,8 +316,8 @@ final class ComponentInputsEvolutionTest extends CanvasKernelTestBase {
    * that changes the schema, we can simulate it with 2 modules, one with the v1
    * of the schema, and others with the v2 of the schema.
    *
-   * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent::getExplicitInputDefinitions()
-   * @covers \Drupal\canvas\ComponentSource\ComponentSourceBase::generateVersionHash()
+   * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent::getExplicitInputDefinitions
+   * @covers \Drupal\canvas\ComponentSource\ComponentSourceBase::generateVersionHash
    *
    * @see \Drupal\canvas_test_block\Plugin\Block\CanvasTestBlockInputSchemaChangePoc::defaultConfiguration()
    * @see \Drupal\canvas_test_block_simulate_input_schema_change\Plugin\Block\SimulatedInputSchemaChangeBlock::defaultConfiguration()
@@ -501,7 +501,7 @@ final class ComponentInputsEvolutionTest extends CanvasKernelTestBase {
     // because in real workloads, it is impossible to experience Component
     // updates within a single request.
     $reloaded_page = Page::load($page->id());
-    \assert(!is_null($reloaded_page));
+    \assert(!\is_null($reloaded_page));
     self::assertSame($expected_post_update_violations, self::violationsToArray($reloaded_page->getComponentTree()->validate()));
     self::assertSame($expected_mid_update_markup_bc_layer, self::getTextOfAllRenderedBlockComponentInstances($reloaded_page));
     self::assertSame($expected_mid_update_markup_bc_layer, self::getTextOfAllRenderedBlockComponentInstances($page));

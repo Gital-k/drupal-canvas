@@ -80,8 +80,8 @@ class ComponentTreeItemListTest extends CanvasKernelTestBase {
   }
 
   /**
-   * @covers ::getHydratedTree()
-   * @covers ::toRenderable()
+   * @covers ::getHydratedTree
+   * @covers ::toRenderable
    * @dataProvider provider
    */
   public function testHydrationAndRendering(string $host_entity_type_id, array $host_entity_values, array $value, array $expected_value, array $expected_renderable, string $expected_html, array $expected_cache_tags, bool $isPreview): void {
@@ -170,7 +170,7 @@ class ComponentTreeItemListTest extends CanvasKernelTestBase {
       if ($key === '#is_preview' || $key === 'canvas_is_preview') {
         $value = $is_preview;
       }
-      if (is_string($value) && str_starts_with($value, 'canvas/')) {
+      if (\is_string($value) && str_starts_with($value, 'canvas/')) {
         $value .= '.draft';
       }
     });
@@ -194,12 +194,12 @@ class ComponentTreeItemListTest extends CanvasKernelTestBase {
     $expectation = [];
 
     foreach ($expected_renderable as $key => $value) {
-      if (is_array($value)) {
+      if (\is_array($value)) {
         $value = self::addSlotPlaceholders($value);
       }
 
       if ($key === '#slots') {
-        if (is_array($value)) {
+        if (\is_array($value)) {
           foreach ($value as $slot_key => $slot_value) {
             if (isset($slot_value["#plain_text"]) || isset($slot_value["#markup"])) {
               $expectation[$key][$slot_key] = [
@@ -227,7 +227,7 @@ class ComponentTreeItemListTest extends CanvasKernelTestBase {
         continue;
       }
 
-      if (is_array($value)) {
+      if (\is_array($value)) {
         $value = self::removePrefixSuffixKeysRecursive($value);
       }
       $expectation[$key] = $value;
