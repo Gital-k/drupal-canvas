@@ -18,11 +18,12 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Drupal\Core\Entity\FieldableEntityInterface;
 
 /**
  * Handles translation metadata and creation for Canvas entities.
  */
-class ApiTranslationController extends ControllerBase {
+final class ApiTranslationController extends ControllerBase {
 
   /**
    * Maps route entity type slugs to Drupal internal entity type IDs.
@@ -77,8 +78,8 @@ class ApiTranslationController extends ControllerBase {
   /**
    * {@inheritdoc}
    */
-  public static function create(ContainerInterface $container): self {
-    return new self(
+  public static function create(ContainerInterface $container): static {
+    return new static(
       $container->get('entity_type.manager'),
       $container->get('language_manager'),
       $container->get('language.config_factory_override'),
@@ -136,7 +137,7 @@ class ApiTranslationController extends ControllerBase {
     }
 
     $body = json_decode($request->getContent(), TRUE);
-    if (!is_array($body) || empty($body['source_langcode'])) {
+    if (!\is_array($body) || empty($body['source_langcode'])) {
       return new JsonResponse(
         ['error' => 'Missing required body parameter: source_langcode'],
         Response::HTTP_BAD_REQUEST
@@ -200,7 +201,7 @@ class ApiTranslationController extends ControllerBase {
     if (!$entity) {
       throw new NotFoundHttpException("Entity $drupal_entity_type:$id not found.");
     }
-    if (!$entity instanceof TranslatableInterface) {
+    if (!$entity instanceof TranslatableInterface || !$entity instanceof FieldableEntityInterface) {
       throw new NotFoundHttpException("Entity $drupal_entity_type:$id is not translatable.");
     }
 

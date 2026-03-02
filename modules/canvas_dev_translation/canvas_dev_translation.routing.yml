@@ -11,7 +11,7 @@ canvas_dev_translation.api.translations:
       - basic_auth
 
 canvas_dev_translation.api.translations.create:
-  path: '/canvas/api/v0/{entity_type}/{id}/translations/{target_langcode}'
+  path: '/canvas/api/v0/auto-save/{entity_type}/{id}/translations/{target_langcode}'
   defaults:
     _controller: '\Drupal\canvas_dev_translation\Controller\ApiTranslationController::createTranslation'
   methods: [POST]
