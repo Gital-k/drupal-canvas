@@ -12,84 +12,63 @@ import { useGetLanguagesQuery } from '@/services/languageApi';
 import type React from 'react';
 
 import styles from './LanguageSelector.module.css';
-
 interface LanguageSelectorProps {
-  /**
-   * Optional set of langcodes that have existing translations for the current
-   * entity. When provided, each language shows a filled dot (translated) or
-   * empty dot (not yet translated).
-   */
+  entityType: string;
+  entityId: string;
   translatedLanguages?: Set<string>;
 }
 
 const LanguageSelector: React.FC<LanguageSelectorProps> = ({
+  entityType,
+  entityId,
   translatedLanguages,
 }) => {
   const dispatch = useAppDispatch();
   const currentLanguage = useAppSelector(selectCurrentLanguage);
   const availableLanguages = useAppSelector(selectAvailableLanguages);
 
-  // Fetch languages and hydrate the store. Cached after first call.
-  useGetLanguagesQuery();
+  // Fetch languages for this entity
+  useGetLanguagesQuery({ entityType, id: entityId });
 
-  // Hide on single-language sites.
-  if (availableLanguages.length <= 1) {
-    return null;
-  }
+  // Hide on single-language sites
+  if (!availableLanguages || availableLanguages.length <= 1) return null;
 
   const currentLabel =
     availableLanguages.find((l) => l.id === currentLanguage)?.label ??
     currentLanguage.toUpperCase();
 
   return (
-    <Flex align="center" gap="1" className={styles.wrapper}>
-      <GlobeIcon className={styles.globeIcon} aria-hidden="true" />
+    <Flex align="center" gap="1">
+      <GlobeIcon aria-hidden="true" />
       <Select.Root
         value={currentLanguage}
         onValueChange={(value) => dispatch(setCurrentLanguage(value))}
         size="1"
       >
-        <Tooltip content="Switch language">
-          <Select.Trigger
-            className={styles.trigger}
-            aria-label={`Language: ${currentLabel}`}
-          />
-        </Tooltip>
+        <Select.Trigger aria-label={`Language: ${currentLabel}`} />
         <Select.Content position="popper" sideOffset={4}>
           {availableLanguages.map((lang) => {
             const isTranslated =
               !translatedLanguages || translatedLanguages.has(lang.id);
-
             return (
               <Select.Item key={lang.id} value={lang.id}>
                 <Flex align="center" gap="2">
-                  <Text size="2">{lang.label}</Text>
-                  {lang.isDefault && (
-                    <Text size="1" className={styles.defaultBadge}>
-                      default
-                    </Text>
-                  )}
+                  <Text>{lang.label}</Text>
+                  {lang.isDefault && <Text>default</Text>}
                   {translatedLanguages && (
-                    <Tooltip
-                      content={
+                    <span
+                      aria-label={
                         isTranslated
                           ? 'Translation exists'
                           : 'No translation yet'
                       }
-                    >
-                      <span
-                        className={
-                          isTranslated
-                            ? styles.dotTranslated
-                            : styles.dotMissing
-                        }
-                        aria-label={
-                          isTranslated
-                            ? 'Translation exists'
-                            : 'No translation yet'
-                        }
-                      />
-                    </Tooltip>
+                      style={{
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        backgroundColor: isTranslated ? 'green' : 'gray',
+                      }}
+                    />
                   )}
                 </Flex>
               </Select.Item>
@@ -100,5 +79,4 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
     </Flex>
   );
 };
-
 export default LanguageSelector;

@@ -158,7 +158,10 @@ const Topbar = () => {
             gap="2"
             width={leftRightColumnWidth}
           >
-            <LanguageSelector />
+            <LanguageSelector
+              entityType={entityType || 'canvas_page'}
+              entityId={previewEntityId || '3'}
+            />
             <PreviewControls isPreview={isPreview} />
             <UnpublishedChanges />
           </Flex>
