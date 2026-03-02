@@ -255,7 +255,7 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
         $element[$key]['#attributes']['data-field-label'] = $field_label;
       }
       // Recursively process child elements.
-      if (is_array($element[$key])) {
+      if (\is_array($element[$key])) {
         $this->markMultivalueFormElements($element[$key], $field_label);
       }
     }
