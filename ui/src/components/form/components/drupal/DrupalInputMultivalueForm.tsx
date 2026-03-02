@@ -142,7 +142,7 @@ const DrupalInputMultivalueForm = ({
     const removeActionCell = tableRow.querySelector('.canvas-remove-action');
     if (removeActionCell) {
       const removeButton = removeActionCell.querySelector(
-        'input[type="submit"][name*="remove"]'
+        'input[type="submit"][name*="remove"]',
       ) as HTMLElement | null;
       if (removeButton) {
         // Dispatch mousedown first (some Drupal AJAX handlers listen for it),
