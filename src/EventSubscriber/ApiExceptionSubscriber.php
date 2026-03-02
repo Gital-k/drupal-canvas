@@ -161,6 +161,7 @@ final class ApiExceptionSubscriber implements EventSubscriberInterface {
           'entity_type' => $entity->getEntityTypeId(),
           'entity_id' => $entity->id(),
           'label' => $entity->label(),
+          'langcode' => $entity->language()->getId(),
           ApiAutoSaveController::AUTO_SAVE_KEY => AutoSaveManager::getAutoSaveKey($entity),
         ]),
       ];
