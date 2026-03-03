@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupal\canvas\Plugin\Field\FieldTypeOverride;
 
 use Drupal\canvas\Plugin\DataType\ComputedEntityCanonicalRelativeUrl;
+use Drupal\canvas\Plugin\DataType\ComputedEntityTargetUuid;
 use Drupal\canvas\Plugin\Validation\Constraint\UriConstraint;
 use Drupal\canvas\Plugin\Validation\Constraint\UriSchemeConstraint;
 use Drupal\canvas\Plugin\Validation\Constraint\UriTargetMediaTypeConstraint;
@@ -20,8 +21,9 @@ use Drupal\Core\TypedData\DataReferenceDefinitionInterface;
  * Adds properties to entity reference field implementations.
  *
  * It adds:
- * - a `target_uuid` field property, which allows components in default content
- *   to use that, and have it translated to the corresponding `target_id`.
+ * - a computed, read-only `target_uuid` field property, derived from the
+ *   referenced entity. When setting values, `target_uuid` is resolved to
+ *   `target_id` (for default content import), then discarded.
  * - a `url` field property, which allows generating (canonical) links to
  *   referenced entities (crucial for Canvas' ContentTemplates)
  */
@@ -48,8 +50,10 @@ trait CoreFeatureEntityReferenceItemAddPropertiesTrait {
 
     $definitions['target_uuid'] = DataDefinition::create('string')
       ->setLabel(new TranslatableMarkup('Target UUID'))
-      ->setRequired(FALSE)
-      ->addConstraint('Uuid');
+      ->setComputed(TRUE)
+      ->setReadOnly(TRUE)
+      ->addConstraint('Uuid')
+      ->setClass(ComputedEntityTargetUuid::class);
 
     // A computed URL to make linking to referenced entities simple.
     // (Entity reference fields really are a kind of special "link" field type;
@@ -87,22 +91,10 @@ trait CoreFeatureEntityReferenceItemAddPropertiesTrait {
   /**
    * {@inheritdoc}
    */
-  public function onChange($property_name, $notify = TRUE): void {
-    if ($property_name === 'target_uuid' && empty($this->target_id)) {
-      $uuid = $this->get('target_uuid')->getValue();
-      if ($uuid) {
-        $this->writePropertyValue('target_id', $this->getTargetId($uuid));
-      }
-    }
-    parent::onChange($property_name, $notify);
-  }
-
-  /**
-   * {@inheritdoc}
-   */
   public function setValue($values, $notify = TRUE): void {
     if (\is_array($values) && isset($values['target_uuid'])) {
       $values['target_id'] = $this->getTargetId($values['target_uuid']);
+      unset($values['target_uuid']);
     }
     parent::setValue($values, $notify);
   }
