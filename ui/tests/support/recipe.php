@@ -20,4 +20,4 @@ if (!chdir($root)) {
   throw new \Exception('Could not change directory from "' . getcwd() . '" to "' . $root);
 }
 
-passthru("DRUPAL_DEV_SITE_PATH=$drupal_site_path php core/scripts/drupal recipe $recipe");
+echo shell_exec("DRUPAL_DEV_SITE_PATH=$drupal_site_path php core/scripts/drupal recipe $recipe");
