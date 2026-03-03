@@ -52,7 +52,7 @@ to one of us! 😊 🙏
 - `component tree field type`: Canvas's field type that allows storing a _component tree_ ⚠️ This is currently limited to the "default" _view mode_, and hence one component tree per _content entity_. ⚠️
 - `component tree root`: the root of the _component tree_ is the special case: it does not exist in another _component_, but it behaves the same as any other _component slot_
 - _component type_: see [`Canvas Components` doc](components.md)
-- _component version_: a version (a deterministic hash) identifying the _version_ of a `Component config entity` either because the underlying _component_ itself changed, or because the default `static prop sources` changed due to modified shape matching
+- _component version_: a version (a deterministic hash) identifying the _version_ of a `Component config entity` either because the underlying _component_ itself changed, or because the default _static prop sources_ changed due to modified shape matching
 - `content type template`: see [`Canvas Config Management` doc](config-management.md).
 - `layout`: synonym of _component tree_
 - _prop expression_: see [`Canvas Shape Matching into Field Types` doc](shape-matching-into-field-types.md)

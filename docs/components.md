@@ -66,8 +66,8 @@ Fortunately, it is possible to construct such an ephemeral object. See the `JS` 
 
 Once that is built for a `ComponentSource`, any _component instance_ using a _component_ of this source can be populated
 using both:
-- `static prop sources`: content author-defined static values
-- `entity field prop sources`: site builder-defined references to structured data, when used in `ContentTemplates`
+- _static prop sources_: content author-defined static values
+- _entity field prop sources_: site builder-defined references to structured data, when used in `ContentTemplates`
 
 See:
 - `\Drupal\Core\Theme\Component\ComponentMetadata`

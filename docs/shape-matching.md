@@ -200,7 +200,7 @@ _prop expressions_ are one of the lowest level building block of how Canvas work
 system, but more precise (it can return non-string values) and powerful (they can be chained).
 
 Only developers of field types ever have to understand them in detail. Site Builders and Content Creators only interact
-with them  indirectly: Site Builders choose `entity field prop sources` or `static prop sources` to populate
+with them  indirectly: Site Builders choose _entity field prop sources_ or _static prop sources_ to populate
 _component inputs_, and those _prop sources_ contain _prop expressions_ that define how to retrieve the actual value(s).
 
 So, _if_ you're going to implement `hook_canvas_storable_prop_shape_alter()`, you will need to have at least a basic
