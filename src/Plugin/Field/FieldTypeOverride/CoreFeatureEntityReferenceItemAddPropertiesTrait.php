@@ -89,7 +89,10 @@ trait CoreFeatureEntityReferenceItemAddPropertiesTrait {
    */
   public function onChange($property_name, $notify = TRUE): void {
     if ($property_name === 'target_uuid' && empty($this->target_id)) {
-      $this->set('target_id', $this->get('target_uuid')->getValue());
+      $uuid = $this->get('target_uuid')->getValue();
+      if ($uuid) {
+        $this->writePropertyValue('target_id', $this->getTargetId($uuid));
+      }
     }
     parent::onChange($property_name, $notify);
   }
