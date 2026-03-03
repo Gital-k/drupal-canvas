@@ -47,7 +47,7 @@ to one of us! 😊 🙏
 - _component node_: one of the node types in the UI data model, representing a _component instance_ in the _component tree_
 - _component input_: see [`Canvas Components` doc](components.md)
 - _component slot_: see [`Canvas Components` doc](components.md)
-- `Component Source Plugin`: see [`Canvas Components` doc](components.md)
+- _Component Source Plugin_: see [`Canvas Components` doc](components.md)
 - _component tree_: a tree of _component instances_, by placing >=1 _component instances_ in a particular order in another _component instance_'s slot
 - `component tree field type`: Canvas's field type that allows storing a _component tree_ ⚠️ This is currently limited to the "default" _view mode_, and hence one component tree per _content entity_. ⚠️
 - `component tree root`: the root of the _component tree_ is the special case: it does not exist in another _component_, but it behaves the same as any other _component slot_
@@ -94,7 +94,7 @@ Moved to the [`Canvas Shape Matching into Field Types` doc](shape-matching-into-
 The _component tree_ is represented by a `\Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList`, which
 contains one field value for each _component instance_ in the tree.
 Each _component instance_ is represented by a `\Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem`, which
-each allow accessing the `Component config entity` and `Component Source Plugin` that represents the _component_.
+each allow accessing the `Component config entity` and _Component Source Plugin_ that represents the _component_.
 
 See `\Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem` + its validation constraint.
 
@@ -177,7 +177,7 @@ This is because editing will be specific to a _component instance_, which is mod
 
 No validation is necessary for this _field prop_, because it is more easily validated at the _field item_ level of the
 `Canvas field type`, not at the _field prop_ level — there, the aforementioned `::validateComponentInput()` method is called
-for every _component instance_ encountered in the stored _component tree_. If the `Component Source Plugin` complains, a
+for every _component instance_ encountered in the stored _component tree_. If the _Component Source Plugin_ complains, a
 validation error occurs.
 
 Example: A simple tree showing a root item (`41595148-e5c1-4873-b373-be3ae6e21340`) with a child (`3b305d86-86a7-4684-8664-7ef1fc2be070`) in the `body` slot, plus another root item (`41595148-e5c1-4873-b373-be3ae6e21340`).
@@ -313,7 +313,7 @@ _component instance_ in the specified _component slot_.
 To hydrate the stored _component tree_:
 1. get (flat) list of _component instances_ from the _tree_ _field prop_ (3.2.1): a list of `uuids`
 2. load the corresponding `Component config entity` for each _component instance_ given its UUID, which in turn enables
-   loading the corresponding `Component Source Plugin`
+   loading the corresponding _Component Source Plugin_
 3. get the explicit input from the _inputs_ _field prop_ (3.2.2) for each _component instance_, by using the `Component
    Source Plugin`'s `::getExplicitInput()` method
    - for `Component Source Plugins` with their own input UX (such as `BlockComponent`), that's just forwarding the

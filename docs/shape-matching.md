@@ -43,7 +43,7 @@ to one of us! 😊 🙏
 
 - _component_: see [`Canvas Components` doc](components.md)
 - _component input_: see [`Canvas Components` doc](components.md)
-- `Component Source Plugin`: see [`Canvas Components` doc](components.md)
+- _Component Source Plugin_: see [`Canvas Components` doc](components.md)
 - _component type_: see [`Canvas Components` doc](components.md)
 - _conjured field_: a _field instance_ that is not backed by code nor config, but generated dynamically to edit/store a value for a _component input_ as _unstructured data_
 - _prop expression_: a (compact) string representing what context (entity type+bundle or field type) is required for retrieving one or more properties stored inside of that context; also has a typed PHP object representation to facilitate logic
@@ -75,7 +75,7 @@ This uses the terms defined above.
 
 ### 3.1 Data Model: from Front-End Developer to a Canvas data model that empowers the Content Creator
 
-⚠️ This only applies to _components_ originating from a `Component Source Plugin` that DO NOT have an input UX (such as
+⚠️ This only applies to _components_ originating from a _Component Source Plugin_ that DO NOT have an input UX (such as
 `SDC`), for others the UX and storage are both simply the existing one, and NOTHING in this document applies! ⚠️
 
 #### 3.1.1 Interpreting _components_ without input UX: _prop shapes_

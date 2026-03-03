@@ -22,7 +22,7 @@ to one of us! 😊 🙏
 
 ### 1.1 Existing Drupal Terminology that is crucial for Canvas
 
-- `configuration entity dependencies`: [configuration entities may declare dependencies on modules, themes or another config entity](https://www.drupal.org/docs/drupal-apis/configuration-api/configuration-entity-dependencies)
+- _configuration entity dependencies_: [configuration entities may declare dependencies on modules, themes or another config entity](https://www.drupal.org/docs/drupal-apis/configuration-api/configuration-entity-dependencies)
 - _configuration validation_: the ability to [thoroughly validate](https://www.drupal.org/project/drupal/issues/2164373) configuration
 - `SDC`: a [Single-Directory Component](https://www.drupal.org/project/sdc)
 - `Block`: a [block plugin](https://www.drupal.org/docs/drupal-apis/block-api/block-api-overview) — ⚠️ not to be confused with the identically named config entities!
@@ -39,18 +39,18 @@ to one of us! 😊 🙏
 ### 1.2 Canvas terminology
 
 - _component_: see [`Canvas Components` doc](components.md)
-- `Component config entity`: _components_ available for use in Canvas are tracked as config entities. They correspond 1:1 to eligible
+- _Component config entity_: _components_ available for use in Canvas are tracked as config entities. They correspond 1:1 to eligible
   `SDCs` and `Blocks`.
 - _component input_: see [`Canvas Components` doc](components.md)
-- `Component Source Plugin`: see [`Canvas Components` doc](components.md)
+- _Component Source Plugin_: see [`Canvas Components` doc](components.md)
 - _component slot_: see [`Canvas Components` doc](components.md)
 - _component type_: see [`Canvas Components` doc](components.md)
 - _component tree_: see [`Canvas Data Model` doc](data-model.md)
-- `content type template`: the default _component tree_ for a particular _content type_, which typically includes assigning the smallest units of _structured data_ to particular _component inputs_, and uses `configuration entity dependencies` to ensure the necessary _components_ are present
+- _content type template_: the default _component tree_ for a particular _content type_, which typically includes assigning the smallest units of _structured data_ to particular _component inputs_, and uses _configuration entity dependencies_ to ensure the necessary _components_ are present
 - `Folders`: a way to organize components, patterns and code components into individual "Folders" on the client-side of Canvas
-- `Folder config entity`: stores a list of `items` of particular `configEntityTypeId`, currently limited to _component_, `pattern` and `js_component`
-- `PageRegion config entity`: stores a _component tree_ for every _theme region_ in a given Drupal theme
-- `Pattern config entity`: stores a _component tree_ that allows Ambitious Site Builders to save common component composition patterns for Content Creators to reuse
+- _`Folder` config entity_: stores a list of items of particular `configEntityTypeId`, currently limited to `component`, `pattern` and `js_component`
+- _`PageRegion` config entity_: stores a _component tree_ for every _theme region_ in a given Drupal theme
+- _`Pattern` config entity_: stores a _component tree_ that allows Ambitious Site Builders to save common component composition patterns for Content Creators to reuse
 - _structured data_: see [`Canvas Data Model` doc](data-model.md)
 - _unstructured data_: see [`Canvas Data Model` doc](data-model.md)
 - `Canvas field`: see [`Canvas Data Model` doc](data-model.md)
@@ -63,8 +63,8 @@ This adds to the product requirements listed in [`Canvas Components` doc](compon
 
 (There are [more](https://docs.google.com/spreadsheets/d/1OpETAzprh6DWjpTsZG55LWgldWV_D8jNe9AM73jNaZo/edit?gid=1721130122#gid=1721130122), but these in particular affect Canvas's supported components.)
 
-- MUST be able to synchronize _components_ and `content type templates` from one site to another WITHOUT changes to Drupal deployment best practices (requirement [`14. Configuration management`](https://docs.google.com/spreadsheets/d/1OpETAzprh6DWjpTsZG55LWgldWV_D8jNe9AM73jNaZo/edit?gid=1721130122#gid=1721130122&range=B25))
-- MUST be able to populate a `theme`'s _page template_ using Canvas _components_ (requirement [`19. Modify the page template`](https://docs.google.com/spreadsheets/d/1OpETAzprh6DWjpTsZG55LWgldWV_D8jNe9AM73jNaZo/edit?gid=1721130122#gid=1721130122&range=B30))
+- MUST be able to synchronize _components_ and _content type templates_ from one site to another WITHOUT changes to Drupal deployment best practices (requirement [`14. Configuration management`](https://docs.google.com/spreadsheets/d/1OpETAzprh6DWjpTsZG55LWgldWV_D8jNe9AM73jNaZo/edit?gid=1721130122#gid=1721130122&range=B25))
+- MUST be able to populate a theme's _page template_ using Canvas _components_ (requirement [`19. Modify the page template`](https://docs.google.com/spreadsheets/d/1OpETAzprh6DWjpTsZG55LWgldWV_D8jNe9AM73jNaZo/edit?gid=1721130122#gid=1721130122&range=B30))
 - MUST be able to store and reuse _component_ compositions (requirement [`29. Layout Patterns`](https://docs.google.com/spreadsheets/d/1OpETAzprh6DWjpTsZG55LWgldWV_D8jNe9AM73jNaZo/edit?gid=1721130122#gid=1721130122&range=B41))
 - MUST support auditability, assuming (to answer questions such as: which _field type_ and _field widget_ does a _component_ use when it is instantiated, why is a given `SDC` not available as a _component_ in Canvas, et cetera)
 
@@ -96,7 +96,7 @@ Some of these routes are treated with the `canvas_external_api: true` route opti
 applications, too. The Canvas OAuth module, an optional submodule of Canvas, provides OAuth2 authentication for these routes.
 (See [`canvas_oauth/README.md`](../modules/canvas_oauth/README.md) for more info.)
 
-### 3.1 `Component config entity`
+### 3.1 _Component config entity_
 
 See:
 - `\Drupal\canvas\Entity\Component`
@@ -104,19 +104,19 @@ See:
 - `\Drupal\canvas\ComponentSource\ComponentSourceInterface`
 - `\Drupal\canvas\ComponentSource\ComponentInstanceUpdaterInterface`
 
-One `Component config entity` is [automatically created (and updated](https://www.drupal.org/project/canvas/issues/3463999)
+One _Component config entity_ is [automatically created (and updated](https://www.drupal.org/project/canvas/issues/3463999)
 per _component_ that is present and meets the criteria (see [`Canvas Components` doc, section 3.1.1](components.md#3.1.1)).
 
 When a _component_ does not meet the criteria, the _reasons_ for that are tracked and presented in the UI.
 
 The `Component` config entity contains:
-- the _component_ ID, with the prefix (the first ID part) identifying the `Component Source Plugin`, and the
-  remainder being used by that plugin (typically to allow a `Component Source Plugin` to provide >1 _component_)
-- the `source`: a `Component Source Plugin` ID.
+- the _component_ ID, with the prefix (the first ID part) identifying the _Component Source Plugin_, and the
+  remainder being used by that plugin (typically to allow a _Component Source Plugin_ to provide >1 _component_)
+- the `source`: a _Component Source Plugin_ ID.
 - the `source_local_id`: The intra-source ID of this component in this source — can be a plugin ID (e.g. for `Block` and
   `SDC`), a config entity ID (e.g. for `js`), or anything else, such as a URL to identify a remotely discoverable
-  _component_ if such a `Component Source Plugin` existed
-- the (versioned) `settings`: each `Component Source Plugin` MAY need to store component settings, and each has different needs:
+  _component_ if such a _Component Source Plugin_ existed
+- the (versioned) `settings`: each _Component Source Plugin_ MAY need to store component settings, and each has different needs:
   - `SDC` component type: `prop_field_definitions`, to configure what field type, widget and so on to use to store and
      edit the SDC's props.
   - `Block` component type: `default_settings`, to store the default block plugin settings, if any. For example: hide
@@ -128,11 +128,11 @@ The `Component` config entity contains:
   new content must use the most current Site Builder-curated list of `Components`.
 - which _field type_ and _field widget_ must be used to populate it with _unstructured data_ — for algorithmic details,
  see [`Canvas Data model`, section 3.1: "from Front-End Developer to a Canvas data model that empowers the Content Creator](./data-model.md#3.1)
-- the (versioned) `fallback_metadata`: when the `Component Source Plugin` can no longer find the _component_ because a dependency is
+- the (versioned) `fallback_metadata`: when the _Component Source Plugin_ can no longer find the _component_ because a dependency is
   removed (e.g. the module providing an SDC is uninstalled or a `JavaScriptComponent` config entity is deleted), this
   metadata (currently only slot definitions) will be used to fall back to the special `fallback` source to ensure
   existing _component trees_ continue to work (see [`Canvas Components` doc, section 3.4](components.md#3.4))
-- `config entity dependencies` on the modules providing the _field type_ and _field widget_
+- _config entity dependencies_ on the modules providing the _field type_ and _field widget_
 
 These config entities are therefore the foundations that enable Canvas to work reliably, and allow:
 - auditing (listing which components are available to Canvas and reasons why components are unavailable, tracking changes in
@@ -181,8 +181,8 @@ restrictions are applied during validation:
   See `config/schema/canvas.json_schema.yml`.
 
 Once a _code component_ is considered ready for use by its creator, it can be exposed as a Canvas _component_ (which under
-the hood involves creating a sibling `Component config entity` — see [section 3.1](#3.1) above). This is made possible
-by the `JS` `Component Source Plugin`. Section `3.2.1` below describes this in detail.
+the hood involves creating a sibling _Component config entity_ — see [section 3.1](#3.1) above). This is made possible
+by the `JS` _Component Source Plugin_. Section `3.2.1` below describes this in detail.
 
 To the Content Creator, then, the input UX of an `SDC`-sourced _component_ and a `JS`-sourced _component_ with the same
 "props" (the name used for the _explicit component input_ of both of those `Component Source Plugins`) must be
@@ -198,13 +198,13 @@ whether the _code component_ defined by the config entity is _internal_ or _expo
 
 When the `JavaScriptComponent config entity` is modified to:
 - `status === false` ⇒
-  - If a corresponding `Component config entity` does not exist yet, it remains that way.
-  - If a corresponding `Component config entity` already exists, it gets _its_ `status` set to `false` too.
+  - If a corresponding _Component config entity_ does not exist yet, it remains that way.
+  - If a corresponding _Component config entity_ already exists, it gets _its_ `status` set to `false` too.
   - The end result is: Content Creators CAN NOT instantiate this _code component_.
   - **This is "internal" in the diagram.**
 - `status === true` =>
-  - If a corresponding `Component config entity` does not exist yet, it is created (and has its `status` set to `true`).
-  - If a corresponding `Component config entity` already exists, it gets its `status` set to `true` if it isn’t already.
+  - If a corresponding _Component config entity_ does not exist yet, it is created (and has its `status` set to `true`).
+  - If a corresponding _Component config entity_ already exists, it gets its `status` set to `true` if it isn’t already.
   - The end result is: Content Creators CAN instantiate this _code component_.
   - **This is "exposed" in the diagram.**
 
@@ -218,29 +218,28 @@ overrides the "Published" (saved) version on certain routes, thanks to a conditi
 `\Drupal\canvas\Config\CanvasConfigOverrides`.)
 
 
-### 3.3 `PageRegion config entity`
+### 3.3 _`PageRegion` config entity_
 
 See:
 - `\Drupal\canvas\Entity\PageRegion`
 - `\Drupal\canvas\Plugin\DisplayVariant\CanvasPageVariant`
 - `\Drupal\canvas\Controller\CanvasBlockListController`
 
-Multiple `PageRegion config entities` may be created per Drupal theme: one per region, except the `content` region. This allows using Canvas instead of the Block module's
+Multiple _`PageRegion` config entities_ may be created per Drupal theme: one per region, except the `content` region. This allows using Canvas instead of the Block module's
 "Block Layout" functionality (at `/admin/structure/block`) to populate the _theme regions_ of the Drupal theme's
 `page.html.twig`.
 
-⚠️ This means it is currently not possible to have a a different `PageRegion config entity` per route/URL/…, which the
+⚠️ This means it is currently not possible to have a a different _`PageRegion` config entity_ per route/URL/…, which the
 "Block Layout" functionality solved using "visibility conditions". This will be covered in the future by Canvas's product
 requirement [`41. Conditional display of components`](https://docs.google.com/spreadsheets/d/1OpETAzprh6DWjpTsZG55LWgldWV_D8jNe9AM73jNaZo/edit?gid=1721130122#gid=1721130122&range=B53),
 which will be Canvas's generalized equivalent to Drupal core's Block module's "visibility conditions".
 
-⚠️ Since [#3494114](https://drupal.org/node/3494114), if an auto-saved modification to the active theme's `PageRegion
-config entity` occurred, then Canvas previews will use that instead of the stored/active config entity. This means it is
-currently only possible to have one draft/non-live `PageRegion config entity` per theme region. This will be covered in the future by
+⚠️ Since [#3494114](https://drupal.org/node/3494114), if an auto-saved modification to the active theme's _`PageRegion` config entity_ occurred, then Canvas previews will use that instead of the stored/active config entity. This means it is
+currently only possible to have one draft/non-live _`PageRegion` config entity_ per theme region. This will be covered in the future by
 Canvas's product requirements [`37. Revisionable templates`](https://docs.google.com/spreadsheets/d/1OpETAzprh6DWjpTsZG55LWgldWV_D8jNe9AM73jNaZo/edit?gid=1721130122#gid=1721130122&range=B49)
 and [`55. Workspaces`](https://docs.google.com/spreadsheets/d/1OpETAzprh6DWjpTsZG55LWgldWV_D8jNe9AM73jNaZo/edit?gid=1721130122#gid=1721130122&range=B62).
 
-Once a theme has >=1 Canvas _enabled_ `PageRegion config entity`, then the block layout (if any) is not used, and Canvas's
+Once a theme has >=1 Canvas _enabled_ _`PageRegion` config entity_, then the block layout (if any) is not used, and Canvas's
 `PageVariantInterface` implementation is used instead. The Ambitious Site Builder is informed about this on the block
 listing UI.
 
@@ -250,16 +249,16 @@ rely on the Block module to provide the intended administrative User Experience,
 See `\Drupal\block\Plugin\DisplayVariant\BlockPageVariant`.
 
 
-### 3.4 `Pattern config entity`
+### 3.4 _`Pattern` config entity_
 
 See:
 - `\Drupal\canvas\Entity\Pattern`
 
-A `Pattern config entity` can be created by Ambitious Site Builders to accelerate the work of Content Creators: it
+A _`Pattern` config entity_ can be created by Ambitious Site Builders to accelerate the work of Content Creators: it
 contains a common _component_ composition pattern.
 
-When using a pattern (reusing a `Pattern config entity`), the _component tree_ it contains at the time of using it is
-_absorbed_ into the place where it is being used in an `Canvas field`. Hence any changes to a `Pattern config entity` will
+When using a pattern (reusing a _`Pattern` config entity_), the _component tree_ it contains at the time of using it is
+_absorbed_ into the place where it is being used in an `Canvas field`. Hence any changes to a _`Pattern` config entity_ will
 only be visible in any subsequent uses of it. (Similar to how Drupal Recipes behave.)
 
 ### 3.5 `ContentTemplate` config entity

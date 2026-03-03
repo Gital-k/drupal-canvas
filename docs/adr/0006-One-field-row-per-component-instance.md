@@ -87,7 +87,7 @@ Instead, use an approach that is more typical/familiar; store N (# component ins
   3. `component_version` — REQUIRED — identifies version (deterministic hash) of the `Component`
   3. `parent_uuid` — OPTIONAL — identifies parent component instance in the tree, if any
   4. `slot` — OPTIONAL — identifies the slot in the parent component instance in the tree, if any
-  5. `inputs` — REQUIRED — JSON blob that can be interpreted by the `Component Source Plugin` providing this component to populate this component instance
+  5. `inputs` — REQUIRED — JSON blob that can be interpreted by the _Component Source Plugin_ providing this component to populate this component instance
 - deltas ONLY have meaning within the same `parent_uuid`, `slot` pair
 - every field property of every delta is available as Typed Data
 
@@ -111,7 +111,7 @@ In order of importance, with the following markers:
   - In the future: adding support for _locking a subset of the explicit inputs when using asymmetric translations_: add an `untranslatable_inputs` field property/column, which would have its key-value pairs merged with those in `inputs` (and always be `NULL` when using symmetric translations)
 4. `+T` Supporting "exposed slots defined in content templates" functionality is as simple as allowing `slot` to be an exposed slot defined by the `ContentTemplate` config entity
 3. `+TOB` Improving storage efficiency (deduplicating the same `inputs` data across different revisions of the same component instance and/or across component instances within the same revision) can be done in a generic way (not specific to Canvas), benefiting many field types at once
-6. `≃T` The JSON blob for each component instance's `inputs` field property/column still remains that: a _blob_, which only the corresponding `Component Source Plugin` can load, validate, and understand.
+6. `≃T` The JSON blob for each component instance's `inputs` field property/column still remains that: a _blob_, which only the corresponding _Component Source Plugin_ can load, validate, and understand.
 7. `≃TOB` This shifts away from an _almost_ document-oriented data storage model to a relational data storage model
   - `+TOB`This makes Canvas more in line with the rest of the Drupal ecosystem
   - `+TOB` This mitigates the risks associated with relying on per-database differences in their JSON support (see [#3343634](https://www.drupal.org/project/drupal/issues/3343634))

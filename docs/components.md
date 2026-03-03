@@ -14,11 +14,11 @@ In the rest of this document, `Drupal Canvas` will be written as `Canvas`.
 ### 1.2 Canvas terminology
 
 - _component_: a component generates markup (and might attach CSS + JS), potentially based on some input.
-- `Component Source Plugin`: _components_ have a translation layer (per _component type_) between the `Component` config entity and the actual plugin that
+- _Component Source Plugin_: _components_ have a translation layer (per _component type_) between the `Component` config entity and the actual plugin that
   accepts input and generates output, e.g. `SingleDirectoryComponent` (`sdc`-prefixed) and `BlockComponent` (`block`-prefixed).
 - _component input_: either _explicit component input_ or _implicit component input_, this is the catch-all for both
 - _component slot_: each component may in its metadata define 0 or more slots, each slot accepts >=0 component instances in a particular order
-- _component type_: the ID of a `Component Source Plugin` — currently either "sdc", "block" or "js"
+- _component type_: the ID of a _Component Source Plugin_ — currently either "sdc", "block" or "js"
 - _explicit component input_: each _component_ may in its metadata define 0 or more explicit inputs to be provided by the person placing an instance of this _component_, each input accepts structured data conforming to the shape defined in the _component_'s (`ComponentSourcePlugin`-specific) metadata
 - _implicit component input_: in contrast with a _explicit component input_, an implicit input is not provided by the person placing an instance: it is implicitly present: it is provided by other content displayed on the current route, by the request context (e.g. URL query string, current user …) or by the environment (e.g. time of day).
   - ⚠️This is not yet supported. the `Block` component type needs it to support [_contexts_](https://www.drupal.org/docs/drupal-apis/plugin-api/plugin-contexts#s-context-on-blocks), unclear how that will be surfaced in Canvas; initially, only block plugins that do not require contexts are supported.
@@ -46,9 +46,9 @@ are not yet finalized. That is likely to affect the requirements above.
 
 This uses the terms defined above.
 
-All `Component Source Plugin` should have kernel test coverage. See `ComponentSourceTestBase`.
+All _Component Source Plugin_ should have kernel test coverage. See `ComponentSourceTestBase`.
 
-Any `Component Source Plugin` without a native (explicit) input UX can reuse the infrastructure that Canvas originally
+Any _Component Source Plugin_ without a native (explicit) input UX can reuse the infrastructure that Canvas originally
 built to provide an input UX for `SDC`-sourced `Components`. To generate an input UX, the precise shape of each input
 (and it being required or optional) must be expressed in a standardized way. To avoid inventing new infrastructure,
 Canvas opted to rely on the SDC subsystem of Drupal core's abstraction for expressing this: the `ComponentMetadata`
@@ -58,7 +58,7 @@ While imperfect (because it contains _all_ metadata rather than only that relati
 the pragmatic choice to get the job done. See [`XB Shape Matching
 into Field Types` doc](shape-matching-into-field-types.md) for details on how that works.
 
-In other words: _any_ `Component Source Plugin` can use the same Drupal Field-powered UX that XB provides for SDCs,
+In other words: _any_ _Component Source Plugin_ can use the same Drupal Field-powered UX that XB provides for SDCs,
 all it requires is generating a `ComponentMetadata` object that expresses its input schema.
 Unfortunately generating a `ComponentMetadata` object is insufficient: SDC's inputs ("props") validation infrastructure
 requires an SDC plugin object (which in turn contains `ComponentMetadata`), and hence so does this infrastructure.
@@ -85,7 +85,7 @@ schema.
 
 `SDC` _components_ DO NOT accept implicit inputs.
 
-`SDC` DOES NOT provide an input UX, so its `Component Source Plugin` must do so on its behalf; and does so by matching
+`SDC` DOES NOT provide an input UX, so its _Component Source Plugin_ must do so on its behalf; and does so by matching
 available field types against the JSON schema of its explicit inputs ("props"). For details, see the [`Canvas Shape Matching
 into Field Types` doc](shape-matching-into-field-types.md). Using the _conjured fields_ explained there requires a
 significant amount of metadata, which is reduced significantly thanks to:
@@ -135,7 +135,7 @@ defined  using config schema (`type: block.settings.<PLUGIN ID>`). Defaults are 
 `Block` _components_ specify the accepted explicit inputs. They typically allow influencing the logic in the block
 plugin. These explicit inputs can hence be seen as knobs and levers to adjust what the underlying block plugin does.
 
-`Block` DOES provide an input UX (`BlockPluginInterface::buildConfigurationForm()`), so its `Component Source Plugin`
+`Block` DOES provide an input UX (`BlockPluginInterface::buildConfigurationForm()`), so its _Component Source Plugin_
 simply reuses that.
 
 #### 3.2.2 Criteria for `Block` _components_
@@ -170,7 +170,7 @@ doc](config-management.md#3.2) for all details.
 
 `JS` _components_ DO NOT accept implicit inputs.
 
-`JS` DOES NOT provide an input UX, so its `Component Source Plugin` must do so on its behalf; and does so by matching
+`JS` DOES NOT provide an input UX, so its _Component Source Plugin_ must do so on its behalf; and does so by matching
 available field types against the JSON schema of its explicit inputs ("props"). For details, see the [`Canvas Shape Matching
 into Field Types` doc](shape-matching-into-field-types.md). (It shares this infrastructure with the `SDC` `Component
 Source Plugin`.)
@@ -190,13 +190,13 @@ from also being deleted via cascade delete.
 The `Component` config entity will consult the component audit service to ascertain if the _component_ is in use (used in a
 component tree on a content or configuration entity).
 
-If it is in use, the `Component` config entity will then call the `Component Source Plugin`'s `::onDependencyRemoval()` method
+If it is in use, the `Component` config entity will then call the _Component Source Plugin_'s `::onDependencyRemoval()` method
 passing dependencies that are being removed. This gives the plugin the chance to change its settings and perform any
 related operations. The plugin should return TRUE from this method if the `Component` config entity should prevent itself from
 being deleted. If the source plugin returns TRUE from this method, the `Component` config entity will transition from the
 previously configured source plugin to [a special-purpose `fallback` plugin](../src/Plugin/Canvas/ComponentSource/Fallback.php).
 
-The `fallback` `Component Source Plugin` will retain the stored explicit input to avoid data loss in case the _component_ is reintroduced. Slots that contain _component subtrees_
+The `fallback` _Component Source Plugin_ will retain the stored explicit input to avoid data loss in case the _component_ is reintroduced. Slots that contain _component subtrees_
 will not lose those subtrees; they will simply only be visible in the "Layers" panel in the Canvas UI. (Because it is impossible to approximate how the containing slots were shaped.)
 
 ### 3.5 Other _component types_
@@ -205,6 +205,6 @@ Nothing yet, this will change when we [support other _component types_ later](ht
 
 ### 3.6 Categorization
 
-Each _component_ can be placed in a folder to group them in the UI. The initial folder is determined by each `Component Source Plugin`.
+Each _component_ can be placed in a folder to group them in the UI. The initial folder is determined by each _Component Source Plugin_.
 E.g. `SDC` _components_ are using the `group` property in their metadata.
 See `\Drupal\canvas\ComponentSource\ComponentSourceInterface::determineDefaultFolder()`
