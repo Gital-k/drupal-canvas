@@ -14,7 +14,7 @@ Currently, Drupal Canvas is not integrated with any Drupal content entity type f
 
 The page is intended to act opposite of Drupal's normal structured content, by being completely unstructured and content existing solely within Drupal Canvas.
 
-Drupal Canvas must also empower contributed modules to reliably provide such a page without structured content. For example, the [GDPR module](https://drupal.org/project/gdpr) might want to provide a "Privacy policy" page at `/privacy-policy` — without having to make assumptions about what `NodeType`s may exist on a site.
+Drupal Canvas must also empower contributed modules to reliably provide such a page without structured content. For example, the [GDPR module](https://drupal.org/project/gdpr) might want to provide a "Privacy policy" page at `/privacy-policy` — without having to make assumptions about what `NodeTypes` may exist on a site.
 A module's `hook_install()` would be able to call `Page::create()` to create such a content entity and hence guarantee its existence. Module-shipped updates are considered out-of-scope at this time. The shipping module MAY link to the shipped `Page` but only using its _path alias_, i.e. using `internal:/privacy-policy`. Deletion of the `Page` by an authorized user must be respected by the shipping module, and requires checking the existence of the specified path alias prior to generating a link to it.
 
 There are two approaches:
@@ -45,7 +45,7 @@ For the content entity type, we will:
   - The `description` will be an **optional** `string_long` base field, usable for SEO purposes and page administration.
   - The `path` will be a **required** `path` base field, adding a dependency on the Path module, so that pages can have custom paths.
   - The `image` will be an **optional** `entity_reference` base field allowing `Media` entities, also adding a dependency on the Media module.
-    - The allowed bundles should only `MediaType`s with `allowed_field_types` containing `image`.
+    - The allowed bundles should only `MediaTypes` with `allowed_field_types` containing `image`.
     - It will be dynamically determined.
     - Usage for SEO and possibly on page listing, see later bullet for SEO via Metatag.
 * The content entity type can use the default `ContentEntityForm` for the `add-form` and `edit-form` form handlers.
@@ -70,11 +70,11 @@ Using a custom content entity type will deviate from the following functionality
 * Not being able to create sorted lists of `Page` and `Node` content entities, since Views does not support multiple base tables. User research showed that a [listing mixing both in a single list is confusing](https://www.drupal.org/project/canvas/issues/3482259#comment-15848593:~:text=UX%20has%20identified%20that%20the%20basic%20page%20concept%20is%20somewhat%20distinct%20from%20the%20structured%20content%20and%20that%20at%20least%20in%20some%20UIs%2C%20that%20should%20be%20prioritized%20over%20other%20types%20of%20content.%20Here%27s%20an%20example%20of%20one%20screen%20for%20this%3A), so that is a non-issue.
 * Existing [Linkit](https://www.drupal.org/project/linkit) profiles will have to be updated to allow referencing the new entity type. However, existing profiles can be updated.
 * Drupal's `link` field type widget is hardcoded to only support `Node` content entities. ([source](https://git.drupalcode.org/project/drupal/-/blob/11.x/core/modules/link/src/Plugin/Field/FieldWidget/LinkWidget.php#L217-220), [issue](https://www.drupal.org/project/drupal/issues/2423093))
-* Other entities would need to use [Dynamic Entity Reference](https://www.drupal.org/project/dynamic_entity_reference) to support referencing both `Node`s and `Page`s, if this is a use case.
+* Other entities would need to use [Dynamic Entity Reference](https://www.drupal.org/project/dynamic_entity_reference) to support referencing both `Nodes` and `Pages`, if this is a use case.
 
 The new `Page` content entity type described in this ADR is simply a more _explicit_ way of handling unstructured content: it enables a better UX, with less confusion, and with strong guarantees that installing contrib/custom modules will NOT weaken that better UX. Those guarantees are impossible to achieve with a locked `NodeType`. We have the ability to move the `Page` content entity type into its own submodule at a later time before the 1.0 release.
 
-For the 1.0 release, Drupal Canvas WILL support `Node`s and any `NodeType` (and in principle every bundle of every content entity type) for _structured content_.
+For the 1.0 release, Drupal Canvas WILL support `Nodes` and any `NodeType` (and in principle every bundle of every content entity type) for _structured content_.
 
 We lose some integrations users may expect, but we are now aware of them, not all of them would work reliably, and we can make product and engineering decisions off of this feedback.
 

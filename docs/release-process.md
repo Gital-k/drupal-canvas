@@ -11,7 +11,7 @@ To create a new release of the Canvas module:
 
 When a `v`-prefixed tag (for example, `v1.0.3`) is pushed, the `release` job in `.gitlab-ci.yml`:
 
-1. Builds UI assets by running `npm ci` and `npm run build` in `ui/`.
+1. Builds UI assets by running _npm ci_ and `npm run build` in `ui/`.
 2. Creates a release commit. Built assets (`ui/dist/`, `packages/astro-hydration/dist/`) are normally ignored, so the job temporarily un-ignores them, stages them, and commits them.
 3. Creates a tag without the `v` prefix. The `VERSION` variable strips the first character from `CI_COMMIT_TAG` with `cut -c2-`, so `v1.0.3` becomes `1.0.3`. This tag points to the release commit that contains built assets.
 4. Pushes only the new release tag. GitLab CI checks out tags in detached HEAD state, so this release commit is not added to `1.x`.

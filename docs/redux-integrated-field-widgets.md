@@ -12,7 +12,7 @@ Related Canvas issue queue components:
 
 ### 1.1 Existing Drupal terminology that is crucial for Canvas
 
-- `field widget`: a class that uses Form API to specify the editing UX for a `field type`.
+- _field widget_: a class that uses Form API to specify the editing UX for a _field type_.
 
 ### 1.2 Existing non-Drupal terminology that is crucial for Canvas
 
@@ -33,7 +33,7 @@ This uses the terms defined above.
 (There are [more](https://docs.google.com/spreadsheets/d/1OpETAzprh6DWjpTsZG55LWgldWV_D8jNe9AM73jNaZo/edit?gid=1721130122#gid=1721130122), but these in particular affect Canvas's supported components.)
 
 - MUST support a real-time preview;
-- MUST allow continuing to use existing Drupal functionality (notably: `field widget`s).
+- MUST allow continuing to use existing Drupal functionality (notably: _field widgets_).
 
 
 ## 3. Implementation
@@ -42,7 +42,7 @@ See:
 - `ui/src/components/form/inputBehaviors.tsx`
 - `ui/src/components/form/Form.tsx`
 
-Integrating `Redux` with the `component input`s form (and likely other forms in the future) allows us to integrate Drupal Form API-generated forms into the larger Canvas application. The reasons for this include:
+Integrating `Redux` with the _component inputs_ form (and likely other forms in the future) allows us to integrate Drupal Form API-generated forms into the larger Canvas application. The reasons for this include:
 - Canvas's undo functionality is fully aware of changes made in these forms;
 - Changes made in these forms can trigger real-time updates of the UI, including the preview.
 
@@ -50,25 +50,25 @@ Integrating `Redux` with the `component input`s form (and likely other forms in 
 ### 3.1 Why?
 
 If you have not yet read [`Canvas Shape Matching into Field Types` doc](shape-matching-into-field-types.md), and
-specifically section 3.1.2 ("Finding fitting `field type`: `conjured field`s and `field instance`s") because the data
+specifically section 3.1.2 ("Finding fitting _field type_: _conjured fields_ and _field instances_") because the data
 model parts are less relevant/interesting, that is fine. Here's a summary that explains why this document/infrastructure
 is needed:
-1. Canvas is about composing components (into a `component tree`) to craft an experience
-2. a `component` has `component input`s, which must be populated to render the `component`
-3. Canvas aims to use Drupal's existing `field type` functionality to store values for those `component input`s
-4. for Canvas to choose a `field type` that is appropriate for a particular `component input`, Canvas analyzes its `prop shape`
-5. each `field type` has one or more `field widget`s, which Canvas must use to be able to actually use that `field type`
-6. a `field widget` uses one or more `HTML form control element`s (and may or may not use AJAX)
-7. this document explains what the infrastructure is that is needed to make `field widget`s allow for real-time updates
-   of the preview of the `component tree`, i.e. without having to rely on `field widget`s historical reliance on
+1. Canvas is about composing components (into a _component tree_) to craft an experience
+2. a _component_ has _component inputs_, which must be populated to render the _component_
+3. Canvas aims to use Drupal's existing _field type_ functionality to store values for those _component inputs_
+4. for Canvas to choose a _field type_ that is appropriate for a particular _component input_, Canvas analyzes its _prop shape_
+5. each _field type_ has one or more _field widgets_, which Canvas must use to be able to actually use that _field type_
+6. a _field widget_ uses one or more `HTML form control elements` (and may or may not use AJAX)
+7. this document explains what the infrastructure is that is needed to make _field widgets_ allow for real-time updates
+   of the preview of the _component tree_, i.e. without having to rely on _field widgets_ historical reliance on
    submitting HTML forms to the server (which incurs significant latency, resulting in inferior UX)
 
 **The goal: getting all this data flowing exactly as intended all the way from each `HTML form control element` via all
-intermediary concepts (`field widget`, `field type`, `field prop`, etc.) into a `component input`, to achieve real-time
+intermediary concepts (_field widget_, _field type_, _field prop_, etc.) into a _component input_, to achieve real-time
  previews.**
 
 ### 3.2 How?
-The `Semi-Coupled theme engine` makes it possible to process Drupal `render element`s with `React component`s  instead of `Twig`. See the [`Canvas Semi-Coupled theme engine` doc](semi-coupled-theme-engine.md) for more details.
+The `Semi-Coupled theme engine` makes it possible to process Drupal _render elements_ with `React components`  instead of `Twig`. See the [`Canvas Semi-Coupled theme engine` doc](semi-coupled-theme-engine.md) for more details.
 
 To redux-sync a `React`-rendered `HTML form control element`, it should be wrapped by `inputBehaviors`:
 
@@ -85,8 +85,8 @@ export default inputBehaviors(Input);
 ```
 
 `inputBehaviors` automatically takes care of several things:
-- Value changes update the `Redux` store. This means it can update the `component tree` preview in real time and it is tracked by Canvas's undo history.
-- Client-side validation based on the [JSON Schema definition](https://json-schema.org/understanding-json-schema) of each `component input`.
+- Value changes update the `Redux` store. This means it can update the _component tree_ preview in real time and it is tracked by Canvas's undo history.
+- Client-side validation based on the [JSON Schema definition](https://json-schema.org/understanding-json-schema) of each _component input_.
 - Value changes are also written to the [formState slice](../ui/src/features/form/formStateSlice.ts)
 - Applies 'transforms' (see [3.4 Transforms](#34-transforms)) in order to map the data from the form structure to the expected value
 
@@ -98,11 +98,11 @@ is present while composing, but removed when the final value is present.
 #### 3.2.1 Source vs resolved input
 
 Some components have a different representations for the source and resolved form of their input. For example, an Image SDC
-might have an `image` property with a `prop source` that is stored as a reference to a media entity
-but via a `prop expression` this might evaluate to an object with keys `src`, `alt`, `width` and `height`.
+might have an `image` property with a _prop source_ that is stored as a reference to a media entity
+but via a _prop expression_ this might evaluate to an object with keys `src`, `alt`, `width` and `height`.
 The client-side representation of the data model keeps track of both the source and resolved values.
-In the case of `SDC` and `JS` `components`, the source will take the form of an array representation
-of the `prop source`. e.g. for a "text" `field item` this might be
+In the case of `SDC` and `JS` _components_, the source will take the form of an array representation
+of the _prop source_. e.g. for a "text" _field item_ this might be
 
 ```
 "text": {
@@ -118,10 +118,10 @@ And the resolved would be the value in the field
 ```
 
 Ordinarily a `static prop source` needs a value key in order to be evaluated. In cases where the resolved value duplicates
-the `prop source`'s value for the "value" key, this can be omitted. When the source is evaluated, the resolved value will be merged with the other
+the _prop source_'s value for the "value" key, this can be omitted. When the source is evaluated, the resolved value will be merged with the other
 source values.
 
-There are some `prop source`s where the expression used means the resolved value is entirely different to that of the source value, such as the media example above.
+There are some _prop sources_ where the expression used means the resolved value is entirely different to that of the source value, such as the media example above.
 
 In that case, the source values should include the actual value.
 
@@ -159,32 +159,32 @@ which when evaluated resolves to
 }
 ```
 
-### 3.3 The spectrum of `HTML form control element` → `component input` flows
+### 3.3 The spectrum of `HTML form control element` → _component input_ flows
 
-A `component input` has a `prop shape`, resulting in >=1 `field prop`s being used, which needs 1 `field widget` that has
-multiple `HTML form control element`s.
+A _component input_ has a _prop shape_, resulting in >=1 _field props_ being used, which needs 1 _field widget_ that has
+multiple `HTML form control elements`.
 
 6 axes have been identified, each with their own spectrum, that cause (necessary) complexity this infrastructure has to
 tame, because each combination across all 6 axes must work correctly:
-1. **Number of `field prop`s:** non-list `prop shape`s: the shape of the value needed by a `component input` ranges between:
-  - simple value like a number, needs single `field prop` from 1 `field item`
-  - key-value pairs ("objects" in JSON Schema), needs multiple `field prop`s from 1 `field item`
-2. **List `prop shape`s ("array" in JSON schema):** the same as above, but 2 or more times, in a `field item list` ("multiple cardinality")
-3. **Computed `field prop`s:** a `field item` that has >=1 _computed_ `field prop`s, _if_ needed by the `component input`.
-   For example: `\Drupal\text\Plugin\Field\FieldType\TextLongItem` has a `processed` computed `field prop`.
-4. **HTML form structure of a `field widget`:** a `field widget`'s use of `HTML form control element`s for a single
-   `field item`. This is solved using the [3.4 Transforms](#34-transforms) infrastructure.
-  - 1:1: one `HTML form control element` to one `field prop`.
+1. **Number of _field props_:** non-list _prop shapes_: the shape of the value needed by a _component input_ ranges between:
+  - simple value like a number, needs single _field prop_ from 1 _field item_
+  - key-value pairs ("objects" in JSON Schema), needs multiple _field props_ from 1 _field item_
+2. **List _prop shapes_ ("array" in JSON schema):** the same as above, but 2 or more times, in a `field item list` ("multiple cardinality")
+3. **Computed _field props_:** a _field item_ that has >=1 _computed_ _field props_, _if_ needed by the _component input_.
+   For example: `\Drupal\text\Plugin\Field\FieldType\TextLongItem` has a `processed` computed _field prop_.
+4. **HTML form structure of a _field widget_:** a _field widget_'s use of `HTML form control elements` for a single
+   _field item_. This is solved using the [3.4 Transforms](#34-transforms) infrastructure.
+  - 1:1: one `HTML form control element` to one _field prop_.
     For example: `\Drupal\Core\Field\Plugin\Field\FieldWidget\NumberWidget::formElement()`.
-  - N:1: multiple `HTML form control element` to one `field prop`.
+  - N:1: multiple `HTML form control element` to one _field prop_.
     For example: `\Drupal\datetime\Plugin\Field\FieldWidget\DateTimeDefaultWidget::formElement()` has separate "date"
-    and "time" `HTML form control element`s.
-  - 1:N: one `HTML form control element` to multiple `field prop`s.
+    and "time" `HTML form control elements`.
+  - 1:N: one `HTML form control element` to multiple _field props_.
     For example: `\Drupal\image\Plugin\Field\FieldWidget\ImageWidget::formElement()` uses `<input type="file">` and
-    populates the following `field prop`s: `target_id`, `width` and `height`.
-5. **AJAX**: a `field widget`'s reliance on AJAX or not. (Often for _computed_ `field prop`s, but not always.)
+    populates the following _field props_: `target_id`, `width` and `height`.
+5. **AJAX**: a _field widget_'s reliance on AJAX or not. (Often for _computed_ _field props_, but not always.)
    For example: `\Drupal\Core\Field\Plugin\Field\FieldWidget\EntityReferenceAutocompleteWidget::formElement()`.
-6. **Multi-value `field widget`s**: some `field widget`s natively support multiple values, without the need
+6. **Multi-value _field widgets_**: some _field widgets_ natively support multiple values, without the need
    repeating the form structure multiple times.
    For example: `\Drupal\media_library\Plugin\Field\FieldWidget\MediaLibraryWidget` has
    ```
@@ -210,7 +210,7 @@ Legend:
 _⚠️The table is incomplete: many permutations are missing!_
 
 How to interpret the above table?
-- If a given `component input` has a simple, single value `prop shape` — such as a string, number, or boolean, the relationship to its corresponding `HTML form control element` is straightforward: a "first name" prop that stores a string is easily synchronized with a "first name" `<input type="text">` where that value can be changed. These types of props already work well with Canvas.
+- If a given _component input_ has a simple, single value _prop shape_ — such as a string, number, or boolean, the relationship to its corresponding `HTML form control element` is straightforward: a "first name" prop that stores a string is easily synchronized with a "first name" `<input type="text">` where that value can be changed. These types of props already work well with Canvas.
 - Most other things require research for how to achieve them. In [#3487284](https://www.drupal.org/project/canvas/issues/3487284) we will discover the different cases and try to find a way forward.
 
 Ideally the solutions for the above would be ones where the custom per-field-type logic largely occurs server side. This means the field-specific logic is being added in the same place the field is defined. It also reduces the chances of a majority-PHP contrib module having to write custom JS to work with Canvas.
