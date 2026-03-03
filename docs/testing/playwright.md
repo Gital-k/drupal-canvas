@@ -29,7 +29,7 @@ Then run the tests:
 npm run test:playwright
 ```
 This is the same script which will run in the CI (and will ensure that the
-one-time `playwright install` installation command has been run). You can also
+one-time _playwright install_ installation command has been run). You can also
 run more specific Playwright commands. For example, a single test:
 ```
 npx playwright test canary.spec.ts

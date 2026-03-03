@@ -14,11 +14,11 @@ In the rest of this document, `Drupal Canvas` will be written as `Canvas`.
 ### 1.2 Canvas terminology
 
 - `component`: a component generates markup (and might attach CSS + JS), potentially based on some input.
-- `Component Source Plugin`: `components` have a translation layer (per `component type`) between the `Component` config entity and the actual plugin that
+- `Component Source Plugin`: `components` have a translation layer (per _component type_) between the `Component` config entity and the actual plugin that
   accepts input and generates output, e.g. `SingleDirectoryComponent` (`sdc`-prefixed) and `BlockComponent` (`block`-prefixed).
-- `component input`: either `explicit component input` or `implicit component input`, this is the catch-all for both
-- `component slot`: each component may in its metadata define 0 or more slots, each slot accepts >=0 component instances in a particular order
-- `component type`: the ID of a `Component Source Plugin` — currently either "sdc", "block" or "js"
+- _component input_: either `explicit component input` or `implicit component input`, this is the catch-all for both
+- _component slot_: each component may in its metadata define 0 or more slots, each slot accepts >=0 component instances in a particular order
+- _component type_: the ID of a `Component Source Plugin` — currently either "sdc", "block" or "js"
 - `explicit component input`: each `component` may in its metadata define 0 or more explicit inputs to be provided by the person placing an instance of this `component`, each input accepts structured data conforming to the shape defined in the `component`'s (`ComponentSourcePlugin`-specific) metadata
 - `implicit component input`: in contrast with a `explicit component input`, an implicit input is not provided by the person placing an instance: it is implicitly present: it is provided by other content displayed on the current route, by the request context (e.g. URL query string, current user …) or by the environment (e.g. time of day).
   - ⚠️This is not yet supported. the `Block` component type needs it to support [_contexts_](https://www.drupal.org/docs/drupal-apis/plugin-api/plugin-contexts#s-context-on-blocks), unclear how that will be surfaced in Canvas; initially, only block plugins that do not require contexts are supported.
@@ -36,7 +36,7 @@ This uses the terms defined above.
 - MUST support categorization of `components`
 - MUST support efficiently storing `explicit component input` in whatever format is appropriate for the `Component
   Source Plugin`
-- MAY require API additions and perhaps even changes to `SDCs` (such as: defining restrictions for `component slots`, schema references and more) ⚠️ [an overview of what has been identified is constantly updated](https://www.drupal.org/project/canvas/issues/3462705) ⚠️
+- MAY require API additions and perhaps even changes to `SDCs` (such as: defining restrictions for _component slots_, schema references and more) ⚠️ [an overview of what has been identified is constantly updated](https://www.drupal.org/project/canvas/issues/3462705) ⚠️
 
 ⚠️ The [supported component modeling approaches](https://www.drupal.org/project/canvas/issues/3446083)
 are not yet finalized. That is likely to affect the requirements above.
@@ -64,7 +64,7 @@ Unfortunately generating a `ComponentMetadata` object is insufficient: SDC's inp
 requires an SDC plugin object (which in turn contains `ComponentMetadata`), and hence so does this infrastructure.
 Fortunately, it is possible to construct such an ephemeral object. See the `JS` `ComponentSource` for an example.
 
-Once that is built for a `ComponentSource`, any `component instance` using a `component` of this source can be populated
+Once that is built for a `ComponentSource`, any _component instance_ using a `component` of this source can be populated
 using both:
 - `static prop sources`: content author-defined static values
 - `entity field prop sources`: site builder-defined references to structured data, when used in `ContentTemplates`
@@ -87,7 +87,7 @@ schema.
 
 `SDC` DOES NOT provide an input UX, so its `Component Source Plugin` must do so on its behalf; and does so by matching
 available field types against the JSON schema of its explicit inputs ("props"). For details, see the [`Canvas Shape Matching
-into Field Types` doc](shape-matching-into-field-types.md). Using the `conjured fields` explained there requires a
+into Field Types` doc](shape-matching-into-field-types.md). Using the _conjured fields_ explained there requires a
 significant amount of metadata, which is reduced significantly thanks to:
 - `\Drupal\canvas\ComponentSource\ComponentSourceInterface::preSaveItem()`
 - `\Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::collapse()`
@@ -98,7 +98,7 @@ For an `SDC` to be compatible/eligible for use in Canvas, it:
 - MUST always have schema, even for theme `SDCs`
 - MUST have `title` for each prop and each slot
 - MUST have `example` for each required prop, the first example is used as the default value
-- MUST have only props for whose `prop shapes` a `static prop source` can be found (see the [`Canvas Shape Matching into Field
+- MUST have only props for whose _prop shapes_ a `static prop source` can be found (see the [`Canvas Shape Matching into Field
   Types` doc, section 3.1.2.b](shape-matching-into-field-types.md#3.1.2.b).
 - MUST not have `status` value `obsolete`
 - MUST not have `noUi` value `true`
@@ -196,12 +196,12 @@ related operations. The plugin should return TRUE from this method if the `Compo
 being deleted. If the source plugin returns TRUE from this method, the `Component` config entity will transition from the
 previously configured source plugin to [a special-purpose `fallback` plugin](../src/Plugin/Canvas/ComponentSource/Fallback.php).
 
-The `fallback` `Component Source Plugin` will retain the stored explicit input to avoid data loss in case the `component` is reintroduced. Slots that contain `component subtrees`
+The `fallback` `Component Source Plugin` will retain the stored explicit input to avoid data loss in case the `component` is reintroduced. Slots that contain _component subtrees_
 will not lose those subtrees; they will simply only be visible in the "Layers" panel in the Canvas UI. (Because it is impossible to approximate how the containing slots were shaped.)
 
-### 3.5 Other `component types`
+### 3.5 Other _component types_
 
-Nothing yet, this will change when we [support other `component types` later](https://www.drupal.org/project/canvas/issues/3454519).
+Nothing yet, this will change when we [support other _component types_ later](https://www.drupal.org/project/canvas/issues/3454519).
 
 ### 3.6 Categorization
 

@@ -23,7 +23,7 @@ segmentation, but on a temporary basis. E.g. “Christmas campaign”
 `Personalization Variant` (term might change to `Variation`): A particular customization for a given Personalization
 Segment.  Not to be confused with [SDC Variant](https://www.drupal.org/node/3517062).
 When we talk about Personalization Variants, we talk about _both_:
-- the explicit inputs for `component instances` being different per variant. At the `component level`, this is what
+- the explicit inputs for _component instances_ being different per variant. At the _component level_, this is what
 Figma defines as Variant, Storybook might define it as Story, and at the SDC component level we
 [might define it as Example](https://www.drupal.org/project/drupal/issues/3522644).
 - the `components`: it is possible not only to keep the same `components` and just assign different
@@ -71,7 +71,7 @@ should see the Personalization Variant mapped to the matching segment. See 3.3. 
 * MUST be possible for the Site Builder to preview a given Personalization Variant
 * MUST be possible for the Site Builder to name a Personalization Variant on creation
 * MUST be possible for the Site Builder to select a set of Segments after naming a Personalization Variant.
-* MUST be possible for the Site Builder to add/modify/delete a `component instance` for a given Personalization Variant.
+* MUST be possible for the Site Builder to add/modify/delete a _component instance_ for a given Personalization Variant.
 * We MIGHT rename/prefix the SDC Variant on the UI for avoiding confusions on terminology for Site Builders.
 * We MIGHT want to reuse this infrastructure for a generalist “override” system, so when possible do not
 be too specific.

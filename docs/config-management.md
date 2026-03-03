@@ -23,36 +23,36 @@ to one of us! 😊 🙏
 ### 1.1 Existing Drupal Terminology that is crucial for Canvas
 
 - `configuration entity dependencies`: [configuration entities may declare dependencies on modules, themes or another config entity](https://www.drupal.org/docs/drupal-apis/configuration-api/configuration-entity-dependencies)
-- `configuration validation`: the ability to [thoroughly validate](https://www.drupal.org/project/drupal/issues/2164373) configuration
+- _configuration validation_: the ability to [thoroughly validate](https://www.drupal.org/project/drupal/issues/2164373) configuration
 - `SDC`: a [Single-Directory Component](https://www.drupal.org/project/sdc)
 - `Block`: a [block plugin](https://www.drupal.org/docs/drupal-apis/block-api/block-api-overview) — ⚠️ not to be confused with the identically named config entities!
-- `field type`: see [`Canvas Data Model` doc](data-model.md)
-- `field widget`: see [`Redux-integrated field widgets` doc](redux-integrated-field-widgets.md)
-- `page template`: a Drupal theme's template in which every `theme region` is rendered
-- `page.html.twig`: see `page template`
+- _field type_: see [`Canvas Data Model` doc](data-model.md)
+- _field widget_: see [`Redux-integrated field widgets` doc](redux-integrated-field-widgets.md)
+- _page template_: a Drupal theme's template in which every _theme region_ is rendered
+- `page.html.twig`: see _page template_
 - `PageDisplayVariant`: Drupal is architected to allow multiple implementations to decorate/lay out the _main content_
   that is  computed by a route's controller. Such implementations are `PageDisplayVariant` plugins.
-- `theme region`: a Drupal theme exposes multiple regions to Drupal, to render things (historically: "blocks") into; the
+- _theme region_: a Drupal theme exposes multiple regions to Drupal, to render things (historically: "blocks") into; the
   surrounding markup is defined in the Drupal theme's `page.html.twig`. This is conceptually identical to
-  `component slots`.
+  _component slots_.
 
 ### 1.2 Canvas terminology
 
 - `component`: see [`Canvas Components` doc](components.md)
 - `Component config entity`: `components` available for use in Canvas are tracked as config entities. They correspond 1:1 to eligible
   `SDCs` and `Blocks`.
-- `component input`: see [`Canvas Components` doc](components.md)
+- _component input_: see [`Canvas Components` doc](components.md)
 - `Component Source Plugin`: see [`Canvas Components` doc](components.md)
-- `component slot`: see [`Canvas Components` doc](components.md)
-- `component type`: see [`Canvas Components` doc](components.md)
-- `component tree`: see [`Canvas Data Model` doc](data-model.md)
-- `content type template`: the default `component tree` for a particular `content type`, which typically includes assigning the smallest units of `structured data` to particular `component inputs`, and uses `configuration entity dependencies` to ensure the necessary `components` are present
+- _component slot_: see [`Canvas Components` doc](components.md)
+- _component type_: see [`Canvas Components` doc](components.md)
+- _component tree_: see [`Canvas Data Model` doc](data-model.md)
+- `content type template`: the default _component tree_ for a particular _content type_, which typically includes assigning the smallest units of _structured data_ to particular _component inputs_, and uses `configuration entity dependencies` to ensure the necessary `components` are present
 - `Folders`: a way to organize components, patterns and code components into individual "Folders" on the client-side of Canvas
 - `Folder config entity`: stores a list of `items` of particular `configEntityTypeId`, currently limited to `component`, `pattern` and `js_component`
-- `PageRegion config entity`: stores a `component tree` for every `theme region` in a given Drupal theme
-- `Pattern config entity`: stores a `component tree` that allows Ambitious Site Builders to save common component composition patterns for Content Creators to reuse
-- `structured data`: see [`Canvas Data Model` doc](data-model.md)
-- `unstructured data`: see [`Canvas Data Model` doc](data-model.md)
+- `PageRegion config entity`: stores a _component tree_ for every _theme region_ in a given Drupal theme
+- `Pattern config entity`: stores a _component tree_ that allows Ambitious Site Builders to save common component composition patterns for Content Creators to reuse
+- _structured data_: see [`Canvas Data Model` doc](data-model.md)
+- _unstructured data_: see [`Canvas Data Model` doc](data-model.md)
 - `Canvas field`: see [`Canvas Data Model` doc](data-model.md)
 
 ## 2. Product requirements
@@ -64,9 +64,9 @@ This adds to the product requirements listed in [`Canvas Components` doc](compon
 (There are [more](https://docs.google.com/spreadsheets/d/1OpETAzprh6DWjpTsZG55LWgldWV_D8jNe9AM73jNaZo/edit?gid=1721130122#gid=1721130122), but these in particular affect Canvas's supported components.)
 
 - MUST be able to synchronize `components` and `content type templates` from one site to another WITHOUT changes to Drupal deployment best practices (requirement [`14. Configuration management`](https://docs.google.com/spreadsheets/d/1OpETAzprh6DWjpTsZG55LWgldWV_D8jNe9AM73jNaZo/edit?gid=1721130122#gid=1721130122&range=B25))
-- MUST be able to populate a `theme`'s `page template` using Canvas `components` (requirement [`19. Modify the page template`](https://docs.google.com/spreadsheets/d/1OpETAzprh6DWjpTsZG55LWgldWV_D8jNe9AM73jNaZo/edit?gid=1721130122#gid=1721130122&range=B30))
+- MUST be able to populate a `theme`'s _page template_ using Canvas `components` (requirement [`19. Modify the page template`](https://docs.google.com/spreadsheets/d/1OpETAzprh6DWjpTsZG55LWgldWV_D8jNe9AM73jNaZo/edit?gid=1721130122#gid=1721130122&range=B30))
 - MUST be able to store and reuse `component` compositions (requirement [`29. Layout Patterns`](https://docs.google.com/spreadsheets/d/1OpETAzprh6DWjpTsZG55LWgldWV_D8jNe9AM73jNaZo/edit?gid=1721130122#gid=1721130122&range=B41))
-- MUST support auditability, assuming (to answer questions such as: which `field type` and `field widget` does a `component` use when it is instantiated, why is a given `SDC` not available as a `component` in Canvas, et cetera)
+- MUST support auditability, assuming (to answer questions such as: which _field type_ and _field widget_ does a `component` use when it is instantiated, why is a given `SDC` not available as a `component` in Canvas, et cetera)
 
 
 ## 3. Implementation
@@ -121,25 +121,25 @@ The `Component` config entity contains:
      edit the SDC's props.
   - `Block` component type: `default_settings`, to store the default block plugin settings, if any. For example: hide
      the site slogan whenever the "site branding" block is placed. Not to be confused with the settings specified per
-     `component instance`, which override those defaults.
+     _component instance_, which override those defaults.
 - the `status`: `true` conveys it is available for Canvas Content Creators, `false` conveys it once was available, but not
   anymore (either because it was explicitly disabled by the Site Builder, or because the underlying SDC was marked as
   "obsolete"). Existing content can then continue to use disabled `Components` (in other words: nothing breaks), while
   new content must use the most current Site Builder-curated list of `Components`.
-- which `field type` and `field widget` must be used to populate it with `unstructured data` — for algorithmic details,
+- which _field type_ and _field widget_ must be used to populate it with _unstructured data_ — for algorithmic details,
  see [`Canvas Data model`, section 3.1: "from Front-End Developer to a Canvas data model that empowers the Content Creator](./data-model.md#3.1)
 - the (versioned) `fallback_metadata`: when the `Component Source Plugin` can no longer find the `component` because a dependency is
   removed (e.g. the module providing an SDC is uninstalled or a `JavaScriptComponent` config entity is deleted), this
   metadata (currently only slot definitions) will be used to fall back to the special `fallback` source to ensure
-  existing `component trees` continue to work (see [`Canvas Components` doc, section 3.4](components.md#3.4))
-- `config entity dependencies` on the modules providing the `field type` and `field widget`
+  existing _component trees_ continue to work (see [`Canvas Components` doc, section 3.4](components.md#3.4))
+- `config entity dependencies` on the modules providing the _field type_ and _field widget_
 
 These config entities are therefore the foundations that enable Canvas to work reliably, and allow:
 - auditing (listing which components are available to Canvas and reasons why components are unavailable, tracking changes in
-  computed `field type` and `field widget` for a `component input` thanks to those being stored in _versioned_
+  computed _field type_ and _field widget_ for a _component input_ thanks to those being stored in _versioned_
   `settings` — see [`Canvas Data model`, section 3.1.2.b](./data-model#3.1.2.b))
 - dependency-checking (this config entity's dependencies on other modules, as well as other config entities depending on
-  this config entity, but also ensuring the necessary code is present, such as `field type` and `field widget` plugins)
+  this config entity, but also ensuring the necessary code is present, such as _field type_ and _field widget_ plugins)
 - exporting, importing, synchronizing from one environment or site to another
 - validating: the ability to be 100% confident that all dependencies are satisfied, and all criteria are still met (see
   [`Canvas Components` doc, section 3.1.1](components.md#3.1.1)).
@@ -172,7 +172,7 @@ wheel, the same _schema_ for defining explicit inputs as that of `SDC` is adopte
 for every valid `JavaScript Component config entity` a working auto-generated input UX can be guaranteed, additional
 restrictions are applied during validation:
 - Not all JSON Schema "types" and "formats" are allowed; only ones that Canvas can generate an input UX for. That means it
-  must have a "storable `prop shape`". See [`section 3.1.2.b in Canvas Shape Matching into Field Types`
+  must have a "storable _prop shape_". See [`section 3.1.2.b in Canvas Shape Matching into Field Types`
   doc](shape-matching-into-field-types.md). The `IsStorablePropShapeConstraint` validation constraint checks this. It
   ensures a good UX for the in-browser _code component_ editor.
 - Fascinatingly, to make these config entities comply with `SDC`'s schema, we must express the _supported subset_ of
@@ -226,7 +226,7 @@ See:
 - `\Drupal\canvas\Controller\CanvasBlockListController`
 
 Multiple `PageRegion config entities` may be created per Drupal theme: one per region, except the `content` region. This allows using Canvas instead of the Block module's
-"Block Layout" functionality (at `/admin/structure/block`) to populate the `theme regions` of the Drupal theme's
+"Block Layout" functionality (at `/admin/structure/block`) to populate the _theme regions_ of the Drupal theme's
 `page.html.twig`.
 
 ⚠️ This means it is currently not possible to have a a different `PageRegion config entity` per route/URL/…, which the
@@ -258,7 +258,7 @@ See:
 A `Pattern config entity` can be created by Ambitious Site Builders to accelerate the work of Content Creators: it
 contains a common `component` composition pattern.
 
-When using a pattern (reusing a `Pattern config entity`), the `component tree` it contains at the time of using it is
+When using a pattern (reusing a `Pattern config entity`), the _component tree_ it contains at the time of using it is
 _absorbed_ into the place where it is being used in an `Canvas field`. Hence any changes to a `Pattern config entity` will
 only be visible in any subsequent uses of it. (Similar to how Drupal Recipes behave.)
 
