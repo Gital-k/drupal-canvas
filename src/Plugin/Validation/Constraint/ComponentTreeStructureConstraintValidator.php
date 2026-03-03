@@ -293,7 +293,7 @@ final class ComponentTreeStructureConstraintValidator extends ConstraintValidato
     }
 
     \assert($parent_config_entity instanceof Component);
-    $parent_config_entity->loadVersion($parent_instance['component_version']);
+    $parent_config_entity = $parent_config_entity->loadVersion($parent_instance['component_version']);
     $slots = $parent_config_entity->getSlotDefinitions();
     if (\count($slots) === 0) {
       $context->buildViolation('Invalid component subtree. A component subtree must only exist for components with >=1 slot, but the component %component has no slots, yet a subtree exists for the instance with UUID %uuid.', [

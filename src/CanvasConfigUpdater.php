@@ -201,9 +201,6 @@ class CanvasConfigUpdater {
       return FALSE;
     }
 
-    // Track the originally loaded version to enable avoiding side effects.
-    $originally_loaded_version = $component->getLoadedVersion();
-
     // All versions of the Component config entity must have a `required` flag
     // for every prop field definition.
     // Note: Start with the oldest version, because it is least likely to have
@@ -212,8 +209,7 @@ class CanvasConfigUpdater {
     // update path.)
     $needs_updating = FALSE;
     foreach (array_reverse($component->getVersions()) as $version) {
-      $component->loadVersion($version);
-      $settings = $component->getSettings();
+      $settings = $component->loadVersion($version)->getSettings();
       \assert(\array_key_exists('prop_field_definitions', $settings));
       foreach ($settings['prop_field_definitions'] as $prop_field_definition) {
         if (!isset($prop_field_definition['required'])) {
@@ -223,9 +219,6 @@ class CanvasConfigUpdater {
       }
     }
 
-    // Avoid side effects: ensure the given Component still has the same version
-    // loaded. (Not strictly necessary, just a precaution.)
-    $component->loadVersion($originally_loaded_version);
     return $needs_updating;
   }
 
@@ -268,8 +261,7 @@ class CanvasConfigUpdater {
     // there will be one new "past version".
     // If this would update oldest to newest, it'd fail to update the newly
     // created past version.
-    $component->loadVersion($component->getActiveVersion());
-    $settings = $component->getSettings();
+    $settings = $component->loadVersion($component->getActiveVersion())->getSettings();
     \assert(\array_key_exists('prop_field_definitions', $settings));
     $active_version_updated = FALSE;
     foreach ($settings['prop_field_definitions'] as $prop_name => &$prop_field_definition) {
@@ -306,9 +298,9 @@ class CanvasConfigUpdater {
         // The active version has already been updated above.
         continue;
       }
-      $component->loadVersion($version);
-      \assert(!$component->isLoadedVersionActiveVersion());
-      $settings = $component->getSettings();
+      $versioned_component = $component->loadVersion($version);
+      \assert(!$versioned_component->isLoadedVersionActiveVersion());
+      $settings = $versioned_component->getSettings();
       \assert(\array_key_exists('prop_field_definitions', $settings));
       foreach ($settings['prop_field_definitions'] as $prop_name => &$prop_field_definition) {
         if (!isset($prop_field_definition['required'])) {
@@ -346,9 +338,6 @@ class CanvasConfigUpdater {
       return FALSE;
     }
 
-    // Track the originally loaded version to enable avoiding side effects.
-    $originally_loaded_version = $component->getLoadedVersion();
-
     // Any versions of the Component config entity cannot have a
     // `FieldTypePropExpression('text', 'value')` nor
     // `FieldTypePropExpression('text_long', 'value')`.
@@ -357,8 +346,8 @@ class CanvasConfigUpdater {
     // new versions, but not for old versions: it lacked an update path.)
     $needs_updating = FALSE;
     foreach (array_reverse($component->getVersions()) as $version) {
-      $component->loadVersion($version);
-      $settings = $component->getSettings();
+      $versioned_component = $component->loadVersion($version);
+      $settings = $versioned_component->getSettings();
       \assert(\array_key_exists('prop_field_definitions', $settings));
       foreach ($settings['prop_field_definitions'] as $prop_field_definition) {
         \assert(isset($prop_field_definition['expression']) && isset($prop_field_definition['field_type']));
@@ -374,9 +363,6 @@ class CanvasConfigUpdater {
       }
     }
 
-    // Avoid side effects: ensure the given Component still has the same version
-    // loaded. (Not strictly necessary, just a precaution.)
-    $component->loadVersion($originally_loaded_version);
     return $needs_updating;
   }
 
@@ -405,8 +391,8 @@ class CanvasConfigUpdater {
     // If this would update oldest to newest, it'd fail to update the newly
     // created past version.
     $new_past_version = $component->getActiveVersion();
-    $component->loadVersion($new_past_version);
-    $settings = $component->getSettings();
+    $versioned_component = $component->loadVersion($new_past_version);
+    $settings = $versioned_component->getSettings();
     \assert(\array_key_exists('prop_field_definitions', $settings));
     $active_version_updated = FALSE;
     foreach ($settings['prop_field_definitions'] as &$prop_field_definition) {
@@ -420,7 +406,7 @@ class CanvasConfigUpdater {
       if ($needs_updating) {
         $prop_field_definition['expression'] = (string) (new FieldTypePropExpression($prop_field_definition['field_type'], 'processed'));
         $active_version_updated = TRUE;
-        $updated_versions[] = $component->getActiveVersion();
+        $updated_versions[] = $versioned_component->getActiveVersion();
       }
     }
     // >=1 expression was changed. The active version is validated against
@@ -431,7 +417,7 @@ class CanvasConfigUpdater {
       $source_for_new_version = $this->componentSourceManager->createInstance(
         $component_source->getPluginId(),
         [
-          'local_source_id' => $component->get('source_local_id'),
+          'local_source_id' => $versioned_component->get('source_local_id'),
           ...$settings,
         ],
       );
@@ -450,9 +436,9 @@ class CanvasConfigUpdater {
         // The active version has already been updated above.
         continue;
       }
-      $component->loadVersion($version);
-      \assert(!$component->isLoadedVersionActiveVersion());
-      $settings = $component->getSettings();
+      $versioned_component = $component->loadVersion($version);
+      \assert(!$versioned_component->isLoadedVersionActiveVersion());
+      $settings = $versioned_component->getSettings();
       \assert(\array_key_exists('prop_field_definitions', $settings));
       foreach ($settings['prop_field_definitions'] as &$prop_field_definition) {
         \assert(isset($prop_field_definition['expression']) && isset($prop_field_definition['field_type']));
@@ -497,9 +483,6 @@ class CanvasConfigUpdater {
       return FALSE;
     }
 
-    // Track the originally loaded version to enable avoiding side effects.
-    $originally_loaded_version = $component->getLoadedVersion();
-
     // Only the active version needs its prop order corrected, potentially.
     $component->resetToActiveVersion();
 
@@ -510,9 +493,6 @@ class CanvasConfigUpdater {
     $metadata = $component_source->getMetadata();
     $actual_prop_order = \array_keys(ComponentMetadataHelper::getNonAttributeComponentProperties($metadata));
 
-    // Avoid side effects: ensure the given Component still has the same version
-    // loaded. (Not strictly necessary, just a precaution.)
-    $component->loadVersion($originally_loaded_version);
     return $stored_prop_order !== $actual_prop_order;
   }
 
@@ -590,15 +570,11 @@ class CanvasConfigUpdater {
       return FALSE;
     }
 
-    // Track the originally loaded version to enable avoiding side effects.
-    $originally_loaded_version = $component->getLoadedVersion();
-
     // Any versions of the Component config entity cannot use a multi-bundle
     // FieldPropExpression.
     $needs_updating = FALSE;
     foreach (array_reverse($component->getVersions()) as $version) {
-      $component->loadVersion($version);
-      $settings = $component->getSettings();
+      $settings = $component->loadVersion($version)->getSettings();
       \assert(\array_key_exists('prop_field_definitions', $settings));
       foreach ($settings['prop_field_definitions'] as $prop_field_definition) {
         \assert(isset($prop_field_definition['expression']) && isset($prop_field_definition['field_type']));
@@ -611,9 +587,6 @@ class CanvasConfigUpdater {
       }
     }
 
-    // Avoid side effects: ensure the given Component still has the same version
-    // loaded. (Not strictly necessary, just a precaution.)
-    $component->loadVersion($originally_loaded_version);
     return $needs_updating;
   }
 
@@ -642,8 +615,8 @@ class CanvasConfigUpdater {
     // If this would update oldest to newest, it'd fail to update the newly
     // created past version.
     $new_past_version = $component->getActiveVersion();
-    $component->loadVersion($new_past_version);
-    $settings = $component->getSettings();
+    $versioned_component = $component->loadVersion($new_past_version);
+    $settings = $versioned_component->getSettings();
     \assert(\array_key_exists('prop_field_definitions', $settings));
     $active_version_updated = FALSE;
     foreach ($settings['prop_field_definitions'] as &$prop_field_definition) {
@@ -658,7 +631,7 @@ class CanvasConfigUpdater {
           ReferenceFieldTypePropExpression::class => (string) $expression->generateBundleSpecificBranches(),
         };
         $active_version_updated = TRUE;
-        $updated_versions[] = $component->getActiveVersion();
+        $updated_versions[] = $versioned_component->getActiveVersion();
       }
     }
     // >=1 expression was changed. The active version is validated against
@@ -688,9 +661,9 @@ class CanvasConfigUpdater {
         // The active version has already been updated above.
         continue;
       }
-      $component->loadVersion($version);
-      \assert(!$component->isLoadedVersionActiveVersion());
-      $settings = $component->getSettings();
+      $versioned_component = $component->loadVersion($version);
+      \assert(!$versioned_component->isLoadedVersionActiveVersion());
+      $settings = $versioned_component->getSettings();
       \assert(\array_key_exists('prop_field_definitions', $settings));
       foreach ($settings['prop_field_definitions'] as &$prop_field_definition) {
         \assert(isset($prop_field_definition['expression']) && isset($prop_field_definition['field_type']));

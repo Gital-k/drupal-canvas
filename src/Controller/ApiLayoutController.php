@@ -266,7 +266,7 @@ final class ApiLayoutController {
       throw new NotFoundHttpException('No such component: ' . $componentType);
     }
     try {
-      $component->loadVersion($version);
+      $component = $component->loadVersion($version);
     }
     catch (\OutOfRangeException) {
       throw new NotFoundHttpException(\sprintf('No such version %s for component %s', $version, $componentType));
