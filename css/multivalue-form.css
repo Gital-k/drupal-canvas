@@ -81,13 +81,6 @@
   position: relative;
 }
 
-/* Style the tabledrag toggle wrapper outside the container */
-.tabledrag-toggle-wrapper {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 8px;
-}
-
 /* Add new button wrapper */
 .add-new-wrapper {
   overflow: hidden;

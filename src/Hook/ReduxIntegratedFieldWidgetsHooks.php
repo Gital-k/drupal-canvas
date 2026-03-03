@@ -177,6 +177,11 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
 
   /**
    * Implements hook_preprocess_field_multiple_value_form().
+   *
+   * Adds attributes and classes to form elements to enable canvas-specific
+   * functionality and styling for multivalue fields. This may be impacted
+   * by other modules or changes over time, but is intended to support
+   * enhanced UI and behaviors in Canvas.
    */
   #[Hook('preprocess_field_multiple_value_form')]
   public static function canvasStarkPreprocessFieldMultipleValueForm(array &$variables): void {
@@ -187,7 +192,7 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
     }
 
     // Set up classes for the drag handle and remove action columns.
-    // The tabledrag-icons library overrides Drupal's tableDragHandle theme
+    // The multivalue-form library overrides Drupal's tableDragHandle theme
     // function to render custom SVG icons matching the Radix UI
     // DragHandleDots2Icon directly, instead of the default Drupal handle.
     if (isset($variables['table']['#rows'])) {
@@ -202,8 +207,6 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
         }
       }
 
-      // Attach the library that replaces tabledrag icons.
-      $variables['table']['#attached']['library'][] = 'canvas/tabledrag-icons';
       // Attach the library for multivalue form styles.
       $variables['table']['#attached']['library'][] = 'canvas/multivalue-form';
     }

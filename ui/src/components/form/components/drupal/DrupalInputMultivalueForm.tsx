@@ -158,7 +158,6 @@ const DrupalInputMultivalueForm = ({
       }
     }
 
-    // Last resort fallback: clear the input value locally.
     setDisplayValue('');
     if (!inputWrapperRef.current) return;
     const inputElement = inputWrapperRef.current.querySelector(
