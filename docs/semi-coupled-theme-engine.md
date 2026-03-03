@@ -13,7 +13,7 @@ Related Canvas issue queue components:
 
 - `render array`: A PHP array used by Drupal that can be processed by Drupal's Render API to become markup.
 - `render element`: A renderable item within a `render array` (also an array).
-- `template`: A file that is a mixture of markup and content provided by a render array. Usually this is `Twig`, but Canvas's `Semi-Coupled theme engine` allows `React component`s to be used as well.
+- `template`: A file that is a mixture of markup and content provided by a render array. Usually this is `Twig`, but Canvas's `Semi-Coupled theme engine` allows `React components` to be used as well.
 - `theme engine`: A Drupal extension type that allows themes to be developed in a particular `template` language.
 - `theme suggestions`: Templates are determined based on their name — theme suggestions provide additional filename candidates for which template is used, allowing for broad templates such as ones that render all nodes, or more specific templates like ones that are only used for nodes of a specific content type.
 - [`Twig`](https://twig.symfony.com/): A PHP-based `template` language, used by Drupal's default `theme engine`.
@@ -30,7 +30,7 @@ Related Canvas issue queue components:
 ### 1.3 Canvas terminology
 
 - `component`: see [`Canvas Components` doc](components.md)
-- `Semi-Coupled theme engine`: A Canvas-provided `theme engine` that allows a mixture of `Twig` and `React component`s as `template`s.
+- `Semi-Coupled theme engine`: A Canvas-provided `theme engine` that allows a mixture of `Twig` and `React components` as `templates`.
 - [`Hyperscriptify`](https://github.com/drupal-jsx/hyperscriptify): A JS library created for Canvas that converts `Semi-Coupled theme engine` markup (provided by `Twig` and `JSX` templates) into `React elements`.
 
 ## 2. Product requirements
@@ -48,7 +48,7 @@ This uses the terms defined above to explain which Canvas product requirements n
 _For details on what these steps are doing, see "Implementation" below._
 
 - The routes for the Canvas UI's Props Edit form and Entity Edit form are automatically rendered with the `Canvas Stark` theme, which uses the `Semi-Coupled theme engine` (additional routes will likely be use the `Canvas stark` theme in the future)
-- The `Semi-Coupled theme engine` makes it so a `render` array can use a pages that area a combination of `Twig` templates and `React component`s .
+- The `Semi-Coupled theme engine` makes it so a `render` array can use a pages that area a combination of `Twig` templates and `React components` .
 
 For a `render element` to use a `React component` instead of a `Twig` `template`:
 
@@ -67,7 +67,7 @@ For a `render element` to use a `React component` instead of a `Twig` `template`
 ### 4.1 Preparing a Drupal `render element` to be rendered by a `React component`
 When the `Semi-Coupled theme engine` encounters a `template` that is inside a `process_as_jsx` directory thus meant to be rendered by `React`, the `template` contents are different and the resulting `render array` is also different.
 - The `render array` contents are informed by the JSON object  the `template` (see section 4.2 for details on the JSON). The primary purpose of this JSON object is to determine which render children should be rendered as HTML within the `theme engine` and which are made available as props to the `React component`.
-  - ⚠️ Ideally we would not use the `html.twig` file extension for the `template`s intended for the `Semi-coupled theme engine` as they do not contain Twig markup. There is an [issue for this](https://drupal.org/i/3480223).
+  - ⚠️ Ideally we would not use the `html.twig` file extension for the `templates` intended for the `Semi-coupled theme engine` as they do not contain Twig markup. There is an [issue for this](https://drupal.org/i/3480223).
   - If there are templates that should not *always* be rendered by `React`, use Drupal's existing theme suggestions system to make the template in `process_as_jsx` more specific so it targets only the needed context.
 - When specific `render array` contents are set to be available to the `React component` as props, this includes "unpacking" values that might otherwise need to be accessed via a method. E.g. field values are all present in the object, and referenced entities are already loaded with their field contents similarly unpacked.
 

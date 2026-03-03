@@ -23,11 +23,11 @@ segmentation, but on a temporary basis. E.g. “Christmas campaign”
 `Personalization Variant` (term might change to `Variation`): A particular customization for a given Personalization
 Segment.  Not to be confused with [SDC Variant](https://www.drupal.org/node/3517062).
 When we talk about Personalization Variants, we talk about _both_:
-- the explicit inputs for `component instance`s being different per variant. At the `component level`, this is what
+- the explicit inputs for `component instances` being different per variant. At the `component level`, this is what
 Figma defines as Variant, Storybook might define it as Story, and at the SDC component level we
 [might define it as Example](https://www.drupal.org/project/drupal/issues/3522644).
-- the `component`s: it is possible not only to keep the same `component`s and just assign different
-`explicit component input`s per variant, but also to completely change _which_ `component`s are present in a variant
+- the `components`: it is possible not only to keep the same `components` and just assign different
+`explicit component inputs` per variant, but also to completely change _which_ `components` are present in a variant
 
 `Default Personalization Variant`: The variant that will be displayed to the user when they don’t fit any of the
 previous Segments. Colloquially speaking can be referred to as the `Default Site`.
@@ -267,14 +267,14 @@ The `switch` component instance slot contain the different `case` component inst
 A `case` mapped to the `default` `Segment` is mandatory.
 
 The mapping of `Segment` <=> Variants resides in the inputs of each grafting.
-This mapping is 1-to-1 initially, but must include the option of having multiple `Segment`s per Variant in the future.
+This mapping is 1-to-1 initially, but must include the option of having multiple `Segments` per Variant in the future.
 
 Then the inputs for the `case` component instance would look like
 
 ```yaml
 case inputs:
   variant_id: 'variation-3' # This matches one of the `switch` `variants` above.
-  segments: ['my-segment-id'] # This is the actual mapping variant <=> `Segment`s
+  segments: ['my-segment-id'] # This is the actual mapping variant <=> `Segments`
 ```
 
 Each `switch` or `case` could have a user-friendly label. This isn't in the `inputs` itself, but on the top-level
@@ -285,7 +285,7 @@ component instance label.
 TBD
 
 See https://www.drupal.org/project/canvas/issues/3525746#comment-16121437
-(this will define the -hopefully- generic switch-case `nodeType`s, or point to docs in `data-model.md 3.4.x` itself.)
+(this will define the -hopefully- generic switch-case `nodeTypes`, or point to docs in `data-model.md 3.4.x` itself.)
 
 ### 3.3. Personalization Negotiation
 

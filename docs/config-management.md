@@ -34,19 +34,19 @@ to one of us! 😊 🙏
   that is  computed by a route's controller. Such implementations are `PageDisplayVariant` plugins.
 - `theme region`: a Drupal theme exposes multiple regions to Drupal, to render things (historically: "blocks") into; the
   surrounding markup is defined in the Drupal theme's `page.html.twig`. This is conceptually identical to
-  `component slot`s.
+  `component slots`.
 
 ### 1.2 Canvas terminology
 
 - `component`: see [`Canvas Components` doc](components.md)
-- `Component config entity`: `component`s available for use in Canvas are tracked as config entities. They correspond 1:1 to eligible
-  `SDC`s and `Block`s.
+- `Component config entity`: `components` available for use in Canvas are tracked as config entities. They correspond 1:1 to eligible
+  `SDCs` and `Blocks`.
 - `component input`: see [`Canvas Components` doc](components.md)
 - `Component Source Plugin`: see [`Canvas Components` doc](components.md)
 - `component slot`: see [`Canvas Components` doc](components.md)
 - `component type`: see [`Canvas Components` doc](components.md)
 - `component tree`: see [`Canvas Data Model` doc](data-model.md)
-- `content type template`: the default `component tree` for a particular `content type`, which typically includes assigning the smallest units of `structured data` to particular `component input`s, and uses `configuration entity dependencies` to ensure the necessary `component`s are present
+- `content type template`: the default `component tree` for a particular `content type`, which typically includes assigning the smallest units of `structured data` to particular `component inputs`, and uses `configuration entity dependencies` to ensure the necessary `components` are present
 - `Folders`: a way to organize components, patterns and code components into individual "Folders" on the client-side of Canvas
 - `Folder config entity`: stores a list of `items` of particular `configEntityTypeId`, currently limited to `component`, `pattern` and `js_component`
 - `PageRegion config entity`: stores a `component tree` for every `theme region` in a given Drupal theme
@@ -63,8 +63,8 @@ This adds to the product requirements listed in [`Canvas Components` doc](compon
 
 (There are [more](https://docs.google.com/spreadsheets/d/1OpETAzprh6DWjpTsZG55LWgldWV_D8jNe9AM73jNaZo/edit?gid=1721130122#gid=1721130122), but these in particular affect Canvas's supported components.)
 
-- MUST be able to synchronize `component`s and `content type template`s from one site to another WITHOUT changes to Drupal deployment best practices (requirement [`14. Configuration management`](https://docs.google.com/spreadsheets/d/1OpETAzprh6DWjpTsZG55LWgldWV_D8jNe9AM73jNaZo/edit?gid=1721130122#gid=1721130122&range=B25))
-- MUST be able to populate a `theme`'s `page template` using Canvas `component`s (requirement [`19. Modify the page template`](https://docs.google.com/spreadsheets/d/1OpETAzprh6DWjpTsZG55LWgldWV_D8jNe9AM73jNaZo/edit?gid=1721130122#gid=1721130122&range=B30))
+- MUST be able to synchronize `components` and `content type templates` from one site to another WITHOUT changes to Drupal deployment best practices (requirement [`14. Configuration management`](https://docs.google.com/spreadsheets/d/1OpETAzprh6DWjpTsZG55LWgldWV_D8jNe9AM73jNaZo/edit?gid=1721130122#gid=1721130122&range=B25))
+- MUST be able to populate a `theme`'s `page template` using Canvas `components` (requirement [`19. Modify the page template`](https://docs.google.com/spreadsheets/d/1OpETAzprh6DWjpTsZG55LWgldWV_D8jNe9AM73jNaZo/edit?gid=1721130122#gid=1721130122&range=B30))
 - MUST be able to store and reuse `component` compositions (requirement [`29. Layout Patterns`](https://docs.google.com/spreadsheets/d/1OpETAzprh6DWjpTsZG55LWgldWV_D8jNe9AM73jNaZo/edit?gid=1721130122#gid=1721130122&range=B41))
 - MUST support auditability, assuming (to answer questions such as: which `field type` and `field widget` does a `component` use when it is instantiated, why is a given `SDC` not available as a `component` in Canvas, et cetera)
 
@@ -124,14 +124,14 @@ The `Component` config entity contains:
      `component instance`, which override those defaults.
 - the `status`: `true` conveys it is available for Canvas Content Creators, `false` conveys it once was available, but not
   anymore (either because it was explicitly disabled by the Site Builder, or because the underlying SDC was marked as
-  "obsolete"). Existing content can then continue to use disabled `Component`s (in other words: nothing breaks), while
-  new content must use the most current Site Builder-curated list of `Component`s.
+  "obsolete"). Existing content can then continue to use disabled `Components` (in other words: nothing breaks), while
+  new content must use the most current Site Builder-curated list of `Components`.
 - which `field type` and `field widget` must be used to populate it with `unstructured data` — for algorithmic details,
  see [`Canvas Data model`, section 3.1: "from Front-End Developer to a Canvas data model that empowers the Content Creator](./data-model.md#3.1)
 - the (versioned) `fallback_metadata`: when the `Component Source Plugin` can no longer find the `component` because a dependency is
   removed (e.g. the module providing an SDC is uninstalled or a `JavaScriptComponent` config entity is deleted), this
   metadata (currently only slot definitions) will be used to fall back to the special `fallback` source to ensure
-  existing `component tree`s continue to work (see [`Canvas Components` doc, section 3.4](components.md#3.4))
+  existing `component trees` continue to work (see [`Canvas Components` doc, section 3.4](components.md#3.4))
 - `config entity dependencies` on the modules providing the `field type` and `field widget`
 
 These config entities are therefore the foundations that enable Canvas to work reliably, and allow:
@@ -145,8 +145,8 @@ These config entities are therefore the foundations that enable Canvas to work r
   [`Canvas Components` doc, section 3.1.1](components.md#3.1.1)).
 
 UI routes:
-- available `component`s: `/admin/appearance/component`
-- unavailable `component`s: `/admin/appearance/component/status`
+- available `components`: `/admin/appearance/component`
+- unavailable `components`: `/admin/appearance/component/status`
 
 
 ### 3.2 `JavaScriptComponent config entity`
@@ -160,7 +160,7 @@ See:
 - `type: canvas.json_schema.prop.*`
 
 A `JavaScriptComponent config entity` (UI label: _code components_) can be created by Ambitious Site Builders to create
-so-called components in the browser, without the need for learning how to create `SDC`s, and most importantly: without
+so-called components in the browser, without the need for learning how to create `SDCs`, and most importantly: without
 the need for deploying new or updated modules or themes.
 
 The intent is to make it as easy and frictionless as possible to create such _code components_, while also ensuring that
@@ -185,7 +185,7 @@ the hood involves creating a sibling `Component config entity` — see [section 
 by the `JS` `Component Source Plugin`. Section `3.2.1` below describes this in detail.
 
 To the Content Creator, then, the input UX of an `SDC`-sourced `component` and a `JS`-sourced `component` with the same
-"props" (the name used for the `explicit component input` of both of those `Component Source Plugin`s) must be
+"props" (the name used for the `explicit component input` of both of those `Component Source Plugins`) must be
 _indistinguishable_ from each other — despite one relying on Twig and the other only on JS.
 
 
@@ -226,7 +226,7 @@ See:
 - `\Drupal\canvas\Controller\CanvasBlockListController`
 
 Multiple `PageRegion config entities` may be created per Drupal theme: one per region, except the `content` region. This allows using Canvas instead of the Block module's
-"Block Layout" functionality (at `/admin/structure/block`) to populate the `theme region`s of the Drupal theme's
+"Block Layout" functionality (at `/admin/structure/block`) to populate the `theme regions` of the Drupal theme's
 `page.html.twig`.
 
 ⚠️ This means it is currently not possible to have a a different `PageRegion config entity` per route/URL/…, which the
@@ -297,7 +297,7 @@ The `StagedConfigUpdate` specifies the configuration object it targets and has a
 are executed once published. This occurs when the entity is changed from `status: false` to `status: true`. See
 `\Drupal\canvas\Controller\ApiAutoSaveController::post` and `\Drupal\canvas\Entity\StagedConfigUpdate::applyUpdateOnSave`.
 
-Any user of the Canvas UI can create `StagedConfigUpdate`s, as long as they can update the target configuration (simple
+Any user of the Canvas UI can create `StagedConfigUpdates`, as long as they can update the target configuration (simple
 configuration such as `system.site`, or a config entity such as `node.type.article`).
 
 ### 3.7 `Folder` config entity
@@ -306,13 +306,13 @@ See:
 - `\Drupal\canvas\Entity\Folder`
 - `\Drupal\canvas\Entity\FolderItemInterface`
 
-A `Folder` config entity allows organizing certain Canvas config entities in `Folder`s. A `Folder` targets a single Canvas
+A `Folder` config entity allows organizing certain Canvas config entities in `Folders`. A `Folder` targets a single Canvas
 config entity type, must have a unique name (per config entity type), and can list >=0 entities of that config entity
 type. Each such config config entity can only exist  in a single `Folder`.
 `Folder` config entities use the (configuration system-provided) UUID as their identifier.
 
 ⚠️ Still to be built:
-- A UI to create `Folder`s: https://www.drupal.org/project/canvas/issues/3540577
-- A UI to manage `Folder`s: https://www.drupal.org/project/canvas/issues/3540580
-- Adding UI to create and manage `Pattern`s and `Code Component`s
-- Automated creation of `Folder`s based on `Component` category or group: https://www.drupal.org/project/canvas/issues/3541364
+- A UI to create `Folders`: https://www.drupal.org/project/canvas/issues/3540577
+- A UI to manage `Folders`: https://www.drupal.org/project/canvas/issues/3540580
+- Adding UI to create and manage `Patterns` and `Code Components`
+- Automated creation of `Folders` based on `Component` category or group: https://www.drupal.org/project/canvas/issues/3541364

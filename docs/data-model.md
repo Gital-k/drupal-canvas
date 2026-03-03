@@ -4,7 +4,7 @@ In the rest of this document, `Drupal Canvas` will be written as `Canvas`.
 
 This builds on top of the [`Canvas Components` doc](components.md). Please read that first.
 
-Some of the examples here refer to details that `component type`s that use
+Some of the examples here refer to details that `component types` that use
 [`Canvas Shape Matching into Field Types` doc](shape-matching-into-field-types.md). It should be possible to first read this
 without having read that, to understand the big picture. It is recommended to first read this, then that one, followed
 by a second pass of this document.
@@ -27,14 +27,14 @@ to one of us! 😊 🙏
 
 ### 1.1 Existing Drupal Terminology that is crucial for Canvas
 
-- `content entity`: an entity that can be created by a Content Creator, containing various `field`s, potentially including the `Canvas field type`, of a particular entity type (e.g. "node")
+- `content entity`: an entity that can be created by a Content Creator, containing various `fields`, potentially including the `Canvas field type`, of a particular entity type (e.g. "node")
 - `data type`: Drupal's smallest unit of representing data, defines semantics and typically comes with validation logic and convenience methods for interacting with the data it represents ⚠️ Not all data types in Drupal core do what they say, see `\Drupal\canvas\Plugin\DataTypeOverride\UriOverride` for example. ⚠️
 - `field`: synonym of `field item list`
 - `field prop`: a property defined by a `field type`, with a value for that property on such a `field item`, represented by a `data type`. Often a single prop exists (typically: `value`), but not always (for example: the `image` field type: `target_id`, `entity`, `alt`, `title`, `width`, `height` — with `entity` a `computed field prop`)
 - `field instance`: a definition for instantiating a `field type` into a `field item list` containing >=1 `field item`
 - `field item`: the instantiation of a `field type`
 - `field item list`: to support multiple-cardinality values, Drupal core has opted to wrap every `field item` in a list — even if a particular `field instance` is single-cardinality
-- `field type`: metadata plus a class defining the `field prop`s that exist on this field type, requires a `field instance` to be used
+- `field type`: metadata plus a class defining the `field props` that exist on this field type, requires a `field instance` to be used
 - `SDC`: see [`Canvas Components` doc](components.md)
 - `theme region`: see [`Canvas Config Management` doc](config-management.md)
 - `view mode`: view modes lets a `content entity` be displayed in multiple ways
@@ -43,16 +43,16 @@ to one of us! 😊 🙏
 
 - `component`: see [`Canvas Components` doc](components.md)
 - `Component config entity`: see [`Canvas Config Management` doc](config-management.md)
-- `component instance`: a UUID uniquely identifying this instance + `component version` + values for each required `component input` (if any) + optionally values for its `component slot`s (if any)
+- `component instance`: a UUID uniquely identifying this instance + `component version` + values for each required `component input` (if any) + optionally values for its `component slots` (if any)
 - `component node`: one of the node types in the UI data model, representing a `component instance` in the `component tree`
 - `component input`: see [`Canvas Components` doc](components.md)
 - `component slot`: see [`Canvas Components` doc](components.md)
 - `Component Source Plugin`: see [`Canvas Components` doc](components.md)
-- `component tree`: a tree of `component instance`s, by placing >=1 `component instance`s in a particular order in another `component instance`'s slot
+- `component tree`: a tree of `component instances`, by placing >=1 `component instances` in a particular order in another `component instance`'s slot
 - `component tree field type`: Canvas's field type that allows storing a `component tree` ⚠️ This is currently limited to the "default" `view mode`, and hence one component tree per `content entity`. ⚠️
 - `component tree root`: the root of the `component tree` is the special case: it does not exist in another `component`, but it behaves the same as any other `component slot`
 - `component type`: see [`Canvas Components` doc](components.md)
-- `component version`: a version (a deterministic hash) identifying the _version_ of a `Component config entity` either because the underlying `component` itself changed, or because the default `static prop source`s changed due to modified shape matching
+- `component version`: a version (a deterministic hash) identifying the _version_ of a `Component config entity` either because the underlying `component` itself changed, or because the default `static prop sources` changed due to modified shape matching
 - `content type template`: see [`Canvas Config Management` doc](config-management.md).
 - `layout`: synonym of `component tree`
 - `prop expression`: see [`Canvas Shape Matching into Field Types` doc](shape-matching-into-field-types.md)
@@ -81,8 +81,8 @@ This adds to the product requirements listed in [`Canvas Components` doc](compon
 This uses the terms defined above.
 
 Given a component developed by a [Front-End Developer](diagrams/structurizr-SystemContext-001.md): how does Canvas allow a
-Content Creator to place a `component instance` in the `component tree`, specify values for the `component input`s and
-`component slot`s?
+Content Creator to place a `component instance` in the `component tree`, specify values for the `component inputs` and
+`component slots`?
 
 ### 3.1 Data Model: from Front-End Developer to a Canvas data model that empowers the Content Creator
 
@@ -98,7 +98,7 @@ each allow accessing the `Component config entity` and `Component Source Plugin`
 
 See `\Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem` + its validation constraint.
 
-Canvas defines a new `Canvas field type` with the following `field prop`s:
+Canvas defines a new `Canvas field type` with the following `field props`:
 - _uuid_ — A unique ID for this `component instance`
 - _component_id_ — This is the ID of the `Component config entity` this `component instance` references
 - _component_version_ — This is the version of the `Component config entity` this `component instance` uses.
@@ -108,7 +108,7 @@ Canvas defines a new `Canvas field type` with the following `field prop`s:
 
 When _parent_uuid_ and _slot_ are empty, the `component instance` is at the root of the `component tree`.
 
-Additionally there are two computed `field prop`s:
+Additionally there are two computed `field props`:
 - _component_ - this is an entity reference to the `Component config entity` the `component instance` uses, meaning also the appropriate version will be loaded. Any methods on the `Component config entity` can be chained. E.g. `$item->get('component')?->getComponentSource()`.
 - _parent_item_ - this is a data reference to the sibling `\Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem` in the tree that represents the `component instance`'s parent `component instance` in the `component tree`. If the `component instance` has no parent, this will be NULL. Any methods on the parent `component instance` can be chained, e.g. `$item->get('parent_item')->getComponent()?->getComponentSource()?->getSlotDefinitions()`
 
@@ -126,7 +126,7 @@ Additionally, convenience methods for accessing/setting values on the `Component
 - `getLabel(): ?string` - gets the (optional) label for the `component instance` to provide context for content authors
 - `setLabel(?string $label): self` - sets the (optional) label for the `component instance` to provide context for content authors
 
-Storing these as separate `field prop`s simplifies supporting both symmetric and asymmetric translations:
+Storing these as separate `field props` simplifies supporting both symmetric and asymmetric translations:
 - the _inputs_ column group (just the `inputs` column) group SHOULD always be translatable
 - the _tree_ column group (comprising `uuid`, `component_id`, `component_version`, `parent_uuid` and `slot`) can be either:
   1. marked translatable for _asymmetric translations_ (a different `component tree` per `content entity` translation)
@@ -134,7 +134,7 @@ Storing these as separate `field prop`s simplifies supporting both symmetric and
 
 (Drupal's Content Translation module natively supports configuring this.)
 
-#### 3.2.1 The columns (`field prop`s) storing the tree structure
+#### 3.2.1 The columns (`field props`) storing the tree structure
 
 The `uuid`, `component_id`, `component_version`, `parent_uuid` and `slot` columns model the tree structure.
 
@@ -228,7 +228,7 @@ The above is the _runtime_ representation.
 
 The _stored_ representation is optimized for compactness, and each `ComponentSource` is the authority for how to
 optimize the stored data. For example:
-- `ComponentSource`s whose explicit inputs are populated by `StaticPropSource`s can decide that all instances of some
+- `ComponentSources` whose explicit inputs are populated by `StaticPropSources` can decide that all instances of some
   `component version` must use the exact same `StaticPropSource`. That enables them to store only the value inside the
   `StaticPropSource`, and load the metadata when needed. Result: see below.
 - The `Block` `ComponentSource` _could_ (but does not yet at the time of writing) choose to omit `label` and
@@ -274,14 +274,14 @@ optimize the stored data. For example:
 Assuming the _tree_ column groups (`uuid`, `component_id`, `parent_uuid` and `slot`) has already been validated, a `component tree` described in an `Canvas field` then is valid
 when: for each `component instance` in the _tree_ `field prop`:
 1. getting the explicit input using `ComponentSourceInterface::getExplicitInput()` (which for `Block` requires no extra
-   work but for `SDC` involves resolving the stored `prop source`s, resulting in values to be passed to the
-   corresponding `component input`s)
+   work but for `SDC` involves resolving the stored `prop sources`, resulting in values to be passed to the
+   corresponding `component inputs`)
 2. calling `ComponentSourceInterface::validateComponentInput()` (which for `Block` uses config schema validation and for
   `SDC` checking if `\Drupal\Core\Theme\Component\ComponentValidator::validateProps()` does not throw an exception)
 
-#### 3.2.4 Facilitating `component input`s changes
+#### 3.2.4 Facilitating `component inputs` changes
 
-When a `component` evolves, _some_ `component input`s cannot happen without also updating the stored `component tree`. In
+When a `component` evolves, _some_ `component inputs` cannot happen without also updating the stored `component tree`. In
 other words: an upgrade path is necessary if a Front-End Developer makes certain drastic changes:
 - renaming a `component input`
 - changing the schema of a `component input`
@@ -296,7 +296,7 @@ require logic somewhat like this:
 
 The above sequence assumes doing this per-entity. But this can actually be done _per entity-type_, or more precisely:
 per `Canvas field`. So if the `Canvas field type` is only used for one entity type but is used in many bundles (i.e. many
-different `content entity type`s), then a single query can find all `component instances` of the evolving `component`.
+different `content entity types`), then a single query can find all `component instances` of the evolving `component`.
 After that point, the typical Drupal update path best practices apply. The key observation here: it is possible to
 efficiently find all uses of a `component`.
 
@@ -307,21 +307,21 @@ See `\Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList`.
 _This uses 3.2.1, 3.2.2 and 3.2.3._
 
 Thanks to the validation in 3.2.3, it is guaranteed that each individual `component instance` _can_ be rendered. But the
-goal is of course to render a `component tree` (not `component instance`s), by starting at the root and rendering each
+goal is of course to render a `component tree` (not `component instances`), by starting at the root and rendering each
 `component instance` in the specified `component slot`.
 
 To hydrate the stored `component tree`:
-1. get (flat) list of `component instance`s from the _tree_ `field prop` (3.2.1): a list of `uuid`s
+1. get (flat) list of `component instances` from the _tree_ `field prop` (3.2.1): a list of `uuids`
 2. load the corresponding `Component config entity` for each `component instance` given its UUID, which in turn enables
    loading the corresponding `Component Source Plugin`
 3. get the explicit input from the _inputs_ `field prop` (3.2.2) for each `component instance`, by using the `Component
    Source Plugin`'s `::getExplicitInput()` method
-   - for `Component Source Plugin`s with their own input UX (such as `BlockComponent`), that's just forwarding the
+   - for `Component Source Plugins` with their own input UX (such as `BlockComponent`), that's just forwarding the
      stored values
    - for those without their own input UX (such as `SingleDirectoryComponent`), that may require additional resolving or
      evaluating (such as resolving the stored `prop source` — see 3.1)
-4. pass those explicit inputs to each `component instance`, resulting in a list of hydrated `component instance`s
-5. transform that list to a tree by respecting the _tree_ `field prop` (3.2.1), by placing nested `component instance`s
+4. pass those explicit inputs to each `component instance`, resulting in a list of hydrated `component instances`
+5. transform that list to a tree by respecting the _tree_ `field prop` (3.2.1), by placing nested `component instances`
    in the specified `component slot` of the specified parent `component instance` (special case: the root)
 
 To render the stored `component tree`, it must first be hydrated it (see above), after which it can be
@@ -354,20 +354,20 @@ Each node in the `component tree` is described with a `nodeType` key which is on
 
 The top level of the `layout` structure is an array of zero or more `region` nodes.
 
-#### 3.4.1 `component node`s
+#### 3.4.1 `component nodes`
 
 A `component node` represents a single `component instance` in the `component tree` and
-will contain zero or more `component slot`s.
+will contain zero or more `component slots`.
 
-`component node`s have the following keys
+`component nodes` have the following keys
 - `uuid`: a unique identifier for the `component instance`.
 - `type`: an opaque string containing a `Component config entity` ID + version that this instantiates
 - `name`: a name assigned by a Content Creator, to for example distinguish this particular `component instance` of some
   `component` among the 20 such in the current component tree
-- `slots`: an object of `slot node`s representing each `component slot` of this `component instance` (including empty
+- `slots`: an object of `slot nodes` representing each `component slot` of this `component instance` (including empty
   slots)
 
-An example simple `component instance` of a `component` with no `component slot`s, and with a name for the `component
+An example simple `component instance` of a `component` with no `component slots`, and with a name for the `component
 instance` specified by the Content Creator:
 ```json
 {
@@ -396,13 +396,13 @@ An example simple `component instance` of a `component` with a single `component
 }
 ```
 
-#### 3.4.2 `slot node`s
+#### 3.4.2 `slot nodes`
 
 A `slot node` must be the child of a `component node`.
 
-`slot node`s have the following keys
+`slot nodes` have the following keys
 - `name`: a human-readable name that may be displayed to the user.
-- `components`: an array of `component node`s that represent the top-level `component instances` for this `component slot`
+- `components`: an array of `component nodes` that represent the top-level `component instances` for this `component slot`
 - `id`: a unique ID made up of the `uuid` of the parent component followed by the `component slot` name, separated by a slash.
 
 ```json
@@ -414,16 +414,16 @@ A `slot node` must be the child of a `component node`.
 }
 ```
 
-#### 3.4.3 `region node`s
+#### 3.4.3 `region nodes`
 
 A `region node` can only exist at the top level in the `layout` tree and can be
 thought of as a special case of a `slot` that applies to the page rather than
-a `component`. Just like a `slot node`, it can contain zero or more `component node`s.
+a `component`. Just like a `slot node`, it can contain zero or more `component nodes`.
 
-`region node`s have the following keys
+`region nodes` have the following keys
 - `id` is the identifier of the `theme region`.
 - `name`: a human-readable name that may be displayed to the user.
-- `components`: an array of `component node`s that represent the top-level `component instances` for this `theme region`
+- `components`: an array of `component nodes` that represent the top-level `component instances` for this `theme region`
 
 The `theme region` with the ID of `content` is treated specially by the server, and assumed to contain
 the `content entity`. The front end should not need to do anything special
@@ -451,7 +451,7 @@ UUID of the `component instance`.
 UUIDs that don't have model values, or model values that are orphaned and
 don't have corresponding components in the layout. The server side's validation logic forbids saving in this case.)
 
-A complete example, with three `region node`s:
+A complete example, with three `region nodes`:
 * A `'header'` region with a single component instance.
 * A `'content'` region with multiple, nested component instances a tree.
 * An empty `'footer'` region.
@@ -554,9 +554,9 @@ A complete example, with three `region node`s:
 }
 ```
 
-### 3.5 Data Model: dealing with `component`s evolution
+### 3.5 Data Model: dealing with `components` evolution
 
-The stored `component tree`s contain `component instance`s tied with specific versions of the associated `Component config entity`. But every `component` can evolve, which will result in new versions.
+The stored `component trees` contain `component instances` tied with specific versions of the associated `Component config entity`. But every `component` can evolve, which will result in new versions.
 
 Each `component source` is able to specify an updater class (see `\Drupal\canvas\ComponentSource\ComponentInstanceUpdaterInterface`).
 This updater will be responsible for:
@@ -565,11 +565,11 @@ This updater will be responsible for:
 * Deciding if a `component instance` not using the active version can be updated automatically without any data loss.
 * Performing that update.
 
-This update of the `component tree`'s`component instance`s will happen automatically
+This update of the `component tree`'s`component instances` will happen automatically
 as soon as we attempt to edit a component tree (see `\Drupal\canvas\Controller\ApiLayoutController::buildRegion()` and
 `\Drupal\canvas\Controller\ApiConfigControllers::normalize()`).
 
-For those `component source`s not providing an input UX (see [`Canvas Components` doc](components.md)), the scenarios
+For those `component sources` not providing an input UX (see [`Canvas Components` doc](components.md)), the scenarios
 where such an update is possible without any risk are:
 
 - Adding optional props

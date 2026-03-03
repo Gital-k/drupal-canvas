@@ -56,7 +56,7 @@ flowchart TD
     %% ComponentIncompatibilityReasonRepository
     ReasonRepository(("incompatibility reason repository"))
 
-    %% (re)generating of `Component`s: flow -> subgraphs
+    %% (re)generating of `Components`: flow -> subgraphs
     subgraph "**ComponentSourceManager**: (re)generating of _Component_ config entities"
         genAll
         genAll --> |for each _ComponentSource_| genForSource
@@ -80,7 +80,7 @@ flowchart TD
 
         end
     end
-    %% (re)generating of `Component`s: results -> outside subgraphs
+    %% (re)generating of `Components`: results -> outside subgraphs
     componentAlreadyExists --> |"🚫<br>yes<br><br>✍️<br>_disable_: status=FALSE<br><br>(because no longer meets requirement)"| Components
     componentAlreadyExists --> |"⛔<br>no<br><br>_track why_"| ReasonRepository
     computedSettingsYieldNewVersion --> |"✅<br>yes<br><br>✍️<br>_create new version_<br><br>(creates or updates _Component_ config entity)"| Components
