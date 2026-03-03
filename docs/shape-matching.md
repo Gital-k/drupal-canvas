@@ -75,10 +75,10 @@ This uses the terms defined above.
 
 ### 3.1 Data Model: from Front-End Developer to a Canvas data model that empowers the Content Creator
 
-⚠️ This only applies to `components` originating from a `Component Source Plugin` that DO NOT have an input UX (such as
+⚠️ This only applies to _components_ originating from a `Component Source Plugin` that DO NOT have an input UX (such as
 `SDC`), for others the UX and storage are both simply the existing one, and NOTHING in this document applies! ⚠️
 
-#### 3.1.1 Interpreting `components` without input UX: _prop shapes_
+#### 3.1.1 Interpreting _components_ without input UX: _prop shapes_
 
 See `\Drupal\canvas\PropShape\PropShape`.
 

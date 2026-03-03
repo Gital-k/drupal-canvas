@@ -14,13 +14,13 @@ In the rest of this document, `Drupal Canvas` will be written as `Canvas`.
 ### 1.2 Canvas terminology
 
 - _component_: a component generates markup (and might attach CSS + JS), potentially based on some input.
-- `Component Source Plugin`: `components` have a translation layer (per _component type_) between the `Component` config entity and the actual plugin that
+- `Component Source Plugin`: _components_ have a translation layer (per _component type_) between the `Component` config entity and the actual plugin that
   accepts input and generates output, e.g. `SingleDirectoryComponent` (`sdc`-prefixed) and `BlockComponent` (`block`-prefixed).
-- _component input_: either `explicit component input` or `implicit component input`, this is the catch-all for both
+- _component input_: either _explicit component input_ or _implicit component input_, this is the catch-all for both
 - _component slot_: each component may in its metadata define 0 or more slots, each slot accepts >=0 component instances in a particular order
 - _component type_: the ID of a `Component Source Plugin` — currently either "sdc", "block" or "js"
-- `explicit component input`: each _component_ may in its metadata define 0 or more explicit inputs to be provided by the person placing an instance of this _component_, each input accepts structured data conforming to the shape defined in the _component_'s (`ComponentSourcePlugin`-specific) metadata
-- `implicit component input`: in contrast with a `explicit component input`, an implicit input is not provided by the person placing an instance: it is implicitly present: it is provided by other content displayed on the current route, by the request context (e.g. URL query string, current user …) or by the environment (e.g. time of day).
+- _explicit component input_: each _component_ may in its metadata define 0 or more explicit inputs to be provided by the person placing an instance of this _component_, each input accepts structured data conforming to the shape defined in the _component_'s (`ComponentSourcePlugin`-specific) metadata
+- _implicit component input_: in contrast with a _explicit component input_, an implicit input is not provided by the person placing an instance: it is implicitly present: it is provided by other content displayed on the current route, by the request context (e.g. URL query string, current user …) or by the environment (e.g. time of day).
   - ⚠️This is not yet supported. the `Block` component type needs it to support [_contexts_](https://www.drupal.org/docs/drupal-apis/plugin-api/plugin-contexts#s-context-on-blocks), unclear how that will be surfaced in Canvas; initially, only block plugins that do not require contexts are supported.
 
 ## 2. Product requirements
@@ -29,12 +29,12 @@ This uses the terms defined above.
 
 (There are [more](https://docs.google.com/spreadsheets/d/1OpETAzprh6DWjpTsZG55LWgldWV_D8jNe9AM73jNaZo/edit?gid=1721130122#gid=1721130122), but these in particular affect Canvas's supported components.)
 
-- MUST be possible for the Site Builder to control, audit and synchronize which `components` are available for Content Creators → see [`Canvas Config Management` doc](config-management.md)
+- MUST be possible for the Site Builder to control, audit and synchronize which _components_ are available for Content Creators → see [`Canvas Config Management` doc](config-management.md)
 - MUST support `SDC` and `Block` today
   - MUST be evolvable to [support other component types later](https://www.drupal.org/project/canvas/issues/3454519)
 - MUST support existing `SDCs` and `Blocks`, if they meet certain criteria necessary for Canvas to provide a good UX
-- MUST support categorization of `components`
-- MUST support efficiently storing `explicit component input` in whatever format is appropriate for the `Component
+- MUST support categorization of _components_
+- MUST support efficiently storing _explicit component input_ in whatever format is appropriate for the `Component
   Source Plugin`
 - MAY require API additions and perhaps even changes to `SDCs` (such as: defining restrictions for _component slots_, schema references and more) ⚠️ [an overview of what has been identified is constantly updated](https://www.drupal.org/project/canvas/issues/3462705) ⚠️
 
@@ -76,14 +76,14 @@ See:
 - `\Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::buildEphemeralSdcPluginInstance()`
 
 
-### 3.1 `SDC` `components`
+### 3.1 `SDC` _components_
 
-#### 3.1.1 Inputs & instantiation UX for `SDC` `components`
-`SDC` `components` specify the accepted explicit inputs ("props") and their shapes in a `*.component.yml` file. The
+#### 3.1.1 Inputs & instantiation UX for `SDC` _components_
+`SDC` _components_ specify the accepted explicit inputs ("props") and their shapes in a `*.component.yml` file. The
 shapes (and  semantics!) are defined using JSON schema. Defaults are present as an `example`, which is a feature of JSON
 schema.
 
-`SDC` `components` DO NOT accept implicit inputs.
+`SDC` _components_ DO NOT accept implicit inputs.
 
 `SDC` DOES NOT provide an input UX, so its `Component Source Plugin` must do so on its behalf; and does so by matching
 available field types against the JSON schema of its explicit inputs ("props"). For details, see the [`Canvas Shape Matching
@@ -92,7 +92,7 @@ significant amount of metadata, which is reduced significantly thanks to:
 - `\Drupal\canvas\ComponentSource\ComponentSourceInterface::preSaveItem()`
 - `\Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::collapse()`
 
-#### 3.1.2 Criteria for `SDC` `components`
+#### 3.1.2 Criteria for `SDC` _components_
 
 For an `SDC` to be compatible/eligible for use in Canvas, it:
 - MUST always have schema, even for theme `SDCs`
@@ -113,32 +113,32 @@ _Note:_ this list of criteria is not final, it will keep evolving _at least_ unt
 - … likely more to come, see the [full list](https://www.drupal.org/project/canvas/issues/3462705)
 
 
-### 3.2 `Block` `components`
+### 3.2 `Block` _components_
 
 An immediate question that will come to mind when reading this: why `Block` the _plugins_ and not `Block` the _config entities_?
 It does not make sense to surface the config entities, because:
 1. they're hard-coupled to a theme (region): they're a "placed block" in the Drupal UI!
 2. there can be multiple instances ("placements") of the same block plugin, each with a different label, but they'd render exactly the same in Canvas
 
-Therefore, it only makes sense to surface _block plugins_ as Canvas `components`.
+Therefore, it only makes sense to surface _block plugins_ as Canvas _components_.
 
-#### 3.2.1 Inputs & instantiation UX for `Block` `components`
+#### 3.2.1 Inputs & instantiation UX for `Block` _components_
 
-`Block` `components` specify the accepted explicit inputs and their shapes in `*.schema.yml` file. The shapes are
+`Block` _components_ specify the accepted explicit inputs and their shapes in `*.schema.yml` file. The shapes are
 defined  using config schema (`type: block.settings.<PLUGIN ID>`). Defaults are present as the
 `::defaultConfiguration()` method  on the PHP plugin class.
 
-`Block` `components` DO accept implicit inputs, in two ways even:
+`Block` _components_ DO accept implicit inputs, in two ways even:
 1. Logic in the block plugin can fetch data — through database queries, HTTP requests, anything.
 2. Contexts. Not yet supported. (⚠️ handling contexts is still TBD in [#3485502](https://www.drupal.org/project/canvas/issues/3485502))
 
-`Block` `components` specify the accepted explicit inputs. They typically allow influencing the logic in the block
+`Block` _components_ specify the accepted explicit inputs. They typically allow influencing the logic in the block
 plugin. These explicit inputs can hence be seen as knobs and levers to adjust what the underlying block plugin does.
 
 `Block` DOES provide an input UX (`BlockPluginInterface::buildConfigurationForm()`), so its `Component Source Plugin`
 simply reuses that.
 
-#### 3.2.2 Criteria for `Block` `components`
+#### 3.2.2 Criteria for `Block` _components_
 
 For a `Block` to be compatible/eligible for use in Canvas it:
  - MUST have fully validatable block plugin settings config schema via the `FullyValidatable` constraint
@@ -159,26 +159,26 @@ refer to "blocks" and not "block plugins", under the hood, they actually _are_ b
 
 
 
-### 3.3 `JS` `components` (aka "code components")
+### 3.3 `JS` _components_ (aka "code components")
 
-#### 3.3.1 Inputs & instantiation UX for `JS` `components`
+#### 3.3.1 Inputs & instantiation UX for `JS` _components_
 
-`JS` `components` specify the accepted explicit inputs ("props") and their shapes in the underlying
-`JavaScriptComponent config entity`, using the exact same format (JSON schema) as `SDC` `components` (see [section
+`JS` _components_ specify the accepted explicit inputs ("props") and their shapes in the underlying
+`JavaScriptComponent config entity`, using the exact same format (JSON schema) as `SDC` _components_ (see [section
 3.1.1 above](#3.1.1)). See [section 3.2 `JavaScriptComponent config entity` in the `Canvas Config Management`
 doc](config-management.md#3.2) for all details.
 
-`JS` `components` DO NOT accept implicit inputs.
+`JS` _components_ DO NOT accept implicit inputs.
 
 `JS` DOES NOT provide an input UX, so its `Component Source Plugin` must do so on its behalf; and does so by matching
 available field types against the JSON schema of its explicit inputs ("props"). For details, see the [`Canvas Shape Matching
 into Field Types` doc](shape-matching-into-field-types.md). (It shares this infrastructure with the `SDC` `Component
 Source Plugin`.)
 
-#### 3.3.2 Criteria for `JS` `components`
+#### 3.3.2 Criteria for `JS` _components_
 
 There aren't any, because the validation logic for the `JavaScriptComponent config entity` type prevents saving a `JS`
-_component_ whose inputs Canvas cannot generate an input UX for: it imposes the same criteria as for `SDC` `components` (see
+_component_ whose inputs Canvas cannot generate an input UX for: it imposes the same criteria as for `SDC` _components_ (see
 [section 3.1.2 above](#3.1.2)).
 
 ### 3.4 Fallback
@@ -206,5 +206,5 @@ Nothing yet, this will change when we [support other _component types_ later](ht
 ### 3.6 Categorization
 
 Each _component_ can be placed in a folder to group them in the UI. The initial folder is determined by each `Component Source Plugin`.
-E.g. `SDC` `components` are using the `group` property in their metadata.
+E.g. `SDC` _components_ are using the `group` property in their metadata.
 See `\Drupal\canvas\ComponentSource\ComponentSourceInterface::determineDefaultFolder()`

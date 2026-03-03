@@ -402,7 +402,7 @@ A _slot node_ must be the child of a _component node_.
 
 _slot nodes_ have the following keys
 - `name`: a human-readable name that may be displayed to the user.
-- `components`: an array of _component nodes_ that represent the top-level _component instances_ for this _component slot_
+- _components_: an array of _component nodes_ that represent the top-level _component instances_ for this _component slot_
 - `id`: a unique ID made up of the `uuid` of the parent component followed by the _component slot_ name, separated by a slash.
 
 ```json
@@ -423,7 +423,7 @@ a _component_. Just like a _slot node_, it can contain zero or more _component n
 _region nodes_ have the following keys
 - `id` is the identifier of the _theme region_.
 - `name`: a human-readable name that may be displayed to the user.
-- `components`: an array of _component nodes_ that represent the top-level _component instances_ for this _theme region_
+- _components_: an array of _component nodes_ that represent the top-level _component instances_ for this _theme region_
 
 The _theme region_ with the ID of `content` is treated specially by the server, and assumed to contain
 the _content entity_. The front end should not need to do anything special
@@ -554,7 +554,7 @@ A complete example, with three _region nodes_:
 }
 ```
 
-### 3.5 Data Model: dealing with `components` evolution
+### 3.5 Data Model: dealing with _components_ evolution
 
 The stored _component trees_ contain _component instances_ tied with specific versions of the associated `Component config entity`. But every _component_ can evolve, which will result in new versions.
 

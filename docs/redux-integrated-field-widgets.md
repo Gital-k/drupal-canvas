@@ -101,7 +101,7 @@ Some components have a different representations for the source and resolved for
 might have an `image` property with a _prop source_ that is stored as a reference to a media entity
 but via a _prop expression_ this might evaluate to an object with keys `src`, `alt`, `width` and `height`.
 The client-side representation of the data model keeps track of both the source and resolved values.
-In the case of `SDC` and `JS` `components`, the source will take the form of an array representation
+In the case of `SDC` and `JS` _components_, the source will take the form of an array representation
 of the _prop source_. e.g. for a "text" _field item_ this might be
 
 ```

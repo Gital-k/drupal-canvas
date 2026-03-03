@@ -26,8 +26,8 @@ When we talk about Personalization Variants, we talk about _both_:
 - the explicit inputs for _component instances_ being different per variant. At the _component level_, this is what
 Figma defines as Variant, Storybook might define it as Story, and at the SDC component level we
 [might define it as Example](https://www.drupal.org/project/drupal/issues/3522644).
-- the `components`: it is possible not only to keep the same `components` and just assign different
-`explicit component inputs` per variant, but also to completely change _which_ `components` are present in a variant
+- the _components_: it is possible not only to keep the same _components_ and just assign different
+`explicit component inputs` per variant, but also to completely change _which_ _components_ are present in a variant
 
 `Default Personalization Variant`: The variant that will be displayed to the user when they don’t fit any of the
 previous Segments. Colloquially speaking can be referred to as the `Default Site`.

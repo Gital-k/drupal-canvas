@@ -39,14 +39,14 @@ to one of us! 😊 🙏
 ### 1.2 Canvas terminology
 
 - _component_: see [`Canvas Components` doc](components.md)
-- `Component config entity`: `components` available for use in Canvas are tracked as config entities. They correspond 1:1 to eligible
+- `Component config entity`: _components_ available for use in Canvas are tracked as config entities. They correspond 1:1 to eligible
   `SDCs` and `Blocks`.
 - _component input_: see [`Canvas Components` doc](components.md)
 - `Component Source Plugin`: see [`Canvas Components` doc](components.md)
 - _component slot_: see [`Canvas Components` doc](components.md)
 - _component type_: see [`Canvas Components` doc](components.md)
 - _component tree_: see [`Canvas Data Model` doc](data-model.md)
-- `content type template`: the default _component tree_ for a particular _content type_, which typically includes assigning the smallest units of _structured data_ to particular _component inputs_, and uses `configuration entity dependencies` to ensure the necessary `components` are present
+- `content type template`: the default _component tree_ for a particular _content type_, which typically includes assigning the smallest units of _structured data_ to particular _component inputs_, and uses `configuration entity dependencies` to ensure the necessary _components_ are present
 - `Folders`: a way to organize components, patterns and code components into individual "Folders" on the client-side of Canvas
 - `Folder config entity`: stores a list of `items` of particular `configEntityTypeId`, currently limited to _component_, `pattern` and `js_component`
 - `PageRegion config entity`: stores a _component tree_ for every _theme region_ in a given Drupal theme
@@ -63,8 +63,8 @@ This adds to the product requirements listed in [`Canvas Components` doc](compon
 
 (There are [more](https://docs.google.com/spreadsheets/d/1OpETAzprh6DWjpTsZG55LWgldWV_D8jNe9AM73jNaZo/edit?gid=1721130122#gid=1721130122), but these in particular affect Canvas's supported components.)
 
-- MUST be able to synchronize `components` and `content type templates` from one site to another WITHOUT changes to Drupal deployment best practices (requirement [`14. Configuration management`](https://docs.google.com/spreadsheets/d/1OpETAzprh6DWjpTsZG55LWgldWV_D8jNe9AM73jNaZo/edit?gid=1721130122#gid=1721130122&range=B25))
-- MUST be able to populate a `theme`'s _page template_ using Canvas `components` (requirement [`19. Modify the page template`](https://docs.google.com/spreadsheets/d/1OpETAzprh6DWjpTsZG55LWgldWV_D8jNe9AM73jNaZo/edit?gid=1721130122#gid=1721130122&range=B30))
+- MUST be able to synchronize _components_ and `content type templates` from one site to another WITHOUT changes to Drupal deployment best practices (requirement [`14. Configuration management`](https://docs.google.com/spreadsheets/d/1OpETAzprh6DWjpTsZG55LWgldWV_D8jNe9AM73jNaZo/edit?gid=1721130122#gid=1721130122&range=B25))
+- MUST be able to populate a `theme`'s _page template_ using Canvas _components_ (requirement [`19. Modify the page template`](https://docs.google.com/spreadsheets/d/1OpETAzprh6DWjpTsZG55LWgldWV_D8jNe9AM73jNaZo/edit?gid=1721130122#gid=1721130122&range=B30))
 - MUST be able to store and reuse _component_ compositions (requirement [`29. Layout Patterns`](https://docs.google.com/spreadsheets/d/1OpETAzprh6DWjpTsZG55LWgldWV_D8jNe9AM73jNaZo/edit?gid=1721130122#gid=1721130122&range=B41))
 - MUST support auditability, assuming (to answer questions such as: which _field type_ and _field widget_ does a _component_ use when it is instantiated, why is a given `SDC` not available as a _component_ in Canvas, et cetera)
 
@@ -145,8 +145,8 @@ These config entities are therefore the foundations that enable Canvas to work r
   [`Canvas Components` doc, section 3.1.1](components.md#3.1.1)).
 
 UI routes:
-- available `components`: `/admin/appearance/component`
-- unavailable `components`: `/admin/appearance/component/status`
+- available _components_: `/admin/appearance/component`
+- unavailable _components_: `/admin/appearance/component/status`
 
 
 ### 3.2 `JavaScriptComponent config entity`
@@ -185,7 +185,7 @@ the hood involves creating a sibling `Component config entity` — see [section 
 by the `JS` `Component Source Plugin`. Section `3.2.1` below describes this in detail.
 
 To the Content Creator, then, the input UX of an `SDC`-sourced _component_ and a `JS`-sourced _component_ with the same
-"props" (the name used for the `explicit component input` of both of those `Component Source Plugins`) must be
+"props" (the name used for the _explicit component input_ of both of those `Component Source Plugins`) must be
 _indistinguishable_ from each other — despite one relying on Twig and the other only on JS.
 
 
