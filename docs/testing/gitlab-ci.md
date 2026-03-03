@@ -18,4 +18,4 @@ gitlab-ci-local \
 ## Tracked Files
 
 Untracked and ignored files will not be synced inside isolated jobs, only tracked
-files are synced, so remember to _git add_ first.
+files are synced, so remember to `git add` first.

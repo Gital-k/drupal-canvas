@@ -41,7 +41,7 @@ to one of us! 😊 🙏
 
 ### 1.2 Canvas terminology
 
-- `component`: see [`Canvas Components` doc](components.md)
+- _component_: see [`Canvas Components` doc](components.md)
 - _component input_: see [`Canvas Components` doc](components.md)
 - `Component Source Plugin`: see [`Canvas Components` doc](components.md)
 - _component type_: see [`Canvas Components` doc](components.md)
@@ -133,7 +133,7 @@ Hence the matching works like this:
    to find a match
 
 Finally, while the _prop shape_ may be the same for many _component inputs_, that same _prop shape_ may be required for
-one `component`'s _component input_, but optional for another. So an additional filtering step is required for optional
+one _component_'s _component input_, but optional for another. So an additional filtering step is required for optional
 versus required occurrences of a _prop shape_:
 3. if a _component input_ is required, the matching _entity fields_ must also be marked as required
 

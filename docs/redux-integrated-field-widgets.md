@@ -54,7 +54,7 @@ specifically section 3.1.2 ("Finding fitting _field type_: _conjured fields_ and
 model parts are less relevant/interesting, that is fine. Here's a summary that explains why this document/infrastructure
 is needed:
 1. Canvas is about composing components (into a _component tree_) to craft an experience
-2. a `component` has _component inputs_, which must be populated to render the `component`
+2. a _component_ has _component inputs_, which must be populated to render the _component_
 3. Canvas aims to use Drupal's existing _field type_ functionality to store values for those _component inputs_
 4. for Canvas to choose a _field type_ that is appropriate for a particular _component input_, Canvas analyzes its _prop shape_
 5. each _field type_ has one or more _field widgets_, which Canvas must use to be able to actually use that _field type_

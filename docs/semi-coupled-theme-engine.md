@@ -22,14 +22,14 @@ Related Canvas issue queue components:
 
 - [`JSX`](https://react.dev/learn/writing-markup-with-jsx): A syntax extension to JavaScript that allows writing HTML-like markup, and hence is essentially a JS-based template language.
 - [`React`](https://react.dev): A JavaScript library used to create highly interactive user interfaces.
-- [`React component`](https://react.dev/learn/your-first-component): a reusable building block consisting of at least markup and potentially functionality. These are created in `js|jsx|ts|tsx` files and typically written using `JSX` syntax. In this document, it is NOT to be confused with `component` as in [`Canvas Components` doc](components.md).
+- [`React component`](https://react.dev/learn/your-first-component): a reusable building block consisting of at least markup and potentially functionality. These are created in `js|jsx|ts|tsx` files and typically written using `JSX` syntax. In this document, it is NOT to be confused with _component_ as in [`Canvas Components` doc](components.md).
 - `React element` is what is returned by a `React component`: an object describing the DOM nodes that a `React component` represents. When passed as an arg to `React.render()`, the markup it represents is returned.
 - [HTML `<template>` element](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/template)
 - [HTML `slot` attribute](https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/slot)
 
 ### 1.3 Canvas terminology
 
-- `component`: see [`Canvas Components` doc](components.md)
+- _component_: see [`Canvas Components` doc](components.md)
 - `Semi-Coupled theme engine`: A Canvas-provided _theme engine_ that allows a mixture of `Twig` and `React components` as `templates`.
 - [`Hyperscriptify`](https://github.com/drupal-jsx/hyperscriptify): A JS library created for Canvas that converts `Semi-Coupled theme engine` markup (provided by `Twig` and `JSX` templates) into `React elements`.
 

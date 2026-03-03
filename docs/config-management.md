@@ -38,7 +38,7 @@ to one of us! 😊 🙏
 
 ### 1.2 Canvas terminology
 
-- `component`: see [`Canvas Components` doc](components.md)
+- _component_: see [`Canvas Components` doc](components.md)
 - `Component config entity`: `components` available for use in Canvas are tracked as config entities. They correspond 1:1 to eligible
   `SDCs` and `Blocks`.
 - _component input_: see [`Canvas Components` doc](components.md)
@@ -48,7 +48,7 @@ to one of us! 😊 🙏
 - _component tree_: see [`Canvas Data Model` doc](data-model.md)
 - `content type template`: the default _component tree_ for a particular _content type_, which typically includes assigning the smallest units of _structured data_ to particular _component inputs_, and uses `configuration entity dependencies` to ensure the necessary `components` are present
 - `Folders`: a way to organize components, patterns and code components into individual "Folders" on the client-side of Canvas
-- `Folder config entity`: stores a list of `items` of particular `configEntityTypeId`, currently limited to `component`, `pattern` and `js_component`
+- `Folder config entity`: stores a list of `items` of particular `configEntityTypeId`, currently limited to _component_, `pattern` and `js_component`
 - `PageRegion config entity`: stores a _component tree_ for every _theme region_ in a given Drupal theme
 - `Pattern config entity`: stores a _component tree_ that allows Ambitious Site Builders to save common component composition patterns for Content Creators to reuse
 - _structured data_: see [`Canvas Data Model` doc](data-model.md)
@@ -65,8 +65,8 @@ This adds to the product requirements listed in [`Canvas Components` doc](compon
 
 - MUST be able to synchronize `components` and `content type templates` from one site to another WITHOUT changes to Drupal deployment best practices (requirement [`14. Configuration management`](https://docs.google.com/spreadsheets/d/1OpETAzprh6DWjpTsZG55LWgldWV_D8jNe9AM73jNaZo/edit?gid=1721130122#gid=1721130122&range=B25))
 - MUST be able to populate a `theme`'s _page template_ using Canvas `components` (requirement [`19. Modify the page template`](https://docs.google.com/spreadsheets/d/1OpETAzprh6DWjpTsZG55LWgldWV_D8jNe9AM73jNaZo/edit?gid=1721130122#gid=1721130122&range=B30))
-- MUST be able to store and reuse `component` compositions (requirement [`29. Layout Patterns`](https://docs.google.com/spreadsheets/d/1OpETAzprh6DWjpTsZG55LWgldWV_D8jNe9AM73jNaZo/edit?gid=1721130122#gid=1721130122&range=B41))
-- MUST support auditability, assuming (to answer questions such as: which _field type_ and _field widget_ does a `component` use when it is instantiated, why is a given `SDC` not available as a `component` in Canvas, et cetera)
+- MUST be able to store and reuse _component_ compositions (requirement [`29. Layout Patterns`](https://docs.google.com/spreadsheets/d/1OpETAzprh6DWjpTsZG55LWgldWV_D8jNe9AM73jNaZo/edit?gid=1721130122#gid=1721130122&range=B41))
+- MUST support auditability, assuming (to answer questions such as: which _field type_ and _field widget_ does a _component_ use when it is instantiated, why is a given `SDC` not available as a _component_ in Canvas, et cetera)
 
 
 ## 3. Implementation
@@ -105,17 +105,17 @@ See:
 - `\Drupal\canvas\ComponentSource\ComponentInstanceUpdaterInterface`
 
 One `Component config entity` is [automatically created (and updated](https://www.drupal.org/project/canvas/issues/3463999)
-per `component` that is present and meets the criteria (see [`Canvas Components` doc, section 3.1.1](components.md#3.1.1)).
+per _component_ that is present and meets the criteria (see [`Canvas Components` doc, section 3.1.1](components.md#3.1.1)).
 
-When a `component` does not meet the criteria, the _reasons_ for that are tracked and presented in the UI.
+When a _component_ does not meet the criteria, the _reasons_ for that are tracked and presented in the UI.
 
 The `Component` config entity contains:
-- the `component` ID, with the prefix (the first ID part) identifying the `Component Source Plugin`, and the
-  remainder being used by that plugin (typically to allow a `Component Source Plugin` to provide >1 `component`)
+- the _component_ ID, with the prefix (the first ID part) identifying the `Component Source Plugin`, and the
+  remainder being used by that plugin (typically to allow a `Component Source Plugin` to provide >1 _component_)
 - the `source`: a `Component Source Plugin` ID.
 - the `source_local_id`: The intra-source ID of this component in this source — can be a plugin ID (e.g. for `Block` and
   `SDC`), a config entity ID (e.g. for `js`), or anything else, such as a URL to identify a remotely discoverable
-  `component` if such a `Component Source Plugin` existed
+  _component_ if such a `Component Source Plugin` existed
 - the (versioned) `settings`: each `Component Source Plugin` MAY need to store component settings, and each has different needs:
   - `SDC` component type: `prop_field_definitions`, to configure what field type, widget and so on to use to store and
      edit the SDC's props.
@@ -128,7 +128,7 @@ The `Component` config entity contains:
   new content must use the most current Site Builder-curated list of `Components`.
 - which _field type_ and _field widget_ must be used to populate it with _unstructured data_ — for algorithmic details,
  see [`Canvas Data model`, section 3.1: "from Front-End Developer to a Canvas data model that empowers the Content Creator](./data-model.md#3.1)
-- the (versioned) `fallback_metadata`: when the `Component Source Plugin` can no longer find the `component` because a dependency is
+- the (versioned) `fallback_metadata`: when the `Component Source Plugin` can no longer find the _component_ because a dependency is
   removed (e.g. the module providing an SDC is uninstalled or a `JavaScriptComponent` config entity is deleted), this
   metadata (currently only slot definitions) will be used to fall back to the special `fallback` source to ensure
   existing _component trees_ continue to work (see [`Canvas Components` doc, section 3.4](components.md#3.4))
@@ -180,11 +180,11 @@ restrictions are applied during validation:
   schema_! This ensures a good DX for those modifying (exported) configuration by hand.
   See `config/schema/canvas.json_schema.yml`.
 
-Once a _code component_ is considered ready for use by its creator, it can be exposed as a Canvas `component` (which under
+Once a _code component_ is considered ready for use by its creator, it can be exposed as a Canvas _component_ (which under
 the hood involves creating a sibling `Component config entity` — see [section 3.1](#3.1) above). This is made possible
 by the `JS` `Component Source Plugin`. Section `3.2.1` below describes this in detail.
 
-To the Content Creator, then, the input UX of an `SDC`-sourced `component` and a `JS`-sourced `component` with the same
+To the Content Creator, then, the input UX of an `SDC`-sourced _component_ and a `JS`-sourced _component_ with the same
 "props" (the name used for the `explicit component input` of both of those `Component Source Plugins`) must be
 _indistinguishable_ from each other — despite one relying on Twig and the other only on JS.
 
@@ -256,7 +256,7 @@ See:
 - `\Drupal\canvas\Entity\Pattern`
 
 A `Pattern config entity` can be created by Ambitious Site Builders to accelerate the work of Content Creators: it
-contains a common `component` composition pattern.
+contains a common _component_ composition pattern.
 
 When using a pattern (reusing a `Pattern config entity`), the _component tree_ it contains at the time of using it is
 _absorbed_ into the place where it is being used in an `Canvas field`. Hence any changes to a `Pattern config entity` will
