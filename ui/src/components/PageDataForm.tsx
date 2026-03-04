@@ -15,10 +15,13 @@ import hyperscriptify from '@/local_packages/hyperscriptify';
 import propsify from '@/local_packages/hyperscriptify/propsify/standard/index.js';
 import { useGetPageLayoutQuery } from '@/services/componentAndLayout';
 import { useGetPageDataFormQuery } from '@/services/pageDataForm';
+import { getDrupalSettings } from '@/utils/drupal-globals';
 import { AJAX_UPDATE_FORM_STATE_EVENT } from '@/types/Ajax';
 import parseHyperscriptifyTemplate from '@/utils/parse-hyperscriptify-template';
 
 import type { AjaxUpdateFormStateEvent } from '@/types/Ajax';
+
+const drupalSettings = getDrupalSettings();
 
 const PageDataFormRenderer = () => {
   const pageData = useAppSelector(selectPageData);
@@ -39,7 +42,9 @@ const PageDataFormRenderer = () => {
     entityId && entityType ? { entityId, entityType } : skipToken,
   );
   const { isFetching: isFetchingLayout } = useGetPageLayoutQuery(
-    entityId && entityType ? { entityId, entityType } : skipToken,
+    entityId && entityType
+      ? { entityId, entityType, langcode: drupalSettings.langcode }
+      : skipToken,
   );
 
   const formRef = useRef<HTMLDivElement>(null);
@@ -93,10 +98,10 @@ const PageDataFormRenderer = () => {
       e: AjaxUpdateFormStateEvent,
     ) => void = ({ detail }) => {
       const { updates, formId } = detail;
-      // We only care about the entity form, not the component instance form.
+            // We only care about the entity form, not the component instance form.
       if (formId === FORM_TYPES.ENTITY_FORM) {
         if (Object.keys(updates).length === 0) {
-          // Nothing has changed, no need to change the state.
+                    // Nothing has changed, no need to change the state.
           return;
         }
 

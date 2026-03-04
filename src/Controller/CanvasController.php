@@ -40,8 +40,11 @@ use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Entity\Pattern;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Drupal\Core\Language\LanguageManagerInterface;
 
 final class CanvasController {
+
+  protected LanguageManagerInterface $languageManager;
 
   public function __construct(
     private readonly AssetRenderer $assetRenderer,
@@ -61,7 +64,10 @@ final class CanvasController {
     private readonly CanvasExtensionPluginManager $extensionPluginManager,
     private readonly ThemeSettingsDiscovery $themeSettingsDiscovery,
     private readonly GlobalImports $globalImports,
-  ) {}
+    LanguageManagerInterface $language_manager,
+  ) {
+    $this->languageManager = $language_manager;
+  }
 
   private const HTML = <<<HTML
 <!doctype html>
@@ -173,6 +179,7 @@ HTML;
           'canvas/canvasData.v0',
         ],
         'drupalSettings' => [
+          'langcode' => $this->languageManager->getCurrentLanguage()->getId(),
           'canvas' => [
             'base' => $entity_type !== NULL && $entity !== NULL
               ? Url::fromRoute('canvas.boot.entity', [
@@ -336,7 +343,7 @@ HTML;
     // Find all used client-side transforms.
     $transforms = [];
     foreach ($this->fieldWidgetPluginManager->getDefinitions() as $definition) {
-      if (!isset($definition['canvas']['transforms']) || !is_array($definition['canvas']['transforms'])) {
+      if (!isset($definition['canvas']['transforms']) || !\is_array($definition['canvas']['transforms'])) {
         continue;
       }
       $transforms = [...$transforms, ...\array_keys($definition['canvas']['transforms'])];

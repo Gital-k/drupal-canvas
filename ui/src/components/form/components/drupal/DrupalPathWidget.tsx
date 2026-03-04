@@ -70,7 +70,9 @@ const DrupalPathWidget = ({
   const { entityId, entityType } = useParams();
   const titleInput = useEntityTitle();
   const { data: fetchedLayout } = useGetPageLayoutQuery(
-    entityId && entityType ? { entityId, entityType } : skipToken,
+  entityId && entityType
+    ? { entityId, entityType, langcode: drupalSettings.langcode }
+    : skipToken,
   );
   const isPublished = fetchedLayout?.isPublished;
 

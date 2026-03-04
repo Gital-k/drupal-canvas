@@ -34,75 +34,77 @@ export type UpdateComponentQueryArg = {
   componentInstanceUuid: string;
   componentType: string;
   model: Omit<ComponentModel, 'name'> | Omit<EvaluatedComponentModel, 'name'>;
+  langcode?: string;
+  templateBundle?: string;
+  templateViewMode?: string;
 };
 
-export const previewApi = createApi({
-  reducerPath: 'previewApi',
-  baseQuery: baseQueryWithAutoSaves,
-  endpoints: (builder) => ({
-    postPreview: builder.mutation<
-      { html: string; autoSaves: AutoSavesHash },
-      {
-        entityType: string;
-        entityId: string;
-        layout: any;
-        model: any;
-        entity_form_fields: any;
-      }
-    >({
-      query: ({ entityType, entityId, ...body }) => ({
-        url: `canvas/api/v0/layout/${entityType}/${entityId}`,
-        method: 'POST',
-        body,
-      }),
-      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
-        const { data, meta } = await queryFulfilled;
-        const { html, autoSaves } = data;
-        dispatch(
-          pendingChangesApi.util.invalidateTags([
-            { type: 'PendingChanges', id: 'LIST' },
-          ]),
-        );
-        // Update our preview slice.
-        dispatch(setHtml(html));
-        handleAutoSavesHashUpdate(dispatch, autoSaves, meta);
-        dispatch(setPostPreviewCompleted(true));
-      },
-    }),
-    updateComponent: builder.mutation<
-      UpdateComponentResultType,
-      UpdateComponentQueryArg
-    >({
-      query: ({ type, ...body }) => {
-        let url = '';
-        if (type === 'entity') {
-          url = 'canvas/api/v0/layout/{entity_type}/{entity_id}';
-        } else if (type === 'template') {
-          url =
-            'canvas/api/v0/layout-content-template/{entity_type}.{template_bundle}.{template_view_mode}/{entity_id}';
+      export const previewApi = createApi({
+        reducerPath: 'previewApi',
+        baseQuery: baseQueryWithAutoSaves,
+        endpoints: (builder) => ({
+            postPreview: builder.mutation<
+        { html: string; autoSaves: AutoSavesHash },
+        {
+          entityType: string;
+          entityId: string;
+          langcode: string;
+          layout: any;
+          model: any;
+          entity_form_fields: any;
         }
-        return {
-          url,
-          method: 'PATCH',
+      >({
+        query: ({ entityType, entityId, langcode, ...body }) => ({
+          url: `canvas/api/v0/layout/${entityType}/${entityId}/${langcode}`,
+          method: 'POST',
           body,
-        };
-      },
+        }),
+        async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+          const { data, meta } = await queryFulfilled;
+          const { html, autoSaves } = data;
+          dispatch(
+            pendingChangesApi.util.invalidateTags([
+              { type: 'PendingChanges', id: 'LIST' },
+            ]),
+          );
+          dispatch(setHtml(html));
+          handleAutoSavesHashUpdate(dispatch, autoSaves, meta);
+          dispatch(setPostPreviewCompleted(true));
+        },
+      }),
+      updateComponent: builder.mutation<UpdateComponentResultType, UpdateComponentQueryArg>({
+        query: ({ type, langcode, templateBundle, templateViewMode, ...body }) => {
+          let url = '';
+          if (type === 'entity') {
+            if (!langcode) {
+              throw new Error('langcode is required for entity updateComponent');
+            }
+            url = `canvas/api/v0/layout/${body.componentType}/${body.componentInstanceUuid}/${langcode}`;
+          } else if (type === 'template') {
+            if (!templateBundle || !templateViewMode) {
+              throw new Error('templateBundle and templateViewMode are required for template updateComponent');
+            }
+            if (!langcode) {
+              throw new Error('langcode is required for template updateComponent');
+            }
+            url = `canvas/api/v0/layout-content-template/${body.componentType}.${templateBundle}.${templateViewMode}/${body.componentInstanceUuid}/${langcode}`;
+          }
+          return {
+            url,
+            method: 'PATCH',
+            body,
+          };
+        },
       async onQueryStarted(body, { dispatch, queryFulfilled }) {
-        // Force any ajax calls to wait.
         pushCanvasLayoutRequest();
         const { data, meta } = await queryFulfilled;
-        // Tell ajax calls they're good to go.
         popCanvasLayoutRequest();
         const { html, layout, model, autoSaves } = data;
         dispatch(
-          pendingChangesApi.util.invalidateTags([
-            { type: 'PendingChanges', id: 'LIST' },
-          ]),
+          pendingChangesApi.util.invalidateTags([{ type: 'PendingChanges', id: 'LIST' }]),
         );
         dispatch(setHtml(html));
         handleAutoSavesHashUpdate(dispatch, autoSaves, meta);
-        // Pass update preview false to prevent a subsequent preview update,
-        // we have the data here.
         dispatch(setLayoutModel({ layout, model, updatePreview: false }));
       },
     }),

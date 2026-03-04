@@ -37,7 +37,10 @@ const Preview: React.FC = () => {
   const selectedComponent = useAppSelector(selectSelectedComponentUuid);
   const backgroundUpdate = useAppSelector(selectPreviewBackgroundUpdate);
   const entity_form_fields = useAppSelector(selectPageData);
-  const { entityId, entityType } = useParams();
+  const { entityId, entityType, bundle, viewMode, previewEntityId } = useParams();
+  const currentLanguage = useAppSelector(
+    (state: any) => state.language.currentLanguage,
+  );
   const editorFrameContext = useAppSelector(selectEditorFrameContext);
   const frameSrcDoc = useAppSelector(selectPreviewHtml);
   const { showBoundary } = useErrorBoundary();
@@ -62,7 +65,6 @@ const Preview: React.FC = () => {
   const sendPreviewRequest = useCallback(
     async (context: 'entity' | 'template') => {
       try {
-        // Execute Request
         if (context === 'entity' && entityId && entityType) {
           await postPreview({
             layout,
@@ -70,12 +72,18 @@ const Preview: React.FC = () => {
             entity_form_fields,
             entityId,
             entityType,
+            langcode: currentLanguage,
           }).unwrap();
         } else if (context === 'template') {
           await postTemplatePreview({
             layout,
             model,
             entity_form_fields,
+            entityType: entityType || '',
+            bundle: bundle || '',
+            viewMode: viewMode || '',
+            previewEntityId: previewEntityId || '',
+            langcode: currentLanguage,
           }).unwrap();
         }
       } catch (err) {
@@ -88,6 +96,7 @@ const Preview: React.FC = () => {
       entity_form_fields,
       entityId,
       entityType,
+      currentLanguage,
       postPreview,
       postTemplatePreview,
       showBoundary,
@@ -138,9 +147,14 @@ const Preview: React.FC = () => {
     updatePreview,
     editorFrameContext,
     stableScheduleRequest,
+    entityType,
+    entityId,
+    bundle,
+    viewMode,
+    previewEntityId,
+    currentLanguage,
   ]);
 
-  // Effect: Cleanup interval on unmount
   useEffect(() => {
     return () => {
       if (pollingIntervalRef.current) {

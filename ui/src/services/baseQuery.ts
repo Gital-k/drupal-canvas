@@ -38,7 +38,7 @@ export const popCanvasLayoutRequest = () => {
   const canvasSettings = getCanvasSettings();
   canvasSettings.canvasLayoutRequestInProgress.pop();
   if (canvasSettings.canvasLayoutRequestInProgress.length === 0) {
-    // Notify the application that the layout request has completed.
+        // Notify the application that the layout request has completed.
     const event = new CustomEvent('canvasLayoutRequestComplete');
     document.dispatchEvent(event);
   }
@@ -52,7 +52,7 @@ export const popCanvasLayoutRequest = () => {
 export const extractEntityParams = (url: string) => {
   // Remove query parameters and hash fragments
   url = url.split('?')[0].split('#')[0];
-  // Match /canvas/(editor||preview)/:entityType/:entityId/
+    // Match /canvas/(editor||preview)/:entityType/:entityId/
   const matchPageEditor = url.match(
     /\/canvas\/(editor|preview)\/([^/]+)\/([^/]+)\/?/,
   );
@@ -72,6 +72,15 @@ export const extractEntityParams = (url: string) => {
     };
   }
   return { entityType: undefined, entityId: undefined };
+};
+
+/**
+ * Extracts the langcode from a Canvas layout API URL.
+ * Matches: canvas/api/v0/layout/{entityType}/{entityId}/{langcode}
+ */
+export const extractLangcodeFromUrl = (url: string): string | undefined => {
+  const match = url.match(/canvas\/api\/v0\/layout\/[^/]+\/[^/]+\/([a-z]{2,})/);
+  return match ? match[1] : undefined;
 };
 
 /**
@@ -161,8 +170,7 @@ const rawBaseQuery = (appConfiguration: AppConfiguration) => {
   };
 };
 
-// Higher-order base query to inject the current autoSavesHash and clientInstanceId for all mutations (POST, PATCH, DELETE)
-// to allow the backend to recognize potential conflicts where the client is updating potentially out of date data.
+// Higher-order base query to inject the current autoSavesHash and clientInstanceId for all mutations.
 export const withAutoSavesInjection: (
   baseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError>,
 ) => BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> = (
@@ -174,8 +182,6 @@ export const withAutoSavesInjection: (
       if (
         url &&
         api.type === 'mutation' &&
-        // Skip autoSaves injection for mutations that do not impact data that
-        // is autosaved, such as creating folders.
         !['createFolder', 'createContentTemplate', 'updateFolder'].includes(
           api.endpoint,
         )
@@ -184,24 +190,34 @@ export const withAutoSavesInjection: (
         const { publishReview } = state;
         const { entityType, entityId, templateBundle, templateViewMode } =
           extractEntityParams(window.location.href);
-        const autoSaveKey = replaceEntityParamsInUrl(
+
+        let autoSaveKey = replaceEntityParamsInUrl(
           url,
           entityType,
           entityId,
           templateBundle,
           templateViewMode,
         );
-        // We want to send back the specific autoSave hash for the particular URL being updated
+
+        // For layout POST/PATCH URLs that include a langcode, the autoSavesHash
+        // was stored with the langcode in the key (from the GET response).
+        // Extract langcode from the request URL itself to find the correct hash.
+        const langcodeFromUrl = extractLangcodeFromUrl(autoSaveKey);
+        if (langcodeFromUrl && !autoSaveKey.endsWith(`/${langcodeFromUrl}`)) {
+          autoSaveKey = `${autoSaveKey}/${langcodeFromUrl}`;
+        }
+
         const autoSaves =
           autoSaveKey && publishReview.autoSavesHash[autoSaveKey]
             ? publishReview.autoSavesHash[autoSaveKey]
             : undefined;
+
         return baseQuery(
           {
             ...args,
             body: {
               ...args.body,
-              ...(autoSaves && { autoSaves }),
+              autoSaves,
               clientInstanceId: publishReview.clientInstanceId,
             },
           },

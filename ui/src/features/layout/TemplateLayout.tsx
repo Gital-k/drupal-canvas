@@ -15,6 +15,9 @@ import {
 const TemplateLayout = () => {
   const dispatch = useAppDispatch();
   const { entityType, bundle, viewMode, previewEntityId } = useParams();
+  const currentLanguage = useAppSelector(
+    (state: any) => state.language.currentLanguage,
+  );
 
   const isInitialized = useAppSelector(selectIsInitialized);
   const {
@@ -24,8 +27,8 @@ const TemplateLayout = () => {
     isFetching,
     refetch,
   } = useGetTemplateLayoutQuery(
-    entityType && bundle && viewMode && previewEntityId
-      ? { entityType, bundle, viewMode, previewEntityId }
+    entityType && bundle && viewMode && previewEntityId && currentLanguage
+      ? { entityType, bundle, viewMode, previewEntityId, langcode: currentLanguage }
       : skipToken,
     // Setting `refetchOnMountOrArgChange` instead of a cache invalidation
     // prevents re-fetching due to the same query being used elsewhere in the app.

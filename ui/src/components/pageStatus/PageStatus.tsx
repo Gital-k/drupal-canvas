@@ -8,6 +8,7 @@ import { HOMEPAGE_CONFIG_ID } from '@/components/pageInfo/PageInfo';
 import { setHomepageStagedConfigExists } from '@/features/configuration/configurationSlice';
 import { useGetPageLayoutQuery } from '@/services/componentAndLayout';
 import { useGetAllPendingChangesQuery } from '@/services/pendingChangesApi';
+import { getDrupalSettings } from '@/utils/drupal-globals';
 import { findInChanges } from '@/utils/function-utils';
 
 export interface PageStatusBadgeProps {
@@ -52,6 +53,8 @@ export const PageStatusBadge: React.FC<PageStatusBadgeProps> = ({
   );
 };
 
+const drupalSettings = getDrupalSettings();
+
 const PageStatus = () => {
   const { data: changes, isSuccess: isGetPendingChangesSuccess } =
     useGetAllPendingChangesQuery();
@@ -60,7 +63,9 @@ const PageStatus = () => {
   // skipToken prevents the query from running until both args are defined.
   // "Pass skipToken to a query selector to have that selector return an uninitialized state."
   const { data: fetchedLayout, isError } = useGetPageLayoutQuery(
-    entityId && entityType ? { entityId, entityType } : skipToken,
+    entityId && entityType
+      ? { entityId, entityType, langcode: drupalSettings.langcode }
+      : skipToken,
   );
   const dispatch = useAppDispatch();
 
@@ -71,7 +76,7 @@ const PageStatus = () => {
     }
   }, [changes, fetchedLayout, entityId, entityType]);
 
-  // Check if the homepage staged update exists in the current auto-save.
+    // Check if the homepage staged update exists in the current auto-save.
   useEffect(() => {
     if (isGetPendingChangesSuccess) {
       const containsHomepageConfig = Object.prototype.hasOwnProperty.call(

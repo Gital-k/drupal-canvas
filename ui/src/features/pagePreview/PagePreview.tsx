@@ -13,8 +13,11 @@ import { selectPageData } from '@/features/pageData/pageDataSlice';
 import { selectPreviewHtml } from '@/features/pagePreview/previewSlice';
 import { usePostPreviewMutation } from '@/services/preview';
 import { getViewportSizes } from '@/utils/viewports';
+import { getDrupalSettings } from '@/utils/drupal-globals';
 
 import styles from './PagePreview.module.css';
+
+const drupalSettings = getDrupalSettings();
 
 const PagePreview = () => {
   const layout = useAppSelector(selectLayout);
@@ -29,9 +32,11 @@ const PagePreview = () => {
   const { width } = useParams();
   const [linkIntercepted, setLinkIntercepted] = useState('');
   const [submissionIntercepted, setSubmissionIntercepted] = useState(false);
-  // Get viewport sizes (supports theme-level customization).
+
+  // Get viewport sizes (supports theme-level customization)
   const viewportSizes = useMemo(() => getViewportSizes(), []);
 
+  // --- Send Preview Request ---
   useEffect(() => {
     const sendPreviewRequest = async () => {
       if (!entityType || !entityId) {
@@ -44,6 +49,7 @@ const PagePreview = () => {
           entity_form_fields,
           entityId,
           entityType,
+          langcode: drupalSettings.langcode, // <-- Use Drupal langcode
         }).unwrap();
       } catch (err) {
         showBoundary(err);
@@ -63,6 +69,7 @@ const PagePreview = () => {
     showBoundary,
   ]);
 
+  // --- Handle viewport width ---
   useEffect(() => {
     if (!width || width === 'full') {
       setWidthVal('100%');
@@ -76,21 +83,21 @@ const PagePreview = () => {
     }
   }, [width, viewportSizes]);
 
+  // --- Intercept links and form submissions inside iframe ---
   useEffect(() => {
     function handlePreviewLinkClick(event: MessageEvent) {
-      if (event.data && event.data.canvasPreviewClickedUrl) {
+      if (event.data?.canvasPreviewClickedUrl) {
         setLinkIntercepted(event.data.canvasPreviewClickedUrl);
       }
-      if (event.data && event.data.canvasPreviewFormSubmitted) {
+      if (event.data?.canvasPreviewFormSubmitted) {
         setSubmissionIntercepted(true);
       }
     }
     window.addEventListener('message', handlePreviewLinkClick);
-
     return () => {
       window.removeEventListener('message', handlePreviewLinkClick);
     };
-  });
+  }, []);
 
   const handleDialogOpenChange = (isOpen: boolean) => {
     if (!isOpen) {

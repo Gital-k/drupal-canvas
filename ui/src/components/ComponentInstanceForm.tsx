@@ -41,7 +41,7 @@ import {
 import { AJAX_UPDATE_FORM_STATE_EVENT } from '@/types/Ajax';
 import { isPropSourceComponent } from '@/types/Component';
 import parseHyperscriptifyTemplate from '@/utils/parse-hyperscriptify-template';
-
+import { useParams } from 'react-router';
 import type {
   ComponentModel,
   EvaluatedComponentModel,
@@ -74,7 +74,10 @@ const ComponentInstanceFormRenderer: React.FC<
   const inputAndUiData: InputUIData = useInputUIData();
   const { selectedComponentType, version, selectedComponent } = inputAndUiData;
   const editorFrameContext = useAppSelector(selectEditorFrameContext);
-
+  const currentLanguage = useAppSelector(
+  (state: any) => state.language.currentLanguage,
+  );
+  const { bundle, viewMode } = useParams();
   const [jsxFormContent, setJsxFormContent] =
     useState<React.ReactElement | null>(null);
   const [currentComponentId, setCurrentComponentId] = useState<string | null>(
@@ -217,25 +220,31 @@ const ComponentInstanceFormRenderer: React.FC<
 
         const component = components?.[selectedComponentType];
         if (isEvaluatedComponentModel(selectedModel) && component) {
-          patchComponent({
-            type: editorFrameContext,
-            componentInstanceUuid: selectedComponentId,
-            componentType: `${selectedComponentType}@${version}`,
-            model: {
-              source: syncPropSourcesToResolvedValues(
-                selectedModel.source,
-                component,
-                resolved,
-              ),
+        patchComponent({
+          type: editorFrameContext,
+          componentInstanceUuid: selectedComponentId,
+          componentType: `${selectedComponentType}@${version}`,
+          langcode: currentLanguage,
+          templateBundle: bundle,
+          templateViewMode: viewMode,
+          model: {
+            source: syncPropSourcesToResolvedValues(
+              selectedModel.source,
+              component,
               resolved,
-            },
-          });
+            ),
+            resolved,
+          },
+        });
           return;
         }
         patchComponent({
           type: editorFrameContext,
           componentInstanceUuid: selectedComponentId,
           componentType: `${selectedComponentType}@${version}`,
+          langcode: currentLanguage,
+          templateBundle: bundle,
+          templateViewMode: viewMode,
           model: {
             ...selectedModel,
             resolved,

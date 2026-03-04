@@ -343,7 +343,7 @@ canvas.api.form.content_entity:
     - POST
 
 canvas.api.layout.get: &layout_get_route
-  path: '/canvas/api/v0/layout/{entity_type}/{entity}'
+  path: '/canvas/api/v0/layout/{entity_type}/{entity}/{langcode}'
   defaults:
     _controller: 'Drupal\canvas\Controller\ApiLayoutController::get'
     # We need a title callback because we use the HTML renderer to generate the preview.
@@ -358,12 +358,14 @@ canvas.api.layout.get: &layout_get_route
     parameters:
       entity:
         type: entity:{entity_type}
+      langcode:
+        type: string
   methods: [GET]
 
 # Specialized version of the `canvas.api.layout.get` route, with one additional route parameter.
 canvas.api.layout.get.content_template:
   <<: *layout_get_route
-  path: '/canvas/api/v0/layout-content-template/{entity}/{preview_entity}'
+  path: '/canvas/api/v0/layout-content-template/{entity}/{preview_entity}/{langcode}'
   requirements:
     <<: *layout_get_route_requirements
     _canvas_preview_entity_view_access: TRUE
@@ -376,9 +378,11 @@ canvas.api.layout.get.content_template:
       preview_entity:
         # @see \Drupal\canvas\Routing\ContentTemplatePreviewEntityConverter
         type: canvas_content_template_preview_entity
-
+      langcode:
+        type: string
+      
 canvas.api.layout.patch: &layout_patch_route
-  path: '/canvas/api/v0/layout/{entity_type}/{entity}'
+  path: '/canvas/api/v0/layout/{entity_type}/{entity}/{langcode}'
   defaults:
     _controller: 'Drupal\canvas\Controller\ApiLayoutController::patch'
     # We need a title callback because we use the HTML renderer to generate the preview.
@@ -390,12 +394,14 @@ canvas.api.layout.patch: &layout_patch_route
     parameters:
       entity:
         type: entity:{entity_type}
+      langcode:
+        type: string
   methods: [PATCH]
 
 # Specialized version of the `canvas.api.layout.patch` route, with one additional route parameter.
 canvas.api.layout.patch.content_template:
   <<: *layout_patch_route
-  path: '/canvas/api/v0/layout-content-template/{entity}/{preview_entity}'
+  path: '/canvas/api/v0/layout-content-template/{entity}/{preview_entity}/{langcode}'
   requirements:
     <<: *layout_get_route_requirements
     _canvas_preview_entity_view_access: TRUE
@@ -403,9 +409,11 @@ canvas.api.layout.patch.content_template:
     _canvas_use_template_draft: TRUE
     parameters:
       <<: *layout_get_route_content_template_parameters
+      langcode:
+        type: string
 
 canvas.api.layout.post: &layout_post_route
-  path: '/canvas/api/v0/layout/{entity_type}/{entity}'
+  path: '/canvas/api/v0/layout/{entity_type}/{entity}/{langcode}'
   defaults:
     _controller: 'Drupal\canvas\Controller\ApiLayoutController::post'
     # We need a title callback because we use the HTML renderer to generate the preview.
@@ -420,18 +428,22 @@ canvas.api.layout.post: &layout_post_route
     parameters:
       entity:
         type: entity:{entity_type}
+      langcode:
+        type: string
   methods: [POST]
 
 # Specialized version of the `canvas.api.layout.post` route, with one additional route parameter.
 canvas.api.layout.post.content_template:
   <<: *layout_post_route
-  path: '/canvas/api/v0/layout-content-template/{entity}/{preview_entity}'
+  path: '/canvas/api/v0/layout-content-template/{entity}/{preview_entity}/{langcode}'
   options:
     requirements:
       <<: *layout_get_route_requirements
       _canvas_preview_entity_view_access: TRUE
     parameters:
       <<: *layout_get_route_content_template_parameters
+      langcode:
+        type: string
 
 canvas.api.log_error:
   path: '/canvas/api/v0/log-error'

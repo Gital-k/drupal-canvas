@@ -7,6 +7,7 @@ import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import { clearSelection } from '@/features/ui/uiSlice';
 import { useUndoRedo } from '@/hooks/useUndoRedo';
 import { useGetPageLayoutQuery } from '@/services/componentAndLayout';
+import { useGetLanguagesQuery } from '@/services/languageApi';
 
 import {
   selectIsInitialized,
@@ -18,6 +19,16 @@ const LayoutLoader = () => {
   const dispatch = useAppDispatch();
   const isInitialized = useAppSelector(selectIsInitialized);
   const { entityId, entityType } = useParams();
+  const currentLanguage = useAppSelector(
+    (state: any) => state.language.currentLanguage,
+  );
+
+  const { isSuccess: isLanguagesSuccess } = useGetLanguagesQuery(
+    entityId && entityType ? { entityType, id: entityId } : skipToken,
+  );
+
+  const isLayoutQueryReady =
+    !!(entityId && entityType && currentLanguage && isLanguagesSuccess);
 
   const {
     data: fetchedLayout,
@@ -26,7 +37,9 @@ const LayoutLoader = () => {
     isFetching,
     refetch,
   } = useGetPageLayoutQuery(
-    entityId && entityType ? { entityId, entityType } : skipToken,
+    isLayoutQueryReady
+      ? { entityId, entityType, langcode: currentLanguage }
+      : skipToken,
     // Setting `refetchOnMountOrArgChange` instead of a cache invalidation
     // prevents re-fetching due to the same query being used elsewhere in the app.
     { refetchOnMountOrArgChange: true },
@@ -38,10 +51,13 @@ const LayoutLoader = () => {
   useEffect(() => {
     dispatch(setInitialized(false));
     dispatch(clearSelection());
-    if (entityId && entityType) {
+  }, [entityType, entityId, dispatch]);
+
+  useEffect(() => {
+    if (isLayoutQueryReady) {
       refetch();
     }
-  }, [refetch, entityType, entityId, dispatch]);
+  }, [isLayoutQueryReady, refetch]);
 
   useEffect(() => {
     if (isError && error && !isFetching) {

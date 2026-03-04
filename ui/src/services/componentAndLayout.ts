@@ -140,12 +140,12 @@ export const componentAndLayoutApi = createApi({
     >({
       query: (id) => `/canvas/api/v0/usage/component/${id}/details`,
     }),
-    getPageLayout: builder.query<
-      LayoutApiResponse,
-      { entityId: string; entityType: string }
-    >({
-      query: ({ entityId, entityType }) => {
-        return `canvas/api/v0/layout/${entityType}/${entityId}`;
+    getPageLayout: builder.query({
+      query: ({ entityId, entityType, langcode }) => {
+        if (!langcode) {
+          throw new Error('hi langcode is required for this endpoint');
+        }
+        return `canvas/api/v0/layout/${entityType}/${entityId}/${langcode}`;
       },
       providesTags: () => [{ type: 'Layout' }],
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
@@ -169,10 +169,11 @@ export const componentAndLayoutApi = createApi({
         bundle: string;
         viewMode: string;
         previewEntityId: string;
+        langcode: string;
       }
     >({
-      query: ({ bundle, viewMode, entityType, previewEntityId }) => {
-        return `canvas/api/v0/layout-content-template/${entityType}.${bundle}.${viewMode}/${previewEntityId}`;
+      query: ({ bundle, viewMode, entityType, previewEntityId, langcode }) => {
+        return `canvas/api/v0/layout-content-template/${entityType}.${bundle}.${viewMode}/${previewEntityId}/${langcode}`;
       },
       providesTags: () => [{ type: 'Layout' }],
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
@@ -190,52 +191,70 @@ export const componentAndLayoutApi = createApi({
       },
     }),
     postTemplateLayout: builder.mutation<
-      { html: string; autoSaves: AutoSavesHash },
-      { layout: any; model: any; entity_form_fields: any }
-    >({
-      query: (body) => ({
-        url: 'canvas/api/v0/layout-content-template/{entity_type}.{template_bundle}.{template_view_mode}/{entity_id}',
-        method: 'POST',
-        body,
-      }),
-      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
-        const { data, meta } = await queryFulfilled;
-        const { html, autoSaves } = data;
-        dispatch(
-          pendingChangesApi.util.invalidateTags([
-            { type: 'PendingChanges', id: 'LIST' },
-          ]),
-        );
-        // Update our template preview slice.
-        dispatch(setHtml(html));
-        handleAutoSavesHashUpdate(dispatch, autoSaves, meta);
-        dispatch(setPostPreviewCompleted(true));
-      },
-    }),
-    updateComponentInTemplate: builder.mutation<
-      UpdateComponentResultType,
-      UpdateComponentQueryArg
-    >({
-      query: (body) => ({
-        url: 'canvas/api/v0/layout-content-template/{entity_type}.{template_bundle}.{template_view_mode}/{entity_id}',
-        method: 'PATCH',
-        body,
-      }),
-      async onQueryStarted(body, { dispatch, queryFulfilled }) {
-        const { data, meta } = await queryFulfilled;
-        const { html, layout, model, autoSaves } = data;
-        dispatch(
-          pendingChangesApi.util.invalidateTags([
-            { type: 'PendingChanges', id: 'LIST' },
-          ]),
-        );
-        dispatch(setHtml(html));
-        handleAutoSavesHashUpdate(dispatch, autoSaves, meta);
-        // Pass update preview false to prevent a subsequent preview update,
-        // we have the data here.
-        dispatch(setLayoutModel({ layout, model, updatePreview: false }));
-      },
-    }),
+  { html: string; autoSaves: AutoSavesHash },
+  {
+    entityType: string;
+    bundle: string;
+    viewMode: string;
+    previewEntityId: string;
+    langcode: string;
+    layout: any;
+    model: any;
+    entity_form_fields: any;
+  }
+>({
+  query: ({ entityType, bundle, viewMode, previewEntityId, langcode, ...body }) => ({
+    url: `canvas/api/v0/layout-content-template/${entityType}.${bundle}.${viewMode}/${previewEntityId}/${langcode}`,
+    method: 'POST',
+    body,
+  }),
+  async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+    try {
+      const { data, meta } = await queryFulfilled;
+      const { html, autoSaves } = data;
+      dispatch(
+        pendingChangesApi.util.invalidateTags([{ type: 'PendingChanges', id: 'LIST' }])
+      );
+      dispatch(setHtml(html));
+      handleAutoSavesHashUpdate(dispatch, autoSaves, meta);
+      dispatch(setPostPreviewCompleted(true));
+    } catch (err) {
+      console.error(err);
+    }
+  },
+}),
+
+updateComponentInTemplate: builder.mutation<
+  UpdateComponentResultType,
+  {
+    entityType: string;
+    bundle: string;
+    viewMode: string;
+    previewEntityId: string;
+    langcode: string;
+    body: UpdateComponentQueryArg;
+  }
+>({
+  query: ({ entityType, bundle, viewMode, previewEntityId, langcode, body }) => ({
+    url: `canvas/api/v0/layout-content-template/${entityType}.${bundle}.${viewMode}/${previewEntityId}/${langcode}`,
+    method: 'PATCH',
+    body,
+  }),
+  async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+    try {
+      const { data, meta } = await queryFulfilled;
+      const { html, layout, model, autoSaves } = data;
+      dispatch(
+        pendingChangesApi.util.invalidateTags([{ type: 'PendingChanges', id: 'LIST' }])
+      );
+      dispatch(setHtml(html));
+      handleAutoSavesHashUpdate(dispatch, autoSaves, meta);
+      dispatch(setLayoutModel({ layout, model, updatePreview: false }));
+    } catch (err) {
+      console.error(err);
+    }
+  },
+}),
 
     getCodeComponents: builder.query<
       Record<string, CodeComponentSerialized>,
