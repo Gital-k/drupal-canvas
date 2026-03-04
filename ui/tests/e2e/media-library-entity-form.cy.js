@@ -40,7 +40,6 @@ const testMediaLibraryInEntityForm = (cy, loadOptions = {}, title) => {
     cy.findByRole('dialog').should('not.exist');
     cy.get('@entityForm').findByRole(step.expectedAlt).should('not.exist');
     if (ix > 0) {
-      cy.intercept('POST', '**/canvas/api/v0/layout/**').as('updatePreview');
       const removeIt = `[class*="contextualPanel"] .js-media-library-selection  [aria-label="${step.removeText}"][data-form-id="page_data_form"][data-once="drupal-ajax"][data-ajax="true"]:not(.visually-hidden)`;
       cy.reasonableWait();
       cy.get(removeIt).click();
@@ -65,7 +64,6 @@ const testMediaLibraryInEntityForm = (cy, loadOptions = {}, title) => {
     cy.findByRole('dialog', { timeout: 10000 }).as('dialog');
     cy.reasonableWait();
     cy.get('@dialog').findByLabelText(step.selectNewText).check();
-    cy.intercept('POST', '**/canvas/api/v0/layout/**').as('updatePreview');
     cy.reasonableWait();
     cy.get('@dialog')
       .findByRole('button', {
