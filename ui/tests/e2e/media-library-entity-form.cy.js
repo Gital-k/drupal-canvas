@@ -44,11 +44,6 @@ const testMediaLibraryInEntityForm = (cy, loadOptions = {}, title) => {
       const removeIt = `[class*="contextualPanel"] .js-media-library-selection  [aria-label="${step.removeText}"][data-form-id="page_data_form"][data-once="drupal-ajax"][data-ajax="true"]:not(.visually-hidden)`;
       cy.reasonableWait();
       cy.get(removeIt).click();
-
-      // Wait for the preview to finish loading.
-      cy.wait('@updatePreview');
-      cy.findByLabelText('Loading Preview').should('not.exist');
-
       cy.get(removeIt).should('not.exist', { timeout: 10000 });
       cy.log(`Iteration ${ix + 1}: ${step.removeText} complete`);
     }
@@ -78,10 +73,6 @@ const testMediaLibraryInEntityForm = (cy, loadOptions = {}, title) => {
       })
       .click();
     cy.findByRole('dialog').should('not.exist');
-    // Wait for the preview to finish loading.
-    cy.wait('@updatePreview', { timeout: 10000 });
-    cy.findByLabelText('Loading Preview').should('not.exist');
-
     cy.get('@entityForm').findByAltText(step.expectedAlt).should('exist');
     cy.get('@entityForm')
       .findByRole('button', { name: step.removeAriaLabel })

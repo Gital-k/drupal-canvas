@@ -91,7 +91,8 @@ describe('Media Library', () => {
     }).as('updatePreview');
     cy.findByLabelText('Display width').type(190);
     cy.findByLabelText('Display width').trigger('change');
-    // Make sure the preview has been updated with the new width.
+    // Make sure the preview has been updated with the new width, so we can
+    // then confirm no errors have occured.
     cy.wait('@updatePreview');
     cy.waitForElementInIframe('video > source');
     // Components that fail to render have this data attribute.
