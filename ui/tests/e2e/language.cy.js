@@ -39,9 +39,7 @@ const testCanvasPagesCanBeCreatedInMultilingualSites = (
 describe('Canvas pages can be created in any language', () => {
   before(() => {
     cy.drupalCanvasInstall();
-    cy.drupalRecipeApply(
-      '../tests/fixtures/recipes/language/',
-    );
+    cy.drupalRecipeApply('../tests/fixtures/recipes/language/');
   });
 
   beforeEach(() => {
