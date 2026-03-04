@@ -177,7 +177,6 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
 
   /**
    * Implements hook_preprocess_field_multiple_value_form().
-   *
    */
   #[Hook('preprocess_field_multiple_value_form')]
   public static function canvasStarkPreprocessFieldMultipleValueForm(array &$variables): void {
