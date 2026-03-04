@@ -1,5 +1,12 @@
 <?php
 
+/**
+ * @file
+ * Helper to apply recipes through JS tests.
+ */
+
+declare(strict_types=1);
+
 $drupal_site_path = getenv('DRUPAL_DEV_SITE_PATH');
 
 if (empty($drupal_site_path)) {
