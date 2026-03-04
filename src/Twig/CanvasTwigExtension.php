@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Twig;
 
+use Drupal\Component\Assertion\Inspector;
 use Drupal\Component\Utility\UrlHelper;
 use Drupal\Core\File\FileUrlGeneratorInterface;
 use Drupal\Core\Image\ImageFactory;
@@ -169,18 +170,22 @@ final class CanvasTwigExtension extends AbstractExtension {
     $publicBasePath = PublicStream::basePath();
     $pathSegment = parse_url($url, PHP_URL_PATH);
     $path = ltrim(is_string($pathSegment) ? $pathSegment : $url, '/');
+    $basePath = trim(\Drupal::request()->getBasePath(), '/');
+    $prefix = $publicBasePath . '/';
 
-    // Check if this is a public files URL.
-    if (!str_starts_with($path, $publicBasePath . '/')) {
+    if (str_starts_with($path, $prefix)) {
+      $target = substr($path, strlen($prefix));
+    }
+    elseif ($basePath !== '' && str_starts_with($path, $basePath . '/' . $prefix)) {
+      $target = substr($path, strlen($basePath . '/' . $prefix));
+    }
+    else {
       return NULL;
     }
 
     // Decode the path so the URI uses actual characters, avoiding
     // double-encoding when Drupal builds the styled URL.
-    $target = rawurldecode(substr($path, strlen($publicBasePath) + 1));
-
-    // Return the stream wrapper URI.
-    return 'public://' . $target;
+    return 'public://' . rawurldecode($target);
   }
 
   /**
@@ -224,20 +229,20 @@ final class CanvasTwigExtension extends AbstractExtension {
   }
 
   /**
-   * Applies an image style to an image object.
+   * Applies an image style to an image array.
    *
-   * This filter takes an image object and applies a Drupal image style,
-   * returning a new object with the styled URL and transformed dimensions.
+   * This filter takes an image array and applies a Drupal image style,
+   * returning a new array with the styled URL and transformed dimensions.
    * The dimensions are calculated using ImageStyle::transformDimensions()
    * so the styled derivative doesn't need to exist yet.
    *
    * @param array $image
-   *   Image object with 'src', 'width', 'height', and optionally 'alt'.
+   *   Image array with 'src', 'width', 'height', and optionally 'alt'.
    * @param string $styleName
    *   The image style machine name.
    *
    * @return array
-   *   Image object with 'src' as styled URL and transformed 'width'/'height'.
+   *   Image array with 'src' as styled URL and transformed 'width'/'height'.
    */
   public function applyImageStyle(array $image, string $styleName): array {
     $result = $image;
@@ -267,9 +272,11 @@ final class CanvasTwigExtension extends AbstractExtension {
     // Transform dimensions if we have them.
     if (!empty($image['width']) && !empty($image['height'])) {
       $dimensions = [
-        'width' => (int) $image['width'],
-        'height' => (int) $image['height'],
+        'width' => $image['width'],
+        'height' => $image['height'],
       ];
+      \assert(Inspector::assertAllNumeric($dimensions));
+      $dimensions = array_map('intval', $dimensions);
       $style->transformDimensions($dimensions, $uri);
       $result['width'] = $dimensions['width'];
       $result['height'] = $dimensions['height'];
