@@ -1,0 +1,72 @@
+_meta:
+  version: '1.0'
+  entity_type: media
+  uuid: a6297c13-7d13-40da-9c21-98e843536bb6
+  bundle: image
+  default_langcode: en
+  depends:
+    93a3ed1e-a577-43d4-9d64-e2046b31e0f5: file
+default:
+  revision_user:
+    -
+      target_id: 1
+  status:
+    -
+      value: true
+  uid:
+    -
+      target_id: 1
+  name:
+    -
+      value: Example
+  path:
+    -
+      langcode: en
+      alias: null
+  content_translation_source:
+    -
+      value: und
+  content_translation_outdated:
+    -
+      value: false
+  field_media_image:
+    -
+      alt: Example
+      title: ''
+      width: 500
+      height: 500
+      entity: 93a3ed1e-a577-43d4-9d64-e2046b31e0f5
+translations:
+  es:
+    revision_user:
+      -
+        target_id: 1
+    status:
+      -
+        value: true
+    uid:
+      -
+        target_id: 1
+    name:
+      -
+        value: Spanish Example
+    revision_translation_affected:
+      -
+        value: true
+    path:
+      -
+        langcode: es
+        alias: null
+    content_translation_source:
+      -
+        value: en
+    content_translation_outdated:
+      -
+        value: false
+    field_media_image:
+      -
+        alt: 'Spanish Example'
+        title: ''
+        width: 500
+        height: 500
+        entity: 93a3ed1e-a577-43d4-9d64-e2046b31e0f5

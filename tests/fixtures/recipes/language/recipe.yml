@@ -16,6 +16,14 @@ config:
         label: Spanish
         direction: ltr
         weight: 0
+    language.content_settings.media.image:
+      entity_create:create:
+        target_entity_type_id: media
+        target_bundle: image
+        default_langcode: site_default
+        third_party_settings:
+          content_translation:
+            enabled: true
     language.content_settings.canvas_page.canvas_page:
       entity_create:create:
         target_entity_type_id: canvas_page
