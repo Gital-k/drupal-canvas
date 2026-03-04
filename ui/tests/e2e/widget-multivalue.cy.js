@@ -106,9 +106,10 @@ describe('Multivalue widget drag and drop', () => {
       expect(pointerEvents).to.not.equal('none');
     });
 
-    cy.get(
-      dragHandle,
-    ).realDnd('input[value="Neutral Milk Hotel"]', dndDefaults);
+    cy.get(dragHandle).realDnd(
+      'input[value="Neutral Milk Hotel"]',
+      dndDefaults,
+    );
     // Wait for table drag AJAX to complete before asserting the new order.
     cy.get('body[data-canvas-layout-request-in-progress]').should('not.exist');
 
@@ -165,14 +166,18 @@ describe('Multivalue widget drag and drop', () => {
 
     // Ensure the drop target is in the viewport.
     cy.get('@unlimited-text').findAllByRole('textbox').eq(0).scrollIntoView();
-    const dragHandle2 = '[data-drupal-selector="edit-field-cvt-unlimited-text"] tr.draggable:nth-child(4) [title="Change order"]';
+    const dragHandle2 =
+      '[data-drupal-selector="edit-field-cvt-unlimited-text"] tr.draggable:nth-child(4) [title="Change order"]';
 
     // Ensure the drag handle is ready and doesn't have pointer-events: none.
     cy.get(dragHandle2).should(($el) => {
       const pointerEvents = window.getComputedStyle($el[0]).pointerEvents;
       expect(pointerEvents).to.not.equal('none');
     });
-    cy.get(dragHandle2).realDnd('input[value="Neutral Milk Hotel"]', dndDefaults);
+    cy.get(dragHandle2).realDnd(
+      'input[value="Neutral Milk Hotel"]',
+      dndDefaults,
+    );
 
     cy.get('@unlimited-text')
       .findAllByRole('textbox')
