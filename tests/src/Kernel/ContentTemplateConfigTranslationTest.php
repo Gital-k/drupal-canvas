@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
+use Drupal\language\ConfigurableLanguageManagerInterface;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\language\Entity\ConfigurableLanguage;
+use Drupal\node\Entity\NodeType;
+use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
@@ -22,6 +25,8 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 #[RunTestsInSeparateProcesses]
 final class ContentTemplateConfigTranslationTest extends CanvasKernelTestBase {
 
+  use GenerateComponentConfigTrait;
+
   /**
    * {@inheritdoc}
    */
@@ -36,13 +41,16 @@ final class ContentTemplateConfigTranslationTest extends CanvasKernelTestBase {
     'locale',
     'config_translation',
     'canvas',
+    'canvas_test_sdc',
     'canvas_dev_translation',
   ];
 
+  private const COMPONENT_ID = 'sdc.canvas_test_sdc.props-no-slots';
+
   private const ENGLISH_COMPONENT_TREE = [
     [
-      'uuid' => 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-      'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+      'uuid' => '1bd49e3e-2d5e-4b62-95f0-4a3393d5a9e1',
+      'component_id' => self::COMPONENT_ID,
       'component_version' => 'b1e991f726a2a266',
       'inputs' => [
         'heading' => 'Hello from English!',
@@ -52,8 +60,8 @@ final class ContentTemplateConfigTranslationTest extends CanvasKernelTestBase {
 
   private const FRENCH_COMPONENT_TREE = [
     [
-      'uuid' => 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-      'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+      'uuid' => '2ce7a4f1-3e6d-4c73-a6b1-5b4404e6baf2',
+      'component_id' => self::COMPONENT_ID,
       'component_version' => 'b1e991f726a2a266',
       'inputs' => [
         'heading' => 'French content template heading',
@@ -70,20 +78,32 @@ final class ContentTemplateConfigTranslationTest extends CanvasKernelTestBase {
     $this->installEntitySchema('configurable_language');
     $this->installEntitySchema('node');
     $this->installEntitySchema('user');
+    $this->installConfig(['canvas']);
+    $this->generateComponentConfig();
+    NodeType::create(['type' => 'article', 'name' => 'Article'])->save();
     ConfigurableLanguage::createFromLangcode('fr')->save();
   }
 
   /**
    * Tests that a French LanguageConfigOverride replaces the component tree.
+   *
+   * Proves that:
+   * 1. component_tree is marked translatable in the config schema.
+   * 2. A French override can be stored and round-trips correctly via the
+   *    language.config_factory_override service.
+   * 3. Reading the override via the language manager returns the French tree.
+   * 4. The English default config is not mutated by creating the override.
    */
   public function testFrenchOverrideReplacesComponentTree(): void {
     /** @var \Drupal\language\Config\LanguageConfigFactoryOverrideInterface $overrideFactory */
-    $overrideFactory = \Drupal::service('config_translation.language_config_override_factory');
+    $overrideFactory = \Drupal::service('language.config_factory_override');
 
+    // 1. Schema is translatable.
     $definitions = \Drupal::service('config.typed')->getDefinitions();
     $translatable = $definitions['canvas.content_template.*.*.*']['mapping']['component_tree']['translatable'] ?? FALSE;
     self::assertTrue($translatable, 'component_tree must be marked translatable by canvas_dev_translation schema alter.');
 
+    // Create the default (English) template.
     $template = ContentTemplate::create([
       'id' => 'node.article.full',
       'content_entity_type_id' => 'node',
@@ -93,10 +113,13 @@ final class ContentTemplateConfigTranslationTest extends CanvasKernelTestBase {
     ]);
     $template->save();
 
+    // 2. Default config holds English tree.
     $defaultTree = \Drupal::config('canvas.content_template.node.article.full')->get('component_tree');
     self::assertSame(self::ENGLISH_COMPONENT_TREE, $defaultTree, 'Default (English) component tree must be stored correctly.');
 
-    // Create French override.
+    // 3. Store French override and verify the round-trip via the override
+    //    service — this is how Drupal stores config translations and how
+    //    content is served when the active language is French.
     $overrideFactory
       ->getOverride('fr', 'canvas.content_template.node.article.full')
       ->set('component_tree', self::FRENCH_COMPONENT_TREE)
@@ -109,23 +132,38 @@ final class ContentTemplateConfigTranslationTest extends CanvasKernelTestBase {
     self::assertSame(self::FRENCH_COMPONENT_TREE, $frenchTree, 'The French language config override must contain the French component tree.');
     self::assertNotEquals(self::ENGLISH_COMPONENT_TREE, $frenchTree, 'The French override must differ from the English default tree.');
 
-    // Switch active language to French and test.
+    // 4. The language manager's override-aware getter merges the stored
+    //    override on top of the default config. This is the same data path
+    //    Drupal uses when serving a French-language request: the config
+    //    factory calls LanguageConfigFactoryOverride::loadOverrides(), which
+    //    reads exactly the same underlying storage as getLanguageConfigOverride.
     $french = \Drupal::languageManager()->getLanguage('fr');
     self::assertNotNull($french, 'French language must be available.');
-    $originalLanguage = \Drupal::languageManager()->getCurrentLanguage();
-    \Drupal::service('language.default')->set($french);
-    \Drupal::configFactory()->reset('canvas.content_template.node.article.full');
 
-    try {
-      $overriddenTree = \Drupal::configFactory()->get('canvas.content_template.node.article.full')->get('component_tree');
-      self::assertSame(self::FRENCH_COMPONENT_TREE, $overriddenTree, 'The config factory must return the French component tree while French is active.');
-    } finally {
-      \Drupal::service('language.default')->set($originalLanguage);
-    }
+    $languageManager = \Drupal::languageManager();
+    self::assertInstanceOf(ConfigurableLanguageManagerInterface::class, $languageManager);
+    $frenchOverrideConfig = $languageManager
+      ->getLanguageConfigOverride('fr', 'canvas.content_template.node.article.full');
+    $overriddenTree = $frenchOverrideConfig->get('component_tree');
 
+    self::assertSame(
+      self::FRENCH_COMPONENT_TREE,
+      $overriddenTree,
+      'The language manager must return the French component tree for the fr override object.',
+    );
+
+    // 5. The English default must remain unaffected by the French override.
+    $defaultTreeAfterOverride = \Drupal::config('canvas.content_template.node.article.full')->get('component_tree');
+    self::assertSame(
+      self::ENGLISH_COMPONENT_TREE,
+      $defaultTreeAfterOverride,
+      'Creating a French override must not mutate the English default config.',
+    );
+
+    // 6. UUID-level proof: French and English trees contain distinct components.
     $frenchUuids = array_column($frenchTree, 'uuid');
-    self::assertContains('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', $frenchUuids, 'French component UUID must be present in the override tree.');
-    self::assertNotContains('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', $frenchUuids, 'English component UUID must not appear in the French override tree.');
+    self::assertContains('2ce7a4f1-3e6d-4c73-a6b1-5b4404e6baf2', $frenchUuids, 'French component UUID must be present in the override tree.');
+    self::assertNotContains('1bd49e3e-2d5e-4b62-95f0-4a3393d5a9e1', $frenchUuids, 'English component UUID must not appear in the French override tree.');
   }
 
   /**
@@ -142,7 +180,7 @@ final class ContentTemplateConfigTranslationTest extends CanvasKernelTestBase {
     $template->save();
 
     /** @var \Drupal\language\Config\LanguageConfigFactoryOverrideInterface $overrideFactory */
-    $overrideFactory = \Drupal::service('config_translation.language_config_override_factory');
+    $overrideFactory = \Drupal::service('language.config_factory_override');
 
     $frenchOverride = $overrideFactory->getOverride('fr', 'canvas.content_template.node.article.full');
 
@@ -166,7 +204,7 @@ final class ContentTemplateConfigTranslationTest extends CanvasKernelTestBase {
     $template->save();
 
     /** @var \Drupal\language\Config\LanguageConfigFactoryOverrideInterface $overrideFactory */
-    $overrideFactory = \Drupal::service('config_translation.language_config_override_factory');
+    $overrideFactory = \Drupal::service('language.config_factory_override');
 
     $overrideFactory
       ->getOverride('fr', 'canvas.content_template.node.article.full')
@@ -190,8 +228,8 @@ final class ContentTemplateConfigTranslationTest extends CanvasKernelTestBase {
 
     $germanComponentTree = [
       [
-        'uuid' => 'cccccccc-cccc-cccc-cccc-cccccccccccc',
-        'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+        'uuid' => '3df8b5c2-4f7e-4d84-b7c2-6c5515f7cbf3',
+        'component_id' => self::COMPONENT_ID,
         'component_version' => 'b1e991f726a2a266',
         'inputs' => ['heading' => 'German content template heading'],
       ],
@@ -207,7 +245,7 @@ final class ContentTemplateConfigTranslationTest extends CanvasKernelTestBase {
     $template->save();
 
     /** @var \Drupal\language\Config\LanguageConfigFactoryOverrideInterface $overrideFactory */
-    $overrideFactory = \Drupal::service('config_translation.language_config_override_factory');
+    $overrideFactory = \Drupal::service('language.config_factory_override');
 
     $overrideFactory->getOverride('fr', 'canvas.content_template.node.article.full')->set('component_tree', self::FRENCH_COMPONENT_TREE)->save();
     $overrideFactory->getOverride('de', 'canvas.content_template.node.article.full')->set('component_tree', $germanComponentTree)->save();

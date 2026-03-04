@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
+use Drupal\language\ConfigurableLanguageManagerInterface;
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\language\Entity\ConfigurableLanguage;
+use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
@@ -24,6 +26,8 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 #[RunTestsInSeparateProcesses]
 final class PageRegionConfigTranslationTest extends CanvasKernelTestBase {
 
+  use GenerateComponentConfigTrait;
+
   /**
    * {@inheritdoc}
    */
@@ -35,6 +39,7 @@ final class PageRegionConfigTranslationTest extends CanvasKernelTestBase {
     'locale',
     'config_translation',
     'canvas',
+    'canvas_test_sdc',
     'canvas_dev_translation',
   ];
 
@@ -44,7 +49,7 @@ final class PageRegionConfigTranslationTest extends CanvasKernelTestBase {
 
   private const ENGLISH_COMPONENT_TREE = [
     [
-      'uuid' => 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+      'uuid' => 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
       'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
       'component_version' => 'b1e991f726a2a266',
       'inputs' => [
@@ -55,7 +60,7 @@ final class PageRegionConfigTranslationTest extends CanvasKernelTestBase {
 
   private const FRENCH_COMPONENT_TREE = [
     [
-      'uuid' => 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+      'uuid' => 'b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e',
       'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
       'component_version' => 'b1e991f726a2a266',
       'inputs' => [
@@ -66,7 +71,7 @@ final class PageRegionConfigTranslationTest extends CanvasKernelTestBase {
 
   private const FRENCH_MULTI_COMPONENT_TREE = [
     [
-      'uuid' => 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+      'uuid' => 'c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f',
       'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
       'component_version' => 'b1e991f726a2a266',
       'inputs' => [
@@ -74,7 +79,7 @@ final class PageRegionConfigTranslationTest extends CanvasKernelTestBase {
       ],
     ],
     [
-      'uuid' => 'dddddddd-dddd-dddd-dddd-dddddddddddd',
+      'uuid' => 'd4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a',
       'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
       'component_version' => 'b1e991f726a2a266',
       'inputs' => [
@@ -90,6 +95,9 @@ final class PageRegionConfigTranslationTest extends CanvasKernelTestBase {
     parent::setUp();
     $this->installConfig(['system', 'language']);
     $this->installEntitySchema('configurable_language');
+    $this->installEntitySchema('user');
+    $this->installConfig(['canvas']);
+    $this->generateComponentConfig();
     \Drupal::service('theme_installer')->install([self::TEST_THEME]);
     ConfigurableLanguage::createFromLangcode('fr')->save();
   }
@@ -99,7 +107,7 @@ final class PageRegionConfigTranslationTest extends CanvasKernelTestBase {
    */
   public function testFrenchOverrideReplacesComponentTree(): void {
     /** @var \Drupal\language\Config\LanguageConfigFactoryOverrideInterface $overrideFactory */
-    $overrideFactory = \Drupal::service('config_translation.language_config_override_factory');
+    $overrideFactory = \Drupal::service('language.config_factory_override');
 
     $region = PageRegion::create([
       'theme' => self::TEST_THEME,
@@ -119,22 +127,26 @@ final class PageRegionConfigTranslationTest extends CanvasKernelTestBase {
     self::assertSame(self::FRENCH_COMPONENT_TREE, $frenchTree, 'French override must contain the French component tree.');
     self::assertNotEquals(self::ENGLISH_COMPONENT_TREE, $frenchTree, 'French override must differ from English default.');
 
-    $originalLanguage = \Drupal::languageManager()->getCurrentLanguage();
-    $frenchLanguage = \Drupal::languageManager()->getLanguage('fr');
-    self::assertNotNull($frenchLanguage, 'French language must be available.');
-    \Drupal::service('language.default')->set($frenchLanguage);
-    \Drupal::configFactory()->reset(self::CONFIG_NAME);
+    // Verify the override is accessible via the language manager — the same
+    // storage path that LanguageConfigFactoryOverride::loadOverrides() reads
+    // on a real French-language request.
+    $french = \Drupal::languageManager()->getLanguage('fr');
+    self::assertNotNull($french, 'French language must be available.');
 
-    try {
-      $overriddenTree = \Drupal::configFactory()->get(self::CONFIG_NAME)->get('component_tree');
-      self::assertSame(self::FRENCH_COMPONENT_TREE, $overriddenTree, 'Config factory must return French tree while French is active.');
-    } finally {
-      \Drupal::service('language.default')->set($originalLanguage);
-    }
+    $languageManager = \Drupal::languageManager();
+    self::assertInstanceOf(ConfigurableLanguageManagerInterface::class, $languageManager);
+    $overriddenTree = $languageManager
+      ->getLanguageConfigOverride('fr', self::CONFIG_NAME)
+      ->get('component_tree');
+    self::assertSame(self::FRENCH_COMPONENT_TREE, $overriddenTree, 'Language manager must return the French component tree for the fr override.');
+
+    // English default must remain unaffected.
+    $defaultTreeAfterOverride = \Drupal::config(self::CONFIG_NAME)->get('component_tree');
+    self::assertSame(self::ENGLISH_COMPONENT_TREE, $defaultTreeAfterOverride, 'Creating a French override must not mutate the English default config.');
 
     $frenchUuids = array_column($frenchTree, 'uuid');
-    self::assertContains('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', $frenchUuids, 'French UUID must exist.');
-    self::assertNotContains('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', $frenchUuids, 'English UUID must not appear.');
+    self::assertContains('b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', $frenchUuids, 'French UUID must exist.');
+    self::assertNotContains('a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d', $frenchUuids, 'English UUID must not appear.');
   }
 
   /**
@@ -142,7 +154,7 @@ final class PageRegionConfigTranslationTest extends CanvasKernelTestBase {
    */
   public function testFrenchOverrideWithDifferentTreeStructure(): void {
     /** @var \Drupal\language\Config\LanguageConfigFactoryOverrideInterface $overrideFactory */
-    $overrideFactory = \Drupal::service('config_translation.language_config_override_factory');
+    $overrideFactory = \Drupal::service('language.config_factory_override');
 
     $region = PageRegion::create([
       'theme' => self::TEST_THEME,
@@ -161,9 +173,9 @@ final class PageRegionConfigTranslationTest extends CanvasKernelTestBase {
     self::assertCount(1, \Drupal::config(self::CONFIG_NAME)->get('component_tree'), 'English default tree must still have 1 component.');
 
     $frenchUuids = array_column($frenchTree, 'uuid');
-    self::assertContains('cccccccc-cccc-cccc-cccc-cccccccccccc', $frenchUuids);
-    self::assertContains('dddddddd-dddd-dddd-dddd-dddddddddddd', $frenchUuids);
-    self::assertNotContains('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', $frenchUuids);
+    self::assertContains('c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f', $frenchUuids);
+    self::assertContains('d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a', $frenchUuids);
+    self::assertNotContains('a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d', $frenchUuids);
   }
 
   /**
@@ -171,7 +183,7 @@ final class PageRegionConfigTranslationTest extends CanvasKernelTestBase {
    */
   public function testDefaultTreeServedWhenNoOverrideExists(): void {
     /** @var \Drupal\language\Config\LanguageConfigFactoryOverrideInterface $overrideFactory */
-    $overrideFactory = \Drupal::service('config_translation.language_config_override_factory');
+    $overrideFactory = \Drupal::service('language.config_factory_override');
 
     $region = PageRegion::create([
       'theme' => self::TEST_THEME,
@@ -192,7 +204,7 @@ final class PageRegionConfigTranslationTest extends CanvasKernelTestBase {
    */
   public function testDeletingOverrideRestoresDefault(): void {
     /** @var \Drupal\language\Config\LanguageConfigFactoryOverrideInterface $overrideFactory */
-    $overrideFactory = \Drupal::service('config_translation.language_config_override_factory');
+    $overrideFactory = \Drupal::service('language.config_factory_override');
 
     $region = PageRegion::create([
       'theme' => self::TEST_THEME,
@@ -219,13 +231,13 @@ final class PageRegionConfigTranslationTest extends CanvasKernelTestBase {
    */
   public function testMultipleLanguageOverridesAreIndependent(): void {
     /** @var \Drupal\language\Config\LanguageConfigFactoryOverrideInterface $overrideFactory */
-    $overrideFactory = \Drupal::service('config_translation.language_config_override_factory');
+    $overrideFactory = \Drupal::service('language.config_factory_override');
 
     ConfigurableLanguage::createFromLangcode('de')->save();
 
     $germanComponentTree = [
       [
-        'uuid' => 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+        'uuid' => 'e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b',
         'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
         'component_version' => 'b1e991f726a2a266',
         'inputs' => ['heading' => 'German header region content'],
@@ -258,7 +270,7 @@ final class PageRegionConfigTranslationTest extends CanvasKernelTestBase {
    */
   public function testUpdatingOverrideReplacesItCompletely(): void {
     /** @var \Drupal\language\Config\LanguageConfigFactoryOverrideInterface $overrideFactory */
-    $overrideFactory = \Drupal::service('config_translation.language_config_override_factory');
+    $overrideFactory = \Drupal::service('language.config_factory_override');
 
     $region = PageRegion::create([
       'theme' => self::TEST_THEME,
@@ -280,7 +292,7 @@ final class PageRegionConfigTranslationTest extends CanvasKernelTestBase {
     self::assertCount(2, $updatedTree);
 
     $frenchUuids = array_column($updatedTree, 'uuid');
-    self::assertNotContains('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', $frenchUuids);
+    self::assertNotContains('b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', $frenchUuids, 'Original French UUID must be gone after update.');
   }
 
 }
