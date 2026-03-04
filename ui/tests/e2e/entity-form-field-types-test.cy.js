@@ -37,15 +37,18 @@ describe(
       cy.findByTestId('canvas-page-data-form').as('entityForm');
       // Log all ajax form requests to help with debugging.
       cy.intercept('POST', '**/canvas/api/v0/form/content-entity/**');
-
+      cy.intercept({
+        url: '**/canvas/api/v0/layout/node/2',
+        times: 1,
+        method: 'POST',
+      }).as('updatePreview');
       const path = '/not-empty-anymore';
       cy.findByLabelText('URL alias').as('path');
       cy.get('@path').should('have.value', '/i-am-an-empty-node');
       cy.get('@path').clear();
       cy.get('@path').type(path);
       cy.get('@path').should('have.value', path);
-      // Wait for the preview to finish loading to confirm the form continues to
-      // work after such changes are completed.
+      // Wait for the preview to finish loading.
       cy.wait('@updatePreview');
       cy.findByLabelText('Loading Preview').should('not.exist');
 
@@ -118,7 +121,7 @@ describe(
       cy.get('@checkbox').click();
       cy.get('@checkbox').should('be.checked');
       // Wait for the preview to finish loading.
-      // cy.wait('@updatePreview');
+      cy.wait('@updatePreview');
       cy.findByLabelText('Loading Preview').should('not.exist');
       cy.publishAllPendingChanges('No more gravy');
 
