@@ -228,6 +228,8 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
     if ($is_multiple && $this->themeManager->getActiveTheme()->getName() === 'canvas_stark') {
       // Get the field label to add to all input elements.
       $field_label = $field_definition->getLabel();
+      // Add widget type to the widget element for theme suggestions.
+      $widget['#widget_type'] = $context['widget']->getPluginId();
       // Mark all input elements within multivalue widgets and add field title.
       $this->markMultivalueFormElements($widget, $field_label);
     }
@@ -245,7 +247,7 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
     foreach (Element::children($element) as $key) {
       // Mark input elements.
       if (isset($element[$key]['#type']) &&
-          in_array($element[$key]['#type'], ['textfield'], TRUE)) {
+          in_array($element[$key]['#type'], ['textfield', 'number'], TRUE)) {
         $element[$key]['#is_multivalue_form'] = TRUE;
         $element[$key]['#attributes']['data-field-label'] = $field_label;
       }
