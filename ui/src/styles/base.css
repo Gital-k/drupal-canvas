@@ -66,7 +66,8 @@ drupal-html-fragment {
   }
 }
 
-[data-canvas-layout-request-in-progress] [data-canvas-tabledrag="true"] {
+[data-canvas-layout-request-in-progress] [data-canvas-tabledrag="true"],
+[data-canvas-layout-request-in-progress] a.tabledrag-handle {
   pointer-events: none;
   user-select: none;
 }
