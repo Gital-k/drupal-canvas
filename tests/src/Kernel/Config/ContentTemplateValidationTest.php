@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Config;
 
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Drupal\canvas\PropSource\PropSource;
 use Drupal\Core\Entity\Entity\EntityViewMode;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
@@ -12,7 +14,7 @@ use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\Tests\canvas\Traits\BetterConfigDependencyManagerTrait;
-use Drupal\Tests\canvas\Traits\DataProviderWithCoreSpecificComponentActiveVersionTrait;
+use Drupal\Tests\canvas\Traits\DataProviderWithComponentTreeTrait;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\canvas\Traits\CreateTestJsComponentTrait;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
@@ -22,13 +24,14 @@ use Drupal\canvas_test_validation\Plugin\Canvas\ComponentSource\InvalidSlots;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
- * @group canvas
+ * Tests Content Template Validation.
  */
 #[RunTestsInSeparateProcesses]
+#[Group('canvas')]
 final class ContentTemplateValidationTest extends BetterConfigEntityValidationTestBase {
 
   use BetterConfigDependencyManagerTrait;
-  use DataProviderWithCoreSpecificComponentActiveVersionTrait;
+  use DataProviderWithComponentTreeTrait;
   use ContentTypeCreationTrait;
   use ContribStrictConfigSchemaTestTrait;
   use CreateTestJsComponentTrait;
@@ -232,10 +235,11 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
   }
 
   /**
-   * @dataProvider providerInvalidComponentTree
-   */
+ * Tests invalid component tree.
+ */
+  #[DataProvider('providerInvalidComponentTree')]
   public function testInvalidComponentTree(array $component_tree, array $expected_messages): void {
-    self::addMissingBlockComponentVersions($component_tree);
+    self::populateActiveComponentVersionPlaceholders($component_tree);
     \assert($this->entity instanceof ContentTemplate);
     $this->entity->setComponentTree($component_tree);
     $this->assertValidationErrors($expected_messages);
@@ -650,8 +654,9 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
   }
 
   /**
-   * @dataProvider providerInvalidExposedSlot
-   */
+ * Tests invalid exposed slot.
+ */
+  #[DataProvider('providerInvalidExposedSlot')]
   public function testInvalidExposedSlot(array $exposed_slots, array $expected_errors): void {
     $this->entity->set('exposed_slots', $exposed_slots);
     $this->assertValidationErrors($expected_errors);

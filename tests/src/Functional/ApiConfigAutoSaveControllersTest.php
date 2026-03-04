@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Functional;
 
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Url;
@@ -11,7 +13,6 @@ use Drupal\canvas\Entity\AssetLibrary;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Entity\CanvasAssetInterface;
-use Drupal\Tests\canvas\Traits\AutoSaveManagerTestTrait;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\user\UserInterface;
 use GuzzleHttp\RequestOptions;
@@ -20,14 +21,13 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 /**
  * Tests the details of auto-saving config entities, NOT the "live" version.
  *
- * @covers \Drupal\canvas\Controller\ApiConfigAutoSaveControllers
- * @group canvas
+ * @legacy-covers \Drupal\canvas\Controller\ApiConfigAutoSaveControllers
  */
 #[RunTestsInSeparateProcesses]
+#[Group('canvas')]
 final class ApiConfigAutoSaveControllersTest extends HttpApiTestBase {
 
   use ContribStrictConfigSchemaTestTrait;
-  use AutoSaveManagerTestTrait;
 
   /**
    * {@inheritdoc}
@@ -186,8 +186,9 @@ final class ApiConfigAutoSaveControllersTest extends HttpApiTestBase {
   }
 
   /**
-   * @dataProvider providerTest
-   */
+ * Tests .
+ */
+  #[DataProvider('providerTest')]
   public function test(
     string $entity_type_id,
     array $initial_entity,

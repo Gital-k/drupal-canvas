@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource;
 
+use Drupal\canvas\Entity\ContentTemplate;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\Depends;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponentDiscovery;
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
 use Drupal\Core\Cache\Cache;
@@ -36,38 +41,34 @@ use Drupal\node\Entity\Node;
 use Drupal\node\Entity\NodeType;
 use Drupal\Tests\canvas\Kernel\BrokenComponentManager;
 use Drupal\Tests\canvas\Kernel\BrokenPluginManagerInterface;
-use Drupal\Tests\canvas\Kernel\Traits\CiModulePathTrait;
-use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
 use Drupal\Tests\canvas\Traits\SingleDirectoryComponentTreeTestTrait;
-use Drupal\Tests\canvas\Traits\CrawlerTrait;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
 use Drupal\Tests\node\Traits\ContentTypeCreationTrait;
 use Drupal\Tests\TestFileCreationTrait;
-use Drupal\Tests\user\Traits\UserCreationTrait;
 use Twig\Error\Error;
 use Twig\Error\RuntimeError;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Twig\Error\SyntaxError;
 
 /**
- * @coversDefaultClass \Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent
- * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponentDiscovery
- * @group canvas
- * @group canvas_component_sources
+ * Tests Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent.
+ *
  * @phpstan-import-type ComponentConfigEntityId from \Drupal\canvas\Entity\Component
  * @phpstan-import-type SingleComponentInputArray from \Drupal\canvas\Plugin\DataType\ComponentInputs
+ * @legacy-covers \Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponentDiscovery
  */
 #[RunTestsInSeparateProcesses]
+#[CoversClass(SingleDirectoryComponent::class)]
+#[Group('canvas')]
+#[Group('canvas_component_sources')]
 final class SingleDirectoryComponentTest extends GeneratedFieldExplicitInputUxComponentSourceBaseTestBase {
 
-  use ConstraintViolationsTestTrait;
   use SingleDirectoryComponentTreeTestTrait;
-  use CiModulePathTrait;
-  use CrawlerTrait;
   use MediaTypeCreationTrait;
   use TestFileCreationTrait;
   use ContentTypeCreationTrait;
-  use UserCreationTrait;
+
+  protected const string UUID_PARTLY_DYNAMIC_HERO = '6eda12fa-c990-4292-8399-31491fae4a52';
 
   /**
    * {@inheritdoc}
@@ -111,8 +112,9 @@ final class SingleDirectoryComponentTest extends GeneratedFieldExplicitInputUxCo
   }
 
   /**
-   * @depends testDiscovery
-   */
+ * Tests get client side info.
+ */
+  #[Depends('testDiscovery')]
   public function testGetClientSideInfo(array $component_ids): void {
     $this->installEntitySchema('node');
     $this->installConfig('node');
@@ -123,8 +125,8 @@ final class SingleDirectoryComponentTest extends GeneratedFieldExplicitInputUxCo
   /**
    * All test module SDCs must either have a Component or a reason why not.
    *
-   * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponentDiscovery::discover
-   * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponentDiscovery::checkRequirements
+   * @legacy-covers \Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponentDiscovery::discover
+   * @legacy-covers \Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponentDiscovery::checkRequirements
    */
   public function testDiscovery(): array {
     // Nothing discovered initially.
@@ -144,6 +146,9 @@ final class SingleDirectoryComponentTest extends GeneratedFieldExplicitInputUxCo
       ],
       'sdc.canvas_test_sdc.html-invalid-format' => [
         'Invalid value "invalid" for "x-formatting-context". Valid values are "inline" and "block".',
+      ],
+      'sdc.canvas_test_sdc.image-gallery-nonsensical' => [
+        'The "maxItems" restriction on arrays (if set) must be at least 2, but got 1 on prop "images". Use a non-array type for single-value props.',
       ],
       'sdc.canvas_test_sdc.image-required-with-invalid-example' => [
         'Prop "image" has invalid example value: [src] The property src is required',
@@ -251,9 +256,8 @@ final class SingleDirectoryComponentTest extends GeneratedFieldExplicitInputUxCo
 
   /**
    * Tests the shape-matched `prop_field_definitions` for the eligible SDCs.
-   *
-   * @depends testDiscovery
    */
+  #[Depends('testDiscovery')]
   public function testSettings(array $component_ids): void {
     $settings = $this->getAllSettings($component_ids);
     self::assertSame(self::getExpectedSettings(), $settings);
@@ -282,9 +286,9 @@ final class SingleDirectoryComponentTest extends GeneratedFieldExplicitInputUxCo
    *
    * @param array<ComponentConfigEntityId> $component_ids
    *
-   * @covers ::getReferencedPluginClass
-   * @depends testDiscovery
+   * @legacy-covers ::getReferencedPluginClass
    */
+  #[Depends('testDiscovery')]
   public function testGetReferencedPluginClass(array $component_ids): void {
     self::assertSame(
       // All SDCs use the same plugin class!
@@ -298,9 +302,9 @@ final class SingleDirectoryComponentTest extends GeneratedFieldExplicitInputUxCo
    *
    * @param array<ComponentConfigEntityId> $component_ids
    *
-   * @covers ::renderComponent
-   * @depends testDiscovery
+   * @legacy-covers ::renderComponent
    */
+  #[Depends('testDiscovery')]
   public function testRenderComponentLive(array $component_ids): void {
     $this->installEntitySchema('node');
     $this->installConfig('node');
@@ -1091,35 +1095,46 @@ HTML
   }
 
   /**
-   * @covers ::getExplicitInput
-   * @dataProvider providerComponentResolving
+   * Tests get explicit input.
+   *
+   * @legacy-covers ::getExplicitInput
    */
-  public function testGetExplicitInput(array $component_item_value, array $expected_props_for_uuids, ?array $permissions = NULL): void {
+  #[DataProvider('providerComponentResolving')]
+  public function testGetExplicitInput(array $component_item_value, array $expected_props_for_uuids, array $permissions): void {
     $this->generateComponentConfig();
     $this->installEntitySchema('node');
-    $this->container->get('module_installer')->install(['canvas_test_config_node_article']);
-    $node = Node::create([
-      'title' => 'Test node',
-      'type' => 'article',
-      'field_canvas_test' => $component_item_value,
-    ]);
-    $canvas_field_item = $node->field_canvas_test[0];
-    if ($permissions !== NULL) {
-      // If we are setting permissions to check access, we need to save the node,
-      // but we cannot use $permissions for the user saving the node because we
-      // may be testing insufficient permissions. So we temporarily set a user with
-      // 'access content' permission to save the node, then use the permissions
-      // we are testing with.
-      $this->setUpCurrentUser(permissions: ['access content']);
-      $node->save();
-      $this->setUpCurrentUser(permissions: $permissions);
-    }
+    $this->installConfig(['node']);
+    NodeType::create(['type' => 'article', 'name' => 'Article'])->save();
 
+    // Create a sample "article" node.
+    $node = Node::create(['title' => 'Test node', 'type' => 'article']);
+    self::assertEntityIsValid($node);
+    $node->save();
+
+    // Create a template for "article" nodes, to allow populating it using
+    // entity field data.
+    $template = ContentTemplate::create([
+      'content_entity_type_id' => 'node',
+      'content_entity_type_bundle' => 'article',
+      'content_entity_type_view_mode' => 'full',
+      'component_tree' => $component_item_value,
+    ]);
+    self::assertEntityIsValid($template);
+    $template->save();
+
+    // Resolve the inputs for the first component instance aka first field item.
+    $canvas_field_item = $template->getComponentTree()[0];
+    // Test as a visitor with the specified permissions.
+    $this->setUpCurrentUser(permissions: $permissions);
     $this->assertInstanceOf(ComponentTreeItem::class, $canvas_field_item);
     $actual_props = array_combine(
       \array_keys($expected_props_for_uuids),
       \array_map(
-        fn (string $uuid) => $canvas_field_item->getComponent()?->getComponentSource()->getExplicitInput($uuid, $canvas_field_item)['resolved'],
+        fn (string $uuid) => $canvas_field_item->getComponent()?->getComponentSource()->getExplicitInput(
+          uuid: $uuid,
+          item: $canvas_field_item,
+          host_entity: $node,
+        )['resolved'],
         \array_keys($expected_props_for_uuids)
       )
     );
@@ -1128,20 +1143,20 @@ HTML
 
   public static function providerComponentResolving(): array {
     $test_cases = static::getValidTreeTestCases();
-    $invalid_test_cases = static::getInvalidTreeTestCases();
-    // Only 1 invalid case will allow to call
-    // \Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem::resolveComponentProps()
-    // without an exception.
-    $test_cases['invalid UUID, missing component_id key'] = $invalid_test_cases['invalid UUID, missing component_id key'];
-    $test_cases['invalid UUID, missing component_id key'][] = [];
     $test_cases['valid values using static inputs'][] = [
       'dynamic-static-card2df' => [
         'heading' => new EvaluationResult('They say I am static, but I want to believe I can change!'),
       ],
     ];
+    // No permissions needed.
+    $test_cases['valid values using static inputs'][] = [];
+
     $test_cases['valid values for propless component'][] = [
       'propless-component-uuid' => [],
     ];
+    // No permissions needed.
+    $test_cases['valid values for propless component'][] = [];
+
     $test_cases['valid value for optional explicit input using an URL prop shape, with default value'][] = [
       'optional-url-with-default-value' => [
         'heading' => new EvaluationResult('Gracie says hi!'),
@@ -1156,8 +1171,11 @@ HTML
         ),
       ],
     ];
+    // No permissions needed.
+    $test_cases['valid value for optional explicit input using an URL prop shape, with default value'][] = [];
+
     $hero_with_dynamic_sources = [
-      'uuid' => 'partly-dynamic-hero',
+      'uuid' => self::UUID_PARTLY_DYNAMIC_HERO,
       'component_id' => 'sdc.canvas_test_sdc.my-hero',
       'component_version' => 'a681ae184a8f6b7f',
       'inputs' => [
@@ -1178,7 +1196,7 @@ HTML
         $hero_with_dynamic_sources,
       ],
       [
-        'partly-dynamic-hero' => [
+        self::UUID_PARTLY_DYNAMIC_HERO => [
           // Permanent cacheability because populated by StaticPropSource
           // without references.
           'heading' => new EvaluationResult('hello, world!'),
@@ -1208,7 +1226,7 @@ HTML
         $hero_with_dynamic_sources,
       ],
       [
-        'partly-dynamic-hero' => [
+        self::UUID_PARTLY_DYNAMIC_HERO => [
           'heading' => new EvaluationResult('hello, world!'),
           // Node access-dependent cacheability because DynamicPropSource.
           'subheading' => new EvaluationResult(
@@ -2577,9 +2595,11 @@ HTML
   }
 
   /**
-   * @covers ::calculateDependencies
-   * @depends testDiscovery
+   * Tests calculate dependencies.
+   *
+   * @legacy-covers ::calculateDependencies
    */
+  #[Depends('testDiscovery')]
   public function testCalculateDependencies(array $component_ids): void {
     self::assertSame([
       'sdc.canvas_test_sdc.attributes' => [
@@ -5249,9 +5269,11 @@ HTML
   }
 
   /**
-   * @covers ::inputToClientModel
-   * @dataProvider explicitsInputsProvider
+   * Tests input to client model.
+   *
+   * @legacy-covers ::inputToClientModel
    */
+  #[DataProvider('explicitsInputsProvider')]
   public function testInputToClientModel(string $component_id, array $explicit_input, array $expected_client_model):void {
     $this->generateComponentConfig();
 
@@ -5272,15 +5294,17 @@ HTML
   }
 
   /**
+   * Tests client model to input.
+   *
    * @param array{source: SingleComponentInputArray, resolved: array<string, mixed>} $clientModel
    * @param ?array $nodeValues
    * @param ?array $expectedInput
    * @param ?class-string<\Throwable> $expectedExceptionClass
    * @param ?string $expectedExceptionMessage
    *
-   * @covers ::clientModelToInput
-   * @dataProvider providerClientModelToInput
+   * @legacy-covers ::clientModelToInput
    */
+  #[DataProvider('providerClientModelToInput')]
   public function testClientModelToInput(array $clientModel, ?array $nodeValues, ?array $expectedInput, ?string $expectedExceptionClass, ?string $expectedExceptionMessage): void {
     $this->generateComponentConfig();
     $component = Component::load('sdc.canvas_test_sdc.my-hero');
@@ -5570,20 +5594,9 @@ HTML
     $image->save();
     return [
       'image' => [
-        'sourceType' => 'static:field_item:entity_reference',
-        'value' => ['target_id' => $image->id()],
         // This expression resolves `src` to the image's public URL.
         // @see \Drupal\canvas\Hook\ShapeMatchingHooks::mediaLibraryStorablePropShapeAlter()
-        'expression' => 'ℹ︎entity_reference␟entity␜␜entity:media:image␝field_media_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
-        'sourceTypeSettings' => [
-          'storage' => ['target_type' => 'media'],
-          'instance' => [
-            'handler' => 'default:media',
-            'handler_settings' => [
-              'target_bundles' => ['image' => 'image'],
-            ],
-          ],
-        ],
+        ['target_id' => $image->id()],
       ],
     ];
   }
