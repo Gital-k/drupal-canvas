@@ -21,9 +21,9 @@ use Drupal\Core\TypedData\DataReferenceDefinitionInterface;
  * Adds properties to entity reference field implementations.
  *
  * It adds:
- * - a computed, read-only `target_uuid` field property, derived from the
- *   referenced entity. When setting values, `target_uuid` is resolved to
- *   `target_id` (for default content import), then discarded.
+ * - a computed `target_uuid` field property, derived from the referenced
+ *   entity. When setting values via `setValue()` or `onChange()`,
+ *   `target_uuid` is resolved to `target_id`, then discarded.
  * - a `url` field property, which allows generating (canonical) links to
  *   referenced entities (crucial for Canvas' ContentTemplates)
  */
@@ -51,7 +51,7 @@ trait CoreFeatureEntityReferenceItemAddPropertiesTrait {
     $definitions['target_uuid'] = DataDefinition::create('string')
       ->setLabel(new TranslatableMarkup('Target UUID'))
       ->setComputed(TRUE)
-      ->setReadOnly(TRUE)
+      ->setReadOnly(FALSE)
       ->addConstraint('Uuid')
       ->setClass(ComputedEntityTargetUuid::class);
 
@@ -86,6 +86,19 @@ trait CoreFeatureEntityReferenceItemAddPropertiesTrait {
     }
 
     return $definitions;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function onChange(mixed $property_name, $notify = TRUE): void {
+    if ($property_name === 'target_uuid') {
+      $target_uuid = $this->get('target_uuid')->getValue();
+      if ($target_uuid !== NULL) {
+        $this->writePropertyValue('target_id', $this->getTargetId($target_uuid));
+      }
+    }
+    parent::onChange($property_name, $notify);
   }
 
   /**
