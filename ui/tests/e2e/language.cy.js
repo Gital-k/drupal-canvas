@@ -3,7 +3,7 @@ const testCanvasPagesCanBeCreatedInMultilingualSites = (
   title,
   expectedUrlAlias,
   expectedPathPrefix,
-  expectedMediaAlt
+  expectedMediaAlt,
 ) => {
   cy.visit(`/es/canvas`);
 
@@ -49,7 +49,7 @@ const testCanvasPagesCanBeCreatedInMultilingualSites = (
   cy.visit(`/es/admin/content/pages`);
   cy.findByText(title).click();
   cy.get('body').should('contain.text', title);
-  cy.get('img[alt="' + expectedMediaAlt + '"]').should('exist')
+  cy.get('img[alt="' + expectedMediaAlt + '"]').should('exist');
   cy.url().should(
     'eq',
     `${Cypress.config().baseUrl}${expectedPathPrefix}${expectedUrlAlias}`,
