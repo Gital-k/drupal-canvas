@@ -21,4 +21,9 @@ if (!chdir($root)) {
 }
 
 echo getcwd() . "\n";
-echo shell_exec("DRUPAL_DEV_SITE_PATH=$drupal_site_path php core/scripts/drupal recipe $recipe");
+try {
+  echo shell_exec("DRUPAL_DEV_SITE_PATH=$drupal_site_path php core/scripts/drupal recipe $recipe");
+}
+catch (\Exception $e) {
+  echo $e->getMessage();
+}
