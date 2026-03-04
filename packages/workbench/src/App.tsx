@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { canvasTreeToSpec } from 'drupal-canvas/json-render-utils';
 import { useLocation, useNavigate, useParams } from 'react-router';
 import { toViteFsUrl } from '@drupal-canvas/vite-compat/runtime';
 import { Badge } from '@wb/components/ui/badge';
@@ -29,12 +30,11 @@ import type {
   DiscoveryResult,
 } from '@wb/lib/discovery-client';
 import type {
-  PreviewComponentRenderRequest,
   PreviewManifest,
   PreviewManifestComponent,
-  PreviewPageRenderRequest,
   PreviewRenderRequest,
 } from '@wb/lib/preview-contract';
+import type { CanvasComponentTree } from 'drupal-canvas/json-render-utils';
 
 const SIDEBAR_COOKIE_NAME = 'sidebar_state';
 
@@ -291,9 +291,9 @@ export function App() {
 
       if (event.data.type === 'preview:rendered') {
         setFrameStatus(
-          event.data.payload.kind === 'component'
-            ? `Rendered component ${event.data.payload.renderId}.`
-            : `Rendered page ${event.data.payload.renderId}.`,
+          isPageRoute
+            ? `Rendered page ${event.data.payload.renderId}.`
+            : `Rendered component ${event.data.payload.renderId}.`,
         );
         return;
       }
@@ -307,13 +307,14 @@ export function App() {
     return () => {
       window.removeEventListener('message', handleFrameMessage);
     };
-  }, []);
+  }, [isPageRoute]);
 
   useEffect(() => {
     if (!isFrameReady || !previewManifest) {
       return;
     }
 
+    const pageSpecAbortController = new AbortController();
     const frameWindow = iframeRef.current?.contentWindow;
     if (!frameWindow) {
       return;
@@ -324,59 +325,110 @@ export function App() {
       selectedComponent?.previewable &&
       selectedComponent.moduleUrl
     ) {
-      const message: PreviewComponentRenderRequest = {
+      const tree: CanvasComponentTree = [
+        {
+          uuid: crypto.randomUUID(),
+          parent_uuid: null,
+          slot: null,
+          component_id: selectedComponent.name,
+          component_version: null,
+          inputs: selectedComponent.exampleProps,
+          label: null,
+        },
+      ];
+      const message: PreviewRenderRequest = {
         source: 'canvas-workbench-parent',
         type: 'preview:render',
         payload: {
-          mode: 'component',
-          componentId: selectedComponent.id,
-          moduleUrl: selectedComponent.moduleUrl,
-          cssUrl: selectedComponent.cssUrl,
-          globalCssUrl: previewManifest.globalCssUrl,
-          props: selectedComponent.exampleProps,
+          renderId: selectedComponent.id,
+          spec: canvasTreeToSpec(tree),
+          registrySources: [
+            {
+              name: selectedComponent.name,
+              jsEntryUrl: selectedComponent.moduleUrl,
+            },
+          ],
+          cssUrls: [
+            ...(previewManifest.globalCssUrl
+              ? [previewManifest.globalCssUrl]
+              : []),
+            ...(selectedComponent.cssUrl ? [selectedComponent.cssUrl] : []),
+          ],
         },
       };
       setFrameStatus(`Rendering component ${selectedComponent.name}...`);
-      frameWindow.postMessage(
-        message as PreviewRenderRequest,
-        window.location.origin,
-      );
+      frameWindow.postMessage(message, window.location.origin);
       return;
     }
 
     if (isPageRoute && selectedPage && discoveryResult) {
-      const pageMessage: PreviewPageRenderRequest = {
-        source: 'canvas-workbench-parent',
-        type: 'preview:render',
-        payload: {
-          mode: 'page',
-          pageSlug: selectedPage.slug,
-          pageSpecUrl: toViteFsUrl(selectedPage.path),
-          globalCssUrl: previewManifest.globalCssUrl,
-          components: discoveryResult.components
-            .filter(
-              (
-                component,
-              ): component is DiscoveredComponent & { jsEntryPath: string } =>
-                component.jsEntryPath !== null,
-            )
-            .map(
-              (component: DiscoveredComponent & { jsEntryPath: string }) => ({
-                name: component.name,
-                jsEntryUrl: toViteFsUrl(component.jsEntryPath),
-                cssEntryUrl: component.cssEntryPath
-                  ? toViteFsUrl(component.cssEntryPath)
-                  : null,
-              }),
-            ),
-        },
-      };
       setFrameStatus(`Rendering page ${selectedPage.name}...`);
-      frameWindow.postMessage(
-        pageMessage as PreviewRenderRequest,
-        window.location.origin,
-      );
+      void (async () => {
+        try {
+          const pageResponse = await fetch(toViteFsUrl(selectedPage.path), {
+            signal: pageSpecAbortController.signal,
+          });
+          if (!pageResponse.ok) {
+            throw new Error(
+              `Failed to load page "${selectedPage.slug}" (${pageResponse.status}).`,
+            );
+          }
+          const pageSpec = await pageResponse.json();
+          const pageMessage: PreviewRenderRequest = {
+            source: 'canvas-workbench-parent',
+            type: 'preview:render',
+            payload: {
+              renderId: selectedPage.slug,
+              spec: pageSpec,
+              registrySources: discoveryResult.components
+                .filter(
+                  (
+                    component,
+                  ): component is DiscoveredComponent & {
+                    jsEntryPath: string;
+                  } => component.jsEntryPath !== null,
+                )
+                .map(
+                  (
+                    component: DiscoveredComponent & { jsEntryPath: string },
+                  ) => ({
+                    name: component.name,
+                    jsEntryUrl: toViteFsUrl(component.jsEntryPath),
+                  }),
+                ),
+              cssUrls: [
+                ...(previewManifest.globalCssUrl
+                  ? [previewManifest.globalCssUrl]
+                  : []),
+                ...discoveryResult.components
+                  .filter((component) => component.cssEntryPath !== null)
+                  .map((component) => toViteFsUrl(component.cssEntryPath!)),
+              ],
+            },
+          };
+          if (pageSpecAbortController.signal.aborted) {
+            return;
+          }
+          frameWindow.postMessage(pageMessage, window.location.origin);
+        } catch (pageLoadError: unknown) {
+          if (
+            pageLoadError instanceof DOMException &&
+            pageLoadError.name === 'AbortError'
+          ) {
+            return;
+          }
+          setFrameStatus(
+            pageLoadError instanceof Error
+              ? pageLoadError.message
+              : 'Unknown page loading error.',
+          );
+        }
+      })();
     }
+
+    return () => {
+      pageSpecAbortController.abort();
+    };
   }, [
     discoveryResult,
     isFrameReady,
