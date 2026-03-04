@@ -40,7 +40,7 @@ describe('Canvas pages can be created in any language', () => {
   before(() => {
     cy.drupalCanvasInstall();
     cy.drupalRecipeApply(
-      'modules/contrib/canvas/tests/fixtures/recipes/language/',
+      '../tests/fixtures/recipes/language/',
     );
   });
 
@@ -60,7 +60,7 @@ describe('Canvas pages can be created in any language', () => {
 
   it('Using interface language', () => {
     cy.drupalRecipeApply(
-      'modules/contrib/canvas/tests/fixtures/recipes/language/interface_negotiation',
+      '../tests/fixtures/recipes/language/interface_negotiation',
     );
     testCanvasPagesCanBeCreatedInMultilingualSites(
       cy,
