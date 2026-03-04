@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
+use Drupal\language\Entity\ConfigurableLanguage;
 use Drupal\Core\Access\CsrfRequestHeaderAccessCheck;
 use Drupal\Core\Access\CsrfTokenGenerator;
 use Drupal\Core\Session\SessionConfigurationInterface;
@@ -33,7 +34,7 @@ use Drupal\Core\Cache\CacheableJsonResponse;
  * @todo Refactor this to start using CanvasKernelTestBase and stop using CanvasTestSetup in https://www.drupal.org/project/canvas/issues/3531679
  */
 #[RunTestsInSeparateProcesses]
-final class ApiAutoSaveControllerTestTranslation extends KernelTestBase {
+final class ApiAutoSaveControllerTranslationTest extends KernelTestBase {
 
   use AutoSaveManagerTestTrait;
   use AutoSaveRequestTestTrait;
@@ -53,6 +54,8 @@ final class ApiAutoSaveControllerTestTranslation extends KernelTestBase {
     'path',
     'test_user_config',
     'canvas_force_publish_error',
+    'language',
+    'content_translation',
   ];
 
   /**
@@ -61,8 +64,10 @@ final class ApiAutoSaveControllerTestTranslation extends KernelTestBase {
   protected function setUp(): void {
     parent::setUp();
     $this->installEntitySchema('path_alias');
+    $this->installConfig(['language']);
     // @todo Remove this setup once refactored https://www.drupal.org/project/canvas/issues/3531679
     (new CanvasTestSetup())->setup();
+    ConfigurableLanguage::createFromLangcode('fr')->save();
   }
 
   /**
@@ -74,9 +79,7 @@ final class ApiAutoSaveControllerTestTranslation extends KernelTestBase {
     /** @var \Drupal\canvas\AutoSave\AutoSaveManager $autoSave */
     $autoSave = $this->container->get(AutoSaveManager::class);
 
-    $account = $this->createUser([Page::EDIT_PERMISSION]);
-    \assert($account !== FALSE);
-    $this->setCurrentUser($account);
+    $this->setUpCurrentUser(permissions: [Page::EDIT_PERMISSION]);
 
     // Create a Page with an English source and a French translation.
     $page = Page::create([
@@ -180,9 +183,11 @@ final class ApiAutoSaveControllerTestTranslation extends KernelTestBase {
       'The FR translation must carry the auto-saved title after publishing.',
     );
 
-    // FR auto-save must be cleared; EN auto-save must remain intact.
+    // FR auto-save must be cleared after publishing; EN was never created.
     $remainingAutoSaves = $this->getAutoSaveStatesFromServer();
+    $enKey = \sprintf('canvas_page:%d:en', $page->id());
     self::assertArrayNotHasKey($frKey, $remainingAutoSaves, 'FR auto-save must be cleared after publishing.');
+    self::assertArrayNotHasKey($enKey, $remainingAutoSaves, 'EN auto-save must not exist as it was never created in this test.');
   }
 
   /**
