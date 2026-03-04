@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\EventSubscriber;
 
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Drupal\Core\Routing\RouteMatch;
 use Drupal\canvas\EventSubscriber\ApiExceptionSubscriber;
 use Drupal\Tests\canvas\Doubles\TestVerboseException;
@@ -17,16 +19,16 @@ use Symfony\Component\Routing\Route;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
- * @group canvas
+ * Tests Api Exception Subscriber.
  */
 #[RunTestsInSeparateProcesses]
+#[Group('canvas')]
 class ApiExceptionSubscriberTest extends CanvasKernelTestBase {
 
   /**
    * Tests the response for an HTTP 500 error.
-   *
-   * @dataProvider providerTest500Response
    */
+  #[DataProvider('providerTest500Response')]
   public function test500Response(string $exception_class, array $exception_arguments, string $expected_message): void {
     $sut = new ApiExceptionSubscriber(
       new RouteMatch('canvas.api.test', new Route('/test-path')),
@@ -51,7 +53,7 @@ class ApiExceptionSubscriberTest extends CanvasKernelTestBase {
     $response = $event->getResponse();
     \assert($response instanceof Response);
     $content = $response->getContent();
-    \assert(is_string($content));
+    \assert(\is_string($content));
     $content = json_decode($content, TRUE, 512, JSON_THROW_ON_ERROR);
     self::assertEquals(500, $response->getStatusCode(), 'Response status code is 500.');
     self::assertArrayHasKey('message', $content, 'Response contains correct message.');

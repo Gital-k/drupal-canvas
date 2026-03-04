@@ -6,6 +6,8 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase;
 use Drupal\canvas\PropExpressions\StructuredData\EntityFieldBasedPropExpressionInterface;
 use Drupal\canvas\PropShape\PersistentPropShapeRepository;
@@ -42,11 +44,11 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
  *
  * @see docs/data-model.md
  * @see \Drupal\Tests\canvas\Kernel\PropShapeRepositoryTest
- * @group canvas
  *
  * @phpstan-type ShapeMatchingResults array{'SDC props': non-empty-list<string>, 'static prop source': null|string, instances: string[], adapter_matches_field_type: string[], adapter_matches_instance: string[]}
  */
 #[RunTestsInSeparateProcesses]
+#[Group('canvas')]
 class PropShapeToFieldInstanceTest extends CanvasKernelTestBase {
 
   use MediaTypeCreationTrait;
@@ -72,9 +74,8 @@ class PropShapeToFieldInstanceTest extends CanvasKernelTestBase {
 
   /**
    * Tests matches for \Drupal\Core\Theme\Component\ComponentMetadata props.
-   *
-   * @dataProvider provider
    */
+  #[DataProvider('provider')]
   public function test(array $modules, array $expected): void {
     $missing_test_modules = array_diff($modules, \array_keys(\Drupal::service('extension.list.module')->getList()));
     if (!empty($missing_test_modules)) {
@@ -297,7 +298,7 @@ class PropShapeToFieldInstanceTest extends CanvasKernelTestBase {
 
     // Removing some test components that have been enabled due to all SDCs now
     // in canvas_test_sdc module.
-    $components_to_remove = ['crash', 'component-no-meta-enum', 'component-mismatch-meta-enum', 'empty-enum', 'deprecated', 'experimental', 'image-gallery', 'image-optional-with-example-and-additional-prop', 'obsolete', 'grid-container', 'html-invalid-format', 'my-cta', 'sparkline', 'sparkline_min_2', 'props-invalid-shapes', 'props-no-examples', 'props-no-slots', 'props-no-title', 'props-slots', 'image-optional-with-example', 'image-optional-without-example', 'image-required-with-example', 'image-required-with-invalid-example', 'image-required-without-example'];
+    $components_to_remove = ['crash', 'component-no-meta-enum', 'component-mismatch-meta-enum', 'empty-enum', 'deprecated', 'experimental', 'image-gallery', 'image-gallery-nonsensical', 'image-optional-with-example-and-additional-prop', 'obsolete', 'grid-container', 'html-invalid-format', 'my-cta', 'sparkline', 'sparkline_min_2', 'props-invalid-shapes', 'props-no-examples', 'props-no-slots', 'props-no-title', 'props-slots', 'image-optional-with-example', 'image-optional-without-example', 'image-required-with-example', 'image-required-with-invalid-example', 'image-required-without-example'];
     foreach ($components_to_remove as $key) {
       unset($components['canvas_test_sdc:' . $key]);
     }
@@ -379,7 +380,7 @@ class PropShapeToFieldInstanceTest extends CanvasKernelTestBase {
 
             $input_schema = $match->getInputSchema($input_name);
             $input_primitive_type = JsonSchemaType::from(
-              is_array($input_schema['type']) ? $input_schema['type'][0] : $input_schema['type']
+              \is_array($input_schema['type']) ? $input_schema['type'][0] : $input_schema['type']
             );
 
             $input_is_required = $match->inputIsRequired($input_name);

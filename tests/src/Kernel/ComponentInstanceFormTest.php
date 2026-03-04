@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
 use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\canvas\Form\ComponentInstanceForm;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent;
@@ -25,11 +28,13 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
- * @coversClass \Drupal\canvas\Form\ComponentInstanceForm
- * @covers \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::buildComponentInstanceForm
- * @group canvas
+ * Tests Component Instance Form.
+ *
+ * @legacy-covers \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::buildComponentInstanceForm
  */
+#[CoversClass(ComponentInstanceForm::class)]
 #[RunTestsInSeparateProcesses]
+#[Group('canvas')]
 final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
 
   use CiModulePathTrait;
@@ -297,8 +302,8 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
   }
 
   private static function findSuggestionByLabel(string|array $label, string $prop, array $suggestions): array {
-    $is_final_level = is_string($label) || count($label) === 1;
-    $needle = is_array($label) ? reset($label) : $label;
+    $is_final_level = \is_string($label) || count($label) === 1;
+    $needle = \is_array($label) ? reset($label) : $label;
     // When recursing, the $prop key won't exist.
     $haystack = \array_key_exists($prop, $suggestions) ? $suggestions[$prop] : $suggestions;
     \assert(array_is_list($haystack));
