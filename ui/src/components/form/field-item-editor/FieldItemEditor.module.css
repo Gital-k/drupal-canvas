@@ -1,0 +1,228 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--gray-a5);
+  border-radius: var(--radius-3);
+  background: var(--gray-a1);
+}
+
+.listView {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.listItem {
+  padding: var(--space-3);
+  border-radius: var(--radius-2);
+  background: white;
+  border: 1px solid var(--gray-a5);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.listItem:hover {
+  border-color: var(--gray-a6);
+  background: var(--gray-a1);
+}
+
+.listItemSelected {
+  background: white;
+  border: 1px solid var(--accent-a6);
+}
+
+.listItemSelected:hover {
+  background: var(--gray-a1);
+}
+
+.dragHandle {
+  display: flex;
+  align-items: center;
+  cursor: grab;
+  color: var(--gray-a9);
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+}
+
+.dragHandle:hover {
+  opacity: 1;
+}
+
+.dragHandle:active {
+  cursor: grabbing;
+}
+
+.itemText {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.addButton {
+  width: 100%;
+  justify-content: center;
+  background: var(--gray-a2);
+  color: var(--accent-9);
+  border: 1px solid var(--gray-a5);
+}
+
+.addButton:hover {
+  background: var(--gray-a3);
+}
+
+.editPanel {
+  margin-top: var(--space-2);
+  padding: var(--space-4);
+  animation: slideDown 0.2s ease;
+  background: white;
+  border: 1px solid var(--gray-a5);
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.editPanelHeader {
+  border-bottom: 1px solid var(--gray-a5);
+  padding-bottom: var(--space-2);
+}
+
+.editPanelContent {
+  padding: var(--space-2) 0;
+}
+
+.editPanelContent .js-form-item {
+  margin: 0;
+}
+
+.editPanelContent .form-item__label {
+  display: none;
+}
+
+.editPanelContent input[type="text"],
+.editPanelContent textarea {
+  width: 100%;
+  padding: var(--space-2);
+  border: 1px solid var(--gray-a6);
+  border-radius: var(--radius-2);
+  font-size: var(--font-size-2);
+  font-family: inherit;
+}
+
+.editPanelInputArea {
+  min-height: 40px;
+}
+
+.editPanelInputArea [data-field-item-input] {
+  display: block !important;
+}
+
+.editPanelInputArea .js-form-item {
+  margin: 0;
+}
+
+.editPanelInputArea .form-item__label {
+  display: none;
+}
+
+.editPanelInputArea input[type="text"],
+.editPanelInputArea textarea {
+  width: 100%;
+  padding: var(--space-2);
+  border: 1px solid var(--gray-a6);
+  border-radius: var(--radius-2);
+  font-size: var(--font-size-2);
+  font-family: inherit;
+}
+
+.editPanelFooter {
+  border-top: 1px solid var(--gray-a5);
+  padding-top: var(--space-2);
+}
+
+.hiddenOriginalFields {
+  display: none;
+}
+
+.inputWrapper {
+  transition: opacity 0.2s ease;
+}
+
+.inputWrapperVisible {
+  display: block;
+  opacity: 1;
+}
+
+.inputWrapperHidden {
+  position: absolute;
+  left: -9999px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.hasFieldEditor > table,
+.hasFieldEditor > .clearfix,
+.hasFieldEditor > .tabledrag-toggle-weight-wrapper {
+  display: none !important;
+}
+
+.hiddenTable {
+  position: absolute !important;
+  left: -9999px !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.hiddenTable.showingEditRow {
+  position: static !important;
+  left: auto !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+.hiddenRow {
+  display: none !important;
+}
+
+.visibleRow {
+  display: table-row !important;
+}
+
+.visibleRow td:not(:first-child) {
+  display: none !important;
+}
+
+.visibleRow td:first-child {
+  padding: 0 !important;
+  border: none !important;
+}
+
+.visibleRow .js-form-item {
+  margin: 0;
+}
+
+.visibleRow .form-item__label,
+.visibleRow label {
+  display: none !important;
+}
+
+.visibleRow input[type="text"],
+.visibleRow textarea {
+  width: 100%;
+  padding: var(--space-2);
+  border: 1px solid var(--gray-a6);
+  border-radius: var(--radius-2);
+  font-size: var(--font-size-2);
+  font-family: inherit;
+}
