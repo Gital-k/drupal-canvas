@@ -69,7 +69,7 @@ const testMediaLibraryInComponentInstanceForm = (
     cy.get('div[role="dialog"]').should('not.exist');
     const removeIt = `[class*="contextualPanel"] .js-media-library-selection  [aria-label="${step.removeText}"][data-once="drupal-ajax"]`;
 
-    cy.intercept('POST', '**/canvas/api/v0/layout/**').as('updatePreview');
+    cy.intercept('PATCH', '**/canvas/api/v0/layout/**').as('updatePreview');
     cy.get(removeIt).realClick({ force: true });
     cy.waitForAjax();
     cy.wait('@updatePreview');
