@@ -271,7 +271,7 @@ class CanvasAiPageBuilderHelper {
     }
 
     $available_components = Json::decode((string) $response->getBody());
-    if (!is_array($available_components) || empty($available_components)) {
+    if (!\is_array($available_components) || empty($available_components)) {
       return [];
     }
 
@@ -293,7 +293,7 @@ class CanvasAiPageBuilderHelper {
       }
       elseif ($source === JsComponent::SOURCE_PLUGIN_ID) {
         $component_data = $available_components[$component_id] ?? [];
-        $this->processCodeComponents($component, $output, is_array($component_data) ? $component_data : []);
+        $this->processCodeComponents($component, $output, \is_array($component_data) ? $component_data : []);
       }
       else {
         // Other sources: id, name, description (description = name)

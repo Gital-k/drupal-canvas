@@ -122,7 +122,7 @@ final class CanvasAiComponentDescriptionSettingsForm extends ConfigFormBase {
 
       $this->config('canvas_ai.component_description.settings')
         ->set('component_context.' . $source . '.enabled', $components['enabled'])
-        ->set('component_context.' . $source . '.data', Yaml::encode(is_array($components_data) ? $components_data : []))
+        ->set('component_context.' . $source . '.data', Yaml::encode(\is_array($components_data) ? $components_data : []))
         ->save();
     }
     parent::submitForm($form, $form_state);
