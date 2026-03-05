@@ -86,7 +86,7 @@ export function jsonSchemaValidate(
  * Get an object of array schemas keyed by prop name.
  *
  * @param {InputUIData} inputAndUiData
- *   An object usually generated on render in inputBehaviors.tsx.
+ *   An object usually generated on render by components wrapped with WrapRHF.
  *   The specific properties required by this function:
  *   - components {ComponentsList|undefined}: the list of all available components,
  *     managed by `services/componentAndLayoutApi`
@@ -118,7 +118,7 @@ export function getPropSchemas(inputAndUiData: InputUIData) {
  * @param target
  *   The HTMLFormElement being validated.
  * @param {InputUIData} inputAndUiData
- *   An object usually generated on render in inputBehaviors.tsx.
+ *   An object usually generated on render by components wrapped with WrapRHF.
  *   The specific properties required by this function:
  *   - selectedComponent {string}: the id of the selected component within the model.
  * @param newValue {string | number | boolean | null}
@@ -177,8 +177,9 @@ export const shouldSkipPropValidation = (
  * @param {any} data
  *   The data to check against the schema.
  * @param inputAndUiData
- *   An object usually generated on render in inputBehaviors.tsx with information
- *   about the form and props. This is needed for passing to getPropSchemas().
+ *   An object usually generated on render by WrapRHF wrapped components,
+ *   containing information about the form and props. This is needed for passing
+ *   to getPropSchemas().
  *
  * @return {JsonSchemaValidationResult}
  */
@@ -215,7 +216,7 @@ export function toPropName(inputName: string, selectedComponent: string) {
  * @param {object} formState
  *   An object with any number of {formElementName: formElementValue}.
  * @param {InputUIData} inputAndUiData
- *   An object usually generated on render in inputBehaviors.tsx.
+ *   An object usually generated on render by components wrapped with WrapRHF.
  *   The specific properties required by this function:
  *   - components {ComponentsList|undefined}: the list of all available components,
  *     managed by `services/componentAndLayoutApi`
@@ -351,7 +352,7 @@ export const formStateToObject = (
  * @param {object} formState
  *   An object with any number of {formElementName: formElementValue}.
  * @param {InputUIData} inputAndUiData
- *   An object usually generated on render in inputBehaviors.tsx.
+ *   An object usually generated on render by components wrapped with WrapRHF.
  *   The specific properties required by this function:
  *   - components {ComponentsList|undefined}: the list of all available components,
  *     managed by `services/componentAndLayoutApi`

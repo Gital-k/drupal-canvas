@@ -64,7 +64,7 @@ jQuery(document).on('ajaxStop', () => {
   // synthesized event object, it does not perfectly replicate a
   // naturally occurring event. We fire a CustomEvent to allow listeners added
   // in components to fire.
-  // @see inputBehaviors.tsx
+  // @see createEnhancedOnChange in '@/components/form/wrapRHF-utils'
   // @see https://api.jquery.com/trigger/
   document.dispatchEvent(new CustomEvent('drupalAjaxStop'));
 });
