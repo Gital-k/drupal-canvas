@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource;
 
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
 use Drupal\canvas\ComponentSource\ComponentInstanceUpdateAttemptResult;
 use Drupal\canvas\ComponentSource\ComponentSourceInterface;
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
@@ -24,11 +26,12 @@ use Drupal\Tests\user\Traits\UserCreationTrait;
 use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
- * @coversDefaultClass \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentInstanceUpdater
- * @group canvas
- * @group canvas_component_sources
- * @group canvas_data_model
+ * Tests Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentInstanceUpdater.
  */
+#[CoversClass(GeneratedFieldExplicitInputUxComponentInstanceUpdater::class)]
+#[Group('canvas')]
+#[Group('canvas_component_sources')]
+#[Group('canvas_data_model')]
 class GeneratedFieldExplicitInputUxComponentInstanceUpdaterTest extends CanvasKernelTestBase {
 
   use GenerateComponentConfigTrait;
@@ -434,7 +437,7 @@ class GeneratedFieldExplicitInputUxComponentInstanceUpdaterTest extends CanvasKe
 
   protected function addOptionalProp(): void {
     $props = $this->jsComponent->getProps();
-    \assert(!is_null($props));
+    \assert(!\is_null($props));
     $props['voice'] = [
       'type' => 'string',
       'title' => 'Voice',
@@ -446,7 +449,7 @@ class GeneratedFieldExplicitInputUxComponentInstanceUpdaterTest extends CanvasKe
 
   protected function removeOptionalProp(): void {
     $props = $this->jsComponent->getProps();
-    \assert(!is_null($props));
+    \assert(!\is_null($props));
     unset($props['optional_text']);
     $this->jsComponent->setProps($props)
       ->save();
@@ -454,7 +457,7 @@ class GeneratedFieldExplicitInputUxComponentInstanceUpdaterTest extends CanvasKe
 
   protected function removeRequiredProp(): void {
     $props = $this->jsComponent->getProps();
-    \assert(!is_null($props));
+    \assert(!\is_null($props));
     unset($props['required_text']);
     $this->jsComponent->setProps($props)
       ->save();
@@ -486,7 +489,7 @@ class GeneratedFieldExplicitInputUxComponentInstanceUpdaterTest extends CanvasKe
   protected function addRequiredProp(): void {
     $props = $this->jsComponent->getProps();
     $required_props = $this->jsComponent->getRequiredProps();
-    \assert(!is_null($props));
+    \assert(!\is_null($props));
     $props['voice'] = [
       'type' => 'string',
       'title' => 'Voice',
@@ -501,7 +504,7 @@ class GeneratedFieldExplicitInputUxComponentInstanceUpdaterTest extends CanvasKe
 
   protected function changePropType(): void {
     $props = $this->jsComponent->getProps();
-    \assert(!is_null($props));
+    \assert(!\is_null($props));
     $props['optional_text']['enum'] = [
       'polite',
       'shouting',
@@ -516,7 +519,7 @@ class GeneratedFieldExplicitInputUxComponentInstanceUpdaterTest extends CanvasKe
 
   protected function changeExamplesFromProp(): void {
     $props = $this->jsComponent->getProps();
-    \assert(!is_null($props));
+    \assert(!\is_null($props));
     $props['required_text']['examples'] = [
       'A brand new example for a prop',
     ];

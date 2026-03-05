@@ -73,7 +73,7 @@ final class ComponentMetadataRequirementsChecker {
       // the prop.
       if (isset($prop['examples'][0])) {
         $example = $prop['examples'][0];
-        if (is_array($example)) {
+        if (\is_array($example)) {
           $example = (object) $example;
         }
         $validator->reset();
@@ -84,6 +84,15 @@ final class ComponentMetadataRequirementsChecker {
             $validator->getErrors()
           )));
         }
+      }
+
+      // JSON Schema does not require that arrays allow >=2 items, but for the
+      // use of the `type: array` type to make sense in Canvas, it is required
+      // that IF `maxItems` is specified, it is >1. Because a single-value array
+      // would be a pointless (array) wrapper for a component prop. (And `0` for
+      // an empty array would make even less sense, let alone negative numbers.)
+      if (\in_array('array', $prop['type'], TRUE) && \array_key_exists('maxItems', $prop) && $prop['maxItems'] < 2) {
+        $messages[] = \sprintf('The "maxItems" restriction on arrays (if set) must be at least 2, but got %d on prop "%s". Use a non-array type for single-value props.', $prop['maxItems'], $prop_name);
       }
 
       // Validation for the additional functionality overlaid on top of the SDC

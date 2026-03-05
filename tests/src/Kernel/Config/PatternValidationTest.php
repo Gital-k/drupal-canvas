@@ -5,24 +5,27 @@ declare(strict_types=1);
 namespace Drupal\Tests\canvas\Kernel\Config;
 
 // cspell:ignore thisisatestpattern
-
+use PHPUnit\Framework\Attributes\DataProvider;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ComponentTreeEntityInterface;
 use Drupal\canvas\Entity\Pattern;
 use Drupal\canvas\PropSource\PropSource;
 use Drupal\Tests\canvas\Traits\BetterConfigDependencyManagerTrait;
-use Drupal\Tests\canvas\Traits\DataProviderWithCoreSpecificComponentActiveVersionTrait;
+use Drupal\Tests\canvas\Traits\DataProviderWithComponentTreeTrait;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\TestTools\Random;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
+/**
+ * Tests Pattern Validation.
+ */
 #[Group('canvas')]
 #[RunTestsInSeparateProcesses]
 class PatternValidationTest extends BetterConfigEntityValidationTestBase {
 
   use BetterConfigDependencyManagerTrait;
-  use DataProviderWithCoreSpecificComponentActiveVersionTrait;
+  use DataProviderWithComponentTreeTrait;
   use GenerateComponentConfigTrait;
 
   /**
@@ -180,12 +183,14 @@ class PatternValidationTest extends BetterConfigEntityValidationTestBase {
   }
 
   /**
-   * @dataProvider providerInvalidComponentTree
-   * @covers \Drupal\canvas\Plugin\Validation\Constraint\ComponentTreeMeetsRequirementsConstraint
+   * Tests invalid component tree.
+   *
+   * @legacy-covers \Drupal\canvas\Plugin\Validation\Constraint\ComponentTreeMeetsRequirementsConstraint
    */
+  #[DataProvider('providerInvalidComponentTree')]
   public function testInvalidComponentTree(array $component_tree, array $expected_messages): void {
     \assert($this->entity instanceof Pattern);
-    self::addMissingBlockComponentVersions($component_tree);
+    self::populateActiveComponentVersionPlaceholders($component_tree);
     \assert($this->entity instanceof ComponentTreeEntityInterface);
     $this->entity->setComponentTree($component_tree);
     $this->assertValidationErrors($expected_messages);
