@@ -1,0 +1,826 @@
+<?php
+
+/**
+ * @file
+ * Install file for Canvas Test Templates in Cypress module.
+ *
+ * Converts the template_basic_setup recipe into programmatic PHP installation.
+ */
+
+declare(strict_types=1);
+
+use Drupal\Core\Entity\Entity\EntityFormDisplay;
+use Drupal\field\Entity\FieldConfig;
+use Drupal\field\Entity\FieldStorageConfig;
+use Drupal\file\Entity\File;
+use Drupal\filter\Entity\FilterFormat;
+use Drupal\media\Entity\Media;
+use Drupal\node\Entity\Node;
+use Drupal\node\Entity\NodeType;
+use Drupal\taxonomy\Entity\Term;
+use Drupal\taxonomy\Entity\Vocabulary;
+use Drupal\canvas\Entity\ContentTemplate;
+
+// cspell:ignore treehouse
+
+/**
+ * Implements hook_install().
+ */
+function canvas_test_templates_in_cypress_install(): void {
+  // Ensure dependencies are met.
+  $module_installer = \Drupal::service('module_installer');
+
+  // Install required modules if not already installed.
+  $required_modules = [
+    'node', 'field', 'file', 'image', 'media', 'taxonomy', 'datetime', 'link', 'options', 'filter'
+  ];
+
+  foreach ($required_modules as $module) {
+    if (!\Drupal::moduleHandler()->moduleExists($module)) {
+      $module_installer->install([$module]);
+    }
+  }
+
+  // Create the tags vocabulary (from core/recipes/tags_taxonomy).
+  if (!Vocabulary::load('tags')) {
+    $vocabulary = Vocabulary::create([
+      'vid' => 'tags',
+      'name' => 'Tags',
+      'description' => 'Use tags to group articles on similar topics into categories.',
+    ]);
+    $vocabulary->save();
+  }
+
+  // Create page content type if it doesn't exist.
+  if (!NodeType::load('page')) {
+    $page_type = NodeType::create([
+      'type' => 'page',
+      'name' => 'Basic page',
+      'description' => 'Use basic pages for your static content, such as an "About us" page.',
+      'display_submitted' => FALSE,
+      'new_revision' => FALSE,
+      'preview_mode' => 1,
+    ]);
+    $page_type->save();
+  }
+
+  // Create article content type if it doesn't exist (needed for Canvas templates).
+  if (!NodeType::load('article')) {
+    $article_type = NodeType::create([
+      'type' => 'article',
+      'name' => 'Article',
+      'description' => 'Use articles for time-sensitive content like news, press releases or blog posts.',
+      'display_submitted' => TRUE,
+      'new_revision' => TRUE,
+      'preview_mode' => 1,
+    ]);
+    $article_type->save();
+  }
+
+  // Create image media type if it doesn't exist.
+  if (!\Drupal::entityTypeManager()->getStorage('media_type')->load('image')) {
+    // First ensure the image field exists on media entities
+    if (!\Drupal::entityTypeManager()->getStorage('field_storage_config')->load('media.field_media_image')) {
+      FieldStorageConfig::create([
+        'field_name' => 'field_media_image',
+        'entity_type' => 'media',
+        'type' => 'image',
+        'settings' => [
+          'uri_scheme' => 'public',
+        ],
+      ])->save();
+    }
+
+    $media_type = \Drupal::entityTypeManager()->getStorage('media_type')->create([
+      'id' => 'image',
+      'label' => 'Image',
+      'description' => 'Use local images for reusable media.',
+      'source' => 'image',
+      'source_configuration' => [
+        'source_field' => 'field_media_image',
+      ],
+    ]);
+    $media_type->save();
+
+    // Add the source field to the media type
+    if (!\Drupal::entityTypeManager()->getStorage('field_config')->load('media.image.field_media_image')) {
+      FieldConfig::create([
+        'field_name' => 'field_media_image',
+        'entity_type' => 'media',
+        'bundle' => 'image',
+        'label' => 'Image',
+        'required' => TRUE,
+        'settings' => [
+          'file_directory' => '',
+          'file_extensions' => 'png gif jpg jpeg',
+          'max_filesize' => '',
+          'max_resolution' => '',
+          'min_resolution' => '',
+          'alt_field' => TRUE,
+          'alt_field_required' => TRUE,
+          'title_field' => FALSE,
+          'title_field_required' => FALSE,
+        ],
+      ])->save();
+    }
+  }
+
+  // Create taxonomy terms.
+  _canvas_test_templates_create_taxonomy_terms();
+
+  // Ensure body field exists for content types.
+  _canvas_test_templates_ensure_body_fields();
+
+  // Ensure text formats exist.
+  _canvas_test_templates_ensure_text_formats();
+
+  // Create field storage and field instances.
+  _canvas_test_templates_create_fields();
+
+  // Configure form display.
+  _canvas_test_templates_configure_form_display();
+
+  // Create files and media entities.
+  $media_entities = _canvas_test_templates_create_media_entities();
+
+  // Create content nodes.
+  _canvas_test_templates_create_nodes($media_entities);
+
+  // Create Canvas content templates.
+  _canvas_test_templates_create_content_templates();
+}
+
+/**
+ * Ensures body fields exist for page and article content types.
+ */
+function _canvas_test_templates_ensure_body_fields(): void {
+  // Ensure body field storage exists.
+  if (!FieldStorageConfig::loadByName('node', 'body')) {
+    FieldStorageConfig::create([
+      'field_name' => 'body',
+      'entity_type' => 'node',
+      'type' => 'text_with_summary',
+      'cardinality' => 1,
+    ])->save();
+  }
+
+  // Add body field to page content type.
+  if (!FieldConfig::loadByName('node', 'page', 'body')) {
+    FieldConfig::create([
+      'field_name' => 'body',
+      'entity_type' => 'node',
+      'bundle' => 'page',
+      'label' => 'Body',
+      'settings' => [
+        'display_summary' => FALSE,
+      ],
+    ])->save();
+  }
+
+  // Add body field to article content type.
+  if (!FieldConfig::loadByName('node', 'article', 'body')) {
+    FieldConfig::create([
+      'field_name' => 'body',
+      'entity_type' => 'node',
+      'bundle' => 'article',
+      'label' => 'Body',
+      'settings' => [
+        'display_summary' => TRUE,
+      ],
+    ])->save();
+  }
+}
+
+/**
+ * Ensures required text formats exist.
+ */
+function _canvas_test_templates_ensure_text_formats(): void {
+  // Create basic_html format if it doesn't exist.
+  if (!\Drupal::entityTypeManager()->getStorage('filter_format')->load('basic_html')) {
+    FilterFormat::create([
+      'format' => 'basic_html',
+      'name' => 'Basic HTML',
+      'filters' => [
+        'filter_html' => [
+          'status' => TRUE,
+          'weight' => -10,
+          'settings' => [
+            'allowed_html' => '<a href> <em> <strong> <cite> <blockquote cite> <code> <ul> <ol> <li> <dl> <dt> <dd> <h4> <h5> <h6> <p> <br>',
+          ],
+        ],
+        'filter_autop' => [
+          'status' => TRUE,
+          'weight' => 0,
+        ],
+        'filter_url' => [
+          'status' => TRUE,
+          'weight' => 0,
+        ],
+        'filter_htmlcorrector' => [
+          'status' => TRUE,
+          'weight' => 10,
+        ],
+      ],
+    ])->save();
+  }
+}
+
+/**
+ * Creates taxonomy terms.
+ */
+function _canvas_test_templates_create_taxonomy_terms(): array {
+  $terms = [];
+
+  // Cool tag.
+  $term1 = Term::create([
+    'uuid' => 'ad0f8699-9c47-4d2c-93a2-59729c2e70c1',
+    'vid' => 'tags',
+    'name' => 'Cool tag',
+    'status' => TRUE,
+    'weight' => 0,
+  ]);
+  $term1->save();
+  $terms['cool_tag'] = $term1;
+
+  // OK tag.
+  $term2 = Term::create([
+    'uuid' => '4f797556-f1bd-4bf2-a034-2550afa55c5d',
+    'vid' => 'tags',
+    'name' => 'Ok tag',
+    'status' => TRUE,
+    'weight' => 0,
+  ]);
+  $term2->save();
+  $terms['ok_tag'] = $term2;
+
+  return $terms;
+}
+
+/**
+ * Creates field storage and field instances for the page bundle.
+ */
+function _canvas_test_templates_create_fields(): void {
+  $fields = [
+    'field_the_number' => [
+      'type' => 'integer',
+      'label' => 'The Number',
+      'settings' => [
+        'unsigned' => FALSE,
+        'size' => 'normal',
+      ],
+      'field_settings' => [
+        'min' => NULL,
+        'max' => NULL,
+        'prefix' => '',
+        'suffix' => '',
+      ],
+    ],
+    'field_the_boolean' => [
+      'type' => 'boolean',
+      'label' => 'The Boolean',
+      'settings' => [],
+      'field_settings' => [
+        'on_label' => 'On',
+        'off_label' => 'Off',
+      ],
+    ],
+    'field_date' => [
+      'type' => 'datetime',
+      'label' => 'Date',
+      'settings' => [
+        'datetime_type' => 'datetime',
+      ],
+      'field_settings' => [],
+    ],
+    'field_date_only' => [
+      'type' => 'datetime',
+      'label' => 'Date Only',
+      'settings' => [
+        'datetime_type' => 'date',
+      ],
+      'field_settings' => [],
+    ],
+    'field_image_media' => [
+      'type' => 'entity_reference',
+      'label' => 'Image Media',
+      'settings' => [
+        'target_type' => 'media',
+      ],
+      'field_settings' => [
+        'handler' => 'default:media',
+        'handler_settings' => [
+          'target_bundles' => ['image' => 'image'],
+          'sort' => ['field' => '_none'],
+          'auto_create' => FALSE,
+          'auto_create_bundle' => '',
+        ],
+      ],
+    ],
+    'field_image_upload' => [
+      'type' => 'image',
+      'label' => 'Image Upload',
+      'settings' => [
+        'uri_scheme' => 'public',
+        'default_image' => [
+          'uuid' => NULL,
+          'alt' => '',
+          'title' => '',
+          'width' => NULL,
+          'height' => NULL,
+        ],
+      ],
+      'field_settings' => [
+        'file_directory' => '',
+        'file_extensions' => 'png gif jpg jpeg',
+        'max_filesize' => '',
+        'max_resolution' => '',
+        'min_resolution' => '',
+        'alt_field' => TRUE,
+        'alt_field_required' => TRUE,
+        'title_field' => FALSE,
+        'title_field_required' => FALSE,
+        'default_image' => [
+          'uuid' => '',
+          'alt' => '',
+          'title' => '',
+          'width' => NULL,
+          'height' => NULL,
+        ],
+      ],
+    ],
+    'field_the_link' => [
+      'type' => 'link',
+      'label' => 'The Link',
+      'settings' => [],
+      'field_settings' => [
+        'link_type' => 17, // LINK_EXTERNAL | LINK_INTERNAL
+        'title' => 2, // DRUPAL_OPTIONAL
+      ],
+    ],
+    'field_the_email' => [
+      'type' => 'email',
+      'label' => 'The Email',
+      'settings' => [],
+      'field_settings' => [],
+    ],
+    'field_number_list' => [
+      'type' => 'list_integer',
+      'label' => 'Number List',
+      'settings' => [
+        'allowed_values' => [
+          1 => 'one',
+          2 => 'two',
+          3 => 'three',
+        ],
+      ],
+      'field_settings' => [],
+    ],
+    'field_one_tag' => [
+      'type' => 'entity_reference',
+      'label' => 'One Tag',
+      'settings' => [
+        'target_type' => 'taxonomy_term',
+      ],
+      'field_settings' => [
+        'handler' => 'default:taxonomy_term',
+        'handler_settings' => [
+          'target_bundles' => ['tags' => 'tags'],
+          'sort' => ['field' => 'name', 'direction' => 'asc'],
+          'auto_create' => FALSE,
+        ],
+      ],
+    ],
+  ];
+
+  foreach ($fields as $field_name => $field_info) {
+    // Create field storage if it doesn't exist.
+    if (!FieldStorageConfig::loadByName('node', $field_name)) {
+      $storage_config = [
+        'field_name' => $field_name,
+        'entity_type' => 'node',
+        'type' => $field_info['type'],
+        'settings' => $field_info['settings'],
+        'cardinality' => 1,
+      ];
+
+      FieldStorageConfig::create($storage_config)->save();
+    }
+
+    // Create field instance if it doesn't exist.
+    if (!FieldConfig::loadByName('node', 'page', $field_name)) {
+      $field_config = [
+        'field_name' => $field_name,
+        'entity_type' => 'node',
+        'bundle' => 'page',
+        'label' => $field_info['label'],
+        'settings' => $field_info['field_settings'],
+        'required' => FALSE,
+      ];
+
+      FieldConfig::create($field_config)->save();
+    }
+  }
+}
+
+/**
+ * Configures the form display for the page content type.
+ */
+function _canvas_test_templates_configure_form_display(): void {
+  $form_display = EntityFormDisplay::load('node.page.default');
+  if (!$form_display) {
+    $form_display = EntityFormDisplay::create([
+      'targetEntityType' => 'node',
+      'bundle' => 'page',
+      'mode' => 'default',
+      'status' => TRUE,
+    ]);
+  }
+
+  // Configure widget settings based on recipe configuration.
+  $widgets = [
+    'field_the_number' => [
+      'type' => 'number',
+      'weight' => 121,
+      'settings' => ['placeholder' => ''],
+    ],
+    'field_one_tag' => [
+      'type' => 'entity_reference_autocomplete',
+      'weight' => 122,
+      'settings' => [
+        'match_operator' => 'CONTAINS',
+        'match_limit' => 10,
+        'size' => 60,
+      ],
+    ],
+    'field_image_media' => [
+      'type' => 'media_library_widget',
+      'weight' => 123,
+      'settings' => [],
+    ],
+    'field_image_upload' => [
+      'type' => 'image_image',
+      'weight' => 124,
+      'settings' => [
+        'progress_indicator' => 'throbber',
+        'preview_image_style' => 'thumbnail',
+      ],
+    ],
+    'field_number_list' => [
+      'type' => 'options_select',
+      'weight' => 125,
+      'settings' => [],
+    ],
+    'field_date' => [
+      'type' => 'datetime_default',
+      'weight' => 126,
+      'settings' => [],
+    ],
+    'field_date_only' => [
+      'type' => 'datetime_default',
+      'weight' => 127,
+      'settings' => [],
+    ],
+    'field_the_boolean' => [
+      'type' => 'boolean_checkbox',
+      'weight' => 128,
+      'settings' => ['display_label' => TRUE],
+    ],
+    'field_the_email' => [
+      'type' => 'email_default',
+      'weight' => 129,
+      'settings' => [
+        'placeholder' => '',
+        'size' => 60,
+      ],
+    ],
+    'field_the_link' => [
+      'type' => 'link_default',
+      'weight' => 130,
+      'settings' => [
+        'placeholder_url' => '',
+        'placeholder_title' => '',
+      ],
+    ],
+  ];
+
+  foreach ($widgets as $field_name => $widget_config) {
+    $form_display->setComponent($field_name, [
+      'type' => $widget_config['type'],
+      'weight' => $widget_config['weight'],
+      'settings' => $widget_config['settings'],
+      'region' => 'content',
+    ]);
+  }
+
+  $form_display->save();
+}
+
+/**
+ * Creates media entities with associated files.
+ */
+function _canvas_test_templates_create_media_entities(): array {
+  $media_entities = [];
+
+  // Copy image files from original recipe to public files directory.
+  $file_system = \Drupal::service('file_system');
+
+  // Ensure the public files directory exists.
+  $public_path = \Drupal::service('stream_wrapper_manager')->getViaUri('public://')->getDirectoryPath();
+  $file_system->prepareDirectory($public_path, \Drupal\Core\File\FileSystemInterface::CREATE_DIRECTORY | \Drupal\Core\File\FileSystemInterface::MODIFY_PERMISSIONS);
+
+  $images = [
+    'treehouse.jpeg' => [
+      'uuid' => '31dc1fff-06d2-4170-8ea6-503e59960e99',
+      'media_uuid' => '5cd8f890-a1b8-4a9f-980d-a9ddadeaec81',
+      'alt' => 'tree house',
+      'width' => 1024,
+      'height' => 665,
+    ],
+    'cool-cat.jpg' => [
+      'uuid' => '2682397b-b2ed-47b0-b309-b4e2e2b90c85',
+      'media_uuid' => '707319dc-23e8-4974-b019-e0ea0f4ec731',
+      'alt' => 'cool cat',
+      'width' => 600,
+      'height' => 800,
+    ],
+    'secret-plans_2.jpg' => [
+      'uuid' => 'b056131d-fdc2-4aeb-9776-3e8001c1a0d1',
+      'media_uuid' => null, // This is for direct file upload field
+      'alt' => 'secret plans',
+      'width' => 1000,
+      'height' => 1333,
+    ],
+    'hello-folks_2.jpg' => [
+      'uuid' => '811ced3c-81e9-49b9-a82d-ef4da8772e9f',
+      'media_uuid' => null, // This is for direct file upload field
+      'alt' => 'hello folks',
+      'width' => 600,
+      'height' => 800,
+    ],
+  ];
+
+  foreach ($images as $filename => $image_info) {
+    // Copy the image file from the recipe to our module directory first.
+    $source_path = DRUPAL_ROOT . '/modules/contrib/canvas/tests/fixtures/recipes/template_basic_setup/content/file/' . $filename;
+    $destination_uri = 'public://' . $filename;
+
+    if (file_exists($source_path)) {
+      // Copy the file to public directory.
+      $file_system->copy($source_path, $destination_uri, \Drupal\Core\File\FileSystemInterface::EXISTS_REPLACE);
+
+      // Create File entity.
+      $file = File::create([
+        'uuid' => $image_info['uuid'],
+        'filename' => $filename,
+        'uri' => $destination_uri,
+        'status' => 1,
+        'uid' => 1,
+      ]);
+      $file->save();
+
+      // Create Media entity if it has a media UUID.
+      if ($image_info['media_uuid']) {
+        $media = Media::create([
+          'uuid' => $image_info['media_uuid'],
+          'bundle' => 'image',
+          'name' => pathinfo($filename, PATHINFO_FILENAME),
+          'status' => TRUE,
+          'uid' => 1,
+          'field_media_image' => [
+            'target_id' => $file->id(),
+            'alt' => $image_info['alt'],
+            'title' => '',
+            'width' => $image_info['width'],
+            'height' => $image_info['height'],
+          ],
+        ]);
+        $media->save();
+        $media_entities[$image_info['media_uuid']] = $media;
+      }
+    }
+  }
+
+  return $media_entities;
+}
+
+/**
+ * Creates sample page nodes with all field values populated.
+ */
+function _canvas_test_templates_create_nodes(array $media_entities): void {
+  // Get taxonomy terms.
+  $cool_tag = \Drupal::entityTypeManager()
+    ->getStorage('taxonomy_term')
+    ->loadByProperties(['uuid' => 'ad0f8699-9c47-4d2c-93a2-59729c2e70c1']);
+  $cool_tag = reset($cool_tag);
+
+  $ok_tag = \Drupal::entityTypeManager()
+    ->getStorage('taxonomy_term')
+    ->loadByProperties(['uuid' => '4f797556-f1bd-4bf2-a034-2550afa55c5d']);
+  $ok_tag = reset($ok_tag);
+
+  // Create "Debut Page" node.
+  $node1 = Node::create([
+    'uuid' => '3770d0c8-4cab-4a77-b8cc-1f76fcdafa00',
+    'type' => 'page',
+    'title' => 'Debut Page',
+    'status' => TRUE,
+    'uid' => 1,
+    'created' => 1760098151,
+    'body' => [
+      'value' => '<p>This page emerged on the scene.<strong> This page was met with indifference</strong>.</p>',
+      'format' => 'basic_html',
+      'summary' => '',
+    ],
+    'field_date' => '2010-10-10T10:10:10',
+    'field_date_only' => '2011-11-11',
+    'field_the_number' => 33,
+    'field_number_list' => 1,
+    'field_the_boolean' => TRUE,
+    'field_the_email' => 'one@one.com',
+    'field_the_link' => [
+      'uri' => 'https://qwantz.com',
+      'title' => 'Dinosaur Comics',
+      'options' => [],
+    ],
+    'field_one_tag' => $cool_tag ? $cool_tag->id() : NULL,
+    'field_image_media' => isset($media_entities['5cd8f890-a1b8-4a9f-980d-a9ddadeaec81']) ? $media_entities['5cd8f890-a1b8-4a9f-980d-a9ddadeaec81']->id() : NULL,
+  ]);
+
+  // Add image upload field value (file reference).
+  $file = \Drupal::entityTypeManager()
+    ->getStorage('file')
+    ->loadByProperties(['uuid' => 'b056131d-fdc2-4aeb-9776-3e8001c1a0d1']);
+  $file = reset($file);
+  if ($file) {
+    $node1->set('field_image_upload', [
+      'target_id' => $file->id(),
+      'alt' => 'secret plans',
+      'title' => '',
+      'width' => 1000,
+      'height' => 1333,
+    ]);
+  }
+
+  $node1->save();
+
+  // Create "Followup Page" node.
+  $node2 = Node::create([
+    'uuid' => '9321f984-c293-4d2f-a8d9-173e0c1c0945',
+    'type' => 'page',
+    'title' => 'Followup Page',
+    'status' => TRUE,
+    'uid' => 1,
+    'created' => 1760098152,
+    'body' => [
+      'value' => '<p>This is the followup page. <strong>It was equally unremarkable.</strong></p>',
+      'format' => 'basic_html',
+      'summary' => '',
+    ],
+    'field_date' => '2008-08-08T08:08:08',
+    'field_date_only' => '2007-07-07',
+    'field_the_number' => 44,
+    'field_number_list' => 2,
+    'field_the_boolean' => FALSE,
+    'field_the_email' => 'another@another.com',
+    'field_the_link' => [
+      'uri' => 'https://drupal.org',
+      'title' => 'Some guy made a blog',
+      'options' => [],
+    ],
+    'field_one_tag' => $ok_tag ? $ok_tag->id() : NULL,
+    'field_image_media' => isset($media_entities['707319dc-23e8-4974-b019-e0ea0f4ec731']) ? $media_entities['707319dc-23e8-4974-b019-e0ea0f4ec731']->id() : NULL,
+  ]);
+
+  // Add image upload field value (file reference).
+  $file2 = \Drupal::entityTypeManager()
+    ->getStorage('file')
+    ->loadByProperties(['uuid' => '811ced3c-81e9-49b9-a82d-ef4da8772e9f']);
+  $file2 = reset($file2);
+  if ($file2) {
+    $node2->set('field_image_upload', [
+      'target_id' => $file2->id(),
+      'alt' => 'hello folks',
+      'title' => '',
+      'width' => 600,
+      'height' => 800,
+    ]);
+  }
+
+  $node2->save();
+}
+
+/**
+ * Creates Canvas content templates.
+ */
+function _canvas_test_templates_create_content_templates(): void {
+  // Create page template if it doesn't exist.
+  if (!\Drupal::entityTypeManager()->getStorage('content_template')->load('node.page.full')) {
+    $page_template = ContentTemplate::create([
+      'content_entity_type_id' => 'node',
+      'content_entity_type_bundle' => 'page',
+      'content_entity_type_view_mode' => 'full',
+      'component_tree' => [],
+      'exposed_slots' => [],
+    ]);
+    $page_template->save();
+  }
+
+  // Create article template if it doesn't exist.
+  if (!\Drupal::entityTypeManager()->getStorage('content_template')->load('node.article.full')) {
+    $article_template = ContentTemplate::create([
+      'content_entity_type_id' => 'node',
+      'content_entity_type_bundle' => 'article',
+      'content_entity_type_view_mode' => 'full',
+      'component_tree' => [],
+      'exposed_slots' => [],
+    ]);
+    $article_template->save();
+  }
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function canvas_test_templates_in_cypress_uninstall(): void {
+  // Delete field storage configurations to clean up.
+  $field_storages = \Drupal::entityTypeManager()
+    ->getStorage('field_storage_config')
+    ->loadByProperties(['entity_type' => 'node']);
+
+  $fields_to_delete = [
+    'field_the_number',
+    'field_the_boolean',
+    'field_date',
+    'field_date_only',
+    'field_image_media',
+    'field_image_upload',
+    'field_the_link',
+    'field_the_email',
+    'field_number_list',
+    'field_one_tag',
+  ];
+
+  foreach ($field_storages as $field_storage) {
+    if (in_array($field_storage->getName(), $fields_to_delete)) {
+      $field_storage->delete();
+    }
+  }
+
+  // Delete created content.
+  $uuids_to_delete = [
+    '3770d0c8-4cab-4a77-b8cc-1f76fcdafa00', // Debut Page
+    '9321f984-c293-4d2f-a8d9-173e0c1c0945', // Followup Page
+  ];
+
+  $nodes = \Drupal::entityTypeManager()
+    ->getStorage('node')
+    ->loadByProperties(['uuid' => $uuids_to_delete]);
+
+  foreach ($nodes as $node) {
+    $node->delete();
+  }
+
+  // Delete media entities.
+  $media_uuids = [
+    '5cd8f890-a1b8-4a9f-980d-a9ddadeaec81',
+    '707319dc-23e8-4974-b019-e0ea0f4ec731',
+  ];
+
+  $media_entities = \Drupal::entityTypeManager()
+    ->getStorage('media')
+    ->loadByProperties(['uuid' => $media_uuids]);
+
+  foreach ($media_entities as $media) {
+    $media->delete();
+  }
+
+  // Delete files.
+  $file_uuids = [
+    '31dc1fff-06d2-4170-8ea6-503e59960e99',
+    '2682397b-b2ed-47b0-b309-b4e2e2b90c85',
+    'b056131d-fdc2-4aeb-9776-3e8001c1a0d1',
+    '811ced3c-81e9-49b9-a82d-ef4da8772e9f',
+  ];
+
+  $files = \Drupal::entityTypeManager()
+    ->getStorage('file')
+    ->loadByProperties(['uuid' => $file_uuids]);
+
+  foreach ($files as $file) {
+    $file->delete();
+  }
+
+  // Delete taxonomy terms.
+  $term_uuids = [
+    'ad0f8699-9c47-4d2c-93a2-59729c2e70c1',
+    '4f797556-f1bd-4bf2-a034-2550afa55c5d',
+  ];
+
+  $terms = \Drupal::entityTypeManager()
+    ->getStorage('taxonomy_term')
+    ->loadByProperties(['uuid' => $term_uuids]);
+
+  foreach ($terms as $term) {
+    $term->delete();
+  }
+}
