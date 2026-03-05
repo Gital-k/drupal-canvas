@@ -21,7 +21,6 @@ describe('preview-contract', () => {
   it('marks components with supported JS entries as previewable', () => {
     const component = toPreviewManifestComponent({
       id: 'abc',
-      kind: 'index',
       name: 'hero',
       relativeDirectory: 'src/hero',
       metadataPath: '/tmp/src/hero/component.yml',
@@ -31,15 +30,16 @@ describe('preview-contract', () => {
 
     expect(component.previewable).toBe(true);
     expect(component.ineligibilityReason).toBeNull();
-    expect(component.moduleUrl).toBe('/@fs/tmp/src/hero/index.tsx');
-    expect(component.cssUrl).toBe('/@fs/tmp/src/hero/index.css');
+    expect(component.js.entryPath).toBe('/tmp/src/hero/index.tsx');
+    expect(component.js.url).toBe('/@fs/tmp/src/hero/index.tsx');
+    expect(component.css.entryPath).toBe('/tmp/src/hero/index.css');
+    expect(component.css.url).toBe('/@fs/tmp/src/hero/index.css');
     expect(component.exampleProps).toEqual({});
   });
 
   it('marks components without JS entries as non-previewable', () => {
     const component = toPreviewManifestComponent({
       id: 'abc',
-      kind: 'named',
       name: 'hero',
       relativeDirectory: 'src/hero',
       metadataPath: '/tmp/src/hero/hero.component.yml',
@@ -49,14 +49,16 @@ describe('preview-contract', () => {
 
     expect(component.previewable).toBe(false);
     expect(component.ineligibilityReason).toBe('missing_js_entry');
-    expect(component.moduleUrl).toBeNull();
+    expect(component.js.entryPath).toBeNull();
+    expect(component.js.url).toBeNull();
+    expect(component.css.entryPath).toBeNull();
+    expect(component.css.url).toBeNull();
     expect(component.exampleProps).toEqual({});
   });
 
   it('marks unsupported JS extensions as non-previewable', () => {
     const component = toPreviewManifestComponent({
       id: 'abc',
-      kind: 'named',
       name: 'hero',
       relativeDirectory: 'src/hero',
       metadataPath: '/tmp/src/hero/hero.component.yml',

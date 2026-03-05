@@ -323,7 +323,7 @@ export function App() {
     if (
       !isPageRoute &&
       selectedComponent?.previewable &&
-      selectedComponent.moduleUrl
+      selectedComponent.js.url
     ) {
       const tree: CanvasComponentTree = [
         {
@@ -345,14 +345,14 @@ export function App() {
           registrySources: [
             {
               name: selectedComponent.name,
-              jsEntryUrl: selectedComponent.moduleUrl,
+              jsEntryUrl: selectedComponent.js.url,
             },
           ],
           cssUrls: [
             ...(previewManifest.globalCssUrl
               ? [previewManifest.globalCssUrl]
               : []),
-            ...(selectedComponent.cssUrl ? [selectedComponent.cssUrl] : []),
+            ...(selectedComponent.css.url ? [selectedComponent.css.url] : []),
           ],
         },
       };
@@ -608,8 +608,8 @@ export function App() {
                   selectedComponentId: selectedComponent?.id ?? null,
                   selectedPageSlug: selectedPage?.slug ?? null,
                   routePath: location.pathname,
-                  selectedModuleUrl: selectedComponent?.moduleUrl ?? null,
-                  selectedComponentCssUrl: selectedComponent?.cssUrl ?? null,
+                  selectedJsUrl: selectedComponent?.js.url ?? null,
+                  selectedCssUrl: selectedComponent?.css.url ?? null,
                   frameReady: isFrameReady,
                   frameStatus,
                 },

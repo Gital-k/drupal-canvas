@@ -12,16 +12,19 @@ export type PreviewIneligibilityReason =
 
 export interface PreviewManifestComponent {
   id: string;
-  kind: 'named' | 'index';
   name: string;
   relativeDirectory: string;
   metadataPath: string;
-  jsEntryPath: string | null;
-  cssEntryPath: string | null;
+  js: {
+    entryPath: string | null;
+    url: string | null;
+  };
+  css: {
+    entryPath: string | null;
+    url: string | null;
+  };
   previewable: boolean;
   ineligibilityReason: PreviewIneligibilityReason | null;
-  moduleUrl: string | null;
-  cssUrl: string | null;
   exampleProps: Record<string, unknown>;
 }
 
@@ -76,7 +79,6 @@ export type PreviewFrameEvent =
 
 export function toPreviewManifestComponent(component: {
   id: string;
-  kind: 'named' | 'index';
   name: string;
   relativeDirectory: string;
   metadataPath: string;
@@ -85,32 +87,59 @@ export function toPreviewManifestComponent(component: {
 }): PreviewManifestComponent {
   if (!component.jsEntryPath) {
     return {
-      ...component,
+      id: component.id,
+      name: component.name,
+      relativeDirectory: component.relativeDirectory,
+      metadataPath: component.metadataPath,
+      js: {
+        entryPath: component.jsEntryPath,
+        url: null,
+      },
+      css: {
+        entryPath: component.cssEntryPath,
+        url: null,
+      },
       previewable: false,
       ineligibilityReason: 'missing_js_entry',
-      moduleUrl: null,
-      cssUrl: null,
       exampleProps: {},
     };
   }
 
   if (!isSupportedPreviewModulePath(component.jsEntryPath)) {
     return {
-      ...component,
+      id: component.id,
+      name: component.name,
+      relativeDirectory: component.relativeDirectory,
+      metadataPath: component.metadataPath,
+      js: {
+        entryPath: component.jsEntryPath,
+        url: null,
+      },
+      css: {
+        entryPath: component.cssEntryPath,
+        url: null,
+      },
       previewable: false,
       ineligibilityReason: 'unsupported_js_extension',
-      moduleUrl: null,
-      cssUrl: null,
       exampleProps: {},
     };
   }
 
   return {
-    ...component,
+    id: component.id,
+    name: component.name,
+    relativeDirectory: component.relativeDirectory,
+    metadataPath: component.metadataPath,
+    js: {
+      entryPath: component.jsEntryPath,
+      url: toViteFsUrl(component.jsEntryPath),
+    },
+    css: {
+      entryPath: component.cssEntryPath,
+      url: component.cssEntryPath ? toViteFsUrl(component.cssEntryPath) : null,
+    },
     previewable: true,
     ineligibilityReason: null,
-    moduleUrl: toViteFsUrl(component.jsEntryPath),
-    cssUrl: component.cssEntryPath ? toViteFsUrl(component.cssEntryPath) : null,
     exampleProps: {},
   };
 }
