@@ -327,7 +327,7 @@ function canvas_test_article_fields_install(): void {
       'settings' => [],
       'cardinality' => -1,
       'widget' => [
-        'type' => 'text_textfield',
+        'type' => 'string_textfield',
         // Ensure this is at the top of the form to increase drag and drop reliability in e2e test.
         'weight' => -1000,
         'settings' => [
