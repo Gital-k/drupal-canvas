@@ -1,0 +1,106 @@
+---
+title: APIs - Import maps
+---
+
+Canvas uses [import maps](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/script/type/importmap) to resolve JavaScript module specifiers for code components. The import map is built on the backend and injected into the page as a `<script type="importmap">` tag.
+
+## How it works
+
+Canvas provides a set of global imports (e.g. `preact`, `react`, `clsx`, `tailwind-merge`) that are available to all code components. When a code component is rendered, Canvas also generates scoped imports for that component's dependencies.
+
+These are attached to render arrays using the `#attached` property with the `import_maps` key, which supports two types of entries:
+
+- **Global imports** (`imports`) — available to all modules on the page.
+- **Scoped imports** (`scopes`) — available only to a specific module URL.
+
+## Adding custom imports
+
+Any module or theme can add entries to the import map by attaching them to a render array. For example, using `hook_page_attachments_alter()`:
+
+```php
+use Drupal\canvas\Render\ImportMapResponseAttachmentsProcessor;
+
+function my_module_page_attachments_alter(array &$attachments): void {
+  $attachments['#attached']['import_maps'][ImportMapResponseAttachmentsProcessor::GLOBAL_IMPORTS]['my-library'] = '/modules/my_module/js/my-library.js';
+}
+```
+
+Scoped imports can be added similarly:
+
+```php
+use Drupal\canvas\Render\ImportMapResponseAttachmentsProcessor;
+
+function my_module_page_attachments_alter(array &$attachments): void {
+  $scope = '/modules/my_module/js/my-component.js';
+  $attachments['#attached']['import_maps'][ImportMapResponseAttachmentsProcessor::SCOPED_IMPORTS][$scope] = [
+    'preact' => '/modules/my_module/js/custom-preact.js',
+  ];
+}
+```
+
+Scoped imports allow a specific module to use a different version of a library without affecting other modules on the page.
+
+## Altering existing imports
+
+To alter the import map that Canvas generates (for example, to replace a built-in library with a custom version), decorate the `Drupal\canvas\GlobalImports` service:
+
+```yaml
+# my_module.services.yml
+services:
+  Drupal\my_module\CustomGlobalImports:
+    decorates: Drupal\canvas\GlobalImports
+```
+
+```php
+namespace Drupal\my_module;
+
+use Drupal\canvas\GlobalImports;
+
+class CustomGlobalImports extends GlobalImports {
+
+  public function getGlobalImports(): array {
+    $imports = parent::getGlobalImports();
+    // Replace an existing import.
+    $imports['tailwind-merge'] = '/modules/my_module/js/custom-tailwind-merge.js';
+    // Add a new import.
+    $imports['my-utils'] = '/modules/my_module/js/utils.js';
+    return $imports;
+  }
+
+}
+```
+
+## Example: adding a Tailwind CSS plugin
+
+Canvas uses import maps to resolve Tailwind CSS plugins referenced via `@plugin` in component styles. For example, `@tailwindcss/typography` is already included as a global import.
+
+To add a custom Tailwind plugin (e.g. `@tailwindcss/forms`), decorate the `GlobalImports` service and add an import map entry pointing to a JS file that exports the plugin:
+
+```yaml
+# my_module.services.yml
+services:
+  Drupal\my_module\CustomGlobalImports:
+    decorates: Drupal\canvas\GlobalImports
+```
+
+```php
+namespace Drupal\my_module;
+
+use Drupal\canvas\GlobalImports;
+
+class CustomGlobalImports extends GlobalImports {
+
+  public function getGlobalImports(): array {
+    $imports = parent::getGlobalImports();
+    $imports['@tailwindcss/forms'] = '/' . $this->extensionPathResolver->getPath('module', 'my_module') . '/js/tailwindcss-forms.js?' . $this->getQueryString();
+    return $imports;
+  }
+
+}
+```
+
+Code components can then use the plugin in their CSS:
+
+```css
+@plugin "@tailwindcss/forms";
+```
