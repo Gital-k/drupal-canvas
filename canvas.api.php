@@ -103,5 +103,33 @@ function hook_canvas_storable_prop_shape_alter(CandidateStorablePropShape $stora
 }
 
 /**
+ * Alter the Canvas import map.
+ *
+ * This hook allows modules and themes to add, remove, or modify entries in the
+ * import map used by Canvas code components. The import map follows the
+ * standard import map specification structure.
+ *
+ * For global imports cache-busting query strings are appended after this hook fires.
+ *
+ * @param array $import_maps
+ *   The import map array following the import map spec structure:
+ *   - 'imports': Global import entries (specifier => URL).
+ *   - 'scopes': (optional) Scoped import entries (scope URL => specifier =>
+ *     URL).
+ *
+ * @see https://developer.mozilla.org/en-US/docs/Web/HTML/Element/script/type/importmap
+ * @see \Drupal\canvas\GlobalImports::getImportMap()
+ */
+function hook_canvas_importmap_alter(array &$import_maps): void {
+  $module_path = \Drupal::service('extension.path.resolver')->getPath('module', 'my_module');
+
+  // Add a new globally available package for code components.
+  $import_maps['imports']['my-library'] = \base_path() . $module_path . '/js/my-library.js';
+
+  // Replace an existing global import with a custom build.
+  $import_maps['imports']['clsx'] = \base_path() . $module_path . '/js/custom-clsx.js';
+}
+
+/**
  * @} End of "addtogroup hooks".
  */
