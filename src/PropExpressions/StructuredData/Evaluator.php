@@ -76,7 +76,7 @@ final class Evaluator {
       else {
         // Assume it is local time and an unknown format; parse it as best
         // we can and reformat to iso8601.
-        $date = new DrupalDateTime($result->value)->format(\DateTimeInterface::ISO8601);
+        $date = (new DrupalDateTime($result->value))->format(\DateTimeInterface::ISO8601);
         return new EvaluationResult($date, $result);
       }
     }
