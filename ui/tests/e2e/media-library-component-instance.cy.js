@@ -69,8 +69,11 @@ const testMediaLibraryInComponentInstanceForm = (
     cy.get('div[role="dialog"]').should('not.exist');
     const removeIt = `[class*="contextualPanel"] .js-media-library-selection  [aria-label="${step.removeText}"][data-once="drupal-ajax"]`;
 
+    cy.intercept('POST', '**/canvas/api/v0/layout/**').as('updatePreview');
     cy.get(removeIt).realClick({ force: true });
     cy.waitForAjax();
+    cy.wait('@updatePreview');
+    cy.findByLabelText('Loading Preview').should('not.exist');
 
     cy.log(
       `Confirm removing a required image in step ${index + 1} results in the example appearing in the preview.`,
@@ -78,13 +81,6 @@ const testMediaLibraryInComponentInstanceForm = (
 
     // The default image should appear because the prop is required.
     cy.waitForElementInIframe(defaultPlaceholder);
-
-    // Waiting for the build id does not work - it does not update.
-    // Waiting for the preview (the last request after clicking remove) does not
-    // appear to work reliably either. Hence, the fixed wait. Presumably there is
-    // something that can be waited on, but it is not clear what.
-    // eslint-disable-next-line cypress/no-unnecessary-waiting
-    cy.wait(1000);
     const addIt = `[class*="contextualPanel"] .js-media-library-widget .js-media-library-open-button[data-once="drupal-ajax"]`;
     cy.get(addIt).first().click({ force: true });
     cy.waitForAjax();
