@@ -78,10 +78,8 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
   const importMapTags = useMemo(() => {
     const importMapEls = document.querySelectorAll('script[type="importmap"]');
     const previewImportMapAdditions = {
-      '@/components/': Drupal.url(
-        'canvas/api/v0/auto-saves/js/js_component/',
-      ),
-    }
+      '@/components/': Drupal.url('canvas/api/v0/auto-saves/js/js_component/'),
+    };
     return Array.from(importMapEls)
       .map((el) => {
         try {
