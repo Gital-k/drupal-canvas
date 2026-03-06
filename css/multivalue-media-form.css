@@ -1,0 +1,39 @@
+.canvas-multivalue-media [data-canvas-media-library-fieldset-wrapper] {
+  [data-canvas-media-library-selection] {
+    [data-media-library-item-delta] {
+      position: static;
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: var(--space-2);
+      padding: 6px var(--space-2);
+      border-bottom: 1px solid #CDCED6;
+
+      > article {
+        flex: 1 1 0;
+        min-width: 0;
+      }
+
+      [data-canvas-media-remove-button] {
+        position: static;
+        flex-shrink: 0;
+        top: auto;
+        right: auto;
+      }
+    }
+  }
+
+  .canvas-media-drag-handle {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    color: var(--blue-9);
+    cursor: grab;
+
+    &:active {
+      cursor: grabbing;
+    }
+  }
+}

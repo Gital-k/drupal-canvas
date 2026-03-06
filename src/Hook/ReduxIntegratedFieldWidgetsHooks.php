@@ -123,6 +123,19 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
         $form['selection'][$key]['remove_button']['#attributes']['data-canvas-media-remove-button'] = 'true';
       }
 
+      // Mark multivalue media fields so templates can conditionally render
+      // the drag handle icon.
+      if ($this->moduleHandler->moduleExists('canvas_dev_mode')) {
+        $field_definition = $context['items']->getFieldDefinition();
+        if ($field_definition->getFieldStorageDefinition()->isMultiple()) {
+          $form['#is_multivalue_media_form'] = TRUE;
+          $form['selection']['#is_multivalue_media_form'] = TRUE;
+          $selection = $form['selection'] ?? [];
+          foreach (Element::children($selection) as $key) {
+            $form['selection'][$key]['#is_multivalue_media_form'] = TRUE;
+          }
+        }
+      }
     }
     // Use a Canvas-specific media library opener, because the default opener
     // assumes the media library is opened for a field widget of a field
@@ -204,6 +217,35 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
     }
     if (isset($variables['button']['#value'])) {
       $variables['button']['#value'] = t('+ Add new');
+    }
+  }
+
+  /**
+   * Implements hook_preprocess_fieldset().
+   *
+   * Exposes the is_multivalue_media_form flag as a Twig variable so that
+   * fieldset--media-library-widget.html.twig can pass it as a data attribute
+   * to the JSX container.
+   */
+  #[Hook('preprocess_fieldset')]
+  public static function canvasStarkPreprocessFieldset(array &$variables): void {
+    if (!empty($variables['element']['#is_multivalue_media_form'])) {
+      $variables['is_multivalue_media_form'] = TRUE;
+      $variables['attributes']['class'][] = 'canvas-multivalue-media';
+      $variables['#attached']['library'][] = 'canvas/multivalue-media-form';
+    }
+  }
+
+  /**
+   * Implements hook_preprocess_media_library_item().
+   *
+   * Exposes is_multivalue_media_item so media-library-item.html.twig can
+   * conditionally render the drag handle icon.
+   */
+  #[Hook('preprocess_media_library_item')]
+  public static function canvasStarkPreprocessMediaLibraryItem(array &$variables): void {
+    if (!empty($variables['element']['#is_multivalue_media_form'])) {
+      $variables['is_multivalue_media_item'] = TRUE;
     }
   }
 

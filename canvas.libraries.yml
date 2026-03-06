@@ -225,7 +225,7 @@ canvasData.v0.jsonapiSettings:
   drupalSettings:
     canvasData:
       v0:
-        jsonapiSettings: null 
+        jsonapiSettings: null
 
 multivalue-form:
   css:
@@ -237,3 +237,13 @@ multivalue-form:
     - core/drupal
     - core/drupal.tabledrag
 
+multivalue-media-form:
+  css:
+    theme:
+      css/multivalue-media-form.css: {}
+  js:
+    js/multivalue-media-tabledrag.js: {}
+  dependencies:
+    - core/once
+    - core/sortable
+    - media_library/widget
