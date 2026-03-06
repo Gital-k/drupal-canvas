@@ -19,6 +19,7 @@ use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\file\FileInterface;
 use Drupal\canvas\Entity\Page;
 use Drupal\pathauto\PathautoItem;
 use Drupal\pathauto\PathautoState;
@@ -236,7 +237,7 @@ final class PageHooks {
       return '';
     }
     $file = $media->get('field_media_image')->entity;
-    if ($file === NULL) {
+    if ($file === NULL || !$file instanceof FileInterface) {
       return '';
     }
     $uri = $file->getFileUri();
