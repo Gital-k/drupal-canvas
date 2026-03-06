@@ -20,6 +20,8 @@ use Drupal\node\Entity\NodeType;
 use Drupal\taxonomy\Entity\Term;
 use Drupal\taxonomy\Entity\Vocabulary;
 use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\Core\File\FileExists;
+use Drupal\Core\File\FileSystemInterface;
 
 // cspell:ignore treehouse
 
@@ -32,7 +34,7 @@ function canvas_test_templates_in_cypress_install(): void {
 
   // Install required modules if not already installed.
   $required_modules = [
-    'node', 'field', 'file', 'image', 'media', 'taxonomy', 'datetime', 'link', 'options', 'filter'
+    'node', 'field', 'file', 'image', 'media', 'taxonomy', 'datetime', 'link', 'options', 'filter',
   ];
 
   foreach ($required_modules as $module) {
@@ -148,6 +150,9 @@ function canvas_test_templates_in_cypress_install(): void {
 
   // Create Canvas content templates.
   _canvas_test_templates_create_content_templates();
+
+  // Set last login time for user 2.
+  _canvas_test_templates_set_user_last_login();
 }
 
 /**
@@ -238,6 +243,7 @@ function _canvas_test_templates_create_taxonomy_terms(): array {
     'name' => 'Cool tag',
     'status' => TRUE,
     'weight' => 0,
+    'path' => ['alias' => '/tags/cool-tag'],
   ]);
   $term1->save();
   $terms['cool_tag'] = $term1;
@@ -249,6 +255,7 @@ function _canvas_test_templates_create_taxonomy_terms(): array {
     'name' => 'Ok tag',
     'status' => TRUE,
     'weight' => 0,
+    'path' => ['alias' => '/tags/ok-tag'],
   ]);
   $term2->save();
   $terms['ok_tag'] = $term2;
@@ -353,8 +360,8 @@ function _canvas_test_templates_create_fields(): void {
       'label' => 'The Link',
       'settings' => [],
       'field_settings' => [
-        'link_type' => 17, // LINK_EXTERNAL | LINK_INTERNAL
-        'title' => 2, // DRUPAL_OPTIONAL
+        'link_type' => 17,
+        'title' => 2,
       ],
     ],
     'field_the_email' => [
@@ -526,7 +533,7 @@ function _canvas_test_templates_create_media_entities(): array {
 
   // Ensure the public files directory exists.
   $public_path = \Drupal::service('stream_wrapper_manager')->getViaUri('public://')->getDirectoryPath();
-  $file_system->prepareDirectory($public_path, \Drupal\Core\File\FileSystemInterface::CREATE_DIRECTORY | \Drupal\Core\File\FileSystemInterface::MODIFY_PERMISSIONS);
+  $file_system->prepareDirectory($public_path, FileSystemInterface::CREATE_DIRECTORY | FileSystemInterface::MODIFY_PERMISSIONS);
 
   $images = [
     'treehouse.jpeg' => [
@@ -545,14 +552,14 @@ function _canvas_test_templates_create_media_entities(): array {
     ],
     'secret-plans_2.jpg' => [
       'uuid' => 'b056131d-fdc2-4aeb-9776-3e8001c1a0d1',
-      'media_uuid' => null, // This is for direct file upload field
+      'media_uuid' => NULL,
       'alt' => 'secret plans',
       'width' => 1000,
       'height' => 1333,
     ],
     'hello-folks_2.jpg' => [
       'uuid' => '811ced3c-81e9-49b9-a82d-ef4da8772e9f',
-      'media_uuid' => null, // This is for direct file upload field
+      'media_uuid' => NULL,
       'alt' => 'hello folks',
       'width' => 600,
       'height' => 800,
@@ -566,7 +573,7 @@ function _canvas_test_templates_create_media_entities(): array {
 
     if (file_exists($source_path)) {
       // Copy the file to public directory.
-      $file_system->copy($source_path, $destination_uri, \Drupal\Core\File\FileSystemInterface::EXISTS_REPLACE);
+      $file_system->copy($source_path, $destination_uri, FileExists::Replace);
 
       // Create File entity.
       $file = File::create([
@@ -574,7 +581,7 @@ function _canvas_test_templates_create_media_entities(): array {
         'filename' => $filename,
         'uri' => $destination_uri,
         'status' => 1,
-        'uid' => 1,
+        'uid' => 2,
       ]);
       $file->save();
 
@@ -585,15 +592,17 @@ function _canvas_test_templates_create_media_entities(): array {
           'bundle' => 'image',
           'name' => pathinfo($filename, PATHINFO_FILENAME),
           'status' => TRUE,
-          'uid' => 1,
+          'uid' => 2,
           'field_media_image' => [
             'target_id' => $file->id(),
             'alt' => $image_info['alt'],
-            'title' => '',
+            'title' => pathinfo($filename, PATHINFO_FILENAME),
             'width' => $image_info['width'],
             'height' => $image_info['height'],
           ],
+          'path' => ['alias' => '/media/' . pathinfo($filename, PATHINFO_FILENAME)],
         ]);
+        $media->setPublished();
         $media->save();
         $media_entities[$image_info['media_uuid']] = $media;
       }
@@ -624,7 +633,7 @@ function _canvas_test_templates_create_nodes(array $media_entities): void {
     'type' => 'page',
     'title' => 'Debut Page',
     'status' => TRUE,
-    'uid' => 1,
+    'uid' => 2,
     'created' => 1760098151,
     'body' => [
       'value' => '<p>This page emerged on the scene.<strong> This page was met with indifference</strong>.</p>',
@@ -669,7 +678,7 @@ function _canvas_test_templates_create_nodes(array $media_entities): void {
     'type' => 'page',
     'title' => 'Followup Page',
     'status' => TRUE,
-    'uid' => 1,
+    'uid' => 2,
     'created' => 1760098152,
     'body' => [
       'value' => '<p>This is the followup page. <strong>It was equally unremarkable.</strong></p>',
@@ -739,6 +748,18 @@ function _canvas_test_templates_create_content_templates(): void {
 }
 
 /**
+ * Sets the last login time for user 2 to March 2024.
+ */
+function _canvas_test_templates_set_user_last_login(): void {
+  $user = \Drupal::entityTypeManager()->getStorage('user')->load(2);
+  if ($user) {
+    $march_2024_timestamp = strtotime('2024-03-15 10:00:00');
+    $user->set('login', $march_2024_timestamp);
+    $user->save();
+  }
+}
+
+/**
  * Implements hook_uninstall().
  */
 function canvas_test_templates_in_cypress_uninstall(): void {
@@ -761,15 +782,15 @@ function canvas_test_templates_in_cypress_uninstall(): void {
   ];
 
   foreach ($field_storages as $field_storage) {
-    if (in_array($field_storage->getName(), $fields_to_delete)) {
+    if (\in_array($field_storage->getName(), $fields_to_delete)) {
       $field_storage->delete();
     }
   }
 
   // Delete created content.
   $uuids_to_delete = [
-    '3770d0c8-4cab-4a77-b8cc-1f76fcdafa00', // Debut Page
-    '9321f984-c293-4d2f-a8d9-173e0c1c0945', // Followup Page
+    '3770d0c8-4cab-4a77-b8cc-1f76fcdafa00',
+    '9321f984-c293-4d2f-a8d9-173e0c1c0945',
   ];
 
   $nodes = \Drupal::entityTypeManager()
