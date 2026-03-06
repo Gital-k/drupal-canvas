@@ -7,13 +7,16 @@ namespace Drupal\canvas\Hook;
 use Drupal\Component\Serialization\Json;
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Access\AccessResultInterface;
+use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Field\BaseFieldDefinition;
+use Drupal\Core\File\FileUrlGeneratorInterface;
 use Drupal\Core\Hook\Attribute\Hook;
+use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\canvas\Entity\Page;
@@ -32,6 +35,8 @@ final class PageHooks {
   public function __construct(
     private readonly ModuleHandlerInterface $moduleHandler,
     private readonly ConfigFactoryInterface $configFactory,
+    private readonly RouteMatchInterface $routeMatch,
+    private readonly FileUrlGeneratorInterface $fileUrlGenerator,
   ) {
   }
 
@@ -75,6 +80,71 @@ final class PageHooks {
       }
     }
     return $fields;
+  }
+
+  /**
+   * Implements hook_page_attachments().
+   *
+   * When the Metatag module is not installed, outputs basic meta tags for
+   * Canvas pages (description, canonical, Open Graph title/description/image)
+   * so that the "SEO settings" fields have an effect. When Metatag is enabled,
+   * it handles meta tags and this hook does nothing.
+   */
+  #[Hook('page_attachments')]
+  public function pageAttachments(array &$page): void {
+    $route_name = $this->routeMatch->getRouteName();
+    if ($route_name !== 'entity.canvas_page.canonical' && $route_name !== 'entity.canvas_page.latest_version') {
+      return;
+    }
+    $page_entity = $this->routeMatch->getParameter(Page::ENTITY_TYPE_ID);
+    if (!$page_entity instanceof Page || !$page_entity->id()) {
+      return;
+    }
+    $cacheability = CacheableMetadata::createFromObject($page_entity);
+    $cacheability->applyTo($page);
+
+    $title = $page_entity->get('title')->value ?? '';
+    $description = trim($page_entity->get('description')->value ?? '');
+
+    if (!isset($page['#attached']['html_head'])) {
+      $page['#attached']['html_head'] = [];
+    }
+    if ($description !== '') {
+      $page['#attached']['html_head'][] = [
+        [
+          '#tag' => 'meta',
+          '#attributes' => [
+            'name' => 'description',
+            'content' => $description,
+          ],
+        ],
+        'canvas_page_description',
+      ];
+    }
+    // Title
+    $page['#attached']['html_head'][] = [
+      [
+        '#tag' => 'meta',
+        '#attributes' => [
+          'name' => 'title',
+          'content' => $title,
+        ],
+      ],
+      'canvas_page_title',
+    ];
+    $image_url = $this->getPageImageUrl($page_entity);
+    if ($image_url !== '') {
+      $page['#attached']['html_head'][] = [
+        [
+          '#tag' => 'link',
+          '#attributes' => [
+            'rel' => 'image_src',
+            'href' => $image_url,
+          ],
+        ],
+        'canvas_page_og_image',
+      ];
+    }
   }
 
   /**
@@ -141,6 +211,39 @@ final class PageHooks {
   #[Hook('gin_ignore_sticky_form_actions')]
   public function ignoreGinStickyForm(): array {
     return ['canvas_page_form'];
+  }
+
+  /**
+   * Gets the absolute URL of the image from a Canvas page's image field.
+   *
+   * @param \Drupal\canvas\Entity\Page $page
+   *   The Canvas page entity.
+   *
+   * @return string
+   *   The absolute URL of the image file, or an empty string if none.
+   */
+  private function getPageImageUrl(Page $page): string {
+    $image_field = $page->get('image');
+    if ($image_field->isEmpty()) {
+      return '';
+    }
+    $media = $image_field->entity;
+    if ($media === NULL) {
+      return '';
+    }
+    // Core image media type uses field_media_image.
+    if (!$media->hasField('field_media_image') || $media->get('field_media_image')->isEmpty()) {
+      return '';
+    }
+    $file = $media->get('field_media_image')->entity;
+    if ($file === NULL) {
+      return '';
+    }
+    $uri = $file->getFileUri();
+    if ($uri === NULL) {
+      return '';
+    }
+    return $this->fileUrlGenerator->generateAbsoluteString($uri);
   }
 
 }
