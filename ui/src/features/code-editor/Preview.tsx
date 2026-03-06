@@ -74,11 +74,29 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
 
   const [iframeSrcDoc, setIframeSrcDoc] = useState('');
 
-  // Copy import maps from the main window into the preview iframe.
+  // Copy import maps from the main window, adding preview-specific entries.
   const importMapTags = useMemo(() => {
     const importMapEls = document.querySelectorAll('script[type="importmap"]');
+    const previewImportMapAdditions = {
+      '@/components/': Drupal.url(
+        'canvas/api/v0/auto-saves/js/js_component/',
+      ),
+    }
     return Array.from(importMapEls)
-      .map((el) => el.outerHTML)
+      .map((el) => {
+        try {
+          const importMap = JSON.parse(el.textContent || '{}');
+          if (importMap.imports) {
+            importMap.imports = {
+              ...importMap.imports,
+              ...previewImportMapAdditions,
+            };
+          }
+          return `<script type="importmap">${JSON.stringify(importMap)}</script>`;
+        } catch {
+          return el.outerHTML;
+        }
+      })
       .join('\n');
   }, []);
 
