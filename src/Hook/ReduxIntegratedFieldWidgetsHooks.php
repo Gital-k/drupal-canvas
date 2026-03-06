@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Hook;
 
-use Drupal\Core\Asset\AttachedAssetsInterface;
 use Drupal\Component\Serialization\Json;
 use Drupal\Core\Asset\LibraryDiscoveryInterface;
 use Drupal\Core\Extension\ModuleExtensionList;
@@ -74,28 +73,16 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
       // contains the default CSS of the admin theme.
       // @see \Drupal\canvas\Hook\LibraryHooks::customizeDialogLibrary()
       $libraries['ui']['dependencies'][] = 'canvas/canvas.scoped.admin.css';
-    }
-  }
-
-  /**
-   * Implements hook_js_alter().
-   *
-   * Replaces core's media library widget JS with a Canvas override to support
-   * multi-cardinality fields with custom weight field naming patterns.
-   *
-   * @see js/media_library.widget.overrides.js
-   */
-  #[Hook('js_alter')]
-  public function jsAlter(array &$javascript, AttachedAssetsInterface $assets): void {
-    // Only replace when in a Canvas context (canvas_stark theme active).
-    if ($this->themeManager->getActiveTheme()->getName() !== 'canvas_stark') {
-      return;
-    }
-    // Replace core media library widget JS with Canvas override.
-    $media_library_widget_key = 'core/modules/media_library/js/media_library.widget.js';
-    if (isset($javascript[$media_library_widget_key])) {
-      $canvas_path = $this->extensionList->getPath('canvas');
-      $javascript[$media_library_widget_key]['data'] = $canvas_path . '/js/media_library.widget.overrides.js';
+      // Replace core's media library widget JS with a Canvas override that
+      // supports multi-cardinality fields with custom weight field naming
+      // patterns. This must happen at the library definition level (not in
+      // hook_js_alter) so that JS aggregation picks up the correct file.
+      // @see js/media_library.widget.overrides.js
+      if (isset($libraries['widget']['js']['js/media_library.widget.js'])) {
+        $canvas_path = $this->extensionList->getPath('canvas');
+        $libraries['widget']['js']['/' . $canvas_path . '/js/media_library.widget.overrides.js'] = $libraries['widget']['js']['js/media_library.widget.js'];
+        unset($libraries['widget']['js']['js/media_library.widget.js']);
+      }
     }
   }
 
