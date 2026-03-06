@@ -40,8 +40,9 @@ trait EntityOperationLinksTrait {
   protected function buildEntityOperationLinks(array $operations): CanvasResourceLinkCollection {
     $links = new CanvasResourceLinkCollection([]);
     foreach ($operations as $link_rel => $operation) {
-      $route_name = $operation['route']['name'];
+      $route_name = $operation['route']['name'] ?? NULL;
       $route_params = $operation['route']['params'] ?? [];
+      \assert(!empty($route_name), 'Route name is required for building entity operation links.');
       $url = Url::fromRoute($route_name, $route_params);
       if (isset($operation['op'])) {
         $access = $this->access(operation: $operation['op'], return_as_object: TRUE);
