@@ -12,10 +12,15 @@ interface MediaLibraryWidgetContainerProps {
     class?: string;
     [key: string]: any;
   };
-  renderChildren: React.ReactNode;
+  children: React.ReactNode;
 }
 
-interface MediaLibraryWidgetContainerInnerProps extends MediaLibraryWidgetContainerProps {
+interface MediaLibraryWidgetContainerInnerProps {
+  attributes: {
+    class?: string;
+    [key: string]: any;
+  };
+  renderChildren: React.ReactNode;
   isReordering: boolean;
 }
 
@@ -52,14 +57,14 @@ MediaLibraryWidgetContainerInner.displayName =
 
 const MediaLibraryWidgetContainer = ({
   attributes,
-  renderChildren,
+  children,
 }: MediaLibraryWidgetContainerProps) => {
   const isReordering = useAppSelector(selectIsReordering);
 
   return (
     <MediaLibraryWidgetContainerInner
       attributes={attributes}
-      renderChildren={renderChildren}
+      renderChildren={children}
       isReordering={isReordering}
     />
   );

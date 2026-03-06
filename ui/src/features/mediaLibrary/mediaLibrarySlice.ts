@@ -12,10 +12,10 @@ export const mediaLibrarySlice = createAppSlice({
   name: 'mediaLibrary',
   initialState,
   reducers: (create) => ({
-    setReorderingStart: create.reducer((state) => {
+    setReorderingStart: create.reducer((state: MediaLibrarySliceState) => {
       state.isReordering = true;
     }),
-    setReorderingEnd: create.reducer((state) => {
+    setReorderingEnd: create.reducer((state: MediaLibrarySliceState) => {
       state.isReordering = false;
     }),
   }),

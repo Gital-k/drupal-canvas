@@ -5,8 +5,7 @@ In the rest of this document, `Drupal Canvas` will be written as `Canvas`.
 ## Finding issues 🐛, code 🤖 & people 👯‍♀️
 Related Canvas issue queue components:
 1. [Redux-integrated field widgets](https://www.drupal.org/project/issues/canvas?component=Redux-integrated+field+widgets)
-2. [Semi-Coupled theme engine](https://www.drupal.org/project/issues/canvas?component=Semi-Coupled+theme+engine)
-3. [Shape matching](https://www.drupal.org/project/issues/canvas?component=Shape+matching)
+2. [Shape matching](https://www.drupal.org/project/issues/canvas?component=Shape+matching)
 
 ## 1. Terminology
 
@@ -24,7 +23,6 @@ Related Canvas issue queue components:
 This uses _most_ of the Canvas terminology in the:
 - [`Canvas Components` doc](components.md)
 - [`Canvas Shape Matching into Field Types` doc](shape-matching-into-field-types.md)
-- [`Canvas Semi-Coupled theme engine` doc](semi-coupled-theme-engine.md)
 
 ## 2. Product requirements
 
@@ -68,7 +66,7 @@ intermediary concepts (`field widget`, `field type`, `field prop`, etc.) into a 
  previews.**
 
 ### 3.2 How?
-The `Semi-Coupled theme engine` makes it possible to process Drupal `render element`s with `React component`s  instead of `Twig`. See the [`Canvas Semi-Coupled theme engine` doc](semi-coupled-theme-engine.md) for more details.
+The forms use Drupal's Form API but ultimately render `React component`s  instead of `Twig`. See the [`Twig to React in the Canvas_Stark theme` doc](twig-to-react-in-canvas-stark.md) for more details.
 
 To redux-sync a `React`-rendered `HTML form control element`, it should be wrapped by `inputBehaviors`:
 
