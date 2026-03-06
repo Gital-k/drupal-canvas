@@ -4,22 +4,25 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Twig;
 
-use PHPUnit\Framework\Attributes\Group;
-use PHPUnit\Framework\Attributes\DataProvider;
+use Drupal\Component\Utility\UrlHelper;
 use Drupal\Core\Image\ImageFactory;
 use Drupal\Core\Image\ImageInterface;
 use Drupal\Core\StreamWrapper\PublicStream;
 use Drupal\Core\StreamWrapper\StreamWrapperManagerInterface;
-use Drupal\canvas\Twig\CanvasTwigExtension;
 use Drupal\canvas\Routing\ParametrizedImageStyleConverter;
+use Drupal\canvas\Twig\CanvasTwigExtension;
 use Drupal\file\FileInterface;
 use Drupal\image\Entity\ImageStyle;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Kernel\Traits\PredictableImageStyleItokTestTrait;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\CoversMethod;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Session\Session;
+use Symfony\Component\HttpFoundation\Session\Storage\MockArraySessionStorage;
 
 // cspell:ignore itok MIOT
 /**
@@ -76,8 +79,8 @@ class CanvasTwigExtensionFiltersTest extends CanvasKernelTestBase {
   }
 
   /**
- * Tests to src set.
- */
+   * Tests to src set.
+   */
   #[DataProvider('providerToSrcSet')]
   public function testToSrcSet(string $src, ?int $intrinsicImageWidth, ?string $expected): void {
     $actual = $this->canvasTwigExtension->toSrcSet($src, $intrinsicImageWidth);
@@ -158,7 +161,7 @@ class CanvasTwigExtensionFiltersTest extends CanvasKernelTestBase {
     $result = $extension->applyImageStyle($image, 'test_style');
 
     $this->assertIsArray($result);
-    // Should return a URL for the styled derivative.
+    $this->assertTrue(UrlHelper::isValid($result['src']));
     $this->assertStringContainsString('/styles/test_style/', $result['src']);
     $this->assertStringContainsString('test-image.jpg', $result['src']);
     // Dimensions should be transformed (scaled to width 200).
@@ -254,20 +257,15 @@ class CanvasTwigExtensionFiltersTest extends CanvasKernelTestBase {
         'PHP_SELF' => $subdirectoryBaseUrl . '/index.php',
       ],
     );
-    $requestStack = $this->container->get('request_stack');
-    $requestStack->push($request);
+    $request->setSession(new Session(new MockArraySessionStorage()));
+    $this->container->get('request_stack')->push($request);
 
-    try {
-      $image = [
-        'src' => $subdirectoryBaseUrl . '/' . $publicBasePath . '/test-image.jpg',
-        'width' => 400,
-        'height' => 300,
-      ];
-      $result = $extension->applyImageStyle($image, 'test_style');
-    }
-    finally {
-      $requestStack->pop();
-    }
+    $image = [
+      'src' => $subdirectoryBaseUrl . '/' . $publicBasePath . '/test-image.jpg',
+      'width' => 400,
+      'height' => 300,
+    ];
+    $result = $extension->applyImageStyle($image, 'test_style');
 
     $this->assertIsArray($result);
     // Should return a URL for the styled derivative.
@@ -301,20 +299,15 @@ class CanvasTwigExtensionFiltersTest extends CanvasKernelTestBase {
         'PHP_SELF' => $subdirectoryBaseUrl . '/index.php',
       ],
     );
-    $requestStack = $this->container->get('request_stack');
-    $requestStack->push($request);
+    $request->setSession(new Session(new MockArraySessionStorage()));
+    $this->container->get('request_stack')->push($request);
 
-    try {
-      $image = [
-        'src' => '/other/' . $publicBasePath . '/test-image.jpg',
-        'width' => 400,
-        'height' => 300,
-      ];
-      $result = $extension->applyImageStyle($image, 'test_style');
-    }
-    finally {
-      $requestStack->pop();
-    }
+    $image = [
+      'src' => '/other/' . $publicBasePath . '/test-image.jpg',
+      'width' => 400,
+      'height' => 300,
+    ];
+    $result = $extension->applyImageStyle($image, 'test_style');
 
     // Paths outside the detected base path should remain unchanged.
     $this->assertIsArray($result);
