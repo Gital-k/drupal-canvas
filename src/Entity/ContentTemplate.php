@@ -7,9 +7,7 @@ namespace Drupal\canvas\Entity;
 use Drupal\canvas\CanvasUriDefinitions;
 use Drupal\canvas\ClientSideRepresentation;
 use Drupal\canvas\EntityHandlers\VisibleWhenDisabledCanvasConfigEntityAccessControlHandler;
-use Drupal\canvas\Resource\CanvasResourceLink;
 use Drupal\canvas\Resource\CanvasResourceLinkCollection;
-use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
 use Drupal\Core\Config\Entity\ConfigEntityInterface;
@@ -27,7 +25,6 @@ use Drupal\Core\Entity\Query\QueryInterface;
 use Drupal\Core\Entity\TypedData\EntityDataDefinition;
 use Drupal\Core\Entity\TypedData\EntityDataDefinitionInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
-use Drupal\Core\Url;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Storage\ComponentTreeLoader;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
@@ -76,6 +73,7 @@ use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 final class ContentTemplate extends ComponentTreeConfigEntityBase implements CanvasHttpApiEligibleConfigEntityInterface, EntityViewDisplayInterface, AutoSavePublishAwareInterface {
 
   use ConfigUpdaterAwareEntityTrait;
+  use EntityOperationLinksTrait;
 
   public const string ENTITY_TYPE_ID = 'content_template';
 
@@ -445,9 +443,7 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
    *   A collection of links for this content template.
    */
   private function getEntityOperations(): CanvasResourceLinkCollection {
-    $links = new CanvasResourceLinkCollection([]);
-    /** @var array<string, array{route: array{name: string, params?: array<string, string|null>}, op?: string}> $possible_operations */
-    $possible_operations = [
+    return $this->buildEntityOperationLinks([
       CanvasUriDefinitions::LINK_REL_EDIT => [
         'route' => [
           'name' => 'canvas.boot.content_template',
@@ -458,29 +454,7 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
           ],
         ],
       ],
-    ];
-    foreach ($possible_operations as $link_rel => $operation) {
-      $route_name = $operation['route']['name'];
-      $route_params = $operation['route']['params'] ?? [];
-      $url = Url::fromRoute($route_name, $route_params);
-      if (isset($operation['op'])) {
-        $access = $this->access(operation: $operation['op'], return_as_object: TRUE);
-      }
-      else {
-        $access = $url->access(return_as_object: TRUE);
-      }
-      \assert($access instanceof AccessResult);
-      if ($access->isAllowed()) {
-        $links = $links->withLink(
-          $link_rel,
-          new CanvasResourceLink($access, $url, $link_rel)
-        );
-      }
-      else {
-        $links->addCacheableDependency($access);
-      }
-    }
-    return $links;
+    ]);
   }
 
   public function normalizeForClientSide(): ClientSideRepresentation {

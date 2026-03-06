@@ -9,9 +9,7 @@ use Drupal\canvas\CanvasUriDefinitions;
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
-use Drupal\canvas\Resource\CanvasResourceLink;
 use Drupal\canvas\Resource\CanvasResourceLinkCollection;
-use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
 use Drupal\Core\Config\Entity\ConfigEntityBase;
@@ -63,6 +61,7 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
 
   use CanvasAssetLibraryTrait;
   use ConfigUpdaterAwareEntityTrait;
+  use EntityOperationLinksTrait;
 
   public const string ENTITY_TYPE_ID = 'js_component';
   public const string ADMIN_PERMISSION = 'administer code components';
@@ -122,30 +121,19 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
   }
 
   private function getEntityOperations(): CanvasResourceLinkCollection {
-    $links = new CanvasResourceLinkCollection([]);
-    // Link relation type => route name.
-    $possible_operations = [
-      CanvasUriDefinitions::LINK_REL_DELETE => ['route_name' => 'canvas.api.config.delete', 'op' => 'delete'],
+    return $this->buildEntityOperationLinks([
       // @todo Add a URL template using the CanvasUriDefinitions::LINK_REL_USAGE_DETAILS link relation type
-    ];
-    foreach ($possible_operations as $link_rel => ['route_name' => $route_name, 'op' => $entity_operation]) {
-      $access = $this->access(operation: $entity_operation, return_as_object: TRUE);
-      \assert($access instanceof AccessResult);
-      if ($access->isAllowed()) {
-        $route_params = [
-          'canvas_config_entity_type_id' => self::ENTITY_TYPE_ID,
-          'canvas_config_entity' => $this->id(),
-        ];
-        $links = $links->withLink(
-          $link_rel,
-          new CanvasResourceLink($access, Url::fromRoute($route_name, $route_params), $link_rel)
-        );
-      }
-      else {
-        $links->addCacheableDependency($access);
-      }
-    }
-    return $links;
+      CanvasUriDefinitions::LINK_REL_DELETE => [
+        'route' => [
+          'name' => 'canvas.api.config.delete',
+          'params' => [
+            'canvas_config_entity_type_id' => self::ENTITY_TYPE_ID,
+            'canvas_config_entity' => $this->id(),
+          ],
+        ],
+        'op' => 'delete',
+      ],
+    ]);
   }
 
   /**
