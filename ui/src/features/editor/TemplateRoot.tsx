@@ -45,6 +45,7 @@ const TemplateRoot = () => {
             bundle,
             viewMode,
             suggestedPreviewEntityId: suggestedEntityId,
+            links: viewModeData?.links,
           },
           {
             replace: true,

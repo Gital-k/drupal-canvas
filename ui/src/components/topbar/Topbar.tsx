@@ -13,10 +13,7 @@ import ContentPreviewSelector from '@/components/templates/ContentPreviewSelecto
 import UndoRedo from '@/components/UndoRedo';
 import { selectEditorFrameContext } from '@/features/ui/uiSlice';
 import useEditorNavigation from '@/hooks/useEditorNavigation';
-import {
-  useGetContentTemplatesQuery,
-  useGetPreviewContentEntitiesQuery,
-} from '@/services/componentAndLayout';
+import { useGetPreviewContentEntitiesQuery } from '@/services/componentAndLayout';
 import { getDrupalSettings } from '@/utils/drupal-globals';
 
 import PageInfo from '../pageInfo/PageInfo';
@@ -53,11 +50,6 @@ const Topbar = () => {
     hasPersonalizeExtensionAvailable = true;
   }
 
-  // Fetch template data to get edit-form link
-  const { data: templatesData } = useGetContentTemplatesQuery(undefined, {
-    skip: !isTemplateEditorContext,
-  });
-
   // Fetch preview content entities for template routes
   const { data: previewEntities = {} } = useGetPreviewContentEntitiesQuery(
     {
@@ -71,27 +63,12 @@ const Topbar = () => {
 
   // Handle preview entity selection change
   const handlePreviewEntityChange = (selectedEntityId: string) => {
-    const templateLink =
-      templatesData &&
-      entityType &&
-      bundle &&
-      viewMode &&
-      templatesData[entityType]?.['bundles']?.[bundle]?.['viewModes']?.[
-        viewMode
-      ]?.links?.['edit-form'];
-    if (templateLink) {
-      // @todo: Change to use navigate() when we can do full FE routing.
-      setTimeout(() => {
-        // Use a timeout to ensure that RTK query cleans up its subscriptions first before navigating away.
-        // Without this timeout, RTK throws an error because it tries to make a request following cache invalidation while
-        // the window.location.href is in progress.
-        window.location.href = `${templateLink}/${selectedEntityId}`;
-      }, 100);
-    }
+    setTemplatePreviewEntityId(selectedEntityId);
   };
 
   const backHref =
     window.sessionStorage.getItem(PREVIOUS_URL_STORAGE_KEY) ?? '/';
+
   // Must be wide enough to accommodate all the buttons that can appear in the top left and top right. The two
   // columns must be the same width so that the center column is always centered to the whole window.
   const leftRightColumnWidth = '300px';

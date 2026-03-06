@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useHref, useLocation, useNavigate } from 'react-router-dom';
 
 import { DEFAULT_REGION } from '@/features/ui/uiSlice';
 import { getCanvasSettings } from '@/utils/drupal-globals';
@@ -23,6 +23,7 @@ export type TemplateViewModeNavigation = Pick<
   'entityType' | 'bundle' | 'viewMode'
 > & {
   suggestedPreviewEntityId?: number | string;
+  links?: TemplateViewMode['links'];
 };
 
 /**
@@ -39,6 +40,10 @@ export type TemplateViewModeNavigation = Pick<
 export function useEditorNavigation() {
   const navigate = useNavigate();
   const location = useLocation();
+  // useHref('/') returns the router basename with a trailing slash (e.g. "/canvas/").
+  // Used to strip the basename from server-provided URLs so React Router receives
+  // a path relative to its own root.
+  const rootHref = useHref('/');
 
   /**
    * Updates the current route to select a specific region.
@@ -92,23 +97,32 @@ export function useEditorNavigation() {
   );
 
   /**
-   * Constructs a URL path for the template editor.
-   * @param viewMode - The template view mode containing entityType, bundle, viewMode,
-   *                   and optionally a suggested preview entity ID.
-   * @returns The URL path string, or empty string if viewMode is incomplete.
+   * Constructs a URL path for the template editor from the server-provided
+   * edit-form link. The link is stripped of the router basename so React Router
+   * can resolve it correctly.
+   * @param viewMode - The template view mode, must include links['edit-form'].
+   * @returns The URL path string, or empty string if the link is unavailable.
    */
   const urlForTemplateEditor = useCallback(
     (viewMode?: TemplateViewModeNavigation) => {
-      if (!viewMode?.entityType || !viewMode?.bundle || !viewMode?.viewMode) {
+      if (!viewMode?.links?.['edit-form']) {
         console.warn(
-          '[useEditorNavigation] urlForTemplateEditor called with undefined or incomplete viewMode:',
+          '[useEditorNavigation] urlForTemplateEditor: no `edit-form` link available for viewMode:',
           viewMode,
         );
         return '';
       }
-      return `/template/${viewMode.entityType}/${viewMode.bundle}/${viewMode.viewMode}/${viewMode.suggestedPreviewEntityId || ''}`;
+      const templateUrl = viewMode.suggestedPreviewEntityId
+        ? viewMode.links['edit-form'] + `/${viewMode.suggestedPreviewEntityId}`
+        : viewMode.links['edit-form'];
+      // The server URL includes the router basename (e.g. "/canvas/template/...").
+      // Strip it so React Router resolves the path correctly relative to its root.
+      const basename = rootHref.endsWith('/') ? rootHref.slice(0, -1) : rootHref;
+      return templateUrl.startsWith(basename)
+        ? templateUrl.slice(basename.length)
+        : templateUrl;
     },
-    [],
+    [rootHref],
   );
 
   /**
