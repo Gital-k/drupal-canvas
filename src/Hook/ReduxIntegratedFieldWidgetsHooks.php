@@ -157,6 +157,10 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
       else {
         unset($form['uri']['#description']);
       }
+      // Remove the "URL" label that appears above the URL text input.
+      if (isset($form['uri']['#title'])) {
+        $form['uri']['#title_display'] = 'invisible';
+      }
     }
   }
 
@@ -256,7 +260,7 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
     foreach (Element::children($element) as $key) {
       // Mark input elements.
       if (isset($element[$key]['#type']) &&
-          in_array($element[$key]['#type'], ['textfield'], TRUE)) {
+          in_array($element[$key]['#type'], ['textfield', 'url'], TRUE)) {
         $element[$key]['#is_multivalue_form'] = TRUE;
         $element[$key]['#attributes']['data-field-label'] = $field_label;
       }
