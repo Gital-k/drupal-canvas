@@ -3,7 +3,7 @@
  * Overrides the media library widget's drag-to-reorder on multivalue fields
  * to use the Canvas six-dot drag handle instead of the thumbnail preview.
  *
- * For non-Canvas widgets the original core behaviour is preserved verbatim.
+ * For non-Canvas widgets the original core behavior is preserved verbatim.
  *
  * Keyboard reordering: when focus is on a .canvas-media-drag-handle inside a
  * Canvas multivalue media widget, ArrowUp/ArrowDown move the item and update
@@ -14,7 +14,7 @@
   'use strict';
 
   /**
-   * Synchronises the hidden weight inputs after a DOM reorder.
+   * Synchronizes the hidden weight inputs after a DOM reorder.
    *
    * @param {HTMLElement} container
    *   The .js-media-library-selection element.
