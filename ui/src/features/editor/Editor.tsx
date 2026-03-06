@@ -152,7 +152,9 @@ const Editor: React.FC<EditorProps> = ({ context, disable = false }) => {
             onReset={() => {
               if (entityType && bundle && viewMode && templatesData) {
                 const viewModeData =
-                  templatesData?.[entityType]?.bundles?.[bundle]?.viewModes?.[viewMode];
+                  templatesData?.[entityType]?.bundles?.[bundle]?.viewModes?.[
+                    viewMode
+                  ];
                 navigateToTemplateEditor(viewModeData, { replace: true });
               } else {
                 navigate('/', { replace: true });

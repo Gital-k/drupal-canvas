@@ -117,7 +117,9 @@ export function useEditorNavigation() {
         : viewMode.links['edit-form'];
       // The server URL includes the router basename (e.g. "/canvas/template/...").
       // Strip it so React Router resolves the path correctly relative to its root.
-      const basename = rootHref.endsWith('/') ? rootHref.slice(0, -1) : rootHref;
+      const basename = rootHref.endsWith('/')
+        ? rootHref.slice(0, -1)
+        : rootHref;
       return templateUrl.startsWith(basename)
         ? templateUrl.slice(basename.length)
         : templateUrl;
