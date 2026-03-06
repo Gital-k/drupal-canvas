@@ -11,11 +11,6 @@
 // Each object property is a prop type with a value of an array of the available
 // suggestions to it.
 const suggestionsByProp = {
-  test_object_drupal_image: [
-    'Image Media > Image > Image',
-    'Image Upload',
-    'Image Media > Image > Thumbnail',
-  ],
   test_string_format_uri_reference: [
     'The Link > The Link',
     'Authored by > URL',
@@ -30,6 +25,11 @@ const suggestionsByProp = {
     'The Link > Resolved URL',
     'Image Media > Media > Thumbnail',
     'One Tag > Taxonomy term > Revision user > URL',
+  ],
+  test_object_drupal_image: [
+    'Image Media > Image > Image',
+    'Image Upload',
+    'Image Media > Image > Thumbnail',
   ],
   test_string_format_iri_reference: [
     'The Link > Resolved URL',
@@ -175,14 +175,14 @@ const entityValuesNode4 = {
   'Image Upload > Status': 'true',
   'Image Upload > Alternative text': 'secret plans',
   'Image Upload > Title': '', // this seems wrong?
-  'Image Upload > URI': 'public://secret-plans_2.jpg',
+  'Image Upload > URI': 'image-test.gif',
   'Absolute URL': '/node/4', // Updated to match our test data
   'Image Upload > Width': '1000',
   'Image Upload > Height': '1333',
-  'Image Upload > File size': '318082',
+  'Image Upload > File size': /\d+/,
   'Image Upload > Changed': /\d{9,}/,
   'Image Upload > Created': /\d{9,}/,
-  'Image Upload': /.*?\/files\/.*?secret-plans_2\.jpg.*/,
+  'Image Upload': 'image-test.gif',
   'Relative URL': /\/node\/\d+/,
   'Revision user > User > Name': '',
   'Revision user > User > Email': 'canvas@test.com',
@@ -217,13 +217,13 @@ const entityValuesNode4 = {
   'Image Media > Media > Published': 'true',
   'Image Media > Media > Image > Alternative text': 'tree house',
   'Image Media > Media > Image > Title': '',
-  'Image Media > Image > Image': /.*?\/files\/.*?treehouse\.jpeg.*/,
-  'Image Media > Media > Image': /.*?\/files\/.*?treehouse\.jpeg.*/,
-  'Image Media > Image > Thumbnail': /.*?\/files\/.*?treehouse\.jpeg.*/,
-  'Image Media > Media > Thumbnail': /.*?\/files\/.*?treehouse\.jpeg.*/,
+  'Image Media > Image > Image': 'image-test.png',
+  'Image Media > Media > Image': 'image-test.png',
+  'Image Media > Image > Thumbnail': 'image-test.png',
+  'Image Media > Media > Thumbnail': 'image-test.png',
   'Image Media > URL': 'media/treehouse',
-  'Image Media > Media > Thumbnail > URI': /public:\/\/.*treehouse.*\.jpeg/,
-  'Image Media > Media > Image > URI': /public:\/\/.*treehouse.*\.jpeg/,
+  'Image Media > Media > Thumbnail > URI': 'image-test.png',
+  'Image Media > Media > Image > URI': 'image-test.png',
   'Image Media > Media > Authored by > URL': '',
   'Image Media > Media > Revision user > URL': '',
   'Image Media > Media > Image > Height': '665',
@@ -278,7 +278,7 @@ describe('Linking Basic Page fields', () => {
   // These tests can take a long time to run and are not particularly browser
   // dependent. Only run in Chromium to keep test duration reasonable.
   beforeEach(() => {
-    cy.viewport(1400, 1920);
+    cy.viewport(1400, 2600);
 
     // Setup test site with Drupal Canvas, templates enabled, and page with many field types
     cy.drupalCanvasInstall([

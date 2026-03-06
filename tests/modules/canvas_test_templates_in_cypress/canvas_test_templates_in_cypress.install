@@ -523,93 +523,137 @@ function _canvas_test_templates_configure_form_display(): void {
 }
 
 /**
- * Creates media entities with associated files.
+ * Creates media entities with associated files using test images.
  */
 function _canvas_test_templates_create_media_entities(): array {
   $media_entities = [];
 
-  // Copy image files from original recipe to public files directory.
-  $file_system = \Drupal::service('file_system');
+  // Get test image files from Drupal core test fixtures.
+  // This mimics what CanvasTestSetup does.
+  $test_image_files = _canvas_test_templates_get_test_files('image');
 
-  // Ensure the public files directory exists.
-  $public_path = \Drupal::service('stream_wrapper_manager')->getViaUri('public://')->getDirectoryPath();
-  $file_system->prepareDirectory($public_path, FileSystemInterface::CREATE_DIRECTORY | FileSystemInterface::MODIFY_PERMISSIONS);
+  if (empty($test_image_files)) {
+    // If no test files found, return early.
+    return $media_entities;
+  }
 
   $images = [
     'treehouse.jpeg' => [
       'uuid' => '31dc1fff-06d2-4170-8ea6-503e59960e99',
       'media_uuid' => '5cd8f890-a1b8-4a9f-980d-a9ddadeaec81',
       'alt' => 'tree house',
-      'width' => 1024,
-      'height' => 665,
+      'file_index' => 0,
     ],
     'cool-cat.jpg' => [
       'uuid' => '2682397b-b2ed-47b0-b309-b4e2e2b90c85',
       'media_uuid' => '707319dc-23e8-4974-b019-e0ea0f4ec731',
       'alt' => 'cool cat',
-      'width' => 600,
-      'height' => 800,
+      'file_index' => 1,
     ],
     'secret-plans_2.jpg' => [
       'uuid' => 'b056131d-fdc2-4aeb-9776-3e8001c1a0d1',
       'media_uuid' => NULL,
       'alt' => 'secret plans',
-      'width' => 1000,
-      'height' => 1333,
+      'file_index' => 2,
     ],
     'hello-folks_2.jpg' => [
       'uuid' => '811ced3c-81e9-49b9-a82d-ef4da8772e9f',
       'media_uuid' => NULL,
       'alt' => 'hello folks',
-      'width' => 600,
-      'height' => 800,
+      'file_index' => 3,
     ],
   ];
 
   foreach ($images as $filename => $image_info) {
-    // Copy the image file from the recipe to our module directory first.
-    $source_path = DRUPAL_ROOT . '/modules/contrib/canvas/tests/fixtures/recipes/template_basic_setup/content/file/' . $filename;
-    $destination_uri = 'public://' . $filename;
+    // Use test files from core fixtures, cycling through available images.
+    $file_index = $image_info['file_index'] % count($test_image_files);
+    $test_file = $test_image_files[$file_index];
 
-    if (file_exists($source_path)) {
-      // Copy the file to public directory.
-      $file_system->copy($source_path, $destination_uri, FileExists::Replace);
+    // Create File entity from the test file.
+    $file = File::create([
+      'uuid' => $image_info['uuid'],
+      'uri' => $test_file->uri,
+      'status' => 1,
+      'uid' => 2,
+    ]);
+    $file->setPermanent();
+    $file->save();
 
-      // Create File entity.
-      $file = File::create([
-        'uuid' => $image_info['uuid'],
-        'filename' => $filename,
-        'uri' => $destination_uri,
-        'status' => 1,
+    // Create Media entity if it has a media UUID.
+    if ($image_info['media_uuid']) {
+      // Get actual image dimensions from the file.
+      $image_dimensions = @getimagesize($file->getFileUri());
+      $width = $image_dimensions ? $image_dimensions[0] : NULL;
+      $height = $image_dimensions ? $image_dimensions[1] : NULL;
+
+      $media = Media::create([
+        'uuid' => $image_info['media_uuid'],
+        'bundle' => 'image',
+        'name' => pathinfo($filename, PATHINFO_FILENAME),
+        'status' => TRUE,
         'uid' => 2,
+        'field_media_image' => [
+          'target_id' => $file->id(),
+          'alt' => $image_info['alt'],
+          'title' => pathinfo($filename, PATHINFO_FILENAME),
+          'width' => $width,
+          'height' => $height,
+        ],
+        'path' => ['alias' => '/media/' . pathinfo($filename, PATHINFO_FILENAME)],
       ]);
-      $file->save();
-
-      // Create Media entity if it has a media UUID.
-      if ($image_info['media_uuid']) {
-        $media = Media::create([
-          'uuid' => $image_info['media_uuid'],
-          'bundle' => 'image',
-          'name' => pathinfo($filename, PATHINFO_FILENAME),
-          'status' => TRUE,
-          'uid' => 2,
-          'field_media_image' => [
-            'target_id' => $file->id(),
-            'alt' => $image_info['alt'],
-            'title' => pathinfo($filename, PATHINFO_FILENAME),
-            'width' => $image_info['width'],
-            'height' => $image_info['height'],
-          ],
-          'path' => ['alias' => '/media/' . pathinfo($filename, PATHINFO_FILENAME)],
-        ]);
-        $media->setPublished();
-        $media->save();
-        $media_entities[$image_info['media_uuid']] = $media;
-      }
+      $media->setPublished();
+      $media->save();
+      $media_entities[$image_info['media_uuid']] = $media;
     }
   }
 
   return $media_entities;
+}
+
+/**
+ * Gets a list of test files from Drupal core fixtures.
+ *
+ * This mimics the TestFileCreationTrait::getTestFiles() method.
+ *
+ * @param string $type
+ *   File type, possible values: 'binary', 'html', 'image', 'javascript',
+ *   'php', 'sql', 'text'.
+ *
+ * @return object[]
+ *   List of files in public:// that match the filter.
+ */
+function _canvas_test_templates_get_test_files(string $type): array {
+  $file_system = \Drupal::service('file_system');
+
+  // Copy test files from core fixtures if they haven't been copied yet.
+  $original = DRUPAL_ROOT . '/core/tests/fixtures/files';
+  if (is_dir($original)) {
+    $files = $file_system->scanDirectory($original, '/' . $type . '-.*/');
+    foreach ($files as $file) {
+      // Copy to public:// if not already there.
+      $destination = 'public://' . basename($file->uri);
+      if (!file_exists($destination)) {
+        $file_system->copy($file->uri, $destination, FileExists::Replace);
+      }
+    }
+  }
+
+  // Now scan public:// for the test files.
+  $files = [];
+  if (in_array($type, ['binary', 'html', 'image', 'javascript', 'php', 'sql', 'text'])) {
+    $files = $file_system->scanDirectory('public://', '/' . $type . '\-.*/');
+  }
+
+  // Sort files for consistency.
+  usort($files, function ($file1, $file2) {
+    $compare_size = filesize($file1->uri) - filesize($file2->uri);
+    if ($compare_size) {
+      return $compare_size;
+    }
+    return strnatcmp($file1->name, $file2->name);
+  });
+
+  return array_values($files);
 }
 
 /**
