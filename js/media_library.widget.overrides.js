@@ -74,12 +74,17 @@
                   const $child = $(child);
                   const oldDelta = $child.attr('data-media-library-item-delta');
 
+                  const selectionPattern = new RegExp('\\[selection\\]\\[' + oldDelta + '\\](?!\\d)', 'g');
+                  const selectorPattern = new RegExp('-selection-' + oldDelta + '-(?!\\d)', 'g');
+                  const buttonPattern = new RegExp('-' + oldDelta + '-(?!\\d)', 'g');
+
                   $child.find('input, select, textarea').each((_, field) => {
                     const $field = $(field);
                     const oldName = $field.attr('name');
-                    if (oldName && oldName.includes('[selection][' + oldDelta + ']')) {
+                    if (oldName && selectionPattern.test(oldName)) {
+                      selectionPattern.lastIndex = 0;
                       const tempName = oldName.replace(
-                        '[selection][' + oldDelta + ']',
+                        selectionPattern,
                         '[selection][TEMP_' + oldDelta + ']'
                       );
                       $field.attr('name', tempName);
@@ -87,7 +92,7 @@
                       const oldSelector = $field.attr('data-drupal-selector');
                       if (oldSelector) {
                         const tempSelector = oldSelector.replace(
-                          '-selection-' + oldDelta + '-',
+                          selectorPattern,
                           '-selection-TEMP_' + oldDelta + '-'
                         );
                         $field.attr('data-drupal-selector', tempSelector);
@@ -98,8 +103,9 @@
                   $child.find('[data-canvas-media-remove-button]').each((_, button) => {
                     const $button = $(button);
                     const oldName = $button.attr('name');
-                    if (oldName && oldName.includes('-' + oldDelta + '-')) {
-                      const tempName = oldName.replace('-' + oldDelta + '-', '-TEMP_' + oldDelta + '-');
+                    if (oldName && buttonPattern.test(oldName)) {
+                      buttonPattern.lastIndex = 0;
+                      const tempName = oldName.replace(buttonPattern, '-TEMP_' + oldDelta + '-');
                       $button.attr('name', tempName);
                     }
                   });
@@ -114,12 +120,17 @@
 
                   $child.attr('data-media-library-item-delta', index);
 
+                  const tempSelectionPattern = new RegExp('\\[selection\\]\\[TEMP_' + oldDelta + '\\](?!\\d)', 'g');
+                  const tempSelectorPattern = new RegExp('-selection-TEMP_' + oldDelta + '-(?!\\d)', 'g');
+                  const tempButtonPattern = new RegExp('-TEMP_' + oldDelta + '-(?!\\d)', 'g');
+
                   $child.find('input, select, textarea').each((_, field) => {
                     const $field = $(field);
                     const tempName = $field.attr('name');
-                    if (tempName && tempName.includes('[selection][TEMP_' + oldDelta + ']')) {
+                    if (tempName && tempSelectionPattern.test(tempName)) {
+                      tempSelectionPattern.lastIndex = 0;
                       const newName = tempName.replace(
-                        '[selection][TEMP_' + oldDelta + ']',
+                        tempSelectionPattern,
                         '[selection][' + index + ']'
                       );
                       $field.attr('name', newName);
@@ -127,7 +138,7 @@
                       const tempSelector = $field.attr('data-drupal-selector');
                       if (tempSelector) {
                         const newSelector = tempSelector.replace(
-                          '-selection-TEMP_' + oldDelta + '-',
+                          tempSelectorPattern,
                           '-selection-' + index + '-'
                         );
                         $field.attr('data-drupal-selector', newSelector);
@@ -138,8 +149,9 @@
                   $child.find('[data-canvas-media-remove-button]').each((_, button) => {
                     const $button = $(button);
                     const tempName = $button.attr('name');
-                    if (tempName && tempName.includes('-TEMP_' + oldDelta + '-')) {
-                      const newName = tempName.replace('-TEMP_' + oldDelta + '-', '-' + index + '-');
+                    if (tempName && tempButtonPattern.test(tempName)) {
+                      tempButtonPattern.lastIndex = 0;
+                      const newName = tempName.replace(tempButtonPattern, '-' + index + '-');
                       $button.attr('name', newName);
                     }
                   });
