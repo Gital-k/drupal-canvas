@@ -228,7 +228,7 @@ final class PageHooks {
       return '';
     }
     $media = $image_field->entity;
-    if ($media === NULL) {
+    if ($media === NULL || !$media instanceof FieldableEntityInterface) {
       return '';
     }
     // Core image media type uses field_media_image.
