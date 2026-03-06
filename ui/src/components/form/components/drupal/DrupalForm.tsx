@@ -22,10 +22,10 @@ interface AjaxContent {
 
 const DrupalForm = ({
   attributes = {},
-  renderChildren = null,
+  children,
 }: {
   attributes: Attributes;
-  renderChildren: ReactNode;
+  children: ReactNode;
 }) => {
   const formId = attributes['data-form-id'] as FormId;
   const formRef = useRef<HTMLFormElement>(null);
@@ -122,7 +122,7 @@ const DrupalForm = ({
 
   const formContent = (
     <>
-      {renderChildren}
+      {children}
       {/* Render AJAX content using portals so it appears in the correct DOM
       location and has access to the FormProvider context */}
       {ajaxContents.map((ajaxContent) => {

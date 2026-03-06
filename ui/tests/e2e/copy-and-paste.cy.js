@@ -55,6 +55,7 @@ describe('Copy and paste a node using keyboard shortcuts', () => {
       .last()
       .rightclick({ force: true });
     cy.findByText('Delete').click();
+
     cy.waitForElementContentNotInIframe('div', 'hello, world!');
     cy.getIframeBody()
       .findAllByText('Canvas Needs This For The Time Being')
