@@ -32,7 +32,6 @@ const twigToJSXComponentMap = {
   'drupal-canvas-form-element': DrupalFormElement,
   'drupal-canvas-form-element-label': DrupalFormElementLabel,
   'drupal-canvas-input': DrupalInput,
-  'drupal-canvas-input--checkbox': DrupalInput,
   'drupal-canvas-input--checkbox--inwidget-boolean-checkbox': DrupalToggle,
   'drupal-canvas-input--url': DrupalInput,
   'drupal-canvas-input--textfield--inwidget-path': DrupalPathWidget,
