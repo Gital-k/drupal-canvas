@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace Drupal\Tests\canvas\Kernel;
 
 use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\canvas\Routing\ContentTemplateFromPartsParamConverter;
 use Drupal\Core\Url;
-use Drupal\KernelTests\KernelTestBase;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\node\Traits\ContentTypeCreationTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use Drupal\user\UserInterface;
+use PHPUnit\Framework\Attributes\CoversMethod;
+use PHPUnit\Framework\Attributes\Group;
 
 /**
  * Tests access checking for the canvas.boot.content_template route.
@@ -19,10 +21,9 @@ use Drupal\user\UserInterface;
  * generation (not just inbound requests). The converter loads the ContentTemplate
  * from route parameters (entity_type, bundle, view_mode_name), allowing
  * _entity_access to check permissions even when generating URLs.
- *
- * @group canvas
  */
-final class ContentTemplateBootRouteAccessTest extends KernelTestBase {
+#[Group('canvas')]
+final class ContentTemplateBootRouteAccessTest extends CanvasKernelTestBase {
 
   use ContribStrictConfigSchemaTestTrait;
   use ContentTypeCreationTrait;
@@ -64,10 +65,9 @@ final class ContentTemplateBootRouteAccessTest extends KernelTestBase {
    * 2. It constructs the ContentTemplate ID from route parameters
    * 3. It loads the entity, making it available for _entity_access checks
    * 4. Access is granted/denied based on entity permissions
-   *
-   * @covers \Drupal\canvas\Routing\ContentTemplateFromPartsParamConverter::convert
-   * @covers \Drupal\canvas\Routing\ContentTemplateFromPartsParamConverter::applies
    */
+  #[CoversMethod(ContentTemplateFromPartsParamConverter::class, 'convert')]
+  #[CoversMethod(ContentTemplateFromPartsParamConverter::class, 'applies')]
   public function testContentTemplateBootRouteAccess(): void {
     // Create a ContentTemplate for node.article.full.
     $template = ContentTemplate::create([
