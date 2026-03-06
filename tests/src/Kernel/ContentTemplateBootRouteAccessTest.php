@@ -11,7 +11,7 @@ use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\node\Traits\ContentTypeCreationTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use Drupal\user\UserInterface;
-use PHPUnit\Framework\Attributes\CoversMethod;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Group;
 
 /**
@@ -23,6 +23,7 @@ use PHPUnit\Framework\Attributes\Group;
  * _entity_access to check permissions even when generating URLs.
  */
 #[Group('canvas')]
+#[CoversClass(ContentTemplateFromPartsParamConverter::class)]
 final class ContentTemplateBootRouteAccessTest extends CanvasKernelTestBase {
 
   use ContribStrictConfigSchemaTestTrait;
@@ -66,8 +67,6 @@ final class ContentTemplateBootRouteAccessTest extends CanvasKernelTestBase {
    * 3. It loads the entity, making it available for _entity_access checks
    * 4. Access is granted/denied based on entity permissions
    */
-  #[CoversMethod(ContentTemplateFromPartsParamConverter::class, 'convert')]
-  #[CoversMethod(ContentTemplateFromPartsParamConverter::class, 'applies')]
   public function testContentTemplateBootRouteAccess(): void {
     // Create a ContentTemplate for node.article.full.
     $template = ContentTemplate::create([
