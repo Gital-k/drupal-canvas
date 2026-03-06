@@ -118,7 +118,9 @@
   font-weight: 600;
 }
 
-.field-multiple-table td .js-form-type-textfield {
+.field-multiple-table td .js-form-type-textfield,
+.field-multiple-table td .js-form-type-url
+{
   margin-bottom: 0;
 }
 
