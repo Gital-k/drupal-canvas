@@ -1561,8 +1561,18 @@ class PropShapeToFieldInstanceTest extends CanvasKernelTestBase {
             'ℹ︎␜entity:node:foo␝field_event_duration␞␟end_value',
             'ℹ︎␜entity:node:foo␝field_event_duration␞␟value',
           ],
-          'adapter_matches_field_type' => [],
-          'adapter_matches_instance' => [],
+          'adapter_matches_field_type' => [
+            'unix_to_date_time' => [
+              'unix' => 'ℹ︎integer␟value',
+            ],
+          ],
+          'adapter_matches_instance' => [
+            'unix_to_date_time' => [
+              'unix' => [
+                'ℹ︎␜entity:node:foo␝one_from_an_integer_list␞␟value',
+              ],
+            ],
+          ],
         ],
         'optional, type=string&format=duration' => [
           'SDC props' => [

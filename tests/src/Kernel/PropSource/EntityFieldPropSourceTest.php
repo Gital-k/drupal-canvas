@@ -10,6 +10,7 @@ use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Http\Exception\CacheableAccessDeniedHttpException;
 use Drupal\canvas\Plugin\Adapter\UnixTimestampToDateAdapter;
+use Drupal\canvas\Plugin\Adapter\UnixTimestampToDateTimeAdapter;
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
 use Drupal\canvas\PropExpressions\StructuredData\FieldObjectPropsExpression;
 use Drupal\canvas\PropExpressions\StructuredData\FieldPropExpression;
@@ -264,6 +265,42 @@ class EntityFieldPropSourceTest extends PropSourceTestBase {
           ])
           // Cache contexts added by host entity access checking.
           // @see \Drupal\canvas\PropExpressions\StructuredData\Evaluator::validateAccess()
+          ->setCacheContexts(['user.permissions']),
+      ),
+      'expected_user_access_denied_message' => ["Access denied to entity while evaluating expression, ℹ︎␜entity:user␝created␞␟value, reason: The 'access user profiles' permission is required."],
+      'expected_evaluation_with_node_host_entity' => NULL,
+      'expected_node_access_denied_message' => NULL,
+      'expected_dependencies_expression_only' => [
+        'module' => [
+          'user',
+          'canvas',
+        ],
+      ],
+      'expected_dependencies_with_host_entity' => [
+        'module' => [
+          'user',
+          'canvas',
+        ],
+      ],
+    ];
+
+    yield "simple, with date-time adapter: FieldPropExpression" => [
+      'permissions' => ['access user profiles'],
+      'expression' => 'ℹ︎␜entity:user␝created␞␟value',
+      'adapter_plugin_id' => 'unix_to_date_time',
+      'is_required' => TRUE,
+      'expected_array_representation' => [
+        'sourceType' => PropSource::EntityField->value,
+        'expression' => 'ℹ︎␜entity:user␝created␞␟value',
+        'adapter' => UnixTimestampToDateTimeAdapter::PLUGIN_ID,
+      ],
+      'expected_expression_class' => FieldPropExpression::class,
+      'expected_evaluation_with_user_host_entity' => new EvaluationResult(
+        '1992-01-06T11:00:00.000Z',
+        (new CacheableMetadata())
+          ->setCacheTags([
+            'user:1',
+          ])
           ->setCacheContexts(['user.permissions']),
       ),
       'expected_user_access_denied_message' => ["Access denied to entity while evaluating expression, ℹ︎␜entity:user␝created␞␟value, reason: The 'access user profiles' permission is required."],

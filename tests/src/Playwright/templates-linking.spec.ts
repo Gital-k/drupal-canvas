@@ -154,6 +154,7 @@ const suggestionsByProp = {
     'Date Only',
     'Date and time',
   ],
+  test_string_format_date_time: ['Authored on'],
   test_string_html_block: [
     'Body > Processed summary',
     'Body > Body',
@@ -552,6 +553,7 @@ const entityValuesNode4 = {
   'test_string_format_date::Changed': '2025-10-10',
   'test_string_format_date::Date Only': '2011-11-11',
   'test_string_format_date::Date and time': '2010-10-10T10:10:10',
+  'test_string_format_date_time::Authored on': '2025-10-10T12:09:11.000Z',
 };
 
 // Object mapping prop names to their corresponding preview selectors.
@@ -562,6 +564,7 @@ const propNameToSelector = {
   test_string_multiline: '#test-string-multiline',
   test_REQUIRED_string: '#test-required-string',
   test_string_format_date: '#test-string-format-date',
+  test_string_format_date_time: '#test-string-format-date-time',
   test_string_enum: '#test-string-enum',
   test_integer_enum: '#test-integer-enum',
   test_string_format_email: '#test-string-format-email',

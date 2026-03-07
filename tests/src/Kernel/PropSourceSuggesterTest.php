@@ -581,6 +581,11 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
         '⿲sdc_test_all_props:all-props␟test_string_format_date_time' => [
           'required' => FALSE,
           'instances' => [
+            'Authored on' => [
+              'sourceType' => PropSource::EntityField->value,
+              'expression' => 'ℹ︎␜entity:node␝created␞␟value',
+              'adapter' => 'unix_to_date_time',
+            ],
             "field_event_duration → End date value" => [
               'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:node:foo␝field_event_duration␞␟end_value',
@@ -589,8 +594,15 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
               'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:node:foo␝field_event_duration␞␟value',
             ],
+            'Changed' => [
+              'sourceType' => PropSource::EntityField->value,
+              'expression' => 'ℹ︎␜entity:node␝changed␞␟value',
+              'adapter' => 'unix_to_date_time',
+            ],
           ],
-          'adapters' => [],
+          'adapters' => [
+            'UNIX timestamp to date-time' => 'unix_to_date_time',
+          ],
           'host_entity_urls' => [],
         ],
         '⿲sdc_test_all_props:all-props␟test_string_format_date' => [
