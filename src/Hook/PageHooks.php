@@ -33,6 +33,21 @@ use Drupal\pathauto\PathautoState;
  */
 final class PageHooks {
 
+  /**
+   * Default token strings for Canvas page metatags.
+   *
+   * Used as the metatags base field default and in hook_metatags_alter() when
+   * the stored value is empty. Metatag replaces these when generating the page.
+   *
+   * @see https://stackoverflow.com/a/19274942 (image_src / og:image)
+   */
+  private const METATAG_DEFAULT_TOKENS = [
+    'title' => '[canvas_page:title] | [site:name]',
+    'description' => '[canvas_page:description]',
+    'canonical_url' => '[canvas_page:url:absolute]',
+    'image_src' => '[canvas_page:image:entity:field_media_image:entity:url]',
+  ];
+
   public function __construct(
     private readonly ModuleHandlerInterface $moduleHandler,
     private readonly ConfigFactoryInterface $configFactory,
@@ -69,13 +84,7 @@ final class PageHooks {
             'settings' => ['sidebar' => \TRUE, 'use_details' => \TRUE],
           ])
           ->setDisplayConfigurable('form', \TRUE)
-          ->setDefaultValue(Json::encode([
-            'title' => '[canvas_page:title] | [site:name]',
-            'description' => '[canvas_page:description]',
-            'canonical_url' => '[canvas_page:url]',
-            // @see https://stackoverflow.com/a/19274942
-            'image_src' => '[canvas_page:image:entity:field_media_image:entity:url]',
-          ]))
+          ->setDefaultValue(Json::encode(self::METATAG_DEFAULT_TOKENS))
           ->setInternal(\TRUE)
           ->setProvider('metatag');
       }
@@ -93,6 +102,9 @@ final class PageHooks {
    */
   #[Hook('page_attachments')]
   public function pageAttachments(array &$page): void {
+    if ($this->moduleHandler->moduleExists('metatag')) {
+      return;
+    }
     $route_name = $this->routeMatch->getRouteName();
     if ($route_name !== 'entity.canvas_page.canonical' && $route_name !== 'entity.canvas_page.latest_version') {
       return;
@@ -122,17 +134,6 @@ final class PageHooks {
         'canvas_page_description',
       ];
     }
-    // Title
-    $page['#attached']['html_head'][] = [
-      [
-        '#tag' => 'meta',
-        '#attributes' => [
-          'name' => 'title',
-          'content' => $title,
-        ],
-      ],
-      'canvas_page_title',
-    ];
     $image_url = $this->getPageImageUrl($page_entity);
     if ($image_url !== '') {
       $page['#attached']['html_head'][] = [
@@ -212,6 +213,28 @@ final class PageHooks {
   #[Hook('gin_ignore_sticky_form_actions')]
   public function ignoreGinStickyForm(): array {
     return ['canvas_page_form'];
+  }
+
+  /**
+   * Implements hook_metatags_alter().
+   *
+   * When the metatags field has no value for title, description, canonical_url,
+   * or image_src (e.g. for pages created before Metatag was enabled), fills them
+   * with the same default tokens as the base field. Metatag replaces the
+   * tokens when generating the page.
+   */
+  #[Hook('metatags_alter')]
+  public function metatagsAlter(array &$metatags, array &$context): void {
+    $entity = $context['entity'] ?? NULL;
+    if (!$entity instanceof Page || !$entity->id()) {
+      return;
+    }
+
+    foreach (self::METATAG_DEFAULT_TOKENS as $tag => $token_value) {
+      if (empty($metatags[$tag]) || trim((string) $metatags[$tag]) === '') {
+        $metatags[$tag] = $token_value;
+      }
+    }
   }
 
   /**
