@@ -70,10 +70,12 @@ final class RenderSafeComponentContainer extends RenderElementBase implements Co
         throw $e;
       }
       catch (\Throwable $e) {
-        // Check if this exception wraps a FormAjaxException or EnforcedResponseException.
-        // When these exceptions are thrown during inline template rendering,
-        // Twig wraps them in RuntimeError. We need to unwrap and rethrow them
-        // to allow Ajax form submissions to work correctly in component slots.
+        // Check if this exception wraps a FormAjaxException or
+        // EnforcedResponseException.
+        // When these exceptions are thrown during inline template
+        // rendering, Twig wraps them in RuntimeError. We need to unwrap
+        // and rethrow them to allow Ajax form submissions to work
+        // correctly in component slots.
         $previous = $e->getPrevious();
         if ($previous instanceof EnforcedResponseException || $previous instanceof FormAjaxException) {
           throw $previous;
