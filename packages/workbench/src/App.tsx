@@ -43,8 +43,20 @@ const DEFAULT_COMPONENT_VARIANT_ID = '__default__';
 interface ComponentPreviewVariant {
   id: string;
   label: string;
+  mockIndex: number | null;
   source: 'default' | 'mock';
   mock: PreviewManifestComponentMock | null;
+}
+
+function toComponentRoute(
+  componentId: string,
+  mockIndex: number | null,
+): string {
+  if (mockIndex === null) {
+    return `/component/${componentId}`;
+  }
+
+  return `/component/${componentId}/${mockIndex + 1}`;
 }
 
 function getSidebarDefaultOpen(): boolean {
@@ -80,7 +92,11 @@ function pickInitialPage(pages: DiscoveredPage[]): DiscoveredPage | null {
 export function App() {
   const location = useLocation();
   const navigate = useNavigate();
-  const params = useParams<{ slug?: string; componentId?: string }>();
+  const params = useParams<{
+    slug?: string;
+    componentId?: string;
+    mockIndex?: string;
+  }>();
   const [discoveryResult, setDiscoveryResult] =
     useState<DiscoveryResult | null>(null);
   const [previewManifest, setPreviewManifest] =
@@ -91,11 +107,20 @@ export function App() {
   const [iframeKey, setIframeKey] = useState(0);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [sidebarDefaultOpen] = useState(getSidebarDefaultOpen);
-  const [selectedComponentVariantId, setSelectedComponentVariantId] = useState(
-    DEFAULT_COMPONENT_VARIANT_ID,
-  );
 
   const selectedComponentId = params.componentId ?? null;
+  const selectedMockIndex = useMemo<number | null>(() => {
+    if (params.mockIndex === undefined) {
+      return null;
+    }
+
+    const parsedMockIndex = Number(params.mockIndex);
+    if (!Number.isInteger(parsedMockIndex) || parsedMockIndex < 1) {
+      return -1;
+    }
+
+    return parsedMockIndex - 1;
+  }, [params.mockIndex]);
   const selectedPageSlug = params.slug ?? null;
   const isComponentRoute =
     location.pathname === '/component' ||
@@ -175,12 +200,14 @@ export function App() {
       {
         id: DEFAULT_COMPONENT_VARIANT_ID,
         label: 'Default',
+        mockIndex: null,
         source: 'default',
         mock: null,
       },
       ...selectedComponent.mocks.map((mock, index) => ({
         id: mock.id,
         label: `Mock ${index + 1}`,
+        mockIndex: index,
         source: 'mock' as const,
         mock,
       })),
@@ -193,24 +220,18 @@ export function App() {
         return null;
       }
 
+      if (selectedMockIndex === null) {
+        return componentPreviewVariants[0] ?? null;
+      }
+
       return (
         componentPreviewVariants.find(
-          (variant) => variant.id === selectedComponentVariantId,
-        ) ??
-        componentPreviewVariants[0] ??
-        null
+          (variant) => variant.mockIndex === selectedMockIndex,
+        ) ?? null
       );
-    }, [
-      componentPreviewVariants,
-      selectedComponent,
-      selectedComponentVariantId,
-    ]);
+    }, [componentPreviewVariants, selectedComponent, selectedMockIndex]);
 
   const selectedComponentMock = selectedComponentVariant?.mock ?? null;
-
-  useEffect(() => {
-    setSelectedComponentVariantId(DEFAULT_COMPONENT_VARIANT_ID);
-  }, [selectedComponent?.id]);
 
   useEffect(() => {
     let isMounted = true;
@@ -329,6 +350,28 @@ export function App() {
     selectedComponentId,
     selectedPage,
     sortedPages,
+  ]);
+
+  useEffect(() => {
+    if (!selectedComponent) {
+      return;
+    }
+
+    if (selectedMockIndex === null) {
+      return;
+    }
+
+    if (selectedComponentVariant) {
+      return;
+    }
+
+    navigate(toComponentRoute(selectedComponent.id, null), { replace: true });
+  }, [
+    componentPreviewVariants,
+    navigate,
+    selectedComponent,
+    selectedComponentVariant,
+    selectedMockIndex,
   ]);
 
   useEffect(() => {
@@ -576,7 +619,7 @@ export function App() {
                     <SidebarMenuButton
                       isActive={component.id === selectedComponent?.id}
                       onClick={() => {
-                        navigate(`/component/${component.id}`);
+                        navigate(toComponentRoute(component.id, null));
                       }}
                     >
                       <span>{component.name}</span>
@@ -673,7 +716,12 @@ export function App() {
                     }
                     size="xs"
                     onClick={() => {
-                      setSelectedComponentVariantId(variant.id);
+                      navigate(
+                        toComponentRoute(
+                          selectedComponent.id,
+                          variant.mockIndex,
+                        ),
+                      );
                     }}
                   >
                     {variant.label}
