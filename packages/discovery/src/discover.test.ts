@@ -145,6 +145,32 @@ describe('discoverCodeComponents', () => {
     expect(result.components[0].cssEntryPath).toBeNull();
   });
 
+  it('accepts empty array shorthand for props and slots', async () => {
+    const root = await makeTempDir();
+    tempDirs.push(root);
+
+    await writeFile(
+      path.join(root, 'src/navigation/component.yml'),
+      [
+        'name: Navigation',
+        'machineName: navigation',
+        'status: true',
+        'required: []',
+        'props: []',
+        'slots: []',
+      ].join('\n'),
+    );
+    await writeFile(
+      path.join(root, 'src/navigation/index.tsx'),
+      'export default function Navigation() { return null; }',
+    );
+
+    const result = await discoverCodeComponents({ scanRoot: root });
+
+    expect(result.components).toHaveLength(1);
+    expect(result.components[0].name).toBe('navigation');
+  });
+
   it('uses named metadata when both metadata formats exist in same directory', async () => {
     const root = await makeTempDir();
     tempDirs.push(root);

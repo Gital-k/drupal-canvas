@@ -24,6 +24,7 @@ import { fetchDiscoveryResult } from '@wb/lib/discovery-client';
 import { fetchPreviewManifest } from '@wb/lib/preview-client';
 import { isPreviewFrameEvent } from '@wb/lib/preview-contract';
 
+import type { Spec } from '@json-render/core';
 import type {
   DiscoveredComponent,
   DiscoveredPage,
@@ -32,11 +33,19 @@ import type {
 import type {
   PreviewManifest,
   PreviewManifestComponent,
+  PreviewManifestComponentMock,
   PreviewRenderRequest,
 } from '@wb/lib/preview-contract';
-import type { CanvasComponentTree } from 'drupal-canvas/json-render-utils';
 
 const SIDEBAR_COOKIE_NAME = 'sidebar_state';
+const DEFAULT_COMPONENT_VARIANT_ID = '__default__';
+
+interface ComponentPreviewVariant {
+  id: string;
+  label: string;
+  source: 'default' | 'mock';
+  mock: PreviewManifestComponentMock | null;
+}
 
 function getSidebarDefaultOpen(): boolean {
   if (typeof document === 'undefined') {
@@ -82,6 +91,9 @@ export function App() {
   const [iframeKey, setIframeKey] = useState(0);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [sidebarDefaultOpen] = useState(getSidebarDefaultOpen);
+  const [selectedComponentVariantId, setSelectedComponentVariantId] = useState(
+    DEFAULT_COMPONENT_VARIANT_ID,
+  );
 
   const selectedComponentId = params.componentId ?? null;
   const selectedPageSlug = params.slug ?? null;
@@ -153,6 +165,52 @@ export function App() {
 
     return sortedPages.find((page) => page.slug === selectedPageSlug) ?? null;
   }, [isPageRoute, selectedPageSlug, sortedPages]);
+
+  const componentPreviewVariants = useMemo<ComponentPreviewVariant[]>(() => {
+    if (!selectedComponent) {
+      return [];
+    }
+
+    return [
+      {
+        id: DEFAULT_COMPONENT_VARIANT_ID,
+        label: 'Default',
+        source: 'default',
+        mock: null,
+      },
+      ...selectedComponent.mocks.map((mock, index) => ({
+        id: mock.id,
+        label: `Mock ${index + 1}`,
+        source: 'mock' as const,
+        mock,
+      })),
+    ];
+  }, [selectedComponent]);
+
+  const selectedComponentVariant =
+    useMemo<ComponentPreviewVariant | null>(() => {
+      if (!selectedComponent) {
+        return null;
+      }
+
+      return (
+        componentPreviewVariants.find(
+          (variant) => variant.id === selectedComponentVariantId,
+        ) ??
+        componentPreviewVariants[0] ??
+        null
+      );
+    }, [
+      componentPreviewVariants,
+      selectedComponent,
+      selectedComponentVariantId,
+    ]);
+
+  const selectedComponentMock = selectedComponentVariant?.mock ?? null;
+
+  useEffect(() => {
+    setSelectedComponentVariantId(DEFAULT_COMPONENT_VARIANT_ID);
+  }, [selectedComponent?.id]);
 
   useEffect(() => {
     let isMounted = true;
@@ -325,7 +383,7 @@ export function App() {
       selectedComponent?.previewable &&
       selectedComponent.js.url
     ) {
-      const tree: CanvasComponentTree = [
+      const defaultSpec: Spec = canvasTreeToSpec([
         {
           uuid: crypto.randomUUID(),
           parent_uuid: null,
@@ -335,28 +393,63 @@ export function App() {
           inputs: selectedComponent.exampleProps,
           label: null,
         },
-      ];
-      const message: PreviewRenderRequest = {
-        source: 'canvas-workbench-parent',
-        type: 'preview:render',
-        payload: {
-          renderId: selectedComponent.id,
-          spec: canvasTreeToSpec(tree),
-          registrySources: [
+      ]);
+      const specToRender = selectedComponentMock?.spec ?? defaultSpec;
+      const selectedMockRenderId = selectedComponentMock
+        ? `${selectedComponent.id}:${selectedComponentMock.id}`
+        : selectedComponent.id;
+      const registrySources = selectedComponentMock
+        ? (discoveryResult?.components
+            .filter(
+              (
+                component,
+              ): component is DiscoveredComponent & { jsEntryPath: string } =>
+                component.jsEntryPath !== null,
+            )
+            .map(
+              (component: DiscoveredComponent & { jsEntryPath: string }) => ({
+                name: component.name,
+                jsEntryUrl: toViteFsUrl(component.jsEntryPath),
+              }),
+            ) ?? [])
+        : [
             {
               name: selectedComponent.name,
               jsEntryUrl: selectedComponent.js.url,
             },
-          ],
-          cssUrls: [
+          ];
+      const cssUrls = selectedComponentMock
+        ? [
+            ...(previewManifest.globalCssUrl
+              ? [previewManifest.globalCssUrl]
+              : []),
+            ...(discoveryResult?.components ?? [])
+              .filter((component) => component.cssEntryPath !== null)
+              .map((component) => toViteFsUrl(component.cssEntryPath!)),
+          ]
+        : [
             ...(previewManifest.globalCssUrl
               ? [previewManifest.globalCssUrl]
               : []),
             ...(selectedComponent.css.url ? [selectedComponent.css.url] : []),
-          ],
+          ];
+
+      const message: PreviewRenderRequest = {
+        source: 'canvas-workbench-parent',
+        type: 'preview:render',
+        payload: {
+          renderId: selectedMockRenderId,
+          renderType: 'component',
+          spec: specToRender,
+          registrySources,
+          cssUrls,
         },
       };
-      setFrameStatus(`Rendering component ${selectedComponent.name}...`);
+      setFrameStatus(
+        selectedComponentMock
+          ? `Rendering mock ${selectedComponentMock.label} for ${selectedComponent.name}...`
+          : `Rendering component ${selectedComponent.name}...`,
+      );
       frameWindow.postMessage(message, window.location.origin);
       return;
     }
@@ -379,6 +472,7 @@ export function App() {
             type: 'preview:render',
             payload: {
               renderId: selectedPage.slug,
+              renderType: 'page',
               spec: pageSpec,
               registrySources: discoveryResult.components
                 .filter(
@@ -435,6 +529,7 @@ export function App() {
     isPageRoute,
     previewManifest,
     selectedComponent,
+    selectedComponentMock,
     selectedPage,
   ]);
 
@@ -563,6 +658,31 @@ export function App() {
         </header>
 
         <section className="flex min-w-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
+          {selectedComponent && selectedComponent.mocks.length > 0 ? (
+            <section className="rounded-none border p-3">
+              <h3 className="text-sm font-semibold">Component variants</h3>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {componentPreviewVariants.map((variant) => (
+                  <Button
+                    key={variant.id}
+                    type="button"
+                    variant={
+                      variant.id === selectedComponentVariant?.id
+                        ? 'default'
+                        : 'outline'
+                    }
+                    size="xs"
+                    onClick={() => {
+                      setSelectedComponentVariantId(variant.id);
+                    }}
+                  >
+                    {variant.label}
+                  </Button>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
           {selectedKind === null ? (
             <div className="rounded-none border p-4">
               No components or pages were discovered.
@@ -590,10 +710,18 @@ export function App() {
           {selectedComponent ? (
             <section className="rounded-none border p-3">
               <h3 className="text-sm font-semibold">
-                Example props (first examples)
+                {selectedComponentMock
+                  ? `Mock spec (${selectedComponentMock.label})`
+                  : 'Example props (first examples)'}
               </h3>
               <pre className="mt-2 overflow-auto rounded-none bg-black/5 p-2 text-xs">
-                {JSON.stringify(selectedComponent.exampleProps, null, 2)}
+                {JSON.stringify(
+                  selectedComponentMock
+                    ? selectedComponentMock.spec
+                    : selectedComponent.exampleProps,
+                  null,
+                  2,
+                )}
               </pre>
             </section>
           ) : null}
@@ -606,6 +734,10 @@ export function App() {
                   globalCssUrl: previewManifest.globalCssUrl,
                   selectedKind,
                   selectedComponentId: selectedComponent?.id ?? null,
+                  selectedComponentVariantId:
+                    selectedComponentVariant?.id ?? null,
+                  selectedComponentMockSourcePath:
+                    selectedComponentMock?.sourcePath ?? null,
                   selectedPageSlug: selectedPage?.slug ?? null,
                   routePath: location.pathname,
                   selectedJsUrl: selectedComponent?.js.url ?? null,

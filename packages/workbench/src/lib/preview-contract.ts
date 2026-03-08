@@ -26,12 +26,30 @@ export interface PreviewManifestComponent {
   previewable: boolean;
   ineligibilityReason: PreviewIneligibilityReason | null;
   exampleProps: Record<string, unknown>;
+  mocks: PreviewManifestComponentMock[];
+}
+
+export interface PreviewManifestComponentMock {
+  id: string;
+  label: string;
+  sourcePath: string;
+  spec: Spec;
+}
+
+export interface PreviewWarning {
+  code:
+    | DiscoveryWarning['code']
+    | 'invalid_mock_json'
+    | 'invalid_mock_spec_array'
+    | 'invalid_mock_spec_entry';
+  message: string;
+  path?: string;
 }
 
 export interface PreviewManifest {
   scanRoot: string;
   components: PreviewManifestComponent[];
-  warnings: DiscoveryWarning[];
+  warnings: PreviewWarning[];
   globalCssUrl: string | null;
 }
 
@@ -40,6 +58,7 @@ export interface PreviewRenderRequest {
   type: 'preview:render';
   payload: {
     renderId: string;
+    renderType: 'component' | 'page';
     spec: Spec;
     registrySources: Array<{
       name: string;
@@ -102,6 +121,7 @@ export function toPreviewManifestComponent(component: {
       previewable: false,
       ineligibilityReason: 'missing_js_entry',
       exampleProps: {},
+      mocks: [],
     };
   }
 
@@ -122,6 +142,7 @@ export function toPreviewManifestComponent(component: {
       previewable: false,
       ineligibilityReason: 'unsupported_js_extension',
       exampleProps: {},
+      mocks: [],
     };
   }
 
@@ -141,6 +162,7 @@ export function toPreviewManifestComponent(component: {
     previewable: true,
     ineligibilityReason: null,
     exampleProps: {},
+    mocks: [],
   };
 }
 
@@ -177,9 +199,11 @@ export function isPreviewRenderRequest(
     return false;
   }
 
-  const { renderId, spec, registrySources, cssUrls } = value.payload;
+  const { renderId, renderType, spec, registrySources, cssUrls } =
+    value.payload;
   return (
     typeof renderId === 'string' &&
+    (renderType === 'component' || renderType === 'page') &&
     isRecord(spec) &&
     typeof spec.root === 'string' &&
     isRecord(spec.elements) &&

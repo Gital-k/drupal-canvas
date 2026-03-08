@@ -1,0 +1,186 @@
+---
+title: Code components - Workbench mocks
+description: Add component mock specs for tabbed Workbench previews.
+---
+
+Workbench mocks let you preview the same component with multiple prop and slot
+configurations.
+
+Each mock file contains an array of
+[json-render](https://json-render.dev) specs, similar to page specs. Each
+array item becomes a tab in the Workbench preview panel.
+
+## File naming and placement
+
+Workbench supports two mock file patterns, matched to metadata naming:
+
+- index metadata (`component.yml`) -> `mocks.json`
+- named metadata (`<name>.component.yml`) -> `<name>.mocks.json`
+
+Use the same directory as the component metadata and source file.
+
+### Example: index-style component
+
+```text
+src/components/hero/
+  component.yml
+  index.tsx
+  mocks.json
+```
+
+### Example: named component
+
+```text
+src/components/card/
+  card.component.yml
+  card.tsx
+  card.mocks.json
+```
+
+## Spec format
+
+Each entry in the mock array is a full
+[json-render](https://json-render.dev) spec with `root` and `elements`.
+
+In each element, `type` must match a discovered component name. You can use the
+plain discovered name (for example, `hero`) or the `js.` component ID (for
+example, `js.hero`).
+
+Concrete examples:
+
+- If metadata is `src/components/hero/component.yml`, use `hero` or `js.hero`.
+- If metadata is `src/components/pricing-table/component.yml`, use
+  `pricing-table`, `js.pricing-table`, or `js.pricing_table`.
+
+## Example mock files
+
+The following examples are complete files you can copy and adjust.
+
+### `mocks.json` with multiple states
+
+```json
+[
+  {
+    "root": "banner-standard",
+    "elements": {
+      "banner-standard": {
+        "type": "banner",
+        "props": {
+          "title": "Standard banner",
+          "variant": "default"
+        }
+      }
+    }
+  },
+  {
+    "root": "banner-alert",
+    "elements": {
+      "banner-alert": {
+        "type": "banner",
+        "props": {
+          "title": "Service interruption",
+          "variant": "danger"
+        }
+      }
+    }
+  },
+  {
+    "root": "banner-success",
+    "elements": {
+      "banner-success": {
+        "type": "banner",
+        "props": {
+          "title": "Settings saved",
+          "variant": "success"
+        }
+      }
+    }
+  }
+]
+```
+
+Workbench shows these entries as `Mock 1`, `Mock 2`, and `Mock 3`, plus the
+`Default` tab.
+
+### `card.mocks.json` with slot trees
+
+```json
+[
+  {
+    "root": "promo-card",
+    "elements": {
+      "promo-card": {
+        "type": "card",
+        "props": {
+          "tone": "brand"
+        },
+        "slots": {
+          "header": ["card-heading"],
+          "body": ["card-layout"]
+        }
+      },
+      "card-heading": {
+        "type": "heading",
+        "props": {
+          "text": "Limited release"
+        }
+      },
+      "card-layout": {
+        "type": "stack",
+        "children": ["card-copy", "card-cta"]
+      },
+      "card-copy": {
+        "type": "text",
+        "props": {
+          "content": "A short description for this campaign."
+        }
+      },
+      "card-cta": {
+        "type": "button",
+        "props": {
+          "label": "Read more",
+          "href": "/campaign"
+        }
+      }
+    }
+  },
+  {
+    "root": "article-card",
+    "elements": {
+      "article-card": {
+        "type": "card",
+        "props": {
+          "tone": "neutral"
+        },
+        "slots": {
+          "header": ["article-title"],
+          "body": ["article-body"]
+        }
+      },
+      "article-title": {
+        "type": "heading",
+        "props": {
+          "text": "Weekly update"
+        }
+      },
+      "article-body": {
+        "type": "text",
+        "props": {
+          "content": "This card uses a simpler slot tree."
+        }
+      }
+    }
+  }
+]
+```
+
+## Validation and warnings
+
+Workbench validates mock entries before rendering.
+
+- If a file is not valid JSON, Workbench adds a warning.
+- If a file does not contain an array, Workbench adds a warning.
+- If one array entry is invalid, that entry is skipped, and valid entries still
+  render.
+
+Check the Workbench warnings section if a mock tab does not appear.

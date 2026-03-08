@@ -35,6 +35,7 @@ describe('preview-contract', () => {
     expect(component.css.entryPath).toBe('/tmp/src/hero/index.css');
     expect(component.css.url).toBe('/@fs/tmp/src/hero/index.css');
     expect(component.exampleProps).toEqual({});
+    expect(component.mocks).toEqual([]);
   });
 
   it('marks components without JS entries as non-previewable', () => {
@@ -54,6 +55,7 @@ describe('preview-contract', () => {
     expect(component.css.entryPath).toBeNull();
     expect(component.css.url).toBeNull();
     expect(component.exampleProps).toEqual({});
+    expect(component.mocks).toEqual([]);
   });
 
   it('marks unsupported JS extensions as non-previewable', () => {
@@ -103,6 +105,7 @@ describe('preview-contract', () => {
     expect(manifest.components).toHaveLength(1);
     expect(manifest.components[0].previewable).toBe(true);
     expect(manifest.components[0].exampleProps).toEqual({});
+    expect(manifest.components[0].mocks).toEqual([]);
     expect(manifest.globalCssUrl).toBeNull();
     expect(manifest.warnings).toHaveLength(1);
   });
@@ -124,6 +127,7 @@ describe('preview-contract', () => {
         type: 'preview:render',
         payload: {
           renderId: 'id-1',
+          renderType: 'component',
           spec: validSpec,
           registrySources: [
             {
@@ -142,6 +146,7 @@ describe('preview-contract', () => {
         type: 'preview:render',
         payload: {
           renderId: 1,
+          renderType: 'component',
           spec: validSpec,
           registrySources: [],
           cssUrls: [],
@@ -155,6 +160,7 @@ describe('preview-contract', () => {
         type: 'preview:render',
         payload: {
           renderId: 'home',
+          renderType: 'component',
           spec: {
             root: 123,
             elements: {},
@@ -171,6 +177,7 @@ describe('preview-contract', () => {
         type: 'preview:render',
         payload: {
           renderId: 'home',
+          renderType: 'component',
           spec: validSpec,
           registrySources: [
             {
@@ -189,6 +196,7 @@ describe('preview-contract', () => {
         type: 'preview:render',
         payload: {
           renderId: 'home',
+          renderType: 'component',
           spec: validSpec,
           registrySources: [],
           cssUrls: ['/@fs/tmp/file.css', 123],
@@ -202,9 +210,24 @@ describe('preview-contract', () => {
         type: 'preview:render',
         payload: {
           renderId: 'home',
+          renderType: 'component',
           spec: validSpec,
           registrySources: [],
           cssUrls: false,
+        },
+      }),
+    ).toBe(false);
+
+    expect(
+      isPreviewRenderRequest({
+        source: 'canvas-workbench-parent',
+        type: 'preview:render',
+        payload: {
+          renderId: 'home',
+          renderType: 'unknown',
+          spec: validSpec,
+          registrySources: [],
+          cssUrls: [],
         },
       }),
     ).toBe(false);

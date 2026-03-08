@@ -427,7 +427,11 @@ export async function defineComponentRegistry(
         }
         const names = c.name.startsWith('js.')
           ? [c.name]
-          : [c.name, toComponentId(c.name.replace(/-/g, '_').toLowerCase())];
+          : [
+              c.name,
+              toComponentId(c.name.toLowerCase()),
+              toComponentId(c.name.replace(/-/g, '_').toLowerCase()),
+            ];
         return { names, renderFn } as const;
       }),
   );

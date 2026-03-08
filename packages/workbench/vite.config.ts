@@ -13,10 +13,16 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 
 import { discoverCodeComponents } from '../discovery/src/discover';
+import { validateMockSpecArray } from './src/lib/mock-spec';
 import { buildPreviewManifest } from './src/lib/preview-contract';
 
 import type { Plugin } from 'vite';
 import type { DiscoveryResult } from '../discovery/src/types';
+import type {
+  PreviewManifestComponent,
+  PreviewManifestComponentMock,
+  PreviewWarning,
+} from './src/lib/preview-contract';
 
 const require = createRequire(import.meta.url);
 const hostProjectRoot = process.cwd();
@@ -43,6 +49,82 @@ function isPreviewSourcePath(filePath: string): boolean {
 function isTopLevelPageSpecPath(filePath: string): boolean {
   const normalizedPath = filePath.replaceAll('\\', '/');
   return /(^|\/)pages\/[^/]+\.json$/.test(normalizedPath);
+}
+
+function isMockSpecPath(filePath: string): boolean {
+  const normalizedPath = filePath.replaceAll('\\', '/');
+  return (
+    /(^|\/)mocks\.json$/.test(normalizedPath) ||
+    /(^|\/)[^/]+\.mocks\.json$/.test(normalizedPath)
+  );
+}
+
+function toExpectedMockPaths(component: PreviewManifestComponent): string[] {
+  const componentDirectory = path.dirname(component.metadataPath);
+  const metadataFilename = path.basename(component.metadataPath);
+
+  if (metadataFilename === 'component.yml') {
+    return [path.join(componentDirectory, 'mocks.json')];
+  }
+
+  const namedComponentBase = metadataFilename.replace(/\.component\.yml$/, '');
+  return [path.join(componentDirectory, `${namedComponentBase}.mocks.json`)];
+}
+
+async function loadComponentMocks(
+  component: PreviewManifestComponent,
+  scanRoot: string,
+  allComponentNames: string[],
+): Promise<{
+  mocks: PreviewManifestComponentMock[];
+  warnings: PreviewWarning[];
+}> {
+  const expectedMockPaths = toExpectedMockPaths(component);
+  const mocks: PreviewManifestComponentMock[] = [];
+  const warnings: PreviewWarning[] = [];
+
+  for (const mockPath of expectedMockPaths) {
+    let fileContent: string;
+    try {
+      fileContent = await fs.readFile(mockPath, 'utf-8');
+    } catch {
+      continue;
+    }
+
+    let parsedJson: unknown;
+    try {
+      parsedJson = JSON.parse(fileContent);
+    } catch {
+      warnings.push({
+        code: 'invalid_mock_json',
+        message: `Failed to parse mock JSON file: ${mockPath}`,
+        path: mockPath,
+      });
+      continue;
+    }
+
+    const parsed = validateMockSpecArray(parsedJson, mockPath, {
+      componentNames: allComponentNames,
+    });
+    warnings.push(...parsed.warnings);
+
+    const fileLabel = path.basename(mockPath).replace(/\.json$/, '');
+    parsed.specs.forEach((spec, index) => {
+      const id = `${path.relative(scanRoot, mockPath).replaceAll('\\', '/')}#${index}`;
+      mocks.push({
+        id,
+        label:
+          parsed.specs.length > 1 ? `${fileLabel} ${index + 1}` : fileLabel,
+        sourcePath: mockPath,
+        spec,
+      });
+    });
+  }
+
+  return {
+    mocks,
+    warnings,
+  };
 }
 
 function canvasWorkbenchDiscovery(): Plugin {
@@ -122,14 +204,36 @@ function canvasWorkbenchDiscovery(): Plugin {
           await refresh();
 
           const manifest = buildPreviewManifest(cachedResult!);
-          manifest.components = await Promise.all(
-            manifest.components.map(async (component) => ({
-              ...component,
-              exampleProps: await extractFirstExamplePropsFromComponentYaml(
-                component.metadataPath,
-              ),
-            })),
+          const discoveredComponentNames = manifest.components.map(
+            (component) => component.name,
           );
+          const componentMocksAndExamples = await Promise.all(
+            manifest.components.map(async (component) => {
+              const { mocks, warnings } = await loadComponentMocks(
+                component,
+                manifest.scanRoot,
+                discoveredComponentNames,
+              );
+              return {
+                component: {
+                  ...component,
+                  exampleProps: await extractFirstExamplePropsFromComponentYaml(
+                    component.metadataPath,
+                  ),
+                  mocks,
+                },
+                warnings,
+              };
+            }),
+          );
+
+          manifest.components = componentMocksAndExamples.map(
+            ({ component }) => component,
+          );
+          manifest.warnings = [
+            ...manifest.warnings,
+            ...componentMocksAndExamples.flatMap(({ warnings }) => warnings),
+          ];
 
           res.statusCode = 200;
           res.setHeader('Content-Type', 'application/json');
@@ -181,12 +285,19 @@ function canvasWorkbenchDiscovery(): Plugin {
         const metadataChanged = isComponentMetadataPath(filePath);
         const sourceChanged = isPreviewSourcePath(filePath);
         const pageChanged = isTopLevelPageSpecPath(filePath);
-        if (!metadataChanged && !sourceChanged && !pageChanged) {
+        const mockChanged = isMockSpecPath(filePath);
+        if (
+          !metadataChanged &&
+          !sourceChanged &&
+          !pageChanged &&
+          !mockChanged
+        ) {
           return;
         }
 
         const requiresManifestRefresh =
           metadataChanged ||
+          mockChanged ||
           pageChanged ||
           (sourceChanged && event !== 'change');
         if (!requiresManifestRefresh) {

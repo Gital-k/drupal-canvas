@@ -8,6 +8,13 @@ Storybook, but focused on Drupal Canvas Code Components and Canvas pages.
 Provide a complete local Drupal Canvas preview experience for Code Components
 and Canvas Pages built with Code Components from source code alone.
 
+## User docs
+
+For end-user guidance, see the Workbench chapter in `docs/user`:
+
+- [Workbench introduction](../../docs/user/src/content/docs/code-components/workbench/index.mdx)
+- [Adding mocks](../../docs/user/src/content/docs/code-components/workbench/mocks.mdx)
+
 ## What we are testing
 
 - Run a local Vite + React app that scans your local codebase.
