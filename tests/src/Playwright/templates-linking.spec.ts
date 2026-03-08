@@ -154,7 +154,12 @@ const suggestionsByProp = {
     'Date Only',
     'Date and time',
   ],
-  test_string_format_date_time: ['Authored on'],
+  test_string_format_date_time: [
+    'Authored on',
+    'Changed',
+    'Date Only',
+    'Date and time',
+  ],
   test_string_html_block: [
     'Body > Processed summary',
     'Body > Body',
@@ -174,6 +179,7 @@ const suggestionsByProp = {
 
 const suggestionsToLinkByProp = {
   test_string_format_date: ['Authored on'],
+  test_string_format_date_time: ['Authored on'],
 };
 
 // cspell:ignore Bwidth Fitok treehouse
