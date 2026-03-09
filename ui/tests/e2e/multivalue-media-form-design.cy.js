@@ -233,4 +233,50 @@ describe('Multivalue Media Form Design (canvas_dev_mode)', () => {
       expect(alt).to.equal(firstAlt);
     });
   });
+
+  it('shows cardinality message for limited media field', () => {
+    cy.loadURLandWaitForCanvasLoaded({ url: 'canvas/editor/node/2' });
+    cy.findByTestId('canvas-page-data-form').as('entityForm');
+    cy.get('@entityForm').recordFormBuildId();
+
+    // field_cvt_limited_media has cardinality 2 and is seeded with 2 items,
+    // so remaining = 0 → Drupal renders the "maximum selected" message.
+    cy.get('[data-drupal-selector="edit-field-cvt-limited-media"]').as(
+      'limited-media',
+    );
+
+    cy.get('@limited-media')
+      .find('.js-media-library-item')
+      .should('have.length', 2);
+
+    // Verify "maximum selected" message is shown.
+    cy.get('@limited-media')
+      .find('.description')
+      .should('contain.text', 'The maximum number of media items have been selected.');
+
+    // Remove one item — this triggers AJAX which re-renders the widget
+    // with remaining = 1 and updates the description.
+    cy.intercept('POST', '**/canvas/api/v0/layout/**').as('updatePreview');
+
+    cy.get('@limited-media')
+      .find('.js-media-library-item')
+      .first()
+      .find('[data-canvas-media-remove-button]')
+      .click();
+
+    cy.selectorShouldHaveUpdatedFormBuildId(
+      '[data-testid="canvas-page-data-form"]',
+    );
+    cy.wait('@updatePreview');
+    cy.findByLabelText('Loading Preview').should('not.exist');
+
+    cy.get('@limited-media')
+      .find('.js-media-library-item')
+      .should('have.length', 1);
+
+    // Verify "1 media item remaining" message is now shown.
+    cy.get('@limited-media')
+      .find('.description')
+      .should('contain.text', 'One media item remaining.');
+  });
 });
