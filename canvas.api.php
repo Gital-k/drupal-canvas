@@ -109,7 +109,8 @@ function hook_canvas_storable_prop_shape_alter(CandidateStorablePropShape $stora
  * import map used by Canvas code components. The import map follows the
  * standard import map specification structure.
  *
- * For global imports cache-busting query strings are appended after this hook fires.
+ * For global imports cache-busting query strings are appended after this hook
+ * fires.
  *
  * @param array $import_maps
  *   The import map array following the import map spec structure:
