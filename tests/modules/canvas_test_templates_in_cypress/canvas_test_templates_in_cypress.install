@@ -21,7 +21,6 @@ use Drupal\taxonomy\Entity\Term;
 use Drupal\taxonomy\Entity\Vocabulary;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\Core\File\FileExists;
-use Drupal\Core\File\FileSystemInterface;
 
 // cspell:ignore treehouse
 
@@ -583,7 +582,7 @@ function _canvas_test_templates_create_media_entities(): array {
     // Create Media entity if it has a media UUID.
     if ($image_info['media_uuid']) {
       // Get actual image dimensions from the file.
-      $image_dimensions = is_string($file->getFileUri()) ?  @getimagesize($file->getFileUri()) : [];
+      $image_dimensions = is_string($file->getFileUri()) ? @getimagesize($file->getFileUri()) : [];
       $width = $image_dimensions ? $image_dimensions[0] : NULL;
       $height = $image_dimensions ? $image_dimensions[1] : NULL;
 
