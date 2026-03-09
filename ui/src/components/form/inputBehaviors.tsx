@@ -21,7 +21,6 @@ import {
   setFieldValue,
 } from '@/features/form/formStateSlice';
 import { AJAX_UPDATE_FORM_BUILD_ID_EVENT } from '@/types/Ajax';
-import { VALUE_THAT_MEANS_REMOVE } from '@/utils/function-utils';
 import { isAjaxing } from '@/utils/isAjaxing';
 
 import type { PropsValues } from '@drupal-canvas/types';
@@ -189,28 +188,6 @@ export const InputBehaviorsCommon = ({
         elementType === 'checkbox' ? !!inputValue : inputValue,
       );
     }
-    // When a tracked hidden input is removed from the DOM (e.g., media library
-    // remove button AJAX rebuild), flag its value for removal so the transform
-    // chain can trigger the fallback to example/default values via
-    // flaggedForRemoval. Only applies to hidden inputs with
-    // data-track-hidden-value — regular visible inputs don't need cleanup
-    // because they always re-render with their current value.
-    return () => {
-      if (
-        fieldName &&
-        formId &&
-        fieldName !== 'form_build_id' &&
-        elementType === 'hidden' &&
-        attributes['data-track-hidden-value']
-      ) {
-        dispatchFieldValue(
-          dispatch,
-          formId,
-          fieldName,
-          VALUE_THAT_MEANS_REMOVE,
-        );
-      }
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
