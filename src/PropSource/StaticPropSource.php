@@ -513,12 +513,23 @@ final class StaticPropSource extends PropSourceBase {
     // and doesn't lose them. Only initialize when there are actual items to
     // preserve.
     // @see \Drupal\media_library\Plugin\Field\FieldWidget\MediaLibraryWidget::form()
+    // @see \Drupal\media_library\Plugin\Field\FieldWidget\MediaLibraryWidget::addItems()
     if ($widget->getPluginId() === 'media_library_widget' && !$this->fieldItemList->isEmpty()) {
       $field_name = $field_definition->getName();
       $widget_state = $widget::getWidgetState($form['#parents'] ?? [], $field_name, $form_state);
       if (!isset($widget_state['items'])) {
-        // Initialize with current field value (existing items only)
-        $widget_state['items'] = $field->getValue();
+        // Initialize with current field values including weight, matching the
+        // structure that MediaLibraryWidget::addItems() uses. The weight is
+        // required for usort() in MediaLibraryWidget::form() and for correctly
+        // calculating the next weight when adding new items.
+        $items = [];
+        foreach ($field->getValue() as $delta => $value) {
+          $items[] = [
+            'target_id' => $value['target_id'] ?? NULL,
+            'weight' => $delta,
+          ];
+        }
+        $widget_state['items'] = $items;
         $widget::setWidgetState($form['#parents'] ?? [], $field_name, $form_state, $widget_state);
       }
     }
