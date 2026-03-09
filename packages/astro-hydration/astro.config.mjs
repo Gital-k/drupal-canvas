@@ -70,21 +70,29 @@ export default defineConfig({
           const buildOnly = pkg.canvas?.buildOnly ?? [];
           const importMapLibraries = Object.keys(pkg.dependencies)
             .filter(dep => !buildOnly.includes(dep));
-          
+
           // Check if id matches an import map library. Handle:
           // - Bare specifiers: "clsx", "preact"
           // - Subpath imports: "preact/hooks", "drupal-canvas/utils"
           // - Full paths: ".../node_modules/clsx/dist/clsx.mjs"
-          const matchedLibrary = importMapLibraries.find(lib => 
-            id === lib || 
+          const matchedLibrary = importMapLibraries.find(lib =>
+            id === lib ||
             id.startsWith(`${lib}/`) ||
             id.includes(`/node_modules/${lib}/`)
           );
-          
+
           if (matchedLibrary) {
             // Bundle if imported directly from astro-hydration source.
             if (parent?.includes(path.resolve(__dirname, 'src/'))) {
               return false;
+            }
+            // Preact subpaths are separate output chunks (each with its own
+            // import map entry). Their internal imports must use bare specifiers
+            // so they don't bypass the import map.
+            if (matchedLibrary === 'preact' &&
+                parent?.includes('/node_modules/preact/') &&
+                (id === 'preact' || id === 'preact/hooks' || id === 'preact/compat')) {
+              return true;
             }
             // Bundle if it's an internal import within the same package (e.g.,
             // swr/dist/_internal imported by swr/dist/index).
