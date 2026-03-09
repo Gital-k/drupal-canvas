@@ -614,6 +614,7 @@ playwright:
   image: ghcr.io/drupal-canvas/drupal-testing:1.0.0
   extends:
     - .test-variables
+  parallel: 4
   variables:
     GIT_DEPTH: 1
     _TARGET_DB_TYPE: sqlite
@@ -626,7 +627,7 @@ playwright:
     - composer run install-dev-deps
   script:
     - npm ci
-    - npm run test:playwright | tee $CI_PROJECT_DIR/playwright.log || EXIT_CODE=$?
+    - npm run test:playwright -- --shard=$CI_NODE_INDEX/$CI_NODE_TOTAL | tee $CI_PROJECT_DIR/playwright.log || EXIT_CODE=$?
     # Auto-retry when a single failure occurs (because only "3 failed" suggests a systemic failure: a failure on all 3
     # browsers. Any human would manually click "retry", so automate it).
     - grep "1 failed" $CI_PROJECT_DIR/playwright.log && exit 112 || true
