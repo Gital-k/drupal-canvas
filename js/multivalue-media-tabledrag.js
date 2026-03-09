@@ -21,7 +21,16 @@
    */
   function updateWeights(container) {
     Array.from(container.children).forEach((child, index) => {
-      const w = child.querySelector('.js-media-library-item-weight');
+      // In canvas_stark, input.html.twig renders all inputs as
+      // <drupal-canvas-input>. After HyperscriptifyAdditional processes it,
+      // the original element is *removed* from the DOM and replaced by a
+      // <drupal-html-fragment> containing the React-rendered <input>. The
+      // class js-media-library-item-weight is lost in this process.
+      // The weight field is the only type="number" input per item, so we
+      // locate it that way.
+      const w =
+        child.querySelector('input[type="number"]') ||
+        child.querySelector('.js-media-library-item-weight');
       if (w) w.value = index;
     });
   }
@@ -88,6 +97,7 @@
             handle: isCanvas
               ? '.canvas-media-drag-handle'
               : '.js-media-library-item-preview',
+            forceFallback: true,
             onEnd() {
               updateWeights(el);
             },

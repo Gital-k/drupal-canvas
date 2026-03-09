@@ -341,6 +341,50 @@ function canvas_test_article_fields_install(): void {
         ['value' => 'Marshmallow Coast'],
       ],
     ],
+    'field_cvt_unlimited_media' => [
+      'type' => 'entity_reference',
+      'label' => 'Canvas Unlimited Media',
+      'settings' => [
+        'target_type' => 'media',
+        'handler' => 'default:media',
+        'handler_settings' => [
+          'target_bundles' => ['image' => 'image'],
+          'sort' => ['field' => '_none'],
+          'auto_create' => FALSE,
+          'auto_create_bundle' => '',
+        ],
+      ],
+      'cardinality' => -1,
+      'widget' => [
+        'type' => 'media_library_widget',
+        'weight' => -999,
+        'settings' => [
+          'media_types' => [],
+        ],
+      ],
+    ],
+    'field_cvt_media' => [
+      'type' => 'entity_reference',
+      'label' => 'Canvas Single Media',
+      'settings' => [
+        'target_type' => 'media',
+        'handler' => 'default:media',
+        'handler_settings' => [
+          'target_bundles' => ['image' => 'image'],
+          'sort' => ['field' => '_none'],
+          'auto_create' => FALSE,
+          'auto_create_bundle' => '',
+        ],
+      ],
+      'cardinality' => 1,
+      'widget' => [
+        'type' => 'media_library_widget',
+        'weight' => -998,
+        'settings' => [
+          'media_types' => [],
+        ],
+      ],
+    ],
     'field_cvt_boolean_checkbox' => [
       'type' => 'boolean',
       'label' => 'Canvas Boolean Checkbox (default true)',
@@ -532,6 +576,7 @@ function canvas_test_article_fields_install(): void {
     $role->grantPermission('view all revisions');
     $role->grantPermission('view any unpublished content');
     $role->grantPermission('view latest version');
+    $role->grantPermission('view media');
     $role->save();
   }
 
@@ -546,6 +591,19 @@ function canvas_test_article_fields_install(): void {
         continue;
       }
       $node->set($field_name, $default_value);
+    }
+    // Seed the unlimited media field with the first two image media entities.
+    if ($node->hasField('field_cvt_unlimited_media')) {
+      $media_entities = \Drupal::entityTypeManager()
+        ->getStorage('media')
+        ->loadByProperties(['bundle' => 'image']);
+      $media_ids = \array_slice(\array_keys($media_entities), 0, 2);
+      if (!empty($media_ids)) {
+        $node->set('field_cvt_unlimited_media', \array_map(
+          static fn($id) => ['target_id' => $id],
+          $media_ids,
+        ));
+      }
     }
     $node->save();
   }
