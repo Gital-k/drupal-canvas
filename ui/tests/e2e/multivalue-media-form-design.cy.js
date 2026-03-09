@@ -19,6 +19,7 @@
  *       [data-canvas-media-remove-button] ← remove button
  */
 
+// @todo Remove the canvas_dev_mode condition as part of https://www.drupal.org/node/3577946
 describe('Multivalue Media Form Design (canvas_dev_mode)', () => {
   before(() => {
     cy.drupalCanvasInstall(['canvas_test_article_fields', 'canvas_dev_mode']);

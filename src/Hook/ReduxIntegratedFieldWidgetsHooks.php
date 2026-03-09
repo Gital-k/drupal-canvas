@@ -125,6 +125,7 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
 
       // Mark multivalue media fields so templates can conditionally render
       // the drag handle icon.
+      // @todo Remove as part of https://www.drupal.org/node/3577946
       if ($this->moduleHandler->moduleExists('canvas_dev_mode')) {
         $field_definition = $context['items']->getFieldDefinition();
         if ($field_definition->getFieldStorageDefinition()->isMultiple()) {
