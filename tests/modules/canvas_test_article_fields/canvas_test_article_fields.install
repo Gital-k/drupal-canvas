@@ -343,11 +343,6 @@ function canvas_test_article_fields_install(): void {
           'title' => 'Drupal',
           'options' => [],
         ],
-        [
-          'uri' => '',
-          'title' => '',
-          'options' => [],
-        ],
       ],
     ],
     'field_cvt_unlimited_text' => [
