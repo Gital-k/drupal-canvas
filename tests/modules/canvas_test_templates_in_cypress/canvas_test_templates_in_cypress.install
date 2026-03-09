@@ -572,6 +572,7 @@ function _canvas_test_templates_create_media_entities(): array {
     // Create File entity from the test file.
     $file = File::create([
       'uuid' => $image_info['uuid'],
+      // @phpstan-ignore-next-line
       'uri' => $test_file->uri,
       'status' => 1,
       'uid' => 2,
@@ -582,7 +583,7 @@ function _canvas_test_templates_create_media_entities(): array {
     // Create Media entity if it has a media UUID.
     if ($image_info['media_uuid']) {
       // Get actual image dimensions from the file.
-      $image_dimensions = @getimagesize($file->getFileUri());
+      $image_dimensions = is_string($file->getFileUri()) ?  @getimagesize($file->getFileUri()) : [];
       $width = $image_dimensions ? $image_dimensions[0] : NULL;
       $height = $image_dimensions ? $image_dimensions[1] : NULL;
 
@@ -640,7 +641,7 @@ function _canvas_test_templates_get_test_files(string $type): array {
 
   // Now scan public:// for the test files.
   $files = [];
-  if (in_array($type, ['binary', 'html', 'image', 'javascript', 'php', 'sql', 'text'])) {
+  if (in_array($type, ['binary', 'html', 'image', 'javascript', 'php', 'sql', 'text'], TRUE)) {
     $files = $file_system->scanDirectory('public://', '/' . $type . '\-.*/');
   }
 
@@ -826,7 +827,7 @@ function canvas_test_templates_in_cypress_uninstall(): void {
   ];
 
   foreach ($field_storages as $field_storage) {
-    if (\in_array($field_storage->getName(), $fields_to_delete)) {
+    if (\in_array($field_storage->getName(), $fields_to_delete, TRUE)) {
       $field_storage->delete();
     }
   }

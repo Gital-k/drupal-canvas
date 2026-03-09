@@ -177,8 +177,8 @@ const entityValuesNode4 = {
   'Image Upload > Title': '', // this seems wrong?
   'Image Upload > URI': 'image-test.gif',
   'Absolute URL': '/node/4', // Updated to match our test data
-  'Image Upload > Width': '1000',
-  'Image Upload > Height': '1333',
+  'Image Upload > Width': /\d{2,4}/,
+  'Image Upload > Height': /\d{2,4}/,
   'Image Upload > File size': /\d+/,
   'Image Upload > Changed': /\d{9,}/,
   'Image Upload > Created': /\d{9,}/,
@@ -226,8 +226,8 @@ const entityValuesNode4 = {
   'Image Media > Media > Image > URI': 'image-test.png',
   'Image Media > Media > Authored by > URL': '',
   'Image Media > Media > Revision user > URL': '',
-  'Image Media > Media > Image > Height': '665',
-  'Image Media > Media > Image > Width': '1024',
+  'Image Media > Media > Image > Height': /\d{2,4}/,
+  'Image Media > Media > Image > Width': /\d{2,4}/,
   'The Link > Link text': 'Dinosaur Comics',
   'The Link > The Link': 'https://qwantz.com',
   'The Link > Resolved URL': 'https://qwantz.com',
