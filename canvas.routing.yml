@@ -513,6 +513,8 @@ canvas.api.layout.get.content_template:
         # @see \Drupal\canvas\Routing\ContentTemplatePreviewEntityConverter
         type: canvas_content_template_preview_entity
 
+# @see \Drupal\canvas\EventSubscriber\ClientDataModelOperationRouteSubscriber
+# @todo Make this a redirect and trigger a deprecation error?
 canvas.api.layout.patch: &layout_patch_route
   path: '/canvas/api/v0/layout/{entity_type}/{entity}'
   defaults:
@@ -520,7 +522,8 @@ canvas.api.layout.patch: &layout_patch_route
     # We need a title callback because we use the HTML renderer to generate the preview.
     _title_callback: 'Drupal\canvas\Controller\ApiLayoutController::getLabel'
   requirements:
-    <<: *layout_get_route_requirements
+    _canvas_component_tree_edit_access: TRUE
+    _entity_access: 'entity.update'
   options:
     _canvas_use_template_draft: TRUE
     parameters:

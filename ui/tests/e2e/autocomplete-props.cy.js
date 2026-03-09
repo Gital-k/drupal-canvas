@@ -82,7 +82,7 @@ describe('Prop with autocomplete', () => {
       'have.text',
       'Canvas With a block in the layout',
     );
-    cy.intercept('PATCH', '**/canvas/api/layout/node/1').as('patchPreview');
+    cy.intercept('PATCH', '**/canvas/api/layout/**/node/1').as('patchPreview');
     cy.get('ul.ui-autocomplete li').click();
     cy.get('@linkField').should('have.attr', 'value', 'entity:node/3');
 

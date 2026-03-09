@@ -15,11 +15,15 @@ import { handleAutoSavesHashUpdate } from '@/utils/autoSaves';
 import type { RootState } from '@/app/store';
 import type {
   ComponentModel,
+  DuplicateNodePayload,
   EvaluatedComponentModel,
+  InsertMultipleNodesPayload,
+  MoveNodePayload,
+  NodeParentPosition,
   PropSource,
   ResolvedValues,
+  ShiftNodePayload,
 } from '@/features/layout/layoutModelSlice';
-import type { EditorFrameContext } from '@/features/ui/uiSlice';
 import type { ConflictError } from '@/services/pendingChangesApi';
 import type { AutoSavesHash } from '@/types/AutoSaves';
 import type { InputUIData } from '@/types/Form';
@@ -32,12 +36,48 @@ export type UpdateComponentResultType = {
   errors?: Array<ConflictError>;
 };
 
-export type UpdateComponentQueryArg = {
-  type: EditorFrameContext;
+interface MoveNodeQueryArg extends MoveNodePayload, NodeParentPosition {
+  operation: 'move-node';
+}
+
+interface ShiftNodeQueryArg extends ShiftNodePayload {
+  operation: 'shift-node';
+}
+
+interface DeleteNodeQueryArg {
+  operation: 'delete-node';
+  componentInstanceUuid: string;
+}
+
+interface DuplicateNodeQueryArg extends DuplicateNodePayload {
+  operation: 'duplicate-node';
+  uuidMap: Record<string, string>;
+}
+
+interface InsertNodesQueryArg
+  extends InsertMultipleNodesPayload, NodeParentPosition {
+  operation: 'insert-nodes';
+}
+
+// @todo Split this up to only modify a single prop, not the
+//   whole model.
+type UpdateComponentQueryArg = {
+  operation: 'update-model';
   componentInstanceUuid: string;
   componentType: string;
   model: Omit<ComponentModel, 'name'> | Omit<EvaluatedComponentModel, 'name'>;
 };
+
+export type PatchLayoutAndModelQueryArg =
+  | UpdateComponentQueryArg
+  | InsertNodesQueryArg
+  | DeleteNodeQueryArg
+  | ShiftNodeQueryArg
+  | MoveNodeQueryArg
+  | DuplicateNodeQueryArg;
+
+// Re-export for backward compatibility
+export type { UpdateComponentQueryArg };
 
 export const previewApi = createApi({
   reducerPath: 'previewApi',
@@ -126,29 +166,26 @@ export const previewApi = createApi({
     }),
     updateComponent: builder.mutation<
       UpdateComponentResultType,
-      UpdateComponentQueryArg
+      PatchLayoutAndModelQueryArg
     >({
-      query: ({ type, ...body }) => {
-        let url = '';
-        if (type === 'entity') {
-          url = 'canvas/api/v0/layout/{entity_type}/{entity_id}';
-        } else if (type === 'template') {
-          url =
-            'canvas/api/v0/layout-content-template/{entity_type}.{template_bundle}.{template_view_mode}/{entity_id}';
-        }
-        return {
-          url,
-          method: 'PATCH',
-          body,
-        };
-      },
-      async onQueryStarted(body, { dispatch, queryFulfilled }) {
+      query: ({ operation, ...body }) => ({
+        url: `canvas/api/v0/layout/${operation}/{entity_type}/{entity_id}`,
+        method: 'PATCH',
+        body,
+        autoSaveUrlKey: `canvas/api/v0/layout/{entity_type}/{entity_id}`,
+      }),
+      async onQueryStarted(body, { dispatch, queryFulfilled, getState }) {
         // Force any ajax calls to wait.
         pushCanvasLayoutRequest();
+        const {
+          configuration: { entityType, entity },
+        } = getState() as RootState;
+        const autoSaveKey = `canvas/api/v0/layout/{entity_type}/{entity_id}`
+          .replace('{entity_type}', entityType)
+          .replace('{entity_id}', entity);
         let data: any;
-        let meta: any;
         try {
-          ({ data, meta } = await queryFulfilled);
+          ({ data } = await queryFulfilled);
         } catch {
           // If the request fails (e.g. the server rejects an invalid field
           // value), we must still release the lock so that subsequent Drupal
@@ -170,7 +207,11 @@ export const previewApi = createApi({
         // preview snapshot, which selectPreviewHtml prefers while set.
         dispatch(setSnapshotHTML(''));
         dispatch(setHtml(html));
-        handleAutoSavesHashUpdate(dispatch, autoSaves, meta);
+        handleAutoSavesHashUpdate(dispatch, autoSaves, {
+          request: {
+            url: autoSaveKey,
+          },
+        });
         // Pass update preview false to prevent a subsequent preview update,
         // we have the data here.
         dispatch(setLayoutModel({ layout, model, updatePreview: false }));
@@ -202,15 +243,10 @@ export const usePatchComponent = () => {
     inputUIData: InputUIData,
     model: UpdateComponentQueryArg['model'],
   ) => {
-    const {
-      selectedComponent,
-      selectedComponentType,
-      version,
-      editorFrameContext,
-    } = inputUIData;
+    const { selectedComponent, selectedComponentType, version } = inputUIData;
 
-    const arg = {
-      type: editorFrameContext,
+    const arg: UpdateComponentQueryArg = {
+      operation: 'update-model',
       componentInstanceUuid: selectedComponent,
       componentType: `${selectedComponentType}@${version}`,
       model,
@@ -248,13 +284,8 @@ export const usePatchProp = () => {
     sourceValue: PropSource | PropSource['value'],
     resolvedValue: ResolvedValues[string],
   ) => {
-    const {
-      selectedComponent,
-      selectedComponentType,
-      version,
-      editorFrameContext,
-      model,
-    } = inputUIData;
+    const { selectedComponent, selectedComponentType, version, model } =
+      inputUIData;
 
     const selectedModel = model?.[selectedComponent];
     if (!selectedModel || !('source' in selectedModel)) {
@@ -262,7 +293,7 @@ export const usePatchProp = () => {
     }
 
     return updateComponent({
-      type: editorFrameContext,
+      operation: 'update-model',
       componentInstanceUuid: selectedComponent,
       componentType: `${selectedComponentType}@${version}`,
       model: {

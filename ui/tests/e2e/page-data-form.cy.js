@@ -54,7 +54,9 @@ describe('Page data form', () => {
     cy.get('@layersTree').findByText('Two Column').should('exist');
     cy.get('button[aria-label="Redo"]').should('be.enabled');
 
-    cy.intercept('PATCH', '**/canvas/api/v0/layout/node/1').as('patchPreview');
+    cy.intercept('PATCH', '**/canvas/api/v0/layout/**/node/1').as(
+      'patchPreview',
+    );
     // Switch back to component instance form.
     cy.clickComponentInPreview('Hero');
     cy.findByTestId('canvas-contextual-panel--settings').click();

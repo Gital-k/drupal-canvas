@@ -179,7 +179,7 @@ describe('Contextual panel', () => {
     cy.loadURLandWaitForCanvasLoaded();
 
     // Extra debug output for component patching.
-    cy.intercept('PATCH', '**/canvas/api/v0/layout/node/1');
+    cy.intercept('PATCH', '**/canvas/api/v0/layout/**/node/1');
 
     // Make note of the number of Hero components currently in the preview.
     cy.getIframeBody()

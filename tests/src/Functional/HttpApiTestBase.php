@@ -136,7 +136,7 @@ abstract class HttpApiTestBase extends FunctionalTestBase {
     // Because the 'autoSaveStartingPoint`, which is returned from the
     // $auto_save_url GET request, is created using the saved entity in addition
     // to the auto-save entry we need to expect the cache tags of the entity.
-    // @see \Drupal\canvas\Controller\AutoSaveValidateTrait::getClientAutoSaveData()
+    // @see \Drupal\canvas\AutoSave\AutoSaveManager::getClientAutoSaveData()
     $entity = $this->container->get(EntityTypeManagerInterface::class)->getStorage($entity_type_id)->load($entity_id);
     $cacheTags = [AutoSaveManager::CACHE_TAG, 'http_response'];
     if ($entity instanceof EntityInterface) {

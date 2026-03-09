@@ -49,9 +49,18 @@ import { rtkQueryErrorHandler } from '@/utils/rtkQuery-error';
 
 import type { Action, Middleware, ThunkAction } from '@reduxjs/toolkit';
 import type { UnknownAction } from 'redux';
-import type { LayoutModelSliceState } from '@/features/layout/layoutModelSlice';
+import type {
+  DeleteNodeAction,
+  DuplicateNodeAction,
+  InsertNodesAction,
+  LayoutModelSliceState,
+  MoveNodeAction,
+  PatchLayoutAction,
+  ShiftNodeAction,
+} from '@/features/layout/layoutModelSlice';
 import type { PageDataState } from '@/features/pageData/pageDataSlice';
 import type { UndoRedoStackItem, UndoRedoType } from '@/features/ui/uiSlice';
+import type { PatchLayoutAndModelQueryArg } from '@/services/preview';
 
 // Reducer enhancer to decorate undoable aware reducers and unset future state
 // if an action is performed on another undoable slice.
@@ -180,6 +189,8 @@ const undoRedoActionIdMiddleware: Middleware<{}, RootState> =
     if (matchesUndoRedo && matchesUndoRedo.length === 2) {
       const id = uuidv4();
       const [, undoOrRedo] = matchesUndoRedo;
+      // @todo implement history rewriting per
+      //    https://madebyevan.com/figma/how-figmas-multiplayer-technology-works/#implementing-undo
       store.dispatch(performUndoOrRedo(undoOrRedo === 'UNDO'));
       store.dispatch(setLatestUndoRedoActionId(id));
       return next({
@@ -228,6 +239,77 @@ const undoRedoActionIdMiddleware: Middleware<{}, RootState> =
     return next(action);
   };
 
+const patchLayoutMiddleware: Middleware<{}, RootState> = ((store) =>
+  (next) =>
+  (action) => {
+    const isPatchLayoutAction = (action: Action): action is PatchLayoutAction =>
+      action.type.match(
+        /^layoutModel\/(duplicateNode|insertNodes|moveNode|shiftNode|deleteNode)$/,
+      ) !== null;
+    const isDuplicateNodeAction = (
+      action: PatchLayoutAction,
+    ): action is DuplicateNodeAction =>
+      action.type === 'layoutModel/duplicateNode';
+    const isInsertNodesAction = (
+      action: PatchLayoutAction,
+    ): action is InsertNodesAction => action.type === 'layoutModel/insertNodes';
+    const isMoveNodeAction = (
+      action: PatchLayoutAction,
+    ): action is MoveNodeAction => action.type === 'layoutModel/moveNode';
+    const isShiftNodeAction = (
+      action: PatchLayoutAction,
+    ): action is ShiftNodeAction => action.type === 'layoutModel/shiftNode';
+    const isDeleteNodeAction = (
+      action: PatchLayoutAction,
+    ): action is DeleteNodeAction => action.type === 'layoutModel/deleteNode';
+    const queryArgFactory = (
+      action: PatchLayoutAction,
+    ): PatchLayoutAndModelQueryArg => {
+      if (isDuplicateNodeAction(action)) {
+        return {
+          ...action.payload,
+          operation: 'duplicate-node',
+        };
+      }
+      if (isInsertNodesAction(action)) {
+        return {
+          ...action.payload,
+          operation: 'insert-nodes',
+        };
+      }
+      if (isDeleteNodeAction(action)) {
+        return {
+          operation: 'delete-node',
+          componentInstanceUuid: action.payload,
+        };
+      }
+      if (isMoveNodeAction(action)) {
+        return {
+          operation: 'move-node',
+          ...action.payload,
+        };
+      }
+      if (isShiftNodeAction(action)) {
+        return {
+          operation: 'shift-node',
+          ...action.payload,
+        };
+      }
+      throw new Error('Unsupported');
+    };
+    const patchAction = action as Action;
+
+    if (isPatchLayoutAction(patchAction)) {
+      const patchLayoutAndModelQueryArg = queryArgFactory(patchAction);
+      store.dispatch(
+        previewApi.endpoints.updateComponent.initiate(
+          patchLayoutAndModelQueryArg,
+        ),
+      );
+    }
+    return next(action);
+  }) as Middleware<{}, RootState, AppDispatch>;
+
 // The store setup is wrapped in `makeStore` to allow reuse
 // when setting up tests that need the same store config
 export const makeStore = (preloadedState?: Partial<RootState>) => {
@@ -251,6 +333,7 @@ export const makeStore = (preloadedState?: Partial<RootState>) => {
         pendingChangesApi.middleware,
         contentApi.middleware,
         contentEntityReferenceApi.middleware,
+        patchLayoutMiddleware,
         rtkQueryErrorHandler, // Add the error handling middleware
       );
     },

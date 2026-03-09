@@ -172,14 +172,17 @@ const rawBaseQuery = (appConfiguration: AppConfiguration) => {
 
 // Higher-order base query to inject the current autoSavesHash and clientInstanceId for all mutations (POST, PATCH, DELETE)
 // to allow the backend to recognize potential conflicts where the client is updating potentially out of date data.
+type AutoSavesQueryFn = BaseQueryFn<
+  string | (FetchArgs & { autoSaveUrlKey?: string }),
+  unknown,
+  FetchBaseQueryError
+>;
 export const withAutoSavesInjection: (
-  baseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError>,
-) => BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> = (
-  baseQuery,
-) => {
+  baseQuery: AutoSavesQueryFn,
+) => AutoSavesQueryFn = (baseQuery) => {
   return (args, api, extraOptions) => {
     if (typeof args === 'object') {
-      const { url } = args;
+      let { url } = args;
       if (
         url &&
         api.type === 'mutation' &&
@@ -192,6 +195,13 @@ export const withAutoSavesInjection: (
           'uploadFont',
         ].includes(api.endpoint)
       ) {
+        // If an autoSaveUrlKey is provided, use it for looking up the autoSave
+        // hash rather than the actual request URL (useful for operation-specific
+        // routes like /layout/delete-node/... that share the same auto-save as
+        // /layout/...).
+        if ('autoSaveUrlKey' in args && args.autoSaveUrlKey !== undefined) {
+          url = args.autoSaveUrlKey;
+        }
         const state = api.getState() as RootState;
         const { publishReview } = state;
         const { entityType, entityId, templateBundle, templateViewMode } =
@@ -227,8 +237,5 @@ export const withAutoSavesInjection: (
 };
 
 // Export a baseQuery with autoSaves injection by default
-export const baseQueryWithAutoSaves: BaseQueryFn<
-  string | FetchArgs,
-  unknown,
-  FetchBaseQueryError
-> = withAutoSavesInjection(baseQuery);
+export const baseQueryWithAutoSaves: AutoSavesQueryFn =
+  withAutoSavesInjection(baseQuery);

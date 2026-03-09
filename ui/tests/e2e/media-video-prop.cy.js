@@ -85,7 +85,7 @@ describe('Media Library', () => {
     cy.waitForElementInIframe('video > source');
     cy.findByLabelText('Display width').clear();
     cy.intercept({
-      url: '**/canvas/api/v0/layout/canvas_page/2',
+      url: '**/canvas/api/v0/layout/**/canvas_page/2',
       times: 1,
       method: 'PATCH',
     }).as('updatePreview');

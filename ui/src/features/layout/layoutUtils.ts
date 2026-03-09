@@ -136,6 +136,12 @@ function findByIdentifier(
   return null;
 }
 
+export type ParentInfo = {
+  parentId: string;
+  parentType: string;
+  childIndex: number;
+} | null;
+
 /**
  * Finds the parent information and index of a component
  * @param roots - The root region nodes to search in
@@ -145,7 +151,7 @@ function findByIdentifier(
 export function findParentInfo(
   roots: Array<RegionNode>,
   uuid: string,
-): { parentId: string; parentType: string; childIndex: number } | null {
+): ParentInfo {
   // Check if component is directly in a region
   for (const region of roots) {
     for (let i = 0; i < region.components.length; i++) {
@@ -471,29 +477,29 @@ export function getNodeDepth(
  * Replace UUIDs in a layout node and its corresponding model.
  * @param component - The component to update. Can have slots, child components etc
  * @param model - The corresponding model object to update. Should contain models for component and all children.
- * @param newUUID - Optionally specify the UUID of the new Component.
+ * @param uuidMap - uuidMap to use from old uuid to new uuid.
  * @returns An updated model and an updated state.
  */
 export function replaceUUIDsAndUpdateModel(
   component: ComponentNode,
   model: ComponentModels,
-  newUUID?: string,
+  uuidMap: Record<string, string>,
 ): {
   updatedNode: ComponentNode;
   updatedModel: ComponentModels;
+  uuidMap: Record<string, string>;
 } {
-  const oldToNewUUIDMap: Record<string, string> = {};
   const updatedModel: ComponentModels = {};
 
   const replaceUUIDsInComponents = (
     components: ComponentNode[],
-    newUUID?: string,
   ): ComponentNode[] => {
     return components.map((component, i) => {
-      const newUuid = i === 0 && newUUID ? newUUID : uuidv4();
+      const newUuid =
+        component.uuid in uuidMap ? uuidMap[component.uuid] : uuidv4();
       const newComponent: ComponentNode = { ...component, uuid: newUuid };
 
-      oldToNewUUIDMap[component.uuid] = newComponent.uuid;
+      uuidMap[component.uuid] = newComponent.uuid;
 
       newComponent.slots = replaceUUIDsInSlots(
         newComponent.slots,
@@ -520,18 +526,38 @@ export function replaceUUIDsAndUpdateModel(
     });
   };
 
-  const updatedNode = replaceUUIDsInComponents([component], newUUID)[0];
+  const updatedNode = replaceUUIDsInComponents([component])[0];
 
   // Update the model keys
   for (const oldUUID in model) {
-    const newUUID = oldToNewUUIDMap[oldUUID];
+    const newUUID = uuidMap[oldUUID];
     if (newUUID) {
       updatedModel[newUUID] = JSON.parse(JSON.stringify(model[oldUUID]));
     }
   }
 
-  return { updatedNode, updatedModel };
+  return { updatedNode, updatedModel, uuidMap };
 }
+
+export const getNodeAtPath = (
+  layout: Array<LayoutNode>,
+  path: number[],
+): LayoutNode | null => {
+  if (path.length === 0) {
+    throw new Error(
+      'Path must have at least one element to define where to insert the node.',
+    );
+  }
+  if (!(path[0] in layout)) {
+    return null;
+  }
+  if (path.length === 1) {
+    return layout[path[0]];
+  }
+  const node = layout[path[0]];
+  const children: LayoutChildNode[] = getChildrenFromNode(node);
+  return getNodeAtPath(children, path.slice(1));
+};
 
 /**
  * Takes an array of RegionNodes and the UUID of a component and returns the region node that contains a ComponentNode
