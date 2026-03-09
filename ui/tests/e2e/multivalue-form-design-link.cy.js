@@ -66,10 +66,7 @@ describe('Multivalue Form Design – Link Field', () => {
       .eq(1)
       .click();
     cy.get('[role="dialog"]').find('input[type="text"]').first().clear();
-    cy.get('[role="dialog"]')
-      .find('input[type="text"]')
-      .first()
-      .type(title);
+    cy.get('[role="dialog"]').find('input[type="text"]').first().type(title);
     cy.get('[role="dialog"]')
       .find('input[type="text"]')
       .first()
@@ -230,7 +227,10 @@ describe('Multivalue Form Design – Link Field', () => {
     verifyTitleRowText('@unlimited-link', 1, 'Example Site');
 
     // Confirm all values.
-    confirmUrlInputs('@unlimited-link', ['https://drupal.org', 'https://www.example.com']);
+    confirmUrlInputs('@unlimited-link', [
+      'https://drupal.org',
+      'https://www.example.com',
+    ]);
     confirmTitleInputs('@unlimited-link', ['Drupal', 'Example Site']);
   });
 
@@ -606,4 +606,3 @@ describe('Multivalue Form Design – Link Field', () => {
     ]);
   });
 });
-
