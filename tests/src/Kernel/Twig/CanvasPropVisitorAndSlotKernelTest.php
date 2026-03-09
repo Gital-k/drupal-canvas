@@ -38,19 +38,11 @@ final class CanvasPropVisitorAndSlotKernelTest extends CanvasKernelTestBase {
   private RendererInterface $renderer;
 
   /**
-   * The Twig environment service.
-   *
-   * @var \Drupal\Core\Template\TwigEnvironment
-   */
-  private object $twig;
-
-  /**
    * {@inheritdoc}
    */
   protected function setUp(): void {
     parent::setUp();
     $this->renderer = $this->container->get(RendererInterface::class);
-    $this->twig = $this->container->get('twig');
   }
 
   /**
