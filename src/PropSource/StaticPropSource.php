@@ -514,7 +514,7 @@ final class StaticPropSource extends PropSourceBase {
     // preserve.
     // @see \Drupal\media_library\Plugin\Field\FieldWidget\MediaLibraryWidget::form()
     // @see \Drupal\media_library\Plugin\Field\FieldWidget\MediaLibraryWidget::addItems()
-    if ($widget->getPluginId() === 'media_library_widget' && !$this->fieldItemList->isEmpty()) {
+    if ($widget->getPluginId() === 'media_library_widget' && $this->getCardinality() !== 1 && !$this->fieldItemList->isEmpty()) {
       $field_name = $field_definition->getName();
       $widget_state = $widget::getWidgetState($form['#parents'] ?? [], $field_name, $form_state);
       if (!isset($widget_state['items'])) {
