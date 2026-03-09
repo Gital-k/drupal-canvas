@@ -3,6 +3,7 @@ import react from 'eslint-plugin-react';
 import reactHooks from 'eslint-plugin-react-hooks';
 import eslintPluginYml from 'eslint-plugin-yml';
 import { defineConfig } from 'eslint/config';
+import tseslint from 'typescript-eslint';
 import js from '@eslint/js';
 
 import required from './required.js';
@@ -13,7 +14,7 @@ import type { ESLint } from 'eslint';
 const recommended: Config[] = defineConfig([
   required,
   {
-    files: ['**/*.{js,jsx}'],
+    files: ['**/*.{ts,tsx,js,jsx}'],
     plugins: {
       react,
       'react-hooks': reactHooks as ESLint.Plugin,
@@ -36,6 +37,7 @@ const recommended: Config[] = defineConfig([
       'react/prop-types': 'off',
     },
   },
+  ...tseslint.configs.recommended,
   ...eslintPluginYml.configs['flat/recommended'],
 ]);
 
