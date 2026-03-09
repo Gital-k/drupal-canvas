@@ -348,7 +348,10 @@ function canvas_test_article_fields_install(): void {
         'target_type' => 'media',
         'handler' => 'default:media',
         'handler_settings' => [
-          'target_bundles' => ['image' => 'image'],
+          'target_bundles' => [
+            'image' => 'image',
+            'video' => 'video',
+          ],
           'sort' => ['field' => '_none'],
           'auto_create' => FALSE,
           'auto_create_bundle' => '',
@@ -370,7 +373,10 @@ function canvas_test_article_fields_install(): void {
         'target_type' => 'media',
         'handler' => 'default:media',
         'handler_settings' => [
-          'target_bundles' => ['image' => 'image'],
+          'target_bundles' => [
+            'image' => 'image',
+            'video' => 'video',
+          ],
           'sort' => ['field' => '_none'],
           'auto_create' => FALSE,
           'auto_create_bundle' => '',
