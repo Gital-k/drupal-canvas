@@ -576,10 +576,10 @@ describe('Multivalue Form Design – Link Field', () => {
       .eq(0)
       .click();
 
+    cy.get('[role="dialog"]').find('input').first().clear();
     cy.get('[role="dialog"]')
       .find('input')
       .first()
-      .clear()
       .type('https://modified-url.com{enter}');
 
     cy.get('[role="dialog"]').should('not.exist');
