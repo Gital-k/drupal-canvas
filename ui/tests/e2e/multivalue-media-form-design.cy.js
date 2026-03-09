@@ -252,7 +252,10 @@ describe('Multivalue Media Form Design (canvas_dev_mode)', () => {
     // Verify "maximum selected" message is shown.
     cy.get('@limited-media')
       .find('.description')
-      .should('contain.text', 'The maximum number of media items have been selected.');
+      .should(
+        'contain.text',
+        'The maximum number of media items have been selected.',
+      );
 
     // Remove one item — this triggers AJAX which re-renders the widget
     // with remaining = 1 and updates the description.
