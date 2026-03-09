@@ -25,7 +25,9 @@
  * - component_prop_name: The name of the component prop this media library widget is for.
  *   Only set when rendered inside the ComponentInstanceForm; absent otherwise.
  * - is_multivalue_media_form: Boolean. TRUE for unlimited-cardinality media
- *   fields when canvas_dev_mode is enabled.
+ *   fields when canvas_dev_mode is enabled. Used to conditionally render the
+ *   weight toggle prefix. The corresponding data attributes are set in the
+ *   preprocess hook via $variables['attributes'].
  *
  * @see template_preprocess_fieldset()
  * @see \Drupal\canvas\Hook\ReduxIntegratedFieldWidgetsHooks::canvasStarkPreprocessFieldset()
@@ -41,10 +43,7 @@
   'form-wrapper',
 ]
 %}
-<fieldset{{ attributes.addClass(classes) }}
-  data-canvas-media-library-fieldset='true'
-  {% if is_multivalue_media_form %}data-canvas-media-multivalue='true'{% endif %}
->
+<fieldset{{ attributes.addClass(classes) }}>
   <legend>
     <canvas-drupal-label
         title="{{ legend.title }}"
