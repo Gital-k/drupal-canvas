@@ -321,6 +321,35 @@ function canvas_test_article_fields_install(): void {
         ['value' => 'http://drupal.org'],
       ],
     ],
+    'field_cvt_unlimited_link' => [
+      'type' => 'link',
+      'label' => 'Canvas Unlimited Link',
+      'settings' => [
+        'title' => 1,
+        'link_type' => 0x10,
+      ],
+      'cardinality' => -1,
+      'widget' => [
+        'type' => 'link_default',
+        'weight' => -999,
+        'settings' => [
+          'placeholder_url' => '',
+          'placeholder_title' => '',
+        ],
+      ],
+      'default_value' => [
+        [
+          'uri' => 'https://drupal.org',
+          'title' => 'Drupal',
+          'options' => [],
+        ],
+        [
+          'uri' => '',
+          'title' => '',
+          'options' => [],
+        ],
+      ],
+    ],
     'field_cvt_unlimited_text' => [
       'type' => 'string',
       'label' => 'Canvas Unlimited Text',
