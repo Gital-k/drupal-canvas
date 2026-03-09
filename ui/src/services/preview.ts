@@ -24,6 +24,7 @@ import type {
   ResolvedValues,
   ShiftNodePayload,
 } from '@/features/layout/layoutModelSlice';
+import type { EditorFrameContext } from '@/features/ui/uiSlice';
 import type { ConflictError } from '@/services/pendingChangesApi';
 import type { AutoSavesHash } from '@/types/AutoSaves';
 import type { InputUIData } from '@/types/Form';
@@ -37,31 +38,37 @@ export type UpdateComponentResultType = {
 };
 
 interface MoveNodeQueryArg extends MoveNodePayload, NodeParentPosition {
+  type?: EditorFrameContext;
   operation: 'move-node';
 }
 
 interface ShiftNodeQueryArg extends ShiftNodePayload {
+  type?: EditorFrameContext;
   operation: 'shift-node';
 }
 
 interface DeleteNodeQueryArg {
+  type?: EditorFrameContext;
   operation: 'delete-node';
   componentInstanceUuid: string;
 }
 
 interface DuplicateNodeQueryArg extends DuplicateNodePayload {
+  type?: EditorFrameContext;
   operation: 'duplicate-node';
   uuidMap: Record<string, string>;
 }
 
 interface InsertNodesQueryArg
   extends InsertMultipleNodesPayload, NodeParentPosition {
+  type?: EditorFrameContext;
   operation: 'insert-nodes';
 }
 
 // @todo Split this up to only modify a single prop, not the
 //   whole model.
 type UpdateComponentQueryArg = {
+  type?: EditorFrameContext;
   operation: 'update-model';
   componentInstanceUuid: string;
   componentType: string;
@@ -243,10 +250,16 @@ export const usePatchComponent = () => {
     inputUIData: InputUIData,
     model: UpdateComponentQueryArg['model'],
   ) => {
-    const { selectedComponent, selectedComponentType, version } = inputUIData;
+    const {
+      selectedComponent,
+      selectedComponentType,
+      version,
+      editorFrameContext,
+    } = inputUIData;
 
     const arg: UpdateComponentQueryArg = {
       operation: 'update-model',
+      type: editorFrameContext,
       componentInstanceUuid: selectedComponent,
       componentType: `${selectedComponentType}@${version}`,
       model,
@@ -284,8 +297,13 @@ export const usePatchProp = () => {
     sourceValue: PropSource | PropSource['value'],
     resolvedValue: ResolvedValues[string],
   ) => {
-    const { selectedComponent, selectedComponentType, version, model } =
-      inputUIData;
+    const {
+      selectedComponent,
+      selectedComponentType,
+      version,
+      editorFrameContext,
+      model,
+    } = inputUIData;
 
     const selectedModel = model?.[selectedComponent];
     if (!selectedModel || !('source' in selectedModel)) {
@@ -294,6 +312,7 @@ export const usePatchProp = () => {
 
     return updateComponent({
       operation: 'update-model',
+      type: editorFrameContext,
       componentInstanceUuid: selectedComponent,
       componentType: `${selectedComponentType}@${version}`,
       model: {
