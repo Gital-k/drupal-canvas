@@ -264,13 +264,30 @@ const dateTime: Transformer<
   return singleValue;
 };
 
-const mediaSelection: Transformer<BaseTransformOptions, null | PropsValues> = (
-  value,
-) => {
-  if (value && typeof value === 'object' && 'selection' in value) {
-    return value.selection;
+const mediaSelection: Transformer<
+  BaseTransformOptions,
+  null | PropsValues | Array<PropsValues>
+> = (value, options) => {
+  const { multiple = false } = options;
+  if (!value || typeof value !== 'object' || !('selection' in value)) {
+    return null;
   }
-  return null;
+  const selection = value.selection;
+  // Treat empty selections (empty object or empty array) as no value so the
+  // prop falls back to the example/default rather than persisting stale data.
+  if (
+    selection === null ||
+    selection === undefined ||
+    (typeof selection === 'object' && Object.keys(selection).length === 0)
+  ) {
+    return null;
+  }
+  if (multiple) {
+    // For multi-value fields, ensure the selection is an array so downstream
+    // transforms (mainProperty) can iterate and sort by weight.
+    return Array.isArray(selection) ? selection : Object.values(selection);
+  }
+  return selection;
 };
 
 const transforms = {
