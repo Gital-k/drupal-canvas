@@ -73,6 +73,8 @@ const testMediaLibraryInComponentInstanceForm = (
     cy.get(removeIt).realClick({ force: true });
     cy.waitForAjax();
     cy.wait('@updatePreview');
+    // eslint-disable-next-line cypress/no-unnecessary-waiting
+    cy.wait(1000);
     cy.findByLabelText('Loading Preview').should('not.exist');
 
     cy.log(
