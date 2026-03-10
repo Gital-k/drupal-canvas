@@ -15,8 +15,8 @@ import {
 
 import LibraryItemList from './LibraryItemList';
 
-import type { CanvasComponent, ComponentsList } from '@/types/Component';
 import type { ComponentWithChildren } from '@/hooks/useComponentHierarchy';
+import type { CanvasComponent, ComponentsList } from '@/types/Component';
 import type { FolderData } from './FolderList';
 
 interface ComponentListProps {
@@ -29,7 +29,7 @@ const ComponentList = ({ searchTerm }: ComponentListProps) => {
     data: folders,
     error: foldersError,
     isLoading: foldersLoading,
-  } = useGetFoldersQuery({ status: false });
+  } = useGetFoldersQuery();
   const { showBoundary } = useErrorBoundary();
 
   // Build hierarchy data from allowedComponents in slots
@@ -49,7 +49,12 @@ const ComponentList = ({ searchTerm }: ComponentListProps) => {
       componentsWithHierarchy as ComponentsList,
       childComponentIds,
     );
-  }, [slotFilteredComponents, components, componentsWithHierarchy, childComponentIds]);
+  }, [
+    slotFilteredComponents,
+    components,
+    componentsWithHierarchy,
+    childComponentIds,
+  ]);
 
   useEffect(() => {
     if (error || foldersError) {
@@ -58,7 +63,9 @@ const ComponentList = ({ searchTerm }: ComponentListProps) => {
   }, [error, foldersError, showBoundary]);
 
   const renderItem = (item: CanvasComponent) => {
-    const itemWithChildren = componentsWithHierarchy[item.id] as ComponentWithChildren;
+    const itemWithChildren = componentsWithHierarchy[
+      item.id
+    ] as ComponentWithChildren;
     return (
       <HierarchicalListItem
         item={itemWithChildren || item}

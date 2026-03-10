@@ -9,8 +9,8 @@ import { ListIndentContext } from '@/components/sidePanel/ListIndentContext';
 
 import type React from 'react';
 import type { LayoutItemType } from '@/features/ui/primaryPanelSlice';
-import type { CanvasComponent } from '@/types/Component';
 import type { ComponentWithChildren } from '@/hooks/useComponentHierarchy';
+import type { CanvasComponent } from '@/types/Component';
 
 import detailsStyles from '@/components/form/components/AccordionAndDetails.module.css';
 import listStyles from '@/components/list/List.module.css';

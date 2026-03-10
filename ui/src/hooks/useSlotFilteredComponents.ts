@@ -3,12 +3,14 @@ import { useMemo } from 'react';
 import { useAppSelector } from '@/app/hooks';
 import { selectTargetSlotInfo } from '@/features/ui/uiSlice';
 import { useGetComponentsQuery } from '@/services/componentAndLayout';
+import { getSlotAllowedComponentIds } from '@/utils/slot-utils';
 
-import type { CanvasComponent, ComponentsList, PropSourceComponent } from '@/types/Component';
+import type { PropSourceComponent } from '@/types/Component';
 
 /**
- * Hook to get the expected/allowedComponents for the current target slot.
- * Supports both Drupal core 'expected' and legacy 'allowedComponents' properties.
+ * Hook to get the resolved allowed component IDs for the current target slot.
+ * Supports both Drupal core 'expected' and legacy 'allowedComponents' properties,
+ * including tag-based matching per Drupal core #3514072.
  *
  * Returns undefined if:
  * - No slot is being targeted (not dragging over a slot)
@@ -28,22 +30,24 @@ export function useTargetSlotAllowedComponents(): string[] | undefined {
     const [componentType] = targetSlotInfo.parentComponentType.split('@');
 
     // Look up the parent component from the components list
-    const parentComponent = components?.[componentType] as PropSourceComponent | undefined;
+    const parentComponent = components?.[componentType] as
+      | PropSourceComponent
+      | undefined;
 
     if (!parentComponent?.metadata?.slots) {
       return undefined;
     }
 
-    // Get the slot definition with expected/allowedComponents
-    const slotDefinition = parentComponent.metadata.slots[targetSlotInfo.slotId];
-
-    // Support both Drupal core 'expected' and legacy 'allowedComponents'
-    return slotDefinition?.expected || slotDefinition?.allowedComponents;
+    // Get the slot definition and resolve expected entries (IDs + tags)
+    const slotDefinition =
+      parentComponent.metadata.slots[targetSlotInfo.slotId];
+    return getSlotAllowedComponentIds(slotDefinition, components);
   }, [targetSlotInfo, components]);
 }
 
 /**
  * Filters a component list based on the current target slot's allowedComponents.
+ * Supports tag-based matching: tags in 'expected' are resolved to concrete component IDs.
  *
  * If no restrictions exist, returns all components unchanged.
  */
@@ -62,7 +66,7 @@ export function useSlotFilteredComponents<T extends { id: string }>(
       return items;
     }
 
-    // Filter items to only those in allowedComponents
+    // Filter items to only those in resolved allowedComponents
     const filtered: Record<string, T> = {};
     for (const [key, item] of Object.entries(items)) {
       if (allowedComponents.includes(item.id)) {

@@ -1,6 +1,12 @@
 import { useMemo } from 'react';
 
-import type { CanvasComponent, ComponentsList, PropSourceComponent } from '@/types/Component';
+import { getSlotAllowedComponentIds } from '@/utils/slot-utils';
+
+import type {
+  CanvasComponent,
+  ComponentsList,
+  PropSourceComponent,
+} from '@/types/Component';
 
 /**
  * A component that may have child components attached (from allowedComponents in slots).
@@ -18,9 +24,11 @@ export interface HierarchyResult {
 }
 
 /**
- * Builds a hierarchy of components based on allowedComponents in slot definitions.
- * Organisms that have slots with allowedComponents will have their allowed children
+ * Builds a hierarchy of components based on expected/allowedComponents in slot definitions.
+ * Organisms that have slots with restrictions will have their allowed children
  * attached as childComponents property.
+ *
+ * Supports both direct component IDs and tag-based matching per Drupal core #3514072.
  *
  * @param components - The full list of components from the API
  * @returns HierarchyResult with hierarchy-enriched components and set of child IDs
@@ -45,12 +53,9 @@ export function useComponentHierarchy(
         const children: CanvasComponent[] = [];
 
         Object.values(slots).forEach((slot) => {
-          // Support both Drupal core 'expected' and legacy 'allowedComponents'
-          const allowedComponents = slot.expected || slot.allowedComponents;
-          if (allowedComponents && Array.isArray(allowedComponents)) {
-            allowedComponents.forEach((allowedId) => {
-              // allowedId format: "sdc.y_canvas.y-accordion-item"
-              // components key format: "sdc.y_canvas.y-accordion-item"
+          const allowedIds = getSlotAllowedComponentIds(slot, components);
+          if (allowedIds) {
+            allowedIds.forEach((allowedId) => {
               if (components[allowedId]) {
                 childComponentIds.add(allowedId);
                 children.push(components[allowedId]);

@@ -1,12 +1,15 @@
 import { useDndContext } from '@dnd-kit/core';
 
 import { useGetComponentsQuery } from '@/services/componentAndLayout';
+import { getSlotAllowedComponentIds } from '@/utils/slot-utils';
 
 import type { SlotNode } from '@/features/layout/layoutModelSlice';
 import type { PropSourceComponent } from '@/types/Component';
 
 /**
- * Check if a component is restricted (only allowed in specific slots)
+ * Check if a component is restricted (only allowed in specific slots).
+ * Supports tag-based matching: a component is restricted if any slot's
+ * expected entries (IDs or tags) resolve to include it.
  */
 function isRestrictedComponent(
   componentId: string,
@@ -14,15 +17,16 @@ function isRestrictedComponent(
 ): boolean {
   if (!components) return false;
 
-  // Check if any component has this item in their slot's expected/allowedComponents
   for (const component of Object.values(components)) {
     const propSource = component as PropSourceComponent;
     const slots = propSource?.metadata?.slots;
     if (slots) {
       for (const slot of Object.values(slots)) {
-        // Support both Drupal core 'expected' and legacy 'allowedComponents'
-        const allowed = slot.expected || slot.allowedComponents;
-        if (allowed?.includes(componentId)) {
+        const allowedIds = getSlotAllowedComponentIds(
+          slot,
+          components as Record<string, any>,
+        );
+        if (allowedIds?.includes(componentId)) {
           return true;
         }
       }
@@ -33,7 +37,8 @@ function isRestrictedComponent(
 
 /**
  * Hook to determine if the currently dragged component can be dropped into
- * a specific parent slot based on the slot's allowedComponents configuration.
+ * a specific parent slot based on the slot's expected/allowedComponents configuration.
+ * Supports tag-based matching per Drupal core #3514072.
  *
  * @param parentSlot - The slot where the drop would occur
  * @param parentComponentType - The type of the parent component (e.g., 'sdc.y_canvas.y-accordion@version')
@@ -77,17 +82,10 @@ export function useIsDropAllowed(
   // Strip version suffix from parent component type (e.g., '@abc123')
   const [cleanParentType] = parentComponentType.split('@');
 
-  // Get parent component's metadata to find slot's allowedComponents
-  const parentComponent = components?.[cleanParentType] as PropSourceComponent | undefined;
-
-  // Debug logging for slot drops
-  console.log('[useIsDropAllowed] Slot drop check:', {
-    draggedItemId,
-    cleanParentType,
-    slotName: parentSlot.name,
-    hasMetadataSlots: !!parentComponent?.metadata?.slots,
-    availableSlots: parentComponent?.metadata?.slots ? Object.keys(parentComponent.metadata.slots) : [],
-  });
+  // Get parent component's metadata to find slot's expected/allowedComponents
+  const parentComponent = components?.[cleanParentType] as
+    | PropSourceComponent
+    | undefined;
 
   if (!parentComponent?.metadata?.slots) {
     // Parent has no slots defined, restricted items cannot drop here
@@ -98,28 +96,22 @@ export function useIsDropAllowed(
   const slotName = parentSlot.name || parentSlot.id;
   const slotDefinition = parentComponent.metadata.slots[slotName];
 
-  // Support both Drupal core 'expected' and legacy 'allowedComponents'
-  const allowedInSlot = slotDefinition?.expected || slotDefinition?.allowedComponents;
-
-  console.log('[useIsDropAllowed] Slot definition:', {
-    slotName,
-    slotDefinition,
-    allowedComponents: allowedInSlot,
-    includes: allowedInSlot?.includes(draggedItemId),
-  });
+  // Resolve expected entries (IDs + tags) to concrete component IDs
+  const allowedInSlot = getSlotAllowedComponentIds(slotDefinition, components);
 
   if (!allowedInSlot) {
     // No expected/allowedComponents restriction on this slot, restricted items cannot drop here
     return false;
   }
 
-  // Check if the dragged item is in the expected/allowedComponents list
+  // Check if the dragged item is in the resolved allowed list
   return allowedInSlot.includes(draggedItemId);
 }
 
 /**
  * Hook to check if any drop zones should be disabled for the current drag.
  * Returns whether the dragged item has slot restrictions (is a Molecule).
+ * Supports tag-based matching.
  *
  * @returns object with draggedItemId and whether it has restrictions
  */
@@ -133,25 +125,32 @@ export function useDraggedItemInfo(): {
 
   const origin = active?.data?.current?.origin;
   if (origin !== 'library') {
-    return { draggedItemId: undefined, hasSlotRestrictions: false, allowedParentTypes: [] };
+    return {
+      draggedItemId: undefined,
+      hasSlotRestrictions: false,
+      allowedParentTypes: [],
+    };
   }
 
   const draggedItem = active?.data?.current?.item;
   const draggedItemId = draggedItem?.id;
   if (!draggedItemId || !components) {
-    return { draggedItemId, hasSlotRestrictions: false, allowedParentTypes: [] };
+    return {
+      draggedItemId,
+      hasSlotRestrictions: false,
+      allowedParentTypes: [],
+    };
   }
 
-  // Find which parent components have this item in their expected/allowedComponents
+  // Find which parent components have this item in their resolved expected/allowedComponents
   const allowedParentTypes: string[] = [];
   Object.entries(components).forEach(([componentId, component]) => {
     const propSource = component as PropSourceComponent;
     const slots = propSource?.metadata?.slots;
     if (slots) {
       Object.values(slots).forEach((slot) => {
-        // Support both Drupal core 'expected' and legacy 'allowedComponents'
-        const allowed = slot.expected || slot.allowedComponents;
-        if (allowed?.includes(draggedItemId)) {
+        const allowedIds = getSlotAllowedComponentIds(slot, components);
+        if (allowedIds?.includes(draggedItemId)) {
           allowedParentTypes.push(componentId);
         }
       });
