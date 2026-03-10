@@ -275,8 +275,6 @@ const propNameToSelector = {
 };
 
 describe('Linking Basic Page fields', () => {
-  // These tests can take a long time to run and are not particularly browser
-  // dependent. Only run in Chromium to keep test duration reasonable.
   beforeEach(() => {
     cy.viewport(1400, 2600);
 
@@ -327,8 +325,6 @@ describe('Linking Basic Page fields', () => {
    */
   const addAllPropsComponent = () => {
     cy.openLibraryPanel();
-    // cy.insertComponent({ name: 'Two Column' });
-    // cy.findByLabelText('Column Width').should('exist');
     cy.insertComponent({ name: 'All props' });
     cy.openLayersPanel();
     cy.clickComponentInLayersView('All props');
@@ -549,7 +545,6 @@ describe('Linking Basic Page fields', () => {
       cy.get('.primaryPanelContent')
         .findAllByLabelText('All props')
         .should('not.exist');
-      cy.screenshot(`this-running-${testName}`);
     });
   });
 });
