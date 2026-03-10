@@ -313,7 +313,9 @@ describe('Linking Basic Page fields', () => {
   });
 
   afterEach(() => {
-    cy.drupalUninstall();
+    if (Cypress.env('drupalDbPrefix')) {
+      cy.drupalUninstall();
+    }
   });
 
   // beforeEach(() => {
@@ -533,7 +535,7 @@ describe('Linking Basic Page fields', () => {
   Object.entries(suggestionsByProp).forEach(([inputName, suggestions]) => {
     const testName = inputName.replace(/_/g, ' ').replace(/test /g, '');
 
-    it(testName, { retries: { openMode: 0, runMode: 0 } }, () => {
+    it(testName, () => {
       // if (testName === 'bool default true') {
       testPropLinking(inputName, suggestions);
       // }
