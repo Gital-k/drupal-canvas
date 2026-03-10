@@ -88,9 +88,14 @@ export default defineConfig({
             }
             // Preact subpaths are separate output chunks (each with its own
             // import map entry). Their internal imports must use bare specifiers
-            // so they don't bypass the import map.
+            // so they don't bypass the import map. This applies to:
+            // - Cross-subpath imports within preact itself (e.g., hooks → preact)
+            // - The @astrojs/preact client directive importing preact
+            // Without this, Rollup uses relative imports (e.g., ./preact.module.js)
+            // that lack the cache-busting query string from the import map,
+            // causing the browser to load two separate Preact instances.
             if (matchedLibrary === 'preact' &&
-                parent?.includes('/node_modules/preact/') &&
+                (parent?.includes('/node_modules/preact/') || parent?.includes('/node_modules/@astrojs/preact/')) &&
                 (id === 'preact' || id === 'preact/hooks' || id === 'preact/compat')) {
               return true;
             }
@@ -99,8 +104,8 @@ export default defineConfig({
             if (parent?.includes(`/node_modules/${matchedLibrary}/`)) {
               return false;
             }
-            // Bundle if imported from a build-only package (e.g., @astrojs/preact
-            // importing preact).
+            // Bundle if imported from a build-only package (e.g., astro
+            // importing a shared dependency).
             if (buildOnly.some(pkg => parent?.includes(`/node_modules/${pkg}/`))) {
               return false;
             }
