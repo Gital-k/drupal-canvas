@@ -411,10 +411,34 @@ final class ApiLayoutController {
    * Builds a preview renderable for mutate operations using a ClientDataModel.
    */
   private function buildMutatePreviewRenderable(ClientDataModel $clientModel, FieldableEntityInterface $entity): array {
-    // Save the client data model to the entity's auto-save, so the preview
-    // reflects the mutated state.
+    \assert($clientModel->clientInstanceId !== NULL);
+    $clientInstanceId = $clientModel->clientInstanceId;
+
+    $region_layouts = self::getRegionLayoutNodesKeyedByClientSideId($clientModel->layout);
+    \assert(\array_key_exists(CanvasPageVariant::MAIN_CONTENT_REGION, $region_layouts));
+    $main_content_layout = $region_layouts[CanvasPageVariant::MAIN_CONTENT_REGION];
+    unset($region_layouts[CanvasPageVariant::MAIN_CONTENT_REGION]);
+
+    // Update the main entity's component tree and save it to the auto-save
+    // store, so the preview reflects the mutated state.
     $entity = $this->getAutoSavedVersionIfAvailable([$entity])[$entity->id()];
     \assert($entity instanceof FieldableEntityInterface);
+    $this->updateEntity($entity, $main_content_layout, (array) $clientModel->model, $clientModel->entityFormFields, NULL);
+    $this->autoSaveManager->saveEntity($entity, $clientInstanceId);
+
+    // Update all PageRegions' component trees.
+    $regions = $this->getAutoSavedVersionIfAvailable(PageRegion::loadForActiveTheme());
+    foreach ($region_layouts as $client_side_region_id => $region_layout) {
+      if (!isset($regions[$client_side_region_id])) {
+        continue;
+      }
+      $regions[$client_side_region_id] = $regions[$client_side_region_id]->forAutoSaveData([
+        'layout' => $region_layout['components'],
+        'model' => self::extractModelForSubtree($region_layout, (array) $clientModel->model),
+      ], validate: FALSE);
+      $this->autoSaveManager->saveEntity($regions[$client_side_region_id], $clientInstanceId);
+    }
+
     return $this->buildPreviewRenderable($entity, NULL);
   }
 
