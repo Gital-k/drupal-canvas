@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Twig;
 
+use Drupal\canvas\Twig\CanvasPropVisitor;
+use Drupal\canvas\Twig\CanvasTwigExtension;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\CoversMethod;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
@@ -22,14 +26,12 @@ use Twig\Error\SyntaxError;
  *   inside a Canvas custom element.
  * - CanvasTwigExtension::slot() Twig function end-to-end, including render
  *   arrays processed by the real renderer.
- *
- * @legacy-covers \Drupal\canvas\Twig\CanvasPropVisitor
- * @legacy-covers \Drupal\canvas\Twig\CanvasTwigExtension::slot
- * @legacy-covers \Drupal\canvas\Twig\CanvasTwigExtension::jsxAttributes
  */
+#[CoversClass(CanvasPropVisitor::class)]
+#[CoversMethod(CanvasTwigExtension::class, 'slot')]
+#[CoversMethod(CanvasTwigExtension::class, 'jsxAttributes')]
 #[RunTestsInSeparateProcesses]
 #[Group('canvas')]
-#[Group('Twig')]
 final class CanvasPropVisitorAndSlotKernelTest extends CanvasKernelTestBase {
 
   /**

@@ -12,13 +12,10 @@ use Drupal\Tests\UnitTestCase;
 
 /**
  * Unit tests for CanvasPropVisitor static helper methods.
- *
- * @legacy-covers \Drupal\canvas\Twig\CanvasPropVisitor::isInCustomElementAttribute
- * @legacy-covers \Drupal\canvas\Twig\CanvasPropVisitor::hasChildrenAttribute
  */
-#[CoversClass(CanvasPropVisitor::class)]
+#[CoversMethod(CanvasPropVisitor::class, 'isInCustomElementAttribute')]
+#[CoversMethod(CanvasPropVisitor::class, 'hasChildrenAttribute')]
 #[Group('canvas')]
-#[Group('Twig')]
 class CanvasPropVisitorTest extends UnitTestCase {
 
   /**
@@ -36,10 +33,6 @@ class CanvasPropVisitorTest extends UnitTestCase {
     $method = new \ReflectionMethod(CanvasPropVisitor::class, 'hasChildrenAttribute');
     return $method->invoke(NULL, $buffer);
   }
-
-  // ---------------------------------------------------------------------------
-  // isInCustomElementAttribute
-  // ---------------------------------------------------------------------------
 
   /**
    * Tests isInCustomElementAttribute().

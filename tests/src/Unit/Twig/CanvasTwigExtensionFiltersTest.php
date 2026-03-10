@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Unit\Twig;
 
+use PHPUnit\Framework\Attributes\CoversMethod;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Drupal\Component\Render\MarkupInterface;
@@ -21,13 +22,11 @@ use Drupal\Tests\UnitTestCase;
 // cspell:ignore fitok itok Bwidth
 /**
  * Tests Twig filter/function functionality.
- *
- * @legacy-covers \Drupal\canvas\Twig\CanvasTwigExtension::toSrcSet
- * @legacy-covers \Drupal\canvas\Twig\CanvasTwigExtension::jsxAttributes
- * @legacy-covers \Drupal\canvas\Twig\CanvasTwigExtension::slot
  */
+#[CoversMethod(CanvasTwigExtension::class, 'toSrcSet')]
+#[CoversMethod(CanvasTwigExtension::class, 'jsxAttributes')]
+#[CoversMethod(CanvasTwigExtension::class, 'slot')]
 #[Group('canvas')]
-#[Group('Twig')]
 class CanvasTwigExtensionFiltersTest extends UnitTestCase {
 
   /**
@@ -219,10 +218,6 @@ class CanvasTwigExtensionFiltersTest extends UnitTestCase {
     };
     yield 'object with toArray()' => [$custom, '{"key":"value"}'];
   }
-
-  // ---------------------------------------------------------------------------
-  // slot
-  // ---------------------------------------------------------------------------
 
   /**
    * Tests slot() with content that does NOT require the renderer.
