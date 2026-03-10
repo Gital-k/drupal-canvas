@@ -549,6 +549,7 @@ describe('Linking Basic Page fields', () => {
       cy.get('.primaryPanelContent')
         .findAllByLabelText('All props')
         .should('not.exist');
+      cy.screenshot(`this-running-${testName}`);
     });
   });
 });
