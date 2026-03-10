@@ -29,7 +29,6 @@ export const useAjaxFieldRegistration = (
 
     // If field is not yet registered (AJAX-added), register it now
     if (!fieldState || fieldState.invalid === undefined) {
-      // console.log('🟢 Registering AJAX-added input:', fieldName);
       rhfContext.register(fieldName);
       // Set initial value
       rhfContext.setValue(fieldName, currentValue, {
