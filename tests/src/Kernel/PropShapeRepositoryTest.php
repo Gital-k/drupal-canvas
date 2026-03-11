@@ -34,6 +34,7 @@ use Drupal\canvas\PropSource\StaticPropSource;
 use Drupal\canvas\TypedData\BetterEntityDataDefinition;
 use Drupal\link\LinkItemInterface;
 use Drupal\Tests\canvas\Kernel\Traits\VfsPublicStreamUrlTrait;
+use Drupal\Tests\system\Functional\Form\StubForm;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use Drupal\user\Entity\User;
 use JsonSchema\Constraints\Constraint;
@@ -826,6 +827,8 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
       // @see \Drupal\Core\Field\WidgetBase::form()
       $form = ['#parents' => [$this->randomMachineName()]];
       $form_state = new FormState();
+      $form_object = new StubForm('some_id', $form);
+      $form_state->setFormObject($form_object);
       $form = $prop_source->formTemporaryRemoveThisExclamationExclamationExclamation($widget, 'some-prop-name', FALSE, User::create([]), $form, $form_state);
 
       // Finally, prove the total compatibility of the StaticPropSource
@@ -925,7 +928,7 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
     // If the module is already installed during ::setUp(), then this test is
     // still worth running, but only needs to test the "not resolving" part.
     $module_to_install = 'canvas_test_storable_prop_shape_alter';
-    $module_is_already_installed = in_array($module_to_install, static::$modules, TRUE);
+    $module_is_already_installed = \in_array($module_to_install, static::$modules, TRUE);
 
     \Drupal::service(ComponentSourceManager::class)->generateComponents();
 

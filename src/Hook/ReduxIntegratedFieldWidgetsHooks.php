@@ -213,18 +213,48 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
    * Marks elements within multivalue forms to enable specialized rendering.
    * This allows the DrupalInputMultivalueForm component to handle inputs
    * specifically within multivalue widgets.
+   *
+   * For media library widgets in the component instance form, we also set
+   * #component_prop_name so that the DefaultImagePreview React component can
+   * identify which prop to manage. This enables the "Remove default"
+   * functionality for optional image props.
+   *
+   * @see themes/canvas_stark/templates/media_library/fieldset--media-library-widget.html.twig
+   * @see ui/src/components/form/components/DefaultImagePreview.tsx
+   * @see \Drupal\canvas\Form\ComponentInstanceForm
    */
   #[Hook('field_widget_complete_form_alter')]
   public function fieldWidgetCompleteFormAlter(array &$widget, FormStateInterface $form_state, array $context): void {
     // Provide additional context to be used by
     // canvas_theme_suggestions_alter().
-    $widget['#widget-type'] = $context['widget']->getPluginId();
+    $widget_type = $context['widget']->getPluginId();
+    // Set #widget-type so themeSuggestionsAlter() can add widget-specific
+    // theme suggestions (e.g. fieldset__widget_media_library_widget).
+    $widget['#widget-type'] = $widget_type;
     if (isset($widget['widget']) && \is_array($widget["widget"])) {
-      $widget["widget"]['#widget-type'] = $context['widget']->getPluginId();
+      $widget["widget"]['#widget-type'] = $widget_type;
       foreach (Element::children($widget['widget']) as $key) {
-        $widget['widget'][$key]['#widget-type'] = $context['widget']->getPluginId();
+        $widget['widget'][$key]['#widget-type'] = $widget_type;
         foreach (Element::children($widget['widget'][$key]) as $child_key) {
-          $widget['widget'][$key][$child_key]['#widget-type'] = $context['widget']->getPluginId();
+          $widget['widget'][$key][$child_key]['#widget-type'] = $widget_type;
+        }
+      }
+    }
+
+    // For media library widgets in ComponentInstanceForm, propagate
+    // #component_prop_name so DefaultImagePreview can identify the prop,
+    // show the default image preview, and enable "Remove default" for
+    // optional image props.
+    $form_object = $form_state->getFormObject();
+    $is_component_instance_form = $form_object !== NULL && $form_object->getFormId() === ComponentInstanceForm::FORM_ID;
+    if ($widget_type === 'media_library_widget' && $is_component_instance_form) {
+      $field_name = $context['items']->getFieldDefinition()->getName();
+      $widget['#component_prop_name'] = $field_name;
+
+      if (isset($widget['widget'])) {
+        $widget['widget']['#component_prop_name'] = $field_name;
+        foreach (Element::children($widget['widget']) as $key) {
+          $widget['widget'][$key]['#component_prop_name'] = $field_name;
         }
       }
     }
@@ -256,7 +286,7 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
     foreach (Element::children($element) as $key) {
       // Mark input elements.
       if (isset($element[$key]['#type']) &&
-          in_array($element[$key]['#type'], ['textfield'], TRUE)) {
+          \in_array($element[$key]['#type'], ['textfield'], TRUE)) {
         $element[$key]['#is_multivalue_form'] = TRUE;
         $element[$key]['#attributes']['data-field-label'] = $field_label;
       }
@@ -347,7 +377,7 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
     // Only proceed if this is a Canvas page data or component instance form.
     // This restructures the render array to simplify integration of the
     // CKEditor5 React component.
-    if (isset($element['#attributes']['data-form-id']) && in_array($element['#attributes']['data-form-id'], [ComponentInstanceForm::FORM_ID, ModuleHooks::PAGE_DATA_FORM_ID], TRUE)) {
+    if (isset($element['#attributes']['data-form-id']) && \in_array($element['#attributes']['data-form-id'], [ComponentInstanceForm::FORM_ID, ModuleHooks::PAGE_DATA_FORM_ID], TRUE)) {
       $element['value']['#attributes']['data-form-id'] = $element['#attributes']['data-form-id'];
       // The data-editor-for attribute triggers a vanilla JS initialization of
       // CKEditor5. Rename the attribute so we can instead use a React-specific
