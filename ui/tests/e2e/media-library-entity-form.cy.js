@@ -38,7 +38,7 @@ const testMediaLibraryInEntityForm = (cy, loadOptions = {}, title) => {
   iterations.forEach((step, ix) => {
     cy.log(`Iteration ${ix + 1}: start`);
     cy.findByRole('dialog').should('not.exist');
-    cy.get('@entityForm').findByRole(step.expectedAlt).should('not.exist');
+    cy.get('@entityForm').findByAltText(step.expectedAlt).should('not.exist');
     if (ix > 0) {
       cy.intercept('POST', '**/canvas/api/v0/layout/**').as('updatePreview');
       const removeIt = `[class*="contextualPanel"] .js-media-library-selection  [aria-label="${step.removeText}"][data-form-id="page_data_form"][data-once="drupal-ajax"][data-ajax="true"]:not(.visually-hidden)`;
