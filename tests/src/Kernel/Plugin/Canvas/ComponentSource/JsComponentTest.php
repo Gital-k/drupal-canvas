@@ -1391,7 +1391,8 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       );
       $rendered_component = $source->renderComponent(self::getDefaultInputForGeneratedInputUx($component), $source->getSlotDefinitions(), 'test-uuid', $preview);
       self::assertArrayHasKey('#import_maps', $rendered_component);
-      self::assertArrayNotHasKey(ImportMapResponseAttachmentsProcessor::SCOPED_IMPORTS, $rendered_component['#import_maps']);
+      self::assertArrayHasKey(ImportMapResponseAttachmentsProcessor::SCOPED_IMPORTS, $rendered_component['#import_maps']);
+      self::assertEmpty($rendered_component['#import_maps'][ImportMapResponseAttachmentsProcessor::SCOPED_IMPORTS]);
       self::assertNotEmpty($rendered_component['#attached']['library']);
       self::assertEmpty(array_filter(
         $rendered_component['#attached']['library'],
