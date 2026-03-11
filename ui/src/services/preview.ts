@@ -20,6 +20,7 @@ import type {
 import type { EditorFrameContext } from '@/features/ui/uiSlice';
 import type { ConflictError } from '@/services/pendingChangesApi';
 import type { AutoSavesHash } from '@/types/AutoSaves';
+import type { InputUIData } from '@/types/Form';
 
 export type UpdateComponentResultType = {
   html: string;
@@ -152,3 +153,30 @@ export const selectUpdateComponentLoadingState: (
     return selectUpdateComponentSelector(state).isLoading;
   },
 );
+
+export const patchComponent = (payload: {
+  inputUiData: InputUIData;
+  model: Omit<ComponentModel, 'name'> | Omit<EvaluatedComponentModel, 'name'>;
+}) => {
+  return (dispatch: any, getState: () => RootState) => {
+    const { model, inputUiData } = payload;
+    if (
+      !inputUiData.selectedComponent ||
+      inputUiData.selectedComponent === 'noop'
+    ) {
+      return;
+    }
+    const { selectedComponent, version, selectedComponentType } = inputUiData;
+    const state = getState();
+
+    // Dispatch the mutation
+    return dispatch(
+      previewApi.endpoints.updateComponent.initiate({
+        type: state.ui.editorFrameContext,
+        componentInstanceUuid: selectedComponent,
+        componentType: `${selectedComponentType}@${version}`,
+        model,
+      }),
+    );
+  };
+};
