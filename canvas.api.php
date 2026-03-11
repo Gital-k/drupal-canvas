@@ -10,6 +10,7 @@ use Drupal\canvas\PropExpressions\StructuredData\FieldTypePropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\canvas\PropShape\CandidateStorablePropShape;
+use Drupal\canvas\Render\ImportMapResponseAttachmentsProcessor;
 use Drupal\canvas\TypedData\BetterEntityDataDefinition;
 
 /**
@@ -125,10 +126,10 @@ function hook_canvas_importmap_alter(array &$import_maps): void {
   $module_path = \Drupal::service('extension.path.resolver')->getPath('module', 'my_module');
 
   // Add a new globally available package for code components.
-  $import_maps['imports']['my-library'] = \base_path() . $module_path . '/js/my-library.js';
+  $import_maps[ImportMapResponseAttachmentsProcessor::GLOBAL_IMPORTS]['my-library'] = \base_path() . $module_path . '/js/my-library.js';
 
   // Replace an existing global import with a custom build.
-  $import_maps['imports']['clsx'] = \base_path() . $module_path . '/js/custom-clsx.js';
+  $import_maps[ImportMapResponseAttachmentsProcessor::GLOBAL_IMPORTS]['clsx'] = \base_path() . $module_path . '/js/custom-clsx.js';
 }
 
 /**
