@@ -3,7 +3,10 @@ import { v4 as uuidv4 } from 'uuid';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 
 import { syncPropSourcesToResolvedValues } from '@/components/form/InputBehaviorsComponentPropsForm';
-import { selectEditorFrameContext } from '@/features/ui/uiSlice';
+import {
+  EditorFrameContext,
+  selectEditorFrameContext,
+} from '@/features/ui/uiSlice';
 import { previewApi } from '@/services/preview';
 import { hasSlotDefinitions, isPropSourceComponent } from '@/types/Component';
 import {
@@ -24,10 +27,11 @@ import {
 import type { PayloadAction } from '@reduxjs/toolkit';
 import type { StateWithHistory } from 'redux-undo';
 import type { AppThunk, RootState } from '@/app/store';
-import type { EditorFrameContext } from '@/features/ui/uiSlice';
 import type {
   CanvasComponent,
   ComponentsList,
+  DefaultValues,
+  FieldDataItem,
   PropSourceComponent,
 } from '@/types/Component';
 import type { InputUIData } from '@/types/Form';
@@ -720,6 +724,66 @@ export const updateExistingComponentValues =
     // update is complete.
     if (resetSelection) {
       componentSelectionUtils.setSelectedComponent(resetSelection);
+    }
+  };
+
+export const _unlinkPropFromEntityValue =
+  (payload: {
+    propName: string;
+    componentToUpdateId: string;
+    inputUIData: InputUIData;
+  }): AppThunk =>
+  async (dispatch, getState) => {
+    const state = getState();
+    const components: ComponentsList | undefined = state?.componentAndLayoutApi
+      ?.queries?.['getComponents(undefined)']?.data as
+      | ComponentsList
+      | undefined;
+    if (!components) {
+      console.warn('No components list found, cannot update component values.');
+      return;
+    }
+    const { propName, componentToUpdateId, inputUIData } = payload;
+    const { selectedComponentType, version } = inputUIData;
+    const model = selectModel(state)[componentToUpdateId];
+    const component: CanvasComponent | undefined =
+      components?.[selectedComponentType];
+    if (!component) {
+      return;
+    }
+    const propData: FieldDataItem | undefined = (
+      component as PropSourceComponent
+    ).propSources?.[propName];
+    if (!propData) {
+      return;
+    }
+    const default_values: DefaultValues = propData?.default_values || {};
+    if (isEvaluatedComponentModel(model)) {
+      const valuePayload = {
+        type: EditorFrameContext.TEMPLATE,
+        componentInstanceUuid: componentToUpdateId,
+        componentType: `${selectedComponentType}@${version}`,
+        model: {
+          ...model,
+          source: {
+            ...model.source,
+            [propName]: {
+              expression: propData.expression,
+              sourceType: propData.sourceType,
+              sourceTypeSettings: propData.sourceTypeSettings,
+            },
+          },
+          resolved: {
+            ...model.resolved,
+            [propName]: default_values.resolved,
+          },
+        },
+      };
+      await dispatch(
+        previewApi.endpoints.updateComponent.initiate(valuePayload, {
+          fixedCacheKey: componentToUpdateId,
+        }),
+      );
     }
   };
 
