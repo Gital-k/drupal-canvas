@@ -69,6 +69,7 @@ export interface uiSliceState {
   viewportMinHeight: number;
   editorViewPort: EditorViewPort;
   latestUndoRedoActionId: string;
+  needsPreviewAfterUndoRedo: boolean;
   firstLoadComplete: boolean;
   editorFrameMode: EditorFrameMode;
   editorFrameContext: EditorFrameContext;
@@ -113,6 +114,7 @@ export const initialState: uiSliceState = {
     hash: '',
   },
   latestUndoRedoActionId: '',
+  needsPreviewAfterUndoRedo: false,
   firstLoadComplete: false,
   editorFrameMode: EditorFrameMode.EDIT,
   editorFrameContext: EditorFrameContext.NONE,
@@ -220,9 +222,13 @@ export const uiSlice = createAppSlice({
           undoStack,
           redoStack,
           currentRoute: routeToRestore || state.currentRoute,
+          needsPreviewAfterUndoRedo: true,
         };
       },
     ),
+    clearPreviewAfterUndoRedo: create.reducer((state) => {
+      state.needsPreviewAfterUndoRedo = false;
+    }),
     setPending: create.reducer((state, action: PayloadAction<boolean>) => {
       state.pending = action.payload;
     }),
@@ -417,6 +423,9 @@ export const uiSlice = createAppSlice({
     selectLatestUndoRedoActionId: (ui): string => {
       return ui.latestUndoRedoActionId;
     },
+    selectNeedsPreviewAfterUndoRedo: (ui): boolean => {
+      return ui.needsPreviewAfterUndoRedo;
+    },
     selectFirstLoadComplete: (ui): boolean => {
       return ui.firstLoadComplete;
     },
@@ -484,6 +493,7 @@ export const {
   unsetEditorFrameContext,
   pushUndo,
   performUndoOrRedo,
+  clearPreviewAfterUndoRedo,
   clearUndoRedoHistory,
   clearSelection,
   setSelection,
@@ -507,6 +517,7 @@ export const {
   selectViewportWidth,
   selectViewportMinHeight,
   selectLatestUndoRedoActionId,
+  selectNeedsPreviewAfterUndoRedo,
   selectFirstLoadComplete,
   selectEditorFrameMode,
   selectEditorFrameContext,
