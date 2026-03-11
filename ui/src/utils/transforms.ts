@@ -3,7 +3,6 @@ import type {
   PropSource,
   StaticPropSource,
 } from '@/features/layout/layoutModelSlice';
-import { VALUE_THAT_MEANS_REMOVE } from '@/utils/function-utils';
 
 export interface TransformOptions {
   [key: string]: any;
@@ -45,12 +44,6 @@ const mainProperty: Transformer<{
   multiple?: boolean;
 }> = (value, options): any => {
   const { name = 'value', multiple = false } = options;
-
-  // Pass through the removal sentinel so flaggedForRemoval can detect it
-  // downstream and trigger the fallback to example/default values.
-  if ((value as unknown) === VALUE_THAT_MEANS_REMOVE) {
-    return VALUE_THAT_MEANS_REMOVE;
-  }
 
   // Handle null/undefined input for entire value
   if (value === null || value === undefined) {
@@ -277,18 +270,16 @@ const mediaSelection: Transformer<
 > = (value, options) => {
   const { multiple = false } = options;
   if (!value || typeof value !== 'object' || !('selection' in value)) {
-    // No selection wrapper at all — signal removal so the prop falls back to
-    // example/default via flaggedForRemoval rather than persisting stale data.
-    return VALUE_THAT_MEANS_REMOVE;
+    return null;
   }
   const selection = value.selection;
-  // Treat empty selections (empty object or empty array) as removal.
   if (
     selection === null ||
     selection === undefined ||
+    selection === '' ||
     (typeof selection === 'object' && Object.keys(selection).length === 0)
   ) {
-    return VALUE_THAT_MEANS_REMOVE;
+    return null;
   }
   if (multiple) {
     // For multi-value fields, ensure the selection is an array so downstream
