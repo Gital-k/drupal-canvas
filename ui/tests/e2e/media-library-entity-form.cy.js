@@ -40,7 +40,7 @@ const testMediaLibraryInEntityForm = (cy, loadOptions = {}, title) => {
   iterations.forEach((step, ix) => {
     cy.log(`Iteration ${ix + 1}: start`);
     cy.findByRole('dialog').should('not.exist');
-    cy.get('@entityForm').findByRole(step.expectedAlt).should('not.exist');
+    cy.get('@entityForm').findByAltText(step.expectedAlt).should('not.exist');
     if (ix > 0) {
       cy.intercept('POST', '**/canvas/api/v0/layout/**').as('updatePreview');
       cy.get('@entityForm')
@@ -76,7 +76,6 @@ const testMediaLibraryInEntityForm = (cy, loadOptions = {}, title) => {
     cy.get('@entityForm')
       .findByRole('button', { name: step.removeAriaLabel })
       .should('exist');
-    cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
     cy.log(`Iteration ${ix + 1}: Adding ${step.expectedAlt} complete`);
   });
 

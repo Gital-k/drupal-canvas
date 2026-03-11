@@ -4,10 +4,12 @@ import { Command } from 'commander';
 
 import packageJson from '../package.json';
 import { buildCommand } from './commands/build';
+import { buildDeprecatedCommand } from './commands/build-deprecated';
 import { downloadCommand } from './commands/download';
 import { scaffoldCommand } from './commands/scaffold';
 import { uploadCommand } from './commands/upload';
 import { validateCommand } from './commands/validate';
+import { handleLegacyComponentDirMigration } from './config';
 
 const version = (packageJson as { version?: string }).version;
 
@@ -21,8 +23,16 @@ program
 downloadCommand(program);
 scaffoldCommand(program);
 uploadCommand(program);
-buildCommand(program);
+buildDeprecatedCommand(program);
 validateCommand(program);
+buildCommand(program);
+
+program.hook('preAction', async (command) => {
+  const commandOptions = command.opts?.() as { yes?: boolean };
+  await handleLegacyComponentDirMigration({
+    skipPrompt: Boolean(commandOptions?.yes),
+  });
+});
 
 // Handle errors
 program.showHelpAfterError();

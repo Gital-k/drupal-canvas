@@ -7,8 +7,10 @@ import * as p from '@clack/prompts';
 import {
   ensureConfig,
   getConfig,
+  handleLegacyComponentDirMigration,
   loadEnvFiles,
   promptForConfig,
+  resetLegacyComponentDirMigrationForTests,
   setConfig,
 } from './config';
 
@@ -32,11 +34,14 @@ describe('config', () => {
     it('should return default config values', () => {
       const config = getConfig();
       expect(config).toEqual({
-        siteUrl: '',
+        aliasBaseDir: 'src',
         clientId: '',
         clientSecret: '',
-        scope: 'canvas:js_component canvas:asset_library',
         componentDir: './components',
+        deprecatedComponentDir: './components',
+        outputDir: 'dist',
+        scope: 'canvas:js_component canvas:asset_library',
+        siteUrl: '',
         userAgent: '',
       });
     });
@@ -47,11 +52,14 @@ describe('config', () => {
         clientId: 'test-client',
       });
       expect(getConfig()).toEqual({
-        siteUrl: 'https://example.com',
+        aliasBaseDir: 'src',
         clientId: 'test-client',
         clientSecret: '',
-        scope: 'canvas:js_component canvas:asset_library',
         componentDir: './components',
+        deprecatedComponentDir: './components',
+        outputDir: 'dist',
+        scope: 'canvas:js_component canvas:asset_library',
+        siteUrl: 'https://example.com',
         userAgent: '',
       });
     });
@@ -170,6 +178,7 @@ describe('config', () => {
       vi.resetModules();
       vi.unstubAllEnvs();
       vi.stubEnv('HOME', '/home/user');
+      resetLegacyComponentDirMigrationForTests();
     });
 
     it('should load from home directory .canvasrc file only', async () => {
@@ -222,18 +231,20 @@ describe('config', () => {
       vi.stubEnv('CANVAS_CLIENT_ID', 'test-client');
       vi.stubEnv('CANVAS_CLIENT_SECRET', 'test-secret');
       vi.stubEnv('CANVAS_SCOPE', 'canvas:js_component canvas:asset_library');
-      vi.stubEnv('CANVAS_COMPONENT_DIR', './test-components');
       vi.stubEnv('CANVAS_USER_AGENT', 'simpletest123456');
 
       // Re-import config to trigger initialization
       const { getConfig } = await import('./config');
 
       expect(getConfig()).toEqual({
-        siteUrl: 'https://test.example.com',
+        aliasBaseDir: 'src',
         clientId: 'test-client',
         clientSecret: 'test-secret',
+        componentDir: process.cwd(),
+        deprecatedComponentDir: './components',
+        outputDir: 'dist',
         scope: 'canvas:js_component canvas:asset_library',
-        componentDir: './test-components',
+        siteUrl: 'https://test.example.com',
         userAgent: 'simpletest123456',
       });
     });
@@ -245,13 +256,95 @@ describe('config', () => {
       const { getConfig } = await import('./config');
 
       expect(getConfig()).toEqual({
+        aliasBaseDir: 'src',
         siteUrl: '',
         clientId: '',
         clientSecret: '',
         scope: 'canvas:js_component canvas:asset_library',
-        componentDir: './components',
+        componentDir: process.cwd(),
+        deprecatedComponentDir: './components',
+        outputDir: 'dist',
         userAgent: '',
       });
+    });
+  });
+
+  describe('legacy componentDir migration', () => {
+    beforeEach(() => {
+      vi.unstubAllEnvs();
+      vi.stubEnv('CANVAS_COMPONENT_DIR', './legacy-components');
+      resetLegacyComponentDirMigrationForTests();
+      vi.mocked(path.resolve).mockReturnValue(
+        '/current/dir/canvas.config.json',
+      );
+      vi.mocked(p.isCancel).mockReturnValue(false);
+    });
+
+    it('should create canvas.config.json when missing and confirmed', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+      vi.mocked(p.confirm).mockResolvedValue(true);
+
+      await handleLegacyComponentDirMigration();
+
+      expect(p.confirm).toHaveBeenCalledWith({
+        message:
+          'Create canvas.config.json with "componentDir": "./legacy-components"?',
+        initialValue: true,
+      });
+      expect(fs.writeFileSync).toHaveBeenCalledTimes(1);
+      const writeContent = vi.mocked(fs.writeFileSync).mock
+        .calls[0][1] as string;
+      expect(JSON.parse(writeContent)).toEqual({
+        componentDir: './legacy-components',
+      });
+      expect(getConfig().componentDir).toBe('./legacy-components');
+      expect(getConfig().deprecatedComponentDir).toBe('./legacy-components');
+    });
+
+    it('should extend existing canvas.config.json when missing componentDir', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue(
+        JSON.stringify({ aliasBaseDir: 'src' }),
+      );
+      vi.mocked(p.confirm).mockResolvedValue(true);
+
+      await handleLegacyComponentDirMigration();
+
+      expect(p.confirm).toHaveBeenCalledWith({
+        message:
+          'Add "componentDir": "./legacy-components" to canvas.config.json?',
+        initialValue: true,
+      });
+      const writeContent = vi.mocked(fs.writeFileSync).mock
+        .calls[0][1] as string;
+      expect(JSON.parse(writeContent)).toEqual({
+        aliasBaseDir: 'src',
+        componentDir: './legacy-components',
+      });
+    });
+
+    it('should not prompt when componentDir already exists in canvas.config.json', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue(
+        JSON.stringify({ componentDir: './components' }),
+      );
+
+      await handleLegacyComponentDirMigration();
+
+      expect(p.confirm).not.toHaveBeenCalled();
+      expect(fs.writeFileSync).not.toHaveBeenCalled();
+    });
+
+    it('should skip prompt in non-interactive mode and show instructions', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+
+      await handleLegacyComponentDirMigration({ skipPrompt: true });
+
+      expect(p.confirm).not.toHaveBeenCalled();
+      expect(fs.writeFileSync).not.toHaveBeenCalled();
+      expect(p.log.info).toHaveBeenCalledWith(
+        'Add "componentDir": "./legacy-components" to canvas.config.json to persist this setting.',
+      );
     });
   });
 });
