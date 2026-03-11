@@ -508,6 +508,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
         'drupal-canvas' => \sprintf('%s/packages/astro-hydration/dist/drupal-canvas.js?2.1.0-alpha3', $module_path),
         '@tailwindcss/typography' => \sprintf('%s/packages/astro-hydration/dist/tailwindcss-typography.js?2.1.0-alpha3', $module_path),
       ],
+      ImportMapResponseAttachmentsProcessor::SCOPED_IMPORTS => [],
     ];
 
     $this->assertEquals([
