@@ -182,11 +182,9 @@ final class Evaluator {
     // @see \Drupal\canvas\PropSource\EntityFieldPropSource::evaluate()
     else {
       \assert($expr instanceof EntityFieldBasedPropExpressionInterface);
-      $entity = $entity_or_field;
+      $entity = \Drupal::service('entity.repository')->getTranslationFromContext($entity_or_field);
       // @todo support non-fieldable entities?
       \assert($entity instanceof FieldableEntityInterface);
-      /** @var \Drupal\Core\Entity\FieldableEntityInterface $entity */
-      $entity = \Drupal::service('entity.repository')->getTranslationFromContext($entity_or_field);
       $entity_access = self::validateAccess($entity, $expr);
       $field_item_list = $entity->get($expr->getFieldName());
       \assert($field_item_list instanceof FieldItemListInterface);
