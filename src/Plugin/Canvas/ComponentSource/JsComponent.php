@@ -177,9 +177,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
     // code component changes, so does the filename.
     // @see \Drupal\canvas\Entity\CanvasAssetLibraryTrait::getJsPath()
     $scoped_map = $this->getScopedDependencies($component, $autoSave, $isPreview);
-    if (count($scoped_map) > 0) {
-      $import_maps[ImportMapResponseAttachmentsProcessor::SCOPED_IMPORTS] = \array_merge($import_maps[ImportMapResponseAttachmentsProcessor::SCOPED_IMPORTS] ?? [], $scoped_map);
-    }
+    $import_maps[ImportMapResponseAttachmentsProcessor::SCOPED_IMPORTS] = \array_merge($import_maps[ImportMapResponseAttachmentsProcessor::SCOPED_IMPORTS], $scoped_map);
 
     $build['#attached']['library'] = \array_merge($build['#attached']['library'], $this->getDependencyLibraries($component, $autoSave, $isPreview));
 

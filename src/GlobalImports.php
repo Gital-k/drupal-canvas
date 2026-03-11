@@ -23,10 +23,13 @@ class GlobalImports {
     private readonly ThemeManagerInterface $themeManager,
   ) {}
 
+  /**
+   * @return array{imports: array<string, string>, scopes: array<string, array<string, string>>}
+   */
   public function getImportMap(): array {
     $base_path = \base_path();
-
     $canvas_path = $this->extensionPathResolver->getPath('module', 'canvas');
+
     // Build base import map.
     // Whenever updating this import map, also update the list of supported
     // imports in `packages/eslint-config/src/rules/component-imports.ts`.
@@ -56,6 +59,7 @@ class GlobalImports {
         '@/lib/jsonapi-utils' => \sprintf('%s%s/packages/astro-hydration/dist/jsonapi-utils.js', $base_path, $canvas_path),
         '@/lib/drupal-utils' => \sprintf('%s%s/packages/astro-hydration/dist/drupal-utils.js', $base_path, $canvas_path),
       ],
+      ImportMapResponseAttachmentsProcessor::SCOPED_IMPORTS => [],
     ];
     // Allow modules and themes to alter the import map.
     // @todo Deprecate hook_canvas_importmap_alter() in favor of Drupal core's hook_importmap_alter() when https://www.drupal.org/i/3398525 lands.
