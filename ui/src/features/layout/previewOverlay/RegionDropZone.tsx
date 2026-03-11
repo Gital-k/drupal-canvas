@@ -5,6 +5,7 @@ import { useDroppable } from '@dnd-kit/core';
 
 import { useAppSelector } from '@/app/hooks';
 import { selectLayout } from '@/features/layout/layoutModelSlice';
+import { useDraggedItemInfo } from '@/hooks/useIsDropAllowed';
 
 import type React from 'react';
 import type { RegionNode } from '@/features/layout/layoutModelSlice';
@@ -20,6 +21,7 @@ const RegionDropZone: React.FC<RegionDropZoneProps> = (props) => {
   const layout = useAppSelector(selectLayout);
   const [activeOrigin, setActiveOrigin] = useState('');
   const accepts = ['overlay', 'library'];
+  const { hasSlotRestrictions } = useDraggedItemInfo();
 
   const regionIndex = layout.findIndex((r) => r.id === region.id);
   const regionPath = [regionIndex];
@@ -37,7 +39,7 @@ const RegionDropZone: React.FC<RegionDropZoneProps> = (props) => {
     active,
   } = useDroppable({
     id: `${region.id}_${position}`,
-    disabled: !accepts.includes(activeOrigin),
+    disabled: !accepts.includes(activeOrigin) || hasSlotRestrictions,
     data: {
       region: region,
       parentRegion: region,

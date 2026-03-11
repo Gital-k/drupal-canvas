@@ -732,6 +732,8 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
       'examples',
       // @see https://www.drupal.org/i/3514072
       'expected',
+      // Legacy Canvas property, supported alongside 'expected'.
+      'allowedComponents',
     ]));
   }
 

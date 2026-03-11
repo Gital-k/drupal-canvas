@@ -74,11 +74,6 @@ export function useIsDropAllowed(
     return !isRestricted;
   }
 
-  // If not restricted, allow all drops
-  if (!isRestricted) {
-    return true;
-  }
-
   // Strip version suffix from parent component type (e.g., '@abc123')
   const [cleanParentType] = parentComponentType.split('@');
 
@@ -88,8 +83,9 @@ export function useIsDropAllowed(
     | undefined;
 
   if (!parentComponent?.metadata?.slots) {
-    // Parent has no slots defined, restricted items cannot drop here
-    return false;
+    // Parent has no slots defined
+    // Restricted items cannot drop here; unrestricted items can
+    return !isRestricted;
   }
 
   // Find the slot definition by matching slot name or id
@@ -100,8 +96,9 @@ export function useIsDropAllowed(
   const allowedInSlot = getSlotAllowedComponentIds(slotDefinition, components);
 
   if (!allowedInSlot) {
-    // No expected/allowedComponents restriction on this slot, restricted items cannot drop here
-    return false;
+    // No expected/allowedComponents restriction on this slot
+    // Restricted items cannot drop here; unrestricted items can
+    return !isRestricted;
   }
 
   // Check if the dragged item is in the resolved allowed list

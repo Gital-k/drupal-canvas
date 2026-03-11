@@ -12,6 +12,7 @@ import {
   setListDragging,
   setPreviewDragging,
   setTargetSlot,
+  setTargetSlotInfo,
   setTreeDragging,
   setUpdatingComponent,
   unsetTargetSlot,
@@ -160,8 +161,21 @@ const DragEventsHandler: React.FC = () => {
 
     if (parentRegion) {
       dispatch(setTargetSlot(parentRegion.id));
+      dispatch(setTargetSlotInfo(undefined));
     } else if (parentSlot) {
       dispatch(setTargetSlot(parentSlot.id));
+      const parentComponentType =
+        over?.data?.current?.component?.type as string | undefined;
+      if (parentComponentType) {
+        dispatch(
+          setTargetSlotInfo({
+            slotId: parentSlot.name || parentSlot.id,
+            parentComponentType,
+          }),
+        );
+      } else {
+        dispatch(setTargetSlotInfo(undefined));
+      }
     }
   }
 
@@ -171,6 +185,7 @@ const DragEventsHandler: React.FC = () => {
     dispatch(setTreeDragging(false));
     dispatch(setCodeDragging(false));
     dispatch(unsetTargetSlot());
+    dispatch(setTargetSlotInfo(undefined));
     setIsDraggingFolder(false);
     setIsFolderAtBoundary(false);
     window.document.body.classList.remove(styles.dragging);

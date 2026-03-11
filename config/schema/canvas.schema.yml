@@ -400,6 +400,14 @@ canvas.slot_definition:
       sequence:
         type: string
         label: 'A component ID or tag'
+    # Legacy Canvas property, supported alongside 'expected'.
+    allowedComponents:
+      type: sequence
+      label: 'Allowed components'
+      requiredKey: false
+      sequence:
+        type: string
+        label: 'A component ID'
 
 canvas.component_source_local_id.sdc:
   type: canvas.component_source_local_id.*

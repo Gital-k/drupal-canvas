@@ -8,6 +8,7 @@ import { useAppSelector } from '@/app/hooks';
 import { selectLayout } from '@/features/layout/layoutModelSlice';
 import { findNodePathByUuid } from '@/features/layout/layoutUtils';
 import useGetComponentName from '@/hooks/useGetComponentName';
+import { useIsDropAllowed } from '@/hooks/useIsDropAllowed';
 
 import type React from 'react';
 import type {
@@ -28,6 +29,7 @@ const EmptySlotDropZone: React.FC<EmptySlotDropZoneProps> = (props) => {
   const [activeName, setActiveName] = useState('');
   const [activeOrigin, setActiveOrigin] = useState('');
   const parentComponentName = useGetComponentName(parentComponent);
+  const isDropAllowed = useIsDropAllowed(slot, parentComponent.type);
 
   const slotPath = findNodePathByUuid(layout, slot.id);
   if (!slotPath) {
@@ -44,7 +46,7 @@ const EmptySlotDropZone: React.FC<EmptySlotDropZoneProps> = (props) => {
     active,
   } = useDroppable({
     id: `${slot.id}`,
-    disabled: !accepts.includes(activeOrigin),
+    disabled: !accepts.includes(activeOrigin) || !isDropAllowed,
     data: {
       component: parentComponent,
       parentSlot: slot,

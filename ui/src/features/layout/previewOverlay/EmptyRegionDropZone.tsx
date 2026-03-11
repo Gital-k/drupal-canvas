@@ -9,6 +9,7 @@ import { Text } from '@radix-ui/themes';
 import { useAppSelector } from '@/app/hooks';
 import { selectLayout } from '@/features/layout/layoutModelSlice';
 import { selectEditorFrameContext } from '@/features/ui/uiSlice';
+import { useDraggedItemInfo } from '@/hooks/useIsDropAllowed';
 import { useTemplateCaption } from '@/hooks/useTemplateCaption';
 
 import type React from 'react';
@@ -26,6 +27,7 @@ const EmptyRegionDropZone: React.FC<EmptyRegionDropZoneProps> = (props) => {
   const [activeOrigin, setActiveOrigin] = useState('');
   const isTemplateRoute =
     useAppSelector(selectEditorFrameContext) === 'template';
+  const { hasSlotRestrictions } = useDraggedItemInfo();
 
   const regionIndex = layout.findIndex((r) => r.id === region.id);
   const regionPath = [regionIndex, 0];
@@ -37,7 +39,7 @@ const EmptyRegionDropZone: React.FC<EmptyRegionDropZoneProps> = (props) => {
     active,
   } = useDroppable({
     id: region.id,
-    disabled: !accepts.includes(activeOrigin),
+    disabled: !accepts.includes(activeOrigin) || hasSlotRestrictions,
     data: {
       region: region,
       parentRegion: region,

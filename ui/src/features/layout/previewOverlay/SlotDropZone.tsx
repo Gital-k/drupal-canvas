@@ -5,6 +5,7 @@ import { useDroppable } from '@dnd-kit/core';
 import { useAppSelector } from '@/app/hooks';
 import { selectLayout } from '@/features/layout/layoutModelSlice';
 import { findNodePathByUuid } from '@/features/layout/layoutUtils';
+import { useIsDropAllowed } from '@/hooks/useIsDropAllowed';
 
 import type React from 'react';
 import type {
@@ -26,6 +27,7 @@ const SlotDropZone: React.FC<SlotDropZoneProps> = (props) => {
   const layout = useAppSelector(selectLayout);
   const [activeOrigin, setActiveOrigin] = useState('');
   const accepts = ['overlay', 'library'];
+  const isDropAllowed = useIsDropAllowed(slot, parentComponent?.type);
 
   const slotPath = findNodePathByUuid(layout, slot.id);
   if (!slotPath) {
@@ -40,7 +42,7 @@ const SlotDropZone: React.FC<SlotDropZoneProps> = (props) => {
     active,
   } = useDroppable({
     id: `${slot.id}_${position}`,
-    disabled: !accepts.includes(activeOrigin),
+    disabled: !accepts.includes(activeOrigin) || !isDropAllowed,
     data: {
       slot: slot,
       component: parentComponent,

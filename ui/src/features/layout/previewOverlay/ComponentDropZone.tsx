@@ -7,6 +7,7 @@ import { useAppSelector } from '@/app/hooks';
 import { selectLayout } from '@/features/layout/layoutModelSlice';
 import { findNodePathByUuid } from '@/features/layout/layoutUtils';
 import useGetComponentName from '@/hooks/useGetComponentName';
+import { useIsDropAllowed } from '@/hooks/useIsDropAllowed';
 
 import type React from 'react';
 import type {
@@ -22,14 +23,17 @@ export interface ComponentDropZoneProps {
   position: 'top' | 'bottom' | 'left' | 'right';
   parentSlot?: SlotNode;
   parentRegion?: RegionNode;
+  parentComponentType?: string;
 }
 const ComponentDropZone: React.FC<ComponentDropZoneProps> = (props) => {
-  const { component, position, parentSlot, parentRegion } = props;
+  const { component, position, parentSlot, parentRegion, parentComponentType } =
+    props;
   const layout = useAppSelector(selectLayout);
   const [draggedItem, setDraggedItem] = useState('');
   const componentName = useGetComponentName(component);
   const [activeOrigin, setActiveOrigin] = useState('');
   const accepts = ['overlay', 'library'];
+  const isDropAllowed = useIsDropAllowed(parentSlot, parentComponentType);
 
   function getPositionRelation(position: ComponentDropZoneProps['position']) {
     return position === 'top' || position === 'left' ? 'before' : 'after';
@@ -53,7 +57,10 @@ const ComponentDropZone: React.FC<ComponentDropZoneProps> = (props) => {
     active,
   } = useDroppable({
     id: `${component.uuid}_${position}`,
-    disabled: draggedItem === component.uuid || !accepts.includes(activeOrigin),
+    disabled:
+      draggedItem === component.uuid ||
+      !accepts.includes(activeOrigin) ||
+      !isDropAllowed,
     data: {
       component: component,
       parentSlot: parentSlot,

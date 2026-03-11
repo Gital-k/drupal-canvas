@@ -37,6 +37,7 @@ export interface ComponentOverlayProps {
   iframeRef: React.RefObject<HTMLIFrameElement>;
   parentSlot?: SlotNode;
   parentRegion?: RegionNode;
+  parentComponentType?: string;
   index: number;
   disableDrop?: boolean;
   forceRecalculate?: number; // Increment this prop to trigger a re-calculation of the component overlay's border rect
@@ -47,6 +48,7 @@ const ComponentOverlay: React.FC<ComponentOverlayProps> = (props) => {
     component,
     parentSlot,
     parentRegion,
+    parentComponentType,
     iframeRef,
     index,
     disableDrop = false,
@@ -240,6 +242,7 @@ const ComponentOverlay: React.FC<ComponentOverlayProps> = (props) => {
               position={stackDirection.startsWith('v') ? 'top' : 'left'}
               parentSlot={parentSlot}
               parentRegion={parentRegion}
+              parentComponentType={parentComponentType}
             />
           )}
           <ComponentDropZone
@@ -247,6 +250,7 @@ const ComponentOverlay: React.FC<ComponentOverlayProps> = (props) => {
             position={stackDirection.startsWith('v') ? 'bottom' : 'right'}
             parentSlot={parentSlot}
             parentRegion={parentRegion}
+            parentComponentType={parentComponentType}
           />
         </>
       )}

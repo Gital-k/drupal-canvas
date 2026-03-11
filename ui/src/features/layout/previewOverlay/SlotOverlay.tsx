@@ -150,6 +150,7 @@ const SlotOverlay: React.FC<SlotOverlayProps> = (props) => {
           key={childComponent.uuid}
           iframeRef={iframeRef}
           parentSlot={slot}
+          parentComponentType={parentComponent.type}
           component={childComponent}
           index={index}
           disableDrop={disableDrop}
