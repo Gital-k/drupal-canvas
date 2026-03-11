@@ -21,17 +21,17 @@ const walk = (dir) => {
   return files.reduce((all, folderContents) => all.concat(folderContents), []);
 };
 
-const ALLOWED_SPECS = [
-  'image-code-component.cy.js',
-  'media-library.cy.js',
-  'media-library-component-instance.cy.js',
-];
+// const ALLOWED_SPECS = [
+//   'image-code-component.cy.js',
+//   'media-library.cy.js',
+//   'media-library-component-instance.cy.js',
+// ];
 
 const getSpecFiles = () =>
   walk(TEST_FOLDER)
     .sort()
     .filter((item) => !!item)
-    .filter((item) => ALLOWED_SPECS.some((spec) => item.endsWith(spec)))
+    // .filter((item) => ALLOWED_SPECS.some((spec) => item.endsWith(spec)))
     .filter((_, index) => index % NODE_TOTAL === NODE_INDEX - 1);
 
 console.log(getSpecFiles().join(','));
