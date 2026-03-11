@@ -1,5 +1,7 @@
 import clsx from 'clsx';
 
+import { a2p } from '@/local_packages/utils';
+
 import { interceptNativeSetter } from './formChangeUtils';
 
 import type { Attributes } from '@/types/DrupalAttribute';
@@ -17,7 +19,7 @@ const TextField = ({
     <div className={styles.wrap}>
       <input
         autoComplete="off"
-        {...attributes}
+        {...a2p(attributes)}
         className={clsx(styles.root, className)}
         ref={(element) => {
           if (element) {

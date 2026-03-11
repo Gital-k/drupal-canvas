@@ -64,7 +64,7 @@ jQuery(document).on('ajaxStop', () => {
   // synthesized event object, it does not perfectly replicate a
   // naturally occurring event. We fire a CustomEvent to allow listeners added
   // in components to fire.
-  // @see inputBehaviors.tsx
+  // @see createEnhancedOnChange in '@/components/form/wrapRHF-utils'
   // @see https://api.jquery.com/trigger/
   document.dispatchEvent(new CustomEvent('drupalAjaxStop'));
 });
@@ -258,7 +258,7 @@ if (container) {
     const updates = updatedInputs
       .map((el) => {
         // For each element, parse out its attributes. These are JSON sent by
-        // the canvas_stark.theme with the semi_coupled theme engine.
+        // the canvas_stark.theme.
         return JSON.parse(el.getAttribute('attributes') || '{}');
       })
       // Build a key-value pair of input names and values.

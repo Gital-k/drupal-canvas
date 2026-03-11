@@ -114,7 +114,6 @@ scriptification
 scriptified
 scriptify
 sdcs
-semicoupled
 shadcn
 sonner
 sparkline
@@ -122,6 +121,7 @@ Starshot
 subcontent
 subroute
 subtrigger
+subtyping
 supersets
 superstrongpassword
 SVAY

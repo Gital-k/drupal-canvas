@@ -32,8 +32,8 @@ a.tabledrag-handle .handle.handle {
   max-width: unset;
 }
 
-/* This fragment is used only for wrapping and should not impact layouts. */
-drupal-html-fragment {
+/* These fragments are used only for wrapping and should not impact layouts. */
+drupal-html-fragment, element-prop {
   display: contents;
 }
 
@@ -44,7 +44,6 @@ drupal-html-fragment {
 [data-canvas-layout-request-in-progress] [data-once="drupal-ajax"],
 [data-canvas-layout-request-in-progress] .use-ajax,
 [data-canvas-layout-request-in-progress] .use-ajax-submit{
-  /*background-color: #f8f9ff;*/
   background: linear-gradient(
     90deg,
     #dfebf3 0%,
@@ -79,4 +78,8 @@ drupal-html-fragment {
 
 [data-invalid-prop-value][data-invalid-prop-value] {
   outline: 1px solid red;
+}
+.canvas-linked-prop-label-wrapper--multiple-values {
+  display: flex;
+  align-items: center;
 }
