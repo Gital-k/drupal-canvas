@@ -12,12 +12,11 @@
 
 .content {
   overflow: hidden;
-
-  &[data-state="open"] {
-    animation: slide-down 200ms ease-in-out;
-  }
+  height: 0;
+  transition: height 200ms ease-in-out;
+  height: var(--radix-collapsible-content-height);
   &[data-state="closed"] {
-    animation: slide-up 200ms ease-in-out;
+    max-height: 0;
   }
 }
 
@@ -36,27 +35,5 @@
   color: var(--slate-12);
   .trigger[data-state="open"] > & {
     transform: rotate(90deg);
-  }
-}
-
-@keyframes slide-down {
-  from {
-    height: 0;
-    opacity: 0;
-  }
-  to {
-    height: var(--content-height);
-    opacity: 1;
-  }
-}
-
-@keyframes slide-up {
-  from {
-    height: var(--content-height);
-    opacity: 1;
-  }
-  to {
-    height: 0;
-    opacity: 0;
   }
 }

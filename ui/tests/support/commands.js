@@ -1365,3 +1365,14 @@ Cypress.Commands.add('insertComponent', (identifier, options = {}) => {
     }
   });
 });
+
+// Represents a wait that does not exceed how long it would take for a real
+// user to proceed with a subsequent action. Intended to be used for actions
+// that would only fail if they occur faster than a user could reasonably
+// perform them.
+// This is especially true for excessive preview requests, which are queued to
+// prevent parallel requests. This works fine at even the fastest human speed,
+// but becomes less stable at automated speeds.
+Cypress.Commands.add('reasonableWait', () => {
+  cy.wait(100);
+});
