@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
+import { useAppSelector } from '@/app/hooks';
+import { selectIsReordering } from '@/features/mediaLibrary/mediaLibrarySlice';
 import useMutationObserver from '@/hooks/useMutationObserver';
 import { a2p } from '@/local_packages/utils';
 import { VALUE_THAT_MEANS_REMOVE } from '@/utils/function-utils';
@@ -9,6 +11,9 @@ import type { Attributes } from '@/types/DrupalAttribute';
 const Hidden = ({ attributes }: { attributes?: Attributes }) => {
   const [value, setValue] = useState(attributes?.value || '');
   const ref = useRef<HTMLInputElement | null>(null);
+  const isReordering = useAppSelector(selectIsReordering);
+  const isReorderingRef = useRef(isReordering);
+  isReorderingRef.current = isReordering;
 
   useEffect(() => {
     // Add a mutation observer to the form element this input belongs to. This
@@ -35,7 +40,10 @@ const Hidden = ({ attributes }: { attributes?: Attributes }) => {
             // Call the onChange listener so the Redux store is updated.
             if (
               attributes?.onChange &&
-              typeof attributes.onChange === 'function'
+              typeof attributes.onChange === 'function' &&
+              // Drag-and-drop reordering temporarily removes and re-adds DOM
+              // elements, which should not be treated as a true removal.
+              !isReorderingRef.current
             ) {
               const event = new Event('change');
               ref.current!.value = VALUE_THAT_MEANS_REMOVE;

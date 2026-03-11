@@ -72,6 +72,8 @@ describe('📸️ Code image component', () => {
 
       // Removing the media item should fall back to the default because the
       // image is optional
+      // eslint-disable-next-line cypress/no-unnecessary-waiting
+      cy.wait(1000);
       cy.waitForElementInIframe(
         'img[src*="https://placehold.co/1200x900@2x.png"]',
         iframeSelector,

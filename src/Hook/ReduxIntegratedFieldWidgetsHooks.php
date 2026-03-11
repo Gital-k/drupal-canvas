@@ -6,6 +6,7 @@ namespace Drupal\canvas\Hook;
 
 use Drupal\Component\Serialization\Json;
 use Drupal\Core\Asset\LibraryDiscoveryInterface;
+use Drupal\Core\Extension\ModuleExtensionList;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Hook\Order\OrderAfter;
 use Drupal\Core\Security\TrustedCallbackInterface;
@@ -33,6 +34,7 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
     private readonly LibraryDiscoveryInterface $libraryDiscovery,
     private readonly RequestStack $requestStack,
     private readonly ThemeManagerInterface $themeManager,
+    private readonly ModuleExtensionList $extensionList,
   ) {
   }
 
@@ -71,6 +73,16 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
       // contains the default CSS of the admin theme.
       // @see \Drupal\canvas\Hook\LibraryHooks::customizeDialogLibrary()
       $libraries['ui']['dependencies'][] = 'canvas/canvas.scoped.admin.css';
+      // Replace core's media library widget JS with a Canvas override that
+      // supports multi-cardinality fields with custom weight field naming
+      // patterns. This must happen at the library definition level (not in
+      // hook_js_alter) so that JS aggregation picks up the correct file.
+      // @see js/media_library.widget.overrides.js
+      if (isset($libraries['widget']['js']['js/media_library.widget.js'])) {
+        $canvas_path = $this->extensionList->getPath('canvas');
+        $libraries['widget']['js']['/' . $canvas_path . '/js/media_library.widget.overrides.js'] = $libraries['widget']['js']['js/media_library.widget.js'];
+        unset($libraries['widget']['js']['js/media_library.widget.js']);
+      }
     }
   }
 
@@ -114,12 +126,14 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
 
       // Most hidden fields are read only. Add an attribute that allows it to be
       // updated and tracked in Redux form state.
-      if (isset($form['selection'][0]['target_id'])) {
-        $form['selection'][0]['target_id']['#attributes']['data-track-hidden-value'] = 'true';
-      }
-
       $selections = $form['selection'] ?? [];
       foreach (Element::children($selections) as $key) {
+        if (isset($form['selection'][$key]['target_id'])) {
+          $form['selection'][$key]['target_id']['#attributes']['data-track-hidden-value'] = 'true';
+        }
+        if (isset($form['selection'][$key]['weight'])) {
+          $form['selection'][$key]['weight']['#attributes']['data-track-hidden-value'] = 'true';
+        }
         $form['selection'][$key]['remove_button']['#attributes']['data-canvas-media-remove-button'] = 'true';
       }
 
@@ -273,7 +287,7 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
   #[Hook('field_widget_info_alter')]
   public function fieldWidgetInfoAlter(array &$info): void {
     $map = [
-      'boolean_checkbox' => ['mainProperty' => ['list' => \FALSE]],
+      'boolean_checkbox' => ['mainProperty' => []],
       'datetime_default' => ['mainProperty' => [], 'dateTime' => []],
       'email_default' => ['mainProperty' => []],
       'file_generic' => ['mainProperty' => ['name' => 'fids']],

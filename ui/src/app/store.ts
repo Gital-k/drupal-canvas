@@ -15,6 +15,7 @@ import {
   setInitialLayoutModel,
   setUpdatePreview,
 } from '@/features/layout/layoutModelSlice';
+import { mediaLibrarySlice } from '@/features/mediaLibrary/mediaLibrarySlice';
 import {
   pageDataReducer,
   setInitialPageData,
@@ -150,6 +151,7 @@ const rootReducer = combineSlices(
   codeComponentDialogSlice,
   uiSlice,
   formStateSlice,
+  mediaLibrarySlice,
   extensionsSlice,
   pendingChangesApi,
   publishReviewSlice,
