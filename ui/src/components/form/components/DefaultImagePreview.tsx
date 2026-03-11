@@ -8,7 +8,7 @@ import {
 } from '@/features/ui/uiSlice';
 import useInputUIData from '@/hooks/useInputUIData';
 import useMutationObserver from '@/hooks/useMutationObserver';
-import { useUpdateComponentMutation } from '@/services/preview';
+import { patchComponent } from '@/services/preview';
 import { isPropSourceComponent } from '@/types/Component';
 
 import type { CodeComponentPropImageExample } from '@/types/CodeComponent';
@@ -57,18 +57,13 @@ const isEmptyValue = (value: unknown): boolean => {
 
 const DefaultImagePreview = ({ propName }: DefaultImagePreviewProps) => {
   const editorFrameContext = useAppSelector(selectEditorFrameContext);
+  const inputUiData = useInputUIData();
   const {
     selectedComponent: selectedComponentId,
     components,
     selectedComponentType,
-    version,
     model,
-  } = useInputUIData();
-
-  const [patchComponent] = useUpdateComponentMutation({
-    fixedCacheKey: selectedComponentId,
-  });
-
+  } = inputUiData;
   const [hasMediaInWidget, setHasMediaInWidget] = useState(false);
   const fieldsetRef = useRef<Element | null>(null);
 
@@ -159,9 +154,7 @@ const DefaultImagePreview = ({ propName }: DefaultImagePreviewProps) => {
     }
 
     patchComponent({
-      type: editorFrameContext,
-      componentInstanceUuid: selectedComponentId,
-      componentType: `${selectedComponentType}@${version}`,
+      inputUiData,
       model: {
         source: {
           ...selectedModel.source,

@@ -17,16 +17,11 @@ import {
   clearFieldValues,
   selectFormValues,
 } from '@/features/form/formStateSlice';
-import {
-  isEvaluatedComponentModel,
-  selectLayout,
-  selectModel,
-} from '@/features/layout/layoutModelSlice';
+import { isEvaluatedComponentModel } from '@/features/layout/layoutModelSlice';
 import { findComponentByUuid } from '@/features/layout/layoutUtils';
 import {
   selectEditorFrameContext,
   selectLatestUndoRedoActionId,
-  selectSelectedComponentUuid,
 } from '@/features/ui/uiSlice';
 import { useDrupalBehaviors } from '@/hooks/useDrupalBehaviors';
 import useInputUIData from '@/hooks/useInputUIData';
@@ -35,8 +30,8 @@ import propsify from '@/local_packages/hyperscriptify/propsify/standard/index.js
 import { useGetComponentsQuery } from '@/services/componentAndLayout';
 import { useGetComponentInstanceFormQuery } from '@/services/componentInstanceForm';
 import {
+  patchComponent,
   selectUpdateComponentLoadingState,
-  useUpdateComponentMutation,
 } from '@/services/preview';
 import { AJAX_UPDATE_FORM_STATE_EVENT } from '@/types/Ajax';
 import { isPropSourceComponent } from '@/types/Component';
@@ -71,8 +66,8 @@ const ComponentInstanceFormRenderer: React.FC<
   );
   const { queryString } = props;
   const { showBoundary } = useErrorBoundary();
-  const inputAndUiData: InputUIData = useInputUIData();
-  const { selectedComponentType, version, selectedComponent } = inputAndUiData;
+  const inputUiData: InputUIData = useInputUIData();
+  const { selectedComponentType, selectedComponent } = inputUiData;
   const editorFrameContext = useAppSelector(selectEditorFrameContext);
 
   const [jsxFormContent, setJsxFormContent] =
@@ -81,9 +76,8 @@ const ComponentInstanceFormRenderer: React.FC<
     null,
   );
   const formRef = useRef(null);
-  const selectedComponentId = selectedComponent || 'noop';
   const skip = useAppSelector((state) =>
-    selectUpdateComponentLoadingState(state, selectedComponentId),
+    selectUpdateComponentLoadingState(state, selectedComponent),
   );
   const { currentData, error, originalArgs, isFetching } =
     useGetComponentInstanceFormQuery(
@@ -93,10 +87,6 @@ const ComponentInstanceFormRenderer: React.FC<
       },
     );
   const { data: components } = useGetComponentsQuery();
-
-  const [patchComponent] = useUpdateComponentMutation({
-    fixedCacheKey: selectedComponentId,
-  });
 
   useEffect(() => {
     if (error) {
@@ -185,7 +175,7 @@ const ComponentInstanceFormRenderer: React.FC<
         // Apply transforms for form state.
         const { propsValues: values, selectedModel } = getPropsValues(
           updates,
-          inputAndUiData,
+          inputUiData,
           currentData ? currentData.transforms : {},
         );
 
@@ -199,8 +189,8 @@ const ComponentInstanceFormRenderer: React.FC<
         const { propsValues: transformedFormState } = getPropsValues(
           formState,
           {
-            ...inputAndUiData,
-            model: { [selectedComponentId]: selectedModel },
+            ...inputUiData,
+            model: { [selectedComponent]: selectedModel },
           },
           currentData ? currentData.transforms : {},
         );
@@ -218,9 +208,7 @@ const ComponentInstanceFormRenderer: React.FC<
         const component = components?.[selectedComponentType];
         if (isEvaluatedComponentModel(selectedModel) && component) {
           patchComponent({
-            type: editorFrameContext,
-            componentInstanceUuid: selectedComponentId,
-            componentType: `${selectedComponentType}@${version}`,
+            inputUiData,
             model: {
               source: syncPropSourcesToResolvedValues(
                 selectedModel.source,
@@ -233,9 +221,7 @@ const ComponentInstanceFormRenderer: React.FC<
           return;
         }
         patchComponent({
-          type: editorFrameContext,
-          componentInstanceUuid: selectedComponentId,
-          componentType: `${selectedComponentType}@${version}`,
+          inputUiData,
           model: {
             ...selectedModel,
             resolved,
@@ -288,11 +274,9 @@ const ComponentInstanceFormRenderer: React.FC<
 
 const ComponentInstanceForm: React.FC<ComponentInstanceFormProps> = () => {
   const dispatch = useAppDispatch();
-  const model = useAppSelector(selectModel);
-  const layout = useAppSelector(selectLayout);
-  const { data: components, error } = useGetComponentsQuery();
+  const inputUiData: InputUIData = useInputUIData();
   const { showBoundary } = useErrorBoundary();
-  const selectedComponent = useAppSelector(selectSelectedComponentUuid);
+  const { selectedComponent, model, layout, components } = inputUiData;
   const latestUndoRedoActionId = useAppSelector(selectLatestUndoRedoActionId);
 
   const [formQueryString, setFormQueryString] = useState('');
@@ -336,9 +320,6 @@ const ComponentInstanceForm: React.FC<ComponentInstanceFormProps> = () => {
   }, [dispatch, selectedComponent]);
 
   useEffect(() => {
-    if (error) {
-      showBoundary(error);
-    }
     if (
       !components ||
       !selectedComponent ||
@@ -348,8 +329,11 @@ const ComponentInstanceForm: React.FC<ComponentInstanceFormProps> = () => {
     ) {
       return;
     }
-    const selectedModel = model[selectedComponent];
-    const node = findComponentByUuid(layout, selectedComponent);
+    const selectedModel = model?.[selectedComponent];
+    if (!selectedModel) {
+      return;
+    }
+    const node = findComponentByUuid(layout as RegionNode[], selectedComponent);
     if (!node) {
       return;
     }
@@ -411,7 +395,10 @@ const ComponentInstanceForm: React.FC<ComponentInstanceFormProps> = () => {
 
     if (shouldUpdate) {
       // Build the query string only when needed
-      const tree = findComponentByUuid(layout, selectedComponent);
+      const tree = findComponentByUuid(
+        layout as RegionNode[],
+        selectedComponent,
+      );
       const query = new URLSearchParams({
         form_canvas_tree: JSON.stringify(tree),
         form_canvas_props: JSON.stringify(builtPreparedModel),
@@ -432,7 +419,6 @@ const ComponentInstanceForm: React.FC<ComponentInstanceFormProps> = () => {
     setComponentSource(components?.[selectedComponentType]?.source || '');
   }, [
     components,
-    error,
     showBoundary,
     selectedComponent,
     latestUndoRedoActionId,
