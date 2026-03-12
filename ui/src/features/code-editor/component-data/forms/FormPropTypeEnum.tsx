@@ -219,7 +219,6 @@ export default function FormPropTypeEnum({
                     size="1"
                     color="gray"
                     className="fpe-btn-popover-trigger"
-                    disabled={isDisabled}
                   >
                     <Text size="1" truncate>
                       {validSelectedValues.length > 0
@@ -267,10 +266,17 @@ export default function FormPropTypeEnum({
                                     (v) => v !== String(item.value),
                                   );
                                 }
+
+                                // Convert back to proper type for backend
+                                const typedExample =
+                                  type === 'integer' || type === 'number'
+                                    ? newSelected.map((v) => Number(v))
+                                    : newSelected;
+
                                 dispatch(
                                   updateProp({
                                     id,
-                                    updates: { example: newSelected },
+                                    updates: { example: typedExample },
                                   }),
                                 );
                               }}
@@ -303,7 +309,6 @@ export default function FormPropTypeEnum({
                   setShowRequiredError(required && value === NONE_VALUE);
                 }}
                 size="1"
-                disabled={isDisabled}
               >
                 <Select.Trigger id={`prop-enum-default-${id}`} />
                 <Select.Content>

@@ -42,12 +42,19 @@ export default function FormPropTypeArray({
   const exampleArray = Array.isArray(example) ? example : [];
 
   // Ensure we always have at least one item to display in unlimited mode
+  // Use empty string as default to match single-value component behavior
+  // (no default value unless explicitly set or required)
+  const defaultValue = '';
   const displayArray =
-    exampleArray.length === 0 ? ([''] as (string | number)[]) : exampleArray;
+    exampleArray.length === 0
+      ? ([defaultValue] as (string | number)[])
+      : exampleArray;
 
   const handleDragEnd = createArrayDragEndHandler(displayArray, dispatch, id);
 
   const handleAdd = () => {
+    // Use empty string as default to match single-value component behavior
+    // (no default value unless explicitly set or required)
     handleArrayAdd(displayArray, dispatch, id, '');
   };
 
@@ -94,7 +101,6 @@ export default function FormPropTypeArray({
             number: 'Enter a number',
           }[itemType]
         }
-        disabled={isDisabled}
       />
     </Box>
   );

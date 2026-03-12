@@ -1,8 +1,23 @@
 // Converts local datetime-local input to UTC ISO string
 // Example: "2024-01-15T14:30" → "2024-01-15T19:30:00.000Z"
 export const localTimeToUtcConversion = (datetimeLocal: string): string => {
-  if (!datetimeLocal) return '';
-  const date = new Date(datetimeLocal);
+  if (!datetimeLocal || datetimeLocal.trim() === '') return '';
+
+  // Ensure the datetime string includes seconds if missing
+  // datetime-local inputs may return "YYYY-MM-DDTHH:MM" without seconds
+  let normalized = datetimeLocal;
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(datetimeLocal)) {
+    // Add seconds if only HH:MM is provided
+    normalized = `${datetimeLocal}:00`;
+  }
+
+  const date = new Date(normalized);
+
+  // Validate that the date is valid
+  if (isNaN(date.getTime())) {
+    return '';
+  }
+
   return date.toISOString();
 };
 
