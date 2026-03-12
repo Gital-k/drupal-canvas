@@ -17,6 +17,7 @@ use Drupal\Core\Url;
 use Drupal\canvas\Audit\ComponentAudit;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Entity\AssetLibrary;
+use Drupal\canvas\Entity\BrandKit;
 use Drupal\canvas\Entity\Folder;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ComponentInterface;
@@ -177,8 +178,10 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
       'items' => [
         'sdc.canvas_broken_sdcs.invalid-filter',
         'sdc.canvas_broken_sdcs.malformed-image',
+        'sdc.canvas_test_sdc.mixed-images-with-example',
         'sdc.canvas_test_sdc.my-cta',
         'sdc.canvas_test_sdc.component-mismatch-meta-enum',
+        'sdc.canvas_test_sdc.component-mismatch-meta-enum-array-items',
         'sdc.canvas_test_sdc.component-no-meta-enum',
         'sdc.canvas_test_sdc.banner',
         'sdc.canvas_test_sdc.card',
@@ -245,6 +248,8 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
       'administer themes',
       Page::EDIT_PERMISSION,
       Component::ADMIN_PERMISSION,
+      AssetLibrary::ADMIN_PERMISSION,
+      BrandKit::ADMIN_PERMISSION,
       JavaScriptComponent::ADMIN_PERMISSION,
       Pattern::ADMIN_PERMISSION,
       Folder::ADMIN_PERMISSION,
@@ -1472,7 +1477,6 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
       'label' => NULL,
       'css' => NULL,
       'js' => NULL,
-      'fonts' => NULL,
     ];
     $request_options[RequestOptions::JSON] = $asset_library_to_send;
     $body = $this->assertExpectedResponse('POST', $list_url, $request_options, 500, NULL, NULL, NULL, NULL);
@@ -1550,7 +1554,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
   }
 
   private function assertAuthenticationAndAuthorization(string $entity_type_id, bool $delete_allowed = TRUE, array $initial_items = [], array $initial_cache_tags = ['http_response']): void {
-    if (!in_array("config:{$entity_type_id}_list", $initial_cache_tags, TRUE)) {
+    if (!\in_array("config:{$entity_type_id}_list", $initial_cache_tags, TRUE)) {
       $initial_cache_tags[] = "config:{$entity_type_id}_list";
     }
     $list_url = Url::fromUri("base:/canvas/api/v0/config/$entity_type_id");
@@ -1644,7 +1648,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
   }
 
   private function assertExposedCodeComponents(array $expected, string $expected_dynamic_page_cache, array $request_options, array $additional_expected_cache_tags = []): void {
-    \assert(in_array($expected_dynamic_page_cache, ['HIT', 'MISS'], TRUE));
+    \assert(\in_array($expected_dynamic_page_cache, ['HIT', 'MISS'], TRUE));
     $expected_contexts = [
       'languages:language_interface',
       'route.menu_active_trails:footer',

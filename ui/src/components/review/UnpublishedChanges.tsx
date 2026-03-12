@@ -29,8 +29,9 @@ import {
   clearSelection,
   selectSelectedComponentUuid,
 } from '@/features/ui/uiSlice';
+import { brandKitApi } from '@/services/brandKit';
 import { componentAndLayoutApi } from '@/services/componentAndLayout';
-import { contentApi } from '@/services/content';
+import { contentApi, useGetContentListQuery } from '@/services/content';
 import {
   CONFLICT_CODE,
   pendingChangesApi,
@@ -79,6 +80,10 @@ const UnpublishedChanges = () => {
   const dispatch = useAppDispatch();
   const { showBoundary } = useErrorBoundary();
   const entity_form_fields = useAppSelector(selectPageData);
+  // Fetch content list to get status information for all pages
+  const { data: pageItems } = useGetContentListQuery({
+    entityType: 'canvas_page',
+  });
 
   // If either the selected component or the preview layout is being updated, disable the Publish button.
   const isUpdating = isUpdatingComponent || isUpdatingPreview;
@@ -136,6 +141,9 @@ const UnpublishedChanges = () => {
       const changedCodeComponentIds = Object.values(changesToPublish)
         .filter((change) => change.entity_type === 'js_component')
         .map((change) => change.entity_id);
+      const changedBrandKitIds = Object.values(changesToPublish)
+        .filter((change) => change.entity_type === 'brand_kit')
+        .map((change) => String(change.entity_id));
 
       await publishAllChanges(changesToPublish);
 
@@ -199,6 +207,18 @@ const UnpublishedChanges = () => {
           ),
         );
       }
+
+      if (changedBrandKitIds.length) {
+        dispatch(
+          brandKitApi.util.invalidateTags([
+            ...changedBrandKitIds.flatMap((id) => [
+              { type: 'BrandKits' as const, id },
+              { type: 'BrandKitsAutoSave' as const, id },
+            ]),
+            { type: 'BrandKits' as const, id: 'LIST' },
+          ]),
+        );
+      }
     }
   };
 
@@ -226,6 +246,16 @@ const UnpublishedChanges = () => {
           dispatch(setForceRefresh(true));
           dispatch(resetCodeEditor());
         }
+      }
+      if (selectedChange.entity_type === 'brand_kit') {
+        const discardedBrandKitId = String(selectedChange.entity_id);
+        dispatch(
+          brandKitApi.util.invalidateTags([
+            { type: 'BrandKits', id: discardedBrandKitId },
+            { type: 'BrandKitsAutoSave', id: discardedBrandKitId },
+            { type: 'BrandKits', id: 'LIST' },
+          ]),
+        );
       }
       // When the discarded change is for the current page, re-apply the
       // refetched layout and model so the canvas, sidebar, and form fields
@@ -287,6 +317,23 @@ const UnpublishedChanges = () => {
     }, 100);
   }
 
+  // Create a map of entity_id -> { status, isNew, hasUnsavedStatusChange } for quick lookup
+  const pageStatusMap = useMemo(() => {
+    if (!pageItems) return {};
+    const map: Record<
+      string,
+      { status: boolean; isNew?: boolean; hasUnsavedStatusChange?: boolean }
+    > = {};
+    pageItems.forEach((page) => {
+      map[String(page.id)] = {
+        status: page.status,
+        isNew: page.isNew,
+        hasUnsavedStatusChange: page.hasUnsavedStatusChange,
+      };
+    });
+    return map;
+  }, [pageItems]);
+
   return (
     <PublishReview
       isUpdating={isUpdating}
@@ -298,6 +345,7 @@ const UnpublishedChanges = () => {
       onDiscardClick={onDiscardClick}
       isPublishing={isPublishing}
       isDiscarding={isDiscarding}
+      pageStatusMap={pageStatusMap}
     />
   );
 };

@@ -15,6 +15,7 @@ import {
 
 import PermissionCheck from '@/components/PermissionCheck';
 import ReviewErrors from '@/components/review/ReviewErrors';
+import { getReviewGroupKey } from '@/components/review/utils';
 import { Divider } from '@/features/code-editor/component-data/FormElement';
 
 import ChangeList from './changes/ChangeList';
@@ -41,6 +42,10 @@ interface PublishReviewProps {
   isDiscarding: boolean;
   isFetching: boolean; // indicates if the list of autosaved changes is being fetched
   isUpdating: boolean; // indicates if the preview is being updated
+  pageStatusMap?: Record<
+    string,
+    { status: boolean; isNew?: boolean; hasUnsavedStatusChange?: boolean }
+  >;
 }
 
 const PublishReview: React.FC<PublishReviewProps> = ({
@@ -55,6 +60,7 @@ const PublishReview: React.FC<PublishReviewProps> = ({
   isDiscarding = false,
   isFetching = false,
   isUpdating = false,
+  pageStatusMap,
 }) => {
   // State to manage the open/close state of the popover
   const [isOpen, setIsOpen] = useState<boolean>(false);
@@ -107,7 +113,7 @@ const PublishReview: React.FC<PublishReviewProps> = ({
   const groups: UnpublishedChangeGroups = useMemo(() => {
     if (!changes?.length) return {};
     return changes.reduce((acc, change) => {
-      const key = change.entity_type ?? 'unknown';
+      const key = getReviewGroupKey(change.entity_type ?? 'unknown');
       if (!acc[key]) {
         acc[key] = [];
       }
@@ -225,6 +231,7 @@ const PublishReview: React.FC<PublishReviewProps> = ({
                       setSelectedChanges={setSelectedChanges}
                       onDiscardClick={handleDiscardClick}
                       onViewClick={onViewClick}
+                      pageStatusMap={pageStatusMap}
                     />
                   </>
                 )}

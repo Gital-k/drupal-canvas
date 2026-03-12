@@ -9,7 +9,6 @@ use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Extension\ModuleExtensionList;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Extension\ThemeHandlerInterface;
-use Drupal\Core\File\FileUrlGeneratorInterface;
 use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\Core\Plugin\Discovery\YamlDiscovery;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
@@ -17,6 +16,7 @@ use Drupal\Core\Theme\ThemeInitializationInterface;
 use Drupal\Core\Theme\ThemeManagerInterface;
 use Drupal\Core\Url;
 use Drupal\canvas\Entity\AssetLibrary;
+use Drupal\canvas\Entity\BrandKit;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Version;
 
@@ -34,7 +34,6 @@ final class LibraryHooks {
     private readonly ThemeHandlerInterface $themeHandler,
     private readonly ModuleExtensionList $moduleExtensionList,
     private readonly Version $version,
-    private readonly FileUrlGeneratorInterface $fileUrlGenerator,
   ) {
   }
 
@@ -116,16 +115,27 @@ final class LibraryHooks {
       if ($library->hasJs()) {
         $libraries[$library_name]['js'][$library->getJsPath()] = [];
       }
-      foreach ($library->getFonts() as $fontEntry) {
-        $fontCssUrl = $this->fileUrlGenerator->generate($fontEntry['uri'])->toString();
-        $libraries[$library_name]['css']['theme'][$fontCssUrl] = [];
-      }
       \assert(empty($library->getAssetLibraryDependencies()));
       // Draft.
       $draft_css_url = \sprintf('/canvas/api/v0/auto-saves/css/%s/%s', AssetLibrary::ENTITY_TYPE_ID, $library_id);
       $libraries[$library_name . '.draft']['css']['theme'][$draft_css_url] = ['preprocess' => FALSE];
       $draft_js_url = \sprintf('/canvas/api/v0/auto-saves/js/%s/%s', AssetLibrary::ENTITY_TYPE_ID, $library_id);
       $libraries[$library_name . '.draft']['js'][$draft_js_url] = ['preprocess' => FALSE];
+    }
+
+    // @see \Drupal\canvas\Entity\BrandKit::getAssetLibrary()
+    // @see \Drupal\canvas\EntityHandlers\CanvasAssetStorage::generateFiles()
+    foreach (BrandKit::loadMultiple() as $brand_kit_id => $brand_kit) {
+      $library_name = "brand_kit." . $brand_kit->id();
+      // Prod.
+      $libraries[$library_name] = [
+        'dependencies' => [],
+      ];
+      if ($brand_kit->hasCss()) {
+        $libraries[$library_name]['css']['theme'][$brand_kit->getCssPath()] = [];
+      }
+      $draft_css_url = \sprintf('/canvas/api/v0/auto-saves/css/%s/%s', BrandKit::ENTITY_TYPE_ID, $brand_kit_id);
+      $libraries[$library_name . '.draft']['css']['theme'][$draft_css_url] = ['preprocess' => FALSE];
     }
 
     // @see \Drupal\canvas\Entity\JavaScriptComponent::getAssetLibrary()
@@ -138,10 +148,12 @@ final class LibraryHooks {
       }
       $libraries[$library_name]['dependencies'] = $component->getAssetLibraryDependencies();
       $libraries[$library_name]['dependencies'][] = 'canvas/asset_library.' . AssetLibrary::GLOBAL_ID;
+      $libraries[$library_name]['dependencies'][] = 'canvas/brand_kit.' . BrandKit::GLOBAL_ID;
       // Draft.
       $draft_css_url = \sprintf('/canvas/api/v0/auto-saves/css/%s/%s', JavaScriptComponent::ENTITY_TYPE_ID, $component_id);
       $libraries[$library_name . '.draft']['css']['component'][$draft_css_url] = ['preprocess' => FALSE];
       $libraries[$library_name . '.draft']['dependencies'][] = 'canvas/asset_library.' . AssetLibrary::GLOBAL_ID . '.draft';
+      $libraries[$library_name . '.draft']['dependencies'][] = 'canvas/brand_kit.' . BrandKit::GLOBAL_ID . '.draft';
       // To avoid a race condition for auto-saved code components, always load
       // the data that it might start using at any point.
       $libraries[$library_name . '.draft']['dependencies'][] = 'canvas/canvasData.v0';
@@ -217,7 +229,7 @@ final class LibraryHooks {
 
   private function buildDependencyChain(array &$all_dependencies, array $all_libraries, array $dependencies_to_check, string $admin_theme_name): void {
     foreach ($dependencies_to_check as $dependency) {
-      if (str_starts_with($dependency, $admin_theme_name . '/') && !in_array($dependency, $all_dependencies, TRUE)) {
+      if (str_starts_with($dependency, $admin_theme_name . '/') && !\in_array($dependency, $all_dependencies, TRUE)) {
         $all_dependencies[] = $dependency;
         /** @var string $internal_dependency_name */
         $internal_dependency_name = str_replace($admin_theme_name . '/', '', $dependency);
@@ -358,7 +370,7 @@ final class LibraryHooks {
         continue;
       }
       foreach ($library['dependencies'] as $key => $dependency) {
-        if (isset($canvas_replacing_cores[$dependency]) && !in_array($dependency, $dependencies_already_added, TRUE)) {
+        if (isset($canvas_replacing_cores[$dependency]) && !\in_array($dependency, $dependencies_already_added, TRUE)) {
           $dependencies_already_added[] = $dependency;
           $library['dependencies'][$key] = 'canvas/' . $canvas_replacing_cores[$dependency];
         }
@@ -474,7 +486,7 @@ final class LibraryHooks {
     $overrides = $active_admin_theme->getLibrariesOverride();
     foreach ($overrides as $theme_overrides) {
       foreach ($theme_overrides as $library_name => $override) {
-        if (in_array($library_name, $libraries['canvas.drupal.dialog']['dependencies'], TRUE)) {
+        if (\in_array($library_name, $libraries['canvas.drupal.dialog']['dependencies'], TRUE)) {
           [$library_source, $library_id] = explode('/', $library_name);
           // Build an admin-theme-overridden version of the dependency.
           $this->themeManager->setActiveTheme($active_admin_theme);

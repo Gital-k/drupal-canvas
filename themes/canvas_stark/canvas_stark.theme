@@ -171,6 +171,22 @@ function canvas_stark_form_node_form_alter(array &$form, FormStateInterface $for
 
 function canvas_stark_preprocess_field_multiple_value_form(array &$variables): void {
   $variables['attributes']['data-canvas-multiple-values'] = 'true';
+  if (isset($variables['element']['#prop_link_data']) && !empty($variables['multiple'])) {
+    $old_data = $variables['table']['#header'][0]['data'];
+    $variables['table']['#header'][0]['data'] = [
+      '#type' => 'container',
+      '#attributes' => [
+        'class' => ['canvas-linked-prop-label-wrapper--multiple-values'],
+      ],
+      'h4' => $old_data,
+      'linker' => [
+        '#theme' => 'prop_linker',
+        '#linked' => $variables['element']['#prop_link_data']['linked'],
+        '#prop_name' => $variables['element']['#prop_link_data']['prop_name'],
+        '#suggestions' => $variables['element']['#prop_link_data']['suggestions'],
+      ],
+    ];
+  }
   $variables['description_attributes'] = $variables['description']['attributes'] ?? [];
 }
 
@@ -206,15 +222,35 @@ function canvas_stark_preprocess_form_element(array &$variables): void {
   $variables['description_attributes'] = $variables['description']['attributes'] ?? [];
 }
 
+/**
+ * Implements hook_preprocess_fieldset__media_library_widget().
+ *
+ * Passes prop linking data to the label component and component_prop_name to
+ * the template. The component_prop_name is used by the DefaultImagePreview
+ * component to identify which prop it should manage, enabling the "Remove
+ * default" functionality for optional image props with example values.
+ *
+ * @see \Drupal\canvas\Hook\ReduxIntegratedFieldWidgetsHooks::fieldWidgetCompleteFormAlter()
+ * @see ui/src/components/form/components/DefaultImagePreview.tsx
+ */
 function canvas_stark_preprocess_fieldset__media_library_widget(array &$variables): void {
   // Prop link data is passed to the media library widget differently, as the
   // label is the fieldset legend, not a label element.
   if (isset($variables['element']['#prop_link_data'])) {
     $variables['prop_link_data'] = Json::encode($variables['element']['#prop_link_data']);
   }
+  if (isset($variables['element']['#component_prop_name'])) {
+    $variables['component_prop_name'] = $variables['element']['#component_prop_name'];
+  }
 }
 
 function canvas_stark_preprocess_fieldset(array &$variables): void {
+  if (isset($variables['element']['#prop_link_data'])) {
+    $variables['prop_link_data'] = Json::encode($variables['element']['#prop_link_data']);
+  }
+}
+
+function canvas_stark_preprocess_datetime_wrapper(array &$variables): void {
   if (isset($variables['element']['#prop_link_data'])) {
     $variables['prop_link_data'] = Json::encode($variables['element']['#prop_link_data']);
   }
