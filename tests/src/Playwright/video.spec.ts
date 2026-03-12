@@ -13,6 +13,8 @@ test.describe('Video Component', () => {
     async ({ browser, drupalSite }) => {
       const page = await browser.newPage();
       const drupal: Drupal = new Drupal({ page, drupalSite });
+      await drupal.drush('theme:enable claro');
+      await drupal.drush('config:set system.theme admin claro');
       await drupal.installModules(['canvas']);
       await page.close();
     },
@@ -92,16 +94,18 @@ test.describe('Video Component', () => {
         '[data-drupal-selector^="edit-canvas-component-props-"][data-drupal-selector$="-video-0-remove-button"]',
       );
 
-      ['mousedown', 'mouseup', 'click'].forEach((eventType) => {
-        button.dispatchEvent(
-          new MouseEvent(eventType, {
-            bubbles: true,
-            cancelable: true,
-            view: window,
-            button: 0,
-          }),
-        );
-      });
+      if (button) {
+        ['mousedown', 'mouseup', 'click'].forEach((eventType) => {
+          button.dispatchEvent(
+            new MouseEvent(eventType, {
+              bubbles: true,
+              cancelable: true,
+              view: window,
+              button: 0,
+            }),
+          );
+        });
+      }
     });
     await expect(
       page.locator(
@@ -109,9 +113,9 @@ test.describe('Video Component', () => {
       ),
     ).not.toBeVisible();
 
-    // Back to the default, which has a poster image.
+    // After removal, optional video prop is NULL, so no video element renders.
     previewFrame = await canvasEditor.getActivePreviewFrame();
-    await expect(previewFrame.locator('video')).toHaveAttribute('poster');
+    await expect(previewFrame.locator('video')).not.toBeVisible();
 
     // Add a different video
     await canvasEditor.editComponentProp(

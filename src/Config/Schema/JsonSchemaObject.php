@@ -13,7 +13,9 @@ use Drupal\Core\TypedData\MapDataDefinition;
 use Drupal\Core\TypedData\TypedDataInterface;
 
 /**
- * Defines a schema data type based on a JSON schema object $ref.
+ * Generates config schema definition for `type: object, $ref: …` prop example.
+ *
+ * @internal
  */
 final class JsonSchemaObject extends Mapping {
 
@@ -22,7 +24,7 @@ final class JsonSchemaObject extends Mapping {
    */
   public function __construct(DataDefinitionInterface $definition, $name = NULL, ?TypedDataInterface $parent = NULL) {
     \assert($definition instanceof MapDataDefinition);
-    $ref = $parent?->getParent()?->getValue()['$ref'] ?? NULL;
+    $ref = $this->findContainingSingleCardinalityProperty($parent);
     if ($ref === NULL) {
       // This will be caught by the parent constraint that requires a $ref key.
       parent::__construct($definition, $name, $parent);
@@ -65,9 +67,9 @@ final class JsonSchemaObject extends Mapping {
       }
       if ($detail['type'] === 'string' && \array_key_exists('format', $detail)) {
         // @see \Drupal\canvas\JsonSchemaInterpreter\JsonSchemaStringFormat::toDataTypeShapeRequirements()
-        if (in_array($detail['format'], [JsonSchemaStringFormat::Iri->value, JsonSchemaStringFormat::IriReference->value, JsonSchemaStringFormat::Uri->value, JsonSchemaStringFormat::UriReference->value], TRUE)) {
+        if (\in_array($detail['format'], [JsonSchemaStringFormat::Iri->value, JsonSchemaStringFormat::IriReference->value, JsonSchemaStringFormat::Uri->value, JsonSchemaStringFormat::UriReference->value], TRUE)) {
           $definition['mapping'][$property_name]['constraints'][UriConstraint::PLUGIN_ID] = [
-            'allowReferences' => in_array($detail['format'], [JsonSchemaStringFormat::IriReference->value, JsonSchemaStringFormat::UriReference->value], TRUE),
+            'allowReferences' => \in_array($detail['format'], [JsonSchemaStringFormat::IriReference->value, JsonSchemaStringFormat::UriReference->value], TRUE),
           ];
           if (\array_key_exists('x-allowed-schemes', $detail)) {
             $definition['mapping'][$property_name]['constraints'][UriSchemeConstraint::PLUGIN_ID] = [
@@ -81,6 +83,40 @@ final class JsonSchemaObject extends Mapping {
       }
     }
     parent::__construct($definition, $name, $parent);
+  }
+
+  /**
+   * Finds the $ref value from the parent context.
+   *
+   * Handles two cases:
+   * 1. Regular object prop: $ref is at parent->parent (the prop definition)
+   * 2. Array example item: $ref is at items.$ref in the prop definition
+   *
+   * @param \Drupal\Core\TypedData\TypedDataInterface|null $parent
+   *   The parent typed data object.
+   *
+   * @return string|null
+   *   The $ref URI, or NULL if not found.
+   */
+  private function findContainingSingleCardinalityProperty(?TypedDataInterface $parent): ?string {
+    // Case 1: Regular object prop example - $ref is sibling of examples.
+    // Structure: props.some_prop.$ref, props.some_prop.examples.0
+    // Parent chain: example item -> examples sequence -> prop definition
+    $ref = $parent?->getParent()?->getValue()['$ref'] ?? NULL;
+    if ($ref !== NULL) {
+      return $ref;
+    }
+
+    // Case 2: Array example item - $ref is in items.
+    // Structure: props.array_prop.items.$ref, props.array_prop.examples.0.0
+    // Parent chain: item -> inner sequence (examples.0) -> outer sequence
+    // (examples) -> prop definition.
+    $propDefinition = $parent?->getParent()?->getParent()?->getValue();
+    if (\is_array($propDefinition) && ($propDefinition['type'] ?? NULL) === 'array') {
+      return $propDefinition['items']['$ref'] ?? NULL;
+    }
+
+    return NULL;
   }
 
 }

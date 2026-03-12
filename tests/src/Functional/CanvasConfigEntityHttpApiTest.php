@@ -177,8 +177,10 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
       'items' => [
         'sdc.canvas_broken_sdcs.invalid-filter',
         'sdc.canvas_broken_sdcs.malformed-image',
+        'sdc.canvas_test_sdc.mixed-images-with-example',
         'sdc.canvas_test_sdc.my-cta',
         'sdc.canvas_test_sdc.component-mismatch-meta-enum',
+        'sdc.canvas_test_sdc.component-mismatch-meta-enum-array-items',
         'sdc.canvas_test_sdc.component-no-meta-enum',
         'sdc.canvas_test_sdc.banner',
         'sdc.canvas_test_sdc.card',
@@ -939,35 +941,35 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
       ],
       'props' => [
         'string' => [
-          'title' => 'Title',
           'type' => 'string',
+          'title' => 'Title',
           'examples' => ['Press', 'Submit now'],
         ],
         'boolean' => [
-          'title' => 'Truth',
           'type' => 'boolean',
+          'title' => 'Truth',
           'examples' => [TRUE, FALSE],
         ],
         'integer' => [
-          'title' => 'Integer',
           'type' => 'integer',
+          'title' => 'Integer',
           'examples' => [23, 10, 2024],
         ],
         'number' => [
-          'title' => 'Number',
           'type' => 'number',
+          'title' => 'Number',
           'examples' => [3.14, 42],
         ],
         // Enum with meta-enum, as this is not mandatory in SDC < 11.2, but it is in Canvas.
         'enum' => [
           'type' => 'string',
-          'title' => 'Enum',
           'enum' => ['primary', 'secondary'],
-          'examples' => ['primary'],
           'meta:enum' => [
             'primary' => 'Primary',
             'secondary' => 'Secondary',
           ],
+          'title' => 'Enum',
+          'examples' => ['primary'],
         ],
       ],
       'slots' => [
@@ -1002,31 +1004,31 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
       'status' => FALSE,
       'props' => [
         'string' => [
-          'title' => 'Title',
           'type' => 'string',
+          'title' => 'Title',
           'examples' => ['Press', 'Submit now'],
         ],
         'boolean' => [
-          'title' => 'Truth',
           'type' => 'boolean',
+          'title' => 'Truth',
           'examples' => [TRUE, FALSE],
         ],
         'integer' => [
-          'title' => 'Integer',
           'type' => 'integer',
+          'title' => 'Integer',
           'examples' => [23, 10, 2024],
         ],
         'number' => [
-          'title' => 'Number',
           'type' => 'number',
+          'title' => 'Number',
           'examples' => [3.14, 42],
         ],
         'enum' => [
-          'title' => 'Enum',
           'type' => 'string',
-          'examples' => ['primary'],
           'enum' => ['primary', 'secondary'],
           'meta:enum' => ['primary' => 'Primary', 'secondary' => 'Secondary'],
+          'title' => 'Enum',
+          'examples' => ['primary'],
         ],
       ],
       'required' => [
@@ -1222,12 +1224,16 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     $auto_save_data = $code_component_to_send;
     $auto_save_data['name'] = 'Auto-save title, should not affect GET requests';
     $auto_save_data['props']['string'] = [
+      'type' => 'string',
       'title' => 'Title (new)',
     ] + $auto_save_data['props']['string'];
     $expected_auto_save = $expected_component;
     unset($expected_auto_save['links']);
     $expected_auto_save['name'] = $auto_save_data['name'];
-    $expected_auto_save['props']['string']['title'] = 'Title (new)';
+    $expected_auto_save['props']['string'] = [
+      'type' => 'string',
+      'title' => 'Title (new)',
+    ] + $expected_auto_save['props']['string'];
     // Expected component has the keys in the same order as the schema, because
     // it is dealing with a saved component. For auto-saves the order of keys
     // sent by the client is what we reflect back because the entity has not
@@ -1235,17 +1241,17 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     // matches what we sent.
     $expected_auto_save['props']['enum'] = [
       'type' => 'string',
-      'title' => 'Enum',
       'enum' => [
         'primary',
         'secondary',
       ],
-      'examples' => [
-        'primary',
-      ],
       'meta:enum' => [
         'primary' => 'Primary',
         'secondary' => 'Secondary',
+      ],
+      'title' => 'Enum',
+      'examples' => [
+        'primary',
       ],
     ];
     $this->performAutoSave($auto_save_data, $expected_auto_save, JavaScriptComponent::ENTITY_TYPE_ID, 'test');
@@ -1324,12 +1330,12 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     // Create a new auto-save entry.
     $auto_save_data = $code_component_to_send;
     $auto_save_data['name'] = 'Auto-save title, should not affect GET requests';
-    $auto_save_data['props']['string'] = [
-      'title' => 'Title (new)',
-    ] + $auto_save_data['props']['string'];
+    unset($auto_save_data['props']['string']['title']);
+    $auto_save_data['props']['string']['title'] = 'Title (new)';
     $expected_auto_save = $expected_component;
     unset($expected_auto_save['links']);
     $expected_auto_save['name'] = $auto_save_data['name'];
+    unset($expected_auto_save['props']['string']['title']);
     $expected_auto_save['props']['string']['title'] = 'Title (new)';
     // Expected component has the keys in the same order as the schema, because
     // it is dealing with a saved component. For auto-saves the order of keys
@@ -1338,17 +1344,17 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     // matches what we sent.
     $expected_auto_save['props']['enum'] = [
       'type' => 'string',
-      'title' => 'Enum',
       'enum' => [
         'primary',
         'secondary',
       ],
-      'examples' => [
-        'primary',
-      ],
       'meta:enum' => [
         'primary' => 'Primary',
         'secondary' => 'Secondary',
+      ],
+      'title' => 'Enum',
+      'examples' => [
+        'primary',
       ],
     ];
     $this->performAutoSave($auto_save_data, $expected_auto_save, JavaScriptComponent::ENTITY_TYPE_ID, 'test');
@@ -1468,6 +1474,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
       'label' => NULL,
       'css' => NULL,
       'js' => NULL,
+      'fonts' => NULL,
     ];
     $request_options[RequestOptions::JSON] = $asset_library_to_send;
     $body = $this->assertExpectedResponse('POST', $list_url, $request_options, 500, NULL, NULL, NULL, NULL);
@@ -1545,7 +1552,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
   }
 
   private function assertAuthenticationAndAuthorization(string $entity_type_id, bool $delete_allowed = TRUE, array $initial_items = [], array $initial_cache_tags = ['http_response']): void {
-    if (!in_array("config:{$entity_type_id}_list", $initial_cache_tags, TRUE)) {
+    if (!\in_array("config:{$entity_type_id}_list", $initial_cache_tags, TRUE)) {
       $initial_cache_tags[] = "config:{$entity_type_id}_list";
     }
     $list_url = Url::fromUri("base:/canvas/api/v0/config/$entity_type_id");
@@ -1639,7 +1646,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
   }
 
   private function assertExposedCodeComponents(array $expected, string $expected_dynamic_page_cache, array $request_options, array $additional_expected_cache_tags = []): void {
-    \assert(in_array($expected_dynamic_page_cache, ['HIT', 'MISS'], TRUE));
+    \assert(\in_array($expected_dynamic_page_cache, ['HIT', 'MISS'], TRUE));
     $expected_contexts = [
       'languages:language_interface',
       'route.menu_active_trails:footer',

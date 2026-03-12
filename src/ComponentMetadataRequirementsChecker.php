@@ -53,18 +53,23 @@ final class ComponentMetadataRequirementsChecker {
     // Check fundamentals.
     $validator = new Validator();
     foreach ($metadata->schema['properties'] ?? [] as $prop_name => $prop) {
-      if (in_array(Attribute::class, $prop['type'], TRUE)) {
+      if (\in_array(Attribute::class, $prop['type'], TRUE)) {
         continue;
       }
 
       // Enums must not have empty values.
-      if (\array_key_exists('enum', $prop) && in_array('', $prop['enum'], TRUE)) {
+      if (\array_key_exists('enum', $prop) && \in_array('', $prop['enum'], TRUE)) {
         $messages[] = \sprintf('Prop "%s" has an empty enum value.', $prop_name);
         continue;
       }
 
+      // For array types, also check enum in items.
+      if (\in_array('array', $prop['type'], TRUE) && isset($prop['items']['enum']) && \in_array('', $prop['items']['enum'], TRUE)) {
+        $messages[] = \sprintf('Prop "%s" has an empty enum value in items.', $prop_name);
+      }
+
       // Required props must have examples.
-      if (in_array($prop_name, $required_props, TRUE) && !isset($prop['examples'][0])) {
+      if (\in_array($prop_name, $required_props, TRUE) && !isset($prop['examples'][0])) {
         $messages[] = \sprintf('Prop "%s" is required, but does not have example value', $prop_name);
       }
 
@@ -73,8 +78,17 @@ final class ComponentMetadataRequirementsChecker {
       // the prop.
       if (isset($prop['examples'][0])) {
         $example = $prop['examples'][0];
-        if (\is_array($example)) {
+        // PHP's "associative arrays" are JSON's "objects". The JSON Schema
+        // validator expects such "objects" to be \stdClass objects.
+        if ($prop['type'] === ['object'] && \is_array($example)) {
           $example = (object) $example;
+        }
+        // Similarly, for `type: array, items: {type: object}`.
+        if ($prop['type'][0] === 'array' && $prop['items']['type'] === 'object' && \is_array($example)) {
+          $example = \array_map(
+            fn (array|object $item) => (object) $item,
+            $example,
+          );
         }
         $validator->reset();
         $validator->validate($example, $prop);
@@ -99,7 +113,7 @@ final class ComponentMetadataRequirementsChecker {
       // JSON Schema.
       // @see docs/shape-matching-into-field-types.md#3.2
       if (\array_key_exists('contentMediaType', $prop) && $prop['contentMediaType'] === 'text/html' && isset($prop['x-formatting-context'])) {
-        if (!in_array($prop['x-formatting-context'], ['inline', 'block'], TRUE)) {
+        if (!\in_array($prop['x-formatting-context'], ['inline', 'block'], TRUE)) {
           $messages[] = \sprintf('Invalid value "%s" for "x-formatting-context". Valid values are "inline" and "block".', $prop['x-formatting-context']);
           continue;
         }
@@ -109,8 +123,12 @@ final class ComponentMetadataRequirementsChecker {
       if (!isset($prop['title'])) {
         $messages[] = \sprintf('Prop "%s" must have title', $prop_name);
       }
-      if (isset($prop['enum'], $prop['meta:enum']) && !empty($forbidden_key_characters)) {
-        foreach ($prop['meta:enum'] as $meta_key => $meta_value) {
+
+      $enum_container = \in_array('array', $prop['type'], TRUE) ?
+        $prop['items'] ?? [] :
+        $prop;
+      if (isset($enum_container['enum'], $enum_container['meta:enum']) && !empty($forbidden_key_characters)) {
+        foreach ($enum_container['meta:enum'] as $meta_key => $meta_value) {
           $meta_key_with_replacements = str_replace(
             \array_keys($forbidden_key_characters),
             array_values($forbidden_key_characters),
@@ -126,8 +144,8 @@ final class ComponentMetadataRequirementsChecker {
           \array_keys($forbidden_key_characters),
           array_values($forbidden_key_characters),
           (string) $key,
-        ), $prop['enum']);
-        $enum_keys_diff = \array_diff($meta_enum_valid_keys, \array_keys($prop['meta:enum']));
+        ), $enum_container['enum']);
+        $enum_keys_diff = \array_diff($meta_enum_valid_keys, \array_keys($enum_container['meta:enum']));
         if (!empty($enum_keys_diff)) {
           $messages[] = \sprintf('The values for the "%s" prop enum must be defined in "meta:enum". Missing keys: "%s"', $prop_name, \implode(', ', $enum_keys_diff));
         }

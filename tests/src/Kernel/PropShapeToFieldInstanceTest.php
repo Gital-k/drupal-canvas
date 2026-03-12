@@ -217,7 +217,7 @@ class PropShapeToFieldInstanceTest extends CanvasKernelTestBase {
       ])->save();
     }
 
-    if (in_array('options', $modules, TRUE)) {
+    if (\in_array('options', $modules, TRUE)) {
       FieldStorageConfig::create([
         'field_name' => 'one_from_an_integer_list',
         'entity_type' => 'node',
@@ -298,7 +298,7 @@ class PropShapeToFieldInstanceTest extends CanvasKernelTestBase {
 
     // Removing some test components that have been enabled due to all SDCs now
     // in canvas_test_sdc module.
-    $components_to_remove = ['crash', 'component-no-meta-enum', 'component-mismatch-meta-enum', 'empty-enum', 'deprecated', 'experimental', 'image-gallery', 'image-gallery-nonsensical', 'image-optional-with-example-and-additional-prop', 'obsolete', 'grid-container', 'html-invalid-format', 'my-cta', 'sparkline', 'sparkline_min_2', 'props-invalid-shapes', 'props-no-examples', 'props-no-slots', 'props-no-title', 'props-slots', 'image-optional-with-example', 'image-optional-without-example', 'image-required-with-example', 'image-required-with-invalid-example', 'image-required-without-example'];
+    $components_to_remove = ['crash', 'component-no-meta-enum', 'component-mismatch-meta-enum', 'component-mismatch-meta-enum-array-items', 'empty-enum', 'deprecated', 'experimental', 'image-gallery', 'image-gallery-nonsensical', 'image-optional-with-example-and-additional-prop', 'obsolete', 'grid-container', 'html-invalid-format', 'my-cta', 'sparkline', 'sparkline_min_2', 'props-invalid-shapes', 'props-no-examples', 'props-no-slots', 'props-no-title', 'props-slots', 'image-optional-with-example', 'image-optional-without-example', 'image-required-with-example', 'image-required-with-invalid-example', 'image-required-without-example'];
     foreach ($components_to_remove as $key) {
       unset($components['canvas_test_sdc:' . $key]);
     }
@@ -328,7 +328,7 @@ class PropShapeToFieldInstanceTest extends CanvasKernelTestBase {
         $cpe = ComponentPropExpression::fromString($cpe_string);
         // @see https://json-schema.org/understanding-json-schema/reference/object#required
         // @see https://json-schema.org/learn/getting-started-step-by-step#required
-        $is_required = in_array($cpe->propName, $component->metadata->schema['required'] ?? [], TRUE);
+        $is_required = \in_array($cpe->propName, $component->metadata->schema['required'] ?? [], TRUE);
 
         $unique_match_key = \sprintf('%s, %s',
           $is_required ? 'REQUIRED' : 'optional',
@@ -519,6 +519,7 @@ class PropShapeToFieldInstanceTest extends CanvasKernelTestBase {
             '⿲canvas_test_sdc:image␟image',
             '⿲canvas_test_sdc:image-srcset-candidate-template-uri␟image',
             '⿲canvas_test_sdc:image-without-ref␟image',
+            '⿲canvas_test_sdc:mixed-images-with-example␟required_image',
           ],
           'static prop source' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
           'instances' => [
@@ -1171,6 +1172,8 @@ class PropShapeToFieldInstanceTest extends CanvasKernelTestBase {
         'optional, type=object&$ref=json-schema-definitions://canvas.module/image' => [
           'SDC props' => [
             '⿲canvas_test_sdc:banner␟image',
+            '⿲canvas_test_sdc:mixed-images-with-example␟primary_image',
+            '⿲canvas_test_sdc:mixed-images-with-example␟secondary_image',
             '⿲sdc_test_all_props:all-props␟test_object_drupal_image',
           ],
           'static prop source' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',

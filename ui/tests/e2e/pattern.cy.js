@@ -36,12 +36,14 @@ describe('Can save and load patterns', () => {
       )
         .first()
         .rightclick({ force: true });
+
       cy.findByText('Delete').click();
       cy.get(
         '.canvas--viewport-overlay [data-canvas-component-id="sdc.canvas_test_sdc.image"]',
       )
         .first()
         .rightclick({ force: true });
+
       cy.findByText('Delete').click();
       cy.waitForComponentNotInPreview('Image');
 

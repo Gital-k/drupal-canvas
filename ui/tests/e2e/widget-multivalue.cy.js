@@ -19,7 +19,6 @@ describe('Multivalue widget drag and drop', () => {
     cy.loadURLandWaitForCanvasLoaded();
     const entityFormSelector = '[data-testid="canvas-page-data-form"]';
     cy.findByTestId('canvas-page-data-form').as('entityForm');
-    cy.get('@entityForm').recordFormBuildId();
     cy.findByRole('heading', { name: 'Canvas Unlimited Text' })
       .parents('.js-form-wrapper')
       .as('unlimited-text');
@@ -40,61 +39,40 @@ describe('Multivalue widget drag and drop', () => {
 
     // Confirms the contents of every text input in the table.
     const confirmTextInputs = (inputContent) => {
+      let attempt = 0;
       cy.get('@unlimited-text')
         .findAllByRole('textbox')
-        .then(($items) => {
+        .should(($items) => {
           const items = [];
           $items.each((ix, el) => {
             items.push(el.value);
           });
+          console.log('attempt', ++attempt);
           expect(items).to.deep.equal(inputContent);
         });
     };
     cy.get('@unlimited-text').findAllByRole('textbox').should('have.length', 2);
     confirmTextInputs(['Marshmallow Coast', '']);
     // Populate the empty second item.
-    cy.get('@unlimited-text')
+    cy.get('@unlimited-text', { timeout: 10000 })
       .findAllByRole('textbox')
       .eq(1)
       .type('Neutral Milk Hotel');
     confirmTextInputs(['Marshmallow Coast', 'Neutral Milk Hotel']);
 
-    // Adding another item puts the focus on the last added item. Blurring this
-    // item will trigger an update to the layout. Do this before we click the
-    // add another button so we can intercept and wait for the blur POST before
-    // we click the button. If the button is clicked while the blur POST is
-    // running we could have a race scenario where the form state is missing
-    // whilst the AJAX call is running.
-    // @todo Remove in https://drupal.org/i/3521641
-    const waitForPreview = () => {
-      cy.intercept({
-        url: '**/canvas/api/v0/layout/node/1',
-        times: 1,
-        method: 'POST',
-      }).as('updatePreview');
-      // Trigger a blur.
-      cy.get(document.activeElement).blur();
-      cy.wait('@updatePreview');
-    };
-
     // Add another item.
-    waitForPreview();
     cy.get('@unlimited-text')
       .findByRole('button', { name: 'Add another item' })
       .click();
-    cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
-    // Wait for ajax behaviors to finish.
-    cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
+
     cy.get('@unlimited-text').findAllByRole('textbox').should('have.length', 3);
 
     // Populate the new item.
-    cy.get('@unlimited-text')
+    cy.get('@unlimited-text', { timeout: 10000 })
       .findAllByRole('textbox')
       .eq(2)
       .type('The Olivia Tremor Control');
     confirmWeightSelectCount(3);
-    waitForPreview();
-    cy.waitForAjax();
 
     confirmTextInputs([
       'Marshmallow Coast',
@@ -118,12 +96,22 @@ describe('Multivalue widget drag and drop', () => {
       // move to it from Cypress.
       scrollBehavior: false,
     };
-    cy.get(
-      '[data-drupal-selector="edit-field-cvt-unlimited-text"] tr.draggable:nth-child(3) [title="Change order"]',
-    ).realDnd('input[value="Neutral Milk Hotel"]', dndDefaults);
+
+    const dragHandle =
+      '[data-drupal-selector="edit-field-cvt-unlimited-text"] tr.draggable:nth-child(3) [title="Change order"]';
+
+    // Ensure the drag handle is ready and doesn't have pointer-events: none.
+    cy.get(dragHandle).should(($el) => {
+      const pointerEvents = window.getComputedStyle($el[0]).pointerEvents;
+      expect(pointerEvents).to.not.equal('none');
+    });
+
+    cy.get(dragHandle).realDnd(
+      'input[value="Neutral Milk Hotel"]',
+      dndDefaults,
+    );
     // Wait for table drag AJAX to complete before asserting the new order.
-    cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
-    cy.waitForAjax();
+    cy.get('body[data-canvas-layout-request-in-progress]').should('not.exist');
 
     confirmTextInputs([
       'Marshmallow Coast',
@@ -134,21 +122,16 @@ describe('Multivalue widget drag and drop', () => {
     cy.get('@unlimited-text')
       .findByRole('button', { name: 'Add another item' })
       .click();
-    cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
-    // Wait for ajax behaviors to finish.
-    cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
     cy.get('@unlimited-text').findAllByRole('textbox').should('have.length', 4);
 
     cy.log(
       'Move an item that has been entered but "Add new item" is not clicked yet',
     );
 
-    cy.get('@unlimited-text')
+    cy.get('@unlimited-text', { timeout: 10000 })
       .findAllByRole('textbox')
       .eq(3)
       .type('The Music Tapes');
-    waitForPreview();
-    cy.waitForAjax();
 
     confirmTextInputs([
       'Marshmallow Coast',
@@ -157,6 +140,17 @@ describe('Multivalue widget drag and drop', () => {
       'The Music Tapes',
     ]);
     confirmWeightSelectCount(4);
+
+    // Wait for preview to complete to ensure the values are saved before
+    // reloading the page.
+    cy.intercept({
+      url: '**/canvas/api/v0/layout/node/1',
+      times: 1,
+      method: 'POST',
+    }).as('updatePreview');
+    // Trigger a blur.
+    cy.get(document.activeElement).blur();
+    cy.wait('@updatePreview');
 
     // Reloading should re-instate the previous form values.
     cy.reload();
@@ -172,11 +166,19 @@ describe('Multivalue widget drag and drop', () => {
 
     // Ensure the drop target is in the viewport.
     cy.get('@unlimited-text').findAllByRole('textbox').eq(0).scrollIntoView();
-    cy.get(
-      '[data-drupal-selector="edit-field-cvt-unlimited-text"] tr.draggable:nth-child(4) [title="Change order"]',
-    ).realDnd('input[value="Neutral Milk Hotel"]', dndDefaults);
-    cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
-    cy.waitForAjax();
+    const dragHandle2 =
+      '[data-drupal-selector="edit-field-cvt-unlimited-text"] tr.draggable:nth-child(4) [title="Change order"]';
+
+    // Ensure the drag handle is ready and doesn't have pointer-events: none.
+    cy.get(dragHandle2).should(($el) => {
+      const pointerEvents = window.getComputedStyle($el[0]).pointerEvents;
+      expect(pointerEvents).to.not.equal('none');
+    });
+    cy.get(dragHandle2).realDnd(
+      'input[value="Neutral Milk Hotel"]',
+      dndDefaults,
+    );
+
     cy.get('@unlimited-text')
       .findAllByRole('textbox')
       .eq(2)

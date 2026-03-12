@@ -1,3 +1,5 @@
+import { useMemo, useRef } from 'react';
+
 import { useAppSelector } from '@/app/hooks';
 import { selectCurrentComponent } from '@/features/form/formStateSlice';
 import { selectLayout, selectModel } from '@/features/layout/layoutModelSlice';
@@ -16,7 +18,25 @@ const useInputUIData = (): InputUIData => {
   const [selectedComponentType, version] = (
     node ? (node.type as string) : 'noop'
   ).split('@');
-  return {
+
+  const prevValuesRef = useRef<any>(null);
+  const prevResultRef = useRef<any>(null);
+
+  // Use useMemo to only create new object when dependencies actually change
+  const result = useMemo(() => {
+    const newResult = {
+      selectedComponent,
+      components,
+      selectedComponentType,
+      layout,
+      node,
+      version,
+      model,
+    };
+
+    prevValuesRef.current = newResult;
+    return newResult;
+  }, [
     selectedComponent,
     components,
     selectedComponentType,
@@ -24,7 +44,11 @@ const useInputUIData = (): InputUIData => {
     node,
     version,
     model,
-  };
+  ]);
+
+  prevResultRef.current = result;
+
+  return result;
 };
 
 export default useInputUIData;

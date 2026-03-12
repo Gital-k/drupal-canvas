@@ -1,7 +1,8 @@
 import { createContext, useContext, useRef, useState } from 'react';
 
 import { RadioGroup, RadioItem } from '@/components/form/components/Radio';
-import InputBehaviors from '@/components/form/inputBehaviors';
+import { useFieldContext } from '@/components/form/contexts/FieldContext';
+import { wrapRHF } from '@/components/form/wrapRHF';
 import { a2p } from '@/local_packages/utils.js';
 
 import type { Attributes } from '@/types/DrupalAttribute';
@@ -11,41 +12,29 @@ interface RadioContextType {
   updateSelected: (value: string | number | undefined) => void;
 }
 
-interface DrupalElement {
-  '#default_value'?: string | number;
-  [key: string]: any;
-}
-
 const RadioContext = createContext<RadioContextType>({
   selected: null,
   updateSelected: () => {},
 });
 const DrupalRadioGroup = ({
   attributes = {},
-  renderChildren,
-  element = {},
+  children,
 }: {
   attributes?: Attributes;
-  renderChildren?: React.ReactNode;
-  element?: DrupalElement;
+  children?: React.ReactNode;
 }) => {
   const [selected, setSelected] = useState<string | number | null>(
-    element['#default_value'] ?? null,
+    (attributes.value as string | null) ||
+      (attributes['data-canvas-radio-default-value'] as string | null) ||
+      null,
   );
+
+  const fieldContext = useFieldContext();
 
   // Callback provided to each radio item in the group, which will update the
   // selected value that is kept track of within this component.
   const updateSelected = (value: string | number | undefined) => {
-    const syntheticEvent = {
-      target: {
-        value,
-        name: attributes['data-canvas-name'],
-      },
-    } as unknown as React.ChangeEvent<HTMLInputElement>;
-
-    if (typeof attributes.onChange === 'function') {
-      attributes.onChange(syntheticEvent);
-    }
+    fieldContext?.triggerChange(value);
     setSelected(value ?? null);
   };
 
@@ -55,7 +44,7 @@ const DrupalRadioGroup = ({
       <RadioGroup
         attributes={a2p(attributes, {}, { skipAttributes: ['onChange'] })}
       >
-        {renderChildren}
+        {children}
       </RadioGroup>
     </RadioContext.Provider>
   );
@@ -99,6 +88,6 @@ const DrupalRadioItem = ({ attributes = {} }: { attributes?: Attributes }) => {
   );
 };
 
-const WrappedDrupalRadioGroup = InputBehaviors(DrupalRadioGroup);
+const WrappedDrupalRadioGroup = wrapRHF(DrupalRadioGroup);
 
 export { WrappedDrupalRadioGroup as DrupalRadioGroup, DrupalRadioItem };
