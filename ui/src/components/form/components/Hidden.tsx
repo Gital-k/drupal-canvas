@@ -42,20 +42,51 @@ const Hidden = ({ attributes }: { attributes?: Attributes }) => {
             if (
               attributes?.onChange &&
               typeof attributes.onChange === 'function' &&
-              // Ajaxing also removes the VALUE_THAT_MEANS_REMOVE and the
-              // observer thinks the user is removing the image, which is wrong
-              !isAjaxing() &&
               // Drag-and-drop reordering temporarily removes and re-adds DOM
               // elements, which should not be treated as a true removal.
               !isReorderingRef.current
             ) {
-              const event = new Event('change');
-              ref.current!.value = VALUE_THAT_MEANS_REMOVE;
-              Object.defineProperty(event, 'target', {
-                writable: false,
-                value: ref.current,
-              });
-              attributes.onChange(event);
+              if (isAjaxing()) {
+                // AJAX is rebuilding the form. Defer until it finishes,
+                // then only re-sync inputs that still exist. Inputs
+                // that are gone were removed server-side (e.g. user
+                // clicked "Remove") — the rebuilt form already reflects
+                // the correct state without needing VALUE_THAT_MEANS_REMOVE.
+                const syncAfterAjax = () => {
+                  const existingInput = document.querySelector(
+                    `[name="${name}"]`,
+                  ) as HTMLInputElement | null;
+                  if (!existingInput) {
+                    // Server removed this input — no action needed.
+                    return;
+                  }
+                  // Input was re-added (form rebuild). These inputs
+                  // lack data-ajax, so HyperscriptifyUpdateStore won't
+                  // sync them. Re-dispatch onChange to keep Redux in sync.
+                  ref.current!.value = existingInput.value;
+                  const event = new Event('change');
+                  Object.defineProperty(event, 'target', {
+                    writable: false,
+                    value: ref.current,
+                  });
+                  (attributes.onChange as Function)(event);
+                };
+                document.addEventListener(
+                  'drupalAjaxStop',
+                  syncAfterAjax,
+                  { once: true },
+                );
+              } else {
+                // Non-AJAX removal (direct DOM manipulation). Flag
+                // the value for removal so Redux cleans it up.
+                const event = new Event('change');
+                ref.current!.value = VALUE_THAT_MEANS_REMOVE;
+                Object.defineProperty(event, 'target', {
+                  writable: false,
+                  value: ref.current,
+                });
+                (attributes.onChange as Function)(event);
+              }
             }
           }
         });

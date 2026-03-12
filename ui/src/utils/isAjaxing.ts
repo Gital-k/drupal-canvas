@@ -1,8 +1,12 @@
-import { getDrupal } from '@/utils/drupal-globals';
+const { jQuery } = window as any;
 
-const Drupal = getDrupal();
+let ajaxCount = 0;
 
-export const isAjaxing = () =>
-  Drupal.ajax.instances.some(
-    (instance: { ajaxing: boolean }) => instance && instance.ajaxing === true,
-  );
+jQuery(document).on('ajaxStart', () => {
+  ajaxCount++;
+});
+jQuery(document).on('ajaxStop', () => {
+  ajaxCount = 0;
+});
+
+export const isAjaxing = () => ajaxCount > 0;
