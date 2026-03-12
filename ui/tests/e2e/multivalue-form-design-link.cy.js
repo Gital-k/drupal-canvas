@@ -1,15 +1,11 @@
 /**
  * Comprehensive tests for multi-value form design for link fields.
  *
- * This test covers the new popover-based multi-value form UI for:
- * - Link fields (external URLs with optional title), verified using the
- *   Canvas Unlimited Link field.
+ * This test covers the new popover-based multi-value form UI for
+ * link fields.
  *
  * The new design features:
- * - Collapsed list items showing URL/title previews.
  * - Popover-based editing (click item → popover with input).
- * - Each link row has two DrupalInputMultivalueForm instances: one for the
- *   URL sub-field and one for the link text (title) sub-field.
  * - Custom drag handles and remove buttons via DrupalInputMultivalueForm.
  */
 
@@ -17,6 +13,7 @@ describe('Multivalue Form Design – Link Field', () => {
   before(() => {
     cy.drupalCanvasInstall([
       'canvas_test_article_fields',
+      // @todo remove once https://drupal.org/i/3577946 is fixed.
       // Required for new multi-value form UI.
       'canvas_dev_mode',
     ]);
