@@ -42,10 +42,11 @@ const SlotDropZone: React.FC<SlotDropZoneProps> = (props) => {
     active,
   } = useDroppable({
     id: `${slot.id}_${position}`,
-    disabled: !accepts.includes(activeOrigin) || !isDropAllowed,
+    disabled: !accepts.includes(activeOrigin),
     data: {
       slot: slot,
       component: parentComponent,
+      parentComponentType: parentComponent?.type,
       position: position,
       parentRegion: parentRegion,
       path: slotPath,
@@ -66,7 +67,7 @@ const SlotDropZone: React.FC<SlotDropZoneProps> = (props) => {
   return (
     <div
       className={clsx(styles.slotDropZone, dropzoneStyle, {
-        [styles.isOver]: isOver,
+        [styles.isOver]: isOver && isDropAllowed,
       })}
       ref={setDropRef}
     ></div>
