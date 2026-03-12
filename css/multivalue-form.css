@@ -119,7 +119,8 @@
 }
 
 .field-multiple-table td .js-form-type-textfield,
-.field-multiple-table td .js-form-type-url
+.field-multiple-table td .js-form-type-url,
+.field-multiple-table td .js-form-type-entity_autocomplete
 {
   margin-bottom: 0;
 }
