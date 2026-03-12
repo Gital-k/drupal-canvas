@@ -9,6 +9,65 @@ import { isAjaxing } from '@/utils/isAjaxing';
 
 import type { Attributes } from '@/types/DrupalAttribute';
 
+/**
+ * Dispatches a synthetic change event on the given input ref so the
+ * inputBehaviors onChange handler picks it up and commits to Redux.
+ */
+function dispatchChangeEvent(
+  ref: React.RefObject<HTMLInputElement | null>,
+  onChange: Function,
+) {
+  const event = new Event('change');
+  Object.defineProperty(event, 'target', {
+    writable: false,
+    value: ref.current,
+  });
+  onChange(event);
+}
+
+/**
+ * Handles the removal of a hidden input from the DOM. Determines whether
+ * the removal was caused by an AJAX form rebuild or by direct DOM
+ * manipulation, and acts accordingly:
+ *
+ * - AJAX rebuild: defers until AJAX completes. If the input reappears
+ *   (form rebuilt with the same field), re-syncs Redux with the new
+ *   value. If it doesn't reappear (server removed it, e.g. user clicked
+ *   "Remove"), does nothing — the rebuilt form already reflects the
+ *   correct state.
+ *
+ * - Non-AJAX removal: flags the value with VALUE_THAT_MEANS_REMOVE so
+ *   Redux cleans it up.
+ */
+function onHiddenFieldRemoved(
+  name: string,
+  ref: React.RefObject<HTMLInputElement | null>,
+  onChange: Function,
+) {
+  if (isAjaxing()) {
+    document.addEventListener(
+      'drupalAjaxStop',
+      () => {
+        const existingInput = document.querySelector(
+          `[name="${name}"]`,
+        ) as HTMLInputElement | null;
+        if (!existingInput) {
+          return;
+        }
+        // Input was re-added (form rebuild). These inputs lack the
+        // data-ajax attribute, so HyperscriptifyUpdateStore won't sync
+        // them. Re-dispatch onChange to keep Redux in sync.
+        ref.current!.value = existingInput.value;
+        dispatchChangeEvent(ref, onChange);
+      },
+      { once: true },
+    );
+  } else {
+    ref.current!.value = VALUE_THAT_MEANS_REMOVE;
+    dispatchChangeEvent(ref, onChange);
+  }
+}
+
 const Hidden = ({ attributes }: { attributes?: Attributes }) => {
   const [value, setValue] = useState(attributes?.value || '');
   const ref = useRef<HTMLInputElement | null>(null);
@@ -46,47 +105,7 @@ const Hidden = ({ attributes }: { attributes?: Attributes }) => {
               // elements, which should not be treated as a true removal.
               !isReorderingRef.current
             ) {
-              if (isAjaxing()) {
-                // AJAX is rebuilding the form. Defer until it finishes,
-                // then only re-sync inputs that still exist. Inputs
-                // that are gone were removed server-side (e.g. user
-                // clicked "Remove") — the rebuilt form already reflects
-                // the correct state without needing VALUE_THAT_MEANS_REMOVE.
-                const syncAfterAjax = () => {
-                  const existingInput = document.querySelector(
-                    `[name="${name}"]`,
-                  ) as HTMLInputElement | null;
-                  if (!existingInput) {
-                    // Server removed this input — no action needed.
-                    return;
-                  }
-                  // Input was re-added (form rebuild). These inputs
-                  // lack data-ajax, so HyperscriptifyUpdateStore won't
-                  // sync them. Re-dispatch onChange to keep Redux in sync.
-                  ref.current!.value = existingInput.value;
-                  const event = new Event('change');
-                  Object.defineProperty(event, 'target', {
-                    writable: false,
-                    value: ref.current,
-                  });
-                  (attributes.onChange as Function)(event);
-                };
-                document.addEventListener(
-                  'drupalAjaxStop',
-                  syncAfterAjax,
-                  { once: true },
-                );
-              } else {
-                // Non-AJAX removal (direct DOM manipulation). Flag
-                // the value for removal so Redux cleans it up.
-                const event = new Event('change');
-                ref.current!.value = VALUE_THAT_MEANS_REMOVE;
-                Object.defineProperty(event, 'target', {
-                  writable: false,
-                  value: ref.current,
-                });
-                (attributes.onChange as Function)(event);
-              }
+              onHiddenFieldRemoved(name, ref, attributes.onChange);
             }
           }
         });
