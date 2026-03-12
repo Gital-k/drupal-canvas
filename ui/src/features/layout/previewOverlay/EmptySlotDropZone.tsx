@@ -67,9 +67,12 @@ const EmptySlotDropZone: React.FC<EmptySlotDropZoneProps> = (props) => {
   }, [active, isOver]);
 
   return (
-    <div className={clsx(styles.emptySlotContainer, {
-      [styles.isDragging]: !!active,
-    })} data-testid="canvas-empty-slot">
+    <div
+      className={clsx(styles.emptySlotContainer, {
+        [styles.isDragging]: !!active,
+      })}
+      data-testid="canvas-empty-slot"
+    >
       <div
         className={clsx(styles.emptySlotDropZone, {
           [styles.isOver]: isOver && isDropAllowed,

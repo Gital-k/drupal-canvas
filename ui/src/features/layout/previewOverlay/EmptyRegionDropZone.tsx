@@ -58,9 +58,11 @@ const EmptyRegionDropZone: React.FC<EmptyRegionDropZoneProps> = (props) => {
   }, [active, isOver]);
 
   return (
-    <div className={clsx(styles.emptyPageContainer, {
-      [styles.isDragging]: !!active,
-    })}>
+    <div
+      className={clsx(styles.emptyPageContainer, {
+        [styles.isDragging]: !!active,
+      })}
+    >
       <div
         className={clsx(styles.emptyPageDropZone, {
           [styles.isOver]: isOver && !hasSlotRestrictions,

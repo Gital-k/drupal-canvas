@@ -34,7 +34,6 @@ const RegionDropZone: React.FC<RegionDropZoneProps> = (props) => {
   const {
     setNodeRef: setDropRef,
     isOver,
-    active,
   } = useDroppable({
     id: `${region.id}_${position}`,
     // See EmptySlotDropZone for rationale on omitting disabled.

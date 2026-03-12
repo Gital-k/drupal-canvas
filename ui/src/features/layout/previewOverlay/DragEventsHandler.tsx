@@ -23,8 +23,6 @@ import { useDropOnFolderHandler } from '@/hooks/useDropOnFolderHandler';
 import { useGetComponentsQuery } from '@/services/componentAndLayout';
 import { getSlotAllowedComponentIds } from '@/utils/slot-utils';
 
-import type { PropSourceComponent } from '@/types/Component';
-
 import {
   cleanupMouseTracking,
   initMouseTracking,
@@ -37,6 +35,7 @@ import type {
   DragOverEvent,
   DragStartEvent,
 } from '@dnd-kit/core';
+import type { PropSourceComponent } from '@/types/Component';
 
 import styles from './DragOverlay.module.css';
 
@@ -191,7 +190,10 @@ const DragEventsHandler: React.FC = () => {
       const slots = propSource?.metadata?.slots;
       if (slots) {
         for (const slot of Object.values(slots)) {
-          const allowedIds = getSlotAllowedComponentIds(slot, components as Record<string, any>);
+          const allowedIds = getSlotAllowedComponentIds(
+            slot,
+            components as Record<string, any>,
+          );
           if (allowedIds?.includes(draggedId)) {
             isRestricted = true;
             break;
@@ -216,10 +218,14 @@ const DragEventsHandler: React.FC = () => {
       if (regionNode?.components && components) {
         for (const comp of regionNode.components) {
           const [compType] = comp.type.split('@');
-          const compMeta = (components[compType] as PropSourceComponent)?.metadata?.slots;
+          const compMeta = (components[compType] as PropSourceComponent)
+            ?.metadata?.slots;
           if (compMeta) {
             for (const slotDef of Object.values(compMeta)) {
-              const allowedIds = getSlotAllowedComponentIds(slotDef, components as Record<string, any>);
+              const allowedIds = getSlotAllowedComponentIds(
+                slotDef,
+                components as Record<string, any>,
+              );
               if (allowedIds && !allowedIds.includes(draggedId)) {
                 return false;
               }
@@ -232,11 +238,15 @@ const DragEventsHandler: React.FC = () => {
 
     // Slot drop — check if slot allows this component
     // parentComponentType may come from layers droppable data, or from overlay's component
-    const parentCompType = over?.data?.current?.parentComponentType || over?.data?.current?.component?.type;
+    const parentCompType =
+      over?.data?.current?.parentComponentType ||
+      over?.data?.current?.component?.type;
     if (!parentCompType) return !isRestricted;
 
     const [parentType] = parentCompType.split('@');
-    const parentComp = components[parentType] as PropSourceComponent | undefined;
+    const parentComp = components[parentType] as
+      | PropSourceComponent
+      | undefined;
     if (!parentComp?.metadata?.slots) return !isRestricted;
 
     const slotName = parentSlot.name || parentSlot.id;
@@ -274,8 +284,9 @@ const DragEventsHandler: React.FC = () => {
       dispatch(setTargetSlotInfo(undefined));
     } else if (parentSlot) {
       dispatch(setTargetSlot(parentSlot.id));
-      const parentComponentType =
-        over?.data?.current?.component?.type as string | undefined;
+      const parentComponentType = over?.data?.current?.component?.type as
+        | string
+        | undefined;
       if (parentComponentType) {
         dispatch(
           setTargetSlotInfo({
