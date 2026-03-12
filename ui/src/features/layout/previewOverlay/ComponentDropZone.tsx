@@ -31,7 +31,6 @@ const ComponentDropZone: React.FC<ComponentDropZoneProps> = (props) => {
   const layout = useAppSelector(selectLayout);
   const [draggedItem, setDraggedItem] = useState('');
   const componentName = useGetComponentName(component);
-  const [activeOrigin, setActiveOrigin] = useState('');
   const accepts = ['overlay', 'library'];
   const isDropAllowed = useIsDropAllowed(parentSlot, parentComponentType);
 
@@ -57,26 +56,18 @@ const ComponentDropZone: React.FC<ComponentDropZoneProps> = (props) => {
     active,
   } = useDroppable({
     id: `${component.uuid}_${position}`,
-    disabled:
-      draggedItem === component.uuid ||
-      !accepts.includes(activeOrigin) ||
-      !isDropAllowed,
+    // Only disable self-drop; origin filtering handled by isDropAllowed
+    // and drop handlers. See EmptySlotDropZone for full rationale.
+    disabled: draggedItem === component.uuid,
     data: {
       component: component,
       parentSlot: parentSlot,
       parentRegion: parentRegion,
+      parentComponentType: parentComponentType,
       path: dropPath,
       accepts,
     },
   });
-
-  useEffect(() => {
-    if (active) {
-      setActiveOrigin(active.data?.current?.origin);
-    } else {
-      setActiveOrigin('');
-    }
-  }, [active]);
 
   useEffect(() => {
     // use the id of the dragged to disable it's dropzone so you can't drop it inside itself.
@@ -88,7 +79,7 @@ const ComponentDropZone: React.FC<ComponentDropZoneProps> = (props) => {
   return (
     <div
       className={clsx(styles.componentDropZone, dropzoneStyle, {
-        [styles.isOver]: isOver,
+        [styles.isOver]: isOver && isDropAllowed,
       })}
       ref={setDropRef}
       data-testid={`canvas-component-drop-zone-${getPositionRelation(position)}-${kebabCase(componentName)}`}

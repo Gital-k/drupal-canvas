@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import clsx from 'clsx';
 import { kebabCase } from 'lodash';
 import { useDroppable } from '@dnd-kit/core';
@@ -19,7 +18,6 @@ export interface RegionDropZoneProps {
 const RegionDropZone: React.FC<RegionDropZoneProps> = (props) => {
   const { region, position } = props;
   const layout = useAppSelector(selectLayout);
-  const [activeOrigin, setActiveOrigin] = useState('');
   const accepts = ['overlay', 'library'];
   const { hasSlotRestrictions } = useDraggedItemInfo();
 
@@ -39,7 +37,7 @@ const RegionDropZone: React.FC<RegionDropZoneProps> = (props) => {
     active,
   } = useDroppable({
     id: `${region.id}_${position}`,
-    disabled: !accepts.includes(activeOrigin) || hasSlotRestrictions,
+    // See EmptySlotDropZone for rationale on omitting disabled.
     data: {
       region: region,
       parentRegion: region,
@@ -48,20 +46,12 @@ const RegionDropZone: React.FC<RegionDropZoneProps> = (props) => {
     },
   });
 
-  useEffect(() => {
-    if (active) {
-      setActiveOrigin(active.data?.current?.origin);
-    } else {
-      setActiveOrigin('');
-    }
-  }, [active]);
-
   const dropzoneStyle = styles[position];
 
   return (
     <div
       className={clsx(styles.regionDropZone, dropzoneStyle, {
-        [styles.isOver]: isOver,
+        [styles.isOver]: isOver && !hasSlotRestrictions,
       })}
       ref={setDropRef}
       data-testid={`canvas-region-drop-zone-${positionLabel}-${kebabCase(region.name)}`}

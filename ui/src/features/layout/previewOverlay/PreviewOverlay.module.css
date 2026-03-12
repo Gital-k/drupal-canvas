@@ -152,6 +152,10 @@
   height: 100%;
   pointer-events: none;
   background: none;
+
+  &.isDragging {
+    pointer-events: all;
+  }
 }
 
 .emptySlotContainer {
@@ -182,6 +186,10 @@
   width: calc(100% - 8px);
   height: calc(100% - 8px);
   pointer-events: none;
+
+  &.isDragging {
+    pointer-events: all;
+  }
   background: rgba(255, 255, 255, 0.3);
   font-size: 12px;
   gap: var(--space-1);

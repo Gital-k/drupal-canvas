@@ -24,7 +24,6 @@ const EmptyRegionDropZone: React.FC<EmptyRegionDropZoneProps> = (props) => {
   const { region } = props;
   const layout = useAppSelector(selectLayout);
   const [activeName, setActiveName] = useState('');
-  const [activeOrigin, setActiveOrigin] = useState('');
   const isTemplateRoute =
     useAppSelector(selectEditorFrameContext) === 'template';
   const { hasSlotRestrictions } = useDraggedItemInfo();
@@ -39,7 +38,7 @@ const EmptyRegionDropZone: React.FC<EmptyRegionDropZoneProps> = (props) => {
     active,
   } = useDroppable({
     id: region.id,
-    disabled: !accepts.includes(activeOrigin) || hasSlotRestrictions,
+    // See EmptySlotDropZone for rationale on omitting disabled.
     data: {
       region: region,
       parentRegion: region,
@@ -58,19 +57,14 @@ const EmptyRegionDropZone: React.FC<EmptyRegionDropZoneProps> = (props) => {
     }
   }, [active, isOver]);
 
-  useEffect(() => {
-    if (active) {
-      setActiveOrigin(active.data?.current?.origin);
-    } else {
-      setActiveOrigin('');
-    }
-  }, [active]);
-
   return (
-    <div className={styles.emptyPageContainer}>
+    <div className={clsx(styles.emptyPageContainer, {
+      [styles.isDragging]: !!active,
+    })}>
       <div
         className={clsx(styles.emptyPageDropZone, {
-          [styles.isOver]: isOver,
+          [styles.isOver]: isOver && !hasSlotRestrictions,
+          [styles.isDragging]: !!active,
         })}
         ref={setDropRef}
         data-testid={`canvas-empty-region-drop-zone-${kebabCase(region.name)}`}

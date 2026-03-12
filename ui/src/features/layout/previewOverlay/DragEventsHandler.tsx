@@ -20,6 +20,10 @@ import {
 import { useDropFromLayoutHandler } from '@/hooks/useDropFromLayoutHandler';
 import { useDropFromLibraryHandler } from '@/hooks/useDropFromLibraryHandler';
 import { useDropOnFolderHandler } from '@/hooks/useDropOnFolderHandler';
+import { useGetComponentsQuery } from '@/services/componentAndLayout';
+import { getSlotAllowedComponentIds } from '@/utils/slot-utils';
+
+import type { PropSourceComponent } from '@/types/Component';
 
 import {
   cleanupMouseTracking,
@@ -42,9 +46,11 @@ const DragEventsHandler: React.FC = () => {
   const [dragOrigin, setDragOrigin] = useState('');
   const [isDraggingFolder, setIsDraggingFolder] = useState(false);
   const [isFolderAtBoundary, setIsFolderAtBoundary] = useState(false);
+  const [isDropNotAllowed, setIsDropNotAllowed] = useState(false);
   const { handleFolderDrop } = useDropOnFolderHandler();
   const { handleNewDrop } = useDropFromLibraryHandler();
   const { handleExistingDrop } = useDropFromLayoutHandler();
+  const { data: components } = useGetComponentsQuery();
 
   // Apply/remove folderAtBoundary class when state changes.
   useEffect(() => {
@@ -59,6 +65,19 @@ const DragEventsHandler: React.FC = () => {
       window.document.body.classList.remove(styles.folderAtBoundary);
     };
   }, [isFolderAtBoundary]);
+
+  // Apply/remove notAllowed class when hovering over a disallowed drop zone.
+  useEffect(() => {
+    if (isDropNotAllowed) {
+      window.document.body.classList.add(styles.notAllowed);
+    } else {
+      window.document.body.classList.remove(styles.notAllowed);
+    }
+
+    return () => {
+      window.document.body.classList.remove(styles.notAllowed);
+    };
+  }, [isDropNotAllowed]);
 
   const afterDrag = (
     elements: HTMLElement[] = [],
@@ -146,6 +165,88 @@ const DragEventsHandler: React.FC = () => {
     }
   }
 
+  /**
+   * Check if the dragged component is allowed in the target drop zone.
+   */
+  function checkDropAllowed(active: any, over: any): boolean {
+    if (!over || !components) return true;
+
+    // Get dragged component ID
+    const origin = active?.data?.current?.origin;
+    let draggedId: string | undefined;
+    if (origin === 'library') {
+      draggedId = active?.data?.current?.item?.id;
+    } else if (origin === 'layers' || origin === 'overlay') {
+      const compType = active?.data?.current?.component?.type;
+      if (compType) {
+        draggedId = compType.split('@')[0];
+      }
+    }
+    if (!draggedId) return true;
+
+    // Check if dragged component is restricted
+    let isRestricted = false;
+    for (const comp of Object.values(components)) {
+      const propSource = comp as PropSourceComponent;
+      const slots = propSource?.metadata?.slots;
+      if (slots) {
+        for (const slot of Object.values(slots)) {
+          const allowedIds = getSlotAllowedComponentIds(slot, components as Record<string, any>);
+          if (allowedIds?.includes(draggedId)) {
+            isRestricted = true;
+            break;
+          }
+        }
+      }
+      if (isRestricted) break;
+    }
+
+    const parentSlot = over?.data?.current?.parentSlot;
+    const parentRegion = over?.data?.current?.parentRegion;
+
+    // Region drop — restricted components cannot be dropped here.
+    // Also check if the region contains components with restricted slots
+    // that don't include the dragged component (defense-in-depth for when
+    // `over` resolves to RegionDropZone instead of EmptySlotDropZone).
+    if (!parentSlot || parentRegion) {
+      if (isRestricted) return false;
+
+      // Check if any component in this region has slots that restrict the dragged component
+      const regionNode = over?.data?.current?.region;
+      if (regionNode?.components && components) {
+        for (const comp of regionNode.components) {
+          const [compType] = comp.type.split('@');
+          const compMeta = (components[compType] as PropSourceComponent)?.metadata?.slots;
+          if (compMeta) {
+            for (const slotDef of Object.values(compMeta)) {
+              const allowedIds = getSlotAllowedComponentIds(slotDef, components as Record<string, any>);
+              if (allowedIds && !allowedIds.includes(draggedId)) {
+                return false;
+              }
+            }
+          }
+        }
+      }
+      return true;
+    }
+
+    // Slot drop — check if slot allows this component
+    // parentComponentType may come from layers droppable data, or from overlay's component
+    const parentCompType = over?.data?.current?.parentComponentType || over?.data?.current?.component?.type;
+    if (!parentCompType) return !isRestricted;
+
+    const [parentType] = parentCompType.split('@');
+    const parentComp = components[parentType] as PropSourceComponent | undefined;
+    if (!parentComp?.metadata?.slots) return !isRestricted;
+
+    const slotName = parentSlot.name || parentSlot.id;
+    const slotDef = parentComp.metadata.slots[slotName];
+    const allowedIds = getSlotAllowedComponentIds(slotDef, components);
+    if (!allowedIds) return !isRestricted;
+
+    return allowedIds.includes(draggedId);
+  }
+
   function handleDragOver(event: DragOverEvent) {
     const { over, active } = event;
     const parentSlot = over?.data?.current?.parentSlot;
@@ -155,8 +256,17 @@ const DragEventsHandler: React.FC = () => {
     if (active.data?.current?.type === 'folder') {
       if (!over || over.data?.current?.destination !== 'folder') {
         dispatch(unsetTargetSlot());
+        setIsDropNotAllowed(false);
         return;
       }
+    }
+
+    // Check slot restrictions using the simple `over` target.
+    if (over) {
+      const allowed = checkDropAllowed(active, over);
+      setIsDropNotAllowed(!allowed);
+    } else {
+      setIsDropNotAllowed(false);
     }
 
     if (parentRegion) {
@@ -188,7 +298,9 @@ const DragEventsHandler: React.FC = () => {
     dispatch(setTargetSlotInfo(undefined));
     setIsDraggingFolder(false);
     setIsFolderAtBoundary(false);
+    setIsDropNotAllowed(false);
     window.document.body.classList.remove(styles.dragging);
+    window.document.body.classList.remove(styles.notAllowed);
 
     // Ensure the mouse tracking is cleaned up
     cleanupMouseTracking();
@@ -243,7 +355,9 @@ const DragEventsHandler: React.FC = () => {
   return (
     <DragOverlay
       modifiers={modifiers}
-      className={clsx(styles.dragOverlay)}
+      className={clsx(styles.dragOverlay, {
+        [styles.notAllowedOverlay]: isDropNotAllowed,
+      })}
       dropAnimation={null}
     >
       {!isDraggingFolder && <div>{componentName}</div>}
