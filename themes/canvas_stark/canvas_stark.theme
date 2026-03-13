@@ -230,9 +230,6 @@ function canvas_stark_preprocess_form_element(array &$variables): void {
  * component to identify which prop it should manage, enabling the "Remove
  * default" functionality for optional image props with example values.
  *
- * @param array $variables
- *   The preprocessed variables for the fieldset template.
- *
  * @see \Drupal\canvas\Hook\ReduxIntegratedFieldWidgetsHooks::fieldWidgetCompleteFormAlter()
  * @see ui/src/components/form/components/DefaultImagePreview.tsx
  */

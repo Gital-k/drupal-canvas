@@ -1,3 +1,4 @@
+/* Multivalue Media Form Styles */
 .canvas-multivalue-media [data-canvas-media-library-fieldset-wrapper] [data-canvas-media-library-selection] {
   flex-direction: column;
 }
