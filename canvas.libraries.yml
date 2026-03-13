@@ -241,9 +241,4 @@ multivalue-media-form:
   css:
     theme:
       css/multivalue-media-form.css: {}
-  js:
-    js/multivalue-media-tabledrag.js: {}
-  dependencies:
-    - core/once
-    - core/sortable
-    - media_library/widget
+

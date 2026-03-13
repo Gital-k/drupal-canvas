@@ -3,20 +3,21 @@
  *
  * Tests the new vertical list UI for multi-value media (image) fields using
  * the media_library_widget. The design features:
- * - Vertical list of selected media items using Sortable.js.
- * - Each item: drag handle (a.canvas-media-drag-handle) | thumbnail | media name | inline delete button.
+ * - Vertical list of selected media items managed by the React component
+ *   DrupalMediaLibraryMultivalueWidget using dnd-kit for drag-to-reorder.
+ * - Each item: drag handle (div[aria-label="Drag to reorder"]) | thumbnail | media name | inline delete button.
  * - "Add media" button (opens media library modal).
- * - Drag-to-reorder via Sortable.js with custom canvas drag handles.
- * - Keyboard reorder via ArrowUp/ArrowDown on the drag handle.
+ * - Drag-to-reorder via PointerSensor using the six-dot drag handle.
  *
  * DOM structure (per item):
- *   .js-media-library-selection           ← items container
- *     .js-media-library-item              ← one media item
- *       a.canvas-media-drag-handle        ← drag handle (SVG six-dot icon)
- *       article                           ← media preview
- *         .js-media-library-item-preview  ← thumbnail
- *         canvas-text[classname="canvas-media-preview-label"]  ← media name
- *       [data-canvas-media-remove-button] ← remove button
+ *   drupal-canvas-media-library-multivalue-widget  ← React component root
+ *     .js-media-library-selection                  ← items container (rendered by React)
+ *       div (SortableItem wrapper)                 ← dnd-kit sortable item
+ *         div[aria-label="Drag to reorder"]        ← drag handle
+ *         .js-media-library-item                   ← Drupal media item
+ *           article                                ← media preview
+ *             .js-media-library-item-preview       ← thumbnail
+ *           [data-canvas-media-remove-button]      ← remove button
  */
 
 // @todo Remove the canvas_dev_mode condition as part of https://www.drupal.org/node/3577946
@@ -59,7 +60,7 @@ describe('Multivalue Media Form Design (canvas_dev_mode)', () => {
       'true',
     );
 
-    // The items container is .js-media-library-selection (uses Sortable.js).
+    // The items container is .js-media-library-selection rendered by the React component.
     cy.get('@unlimited-media')
       .find('.js-media-library-selection')
       .should('exist');
@@ -77,9 +78,9 @@ describe('Multivalue Media Form Design (canvas_dev_mode)', () => {
       .findByAltText('My barber may have been looking at a picture of a dog')
       .should('exist');
 
-    // Each item should have a custom drag handle (a.canvas-media-drag-handle).
+    // Each item should have a React-rendered drag handle button.
     cy.get('@unlimited-media')
-      .find('.canvas-media-drag-handle')
+      .find('[aria-label="Drag to reorder"]')
       .should('have.length', 2);
 
     // Each item should have an inline remove button.
@@ -178,7 +179,7 @@ describe('Multivalue Media Form Design (canvas_dev_mode)', () => {
     cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
   });
 
-  it('can reorder items with custom drag handles via keyboard', () => {
+  it('can reorder items with drag handles via pointer drag', () => {
     cy.loadURLandWaitForCanvasLoaded({ url: 'canvas/editor/node/2' });
 
     cy.get('[data-drupal-selector="edit-field-cvt-unlimited-media"]').as(
@@ -189,14 +190,12 @@ describe('Multivalue Media Form Design (canvas_dev_mode)', () => {
       .find('.js-media-library-item')
       .should('have.length', 2);
 
-    // Verify custom drag handles (a.canvas-media-drag-handle) are present.
+    // Verify React-rendered drag handles are present.
     cy.get('@unlimited-media')
-      .find('.canvas-media-drag-handle')
+      .find('[aria-label="Drag to reorder"]')
       .should('have.length', 2);
 
     // Record the alt text of each item before reorder.
-    // Alt text is stable — it comes from the img attribute, never cleared by
-    // the hyperscriptify process.
     const getItemAlt = (itemIndex) =>
       cy
         .get('@unlimited-media')
@@ -215,18 +214,22 @@ describe('Multivalue Media Form Design (canvas_dev_mode)', () => {
       secondAlt = alt;
     });
 
-    // Keyboard reorder: focus the first item's drag handle and press ArrowDown.
-    // attachKeyboardReorder() in multivalue-media-tabledrag.js handles this:
-    // it calls container.insertBefore(next, item) and updates weight inputs.
     cy.get('@unlimited-media')
-      .find('.js-media-library-item')
-      .first()
-      .find('.canvas-media-drag-handle')
-      .focus();
+      .find('[aria-label="Drag to reorder"]')
+      .eq(0)
+      .scrollIntoView();
 
-    cy.focused().type('{downArrow}');
+    const dragHandleSelector =
+      '[data-drupal-selector="edit-field-cvt-unlimited-media"] .js-media-library-selection > div';
 
-    // After ArrowDown the DOM is reordered synchronously; verify via alt texts.
+    cy.get(
+      `${dragHandleSelector}:nth-child(1) [aria-label="Drag to reorder"]`,
+    ).realDnd(`${dragHandleSelector}:nth-child(2)`, {
+      position: 'center',
+      scrollBehavior: false,
+    });
+
+    // After pointer drag React re-renders in the new order; verify via alt texts.
     getItemAlt(0).then((alt) => {
       expect(alt).to.equal(secondAlt);
     });

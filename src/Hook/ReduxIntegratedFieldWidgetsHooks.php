@@ -124,17 +124,13 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
       }
 
       // Mark multivalue media fields so templates can conditionally render
-      // the drag handle icon.
+      // the React-driven sortable wrapper.
       // @todo Remove as part of https://www.drupal.org/node/3577946
       if ($this->moduleHandler->moduleExists('canvas_dev_mode')) {
         $field_definition = $context['items']->getFieldDefinition();
         if ($field_definition->getFieldStorageDefinition()->isMultiple()) {
           $form['#is_multivalue_media_form'] = TRUE;
           $form['selection']['#is_multivalue_media_form'] = TRUE;
-          $selection = $form['selection'] ?? [];
-          foreach (Element::children($selection) as $key) {
-            $form['selection'][$key]['#is_multivalue_media_form'] = TRUE;
-          }
         }
       }
     }
@@ -226,7 +222,7 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
    *
    * Sets data attributes on the fieldset element and exposes
    * is_multivalue_media_form as a Twig variable so the template can
-   * conditionally render the weight toggle prefix.
+   * conditionally suppress the weight toggle prefix.
    */
   #[Hook('preprocess_fieldset')]
   public static function canvasStarkPreprocessFieldset(array &$variables): void {
@@ -240,15 +236,16 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
   }
 
   /**
-   * Implements hook_preprocess_media_library_item().
+   * Implements hook_preprocess_container().
    *
-   * Exposes is_multivalue_media_item so media-library-item.html.twig can
-   * conditionally render the drag handle icon.
+   * Exposes is_multivalue_media_form to the
+   * container--media-library-widget-selection.html.twig template so it can
+   * render the React-driven sortable wrapper instead of a plain div.
    */
-  #[Hook('preprocess_media_library_item')]
-  public static function canvasStarkPreprocessMediaLibraryItem(array &$variables): void {
+  #[Hook('preprocess_container')]
+  public static function canvasStarkPreprocessContainer(array &$variables): void {
     if (!empty($variables['element']['#is_multivalue_media_form'])) {
-      $variables['is_multivalue_media_item'] = TRUE;
+      $variables['is_multivalue_media_form'] = TRUE;
     }
   }
 
