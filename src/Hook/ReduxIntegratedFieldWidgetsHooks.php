@@ -239,8 +239,7 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
    * Implements hook_preprocess_container().
    *
    * Exposes is_multivalue_media_form to the
-   * container--media-library-widget-selection.html.twig template so it can
-   * render the React-driven sortable wrapper instead of a plain div.
+   * container--media-library-widget-selection.html.twig template.
    */
   #[Hook('preprocess_container')]
   public static function canvasStarkPreprocessContainer(array &$variables): void {

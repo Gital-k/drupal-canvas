@@ -23,7 +23,7 @@ import styles from './DrupalMediaLibraryMultivalueWidget.module.css';
 
 /**
  * Updates the hidden weight inputs for each .js-media-library-item child of
- * the given container so that their values reflect visual order.
+ * the given container.
  */
 function updateWeights(container: HTMLElement): void {
   Array.from(
@@ -83,8 +83,6 @@ interface ChildItem {
 
 /**
  * Returns true if the node is a React element (not a string/number/null).
- * Hyperscriptify includes whitespace text nodes as plain strings in the
- * children array — we must filter those out before wrapping in SortableItem.
  */
 function isElement(node: React.ReactNode): node is React.ReactElement {
   return node !== null && typeof node === 'object' && 'type' in node;
@@ -95,25 +93,7 @@ interface DrupalMediaLibraryMultivalueWidgetProps {
 }
 
 /**
- * React-driven sortable wrapper for the Canvas multivalue media library widget.
- *
- * This component takes over the role of the .js-media-library-selection
- * container for unlimited-cardinality media fields in canvas_stark. It is
- * rendered by the container--media-library-widget-selection.html.twig template
- * when is_multivalue_media_form is TRUE.
- *
- * Each .js-media-library-item child (already hyperscriptified) is wrapped in a
- * dnd-kit SortableItem that provides the six-dot drag handle. Whitespace text
- * nodes that hyperscriptify produces between elements are filtered out before
- * wrapping so only real React elements become sortable items.
- *
- * After a drag ends the component re-renders the children in the new order and
- * updates the hidden .js-media-library-item-weight inputs so the server-side
- * order matches.
- *
- * Single-cardinality fields are not affected: their selection template renders
- * a plain <div> without this component, leaving core's MediaLibraryWidgetSortable
- * behavior untouched.
+ * Sortable wrapper for the Canvas multivalue media library widget.
  *
  * @see themes/canvas_stark/templates/media_library/container--media-library-widget-selection.html.twig
  * @see src/Hook/ReduxIntegratedFieldWidgetsHooks.php
