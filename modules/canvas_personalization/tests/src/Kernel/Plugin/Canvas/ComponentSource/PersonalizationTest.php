@@ -73,6 +73,10 @@ final class PersonalizationTest extends ComponentSourceTestBase {
     ])->save();
   }
 
+  protected function generateComponentConfig(): void {
+    $this->container->get(ComponentSourceManager::class)->generateComponents();
+  }
+
   /**
    * Test our case and switch personalization Components are installed.
    *
@@ -219,7 +223,7 @@ HTML,
    */
   protected function renderComponentsPreview(array $component_ids, callable $get_default_input): array {
     $this->assertCount($this->expectedDefaultComponentInstallCount, $this->componentStorage->loadMultiple());
-    $this->container->get(ComponentSourceManager::class)->generateComponents();
+    $this->generateComponentConfig();
 
     $rendered = [];
     foreach ($this->componentStorage->loadMultiple($component_ids) as $component_id => $component) {
@@ -448,7 +452,7 @@ HTML,
    */
   #[DataProvider('explicitsInputsProvider')]
   public function testInputToClientModel(string $component_id, array $explicit_input): void {
-    $this->container->get(ComponentSourceManager::class)->generateComponents();
+    $this->generateComponentConfig();
 
     $component = Component::load($component_id);
     \assert($component instanceof Component);
