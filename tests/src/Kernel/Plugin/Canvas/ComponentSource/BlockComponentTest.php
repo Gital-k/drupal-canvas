@@ -67,6 +67,10 @@ final class BlockComponentTest extends ComponentSourceTestBase {
     $this->setUpCurrentUser(['name' => 'bob', 'uid' => 2]);
   }
 
+  protected function generateComponentConfig(): void {
+    $this->container->get(ComponentSourceManager::class)->generateComponents();
+  }
+
   /**
    * All test module blocks must either have a Component or a reason why not.
    *
@@ -87,7 +91,7 @@ final class BlockComponentTest extends ComponentSourceTestBase {
 
     // Trigger component generation, as if the test module was just installed.
     // (Kernel tests don't trigger all hooks that are triggered in reality.)
-    $this->container->get(ComponentSourceManager::class)->generateComponents();
+    $this->generateComponentConfig();
 
     self::assertSame([
       'block.canvas_test_block_input_unvalidatable' => [
@@ -119,7 +123,7 @@ final class BlockComponentTest extends ComponentSourceTestBase {
 
     // Trigger component generation, as if the test module was just installed.
     // (Kernel tests don't trigger all hooks that are triggered in reality.)
-    $this->container->get(ComponentSourceManager::class)->generateComponents();
+    $this->generateComponentConfig();
 
     $view_block_component = Component::load('block.views_block.test_view-test_block');
     \assert($view_block_component instanceof Component);
@@ -336,7 +340,7 @@ HTML,
    */
   #[DataProvider('getValidTreeTestCases')]
   public function testGetExplicitInput(array $componentItemValue): void {
-    $this->container->get(ComponentSourceManager::class)->generateComponents();
+    $this->generateComponentConfig();
 
     $this->installEntitySchema('node');
     $this->container->get('module_installer')->install(['canvas_test_config_node_article']);
@@ -411,7 +415,7 @@ HTML,
   }
 
   protected function createAndSaveInUseComponentForFallbackTesting(): ComponentInterface {
-    $this->container->get(ComponentSourceManager::class)->generateComponents();
+    $this->generateComponentConfig();
     /** @var \Drupal\canvas\Entity\ComponentInterface */
     return Component::load('block.system_menu_block.footer');
   }
@@ -448,7 +452,7 @@ HTML,
       'description' => 'Site information links',
     ]);
     $menu->save();
-    $this->container->get(ComponentSourceManager::class)->generateComponents();
+    $this->generateComponentConfig();
   }
 
   /**
@@ -457,7 +461,7 @@ HTML,
    * @legacy-covers \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponentDiscovery::computeCurrentComponentMetadata
    */
   public function testDependencyUpdate(): void {
-    $this->container->get(ComponentSourceManager::class)->generateComponents();
+    $this->generateComponentConfig();
 
     $config = 'canvas.component.block.system_menu_block.footer';
     $this->assertSame('Footer', $this->config($config)->get('label'));
@@ -467,13 +471,13 @@ HTML,
     $label = 'Old footer menu';
     $menu->set('label', $label)->save();
 
-    $this->container->get(ComponentSourceManager::class)->generateComponents();
+    $this->generateComponentConfig();
 
     $this->assertSame($label, $this->config($config)->get('label'));
   }
 
   public function testVersionDeterminability(): void {
-    $this->container->get(ComponentSourceManager::class)->generateComponents();
+    $this->generateComponentConfig();
     $original_component = Component::load('block.canvas_test_block_input_validatable');
     \assert($original_component instanceof Component);
     $original_version = $original_component->getActiveVersion();
@@ -483,7 +487,7 @@ HTML,
     // @see \Drupal\canvas_test_block\Hook\CanvasTestBlockHooks::configSchemaInfoAlter
     \Drupal::keyValue('canvas_test_block')->set('i_can_haz_alter?', TRUE);
     \Drupal::service(TypedConfigManagerInterface::class)->clearCachedDefinitions();
-    $this->container->get(ComponentSourceManager::class)->generateComponents();
+    $this->generateComponentConfig();
 
     $new_component = Component::load('block.canvas_test_block_input_validatable');
     \assert($new_component instanceof Component);
@@ -494,7 +498,7 @@ HTML,
 
   protected function createAndSaveInUseComponentForUninstallValidationTesting(): ComponentInterface {
     $this->enableModules(['help']);
-    $this->container->get(ComponentSourceManager::class)->generateComponents();
+    $this->generateComponentConfig();
     /** @var \Drupal\canvas\Entity\ComponentInterface */
     return Component::load('block.canvas_test_block_input_none');
   }
@@ -514,7 +518,7 @@ HTML,
 
   public function testBlockFormValidationAndSubmit(): void {
     $this->enableModules(['canvas_test_block_form']);
-    $this->container->get(ComponentSourceManager::class)->generateComponents();
+    $this->generateComponentConfig();
     $this->installEntitySchema(Page::ENTITY_TYPE_ID);
     $page1 = Page::create(['title' => 'Forever, feels like never']);
     $page1->save();

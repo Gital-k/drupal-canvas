@@ -72,7 +72,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBaseTestBase extends 
    */
   #[DataProvider('providerHydrationAndRenderingEdgeCases')]
   public function testHydrationAndRenderingEdgeCases(?array $resolved_explicit_input_values_for_object_prop, bool $is_object_prop_present_in_hydration, string $expected_html): void {
-    $this->container->get(ComponentSourceManager::class)->generateComponents();
+    $this->generateComponentConfig();
     // @phpstan-ignore-next-line property.notFound
     $component_with_optional_image_object_shape = Component::load($this->componentWithOptionalImageProp);
     self::assertNotNull($component_with_optional_image_object_shape);
@@ -145,7 +145,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBaseTestBase extends 
    */
   #[DataProvider('providerComponentForValidateInputRejectsUnexpectedProps')]
   public function testValidateComponentInputRejectsUnexpectedProps(string $source_id, string $source_specific_id, string $valid_prop_name, array $valid_prop_input): void {
-    $this->container->get(ComponentSourceManager::class)->generateComponents();
+    $this->generateComponentConfig();
 
     $component_source_manager = $this->container->get(ComponentSourceManager::class);
     \assert($component_source_manager instanceof ComponentSourceManager);
@@ -215,7 +215,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBaseTestBase extends 
    * @see \Drupal\canvas\PropSource\StaticPropSource::getValue()
    */
   public function testClientModelToInputExplicitOptionalImageDeletion(): void {
-    $this->container->get(ComponentSourceManager::class)->generateComponents();
+    $this->generateComponentConfig();
     // @phpstan-ignore-next-line property.notFound
     $component = Component::load($this->componentWithOptionalImageProp);
     self::assertInstanceOf(Component::class, $component);

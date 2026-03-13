@@ -112,6 +112,11 @@ final class SingleDirectoryComponentTest extends GeneratedFieldExplicitInputUxCo
     $this->container->get('theme_installer')->install(['sdc_theme_test']);
   }
 
+
+  protected function generateComponentConfig(): void {
+    $this->container->get(ComponentSourceManager::class)->generateComponents();
+  }
+
   /**
  * Tests get client side info.
  */
@@ -139,7 +144,7 @@ final class SingleDirectoryComponentTest extends GeneratedFieldExplicitInputUxCo
 
     // Trigger component generation, as if the test module was just installed.
     // (Kernel tests don't trigger all hooks that are triggered in reality.)
-    $this->container->get(ComponentSourceManager::class)->generateComponents();
+    $this->generateComponentConfig();
 
     self::assertSame([
       'sdc.canvas_test_sdc.empty-enum' => [
@@ -1068,7 +1073,7 @@ HTML
    * Tests that relative file URLs are rewritten to reference the correct file path.
    */
   public function testRewriteExampleUrl(): void {
-    $this->container->get(ComponentSourceManager::class)->generateComponents();
+    $this->generateComponentConfig();
     $component = Component::load(SingleDirectoryComponentDiscovery::getComponentConfigEntityId('canvas_test_sdc:image'));
     self::assertNotNull($component);
     $source = $component->getComponentSource();
@@ -1128,7 +1133,7 @@ HTML
    */
   #[DataProvider('providerComponentResolving')]
   public function testGetExplicitInput(array $component_item_value, array $expected_props_for_uuids, array $permissions): void {
-    $this->container->get(ComponentSourceManager::class)->generateComponents();
+    $this->generateComponentConfig();
     $this->installEntitySchema('node');
     $this->installConfig(['node']);
     NodeType::create(['type' => 'article', 'name' => 'Article'])->save();
@@ -5533,7 +5538,7 @@ HTML
    */
   #[DataProvider('explicitsInputsProvider')]
   public function testInputToClientModel(string $component_id, array $explicit_input, array $expected_client_model):void {
-    $this->container->get(ComponentSourceManager::class)->generateComponents();
+    $this->generateComponentConfig();
 
     // Ensure the explicit input is valid; helps catch incorrect test cases that
     // could lead to misleading test results.
@@ -5564,7 +5569,7 @@ HTML
    */
   #[DataProvider('providerClientModelToInput')]
   public function testClientModelToInput(array $clientModel, ?array $nodeValues, ?array $expectedInput, ?string $expectedExceptionClass, ?string $expectedExceptionMessage): void {
-    $this->container->get(ComponentSourceManager::class)->generateComponents();
+    $this->generateComponentConfig();
     $component = Component::load('sdc.canvas_test_sdc.my-hero');
     self::assertInstanceOf(Component::class, $component);
 
@@ -5794,7 +5799,7 @@ HTML
       ],
     ], $component->getDependencies());
     self::assertCount(1, $component->getVersions());
-    $this->container->get(ComponentSourceManager::class)->generateComponents();
+    $this->generateComponentConfig();
     $component = Component::load('sdc.canvas_test_sdc.image');
     self::assertInstanceOf(ComponentInterface::class, $component);
     self::assertSame([
@@ -5861,12 +5866,12 @@ HTML
 
   protected function recoverComponentFallback(ComponentInterface $component): void {
     $this->createMediaType('image', ['id' => 'image', 'label' => 'Image']);
-    $this->container->get(ComponentSourceManager::class)->generateComponents();
+    $this->generateComponentConfig();
   }
 
   protected function createAndSaveInUseComponentForUninstallValidationTesting(): ComponentInterface {
     $this->enableModules(['sdc_test']);
-    $this->container->get(ComponentSourceManager::class)->generateComponents();
+    $this->generateComponentConfig();
     /** @var \Drupal\canvas\Entity\ComponentInterface */
     return Component::load('sdc.sdc_test.no-props');
   }

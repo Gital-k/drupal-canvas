@@ -133,9 +133,7 @@ abstract class ComponentSourceTestBase extends CanvasKernelTestBase implements L
    *
    * @return void
    */
-  protected function generateComponentConfig(): void {
-    $this->container->get(ComponentSourceManager::class)->generateComponents();
-  }
+  abstract protected function generateComponentConfig(): void;
 
   /**
    * @param array<ComponentConfigEntityId> $component_ids
@@ -186,7 +184,7 @@ abstract class ComponentSourceTestBase extends CanvasKernelTestBase implements L
   protected function callSourceMethodForEach(string $method_name, array $component_ids): array {
     $this->assertNotEmpty($component_ids);
     $this->assertCount($this->expectedDefaultComponentInstallCount, $this->componentStorage->loadMultiple());
-    $this->container->get(ComponentSourceManager::class)->generateComponents();
+    $this->generateComponentConfig();
     $components = $this->componentStorage->loadMultiple($component_ids);
 
     $return_values = [];
