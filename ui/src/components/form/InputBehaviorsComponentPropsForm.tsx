@@ -72,7 +72,7 @@ export const InputBehaviorsComponentPropsForm = (
     newInputAndUiData: InputUIData,
   ) => {
     // Apply (client-side) transforms for form state.
-    const { selectedModel } = getPropsValues(
+    const { propsValues: values, selectedModel } = getPropsValues(
       newFormState,
       newInputAndUiData,
       // If transforms are not available (typically because TransformsContext is
@@ -87,7 +87,9 @@ export const InputBehaviorsComponentPropsForm = (
     // a) Trigger server-side validation/transformation (massaging of widget values)
     // b) Update both the preview and the model - see the pessimistic update
     //    in onQueryStarted in preview.ts
-    // @see \Drupal\Core\Field\WidgetInterface::massageFormValues(
+    // @see \Drupal\Core\Field\WidgetInterface::massageFormValues()
+    const resolved = { ...selectedModel.resolved, ...values };
+
     let backgroundPreviewUpdate = false;
     if (isScalarProp) {
       // Fire an event to allow listeners to attempt real-time updates.
@@ -114,7 +116,7 @@ export const InputBehaviorsComponentPropsForm = (
           componentType: `${selectedComponentType}@${version}`,
           model: {
             source: syncPropSourcesToResolvedValues(
-              source,
+              selectedModel.source,
               component,
               resolved,
             ),

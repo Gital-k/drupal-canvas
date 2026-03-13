@@ -515,6 +515,9 @@ cypress E2E:
     - grep "✖.*media-library-component-instance\.cy\.js" $CI_PROJECT_DIR/ui/cypress.log && exit 112 || true
     # If no auto-retry was attempted, use the original exit code.
     - exit $EXIT_CODE
+  retry:
+    max: 2
+    exit_codes: 112
 
 cypress unit:
   extends: .cypress-base
