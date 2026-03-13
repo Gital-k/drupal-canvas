@@ -1,8 +1,6 @@
 import { memo } from 'react';
 import clsx from 'clsx';
 
-import { useAppSelector } from '@/app/hooks';
-import { selectIsReordering } from '@/features/mediaLibrary/mediaLibrarySlice';
 import { a2p } from '@/local_packages/utils';
 
 import styles from './MediaLibraryWidgetContainer.module.css';
@@ -21,7 +19,6 @@ interface MediaLibraryWidgetContainerInnerProps {
     [key: string]: any;
   };
   renderChildren: React.ReactNode;
-  isReordering: boolean;
 }
 
 const MediaLibraryWidgetContainerInner = memo(
@@ -41,10 +38,6 @@ const MediaLibraryWidgetContainerInner = memo(
     prevProps: MediaLibraryWidgetContainerInnerProps,
     nextProps: MediaLibraryWidgetContainerInnerProps,
   ) => {
-    // Always block re-renders during active reordering.
-    if (nextProps.isReordering) {
-      return true;
-    }
     return (
       prevProps.renderChildren === nextProps.renderChildren &&
       prevProps.attributes === nextProps.attributes
@@ -59,13 +52,11 @@ const MediaLibraryWidgetContainer = ({
   attributes,
   children,
 }: MediaLibraryWidgetContainerProps) => {
-  const isReordering = useAppSelector(selectIsReordering);
 
   return (
     <MediaLibraryWidgetContainerInner
       attributes={attributes}
       renderChildren={children}
-      isReordering={isReordering}
     />
   );
 };

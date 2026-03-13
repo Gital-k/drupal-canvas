@@ -73,16 +73,6 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
       // contains the default CSS of the admin theme.
       // @see \Drupal\canvas\Hook\LibraryHooks::customizeDialogLibrary()
       $libraries['ui']['dependencies'][] = 'canvas/canvas.scoped.admin.css';
-      // Replace core's media library widget JS with a Canvas override that
-      // supports multi-cardinality fields with custom weight field naming
-      // patterns. This must happen at the library definition level (not in
-      // hook_js_alter) so that JS aggregation picks up the correct file.
-      // @see js/media_library.widget.overrides.js
-      if (isset($libraries['widget']['js']['js/media_library.widget.js'])) {
-        $canvas_path = $this->extensionList->getPath('canvas');
-        $libraries['widget']['js']['/' . $canvas_path . '/js/media_library.widget.overrides.js'] = $libraries['widget']['js']['js/media_library.widget.js'];
-        unset($libraries['widget']['js']['js/media_library.widget.js']);
-      }
     }
   }
 
