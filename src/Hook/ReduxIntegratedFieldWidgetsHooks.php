@@ -218,37 +218,6 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
   }
 
   /**
-   * Implements hook_preprocess_fieldset().
-   *
-   * Sets data attributes on the fieldset element and exposes
-   * is_multivalue_media_form as a Twig variable so the template can
-   * conditionally suppress the weight toggle prefix.
-   */
-  #[Hook('preprocess_fieldset')]
-  public static function canvasStarkPreprocessFieldset(array &$variables): void {
-    $variables['attributes']['data-canvas-media-library-fieldset'] = 'true';
-    if (!empty($variables['element']['#is_multivalue_media_form'])) {
-      $variables['is_multivalue_media_form'] = TRUE;
-      $variables['attributes']['class'][] = 'canvas-multivalue-media';
-      $variables['attributes']['data-canvas-media-multivalue'] = 'true';
-      $variables['#attached']['library'][] = 'canvas/multivalue-media-form';
-    }
-  }
-
-  /**
-   * Implements hook_preprocess_container().
-   *
-   * Exposes is_multivalue_media_form to the
-   * container--media-library-widget-selection.html.twig template.
-   */
-  #[Hook('preprocess_container')]
-  public static function canvasStarkPreprocessContainer(array &$variables): void {
-    if (!empty($variables['element']['#is_multivalue_media_form'])) {
-      $variables['is_multivalue_media_form'] = TRUE;
-    }
-  }
-
-  /**
    * Implements hook_field_widget_complete_form_alter().
    *
    * Marks elements within multivalue forms to enable specialized rendering.

@@ -4,6 +4,7 @@ import {
   closestCenter,
   DndContext,
   KeyboardSensor,
+  MeasuringStrategy,
   PointerSensor,
   useSensor,
   useSensors,
@@ -11,6 +12,7 @@ import {
 import {
   arrayMove,
   SortableContext,
+  sortableKeyboardCoordinates,
   useSortable,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
@@ -22,8 +24,8 @@ import type { DragEndEvent } from '@dnd-kit/core';
 import styles from './DrupalMediaLibraryMultivalueWidget.module.css';
 
 /**
- * Updates the hidden weight inputs for each .js-media-library-item child of
- * the given container.
+ * Writes the visual order back to the hidden weight inputs that Drupal's
+ * MediaLibraryWidget uses to persist sort order on form submission.
  */
 function updateWeights(container: HTMLElement): void {
   Array.from(
@@ -42,6 +44,9 @@ interface SortableItemProps {
   isDisabled: boolean;
 }
 
+/**
+ * Internal sortable row wrapping one Drupal media item..
+ */
 function SortableItem({ id, children, isDisabled }: SortableItemProps) {
   const {
     attributes,
@@ -96,7 +101,7 @@ interface DrupalMediaLibraryMultivalueWidgetProps {
  * Sortable wrapper for the Canvas multivalue media library widget.
  *
  * @see themes/canvas_stark/templates/media_library/container--media-library-widget-selection.html.twig
- * @see src/Hook/ReduxIntegratedFieldWidgetsHooks.php
+ * @see themes/canvas_stark/canvas_stark.theme
  */
 const DrupalMediaLibraryMultivalueWidget = ({
   children,
@@ -112,7 +117,9 @@ const DrupalMediaLibraryMultivalueWidget = ({
 
   const sensors = useSensors(
     useSensor(PointerSensor),
-    useSensor(KeyboardSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
   );
 
   const isDisabled = items.length <= 1;
@@ -145,6 +152,9 @@ const DrupalMediaLibraryMultivalueWidget = ({
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
+        measuring={{
+          droppable: { strategy: MeasuringStrategy.BeforeDragging },
+        }}
         onDragEnd={handleDragEnd}
       >
         <SortableContext

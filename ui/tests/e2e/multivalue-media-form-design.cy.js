@@ -153,7 +153,7 @@ describe('Multivalue Media Form Design (canvas_dev_mode)', () => {
     cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
   });
 
-  it('can reorder items with drag handles via pointer drag', () => {
+  it('can reorder items with drag handles', () => {
     cy.loadURLandWaitForCanvasLoaded({ url: 'canvas/editor/node/2' });
 
     cy.get('[data-drupal-selector="edit-field-cvt-unlimited-media"]').as(
