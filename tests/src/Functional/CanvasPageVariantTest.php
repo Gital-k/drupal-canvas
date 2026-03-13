@@ -30,7 +30,6 @@ use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Plugin\DisplayVariant\CanvasPageVariant;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
-use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\system\Functional\Cache\AssertPageCacheContextsAndTagsTrait;
 use Drupal\user\Entity\Role;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -46,7 +45,6 @@ class CanvasPageVariantTest extends FunctionalTestBase {
 
   use AssertPageCacheContextsAndTagsTrait;
   use ContribStrictConfigSchemaTestTrait;
-  use GenerateComponentConfigTrait;
 
   private const string UUID_IN_ROOT = '16176e0b-8197-40e3-ad49-48f1b6e9a7f9';
   private const string UUID_LOCAL_ACTIONS = '8f6780cd-7b64-499e-9545-321a14951a0d';
@@ -137,7 +135,7 @@ class CanvasPageVariantTest extends FunctionalTestBase {
     ]);
     Role::load('canvaspageadmin')?->grantPermission(Page::EDIT_PERMISSION)->save();
     $this->rebuildContainer();
-    $this->generateComponentConfig();
+    $this->container->get(ComponentSourceManager::class)->generateComponents();
     $this->assertPageDisplayVariant(BlockPageVariant::class, [$block], expected_additional_cache_contexts: ['route.name']);
     $this->assertSame([
       'blocks' => [$block->id()],

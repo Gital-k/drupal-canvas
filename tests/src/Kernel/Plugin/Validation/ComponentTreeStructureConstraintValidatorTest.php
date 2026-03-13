@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Plugin\Validation;
 
+use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use PHPUnit\Framework\Attributes\CoversClass;
 use Drupal\canvas\Plugin\Validation\Constraint\ComponentTreeStructureConstraintValidator;
 use PHPUnit\Framework\Attributes\Group;
@@ -13,7 +14,6 @@ use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
 use Drupal\canvas\Plugin\Validation\Constraint\ComponentTreeStructureConstraint;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
-use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
@@ -25,7 +25,6 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 final class ComponentTreeStructureConstraintValidatorTest extends CanvasKernelTestBase {
 
   use ConstraintViolationsTestTrait;
-  use GenerateComponentConfigTrait;
   use ComponentTreeItemListInstantiatorTrait;
 
   /**
@@ -33,7 +32,7 @@ final class ComponentTreeStructureConstraintValidatorTest extends CanvasKernelTe
  */
   #[DataProvider('providerValidation')]
   public function testValidation(array $items, array $expected_violations): void {
-    $this->generateComponentConfig();
+    $this->container->get(ComponentSourceManager::class)->generateComponents();
     $validator = \Drupal::service(BasicRecursiveValidatorFactory::class)->createValidator();
     $violations = $validator->validate($items, new ComponentTreeStructureConstraint(['basePropertyPath' => 'layout']));
     $this->assertSame($expected_violations, self::violationsToArray($violations));
@@ -44,7 +43,7 @@ final class ComponentTreeStructureConstraintValidatorTest extends CanvasKernelTe
  */
   #[DataProvider('providerValidationItemList')]
   public function testValidationItemList(array $items, array $expected_violations): void {
-    $this->generateComponentConfig();
+    $this->container->get(ComponentSourceManager::class)->generateComponents();
     $item_list = $this->createDanglingComponentTreeItemList();
     $item_list->setValue($items);
     $validator = \Drupal::service(BasicRecursiveValidatorFactory::class)->createValidator();

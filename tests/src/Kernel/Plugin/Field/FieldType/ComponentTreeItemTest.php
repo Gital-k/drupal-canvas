@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Plugin\Field\FieldType;
 
+use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\CoversClass;
 use Drupal\canvas\PropSource\PropSource;
@@ -21,7 +22,6 @@ use Drupal\node\Entity\NodeType;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Kernel\Traits\CiModulePathTrait;
 use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
-use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\canvas\Traits\SingleDirectoryComponentTreeTestTrait;
 use Drupal\Tests\image\Kernel\ImageFieldCreationTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
@@ -37,7 +37,6 @@ class ComponentTreeItemTest extends CanvasKernelTestBase {
   use SingleDirectoryComponentTreeTestTrait;
   use ComponentTreeItemListInstantiatorTrait;
   use ConstraintViolationsTestTrait;
-  use GenerateComponentConfigTrait;
   use CiModulePathTrait;
   use UserCreationTrait;
   use ImageFieldCreationTrait;
@@ -59,7 +58,7 @@ class ComponentTreeItemTest extends CanvasKernelTestBase {
   protected function setUp(): void {
     parent::setUp();
 
-    $this->generateComponentConfig();
+    $this->container->get(ComponentSourceManager::class)->generateComponents();
     $this->installEntitySchema('user');
     $this->installEntitySchema('node_type');
     $this->installEntitySchema('node');
@@ -70,7 +69,7 @@ class ComponentTreeItemTest extends CanvasKernelTestBase {
    * @legacy-covers ::onChange
    */
   public function testSetValue(): void {
-    $this->generateComponentConfig();
+    $this->container->get(ComponentSourceManager::class)->generateComponents();
     $component = Component::load('sdc.canvas_test_sdc.props-slots');
     \assert($component !== NULL);
 
@@ -134,7 +133,7 @@ class ComponentTreeItemTest extends CanvasKernelTestBase {
    * @legacy-covers \Drupal\canvas\Plugin\Validation\Constraint\ComponentTreeStructureConstraintValidator
    */
   public function testInvalidParentUuid(string $parent_uuid, array $expected_violations): void {
-    $this->generateComponentConfig();
+    $this->container->get(ComponentSourceManager::class)->generateComponents();
     $item_list = $this->createDanglingComponentTreeItemList();
     $item_list->setValue([
       [
@@ -168,7 +167,7 @@ class ComponentTreeItemTest extends CanvasKernelTestBase {
     $root_uuid = '947c196f-f108-43fd-a446-03a08100d579';
     $child_uuid = '8b6b47ec-1167-433b-975d-e2d97739f5a6';
 
-    $this->generateComponentConfig();
+    $this->container->get(ComponentSourceManager::class)->generateComponents();
     $item_list = $this->createDanglingComponentTreeItemList();
     $item_list->setValue([
       [
@@ -200,7 +199,7 @@ class ComponentTreeItemTest extends CanvasKernelTestBase {
     $root_uuid = '947c196f-f108-43fd-a446-03a08100d579';
     $child_uuid = '8b6b47ec-1167-433b-975d-e2d97739f5a6';
 
-    $this->generateComponentConfig();
+    $this->container->get(ComponentSourceManager::class)->generateComponents();
     $item_list = $this->createDanglingComponentTreeItemList();
     $item_list->setValue([
       [
@@ -243,7 +242,7 @@ class ComponentTreeItemTest extends CanvasKernelTestBase {
     $child_uuid = '8b6b47ec-1167-433b-975d-e2d97739f5a6';
     $js_uuid = '0aaa0f58-287c-453d-be65-81ba0f4e6f1c';
 
-    $this->generateComponentConfig();
+    $this->container->get(ComponentSourceManager::class)->generateComponents();
     $this->installConfig('canvas_test_code_components');
 
     $item_list = $this->createDanglingComponentTreeItemList();

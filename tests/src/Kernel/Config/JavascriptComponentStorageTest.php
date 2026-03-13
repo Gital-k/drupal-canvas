@@ -13,7 +13,6 @@ use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
 use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
-use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
@@ -30,7 +29,6 @@ final class JavascriptComponentStorageTest extends AssetLibraryStorageTest {
 
   use UserCreationTrait;
   use ConstraintViolationsTestTrait;
-  use GenerateComponentConfigTrait;
 
   /**
    * {@inheritdoc}

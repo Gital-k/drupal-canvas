@@ -5,6 +5,7 @@ declare(strict_types=1);
 // cspell:ignore vlaquxuup
 namespace Drupal\Tests\canvas\Kernel\Plugin\Field\FieldType;
 
+use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -43,7 +44,6 @@ use Drupal\Tests\canvas\Kernel\Traits\CiModulePathTrait;
 use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
 use Drupal\Tests\canvas\Traits\CreateTestJsComponentTrait;
 use Drupal\Tests\canvas\Traits\DataProviderWithComponentTreeTrait;
-use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use Drupal\user\Entity\User;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
@@ -58,7 +58,6 @@ class ComponentTreeItemListTest extends CanvasKernelTestBase {
 
   use ConstraintViolationsTestTrait;
   use CreateTestJsComponentTrait;
-  use GenerateComponentConfigTrait;
   use CiModulePathTrait;
   use UserCreationTrait;
   use ComponentTreeItemListInstantiatorTrait;
@@ -83,7 +82,7 @@ class ComponentTreeItemListTest extends CanvasKernelTestBase {
       ->set('slogan', 'Drupal Canvas Test Site')
       ->save();
     $this->installEntitySchema('path_alias');
-    $this->generateComponentConfig();
+    $this->container->get(ComponentSourceManager::class)->generateComponents();
     $this->createMyCtaComponentFromSdc();
     $this->createMyCtaAutoSaveComponentFromSdc();
   }

@@ -23,7 +23,6 @@ use Drupal\file\Entity\File;
 use Drupal\FunctionalTests\Core\Recipe\RecipeTestTrait;
 use Drupal\media\Entity\Media;
 use Drupal\Tests\BrowserTestBase;
-use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\field\Traits\EntityReferenceFieldCreationTrait;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
 use Drupal\user\UserInterface;
@@ -40,7 +39,6 @@ final class DefaultContentExportImportTest extends BrowserTestBase {
   use EntityReferenceFieldCreationTrait;
   use MediaTypeCreationTrait;
   use RecipeTestTrait;
-  use GenerateComponentConfigTrait;
 
   /**
    * {@inheritdoc}

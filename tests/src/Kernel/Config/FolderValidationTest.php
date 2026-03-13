@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Config;
 
+use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\canvas\Entity\AssetLibrary;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\Folder;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
-use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
@@ -20,7 +20,6 @@ class FolderValidationTest extends BetterConfigEntityValidationTestBase {
   const FOLDER_NAME = 'Unique name';
 
   use ContribStrictConfigSchemaTestTrait;
-  use GenerateComponentConfigTrait;
 
   protected static $modules = [
     'canvas',
@@ -59,7 +58,7 @@ class FolderValidationTest extends BetterConfigEntityValidationTestBase {
 
     // 1. A Component-targeting Folder containing all actual Component config
     // entities. Empty all Folders so we're effectively starting from scratch.
-    $this->generateComponentConfig();
+    $this->container->get(ComponentSourceManager::class)->generateComponents();
     $folders = Folder::loadMultiple();
     foreach ($folders as $folder) {
       $folder->set('items', []);
@@ -169,7 +168,7 @@ class FolderValidationTest extends BetterConfigEntityValidationTestBase {
 
     // 1. A Component-targeting Folder containing all actual Component config
     // entities. Empty all folders so we're effectively starting from scratch.
-    $this->generateComponentConfig();
+    $this->container->get(ComponentSourceManager::class)->generateComponents();
     $folders = Folder::loadMultiple();
     foreach ($folders as $folder) {
       $folder->set('items', []);

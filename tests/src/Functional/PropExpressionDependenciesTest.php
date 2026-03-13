@@ -14,7 +14,6 @@ use Drupal\canvas\PropShape\PersistentPropShapeRepository;
 use Drupal\canvas\PropShape\PropShapeRepositoryInterface;
 use Drupal\file\Entity\File;
 use Drupal\media\Entity\Media;
-use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\field\Traits\EntityReferenceFieldCreationTrait;
 use Drupal\Tests\image\Kernel\ImageFieldCreationTrait;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
@@ -39,7 +38,6 @@ class PropExpressionDependenciesTest extends FunctionalTestBase {
   use EntityReferenceFieldCreationTrait;
   use ImageFieldCreationTrait;
   use MediaTypeCreationTrait;
-  use GenerateComponentConfigTrait;
 
   const SDC_IMAGE_COMPONENT = 'sdc.canvas_test_sdc.image';
   const JS_IMAGE_COMPONENT = 'js.imagine';

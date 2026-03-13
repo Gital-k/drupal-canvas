@@ -120,7 +120,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
   }
 
   protected function generateComponentConfig(): void {
-    parent::generateComponentConfig();
+    $this->container->get(ComponentSourceManager::class)->generateComponents();
     $this->container->get('config.installer')->installDefaultConfig('module', 'canvas_test_code_components');
   }
 
@@ -845,7 +845,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
     // We need to force the cache busting query to ensure we use it correctly.
     $this->setCacheBustingQueryString($this->container, '2.1.0-alpha3');
 
-    $this->generateComponentConfig();
+    this->generateComponentConfig();
     foreach ($this->componentStorage->loadMultiple($component_ids) as $component) {
       \assert($component instanceof Component);
       $source = $component->getComponentSource();
@@ -858,7 +858,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
   }
 
   public function testRenderJsComponentPreloadsGlobalFonts(): void {
-    $this->generateComponentConfig();
+    this->generateComponentConfig();
 
     $file = $this->createManagedFontFile('preloaded.woff2');
     $font_uri = $file->getFileUri();
@@ -1020,7 +1020,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
 
   public function testRewriteExampleUrl(): void {
     self::assertNull(Component::load('js.canvas_test_code_components_captioned_video'));
-    $this->generateComponentConfig();
+    this->generateComponentConfig();
     $video_component = Component::load('js.canvas_test_code_components_captioned_video');
     // @phpstan-ignore-next-line staticMethod.impossibleType
     self::assertInstanceOf(ComponentInterface::class, $video_component);

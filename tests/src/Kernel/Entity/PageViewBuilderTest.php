@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Entity;
 
+use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use PHPUnit\Framework\Attributes\Group;
 use Drupal\Core\Entity\Entity\EntityViewDisplay;
 use Drupal\canvas\Entity\Page;
@@ -11,7 +12,6 @@ use Drupal\canvas\Entity\PageViewBuilder;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Kernel\Traits\PageTrait;
 use Drupal\Tests\canvas\Kernel\Traits\RequestTrait;
-use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
@@ -21,7 +21,6 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 #[Group('canvas')]
 final class PageViewBuilderTest extends CanvasKernelTestBase {
 
-  use GenerateComponentConfigTrait;
   use PageTrait;
   use RequestTrait;
 
@@ -37,7 +36,7 @@ final class PageViewBuilderTest extends CanvasKernelTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
-    $this->generateComponentConfig();
+    $this->container->get(ComponentSourceManager::class)->generateComponents();
     $this->installPageEntitySchema();
 
     $this->config('system.site')

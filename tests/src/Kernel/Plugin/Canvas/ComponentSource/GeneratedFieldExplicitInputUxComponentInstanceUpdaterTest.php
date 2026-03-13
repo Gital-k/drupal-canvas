@@ -20,7 +20,6 @@ use Drupal\canvas\PropShape\PersistentPropShapeRepository;
 use Drupal\canvas\PropShape\PropShapeRepositoryInterface;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Component\Serialization\Json;
-use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -34,7 +33,6 @@ use PHPUnit\Framework\Attributes\DataProvider;
 #[Group('canvas_data_model')]
 class GeneratedFieldExplicitInputUxComponentInstanceUpdaterTest extends CanvasKernelTestBase {
 
-  use GenerateComponentConfigTrait;
   use ComponentTreeItemListInstantiatorTrait;
   use MediaTypeCreationTrait;
   use UserCreationTrait;

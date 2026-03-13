@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Config;
 
+use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\TestWith;
@@ -16,7 +17,6 @@ use Drupal\canvas\EntityHandlers\ContentTemplateAwareViewBuilder;
 use Drupal\node\Entity\Node;
 use Drupal\node\Entity\NodeType;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
-use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\node\Traits\ContentTypeCreationTrait;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\Validator\ConstraintViolationInterface;
@@ -30,7 +30,6 @@ use Symfony\Component\Validator\ConstraintViolationInterface;
 final class ContentTemplateTest extends CanvasKernelTestBase {
 
   use ContentTypeCreationTrait;
-  use GenerateComponentConfigTrait;
 
   /**
    * {@inheritdoc}
@@ -96,7 +95,7 @@ final class ContentTemplateTest extends CanvasKernelTestBase {
   public function testTreeKeyOrdering(): void {
     $this->installConfig('node');
     $this->createContentType(['type' => 'alpha']);
-    $this->generateComponentConfig();
+    $this->container->get(ComponentSourceManager::class)->generateComponents();
     $template = ContentTemplate::create([
       'content_entity_type_id' => 'node',
       'content_entity_type_bundle' => 'alpha',
