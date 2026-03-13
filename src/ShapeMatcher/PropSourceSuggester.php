@@ -247,13 +247,19 @@ final class PropSourceSuggester {
       $adapter_candidates = $this->propMatcher->findAdaptersByMatchingOutput($schema);
       $raw_matches[(string) $cpe]['instances'] = \array_map(fn ($expr): EntityFieldPropSource => new EntityFieldPropSource($expr), $instance_candidates);
       // @todo Remove these hard-coded bits with generic logic in https://www.drupal.org/project/canvas/issues/3563960
-      if ($schema === ['type' => 'string', 'format' => 'date'] && $host_entity_type === 'node') {
+      if (\in_array($schema, [
+        ['type' => 'string', 'format' => 'date'],
+        ['type' => 'string', 'format' => 'date-time'],
+      ], TRUE) && $host_entity_type === 'node') {
+        $adapter_plugin_id = $schema['format'] === 'date'
+          ? 'unix_to_date'
+          : 'unix_to_date_time';
         $created_as_date_string = (new EntityFieldPropSource(
           new FieldPropExpression(BetterEntityDataDefinition::create('node'), 'created', NULL, 'value'),
-        ))->withAdapter('unix_to_date');
+        ))->withAdapter($adapter_plugin_id);
         $changed_as_date_string = (new EntityFieldPropSource(
           expression: new FieldPropExpression(BetterEntityDataDefinition::create('node'), 'changed', NULL, 'value'),
-        ))->withAdapter('unix_to_date');
+        ))->withAdapter($adapter_plugin_id);
         $raw_matches[(string) $cpe]['instances'][] = $created_as_date_string;
         $raw_matches[(string) $cpe]['instances'][] = $changed_as_date_string;
       }
