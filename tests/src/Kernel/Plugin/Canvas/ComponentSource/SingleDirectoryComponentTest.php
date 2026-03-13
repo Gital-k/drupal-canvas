@@ -112,7 +112,6 @@ final class SingleDirectoryComponentTest extends GeneratedFieldExplicitInputUxCo
     $this->container->get('theme_installer')->install(['sdc_theme_test']);
   }
 
-
   protected function generateComponentConfig(): void {
     $this->container->get(ComponentSourceManager::class)->generateComponents();
   }
