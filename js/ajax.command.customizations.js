@@ -596,4 +596,23 @@
       { once: true }
     );
   }
+  const originalInsert = Drupal.AjaxCommands.prototype.insert;
+
+  Drupal.AjaxCommands.prototype.insert = function (...args) {
+    const [,command,] = args;
+
+    if (command.method === 'replaceWith' && command?.selector && document.querySelector(`${command.selector}[data-canvas-media-library-fieldset] `)) {
+      const mediaItems = document.querySelector(`${command.selector}[data-canvas-media-library-fieldset]`).closest('[data-canvas-ml-ajax-target]')
+      const event = new CustomEvent('canvas:updateMediaWidget', {
+        detail: {
+          data: command.data,
+        },
+        bubbles: true,
+      });
+      mediaItems.dispatchEvent(event);
+      return;
+    }
+    originalInsert.apply(this, args);
+  };
+
 })(Drupal, csstree, drupalSettings);

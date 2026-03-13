@@ -133,6 +133,7 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
         }
         if (isset($form['selection'][$key]['weight'])) {
           $form['selection'][$key]['weight']['#attributes']['data-track-hidden-value'] = 'true';
+          $form['selection'][$key]['weight']['#attributes']['data-canvas-media-weight'] = 'true';
         }
         $form['selection'][$key]['remove_button']['#attributes']['data-canvas-media-remove-button'] = 'true';
       }
