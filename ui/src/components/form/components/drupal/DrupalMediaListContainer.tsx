@@ -1,23 +1,124 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useDndContext } from '@dnd-kit/core';
-import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-
-
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
 
 import { useAppSelector } from '@/app/hooks';
 import { toPropName } from '@/components/form/formUtil';
+import { syncPropSourcesToResolvedValues } from '@/components/form/InputBehaviorsComponentPropsForm';
 import { isEvaluatedComponentModel } from '@/features/layout/layoutModelSlice';
 import { selectEditorFrameContext } from '@/features/ui/uiSlice';
 import useInputUIData from '@/hooks/useInputUIData';
 import { useUpdateComponentMutation } from '@/services/preview';
 
-
-
 import type { ReactNode } from 'react';
+import type {
+  EvaluatedComponentModel,
+  Sources,
+} from '@/features/layout/layoutModelSlice';
+import type { EditorFrameContext } from '@/features/ui/uiSlice';
 
+// ---------------------------------------------------------------------------
+// Pure helpers
+// ---------------------------------------------------------------------------
 
+/**
+ * Reads all `target_id` inputs inside a wrapper element and returns their
+ * current values together with the resolved prop name.
+ */
+function collectTargetIds(
+  wrapper: HTMLElement,
+  selectedComponent: string,
+): { propName: string; targetIds: string[] } {
+  const targetIds: string[] = [];
+  let propName = '';
+  wrapper.querySelectorAll('[name*="target_id"]').forEach((el) => {
+    const formEl = el as HTMLFormElement;
+    propName = formEl.name && toPropName(formEl.name, selectedComponent);
+    targetIds.push(formEl.getAttribute('value') || '');
+  });
+  return { propName, targetIds };
+}
 
+/**
+ * Builds the `patchComponent` payload for a drag-reorder operation.
+ * Updates both `source[propName].value` and `resolved[propName]` to the new
+ * target-id order.
+ */
+function buildReorderPatch(
+  model: EvaluatedComponentModel,
+  propName: string,
+  targetIds: string[],
+  editorFrameContext: EditorFrameContext,
+  selectedComponent: string,
+  selectedComponentType: string,
+  version: string,
+) {
+  return {
+    type: editorFrameContext,
+    componentInstanceUuid: selectedComponent,
+    componentType: `${selectedComponentType}@${version}`,
+    model: {
+      source: {
+        ...model.source,
+        [propName]: {
+          ...model.source[propName],
+          value: targetIds,
+        },
+      },
+      resolved: {
+        ...model.resolved,
+        [propName]: targetIds,
+      },
+    },
+  };
+}
 
+/**
+ * Builds the `patchComponent` payload for a remove operation.
+ * Clears the prop value (or resets to required defaults) and syncs sources to
+ * resolved values.
+ */
+function buildRemovePatch(
+  model: EvaluatedComponentModel,
+  propName: string,
+  propSourceData: any,
+  componentData: any,
+  editorFrameContext: EditorFrameContext,
+  selectedComponent: string,
+  selectedComponentType: string,
+  version: string,
+) {
+  const isRequired = !!propSourceData?.required;
+
+  // Deep-clone mutable copies of resolved/source so we don't mutate Redux state.
+  const resolved = JSON.parse(JSON.stringify(model.resolved));
+  const source: Sources = JSON.parse(JSON.stringify(model.source));
+
+  resolved[propName] = isRequired ? propSourceData.default_values.resolved : [];
+  if (!isRequired) {
+    source[propName].value = [];
+  }
+
+  return {
+    type: editorFrameContext,
+    componentInstanceUuid: selectedComponent,
+    componentType: `${selectedComponentType}@${version}`,
+    model: {
+      source: syncPropSourcesToResolvedValues(source, componentData, resolved),
+      resolved,
+    },
+  };
+}
 
 interface SortableRegistrationContextType {
   registerItem: (id: string, element: any) => void;
@@ -26,16 +127,6 @@ interface SortableRegistrationContextType {
 
 const SortableRegistrationContext =
   createContext<SortableRegistrationContextType | null>(null);
-
-export const useSortableRegistration = () => {
-  const context = useContext(SortableRegistrationContext);
-  if (!context) {
-    throw new Error(
-      'useSortableRegistration must be used within DrupalMediaListContainer',
-    );
-  }
-  return context;
-};
 
 interface DrupalMediaListContainerProps {
   children: ReactNode;
@@ -95,12 +186,7 @@ function useDragMonitor(
   useEffect(() => {
     if (lastActive && !active) {
       const finalOrder = itemIdsRef.current;
-      // console.log(`[DrupalMediaListContainer] 🎯 Drag ended`);
-      // console.log(`[DrupalMediaListContainer] Final order:`, finalOrder);
-      // console.log(`[DrupalMediaListContainer] Did reorder happen?`, hasDraggedRef.current);
-
       if (hasDraggedRef.current) {
-        // console.log(`[DrupalMediaListContainer] 📤 Calling onDragEnd callback with final order:`, finalOrder);
         onDragEnd(finalOrder);
       }
 
@@ -124,8 +210,13 @@ const DrupalMediaListContainer = ({
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputUIData = useInputUIData();
   const editorFrameContext = useAppSelector(selectEditorFrameContext);
-  const { selectedComponent, selectedComponentType, version, model, components } =
-    inputUIData || {};
+  const {
+    selectedComponent,
+    selectedComponentType,
+    version,
+    model,
+    components,
+  } = inputUIData || {};
   const [patchComponent] = useUpdateComponentMutation({
     fixedCacheKey: selectedComponent,
   });
@@ -182,77 +273,88 @@ const DrupalMediaListContainer = ({
   }, []);
 
   useEffect(() => {
-    console.log('coco', components[selectedComponentType]);
-    if (!wrapperRef.current) {
+    // When there is only one item, we need to provide special handling of that
+    // item's remove button. This is because when the final item is removed,
+    // the element tracking the value change is removed from the dom and thus
+    // fails to communicate the change to Redux.
+    const wrapper = wrapperRef.current;
+    if (!wrapper) {
       return;
     }
-    const isComponent = wrapperRef.current.closest(
+    const isComponentForm = wrapper.closest(
       '[data-form-id="component_instance_form"]',
     );
-    const handleRemove = (e: Event) => {
-      if (!wrapperRef.current) {
-        return;
-      }
-      const componentData = components?.[selectedComponentType];
-      const propName = toPropName(
-        wrapperRef.current.querySelector('[name*="target_id"]').name,
-        selectedComponent,
-      );
-      console.log('componrnt data ' + propName, componentData);
-      if (!componentData || !componentData?.propSources?.[propName]) {
-        return;
-      }
-      const isRequired = !!componentData?.propSources?.[propName];
-      console.log(
-        'wow',
-        componentData.propSources[propName].default_values.resolved,
-      );
 
-      if (selectedModel && isEvaluatedComponentModel(selectedModel)) {
-        const newValue = isRequired
-          ? componentData.propSources[propName].default_values.resolved
-          : [];
-        const source = isRequired
-          ? selectedModel.source
-          : {
-              ...selectedModel?.source,
-              [propName]: {
-                ...selectedModel.source[propName],
-                value: null,
-              },
-            };
-        patchComponent({
-          type: editorFrameContext,
-          componentInstanceUuid: selectedComponent,
-          componentType: `${selectedComponentType}@${version}`,
-          model: {
-            source,
-            resolved: {
-              ...selectedModel.resolved,
-              [propName]: newValue,
-            },
-          },
-        });
+    const handleRemove = () => {
+      if (
+        !wrapper ||
+        !selectedModel ||
+        !isEvaluatedComponentModel(selectedModel)
+      ) {
+        return;
       }
-    }
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault(); // Prevent default space scrolling
-        handleRemove(e);
+      const targetInput = wrapper.querySelector(
+        '[name*="target_id"]',
+      ) as HTMLInputElement | null;
+      if (!targetInput) {
+        return;
+      }
+      const propName = toPropName(targetInput.name, selectedComponent);
+      const componentData = components?.[selectedComponentType];
+      const propSourceData = (componentData as any)?.propSources?.[propName];
+      if (!componentData || !propSourceData) {
+        return;
+      }
+
+      patchComponent(
+        buildRemovePatch(
+          selectedModel,
+          propName,
+          propSourceData,
+          componentData,
+          editorFrameContext,
+          selectedComponent,
+          selectedComponentType,
+          version,
+        ),
+      );
+    };
+
+    const handleKeyDown = (e: Event) => {
+      const keyEvent = e as KeyboardEvent;
+      if (keyEvent.key === 'Enter' || keyEvent.key === ' ') {
+        keyEvent.preventDefault();
+        handleRemove();
       }
     };
-    console.log(`NUM ITEM IDS for component ${!!isComponent}`, itemIds.length);
-    if (itemIds.length === 1 && wrapperRef.current && !!isComponent) {
-      const removeButton = wrapperRef.current.querySelector('[data-canvas-media-remove-button]');
-      console.log('REMOVE BUTTON', removeButton);
-      if (removeButton) {
-        console.log('Adding event listener to remove button', removeButton);
-        removeButton.addEventListener('mousedown', handleRemove, { capture: true });
-        removeButton.addEventListener('keydown', handleKeyDown);
-      }
 
+    if (itemIds.length === 1 && !!isComponentForm) {
+      const removeButton = wrapper.querySelector(
+        '[data-canvas-media-remove-button]',
+      );
+      if (removeButton) {
+        removeButton.addEventListener('mousedown', handleRemove, {
+          capture: true,
+        });
+        removeButton.addEventListener('keydown', handleKeyDown);
+        return () => {
+          removeButton.removeEventListener('mousedown', handleRemove, {
+            capture: true,
+          });
+          removeButton.removeEventListener('keydown', handleKeyDown);
+        };
+      }
     }
-  }, [itemIds]);
+  }, [
+    itemIds,
+    components,
+    selectedComponent,
+    selectedComponentType,
+    selectedModel,
+    version,
+    editorFrameContext,
+    patchComponent,
+  ]);
 
   // Final callback for when drag ends
   const handleDragEnd = useCallback(
@@ -261,43 +363,40 @@ const DrupalMediaListContainer = ({
       if (!wrapperRef.current) {
         return;
       }
-      // @ts-ignore
-      const targetIds: string[] = [];
-      let propName = '';
-      [...wrapperRef.current.querySelectorAll('[name*="target_id"]')].forEach(
-        (el: Element) => {
-          const formEl = el as HTMLFormElement;
-          propName = formEl.name && toPropName(formEl.name, selectedComponent);
-          targetIds.push(formEl.getAttribute('value') || '');
-        },
+
+      const isComponentForm = wrapperRef.current.closest(
+        '[data-form-id="component_instance_form"]',
       );
+
+      // In the component form, the order within the model is not determined by
+      // weight, but literally the order they appear in the model. Below is
+      // logic that checks the current order of target_ids in the DOM and
+      // patches the model to match that new sequence.
       if (
-        wrapperRef.current.closest(
-          '[data-form-id="component_instance_form"]',
-        ) &&
-        propName
+        isComponentForm &&
+        selectedModel &&
+        isEvaluatedComponentModel(selectedModel)
       ) {
-        if (selectedModel && isEvaluatedComponentModel(selectedModel)) {
-          patchComponent({
-            type: editorFrameContext,
-            componentInstanceUuid: selectedComponent,
-            componentType: `${selectedComponentType}@${version}`,
-            model: {
-              source: {
-                ...selectedModel.source,
-                [propName]: {
-                  ...selectedModel.source[propName],
-                  value: targetIds,
-                },
-              },
-              resolved: {
-                ...selectedModel.resolved,
-                [propName]: targetIds,
-              },
-            },
-          });
+        const { propName, targetIds } = collectTargetIds(
+          wrapperRef.current,
+          selectedComponent,
+        );
+        if (propName) {
+          patchComponent(
+            buildReorderPatch(
+              selectedModel,
+              propName,
+              targetIds,
+              editorFrameContext,
+              selectedComponent,
+              selectedComponentType,
+              version,
+            ),
+          );
         }
       }
+
+      // Sync DOM weight fields to their new visual order.
       wrapperRef.current
         .querySelectorAll('[data-canvas-media-weight]')
         .forEach((el, index) => {

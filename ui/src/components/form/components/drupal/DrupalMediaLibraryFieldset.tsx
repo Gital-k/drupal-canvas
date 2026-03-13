@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 
 import { getDrupal } from '@/utils/drupal-globals';
 
+// This component largely exists to handle AJAX replacements of the media
+// Media Library fieldset in a manner that ensures all media library items are
+// positioned the React component tree in a manner that allows sorting.
 const DrupalMediaLibraryFieldset = ({
   children,
 }: {
