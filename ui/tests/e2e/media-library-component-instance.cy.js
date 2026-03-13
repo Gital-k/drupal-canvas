@@ -85,7 +85,7 @@ const testMediaLibraryInComponentInstanceForm = (
     // something that can be waited on, but it is not clear what.
     // eslint-disable-next-line cypress/no-unnecessary-waiting
     cy.wait(1000);
-    const addIt = `[class*="contextualPanel"] .js-media-library-widget .js-media-library-open-button[data-once="drupal-ajax"]`;
+    const addIt = `[class*="contextualPane"] .js-media-library-widget .js-media-library-open-button[data-once="drupal-ajax"]`;
     cy.get(addIt).first().click({ force: true });
     cy.waitForAjax();
 
