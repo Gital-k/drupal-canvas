@@ -123,10 +123,10 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
         $form['selection'][$key]['remove_button']['#attributes']['data-canvas-media-remove-button'] = 'true';
       }
 
-      // Mark multivalue media fields so templates can conditionally render
-      // the React-driven sortable wrapper.
-      // @todo Remove as part of https://www.drupal.org/node/3577946
+      // @todo Remove canvas_dev_mode condition as part of https://www.drupal.org/node/3577946
       if ($this->moduleHandler->moduleExists('canvas_dev_mode')) {
+        // Mark multi-value media items to trigger custom display logic,
+        // including UI-specific styling and interactive management wrappers.
         $field_definition = $context['items']->getFieldDefinition();
         if ($field_definition->getFieldStorageDefinition()->isMultiple()) {
           $form['#is_multivalue_media_form'] = TRUE;

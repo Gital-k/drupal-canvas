@@ -1,26 +1,8 @@
 /**
- * Comprehensive test for multivalue media form design.
- *
- * Tests the new vertical list UI for multi-value media (image) fields using
- * the media_library_widget. The design features:
- * - Vertical list of selected media items managed by the React component
- *   DrupalMediaLibraryMultivalueWidget using dnd-kit for drag-to-reorder.
- * - Each item: drag handle (div[aria-label="Drag to reorder"]) | thumbnail | media name | inline delete button.
- * - "Add media" button (opens media library modal).
- * - Drag-to-reorder via PointerSensor using the six-dot drag handle.
- *
- * DOM structure (per item):
- *   drupal-canvas-media-library-multivalue-widget  ← React component root
- *     .js-media-library-selection                  ← items container (rendered by React)
- *       div (SortableItem wrapper)                 ← dnd-kit sortable item
- *         div[aria-label="Drag to reorder"]        ← drag handle
- *         .js-media-library-item                   ← Drupal media item
- *           article                                ← media preview
- *             .js-media-library-item-preview       ← thumbnail
- *           [data-canvas-media-remove-button]      ← remove button
+ * Tests the multivalue media field UI for the media_library_widget.
  */
 
-// @todo Remove the canvas_dev_mode condition as part of https://www.drupal.org/node/3577946
+// @todo Remove canvas_dev_mode condition as part of https://www.drupal.org/node/3577946
 describe('Multivalue Media Form Design (canvas_dev_mode)', () => {
   before(() => {
     cy.drupalCanvasInstall(['canvas_test_article_fields', 'canvas_dev_mode']);
@@ -44,15 +26,11 @@ describe('Multivalue Media Form Design (canvas_dev_mode)', () => {
       'active',
     );
 
-    // The media library widget fieldset gets data-drupal-selector based on the
-    // field machine name. The canvas-drupal-label inside the <legend> renders a
-    // <label>.
     cy.get('[data-drupal-selector="edit-field-cvt-unlimited-media"]').as(
       'unlimited-media',
     );
 
-    // The fieldset should have the canvas-multivalue-media class and the
-    // data-canvas-media-multivalue attribute added by canvasStarkPreprocessFieldset.
+    // Canvas adds these to flag the fieldset as a multivalue media widget.
     cy.get('@unlimited-media').should('have.class', 'canvas-multivalue-media');
     cy.get('@unlimited-media').should(
       'have.attr',
@@ -60,7 +38,6 @@ describe('Multivalue Media Form Design (canvas_dev_mode)', () => {
       'true',
     );
 
-    // The items container is .js-media-library-selection rendered by the React component.
     cy.get('@unlimited-media')
       .find('.js-media-library-selection')
       .should('exist');
@@ -70,7 +47,6 @@ describe('Multivalue Media Form Design (canvas_dev_mode)', () => {
       .find('.js-media-library-item')
       .should('have.length', 2);
 
-    // Both seeded media items should be visible via their thumbnail alt texts.
     cy.get('@unlimited-media')
       .findByAltText('The bones equal dollars')
       .should('exist');
@@ -78,7 +54,7 @@ describe('Multivalue Media Form Design (canvas_dev_mode)', () => {
       .findByAltText('My barber may have been looking at a picture of a dog')
       .should('exist');
 
-    // Each item should have a React-rendered drag handle button.
+    // Each item should have a drag handle for reordering.
     cy.get('@unlimited-media')
       .find('[aria-label="Drag to reorder"]')
       .should('have.length', 2);
@@ -88,12 +64,11 @@ describe('Multivalue Media Form Design (canvas_dev_mode)', () => {
       .find('[data-canvas-media-remove-button]')
       .should('have.length', 2);
 
-    // Shows the Add media button.
     cy.get('@unlimited-media')
       .findByRole('button', { name: 'Add media', timeout: 10000 })
       .should('be.visible');
 
-    // Does not show weight toggle.
+    // Canvas replaces Drupal's weight toggle with drag-to-reorder.
     cy.get('@unlimited-media')
       .find('.js-media-library-widget-toggle-weight')
       .should('not.exist');
@@ -155,7 +130,6 @@ describe('Multivalue Media Form Design (canvas_dev_mode)', () => {
       .should('not.be.disabled')
       .click();
 
-    // Wait for the dialog to appear; opening it updates the form build ID.
     cy.findByRole('dialog', { timeout: 10000 }).as('dialog');
     cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
 
@@ -190,7 +164,6 @@ describe('Multivalue Media Form Design (canvas_dev_mode)', () => {
       .find('.js-media-library-item')
       .should('have.length', 2);
 
-    // Verify React-rendered drag handles are present.
     cy.get('@unlimited-media')
       .find('[aria-label="Drag to reorder"]')
       .should('have.length', 2);
@@ -229,7 +202,7 @@ describe('Multivalue Media Form Design (canvas_dev_mode)', () => {
       scrollBehavior: false,
     });
 
-    // After pointer drag React re-renders in the new order; verify via alt texts.
+    // Verify the items have swapped positions.
     getItemAlt(0).then((alt) => {
       expect(alt).to.equal(secondAlt);
     });
@@ -243,8 +216,7 @@ describe('Multivalue Media Form Design (canvas_dev_mode)', () => {
     cy.findByTestId('canvas-page-data-form').as('entityForm');
     cy.get('@entityForm').recordFormBuildId();
 
-    // field_cvt_limited_media has cardinality 2 and is seeded with 2 items,
-    // so remaining = 0 → Drupal renders the "maximum selected" message.
+    // field_cvt_limited_media has cardinality 2 and is seeded with 2 items.
     cy.get('[data-drupal-selector="edit-field-cvt-limited-media"]').as(
       'limited-media',
     );
@@ -253,7 +225,6 @@ describe('Multivalue Media Form Design (canvas_dev_mode)', () => {
       .find('.js-media-library-item')
       .should('have.length', 2);
 
-    // Verify "maximum selected" message is shown.
     cy.get('@limited-media')
       .find('.description')
       .should(
@@ -261,8 +232,6 @@ describe('Multivalue Media Form Design (canvas_dev_mode)', () => {
         'The maximum number of media items have been selected.',
       );
 
-    // Remove one item — this triggers AJAX which re-renders the widget
-    // with remaining = 1 and updates the description.
     cy.intercept('POST', '**/canvas/api/v0/layout/**').as('updatePreview');
 
     cy.get('@limited-media')
@@ -281,7 +250,6 @@ describe('Multivalue Media Form Design (canvas_dev_mode)', () => {
       .find('.js-media-library-item')
       .should('have.length', 1);
 
-    // Verify "1 media item remaining" message is now shown.
     cy.get('@limited-media')
       .find('.description')
       .should('contain.text', 'One media item remaining.');
