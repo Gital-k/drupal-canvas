@@ -434,4 +434,26 @@ props:
       type: array
       items:
         type: string
+
+    test_array_string_format_date:
+      title: 'Array, format=date'
+      description: 'Array of date strings (YYYY-MM-DD).'
+      type: array
+      items:
+        type: string
+        format: date
+      examples:
+        - - '2018-11-13'
+          - '2019-01-01'
+    test_array_string_format_date_time:
+      title: 'Array, format=date-time'
+      description: 'Array of date-time strings (ISO 8601).'
+      type: array
+      items:
+        type: string
+        format: date-time
+      examples:
+        - - '2016-09-16T20:20:39+00:00'
+          - '2026-01-25T12:00:00.000Z'
+
     # @todo finish adding all other types + formats supported by JSON schema
