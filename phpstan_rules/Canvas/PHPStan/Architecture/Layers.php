@@ -47,6 +47,7 @@ final class Layers {
         // Plus specific Drupal core namespaces.
         Selector::inNamespace('Drupal\Core\Access'),
         Selector::inNamespace('Drupal\Core\Cache'),
+        Selector::inNamespace('Drupal\Core\Datetime'),
         Selector::inNamespace('Drupal\Core\Entity'),
         Selector::inNamespace('Drupal\Core\Field'),
         Selector::inNamespace('Drupal\Core\Http\Exception'),
