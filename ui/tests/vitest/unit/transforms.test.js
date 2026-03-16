@@ -1,5 +1,5 @@
-import transforms from '@/utils/transforms';
 import { VALUE_THAT_MEANS_REMOVE } from '@/utils/function-utils';
+import transforms from '@/utils/transforms';
 
 describe('Transforms - link', () => {
   const fieldData = {
@@ -266,7 +266,10 @@ describe('Transforms - mediaSelection', () => {
       transforms.mediaSelection(
         {
           selection: {
-            0: { target_id: VALUE_THAT_MEANS_REMOVE, weight: VALUE_THAT_MEANS_REMOVE },
+            0: {
+              target_id: VALUE_THAT_MEANS_REMOVE,
+              weight: VALUE_THAT_MEANS_REMOVE,
+            },
           },
         },
         { multiple: false },
@@ -279,8 +282,14 @@ describe('Transforms - mediaSelection', () => {
       transforms.mediaSelection(
         {
           selection: {
-            0: { target_id: VALUE_THAT_MEANS_REMOVE, weight: VALUE_THAT_MEANS_REMOVE },
-            1: { target_id: VALUE_THAT_MEANS_REMOVE, weight: VALUE_THAT_MEANS_REMOVE },
+            0: {
+              target_id: VALUE_THAT_MEANS_REMOVE,
+              weight: VALUE_THAT_MEANS_REMOVE,
+            },
+            1: {
+              target_id: VALUE_THAT_MEANS_REMOVE,
+              weight: VALUE_THAT_MEANS_REMOVE,
+            },
           },
         },
         { multiple: true },
@@ -292,7 +301,10 @@ describe('Transforms - mediaSelection', () => {
     const intermediate = transforms.mediaSelection(
       {
         selection: {
-          0: { target_id: VALUE_THAT_MEANS_REMOVE, weight: VALUE_THAT_MEANS_REMOVE },
+          0: {
+            target_id: VALUE_THAT_MEANS_REMOVE,
+            weight: VALUE_THAT_MEANS_REMOVE,
+          },
           1: { target_id: '43', weight: '1' },
         },
       },

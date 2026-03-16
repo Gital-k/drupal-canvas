@@ -52,7 +52,6 @@ const MediaLibraryWidgetContainer = ({
   attributes,
   children,
 }: MediaLibraryWidgetContainerProps) => {
-
   return (
     <MediaLibraryWidgetContainerInner
       attributes={attributes}

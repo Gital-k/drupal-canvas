@@ -346,7 +346,9 @@ const mediaSelection: Transformer<
   // Filter out items flagged for removal (e.g. from Hidden.tsx MutationObserver).
   // If every item was flagged, the field was explicitly cleared — return null so
   // getPropsValues can propagate an explicit null to the resolved model.
-  const validValues = selectionValues.filter((item) => !flaggedForRemoval(item));
+  const validValues = selectionValues.filter(
+    (item) => !flaggedForRemoval(item),
+  );
   if (validValues.length === 0) {
     return null;
   }
