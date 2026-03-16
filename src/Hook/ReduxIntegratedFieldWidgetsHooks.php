@@ -34,7 +34,6 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
     private readonly LibraryDiscoveryInterface $libraryDiscovery,
     private readonly RequestStack $requestStack,
     private readonly ThemeManagerInterface $themeManager,
-    private readonly ModuleExtensionList $extensionList,
   ) {
   }
 
