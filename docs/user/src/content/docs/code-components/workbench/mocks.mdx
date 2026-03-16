@@ -1,172 +1,294 @@
 ---
-title: Code components - Workbench mocks
-description: Add component mock specs for tabbed Workbench previews.
+title: Code components - Workbench component mocks
+description: Add named component mock specs for tabbed Workbench previews.
 ---
 
-Workbench mocks let you preview the same component with multiple prop and slot
-configurations.
+import { Aside } from '@astrojs/starlight/components';
 
-Each mock file contains an array of
-[json-render](https://json-render.dev) specs, similar to page specs. Each
-array item becomes a tab in the Workbench preview panel.
+Workbench component mocks let you preview the same component with multiple named prop and slot configurations.
+
+You can author component mocks in a JSON file. Each mock entry becomes a tab in
+the Workbench preview panel.
+
+Workbench also includes a built-in _Default_ preview for every component. It
+shows the component as Canvas renders it initially, before a content editor
+populates props or slots. Canvas and Workbench generate this preview from the
+first example value of each prop in `component.yml` and leave slots empty.
 
 ## File naming and placement
 
-Workbench supports two mock file patterns, matched to metadata naming:
+Author the mock file in the same directory as the component metadata and source
+file. Name it either `mocks.json` or `[component-name].mocks.json`, depending
+on how the component metadata is named.
 
-- index metadata (`component.yml`) -> `mocks.json`
-- named metadata (`<name>.component.yml`) -> `<name>.mocks.json`
-
-Use the same directory as the component metadata and source file.
-
-### Example: index-style component
+**Example: index-style component**
 
 ```text
 src/components/hero/
-  component.yml
   index.tsx
+  component.yml
   mocks.json
 ```
 
-### Example: named component
+**Example: named component**
 
 ```text
-src/components/card/
-  card.component.yml
+src/components/
   card.tsx
+  card.component.yml
   card.mocks.json
 ```
 
-## Spec format
+## Mock entries
 
-Each entry in the mock array is a full
-[json-render](https://json-render.dev) spec with `root` and `elements`.
+Each mock file contains a JSON array of entries. Every entry includes `name`,
+which Workbench uses as the preview tab label.
 
-In each element, `type` must match a discovered component name. You can use the
-plain discovered name (for example, `hero`) or the `js.` component ID (for
-example, `js.hero`).
+Each entry becomes its own preview tab in Workbench.
 
-Concrete examples:
+### Props format
 
-- If metadata is `src/components/hero/component.yml`, use `hero` or `js.hero`.
-- If metadata is `src/components/pricing-table/component.yml`, use
-  `pricing-table`, `js.pricing-table`, or `js.pricing_table`.
+Use the props format when the preview only changes the component props.
 
-## Example mock files
+| Key | Description |
+| --- | --- |
+| `name` | Labels the preview tab in Workbench. |
+| `props` | Provides prop values for the component. |
 
-The following examples are complete files you can copy and adjust.
-
-### `mocks.json` with multiple states
+**Example:** `heading.mocks.json`
 
 ```json
 [
   {
-    "root": "banner-standard",
-    "elements": {
-      "banner-standard": {
-        "type": "banner",
-        "props": {
-          "title": "Standard banner",
-          "variant": "default"
-        }
-      }
-    }
-  },
-  {
-    "root": "banner-alert",
-    "elements": {
-      "banner-alert": {
-        "type": "banner",
-        "props": {
-          "title": "Service interruption",
-          "variant": "danger"
-        }
-      }
-    }
-  },
-  {
-    "root": "banner-success",
-    "elements": {
-      "banner-success": {
-        "type": "banner",
-        "props": {
-          "title": "Settings saved",
-          "variant": "success"
-        }
-      }
+    "name": "Centered",
+    "props": {
+      "text": "Publish AI-assisted content with editorial control",
+      "eyebrow": "Build faster",
+      "textAlign": "center"
     }
   }
 ]
 ```
 
-Workbench shows these entries as `Mock 1`, `Mock 2`, and `Mock 3`, plus the
-`Default` tab.
+### Props and slots format
 
-### `card.mocks.json` with slot trees
+Use the props and slots format when the preview needs component props and
+slots.
+
+| Key | Description |
+| --- | --- |
+| `name` | Labels the preview tab in Workbench. |
+| `props` | Provides prop values for the inferred root component. |
+| `slots` | Maps root component slots to element IDs from `elements`. Those IDs are arbitrary. |
+| `elements` | Defines authored child elements, keyed by arbitrary element IDs referenced from `slots`. |
+
+Each entry in `elements` must include a `type`. It can also include `props`
+and `slots`, which reference other element IDs from the same `elements`
+object.
+
+Each element `type` must match a discovered component name, such as `card` or
+`js.card`. Workbench discovers these component types from the code components
+available in your project.
+
+**Example:** `card.mocks.json`
 
 ```json
 [
   {
-    "root": "promo-card",
+    "name": "Featured",
+    "props": {
+      "featured": true
+    },
+    "slots": {
+      "header": ["card-featured-header"],
+      "content": ["card-featured-content"],
+      "footer": ["card-featured-actions"]
+    },
     "elements": {
-      "promo-card": {
-        "type": "card",
-        "props": {
-          "tone": "brand"
-        },
-        "slots": {
-          "header": ["card-heading"],
-          "body": ["card-layout"]
-        }
-      },
-      "card-heading": {
+      "card-featured-header": {
         "type": "heading",
         "props": {
-          "text": "Limited release"
+          "text": "Featured article"
         }
       },
-      "card-layout": {
-        "type": "stack",
-        "children": ["card-copy", "card-cta"]
-      },
-      "card-copy": {
+      "card-featured-content": {
         "type": "text",
         "props": {
-          "content": "A short description for this campaign."
+          "content": "Learn how editorial teams use Canvas to review, refine, and publish AI-assisted content."
         }
       },
-      "card-cta": {
+      "card-featured-actions": {
+        "type": "button-group",
+        "props": {
+          "stacked": false
+        },
+        "slots": {
+          "items": ["card-featured-primary-action", "card-featured-secondary-action"]
+        }
+      },
+      "card-featured-primary-action": {
+        "type": "button",
+        "props": {
+          "label": "Get started",
+          "href": "/sign-up",
+          "variant": "primary"
+        }
+      },
+      "card-featured-secondary-action": {
         "type": "button",
         "props": {
           "label": "Read more",
-          "href": "/campaign"
+          "href": "/articles/canvas-workflows"
         }
       }
     }
   },
+]
+```
+
+<Aside>Before rendering, Workbench normalizes the props format and the props and slots format into a [`@json-render/react`](https://json-render.dev)-compatible spec shape (with our [hopefully temporary patch](https://github.com/vercel-labs/json-render/pull/105) by automatically creating the root element from the component that owns the mock file.</Aside>
+
+### Advanced format
+
+Use the advanced format when the preview needs full control over the rendered
+root element.
+
+This format is useful when you need to render a component inside other
+components to verify how it behaves in context.
+
+| Key | Description |
+| --- | --- |
+| `name` | Labels the preview tab in Workbench. |
+| `root` | Identifies the root element to render. |
+| `elements` | Defines the full element tree, including the root element and any elements referenced by slots. |
+
+Unlike the props and slots format, this version lets you control the rendered
+root directly. Define that root element inside `elements`, along with its
+props, slots, and any nested elements it references.
+
+Each element `type` must match a discovered component name, such as `card` or
+`js.card`. Workbench discovers these component types from the code components
+available in your project.
+
+**Example:** `card.mocks.json`
+
+```json
+[
   {
-    "root": "article-card",
+    "name": "In grid",
+    "root": "card-grid",
     "elements": {
-      "article-card": {
-        "type": "card",
+      "card-grid": {
+        "type": "grid",
         "props": {
-          "tone": "neutral"
+          "columns": 3,
+          "gap": "md"
         },
         "slots": {
-          "header": ["article-title"],
-          "body": ["article-body"]
+          "items": ["card-1", "card-2", "card-3"]
         }
       },
-      "article-title": {
+      "card-1": {
+        "type": "card",
+        "props": {
+          "featured": true
+        },
+        "slots": {
+          "header": ["card-1-header"],
+          "content": ["card-1-content"],
+          "footer": ["card-1-footer"]
+        }
+      },
+      "card-1-header": {
         "type": "heading",
         "props": {
-          "text": "Weekly update"
+          "text": "Featured article"
         }
       },
-      "article-body": {
+      "card-1-content": {
         "type": "text",
         "props": {
-          "content": "This card uses a simpler slot tree."
+          "content": "Learn how editorial teams use Canvas to review, refine, and publish AI-assisted content."
+        }
+      },
+      "card-1-footer": {
+        "type": "button-group",
+        "slots": {
+          "items": ["card-1-primary-action", "card-1-secondary-action"]
+        }
+      },
+      "card-1-primary-action": {
+        "type": "button",
+        "props": {
+          "label": "Read more",
+          "href": "/articles/canvas-workflows"
+        }
+      },
+      "card-1-secondary-action": {
+        "type": "button",
+        "props": {
+          "label": "Save for later",
+          "href": "/saved"
+        }
+      },
+      "card-2": {
+        "type": "card",
+        "props": {
+          "featured": false
+        },
+        "slots": {
+          "header": ["card-2-header"],
+          "content": ["card-2-content"],
+          "footer": ["card-2-footer"]
+        }
+      },
+      "card-2-header": {
+        "type": "heading",
+        "props": {
+          "text": "Documentation update"
+        }
+      },
+      "card-2-content": {
+        "type": "text",
+        "props": {
+          "content": "Review the latest guidance for authoring Workbench component mocks."
+        }
+      },
+      "card-2-footer": {
+        "type": "button",
+        "props": {
+          "label": "Open docs",
+          "href": "/docs/workbench-mocks"
+        }
+      },
+      "card-3": {
+        "type": "card",
+        "props": {
+          "featured": false
+        },
+        "slots": {
+          "header": ["card-3-header"],
+          "content": ["card-3-content"],
+          "footer": ["card-3-footer"]
+        }
+      },
+      "card-3-header": {
+        "type": "heading",
+        "props": {
+          "text": "Team workflow"
+        }
+      },
+      "card-3-content": {
+        "type": "text",
+        "props": {
+          "content": "Coordinate AI drafting, editorial review, and publishing approvals in one place."
+        }
+      },
+      "card-3-footer": {
+        "type": "button",
+        "props": {
+          "label": "See workflow",
+          "href": "/workflow"
         }
       }
     }
@@ -174,13 +296,10 @@ Workbench shows these entries as `Mock 1`, `Mock 2`, and `Mock 3`, plus the
 ]
 ```
 
-## Validation and warnings
+<Aside>The advanced format matches the [`@json-render/react`](https://json-render.dev) spec shape (with our [hopefully temporary patch](https://github.com/vercel-labs/json-render/pull/105)).</Aside>
 
-Workbench validates mock entries before rendering.
+### Choosing a format
 
-- If a file is not valid JSON, Workbench adds a warning.
-- If a file does not contain an array, Workbench adds a warning.
-- If one array entry is invalid, that entry is skipped, and valid entries still
-  render.
-
-Check the Workbench warnings section if a mock tab does not appear.
+- Use the props format for quick component variations driven only by props.
+- Use the props and slots format when you need slots, too.
+- Use the advanced format when you need to render the component inside a different root.

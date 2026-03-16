@@ -45,6 +45,7 @@ export default defineConfig({
             //   items: [
             //     { label: 'Introduction', slug: 'code-components/workbench' },
             //     { label: 'Mocks', slug: 'code-components/workbench/mocks' },
+            //     { label: 'Pages', slug: 'code-components/workbench/pages' },
             //   ],
             // },
             {
