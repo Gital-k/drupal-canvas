@@ -13,6 +13,7 @@ use Drupal\Core\StreamWrapper\StreamWrapperManagerInterface;
 use Drupal\canvas\Routing\ParametrizedImageStyleConverter;
 use Drupal\canvas\Twig\CanvasTwigExtension;
 use Drupal\Tests\UnitTestCase;
+use Symfony\Component\HttpFoundation\RequestStack;
 
 // cspell:ignore fitok itok Bwidth
 /**
@@ -39,9 +40,10 @@ class CanvasTwigExtensionFiltersTest extends UnitTestCase {
     $imageFactory = $this->createMock(ImageFactory::class);
     $fileUrlInterfaceManager = $this->createMock(FileUrlGeneratorInterface::class);
     $renderer = $this->createMock(RendererInterface::class);
+    $requestStack = $this->createMock(RequestStack::class);
 
-    // Create the extension instance
-    $this->canvasTwigExtension = new CanvasTwigExtension($streamWrapperManager, $imageFactory, $fileUrlInterfaceManager, $renderer);
+    // Create the extension instance.
+    $this->canvasTwigExtension = new CanvasTwigExtension($streamWrapperManager, $imageFactory, $fileUrlInterfaceManager, $renderer, $requestStack);
   }
 
   /**
