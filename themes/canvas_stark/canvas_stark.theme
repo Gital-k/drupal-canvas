@@ -89,6 +89,13 @@ function canvas_stark_theme_suggestions_input_alter(array &$suggestions, array $
   if ($ml_ajax || $ml_form) {
     $suggestions[] = 'input__media_library';
   }
+  // Only apply multivalue form input suggestion if canvas_dev_mode is
+  // enabled.
+  if (\Drupal::moduleHandler()->moduleExists('canvas_dev_mode') &&
+    isset($variables['element']['#is_multivalue_form']) &&
+    $variables['element']['#is_multivalue_form']) {
+    $suggestions[] = 'input__multivalue_form';
+  }
 }
 
 /**
@@ -248,4 +255,3 @@ function canvas_stark_preprocess_datetime_wrapper(array &$variables): void {
     $variables['prop_link_data'] = Json::encode($variables['element']['#prop_link_data']);
   }
 }
-ReduxIntegratedFieldWidgetsHooks.php
