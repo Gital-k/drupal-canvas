@@ -51,7 +51,7 @@ const mainProperty: Transformer<{
   }
 
   let records: Array<PropsValues> = Array.isArray(value) ? value : [value];
-  if (multiple && typeof value === 'object' && value !== null) {
+  if (multiple && typeof value === 'object') {
     // Convert object to array of entries for sorting
     const entries = Object.entries(value);
 
@@ -228,7 +228,7 @@ const dateTime: Transformer<
   null | string | Array<null | string>,
   PropsValuesOrArrayOfPropsValues,
   DateFieldPropSource
-> = (value, _options, propSource) => {
+> = (value, options, propSource) => {
   if (propSource === null || propSource === undefined) {
     return null;
   }
@@ -265,7 +265,7 @@ const dateTime: Transformer<
 };
 
 const dateRange: Transformer<
-  void,
+  BaseTransformOptions,
   null | PropsValues,
   PropsValuesOrArrayOfPropsValues,
   DateFieldPropSource
@@ -335,12 +335,15 @@ const mediaSelection: Transformer<
   ) {
     return null;
   }
+  const selectionValues = Array.isArray(selection)
+    ? selection
+    : Object.values(selection);
   if (multiple) {
     // For multi-value fields, ensure the selection is an array so downstream
     // transforms (mainProperty) can iterate and sort by weight.
-    return Array.isArray(selection) ? selection : Object.values(selection);
+    return selectionValues;
   }
-  return selection;
+  return selectionValues[0] ?? null;
 };
 
 const transforms = {

@@ -192,6 +192,75 @@ describe('Transforms - main property', () => {
   });
 });
 
+describe('Transforms - mediaSelection', () => {
+  it('Should return null when there is no selection key', () => {
+    expect(transforms.mediaSelection({}, { multiple: false })).toEqual(null);
+  });
+
+  it('Should return null when selection is empty', () => {
+    expect(
+      transforms.mediaSelection({ selection: {} }, { multiple: false }),
+    ).toEqual(null);
+  });
+
+  it('Should return the first selection item for single-value fields', () => {
+    expect(
+      transforms.mediaSelection(
+        { selection: { 0: { target_id: '42', weight: '0' } } },
+        { multiple: false },
+      ),
+    ).toEqual({ target_id: '42', weight: '0' });
+  });
+
+  it('Should return an array of selection items for multiple-value fields', () => {
+    expect(
+      transforms.mediaSelection(
+        {
+          selection: {
+            0: { target_id: '42', weight: '0' },
+            1: { target_id: '43', weight: '1' },
+          },
+        },
+        { multiple: true },
+      ),
+    ).toEqual([
+      { target_id: '42', weight: '0' },
+      { target_id: '43', weight: '1' },
+    ]);
+  });
+
+  it('Should chain with mainProperty to extract target_id for single-value fields', () => {
+    const intermediate = transforms.mediaSelection(
+      { selection: { 0: { target_id: '42', weight: '0' } } },
+      { multiple: false },
+    );
+    expect(
+      transforms.mainProperty(intermediate, {
+        name: 'target_id',
+        multiple: false,
+      }),
+    ).toEqual('42');
+  });
+
+  it('Should chain with mainProperty to extract target_ids for multiple-value fields', () => {
+    const intermediate = transforms.mediaSelection(
+      {
+        selection: {
+          0: { target_id: '42', weight: '0' },
+          1: { target_id: '43', weight: '1' },
+        },
+      },
+      { multiple: true },
+    );
+    expect(
+      transforms.mainProperty(intermediate, {
+        name: 'target_id',
+        multiple: true,
+      }),
+    ).toEqual(['42', '43']);
+  });
+});
+
 describe('Transforms - dateTime', () => {
   it('should return null when propSource is undefined', () => {
     expect(transforms.dateTime({ date: '' }, {}, undefined)).to.equal(null);
