@@ -119,3 +119,15 @@ export const getSiteData = (): SiteData => {
   });
   return siteData;
 };
+
+/**
+ * Returns whether the current document is the Canvas editor preview (layout
+ * iframe). Use this in code components to adjust behavior or styling when
+ * rendered inside the editor.
+ *
+ * @returns true when served by the layout API (canvas.api.layout.get or
+ *   canvas.api.layout.get.content_template), false on the live site and in
+ *   the editor shell.
+ */
+export const isCanvasPreview = (): boolean =>
+  window.drupalSettings?.canvasData?.v0?.isPreview === true;
