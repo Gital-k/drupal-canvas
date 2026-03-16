@@ -735,6 +735,42 @@ export function findNodeParents(
   return result;
 }
 
+export interface ComponentLayerItem {
+  uuid: string;
+  name: string;
+}
+
+/**
+ * Resolve the full path of component layers from root to the target component.
+ * Only component nodes are included (region and slot IDs are filtered out).
+ *
+ * @param nodes - The layout (region nodes) to search.
+ * @param targetUuid - The UUID of the component to find.
+ * @param componentsData - Component metadata for display names.
+ * @returns Array of { uuid, name } from root to target, or empty if not found.
+ */
+export function getComponentLayersFromUuid(
+  nodes: Array<RegionNode>,
+  targetUuid: string,
+  componentsData: ComponentsList | undefined,
+): ComponentLayerItem[] {
+  const path = findNodeParents(nodes, targetUuid);
+  if (!path || path.length === 0) {
+    return [];
+  }
+  const layers: ComponentLayerItem[] = [];
+  for (const id of path) {
+    const component = findComponentByUuid(nodes, id);
+    if (component) {
+      layers.push({
+        uuid: component.uuid,
+        name: getDisplayNameForNode(component, null, componentsData),
+      });
+    }
+  }
+  return layers;
+}
+
 /**
  * Shared utility to get the display name for a component or slot node.
  * @param node - The node (component or slot)
@@ -779,6 +815,7 @@ const layoutUtils = {
   removeComponentByUuid,
   findNodePathByUuid,
   findNodeParents,
+  getComponentLayersFromUuid,
   insertNodeAtPath,
   moveNodeToPath,
   isChildNode,

@@ -5,6 +5,7 @@ import { useParams } from 'react-router-dom';
 
 import { useAppSelector } from '@/app/hooks';
 import { selectLayout } from '@/features/layout/layoutModelSlice';
+import { AncestorHighlightProvider } from '@/features/layout/previewOverlay/AncestorHighlightContext';
 import RegionOverlay from '@/features/layout/previewOverlay/RegionOverlay';
 import {
   DEFAULT_REGION,
@@ -117,29 +118,31 @@ const ViewportOverlay: React.FC<ViewportOverlayProps> = (props) => {
   // This overlay is portalled and rendered higher up the DOM tree to ensure that when the editor frame is zoomed, the UI
   // rendered inside the overlay does not also scale. We don't want tiny text in the UI when a user zooms out for instance.
   return ReactDOM.createPortal(
-    <div
-      ref={positionDivRef}
-      className={clsx('canvas--viewport-overlay', styles.viewportOverlay, {
-        [styles.isZooming]: isZooming,
-      })}
-      onDoubleClick={handleDoubleClick}
-      style={{
-        top: `${rect.top}px`,
-        left: `${rect.left}px`,
-        width: `${rect.width}px`,
-        height: `${rect.height}px`,
-      }}
-    >
-      {displayedRegions.map((region) => (
-        <RegionOverlay
-          iframeRef={iframeRef}
-          region={region}
-          regionId={region.id}
-          key={region.id}
-          regionName={region.name}
-        />
-      ))}
-    </div>,
+    <AncestorHighlightProvider>
+      <div
+        ref={positionDivRef}
+        className={clsx('canvas--viewport-overlay', styles.viewportOverlay, {
+          [styles.isZooming]: isZooming,
+        })}
+        onDoubleClick={handleDoubleClick}
+        style={{
+          top: `${rect.top}px`,
+          left: `${rect.left}px`,
+          width: `${rect.width}px`,
+          height: `${rect.height}px`,
+        }}
+      >
+        {displayedRegions.map((region) => (
+          <RegionOverlay
+            iframeRef={iframeRef}
+            region={region}
+            regionId={region.id}
+            key={region.id}
+            regionName={region.name}
+          />
+        ))}
+      </div>
+    </AncestorHighlightProvider>,
     portalRoot,
   );
 };

@@ -1,0 +1,45 @@
+/* Uniform spacing (4px) between ancestor badges and between the stack and current name tag. */
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  padding-bottom: 4px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.badge {
+  display: flex;
+  align-items: center;
+  height: 20px;
+  margin: 0;
+  padding: 1px 4px;
+  white-space: nowrap;
+  gap: 5px;
+  color: #fff;
+  border-radius: 2px;
+  background-color: var(--color-outline-component);
+  font-size: 12px;
+  cursor: pointer;
+  border: none;
+  text-align: left;
+  width: max-content;
+  max-width: 240px;
+}
+
+.badge:hover {
+  filter: brightness(1.1);
+}
+
+.badge:focus-visible {
+  outline: 2px solid var(--color-outline-component);
+  outline-offset: 2px;
+}
+
+.badge span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

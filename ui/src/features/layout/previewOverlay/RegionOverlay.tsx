@@ -74,6 +74,11 @@ const RegionOverlay: React.FC<RegionOverlayProps> = ({ iframeRef, region }) => {
 
   function handleItemMouseOut(event: React.MouseEvent<HTMLDivElement>) {
     event.stopPropagation();
+    const regionEl = event.currentTarget;
+    const related = event.relatedTarget as Node | null;
+    if (related && regionEl.contains(related)) {
+      return;
+    }
     dispatch(unsetHoveredComponent());
   }
 
