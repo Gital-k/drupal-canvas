@@ -38,13 +38,15 @@ export default defineConfig({
               label: 'Responsive images',
               slug: 'code-components/responsive-images',
             },
-            {
-              label: 'Workbench',
-              items: [
-                { label: 'Introduction', slug: 'code-components/workbench' },
-                { label: 'Mocks', slug: 'code-components/workbench/mocks' },
-              ],
-            },
+            // To enable the links to the Workbench documentation, uncomment the
+            // following lines.
+            // {
+            //   label: 'Workbench',
+            //   items: [
+            //     { label: 'Introduction', slug: 'code-components/workbench' },
+            //     { label: 'Mocks', slug: 'code-components/workbench/mocks' },
+            //   ],
+            // },
             {
               label: 'CLI tool',
               items: [
