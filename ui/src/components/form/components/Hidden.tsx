@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from 'react';
 import useMutationObserver from '@/hooks/useMutationObserver';
 import { a2p } from '@/local_packages/utils';
 import { VALUE_THAT_MEANS_REMOVE } from '@/utils/function-utils';
-import { isAjaxing } from '@/utils/isAjaxing';
 
 import type { Attributes } from '@/types/DrupalAttribute';
 
@@ -36,10 +35,7 @@ const Hidden = ({ attributes }: { attributes?: Attributes }) => {
             // Call the onChange listener so the Redux store is updated.
             if (
               attributes?.onChange &&
-              typeof attributes.onChange === 'function' &&
-              // Ajaxing also removes the VALUE_THAT_MEANS_REMOVE and the
-              // observer thinks the user is removing the image, which is wrong
-              !isAjaxing()
+              typeof attributes.onChange === 'function'
             ) {
               const event = new Event('change');
               ref.current!.value = VALUE_THAT_MEANS_REMOVE;

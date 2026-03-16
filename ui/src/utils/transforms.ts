@@ -1,3 +1,5 @@
+import { flaggedForRemoval } from '@/utils/function-utils';
+
 import type { PropsValues } from '@drupal-canvas/types';
 import type {
   PropSource,
@@ -340,10 +342,19 @@ const mediaSelection: Transformer<
   const selectionValues = Array.isArray(selection)
     ? selection
     : Object.values(selection);
-  if (multiple) {
-    return selectionValues;
+
+  // Filter out items flagged for removal (e.g. from Hidden.tsx MutationObserver).
+  // If every item was flagged, the field was explicitly cleared — return null so
+  // getPropsValues can propagate an explicit null to the resolved model.
+  const validValues = selectionValues.filter((item) => !flaggedForRemoval(item));
+  if (validValues.length === 0) {
+    return null;
   }
-  return selectionValues[0] ?? null;
+
+  if (multiple) {
+    return validValues;
+  }
+  return validValues[0];
 };
 
 const transforms = {

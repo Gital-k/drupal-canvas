@@ -5,6 +5,7 @@ import qs from 'qs';
 
 import { isPropSourceComponent } from '@/types/Component';
 import { getDrupal } from '@/utils/drupal-globals';
+import { flaggedForRemoval } from '@/utils/function-utils';
 import transforms from '@/utils/transforms';
 
 import type * as React from 'react';
@@ -412,7 +413,12 @@ export function getPropsValues(
         value,
       );
       if (transformed === null) {
-        // Ignore null values.
+        // If the raw value contains a removal signal, propagate null explicitly
+        // so it clears the field in the resolved model. Otherwise ignore null
+        // (e.g. a transform that can't run due to missing propSource).
+        if (flaggedForRemoval(value)) {
+          return { ...carry, [key]: null };
+        }
         return carry;
       }
       return {
