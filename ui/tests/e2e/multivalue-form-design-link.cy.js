@@ -464,7 +464,7 @@ describe('Multivalue Form Design – Link Field', () => {
     cy.get('[role="dialog"]').find('[aria-label="Close"]').should('exist');
 
     // Close the popover.
-    cy.get('[aria-label="Close"]').click();
+    cy.get('[role="dialog"]').find('[aria-label="Close"]').click();
     cy.get('[role="dialog"]').should('not.exist');
   });
 
@@ -500,7 +500,7 @@ describe('Multivalue Form Design – Link Field', () => {
     cy.get('[role="dialog"]').find('[aria-label="Close"]').should('exist');
 
     // Close the popover.
-    cy.get('[aria-label="Close"]').click();
+    cy.get('[role="dialog"]').find('[aria-label="Close"]').click();
     cy.get('[role="dialog"]').should('not.exist');
   });
 
@@ -529,7 +529,7 @@ describe('Multivalue Form Design – Link Field', () => {
       .first()
       .type('https://this-should-not-be-saved.com');
 
-    cy.get('[aria-label="Close"]').click();
+    cy.get('[role="dialog"]').find('[aria-label="Close"]').click();
     cy.get('[role="dialog"]').should('not.exist');
 
     // The original URL should be restored.
@@ -549,7 +549,7 @@ describe('Multivalue Form Design – Link Field', () => {
       .first()
       .type('This should not be saved');
 
-    cy.get('[aria-label="Close"]').click();
+    cy.get('[role="dialog"]').find('[aria-label="Close"]').click();
     cy.get('[role="dialog"]').should('not.exist');
 
     // The original title should be restored.
