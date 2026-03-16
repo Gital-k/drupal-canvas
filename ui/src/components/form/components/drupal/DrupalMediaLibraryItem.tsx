@@ -59,8 +59,12 @@ const DrupalMediaLibraryItem = ({
         ref={setNodeRef}
         className={styles.dragHandle}
         data-canvas-drag-handle
+        aria-label="Drag to reorder"
         {...sortableAttributes}
         {...listeners}
+        tabIndex={0}
+        role="button"
+        data-canvas-is-dragging={isDragging}
       >
         <DragHandleDots2Icon />
       </div>

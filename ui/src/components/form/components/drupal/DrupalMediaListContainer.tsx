@@ -5,9 +5,18 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { useDndContext } from '@dnd-kit/core';
+import {
+  closestCenter,
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  useDndContext,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
 import {
   SortableContext,
+  sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 
@@ -20,6 +29,7 @@ import useInputUIData from '@/hooks/useInputUIData';
 import { useUpdateComponentMutation } from '@/services/preview';
 
 import type { ReactNode } from 'react';
+import type { DragEndEvent } from '@dnd-kit/core';
 import type {
   EvaluatedComponentModel,
   Sources,
@@ -249,8 +259,6 @@ const DrupalMediaListContainer = ({
       const reordered = newOrder
         .map((id) => elementMap.get(id))
         .filter((el): el is React.ReactElement => el !== undefined);
-
-      // console.log(`[DrupalMediaListContainer] ✅ Reordered ${reordered.length} elements`);
       return reordered;
     });
 
@@ -400,19 +408,52 @@ const DrupalMediaListContainer = ({
     ],
   );
 
+  // Create sensors scoped to this sortable list - both pointer and keyboard
+  const pointerSensor = useSensor(PointerSensor, {
+    activationConstraint: {
+      distance: 3,
+    },
+  });
+  const keyboardSensor = useSensor(KeyboardSensor, {
+    coordinateGetter: sortableKeyboardCoordinates,
+  });
+  const sensors = useSensors(pointerSensor, keyboardSensor);
+
+  const handleLocalDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = itemIds.indexOf(active.id as string);
+    const newIndex = itemIds.indexOf(over.id as string);
+
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const newOrder = [...itemIds];
+    const [removed] = newOrder.splice(oldIndex, 1);
+    newOrder.splice(newIndex, 0, removed);
+    handleSort(newOrder);
+  };
+
   useDragMonitor(itemIds, handleSort, handleDragEnd);
 
   return (
-    <SortableContext items={itemIds} strategy={verticalListSortingStrategy}>
-      <div
-        ref={wrapperRef}
-        data-num-items={itemIds.length}
-        data-sort-wrapper
-        style={{ display: 'contents' }}
-      >
-        {orderedElements}
-      </div>
-    </SortableContext>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragEnd={handleLocalDragEnd}
+    >
+      <SortableContext items={itemIds} strategy={verticalListSortingStrategy}>
+        <div
+          ref={wrapperRef}
+          data-num-items={itemIds.length}
+          data-sort-wrapper
+          style={{ display: 'contents' }}
+        >
+          {orderedElements}
+        </div>
+      </SortableContext>
+    </DndContext>
   );
 };
 
