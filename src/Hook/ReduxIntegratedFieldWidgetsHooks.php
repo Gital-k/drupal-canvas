@@ -309,6 +309,7 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
     $map = [
       'boolean_checkbox' => ['mainProperty' => []],
       'datetime_default' => ['mainProperty' => [], 'dateTime' => []],
+      'daterange_default' => ['dateRange' => []],
       'email_default' => ['mainProperty' => []],
       'file_generic' => ['mainProperty' => ['name' => 'fids']],
       'image_image' => ['mainProperty' => ['name' => 'fids']],
