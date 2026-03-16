@@ -157,10 +157,6 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
       else {
         unset($form['uri']['#description']);
       }
-      // Remove the "URL" label that appears above the URL text input.
-      if (isset($form['uri']['#title'])) {
-        $form['uri']['#title_display'] = 'invisible';
-      }
     }
   }
 
