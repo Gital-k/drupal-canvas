@@ -50,13 +50,11 @@ const mainProperty: Transformer<{
     return multiple ? [null] : null;
   }
 
-  let records: Array<PropsValues> = Array.isArray(value) ? value : [value];
-  if (multiple && typeof value === 'object') {
-    // Convert object to array of entries for sorting
-    const entries = Object.entries(value);
-
-    // Check if all entries have a weight field (for drag-and-drop reordering)
+  let records: Array<PropsValues>;
+  if (multiple) {
+    // Convert object to array of entries for sorting.
     // Support both 'weight' (media library) and '_weight' (other widgets)
+    const entries = Object.entries(value);
     const hasWeights =
       entries.length > 0 &&
       entries.every(
@@ -83,6 +81,8 @@ const mainProperty: Transformer<{
     } else {
       records = Object.values(value);
     }
+  } else {
+    records = Array.isArray(value) ? value : [value];
   }
   const returnValue = records.map((record: PropsValues) => {
     if (record === null || record === undefined) {
@@ -335,12 +335,12 @@ const mediaSelection: Transformer<
   ) {
     return null;
   }
+  // Normalize to array so both single and multiple paths work uniformly,
+  // and so downstream transforms (mainProperty) can iterate and sort by weight.
   const selectionValues = Array.isArray(selection)
     ? selection
     : Object.values(selection);
   if (multiple) {
-    // For multi-value fields, ensure the selection is an array so downstream
-    // transforms (mainProperty) can iterate and sort by weight.
     return selectionValues;
   }
   return selectionValues[0] ?? null;
