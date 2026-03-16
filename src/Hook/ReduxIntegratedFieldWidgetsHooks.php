@@ -6,7 +6,6 @@ namespace Drupal\canvas\Hook;
 
 use Drupal\Component\Serialization\Json;
 use Drupal\Core\Asset\LibraryDiscoveryInterface;
-use Drupal\Core\Extension\ModuleExtensionList;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Hook\Order\OrderAfter;
 use Drupal\Core\Security\TrustedCallbackInterface;
