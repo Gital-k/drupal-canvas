@@ -136,6 +136,14 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
         $form['selection'][$key]['remove_button']['#attributes']['data-canvas-media-remove-button'] = 'true';
       }
 
+      // @todo Remove canvas_dev_mode condition as part of https://www.drupal.org/node/3577946
+      if ($this->moduleHandler->moduleExists('canvas_dev_mode')) {
+        $field_definition = $context['items']->getFieldDefinition();
+        if ($field_definition->getFieldStorageDefinition()->isMultiple()) {
+          $form['#is_multivalue_media_form'] = TRUE;
+        }
+      }
+
     }
     // Use a Canvas-specific media library opener, because the default opener
     // assumes the media library is opened for a field widget of a field

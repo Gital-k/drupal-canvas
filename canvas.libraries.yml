@@ -240,3 +240,8 @@ multivalue-form:
     - core/drupal
     - core/drupal.tabledrag
 
+multivalue-media-form:
+  css:
+    theme:
+      css/multivalue-media-form.css: {}
+

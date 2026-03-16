@@ -242,6 +242,17 @@ function canvas_stark_preprocess_fieldset__media_library_widget(array &$variable
   if (isset($variables['element']['#component_prop_name'])) {
     $variables['component_prop_name'] = $variables['element']['#component_prop_name'];
   }
+
+  // Required by MediaLibraryWidgetContainer.module.css to scope styles.
+  $variables['attributes']['data-canvas-media-library-fieldset'] = 'true';
+
+  // @todo Remove canvas_dev_mode condition as part of https://www.drupal.org/node/3577946
+  if (!empty($variables['element']['#is_multivalue_media_form'])) {
+    $variables['is_multivalue_media_form'] = TRUE;
+    $variables['attributes']['class'][] = 'canvas-multivalue-media';
+    $variables['attributes']['data-canvas-media-multivalue'] = 'true';
+    $variables['#attached']['library'][] = 'canvas/multivalue-media-form';
+  }
 }
 
 function canvas_stark_preprocess_fieldset(array &$variables): void {

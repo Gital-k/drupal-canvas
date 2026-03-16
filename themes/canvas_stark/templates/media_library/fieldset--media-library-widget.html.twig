@@ -24,8 +24,11 @@
  * - suffix: The content to add after the <fieldset> children.
  * - component_prop_name: The name of the component prop this media library widget is for.
  *   Only set when rendered inside the ComponentInstanceForm; absent otherwise.
+ * - is_multivalue_media_form: Boolean. TRUE for unlimited-cardinality media
+ *   fields. Suppresses the weight toggle prefix.
  *
  * @see template_preprocess_fieldset()
+ * @see themes/canvas_stark/canvas_stark.theme
  *
  * @ingroup themeable
  */
@@ -51,7 +54,7 @@
     </legend>
 
     {# If the prefix is the weight toggle, it is positioned above the wrapper. #}
-    {% if prefix and prefix['weight_toggle'] is defined %}
+    {% if prefix and prefix['weight_toggle'] is defined and not is_multivalue_media_form %}
       {{ prefix }}
     {% endif %}
     <div class="fieldset-wrapper" data-canvas-media-library-fieldset-wrapper='true'>

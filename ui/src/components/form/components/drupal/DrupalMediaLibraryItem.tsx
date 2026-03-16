@@ -1,10 +1,14 @@
 import { useCallback, useId, useRef } from 'react';
+import clsx from 'clsx';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { DragHandleDots2Icon } from '@radix-ui/react-icons';
 
 import { a2p } from '@/local_packages/utils';
 
 import type { ReactNode } from 'react';
+
+import styles from './DrupalMediaLibraryItem.module.css';
 
 interface DrupalMediaLibraryItemProps {
   id?: string; // Optional: unique ID for sorting (will be auto-generated if not provided)
@@ -28,6 +32,7 @@ const DrupalMediaLibraryItem = ({
     attributes: sortableAttributes,
     listeners,
     setNodeRef,
+    setActivatorNodeRef,
     transform,
     transition,
     isDragging,
@@ -59,11 +64,21 @@ const DrupalMediaLibraryItem = ({
       data-item-index={itemIndex}
       ref={mergedRef}
       style={style}
+      {...a2p(attributes, {}, { skipAttributes: ['class'] })}
+      className={clsx(styles.item, attributes.class, {
+        [styles.dragging]: isDragging,
+      })}
       data-drupal-media-item-id={providedId}
-      {...a2p(attributes)}
       {...sortableAttributes}
-      {...listeners}
     >
+      <div
+        ref={setActivatorNodeRef}
+        {...listeners}
+        className={styles.dragHandle}
+        aria-label="Drag to reorder"
+      >
+        <DragHandleDots2Icon />
+      </div>
       {children}
     </div>
   );

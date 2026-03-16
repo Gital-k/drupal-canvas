@@ -1,0 +1,23 @@
+.item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.item.dragging {
+  opacity: 0.5;
+}
+
+.dragHandle {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  cursor: grab;
+  color: var(--blue-9);
+}
+
+.dragHandle:active {
+  cursor: grabbing;
+}
