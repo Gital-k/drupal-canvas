@@ -85,8 +85,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
   }
 
   /**
-   * Tests that the layout API response includes canvasData.v0.isPreview for
-   * code components to detect they are in the Canvas editor.
+   * Tests that the layout API response includes canvasData.v0.isPreview.
    */
   public function testLayoutResponseSetsCanvasDataIsPreview(): void {
     $entity = $this->getTestEntity('node');
