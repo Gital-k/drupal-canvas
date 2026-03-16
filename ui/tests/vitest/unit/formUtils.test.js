@@ -247,7 +247,7 @@ const transformConfig = {
     mainProperty: { name: 'target_id' },
   },
   mediaMultiple: {
-    mediaSelection: {},
+    mediaSelection: { multiple: true },
     mainProperty: { name: 'target_id', multiple: true },
   },
 };

@@ -90,6 +90,9 @@ const mainProperty: Transformer<{
     if (record === null || record === undefined) {
       return null;
     }
+    if (typeof record !== 'object') {
+      return null;
+    }
     if (name in record) {
       return record[name];
     }
