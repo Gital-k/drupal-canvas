@@ -366,9 +366,10 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
         $variables['element']['#is_multivalue_form']) {
         $suggestions[] = 'input__multivalue_form';
       }
-      // entity_autocomplete inputs need a dedicated suggestion so the real input
-      // (with all data-autocomplete-* attributes) is rendered inside the popover,
-      // allowing Drupal's jQuery UI autocomplete behaviors to attach correctly.
+      // entity_autocomplete inputs need a dedicated suggestion so the real
+      // input (with all data-autocomplete-* attributes) is rendered inside
+      // the popover, allowing Drupal's jQuery UI autocomplete behaviors
+      // to attach correctly.
       if (isset($variables['element']['#is_multivalue_autocomplete_form']) &&
         $variables['element']['#is_multivalue_autocomplete_form']) {
         $suggestions[] = 'input__multivalue_autocomplete_form';

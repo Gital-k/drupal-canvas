@@ -248,4 +248,4 @@ function canvas_stark_preprocess_datetime_wrapper(array &$variables): void {
     $variables['prop_link_data'] = Json::encode($variables['element']['#prop_link_data']);
   }
 }
-
+ReduxIntegratedFieldWidgetsHooks.php
