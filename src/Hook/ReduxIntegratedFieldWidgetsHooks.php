@@ -291,7 +291,16 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
       // Mark input elements.
       if (isset($element[$key]['#type']) &&
           in_array($element[$key]['#type'], ['textfield', 'url', 'entity_autocomplete'], TRUE)) {
-        $element[$key]['#is_multivalue_form'] = TRUE;
+        if ($element[$key]['#type'] === 'entity_autocomplete') {
+          // Use a separate marker for entity_autocomplete inputs so they get a
+          // dedicated theme suggestion that renders the real autocomplete input
+          // inside the popover, preserving all Drupal autocomplete attributes
+          // and jQuery UI behaviour.
+          $element[$key]['#is_multivalue_autocomplete_form'] = TRUE;
+        }
+        else {
+          $element[$key]['#is_multivalue_form'] = TRUE;
+        }
         $element[$key]['#attributes']['data-field-label'] = $field_label;
       }
       // Recursively process child elements.
