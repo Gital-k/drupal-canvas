@@ -1,5 +1,4 @@
 import React, {
-  createContext,
   useCallback,
   useEffect,
   useMemo,
@@ -26,10 +25,6 @@ import type {
   Sources,
 } from '@/features/layout/layoutModelSlice';
 import type { EditorFrameContext } from '@/features/ui/uiSlice';
-
-// ---------------------------------------------------------------------------
-// Pure helpers
-// ---------------------------------------------------------------------------
 
 /**
  * Reads all `target_id` inputs inside a wrapper element and returns their
@@ -119,15 +114,6 @@ function buildRemovePatch(
     },
   };
 }
-
-interface SortableRegistrationContextType {
-  registerItem: (id: string, element: any) => void;
-  unregisterItem: (id: string) => void;
-}
-
-const SortableRegistrationContext =
-  createContext<SortableRegistrationContextType | null>(null);
-
 interface DrupalMediaListContainerProps {
   children: ReactNode;
   onSort?: (newOrder: string[]) => void;
@@ -417,15 +403,16 @@ const DrupalMediaListContainer = ({
   useDragMonitor(itemIds, handleSort, handleDragEnd);
 
   return (
-    <SortableRegistrationContext.Provider
-      value={{ registerItem: () => {}, unregisterItem: () => {} }}
-    >
-      <SortableContext items={itemIds} strategy={verticalListSortingStrategy}>
-        <div ref={wrapperRef} data-sort-wrapper style={{ display: 'contents' }}>
-          {orderedElements}
-        </div>
-      </SortableContext>
-    </SortableRegistrationContext.Provider>
+    <SortableContext items={itemIds} strategy={verticalListSortingStrategy}>
+      <div
+        ref={wrapperRef}
+        data-num-items={itemIds.length}
+        data-sort-wrapper
+        style={{ display: 'contents' }}
+      >
+        {orderedElements}
+      </div>
+    </SortableContext>
   );
 };
 

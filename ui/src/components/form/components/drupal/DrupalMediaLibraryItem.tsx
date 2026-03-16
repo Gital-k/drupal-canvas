@@ -1,10 +1,14 @@
-import { useCallback, useId, useRef } from 'react';
+import { useId } from 'react';
+import clsx from 'clsx';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { DragHandleDots2Icon } from '@radix-ui/react-icons';
 
 import { a2p } from '@/local_packages/utils';
 
 import type { ReactNode } from 'react';
+
+import styles from './DrupalMediaLibraryItem.module.css';
 
 interface DrupalMediaLibraryItemProps {
   id?: string; // Optional: unique ID for sorting (will be auto-generated if not provided)
@@ -21,7 +25,6 @@ const DrupalMediaLibraryItem = ({
 }: DrupalMediaLibraryItemProps) => {
   const autoId = useId();
   const id = providedId || `media-item-${autoId}`;
-  const localRef = useRef<HTMLDivElement | null>(null);
 
   // Use useSortable directly in this component
   const {
@@ -39,15 +42,6 @@ const DrupalMediaLibraryItem = ({
     },
   });
 
-  // Merge both refs
-  const mergedRef = useCallback(
-    (node: HTMLDivElement | null) => {
-      localRef.current = node;
-      setNodeRef(node);
-    },
-    [setNodeRef],
-  );
-
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -57,13 +51,19 @@ const DrupalMediaLibraryItem = ({
   return (
     <div
       data-item-index={itemIndex}
-      ref={mergedRef}
       style={style}
-      data-drupal-media-item-id={providedId}
-      {...a2p(attributes)}
-      {...sortableAttributes}
-      {...listeners}
+      {...a2p(attributes, {}, { skipAttributes: ['class'] })}
+      className={clsx(styles.item, attributes.class)}
     >
+      <div
+        ref={setNodeRef}
+        className={styles.dragHandle}
+        data-canvas-drag-handle
+        {...sortableAttributes}
+        {...listeners}
+      >
+        <DragHandleDots2Icon />
+      </div>
       {children}
     </div>
   );
