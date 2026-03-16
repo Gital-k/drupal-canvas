@@ -1,10 +1,11 @@
-import { useCallback, useId, useRef } from 'react';
+import { useCallback, useContext, useId, useRef } from 'react';
 import clsx from 'clsx';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { DragHandleDots2Icon } from '@radix-ui/react-icons';
 
 import { a2p } from '@/local_packages/utils';
+import { SortableRegistrationContext } from '@/components/form/components/drupal/DrupalMediaListContainer';
 
 import type { ReactNode } from 'react';
 
@@ -26,6 +27,9 @@ const DrupalMediaLibraryItem = ({
   const autoId = useId();
   const id = providedId || `media-item-${autoId}`;
   const localRef = useRef<HTMLDivElement | null>(null);
+
+  const sortableCtx = useContext(SortableRegistrationContext);
+  const isSortable = sortableCtx ? sortableCtx.itemCount > 1 : false;
 
   // Use useSortable directly in this component
   const {
@@ -71,14 +75,16 @@ const DrupalMediaLibraryItem = ({
       data-drupal-media-item-id={providedId}
       {...sortableAttributes}
     >
-      <div
-        ref={setActivatorNodeRef}
-        {...listeners}
-        className={styles.dragHandle}
-        aria-label="Drag to reorder"
-      >
-        <DragHandleDots2Icon />
-      </div>
+      {isSortable && (
+        <div
+          ref={setActivatorNodeRef}
+          {...listeners}
+          className={styles.dragHandle}
+          aria-label="Drag to reorder"
+        >
+          <DragHandleDots2Icon />
+        </div>
+      )}
       {children}
     </div>
   );

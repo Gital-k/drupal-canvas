@@ -123,10 +123,13 @@ function buildRemovePatch(
 interface SortableRegistrationContextType {
   registerItem: (id: string, element: any) => void;
   unregisterItem: (id: string) => void;
+  itemCount: number;
 }
 
 const SortableRegistrationContext =
   createContext<SortableRegistrationContextType | null>(null);
+
+export { SortableRegistrationContext };
 
 interface DrupalMediaListContainerProps {
   children: ReactNode;
@@ -418,7 +421,7 @@ const DrupalMediaListContainer = ({
 
   return (
     <SortableRegistrationContext.Provider
-      value={{ registerItem: () => {}, unregisterItem: () => {} }}
+      value={{ registerItem: () => {}, unregisterItem: () => {}, itemCount: itemIds.length }}
     >
       <SortableContext items={itemIds} strategy={verticalListSortingStrategy}>
         <div ref={wrapperRef} data-sort-wrapper style={{ display: 'contents' }}>
