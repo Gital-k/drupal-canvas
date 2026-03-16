@@ -277,4 +277,3 @@ function canvas_stark_preprocess_input(array &$variables): void {
     $variables['#attached']['library'][] = 'canvas_stark/multivalue-autocomplete-popover';
   }
 }
-

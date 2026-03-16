@@ -290,7 +290,7 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
     foreach (Element::children($element) as $key) {
       // Mark input elements.
       if (isset($element[$key]['#type']) &&
-          in_array($element[$key]['#type'], ['textfield', 'url', 'entity_autocomplete'], TRUE)) {
+          \in_array($element[$key]['#type'], ['textfield', 'url', 'entity_autocomplete'], TRUE)) {
         if ($element[$key]['#type'] === 'entity_autocomplete') {
           // Use a separate marker for entity_autocomplete inputs so they get a
           // dedicated theme suggestion that renders the real autocomplete input
