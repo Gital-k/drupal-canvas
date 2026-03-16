@@ -357,6 +357,43 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
     ];
   }
 
+  /**
+   * Implements hook_theme_suggestions_input_alter().
+   *
+   * Adds theme suggestions for multivalue form inputs and multivalue
+   * entity_autocomplete inputs when canvas_dev_mode is enabled.
+   */
+  #[Hook('theme_suggestions_input_alter')]
+  public function themeSuggestionsInputAlter(array &$suggestions, array $variables): void {
+    if ($this->moduleHandler->moduleExists('canvas_dev_mode')) {
+      if (isset($variables['element']['#is_multivalue_form']) &&
+        $variables['element']['#is_multivalue_form']) {
+        $suggestions[] = 'input__multivalue_form';
+      }
+      // entity_autocomplete inputs need a dedicated suggestion so the real input
+      // (with all data-autocomplete-* attributes) is rendered inside the popover,
+      // allowing Drupal's jQuery UI autocomplete behaviors to attach correctly.
+      if (isset($variables['element']['#is_multivalue_autocomplete_form']) &&
+        $variables['element']['#is_multivalue_autocomplete_form']) {
+        $suggestions[] = 'input__multivalue_autocomplete_form';
+      }
+    }
+  }
+
+  /**
+   * Implements hook_preprocess_input().
+   *
+   * Attaches the multivalue autocomplete popover library when rendering
+   * entity_autocomplete inputs within multivalue forms.
+   */
+  #[Hook('preprocess_input')]
+  public function preprocessInput(array &$variables): void {
+    if (isset($variables['element']['#is_multivalue_autocomplete_form']) &&
+      $variables['element']['#is_multivalue_autocomplete_form']) {
+      $variables['#attached']['library'][] = 'canvas_stark/multivalue-autocomplete-popover';
+    }
+  }
+
   #[Hook('element_info_alter', order: new OrderAfter(['editor']))]
   public function elementInfoAlter(array &$info): void {
     if (isset($info['text_format'])) {

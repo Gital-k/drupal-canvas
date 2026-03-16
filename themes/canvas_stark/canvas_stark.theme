@@ -89,21 +89,6 @@ function canvas_stark_theme_suggestions_input_alter(array &$suggestions, array $
   if ($ml_ajax || $ml_form) {
     $suggestions[] = 'input__media_library';
   }
-  // Only apply multivalue form input suggestion if canvas_dev_mode is
-  // enabled.
-  if (\Drupal::moduleHandler()->moduleExists('canvas_dev_mode')) {
-    if (isset($variables['element']['#is_multivalue_form']) &&
-      $variables['element']['#is_multivalue_form']) {
-      $suggestions[] = 'input__multivalue_form';
-    }
-    // entity_autocomplete inputs need a dedicated suggestion so the real input
-    // (with all data-autocomplete-* attributes) is rendered inside the popover,
-    // allowing Drupal's jQuery UI autocomplete behaviors to attach correctly.
-    if (isset($variables['element']['#is_multivalue_autocomplete_form']) &&
-      $variables['element']['#is_multivalue_autocomplete_form']) {
-      $suggestions[] = 'input__multivalue_autocomplete_form';
-    }
-  }
 }
 
 /**
@@ -264,16 +249,3 @@ function canvas_stark_preprocess_datetime_wrapper(array &$variables): void {
   }
 }
 
-/**
- * Implements hook_preprocess_input().
- *
- * Attaches the multivalue autocomplete popover library when rendering
- * entity_autocomplete inputs within multivalue forms.
- */
-function canvas_stark_preprocess_input(array &$variables): void {
-  // Attach the popover library for multivalue autocomplete inputs.
-  if (isset($variables['element']['#is_multivalue_autocomplete_form']) &&
-    $variables['element']['#is_multivalue_autocomplete_form']) {
-    $variables['#attached']['library'][] = 'canvas_stark/multivalue-autocomplete-popover';
-  }
-}
