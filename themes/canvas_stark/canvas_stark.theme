@@ -98,7 +98,7 @@ function canvas_stark_theme_suggestions_input_alter(array &$suggestions, array $
     }
     // entity_autocomplete inputs need a dedicated suggestion so the real input
     // (with all data-autocomplete-* attributes) is rendered inside the popover,
-    // allowing Drupal's jQuery UI autocomplete behaviours to attach correctly.
+    // allowing Drupal's jQuery UI autocomplete behaviors to attach correctly.
     if (isset($variables['element']['#is_multivalue_autocomplete_form']) &&
       $variables['element']['#is_multivalue_autocomplete_form']) {
       $suggestions[] = 'input__multivalue_autocomplete_form';
