@@ -147,7 +147,7 @@
 
         // Also update on autocomplete select (jQuery UI fires 'autocompleteselect')
         if (window.jQuery) {
-          window.jQuery(input).on('autocompleteselect autocompletechange', function () {
+          window.jQuery(input).on('autocompleteselect.autocomplete', function () {
             setTimeout(updatePreview, 0);
           });
         }
