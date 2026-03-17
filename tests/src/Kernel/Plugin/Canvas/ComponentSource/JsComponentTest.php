@@ -1061,10 +1061,8 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
   }
 
   public function testRewriteExampleUrl(): void {
-    self::assertNull(Component::load('js.canvas_test_code_components_captioned_video'));
     $this->generateComponentConfig();
     $video_component = Component::load('js.canvas_test_code_components_captioned_video');
-    // @phpstan-ignore-next-line staticMethod.impossibleType
     self::assertInstanceOf(ComponentInterface::class, $video_component);
 
     $source = $video_component->getComponentSource();

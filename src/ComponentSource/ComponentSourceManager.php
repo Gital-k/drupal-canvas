@@ -75,6 +75,11 @@ final class ComponentSourceManager extends DefaultPluginManager {
    *   (optional) A list of source-specific IDs in the given $source_id. If
    *   omitted, will (re)generate Component config entities for all components.
    *
+   * @phpstan-impure
+   *   Despite returning `$this` for fluent chaining, this method has side
+   *   effects: it creates/updates Component config entities and populates prop
+   *   shape repositories.
+   *
    * @return $this
    */
   public function generateComponents(?string $source_id = NULL, ?array $source_specific_ids = NULL): self {

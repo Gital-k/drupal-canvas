@@ -123,15 +123,16 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
     // Discover all Components, which will cause the prop shape repositories to
     // get populated.
     $this->container->get(ComponentSourceManager::class)->generateComponents();
-    // @todo Remove this when https://github.com/phpstan/phpstan/issues/13566#issuecomment-3645405380 is fixed.
-    // @phpstan-ignore staticMethod.impossibleType
-    self::assertNotEmpty($ephemeral_prop_shape_repository->getUniquePropShapes());
-    // @todo Remove this when https://github.com/phpstan/phpstan/issues/13566#issuecomment-3645405380 is fixed.
-    // @phpstan-ignore staticMethod.impossibleType
-    self::assertNotEmpty($persistent_prop_shape_repository->getUniquePropShapes());
-    // @todo Remove this when https://github.com/phpstan/phpstan/issues/13566#issuecomment-3645405380 is fixed.
-    // @phpstan-ignore staticMethod.impossibleType
-    self::assertNotEmpty(ComponentEntity::loadMultiple());
+    // Store repositories in local variables to force PHPStan to re-evaluate their
+    // method calls after generateComponents(). This avoids PHPStan's "remembered
+    // return value" false positives where it remembers the earlier assertEmpty()
+    // result even though generateComponents() has side effects.
+    $eph_repo = $ephemeral_prop_shape_repository;
+    $pers_repo = $persistent_prop_shape_repository;
+    $component_entity_class = ComponentEntity::class;
+    self::assertNotEmpty($eph_repo->getUniquePropShapes());
+    self::assertNotEmpty($pers_repo->getUniquePropShapes());
+    self::assertNotEmpty($component_entity_class::loadMultiple());
 
     // EphemeralPropShapeRepository must contain a superset, because the
     // persistent prop shape repository contains only the shapes that actually
