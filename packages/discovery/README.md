@@ -38,9 +38,9 @@ named metadata files are used.
 ## API
 
 ```ts
-import { discoverCodeComponents } from '@drupal-canvas/discovery';
+import { discoverCanvasProject } from '@drupal-canvas/discovery';
 
-const result = await discoverCodeComponents({
+const result = await discoverCanvasProject({
   scanRoot: '/absolute/path/to/project',
 });
 ```

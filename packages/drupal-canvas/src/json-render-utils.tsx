@@ -403,7 +403,7 @@ function toComponentId(machineName: string): string {
  * Components are keyed by their Drupal Canvas component_id (`js.<machineName>`)
  * to match the `component_id` used in Canvas component trees.
  *
- * @param components - Array of discovered components from `discoverCodeComponents()`
+ * @param components - Array of discovered components from `discoverCanvasProject()`
  * @returns A component registry that can be passed to `renderCanvasTree()`
  */
 export async function defineComponentRegistry(
@@ -427,7 +427,11 @@ export async function defineComponentRegistry(
         }
         const names = c.name.startsWith('js.')
           ? [c.name]
-          : [c.name, toComponentId(c.name.replace(/-/g, '_').toLowerCase())];
+          : [
+              c.name,
+              toComponentId(c.name.toLowerCase()),
+              toComponentId(c.name.replace(/-/g, '_').toLowerCase()),
+            ];
         return { names, renderFn } as const;
       }),
   );

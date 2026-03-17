@@ -1104,6 +1104,22 @@ describe('defineComponentRegistry', () => {
     vi.doUnmock('/fake/Valid.js');
     vi.doUnmock('/fake/Invalid.js');
   });
+
+  it('should register both dash and underscore component IDs', async () => {
+    const PricingTable = () => <div>pricing</div>;
+
+    vi.doMock('/fake/PricingTable.js', () => ({ default: PricingTable }));
+
+    const registry = await defineComponentRegistry([
+      { name: 'pricing-table', jsEntryPath: '/fake/PricingTable.js' },
+    ]);
+
+    expect(registry['pricing-table']).toBe(PricingTable);
+    expect(registry['js.pricing-table']).toBe(PricingTable);
+    expect(registry['js.pricing_table']).toBe(PricingTable);
+
+    vi.doUnmock('/fake/PricingTable.js');
+  });
 });
 
 describe('defineComponentCatalog', () => {
