@@ -1320,7 +1320,6 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
         // string input, as they're thinking about what string they do want.
         // ⚠️ This won't work for components whose logic specifically checks for
         // an empty string and refuses to render then.
-        // @todo Expand to support multiple-cardinality.
         if ($is_required_prop && $evaluated === '' && $this->getExplicitInputDefinitions()['shapes'][$prop] === ['type' => 'string']) {
           // Confirm that *if* this weren't special-cased, that this would
           // indeed enter the next branch, which would cause it to be skipped.
@@ -1344,7 +1343,9 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
         // If this is a required property without a value, we can leave
         // subsequent validation to bubble up any errors.
         // @see \Drupal\canvas\PropExpressions\StructuredData\Evaluator::doEvaluate()
-        continue;
+        if (!$this->isEmptyRequiredMultiCardinalityStaticPropSource($is_required_prop, $source ?? NULL, $prop_source)) {
+          continue;
+        }
       }
       $props[$prop] = $this->collapse($source, $prop);
     }
@@ -1445,6 +1446,25 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       }
     }
     return $source->toArray();
+  }
+
+  /**
+   * Checks if a prop source is an empty required multi-cardinality static source.
+   *
+   * @param bool $is_required_prop
+   *   Whether the prop is required.
+   * @param mixed $source
+   *   The parsed prop source, or NULL if not yet available.
+   * @param array $prop_source
+   *   The raw prop source array from the client model.
+   *
+   * @return bool
+   */
+  private function isEmptyRequiredMultiCardinalityStaticPropSource(bool $is_required_prop, mixed $source, array $prop_source): bool {
+    return $is_required_prop
+      && $source instanceof StaticPropSource
+      && ($prop_source['sourceTypeSettings']['cardinality'] ?? NULL) !== NULL
+      && $source->fieldItemList->count() === 0;
   }
 
   /**

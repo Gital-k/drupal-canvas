@@ -5972,6 +5972,46 @@ HTML
     );
   }
 
+  /**
+   * Tests that clientModelToInput() retains empty arrays for required multi-cardinality props.
+   *
+   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::clientModelToInput()
+   */
+  public function testClientModelToInputRetainsEmptyArrayForRequiredMultiCardinalityProp(): void {
+    $this->generateComponentConfig();
+
+    $component = Component::load('sdc.canvas_test_sdc.sparkline');
+    $this->assertInstanceOf(Component::class, $component);
+
+    // Simulate the user clearing all items from the `data` field mid-edit.
+    // The Canvas UI sends value=[] in the source and [] in resolved.
+    $clientModel = [
+      'source' => [
+        'data' => [
+          'sourceType' => 'static:field_item:integer',
+          'expression' => 'ℹ︎integer␟value',
+          'value' => [],
+          'sourceTypeSettings' => [
+            'cardinality' => 100,
+            'instance' => ['min' => -100, 'max' => 100],
+          ],
+        ],
+      ],
+      'resolved' => [
+        'data' => [],
+      ],
+    ];
+
+    $input = $component->getComponentSource()->clientModelToInput(
+      'a-uuid-for-testing',
+      $component,
+      $clientModel,
+      NULL,
+    );
+    $this->assertArrayHasKey('data', $input, 'A required multi-cardinality prop cleared by the user should still be stored (as []) for graceful degradation.');
+    $this->assertSame([], $input['data']);
+  }
+
   public function alter(ContainerBuilder $container): void {
     // Swap in the broken version of this class.
     // @see ::triggerBrokenComponent()
