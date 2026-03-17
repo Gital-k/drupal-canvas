@@ -521,6 +521,15 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
 
   /**
    * {@inheritdoc}
+   *
+   * @phpstan-impure
+   */
+  public static function load($id) {
+    return parent::load($id);
+  }
+
+  /**
+   * {@inheritdoc}
    */
   public function loadVersion(string $version): static {
     $this->sourcePluginCollection = NULL;
