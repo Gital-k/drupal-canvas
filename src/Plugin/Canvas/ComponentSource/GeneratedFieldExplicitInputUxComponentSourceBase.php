@@ -1211,6 +1211,9 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       // corresponding source but may not.
       $prop_value = $client_model['resolved'][$prop] ?? NULL;
       $is_static_prop_source = str_starts_with($prop_source['sourceType'] ?? '', PropSource::getTypePrefix(StaticPropSource::class));
+      // Initialized early, so it's defined if an exception is thrown before
+      // PropSource::parse() is reached inside the try block.
+      $source = NULL;
       try {
         // TRICKY: this is always set, *except* in the case of an auto-saved
         // code component that just gained a new prop.
@@ -1343,9 +1346,10 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
         // If this is a required property without a value, we can leave
         // subsequent validation to bubble up any errors.
         // @see \Drupal\canvas\PropExpressions\StructuredData\Evaluator::doEvaluate()
-        if (!$this->isEmptyRequiredMultiCardinalityStaticPropSource($is_required_prop, $source ?? NULL, $prop_source)) {
+        if (!$this->isEmptyRequiredMultiCardinalityStaticPropSource($is_required_prop, $source, $prop_source)) {
           continue;
         }
+        \assert($source instanceof StaticPropSource);
       }
       $props[$prop] = $this->collapse($source, $prop);
     }
