@@ -1453,7 +1453,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
   }
 
   /**
-   * Checks if a prop source is an empty required multi-cardinality static source.
+   * Checks if a prop source is an empty required multi-value static source.
    *
    * @param bool $is_required_prop
    *   Whether the prop is required.
