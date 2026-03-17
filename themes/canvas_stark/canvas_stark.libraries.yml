@@ -1,14 +1,3 @@
 canvas.internal.drupal.ckeditor5:
   js:
     js/ckeditor5.js: {}
-
-multivalue-autocomplete-popover:
-  css:
-    component:
-      css/multivalue-autocomplete-popover.css: {}
-  js:
-    js/multivalue-autocomplete-popover.js: {}
-  dependencies:
-    - core/drupal
-    - core/once
-

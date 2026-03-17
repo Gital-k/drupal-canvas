@@ -3,16 +3,12 @@ import clsx from 'clsx';
 import { ArrowRightIcon, Cross2Icon, TrashIcon } from '@radix-ui/react-icons';
 import { Box, Button, Flex, Popover, Text } from '@radix-ui/themes';
 
-import TextField from '@/components/form/components/TextField';
-import InputBehaviors from '@/components/form/inputBehaviors';
+import DrupalInput from "@/components/form/components/drupal/DrupalInput";
 import { a2p } from '@/local_packages/utils';
 
 import type { Attributes } from '@/types/DrupalAttribute';
 
 import styles from './DrupalInputMultivalueForm.module.css';
-
-// Create the wrapped TextField component with InputBehaviors HOC.
-const TextFieldWithBehaviors = InputBehaviors(TextField);
 
 /**
  * DrupalInputMultivalueForm component for inputs within multivalue widgets.
@@ -52,6 +48,10 @@ const DrupalInputMultivalueForm = ({
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   // Ref for the popover input to focus it when opening.
   const popoverInputRef = useRef<HTMLInputElement | null>(null);
+  // Ref for the container wrapping the popover's DrupalInput, used to observe
+  // autocomplete selection attribute changes on nested inputs.
+  const popoverContainerRef = useRef<HTMLDivElement | null>(null);
+
 
   // Sync displayValue with attributes.value when it changes (e.g., after AJAX updates)
   useEffect(() => {
@@ -60,41 +60,48 @@ const DrupalInputMultivalueForm = ({
     setTempValue(newValue as string);
   }, [attributes.value, attributes.defaultValue]);
 
-  // Handle temporary input changes in popover (not committed until Enter).
-  const handleTempInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setTempValue(e.target.value);
-  };
-
-  // Commit the temporary value to the actual input and display.
-  const handleCommitValue = () => {
-    const newValue = tempValue;
-    setDisplayValue(newValue);
-
-    // Update the hidden real input field to keep it in sync.
-    if (inputWrapperRef.current) {
-      const realInput = inputWrapperRef.current.querySelector(
-        'input',
-      ) as HTMLInputElement | null;
-      if (realInput && realInput.value !== newValue) {
-        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-          HTMLInputElement.prototype,
-          'value',
-        )?.set;
-        nativeInputValueSetter?.call(realInput, newValue);
-        // Trigger both input and change events so React and Drupal handlers are notified.
-        const inputEvent = new Event('input', { bubbles: true });
-        const changeEvent = new Event('change', { bubbles: true });
-        realInput.dispatchEvent(inputEvent);
-        realInput.dispatchEvent(changeEvent);
-      }
+  // Sync the hidden real input with a new value and trigger change events so
+  // React (InputBehaviors) and Drupal form handlers are notified.
+  const syncRealInput = (newValue: string) => {
+    if (!inputWrapperRef.current) return;
+    const realInput = inputWrapperRef.current.querySelector(
+      'input',
+    ) as HTMLInputElement | null;
+    if (realInput && realInput.value !== newValue) {
+      const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        'value',
+      )?.set;
+      nativeInputValueSetter?.call(realInput, newValue);
+      realInput.dispatchEvent(new Event('input', { bubbles: true }));
+      realInput.dispatchEvent(new Event('change', { bubbles: true }));
     }
   };
 
-  // Handle Enter key press in popover input.
+  // Handle input changes in popover — update display and sync in real-time.
+  // For autocomplete fields: data-canvas-no-update is present while the user
+  // is typing a search term and absent once a suggestion is selected.
+  // When absent on an autocomplete input we also close the popover.
+  const handleTempInputChange = (e: React.ChangeEvent<HTMLInputElement> | Event) => {
+    const target = e.target as HTMLInputElement;
+    const newValue = target.value;
+
+    // Always update display and sync the real input in real-time.
+    setTempValue(newValue);
+    setDisplayValue(newValue);
+    syncRealInput(newValue);
+
+    // Close popover on autocomplete selection (data-canvas-no-update absent)
+    const isAutocompleteInput = target.classList.contains('form-autocomplete');
+    if (isAutocompleteInput && !target.hasAttribute('data-canvas-no-update')) {
+      setTimeout(() => setPopoverOpen(false), 0);
+    }
+  };
+
+  // Handle Enter key press in popover input — just close, value is already live.
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      handleCommitValue();
       setPopoverOpen(false);
     }
   };
@@ -105,16 +112,24 @@ const DrupalInputMultivalueForm = ({
     if (open) {
       // When opening, set tempValue to current displayValue.
       setTempValue(displayValue);
-      // Focus the input field in the popover.
+      // Focus the input field in the popover. Find it inside the container
+      // since TextFieldAutocomplete does not forward the ref from attributes.
+      // Also re-attach Drupal behaviors so that entity_autocomplete (jQuery UI
+      // autocomplete) is initialized on the input that just appeared inside the
+      // Radix UI portal — it was never seen by Drupal.behaviors.autocomplete
+      // during the initial page load.
       setTimeout(() => {
-        if (popoverInputRef.current) {
-          popoverInputRef.current.focus();
-          popoverInputRef.current.select();
+        if (popoverContainerRef.current) {
+          window.Drupal?.attachBehaviors(popoverContainerRef.current);
+        }
+        const input = popoverContainerRef.current?.querySelector('input') as HTMLInputElement | null;
+        if (input) {
+          popoverInputRef.current = input;
+          input.focus();
+          input.select();
         }
       }, 0);
     } else {
-      // When closing, revert tempValue to displayValue (discards uncommitted changes).
-      setTempValue(displayValue);
       // Restore focus to the trigger button after closing.
       setTimeout(() => {
         if (triggerRef.current) {
@@ -182,7 +197,7 @@ const DrupalInputMultivalueForm = ({
         style={{ position: 'absolute', left: '-9999px' }}
         aria-hidden="true"
       >
-        <TextFieldWithBehaviors
+        <DrupalInput
           {...(attributes.class ? { className: clsx(attributes.class) } : {})}
           {...{
             attributes: {
@@ -239,22 +254,19 @@ const DrupalInputMultivalueForm = ({
           </Flex>
 
           {/* Input Field - Visual duplicate for popover editing */}
-          <Box>
-            <TextField
+          <Box ref={popoverContainerRef}>
+            <DrupalInput
               {...(attributes.class
                 ? { className: clsx(attributes.class) }
                 : {})}
-              {...{
-                attributes: {
-                  value: tempValue,
-                  onChange: handleTempInputChange,
-                  onKeyDown: handleKeyDown,
-                  type: 'text',
-                  placeholder: attributes.placeholder,
-                  ref: (el: HTMLInputElement | null) => {
-                    popoverInputRef.current = el;
-                  },
-                },
+              attributes={{
+                ...attributes,
+                // data-drupal-uncontrolled prevents InputBehaviors from
+                // overriding value/onChange so we can manage temp state here.
+                'data-drupal-uncontrolled': '',
+                value: tempValue,
+                onChange: handleTempInputChange,
+                onKeyDown: handleKeyDown,
               }}
             />
           </Box>
@@ -273,3 +285,4 @@ const DrupalInputMultivalueForm = ({
 };
 
 export default DrupalInputMultivalueForm;
+

@@ -1,0 +1,38 @@
+.link-list-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.link-section-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.link-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.link-list-link {
+  display: inline-block;
+  padding: 6px 10px;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  color: #2c7be5;
+  background: #f4f7fb;
+  border: 1px solid #d9e2ec;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.link-list-link:hover {
+  background: #2c7be5;
+  color: #ffffff;
+}
