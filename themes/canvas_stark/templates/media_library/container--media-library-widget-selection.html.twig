@@ -12,8 +12,11 @@
  * - children: The rendered child elements of the container.
  * - has_parent: A flag to indicate that the container has one or more parent
      containers.
+ * - is_multivalue_media_form: Boolean. TRUE for unlimited-cardinality media
+ *   fields. When TRUE the React component handles sorting.
  *
  * @see template_preprocess_container()
+ * @see themes/canvas_stark/canvas_stark.theme
  *
  * @ingroup themeable
  */
@@ -25,6 +28,12 @@
   'media-library-selection',
 ]
 %}
-<div{{ attributes.addClass(classes) }} data-canvas-media-library-selection='true'>
-  {{ children }}
-</div>
+{% if is_multivalue_media_form %}
+  <drupal-canvas-media-library-multivalue-widget>
+    {{ children }}
+  </drupal-canvas-media-library-multivalue-widget>
+{% else %}
+  <div{{ attributes.addClass(classes) }} data-canvas-media-library-selection='true'>
+    {{ children }}
+  </div>
+{% endif %}

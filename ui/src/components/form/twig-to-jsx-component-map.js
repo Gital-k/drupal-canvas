@@ -11,6 +11,7 @@ import DrupalFormElement from '@/components/form/components/drupal/DrupalFormEle
 import DrupalFormElementLabel from '@/components/form/components/drupal/DrupalFormElementLabel';
 import DrupalInput from '@/components/form/components/drupal/DrupalInput';
 import DrupalInputMultivalueForm from '@/components/form/components/drupal/DrupalInputMultivalueForm';
+import DrupalMediaLibraryMultivalueWidget from '@/components/form/components/drupal/DrupalMediaLibraryMultivalueWidget';
 import DrupalPathWidget from '@/components/form/components/drupal/DrupalPathWidget';
 import { DrupalRadioGroup } from '@/components/form/components/drupal/DrupalRadio';
 import DrupalSelect from '@/components/form/components/drupal/DrupalSelect';
@@ -43,6 +44,8 @@ const twigToJSXComponentMap = {
   'drupal-canvas-vertical-tabs': DrupalVerticalTabs,
   'drupal-canvas-container--media-library-widget':
     DrupalMediaLibraryWidgetContainer,
+  'drupal-canvas-media-library-multivalue-widget':
+    DrupalMediaLibraryMultivalueWidget,
   'canvas-text': CanvasText,
   'canvas-box': CanvasBox,
   'canvas-description': InputDescription,

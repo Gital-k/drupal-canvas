@@ -242,6 +242,15 @@ function canvas_stark_preprocess_fieldset__media_library_widget(array &$variable
   if (isset($variables['element']['#component_prop_name'])) {
     $variables['component_prop_name'] = $variables['element']['#component_prop_name'];
   }
+
+  $variables['attributes']['data-canvas-media-library-fieldset'] = 'true';
+
+  if (!empty($variables['element']['#is_multivalue_media_form'])) {
+    $variables['is_multivalue_media_form'] = TRUE;
+    $variables['attributes']['class'][] = 'canvas-multivalue-media';
+    $variables['attributes']['data-canvas-media-multivalue'] = 'true';
+    $variables['#attached']['library'][] = 'canvas/multivalue-media-form';
+  }
 }
 
 function canvas_stark_preprocess_fieldset(array &$variables): void {
@@ -253,5 +262,20 @@ function canvas_stark_preprocess_fieldset(array &$variables): void {
 function canvas_stark_preprocess_datetime_wrapper(array &$variables): void {
   if (isset($variables['element']['#prop_link_data'])) {
     $variables['prop_link_data'] = Json::encode($variables['element']['#prop_link_data']);
+  }
+}
+
+/**
+ * Implements hook_preprocess_container().
+ *
+ * Exposes is_multivalue_media_form to the
+ * container--media-library-widget-selection template so it can render the
+ * React-driven sortable wrapper for unlimited-cardinality media fields.
+ *
+ * @see themes/canvas_stark/templates/media_library/container--media-library-widget-selection.html.twig
+ */
+function canvas_stark_preprocess_container(array &$variables): void {
+  if (!empty($variables['element']['#is_multivalue_media_form'])) {
+    $variables['is_multivalue_media_form'] = TRUE;
   }
 }

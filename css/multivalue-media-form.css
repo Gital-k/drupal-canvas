@@ -1,0 +1,22 @@
+/* Multivalue Media Form Styles */
+.canvas-multivalue-media [data-canvas-media-library-fieldset-wrapper] [data-canvas-media-library-selection] {
+  flex-direction: column;
+}
+
+.canvas-multivalue-media [data-canvas-media-library-fieldset-wrapper] [data-canvas-media-library-selection] > * {
+  width: 100%;
+}
+
+.canvas-multivalue-media [data-canvas-media-library-fieldset-wrapper] [data-canvas-media-library-selection] [data-media-library-item-delta] {
+  position: static;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.canvas-multivalue-media [data-canvas-media-library-fieldset-wrapper] [data-canvas-media-library-selection] [data-media-library-item-delta] [data-canvas-media-remove-button] {
+  position: static;
+  top: auto;
+  right: auto;
+  flex-shrink: 0;
+}
