@@ -575,9 +575,14 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
           // In other words: let a prop source being emptier than it portrays
           // result in the appropriate validation errors at the component level.
           // @see \Drupal\canvas\PropSource\StaticPropSource::withValue(allow_empty: TRUE)
-          // @todo Expand to support multiple-cardinality.
-          unset($inputValues[$component_prop_name]);
-          continue;
+          $cardinality = $raw_prop_source['sourceTypeSettings']['cardinality'] ?? NULL;
+          $filtered_source = StaticPropSource::parse($raw_prop_source)->withoutEmptyItems();
+          // If single cardinality or multiple cardinality with no valid items
+          if ($cardinality === NULL || $filtered_source->getValue() === []) {
+            unset($inputValues[$component_prop_name]);
+            continue;
+          }
+          $inputValues[$component_prop_name] = $filtered_source->toArray();
         }
         catch (\LogicException $e) {
           $violations->add(new ConstraintViolation(

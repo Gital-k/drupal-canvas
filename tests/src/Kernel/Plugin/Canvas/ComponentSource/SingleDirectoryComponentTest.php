@@ -5934,6 +5934,44 @@ HTML
     ];
   }
 
+  /**
+   * Tests that validateComponentInput() keeps non-empty items for multi-cardinality props.
+   *
+   * When a multiple-cardinality static prop source contains a mix of valid and
+   * empty items (as happens during "mid-input" preview/auto-save), the empty
+   * items should be filtered out, and the remaining valid items should be
+   * retained for validation — rather than discarding the entire prop.
+   *
+   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::validateComponentInput()
+   */
+  public function testValidateComponentInputFiltersEmptyItemsForMultiCardinalityProps(): void {
+    $this->generateComponentConfig();
+    $component = Component::load('sdc.canvas_test_sdc.sparkline');
+    $this->assertInstanceOf(Component::class, $component);
+
+    $source = $component->getComponentSource();
+    $uuid = 'test-uuid-multi-cardinality';
+    $input_with_empty_item_mixed_in = [
+      'data' => [
+        'sourceType' => 'static:field_item:integer',
+        // The empty item (NULL) should be filtered out, while the valid items
+        // [10, 20] satisfy the required `data` prop and produce 0 violations.
+        'value' => [10, NULL, 20],
+        'expression' => 'ℹ︎integer␟value',
+        'sourceTypeSettings' => [
+          'cardinality' => 100,
+          'instance' => ['min' => -100, 'max' => 100],
+        ],
+      ],
+    ];
+
+    $this->assertCount(
+      0,
+      $source->validateComponentInput($input_with_empty_item_mixed_in, $uuid, NULL),
+      'A required multi-cardinality prop with some empty items mixed in with valid ones should pass validation after the empty items are filtered out.'
+    );
+  }
+
   public function alter(ContainerBuilder $container): void {
     // Swap in the broken version of this class.
     // @see ::triggerBrokenComponent()
