@@ -21,7 +21,10 @@ import {
   SidebarTrigger,
 } from '@wb/components/ui/sidebar';
 import { fetchDiscoveryResult } from '@wb/lib/discovery-client';
-import { fetchPreviewManifest } from '@wb/lib/preview-client';
+import {
+  fetchPreviewManifest,
+  fetchPreviewPageSpec,
+} from '@wb/lib/preview-client';
 import { isPreviewFrameEvent } from '@wb/lib/preview-contract';
 
 import type { Spec } from '@json-render/core';
@@ -149,7 +152,7 @@ export function App() {
     }
 
     return [...previewManifest.components].sort((componentA, componentB) =>
-      componentA.name.localeCompare(componentB.name),
+      componentA.label.localeCompare(componentB.label),
     );
   }, [previewManifest]);
 
@@ -206,7 +209,7 @@ export function App() {
       },
       ...selectedComponent.mocks.map((mock, index) => ({
         id: mock.id,
-        label: `Mock ${index + 1}`,
+        label: mock.label,
         mockIndex: index,
         source: 'mock' as const,
         mock,
@@ -490,8 +493,8 @@ export function App() {
       };
       setFrameStatus(
         selectedComponentMock
-          ? `Rendering mock ${selectedComponentMock.label} for ${selectedComponent.name}...`
-          : `Rendering component ${selectedComponent.name}...`,
+          ? `Rendering mock ${selectedComponentMock.label} for ${selectedComponent.label}...`
+          : `Rendering component ${selectedComponent.label}...`,
       );
       frameWindow.postMessage(message, window.location.origin);
       return;
@@ -501,15 +504,13 @@ export function App() {
       setFrameStatus(`Rendering page ${selectedPage.name}...`);
       void (async () => {
         try {
-          const pageResponse = await fetch(toViteFsUrl(selectedPage.path), {
-            signal: pageSpecAbortController.signal,
-          });
-          if (!pageResponse.ok) {
-            throw new Error(
-              `Failed to load page "${selectedPage.slug}" (${pageResponse.status}).`,
-            );
+          const pageSpec = await fetchPreviewPageSpec(
+            selectedPage.slug,
+            pageSpecAbortController.signal,
+          );
+          if (pageSpecAbortController.signal.aborted) {
+            return;
           }
-          const pageSpec = await pageResponse.json();
           const pageMessage: PreviewRenderRequest = {
             source: 'canvas-workbench-parent',
             type: 'preview:render',
@@ -543,9 +544,6 @@ export function App() {
               ],
             },
           };
-          if (pageSpecAbortController.signal.aborted) {
-            return;
-          }
           frameWindow.postMessage(pageMessage, window.location.origin);
         } catch (pageLoadError: unknown) {
           if (
@@ -590,7 +588,7 @@ export function App() {
       ? 'component'
       : null;
   const selectedName =
-    selectedPage?.name ?? selectedComponent?.name ?? 'No selection';
+    selectedPage?.name ?? selectedComponent?.label ?? 'No selection';
 
   return (
     <SidebarProvider defaultOpen={sidebarDefaultOpen}>
@@ -622,7 +620,7 @@ export function App() {
                         navigate(toComponentRoute(component.id, null));
                       }}
                     >
-                      <span>{component.name}</span>
+                      <span>{component.label}</span>
                       {!component.previewable ? (
                         <Badge variant="destructive">No preview</Badge>
                       ) : null}

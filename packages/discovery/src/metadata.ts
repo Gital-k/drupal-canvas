@@ -94,7 +94,7 @@ function validateRawMetadata(
  * Loads and parses component metadata from YAML files for all discovered
  * components.
  *
- * @param discoveryResult - Discovery result from `discoverCodeComponents()`
+ * @param discoveryResult - Discovery result from `discoverCanvasProject()`
  * @returns Array of parsed component metadata
  */
 export async function loadComponentsMetadata(

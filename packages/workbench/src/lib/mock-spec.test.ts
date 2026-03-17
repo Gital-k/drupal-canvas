@@ -1,82 +1,359 @@
 import { describe, expect, it } from 'vitest';
 
-import { validateMockSpecArray } from './mock-spec';
+import {
+  normalizeMockSpecEntry,
+  parseMockSpecArray,
+  parseMockSpecMetadataArray,
+  validateMockSpecArray,
+} from './mock-spec';
 
 describe('mock-spec', () => {
-  it('parses valid mock spec arrays', () => {
-    const result = validateMockSpecArray(
+  it('normalizes props-format mock entries with an inferred component name', () => {
+    const result = parseMockSpecArray(
       [
         {
-          root: 'root',
+          name: 'Centered',
+          props: {
+            text: 'Hello world',
+          },
+        },
+      ],
+      '/tmp/components/heading/mocks.json',
+      {
+        componentName: 'heading',
+        componentNames: ['heading'],
+      },
+    );
+
+    expect(result.issues).toEqual([]);
+    expect(result.mocks).toHaveLength(1);
+    expect(result.mocks[0]).toEqual({
+      name: 'Centered',
+      spec: {
+        root: 'canvas:mock-root',
+        elements: {
+          'canvas:mock-root': {
+            type: 'heading',
+            props: {
+              text: 'Hello world',
+            },
+          },
+        },
+      },
+    });
+  });
+
+  it('merges shorthand mock props with component example props', () => {
+    const result = parseMockSpecArray(
+      [
+        {
+          name: 'Light',
+          props: {
+            darkVariant: false,
+          },
+        },
+      ],
+      '/tmp/components/hero/mocks.json',
+      {
+        componentName: 'hero',
+        componentNames: ['hero'],
+        componentExampleProps: {
+          title: 'Example title',
+          backgroundColor: 'crust',
+          darkVariant: true,
+        },
+      },
+    );
+
+    expect(result.issues).toEqual([]);
+    expect(result.mocks[0].spec.elements['canvas:mock-root']).toEqual({
+      type: 'hero',
+      props: {
+        title: 'Example title',
+        backgroundColor: 'crust',
+        darkVariant: false,
+      },
+    });
+  });
+
+  it('normalizes props-and-slots mock entries into a synthetic root element', () => {
+    const result = parseMockSpecArray(
+      [
+        {
+          name: 'Featured',
+          props: {
+            featured: true,
+          },
+          slots: {
+            header: ['card-header'],
+          },
           elements: {
-            root: {
-              type: 'js.card',
-              props: {},
+            'card-header': {
+              type: 'heading',
+              props: {
+                text: 'Featured article',
+              },
             },
           },
         },
       ],
-      '/tmp/components/card/mocks.json',
+      '/tmp/components/card/card.mocks.json',
+      {
+        componentName: 'card',
+        componentNames: ['card', 'heading'],
+      },
     );
 
-    expect(result.specs).toHaveLength(1);
-    expect(result.warnings).toEqual([]);
+    expect(result.issues).toEqual([]);
+    expect(result.mocks[0].spec).toEqual({
+      root: 'canvas:mock-root',
+      elements: {
+        'canvas:mock-root': {
+          type: 'card',
+          props: {
+            featured: true,
+          },
+          slots: {
+            header: ['card-header'],
+          },
+        },
+        'card-header': {
+          type: 'heading',
+          props: {
+            text: 'Featured article',
+          },
+        },
+      },
+    });
   });
 
-  it('returns warning for non-array files', () => {
-    const result = validateMockSpecArray(
-      {
-        root: 'root',
-        elements: {},
+  it('preserves advanced-format mock entries', () => {
+    const normalized = normalizeMockSpecEntry({
+      name: 'In grid',
+      root: 'card-grid',
+      elements: {
+        'card-grid': {
+          type: 'grid',
+          slots: {
+            items: ['card-1'],
+          },
+        },
+        'card-1': {
+          type: 'card',
+          props: {
+            featured: true,
+          },
+        },
       },
-      '/tmp/components/card/mocks.json',
+    });
+
+    expect(normalized).toEqual({
+      name: 'In grid',
+      spec: {
+        root: 'card-grid',
+        elements: {
+          'card-grid': {
+            type: 'grid',
+            slots: {
+              items: ['card-1'],
+            },
+          },
+          'card-1': {
+            type: 'card',
+            props: {
+              featured: true,
+            },
+          },
+        },
+      },
+    });
+  });
+
+  it('merges example props into inferred component elements in advanced format', () => {
+    const normalized = normalizeMockSpecEntry(
+      {
+        name: 'In section',
+        root: 'pricing-table-in-section',
+        elements: {
+          'pricing-table-in-section': {
+            type: 'section',
+            props: {
+              backgroundColor: 'base',
+            },
+            slots: {
+              content: ['pricing-table-default'],
+            },
+          },
+          'pricing-table-default': {
+            type: 'pricing-table',
+            props: {},
+          },
+        },
+      },
+      {
+        componentName: 'pricing-table',
+        componentExampleProps: {
+          entryTierName: 'Starter',
+          buttonLabel: 'Choose {tier}',
+        },
+      },
     );
 
+    expect(normalized.spec.elements['pricing-table-default']).toEqual({
+      type: 'pricing-table',
+      props: {
+        entryTierName: 'Starter',
+        buttonLabel: 'Choose {tier}',
+      },
+    });
+    expect(normalized.spec.elements['pricing-table-in-section']).toEqual({
+      type: 'section',
+      props: {
+        backgroundColor: 'base',
+      },
+      slots: {
+        content: ['pricing-table-default'],
+      },
+    });
+  });
+
+  it('returns a warning for non-array files', () => {
+    const result = validateMockSpecArray(
+      {
+        name: 'Centered',
+        props: {},
+      },
+      '/tmp/components/heading/mocks.json',
+    );
+
+    expect(result.mocks).toEqual([]);
     expect(result.specs).toEqual([]);
     expect(result.warnings).toEqual([
       {
         code: 'invalid_mock_spec_array',
         message:
-          'Mock file must contain an array of json-render specs: /tmp/components/card/mocks.json',
-        path: '/tmp/components/card/mocks.json',
+          'Mock file must contain an array of component mock entries: /tmp/components/heading/mocks.json',
+        path: '/tmp/components/heading/mocks.json',
       },
     ]);
   });
 
-  it('warns and skips invalid entries in mixed arrays', () => {
-    const result = validateMockSpecArray(
+  it('extracts mock names for discovery metadata', () => {
+    const result = parseMockSpecMetadataArray(
+      [
+        { name: 'Centered', props: {} },
+        {
+          name: 'Featured',
+          root: 'card',
+          elements: { card: { type: 'card' } },
+        },
+      ],
+      '/tmp/components/card/card.mocks.json',
+    );
+
+    expect(result.issues).toEqual([]);
+    expect(result.mocks).toEqual([{ name: 'Centered' }, { name: 'Featured' }]);
+  });
+
+  it('rejects shorthand entries without an inferred component name', () => {
+    const result = parseMockSpecArray(
       [
         {
-          root: 'root',
+          name: 'Centered',
+          props: {
+            text: 'Hello world',
+          },
+        },
+      ],
+      '/tmp/components/heading/mocks.json',
+    );
+
+    expect(result.mocks).toEqual([]);
+    expect(result.issues).toHaveLength(1);
+    expect(result.issues[0].message).toContain(
+      'Shorthand mock entries require an inferred component name.',
+    );
+  });
+
+  it('rejects entries that do not match a supported authored format', () => {
+    const result = parseMockSpecArray(
+      [
+        {
+          name: 'Broken',
+          slots: {
+            header: ['card-header'],
+          },
+        },
+      ],
+      '/tmp/components/card/card.mocks.json',
+      {
+        componentName: 'card',
+      },
+    );
+
+    expect(result.mocks).toEqual([]);
+    expect(result.issues).toHaveLength(1);
+    expect(result.issues[0].message).toContain('Expected one of these shapes');
+  });
+
+  it('keeps props-and-slots entries even when slot references are unresolved', () => {
+    const result = parseMockSpecArray(
+      [
+        {
+          name: 'Broken',
+          props: {
+            featured: true,
+          },
+          slots: {
+            header: ['missing-header'],
+          },
           elements: {
-            root: {
-              type: 'js.card',
+            'card-footer': {
+              type: 'button',
             },
           },
         },
-        {
-          root: 5,
-          elements: {},
-        },
       ],
-      '/tmp/components/card/mocks.json',
+      '/tmp/components/card/card.mocks.json',
+      {
+        componentName: 'card',
+        componentNames: ['card', 'button'],
+      },
     );
 
-    expect(result.specs).toHaveLength(1);
-    expect(result.warnings).toEqual([
-      {
-        code: 'invalid_mock_spec_entry',
-        message:
-          'Mock spec entry at index 1 is invalid in /tmp/components/card/mocks.json.',
-        path: '/tmp/components/card/mocks.json',
-      },
-    ]);
+    expect(result.issues).toEqual([]);
+    expect(result.mocks).toHaveLength(1);
   });
 
-  it('validates mock entries against json-render catalog component types', () => {
-    const result = validateMockSpecArray(
+  it('keeps advanced-format aliases without validating discovered component types', () => {
+    const result = parseMockSpecArray(
       [
         {
+          name: 'Alias check',
+          root: 'pricing',
+          elements: {
+            pricing: {
+              type: 'js.pricing_table',
+              props: {},
+            },
+          },
+        },
+      ],
+      '/tmp/components/pricing-table/mocks.json',
+      {
+        componentNames: ['pricing-table'],
+      },
+    );
+
+    expect(result.issues).toEqual([]);
+    expect(result.mocks).toHaveLength(1);
+  });
+
+  it('keeps unknown advanced-format component types for later render-time handling', () => {
+    const result = parseMockSpecArray(
+      [
+        {
+          name: 'Broken',
           root: 'root',
           elements: {
             root: {
@@ -90,38 +367,51 @@ describe('mock-spec', () => {
       { componentNames: ['card'] },
     );
 
-    expect(result.specs).toEqual([]);
-    expect(result.warnings).toHaveLength(1);
-    expect(result.warnings[0].code).toBe('invalid_mock_spec_entry');
+    expect(result.issues).toEqual([]);
+    expect(result.mocks).toHaveLength(1);
   });
 
-  it('accepts plain and js-prefixed discovered component names', () => {
-    const result = validateMockSpecArray(
+  it('merges example props during advanced-format parsing', () => {
+    const result = parseMockSpecArray(
       [
         {
-          root: 'a',
+          name: 'In section',
+          root: 'pricing-table-in-section',
           elements: {
-            a: {
-              type: 'pricing-table',
-              props: {},
+            'pricing-table-in-section': {
+              type: 'section',
+              props: {
+                backgroundColor: 'base',
+              },
+              slots: {
+                content: ['pricing-table-default'],
+              },
             },
-          },
-        },
-        {
-          root: 'b',
-          elements: {
-            b: {
-              type: 'js.pricing_table',
+            'pricing-table-default': {
+              type: 'pricing-table',
               props: {},
             },
           },
         },
       ],
       '/tmp/components/pricing-table/mocks.json',
-      { componentNames: ['pricing-table'] },
+      {
+        componentName: 'pricing-table',
+        componentNames: ['pricing-table', 'section'],
+        componentExampleProps: {
+          entryTierName: 'Starter',
+          buttonLabel: 'Choose {tier}',
+        },
+      },
     );
 
-    expect(result.specs).toHaveLength(2);
-    expect(result.warnings).toEqual([]);
+    expect(result.issues).toEqual([]);
+    expect(result.mocks[0].spec.elements['pricing-table-default']).toEqual({
+      type: 'pricing-table',
+      props: {
+        entryTierName: 'Starter',
+        buttonLabel: 'Choose {tier}',
+      },
+    });
   });
 });

@@ -1,7 +1,7 @@
 import { promises as fs } from 'node:fs';
 import chalk from 'chalk';
 import * as p from '@clack/prompts';
-import { discoverCodeComponents } from '@drupal-canvas/discovery';
+import { discoverCanvasProject } from '@drupal-canvas/discovery';
 
 import { ensureConfig, getConfig } from '../config';
 import { bundleLocalAliasImports } from '../lib/build-local-import';
@@ -66,7 +66,7 @@ export function buildCommand(program: Command): void {
         // Step 1: Discover all components
         const s1 = p.spinner();
         s1.start('Discovering components');
-        const discoveryResult = await discoverCodeComponents({
+        const discoveryResult = await discoverCanvasProject({
           scanRoot: componentDir,
         });
         const { components, warnings } = discoveryResult;

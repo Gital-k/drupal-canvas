@@ -13,6 +13,7 @@ export type PreviewIneligibilityReason =
 export interface PreviewManifestComponent {
   id: string;
   name: string;
+  label: string;
   relativeDirectory: string;
   metadataPath: string;
   js: {
@@ -108,6 +109,7 @@ export function toPreviewManifestComponent(component: {
     return {
       id: component.id,
       name: component.name,
+      label: component.name,
       relativeDirectory: component.relativeDirectory,
       metadataPath: component.metadataPath,
       js: {
@@ -129,6 +131,7 @@ export function toPreviewManifestComponent(component: {
     return {
       id: component.id,
       name: component.name,
+      label: component.name,
       relativeDirectory: component.relativeDirectory,
       metadataPath: component.metadataPath,
       js: {
@@ -149,6 +152,7 @@ export function toPreviewManifestComponent(component: {
   return {
     id: component.id,
     name: component.name,
+    label: component.name,
     relativeDirectory: component.relativeDirectory,
     metadataPath: component.metadataPath,
     js: {

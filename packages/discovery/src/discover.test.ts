@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { discoverCodeComponents } from './discover';
+import { discoverCanvasProject } from './discover';
 
 async function makeTempDir(): Promise<string> {
   return fs.mkdtemp(path.join(os.tmpdir(), 'canvas-discovery-'));
@@ -23,7 +23,7 @@ afterEach(async () => {
   tempDirs.length = 0;
 });
 
-describe('discoverCodeComponents', () => {
+describe('discoverCanvasProject', () => {
   it('discovers top-level pages/*.json files and excludes nested page files', async () => {
     const root = await makeTempDir();
     tempDirs.push(root);
@@ -35,7 +35,7 @@ describe('discoverCodeComponents', () => {
       '{"root":"ignored"}',
     );
 
-    const result = await discoverCodeComponents({ scanRoot: root });
+    const result = await discoverCanvasProject({ scanRoot: root });
 
     expect(result.pages).toHaveLength(2);
     expect(result.pages.map((page) => page.slug)).toEqual(['about-us', 'home']);
@@ -57,7 +57,7 @@ describe('discoverCodeComponents', () => {
       'export default function Card() { return null; }',
     );
 
-    const result = await discoverCodeComponents({ scanRoot: root });
+    const result = await discoverCanvasProject({ scanRoot: root });
 
     expect(result.components).toHaveLength(1);
     expect(result.pages).toHaveLength(1);
@@ -82,7 +82,7 @@ describe('discoverCodeComponents', () => {
     await writeFile(path.join(root, 'src/hero/hero.ts'), 'export default {};');
     await writeFile(path.join(root, 'src/hero/hero.css'), '.hero {}');
 
-    const result = await discoverCodeComponents({ scanRoot: root });
+    const result = await discoverCanvasProject({ scanRoot: root });
 
     expect(result.components).toHaveLength(2);
 
@@ -118,7 +118,7 @@ describe('discoverCodeComponents', () => {
       'name: Broken',
     );
 
-    const result = await discoverCodeComponents({ scanRoot: root });
+    const result = await discoverCanvasProject({ scanRoot: root });
 
     expect(result.components).toHaveLength(0);
     expect(
@@ -139,7 +139,7 @@ describe('discoverCodeComponents', () => {
       'export default {};',
     );
 
-    const result = await discoverCodeComponents({ scanRoot: root });
+    const result = await discoverCanvasProject({ scanRoot: root });
 
     expect(result.components).toHaveLength(1);
     expect(result.components[0].cssEntryPath).toBeNull();
@@ -165,7 +165,7 @@ describe('discoverCodeComponents', () => {
       'export default function Navigation() { return null; }',
     );
 
-    const result = await discoverCodeComponents({ scanRoot: root });
+    const result = await discoverCanvasProject({ scanRoot: root });
 
     expect(result.components).toHaveLength(1);
     expect(result.components[0].name).toBe('navigation');
@@ -192,7 +192,7 @@ describe('discoverCodeComponents', () => {
       'export default {};',
     );
 
-    const result = await discoverCodeComponents({ scanRoot: root });
+    const result = await discoverCanvasProject({ scanRoot: root });
 
     expect(result.components).toHaveLength(1);
     expect(result.components[0].kind).toBe('named');
@@ -230,7 +230,7 @@ describe('discoverCodeComponents', () => {
     await writeFile(path.join(root, 'src/ok/component.yml'), 'name: Ok');
     await writeFile(path.join(root, 'src/ok/index.ts'), 'export default {};');
 
-    const result = await discoverCodeComponents({ scanRoot: root });
+    const result = await discoverCanvasProject({ scanRoot: root });
 
     expect(result.components).toHaveLength(1);
     expect(result.components[0].name).toBe('ok');
@@ -245,7 +245,7 @@ describe('discoverCodeComponents', () => {
     await writeFile(path.join(root, 'src/dup/index.js'), 'export default {};');
     await writeFile(path.join(root, 'src/dup/index.ts'), 'export default {};');
 
-    const result = await discoverCodeComponents({ scanRoot: root });
+    const result = await discoverCanvasProject({ scanRoot: root });
 
     expect(result.components).toHaveLength(1);
     expect(
@@ -279,7 +279,7 @@ describe('discoverCodeComponents', () => {
       'export default {};',
     );
 
-    const result = await discoverCodeComponents({ scanRoot: root });
+    const result = await discoverCanvasProject({ scanRoot: root });
 
     expect(result.components).toHaveLength(2);
     expect(
