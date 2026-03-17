@@ -110,7 +110,7 @@ async function getCandidatePageFiles(scanRoot: string): Promise<string[]> {
  * Returns discovered components sorted by metadata path, along with warnings and
  * scan stats (`scannedFiles` and `ignoredFiles`).
  */
-export async function discoverCodeComponents(
+export async function discoverCanvasProject(
   options: DiscoveryOptions = {},
 ): Promise<DiscoveryResult> {
   const scanRoot = path.resolve(options.scanRoot ?? process.cwd());
@@ -276,3 +276,6 @@ export async function discoverCodeComponents(
 
   return result;
 }
+
+/** @deprecated Use `discoverCanvasProject()` instead. */
+export const discoverCodeComponents = discoverCanvasProject;

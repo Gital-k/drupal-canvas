@@ -7,6 +7,7 @@ import {
   drupalCanvasCompat,
   drupalCanvasCompatServer,
   ensureHostGlobalCssExists,
+  extractComponentPreviewMetadataFromComponentYaml,
   extractFirstExamplePropsFromComponentYaml,
   getWorkbenchHostGlobalCssVirtualUrl,
   isSupportedPreviewModulePath,
@@ -114,6 +115,33 @@ describe('vite-compat', () => {
     );
     const resolved = resolveHostGlobalCssPath(root);
     expect(resolved).toBe(path.join(root, 'app/components/global.css'));
+  });
+
+  it('extracts component labels and example props from component metadata', async () => {
+    const root = await makeTempDir();
+    const metadataPath = path.join(root, 'component.yml');
+    await fs.writeFile(
+      metadataPath,
+      [
+        'name: Hero',
+        'props:',
+        '  properties:',
+        '    title:',
+        '      type: string',
+        '      examples:',
+        '        - Hello',
+      ].join('\n'),
+      'utf-8',
+    );
+
+    const result =
+      await extractComponentPreviewMetadataFromComponentYaml(metadataPath);
+    expect(result).toEqual({
+      label: 'Hero',
+      exampleProps: {
+        title: 'Hello',
+      },
+    });
   });
 
   it('validates host global css existence', async () => {
