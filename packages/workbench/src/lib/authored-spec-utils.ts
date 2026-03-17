@@ -230,10 +230,6 @@ function toComponentId(componentName: string): string {
   return `js.${componentName}`;
 }
 
-function toUnderscoreComponentId(componentName: string): string {
-  return `js.${componentName.replace(/-/g, '_')}`;
-}
-
 function buildComponentAliasMap(componentNames: string[]): Map<string, string> {
   const aliasMap = new Map<string, string>();
 
@@ -241,7 +237,6 @@ function buildComponentAliasMap(componentNames: string[]): Map<string, string> {
     const canonicalId = toComponentId(componentName);
     aliasMap.set(componentName, canonicalId);
     aliasMap.set(canonicalId, canonicalId);
-    aliasMap.set(toUnderscoreComponentId(componentName), canonicalId);
   }
 
   return aliasMap;

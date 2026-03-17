@@ -325,30 +325,6 @@ describe('mock-spec', () => {
     expect(result.mocks).toHaveLength(1);
   });
 
-  it('keeps advanced-format aliases without validating discovered component types', () => {
-    const result = parseMockSpecArray(
-      [
-        {
-          name: 'Alias check',
-          root: 'pricing',
-          elements: {
-            pricing: {
-              type: 'js.pricing_table',
-              props: {},
-            },
-          },
-        },
-      ],
-      '/tmp/components/pricing-table/mocks.json',
-      {
-        componentNames: ['pricing-table'],
-      },
-    );
-
-    expect(result.issues).toEqual([]);
-    expect(result.mocks).toHaveLength(1);
-  });
-
   it('keeps unknown advanced-format component types for later render-time handling', () => {
     const result = parseMockSpecArray(
       [

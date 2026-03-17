@@ -79,11 +79,7 @@ function isInferredComponentType(
     return false;
   }
 
-  return (
-    value === componentName ||
-    value === `js.${componentName}` ||
-    value === `js.${componentName.replace(/-/g, '_')}`
-  );
+  return value === componentName || value === `js.${componentName}`;
 }
 
 function mergeExamplePropsIntoInferredComponentElements(
