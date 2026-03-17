@@ -492,12 +492,15 @@ class PropExpressionKernelTest extends CanvasKernelTestBase {
    * @legacy-covers \Drupal\canvas\PropExpressions\StructuredData\ReferenceFieldTypePropExpression
    */
   public function testInvalidReferencePropExpressionDueToMismatchedLeafExpressionCardinality(): void {
-    // @phpstan-ignore method.nonObject
-    self::assertSame(1, FieldStorageConfig::load('media.field_media_test')->getCardinality());
-    // @phpstan-ignore method.nonObject
-    self::assertSame(\SAVED_UPDATED, FieldStorageConfig::load("media.field_media_test")->setCardinality(5)->save());
-    // @phpstan-ignore staticMethod.impossibleType
-    self::assertSame(5, FieldStorageConfig::load('media.field_media_test')?->getCardinality());
+    $field_storage = FieldStorageConfig::load('media.field_media_test');
+    \assert($field_storage instanceof FieldStorageConfig);
+    self::assertSame(1, $field_storage->getCardinality());
+    $field_storage->setCardinality(5);
+    self::assertSame(\SAVED_UPDATED, $field_storage->save());
+    // Reload to verify the new cardinality was persisted.
+    $field_storage_reloaded = FieldStorageConfig::load('media.field_media_test');
+    \assert($field_storage_reloaded instanceof FieldStorageConfig);
+    self::assertSame(5, $field_storage_reloaded->getCardinality());
 
     // @phpstan-ignore method.notFound
     self::assertSame(1, EntityDataDefinition::createFromDataType('entity:file')->getPropertyDefinition('uri')?->getCardinality());
