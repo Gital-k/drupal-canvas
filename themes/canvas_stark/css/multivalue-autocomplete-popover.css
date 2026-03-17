@@ -1,0 +1,168 @@
+/**
+ * @file
+ * CSS-only popover styles for multivalue entity_autocomplete inputs.
+ *
+ * This provides a pure CSS approach to showing the real Drupal autocomplete
+ * input inside a popover, preserving all jQuery UI autocomplete behaviors.
+ */
+
+.multivalue-autocomplete-wrapper {
+  position: static;
+  display: inline-flex;
+  align-items: center;
+  width: 100%;
+}
+
+.multivalue-autocomplete-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #11181c;
+  text-align: left;
+}
+
+.multivalue-autocomplete-trigger:hover {
+  background: #E6F4FE;
+}
+
+.multivalue-autocomplete-trigger:focus {
+  outline: none;
+}
+
+.multivalue-autocomplete-preview {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #11181c;
+  font-size: 14px;
+}
+
+.multivalue-autocomplete-preview:empty::before {
+  content: 'Empty';
+  color: #687076;
+}
+
+.multivalue-autocomplete-arrow {
+  flex-shrink: 0;
+  color: #687076;
+  margin-left: 8px;
+}
+
+.multivalue-autocomplete-popover {
+  position: fixed;
+  z-index: 10000;
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 235px;
+  width: 235px;
+  padding: 8px;
+  background-color: white;
+  border: 1px solid #e8e8ec;
+  border-radius: 8px;
+  transform: translateX(-30px);
+}
+.multivalue-autocomplete-wrapper.is-open .multivalue-autocomplete-popover {
+  display: flex;
+}
+
+/* Popover header */
+.multivalue-autocomplete-popover-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0;
+}
+
+.multivalue-autocomplete-popover-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #11181c;
+}
+
+.multivalue-autocomplete-popover-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #687076;
+}
+
+.multivalue-autocomplete-popover-close:hover {
+  background-color: #f4faff;
+  color: #11181c;
+}
+
+.multivalue-autocomplete-popover-close:focus {
+  outline: none;
+}
+
+.multivalue-autocomplete-input-wrapper {
+  position: relative;
+}
+
+.multivalue-autocomplete-input-wrapper input[type="text"] {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 14px;
+  line-height: 20px;
+  border: 1px solid #CDCED6;
+  border-radius: 4px;
+  background: #fff;
+  color: #11181c;
+  box-sizing: border-box;
+}
+
+.multivalue-autocomplete-input-wrapper input[type="text"]:focus {
+  outline: 2px solid #0090FF;
+  outline-offset: -1px;
+  box-shadow: 0 0 0 1px #0090FF;
+}
+
+/* Footer with Remove button */
+.multivalue-autocomplete-popover-footer {
+  display: flex;
+  justify-content: center;
+}
+
+.multivalue-autocomplete-remove-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 400;
+  color: #e5484d;
+}
+
+.multivalue-autocomplete-remove-btn:hover {
+  background: #fff0f0;
+}
+
+.multivalue-autocomplete-remove-btn:focus {
+  outline: none;
+}
+
+.multivalue-autocomplete-remove-btn svg {
+  width: 14px;
+  height: 14px;
+}
+.ui-autocomplete {
+  z-index: 10001 !important;
+}
