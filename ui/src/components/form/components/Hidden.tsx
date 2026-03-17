@@ -1,19 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 
-
-
 import useMutationObserver from '@/hooks/useMutationObserver';
 import { a2p } from '@/local_packages/utils';
 import { VALUE_THAT_MEANS_REMOVE } from '@/utils/function-utils';
 import { isAjaxing } from '@/utils/isAjaxing';
 
-
-
 import type { Attributes } from '@/types/DrupalAttribute';
-
-
-
-
 
 const Hidden = ({ attributes }: { attributes?: Attributes }) => {
   const [value, setValue] = useState(attributes?.value || '');
@@ -35,10 +27,7 @@ const Hidden = ({ attributes }: { attributes?: Attributes }) => {
       const form = ref.current.closest('form');
 
       const fireRemove = () => {
-        if (
-          attributes?.onChange &&
-          typeof attributes.onChange === 'function'
-        ) {
+        if (attributes?.onChange && typeof attributes.onChange === 'function') {
           const event = new Event('change');
           ref.current!.value = VALUE_THAT_MEANS_REMOVE;
           Object.defineProperty(event, 'target', {
