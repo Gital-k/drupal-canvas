@@ -92,6 +92,9 @@ variables:
   # Enable Canvas contributors to change this from `true` to `false` to disable E2E (end-to-end) tests.
   # (Useful when early in an MR and/or developing low-level functionality that is unlikely to affect E2E tests.)
   _CANVAS_E2E_TESTS: true
+  # Enable video recording for Playwright tests (retain-on-failure). Set to any truthy value to enable.
+  # (Useful for debugging test failures in CI. Videos are saved as artifacts only when tests fail.)
+  CANVAS_E2E_VIDEO: "1"
 
 # @todo Remove when https://www.drupal.org/project/gitlab_templates/issues/3452183 lands.
 .is-push-rule: &is-push-rule
