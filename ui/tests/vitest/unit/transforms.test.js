@@ -259,7 +259,6 @@ describe('Transforms - mediaSelection', () => {
       }),
     ).toEqual(['42', '43']);
   });
-
 });
 
 describe('Transforms - dateTime', () => {
