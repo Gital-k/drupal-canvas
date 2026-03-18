@@ -304,6 +304,3 @@ export async function discoverCanvasProject(
 
   return result;
 }
-
-/** @deprecated Use `discoverCanvasProject()` instead. */
-export const discoverCodeComponents = discoverCanvasProject;

@@ -1,4 +1,4 @@
-export { discoverCanvasProject, discoverCodeComponents } from './discover';
+export { discoverCanvasProject } from './discover';
 export { findDuplicateMachineNames, loadComponentsMetadata } from './metadata';
 export type {
   ComponentMetadata,
