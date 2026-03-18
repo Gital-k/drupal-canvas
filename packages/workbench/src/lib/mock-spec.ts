@@ -46,7 +46,7 @@ export interface NormalizedMockSpecEntry {
 }
 
 export interface MockSpecIssue {
-  code: 'invalid_mock_spec_array' | 'invalid_mock_spec_entry';
+  code: 'invalid_mock_spec_file' | 'invalid_mock_spec_entry';
   message: string;
   path: string;
 }
@@ -55,6 +55,97 @@ export interface MockSpecValidationOptions {
   componentName?: string;
   componentNames?: string[];
   componentExampleProps?: Record<string, unknown>;
+}
+
+export interface AuthoredMockSpecFile {
+  $schema?: string;
+  mocks: unknown[];
+}
+
+function toFileIssue(
+  sourcePath: string,
+  message: string,
+  path = sourcePath,
+): MockSpecIssue {
+  return {
+    code: 'invalid_mock_spec_file',
+    message,
+    path,
+  };
+}
+
+function parseMockSpecEntries(
+  value: unknown,
+  sourcePath: string,
+): {
+  entries: unknown[] | null;
+  issues: MockSpecIssue[];
+} {
+  if (Array.isArray(value)) {
+    return {
+      entries: value,
+      issues: [],
+    };
+  }
+
+  if (!isRecord(value)) {
+    return {
+      entries: null,
+      issues: [
+        toFileIssue(
+          sourcePath,
+          `Mock file must contain an object with a mocks array: ${sourcePath}`,
+        ),
+      ],
+    };
+  }
+
+  const issues: MockSpecIssue[] = [];
+  const allowedTopLevelKeys = new Set(['$schema', 'mocks']);
+  const unexpectedTopLevelKeys = Object.keys(value).filter(
+    (key) => !allowedTopLevelKeys.has(key),
+  );
+
+  if (unexpectedTopLevelKeys.length > 0) {
+    issues.push(
+      toFileIssue(
+        sourcePath,
+        `Mock file contains unexpected top-level keys in ${sourcePath}: ${unexpectedTopLevelKeys.join(', ')}.`,
+      ),
+    );
+  }
+
+  if ('$schema' in value && !isNonEmptyString(value.$schema)) {
+    issues.push(
+      toFileIssue(
+        sourcePath,
+        `Mock file must include a non-empty $schema string when provided: ${sourcePath}`,
+        `${sourcePath}#$schema`,
+      ),
+    );
+  }
+
+  if (!Array.isArray(value.mocks)) {
+    issues.push(
+      toFileIssue(
+        sourcePath,
+        `Mock file must include a mocks array: ${sourcePath}`,
+        `${sourcePath}#mocks`,
+      ),
+    );
+  }
+
+  if (issues.length > 0 || !Array.isArray(value.mocks)) {
+    return {
+      entries: null,
+      issues,
+    };
+  }
+
+  return {
+    entries: value.mocks,
+    issues: [],
+  };
 }
 
 function mergeRootPropsWithExampleProps(
@@ -116,23 +207,18 @@ export function parseMockSpecMetadataArray(
   mocks: MockSpecMetadataEntry[];
   issues: MockSpecIssue[];
 } {
-  if (!Array.isArray(value)) {
+  const parsedFile = parseMockSpecEntries(value, sourcePath);
+  if (!parsedFile.entries) {
     return {
       mocks: [],
-      issues: [
-        {
-          code: 'invalid_mock_spec_array',
-          message: `Mock file must contain an array of component mock entries: ${sourcePath}`,
-          path: sourcePath,
-        },
-      ],
+      issues: parsedFile.issues,
     };
   }
 
   const mocks: MockSpecMetadataEntry[] = [];
-  const issues: MockSpecIssue[] = [];
+  const issues: MockSpecIssue[] = [...parsedFile.issues];
 
-  value.forEach((entry, index) => {
+  parsedFile.entries.forEach((entry, index) => {
     if (!isRecord(entry)) {
       issues.push(toIssue(sourcePath, index, 'Expected an object.'));
       return;
@@ -534,23 +620,18 @@ export function parseMockSpecArray(
   mocks: NormalizedMockSpecEntry[];
   issues: MockSpecIssue[];
 } {
-  if (!Array.isArray(value)) {
+  const parsedFile = parseMockSpecEntries(value, sourcePath);
+  if (!parsedFile.entries) {
     return {
       mocks: [],
-      issues: [
-        {
-          code: 'invalid_mock_spec_array',
-          message: `Mock file must contain an array of component mock entries: ${sourcePath}`,
-          path: sourcePath,
-        },
-      ],
+      issues: parsedFile.issues,
     };
   }
 
   const mocks: NormalizedMockSpecEntry[] = [];
-  const issues: MockSpecIssue[] = [];
+  const issues: MockSpecIssue[] = [...parsedFile.issues];
 
-  value.forEach((entry, index) => {
+  parsedFile.entries.forEach((entry, index) => {
     const parsedEntry = parseEntry(entry, sourcePath, index, options);
     issues.push(...parsedEntry.issues);
 

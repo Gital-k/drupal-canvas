@@ -10,14 +10,16 @@ import {
 describe('mock-spec', () => {
   it('normalizes props-format mock entries with an inferred component name', () => {
     const result = parseMockSpecArray(
-      [
-        {
-          name: 'Centered',
-          props: {
-            text: 'Hello world',
+      {
+        mocks: [
+          {
+            name: 'Centered',
+            props: {
+              text: 'Hello world',
+            },
           },
-        },
-      ],
+        ],
+      },
       '/tmp/components/heading/mocks.json',
       {
         componentName: 'heading',
@@ -45,14 +47,16 @@ describe('mock-spec', () => {
 
   it('merges shorthand mock props with component example props', () => {
     const result = parseMockSpecArray(
-      [
-        {
-          name: 'Light',
-          props: {
-            darkVariant: false,
+      {
+        mocks: [
+          {
+            name: 'Light',
+            props: {
+              darkVariant: false,
+            },
           },
-        },
-      ],
+        ],
+      },
       '/tmp/components/hero/mocks.json',
       {
         componentName: 'hero',
@@ -78,25 +82,27 @@ describe('mock-spec', () => {
 
   it('normalizes props-and-slots mock entries into a synthetic root element', () => {
     const result = parseMockSpecArray(
-      [
-        {
-          name: 'Featured',
-          props: {
-            featured: true,
-          },
-          slots: {
-            header: ['card-header'],
-          },
-          elements: {
-            'card-header': {
-              type: 'heading',
-              props: {
-                text: 'Featured article',
+      {
+        mocks: [
+          {
+            name: 'Featured',
+            props: {
+              featured: true,
+            },
+            slots: {
+              header: ['card-header'],
+            },
+            elements: {
+              'card-header': {
+                type: 'heading',
+                props: {
+                  text: 'Featured article',
+                },
               },
             },
           },
-        },
-      ],
+        ],
+      },
       '/tmp/components/card/card.mocks.json',
       {
         componentName: 'card',
@@ -217,11 +223,10 @@ describe('mock-spec', () => {
     });
   });
 
-  it('returns a warning for non-array files', () => {
+  it('returns a warning for files without a mocks array', () => {
     const result = validateMockSpecArray(
       {
-        name: 'Centered',
-        props: {},
+        $schema: 'https://example.com/component-mocks.schema.json',
       },
       '/tmp/components/heading/mocks.json',
     );
@@ -230,24 +235,26 @@ describe('mock-spec', () => {
     expect(result.specs).toEqual([]);
     expect(result.warnings).toEqual([
       {
-        code: 'invalid_mock_spec_array',
+        code: 'invalid_mock_spec_file',
         message:
-          'Mock file must contain an array of component mock entries: /tmp/components/heading/mocks.json',
-        path: '/tmp/components/heading/mocks.json',
+          'Mock file must include a mocks array: /tmp/components/heading/mocks.json',
+        path: '/tmp/components/heading/mocks.json#mocks',
       },
     ]);
   });
 
   it('extracts mock names for discovery metadata', () => {
     const result = parseMockSpecMetadataArray(
-      [
-        { name: 'Centered', props: {} },
-        {
-          name: 'Featured',
-          root: 'card',
-          elements: { card: { type: 'card' } },
-        },
-      ],
+      {
+        mocks: [
+          { name: 'Centered', props: {} },
+          {
+            name: 'Featured',
+            root: 'card',
+            elements: { card: { type: 'card' } },
+          },
+        ],
+      },
       '/tmp/components/card/card.mocks.json',
     );
 
@@ -257,14 +264,16 @@ describe('mock-spec', () => {
 
   it('rejects shorthand entries without an inferred component name', () => {
     const result = parseMockSpecArray(
-      [
-        {
-          name: 'Centered',
-          props: {
-            text: 'Hello world',
+      {
+        mocks: [
+          {
+            name: 'Centered',
+            props: {
+              text: 'Hello world',
+            },
           },
-        },
-      ],
+        ],
+      },
       '/tmp/components/heading/mocks.json',
     );
 
@@ -277,14 +286,16 @@ describe('mock-spec', () => {
 
   it('rejects entries that do not match a supported authored format', () => {
     const result = parseMockSpecArray(
-      [
-        {
-          name: 'Broken',
-          slots: {
-            header: ['card-header'],
+      {
+        mocks: [
+          {
+            name: 'Broken',
+            slots: {
+              header: ['card-header'],
+            },
           },
-        },
-      ],
+        ],
+      },
       '/tmp/components/card/card.mocks.json',
       {
         componentName: 'card',
@@ -298,22 +309,24 @@ describe('mock-spec', () => {
 
   it('keeps props-and-slots entries even when slot references are unresolved', () => {
     const result = parseMockSpecArray(
-      [
-        {
-          name: 'Broken',
-          props: {
-            featured: true,
-          },
-          slots: {
-            header: ['missing-header'],
-          },
-          elements: {
-            'card-footer': {
-              type: 'button',
+      {
+        mocks: [
+          {
+            name: 'Broken',
+            props: {
+              featured: true,
+            },
+            slots: {
+              header: ['missing-header'],
+            },
+            elements: {
+              'card-footer': {
+                type: 'button',
+              },
             },
           },
-        },
-      ],
+        ],
+      },
       '/tmp/components/card/card.mocks.json',
       {
         componentName: 'card',
@@ -327,18 +340,20 @@ describe('mock-spec', () => {
 
   it('keeps unknown advanced-format component types for later render-time handling', () => {
     const result = parseMockSpecArray(
-      [
-        {
-          name: 'Broken',
-          root: 'root',
-          elements: {
-            root: {
-              type: 'unknown-component',
-              props: {},
+      {
+        mocks: [
+          {
+            name: 'Broken',
+            root: 'root',
+            elements: {
+              root: {
+                type: 'unknown-component',
+                props: {},
+              },
             },
           },
-        },
-      ],
+        ],
+      },
       '/tmp/components/card/mocks.json',
       { componentNames: ['card'] },
     );
@@ -349,27 +364,29 @@ describe('mock-spec', () => {
 
   it('merges example props during advanced-format parsing', () => {
     const result = parseMockSpecArray(
-      [
-        {
-          name: 'In section',
-          root: 'pricing-table-in-section',
-          elements: {
-            'pricing-table-in-section': {
-              type: 'section',
-              props: {
-                backgroundColor: 'base',
+      {
+        mocks: [
+          {
+            name: 'In section',
+            root: 'pricing-table-in-section',
+            elements: {
+              'pricing-table-in-section': {
+                type: 'section',
+                props: {
+                  backgroundColor: 'base',
+                },
+                slots: {
+                  content: ['pricing-table-default'],
+                },
               },
-              slots: {
-                content: ['pricing-table-default'],
+              'pricing-table-default': {
+                type: 'pricing-table',
+                props: {},
               },
-            },
-            'pricing-table-default': {
-              type: 'pricing-table',
-              props: {},
             },
           },
-        },
-      ],
+        ],
+      },
       '/tmp/components/pricing-table/mocks.json',
       {
         componentName: 'pricing-table',
@@ -389,5 +406,50 @@ describe('mock-spec', () => {
         buttonLabel: 'Choose {tier}',
       },
     });
+  });
+
+  it('accepts an optional top-level $schema key', () => {
+    const result = parseMockSpecArray(
+      {
+        $schema: 'https://example.com/component-mocks.schema.json',
+        mocks: [
+          {
+            name: 'Centered',
+            props: {
+              text: 'Hello world',
+            },
+          },
+        ],
+      },
+      '/tmp/components/heading/mocks.json',
+      {
+        componentName: 'heading',
+        componentNames: ['heading'],
+      },
+    );
+
+    expect(result.issues).toEqual([]);
+    expect(result.mocks).toHaveLength(1);
+  });
+
+  it('still accepts legacy top-level arrays during the transition', () => {
+    const result = parseMockSpecArray(
+      [
+        {
+          name: 'Centered',
+          props: {
+            text: 'Hello world',
+          },
+        },
+      ],
+      '/tmp/components/heading/mocks.json',
+      {
+        componentName: 'heading',
+        componentNames: ['heading'],
+      },
+    );
+
+    expect(result.issues).toEqual([]);
+    expect(result.mocks).toHaveLength(1);
   });
 });

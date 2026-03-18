@@ -28,14 +28,16 @@ describe('spec-discovery', () => {
 
   it('builds preview manifest mocks from authored mock entries', () => {
     const result = toPreviewManifestComponentMocks(
-      [
-        {
-          name: 'Centered',
-          props: {
-            text: 'Hello world',
+      {
+        mocks: [
+          {
+            name: 'Centered',
+            props: {
+              text: 'Hello world',
+            },
           },
-        },
-      ],
+        ],
+      },
       {
         sourcePath: '/tmp/components/heading/mocks.json',
         scanRoot: '/tmp',

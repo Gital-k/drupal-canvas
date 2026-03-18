@@ -86,6 +86,30 @@ describe('page-spec', () => {
     expect(result.page?.spec.root).toBe('canvas:component-tree');
   });
 
+  it('accepts an optional top-level $schema key', () => {
+    const result = parsePageSpec(
+      {
+        $schema: 'https://example.com/page-spec.schema.json',
+        title: 'Home',
+        elements: {
+          hero: {
+            type: 'js.hero',
+            props: {
+              title: 'Hello world',
+            },
+          },
+        },
+      },
+      '/tmp/pages/home.json',
+      {
+        componentNames: ['hero'],
+      },
+    );
+
+    expect(result.issues).toEqual([]);
+    expect(result.page?.spec.root).toBe('canvas:component-tree');
+  });
+
   it('extracts page titles for discovery metadata', () => {
     const result = parsePageSpecMetadata(
       {
@@ -122,6 +146,26 @@ describe('page-spec', () => {
     expect(result.page).toBeNull();
     expect(result.issues).toHaveLength(1);
     expect(result.issues[0].message).toContain('unexpected top-level keys');
+  });
+
+  it('rejects empty top-level $schema values', () => {
+    const result = parsePageSpec(
+      {
+        $schema: '',
+        title: 'Home',
+        elements: {
+          hero: {
+            type: 'hero',
+          },
+        },
+      },
+      '/tmp/pages/home.json',
+    );
+
+    expect(result.page).toBeNull();
+    expect(result.issues).toHaveLength(1);
+    expect(result.issues[0].path).toBe('/tmp/pages/home.json#$schema');
+    expect(result.issues[0].message).toContain('non-empty $schema string');
   });
 
   it('rejects authored canvas:component-tree elements', () => {

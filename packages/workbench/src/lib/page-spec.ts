@@ -131,7 +131,7 @@ export function parsePageSpec(
   }
 
   const issues: PageSpecIssue[] = [];
-  const allowedTopLevelKeys = new Set(['title', 'elements']);
+  const allowedTopLevelKeys = new Set(['$schema', 'title', 'elements']);
   const unexpectedTopLevelKeys = Object.keys(value).filter(
     (key) => !allowedTopLevelKeys.has(key),
   );
@@ -148,6 +148,14 @@ export function parsePageSpec(
       code: 'invalid_page_spec',
       message: `Page file must include a non-empty title: ${sourcePath}`,
       path: `${sourcePath}#title`,
+    });
+  }
+
+  if ('$schema' in value && !isNonEmptyString(value.$schema)) {
+    issues.push({
+      code: 'invalid_page_spec',
+      message: `Page file must include a non-empty $schema string when provided: ${sourcePath}`,
+      path: `${sourcePath}#$schema`,
     });
   }
 

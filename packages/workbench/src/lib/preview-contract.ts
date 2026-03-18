@@ -41,7 +41,7 @@ export interface PreviewWarning {
   code:
     | DiscoveryWarning['code']
     | 'invalid_mock_json'
-    | 'invalid_mock_spec_array'
+    | 'invalid_mock_spec_file'
     | 'invalid_mock_spec_entry';
   message: string;
   path?: string;

@@ -1,11 +1,23 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Canvas component mocks",
-  "description": "Authored Canvas component mock format. Each entry includes Workbench metadata and uses the props, props and slots, or advanced format documented for Workbench component mocks.",
-  "type": "array",
-  "items": {
-    "$ref": "#/$defs/mockEntry"
+  "description": "Authored Canvas component mock file format. The file contains a top-level mocks array, and each mock entry uses the props, props and slots, or advanced format documented for Workbench component mocks.",
+  "type": "object",
+  "required": ["mocks"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Optional JSON Schema reference for editor tooling."
+    },
+    "mocks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/mockEntry"
+      }
+    }
   },
+  "additionalProperties": false,
   "$defs": {
     "element": {
       "type": "object",
