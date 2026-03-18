@@ -8,6 +8,7 @@ import {
   ensureHostGlobalCssExists,
   extractComponentPreviewMetadataFromComponentYaml,
   getWorkbenchHostGlobalCssVirtualUrl,
+  resolveCanvasConfig,
 } from '@drupal-canvas/vite-compat';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
@@ -36,6 +37,19 @@ const workbenchNodeModulesPath = path.resolve(__dirname, 'node_modules');
 const geistPackageRoot = path.dirname(
   require.resolve('@fontsource-variable/geist/package.json'),
 );
+const canvasConfig = resolveCanvasConfig({ hostRoot: hostProjectRoot });
+const componentDiscoveryRoot = path.resolve(
+  hostProjectRoot,
+  canvasConfig.componentDir,
+);
+const pagesDiscoveryRoot = path.resolve(hostProjectRoot, canvasConfig.pagesDir);
+const watchRoots = [...new Set([componentDiscoveryRoot, pagesDiscoveryRoot])];
+const allowedFsRoots = [
+  hostProjectRoot,
+  __dirname,
+  geistPackageRoot,
+  ...watchRoots,
+];
 
 function isComponentMetadataPath(filePath: string): boolean {
   const normalizedPath = filePath.replaceAll('\\', '/');
@@ -98,7 +112,7 @@ function toExpectedMockPaths(component: PreviewManifestComponent): string[] {
 
 async function loadComponentMocks(
   component: PreviewManifestComponent,
-  scanRoot: string,
+  componentRoot: string,
   allComponentNames: string[],
   componentExampleProps: Record<string, unknown>,
 ): Promise<{
@@ -131,7 +145,7 @@ async function loadComponentMocks(
 
     const parsed = toPreviewManifestComponentMocks(parsedJson, {
       sourcePath: mockPath,
-      scanRoot,
+      componentRoot,
       componentName: component.name,
       componentNames: allComponentNames,
       componentExampleProps,
@@ -259,7 +273,11 @@ function canvasWorkbenchDiscovery(): Plugin {
     }
 
     refreshTask = (async () => {
-      cachedResult = await discoverCanvasProject({ scanRoot: process.cwd() });
+      cachedResult = await discoverCanvasProject({
+        componentRoot: componentDiscoveryRoot,
+        pagesRoot: pagesDiscoveryRoot,
+        projectRoot: hostProjectRoot,
+      });
     })();
 
     try {
@@ -297,7 +315,7 @@ function canvasWorkbenchDiscovery(): Plugin {
       }
       await refresh();
 
-      server.watcher.add(hostProjectRoot);
+      server.watcher.add(watchRoots);
 
       server.middlewares.use('/__canvas/discovery', (_req, res) => {
         void (async () => {
@@ -336,7 +354,7 @@ function canvasWorkbenchDiscovery(): Plugin {
               const exampleProps = componentPreviewMetadata.exampleProps;
               const { mocks, warnings } = await loadComponentMocks(
                 component,
-                manifest.scanRoot,
+                manifest.componentRoot,
                 discoveredComponentNames,
                 exampleProps,
               );
@@ -540,7 +558,7 @@ export default defineConfig({
       hostRoot: hostProjectRoot,
     }),
     fs: {
-      allow: [hostProjectRoot, __dirname, geistPackageRoot],
+      allow: allowedFsRoots,
     },
   },
   optimizeDeps: {

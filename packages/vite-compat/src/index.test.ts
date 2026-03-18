@@ -11,6 +11,7 @@ import {
   extractFirstExamplePropsFromComponentYaml,
   getWorkbenchHostGlobalCssVirtualUrl,
   isSupportedPreviewModulePath,
+  resolveCanvasConfig,
   resolveHostGlobalCssPath,
   toViteFsUrl,
 } from './index';
@@ -115,6 +116,25 @@ describe('vite-compat', () => {
     );
     const resolved = resolveHostGlobalCssPath(root);
     expect(resolved).toBe(path.join(root, 'app/components/global.css'));
+  });
+
+  it('resolves pagesDir from canvas.config.json', async () => {
+    const root = await makeTempDir();
+    await fs.writeFile(
+      path.join(root, 'canvas.config.json'),
+      JSON.stringify({ pagesDir: './content/pages' }),
+      'utf-8',
+    );
+
+    expect(resolveCanvasConfig({ hostRoot: root }).pagesDir).toBe(
+      './content/pages',
+    );
+  });
+
+  it('uses default pagesDir when canvas.config.json is missing', async () => {
+    const root = await makeTempDir();
+
+    expect(resolveCanvasConfig({ hostRoot: root }).pagesDir).toBe('./pages');
   });
 
   it('extracts component labels and example props from component metadata', async () => {

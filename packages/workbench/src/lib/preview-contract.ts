@@ -48,7 +48,7 @@ export interface PreviewWarning {
 }
 
 export interface PreviewManifest {
-  scanRoot: string;
+  componentRoot: string;
   components: PreviewManifestComponent[];
   warnings: PreviewWarning[];
   globalCssUrl: string | null;
@@ -174,7 +174,7 @@ export function buildPreviewManifest(
   discoveryResult: DiscoveryResult,
 ): PreviewManifest {
   return {
-    scanRoot: discoveryResult.scanRoot,
+    componentRoot: discoveryResult.componentRoot,
     components: discoveryResult.components.map(toPreviewManifestComponent),
     warnings: discoveryResult.warnings,
     globalCssUrl: null,

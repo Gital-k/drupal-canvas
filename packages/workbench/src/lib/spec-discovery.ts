@@ -24,7 +24,7 @@ export function toPreviewManifestComponentMocks(
   value: unknown,
   options: {
     sourcePath: string;
-    scanRoot: string;
+    componentRoot: string;
     componentName: string;
     componentNames: string[];
     componentExampleProps?: Record<string, unknown>;
@@ -42,7 +42,7 @@ export function toPreviewManifestComponentMocks(
   return {
     mocks: parsed.mocks.map((mock, index) => ({
       id: `${path
-        .relative(options.scanRoot, options.sourcePath)
+        .relative(options.componentRoot, options.sourcePath)
         .replaceAll('\\', '/')}#${index}`,
       label: mock.name,
       sourcePath: options.sourcePath,

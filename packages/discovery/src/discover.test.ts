@@ -24,7 +24,7 @@ afterEach(async () => {
 });
 
 describe('discoverCanvasProject', () => {
-  it('discovers top-level pages/*.json files and excludes nested page files', async () => {
+  it('discovers top-level page JSON files and excludes nested page files', async () => {
     const root = await makeTempDir();
     tempDirs.push(root);
 
@@ -35,7 +35,7 @@ describe('discoverCanvasProject', () => {
       '{"root":"ignored"}',
     );
 
-    const result = await discoverCanvasProject({ scanRoot: root });
+    const result = await discoverCanvasProject({ componentRoot: root });
 
     expect(result.pages).toHaveLength(2);
     expect(result.pages.map((page) => page.slug)).toEqual(['about-us', 'home']);
@@ -57,11 +57,52 @@ describe('discoverCanvasProject', () => {
       'export default function Card() { return null; }',
     );
 
-    const result = await discoverCanvasProject({ scanRoot: root });
+    const result = await discoverCanvasProject({ componentRoot: root });
 
     expect(result.components).toHaveLength(1);
     expect(result.pages).toHaveLength(1);
     expect(result.pages[0].slug).toBe('home');
+  });
+
+  it('supports a dedicated pagesRoot outside the component scan root', async () => {
+    const root = await makeTempDir();
+    tempDirs.push(root);
+
+    await writeFile(
+      path.join(root, 'components/card/component.yml'),
+      'name: Card',
+    );
+    await writeFile(
+      path.join(root, 'components/card/index.tsx'),
+      'export default function Card() { return null; }',
+    );
+    await writeFile(
+      path.join(root, 'content/pages/home.json'),
+      '{"root":"home"}',
+    );
+    await writeFile(
+      path.join(root, 'content/pages/nested/ignored.json'),
+      '{"root":"ignored"}',
+    );
+    await writeFile(
+      path.join(root, 'other-components/button/component.yml'),
+      'name: Button',
+    );
+    await writeFile(
+      path.join(root, 'other-components/button/index.tsx'),
+      'export default function Button() { return null; }',
+    );
+
+    const result = await discoverCanvasProject({
+      componentRoot: path.join(root, 'components'),
+      pagesRoot: path.join(root, 'content/pages'),
+      projectRoot: root,
+    });
+
+    expect(result.components).toHaveLength(1);
+    expect(result.components[0].name).toBe('card');
+    expect(result.pages).toHaveLength(1);
+    expect(result.pages[0].relativePath).toBe('content/pages/home.json');
   });
 
   it('discovers index and named metadata variants with expected entries', async () => {
@@ -82,7 +123,7 @@ describe('discoverCanvasProject', () => {
     await writeFile(path.join(root, 'src/hero/hero.ts'), 'export default {};');
     await writeFile(path.join(root, 'src/hero/hero.css'), '.hero {}');
 
-    const result = await discoverCanvasProject({ scanRoot: root });
+    const result = await discoverCanvasProject({ componentRoot: root });
 
     expect(result.components).toHaveLength(2);
 
@@ -118,7 +159,7 @@ describe('discoverCanvasProject', () => {
       'name: Broken',
     );
 
-    const result = await discoverCanvasProject({ scanRoot: root });
+    const result = await discoverCanvasProject({ componentRoot: root });
 
     expect(result.components).toHaveLength(0);
     expect(
@@ -139,7 +180,7 @@ describe('discoverCanvasProject', () => {
       'export default {};',
     );
 
-    const result = await discoverCanvasProject({ scanRoot: root });
+    const result = await discoverCanvasProject({ componentRoot: root });
 
     expect(result.components).toHaveLength(1);
     expect(result.components[0].cssEntryPath).toBeNull();
@@ -165,7 +206,7 @@ describe('discoverCanvasProject', () => {
       'export default function Navigation() { return null; }',
     );
 
-    const result = await discoverCanvasProject({ scanRoot: root });
+    const result = await discoverCanvasProject({ componentRoot: root });
 
     expect(result.components).toHaveLength(1);
     expect(result.components[0].name).toBe('navigation');
@@ -192,7 +233,7 @@ describe('discoverCanvasProject', () => {
       'export default {};',
     );
 
-    const result = await discoverCanvasProject({ scanRoot: root });
+    const result = await discoverCanvasProject({ componentRoot: root });
 
     expect(result.components).toHaveLength(1);
     expect(result.components[0].kind).toBe('named');
@@ -229,11 +270,17 @@ describe('discoverCanvasProject', () => {
 
     await writeFile(path.join(root, 'src/ok/component.yml'), 'name: Ok');
     await writeFile(path.join(root, 'src/ok/index.ts'), 'export default {};');
+    await writeFile(path.join(root, 'pages/home.json'), '{"root":"home"}');
+    await writeFile(
+      path.join(root, 'ignored/pages/hidden.json'),
+      '{"root":"hidden"}',
+    );
 
-    const result = await discoverCanvasProject({ scanRoot: root });
+    const result = await discoverCanvasProject({ componentRoot: root });
 
     expect(result.components).toHaveLength(1);
     expect(result.components[0].name).toBe('ok');
+    expect(result.pages).toHaveLength(1);
     expect(result.stats.ignoredFiles).toBe(1);
   });
 
@@ -245,7 +292,7 @@ describe('discoverCanvasProject', () => {
     await writeFile(path.join(root, 'src/dup/index.js'), 'export default {};');
     await writeFile(path.join(root, 'src/dup/index.ts'), 'export default {};');
 
-    const result = await discoverCanvasProject({ scanRoot: root });
+    const result = await discoverCanvasProject({ componentRoot: root });
 
     expect(result.components).toHaveLength(1);
     expect(
@@ -279,7 +326,7 @@ describe('discoverCanvasProject', () => {
       'export default {};',
     );
 
-    const result = await discoverCanvasProject({ scanRoot: root });
+    const result = await discoverCanvasProject({ componentRoot: root });
 
     expect(result.components).toHaveLength(2);
     expect(

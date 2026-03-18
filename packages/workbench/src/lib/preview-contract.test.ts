@@ -74,7 +74,7 @@ describe('preview-contract', () => {
 
   it('builds a preview manifest from discovery result', () => {
     const manifest = buildPreviewManifest({
-      scanRoot: '/tmp/workspace',
+      componentRoot: '/tmp/workspace',
       components: [
         {
           id: 'one',
@@ -101,7 +101,7 @@ describe('preview-contract', () => {
       },
     });
 
-    expect(manifest.scanRoot).toBe('/tmp/workspace');
+    expect(manifest.componentRoot).toBe('/tmp/workspace');
     expect(manifest.components).toHaveLength(1);
     expect(manifest.components[0].previewable).toBe(true);
     expect(manifest.components[0].exampleProps).toEqual({});

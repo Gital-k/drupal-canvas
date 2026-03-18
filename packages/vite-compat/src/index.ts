@@ -225,6 +225,7 @@ export interface CanvasConfig {
   aliasBaseDir: string;
   outputDir: string;
   componentDir: string;
+  pagesDir: string;
   deprecatedComponentDir: string;
   globalCssPath: string;
 }
@@ -236,6 +237,7 @@ export function resolveCanvasConfig(
     aliasBaseDir: 'src',
     outputDir: 'dist',
     componentDir: options.hostRoot,
+    pagesDir: './pages',
     deprecatedComponentDir: './components',
     globalCssPath: './src/components/global.css',
   };
@@ -252,6 +254,7 @@ export function resolveCanvasConfig(
       aliasBaseDir: parsed.aliasBaseDir ?? DEFAULT_CANVAS_CONFIG.aliasBaseDir,
       outputDir: parsed.outputDir ?? DEFAULT_CANVAS_CONFIG.outputDir,
       componentDir: parsed.componentDir ?? DEFAULT_CANVAS_CONFIG.componentDir,
+      pagesDir: parsed.pagesDir ?? DEFAULT_CANVAS_CONFIG.pagesDir,
       deprecatedComponentDir:
         parsed.componentDir ?? DEFAULT_CANVAS_CONFIG.deprecatedComponentDir,
       globalCssPath:

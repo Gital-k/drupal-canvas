@@ -67,7 +67,8 @@ export function buildCommand(program: Command): void {
         const s1 = p.spinner();
         s1.start('Discovering components');
         const discoveryResult = await discoverCanvasProject({
-          scanRoot: componentDir,
+          componentRoot: componentDir,
+          projectRoot: process.cwd(),
         });
         const { components, warnings } = discoveryResult;
         s1.stop(

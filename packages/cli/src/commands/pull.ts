@@ -100,7 +100,7 @@ export function createComponentsPullTask(
     async prepare(): Promise<string[]> {
       const [fetchedComponents, discoveryResult] = await Promise.all([
         apiService.listComponents(),
-        discoverCodeComponents({ scanRoot: componentDir }),
+        discoverCodeComponents({ componentRoot: componentDir }),
       ]);
 
       components = fetchedComponents;

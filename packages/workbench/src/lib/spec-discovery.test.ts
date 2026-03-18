@@ -40,7 +40,7 @@ describe('spec-discovery', () => {
       },
       {
         sourcePath: '/tmp/components/heading/mocks.json',
-        scanRoot: '/tmp',
+        componentRoot: '/tmp',
         componentName: 'heading',
         componentNames: ['heading'],
         componentExampleProps: {

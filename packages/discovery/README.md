@@ -4,13 +4,13 @@ Filesystem discovery for Drupal Canvas Code Components and pages.
 
 ## What it does
 
-- Scans a `scanRoot` for `component.yml` and `*.component.yml` files.
+- Scans a `componentRoot` for `component.yml` and `*.component.yml` files.
+- Scans a `pagesRoot` for top-level `*.json` page specs.
 - Applies root `.gitignore` rules. Ignores common build and dependency folders
   (`node_modules`, `dist`, `.git`, `.next`, `.turbo`, `coverage`).
 - Resolves JavaScript entries in extension priority: `.ts`, `.tsx`, `.js`,
   `.jsx`.
 - Attaches optional `.css` entries when present.
-- Discovers top-level page specs from `pages/*.json`.
 
 ## File conventions
 
@@ -41,7 +41,9 @@ named metadata files are used.
 import { discoverCanvasProject } from '@drupal-canvas/discovery';
 
 const result = await discoverCanvasProject({
-  scanRoot: '/absolute/path/to/project',
+  componentRoot: '/absolute/path/to/project/components',
+  pagesRoot: '/absolute/path/to/project/pages',
+  projectRoot: '/absolute/path/to/project',
 });
 ```
 
