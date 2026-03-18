@@ -181,8 +181,8 @@ export default function FormPropTypeDate({
         size="1"
         value={
           dateType === 'date-time'
-            ? utcToLocalTimeConversion(displayArray[index] || '')
-            : displayArray[index] || ''
+            ? utcToLocalTimeConversion(displayArray[index] ?? '')
+            : (displayArray[index] ?? '')
         }
         type={dateType === 'date' ? 'date' : 'datetime-local'}
         onChange={(e) => handleMultiValueChange(index, e.target.value)}
