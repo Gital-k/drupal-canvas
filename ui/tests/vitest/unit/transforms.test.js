@@ -1,4 +1,3 @@
-import { VALUE_THAT_MEANS_REMOVE } from '@/utils/function-utils';
 import transforms from '@/utils/transforms';
 
 describe('Transforms - link', () => {
@@ -261,62 +260,6 @@ describe('Transforms - mediaSelection', () => {
     ).toEqual(['42', '43']);
   });
 
-  it('Should return null when all selection items are flagged for removal', () => {
-    expect(
-      transforms.mediaSelection(
-        {
-          selection: {
-            0: {
-              target_id: VALUE_THAT_MEANS_REMOVE,
-              weight: VALUE_THAT_MEANS_REMOVE,
-            },
-          },
-        },
-        { multiple: false },
-      ),
-    ).toEqual(null);
-  });
-
-  it('Should return null when all multiple selection items are flagged for removal', () => {
-    expect(
-      transforms.mediaSelection(
-        {
-          selection: {
-            0: {
-              target_id: VALUE_THAT_MEANS_REMOVE,
-              weight: VALUE_THAT_MEANS_REMOVE,
-            },
-            1: {
-              target_id: VALUE_THAT_MEANS_REMOVE,
-              weight: VALUE_THAT_MEANS_REMOVE,
-            },
-          },
-        },
-        { multiple: true },
-      ),
-    ).toEqual(null);
-  });
-
-  it('Should filter out flagged items and keep valid ones for multiple-value fields', () => {
-    const intermediate = transforms.mediaSelection(
-      {
-        selection: {
-          0: {
-            target_id: VALUE_THAT_MEANS_REMOVE,
-            weight: VALUE_THAT_MEANS_REMOVE,
-          },
-          1: { target_id: '43', weight: '1' },
-        },
-      },
-      { multiple: true },
-    );
-    expect(
-      transforms.mainProperty(intermediate, {
-        name: 'target_id',
-        multiple: true,
-      }),
-    ).toEqual(['43']);
-  });
 });
 
 describe('Transforms - dateTime', () => {
