@@ -3,7 +3,7 @@
 .dateTimeInputWrap input[type='datetime-local'] {
   position: relative;
   min-height: calc(2rem - 2px);
-  padding-inline-start: 0;
+  padding-inline-start: 3px;
   padding-inline-end: 2rem;
   text-indent: 0;
   cursor: pointer;
@@ -41,5 +41,5 @@
 
 .dateTimeInputWrap input[type='date']::-webkit-datetime-edit,
 .dateTimeInputWrap input[type='datetime-local']::-webkit-datetime-edit {
-  padding-inline-start: 2px;
+  padding-inline-start: 3px;
 }
