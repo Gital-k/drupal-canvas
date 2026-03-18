@@ -64,7 +64,6 @@ final class CanvasPageForm extends ContentEntityForm {
     if (isset($form['metatags']['widget'][0])) {
       $form['metatags']['widget'][0]['#type'] = 'container';
       $form['metatags']['widget'][0]['basic']['#type'] = 'container';
-      $form['metatags']['widget'][0]['basic']['description']['#access'] = FALSE;
       $form['metatags']['widget'][0]['basic']['abstract']['#access'] = FALSE;
       $form['metatags']['widget'][0]['basic']['keywords']['#access'] = FALSE;
       $form['metatags']['widget'][0]['preamble']['#access'] = FALSE;
@@ -79,6 +78,13 @@ final class CanvasPageForm extends ContentEntityForm {
       $form['metatags']['widget'][0]['basic']['title']['#group'] = $group;
       // Hide the description to avoid showing the unnecessary help text.
       unset($form['metatags']['widget'][0]['basic']['title']['#description']);
+    }
+
+    // Replace canvas page description with Metatag description.
+    if (isset($form['metatags']['widget'][0]['basic']['description'])) {
+      $form['metatags']['widget'][0]['basic']['description']['#title'] = $this->t('Meta description');
+      $form['metatags']['widget'][0]['basic']['description']['#group'] = $group;
+      $form[$group]['description']['#access'] = FALSE;
     }
 
     $this->addTransliterationSettings($form);
