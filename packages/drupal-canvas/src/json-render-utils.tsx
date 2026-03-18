@@ -1,4 +1,4 @@
-import { createElement } from 'react';
+import { cloneElement, createElement, isValidElement } from 'react';
 import { fromJSONSchema } from 'zod';
 import { defineCatalog, resolveElementProps } from '@json-render/core';
 import { schema } from '@json-render/react/schema';
@@ -293,8 +293,8 @@ function renderSpecElement(
   // Transparent passthrough for the synthetic multi-root wrapper.
   // @see renderSpec
   if (element.type === 'canvas:component-tree') {
-    const children = (element.children ?? []).map((k) =>
-      renderSpecElement(k, elements, registry, ctx),
+    const children = (element.children ?? []).map((childKey) =>
+      renderSpecChild(childKey, elements, registry, ctx),
     );
     return <>{children}</>;
   }
@@ -309,14 +309,14 @@ function renderSpecElement(
     unknown
   >;
 
-  const children = (element.children ?? []).map((k) =>
-    renderSpecElement(k, elements, registry, ctx),
+  const children = (element.children ?? []).map((childKey) =>
+    renderSpecChild(childKey, elements, registry, ctx),
   );
 
   const slots: Record<string, ReactNode[]> = {};
   for (const [slotName, childKeys] of Object.entries(element.slots ?? {})) {
-    slots[slotName] = childKeys.map((k) =>
-      renderSpecElement(k, elements, registry, ctx),
+    slots[slotName] = childKeys.map((childKey) =>
+      renderSpecChild(childKey, elements, registry, ctx),
     );
   }
 
@@ -325,6 +325,21 @@ function renderSpecElement(
     ...slots,
     ...(children.length > 0 ? { children } : {}),
   });
+}
+
+function renderSpecChild(
+  key: string,
+  elements: Spec['elements'],
+  registry: ComponentRegistry,
+  ctx: PropResolutionContext,
+): ReactNode {
+  const child = renderSpecElement(key, elements, registry, ctx);
+
+  if (isValidElement(child)) {
+    return cloneElement(child, { key });
+  }
+
+  return child;
 }
 
 /**
