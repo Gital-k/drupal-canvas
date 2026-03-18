@@ -67,6 +67,7 @@ use Drupal\Core\Entity\Routing\RevisionHtmlRouteProvider;
       "canonical" => "/page/{canvas_page}",
       "delete-form" => "/page/{canvas_page}/delete",
       "edit-form" => "/canvas/editor/canvas_page/{canvas_page}",
+      'revision' => "/page/{canvas_page}/revisions/{canvas_page_revision}/view",
       "revision-delete-form" => "/page/{canvas_page}/revisions/{canvas_page_revision}/delete",
       "revision-revert-form" => "/page/{canvas_page}/revisions/{canvas_page_revision}/revert",
       "version-history" => "/page/{canvas_page}/revisions",
