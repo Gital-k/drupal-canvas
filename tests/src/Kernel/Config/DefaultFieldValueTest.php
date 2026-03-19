@@ -6,7 +6,6 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Config;
 
-use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -41,7 +40,6 @@ class DefaultFieldValueTest extends CanvasKernelTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
-    $this->container->get(ComponentSourceManager::class)->generateComponents();
     $this->installEntitySchema('user');
     $this->installEntitySchema('node');
     $this->installConfig(['canvas_test_config_node_article']);

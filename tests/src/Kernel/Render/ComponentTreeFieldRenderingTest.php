@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Render;
 
-use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use PHPUnit\Framework\Attributes\Group;
 use Drupal\canvas\Entity\Page;
 use Drupal\Core\Render\HtmlResponse;
@@ -44,8 +43,6 @@ final class ComponentTreeFieldRenderingTest extends CanvasKernelTestBase {
     $themes = ['olivero', 'claro'];
     \Drupal::service('theme_installer')->install($themes);
     $this->config('system.theme')->set('default', 'olivero')->save();
-
-    $this->container->get(ComponentSourceManager::class)->generateComponents();
   }
 
   public function testRenderingComponent(): void {

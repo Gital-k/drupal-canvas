@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Controller;
 
-use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use PHPUnit\Framework\Attributes\Group;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Render\HtmlResponse;
@@ -43,8 +42,6 @@ final class ComponentAuditControllerTest extends CanvasKernelTestBase {
 
   protected function setUp(): void {
     parent::setUp();
-    $this->container->get(ComponentSourceManager::class)->generateComponents();
-
     $this->installEntitySchema('node');
     $this->installSchema('node', ['node_access']);
     $this->installEntitySchema('path_alias');

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
-use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Group;
 use Drupal\Component\Datetime\Time;
@@ -87,7 +86,6 @@ class AutoSaveManagerTest extends CanvasKernelTestBase {
     // the `path` module, so the PathAlias entity type must be installed. URL
     // generation fails without this.
     $this->installEntitySchema('path_alias');
-    $this->container->get(ComponentSourceManager::class)->generateComponents();
   }
 
   private function convertClientData(EntityInterface $entity, array $data): EntityInterface {

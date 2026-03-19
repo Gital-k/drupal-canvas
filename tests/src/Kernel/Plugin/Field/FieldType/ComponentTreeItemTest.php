@@ -58,7 +58,6 @@ class ComponentTreeItemTest extends CanvasKernelTestBase {
   protected function setUp(): void {
     parent::setUp();
 
-    $this->container->get(ComponentSourceManager::class)->generateComponents();
     $this->installEntitySchema('user');
     $this->installEntitySchema('node_type');
     $this->installEntitySchema('node');

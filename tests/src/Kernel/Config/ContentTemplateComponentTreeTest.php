@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Config;
 
-use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use PHPUnit\Framework\Attributes\CoversClass;
 use Drupal\canvas\Entity\PageRegion;
 use PHPUnit\Framework\Attributes\Group;
@@ -58,7 +57,6 @@ final class ContentTemplateComponentTreeTest extends ConfigWithComponentTreeTest
       'bundle' => 'alpha',
       'label' => 'Test field',
     ])->save();
-    $this->container->get(ComponentSourceManager::class)->generateComponents();
     $this->entity = ContentTemplate::create([
       'content_entity_type_id' => 'node',
       'content_entity_type_bundle' => 'alpha',
