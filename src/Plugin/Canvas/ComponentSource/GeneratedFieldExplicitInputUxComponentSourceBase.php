@@ -1361,10 +1361,13 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
         // If this is a required property without a value, we can leave
         // subsequent validation to bubble up any errors.
         // @see \Drupal\canvas\PropExpressions\StructuredData\Evaluator::doEvaluate()
-        if (!$this->isRequiredMultiValuePropSourceEmpty($is_required_prop, $source)) {
-          continue;
+        if ($this->isRequiredMultiValuePropSourceEmpty($is_required_prop, $source)) {
+          // A required multi-value prop source with no valid items must still be
+          // collapsed so downstream validation can report the missing required field.
+          \assert($source instanceof StaticPropSource);
+          $props[$prop] = $this->collapse($source, $prop);
         }
-        \assert($source instanceof StaticPropSource);
+        continue;
       }
       $props[$prop] = $this->collapse($source, $prop);
     }
