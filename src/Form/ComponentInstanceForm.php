@@ -150,7 +150,7 @@ final class ComponentInstanceForm extends FormBase {
         // the resolved values.
         // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::optimizeExplicitInput()
         $component->getComponentSource() instanceof GeneratedFieldExplicitInputUxComponentSourceBase && \is_array($client_model) && \array_key_exists('resolved', $client_model) => $client_model['resolved'],
-        // @todo This should never occur; remove this in https://www.drupal.org/project/canvas/issues/3558721
+        // @todo Once the UI bug is fixed, we *should* be able to remove this. 🤞
         $client_model === json_decode('undefined') => $this->componentTreeLoader->load($entity)
           ->getComponentTreeItemByUuid($component_instance_uuid)
           ?->getInputs() ?? [],
