@@ -59,6 +59,7 @@ greppable
 heredocs
 herobanner
 herobannersecond
+hotfixes
 hyperscriptification
 hyperscriptified
 hyperscriptify
@@ -103,6 +104,7 @@ Pryce's
 pubout
 Qqtnj
 rdndmb
+recomputations
 redoable
 redocly
 refetched
@@ -157,6 +159,7 @@ ymls
 adal
 codebuddy
 commandcode
+deepagents
 iflow
 Junie
 junie

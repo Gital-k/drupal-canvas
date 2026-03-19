@@ -114,13 +114,18 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
 
       // Most hidden fields are read only. Add an attribute that allows it to be
       // updated and tracked in Redux form state.
-      if (isset($form['selection'][0]['target_id'])) {
-        $form['selection'][0]['target_id']['#attributes']['data-track-hidden-value'] = 'true';
-      }
-
       $selections = $form['selection'] ?? [];
+      $is_multiple = $context['items']->getFieldDefinition()->getFieldStorageDefinition()->isMultiple();
       foreach (Element::children($selections) as $key) {
+        if (isset($form['selection'][$key]['target_id'])) {
+          $form['selection'][$key]['target_id']['#attributes']['data-track-hidden-value'] = 'true';
+        }
+        if (isset($form['selection'][$key]['weight'])) {
+          $form['selection'][$key]['weight']['#attributes']['data-track-hidden-value'] = 'true';
+          $form['selection'][$key]['weight']['#attributes']['data-canvas-media-weight'] = 'true';
+        }
         $form['selection'][$key]['remove_button']['#attributes']['data-canvas-media-remove-button'] = 'true';
+        $form['selection'][$key]['#attributes']['data-is-multiple'] = $is_multiple ? 'true' : 'false';
       }
 
     }
@@ -286,7 +291,7 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
     foreach (Element::children($element) as $key) {
       // Mark input elements.
       if (isset($element[$key]['#type']) &&
-          \in_array($element[$key]['#type'], ['textfield'], TRUE)) {
+          \in_array($element[$key]['#type'], ['textfield', 'number'], TRUE)) {
         $element[$key]['#is_multivalue_form'] = TRUE;
         $element[$key]['#attributes']['data-field-label'] = $field_label;
       }
@@ -305,6 +310,7 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
     $map = [
       'boolean_checkbox' => ['mainProperty' => ['list' => \FALSE]],
       'datetime_default' => ['mainProperty' => [], 'dateTime' => []],
+      'daterange_default' => ['dateRange' => []],
       'email_default' => ['mainProperty' => []],
       'file_generic' => ['mainProperty' => ['name' => 'fids']],
       'image_image' => ['mainProperty' => ['name' => 'fids']],
