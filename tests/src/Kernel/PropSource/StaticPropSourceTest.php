@@ -374,15 +374,11 @@ class StaticPropSourceTest extends PropSourceTestBase {
           ],
         ],
       ],
-      'value' => [['target_id' => 2], ['target_id' => 1], ['target_id' => 3]],
+      'value' => [2, 1, 3],
       'expression' => 'ℹ︎entity_reference␟entity␜[␜entity:media:anything_is_possible␝field_media_image_1␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}][␜entity:media:image␝field_media_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}][␜entity:media:image_but_not_image_media_source␝field_media_test␞␟{src↠value}]',
       'expected_array_representation' => [
         'sourceType' => PropSource::Static->value . ':field_item:entity_reference',
-        'value' => [
-          ['target_id' => 2],
-          ['target_id' => 1],
-          ['target_id' => 3],
-        ],
+        'value' => [2, 1, 3],
         'expression' => 'ℹ︎entity_reference␟entity␜[␜entity:media:anything_is_possible␝field_media_image_1␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}][␜entity:media:image␝field_media_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}][␜entity:media:image_but_not_image_media_source␝field_media_test␞␟{src↠value}]',
         'sourceTypeSettings' => [
           'storage' => ['target_type' => 'media'],
@@ -474,15 +470,11 @@ class StaticPropSourceTest extends PropSourceTestBase {
           ],
         ],
       ],
-      'value' => [['target_id' => 2], ['target_id' => 1], ['target_id' => 3]],
+      'value' => [2, 1, 3],
       'expression' => 'ℹ︎entity_reference␟entity␜[␜entity:media:anything_is_possible␝field_media_image_1␞␟entity␜␜entity:file␝uri␞␟value][␜entity:media:image␝field_media_image␞␟entity␜␜entity:file␝uri␞␟value][␜entity:media:image_but_not_image_media_source␝field_media_test␞␟value]',
       'expected_array_representation' => [
         'sourceType' => PropSource::Static->value . ':field_item:entity_reference',
-        'value' => [
-          ['target_id' => 2],
-          ['target_id' => 1],
-          ['target_id' => 3],
-        ],
+        'value' => [2, 1, 3],
         'expression' => 'ℹ︎entity_reference␟entity␜[␜entity:media:anything_is_possible␝field_media_image_1␞␟entity␜␜entity:file␝uri␞␟value][␜entity:media:image␝field_media_image␞␟entity␜␜entity:file␝uri␞␟value][␜entity:media:image_but_not_image_media_source␝field_media_test␞␟value]',
         'sourceTypeSettings' => [
           'storage' => [
@@ -563,15 +555,11 @@ class StaticPropSourceTest extends PropSourceTestBase {
           ],
         ],
       ],
-      'value' => [['target_id' => 2], ['target_id' => 1], ['target_id' => 3]],
+      'value' => [2, 1, 3],
       'expression' => 'ℹ︎entity_reference␟entity␜[␜entity:media:anything_is_possible␝field_media_image_1␞␟{src↝entity␜␜entity:file␝uri␞␟value,alt↠alt}][␜entity:media:image␝field_media_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}][␜entity:media:image_but_not_image_media_source␝field_media_test␞␟{src↠value,alt↠value}]',
       'expected_array_representation' => [
         'sourceType' => PropSource::Static->value . ':field_item:entity_reference',
-        'value' => [
-          ['target_id' => 2],
-          ['target_id' => 1],
-          ['target_id' => 3],
-        ],
+        'value' => [2, 1, 3],
         'expression' => 'ℹ︎entity_reference␟entity␜[␜entity:media:anything_is_possible␝field_media_image_1␞␟{src↝entity␜␜entity:file␝uri␞␟value,alt↠alt}][␜entity:media:image␝field_media_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}][␜entity:media:image_but_not_image_media_source␝field_media_test␞␟{src↠value,alt↠value}]',
         'sourceTypeSettings' => [
           'storage' => [

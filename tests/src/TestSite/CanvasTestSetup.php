@@ -322,7 +322,7 @@ class CanvasTestSetup implements TestSetupInterface {
         'component_id' => 'sdc.canvas_test_sdc.image',
         'uuid' => self::UUID_STATIC_IMAGE,
         'inputs' => [
-          'image' => ['target_id' => 3],
+          'image' => 3,
         ],
       ],
       [

@@ -38,9 +38,7 @@ trait CanvasFieldTrait {
           'expression' => 'ℹ︎␜entity:node:article␝field_hero␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
         ],
       ] : [
-        'image' => [
-          'target_id' => (int) $this->mediaEntity->id(),
-        ],
+        'image' => (int) $this->mediaEntity->id(),
       ],
       self::TEST_BLOCK => [
         'label' => '',

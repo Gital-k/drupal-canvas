@@ -159,7 +159,7 @@ final class JavascriptComponentAccessTest extends CanvasKernelTestBase {
       ],
     ]);
     $auto_save_manager->saveEntity($page);
-    self::assertSame([Page::ENTITY_TYPE_ID => ['auto-save-8f48528246bf1d24' => '1']], $audit->getAutoSavesUsingComponentIds([$component_id]));
+    self::assertSame([Page::ENTITY_TYPE_ID => ['auto-save-ea013b301d2da474' => '1']], $audit->getAutoSavesUsingComponentIds([$component_id]));
     // And reset the access cache.
     $entity_type_manager->getAccessControlHandler(JavaScriptComponent::ENTITY_TYPE_ID)->resetCache();
     self::assertEquals(

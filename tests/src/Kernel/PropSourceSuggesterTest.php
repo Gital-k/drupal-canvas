@@ -725,6 +725,10 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
               'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:node:foo␝primary_topic␞␟entity␜␜entity:taxonomy_term␝uuid␞␟value',
             ],
+            'Primary topic → Taxonomy term → Vocabulary → Target UUID' => [
+              'sourceType' => PropSource::EntityField->value,
+              'expression' => 'ℹ︎␜entity:node:foo␝primary_topic␞␟entity␜␜entity:taxonomy_term␝vid␞␟target_uuid',
+            ],
             'Primary topic → Target UUID' => [
               'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:node:foo␝primary_topic␞␟target_uuid',
@@ -736,6 +740,10 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
             "Revision user → Target UUID" => [
               'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:node:foo␝revision_uid␞␟target_uuid',
+            ],
+            "Content type → Target UUID" => [
+              'sourceType' => PropSource::EntityField->value,
+              'expression' => 'ℹ︎␜entity:node:foo␝type␞␟target_uuid',
             ],
             "UUID" => [
               'sourceType' => PropSource::EntityField->value,
