@@ -6,6 +6,8 @@ import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import ComponentContextMenu from '@/features/layout/preview/ComponentContextMenu';
 import { useDataToHtmlMapValue } from '@/features/layout/preview/DataToHtmlMapContext';
 import { ComponentNameTag } from '@/features/layout/preview/NameTag';
+import { ParentLayersBadges } from '@/features/layout/preview/ParentLayersBadges';
+import { useAncestorHighlight } from '@/features/layout/previewOverlay/AncestorHighlightContext';
 import ComponentDropZone from '@/features/layout/previewOverlay/ComponentDropZone';
 import SlotOverlay from '@/features/layout/previewOverlay/SlotOverlay';
 import {
@@ -17,6 +19,7 @@ import {
   setHoveredComponent,
   unsetHoveredComponent,
 } from '@/features/ui/uiSlice';
+import { useComponentLayers } from '@/hooks/useComponentLayers';
 import useComponentSelection from '@/hooks/useComponentSelection';
 import useGetComponentName from '@/hooks/useGetComponentName';
 import useSyncPreviewElementOffset from '@/hooks/useSyncPreviewElementOffset';
@@ -83,6 +86,7 @@ const ComponentOverlay: React.FC<ComponentOverlayProps> = (props) => {
   const { isDragging } = useAppSelector(selectDragging);
   const elementsInsideIframe = useRef<HTMLElement[] | []>([]);
   const name = useGetComponentName(component);
+  const layers = useComponentLayers(component.uuid);
   const {
     attributes,
     listeners,
@@ -98,10 +102,18 @@ const ComponentOverlay: React.FC<ComponentOverlayProps> = (props) => {
     },
   });
   const [forceRecalculateChildren, setForceRecalculateChildren] = useState(0);
+  const [isHoveringBadgeArea, setIsHoveringBadgeArea] = useState(false);
+  const hideBadgeAreaTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
   const isSelected = useAppSelector((state) =>
     selectComponentIsSelected(state, component.uuid),
   );
+  const {
+    highlightedAncestorUuid,
+    setHighlightedAncestor,
+    unsetHighlightedAncestor,
+  } = useAncestorHighlight();
+  const isHighlightedAncestor = highlightedAncestorUuid === component.uuid;
 
   useEffect(() => {
     const iframeDocument = iframeRef.current?.contentDocument;
@@ -129,6 +141,14 @@ const ComponentOverlay: React.FC<ComponentOverlayProps> = (props) => {
     recalculateOffset();
   }, [forceRecalculate, recalculateBorder, recalculateOffset]);
 
+  useEffect(() => {
+    return () => {
+      if (hideBadgeAreaTimerRef.current) {
+        clearTimeout(hideBadgeAreaTimerRef.current);
+      }
+    };
+  }, []);
+
   function handleComponentClick(event: React.MouseEvent<HTMLElement>) {
     event.stopPropagation();
     handleComponentSelection(component.uuid, event.metaKey);
@@ -137,12 +157,38 @@ const ComponentOverlay: React.FC<ComponentOverlayProps> = (props) => {
   function handleItemMouseOver(event: React.MouseEvent<HTMLDivElement>) {
     event.stopPropagation();
     if (!isDragging) {
+      // Do not let an ancestor overlay take hover when the event originated from a descendant overlay.
+      const source = event.target as Element;
+      const sourceOverlay = source.closest('[data-canvas-component-uuid]');
+      const sourceUuid = sourceOverlay?.getAttribute?.(
+        'data-canvas-component-uuid',
+      );
+      if (sourceUuid && sourceUuid !== component.uuid) {
+        return;
+      }
       dispatch(setHoveredComponent(component.uuid));
     }
   }
 
   function handleItemMouseOut(event: React.MouseEvent<HTMLDivElement>) {
     event.stopPropagation();
+    const overlayEl = event.currentTarget;
+    const related = event.relatedTarget as Node | null;
+    if (related && overlayEl.contains(related)) {
+      return;
+    }
+    // Keep hover when moving into an ancestor overlay so the badge stack stays visible and clickable.
+    const relatedEl = related as Element | null;
+    const targetOverlay = relatedEl?.closest?.(
+      '[data-canvas-component-uuid]',
+    ) as Element | null;
+    const targetUuid = targetOverlay?.getAttribute?.(
+      'data-canvas-component-uuid',
+    );
+    const ancestorUuids = layers.slice(0, -1).map((l) => l.uuid);
+    if (targetUuid && ancestorUuids.includes(targetUuid)) {
+      return;
+    }
     dispatch(unsetHoveredComponent());
   }
 
@@ -187,9 +233,11 @@ const ComponentOverlay: React.FC<ComponentOverlayProps> = (props) => {
       onClick={handleComponentClick}
       onKeyDown={handleKeyDown}
       data-canvas-selected={isSelected}
+      data-canvas-component-uuid={component.uuid}
       className={clsx('componentOverlay', styles.componentOverlay, {
         [styles.selected]: isSelected,
         [styles.hovered]: isHovered,
+        [styles.highlightedAncestor]: isHighlightedAncestor,
         [styles.dragging]: isComponentDragged,
         [styles.updating]: isUpdating,
       })}
@@ -212,13 +260,39 @@ const ComponentOverlay: React.FC<ComponentOverlayProps> = (props) => {
           data-canvas-overlay="true"
         />
       </ComponentContextMenu>
-      {(isHovered || isSelected) && (
-        <div className={clsx(styles.canvasNameTag)}>
-          <ComponentNameTag
-            name={name}
-            id={component.uuid}
-            nodeType={component.nodeType}
-          />
+      {(isHovered || isSelected) && !isDragging && (
+        <div className={styles.canvasNameTag}>
+          <div
+            className={styles.canvasNameTagContent}
+            onMouseEnter={() => {
+              if (hideBadgeAreaTimerRef.current) {
+                clearTimeout(hideBadgeAreaTimerRef.current);
+                hideBadgeAreaTimerRef.current = undefined;
+              }
+              setIsHoveringBadgeArea(true);
+            }}
+            onMouseLeave={() => {
+              hideBadgeAreaTimerRef.current = setTimeout(() => {
+                setIsHoveringBadgeArea(false);
+                unsetHighlightedAncestor();
+                hideBadgeAreaTimerRef.current = undefined;
+              }, 100);
+            }}
+          >
+            {isHoveringBadgeArea && isSelected && (
+              <ParentLayersBadges
+                layers={layers.slice(0, -1)}
+                onSelectLayer={(uuid) => handleComponentSelection(uuid, false)}
+                onHighlightAncestor={setHighlightedAncestor}
+                onUnhighlightAncestor={unsetHighlightedAncestor}
+              />
+            )}
+            <ComponentNameTag
+              name={name}
+              id={component.uuid}
+              nodeType={component.nodeType}
+            />
+          </div>
         </div>
       )}
       {component.slots.map((slot: SlotNode) => (
