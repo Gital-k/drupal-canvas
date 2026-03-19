@@ -591,10 +591,9 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
           // In other words: let a prop source being emptier than it portrays
           // result in the appropriate validation errors at the component level.
           // @see \Drupal\canvas\PropSource\StaticPropSource::withValue(allow_empty: TRUE)
-          $cardinality = $raw_prop_source['sourceTypeSettings']['cardinality'] ?? NULL;
           $filtered_source = StaticPropSource::parse($raw_prop_source)->withoutEmptyItems();
           // If single cardinality or multiple cardinality with no valid items
-          if ($cardinality === NULL || $filtered_source->getValue() === []) {
+          if ($filtered_source->getCardinality() === 1 || $filtered_source->getValue() === []) {
             unset($inputValues[$component_prop_name]);
             continue;
           }
@@ -1362,7 +1361,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
         // If this is a required property without a value, we can leave
         // subsequent validation to bubble up any errors.
         // @see \Drupal\canvas\PropExpressions\StructuredData\Evaluator::doEvaluate()
-        if (!$this->isEmptyRequiredMultiCardinalityStaticPropSource($is_required_prop, $source, $prop_source)) {
+        if (!$this->isRequiredMultiValuePropSourceEmpty($is_required_prop, $source)) {
           continue;
         }
         \assert($source instanceof StaticPropSource);
@@ -1475,16 +1474,14 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
    *   Whether the prop is required.
    * @param mixed $source
    *   The parsed prop source, or NULL if not yet available.
-   * @param array $prop_source
-   *   The raw prop source array from the client model.
    *
    * @return bool
    */
-  private function isEmptyRequiredMultiCardinalityStaticPropSource(bool $is_required_prop, mixed $source, array $prop_source): bool {
+  private function isRequiredMultiValuePropSourceEmpty(bool $is_required_prop, mixed $source): bool {
     return $is_required_prop
       && $source instanceof StaticPropSource
-      && ($prop_source['sourceTypeSettings']['cardinality'] ?? NULL) !== NULL
-      && $source->fieldItemList->count() === 0;
+      && $source->getCardinality() !== 1
+      && $source->isEmpty();
   }
 
   /**

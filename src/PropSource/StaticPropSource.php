@@ -162,7 +162,7 @@ final class StaticPropSource extends PropSourceBase {
   /**
    * @return \Drupal\Core\Field\FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED|int<1, max>
    */
-  private function getCardinality() : int {
+  public function getCardinality() : int {
     // TRICKY: unfortunately, `field.storage_settings.*` does not store
     // cardinality, but the FieldStorageConfig entity does (config schema:
     // `field.storage.*.*`). Hence the need for an additional key-value pair.
@@ -274,6 +274,16 @@ final class StaticPropSource extends PropSourceBase {
       $this->fieldStorageSettings,
       $this->fieldInstanceSettings,
     );
+  }
+
+  /**
+   * Determines if this prop source is empty.
+   *
+   * @return bool
+   *   If the prop is empty.
+   */
+  public function isEmpty(): bool {
+    return $this->withoutEmptyItems()->fieldItemList->isEmpty();
   }
 
   /**
