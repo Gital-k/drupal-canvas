@@ -49,7 +49,7 @@ use Drupal\canvas\PropSource\DefaultRelativeUrlPropSource;
 use Drupal\canvas\PropSource\PropSource;
 use Drupal\canvas\PropSource\PropSourceBase;
 use Drupal\canvas\PropSource\StaticPropSource;
-use Drupal\canvas\ShapeMatcher\JsonSchemaFieldInstanceMatcher;
+use Drupal\canvas\ShapeMatcher\EntityFieldPropSourceMatcher;
 use Drupal\canvas\Utility\TypedDataHelper;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpKernel\Exception\NotAcceptableHttpException;
@@ -71,7 +71,7 @@ use Symfony\Component\Validator\ConstraintViolationListInterface;
  * They can *also* be populated using structured data whose shape matches the
  * shape specified in the SDC metadata.
  *
- * @see \Drupal\canvas\ShapeMatcher\JsonSchemaFieldInstanceMatcher
+ * @see \Drupal\canvas\ShapeMatcher\EntityFieldPropSourceMatcher
  *
  * Component Source plugins included in the Drupal Canvas module using it:
  * - "SDC"
@@ -284,7 +284,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
   }
 
   /**
-   * @return array<int, array{'value': mixed, 'label': 'string'}>
+   * @return array<string, string|\Drupal\Core\StringTranslation\TranslatableMarkup>
    *
    * @see \canvas_load_allowed_values_for_component_prop()
    * @todo Ensure that when Canvas adds translation support, that SDC
@@ -299,21 +299,37 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
 
     // Retrieve the JSON schema for this explicit input prop.
     $schema = (new PropShape($explicit_input_definitions['shapes'][$prop_name]))->resolvedSchema;
-    if (!\array_key_exists('enum', $schema)) {
+
+    // For array types, enum is inside items; for non-array types,
+    // enum is at root.
+    $get_enum_schema = static function (array $search_schema): array {
+      $is_array_type = ($search_schema['type'] ?? NULL) === 'array';
+      if ($is_array_type) {
+        \assert(\array_key_exists('items', $search_schema), 'Array type props must have an items schema.');
+        return $search_schema['items'];
+      }
+      return $search_schema;
+    };
+
+    $enum_schema = $get_enum_schema($schema);
+
+    if (!\array_key_exists('enum', $enum_schema)) {
       throw new \LogicException("`enum` is missing for schema of `$prop_name` explicit input prop of `{$this->getPluginId()}.{$this->getSourceSpecificComponentId()}`.");
     }
     // @todo Simplify in https://www.drupal.org/project/canvas/issues/3518247
     $raw_schema = $this->getMetadata()->schema['properties'][$prop_name] ?? [];
-    if (!\array_key_exists('meta:enum', $schema)) {
-      if (!\array_key_exists('meta:enum', $raw_schema)) {
+    $raw_enum_schema = $get_enum_schema($raw_schema);
+
+    if (!\array_key_exists('meta:enum', $enum_schema)) {
+      if (!\array_key_exists('meta:enum', $raw_enum_schema)) {
         throw new \LogicException("`meta:enum` is missing for schema of `$prop_name` explicit input prop of `{$this->getPluginId()}.{$this->getSourceSpecificComponentId()}`.");
       }
       else {
-        $schema['meta:enum'] = $raw_schema['meta:enum'];
+        $enum_schema['meta:enum'] = $raw_enum_schema['meta:enum'];
       }
     }
 
-    return $schema['meta:enum'];
+    return $enum_schema['meta:enum'];
   }
 
   /**
@@ -523,6 +539,33 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
   public function validateComponentInput(array $inputValues, string $component_instance_uuid, ?FieldableEntityInterface $entity): ConstraintViolationListInterface {
     $violations = new ConstraintViolationList();
     $prop_field_definitions = $this->configuration['prop_field_definitions'];
+
+    // Check for unexpected props (garbage values).
+    try {
+      foreach ($inputValues as $prop_name => $prop_value) {
+        if (!\array_key_exists($prop_name, $prop_field_definitions)) {
+          $violations->add(
+            new ConstraintViolation(
+              \sprintf("Component `%s`: the `%s` prop is not defined.", $component_instance_uuid, $prop_name),
+              NULL,
+              [],
+              $entity,
+              "inputs.$component_instance_uuid.$prop_name",
+              $prop_value,
+              code: ComponentTreeItem::VIOLATION_CODE_GARBAGE_INPUT,
+            )
+          );
+          // No point in further validating the value of a non-existent prop.
+          unset($inputValues[$prop_name]);
+        }
+      }
+    }
+    catch (ComponentNotFoundException) {
+      // The violation for a missing component will be added in the validation
+      // of the tree structure.
+      // @see \Drupal\canvas\Plugin\Validation\Constraint\ComponentTreeStructureConstraintValidator
+    }
+
     // Derive required props directly from prop_field_definitions to avoid
     // calling getExplicitInputDefinitions() which internally calls
     // getMetadata() → getComponentPlugin(), which throws a
@@ -652,30 +695,6 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
           )
         );
       }
-    }
-
-    // Check for unexpected props (garbage values).
-    try {
-      $defined_props = $this->configuration['prop_field_definitions'];
-      foreach ($inputValues as $prop_name => $prop_value) {
-        if (!\array_key_exists($prop_name, $defined_props)) {
-          $violations->add(
-            new ConstraintViolation(
-              \sprintf("Component `%s`: the `%s` prop is not defined.", $component_instance_uuid, $prop_name),
-              NULL,
-              [],
-              $entity,
-              "inputs.$component_instance_uuid.$prop_name",
-              $prop_value,
-            )
-          );
-        }
-      }
-    }
-    catch (ComponentNotFoundException) {
-      // The violation for a missing component will be added in the validation
-      // of the tree structure.
-      // @see \Drupal\canvas\Plugin\Validation\Constraint\ComponentTreeStructureConstraintValidator
     }
 
     return $violations;
@@ -1180,7 +1199,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     if (!$property instanceof DependentPluginInterface) {
       return NULL;
     }
-    return JsonSchemaFieldInstanceMatcher::propertyDependsOnReferencedEntity($property->getDataDefinition());
+    return EntityFieldPropSourceMatcher::propertyDependsOnReferencedEntity($property->getDataDefinition());
   }
 
   /**

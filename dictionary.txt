@@ -38,6 +38,7 @@ delaville
 devizzent
 dhta
 diaclone
+demi
 domcontentloaded
 drupalcode
 drupaldev
@@ -48,6 +49,7 @@ entityviewdisplay
 extralight
 extensionless
 fieldtext
+fvar
 folderfy
 gerbeaud
 gesturechange
@@ -57,6 +59,7 @@ greppable
 heredocs
 herobanner
 herobannersecond
+hotfixes
 hyperscriptification
 hyperscriptified
 hyperscriptify
@@ -101,6 +104,7 @@ Pryce's
 pubout
 Qqtnj
 rdndmb
+recomputations
 redoable
 redocly
 refetched
@@ -115,6 +119,7 @@ scriptified
 scriptify
 sdcs
 shadcn
+slnt
 sonner
 sparkline
 Starshot
@@ -145,6 +150,8 @@ useswr
 uuidv
 Validatable
 vaul
+wdth
+wght
 xmdi
 ymls
 
@@ -152,6 +159,7 @@ ymls
 adal
 codebuddy
 commandcode
+deepagents
 iflow
 Junie
 junie

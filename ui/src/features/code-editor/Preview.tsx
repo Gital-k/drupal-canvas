@@ -5,7 +5,12 @@ import { Flex, ScrollArea, Spinner } from '@radix-ui/themes';
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import ErrorCard from '@/components/error/ErrorCard';
 import {
+  buildFontFaceStyles,
+  getFontPreloadDefinitions,
+} from '@/features/brandKit/fontCss';
+import {
   clearDataFetches,
+  selectBrandKit,
   selectCodeComponentProperty,
   selectGlobalAssetLibraryProperty,
   selectPreviewCompiledJsForSlots,
@@ -34,6 +39,7 @@ import MissingDefaultExportMessage, {
 } from './errors/MissingDefaultExportMessage';
 
 import type { File } from '@babel/types';
+import type { BrandKit } from '@/types/CodeComponent';
 
 import styles from './Preview.module.css';
 
@@ -58,6 +64,9 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
   const compiledGlobalCss = useAppSelector(
     selectGlobalAssetLibraryProperty(['css', 'compiled']),
   );
+  const brandKitFonts = useAppSelector((state) =>
+    selectBrandKit<BrandKit['fonts']>(state, 'fonts'),
+  );
   const previewCompiledJsForSlots = useAppSelector(
     selectPreviewCompiledJsForSlots,
   );
@@ -74,59 +83,49 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
 
   const [iframeSrcDoc, setIframeSrcDoc] = useState('');
 
-  // @see GlobalImports.php
-  // Whenever updating this import map, also update the list of supported imports
-  // in packages/eslint-config/src/rules/component-imports.ts.
-  // @see https://drupal.org/i/3552914
-  // @see https://drupal.org/i/3560197
-  const importMap = useMemo(
-    () => ({
-      imports: {
-        // Map to Canvas generated libraries.
-        preact: `${CANVAS_MODULE_PATH}/packages/astro-hydration/dist/preact.module.js`,
-        'preact/hooks': `${CANVAS_MODULE_PATH}/packages/astro-hydration/dist/hooks.module.js`,
-        'react/jsx-runtime': `${CANVAS_MODULE_PATH}/packages/astro-hydration/dist/jsx-runtime-default.js`,
-        react: `${CANVAS_MODULE_PATH}/packages/astro-hydration/dist/compat.module.js`,
-        'react-dom': `${CANVAS_MODULE_PATH}/packages/astro-hydration/dist/compat.module.js`,
-        'react-dom/client': `${CANVAS_MODULE_PATH}/packages/astro-hydration/dist/compat.module.js`,
-        // @todo Remove hardcoding and allow components to nominate their own?
-        clsx: `${CANVAS_MODULE_PATH}/packages/astro-hydration/dist/clsx.js`,
-        'class-variance-authority': `${CANVAS_MODULE_PATH}/packages/astro-hydration/dist/class-variance-authority.js`,
-        'tailwind-merge': `${CANVAS_MODULE_PATH}/packages/astro-hydration/dist/tailwind-merge.js`,
-        '@/components/': Drupal.url(
-          'canvas/api/v0/auto-saves/js/js_component/',
-        ),
-        'drupal-jsonapi-params': `${CANVAS_MODULE_PATH}/packages/astro-hydration/dist/jsonapi-params.js`,
-        swr: `${CANVAS_MODULE_PATH}/packages/astro-hydration/dist/swr.js`,
-        '@tailwindcss/typography': `${CANVAS_MODULE_PATH}/packages/astro-hydration/dist/tailwindcss-typography.js`,
-        'drupal-canvas': `${CANVAS_MODULE_PATH}/packages/astro-hydration/dist/drupal-canvas.js`,
-        // Backward compatibility entries for elements that were moved into drupal-canvas package.
-        '@/lib/FormattedText': `${CANVAS_MODULE_PATH}/packages/astro-hydration/dist/FormattedText.js`,
-        'next-image-standalone': `${CANVAS_MODULE_PATH}/packages/astro-hydration/dist/next-image-standalone.js`,
-        '@/lib/utils': `${CANVAS_MODULE_PATH}/packages/astro-hydration/dist/utils.js`,
-        '@drupal-api-client/json-api-client': `${CANVAS_MODULE_PATH}/packages/astro-hydration/dist/jsonapi-client.js`,
-        '@/lib/jsonapi-utils': `${CANVAS_MODULE_PATH}/packages/astro-hydration/dist/jsonapi-utils.js`,
-        '@/lib/drupal-utils': `${CANVAS_MODULE_PATH}/packages/astro-hydration/dist/drupal-utils.js`,
-      },
-    }),
-    [],
-  );
+  // Copy import maps from the main window, adding preview-specific entries.
+  const importMapTags = useMemo(() => {
+    const importMapEls = document.querySelectorAll('script[type="importmap"]');
+    const previewImportMapAdditions = {
+      '@/components/': Drupal.url('canvas/api/v0/auto-saves/js/js_component/'),
+    };
+    return Array.from(importMapEls)
+      .map((el) => {
+        try {
+          const importMap = JSON.parse(el.textContent || '{}');
+          if (importMap.imports) {
+            importMap.imports = {
+              ...importMap.imports,
+              ...previewImportMapAdditions,
+            };
+          }
+          return `<script type="importmap">${JSON.stringify(importMap)}</script>`;
+        } catch {
+          return el.outerHTML;
+        }
+      })
+      .join('\n');
+  }, []);
 
   const getIframeSrc = useCallback(
     ({
       previewGlobalCss,
+      previewGlobalFontCss,
+      previewGlobalFontPreloads,
       previewCss,
       previewJsData,
     }: {
       previewCss: string;
       previewGlobalCss: string;
+      previewGlobalFontCss: string;
+      previewGlobalFontPreloads: string;
       previewJsData: string;
     }) => `
     <html>
       <head>
-        <script type="importmap">
-          ${JSON.stringify(importMap)}
-        </script>
+        ${importMapTags}
+        ${previewGlobalFontPreloads}
+        <style>${previewGlobalFontCss}</style>
         <style>${previewGlobalCss}</style>
         ${
           // Add CSS for all code components except the current one.
@@ -164,7 +163,7 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
         </script>
       </body>
     </html>`,
-    [codeComponents, componentId, importMap],
+    [codeComponents, componentId, importMapTags],
   );
 
   // Verifies that the component's JS code has a default export.
@@ -216,7 +215,7 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
     try {
       const ast = parse(sourceCodeJs, {
         sourceType: 'module',
-        plugins: ['jsx'],
+        plugins: ['jsx', 'typescript'],
       });
       collectImportedJsComponents(ast);
       if (hasDefaultExport(ast)) {
@@ -244,6 +243,15 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
     // @see ui/lib/code-editor-preview.js
     const propValues = getPropValuesForPreview(props);
     const slotNames = getSlotNamesForPreview(slots);
+    const previewGlobalFontCss = buildFontFaceStyles(brandKitFonts ?? []);
+    const previewGlobalFontPreloads = getFontPreloadDefinitions(
+      brandKitFonts ?? [],
+    )
+      .map(
+        ({ href, type }) =>
+          `<link rel="preload" as="font" type="${type}" href="${href}" crossorigin="anonymous" />`,
+      )
+      .join('\n');
     // Remove the `canvas` and `canvasExtension` properties from `drupalSettings`.
     // They are only added for the Canvas UI, and are not available normally.
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -263,6 +271,8 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
       getIframeSrc({
         previewCss: compiledCss,
         previewGlobalCss: compiledGlobalCss,
+        previewGlobalFontCss,
+        previewGlobalFontPreloads,
         previewJsData,
       }),
     );
@@ -271,6 +281,7 @@ const Preview = ({ isLoading = false }: { isLoading?: boolean }) => {
     compiledGlobalCss,
     compiledJs,
     getIframeSrc,
+    brandKitFonts,
     previewCompiledJsForSlots,
     props,
     slots,

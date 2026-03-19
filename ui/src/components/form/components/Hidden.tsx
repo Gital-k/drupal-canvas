@@ -1,67 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 
-import { useFieldContext } from '@/components/form/contexts/FieldContext';
-import { useSafeRHFContext } from '@/components/form/contexts/FormContext';
 import useMutationObserver from '@/hooks/useMutationObserver';
 import { a2p } from '@/local_packages/utils';
-import { VALUE_THAT_MEANS_REMOVE } from '@/utils/function-utils';
 
 import type { Attributes } from '@/types/DrupalAttribute';
 
 const Hidden = ({ attributes }: { attributes?: Attributes }) => {
   const [value, setValue] = useState(attributes?.value || '');
   const ref = useRef<HTMLInputElement | null>(null);
-
-  // Get react-hook-form context to update form state
-  const rhfMethods = useSafeRHFContext();
-  const fieldName = attributes?.name || attributes?.['data-canvas-name'];
-  const fieldContext = useFieldContext();
-
-  useEffect(() => {
-    // Add a mutation observer to the form element this input belongs to. This
-    // allows us to detect when the input is removed from the DOM, which allows
-    // us to communicate that removal to the Redux store.
-    // Because the observer is attached to a parent of the ref, it is added here
-    // instead of using the `useMutationObserver` hook as placing it in the
-    // useEffect ensures the full form has been rendered already.
-    let observer: MutationObserver | null = null;
-    if (ref.current) {
-      const name = ref.current.name;
-      observer = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-          const removedNode = mutation.removedNodes[0] as Element | null;
-          // Check if  the removed element is the input managed by this
-          // component.
-          if (
-            removedNode &&
-            'querySelector' in removedNode &&
-            removedNode.querySelector(`[name="${name}"]`) &&
-            ref.current
-          ) {
-            ref.current.value = '';
-            fieldContext?.triggerChange(VALUE_THAT_MEANS_REMOVE, ref.current);
-          }
-        });
-      });
-
-      if (
-        ref.current &&
-        'closest' in ref.current &&
-        ref.current.closest('form') &&
-        observer instanceof MutationObserver
-      ) {
-        observer.observe(ref.current.closest('form')!, {
-          childList: true,
-          subtree: true,
-        });
-      }
-    }
-    return () => {
-      if (observer instanceof MutationObserver) {
-        observer.disconnect();
-      }
-    };
-  }, [rhfMethods, fieldName, fieldContext]);
 
   // Hidden field values might be updated by AJAX requests and those value
   // changes should persist on rerender instead of falling back to the initial

@@ -6,7 +6,6 @@ import {
 } from '@/components/form/formUtil';
 import { isEvaluatedComponentModel } from '@/features/layout/layoutModelSlice';
 import { setPreviewBackgroundUpdate } from '@/features/pagePreview/previewSlice';
-import { flaggedForRemoval } from '@/utils/function-utils';
 
 import type { PropsValues } from '@drupal-canvas/types';
 import type { Dispatch } from '@reduxjs/toolkit';
@@ -71,25 +70,6 @@ export const createComponentFormStateHandler = (
     // removal flagging is not necessary for all prop types. It is used for
     // props with complex prop shapes where the empty-indicating value is nested
     // with the structure.
-    Object.keys(values).forEach((prop) => {
-      if (
-        flaggedForRemoval(values[prop]) &&
-        deps.component?.propSources?.[prop]
-      ) {
-        // If the prop is optional, it can be removed.
-        if (!deps.component.propSources[prop]?.required) {
-          if (isEvaluatedComponentModel(selectedModel)) {
-            source[prop].value = [];
-          }
-          resolved[prop] = [];
-        } else {
-          // If the prop is required, we need to set it back to the default.
-          resolved[prop] =
-            deps.component.propSources[prop].default_values.resolved;
-        }
-      }
-    });
-
     let backgroundPreviewUpdate = false;
     if (deps.isScalarProp) {
       // Fire an event to allow listeners to attempt real-time updates.

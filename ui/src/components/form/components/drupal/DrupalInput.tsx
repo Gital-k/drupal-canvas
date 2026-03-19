@@ -8,14 +8,17 @@ import TextFieldAutocomplete from '@/components/form/components/TextFieldAutocom
 import { wrapRHF } from '@/components/form/wrapRHF';
 import { a2p } from '@/local_packages/utils.js';
 
-import type { Attributes } from '@/types/DrupalAttribute';
+import type {
+  Attributes,
+  NumericInputAttributes,
+} from '@/types/DrupalAttribute';
 
 const DrupalInput = ({
   attributes = {},
   element,
 }: {
-  attributes?: Attributes;
   element: any;
+  attributes?: Attributes | NumericInputAttributes;
 }) => {
   switch (attributes?.type) {
     case 'checkbox': {

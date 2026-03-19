@@ -6,11 +6,13 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   drupalCanvasCompat,
   drupalCanvasCompatServer,
-  ensureHardcodedHostGlobalCssExists,
+  ensureHostGlobalCssExists,
+  extractComponentPreviewMetadataFromComponentYaml,
   extractFirstExamplePropsFromComponentYaml,
   getWorkbenchHostGlobalCssVirtualUrl,
   isSupportedPreviewModulePath,
-  resolveHardcodedHostGlobalCssPath,
+  resolveCanvasConfig,
+  resolveHostGlobalCssPath,
   toViteFsUrl,
 } from './index';
 
@@ -105,35 +107,82 @@ describe('vite-compat', () => {
     });
   });
 
-  it('resolves hardcoded host global css path', () => {
-    const resolved = resolveHardcodedHostGlobalCssPath('/tmp/host');
-    expect(resolved).toBe('/tmp/host/src/components/global.css');
+  it('resolves host global css path from canvas.config.json', async () => {
+    const root = await makeTempDir();
+    await fs.writeFile(
+      path.join(root, 'canvas.config.json'),
+      JSON.stringify({ globalCssPath: './app/components/global.css' }),
+      'utf-8',
+    );
+    const resolved = resolveHostGlobalCssPath(root);
+    expect(resolved).toBe(path.join(root, 'app/components/global.css'));
   });
 
-  it('resolves hardcoded host global css path with custom alias base dir', () => {
-    const resolved = resolveHardcodedHostGlobalCssPath('/tmp/host', 'app');
-    expect(resolved).toBe('/tmp/host/app/components/global.css');
+  it('resolves pagesDir from canvas.config.json', async () => {
+    const root = await makeTempDir();
+    await fs.writeFile(
+      path.join(root, 'canvas.config.json'),
+      JSON.stringify({ pagesDir: './content/pages' }),
+      'utf-8',
+    );
+
+    expect(resolveCanvasConfig({ hostRoot: root }).pagesDir).toBe(
+      './content/pages',
+    );
   });
 
-  it('validates hardcoded host global css existence', async () => {
+  it('uses default pagesDir when canvas.config.json is missing', async () => {
+    const root = await makeTempDir();
+
+    expect(resolveCanvasConfig({ hostRoot: root }).pagesDir).toBe('./pages');
+  });
+
+  it('extracts component labels and example props from component metadata', async () => {
+    const root = await makeTempDir();
+    const metadataPath = path.join(root, 'component.yml');
+    await fs.writeFile(
+      metadataPath,
+      [
+        'name: Hero',
+        'props:',
+        '  properties:',
+        '    title:',
+        '      type: string',
+        '      examples:',
+        '        - Hello',
+      ].join('\n'),
+      'utf-8',
+    );
+
+    const result =
+      await extractComponentPreviewMetadataFromComponentYaml(metadataPath);
+    expect(result).toEqual({
+      label: 'Hero',
+      exampleProps: {
+        title: 'Hello',
+      },
+    });
+  });
+
+  it('validates host global css existence', async () => {
     const root = await makeTempDir();
     const cssPath = path.join(root, 'src/components/global.css');
     await fs.mkdir(path.dirname(cssPath), { recursive: true });
     await fs.writeFile(cssPath, '@import "tailwindcss";', 'utf-8');
 
-    const resolved = await ensureHardcodedHostGlobalCssExists(root);
+    const resolved = await ensureHostGlobalCssExists(root);
     expect(resolved).toBe(cssPath);
   });
 
-  it('throws when hardcoded host global css is missing', async () => {
+  it('throws when host global css is missing', async () => {
     const root = await makeTempDir();
-    await expect(ensureHardcodedHostGlobalCssExists(root)).rejects.toThrow(
+    await expect(ensureHostGlobalCssExists(root)).rejects.toThrow(
       'Missing required host Tailwind entrypoint',
     );
   });
 
-  it('builds @fs URL for hardcoded host css path', () => {
-    const resolvedPath = resolveHardcodedHostGlobalCssPath('/tmp/host');
+  it('builds @fs URL for host css path', () => {
+    const resolvedPath = resolveHostGlobalCssPath('/tmp/host');
     expect(toViteFsUrl(resolvedPath)).toBe(
       '/@fs/tmp/host/src/components/global.css',
     );
