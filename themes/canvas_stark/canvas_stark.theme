@@ -171,6 +171,12 @@ function canvas_stark_form_node_form_alter(array &$form, FormStateInterface $for
 
 function canvas_stark_preprocess_field_multiple_value_form(array &$variables): void {
   $variables['attributes']['data-canvas-multiple-values'] = 'true';
+
+  if (isset($variables['table']['#rows'])) {
+    $row_count = count($variables['table']['#rows']);
+    $variables['attributes']['data-canvas-row-count'] = $row_count;
+  }
+
   if (isset($variables['element']['#prop_link_data']) && !empty($variables['multiple'])) {
     $old_data = $variables['table']['#header'][0]['data'];
     $variables['table']['#header'][0]['data'] = [
@@ -242,6 +248,7 @@ function canvas_stark_preprocess_fieldset__media_library_widget(array &$variable
   if (isset($variables['element']['#component_prop_name'])) {
     $variables['component_prop_name'] = $variables['element']['#component_prop_name'];
   }
+  unset($variables['prefix']['weight_toggle']);
 }
 
 function canvas_stark_preprocess_fieldset(array &$variables): void {

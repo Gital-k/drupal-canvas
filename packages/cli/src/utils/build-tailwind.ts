@@ -2,7 +2,9 @@ import { promises as fs } from 'node:fs';
 import path from 'path';
 import { compileCss, extractClassNameCandidates } from 'tailwindcss-in-browser';
 import * as p from '@clack/prompts';
+import { JS_EXTENSIONS } from '@drupal-canvas/discovery';
 import { upsertClassNameCandidatesInComment } from '@drupal-canvas/ui/features/code-editor/utils/classNameCandidates';
+import { resolveHostGlobalCssPath } from '@drupal-canvas/vite-compat';
 
 import { getConfig } from '../config';
 import { transformCss } from '../lib/transform-css';
@@ -35,12 +37,10 @@ export async function downloadGlobalCssInBackground(): Promise<string> {
  * @returns Promise resolving to global CSS content
  */
 export async function getGlobalCss(useLocal: boolean = true): Promise<string> {
-  const config = getConfig();
-  const localGlobalCssPath = path.join(config.componentDir, 'global.css');
-
   // If local-first and file exists, use local file
-  if (useLocal && (await fileExists(localGlobalCssPath))) {
-    return await fs.readFile(localGlobalCssPath, 'utf-8');
+  const globalCssPath = resolveHostGlobalCssPath(process.cwd());
+  if (useLocal && (await fileExists(globalCssPath))) {
+    return await fs.readFile(globalCssPath, 'utf-8');
   }
 
   // Otherwise, download from Canvas (background download)
@@ -111,11 +111,11 @@ export async function getClassNameCandidatesForComponent(
   const resolvedDistDir = distDir ?? path.join(componentsDir, 'dist');
 
   // Find the JS entry file in the cache directory.
-  // It could be index.jsx (kind: 'index') or [component-name].jsx (kind: 'named').
-  const JS_EXTENSIONS = ['.jsx'];
   const cacheEntries = await fs.readdir(dir);
   const jsFile = cacheEntries.find((file) =>
-    JS_EXTENSIONS.includes(path.extname(file).toLowerCase()),
+    (JS_EXTENSIONS as readonly string[]).includes(
+      path.extname(file).toLowerCase(),
+    ),
   );
   if (!jsFile) {
     p.log.warn(`No JS file found in cache directory: ${dir}`);

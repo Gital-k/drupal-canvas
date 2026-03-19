@@ -9,6 +9,7 @@ use PHPUnit\Framework\Attributes\Group;
 use ColinODell\PsrTestLogger\TestLogger;
 use Drupal\canvas\PropSource\PropSource;
 use Drupal\Core\Cache\Cache;
+use Drupal\Core\Entity\Entity\EntityViewMode;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 use Drupal\canvas\Entity\ContentTemplate;
@@ -90,6 +91,20 @@ final class NodeTemplatesTest extends CanvasKernelTestBase {
 
   #[TestWith([
     TRUE,
+    'full',
+    TRUE,
+    [
+      // Components in the component tree.
+      'config:canvas.component.sdc.canvas_test_sdc.my-hero',
+      'config:canvas.component.sdc.canvas_test_sdc.props-no-slots',
+      // Cacheability of resolved props.
+      'node:1',
+      'config:filter.format.basic_html',
+    ],
+  ])]
+  #[TestWith([
+    TRUE,
+    'card',
     TRUE,
     [
       // Components in the component tree.
@@ -102,6 +117,7 @@ final class NodeTemplatesTest extends CanvasKernelTestBase {
   ])]
   #[TestWith([
     FALSE,
+    'full',
     FALSE,
     [
       // Components in the component tree — minus the ones whose props failed to
@@ -114,12 +130,20 @@ final class NodeTemplatesTest extends CanvasKernelTestBase {
       'node:1',
     ],
   ])]
-  public function testOptContentTypeIntoCanvas(bool $node_is_published, bool $expected_entity_data_is_accessible, array $expected_node_component_tree_cache_tags): void {
+  public function testOptContentTypeIntoCanvas(bool $node_is_published, string $view_mode, bool $expected_entity_data_is_accessible, array $expected_node_component_tree_cache_tags): void {
+    // Create an alternate view mode, so we can test that content templates work
+    // for more than just the full view mode.
+    EntityViewMode::create([
+      'id' => 'node.card',
+      'label' => 'Card',
+      'targetEntityType' => 'node',
+    ])->save();
+
     ContentTemplate::create([
-      'id' => 'node.article.full',
+      'id' => "node.article.$view_mode",
       'content_entity_type_id' => 'node',
       'content_entity_type_bundle' => 'article',
-      'content_entity_type_view_mode' => 'full',
+      'content_entity_type_view_mode' => $view_mode,
       'component_tree' => [
         // A static marker so we can easily tell if we're rendering with Canvas,
         // but simultaneously tests all currently supported dynamic ways of
@@ -187,7 +211,7 @@ HTML;
     self::assertFalse($node->isNew());
     $viewBuilder = $this->container->get(EntityTypeManagerInterface::class)->getViewBuilder('node');
     self::assertInstanceOf(ContentTemplateAwareViewBuilder::class, $viewBuilder);
-    $build = $viewBuilder->view($node);
+    $build = $viewBuilder->view($node, $view_mode);
     $crawler = $this->crawlerForRenderArray($build);
     // The content type has not been opted into Canvas, so it should not be using
     // Canvas for rendering.
@@ -203,7 +227,7 @@ HTML;
       // TRICKY: this cache tag is present because the config entity does exist,
       // but is disabled. It was assessed whether it should be used, hence its
       // cache tag is present.
-      'config:canvas.content_template.node.article.full',
+      "config:canvas.content_template.node.article.$view_mode",
     ], $build['#cache']['tags']);
     self::assertEqualsCanonicalizing([
       ...self::REQUIRED_CACHE_CONTEXTS,
@@ -214,13 +238,13 @@ HTML;
       'entity_view',
       'node',
       (string) $node->id(),
-      'full',
+      $view_mode,
       'without-canvas',
     ], $build['#cache']['keys']);
 
     // Confirm although we've opted in the status of the template is false so
     // will not be used.
-    $template = ContentTemplate::load('node.article.full');
+    $template = ContentTemplate::load("node.article.$view_mode");
     \assert($template instanceof ContentTemplate);
     self::assertFalse($template->status());
     self::assertCount(0, $crawler->filter('h1.my-hero__heading:contains("Canvas is large and in charge!")'));
@@ -242,7 +266,7 @@ HTML;
     $this->container->get(LoggerChannelFactoryInterface::class)
       ->get('canvas_test')
       ->addLogger($logger);
-    $build = $viewBuilder->view($node);
+    $build = $viewBuilder->view($node, $view_mode);
     $crawler = $this->crawlerForRenderArray($build);
     $html = $crawler->html();
 
@@ -254,7 +278,7 @@ HTML;
     self::assertCount($expected_entity_data_is_accessible ? 1 : 0, $crawler->filter('p:contains("Hey this is allowed")'));
     self::assertCount(0, $crawler->filter('script'));
     self::assertEqualsCanonicalizing([
-      'config:canvas.content_template.node.article.full',
+      "config:canvas.content_template.node.article.$view_mode",
       ...$expected_node_component_tree_cache_tags,
     ], $build['#cache']['tags']);
     self::assertEqualsCanonicalizing([
@@ -266,7 +290,7 @@ HTML;
       'entity_view',
       'node',
       (string) $node->id(),
-      'full',
+      $view_mode,
       'with-canvas',
     ], $build['#cache']['keys']);
 

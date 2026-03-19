@@ -184,6 +184,9 @@ final class ApiConfigAutoSaveControllersTest extends HttpApiTestBase {
             'original' => 'console.log("Test")',
             'compiled' => 'console.log("Test")',
           ],
+          'imports' => NULL,
+          'assets' => NULL,
+          'shared' => NULL,
         ],
         [
           'css' => [
@@ -202,6 +205,9 @@ final class ApiConfigAutoSaveControllersTest extends HttpApiTestBase {
             'original' => 'console.log("Test")',
             'compiled' => 'console.log("Test")',
           ],
+          'imports' => NULL,
+          'assets' => NULL,
+          'shared' => NULL,
         ],
         ['js', 'compiled'],
         ['css', 'compiled'],
@@ -363,10 +369,6 @@ final class ApiConfigAutoSaveControllersTest extends HttpApiTestBase {
       ->set('make_unused_managed_files_temporary', TRUE)
       ->save();
 
-    $brand_kit = BrandKit::load(BrandKit::GLOBAL_ID);
-    \assert($brand_kit instanceof BrandKit);
-    $brand_kit->delete();
-
     $initial_entity = [
       'id' => 'global',
       'label' => 'Global brand kit',
@@ -399,15 +401,6 @@ final class ApiConfigAutoSaveControllersTest extends HttpApiTestBase {
       'variantType' => 'variable',
       'url' => $font_url,
     ];
-
-    $post_url = Url::fromUri('base:/canvas/api/v0/config/brand_kit');
-    $request_options = [
-      RequestOptions::HEADERS => [
-        'Content-Type' => 'application/json',
-      ],
-      RequestOptions::JSON => $initial_entity,
-    ];
-    $this->assertExpectedResponse('POST', $post_url, $request_options, 201, NULL, NULL, NULL, NULL);
 
     $this->performAutoSave(
       [
@@ -465,10 +458,6 @@ final class ApiConfigAutoSaveControllersTest extends HttpApiTestBase {
       ->set('make_unused_managed_files_temporary', TRUE)
       ->save();
 
-    $brand_kit = BrandKit::load(BrandKit::GLOBAL_ID);
-    \assert($brand_kit instanceof BrandKit);
-    $brand_kit->delete();
-
     $initial_entity = [
       'id' => 'global',
       'label' => 'Global brand kit',
@@ -501,15 +490,6 @@ final class ApiConfigAutoSaveControllersTest extends HttpApiTestBase {
       'variantType' => 'variable',
       'url' => $font_url,
     ];
-
-    $post_url = Url::fromUri('base:/canvas/api/v0/config/brand_kit');
-    $request_options = [
-      RequestOptions::HEADERS => [
-        'Content-Type' => 'application/json',
-      ],
-      RequestOptions::JSON => $initial_entity,
-    ];
-    $this->assertExpectedResponse('POST', $post_url, $request_options, 201, NULL, NULL, NULL, NULL);
 
     $this->performAutoSave(
       [

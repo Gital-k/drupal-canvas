@@ -149,7 +149,7 @@ class ComponentInputsDependenciesTest extends CanvasKernelTestBase {
       'uuid' => $uuid->generate(),
       'component_id' => 'sdc.canvas_test_sdc.heading',
       'inputs' => [
-        'heading' => [
+        'text' => [
           'sourceType' => PropSource::EntityField->value,
           'expression' => 'ℹ︎␜entity:node:alpha␝body␞␟value',
         ],
@@ -219,13 +219,10 @@ class ComponentInputsDependenciesTest extends CanvasKernelTestBase {
         'image.style.canvas_parametrized_width',
         'node.type.alpha',
         'field.field.node.alpha.field_hero',
-        'image.style.canvas_parametrized_width',
         'node.type.alpha',
         'field.field.node.alpha.field_hero',
-        'image.style.canvas_parametrized_width',
         'node.type.alpha',
         'field.field.node.alpha.field_hero',
-        'image.style.canvas_parametrized_width',
       ],
       'content' => [
         'file:file:' . $file_uuid,

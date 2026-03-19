@@ -2,6 +2,7 @@ import { existsSync, promises as fs, statSync } from 'node:fs';
 import path from 'node:path';
 import { parse } from '@babel/parser';
 import * as p from '@clack/prompts';
+import { JS_EXTENSIONS } from '@drupal-canvas/discovery';
 
 import { ASSET_EXTENSIONS } from './asset-extensions';
 
@@ -38,12 +39,11 @@ export interface CollectDependenciesResult {
   unresolvedAliasImports: Set<string>;
 }
 
-const JS_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx'] as const;
 const ALIAS_PREFIX = '@/';
 
 function isJSFile(filePath: string): boolean {
   const ext = path.extname(filePath).toLowerCase();
-  return JS_EXTENSIONS.includes(ext as (typeof JS_EXTENSIONS)[number]);
+  return (JS_EXTENSIONS as readonly string[]).includes(ext);
 }
 
 function isCSSFile(filePath: string): boolean {
@@ -298,31 +298,6 @@ export async function analyzeImports(
 }
 
 /**
- * Extract the package name from an import source.
- * Handles scoped packages (@org/pkg) and regular packages.
- * Preserves full paths for CSS-related imports (e.g., 'swiper/css').
- */
-function getPackageName(source: string): string {
-  // Preserve full path for CSS-related imports - these are typically
-  // side-effect imports that must be bundled separately
-  if (
-    source.includes('/css') ||
-    source.includes('/styles') ||
-    source.endsWith('.css')
-  ) {
-    return source;
-  }
-
-  if (source.startsWith('@')) {
-    // Scoped package: @org/pkg or @org/pkg/subpath
-    const parts = source.split('/');
-    return parts.length >= 2 ? `${parts[0]}/${parts[1]}` : source;
-  }
-  // Regular package: pkg or pkg/subpath
-  return source.split('/')[0];
-}
-
-/**
  * Collect all imports from component entry files.
  * Returns third-party package names, resolved alias imports, and unresolved alias imports.
  */
@@ -346,7 +321,7 @@ export async function collectImports(
   for (const [, analyzedFile] of analysisResult.files) {
     for (const imp of analyzedFile.imports) {
       if (imp.category === 'third-party' && !imp.isSVG && !imp.isImage) {
-        const packageName = getPackageName(imp.source);
+        const packageName = imp.source;
         thirdPartyPackages.add(packageName);
       }
 

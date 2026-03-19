@@ -1,9 +1,9 @@
-import { existsSync, promises as fs, statSync } from 'node:fs';
+import { existsSync, promises as fs, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import * as yaml from 'js-yaml';
 import svgr from 'vite-plugin-svgr';
 
-import { isSupportedPreviewModulePath, toViteFsUrl } from './runtime';
+import { isSupportedPreviewModulePath, toViteFsUrl } from './runtime.ts';
 
 import type { Plugin } from 'vite';
 
@@ -11,15 +11,6 @@ export interface CanvasViteCompatOptions {
   hostRoot: string;
   hostAliasBaseDir?: string;
 }
-
-// @todo Implement automatic discovery of the Tailwind CSS entrypoint in @drupal-canvas/discovery.
-// Idea: Search for the following strings in files:
-// - '@import "tailwindcss"' — note that this is optional in the in-browser code editor
-// - '@theme
-// - Identify more patterns that indicate a Tailwind CSS entrypoint.
-// - Also a file named `global.css` is a good indicator.
-const HARDCODED_HOST_GLOBAL_CSS_RELATIVE_PATH_FROM_ALIAS_BASE =
-  'components/global.css';
 
 const WORKBENCH_HOST_GLOBAL_CSS_VIRTUAL_URL =
   '/@id/virtual:canvas-host-global.css';
@@ -100,32 +91,23 @@ function isPathWithinRoot(filePath: string, rootPath: string): boolean {
 
 export { isSupportedPreviewModulePath, toViteFsUrl };
 
-function resolveHostGlobalCssRelativePath(hostAliasBaseDir: string): string {
-  return path.join(
-    hostAliasBaseDir,
-    HARDCODED_HOST_GLOBAL_CSS_RELATIVE_PATH_FROM_ALIAS_BASE,
-  );
+// @todo Implement automatic discovery of the Tailwind CSS entrypoint in @drupal-canvas/discovery.
+// Idea: Search for the following strings in files:
+// - '@import "tailwindcss"' — note that this is optional in the in-browser code editor
+// - '@theme
+// - Identify more patterns that indicate a Tailwind CSS entrypoint.
+// - Also a file named `global.css` is a good indicator.
+export function resolveHostGlobalCssPath(hostRoot: string): string {
+  const canvasConfig = resolveCanvasConfig({ hostRoot });
+  return path.resolve(hostRoot, canvasConfig.globalCssPath);
 }
 
-export function resolveHardcodedHostGlobalCssPath(
+export async function ensureHostGlobalCssExists(
   hostRoot: string,
-  hostAliasBaseDir = 'src',
-): string {
-  return path.resolve(
-    hostRoot,
-    resolveHostGlobalCssRelativePath(hostAliasBaseDir),
-  );
-}
-
-export async function ensureHardcodedHostGlobalCssExists(
-  hostRoot: string,
-  hostAliasBaseDir = 'src',
 ): Promise<string> {
-  const resolvedPath = resolveHardcodedHostGlobalCssPath(
-    hostRoot,
-    hostAliasBaseDir,
-  );
-  const relativePath = resolveHostGlobalCssRelativePath(hostAliasBaseDir);
+  const resolvedPath = resolveHostGlobalCssPath(hostRoot);
+  const canvasConfig = resolveCanvasConfig({ hostRoot });
+  const relativePath = canvasConfig.globalCssPath;
   try {
     await fs.access(resolvedPath);
   } catch {
@@ -151,36 +133,54 @@ export function drupalCanvasCompatServer(
   };
 }
 
-export async function extractFirstExamplePropsFromComponentYaml(
+export interface ComponentPreviewMetadata {
+  label: string | null;
+  exampleProps: Record<string, unknown>;
+}
+
+export async function extractComponentPreviewMetadataFromComponentYaml(
   metadataPath: string,
-): Promise<Record<string, unknown>> {
+): Promise<ComponentPreviewMetadata> {
   try {
     const content = await fs.readFile(metadataPath, 'utf-8');
     const parsed = yaml.load(content);
     const root = asRecord(parsed);
     const props = asRecord(root?.props);
     const properties = asRecord(props?.properties);
-    if (!properties) {
-      return {};
+
+    const exampleProps: Record<string, unknown> = {};
+    if (properties) {
+      for (const [propName, rawPropDefinition] of Object.entries(properties)) {
+        const propDefinition = asRecord(rawPropDefinition);
+        if (!propDefinition) {
+          continue;
+        }
+
+        const examples = propDefinition.examples;
+        if (Array.isArray(examples) && examples.length > 0) {
+          exampleProps[propName] = examples[0];
+        }
+      }
     }
 
-    const result: Record<string, unknown> = {};
-    for (const [propName, rawPropDefinition] of Object.entries(properties)) {
-      const propDefinition = asRecord(rawPropDefinition);
-      if (!propDefinition) {
-        continue;
-      }
-
-      const examples = propDefinition.examples;
-      if (Array.isArray(examples) && examples.length > 0) {
-        result[propName] = examples[0];
-      }
-    }
-
-    return result;
+    return {
+      label: typeof root?.name === 'string' ? root.name : null,
+      exampleProps,
+    };
   } catch {
-    return {};
+    return {
+      label: null,
+      exampleProps: {},
+    };
   }
+}
+
+export async function extractFirstExamplePropsFromComponentYaml(
+  metadataPath: string,
+): Promise<Record<string, unknown>> {
+  const previewMetadata =
+    await extractComponentPreviewMetadataFromComponentYaml(metadataPath);
+  return previewMetadata.exampleProps;
 }
 
 export function drupalCanvasCompat(options: CanvasViteCompatOptions): Plugin[] {
@@ -219,4 +219,48 @@ export function drupalCanvasCompat(options: CanvasViteCompatOptions): Plugin[] {
   );
 
   return plugins;
+}
+
+export interface CanvasConfig {
+  aliasBaseDir: string;
+  outputDir: string;
+  componentDir: string;
+  pagesDir: string;
+  deprecatedComponentDir: string;
+  globalCssPath: string;
+}
+
+export function resolveCanvasConfig(
+  options: CanvasViteCompatOptions,
+): CanvasConfig {
+  const DEFAULT_CANVAS_CONFIG: CanvasConfig = {
+    aliasBaseDir: 'src',
+    outputDir: 'dist',
+    componentDir: options.hostRoot,
+    pagesDir: './pages',
+    deprecatedComponentDir: './components',
+    globalCssPath: './src/components/global.css',
+  };
+
+  const configPath = path.resolve(options.hostRoot, 'canvas.config.json');
+  if (!existsSync(configPath)) {
+    return { ...DEFAULT_CANVAS_CONFIG };
+  }
+
+  try {
+    const raw = readFileSync(configPath, 'utf-8');
+    const parsed = JSON.parse(raw) as Partial<CanvasConfig>;
+    return {
+      aliasBaseDir: parsed.aliasBaseDir ?? DEFAULT_CANVAS_CONFIG.aliasBaseDir,
+      outputDir: parsed.outputDir ?? DEFAULT_CANVAS_CONFIG.outputDir,
+      componentDir: parsed.componentDir ?? DEFAULT_CANVAS_CONFIG.componentDir,
+      pagesDir: parsed.pagesDir ?? DEFAULT_CANVAS_CONFIG.pagesDir,
+      deprecatedComponentDir:
+        parsed.componentDir ?? DEFAULT_CANVAS_CONFIG.deprecatedComponentDir,
+      globalCssPath:
+        parsed.globalCssPath ?? DEFAULT_CANVAS_CONFIG.globalCssPath,
+    };
+  } catch {
+    return { ...DEFAULT_CANVAS_CONFIG };
+  }
 }

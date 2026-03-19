@@ -41,18 +41,22 @@ properties:
 ```json
 {
   "componentDir": "./components",
+  "pagesDir": "./pages",
   "aliasBaseDir": "src",
-  "outputDir": "dist"
+  "outputDir": "dist",
+  "globalCssPath": "./src/components/global.css"
 }
 ```
 
 **Properties:**
 
-| Property       | Default         | Description                                                                                                               |
-| -------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `componentDir` | `process.cwd()` | Directory where Code Components are stored in the filesystem.                                                             |
-| `aliasBaseDir` | `"src"`         | Base directory for module resolution when using path aliases in your components. Tied to your project's import structure. |
-| `outputDir`    | `"dist"`        | Build output directory (similar to Vite's `build.outDir`). Defines where compiled assets are generated.                   |
+| Property        | Default                         | Description                                                                                                               |
+| --------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `componentDir`  | `process.cwd()`                 | Directory where Code Components are stored in the filesystem.                                                             |
+| `pagesDir`      | `"./pages"`                     | Directory where page specs are stored in the filesystem.                                                                  |
+| `aliasBaseDir`  | `"src"`                         | Base directory for module resolution when using path aliases in your components. Tied to your project's import structure. |
+| `outputDir`     | `"dist"`                        | Build output directory (similar to Vite's `build.outDir`). Defines where compiled assets are generated.                   |
+| `globalCssPath` | `"./src/components/global.css"` | Path to the global CSS file.                                                                                              |
 
 If `canvas.config.json` is not present, the CLI will use the default values
 shown above.
@@ -93,8 +97,8 @@ provided by the Drupal Canvas OAuth module (`canvas_oauth`).
 
 The CLI uses different precedence rules depending on the type of configuration:
 
-**For canvas.config.json properties** (`componentDir`, `aliasBaseDir`,
-`outputDir`):
+**For canvas.config.json properties** (`componentDir`, `pagesDir`,
+`aliasBaseDir`, `outputDir`, `globalCssPath`):
 
 Configuration sources are applied in order of precedence from highest to lowest:
 
@@ -218,6 +222,56 @@ confirmation. Use `--yes` for non-interactive mode (suitable for CI/CD), or
 `--skip-overwrite` to preserve existing components. Global CSS assets are
 downloaded by default and can be controlled with `--skip-css` to exclude them or
 `--css-only` to download only CSS without components.
+
+---
+
+### `pull`
+
+Pull code components and global CSS to your local filesystem.
+
+**Usage:**
+
+```bash
+npx canvas pull [options]
+```
+
+**Options:**
+
+- `-d, --dir <directory>`: Component directory (defaults to `componentDir` from
+  `canvas.config.json` or current working directory)
+- `-y, --yes`: Skip all confirmation prompts (non-interactive mode)
+- `--skip-overwrite`: Skip items that already exist locally
+
+**About prompts:**
+
+- Without flags: Prompts for confirmation before pulling
+- With `--yes`: Fully non-interactive (suitable for CI/CD)
+- With `--skip-overwrite`: Skips items that already exist locally
+- With both `--yes --skip-overwrite`: Fully non-interactive and only pulls new
+  items
+
+**Examples:**
+
+Pull everything:
+
+```bash
+npx canvas pull
+```
+
+Pull only new items (skip existing):
+
+```bash
+npx canvas pull --skip-overwrite
+```
+
+Fully non-interactive, only pull new items:
+
+```bash
+npx canvas pull --yes --skip-overwrite
+```
+
+Pulls all components and global CSS from your site. Use `--skip-overwrite` to
+skip items that already exist locally.
 
 ---
 
@@ -475,6 +529,55 @@ builds and uploads global Tailwind CSS assets unless `--no-tailwind` is
 specified. Global CSS upload can be controlled with `--skip-css` to exclude it
 or `--css-only` to upload only CSS without components. Existing components on
 the site will be updated if they already exist.
+
+---
+
+### `push`
+
+> ⚠️ Experimental: This command is in an early, experimental phase.
+
+Build and push all local components, global CSS, and build artifacts to Drupal.
+
+**Usage:**
+
+```bash
+npx canvas push [options]
+```
+
+**Options:**
+
+- `-d, --dir <directory>`: Directory to scan for components (defaults to
+  `componentDir` from `canvas.config.json` or current working directory)
+- `-y, --yes`: Skip confirmation prompts (non-interactive mode)
+
+**Examples:**
+
+Push all discovered components:
+
+```bash
+npx canvas push
+```
+
+Push components in a specific directory:
+
+```bash
+npx canvas push --dir ./my-components
+```
+
+Non-interactive mode for CI/CD:
+
+```bash
+npx canvas push --yes
+```
+
+This command discovers components, analyzes and bundles dependencies, builds
+Tailwind CSS, and uploads everything to your Drupal site including:
+
+1. **Components** - Built and uploaded as js_component config entities
+2. **Global CSS** - Tailwind CSS assets uploaded as asset_library
+3. **Vendor artifacts** - Bundled third-party dependencies
+4. **Local artifacts** - Bundled local imports (e.g., `@/utils`)
+5. **Shared chunks** - Common code shared between vendor bundles
 
 ---
 

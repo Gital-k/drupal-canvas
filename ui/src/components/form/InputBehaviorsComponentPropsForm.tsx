@@ -4,6 +4,7 @@ import { debounce } from 'lodash';
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import { useComponentTransforms } from '@/components/ComponentInstanceForm';
 import {
+  coerceValueForSchema,
   ComponentPreviewUpdateEvent,
   getPropSchemas,
   getPropsValues,
@@ -26,7 +27,7 @@ import useInputUIData from '@/hooks/useInputUIData';
 import { useGetComponentsQuery } from '@/services/componentAndLayout';
 import { useUpdateComponentMutation } from '@/services/preview';
 import { isPropSourceComponent } from '@/types/Component';
-import { flaggedForRemoval, parseValue } from '@/utils/function-utils';
+import { parseValue } from '@/utils/function-utils';
 
 import type { PropsValues } from '@drupal-canvas/types';
 import type {
@@ -89,30 +90,6 @@ export const InputBehaviorsComponentPropsForm = (
     //    in onQueryStarted in preview.ts
     // @see \Drupal\Core\Field\WidgetInterface::massageFormValues()
     const resolved = { ...selectedModel.resolved, ...values };
-    // Use JSON parse/stringify to create a deep clone of the source data
-    // that is mutable.
-    const source: Sources = isEvaluatedComponentModel(selectedModel)
-      ? JSON.parse(JSON.stringify(selectedModel.source))
-      : {};
-    // Check the object for any values that are flagged for removal. Note that
-    // removal flagging is not necessary for all prop types. It is used for
-    // props with complex prop shapes where the empty-indicating value is nested
-    // with the structure.
-    Object.keys(values).forEach((prop) => {
-      if (flaggedForRemoval(values[prop]) && component?.propSources?.[prop]) {
-        // If the prop is optional, it can be removed.
-        if (!component.propSources[prop]?.required) {
-          if (isEvaluatedComponentModel(selectedModel)) {
-            // Record the user's intent: deletion.
-            source[prop].value = null;
-          }
-          resolved[prop] = [];
-        } else {
-          // If the prop is required, we need to set it back to the default.
-          resolved[prop] = component.propSources[prop].default_values.resolved;
-        }
-      }
-    });
 
     let backgroundPreviewUpdate = false;
     if (isScalarProp) {
@@ -140,7 +117,7 @@ export const InputBehaviorsComponentPropsForm = (
           componentType: `${selectedComponentType}@${version}`,
           model: {
             source: syncPropSourcesToResolvedValues(
-              source,
+              selectedModel.source,
               component,
               resolved,
             ),
@@ -234,9 +211,12 @@ export const InputBehaviorsComponentPropsForm = (
     if (
       !shouldSkipPropValidation(fieldName, target, inputAndUiData, newValue)
     ) {
+      const schemas = getPropSchemas(inputAndUiData);
+      const schema = schemas?.[toPropName(fieldName, selectedComponent)];
+      const valueToValidate = coerceValueForSchema(newValue, schema);
       const [valid, validate] = validateProp(
         toPropName(fieldName, selectedComponent),
-        newValue,
+        valueToValidate,
         inputAndUiData,
       );
       return {

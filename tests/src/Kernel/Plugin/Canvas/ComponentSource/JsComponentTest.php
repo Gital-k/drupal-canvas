@@ -291,6 +291,25 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
           ],
         ],
       ],
+      'js.canvas_test_code_components_with_array_enums' => [
+        'prop_field_definitions' => [
+          'sizes' => [
+            'required' => FALSE,
+            'field_type' => 'list_string',
+            'cardinality' => FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
+            'field_storage_settings' => [
+              'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
+            ],
+            'field_instance_settings' => [],
+            'field_widget' => 'options_select',
+            'default_value' => [
+              ['value' => 'small'],
+              ['value' => 'medium'],
+            ],
+            'expression' => 'ℹ︎list_string␟value',
+          ],
+        ],
+      ],
       'js.canvas_test_code_components_with_array_props' => [
         'prop_field_definitions' => [
           'tags' => [
@@ -640,6 +659,29 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
                 'rel' => 'modulepreload',
                 'fetchpriority' => 'high',
                 'href' => \sprintf('/%s/files/astro-island/Ej9H8EwYfANZUT_jL84bUAXkK8F_p9-yZyj4Sxnz7C8.js', $site_path),
+              ],
+            ],
+          ],
+          'import_maps' => $default_imports,
+        ],
+      ],
+      'js.canvas_test_code_components_with_array_enums' => [
+        'cacheability' => (clone $default_cacheability)
+          ->setCacheTags([
+            'config:canvas.js_component.canvas_test_code_components_with_array_enums',
+          ]),
+        'attachments' => [
+          'library' => [
+            'canvas/astro_island.canvas_test_code_components_with_array_enums',
+            ...$default_libraries,
+          ],
+          'html_head_link' => [
+            ...$default_html_head_links,
+            [
+              [
+                'rel' => 'modulepreload',
+                'fetchpriority' => 'high',
+                'href' => \sprintf('/%s/files/astro-island/7fKtJmQzAnb_T2wt7cmJElNYyF2HbZVXG9NqBNTfGzw.js', $site_path),
               ],
             ],
           ],
@@ -1138,6 +1180,15 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
           'image',
         ],
       ],
+      'js.canvas_test_code_components_with_array_enums' => [
+        'module' => [
+          'core',
+          'options',
+        ],
+        'config' => [
+          'canvas.js_component.canvas_test_code_components_with_array_enums',
+        ],
+      ],
       'js.canvas_test_code_components_with_array_props' => [
         'config' => [
           'image.style.canvas_parametrized_width',
@@ -1230,6 +1281,34 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       'expected_validation_errors' => [],
       'expected_exception' => NULL,
       'expected_output_selector' => \sprintf('canvas-island[uid="%s"][props*="Tilly"][props*="19"]', self::UUID_CRASH_TEST_DUMMY),
+    ];
+
+    // Garbage (non-existent) prop should result in:
+    // - validation error (since 1.1.0)
+    // - hydration failing (`::getExplicitInput()` throwing an exception)
+    // TRICKY: This did not trigger a validation error before 1.1.0. Component
+    // instances created before 1.1.0 may still exist (they are not
+    // automatically updated), so expect the exception that occurs during
+    // hydration to appear similar to a rendering exception.
+    // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::getExplicitInput()
+    // @see https://www.drupal.org/project/canvas/issues/3524401
+    yield "JS Component with extraneous prop, validation error (since 1.1.0), with hydration exception visible similar to rendering exception" => [
+      'component_id' => $component_id,
+      'inputs' => [
+        'age' => 19,
+        'name' => 'Tilly',
+        // But instead trigger a crash during hydration.
+        // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::getExplicitInput()
+        'hydration_should_fail_on_this_non_existent_value' => TRUE,
+      ],
+      'expected_validation_errors' => [
+        '2.inputs.3204a711-a1bd-401d-9ce0-895665487eaa.hydration_should_fail_on_this_non_existent_value' => 'Component `3204a711-a1bd-401d-9ce0-895665487eaa`: the `hydration_should_fail_on_this_non_existent_value` prop is not defined.',
+      ],
+      'expected_exception' => [
+        'class' => \OutOfRangeException::class,
+        'message' => '\'hydration_should_fail_on_this_non_existent_value\' is not a prop on this version of the Component \'Code component: <em class="placeholder">With props</em>\'.',
+      ],
+      'expected_output_selector' => NULL,
     ];
 
     yield "JS Component with valid props, JSON encoding exception" => [
@@ -1702,6 +1781,53 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
                 'height' => 900,
                 'alt' => 'Example image placeholder',
               ],
+            ],
+          ],
+        ],
+        'transforms' => [],
+      ],
+      'js.canvas_test_code_components_with_array_enums' => [
+        'expected_output_selectors' => [
+          'canvas-island[opts*="With array enums"][props*="sizes"]',
+          'script[blocking="render"][src*="/packages/astro-hydration/dist/client.js"]',
+        ],
+        'source' => 'Code component',
+        'metadata' => [
+          'slots' => [],
+        ],
+        'propSources' => [
+          'sizes' => [
+            'required' => FALSE,
+            'jsonSchema' => [
+              'type' => 'array',
+              'items' => [
+                'type' => 'string',
+                'enum' => [
+                  'small',
+                  'medium',
+                  'large',
+                ],
+                'meta:enum' => [
+                  'small' => 'Small',
+                  'medium' => 'Medium',
+                  'large' => 'Large',
+                ],
+              ],
+            ],
+            'sourceType' => 'static:field_item:list_string',
+            'expression' => 'ℹ︎list_string␟value',
+            'sourceTypeSettings' => [
+              'storage' => [
+                'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
+              ],
+              'cardinality' => FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
+            ],
+            'default_values' => [
+              'source' => [
+                ['value' => 'small'],
+                ['value' => 'medium'],
+              ],
+              'resolved' => ['small', 'medium'],
             ],
           ],
         ],
@@ -2505,6 +2631,32 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
           'sourceType' => 'static:field_item:string',
           'value' => [['value' => 'Valid name']],
           'expression' => 'ℹ︎string␟value',
+        ],
+      ],
+    ];
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function providerGetOptionsForExplicitInputEnumProp(): array {
+    return [
+      'non-array enum prop' => [
+        'component_id' => 'js.canvas_test_code_components_with_enums',
+        'prop_name' => 'favorite_color',
+        'expected_options' => [
+          'red' => 'Red',
+          'green' => 'Green',
+          'blue' => 'Blue',
+        ],
+      ],
+      'array-type enum prop with items' => [
+        'component_id' => 'js.canvas_test_code_components_with_array_enums',
+        'prop_name' => 'sizes',
+        'expected_options' => [
+          'small' => 'Small',
+          'medium' => 'Medium',
+          'large' => 'Large',
         ],
       ],
     ];

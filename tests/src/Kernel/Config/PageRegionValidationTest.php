@@ -11,6 +11,7 @@ use Drupal\canvas\PropSource\PropSource;
 use Drupal\Core\Extension\ThemeInstallerInterface;
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Exception\ConstraintViolationException;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Traits\BetterConfigDependencyManagerTrait;
 use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
 use Drupal\TestTools\Random;
@@ -36,20 +37,10 @@ class PageRegionValidationTest extends BetterConfigEntityValidationTestBase {
    * {@inheritdoc}
    */
   protected static $modules = [
+    ...CanvasKernelTestBase::CANVAS_KERNEL_TEST_MINIMAL_MODULES,
+    // Test components.
     'block',
-    'canvas',
     'canvas_test_sdc',
-    // Canvas's dependencies (modules providing field types + widgets).
-    'datetime',
-    'file',
-    'field',
-    'image',
-    'options',
-    'path',
-    'link',
-    'text',
-    'filter',
-    'user',
   ];
 
   /**
@@ -64,6 +55,7 @@ class PageRegionValidationTest extends BetterConfigEntityValidationTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
+    $this->installConfig(['canvas']);
     $this->container->get(ComponentSourceManager::class)->generateComponents();
     $generate_static_prop_source = function (string $label): array {
       return [
@@ -393,7 +385,6 @@ class PageRegionValidationTest extends BetterConfigEntityValidationTestBase {
    * {@inheritdoc}
    */
   public function testRequiredPropertyValuesMissing(?array $additional_expected_validation_errors_when_missing = NULL): void {
-    // @phpstan-ignore-next-line
     parent::testRequiredPropertyValuesMissing([
       'theme' => [
         'id' => 'This validation constraint is configured to inspect the properties <em class="placeholder">%parent.theme, %parent.region</em>, but some do not exist: <em class="placeholder">%parent.theme</em>.',

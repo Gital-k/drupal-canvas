@@ -121,6 +121,9 @@ services:
   Drupal\canvas\Entity\Routing\CanvasHtmlRouteEnhancer:
     tags:
       - { name: route_enhancer }
+  Drupal\canvas\Routing\ContentTemplatePreviewEntityEnhancer:
+    tags:
+      - { name: route_enhancer }
   Drupal\canvas\Routing\ContentTemplatePreviewEntityConverter:
     tags:
       - { name: paramconverter }
@@ -173,6 +176,7 @@ services:
   Drupal\canvas\Controller\ApiUsageControllers: {}
   Drupal\canvas\Controller\AddPageController: {}
   Drupal\canvas\Controller\ViewModeDisplayController: {}
+  Drupal\canvas\Controller\ApiArtifactController: {}
 
   # Decorators.
   Drupal\canvas\Render\ImportMapResponseAttachmentsProcessor:
@@ -188,4 +192,9 @@ services:
     decorates: messenger
     # We don't want any other module to display messages
     decoration_priority: -100
+    arguments: ['@.inner']
+  # @todo Remove after https://www.drupal.org/project/drupal/issues/3001284 lands.
+  Drupal\canvas\Block\BlockManagerDecorator:
+    public: false
+    decorates: plugin.manager.block
     arguments: ['@.inner']
