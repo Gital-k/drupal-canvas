@@ -20,7 +20,6 @@ use PHPUnit\Framework\Attributes\Group;
 #[Group('canvas_component_sources')]
 final class BlockManagerDecoratorTest extends CanvasKernelTestBase {
 
-  use GenerateComponentConfigTrait;
   use UserCreationTrait;
 
   /**
