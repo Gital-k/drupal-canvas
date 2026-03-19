@@ -70,7 +70,6 @@ final class ComponentInputsEvolutionTest extends CanvasKernelTestBase {
     $this->installEntitySchema('path_alias');
     $this->installEntitySchema(Page::ENTITY_TYPE_ID);
     $this->installSchema('user', 'users_data');
-    $this->container->get(ComponentSourceManager::class)->generateComponents();
     // Set up a test user "bob".
     $this->setUpCurrentUser(['name' => 'bob', 'uid' => 2]);
   }

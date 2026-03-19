@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Audit;
 
-use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\Page;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
@@ -26,7 +25,6 @@ abstract class ComponentAuditTestBase extends CanvasKernelTestBase {
     $this->installEntitySchema('media');
     $this->installEntitySchema('user');
     $this->installEntitySchema(Page::ENTITY_TYPE_ID);
-    $this->container->get(ComponentSourceManager::class)->generateComponents();
     $tested_component = Component::load('sdc.canvas_test_sdc.my-cta');
     \assert($tested_component instanceof Component);
     $this->tree = [

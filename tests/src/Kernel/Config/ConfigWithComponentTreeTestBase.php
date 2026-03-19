@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Config;
 
-use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use PHPUnit\Framework\Attributes\Group;
 use Drupal\Core\Config\Entity\ConfigEntityInterface;
 use Drupal\canvas\Entity\ComponentTreeEntityInterface;
@@ -58,14 +57,6 @@ abstract class ConfigWithComponentTreeTestBase extends CanvasKernelTestBase {
     'editor',
     'datetime',
   ];
-
-  /**
-   * {@inheritdoc}
-   */
-  protected function setUp(): void {
-    parent::setUp();
-    $this->container->get(ComponentSourceManager::class)->generateComponents();
-  }
 
   #[TestWith([
     [

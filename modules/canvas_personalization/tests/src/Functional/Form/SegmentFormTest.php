@@ -42,13 +42,6 @@ final class SegmentFormTest extends BrowserTestBase {
   ];
 
   /**
-   * {@inheritdoc}
-   */
-  protected function setUp(): void {
-    parent::setUp();
-  }
-
-  /**
    * Test callback.
    */
   public function testCreatingSegment(): void {

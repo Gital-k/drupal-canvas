@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
-use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use PHPUnit\Framework\Attributes\Group;
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Access\AccessResultForbidden;
@@ -40,7 +39,6 @@ class HomepageNodeDeletionTest extends CanvasKernelTestBase {
     $this->installEntitySchema('node');
     $this->installEntitySchema('path_alias');
     $this->installEntitySchema('user');
-    $this->container->get(ComponentSourceManager::class)->generateComponents();
     $this->installConfig('canvas_test_config_node_article');
   }
 

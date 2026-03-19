@@ -27,14 +27,6 @@ class ComponentTest extends CanvasKernelTestBase {
   const string MISSING_CONFIG_ENTITY_ID = 'sdc.canvas.missing-component';
   const string LABEL = 'Test Component';
 
-  /**
-   * {@inheritdoc}
-   */
-  protected function setUp(): void {
-    parent::setUp();
-    $this->container->get(ComponentSourceManager::class)->generateComponents();
-  }
-
   protected function midTestSetUp(): void {
     // The Standard install profile's "image" media type must be installed when
     // the media_library module gets installed.

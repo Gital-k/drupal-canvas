@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
-use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use PHPUnit\Framework\Attributes\Group;
 use ColinODell\PsrTestLogger\TestLogger;
 use Drupal\canvas\PropSource\PropSource;
@@ -69,9 +68,7 @@ final class NodeTemplatesTest extends CanvasKernelTestBase {
     $this->installEntitySchema('node');
     $this->installEntitySchema('path_alias');
     $this->installConfig(['node', 'filter']);
-    $this->installConfig(['canvas']);
     $this->createContentType(['type' => 'article']);
-    $this->container->get(ComponentSourceManager::class)->generateComponents();
     FilterFormat::create([
       'format' => 'basic_html',
       'name' => 'Basic HTML',

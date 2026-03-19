@@ -5,7 +5,6 @@ declare(strict_types=1);
 // cspell:ignore vlaquxuup
 namespace Drupal\Tests\canvas\Kernel\Plugin\Field\FieldType;
 
-use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -82,7 +81,6 @@ class ComponentTreeItemListTest extends CanvasKernelTestBase {
       ->set('slogan', 'Drupal Canvas Test Site')
       ->save();
     $this->installEntitySchema('path_alias');
-    $this->container->get(ComponentSourceManager::class)->generateComponents();
     $this->createMyCtaComponentFromSdc();
     $this->createMyCtaAutoSaveComponentFromSdc();
   }

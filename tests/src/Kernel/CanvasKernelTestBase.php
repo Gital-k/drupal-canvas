@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
+use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\Core\Config\Entity\ConfigEntityInterface;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
 use Drupal\Core\Entity\ContentEntityInterface;
@@ -101,6 +102,7 @@ abstract class CanvasKernelTestBase extends KernelTestBase {
       // - …
       'canvas',
     ]);
+    $this->container->get(ComponentSourceManager::class)->generateComponents();
   }
 
   /**

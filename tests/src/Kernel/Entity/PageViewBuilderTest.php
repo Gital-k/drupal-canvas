@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Entity;
 
-use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use PHPUnit\Framework\Attributes\Group;
 use Drupal\Core\Entity\Entity\EntityViewDisplay;
 use Drupal\canvas\Entity\Page;
@@ -36,7 +35,6 @@ final class PageViewBuilderTest extends CanvasKernelTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
-    $this->container->get(ComponentSourceManager::class)->generateComponents();
     $this->installPageEntitySchema();
 
     $this->config('system.site')

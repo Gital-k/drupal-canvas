@@ -932,7 +932,7 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
     $module_to_install = 'canvas_test_storable_prop_shape_alter';
     $module_is_already_installed = \in_array($module_to_install, static::$modules, TRUE);
 
-    \Drupal::service(ComponentSourceManager::class)->generateComponents();
+    $this->container->get(ComponentSourceManager::class)->generateComponents();
 
     $component_id = SingleDirectoryComponent::SOURCE_PLUGIN_ID . '.sdc_test_all_props.all-props';
     $prop_name = 'test_integer_by_the_dozen';

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Entity;
 
-use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use PHPUnit\Framework\Attributes\Group;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
@@ -33,7 +32,6 @@ final class PageTest extends CanvasKernelTestBase {
 
   protected function setUp(): void {
     parent::setUp();
-    $this->container->get(ComponentSourceManager::class)->generateComponents();
     $this->installPageEntitySchema();
   }
 
