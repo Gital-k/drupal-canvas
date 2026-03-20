@@ -32,7 +32,7 @@ export function resolveWorkbenchPaths(
     packageRoot,
     options.clientRootRelativePath ?? '.',
   );
-  const workbenchSourceRoot = path.resolve(packageRoot, 'src');
+  const workbenchSourceRoot = path.resolve(clientRoot, '..');
   const hostProjectRoot = process.cwd();
   const runningInsideWorkbenchPackage =
     path.resolve(hostProjectRoot) === path.resolve(packageRoot);

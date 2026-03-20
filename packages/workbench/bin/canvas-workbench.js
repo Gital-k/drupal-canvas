@@ -15,7 +15,7 @@ const viteBinPath = path.resolve(
 const currentFilePath = fileURLToPath(import.meta.url);
 const currentDir = path.dirname(currentFilePath);
 const packageRoot = path.resolve(currentDir, '..');
-const clientRoot = path.join(packageRoot, 'dist/client');
+const clientRoot = path.join(packageRoot, 'dist/client/src/client');
 
 const incomingArgs = process.argv.slice(2);
 const hasExplicitCommand =

@@ -4,7 +4,7 @@ import { createWorkbenchConfig } from './src/server/create-workbench-config';
 
 export default defineConfig(
   createWorkbenchConfig({
-    clientRootRelativePath: '.',
+    clientRootRelativePath: 'src/client',
     useWorkbenchSourceAlias: true,
   }),
 );

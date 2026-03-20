@@ -53,8 +53,7 @@ npx canvas-workbench dev
 ### Published output
 
 - `dist/client` contains the packaged browser app sources and static assets,
-  including `index.html`, copied client/shared source files, CSS, and copied
-  public assets.
+  including the copied client and shared source trees, and copied public assets.
 - `dist/server` contains the packaged Node-side runtime, including the
   `canvas-workbench` binary and the published Vite config entry.
 

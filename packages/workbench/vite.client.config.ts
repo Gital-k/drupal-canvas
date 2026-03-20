@@ -6,9 +6,10 @@ import react from '@vitejs/plugin-react';
 
 const configPath = fileURLToPath(import.meta.url);
 const packageRoot = path.dirname(configPath);
+const clientRoot = path.resolve(packageRoot, 'src/client');
 
 export default defineConfig({
-  root: packageRoot,
+  root: clientRoot,
   build: {
     outDir: path.resolve(packageRoot, 'dist/client'),
     rollupOptions: {
@@ -24,7 +25,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss()] as any,
   resolve: {
     alias: {
-      '@wb': path.resolve(packageRoot, './src'),
+      '@wb': path.resolve(packageRoot, 'src'),
     },
   },
 });

@@ -44,14 +44,12 @@
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",
     "shadcn": "^3.8.5",
-    "tsdown": "^0.17.2",
+    "tsdown": "^0.21.4",
     "typescript": "~5.9.3",
     "vitest": "^4.0.18"
   },
   "scripts": {
-    "build:client": "mkdir -p dist/client/src && cp index.html dist/client/index.html && cp -R public/. dist/client/ && cp -R src/client dist/client/src/client && cp -R src/lib dist/client/src/lib && cp src/index.css dist/client/src/index.css",
-    "build:server": "NODE_ENV=production tsdown",
-    "build": "rm -rf dist && npm run type-check && npm run build:client && npm run build:server",
+    "build": "npm run type-check && NODE_ENV=production tsdown",
     "prepack": "npm run build",
     "type-check": "tsc -p tsconfig.json --pretty",
     "preview": "vite preview",

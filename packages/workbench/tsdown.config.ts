@@ -1,21 +1,28 @@
 import { defineConfig } from 'tsdown';
 
 export default defineConfig({
-  clean: false,
+  clean: ['dist'],
+  copy: [
+    { from: 'public/**/*', to: 'dist/client', flatten: false },
+    { from: 'src/client', to: 'dist/client/src' },
+    { from: 'src/lib', to: 'dist/client/src' },
+  ],
+  deps: {
+    alwaysBundle: ['@drupal-canvas/discovery', '@drupal-canvas/vite-compat'],
+    neverBundle: [
+      'vite',
+      '@vitejs/plugin-react',
+      '@tailwindcss/vite',
+      'vite-plugin-svgr',
+      'react',
+      'react-dom',
+      'react/jsx-runtime',
+      'react/jsx-dev-runtime',
+    ],
+  },
   dts: false,
   entry: ['vite.published.config.ts'],
-  external: [
-    'vite',
-    '@vitejs/plugin-react',
-    '@tailwindcss/vite',
-    'vite-plugin-svgr',
-    'react',
-    'react-dom',
-    'react/jsx-runtime',
-    'react/jsx-dev-runtime',
-  ],
   format: ['es'],
-  noExternal: ['@drupal-canvas/discovery', '@drupal-canvas/vite-compat'],
   outDir: 'dist/server',
   platform: 'node',
 });

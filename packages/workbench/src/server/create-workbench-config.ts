@@ -55,7 +55,7 @@ export function createWorkbenchConfig(
       alias: {
         ...(options.useWorkbenchSourceAlias
           ? {
-              '@wb': path.join(paths.clientRoot, 'src'),
+              '@wb': paths.workbenchSourceRoot,
             }
           : {}),
         react: path.join(paths.workbenchNodeModulesPath, 'react'),
