@@ -25,7 +25,6 @@ use Drupal\canvas\Render\PreviewEnvelope;
 use Drupal\language\Entity\ConfigurableLanguage;
 use Drupal\node\Entity\Node;
 use Drupal\Tests\canvas\Traits\CanvasFieldCreationTrait;
-use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\canvas\Traits\CanvasFieldTrait;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
 use Drupal\Tests\node\Traits\ContentTypeCreationTrait;
@@ -43,7 +42,6 @@ class AutoSaveManagerTest extends CanvasKernelTestBase {
 
   use CanvasFieldCreationTrait;
   use CanvasFieldTrait;
-  use GenerateComponentConfigTrait;
   use ContentTypeCreationTrait;
   use MediaTypeCreationTrait;
 
@@ -88,7 +86,6 @@ class AutoSaveManagerTest extends CanvasKernelTestBase {
     // the `path` module, so the PathAlias entity type must be installed. URL
     // generation fails without this.
     $this->installEntitySchema('path_alias');
-    $this->generateComponentConfig();
   }
 
   private function convertClientData(EntityInterface $entity, array $data): EntityInterface {

@@ -10,6 +10,7 @@ use Drupal\media\Entity\Media;
 use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
+use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ComponentTreeEntityInterface;
@@ -18,7 +19,6 @@ use Drupal\canvas\PropSource\PropSource;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Traits\BetterConfigDependencyManagerTrait;
 use Drupal\Tests\canvas\Traits\DataProviderWithComponentTreeTrait;
-use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\TestTools\Random;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
@@ -33,7 +33,6 @@ class PatternValidationTest extends BetterConfigEntityValidationTestBase {
   use BetterConfigDependencyManagerTrait;
   use DataProviderWithComponentTreeTrait;
   use MediaTypeCreationTrait;
-  use GenerateComponentConfigTrait;
   use ConstraintViolationsTestTrait;
   use UserCreationTrait;
 
@@ -55,7 +54,7 @@ class PatternValidationTest extends BetterConfigEntityValidationTestBase {
   protected function setUp(): void {
     parent::setUp();
     $this->installConfig(['canvas']);
-    $this->generateComponentConfig();
+    $this->container->get(ComponentSourceManager::class)->generateComponents();
     $generate_static_prop_source = function (string $label): string {
       return "Hello, $label!";
     };

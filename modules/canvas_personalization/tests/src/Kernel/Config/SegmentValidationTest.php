@@ -11,7 +11,6 @@ use Drupal\Tests\canvas\Kernel\Config\BetterConfigEntityValidationTestBase;
 use Drupal\Tests\canvas\Traits\BetterConfigDependencyManagerTrait;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\canvas\Traits\CreateTestJsComponentTrait;
-use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\node\Traits\ContentTypeCreationTrait;
 use Drupal\canvas_personalization\Entity\Segment;
 
@@ -25,7 +24,6 @@ class SegmentValidationTest extends BetterConfigEntityValidationTestBase {
   use BetterConfigDependencyManagerTrait;
   use ContentTypeCreationTrait;
   use CreateTestJsComponentTrait;
-  use GenerateComponentConfigTrait;
   use ContribStrictConfigSchemaTestTrait;
 
   /**

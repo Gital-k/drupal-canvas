@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
-use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\Component\Uuid\Php as UuidGenerator;
 use Drupal\canvas\ComponentTreeInputExtractor;
 use Drupal\canvas\Entity\Page;
@@ -29,7 +28,6 @@ final class ComponentTreeInputExtractorTest extends CanvasKernelTestBase {
   protected function setUp(): void {
     parent::setUp();
     $this->installConfig(['canvas_test_search']);
-    $this->container->get(ComponentSourceManager::class)->generateComponents();
   }
 
   #[DataProvider('componentsAndInputs')]

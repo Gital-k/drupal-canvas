@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Config;
 
+use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\PropSource\PropSource;
@@ -13,7 +14,6 @@ use Drupal\canvas\Exception\ConstraintViolationException;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Traits\BetterConfigDependencyManagerTrait;
 use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
-use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\TestTools\Random;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
@@ -26,7 +26,6 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 class PageRegionValidationTest extends BetterConfigEntityValidationTestBase {
 
   use BetterConfigDependencyManagerTrait;
-  use GenerateComponentConfigTrait;
   use ConstraintViolationsTestTrait;
 
   /**
@@ -57,7 +56,7 @@ class PageRegionValidationTest extends BetterConfigEntityValidationTestBase {
   protected function setUp(): void {
     parent::setUp();
     $this->installConfig(['canvas']);
-    $this->generateComponentConfig();
+    $this->container->get(ComponentSourceManager::class)->generateComponents();
     $generate_static_prop_source = function (string $label): array {
       return [
         'sourceType' => 'static:field_item:string',

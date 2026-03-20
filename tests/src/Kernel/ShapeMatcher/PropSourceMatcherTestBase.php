@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\ShapeMatcher;
 
+use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\canvas\PropShape\PersistentPropShapeRepository;
 use Drupal\canvas\PropShape\PropShape;
 use Drupal\canvas\PropShape\PropShapeRepositoryInterface;
 use Drupal\canvas\PropSource\PropSourceBase;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
-use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
@@ -26,8 +26,6 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 #[Group('canvas')]
 #[Group('canvas_shape_matching')]
 abstract class PropSourceMatcherTestBase extends CanvasKernelTestBase {
-
-  use GenerateComponentConfigTrait;
 
   /**
    * {@inheritdoc}
@@ -76,7 +74,7 @@ abstract class PropSourceMatcherTestBase extends CanvasKernelTestBase {
   }
 
   public function test(): void {
-    $this->generateComponentConfig();
+    $this->container->get(ComponentSourceManager::class)->generateComponents();
     $prop_shape_repository = $this->container->get(PropShapeRepositoryInterface::class);
     self::assertInstanceOf(PersistentPropShapeRepository::class, $prop_shape_repository);
 

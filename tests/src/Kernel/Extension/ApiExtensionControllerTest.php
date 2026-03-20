@@ -12,7 +12,6 @@ use Drupal\Core\Session\AccountInterface;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Kernel\Traits\RequestTrait;
 use Drupal\Tests\canvas\Traits\CreateTestJsComponentTrait;
-use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\canvas\Traits\OpenApiSpecTrait;
 use Drupal\Tests\system\Functional\Cache\AssertPageCacheContextsAndTagsTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
@@ -26,7 +25,6 @@ use Symfony\Component\HttpFoundation\Request;
 #[RunTestsInSeparateProcesses]
 class ApiExtensionControllerTest extends CanvasKernelTestBase {
 
-  use GenerateComponentConfigTrait;
   use OpenApiSpecTrait;
   use AssertPageCacheContextsAndTagsTrait;
   use CreateTestJsComponentTrait;

@@ -40,7 +40,6 @@ use Drupal\Tests\canvas\Kernel\Traits\CiModulePathTrait;
 use Drupal\Tests\canvas\Kernel\Traits\VfsPublicStreamUrlTrait;
 use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
 use Drupal\Tests\canvas\Traits\CrawlerTrait;
-use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\canvas\Traits\UninstallValidatorTestTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use Psr\Log\LoggerInterface;
@@ -113,7 +112,6 @@ abstract class ComponentSourceTestBase extends CanvasKernelTestBase implements L
   use CrawlerTrait;
   use ComponentTreeItemListInstantiatorTrait;
   use ConstraintViolationsTestTrait;
-  use GenerateComponentConfigTrait;
 
   protected readonly EntityStorageInterface $componentStorage;
   protected readonly ComponentIncompatibilityReasonRepository $componentReasonRepository;
@@ -139,6 +137,13 @@ abstract class ComponentSourceTestBase extends CanvasKernelTestBase implements L
    * @see ::findIneligibleComponents()
    */
   abstract public function testDiscovery(): array;
+
+  /**
+   * Provide a method to allow child classes to override it.
+   *
+   * @return void
+   */
+  abstract protected function generateComponentConfig(): void;
 
   /**
    * @param array<ComponentConfigEntityId> $component_ids
@@ -244,9 +249,9 @@ abstract class ComponentSourceTestBase extends CanvasKernelTestBase implements L
   protected function getReferencedPluginClasses(array $component_ids): array {
     $this->assertCount($this->expectedDefaultComponentInstallCount, $this->componentStorage->loadMultiple());
     $this->generateComponentConfig();
-
     $actual_classes = [];
-    foreach ($this->componentStorage->loadMultiple($component_ids) as $component_id => $component) {
+    $components = $this->componentStorage->loadMultiple($component_ids);
+    foreach ($components as $component_id => $component) {
       \assert($component instanceof Component);
       $actual_classes[$component_id] = $component->getComponentSource()->getReferencedPluginClass();
     }

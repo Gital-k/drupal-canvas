@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Functional;
 
+use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use PHPUnit\Framework\Attributes\Group;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\Component\Serialization\Json;
@@ -29,7 +30,6 @@ use Drupal\node\Entity\NodeType;
 use Drupal\system\Entity\Menu;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\canvas\Traits\CreateTestJsComponentTrait;
-use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\canvas\Traits\OpenApiSpecTrait;
 use Drupal\Tests\system\Functional\Cache\AssertPageCacheContextsAndTagsTrait;
 use Drupal\user\UserInterface;
@@ -49,7 +49,6 @@ use Symfony\Component\HttpFoundation\Response;
 class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
 
   use ContribStrictConfigSchemaTestTrait;
-  use GenerateComponentConfigTrait;
   use OpenApiSpecTrait;
   use AssertPageCacheContextsAndTagsTrait;
   use CreateTestJsComponentTrait;
@@ -1866,7 +1865,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     // (`stark`) is not installed.
     // @see \_ckeditor5_theme_css()
     // @see \Drupal\Core\Recipe\RecipeConfigInstaller::installRecipeConfig()
-    $this->generateComponentConfig();
+    $this->container->get(ComponentSourceManager::class)->generateComponents();
 
     // Ensure we have an interesting set of Component config entities: the ones
     // provided by the modules & themes, including:

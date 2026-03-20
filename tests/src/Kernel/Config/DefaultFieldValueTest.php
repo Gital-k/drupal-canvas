@@ -15,7 +15,6 @@ use Drupal\Core\Config\Schema\SchemaIncompleteException;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Traits\SingleDirectoryComponentTreeTestTrait;
-use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
@@ -25,7 +24,6 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 class DefaultFieldValueTest extends CanvasKernelTestBase {
 
   use SingleDirectoryComponentTreeTestTrait;
-  use GenerateComponentConfigTrait;
 
   /**
    * {@inheritdoc}
@@ -42,7 +40,6 @@ class DefaultFieldValueTest extends CanvasKernelTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
-    $this->generateComponentConfig();
     $this->installEntitySchema('user');
     $this->installEntitySchema('node');
     $this->installConfig(['canvas_test_config_node_article']);

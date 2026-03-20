@@ -120,7 +120,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
   }
 
   protected function generateComponentConfig(): void {
-    parent::generateComponentConfig();
+    $this->container->get(ComponentSourceManager::class)->generateComponents();
     $this->container->get('config.installer')->installDefaultConfig('module', 'canvas_test_code_components');
   }
 

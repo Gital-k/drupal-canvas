@@ -8,7 +8,6 @@ use PHPUnit\Framework\Attributes\Group;
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Access\AccessResultForbidden;
 use Drupal\Core\Session\AccountInterface;
-use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\node\Traits\NodeCreationTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
@@ -22,7 +21,6 @@ class HomepageNodeDeletionTest extends CanvasKernelTestBase {
 
   use NodeCreationTrait;
   use UserCreationTrait;
-  use GenerateComponentConfigTrait;
 
   /**
    * {@inheritdoc}
@@ -41,7 +39,6 @@ class HomepageNodeDeletionTest extends CanvasKernelTestBase {
     $this->installEntitySchema('node');
     $this->installEntitySchema('path_alias');
     $this->installEntitySchema('user');
-    $this->generateComponentConfig();
     $this->installConfig('canvas_test_config_node_article');
   }
 

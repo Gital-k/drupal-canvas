@@ -43,7 +43,6 @@ use Drupal\Tests\canvas\Kernel\Traits\CiModulePathTrait;
 use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
 use Drupal\Tests\canvas\Traits\CreateTestJsComponentTrait;
 use Drupal\Tests\canvas\Traits\DataProviderWithComponentTreeTrait;
-use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use Drupal\user\Entity\User;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
@@ -58,7 +57,6 @@ class ComponentTreeItemListTest extends CanvasKernelTestBase {
 
   use ConstraintViolationsTestTrait;
   use CreateTestJsComponentTrait;
-  use GenerateComponentConfigTrait;
   use CiModulePathTrait;
   use UserCreationTrait;
   use ComponentTreeItemListInstantiatorTrait;
@@ -83,7 +81,6 @@ class ComponentTreeItemListTest extends CanvasKernelTestBase {
       ->set('slogan', 'Drupal Canvas Test Site')
       ->save();
     $this->installEntitySchema('path_alias');
-    $this->generateComponentConfig();
     $this->createMyCtaComponentFromSdc();
     $this->createMyCtaAutoSaveComponentFromSdc();
   }

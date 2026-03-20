@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas_personalization\Kernel\Plugin\Canvas\ComponentSource;
 
+use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Depends;
@@ -70,6 +71,10 @@ final class PersonalizationTest extends ComponentSourceTestBase {
       'id' => 'andalusian_visitors',
       'label' => 'Andalusian Visitors',
     ])->save();
+  }
+
+  protected function generateComponentConfig(): void {
+    $this->container->get(ComponentSourceManager::class)->generateComponents();
   }
 
   /**

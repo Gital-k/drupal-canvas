@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Config;
 
+use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use PHPUnit\Framework\Attributes\Group;
 use Drupal\Core\Entity\EntityListBuilderInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
@@ -11,7 +12,6 @@ use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\canvas\Entity\VersionedConfigEntityInterface;
 use Drupal\canvas\Entity\Component;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
-use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
@@ -22,26 +22,17 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 #[Group('canvas_component_sources')]
 class ComponentTest extends CanvasKernelTestBase {
 
-  use GenerateComponentConfigTrait;
 
   const string MISSING_COMPONENT_ID = 'canvas:missing-component';
   const string MISSING_CONFIG_ENTITY_ID = 'sdc.canvas.missing-component';
   const string LABEL = 'Test Component';
-
-  /**
-   * {@inheritdoc}
-   */
-  protected function setUp(): void {
-    parent::setUp();
-    $this->generateComponentConfig();
-  }
 
   protected function midTestSetUp(): void {
     // The Standard install profile's "image" media type must be installed when
     // the media_library module gets installed.
     // @see core/profiles/standard/config/optional/media.type.image.yml
     $this->enableModules(['field', 'file', 'image', 'media']);
-    $this->generateComponentConfig();
+    $this->container->get(ComponentSourceManager::class)->generateComponents();
     $this->setInstallProfile('standard');
     $this->container->get('config.installer')->installOptionalConfig();
 
@@ -52,7 +43,7 @@ class ComponentTest extends CanvasKernelTestBase {
       'filter',
     ];
     $this->enableModules($modules);
-    $this->generateComponentConfig();
+    $this->container->get(ComponentSourceManager::class)->generateComponents();
     // @see \Drupal\Core\Field\Plugin\Field\FieldType\EntityReferenceItem::generateSampleValue()
     $this->installEntitySchema('media');
 

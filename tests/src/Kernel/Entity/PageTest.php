@@ -10,7 +10,6 @@ use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Kernel\Traits\PageTrait;
-use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
@@ -21,7 +20,6 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 #[Group('canvas')]
 final class PageTest extends CanvasKernelTestBase {
 
-  use GenerateComponentConfigTrait;
   use MediaTypeCreationTrait;
   use PageTrait;
 
@@ -34,7 +32,6 @@ final class PageTest extends CanvasKernelTestBase {
 
   protected function setUp(): void {
     parent::setUp();
-    $this->generateComponentConfig();
     $this->installPageEntitySchema();
   }
 

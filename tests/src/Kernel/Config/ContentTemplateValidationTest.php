@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Config;
 
+use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Drupal\canvas\PropSource\PropSource;
@@ -17,7 +18,6 @@ use Drupal\Tests\canvas\Traits\BetterConfigDependencyManagerTrait;
 use Drupal\Tests\canvas\Traits\DataProviderWithComponentTreeTrait;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\canvas\Traits\CreateTestJsComponentTrait;
-use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\node\Traits\ContentTypeCreationTrait;
 use Drupal\TestTools\Random;
 use Drupal\canvas_test_validation\Plugin\Canvas\ComponentSource\InvalidSlots;
@@ -36,7 +36,6 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
   use ContentTypeCreationTrait;
   use ContribStrictConfigSchemaTestTrait;
   use CreateTestJsComponentTrait;
-  use GenerateComponentConfigTrait;
 
   /**
    * {@inheritdoc}
@@ -102,7 +101,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
       'bundle' => 'alpha',
       'label' => 'Test field',
     ])->save();
-    $this->generateComponentConfig();
+    $this->container->get(ComponentSourceManager::class)->generateComponents();
     $this->createMyCtaComponentFromSdc();
 
     $this->entity = ContentTemplate::create([

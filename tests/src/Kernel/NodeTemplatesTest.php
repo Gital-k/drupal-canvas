@@ -16,7 +16,6 @@ use Drupal\canvas\EntityHandlers\ContentTemplateAwareViewBuilder;
 use Drupal\filter\Entity\FilterFormat;
 use Drupal\node\NodeInterface;
 use Drupal\Tests\canvas\Traits\CanvasFieldCreationTrait;
-use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\canvas\Traits\SingleDirectoryComponentTreeTestTrait;
 use Drupal\Tests\canvas\Traits\CrawlerTrait;
 use Drupal\Tests\node\Traits\ContentTypeCreationTrait;
@@ -35,7 +34,6 @@ use PHPUnit\Framework\Attributes\TestWith;
 final class NodeTemplatesTest extends CanvasKernelTestBase {
 
   use SingleDirectoryComponentTreeTestTrait;
-  use GenerateComponentConfigTrait;
   use ContentTypeCreationTrait;
   use CanvasFieldCreationTrait;
   use NodeCreationTrait;
@@ -70,9 +68,7 @@ final class NodeTemplatesTest extends CanvasKernelTestBase {
     $this->installEntitySchema('node');
     $this->installEntitySchema('path_alias');
     $this->installConfig(['node', 'filter']);
-    $this->installConfig(['canvas']);
     $this->createContentType(['type' => 'article']);
-    $this->generateComponentConfig();
     FilterFormat::create([
       'format' => 'basic_html',
       'name' => 'Basic HTML',

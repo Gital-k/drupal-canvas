@@ -17,7 +17,6 @@ use Drupal\node\NodeInterface;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Kernel\Traits\PageTrait;
 use Drupal\Tests\canvas\Kernel\Traits\RequestTrait;
-use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\Request;
@@ -32,7 +31,6 @@ final class ComponentAuditControllerTest extends CanvasKernelTestBase {
   use PageTrait;
   use RequestTrait;
   use UserCreationTrait;
-  use GenerateComponentConfigTrait;
 
   /**
    * {@inheritdoc}
@@ -44,8 +42,6 @@ final class ComponentAuditControllerTest extends CanvasKernelTestBase {
 
   protected function setUp(): void {
     parent::setUp();
-    $this->generateComponentConfig();
-
     $this->installEntitySchema('node');
     $this->installSchema('node', ['node_access']);
     $this->installEntitySchema('path_alias');

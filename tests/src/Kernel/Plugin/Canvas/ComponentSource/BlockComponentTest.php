@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource;
 
+use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Depends;
@@ -72,6 +73,10 @@ final class BlockComponentTest extends ComponentSourceTestBase {
     parent::setUp();
     // Set up a test user "bob".
     $this->setUpCurrentUser(['name' => 'bob', 'uid' => 2]);
+  }
+
+  protected function generateComponentConfig(): void {
+    $this->container->get(ComponentSourceManager::class)->generateComponents();
   }
 
   /**

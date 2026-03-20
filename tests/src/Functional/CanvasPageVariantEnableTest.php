@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Functional;
 
+use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use PHPUnit\Framework\Attributes\Group;
 use Drupal\block\Entity\Block;
 use Drupal\Component\Uuid\Uuid;
 use Drupal\Core\Url;
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\Tests\BrowserTestBase;
-use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Drupal\Tests\system\Functional\Cache\AssertPageCacheContextsAndTagsTrait;
 
@@ -26,7 +26,6 @@ use Drupal\Tests\system\Functional\Cache\AssertPageCacheContextsAndTagsTrait;
 #[Group('canvas')]
 class CanvasPageVariantEnableTest extends BrowserTestBase {
 
-  use GenerateComponentConfigTrait;
   use AssertPageCacheContextsAndTagsTrait;
 
   /**
@@ -43,7 +42,7 @@ class CanvasPageVariantEnableTest extends BrowserTestBase {
     $assert = $this->assertSession();
 
     $this->drupalLogin($this->rootUser);
-    $this->generateComponentConfig();
+    $this->container->get(ComponentSourceManager::class)->generateComponents();
 
     $front = Url::fromRoute('<front>');
     $this->drupalGet($front);

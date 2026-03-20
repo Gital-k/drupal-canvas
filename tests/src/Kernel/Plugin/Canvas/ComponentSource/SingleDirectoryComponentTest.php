@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource;
 
+use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\canvas\Entity\ContentTemplate;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Group;
@@ -109,6 +110,10 @@ final class SingleDirectoryComponentTest extends GeneratedFieldExplicitInputUxCo
     $file_system->copy($source, $destination, FileExists::Replace);
 
     $this->container->get('theme_installer')->install(['sdc_theme_test']);
+  }
+
+  protected function generateComponentConfig(): void {
+    $this->container->get(ComponentSourceManager::class)->generateComponents();
   }
 
   /**

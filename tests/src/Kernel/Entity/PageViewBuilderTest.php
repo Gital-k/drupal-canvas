@@ -11,7 +11,6 @@ use Drupal\canvas\Entity\PageViewBuilder;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Kernel\Traits\PageTrait;
 use Drupal\Tests\canvas\Kernel\Traits\RequestTrait;
-use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
@@ -21,7 +20,6 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 #[Group('canvas')]
 final class PageViewBuilderTest extends CanvasKernelTestBase {
 
-  use GenerateComponentConfigTrait;
   use PageTrait;
   use RequestTrait;
 
@@ -37,7 +35,6 @@ final class PageViewBuilderTest extends CanvasKernelTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
-    $this->generateComponentConfig();
     $this->installPageEntitySchema();
 
     $this->config('system.site')

@@ -13,7 +13,6 @@ use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Kernel\Traits\RequestTrait;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Drupal\Tests\canvas\TestSite\CanvasTestSetup;
-use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -27,7 +26,6 @@ final class ComponentTreeFieldRenderingTest extends CanvasKernelTestBase {
 
   use RequestTrait;
   use UserCreationTrait;
-  use GenerateComponentConfigTrait;
 
   /**
    * {@inheritdoc}
@@ -45,8 +43,6 @@ final class ComponentTreeFieldRenderingTest extends CanvasKernelTestBase {
     $themes = ['olivero', 'claro'];
     \Drupal::service('theme_installer')->install($themes);
     $this->config('system.theme')->set('default', 'olivero')->save();
-
-    $this->generateComponentConfig();
   }
 
   public function testRenderingComponent(): void {

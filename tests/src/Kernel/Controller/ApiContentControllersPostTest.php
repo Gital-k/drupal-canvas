@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Drupal\Tests\canvas\Kernel\Controller;
 
 use Drupal\canvas\CanvasUriDefinitions;
-use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\canvas\Controller\ApiContentControllers;
 use Drupal\canvas\Entity\Page;
 use Drupal\Core\Cache\CacheableJsonResponse;
@@ -56,10 +55,6 @@ class ApiContentControllersPostTest extends CanvasKernelTestBase {
     $this->installConfig(['system', 'field', 'filter', 'path_alias']);
 
     $this->setUpCurrentUser([], ['access content', Page::CREATE_PERMISSION, Page::EDIT_PERMISSION]);
-
-    $component_source_manager = \Drupal::service(ComponentSourceManager::class);
-    \assert($component_source_manager instanceof ComponentSourceManager);
-    $component_source_manager->generateComponents();
 
     Page::create([
       'title' => 'A pre-existing page that can be duplicated',

@@ -10,7 +10,6 @@ use Drupal\canvas\Entity\ComponentTreeEntityInterface;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Traits\DataProviderWithComponentTreeTrait;
 use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
-use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use PHPUnit\Framework\Attributes\TestWith;
 
 /**
@@ -21,7 +20,6 @@ abstract class ConfigWithComponentTreeTestBase extends CanvasKernelTestBase {
 
   use ConstraintViolationsTestTrait;
   use DataProviderWithComponentTreeTrait;
-  use GenerateComponentConfigTrait;
 
   /**
    * The config entity with a component tree being tested.
@@ -59,14 +57,6 @@ abstract class ConfigWithComponentTreeTestBase extends CanvasKernelTestBase {
     'editor',
     'datetime',
   ];
-
-  /**
-   * {@inheritdoc}
-   */
-  protected function setUp(): void {
-    parent::setUp();
-    $this->generateComponentConfig();
-  }
 
   #[TestWith([
     [

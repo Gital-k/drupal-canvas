@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Functional;
 
+use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\TestWith;
@@ -13,7 +14,6 @@ use Drupal\Core\Url;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
-use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\canvas\Traits\OpenApiSpecTrait;
 use Drupal\user\UserInterface;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
@@ -27,7 +27,6 @@ use Symfony\Component\HttpFoundation\Response;
 #[Group('canvas_shape_matching')]
 final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
 
-  use GenerateComponentConfigTrait;
   use OpenApiSpecTrait;
 
   /**
@@ -49,7 +48,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
 
   protected function setUp(): void {
     parent::setUp();
-    $this->generateComponentConfig();
+    $this->container->get(ComponentSourceManager::class)->generateComponents();
     $this->createContentType(['type' => 'article', 'name' => 'Article']);
 
     // Required, single-cardinality image field.

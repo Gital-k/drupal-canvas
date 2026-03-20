@@ -57,7 +57,6 @@ final class ContentTemplateComponentTreeTest extends ConfigWithComponentTreeTest
       'bundle' => 'alpha',
       'label' => 'Test field',
     ])->save();
-    $this->generateComponentConfig();
     $this->entity = ContentTemplate::create([
       'content_entity_type_id' => 'node',
       'content_entity_type_bundle' => 'alpha',

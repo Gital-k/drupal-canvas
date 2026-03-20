@@ -24,7 +24,6 @@ use Drupal\Tests\canvas\Kernel\Traits\CiModulePathTrait;
 use Drupal\Tests\canvas\Traits\BetterConfigDependencyManagerTrait;
 use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
-use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\Yaml\Yaml;
@@ -40,7 +39,6 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
   use BetterConfigDependencyManagerTrait;
   use ConstraintViolationsTestTrait;
   use ContribStrictConfigSchemaTestTrait;
-  use GenerateComponentConfigTrait;
   use CiModulePathTrait;
 
   /**
@@ -98,7 +96,7 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
     // this test is manually/explicitly creating.
     // To work around this, first explicitly generate all Component config
     // entities, then delete the auto-created Component config entity.
-    $this->generateComponentConfig();
+    $this->container->get(ComponentSourceManager::class)->generateComponents();
     $auto_created_component = Component::load('sdc.canvas_test_sdc.my-cta');
     self::assertNotNull($auto_created_component);
     self::assertNotNull(Folder::loadByItemAndConfigEntityTypeId('sdc.canvas_test_sdc.my-cta', Component::ENTITY_TYPE_ID));
