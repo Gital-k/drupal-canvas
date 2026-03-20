@@ -29,6 +29,20 @@ async function makeTempDir(): Promise<string> {
   return dir;
 }
 
+async function withWorkingDirectory<T>(
+  directory: string,
+  callback: () => Promise<T> | T,
+): Promise<T> {
+  const previousDirectory = process.cwd();
+  process.chdir(directory);
+
+  try {
+    return await callback();
+  } finally {
+    process.chdir(previousDirectory);
+  }
+}
+
 function getResolveIdHook(plugin: { resolveId?: unknown }) {
   const resolveId = plugin.resolveId as unknown;
   if (!resolveId) {
@@ -290,12 +304,55 @@ describe('vite-compat', () => {
     ).toBeNull();
   });
 
+  it('reuses the host vite plugin for html bootstrap', async () => {
+    const hostRoot = await makeTempDir();
+    await fs.writeFile(
+      path.join(hostRoot, '.env'),
+      [
+        'CANVAS_SITE_URL=http://canvas.ddev.site',
+        'CANVAS_JSONAPI_PREFIX=api',
+      ].join('\n'),
+      'utf-8',
+    );
+
+    const plugins = drupalCanvasCompat({
+      hostRoot,
+    });
+    const drupalCanvasPlugin = plugins.find(
+      (plugin) => plugin.name === 'drupal-canvas',
+    );
+    expect(drupalCanvasPlugin).toBeDefined();
+
+    await withWorkingDirectory(hostRoot, async () => {
+      const config = drupalCanvasPlugin?.config as
+        | ((config: Record<string, unknown>, env: { mode: string }) => unknown)
+        | undefined;
+      config?.(
+        {
+          root: '/tmp/workbench-client',
+        },
+        { mode: 'development' },
+      );
+
+      const transformIndexHtml = drupalCanvasPlugin?.transformIndexHtml as
+        | ((html: string) => { tags?: Array<{ children?: string }> })
+        | undefined;
+      const transformed = transformIndexHtml?.('<html></html>');
+      expect(transformed?.tags).toBeDefined();
+      expect(transformed?.tags?.[0]?.children).toContain(
+        'http://canvas.ddev.site',
+      );
+      expect(transformed?.tags?.[0]?.children).toContain('"api"');
+    });
+  });
+
   it('always adds svgr plugin', () => {
     const plugins = drupalCanvasCompat({
       hostRoot: '/tmp/host',
     });
     const pluginNames = plugins.map((plugin) => plugin.name);
     expect(pluginNames).toContain('canvas-vite-compat-host-alias');
+    expect(pluginNames).toContain('drupal-canvas');
     expect(pluginNames.some((name) => name.includes('svgr'))).toBe(true);
   });
 
@@ -305,6 +362,7 @@ describe('vite-compat', () => {
     });
     const pluginNames = plugins.map((plugin) => plugin.name);
     expect(pluginNames).toContain('canvas-vite-compat-host-alias');
+    expect(pluginNames).toContain('drupal-canvas');
     expect(pluginNames.some((name) => name.includes('svgr'))).toBe(true);
 
     const resolveId = getResolveIdHook(plugins[0]);

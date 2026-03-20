@@ -2,6 +2,7 @@ import { existsSync, promises as fs, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import * as yaml from 'js-yaml';
 import svgr from 'vite-plugin-svgr';
+import drupalCanvas from '@drupal-canvas/vite-plugin';
 
 import type { Plugin } from 'vite';
 
@@ -180,8 +181,14 @@ export async function extractFirstExamplePropsFromComponentYaml(
 }
 
 export function drupalCanvasCompat(options: CanvasViteCompatOptions): Plugin[] {
+  const canvasConfig = resolveCanvasConfig(options);
   const hostAliasPrefix = '@/';
-  const hostAliasBaseDir = options.hostAliasBaseDir ?? 'src';
+  const hostAliasBaseDir =
+    options.hostAliasBaseDir ?? canvasConfig.aliasBaseDir;
+  const hostComponentDir = path.resolve(
+    options.hostRoot,
+    canvasConfig.componentDir,
+  );
 
   const aliasPlugin: Plugin = {
     name: 'canvas-vite-compat-host-alias',
@@ -206,7 +213,12 @@ export function drupalCanvasCompat(options: CanvasViteCompatOptions): Plugin[] {
     },
   };
 
-  const plugins: Plugin[] = [aliasPlugin];
+  const plugins: Plugin[] = [
+    aliasPlugin,
+    ...(drupalCanvas({
+      componentDir: hostComponentDir,
+    }) as Plugin[]),
+  ];
 
   plugins.push(
     svgr({
