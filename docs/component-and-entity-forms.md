@@ -4,6 +4,8 @@
 
 Canvas has two special forms rendered in React that are based on Drupal render arrays: the **Component Instance Form** (for configuring component props) and the **Page Data Form** (the entity edit form within Canvas). Each input is integrated with Redux via React Hook Form (RHF), enabling real-time validation, debounced auto-save back to Drupal, and undo/redo support — all while preserving Drupal behaviors like AJAX and autocomplete.
 
+Intentional change to trigger a new full job - this file would not be in the final commit anyway.
+
 ---
 
 ## Architecture Overview
