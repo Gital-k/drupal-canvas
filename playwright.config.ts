@@ -45,6 +45,34 @@ const activeBrowserProjects = process.env.BROWSER
   ? browserProjects.filter((p) => p.name === process.env.BROWSER)
   : browserProjects;
 
+const templatesLinkingProject = {
+  name: 'templates-linking',
+  testMatch: /templates-linking\.spec\.ts/,
+  use: {
+    ...devices['Desktop Chrome'],
+    deviceScaleFactor: 1,
+    viewport: { width: 1920, height: 1080 },
+  },
+  dependencies: ['setup'],
+};
+
+// In CI this project is isolated to its own job via BROWSER=templates-linking.
+// Locally it runs as part of the full suite alongside the browser projects.
+const activeTemplatesLinkingProjects =
+  !process.env.BROWSER || process.env.BROWSER === 'templates-linking'
+    ? [templatesLinkingProject]
+    : [];
+
+// When running the templates-linking job, exclude it from the regular chromium
+// project so it doesn't run twice.
+const filteredBrowserProjects = activeBrowserProjects.map((project) => {
+  if (project.name !== 'chromium') return project;
+  return {
+    ...project,
+    testIgnore: /templates-linking\.spec\.ts/,
+  };
+});
+
 export default defineConfig({
   testDir: './tests/src/Playwright',
   /* Don't run tests within files in parallel */
@@ -93,6 +121,7 @@ export default defineConfig({
       name: 'setup',
       testMatch: /_global\.setup\.ts/,
     },
-    ...activeBrowserProjects,
+    ...filteredBrowserProjects,
+    ...activeTemplatesLinkingProjects,
   ],
 });
