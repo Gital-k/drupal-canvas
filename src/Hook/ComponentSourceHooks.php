@@ -171,9 +171,7 @@ readonly final class ComponentSourceHooks {
     $is_preview = $route_name !== NULL && str_starts_with($route_name, 'canvas.api.layout.');
 
     if ($is_preview || !empty($canvasData)) {
-      if (!isset($canvasData[CodeComponentDataProvider::V0])) {
-        $canvasData[CodeComponentDataProvider::V0] = [];
-      }
+      $canvasData[CodeComponentDataProvider::V0] ??= [];
       $canvasData[CodeComponentDataProvider::V0]['isPreview'] = $is_preview;
       ksort($canvasData[CodeComponentDataProvider::V0]);
       $settings[CodeComponentDataProvider::CANVAS_DATA_KEY] = $canvasData;
