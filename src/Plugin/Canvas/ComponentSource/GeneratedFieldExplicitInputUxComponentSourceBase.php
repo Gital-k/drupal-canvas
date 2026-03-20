@@ -593,7 +593,8 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
           // In other words: let a prop source being emptier than it portrays
           // result in the appropriate validation errors at the component level.
           // @see \Drupal\canvas\PropSource\StaticPropSource::withValue(allow_empty: TRUE)
-          // If single cardinality or multiple cardinality with no valid items
+          // If a StaticPropSource's field item list is empty, consider it not
+          // set at all.
           if ($source->isEmpty()) {
             unset($inputValues[$component_prop_name]);
             continue;
@@ -838,13 +839,12 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
 
       $widget_definition = $this->fieldWidgetPluginManager->getDefinition($widget->getPluginId());
       if (\array_key_exists('canvas', $widget_definition) && \array_key_exists('transforms', $widget_definition['canvas'])) {
-        $cardinality = $static_prop_source_field_definition['cardinality'] ?? NULL;
         $transforms[$sdc_prop_name] = \array_map(
           static fn (array $transform): array =>
-            [
-              ...$transform,
-              'multiple' => $cardinality !== NULL && $cardinality !== 1,
-            ],
+          [
+            ...$transform,
+            'multiple' => $default_static_source->getCardinality() !== 1,
+          ],
           $widget_definition['canvas']['transforms']);
       }
       else {
@@ -1226,9 +1226,6 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       // corresponding source but may not.
       $prop_value = $client_model['resolved'][$prop] ?? NULL;
       $is_static_prop_source = str_starts_with($prop_source['sourceType'] ?? '', PropSource::getTypePrefix(StaticPropSource::class));
-      // Initialized early, so it's defined if an exception is thrown before
-      // PropSource::parse() is reached inside the try block.
-      $source = NULL;
       try {
         // TRICKY: this is always set, *except* in the case of an auto-saved
         // code component that just gained a new prop.
