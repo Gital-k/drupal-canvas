@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { canvasTreeToSpec } from 'drupal-canvas/json-render-utils';
 import { useLocation, useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
-import { toViteFsUrl } from '@drupal-canvas/vite-compat/runtime';
 import { ThemeMenu } from '@wb/client/components/theme-menu';
 import { Badge } from '@wb/client/components/ui/badge';
 import { Separator } from '@wb/client/components/ui/separator';
@@ -27,6 +26,7 @@ import {
   fetchPreviewPageSpec,
 } from '@wb/lib/preview-client';
 import { isPreviewFrameEvent } from '@wb/lib/preview-contract';
+import { toViteFsUrl } from '@wb/lib/preview-runtime';
 
 import type { Spec } from '@json-render/core';
 import type {

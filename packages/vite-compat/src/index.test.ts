@@ -10,10 +10,8 @@ import {
   extractComponentPreviewMetadataFromComponentYaml,
   extractFirstExamplePropsFromComponentYaml,
   getWorkbenchHostGlobalCssVirtualUrl,
-  isSupportedPreviewModulePath,
   resolveCanvasConfig,
   resolveHostGlobalCssPath,
-  toViteFsUrl,
 } from './index';
 
 const tempDirs: string[] = [];
@@ -64,17 +62,6 @@ describe('vite-compat', () => {
     });
     expect(server).toBeDefined();
     expect(server?.fs?.allow).toEqual(['/tmp/host']);
-  });
-
-  it('converts absolute paths to Vite @fs URLs', () => {
-    expect(toViteFsUrl('/tmp/example/file.tsx')).toBe(
-      '/@fs/tmp/example/file.tsx',
-    );
-  });
-
-  it('checks supported preview module extensions', () => {
-    expect(isSupportedPreviewModulePath('/tmp/a.tsx')).toBe(true);
-    expect(isSupportedPreviewModulePath('/tmp/a.jpg')).toBe(false);
   });
 
   it('extracts first example values from component.yml props', async () => {
@@ -178,13 +165,6 @@ describe('vite-compat', () => {
     const root = await makeTempDir();
     await expect(ensureHostGlobalCssExists(root)).rejects.toThrow(
       'Missing required host Tailwind entrypoint',
-    );
-  });
-
-  it('builds @fs URL for host css path', () => {
-    const resolvedPath = resolveHostGlobalCssPath('/tmp/host');
-    expect(toViteFsUrl(resolvedPath)).toBe(
-      '/@fs/tmp/host/src/components/global.css',
     );
   });
 

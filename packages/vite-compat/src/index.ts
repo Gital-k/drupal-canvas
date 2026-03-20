@@ -3,8 +3,6 @@ import path from 'node:path';
 import * as yaml from 'js-yaml';
 import svgr from 'vite-plugin-svgr';
 
-import { isSupportedPreviewModulePath, toViteFsUrl } from './runtime.ts';
-
 import type { Plugin } from 'vite';
 
 export interface CanvasViteCompatOptions {
@@ -88,8 +86,6 @@ function isPathWithinRoot(filePath: string, rootPath: string): boolean {
     relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative)
   );
 }
-
-export { isSupportedPreviewModulePath, toViteFsUrl };
 
 // @todo Implement automatic discovery of the Tailwind CSS entrypoint in @drupal-canvas/discovery.
 // Idea: Search for the following strings in files:
