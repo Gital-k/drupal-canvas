@@ -4,10 +4,7 @@ import path from 'node:path';
 import { glob } from 'glob';
 import ignore from 'ignore';
 
-import {
-  findDuplicateMachineNames,
-  loadComponentsMetadata,
-} from './metadata';
+import { findDuplicateMachineNames, loadComponentsMetadata } from './metadata';
 
 import type {
   DiscoveredComponent,

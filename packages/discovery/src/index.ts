@@ -8,10 +8,7 @@ export {
   VIDEO_EXTENSIONS,
 } from './asset-extensions';
 export { resolveCanvasConfig } from './config';
-export {
-  findDuplicateMachineNames,
-  loadComponentsMetadata,
-} from './metadata';
+export { findDuplicateMachineNames, loadComponentsMetadata } from './metadata';
 export type {
   CanvasConfig,
   ComponentMetadata,
