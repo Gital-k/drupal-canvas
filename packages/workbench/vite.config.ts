@@ -37,6 +37,9 @@ const workbenchNodeModulesPath = path.resolve(__dirname, 'node_modules');
 const geistPackageRoot = path.dirname(
   require.resolve('@fontsource-variable/geist/package.json'),
 );
+const geistMonoPackageRoot = path.dirname(
+  require.resolve('@fontsource-variable/geist-mono/package.json'),
+);
 const canvasConfig = resolveCanvasConfig({ hostRoot: hostProjectRoot });
 const componentDiscoveryRoot = path.resolve(
   hostProjectRoot,
@@ -48,6 +51,7 @@ const allowedFsRoots = [
   hostProjectRoot,
   __dirname,
   geistPackageRoot,
+  geistMonoPackageRoot,
   ...watchRoots,
 ];
 
