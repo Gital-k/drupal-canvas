@@ -23,7 +23,6 @@ trait CanvasUiAssertionsTrait {
       'baseUrl',
       'branding',
       'breadcrumbs',
-      'isPreview',
       'jsonapiSettings',
       'mainEntity',
       'pageTitle',

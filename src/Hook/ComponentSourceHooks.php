@@ -164,17 +164,7 @@ readonly final class ComponentSourceHooks {
       }
     }
 
-    // Determine if this is a preview route and set isPreview accordingly.
-    // This must be set for layout routes even if $canvasData is otherwise
-    // empty. Check route name pattern - all layout API routes start with
-    // 'canvas.api.layout.'
-    $route_name = $this->routeMatch->getRouteName();
-    $is_preview = $route_name !== NULL
-      && str_starts_with($route_name, 'canvas.api.layout.');
-
-    if ($is_preview || !empty($canvasData)) {
-      $canvasData[CodeComponentDataProvider::V0] ??= [];
-      $canvasData[CodeComponentDataProvider::V0]['isPreview'] = $is_preview;
+    if (!empty($canvasData)) {
       ksort($canvasData[CodeComponentDataProvider::V0]);
       $settings[CodeComponentDataProvider::CANVAS_DATA_KEY] = $canvasData;
     }

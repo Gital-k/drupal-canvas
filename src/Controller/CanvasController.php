@@ -214,7 +214,6 @@ HTML;
           // editor development purposes.
           'canvasData' => [
             'v0' => [
-              'isPreview' => FALSE,
               'pageTitle' => 'This is a page title for testing purposes',
               'breadcrumbs' => [
                 0 => [

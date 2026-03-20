@@ -43,7 +43,6 @@ export interface DrupalSettings {
   };
   canvasData: {
     v0: {
-      isPreview?: boolean;
       pageTitle: string;
       branding: {
         homeUrl: string;

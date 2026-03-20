@@ -85,7 +85,7 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
   }
 
   /**
-   * Tests that the layout API response includes canvasData.v0.isPreview.
+   * Tests that the layout API response includes canvasData.
    */
   public function testLayoutResponseSetsCanvasDataIsPreview(): void {
     $entity = $this->getTestEntity('node');
@@ -97,9 +97,10 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
     $data = static::decodeResponse($response);
     self::assertArrayHasKey('html', $data);
     // The node's component tree includes a code component, so canvasData is
-    // attached and js_settings_alter sets isPreview for the layout route.
-    self::assertStringContainsString('"isPreview":true', $data['html']);
+    // attached. isPreview is now determined client-side based on the URL.
+    self::assertStringContainsString('"canvasData"', $data['html']);
   }
+
 
   /**
    * @see \Drupal\canvas\Entity\ContentTemplate

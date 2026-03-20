@@ -67,7 +67,6 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
         'siteName' => 'Drupal',
         'siteSlogan' => '',
       ],
-      'isPreview' => FALSE,
     ], $drupalSettings[CodeComponentDataProvider::CANVAS_DATA_KEY][CodeComponentDataProvider::V0]);
   }
 

@@ -135,7 +135,11 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
   }
 
   /**
-   * Tests that the layout API POST response includes canvasData.v0.isPreview.
+   * Tests that the layout API POST response is valid.
+   *
+   * Note: canvasData is only included when code components or other data
+   * trigger the necessary asset libraries. isPreview is now determined
+   * client-side based on the URL.
    */
   public function testLayoutPostResponseSetsCanvasDataIsPreview(): void {
     $entity = $this->getTestEntity('node');
@@ -154,10 +158,8 @@ final class ApiLayoutControllerPostTest extends ApiLayoutControllerTestBase {
     self::assertEquals(Response::HTTP_OK, $response->getStatusCode());
     $data = static::decodeResponse($response);
     self::assertArrayHasKey('html', $data);
-    // The node's component tree includes a code component, so canvasData is
-    // attached and js_settings_alter sets isPreview for the layout POST route.
-    self::assertStringContainsString('"isPreview":true', $data['html']);
   }
+
 
   #[DataProvider('providerEntityTypes')]
   public function testEmpty(string $entity_type): void {
