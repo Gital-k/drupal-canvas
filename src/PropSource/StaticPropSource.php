@@ -426,7 +426,7 @@ final class StaticPropSource extends PropSourceBase {
     return match ($this->getCardinality()) {
       // @phpstan-ignore-next-line
       1 => Evaluator::evaluate($this->fieldItemList->first(), $this->expression, $is_required),
-      default => Evaluator::evaluate($this->fieldItemList->isEmpty() ? NULL : $this->fieldItemList, $this->expression, $is_required)
+      default => Evaluator::evaluate($this->fieldItemList, $this->expression, $is_required)
     };
   }
 

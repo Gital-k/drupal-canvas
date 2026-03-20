@@ -1361,12 +1361,6 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
         // If this is a required property without a value, we can leave
         // subsequent validation to bubble up any errors.
         // @see \Drupal\canvas\PropExpressions\StructuredData\Evaluator::doEvaluate()
-        if ($this->isRequiredMultiValuePropSourceEmpty($is_required_prop, $source)) {
-          // A required multi-value prop source with no valid items must
-          // still be collapsed so downstream validation can report it.
-          \assert($source instanceof StaticPropSource);
-          $props[$prop] = $this->collapse($source, $prop);
-        }
         continue;
       }
       $props[$prop] = $this->collapse($source, $prop);
@@ -1468,23 +1462,6 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       }
     }
     return $source->toArray();
-  }
-
-  /**
-   * Checks if a prop source is an empty required multi-value static source.
-   *
-   * @param bool $is_required_prop
-   *   Whether the prop is required.
-   * @param mixed $source
-   *   The parsed prop source, or NULL if not yet available.
-   *
-   * @return bool
-   */
-  private function isRequiredMultiValuePropSourceEmpty(bool $is_required_prop, mixed $source): bool {
-    return $is_required_prop
-      && $source instanceof StaticPropSource
-      && $source->getCardinality() !== 1
-      && $source->isEmpty();
   }
 
   /**
