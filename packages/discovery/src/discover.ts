@@ -7,7 +7,7 @@ import ignore from 'ignore';
 import {
   findDuplicateMachineNames,
   loadComponentsMetadata,
-} from './metadata.ts';
+} from './metadata';
 
 import type {
   DiscoveredComponent,
@@ -15,7 +15,7 @@ import type {
   DiscoveryOptions,
   DiscoveryResult,
   DiscoveryWarning,
-} from './types.ts';
+} from './types';
 
 export const JS_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx'] as const;
 // @todo See if we can find better default AND make this configurable.

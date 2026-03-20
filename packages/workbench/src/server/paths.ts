@@ -1,7 +1,7 @@
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { resolveCanvasConfig } from '@drupal-canvas/vite-compat';
+import { resolveCanvasConfig } from '@drupal-canvas/discovery';
 
 export interface WorkbenchPathsOptions {
   moduleUrl: string;
