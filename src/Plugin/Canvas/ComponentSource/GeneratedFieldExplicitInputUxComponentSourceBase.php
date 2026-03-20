@@ -580,6 +580,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       $inputValues[$component_prop_name] = $raw_prop_source;
 
       if (str_starts_with($raw_prop_source['sourceType'], 'static:')) {
+        \assert($source instanceof StaticPropSource);
         try {
           \assert(\array_key_exists('expression', $raw_prop_source) && \array_key_exists('value', $raw_prop_source) && \array_key_exists('sourceType', $raw_prop_source));
           StaticPropSource::isMinimalRepresentation($raw_prop_source);

@@ -178,7 +178,7 @@ describe('Transforms - main property', () => {
         { name: 'value', multiple: true },
         fieldData,
       ),
-    ).toEqual(['tag1'], ['tag3']);
+    ).toEqual(['tag1', 'tag3']);
   });
 
   it('Should return empty array when all values are empty strings', () => {
