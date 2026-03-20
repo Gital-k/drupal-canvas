@@ -33,7 +33,8 @@ For end-user guidance, see the Workbench chapter in `docs/user`:
 
 ## Setup and run
 
-Workbench ships a `canvas-workbench` binary that starts a bundled Vite server.
+Workbench ships a `canvas-workbench` binary that starts a packaged Vite-based
+runtime.
 
 ```bash
 # In packages/workbench
@@ -49,31 +50,30 @@ npx canvas-workbench dev
 
 ## How the Workbench runtime works
 
-### `bin/canvas-workbench.js`
+### Published output
 
-- Resolves Vite from this package installation and runs the Vite CLI through
-  Node.
-- Ensure that Vite uses the `@drupal-canvas/workbench` package root and
-  `vite.config.ts`, while forwarding extra CLI flags.
-- Keeps `cwd` as the directory where you run the command, so discovery scans
-  your project, not the workbench package.
+- `dist/client` contains the packaged browser app sources and static assets,
+  including `index.html`, copied client/shared source files, CSS, and copied
+  public assets.
+- `dist/server` contains the packaged Node-side runtime, including the
+  `canvas-workbench` binary and the published Vite config entry.
 
-### `vite.config.ts`
+### Packaged runtime
 
-- Sets `root` to the workbench package, but allows Vite file access to both the
-  workbench code and the host project directory.
-- Registers a custom discovery plugin (from `@drupal-canvas/discovery`) that
-  runs `discoverCanvasProject({ componentRoot: process.cwd() })` and caches
-  results.
-- Exposes discovery data at `/__canvas/discovery` as JSON for the UI.
-- Exposes preview manifest data at `/__canvas/preview-manifest` as JSON for
-  preview runtime decisions.
-- Uses routes:
+- The published binary resolves Vite from the installed package and launches it
+  against `dist/client` with the packaged server config from `dist/server`.
+- The server build bundles the internal helper packages
+  `@drupal-canvas/discovery` and `@drupal-canvas/vite-compat`.
+- The packaged client is served from packaged source files through the Workbench
+  Vite runtime, not from a standalone production-built browser bundle.
+- The packaged runtime:
+  - Exposes discovery data at `/__canvas/discovery` as JSON for the UI.
+  - Exposes preview manifest data at `/__canvas/preview-manifest` as JSON for
+    preview runtime decisions.
+  - Uses routes:
   - `/component/<component-id>` for component previews.
   - `/page/<slug>` for discovered pages, where `slug` comes from
     `pages/<slug>.json`.
-- Uses `@drupal-canvas/vite-compat` for shared compatibility behavior — see
-  [`packages/vite-compat/README.md`](../vite-compat/README.md).
 - Watches the host project for relevant file changes (`component.yml`,
   `*.component.yml`, and JS(X)/TS(X)/CSS files), sends targeted HMR update
   events, refreshes discovery when needed, and reloads only the preview iframe
@@ -111,6 +111,10 @@ Workbench currently uses one Vite dev server process for both:
 - the Workbench UI shell, and
 - the preview iframe runtime.
 
+The published package keeps that same model. `dist/server` starts Vite against
+the packaged client sources in `dist/client`, rather than serving a separately
+built static browser bundle.
+
 ### Why this is the current choice
 
 - One startup command and one process simplify local DX while the feature set is
@@ -146,7 +150,9 @@ Move to stronger separation when one or more of these become recurring:
 ## Future: static export mode outline
 
 Workbench does not currently support a Storybook-style static export of host
-component previews. This section captures a potential direction for later work.
+component previews. The current `dist/client` output is packaging-oriented for
+the Workbench Vite runtime, not a deployable static export. This section
+captures a potential direction for later work.
 
 ### Goal
 

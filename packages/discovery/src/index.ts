@@ -1,5 +1,8 @@
-export { discoverCanvasProject, JS_EXTENSIONS } from './discover';
-export { findDuplicateMachineNames, loadComponentsMetadata } from './metadata';
+export { discoverCanvasProject, JS_EXTENSIONS } from './discover.ts';
+export {
+  findDuplicateMachineNames,
+  loadComponentsMetadata,
+} from './metadata.ts';
 export type {
   ComponentMetadata,
   DiscoveredComponent,
@@ -8,4 +11,4 @@ export type {
   DiscoveryResult,
   DiscoveryWarning,
   DiscoveryWarningCode,
-} from './types';
+} from './types.ts';

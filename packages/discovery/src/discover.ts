@@ -4,7 +4,10 @@ import path from 'node:path';
 import { glob } from 'glob';
 import ignore from 'ignore';
 
-import { findDuplicateMachineNames, loadComponentsMetadata } from './metadata';
+import {
+  findDuplicateMachineNames,
+  loadComponentsMetadata,
+} from './metadata.ts';
 
 import type {
   DiscoveredComponent,
@@ -12,7 +15,7 @@ import type {
   DiscoveryOptions,
   DiscoveryResult,
   DiscoveryWarning,
-} from './types';
+} from './types.ts';
 
 export const JS_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx'] as const;
 // @todo See if we can find better default AND make this configurable.

@@ -3,9 +3,9 @@ import { canvasTreeToSpec } from 'drupal-canvas/json-render-utils';
 import { useLocation, useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
 import { toViteFsUrl } from '@drupal-canvas/vite-compat/runtime';
-import { ThemeMenu } from '@wb/components/theme-menu';
-import { Badge } from '@wb/components/ui/badge';
-import { Separator } from '@wb/components/ui/separator';
+import { ThemeMenu } from '@wb/client/components/theme-menu';
+import { Badge } from '@wb/client/components/ui/badge';
+import { Separator } from '@wb/client/components/ui/separator';
 import {
   Sidebar,
   SidebarContent,
@@ -19,8 +19,8 @@ import {
   SidebarProvider,
   SidebarRail,
   SidebarTrigger,
-} from '@wb/components/ui/sidebar';
-import { Tabs, TabsList, TabsTrigger } from '@wb/components/ui/tabs';
+} from '@wb/client/components/ui/sidebar';
+import { Tabs, TabsList, TabsTrigger } from '@wb/client/components/ui/tabs';
 import { fetchDiscoveryResult } from '@wb/lib/discovery-client';
 import {
   fetchPreviewManifest,
