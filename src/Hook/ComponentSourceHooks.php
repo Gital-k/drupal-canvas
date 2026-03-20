@@ -163,7 +163,6 @@ readonly final class ComponentSourceHooks {
         $canvasData = array_replace_recursive($canvasData, $this->memoize($request, 'canvas/canvasData.v0.jsonapiSettings'));
       }
     }
-
     if (!empty($canvasData)) {
       ksort($canvasData[CodeComponentDataProvider::V0]);
       $settings[CodeComponentDataProvider::CANVAS_DATA_KEY] = $canvasData;
