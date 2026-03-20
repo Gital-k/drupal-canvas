@@ -125,8 +125,9 @@ export const getSiteData = (): SiteData => {
  * iframe). Use this in code components to adjust behavior or styling when
  * rendered inside the editor.
  *
- * @returns true when served by the layout API (canvas.api.layout.get or
- *   canvas.api.layout.get.content_template), false on the live site and in
+ * @returns true when served by the layout API (canvas.api.layout.get,
+ *   canvas.api.layout.get.content_template, canvas.api.layout.post, or
+ *   canvas.api.layout.post.content_template), false on the live site and in
  *   the editor shell.
  */
 export const isCanvasPreview = (): boolean =>

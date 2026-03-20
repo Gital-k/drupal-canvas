@@ -163,12 +163,18 @@ readonly final class ComponentSourceHooks {
         $canvasData = array_replace_recursive($canvasData, $this->memoize($request, 'canvas/canvasData.v0.jsonapiSettings'));
       }
     }
-    if (!empty($canvasData)) {
-      $route_name = $this->routeMatch->getRouteName();
-      $canvasData[CodeComponentDataProvider::V0]['isPreview'] = in_array($route_name, [
-        'canvas.api.layout.get',
-        'canvas.api.layout.get.content_template',
-      ]);
+
+    // Determine if this is a preview route and set isPreview accordingly.
+    // This must be set for layout routes even if $canvasData is otherwise empty.
+    // Check route name pattern - all layout API routes start with 'canvas.api.layout.'
+    $route_name = $this->routeMatch->getRouteName();
+    $is_preview = $route_name !== NULL && str_starts_with($route_name, 'canvas.api.layout.');
+
+    if ($is_preview || !empty($canvasData)) {
+      if (!isset($canvasData[CodeComponentDataProvider::V0])) {
+        $canvasData[CodeComponentDataProvider::V0] = [];
+      }
+      $canvasData[CodeComponentDataProvider::V0]['isPreview'] = $is_preview;
       ksort($canvasData[CodeComponentDataProvider::V0]);
       $settings[CodeComponentDataProvider::CANVAS_DATA_KEY] = $canvasData;
     }
