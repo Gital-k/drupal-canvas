@@ -1323,9 +1323,15 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
         // do not need cached responses: the client model changes rapidly.
         $evaluated = $source->evaluate($host_entity, $is_required_prop)->value;
 
-        // Optional component props that evaluate to NULL can be omitted:
-        // storing these would be a waste of storage space.
-        if (!$is_required_prop && $evaluated === NULL) {
+        // Optional component props that evaluate to nothing can be omitted:
+        // storing these would be a waste of storage space. // @see \Drupal\canvas\PropSource\StaticPropSource::getValue()
+        $prop_evaluates_to_nothing = match ($source->getCardinality()) {
+          // Nothing for single-cardinality prop: NULL evaluation result.
+          1 => $evaluated === NULL,
+          // Nothing for multi-cardinality prop: empty array evaluation result.
+          default => $evaluated === [],
+        };
+        if (!$is_required_prop && $prop_evaluates_to_nothing) {
           continue;
         }
 
