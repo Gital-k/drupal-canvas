@@ -165,12 +165,10 @@ readonly final class ComponentSourceHooks {
     }
     if (!empty($canvasData)) {
       $route_name = $this->routeMatch->getRouteName();
-      $is_preview = $route_name === 'canvas.api.layout.get'
-        || $route_name === 'canvas.api.layout.get.content_template';
-      if (!isset($canvasData[CodeComponentDataProvider::V0])) {
-        $canvasData[CodeComponentDataProvider::V0] = [];
-      }
-      $canvasData[CodeComponentDataProvider::V0]['isPreview'] = $is_preview;
+      $canvasData[CodeComponentDataProvider::V0]['isPreview'] = in_array($route_name, [
+        'canvas.api.layout.get',
+        'canvas.api.layout.get.content_template',
+      ]);
       ksort($canvasData[CodeComponentDataProvider::V0]);
       $settings[CodeComponentDataProvider::CANVAS_DATA_KEY] = $canvasData;
     }
