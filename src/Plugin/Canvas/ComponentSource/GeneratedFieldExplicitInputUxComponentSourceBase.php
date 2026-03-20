@@ -573,7 +573,8 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     // @see ::getExplicitInputDefinitions()
     $required_props = \array_keys(\array_filter($prop_field_definitions, static fn (array $definition) => $definition['required'] ?? FALSE));
     foreach ($inputValues as $component_prop_name => $raw_prop_source) {
-      $raw_prop_source = $this->uncollapse($raw_prop_source, $component_prop_name)->toArray();
+      $source = $this->uncollapse($raw_prop_source, $component_prop_name);
+      $raw_prop_source = $source->toArray();
       // Store the expanded prop source with all the values populated from the
       // composite field type.
       $inputValues[$component_prop_name] = $raw_prop_source;
@@ -591,9 +592,13 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
           // In other words: let a prop source being emptier than it portrays
           // result in the appropriate validation errors at the component level.
           // @see \Drupal\canvas\PropSource\StaticPropSource::withValue(allow_empty: TRUE)
-          // @todo Expand to support multiple-cardinality.
-          unset($inputValues[$component_prop_name]);
-          continue;
+          $filtered_source = $source->withoutEmptyItems();
+          // If single cardinality or multiple cardinality with no valid items
+          if ($filtered_source->getCardinality() === 1 || $filtered_source->getValue() === []) {
+            unset($inputValues[$component_prop_name]);
+            continue;
+          }
+          $inputValues[$component_prop_name] = $filtered_source->toArray();
         }
         catch (\LogicException $e) {
           $violations->add(new ConstraintViolation(
@@ -834,7 +839,14 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
 
       $widget_definition = $this->fieldWidgetPluginManager->getDefinition($widget->getPluginId());
       if (\array_key_exists('canvas', $widget_definition) && \array_key_exists('transforms', $widget_definition['canvas'])) {
-        $transforms[$sdc_prop_name] = $widget_definition['canvas']['transforms'];
+        $cardinality = $static_prop_source_field_definition['cardinality'] ?? NULL;
+        $transforms[$sdc_prop_name] = \array_map(
+          static fn (array $transform): array =>
+            [
+              ...$transform,
+              'multiple' => $cardinality !== NULL && $cardinality !== 1,
+            ],
+          $widget_definition['canvas']['transforms']);
       }
       else {
         throw new \LogicException(\sprintf(
@@ -1215,6 +1227,9 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       // corresponding source but may not.
       $prop_value = $client_model['resolved'][$prop] ?? NULL;
       $is_static_prop_source = str_starts_with($prop_source['sourceType'] ?? '', PropSource::getTypePrefix(StaticPropSource::class));
+      // Initialized early, so it's defined if an exception is thrown before
+      // PropSource::parse() is reached inside the try block.
+      $source = NULL;
       try {
         // TRICKY: this is always set, *except* in the case of an auto-saved
         // code component that just gained a new prop.
@@ -1324,7 +1339,6 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
         // string input, as they're thinking about what string they do want.
         // ⚠️ This won't work for components whose logic specifically checks for
         // an empty string and refuses to render then.
-        // @todo Expand to support multiple-cardinality.
         if ($is_required_prop && $evaluated === '' && $this->getExplicitInputDefinitions()['shapes'][$prop] === ['type' => 'string']) {
           // Confirm that *if* this weren't special-cased, that this would
           // indeed enter the next branch, which would cause it to be skipped.
@@ -1348,6 +1362,12 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
         // If this is a required property without a value, we can leave
         // subsequent validation to bubble up any errors.
         // @see \Drupal\canvas\PropExpressions\StructuredData\Evaluator::doEvaluate()
+        if ($this->isRequiredMultiValuePropSourceEmpty($is_required_prop, $source)) {
+          // A required multi-value prop source with no valid items must
+          // still be collapsed so downstream validation can report it.
+          \assert($source instanceof StaticPropSource);
+          $props[$prop] = $this->collapse($source, $prop);
+        }
         continue;
       }
       $props[$prop] = $this->collapse($source, $prop);
@@ -1449,6 +1469,23 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       }
     }
     return $source->toArray();
+  }
+
+  /**
+   * Checks if a prop source is an empty required multi-value static source.
+   *
+   * @param bool $is_required_prop
+   *   Whether the prop is required.
+   * @param mixed $source
+   *   The parsed prop source, or NULL if not yet available.
+   *
+   * @return bool
+   */
+  private function isRequiredMultiValuePropSourceEmpty(bool $is_required_prop, mixed $source): bool {
+    return $is_required_prop
+      && $source instanceof StaticPropSource
+      && $source->getCardinality() !== 1
+      && $source->isEmpty();
   }
 
   /**
