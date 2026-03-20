@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupal\Tests\canvas\Functional;
 
 use Drupal\canvas\AutoSave\AutoSaveManager;
+use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\Page;
@@ -12,7 +13,6 @@ use Drupal\Component\Serialization\Json;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\node\Entity\Node;
 use Drupal\Tests\canvas\TestSite\CanvasTestSetup;
-use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\dynamic_page_cache\EventSubscriber\DynamicPageCacheSubscriber;
 use Drupal\views\Entity\View;
 use PHPUnit\Framework\Attributes\Group;
@@ -29,8 +29,6 @@ use Symfony\Component\DomCrawler\Crawler;
 #[RunTestsInSeparateProcesses]
 #[Group('canvas')]
 final class ContentTemplateAutoSavePreviewTest extends FunctionalTestBase {
-
-  use GenerateComponentConfigTrait;
 
   /**
    * {@inheritdoc}
@@ -180,7 +178,7 @@ final class ContentTemplateAutoSavePreviewTest extends FunctionalTestBase {
     $view->save();
 
     // Trigger component discovery to create the View block component.
-    $this->generateComponentConfig();
+    $this->container->get(ComponentSourceManager::class)->generateComponents();
 
     // Enable the View block component.
     $view_block_component = Component::load('block.views_block.test_articles-block_1');
