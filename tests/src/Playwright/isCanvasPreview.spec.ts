@@ -31,7 +31,12 @@ test.describe('isCanvasPreview', () => {
       );
       await canvasEditor.createCodeComponent('IsCanvasPreviewIndicator', code);
       await canvasEditor.publishAllChanges(['IsCanvasPreviewIndicator']);
-      await canvasEditor.saveCodeComponent('js.isCanvasPreviewIndicator');
+      // @note saveCodeComponent assumes you're in an editor, not root.
+      // await canvasEditor.saveCodeComponent('js.isCanvasPreviewIndicator');
+      await page.getByRole('button', { name: 'Add to components' }).click();
+      await page.getByRole('button', { name: 'Add' }).click();
+      await page.waitForLoadState('networkidle');
+      await canvasEditor.waitForCanvasUi();
 
       await page.close();
     },
