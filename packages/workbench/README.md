@@ -1,52 +1,36 @@
-# Canvas Workbench (prototype)
+# @drupal-canvas/workbench
 
-Canvas Workbench is an early prototype for a local developer tool, similar to
-Storybook, but focused on Drupal Canvas Code Components and Canvas pages.
+Canvas Workbench is a local preview and development app for Drupal Canvas Code
+Components, inspired by Storybook. It scans your project, lists discovered
+components and pages, and renders previews in an isolated frame.
 
-## Goal
+Workbench is zero-config. Run this in your project root:
 
-Provide a complete local Drupal Canvas preview experience for Code Components
-and Canvas Pages built with Code Components from source code alone.
+```bash
+npx @drupal-canvas/workbench@latest
+```
+
+## Installation
+
+Install Workbench:
+
+```bash
+npm install @drupal-canvas/workbench
+```
+
+Then run it from your project root:
+
+```bash
+npx canvas-workbench
+```
+
+The `canvas-workbench` binary starts the packaged Workbench Vite runtime in your
+current working directory.
 
 ## User docs
 
-For end-user guidance, see the Workbench chapter in `docs/user`:
-
-- [Workbench introduction](../../docs/user/src/content/docs/code-components/workbench/index.mdx)
-- [Adding mocks](../../docs/user/src/content/docs/code-components/workbench/mocks.mdx)
-
-## What we are testing
-
-- Run a local Vite + React app that scans your local codebase.
-- Discover Drupal Canvas Code Components automatically.
-- Show discovered components in a UI.
-- Read component inputs from each `component.yml` and let you preview them
-  through different example values.
-- Discover Canvas pages alongside components.
-- Represent pages as [json-render](https://json-render.dev) objects.
-- Use json-render to preview Canvas pages locally.
-- Support hot module reload (HMR) for both component and page previews.
-- Explore an additional story metadata format, possibly compatible with
-  Storybook.
-- Explore integrating Canvas page json-render objects with popular React
-  framework routing.
-
-## Setup and run
-
-Workbench ships a `canvas-workbench` binary that starts a packaged Vite-based
-runtime.
-
-```bash
-# In packages/workbench
-npm run build
-npm link
-
-# Generate a new codebase
-npx @drupal-canvas/create@latest
-# Run in the root of the new project
-npm link @drupal-canvas/workbench
-npx canvas-workbench dev
-```
+For end-user guidance, see:
+https://project.pages.drupalcode.org/canvas/code-components/workbench/
 
 ## How the Workbench runtime works
 
