@@ -4,8 +4,8 @@ export default defineConfig({
   clean: ['dist'],
   copy: [
     { from: 'public/**/*', to: 'dist/client', flatten: false },
-    { from: 'src/client', to: 'dist/client/src' },
-    { from: 'src/lib', to: 'dist/client/src' },
+    { from: 'src/client/**/*', to: 'dist/client/src', flatten: false },
+    { from: 'src/lib/**/*', to: 'dist/client/src', flatten: false },
   ],
   deps: {
     alwaysBundle: ['@drupal-canvas/discovery', '@drupal-canvas/vite-compat'],

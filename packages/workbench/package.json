@@ -49,6 +49,7 @@
     "vitest": "^4.0.18"
   },
   "scripts": {
+    "dev": "NODE_ENV=development tsdown --watch",
     "build": "npm run type-check && NODE_ENV=production tsdown",
     "prepack": "npm run build",
     "type-check": "tsc -p tsconfig.json --pretty",
