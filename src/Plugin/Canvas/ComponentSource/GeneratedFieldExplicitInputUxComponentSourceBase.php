@@ -573,7 +573,8 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     // @see ::getExplicitInputDefinitions()
     $required_props = \array_keys(\array_filter($prop_field_definitions, static fn (array $definition) => $definition['required'] ?? FALSE));
     foreach ($inputValues as $component_prop_name => $raw_prop_source) {
-      $raw_prop_source = $this->uncollapse($raw_prop_source, $component_prop_name)->toArray();
+      $source = $this->uncollapse($raw_prop_source, $component_prop_name);
+      $raw_prop_source = $source->toArray();
       // Store the expanded prop source with all the values populated from the
       // composite field type.
       $inputValues[$component_prop_name] = $raw_prop_source;
@@ -591,7 +592,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
           // In other words: let a prop source being emptier than it portrays
           // result in the appropriate validation errors at the component level.
           // @see \Drupal\canvas\PropSource\StaticPropSource::withValue(allow_empty: TRUE)
-          $filtered_source = StaticPropSource::parse($raw_prop_source)->withoutEmptyItems();
+          $filtered_source = $source->withoutEmptyItems();
           // If single cardinality or multiple cardinality with no valid items
           if ($filtered_source->getCardinality() === 1 || $filtered_source->getValue() === []) {
             unset($inputValues[$component_prop_name]);
