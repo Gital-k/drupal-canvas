@@ -1,4 +1,25 @@
+import { readdir, rm } from 'node:fs/promises';
+import path from 'node:path';
 import { defineConfig } from 'tsdown';
+
+async function removeCopiedTestFiles(directoryPath: string): Promise<void> {
+  const entries = await readdir(directoryPath, { withFileTypes: true });
+
+  await Promise.all(
+    entries.map(async (entry) => {
+      const entryPath = path.join(directoryPath, entry.name);
+
+      if (entry.isDirectory()) {
+        await removeCopiedTestFiles(entryPath);
+        return;
+      }
+
+      if (/\.(test|spec)\.[cm]?[jt]sx?$/.test(entry.name)) {
+        await rm(entryPath);
+      }
+    }),
+  );
+}
 
 export default defineConfig({
   clean: ['dist'],
@@ -28,6 +49,13 @@ export default defineConfig({
   dts: false,
   entry: ['vite.published.config.ts'],
   format: ['es'],
+  hooks: {
+    async 'build:done'(ctx) {
+      await removeCopiedTestFiles(
+        path.join(ctx.options.outDir, '../client/src'),
+      );
+    },
+  },
   outDir: 'dist/server',
   platform: 'node',
 });
