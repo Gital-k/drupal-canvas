@@ -174,11 +174,11 @@ describe('Transforms - main property', () => {
   it('Should filter out empty strings from multi-value fields', () => {
     expect(
       transforms.mainProperty(
-        { 0: { value: 'tag1' }, 1: { value: '' } },
+        { 0: { value: 'tag1' }, 1: { value: '' }, 2: { value: 'tag3' } },
         { name: 'value', multiple: true },
         fieldData,
       ),
-    ).toEqual(['tag1']);
+    ).toEqual(['tag1'], ['tag3']);
   });
 
   it('Should return empty array when all values are empty strings', () => {
