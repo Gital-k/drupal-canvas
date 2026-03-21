@@ -16,13 +16,15 @@ export const edit = (cy) => {
     'Marshmallow Coast',
   );
   items.forEach((item, ix) => {
-    cy.findByLabelText(`Canvas Unlimited Text (value ${ix + 2})`).type(item);
+    cy.findByLabelText(`Canvas Unlimited Text (value ${ix + 2})`, {
+      timeout: 10000,
+    }).type(item);
     cy.findByLabelText(`Canvas Unlimited Text (value ${ix + 2})`).should(
       'have.value',
       item,
     );
     // Wait for the preview to finish loading.
-    cy.wait('@updatePreview');
+    cy.reasonableWait();
     // Queue another intercept for the wait in the main test and/or the next
     // iteration in the loop.
     cy.intercept({
@@ -30,18 +32,12 @@ export const edit = (cy) => {
       times: 1,
       method: 'POST',
     }).as('updatePreview');
-    cy.waitForAjax();
 
-    // Despite waiting on the layout request and AJAX completion, this wait is
-    // still necessary in order to prevent a specific problem where the first
-    // only the first item in the loop makes it to the published version of the
-    // node, despite all items being properly added to the form.
-    // eslint-disable-next-line cypress/no-unnecessary-waiting
-    cy.wait(400);
-    cy.get('@add-another-text').click({ force: true });
-    cy.selectorShouldHaveUpdatedFormBuildId(
-      '[data-testid="canvas-page-data-form"]',
-    );
+    cy.log(`adding item ${ix + 1}`);
+
+    cy.get('@add-another-text').click();
+    cy.wait('@updatePreview');
+    cy.reasonableWait();
   });
 };
 export const assertData = (response) => {

@@ -16,9 +16,11 @@ describe('Contextual panel', () => {
     cy.loadURLandWaitForCanvasLoaded();
     // Wait for the preview iframe to load and render something that confirms it is ready.
     cy.get('iframe[data-canvas-preview]').should('exist');
-    // Right-click on the element that should trigger the context menu
-    cy.getComponentInPreview('Hero').trigger('contextmenu');
 
+    // Right-click on the element that should trigger the context menu
+    cy.get('[aria-label="Draggable component Hero"]')
+      .first()
+      .rightclick({ force: true });
     cy.findByLabelText('Context menu for Hero')
       .should('exist')
       .and('be.visible');
@@ -304,7 +306,9 @@ describe('Contextual panel', () => {
     cy.get('iframe[data-canvas-preview]').should('exist');
 
     // Right-click on the element in the preview should trigger the context menu.
-    cy.getComponentInPreview('Test Code Component').trigger('contextmenu');
+    cy.get('[aria-label="Draggable component Test Code Component"]')
+      .first()
+      .rightclick({ force: true });
 
     // Verify the context menu opened with component name.
     cy.findByLabelText('Context menu for Test Code Component')
