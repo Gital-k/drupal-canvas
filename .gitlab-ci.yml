@@ -504,7 +504,6 @@ vitest:
         - ui/junit-*.xml
 
 cypress E2E:
-  when: never
   extends: .cypress-base
   parallel: 5
   script:
@@ -608,6 +607,7 @@ lint (OpenAPI):
     FORCE_COLOR: "1"
 
 playwright:
+  when: never
   stage: test
   needs: []
   rules:
