@@ -504,9 +504,10 @@ vitest:
         - ui/junit-*.xml
 
 cypress E2E:
-  when: never
   extends: .cypress-base
   parallel: 5
+  rules:
+    - when: never
   script:
     - npx cypress run --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml" --spec=`node ./tests/support/parallel.js` 2>&1 | tee cypress.log || EXIT_CODE=$?
     # Auto-retry when known frequent random failures occur.
