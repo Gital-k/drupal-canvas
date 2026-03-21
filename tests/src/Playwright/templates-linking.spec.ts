@@ -1,11 +1,19 @@
 import { getModuleDir } from '@drupal-canvas/test-utils';
 import { expect } from '@playwright/test';
 
+
+
 import { test } from './fixtures/DrupalSite';
 import { Drupal } from './objects/Drupal';
 
+
+
 import type { Page } from '@playwright/test';
 import type { CanvasEditor } from './objects/CanvasEditor';
+
+
+
+
 
 // Each object property is a prop type with a value of an array of the available
 // suggestions to it.
@@ -189,6 +197,7 @@ test.describe.serial('Linking Basic Page fields ', () => {
       const page = await browser.newPage();
       const drupal: Drupal = new Drupal({ page, drupalSite });
       await drupal.setupCanvasTestSite();
+      await drupal.drush('theme:enable canvas_stark');
       const moduleDir = await getModuleDir();
       await drupal.applyRecipe(
         `${moduleDir}/canvas/tests/fixtures/recipes/template_basic_setup`,
