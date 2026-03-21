@@ -27,7 +27,7 @@ config:
     # config/install/ configs to the DB first, then this import finds canvas.component.js.* already exists
     # and throws "exists already and does not match the recipe's configuration".
     # @see https://www.drupal.org/project/canvas/issues/
-    # canvas_test_code_components: '*'
+    canvas_test_code_components: '*'
   actions:
     system.site:
       simpleConfigUpdate:
