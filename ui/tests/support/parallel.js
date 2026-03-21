@@ -34,7 +34,9 @@ const getSpecFiles = () => {
 
   // Distribute remaining files across nodes 1..N-1
   const remainingNodes = NODE_TOTAL - 1;
-  return otherSpecs.filter((_, index) => index % remainingNodes === NODE_INDEX - 1);
+  return otherSpecs.filter(
+    (_, index) => index % remainingNodes === NODE_INDEX - 1,
+  );
 };
 
 console.log(getSpecFiles().join(','));
