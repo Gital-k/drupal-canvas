@@ -667,6 +667,8 @@ playwright:
   retry:
     max: 2
     exit_codes: 112
+    when:
+      - runner_system_failure
 
 CLI Test:
   stage: test
