@@ -83,10 +83,11 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   /* Maximum failures */
   maxFailures: 999999,
-  /* On CI: exactly one worker per spec file so workers are never reused across
-   * files and each worker always operates on its own clean database.
+  /* On CI: limit workers to avoid resource contention on CPU-constrained pods.
+   * 23 workers caused cascading timeouts under load; 10 stays well within the
+   * 30-minute job limit on a healthy pod while degrading gracefully on a slow one.
    * Locally: 50% of CPU cores to avoid thrashing the dev machine. */
-  workers: process.env.CI ? 23 : '50%',
+  workers: process.env.CI ? 10 : '50%',
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [
     ['list'],
