@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import clsx from 'clsx';
 
+import { useFieldContext } from '@/components/form/contexts/FieldContext';
 import useMutationObserver from '@/hooks/useMutationObserver';
 import { a2p } from '@/local_packages/utils';
 
@@ -22,11 +23,10 @@ const TextFieldAutocomplete = ({
   // they appear due to the component rerendering on value change.
   // The attribute is removed when a suggestion is picked, or the input is
   // blurred.
-  // @see InputBehaviorsCommon in inputBehaviors.tsx where attributes.onChange
-  // is defined.
   attributes['data-canvas-no-update'] = '';
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const fieldContext = useFieldContext();
 
   // This mutation observer responds to the addition of a
   // 'data-canvas-autocomplete-selected' attribute, which will have the value of the
@@ -50,15 +50,8 @@ const TextFieldAutocomplete = ({
             // Remove the attribute to prevent multiple attempts to update the
             // store with the same value.
             record.target.removeAttribute('data-canvas-autocomplete-selected');
-            const changeEvent = new Event('change');
-            Object.defineProperty(changeEvent, 'target', {
-              writable: false,
-              value: record.target,
-            });
 
-            if (typeof attributes.onChange === 'function') {
-              attributes.onChange(changeEvent);
-            }
+            fieldContext?.triggerChange(selection, record.target);
           }
         }
       });
@@ -70,7 +63,12 @@ const TextFieldAutocomplete = ({
     <div className={clsx(styles.wrap, styles.autocompleteWrap)}>
       <input
         autoComplete="off"
-        {...a2p(attributes, {}, { skipAttributes: ['onBlur', 'onChange'] })}
+        defaultValue={attributes.value}
+        {...a2p(
+          attributes,
+          {},
+          { skipAttributes: ['onBlur', 'onChange', 'value'] },
+        )}
         className={clsx(styles.root, styles.autocomplete, className)}
         ref={(node) => {
           if (node) {
@@ -83,11 +81,6 @@ const TextFieldAutocomplete = ({
           // updates.
           if (inputRef.current) {
             inputRef.current.setAttribute('data-canvas-no-update', 'true');
-          }
-          // Call the onChange listener, which will update the UI but not the
-          // store or preview, due to the attribute set above.
-          if (typeof attributes.onChange === 'function') {
-            attributes.onChange(e);
           }
 
           const autocompleteDelay =
@@ -106,10 +99,12 @@ const TextFieldAutocomplete = ({
           setTimeout(() => {
             if (
               inputRef.current &&
-              !inputRef.current.hasAttribute('data-canvas-no-update') &&
-              typeof attributes.onChange === 'function'
+              !inputRef.current.hasAttribute('data-canvas-no-update')
             ) {
-              attributes.onChange(e);
+              fieldContext?.triggerChange(
+                inputRef.current.value,
+                inputRef.current,
+              );
             }
           }, autocompleteDelay * 3);
         }}
@@ -117,11 +112,13 @@ const TextFieldAutocomplete = ({
           if (inputRef.current) {
             inputRef.current.removeAttribute('data-canvas-no-update');
           }
-          // As an additional assurance the value is sent to the store, an
-          // additional onChange is triggered immediately after the store
-          // preventing attribute is removed.
-          if (typeof attributes.onChange === 'function') {
-            attributes.onChange(e);
+          // As an additional assurance the value is sent to the store, trigger
+          // a change immediately after the store-preventing attribute is removed.
+          if (inputRef.current) {
+            fieldContext?.triggerChange(
+              inputRef.current.value,
+              inputRef.current,
+            );
           }
           if (typeof attributes.onBlur === 'function') {
             attributes.onBlur(e);

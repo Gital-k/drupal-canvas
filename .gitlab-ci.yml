@@ -505,7 +505,7 @@ vitest:
 
 cypress E2E:
   extends: .cypress-base
-  parallel: 4
+  parallel: 5
   script:
     - npx cypress run --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml" --spec=`node ./tests/support/parallel.js` 2>&1 | tee cypress.log || EXIT_CODE=$?
     # Auto-retry when known frequent random failures occur.
@@ -616,6 +616,9 @@ playwright:
   image: ghcr.io/drupal-canvas/drupal-testing:1.0.0
   extends:
     - .test-variables
+  parallel:
+    matrix:
+      - BROWSER: [chromium, firefox, webkit, templates-linking]
   variables:
     GIT_DEPTH: 1
     _TARGET_DB_TYPE: sqlite
@@ -664,6 +667,8 @@ playwright:
   retry:
     max: 2
     exit_codes: 112
+    when:
+      - runner_system_failure
 
 CLI Test:
   stage: test

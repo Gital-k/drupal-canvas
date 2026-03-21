@@ -543,6 +543,7 @@ class CanvasTestSetup implements TestSetupInterface {
         'create media',
         'edit any article content',
         'create article content',
+        'administer content templates',
         Page::CREATE_PERMISSION,
         Page::EDIT_PERMISSION,
         Page::DELETE_PERMISSION,
