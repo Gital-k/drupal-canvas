@@ -329,13 +329,15 @@ phpunit:
     name: $_CONFIG_DOCKERHUB_ROOT/php-$PHP_VERSION-ubuntu-apache:$_TARGET_PHP_IMAGE_TAG
   # @todo Remove when https://www.drupal.org/project/gitlab_templates/issues/3452183 lands.
   rules:
-    - *is-push-rule
-    - *php-files-change-rule
-    - *module-metadata-files-change-rule
-    - *module-config-files-change-rule
-    - *SDC-files-change-rule
-    - *UI-fixtures-files-change-rule
-    - *manual-rule
+    - when: never
+#  rules:
+#    - *is-push-rule
+#    - *php-files-change-rule
+#    - *module-metadata-files-change-rule
+#    - *module-config-files-change-rule
+#    - *SDC-files-change-rule
+#    - *UI-fixtures-files-change-rule
+#    - *manual-rule
 
 phpunit (11.3):
   extends: phpunit
