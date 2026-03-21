@@ -68,8 +68,7 @@ final class ContentTemplateAwareViewBuilder extends EntityViewBuilder {
    *   TRUE if on a preview route, FALSE otherwise.
    */
   private function isPreview(): bool {
-    $route = $this->routeMatch->getRouteObject();
-    return $route?->getOption('_canvas_use_template_draft') === TRUE;
+    return AutoSaveManager::routeIsCanvasPreview($this->routeMatch->getRouteObject());
   }
 
   /**

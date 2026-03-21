@@ -36,6 +36,7 @@ use Drupal\canvas\Entity\CanvasHttpApiEligibleConfigEntityInterface;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
+use Symfony\Component\Routing\Route;
 use Symfony\Component\Validator\ConstraintViolationList;
 use Symfony\Component\Validator\ConstraintViolationListInterface;
 
@@ -481,6 +482,13 @@ class AutoSaveManager implements EventSubscriberInterface {
       return !$entity->status();
     }
     return (string) $entity->label() == ApiContentControllers::defaultTitle($entity->getEntityType()) || str_ends_with((string) $entity->label(), self::ENTITY_DUPLICATE_SUFFIX);
+  }
+
+  /**
+   * Determines if the given route is a Canvas preview route.
+   */
+  public static function routeIsCanvasPreview(?Route $route): bool {
+    return $route?->getOption('_canvas_use_template_draft') === TRUE;
   }
 
 }
