@@ -35,13 +35,15 @@ describe('Can save and load patterns', () => {
         '.canvas--viewport-overlay [data-canvas-component-id="sdc.canvas_test_sdc.image"]',
       )
         .first()
-        .trigger('contextmenu');
+        .rightclick({ force: true });
+
       cy.findByText('Delete').click();
       cy.get(
         '.canvas--viewport-overlay [data-canvas-component-id="sdc.canvas_test_sdc.image"]',
       )
         .first()
-        .trigger('contextmenu');
+        .rightclick({ force: true });
+
       cy.findByText('Delete').click();
       cy.waitForComponentNotInPreview('Image');
 
@@ -93,7 +95,7 @@ describe('Can save and load patterns', () => {
 
       cy.get('.primaryPanelContent').within(() => {
         cy.findByText(patternName).should('exist');
-        cy.findByText(patternName).trigger('contextmenu');
+        cy.findByText(patternName).rightclick({ force: true });
       });
       cy.findByText('Insert').click();
 
