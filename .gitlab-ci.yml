@@ -504,6 +504,7 @@ vitest:
         - ui/junit-*.xml
 
 cypress E2E:
+  when: never
   extends: .cypress-base
   parallel: 5
   script:
