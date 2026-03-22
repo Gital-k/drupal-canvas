@@ -1,4 +1,4 @@
-import { Component, useEffect, useState } from 'react';
+import { Component, useEffect, useRef, useState } from 'react';
 import {
   defineComponentRegistry,
   renderSpec,
@@ -28,6 +28,7 @@ function postFrameMessage(
 interface RenderableState {
   type: 'component' | 'page';
   renderId: string;
+  requestToken: number;
   node: ReactNode;
 }
 
@@ -62,6 +63,7 @@ function RenderSignal({
 class FrameRenderBoundary extends Component<
   {
     renderId: string | null;
+    requestToken: number | null;
     onError: (message: string, renderId: string | null) => void;
     children: ReactNode;
   },
@@ -82,8 +84,17 @@ class FrameRenderBoundary extends Component<
     this.props.onError(message, this.props.renderId);
   }
 
-  componentDidUpdate(prevProps: Readonly<{ renderId: string | null }>): void {
-    if (prevProps.renderId !== this.props.renderId && this.state.hasError) {
+  componentDidUpdate(
+    prevProps: Readonly<{
+      renderId: string | null;
+      requestToken: number | null;
+    }>,
+  ): void {
+    if (
+      (prevProps.renderId !== this.props.renderId ||
+        prevProps.requestToken !== this.props.requestToken) &&
+      this.state.hasError
+    ) {
       this.setState({ hasError: false, message: null });
     }
   }
@@ -106,6 +117,7 @@ export function PreviewFrameApp() {
     null,
   );
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const latestRequestTokenRef = useRef(0);
 
   useEffect(() => {
     postFrameMessage({
@@ -134,7 +146,11 @@ export function PreviewFrameApp() {
   async function handleRenderRequest(
     request: PreviewRenderRequest,
   ): Promise<void> {
+    const requestToken = latestRequestTokenRef.current + 1;
+    latestRequestTokenRef.current = requestToken;
+
     try {
+      setActiveRender(null);
       setPreviewError(null);
 
       await Promise.all(
@@ -153,9 +169,14 @@ export function PreviewFrameApp() {
       const node = renderSpec(request.payload.spec, registry);
       const renderType: RenderableState['type'] = request.payload.renderType;
 
+      if (latestRequestTokenRef.current !== requestToken) {
+        return;
+      }
+
       setActiveRender({
         type: renderType,
         renderId: request.payload.renderId,
+        requestToken,
         node,
       });
     } catch (error) {
@@ -163,6 +184,11 @@ export function PreviewFrameApp() {
         error instanceof Error
           ? `${error.message}${error.stack ? `\n${error.stack}` : ''}`
           : `Unknown render error: ${String(error)}`;
+
+      if (latestRequestTokenRef.current !== requestToken) {
+        return;
+      }
+
       setActiveRender(null);
       setPreviewError(message);
       postFrameMessage({
@@ -180,7 +206,12 @@ export function PreviewFrameApp() {
     <main style={{ padding: '1rem' }}>
       <FrameRenderBoundary
         renderId={activeRender?.renderId ?? null}
+        requestToken={activeRender?.requestToken ?? null}
         onError={(message, renderId) => {
+          if (activeRender?.requestToken !== latestRequestTokenRef.current) {
+            return;
+          }
+
           setPreviewError(message);
           postFrameMessage({
             source: 'canvas-workbench-frame',
