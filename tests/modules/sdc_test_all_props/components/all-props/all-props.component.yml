@@ -184,7 +184,7 @@ props:
     test_string_format_uri_image_using_ref:
       title: 'String, format=uri, relative or absolute images only — using $ref'
       description: 'This is the description of String, format=uri, relative or absolute images only — using $ref'
-      $ref: json-schema-definitions://canvas.module/image-uri
+      $ref: module://canvas/schema.json#$defs/image-uri
       # @todo Remove in https://www.drupal.org/project/drupal/issues/3352063 — should not be necessary, but removing this causes \Drupal\Core\Theme\Component\ComponentMetadata::parseSchemaInfo() to generate `type = ['', 'object'] 🐛
       type: string
       # ⚠️ The reference above is equivalent to:
@@ -202,7 +202,7 @@ props:
     test_string_format_uri_public_stream_wrapper_using_ref:
       title: 'String, format=uri, public:// stream wrapper only — using $ref'
       description: 'This is the description of String, format=uri, public:// stream wrapper only — using $ref'
-      $ref: json-schema-definitions://canvas.module/stream-wrapper-uri
+      $ref: module://canvas/schema.json#$defs/stream-wrapper-uri
       # @todo Remove in https://www.drupal.org/project/drupal/issues/3352063 — should not be necessary, but removing this causes \Drupal\Core\Theme\Component\ComponentMetadata::parseSchemaInfo() to generate `type = ['', 'object'] 🐛
       type: string
     test_string_format_uri_reference:
@@ -293,9 +293,9 @@ props:
     # The "image" predefined object format.
     # @todo Agree on one special case, for ecosystem-wide formats: `json-schema-definitions://drupal/<something>`, so `json-schema-definitions://drupal/image` here.
     test_object_drupal_image:
-      title: 'Object, $ref=json-schema-definitions://canvas.module/image'
-      description: 'This is the description of Object, $ref=json-schema-definitions://canvas.module/image'
-      $ref: json-schema-definitions://canvas.module/image
+      title: 'Object, $ref=module://canvas/schema.json#$defs/image'
+      description: 'This is the description of Object, $ref=module://canvas/schema.json#$defs/image'
+      $ref: module://canvas/schema.json#$defs/image
       # @todo Remove in https://www.drupal.org/project/drupal/issues/3352063 — should not be necessary, but removing this causes \Drupal\Core\Theme\Component\ComponentMetadata::parseSchemaInfo() to generate `type = ['', 'object'] 🐛
       type: object
       examples:
@@ -304,11 +304,11 @@ props:
           width: 600
           height: 400
     test_object_drupal_image_ARRAY:
-      title: 'Array of object, $ref=json-schema-definitions://canvas.module/image'
-      description: 'This is the description of Array of object, $ref=json-schema-definitions://canvas.module/image'
+      title: 'Array of object, $ref=module://canvas/schema.json#$defs/image'
+      description: 'This is the description of Array of object, $ref=module://canvas/schema.json#$defs/image'
       type: array
       items:
-        $ref: json-schema-definitions://canvas.module/image
+        $ref: module://canvas/schema.json#$defs/image
         # @todo `type: object` should not be necessary, it's because \Drupal\sdc\Component\ComponentValidator::getClassProps() does not yet support $ref
         type: object
       maxItems: 2
@@ -328,18 +328,18 @@ props:
           #  height: 402
     # The "video" predefined object format.
     test_object_drupal_video:
-      title: 'Object, $ref=json-schema-definitions://canvas.module/video'
-      description: 'This is the description of Object, $ref=json-schema-definitions://canvas.module/video'
-      $ref: json-schema-definitions://canvas.module/video
+      title: 'Object, $ref=module://canvas/schema.json#$defs/video'
+      description: 'This is the description of Object, $ref=module://canvas/schema.json#$defs/video'
+      $ref: module://canvas/schema.json#$defs/video
       type: object
       examples:
         - src: https://example.com/file.mp4
           poster: /sites/default/files/600x400.png
     # The "date-range" object format for this module.
     test_object_drupal_date_range:
-      title: 'Object, $ref=json-schema-definitions://sdc_test_all_props.module/date-range'
-      description: 'This is the description of Object, $ref=json-schema-definitions://sdc_test_all_props.module/date-range'
-      $ref: json-schema-definitions://canvas.module/date-range
+      title: 'Object, $ref=module://sdc_test_all_props/schema.json#$defs/date-range'
+      description: 'This is the description of Object, $ref=module://sdc_test_all_props/schema.json#$defs/date-range'
+      $ref: module://canvas/schema.json#$defs/date-range
       # @todo Remove in https://www.drupal.org/project/drupal/issues/3352063 — should not be necessary, but removing this causes \Drupal\Core\Theme\Component\ComponentMetadata::parseSchemaInfo() to generate `type = ['', 'object'] 🐛
       type: object
 

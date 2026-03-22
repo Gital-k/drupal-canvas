@@ -64,8 +64,8 @@ class HookCanvasStorablePropAlterTest extends PropShapeRepositoryTest {
 
     // 3. This proves it is possible to add support for a well-known prop shape
     // (so: `$ref`) that Canvas does not natively support.
-    $storable_prop_shapes['type=object&$ref=json-schema-definitions://canvas.module/date-range'] = new StorablePropShape(
-      shape: parent::getExpectedUnstorablePropShapes()['type=object&$ref=json-schema-definitions://canvas.module/date-range'],
+    $storable_prop_shapes['type=object&$ref=module://canvas/schema.json#$defs/date-range'] = new StorablePropShape(
+      shape: parent::getExpectedUnstorablePropShapes()['type=object&$ref=module://canvas/schema.json#$defs/date-range'],
       // @phpstan-ignore argument.type
       fieldTypeProp: StructuredDataPropExpression::fromString('ℹ︎daterange␟{from↠value,to↠end_value}'),
       fieldStorageSettings: ['datetime_type' => DateTimeItem::DATETIME_TYPE_DATE],
@@ -81,7 +81,7 @@ class HookCanvasStorablePropAlterTest extends PropShapeRepositoryTest {
   public static function getExpectedUnstorablePropShapes(): array {
     $unstorable_prop_shapes = parent::getExpectedUnstorablePropShapes();
     unset($unstorable_prop_shapes['type=integer&multipleOf=12']);
-    unset($unstorable_prop_shapes['type=object&$ref=json-schema-definitions://canvas.module/date-range']);
+    unset($unstorable_prop_shapes['type=object&$ref=module://canvas/schema.json#$defs/date-range']);
     return $unstorable_prop_shapes;
   }
 

@@ -14,7 +14,7 @@ props:
       -
         src: /ui/assets/videos/bird_vertical.mp4
         poster: 'https://placehold.co/1080x1920.png?text=Vertical'
-    $ref: 'json-schema-definitions://canvas.module/video'
+    $ref: 'module://canvas/schema.json#$defs/video'
   theText:
     title: theText
     type: string

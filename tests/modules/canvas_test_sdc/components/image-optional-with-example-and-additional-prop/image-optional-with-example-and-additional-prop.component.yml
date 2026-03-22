@@ -9,7 +9,7 @@ props:
       description: The main and only text
     image:
       title: 'Image'
-      $ref: json-schema-definitions://canvas.module/image
+      $ref: module://canvas/schema.json#$defs/image
       # @todo `type: object` should not be necessary, it's because \Drupal\sdc\Component\ComponentValidator::getClassProps() does not yet support $ref
       type: object
       examples:

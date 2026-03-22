@@ -71,7 +71,7 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
   public static function getExpectedUnstorablePropShapes(): array {
     $unstorable_prop_shapes = parent::getExpectedUnstorablePropShapes();
     unset(
-      $unstorable_prop_shapes['type=object&$ref=json-schema-definitions://canvas.module/video'],
+      $unstorable_prop_shapes['type=object&$ref=module://canvas/schema.json#$defs/video'],
     );
     return $unstorable_prop_shapes;
   }
@@ -84,9 +84,9 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
     $image_shapes = array_intersect_key(
       $storable_prop_shapes,
       array_flip([
-        'type=object&$ref=json-schema-definitions://canvas.module/image',
-        'type=array&items[$ref]=json-schema-definitions://canvas.module/image&items[type]=object',
-        'type=array&items[$ref]=json-schema-definitions://canvas.module/image&items[type]=object&maxItems=2',
+        'type=object&$ref=module://canvas/schema.json#$defs/image',
+        'type=array&items[$ref]=module://canvas/schema.json#$defs/image&items[type]=object',
+        'type=array&items[$ref]=module://canvas/schema.json#$defs/image&items[type]=object&maxItems=2',
       ]),
     );
     foreach ($image_shapes as $k => $image_shape) {
@@ -111,8 +111,8 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
       );
     }
 
-    $storable_prop_shapes['type=object&$ref=json-schema-definitions://canvas.module/video'] = new StorablePropShape(
-      shape: new PropShape(['type' => 'object', '$ref' => 'json-schema-definitions://canvas.module/video']),
+    $storable_prop_shapes['type=object&$ref=module://canvas/schema.json#$defs/video'] = new StorablePropShape(
+      shape: new PropShape(['type' => 'object', '$ref' => 'module://canvas/schema.json#$defs/video']),
       // @phpstan-ignore-next-line
       fieldTypeProp: StructuredDataPropExpression::fromString('ℹ︎entity_reference␟entity␜[␜entity:media:baby_videos␝field_media_video_file␞␟{src↝entity␜␜entity:file␝uri␞␟url}][␜entity:media:vacation_videos␝field_media_video_file_1␞␟{src↝entity␜␜entity:file␝uri␞␟url}]'),
       fieldWidget: 'media_library_widget',
@@ -130,7 +130,7 @@ class MediaLibraryHookStoragePropAlterTest extends PropShapeRepositoryTest {
       ],
     );
 
-    $storable_prop_shapes['type=string&$ref=json-schema-definitions://canvas.module/stream-wrapper-image-uri'] = new StorablePropShape(
+    $storable_prop_shapes['type=string&$ref=module://canvas/schema.json#$defs/stream-wrapper-image-uri'] = new StorablePropShape(
       shape: new PropShape(['type' => 'string', 'contentMediaType' => 'image/*', 'format' => 'uri', 'x-allowed-schemes' => ['public']]),
       // @phpstan-ignore-next-line
       fieldTypeProp: StructuredDataPropExpression::fromString('ℹ︎entity_reference␟entity␜[␜entity:media:baby_photos␝field_media_image␞␟entity␜␜entity:file␝uri␞␟value][␜entity:media:vacation_photos␝field_media_image_1␞␟entity␜␜entity:file␝uri␞␟value]'),

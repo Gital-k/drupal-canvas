@@ -77,7 +77,7 @@ class GeneratedFieldExplicitInputUxComponentInstanceUpdaterTest extends CanvasKe
       ],
       'background' => [
         'type' => 'object',
-        '$ref' => 'json-schema-definitions://canvas.module/image',
+        '$ref' => 'module://canvas/schema.json#$defs/image',
         'title' => 'Background image',
         'examples' => [
           [
@@ -559,7 +559,7 @@ class GeneratedFieldExplicitInputUxComponentInstanceUpdaterTest extends CanvasKe
     $settings = $component->getSettings();
     self::assertSame('ℹ︎entity_reference␟entity␜␜entity:media:baby_photos␝field_media_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}', $settings['prop_field_definitions']['background']['expression']);
     // Update the expression to drop "alt", which is an optional key-value pair
-    // in `$ref: json-schema-definitions://canvas.module/image`. What matters is
+    // in `$ref: module://canvas/schema.json#$defs/image`. What matters is
     // that the same field data is still compatible with the new expression.
     $settings['prop_field_definitions']['background']['expression'] = 'ℹ︎entity_reference␟entity␜␜entity:media:baby_photos␝field_media_image␞␟{src↠src_with_alternate_widths,width↠width,height↠height}';
     $source = $this->container->get(ComponentSourceManager::class)->createInstance(JsComponent::SOURCE_PLUGIN_ID, [

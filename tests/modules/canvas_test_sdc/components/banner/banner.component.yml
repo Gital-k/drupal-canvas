@@ -21,7 +21,7 @@ props:
       examples:
         - '<p>In a curious work, published in <em>Paris</em> in 1863 by <strong>Delaville Dedreux</strong>, there is a suggestion for reaching the North Pole by an aerostat.</p>'
     image:
-      $ref: json-schema-definitions://canvas.module/image
+      $ref: module://canvas/schema.json#$defs/image
       type: object
       title: Image
       description: The image to use.

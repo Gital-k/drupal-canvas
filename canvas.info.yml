@@ -25,7 +25,7 @@ dependencies:
   # To manage uploaded build artifacts as File entities with file_usage tracking.
   # @see \Drupal\canvas\Controller\ApiArtifactController
   - drupal:file
-  # To support the json-schema-definitions://canvas.module/image prop shape.
+  # To support the module://canvas/schema.json#$defs/image prop shape.
   # @see \Drupal\image\Plugin\Field\FieldType\ImageItem
   # @see \Drupal\canvas\JsonSchemaInterpreter\JsonSchemaType::computeStorablePropShape()
   - drupal:image

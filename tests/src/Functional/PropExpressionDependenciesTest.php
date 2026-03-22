@@ -98,7 +98,7 @@ class PropExpressionDependenciesTest extends FunctionalTestBase {
                 'alt' => 'Example image placeholder',
               ],
             ],
-            '$ref' => 'json-schema-definitions://canvas.module/image',
+            '$ref' => 'module://canvas/schema.json#$defs/image',
           ],
         ],
         'required' => ['image'],

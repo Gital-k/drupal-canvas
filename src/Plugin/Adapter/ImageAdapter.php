@@ -13,10 +13,10 @@ use Drupal\file\FileInterface;
   id: self::PLUGIN_ID,
   label: new TranslatableMarkup('Make relative image URL absolute'),
   inputs: [
-    'image' => ['type' => 'object', '$ref' => 'json-schema-definitions://canvas.module/image'],
+    'image' => ['type' => 'object', '$ref' => 'module://canvas/schema.json#$defs/image'],
   ],
   requiredInputs: ['image'],
-  output: ['type' => 'object', '$ref' => 'json-schema-definitions://canvas.module/image'],
+  output: ['type' => 'object', '$ref' => 'module://canvas/schema.json#$defs/image'],
 )]
 final class ImageAdapter extends AdapterBase implements ContainerFactoryPluginInterface {
 

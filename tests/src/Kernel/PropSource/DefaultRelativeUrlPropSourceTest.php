@@ -88,7 +88,7 @@ class DefaultRelativeUrlPropSourceTest extends PropSourceTestBase {
         'height' => 402,
       ],
       jsonSchema: [
-        '$ref' => 'json-schema-definitions://canvas.module/image',
+        '$ref' => 'module://canvas/schema.json#$defs/image',
       ],
       componentId: 'sdc.canvas_test_sdc.image-optional-with-example-and-additional-prop',
     );

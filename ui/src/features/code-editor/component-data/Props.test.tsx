@@ -417,7 +417,7 @@ describe('props in code editor', () => {
             alt: 'Example image placeholder',
           },
           format: undefined,
-          $ref: 'json-schema-definitions://canvas.module/image',
+          $ref: 'module://canvas/schema.json#$defs/image',
         });
       });
       // Select the "None" option for the example aspect ratio.
@@ -443,7 +443,7 @@ describe('props in code editor', () => {
           type: 'object',
           example: '',
           format: undefined,
-          $ref: 'json-schema-definitions://canvas.module/image',
+          $ref: 'module://canvas/schema.json#$defs/image',
         });
       });
       // Set the prop as required.
@@ -470,7 +470,7 @@ describe('props in code editor', () => {
             alt: 'Example image placeholder',
           },
           format: undefined,
-          $ref: 'json-schema-definitions://canvas.module/image',
+          $ref: 'module://canvas/schema.json#$defs/image',
         });
       });
       // Update the aspect ratio.
@@ -516,7 +516,7 @@ describe('props in code editor', () => {
             alt: 'Example image placeholder',
           },
           format: undefined,
-          $ref: 'json-schema-definitions://canvas.module/image',
+          $ref: 'module://canvas/schema.json#$defs/image',
         });
       });
       // Set the prop as not required, then back to required.
@@ -541,7 +541,7 @@ describe('props in code editor', () => {
             alt: 'Example image placeholder',
           },
           format: undefined,
-          $ref: 'json-schema-definitions://canvas.module/image',
+          $ref: 'module://canvas/schema.json#$defs/image',
         });
       });
     });
@@ -575,7 +575,7 @@ describe('props in code editor', () => {
             poster: 'https://placehold.co/1920x1080.png?text=Widescreen',
           },
           format: undefined,
-          $ref: 'json-schema-definitions://canvas.module/video',
+          $ref: 'module://canvas/schema.json#$defs/video',
         });
       });
 
@@ -592,7 +592,7 @@ describe('props in code editor', () => {
           type: 'object',
           example: '',
           format: undefined,
-          $ref: 'json-schema-definitions://canvas.module/video',
+          $ref: 'module://canvas/schema.json#$defs/video',
         });
       });
 
@@ -603,7 +603,7 @@ describe('props in code editor', () => {
           type: 'object',
           example: '',
           format: undefined,
-          $ref: 'json-schema-definitions://canvas.module/video',
+          $ref: 'module://canvas/schema.json#$defs/video',
         });
       });
 
@@ -623,7 +623,7 @@ describe('props in code editor', () => {
             poster: 'https://placehold.co/1920x1080.png?text=Widescreen',
           },
           format: undefined,
-          $ref: 'json-schema-definitions://canvas.module/video',
+          $ref: 'module://canvas/schema.json#$defs/video',
         });
       });
       // Update the aspect ratio.
@@ -645,7 +645,7 @@ describe('props in code editor', () => {
             poster: 'https://placehold.co/1080x1920.png?text=Vertical',
           },
           format: undefined,
-          $ref: 'json-schema-definitions://canvas.module/video',
+          $ref: 'module://canvas/schema.json#$defs/video',
         });
       });
       // Set the prop as not required, then back to required. The example aspect
@@ -665,7 +665,7 @@ describe('props in code editor', () => {
             poster: 'https://placehold.co/1080x1920.png?text=Vertical',
           },
           format: undefined,
-          $ref: 'json-schema-definitions://canvas.module/video',
+          $ref: 'module://canvas/schema.json#$defs/video',
         });
       });
     });
@@ -2445,7 +2445,7 @@ describe('props in code editor', () => {
         expect(prop.type).toBe('array');
         expect(prop.items).toEqual({
           type: 'object',
-          $ref: 'json-schema-definitions://canvas.module/video',
+          $ref: 'module://canvas/schema.json#$defs/video',
         });
         expect(Array.isArray(prop.example)).toBe(true);
         expect(prop.valueMode).toBe('unlimited');
@@ -2975,7 +2975,7 @@ describe('props in code editor', () => {
                   type: 'array',
                   items: {
                     type: 'object',
-                    $ref: 'json-schema-definitions://canvas.module/image',
+                    $ref: 'module://canvas/schema.json#$defs/image',
                   },
                   example: [
                     {
@@ -2992,7 +2992,7 @@ describe('props in code editor', () => {
                     },
                   ],
                   derivedType: 'image',
-                  $ref: 'json-schema-definitions://canvas.module/image',
+                  $ref: 'module://canvas/schema.json#$defs/image',
                   allowMultiple: true,
                   valueMode: 'unlimited',
                   limitedCount: 1,
@@ -3013,7 +3013,7 @@ describe('props in code editor', () => {
           expect(prop.type).toBe('array');
           expect(prop.items).toMatchObject({
             type: 'object',
-            $ref: 'json-schema-definitions://canvas.module/image',
+            $ref: 'module://canvas/schema.json#$defs/image',
           });
           // Verify example data is preserved or initialized correctly
           if (Array.isArray(prop.example)) {
@@ -3039,7 +3039,7 @@ describe('props in code editor', () => {
                   type: 'array',
                   items: {
                     type: 'object',
-                    $ref: 'json-schema-definitions://canvas.module/video',
+                    $ref: 'module://canvas/schema.json#$defs/video',
                   },
                   example: [
                     {
@@ -3052,7 +3052,7 @@ describe('props in code editor', () => {
                     },
                   ],
                   derivedType: 'video',
-                  $ref: 'json-schema-definitions://canvas.module/video',
+                  $ref: 'module://canvas/schema.json#$defs/video',
                   allowMultiple: true,
                   valueMode: 'unlimited',
                   limitedCount: 1,
@@ -3073,7 +3073,7 @@ describe('props in code editor', () => {
           expect(prop.type).toBe('array');
           expect(prop.items).toMatchObject({
             type: 'object',
-            $ref: 'json-schema-definitions://canvas.module/video',
+            $ref: 'module://canvas/schema.json#$defs/video',
           });
           // Verify the example data structure
           if (Array.isArray(prop.example)) {

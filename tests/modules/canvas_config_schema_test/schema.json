@@ -26,7 +26,7 @@
       "required": ["nesting"],
       "properties": {
         "nesting": {
-          "$ref": "json-schema-definitions://canvas_config_schema_test.module/chip-nozzle",
+          "$ref": "module://canvas_config_schema_test/schema.json#$defs/chip-nozzle",
           "title": "Nest"
         }
       }

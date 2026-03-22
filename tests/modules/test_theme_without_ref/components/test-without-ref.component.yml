@@ -11,7 +11,7 @@ props:
       examples:
         - This is the test child component
     logo:
-      title: "This completely repeats $ref: json-schema-definitions://test_theme_base.theme/organization-logo-url to void depending on the test_theme_base theme"
+      title: "This completely repeats $ref: theme://test_theme_base/schema.json#$defs/organization-logo-url to void depending on the test_theme_base theme"
       type: string
       format: "uri-reference"
       contentMediaType: "image/*"

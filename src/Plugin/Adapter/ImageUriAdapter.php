@@ -14,10 +14,10 @@ use Drupal\file\FileInterface;
   id: self::PLUGIN_ID,
   label: new TranslatableMarkup('Extract image URL'),
   inputs: [
-    'imageUri' => ['type' => 'string', '$ref' => 'json-schema-definitions://canvas.module/stream-wrapper-image-uri'],
+    'imageUri' => ['type' => 'string', '$ref' => 'module://canvas/schema.json#$defs/stream-wrapper-image-uri'],
   ],
   requiredInputs: ['imageUri'],
-  output: ['type' => 'string', '$ref' => 'json-schema-definitions://canvas.module/image-uri'],
+  output: ['type' => 'string', '$ref' => 'module://canvas/schema.json#$defs/image-uri'],
 )]
 final class ImageUriAdapter extends AdapterBase implements ContainerFactoryPluginInterface {
 

@@ -28,9 +28,9 @@ props:
     src:
       title: Stream wrapper image path
       type: string
-      # Note: the canvas_test_sdc:card SDC uses `json-schema-definitions://canvas.module/image`, and that shape
+      # Note: the canvas_test_sdc:card SDC uses `module://canvas/schema.json#$defs/image`, and that shape
       # does NOT accept stream wrapper URIs. Hence this SDC's implementation can NOT reuse canvas_test_sdc:card.
-      $ref: json-schema-definitions://canvas.module/stream-wrapper-image-uri
+      $ref: module://canvas/schema.json#$defs/stream-wrapper-image-uri
       description: Stream wrapper image path e.g. public://
       examples:
         # This is created in the module installer.

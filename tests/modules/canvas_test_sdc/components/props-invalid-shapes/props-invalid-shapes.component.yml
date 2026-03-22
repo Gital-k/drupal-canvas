@@ -10,6 +10,6 @@ props:
       title: Invalid Shape
       type: object
     valid_shape:
-      $ref: json-schema-definitions://canvas.module/image
+      $ref: module://canvas/schema.json#$defs/image
       title: Valid Shape
       type: object

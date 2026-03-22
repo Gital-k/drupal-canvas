@@ -81,7 +81,7 @@
   {
     "name": "Image with example value",
     "type": "object",
-    "$ref": "json-schema-definitions://canvas.module/image",
+    "$ref": "module://canvas/schema.json#$defs/image",
     "example": {
       "src": "https://placehold.co/1200x900@2x.png",
       "width": 1200,

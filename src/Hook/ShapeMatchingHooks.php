@@ -58,9 +58,9 @@ class ShapeMatchingHooks {
 
   const SCHEMA_TO_MEDIA_SOURCE = [
     // @see \Drupal\media\Plugin\media\Source\Image
-    'json-schema-definitions://canvas.module/image' => Image::class,
+    'module://canvas/schema.json#$defs/image' => Image::class,
     // @see \Drupal\media\Plugin\media\Source\VideoFile
-    'json-schema-definitions://canvas.module/video' => VideoFile::class,
+    'module://canvas/schema.json#$defs/video' => VideoFile::class,
   ];
 
   /**
@@ -269,18 +269,18 @@ class ShapeMatchingHooks {
   public function mediaLibraryStorablePropShapeAlter(CandidateStorablePropShape $storable_prop_shape): void {
     $media_type_ids = NULL;
 
-    // @see json-schema-definitions://canvas.module/stream-wrapper-image-uri
+    // @see module://canvas/schema.json#$defs/stream-wrapper-image-uri
     if ($storable_prop_shape->shape->schema['type'] === 'string' &&
       (
         isset($storable_prop_shape->shape->schema['$ref']) &&
-        $storable_prop_shape->shape->schema['$ref'] === 'json-schema-definitions://canvas.module/stream-wrapper-image-uri'
+        $storable_prop_shape->shape->schema['$ref'] === 'module://canvas/schema.json#$defs/stream-wrapper-image-uri'
       )
       || (
         isset($storable_prop_shape->shape->schema['contentMediaType'])
         && $storable_prop_shape->shape->schema['contentMediaType'] === 'image/*'
         // Stream wrapper URIs can only be `format: uri|iri`.
         && \in_array($storable_prop_shape->shape->schema['format'], [JsonSchemaStringFormat::Uri->value, JsonSchemaStringFormat::Iri->value], TRUE)
-        // @see json-schema-definitions://canvas.module/stream-wrapper-image-uri
+        // @see module://canvas/schema.json#$defs/stream-wrapper-image-uri
         && ($storable_prop_shape->shape->schema['x-allowed-schemes'] ?? []) === ['public']
       )
     ) {
@@ -391,7 +391,7 @@ class ShapeMatchingHooks {
   public function datetimeRangeStorablePropShapeAlter(CandidateStorablePropShape $storable_prop_shape): void {
     if ($storable_prop_shape->shape->schema == [
       'type' => 'object',
-      '$ref' => 'json-schema-definitions://canvas.module/date-range',
+      '$ref' => 'module://canvas/schema.json#$defs/date-range',
     ]) {
       $storable_prop_shape->fieldTypeProp = new FieldTypeObjectPropsExpression('daterange', [
         'from' => new FieldTypePropExpression('daterange', 'value'),

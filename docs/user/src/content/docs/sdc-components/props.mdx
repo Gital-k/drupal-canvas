@@ -70,7 +70,7 @@ Textarea input for longer text content that spans multiple lines.
 description:
   type: string
   title: 'Description'
-  $ref: json-schema-definitions://canvas.module/textarea
+  $ref: module://canvas/schema.json#$defs/textarea
   examples: ['A longer description\nthat spans multiple lines']
 ```
 
@@ -182,7 +182,7 @@ Image selection from media library or image upload.
 ```yaml
 image:
   title: 'Component image'
-  $ref: json-schema-definitions://canvas.module/image
+  $ref: module://canvas/schema.json#$defs/image
   type: object
   examples:
     - src: '/path/to/image.jpg'
@@ -247,5 +247,3 @@ prop type with examples.
 | Boolean, strings with different formats | Integer, image, video, array of integers | Enriched HTML |
 |-----------------------------------------|------------------------------------------|---------------|
 | ![Boolean and string](../../../assets/images/boolean-string.webp) | ![Integer, image, video](../../../assets/images/integer-image-video.webp) ![Array of integers](../../../assets/images/array-integers.webp) | ![String, text with HTML](../../../assets/images/string-text-ckeditor.webp) |
-
-

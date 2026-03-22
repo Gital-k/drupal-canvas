@@ -222,7 +222,7 @@ receive a `\Drupal\canvas\PropShape\CandidateStorablePropShape` value object, wh
 
 Any `component input` whose `prop shape` corresponds to a `well-known prop shape` may cause _two_ invocations of that
 alter hook:
-1. once for the `well-known prop shape` (so: `"type": "string|object|…", "$ref": "json-schema-definitions://…"`), if any
+1. once for the `well-known prop shape` (so: `"type": "string|object|…", "$ref": "module://…"`), if any
 2. once for the resolved equivalent (with `$ref` resolved) — unless the above already found a result
 
 The computed `\Drupal\canvas\PropShape\StorablePropShape` can be used to create a `static prop source`
