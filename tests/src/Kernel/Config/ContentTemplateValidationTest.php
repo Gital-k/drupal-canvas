@@ -579,10 +579,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
     $this->entity->set('content_entity_type_id', 'nope');
     $this->assertValidationErrors([
       '' => "The 'content_entity_type_id' property cannot be changed.",
-      'content_entity_type_id' => [
-        "The 'nope' plugin does not exist.",
-        'The value you selected is not a valid choice.',
-      ],
+      'content_entity_type_id' => 'This is not a content entity type that supports Field UI.',
       'content_entity_type_bundle' => "The 'alpha' bundle does not exist on the 'nope' entity type.",
       'content_entity_type_view_mode' => "The 'core.entity_view_mode.nope.full' config does not exist.",
     ]);
@@ -592,10 +589,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
     'node_type',
     [
       '' => "The 'content_entity_type_id' property cannot be changed.",
-      'content_entity_type_id' => [
-        "The 'node_type' plugin must implement or extend Drupal\Core\Entity\ContentEntityInterface.",
-        "This is not a content entity type.",
-      ],
+      'content_entity_type_id' => 'This is not a content entity type that supports Field UI.',
       'content_entity_type_bundle' => "The 'alpha' bundle does not exist on the 'node_type' entity type.",
       'content_entity_type_view_mode' => "The 'core.entity_view_mode.node_type.full' config does not exist.",
     ],
@@ -604,7 +598,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
     'file',
     [
       '' => "The 'content_entity_type_id' property cannot be changed.",
-      'content_entity_type_id' => "This entity type does not support Field UI, so there is no way to configure its display.",
+      'content_entity_type_id' => 'This is not a content entity type that supports Field UI.',
       'content_entity_type_bundle' => "The 'alpha' bundle does not exist on the 'file' entity type.",
       'content_entity_type_view_mode' => "The 'core.entity_view_mode.file.full' config does not exist.",
     ],

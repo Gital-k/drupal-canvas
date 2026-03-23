@@ -924,10 +924,9 @@ canvas.content_template.*.*.*:
       type: string
       label: 'Target entity type'
       constraints:
-        PluginExists:
-          manager: entity_type.manager
-          interface: Drupal\Core\Entity\ContentEntityInterface
-        IsDisplayBuildableEntityType: { }
+        Choice:
+          callback: '\Drupal\canvas\EntityHandlers\ContentTemplateAwareViewBuilder::getSupportedEntityTypeIds'
+          message: 'This is not a content entity type that supports Field UI.'
     content_entity_type_bundle:
       type: string
       label: 'Bundle'
