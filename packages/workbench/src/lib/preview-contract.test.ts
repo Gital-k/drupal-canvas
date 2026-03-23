@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { toViteFsUrl } from '@drupal-canvas/vite-compat/runtime';
 
 import {
   buildPreviewManifest,
@@ -9,20 +8,12 @@ import {
 } from './preview-contract';
 
 describe('preview-contract', () => {
-  it('creates Vite fs URLs from absolute paths', () => {
-    expect(toViteFsUrl('/Users/example/component.tsx')).toBe(
-      '/@fs/Users/example/component.tsx',
-    );
-    expect(toViteFsUrl('C:\\workspace\\component.tsx')).toBe(
-      '/@fs/C:/workspace/component.tsx',
-    );
-  });
-
   it('marks components with supported JS entries as previewable', () => {
     const component = toPreviewManifestComponent({
       id: 'abc',
       name: 'hero',
       relativeDirectory: 'src/hero',
+      projectRelativeDirectory: 'packages/site/src/hero',
       metadataPath: '/tmp/src/hero/component.yml',
       jsEntryPath: '/tmp/src/hero/index.tsx',
       cssEntryPath: '/tmp/src/hero/index.css',
@@ -43,6 +34,7 @@ describe('preview-contract', () => {
       id: 'abc',
       name: 'hero',
       relativeDirectory: 'src/hero',
+      projectRelativeDirectory: 'packages/site/src/hero',
       metadataPath: '/tmp/src/hero/hero.component.yml',
       jsEntryPath: null,
       cssEntryPath: null,
@@ -63,6 +55,7 @@ describe('preview-contract', () => {
       id: 'abc',
       name: 'hero',
       relativeDirectory: 'src/hero',
+      projectRelativeDirectory: 'packages/site/src/hero',
       metadataPath: '/tmp/src/hero/hero.component.yml',
       jsEntryPath: '/tmp/src/hero/hero.mjs',
       cssEntryPath: null,
@@ -75,6 +68,7 @@ describe('preview-contract', () => {
   it('builds a preview manifest from discovery result', () => {
     const manifest = buildPreviewManifest({
       componentRoot: '/tmp/workspace',
+      projectRoot: '/tmp',
       components: [
         {
           id: 'one',
@@ -82,6 +76,7 @@ describe('preview-contract', () => {
           name: 'card',
           directory: '/tmp/workspace/src/card',
           relativeDirectory: 'src/card',
+          projectRelativeDirectory: 'workspace/src/card',
           metadataPath: '/tmp/workspace/src/card/component.yml',
           jsEntryPath: '/tmp/workspace/src/card/index.tsx',
           cssEntryPath: '/tmp/workspace/src/card/index.css',
