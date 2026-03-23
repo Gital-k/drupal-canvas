@@ -9,6 +9,7 @@ use Drupal\canvas\Entity\PageRegion;
 use Drupal\language\Entity\ConfigurableLanguage;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
@@ -20,10 +21,9 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
  * This test proves that Drupal core's config_translation override system works
  * correctly with Canvas PageRegion config entities without any Canvas-specific
  * translation code beyond the schema alteration in canvas_dev_translation.
- *
- * @group canvas
- * @group canvas_dev_translation
  */
+#[Group('canvas')]
+#[Group('canvas_dev_translation')]
 #[RunTestsInSeparateProcesses]
 final class PageRegionTranslationTest extends CanvasKernelTestBase {
 

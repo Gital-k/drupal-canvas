@@ -10,6 +10,7 @@ use Drupal\language\Entity\ConfigurableLanguage;
 use Drupal\node\Entity\NodeType;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
@@ -19,10 +20,9 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
  * correctly with Canvas ContentTemplate config entities without any
  * Canvas-specific translation code beyond the schema alteration in
  * canvas_dev_translation.
- *
- * @group canvas
- * @group canvas_dev_translation
  */
+#[Group('canvas')]
+#[Group('canvas_dev_translation')]
 #[RunTestsInSeparateProcesses]
 final class ContentTemplateTranslationTest extends CanvasKernelTestBase {
 
