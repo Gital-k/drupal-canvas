@@ -2,12 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Drupal\Tests\canvas\Kernel;
+namespace Drupal\Tests\canvas\Kernel\Config;
 
 use Drupal\language\ConfigurableLanguageManagerInterface;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\language\Entity\ConfigurableLanguage;
 use Drupal\node\Entity\NodeType;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
@@ -23,7 +24,7 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
  * @group canvas_dev_translation
  */
 #[RunTestsInSeparateProcesses]
-final class ContentTemplateConfigTranslationTest extends CanvasKernelTestBase {
+final class ContentTemplateTranslationTest extends CanvasKernelTestBase {
 
   use GenerateComponentConfigTrait;
 
