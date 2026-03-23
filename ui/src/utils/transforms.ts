@@ -112,53 +112,44 @@ export interface LinkPropShape extends StaticPropSource {
   };
 }
 
+const resolveEntityUri = (uri: string): string => {
+  const match = uri.match(ENTITY_AUTOCOMPLETE_MATCH);
+  // LinkWidget with autocomplete support only supports matching on node
+  // entities.
+  // @todo Add support for other entity types once core does -
+  // https://www.drupal.org/i/2423093
+  return match !== null ? `entity:node/${match[1]}` : uri;
+};
+
 const link: Transformer<
   BaseTransformOptions,
   Array<null | string | PropsValues> | null | string | PropsValues,
   PropsValuesOrArrayOfPropsValues,
   LinkPropShape
 > = (value, options, propSource) => {
+  if (value == null) return options.multiple ? [] : null;
+
   const records: Array<PropsValues> = Array.isArray(value) ? value : [value];
   const returnValue = records.map((record: PropsValues) => {
     // `1` corresponds to `DRUPAL_OPTIONAL` and `2` to DRUPAL_REQUIRED on the
     // server side.
+    // @see DRUPAL_DISABLED
+    // @see DRUPAL_OPTIONAL
+    // @see DRUPAL_REQUIRED
     if (![1, 2].includes(propSource?.sourceTypeSettings?.instance?.title)) {
       const uri = mainProperty(
         [record],
         { name: 'uri', multiple: false },
         propSource,
       );
-      const match = uri.match(ENTITY_AUTOCOMPLETE_MATCH);
-      if (match !== null) {
-        // LinkWidget with autocomplete support only supports matching on node
-        // entities.
-        // @todo Add support for other entity types once core does -
-        // https://www.drupal.org/i/2423093
-        return `entity:node/${match[1]}`;
-      }
-      return uri;
+      return uri != null ? resolveEntityUri(uri) : uri;
     }
-    if (record === null) {
-      return record;
-    }
-    const match = record.uri.match(ENTITY_AUTOCOMPLETE_MATCH);
-    if (match !== null) {
-      // LinkWidget with autocomplete support only supports matching on node
-      // entities.
-      // @todo Add support for other entity types once core does -
-      // https://www.drupal.org/i/2423093
-      return { ...record, uri: `entity:node/${match[1]}` };
-    }
-    return record;
+    if (record === null) return record;
+    return record.uri != null
+      ? { ...record, uri: resolveEntityUri(record.uri) }
+      : record;
   });
-  if (options.multiple) {
-    return returnValue;
-  }
-  const singleValue = returnValue.shift();
-  if (singleValue === undefined) {
-    return null;
-  }
-  return singleValue;
+  return options.multiple ? returnValue : (returnValue[0] ?? null);
 };
 
 const cast: Transformer<

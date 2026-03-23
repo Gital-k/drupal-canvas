@@ -60,6 +60,60 @@ describe('Transforms - link', () => {
       ),
     ).toEqual({ uri: 'entity:node/3', title: 'Click me' });
   });
+
+  it('Should return null for null value', () => {
+    expect(transforms.link(null, {}, fieldData)).toEqual(null);
+  });
+
+  it('Should return null for undefined value', () => {
+    expect(transforms.link(undefined, {}, fieldData)).toEqual(null);
+  });
+
+  it('Should return empty array for null value when multiple', () => {
+    expect(transforms.link(null, { multiple: true }, fieldData)).toEqual([]);
+  });
+
+  it('Should return empty array for undefined value when multiple', () => {
+    expect(transforms.link(undefined, { multiple: true }, fieldData)).toEqual(
+      [],
+    );
+  });
+
+  it('Should not alter an already-resolved entity:node URI without title', () => {
+    fieldData.sourceTypeSettings.instance.title = 0;
+    expect(
+      transforms.link([{ uri: 'entity:node/42' }], {}, fieldData),
+    ).toEqual('entity:node/42');
+  });
+
+  it('Should not alter an already-resolved entity:node URI with title', () => {
+    fieldData.sourceTypeSettings.instance.title = 2;
+    expect(
+      transforms.link(
+        [{ uri: 'entity:node/42', title: 'Some page' }],
+        {},
+        fieldData,
+      ),
+    ).toEqual({ uri: 'entity:node/42', title: 'Some page' });
+  });
+
+  it('Should not alter an already-resolved entity:node URI in multiple mode', () => {
+    fieldData.sourceTypeSettings.instance.title = 0;
+    expect(
+      transforms.link(
+        [{ uri: 'entity:node/42' }, { uri: 'entity:node/99' }],
+        { multiple: true },
+        fieldData,
+      ),
+    ).toEqual(['entity:node/42', 'entity:node/99']);
+  });
+
+  it('Should handle a record with a null uri when title is enabled', () => {
+    fieldData.sourceTypeSettings.instance.title = 2;
+    expect(
+      transforms.link([{ uri: null, title: 'Click me' }], {}, fieldData),
+    ).toEqual({ uri: null, title: 'Click me' });
+  });
 });
 
 describe('Transforms - main property', () => {
