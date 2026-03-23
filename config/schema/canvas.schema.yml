@@ -928,9 +928,6 @@ canvas.content_template.*.*.*:
           manager: entity_type.manager
           interface: Drupal\Core\Entity\ContentEntityInterface
         IsDisplayBuildableEntityType: { }
-        # @todo Update this in https://www.drupal.org/project/canvas/issues/3518272
-        Choice:
-          - node
     content_entity_type_bundle:
       type: string
       label: 'Bundle'

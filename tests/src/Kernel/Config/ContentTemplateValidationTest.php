@@ -554,7 +554,6 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
       'id' => [],
       'content_entity_type_id' => [
         'content_entity_type_bundle' => "The 'alpha' bundle does not exist on the 'user' entity type.",
-        'content_entity_type_id' => 'The value you selected is not a valid choice.',
         'content_entity_type_view_mode' => "The 'core.entity_view_mode.user.full' config does not exist.",
       ],
       'content_entity_type_bundle' => [],
@@ -594,9 +593,8 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
     [
       '' => "The 'content_entity_type_id' property cannot be changed.",
       'content_entity_type_id' => [
-        "The 'node_type' plugin does not exist.",
-        "'node_type' is not a content entity type.",
-        'The value you selected is not a valid choice.',
+        "The 'node_type' plugin must implement or extend Drupal\Core\Entity\ContentEntityInterface.",
+        "This is not a content entity type.",
       ],
       'content_entity_type_bundle' => "The 'alpha' bundle does not exist on the 'node_type' entity type.",
       'content_entity_type_view_mode' => "The 'core.entity_view_mode.node_type.full' config does not exist.",
@@ -606,10 +604,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
     'file',
     [
       '' => "The 'content_entity_type_id' property cannot be changed.",
-      'content_entity_type_id' => [
-        "The 'file' entity type does not specify a 'field_ui_base_route'.",
-        'The value you selected is not a valid choice.',
-      ],
+      'content_entity_type_id' => "This entity type does not support Field UI, so there is no way to configure its display.",
       'content_entity_type_bundle' => "The 'alpha' bundle does not exist on the 'file' entity type.",
       'content_entity_type_view_mode' => "The 'core.entity_view_mode.file.full' config does not exist.",
     ],

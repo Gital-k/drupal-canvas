@@ -14,12 +14,12 @@ use Symfony\Component\Validator\Constraint as SymfonyConstraint;
 #[Constraint(
   id: 'IsDisplayBuildableEntityType',
   label: new TranslatableMarkup('Is display-buildable entity type', [], ['context' => 'Validation']),
-  type: ['string']
+  type: ['string'],
 )]
 class IsDisplayBuildableEntityTypeConstraint extends SymfonyConstraint {
 
-  public string $notContentEntityTypeMessage = "'@entity_type_id' is not a content entity type.";
+  public string $notContentEntityTypeMessage = "This is not a content entity type.";
 
-  public string $noFieldUiBaseRouteMessage = "The '@entity_type_id' entity type does not specify a 'field_ui_base_route'.";
+  public string $noFieldUiBaseRouteMessage = "This entity type does not support Field UI, so there is no way to configure its display.";
 
 }

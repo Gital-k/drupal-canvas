@@ -46,22 +46,14 @@ final class IsDisplayBuildableEntityTypeConstraintValidator extends ConstraintVa
       throw new UnexpectedValueException($value, 'string');
     }
 
-    $entity_type = $this->entityTypeManager->getDefinition($value, FALSE);
-    if ($entity_type === NULL) {
-      return;
-    }
-
+    $entity_type = $this->entityTypeManager->getDefinition($value);
     if (!$entity_type instanceof ContentEntityTypeInterface) {
       $this->context->buildViolation($constraint->notContentEntityTypeMessage)
-        ->setParameter('@entity_type_id', $value)
         ->setInvalidValue($value)
         ->addViolation();
-      return;
     }
-
-    if (!$entity_type->get('field_ui_base_route')) {
+    elseif (!$entity_type->get('field_ui_base_route')) {
       $this->context->buildViolation($constraint->noFieldUiBaseRouteMessage)
-        ->setParameter('@entity_type_id', $value)
         ->setInvalidValue($value)
         ->addViolation();
     }
