@@ -105,7 +105,7 @@ const testMediaLibraryInComponentInstanceForm = (
       `[class*="contextualPanel"] article .js-media-library-item-preview img[alt="${step.expectedAlt}"]`,
     ).should('exist');
     cy.waitForElementInIframe(`img[alt="${step.expectedAlt}"]`);
-  };);
+  });
 
   const lastStep = iterations.pop();
 
