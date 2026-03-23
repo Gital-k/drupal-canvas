@@ -16,6 +16,12 @@ export interface DrupalSettings {
     entityTypeLabels: {
       [entityType: string]: string | { [key: string]: string };
     };
+    contentTemplateEntityTypes: {
+      [entityTypeId: string]: {
+        label: string;
+        bundleLabel: string | null;
+      };
+    };
     globalAssets: {
       css: string;
       jsHeader: string;

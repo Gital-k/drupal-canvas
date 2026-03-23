@@ -13,7 +13,7 @@ use Drupal\Core\Entity\EntityFieldManagerInterface;
 use Drupal\Core\Entity\EntityPublishedInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
-use Drupal\Core\Entity\FieldableEntityInterface;
+use Drupal\Core\Entity\ContentEntityTypeInterface;
 use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\Core\Routing\RouteMatchInterface;
@@ -87,9 +87,9 @@ final class ContentTemplateHooks {
       // type + view mode, the original template will NOT be used anymore:
       // - not the view mode-specific one, such as `node--teaser.html.twig`
       // - not the generic one, such as `node.html.twig`
-      // @todo Remove the restriction that this only works with nodes, after
-      //   https://www.drupal.org/project/canvas/issues/3498525.
-      if ($entity_type->entityClassImplements(FieldableEntityInterface::class) && $entity_type->id() === 'node') {
+      // Only entity types with `field_ui_base_route` are eligible for Canvas
+      // content templates. This is the same criterion Field UI uses for its UIs.
+      if ($entity_type instanceof ContentEntityTypeInterface && $entity_type->get('field_ui_base_route')) {
         // @see \Drupal\canvas\EntityHandlers\ContentTemplateAwareViewBuilder::createInstance()
         $entity_type->setHandlerClass(ContentTemplateAwareViewBuilder::DECORATED_HANDLER_KEY, $entity_type->getViewBuilderClass())
           ->setViewBuilderClass(ContentTemplateAwareViewBuilder::class);
@@ -117,12 +117,16 @@ final class ContentTemplateHooks {
     // Add content template cacheability for routes where content templates
     // apply, otherwise the content template links in the local tasks will not
     // update when templates are created or deleted.
-    // Also apply to the main "Manage display" page
-    // (entity.entity_view_display.node.default) so tabs update correctly when
-    // templates are created/deleted.
-    // @todo Remove the hardcoded node "entity_view_display" route check after
-    //   https://www.drupal.org/project/canvas/issues/3498525 is resolved.
-    if (ContentTemplateRoutes::applies($route_name) || $route_name === 'entity.entity_view_display.node.default') {
+    // Also apply to the main "Manage display" pages for any supported entity
+    // type so tabs update correctly when templates are created/deleted.
+    $is_entity_view_display_route = FALSE;
+    foreach (ContentTemplateAwareViewBuilder::getSupportedEntityTypeIds() as $entity_type_id) {
+      if (\str_starts_with($route_name, "entity.entity_view_display.$entity_type_id.")) {
+        $is_entity_view_display_route = TRUE;
+        break;
+      }
+    }
+    if (ContentTemplateRoutes::applies($route_name) || $is_entity_view_display_route) {
       // Add list cache tags to invalidate when entity ContentTemplate is
       // created/deleted. This ensures menu local tasks rebuild when template
       // availability changes.

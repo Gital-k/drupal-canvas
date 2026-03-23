@@ -15,6 +15,10 @@ import {
   useGetContentTemplatesQuery,
 } from '@/services/componentAndLayout';
 
+type TemplateListProps = {
+  entityTypeId: string;
+};
+
 import type {
   TemplateInBundle,
   TemplateViewMode,
@@ -25,7 +29,7 @@ import nodeStyles from '@/components/sidePanel/SidebarNode.module.css';
 type BundleListItemProps = {
   bundle: TemplateInBundle;
 };
-const TemplateList = () => {
+const TemplateList = ({ entityTypeId }: TemplateListProps) => {
   const { showBoundary } = useErrorBoundary();
 
   const { data, isLoading, isFetching, error } = useGetContentTemplatesQuery();
@@ -35,6 +39,8 @@ const TemplateList = () => {
     }
   }, [error, showBoundary]);
 
+  const bundles = data?.[entityTypeId]?.bundles;
+
   return (
     <>
       <Skeleton
@@ -43,10 +49,12 @@ const TemplateList = () => {
         width="100%"
         my="3"
       >
-        {!!data?.node?.bundles &&
-          Object.entries(data.node.bundles).map(([bundleKey, bundle]) => (
-            <BundleListItem key={bundleKey} bundle={bundle} />
-          ))}
+        {!!bundles &&
+          Object.entries(bundles)
+            .filter(([, bundle]) => Object.keys(bundle.viewModes).length > 0)
+            .map(([bundleKey, bundle]) => (
+              <BundleListItem key={bundleKey} bundle={bundle} />
+            ))}
       </Skeleton>
       <Skeleton
         loading={isLoading || isFetching}

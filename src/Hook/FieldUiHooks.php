@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupal\canvas\Hook;
 
 use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\canvas\EntityHandlers\ContentTemplateAwareViewBuilder;
 use Drupal\Core\Entity\Display\EntityDisplayInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Form\FormStateInterface;
@@ -34,15 +35,15 @@ final class FieldUiHooks {
   /**
    * Implements hook_form_FORM_ID_alter() for Manage display.
    *
-   * Adds a Canvas call-to-action banner as a custom message type on the node
-   * "Manage display" page. The CTA encourages users to create content templates
-   * using Drupal Canvas instead of the standard "Manage display" table.
+   * Adds a Canvas call-to-action banner as a custom message type on the
+   * "Manage display" page for entity types that support content templates.
+   * The CTA encourages users to create content templates using Drupal Canvas
+   * instead of the standard "Manage display" table.
    *
    * The CTA is only displayed when:
-   * - The user has access to Canvas UI
-   * - The current route is the node entity view display edit form
-   * - The display entity is for a node content type
+   * - The current route is an entity view display edit form for a supported entity type
    * - No content templates exist for the bundle
+   * - The user has permission to create a content template
    *
    * @param array $form
    *   The form array.
@@ -51,9 +52,21 @@ final class FieldUiHooks {
    */
   #[Hook('form_entity_view_display_edit_form_alter')]
   public function formEntityViewDisplayEditFormAlter(array &$form, FormStateInterface $form_state): void {
-    // @todo Make this available for other entity types in
-    //   https://www.drupal.org/project/canvas/issues/3498525.
-    if ($this->routeMatch->getRouteName() !== 'entity.entity_view_display.node.default' || $this->messenger->messagesByType('canvas_cta')) {
+    if ($this->messenger->messagesByType('canvas_cta')) {
+      return;
+    }
+
+    // Show the CTA on entity_view_display routes for any entity type that
+    // supports Canvas content templates (i.e. has a field_ui_base_route).
+    $route_name = $this->routeMatch->getRouteName();
+    $is_supported_route = FALSE;
+    foreach (ContentTemplateAwareViewBuilder::getSupportedEntityTypeIds() as $entity_type_id) {
+      if (\str_starts_with($route_name, "entity.entity_view_display.$entity_type_id.")) {
+        $is_supported_route = TRUE;
+        break;
+      }
+    }
+    if (!$is_supported_route) {
       return;
     }
 

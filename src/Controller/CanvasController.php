@@ -38,6 +38,7 @@ use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Entity\Pattern;
+use Drupal\canvas\EntityHandlers\ContentTemplateAwareViewBuilder;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
@@ -127,8 +128,9 @@ HTML;
     $system_site_config = $this->configFactory->get('system.site');
     $entity_types_with_keys = [];
     $entity_type_labels = [];
+    $supported_template_entity_type_ids = ContentTemplateAwareViewBuilder::getSupportedEntityTypeIds();
     foreach ($this->entityTypeManager->getDefinitions() as $entity_type_id => $entity_type_definition) {
-      if ($entity_type_id === 'node' || $entity_type_definition->entityClassImplements(ComponentTreeEntityInterface::class)) {
+      if (\in_array($entity_type_id, $supported_template_entity_type_ids, TRUE) || $entity_type_definition->entityClassImplements(ComponentTreeEntityInterface::class)) {
         $entity_types_with_keys[$entity_type_id] = $entity_type_definition->getKeys();
         if ($entity_type_definition->getBundleEntityType()) {
           $bundles = $this->entityTypeBundleInfo->getBundleInfo($entity_type_id);
@@ -182,6 +184,20 @@ HTML;
               : Url::fromRoute('canvas.boot.empty')->getInternalPath(),
             'entityTypeKeys' => $entity_types_with_keys,
             'entityTypeLabels' => $entity_type_labels,
+            'contentTemplateEntityTypes' => \array_combine(
+              $supported_template_entity_type_ids,
+              \array_map(function ($id): array {
+                $definition = $this->entityTypeManager->getDefinition($id);
+                $bundle_entity_type_id = $definition->getBundleEntityType();
+                $bundle_label = $bundle_entity_type_id !== NULL
+                  ? (string) $this->entityTypeManager->getDefinition($bundle_entity_type_id)->getLabel()
+                  : NULL;
+                return [
+                  'label' => (string) $definition->getLabel(),
+                  'bundleLabel' => $bundle_label,
+                ];
+              }, $supported_template_entity_type_ids),
+            ),
             'devMode' => $dev_mode,
             'devTranslationMode' => $dev_translation_mode,
             'extensionsAvailable' => count($extensions) > 0,

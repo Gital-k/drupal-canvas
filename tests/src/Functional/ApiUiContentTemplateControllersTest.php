@@ -36,6 +36,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
   protected static $modules = [
     'canvas',
     'node',
+    'entity_test',
     'canvas_test_sdc',
     'canvas_test_code_components',
   ];
@@ -246,6 +247,32 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
       ],
     ];
 
+    yield 'a simple primitive example (sdc.canvas_test_sdc.heading, entity:entity_test:entity_test)' => [
+      'component_config_entity_id' => 'sdc.canvas_test_sdc.heading',
+      'content_entity_type_id' => 'entity_test',
+      'bundle' => 'entity_test',
+      'expected' => [
+        'text' => [
+          [
+            'id' => $hash_for_choice([
+              'source' => [
+                'sourceType' => PropSource::EntityField->value,
+                'expression' => 'ℹ︎␜entity:entity_test␝name␞␟value',
+              ],
+              'label' => 'Name',
+            ]),
+            'source' => [
+              'sourceType' => PropSource::EntityField->value,
+              'expression' => 'ℹ︎␜entity:entity_test␝name␞␟value',
+            ],
+            'label' => 'Name',
+          ],
+        ],
+        'style' => [],
+        'element' => [],
+      ],
+    ];
+
     yield 'a propless example (sdc.canvas_test_sdc.druplicon, entity:node:article)' => [
       'component_config_entity_id' => 'sdc.canvas_test_sdc.druplicon',
       'content_entity_type_id' => 'node',
@@ -256,6 +283,12 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
       'component_config_entity_id' => 'sdc.canvas_test_sdc.druplicon',
       'content_entity_type_id' => 'user',
       'bundle' => 'user',
+      'expected' => [],
+    ];
+    yield 'a propless example (sdc.canvas_test_sdc.druplicon, entity:entity_test:entity_test)' => [
+      'component_config_entity_id' => 'sdc.canvas_test_sdc.druplicon',
+      'content_entity_type_id' => 'entity_test',
+      'bundle' => 'entity_test',
       'expected' => [],
     ];
 
@@ -932,11 +965,68 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
     $this->assertSame($expected, $json);
   }
 
+  public function testSuggestPreviewContentEntitiesForEntityTest(): void {
+    $entity_type_id = 'entity_test';
+    $bundle = 'entity_test';
+
+    // No entities exist yet.
+    $json = $this->assertExpectedResponse(
+      method: 'GET',
+      url: Url::fromUri("base:/canvas/api/v0/ui/content_template/suggestions/preview/$entity_type_id/$bundle"),
+      request_options: [],
+      expected_status: Response::HTTP_OK,
+      expected_cache_contexts: [
+        'user.permissions',
+      ],
+      expected_cache_tags: [
+        'http_response',
+        $entity_type_id . '_list:' . $bundle,
+      ],
+      expected_page_cache: 'UNCACHEABLE (request policy)',
+      expected_dynamic_page_cache: 'MISS',
+    );
+    $this->assertSame([], $json);
+
+    $entity_storage = $this->container->get('entity_type.manager')->getStorage($entity_type_id);
+    for ($i = 1; $i <= 3; ++$i) {
+      $entity_storage->create([
+        'name' => 'Entity ' . $i,
+        'type' => $bundle,
+      ])->save();
+    }
+
+    $json = $this->assertExpectedResponse(
+      method: 'GET',
+      url: Url::fromUri("base:/canvas/api/v0/ui/content_template/suggestions/preview/$entity_type_id/$bundle"),
+      request_options: [],
+      expected_status: Response::HTTP_OK,
+      expected_cache_contexts: [
+        'user.permissions',
+      ],
+      expected_cache_tags: [
+        'http_response',
+        $entity_type_id . ':1',
+        $entity_type_id . ':2',
+        $entity_type_id . ':3',
+        $entity_type_id . '_list:' . $bundle,
+      ],
+      expected_page_cache: 'UNCACHEABLE (request policy)',
+      expected_dynamic_page_cache: 'MISS',
+    );
+    $this->assertSame([
+      1 => ['id' => '1', 'label' => 'Entity 1'],
+      2 => ['id' => '2', 'label' => 'Entity 2'],
+      3 => ['id' => '3', 'label' => 'Entity 3'],
+    ], $json);
+  }
+
   public function testViewModesList(): void {
+    $view_modes_url = Url::fromUri('base:/canvas/api/v0/ui/content_template/view_modes');
+
     // 1. Test endpoint response when no Template entities are available.
     $json = $this->assertExpectedResponse(
       method: 'GET',
-      url: Url::fromUri('base:/canvas/api/v0/ui/content_template/view_modes/node'),
+      url: $view_modes_url,
       request_options: [],
       expected_status: Response::HTTP_OK,
       expected_cache_contexts: NULL,
@@ -946,6 +1036,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
     );
 
     // All View Modes for Article bundle are returned, no ContentTemplates exist.
+    // entity_test has no non-default view modes so it does not appear.
     self::assertEquals([
       'node' => [
         'article' => [
@@ -988,7 +1079,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
     // 3. Test endpoint response, validate Full View Mode `hasTemplate` property of TRUE.
     $json = self::assertExpectedResponse(
       method: 'GET',
-      url: Url::fromUri('base:/canvas/api/v0/ui/content_template/view_modes/node'),
+      url: $view_modes_url,
       request_options: [],
       expected_status: Response::HTTP_OK,
       expected_cache_contexts: NULL,
@@ -1033,7 +1124,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
     // 5. Test endpoint response, validate Full and Teaser View Modes have `hasTemplate` property values of TRUE.
     $json = self::assertExpectedResponse(
       method: 'GET',
-      url: Url::fromUri('base:/canvas/api/v0/ui/content_template/view_modes/node'),
+      url: $view_modes_url,
       request_options: [],
       expected_status: Response::HTTP_OK,
       expected_cache_contexts: NULL,
@@ -1068,6 +1159,63 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
         ],
       ],
     ], $json);
+
+    // 6. Register a custom view mode for entity_test to verify multi-entity-type support.
+    \Drupal\Core\Entity\Entity\EntityViewMode::create([
+      'id' => 'entity_test.test_view_mode',
+      'label' => 'Test view mode',
+      'targetEntityType' => 'entity_test',
+    ])->save();
+
+    $json = self::assertExpectedResponse(
+      method: 'GET',
+      url: $view_modes_url,
+      request_options: [],
+      expected_status: Response::HTTP_OK,
+      expected_cache_contexts: NULL,
+      expected_cache_tags: NULL,
+      expected_page_cache: 'UNCACHEABLE (request policy)',
+      expected_dynamic_page_cache: 'UNCACHEABLE (no cacheability)',
+    );
+
+    // entity_test now appears in the response with the new view mode.
+    self::assertArrayHasKey('entity_test', $json);
+    self::assertEquals([
+      'entity_test' => [
+        'test_view_mode' => [
+          'label' => 'Test view mode',
+          'hasTemplate' => FALSE,
+        ],
+      ],
+    ], $json['entity_test']);
+
+    // Create a ContentTemplate for entity_test and verify hasTemplate becomes TRUE.
+    ContentTemplate::create([
+      'id' => 'entity_test.entity_test.test_view_mode',
+      'content_entity_type_id' => 'entity_test',
+      'content_entity_type_bundle' => 'entity_test',
+      'content_entity_type_view_mode' => 'test_view_mode',
+      'component_tree' => [],
+    ])->save();
+
+    $json = self::assertExpectedResponse(
+      method: 'GET',
+      url: $view_modes_url,
+      request_options: [],
+      expected_status: Response::HTTP_OK,
+      expected_cache_contexts: NULL,
+      expected_cache_tags: NULL,
+      expected_page_cache: 'UNCACHEABLE (request policy)',
+      expected_dynamic_page_cache: 'UNCACHEABLE (no cacheability)',
+    );
+    self::assertEquals([
+      'entity_test' => [
+        'test_view_mode' => [
+          'label' => 'Test view mode',
+          'hasTemplate' => TRUE,
+        ],
+      ],
+    ], $json['entity_test']);
   }
 
 }

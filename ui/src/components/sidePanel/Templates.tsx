@@ -15,6 +15,7 @@ import { extractErrorMessageFromApiResponse } from '@/features/error-handling/er
 import useEditorNavigation from '@/hooks/useEditorNavigation';
 import {
   useCreateContentTemplateMutation,
+  useGetContentTemplatesQuery,
   useGetViewModesQuery,
 } from '@/services/componentAndLayout';
 import { getCanvasSettings } from '@/utils/drupal-globals';
@@ -24,9 +25,19 @@ import type { ModeData } from '@/services/componentAndLayout';
 const canvasSettings = getCanvasSettings();
 
 const Templates = () => {
-  const [openEntityTypes, setOpenEntityTypes] = useState<string[]>([
-    'content-types',
-  ]);
+  const supportedEntityTypes =
+    canvasSettings?.contentTemplateEntityTypes ?? ({} as NonNullable<typeof canvasSettings>['contentTemplateEntityTypes']);
+  const entityTypeIds = Object.keys(supportedEntityTypes);
+  const [openEntityTypes, setOpenEntityTypes] = useState<string[]>(entityTypeIds);
+  const { data } = useGetContentTemplatesQuery();
+
+  const visibleEntityTypeIds = entityTypeIds.filter((entityTypeId) => {
+    if (!data) return true;
+    const bundles = data[entityTypeId]?.bundles ?? {};
+    return Object.values(bundles).some(
+      (bundle) => Object.keys(bundle.viewModes).length > 0,
+    );
+  });
 
   const onClickHandler = (categoryName: string) => {
     setOpenEntityTypes((state) => {
@@ -45,15 +56,18 @@ const Templates = () => {
         </Flex>
       </PermissionCheck>
       <AccordionRoot value={openEntityTypes}>
-        <AccordionDetails
-          value="content-types"
-          title="Content types"
-          onTriggerClick={() => onClickHandler('content-types')}
-        >
-          <ErrorBoundary title="An unexpected error has occurred while fetching templates.">
-            <TemplateList />
-          </ErrorBoundary>
-        </AccordionDetails>
+        {visibleEntityTypeIds.map((entityTypeId) => (
+          <AccordionDetails
+            key={entityTypeId}
+            value={entityTypeId}
+            title={data?.[entityTypeId]?.label ?? supportedEntityTypes[entityTypeId].label}
+            onTriggerClick={() => onClickHandler(entityTypeId)}
+          >
+            <ErrorBoundary title="An unexpected error has occurred while fetching templates.">
+              <TemplateList entityTypeId={entityTypeId} />
+            </ErrorBoundary>
+          </AccordionDetails>
+        ))}
       </AccordionRoot>
     </>
   );
@@ -89,15 +103,26 @@ const AddTemplateDialog = ({
   isOpen,
   setIsOpen,
   contentType = null,
-  entityType = 'node',
+  entityType = null,
 }: TemplateDialogProps) => {
   const { navigateToTemplateEditor } = useEditorNavigation();
+  const supportedEntityTypes =
+    canvasSettings?.contentTemplateEntityTypes ?? ({} as NonNullable<typeof canvasSettings>['contentTemplateEntityTypes']);
+  const entityTypeIds = Object.keys(supportedEntityTypes);
+  const defaultEntityType =
+    entityType ?? (entityTypeIds.length === 1 ? entityTypeIds[0] : null);
   const [selectedContentType, setSelectedContentType] = useState<string | null>(
     contentType,
   );
   const [selectedEntityType, setSelectedEntityType] = useState<string | null>(
-    entityType,
+    defaultEntityType,
   );
+  const selectedEntityTypeMeta = selectedEntityType
+    ? supportedEntityTypes[selectedEntityType]
+    : null;
+  // Entity types without a separate bundle entity type have a single implicit
+  // bundle equal to the entity type ID — no bundle selection needed.
+  const hasBundleSelection = selectedEntityTypeMeta?.bundleLabel != null;
   const [selectedViewMode, setSelectedViewMode] = useState<string | null>();
 
   const [createTemplate, { reset, isSuccess, isError, error }] =
@@ -130,14 +155,20 @@ const AddTemplateDialog = ({
       redirectToSelectedAfterCreation();
       setSelectedContentType('');
       setSelectedViewMode(null);
-      setSelectedEntityType('null');
+      setSelectedEntityType(defaultEntityType);
       reset();
     }
-  }, [isSuccess, reset, setIsOpen, redirectToSelectedAfterCreation]);
+  }, [isSuccess, reset, setIsOpen, redirectToSelectedAfterCreation, defaultEntityType]);
 
   useEffect(() => {
     setSelectedViewMode('');
   }, [selectedContentType]);
+
+  useEffect(() => {
+    // For entity types with no separate bundle, auto-select the implicit bundle.
+    setSelectedContentType(hasBundleSelection ? null : selectedEntityType);
+    setSelectedViewMode(null);
+  }, [selectedEntityType, hasBundleSelection]);
 
   const handleCreateTemplate = () => {
     createTemplate({
@@ -161,9 +192,10 @@ const AddTemplateDialog = ({
   );
 
   const entityBundleLabels =
-    typeof entityType === 'string' &&
-    canvasSettings?.entityTypeLabels?.[entityType];
+    typeof selectedEntityType === 'string' &&
+    canvasSettings?.entityTypeLabels?.[selectedEntityType];
   const bundleLabelType = typeof entityBundleLabels;
+  const showEntityTypeDropdown = !entityType && entityTypeIds.length > 1;
   return (
     <Dialog
       open={isOpen}
@@ -200,27 +232,61 @@ const AddTemplateDialog = ({
       >
         <Box>
           <Text as="p" size="1" color="gray">
-            Creates a new template for a content type using existing view modes
-            as the template name.
+            Creates a new template using existing view modes as the template
+            name.
           </Text>
         </Box>
-        {!contentType && (
+        {showEntityTypeDropdown && (
           <Flex direction="column" gap="2">
             <Box>
-              <DialogFieldLabel htmlFor="content-type">
-                Content type
+              <DialogFieldLabel htmlFor="entity-type">
+                Entity type
               </DialogFieldLabel>
             </Box>
             <Select.Root
+              name="entity-type"
+              required
+              value={selectedEntityType || undefined}
+              onValueChange={(value) => setSelectedEntityType(value)}
+              size="1"
+            >
+              <Select.Trigger
+                id="entity-type"
+                placeholder="Select entity type…"
+                style={{ width: '100%' }}
+              />
+              <Select.Content>
+                {Object.entries(supportedEntityTypes).map(([id, meta]) => {
+                  const { label } = meta as { label: string; bundleLabel: string | null };
+                  return (
+                    <Select.Item key={id} value={id}>
+                      {label}
+                    </Select.Item>
+                  );
+                })}
+              </Select.Content>
+            </Select.Root>
+          </Flex>
+        )}
+        {!contentType && hasBundleSelection && (
+          <Flex direction="column" gap="2">
+            <Box>
+              <DialogFieldLabel htmlFor="content-type">
+                {selectedEntityTypeMeta?.bundleLabel ?? 'Bundle'}
+              </DialogFieldLabel>
+            </Box>
+            <Select.Root
+              key={selectedEntityType}
               name="content-type"
               required
-              value={selectedContentType || undefined}
+              disabled={!selectedEntityType}
+              value={selectedContentType || ''}
               onValueChange={(value) => setSelectedContentType(value as string)}
               size="1"
             >
               <Select.Trigger
                 id="content-type"
-                placeholder="Select content type…"
+                placeholder={`Select ${selectedEntityTypeMeta?.bundleLabel?.toLowerCase() ?? 'bundle'}…`}
                 style={{ width: '100%' }}
               />
               <Select.Content>
@@ -234,6 +300,7 @@ const AddTemplateDialog = ({
             </Select.Root>
           </Flex>
         )}
+        {selectedContentType && (
         <Flex direction="column" gap="2">
           <Box>
             <DialogFieldLabel htmlFor="template-name">
@@ -282,6 +349,7 @@ const AddTemplateDialog = ({
             </Select.Content>
           </Select.Root>
         </Flex>
+        )}
       </Flex>
     </Dialog>
   );

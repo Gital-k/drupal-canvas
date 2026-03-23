@@ -26,6 +26,7 @@ use Drupal\Core\Url;
 use Drupal\canvas\AssetRenderer;
 use Drupal\canvas\ClientSideRepresentation;
 use Drupal\canvas\Entity\CanvasHttpApiEligibleConfigEntityInterface;
+use Drupal\canvas\EntityHandlers\ContentTemplateAwareViewBuilder;
 use Drupal\canvas\EntityHandlers\VisibleWhenDisabledCanvasConfigEntityAccessControlHandler;
 use Drupal\canvas\Exception\ConstraintViolationException;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
@@ -159,8 +160,7 @@ final class ApiConfigControllers extends ApiControllerBase {
     // @phpstan-ignore-next-line argument.type
     $flat_json = json_decode($response->getContent(), TRUE);
 
-    // @todo Generalize beyond nodes in https://www.drupal.org/i/3498525
-    $supported_entity_type_ids = ['node'];
+    $supported_entity_type_ids = ContentTemplateAwareViewBuilder::getSupportedEntityTypeIds();
     $individual_bundle_entity_cache_tag_prefixes_to_ignore = [];
 
     // 1. Create the hierarchy:
@@ -170,8 +170,7 @@ final class ApiConfigControllers extends ApiControllerBase {
     $additional_cacheability = new CacheableMetadata();
     // Update whenever the list of entity types changes, not just when the set
     // of ContentTemplates config entities changes.
-    // @todo Uncomment in https://www.drupal.org/i/3498525
-    // $additional_cacheability->addCacheTags(['entity_types']);
+    $additional_cacheability->addCacheTags(['entity_types']);
     // Update whenever the list of bundles changes. Bundles may be defined via
     // hook_entity_bundle_info()  or via a bundle entity type.
     // @see \Drupal\Core\Entity\EntityTypeBundleInfo::getAllBundleInfo()
@@ -190,39 +189,31 @@ final class ApiConfigControllers extends ApiControllerBase {
       $bundle_info = $this->bundleInfo->getBundleInfo($entity_type_id);
       $bundles = [];
       foreach ($bundle_info as $bundle_key => $info) {
+        $bundle_route_params = $bundle_entity_type_id !== NULL ? [$bundle_entity_type_id => $bundle_key] : [];
+
         /** @var \Drupal\Core\Access\AccessResultInterface $edit_fields_access_check */
-        $edit_fields_access_check = $this->accessManager->checkNamedRoute("entity.$entity_type_id.field_ui_fields", [$bundle_entity_type_id => $bundle_key], $this->currentUser, TRUE);
+        $edit_fields_access_check = $this->accessManager->checkNamedRoute("entity.$entity_type_id.field_ui_fields", $bundle_route_params, $this->currentUser, TRUE);
         \assert($edit_fields_access_check instanceof AccessResultInterface);
         $edit_fields_access = $edit_fields_access_check->isAllowed();
-        /** @var \Drupal\Core\Access\AccessResultInterface $delete_access_check */
-        $delete_access_check = $this->accessManager->checkNamedRoute("entity.$bundle_entity_type_id.delete_form", [$bundle_entity_type_id => $bundle_key], $this->currentUser, TRUE);
-        \assert($delete_access_check instanceof AccessResultInterface);
-        $delete_access = $delete_access_check->isAllowed();
+
+        $additional_cacheability->addCacheableDependency($edit_fields_access_check);
 
         $bundles[$bundle_key] = [
           'label' => $info['label'],
           'viewModes' => [],
+          'editFieldsUrl' => $edit_fields_access ? Url::fromRoute("entity.$entity_type_id.field_ui_fields", $bundle_route_params)->toString() : NULL,
+          'deleteUrl' => NULL,
         ];
-        if ($delete_access) {
-          $delete_url = Url::fromRoute("entity.$bundle_entity_type_id.delete_form", [$bundle_entity_type_id => $bundle_key])
-            ->toString();
-          $bundles[$bundle_key]['deleteUrl'] = $delete_url;
-        }
-        else {
-          $bundles[$bundle_key]['deleteUrl'] = NULL;
-        }
-        if ($edit_fields_access) {
-          $edit_fields_url = Url::fromRoute("entity.$entity_type_id.field_ui_fields", [$bundle_entity_type_id => $bundle_key])
-            ->toString();
-          $bundles[$bundle_key]['editFieldsUrl'] = $edit_fields_url;
-        }
-        else {
-          $bundles[$bundle_key]['editFieldsUrl'] = NULL;
-        }
 
-        $additional_cacheability
-          ->addCacheableDependency($delete_access_check)
-          ->addCacheableDependency($edit_fields_access_check);
+        if ($bundle_entity_type_id !== NULL) {
+          /** @var \Drupal\Core\Access\AccessResultInterface $delete_access_check */
+          $delete_access_check = $this->accessManager->checkNamedRoute("entity.$bundle_entity_type_id.delete_form", [$bundle_entity_type_id => $bundle_key], $this->currentUser, TRUE);
+          \assert($delete_access_check instanceof AccessResultInterface);
+          $additional_cacheability->addCacheableDependency($delete_access_check);
+          if ($delete_access_check->isAllowed()) {
+            $bundles[$bundle_key]['deleteUrl'] = Url::fromRoute("entity.$bundle_entity_type_id.delete_form", [$bundle_entity_type_id => $bundle_key])->toString();
+          }
+        }
       }
 
       $hierarchical_json[$entity_type_id] = [
