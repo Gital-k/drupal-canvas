@@ -52,13 +52,12 @@ const mainProperty: Transformer<{
 
   let records: Array<PropsValues>;
   if (multiple) {
-    // Convert object to array of entries for sorting.
     // Support both 'weight' (media library) and '_weight' (other widgets)
-    const entries = Object.entries(value);
+    const values = Object.values(value);
     const hasWeights =
-      entries.length > 0 &&
-      entries.every(
-        ([, item]) =>
+      values.length > 0 &&
+      values.every(
+        (item) =>
           typeof item === 'object' &&
           item !== null &&
           ('_weight' in item || 'weight' in item),
@@ -66,7 +65,7 @@ const mainProperty: Transformer<{
 
     if (hasWeights) {
       // Sort by weight before extracting values
-      entries.sort(([, a], [, b]) => {
+      values.sort((a, b) => {
         const weightA =
           typeof a === 'object' && a !== null
             ? Number(a._weight ?? a.weight) || 0
@@ -77,25 +76,16 @@ const mainProperty: Transformer<{
             : 0;
         return weightA - weightB;
       });
-      records = entries.map(([, item]) => item);
-    } else {
-      records = Object.values(value);
     }
+    records = values;
   } else {
     records = Array.isArray(value) ? value : [value];
   }
-  const returnValue = records.map((record: PropsValues) => {
-    if (record === null || record === undefined) {
-      return null;
-    }
-    if (typeof record !== 'object') {
-      return null;
-    }
-    if (name in record) {
-      return record[name];
-    }
-    return null;
-  });
+  const returnValue = records.map((record: PropsValues) =>
+    record !== null && typeof record === 'object' && name in record
+      ? record[name]
+      : null,
+  );
   if (multiple) {
     return returnValue.filter((v) => v !== null && v !== '');
   }
