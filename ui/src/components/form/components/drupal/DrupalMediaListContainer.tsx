@@ -21,7 +21,7 @@ import {
 
 import { useAppSelector } from '@/app/hooks';
 import { toPropName } from '@/components/form/formUtil';
-import { syncPropSourcesToResolvedValues } from '@/components/form/InputBehaviorsComponentPropsForm';
+import {syncPropSourcesToResolvedValues} from '@/components/form/formUtil';
 import { isEvaluatedComponentModel } from '@/features/layout/layoutModelSlice';
 import { selectEditorFrameContext } from '@/features/ui/uiSlice';
 import useInputUIData from '@/hooks/useInputUIData';
