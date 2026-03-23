@@ -2,16 +2,16 @@ import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { resolveCanvasConfig } from '@drupal-canvas/discovery';
 
 import {
   drupalCanvasCompat,
   drupalCanvasCompatServer,
-  ensureHardcodedHostGlobalCssExists,
+  ensureHostGlobalCssExists,
+  extractComponentPreviewMetadataFromComponentYaml,
   extractFirstExamplePropsFromComponentYaml,
   getWorkbenchHostGlobalCssVirtualUrl,
-  isSupportedPreviewModulePath,
-  resolveHardcodedHostGlobalCssPath,
-  toViteFsUrl,
+  resolveHostGlobalCssPath,
 } from './index';
 
 const tempDirs: string[] = [];
@@ -27,6 +27,20 @@ async function makeTempDir(): Promise<string> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'canvas-vite-compat-'));
   tempDirs.push(dir);
   return dir;
+}
+
+async function withWorkingDirectory<T>(
+  directory: string,
+  callback: () => Promise<T> | T,
+): Promise<T> {
+  const previousDirectory = process.cwd();
+  process.chdir(directory);
+
+  try {
+    return await callback();
+  } finally {
+    process.chdir(previousDirectory);
+  }
 }
 
 function getResolveIdHook(plugin: { resolveId?: unknown }) {
@@ -64,17 +78,6 @@ describe('vite-compat', () => {
     expect(server?.fs?.allow).toEqual(['/tmp/host']);
   });
 
-  it('converts absolute paths to Vite @fs URLs', () => {
-    expect(toViteFsUrl('/tmp/example/file.tsx')).toBe(
-      '/@fs/tmp/example/file.tsx',
-    );
-  });
-
-  it('checks supported preview module extensions', () => {
-    expect(isSupportedPreviewModulePath('/tmp/a.tsx')).toBe(true);
-    expect(isSupportedPreviewModulePath('/tmp/a.jpg')).toBe(false);
-  });
-
   it('extracts first example values from component.yml props', async () => {
     const root = await makeTempDir();
     const metadataPath = path.join(root, 'component.yml');
@@ -105,37 +108,77 @@ describe('vite-compat', () => {
     });
   });
 
-  it('resolves hardcoded host global css path', () => {
-    const resolved = resolveHardcodedHostGlobalCssPath('/tmp/host');
-    expect(resolved).toBe('/tmp/host/src/components/global.css');
+  it('resolves host global css path from canvas.config.json', async () => {
+    const root = await makeTempDir();
+    await fs.writeFile(
+      path.join(root, 'canvas.config.json'),
+      JSON.stringify({ globalCssPath: './app/components/global.css' }),
+      'utf-8',
+    );
+    const resolved = resolveHostGlobalCssPath(root);
+    expect(resolved).toBe(path.join(root, 'app/components/global.css'));
   });
 
-  it('resolves hardcoded host global css path with custom alias base dir', () => {
-    const resolved = resolveHardcodedHostGlobalCssPath('/tmp/host', 'app');
-    expect(resolved).toBe('/tmp/host/app/components/global.css');
+  it('resolves pagesDir from canvas.config.json', async () => {
+    const root = await makeTempDir();
+    await fs.writeFile(
+      path.join(root, 'canvas.config.json'),
+      JSON.stringify({ pagesDir: './content/pages' }),
+      'utf-8',
+    );
+
+    expect(resolveCanvasConfig({ hostRoot: root }).pagesDir).toBe(
+      './content/pages',
+    );
   });
 
-  it('validates hardcoded host global css existence', async () => {
+  it('uses default pagesDir when canvas.config.json is missing', async () => {
+    const root = await makeTempDir();
+
+    expect(resolveCanvasConfig({ hostRoot: root }).pagesDir).toBe('./pages');
+  });
+
+  it('extracts component labels and example props from component metadata', async () => {
+    const root = await makeTempDir();
+    const metadataPath = path.join(root, 'component.yml');
+    await fs.writeFile(
+      metadataPath,
+      [
+        'name: Hero',
+        'props:',
+        '  properties:',
+        '    title:',
+        '      type: string',
+        '      examples:',
+        '        - Hello',
+      ].join('\n'),
+      'utf-8',
+    );
+
+    const result =
+      await extractComponentPreviewMetadataFromComponentYaml(metadataPath);
+    expect(result).toEqual({
+      label: 'Hero',
+      exampleProps: {
+        title: 'Hello',
+      },
+    });
+  });
+
+  it('validates host global css existence', async () => {
     const root = await makeTempDir();
     const cssPath = path.join(root, 'src/components/global.css');
     await fs.mkdir(path.dirname(cssPath), { recursive: true });
     await fs.writeFile(cssPath, '@import "tailwindcss";', 'utf-8');
 
-    const resolved = await ensureHardcodedHostGlobalCssExists(root);
+    const resolved = await ensureHostGlobalCssExists(root);
     expect(resolved).toBe(cssPath);
   });
 
-  it('throws when hardcoded host global css is missing', async () => {
+  it('throws when host global css is missing', async () => {
     const root = await makeTempDir();
-    await expect(ensureHardcodedHostGlobalCssExists(root)).rejects.toThrow(
+    await expect(ensureHostGlobalCssExists(root)).rejects.toThrow(
       'Missing required host Tailwind entrypoint',
-    );
-  });
-
-  it('builds @fs URL for hardcoded host css path', () => {
-    const resolvedPath = resolveHardcodedHostGlobalCssPath('/tmp/host');
-    expect(toViteFsUrl(resolvedPath)).toBe(
-      '/@fs/tmp/host/src/components/global.css',
     );
   });
 
@@ -261,12 +304,55 @@ describe('vite-compat', () => {
     ).toBeNull();
   });
 
+  it('reuses the host vite plugin for html bootstrap', async () => {
+    const hostRoot = await makeTempDir();
+    await fs.writeFile(
+      path.join(hostRoot, '.env'),
+      [
+        'CANVAS_SITE_URL=http://canvas.ddev.site',
+        'CANVAS_JSONAPI_PREFIX=api',
+      ].join('\n'),
+      'utf-8',
+    );
+
+    const plugins = drupalCanvasCompat({
+      hostRoot,
+    });
+    const drupalCanvasPlugin = plugins.find(
+      (plugin) => plugin.name === 'drupal-canvas',
+    );
+    expect(drupalCanvasPlugin).toBeDefined();
+
+    await withWorkingDirectory(hostRoot, async () => {
+      const config = drupalCanvasPlugin?.config as
+        | ((config: Record<string, unknown>, env: { mode: string }) => unknown)
+        | undefined;
+      config?.(
+        {
+          root: '/tmp/workbench-client',
+        },
+        { mode: 'development' },
+      );
+
+      const transformIndexHtml = drupalCanvasPlugin?.transformIndexHtml as
+        | ((html: string) => { tags?: Array<{ children?: string }> })
+        | undefined;
+      const transformed = transformIndexHtml?.('<html></html>');
+      expect(transformed?.tags).toBeDefined();
+      expect(transformed?.tags?.[0]?.children).toContain(
+        'http://canvas.ddev.site',
+      );
+      expect(transformed?.tags?.[0]?.children).toContain('"api"');
+    });
+  });
+
   it('always adds svgr plugin', () => {
     const plugins = drupalCanvasCompat({
       hostRoot: '/tmp/host',
     });
     const pluginNames = plugins.map((plugin) => plugin.name);
     expect(pluginNames).toContain('canvas-vite-compat-host-alias');
+    expect(pluginNames).toContain('drupal-canvas');
     expect(pluginNames.some((name) => name.includes('svgr'))).toBe(true);
   });
 
@@ -276,6 +362,7 @@ describe('vite-compat', () => {
     });
     const pluginNames = plugins.map((plugin) => plugin.name);
     expect(pluginNames).toContain('canvas-vite-compat-host-alias');
+    expect(pluginNames).toContain('drupal-canvas');
     expect(pluginNames.some((name) => name.includes('svgr'))).toBe(true);
 
     const resolveId = getResolveIdHook(plugins[0]);

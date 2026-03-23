@@ -39,6 +39,14 @@ export default defineConfig({
               slug: 'code-components/responsive-images',
             },
             {
+              label: 'Workbench',
+              items: [
+                { label: 'Introduction', slug: 'code-components/workbench' },
+                { label: 'Mocks', slug: 'code-components/workbench/mocks' },
+                { label: 'Pages', slug: 'code-components/workbench/pages' },
+              ],
+            },
+            {
               label: 'CLI tool',
               items: [
                 { label: 'Introduction', slug: 'code-components/cli-tool' },

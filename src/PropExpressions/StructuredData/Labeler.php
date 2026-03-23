@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\PropExpressions\StructuredData;
 
-use Drupal\canvas\ShapeMatcher\JsonSchemaFieldInstanceMatcher;
 use Drupal\Core\Entity\TypedData\EntityDataDefinitionInterface;
 use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Field\TypedData\FieldItemDataDefinitionInterface;
@@ -70,7 +69,7 @@ final class Labeler {
     \assert($field_definition->getItemDefinition() instanceof FieldItemDataDefinitionInterface);
 
     // To correctly represent this, this must take into account what
-    // JsonSchemaFieldInstanceMatcher may or may not match. It will
+    // EntityFieldPropSourceMatcher may or may not match. It will
     // never match:
     // - DataReferenceTargetDefinition field props: it considers these
     //   irrelevant; it's only the twin DataReferenceDefinition that
@@ -328,7 +327,7 @@ final class Labeler {
         return TRUE;
       }
 
-      $expr_used_by_computed_property = JsonSchemaFieldInstanceMatcher::getReferenceDependency($property_definition);
+      $expr_used_by_computed_property = FieldItemAnalyzer::getReferenceDependency($property_definition);
       if ($expr_used_by_computed_property === NULL) {
         continue;
       }

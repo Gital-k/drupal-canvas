@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\CanvasConfigUpdater;
+use Drupal\canvas\Entity\BrandKit;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Entity\Pattern;
 use Drupal\Core\Config\Entity\ConfigEntityUpdater;
+use Drupal\Core\Entity\EntityDefinitionUpdateManagerInterface;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\image\Entity\ImageStyle;
 
@@ -286,4 +288,42 @@ function canvas_post_update_0013_update_dynamic_prop_sources_to_entity_field_pro
     // prop source is quite low and irrelevant.
     ->update($sandbox, ContentTemplate::ENTITY_TYPE_ID, static fn(ContentTemplate $template): bool => TRUE);
 
+}
+
+/**
+ * Creates the global brand kit config entity for updated sites.
+ */
+function canvas_post_update_0014_create_global_brand_kit(): void {
+  $entity_definition_update_manager = \Drupal::service('entity.definition_update_manager');
+  \assert($entity_definition_update_manager instanceof EntityDefinitionUpdateManagerInterface);
+  $change_list = $entity_definition_update_manager->getChangeList();
+  if (($change_list[BrandKit::ENTITY_TYPE_ID]['entity_type'] ?? NULL) === EntityDefinitionUpdateManagerInterface::DEFINITION_CREATED) {
+    $entity_definition_update_manager->installEntityType(\Drupal::entityTypeManager()->getDefinition(BrandKit::ENTITY_TYPE_ID));
+  }
+
+  if (BrandKit::load(BrandKit::GLOBAL_ID) instanceof BrandKit) {
+    return;
+  }
+
+  $brand_kit = BrandKit::create([
+    'id' => BrandKit::GLOBAL_ID,
+    'label' => 'Global brand kit',
+    'dependencies' => [
+      'enforced' => [
+        'module' => ['canvas'],
+      ],
+    ],
+  ]);
+  $brand_kit->save();
+}
+
+/**
+ * Remove incorrect dependency from config.
+ */
+function canvas_post_update_0015_remove_wrong_image_style_dependency_in_field_configs(array &$sandbox): void {
+  \Drupal::classResolver(ConfigEntityUpdater::class)
+    ->update($sandbox, 'field_config', static function (FieldConfig $field): bool {
+      $dependencies = $field->getDependencies();
+      return \in_array('image.style.canvas_parametrized_width', $dependencies['config'] ?? [], TRUE);
+    });
 }

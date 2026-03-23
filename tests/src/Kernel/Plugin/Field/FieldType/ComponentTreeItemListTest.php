@@ -11,6 +11,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Element\RenderSafeComponentContainer;
 use Drupal\canvas\Entity\AssetLibrary;
+use Drupal\canvas\Entity\BrandKit;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\canvas\Entity\ContentTemplate;
@@ -1168,6 +1169,7 @@ HTML,
                                           'drupal-canvas' => \sprintf('%s/packages/astro-hydration/dist/drupal-canvas.js?2.1.0-alpha3', $path),
                                           '@tailwindcss/typography' => \sprintf('%s/packages/astro-hydration/dist/tailwindcss-typography.js?2.1.0-alpha3', $path),
                                         ],
+                                        ImportMapResponseAttachmentsProcessor::SCOPED_IMPORTS => [],
                                       ],
                                       '#attached' => [
                                         'html_head_link' => [
@@ -1189,6 +1191,7 @@ HTML,
                                         'library' => [
                                           'canvas/astro_island.my-cta',
                                           'canvas/asset_library.' . AssetLibrary::GLOBAL_ID,
+                                          'canvas/brand_kit.' . BrandKit::GLOBAL_ID,
                                         ],
                                       ],
                                       '#name' => 'My First Code Component',
@@ -1242,6 +1245,7 @@ HTML,
                                           'drupal-canvas' => \sprintf('%s/packages/astro-hydration/dist/drupal-canvas.js?2.1.0-alpha3', $path),
                                           '@tailwindcss/typography' => \sprintf('%s/packages/astro-hydration/dist/tailwindcss-typography.js?2.1.0-alpha3', $path),
                                         ],
+                                        ImportMapResponseAttachmentsProcessor::SCOPED_IMPORTS => [],
                                       ],
                                       '#attached' => [
                                         'html_head_link' => [
@@ -1263,6 +1267,7 @@ HTML,
                                         'library' => [
                                           'canvas/astro_island.my-cta-with-auto-save',
                                           'canvas/asset_library.' . AssetLibrary::GLOBAL_ID,
+                                          'canvas/brand_kit.' . BrandKit::GLOBAL_ID,
                                         ],
                                       ],
                                       '#name' => 'My Code Component with Auto-Save',
