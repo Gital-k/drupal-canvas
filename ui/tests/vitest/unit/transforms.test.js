@@ -261,6 +261,41 @@ describe('Transforms - mediaSelection', () => {
   });
 });
 
+describe('Transforms - firstRecord', () => {
+  it('Should return null for null input', () => {
+    expect(transforms.firstRecord(null, {}, {})).toEqual(null);
+  });
+
+  it('Should return null for an empty array', () => {
+    expect(transforms.firstRecord([], {}, {})).toEqual(null);
+  });
+
+  it('Should return the value as-is for a non-array input', () => {
+    expect(transforms.firstRecord('hello', {}, {})).toEqual('hello');
+  });
+
+  it('Should return a single item from a one-element array', () => {
+    expect(transforms.firstRecord([{ value: 'only' }], {}, {})).toEqual({
+      value: 'only',
+    });
+  });
+
+  it('Should return a single item from a multi-element array', () => {
+    expect(
+      transforms.firstRecord(
+        [
+          { value: 'first' },
+          { value: 'second' },
+          { value: 'third' },
+          { value: 'fourth' },
+        ],
+        {},
+        {},
+      ),
+    ).toEqual({ value: 'first' });
+  });
+});
+
 describe('Transforms - dateTime', () => {
   it('should return null when propSource is undefined', () => {
     expect(transforms.dateTime({ date: '' }, {}, undefined)).to.equal(null);

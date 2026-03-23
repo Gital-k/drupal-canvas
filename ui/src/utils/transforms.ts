@@ -95,17 +95,10 @@ const mainProperty: Transformer<{
 const firstRecord: Transformer<BaseTransformOptions, null | PropsValues> = (
   value,
 ) => {
-  if (
-    value === null ||
-    value === undefined ||
-    (Array.isArray(value) && value.length === 0)
-  ) {
+  if (value == null || (Array.isArray(value) && value.length === 0)) {
     return null;
   }
-  if (Array.isArray(value)) {
-    return value.pop() as PropsValues;
-  }
-  return value;
+  return (Array.isArray(value) ? value[0] : value) as PropsValues;
 };
 
 export interface LinkPropShape extends StaticPropSource {
