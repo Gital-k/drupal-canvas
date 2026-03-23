@@ -33,14 +33,9 @@ final class PageRegionTranslationTest extends CanvasKernelTestBase {
    * {@inheritdoc}
    */
   protected static $modules = [
-    'system',
-    'user',
-    'block',
     'language',
     'locale',
     'config_translation',
-    'canvas',
-    'canvas_test_sdc',
     'canvas_dev_translation',
   ];
 
@@ -94,12 +89,10 @@ final class PageRegionTranslationTest extends CanvasKernelTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
-    $this->installConfig(['system', 'language']);
+    $this->installConfig(['language']);
     $this->installEntitySchema('configurable_language');
     $this->installEntitySchema('user');
-    $this->installConfig(['canvas']);
     $this->generateComponentConfig();
-    \Drupal::service('theme_installer')->install([self::TEST_THEME]);
     ConfigurableLanguage::createFromLangcode('fr')->save();
   }
 

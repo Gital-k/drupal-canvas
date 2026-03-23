@@ -32,17 +32,11 @@ final class ContentTemplateTranslationTest extends CanvasKernelTestBase {
    * {@inheritdoc}
    */
   protected static $modules = [
-    'system',
-    'user',
     'field',
-    'text',
-    'filter',
     'node',
     'language',
     'locale',
     'config_translation',
-    'canvas',
-    'canvas_test_sdc',
     'canvas_dev_translation',
   ];
 
@@ -75,11 +69,10 @@ final class ContentTemplateTranslationTest extends CanvasKernelTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
-    $this->installConfig(['system', 'language', 'node']);
+    $this->installConfig(['language', 'node']);
     $this->installEntitySchema('configurable_language');
     $this->installEntitySchema('node');
     $this->installEntitySchema('user');
-    $this->installConfig(['canvas']);
     $this->generateComponentConfig();
     NodeType::create(['type' => 'article', 'name' => 'Article'])->save();
     ConfigurableLanguage::createFromLangcode('fr')->save();
