@@ -344,15 +344,11 @@ const mediaSelection: Transformer<
     ? selection
     : Object.values(selection);
 
-  const validValues = selectionValues;
-  if (validValues.length === 0) {
+  if (selectionValues.length === 0) {
     return null;
   }
 
-  if (multiple) {
-    return validValues;
-  }
-  return validValues[0];
+  return multiple ? selectionValues : selectionValues[0];
 };
 
 const transforms = {
