@@ -589,6 +589,36 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
     ]);
   }
 
+  #[TestWith([
+    'node_type',
+    [
+      '' => "The 'content_entity_type_id' property cannot be changed.",
+      'content_entity_type_id' => [
+        "The 'node_type' plugin does not exist.",
+        "'node_type' is not a content entity type.",
+        'The value you selected is not a valid choice.',
+      ],
+      'content_entity_type_bundle' => "The 'alpha' bundle does not exist on the 'node_type' entity type.",
+      'content_entity_type_view_mode' => "The 'core.entity_view_mode.node_type.full' config does not exist.",
+    ],
+  ])]
+  #[TestWith([
+    'file',
+    [
+      '' => "The 'content_entity_type_id' property cannot be changed.",
+      'content_entity_type_id' => [
+        "The 'file' entity type does not specify a 'field_ui_base_route'.",
+        'The value you selected is not a valid choice.',
+      ],
+      'content_entity_type_bundle' => "The 'alpha' bundle does not exist on the 'file' entity type.",
+      'content_entity_type_view_mode' => "The 'core.entity_view_mode.file.full' config does not exist.",
+    ],
+  ])]
+  public function testNotDisplayBuildableEntityType(string $entity_type_id, array $expected_errors): void {
+    $this->entity->set('content_entity_type_id', $entity_type_id);
+    $this->assertValidationErrors($expected_errors);
+  }
+
   public function testInvalidContentEntityTypeBundle(): void {
     $this->entity->set('content_entity_type_bundle', 'nope');
     $this->assertValidationErrors([
