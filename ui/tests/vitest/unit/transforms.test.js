@@ -117,7 +117,7 @@ describe('Transforms - main property', () => {
     ).toEqual([null]);
   });
 
-  it('Should sort by weight field when present', () => {
+  it('Should sort by field item weight when present', () => {
     expect(
       transforms.mainProperty(
         {
@@ -131,7 +131,7 @@ describe('Transforms - main property', () => {
     ).toEqual(['3', '4', '5']);
   });
 
-  it('Should sort by weight field after reordering', () => {
+  it('Should sort by field item weight after reordering', () => {
     expect(
       transforms.mainProperty(
         {
@@ -145,7 +145,7 @@ describe('Transforms - main property', () => {
     ).toEqual(['5', '3', '4']);
   });
 
-  it('Should sort by _weight field when weight is not present', () => {
+  it('Should sort field items by `_weight` when `weight` is not present', () => {
     expect(
       transforms.mainProperty(
         {
