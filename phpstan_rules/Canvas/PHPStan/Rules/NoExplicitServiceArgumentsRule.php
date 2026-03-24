@@ -168,9 +168,6 @@ final class NoExplicitServiceArgumentsRule implements Rule {
       if (isset($definition['decorates'])) {
         continue;
       }
-      if (isset($definition['parent'])) {
-        continue;
-      }
       if (isset($definition['factory'])) {
         continue;
       }
