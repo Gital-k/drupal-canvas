@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Hook;
 
+use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Asset\AttachedAssetsInterface;
@@ -96,7 +97,7 @@ readonly final class ComponentSourceHooks {
 
     $route = $this->routeMatch->getRouteObject();
     \assert($route instanceof Route);
-    $is_preview = $route->getOption('_canvas_use_template_draft') === TRUE;
+    $is_preview = AutoSaveManager::routeIsCanvasPreview($route);
     // TRICKY: the `route` cache context varies also by route parameters, that
     // is unnecessary here, because this only varies by route definition.
     $page['#cache']['contexts'][] = 'route.name';
