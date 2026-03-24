@@ -17,7 +17,7 @@ const DrupalInput = ({
   attributes = {},
   element,
 }: {
-  element: any;
+  element?: any;
   attributes?: Attributes | NumericInputAttributes;
 }) => {
   switch (attributes?.type) {
