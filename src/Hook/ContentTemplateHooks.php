@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Hook;
 
-use Drupal\canvas\ContentTemplateRoutes;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
 use Drupal\Core\Config\Entity\ConfigEntityInterface;
@@ -125,7 +124,7 @@ final class ContentTemplateHooks {
         break;
       }
     }
-    if (ContentTemplateRoutes::applies($route_name) || $is_entity_view_display_route) {
+    if ($is_entity_view_display_route) {
       // Add list cache tags to invalidate when entity ContentTemplate is
       // created/deleted. This ensures menu local tasks rebuild when template
       // availability changes.
@@ -148,8 +147,17 @@ final class ContentTemplateHooks {
   public function preprocessMenuLocalTask(array &$variables): void {
     $url = $variables['element']['#link']['url'] ?? NULL;
 
-    // Only proceed if this is a routed URL and content template logic applies.
-    if (!$url instanceof Url || !$url->isRouted() || !ContentTemplateRoutes::applies($url->getRouteName())) {
+    // Only proceed if this is a routed URL on a view mode display route for a
+    // supported entity type.
+    if (!$url instanceof Url || !$url->isRouted()) {
+      return;
+    }
+    $url_route_name = $url->getRouteName();
+    $is_view_mode_route = \in_array($url_route_name, \array_map(
+      fn($id) => "entity.entity_view_display.$id.view_mode",
+      $this->contentTemplateRepository->getSupportedEntityTypeIds(),
+    ), TRUE);
+    if (!$is_view_mode_route) {
       return;
     }
 
