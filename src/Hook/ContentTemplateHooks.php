@@ -112,19 +112,11 @@ final class ContentTemplateHooks {
    */
   #[Hook('menu_local_tasks_alter')]
   public function menuLocalTasksAlter(array &$data, string $route_name, RefinableCacheableDependencyInterface &$cacheability): void {
-    // Add content template cacheability for routes where content templates
-    // apply, otherwise the content template links in the local tasks will not
-    // update when templates are created or deleted.
-    // Also apply to the main "Manage display" pages for any supported entity
-    // type so tabs update correctly when templates are created/deleted.
-    $is_entity_view_display_route = FALSE;
-    foreach ($this->contentTemplateRepository->getSupportedEntityTypeIds() as $entity_type_id) {
-      if (\str_starts_with($route_name, "entity.entity_view_display.$entity_type_id.")) {
-        $is_entity_view_display_route = TRUE;
-        break;
-      }
-    }
-    if ($is_entity_view_display_route) {
+    // Add content template cacheability on Field UI's entity view display
+    // routes. Field UI only generates these routes for entity types with
+    // field_ui_base_route, which is the same criterion Canvas uses, so any
+    // entity.entity_view_display.* route is a supported entity type.
+    if (\str_starts_with($route_name, 'entity.entity_view_display.')) {
       // Add list cache tags to invalidate when entity ContentTemplate is
       // created/deleted. This ensures menu local tasks rebuild when template
       // availability changes.
@@ -153,11 +145,7 @@ final class ContentTemplateHooks {
       return;
     }
     $url_route_name = $url->getRouteName();
-    $is_view_mode_route = \in_array($url_route_name, \array_map(
-      fn($id) => "entity.entity_view_display.$id.view_mode",
-      $this->contentTemplateRepository->getSupportedEntityTypeIds(),
-    ), TRUE);
-    if (!$is_view_mode_route) {
+    if (!\str_starts_with($url_route_name, 'entity.entity_view_display.') || !\str_ends_with($url_route_name, '.view_mode')) {
       return;
     }
 
