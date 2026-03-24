@@ -16,7 +16,7 @@ use Symfony\Component\Routing\Route;
 /**
  * Defines an access checker for canvas content template entity.
  */
-final class ViewModeAccessCheck implements AccessInterface {
+class ViewModeAccessCheck implements AccessInterface {
 
   public function __construct(
     private readonly AccessInterface $inner,
@@ -28,13 +28,11 @@ final class ViewModeAccessCheck implements AccessInterface {
    */
   public function access(Route $route, RouteMatchInterface $route_match, AccountInterface $account, string $view_mode_name = 'default', ?string $bundle = NULL): AccessResultInterface {
     $template = $this->loadFromRoute($view_mode_name, $route_match, $bundle);
-    if ($template) {
+    if ($template && $template->status()) {
       // Add the ContentTemplate as a cacheable dependency so access rebuilds
       // when content templates are added or updated.
-      $access = AccessResult::neutral()->addCacheableDependency($template);
-      if ($template->status()) {
-        return $access->allowedIfHasPermission($account, ContentTemplate::ADMIN_PERMISSION);
-      }
+      return AccessResult::allowedIfHasPermission($account, ContentTemplate::ADMIN_PERMISSION)
+        ->addCacheableDependency($template);
     }
     // AccessInterface does not declare access(). Possibly will be fixed in
     // https://www.drupal.org/node/2266817.
