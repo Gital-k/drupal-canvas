@@ -1,9 +1,9 @@
-import { existsSync, promises as fs, readFileSync, statSync } from 'node:fs';
+import { existsSync, promises as fs, statSync } from 'node:fs';
 import path from 'node:path';
 import * as yaml from 'js-yaml';
 import svgr from 'vite-plugin-svgr';
-
-import { isSupportedPreviewModulePath, toViteFsUrl } from './runtime.ts';
+import { resolveCanvasConfig } from '@drupal-canvas/discovery';
+import drupalCanvas from '@drupal-canvas/vite-plugin';
 
 import type { Plugin } from 'vite';
 
@@ -88,8 +88,6 @@ function isPathWithinRoot(filePath: string, rootPath: string): boolean {
     relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative)
   );
 }
-
-export { isSupportedPreviewModulePath, toViteFsUrl };
 
 // @todo Implement automatic discovery of the Tailwind CSS entrypoint in @drupal-canvas/discovery.
 // Idea: Search for the following strings in files:
@@ -184,8 +182,14 @@ export async function extractFirstExamplePropsFromComponentYaml(
 }
 
 export function drupalCanvasCompat(options: CanvasViteCompatOptions): Plugin[] {
+  const canvasConfig = resolveCanvasConfig(options);
   const hostAliasPrefix = '@/';
-  const hostAliasBaseDir = options.hostAliasBaseDir ?? 'src';
+  const hostAliasBaseDir =
+    options.hostAliasBaseDir ?? canvasConfig.aliasBaseDir;
+  const hostComponentDir = path.resolve(
+    options.hostRoot,
+    canvasConfig.componentDir,
+  );
 
   const aliasPlugin: Plugin = {
     name: 'canvas-vite-compat-host-alias',
@@ -210,7 +214,12 @@ export function drupalCanvasCompat(options: CanvasViteCompatOptions): Plugin[] {
     },
   };
 
-  const plugins: Plugin[] = [aliasPlugin];
+  const plugins: Plugin[] = [
+    aliasPlugin,
+    ...(drupalCanvas({
+      componentDir: hostComponentDir,
+    }) as Plugin[]),
+  ];
 
   plugins.push(
     svgr({
@@ -219,48 +228,4 @@ export function drupalCanvasCompat(options: CanvasViteCompatOptions): Plugin[] {
   );
 
   return plugins;
-}
-
-export interface CanvasConfig {
-  aliasBaseDir: string;
-  outputDir: string;
-  componentDir: string;
-  pagesDir: string;
-  deprecatedComponentDir: string;
-  globalCssPath: string;
-}
-
-export function resolveCanvasConfig(
-  options: CanvasViteCompatOptions,
-): CanvasConfig {
-  const DEFAULT_CANVAS_CONFIG: CanvasConfig = {
-    aliasBaseDir: 'src',
-    outputDir: 'dist',
-    componentDir: options.hostRoot,
-    pagesDir: './pages',
-    deprecatedComponentDir: './components',
-    globalCssPath: './src/components/global.css',
-  };
-
-  const configPath = path.resolve(options.hostRoot, 'canvas.config.json');
-  if (!existsSync(configPath)) {
-    return { ...DEFAULT_CANVAS_CONFIG };
-  }
-
-  try {
-    const raw = readFileSync(configPath, 'utf-8');
-    const parsed = JSON.parse(raw) as Partial<CanvasConfig>;
-    return {
-      aliasBaseDir: parsed.aliasBaseDir ?? DEFAULT_CANVAS_CONFIG.aliasBaseDir,
-      outputDir: parsed.outputDir ?? DEFAULT_CANVAS_CONFIG.outputDir,
-      componentDir: parsed.componentDir ?? DEFAULT_CANVAS_CONFIG.componentDir,
-      pagesDir: parsed.pagesDir ?? DEFAULT_CANVAS_CONFIG.pagesDir,
-      deprecatedComponentDir:
-        parsed.componentDir ?? DEFAULT_CANVAS_CONFIG.deprecatedComponentDir,
-      globalCssPath:
-        parsed.globalCssPath ?? DEFAULT_CANVAS_CONFIG.globalCssPath,
-    };
-  } catch {
-    return { ...DEFAULT_CANVAS_CONFIG };
-  }
 }

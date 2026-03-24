@@ -622,7 +622,7 @@ playwright:
     - .test-variables
   parallel:
     matrix:
-      - BROWSER: [chromium, firefox, webkit, templates-linking]
+      - BROWSER: [ chromium, firefox, webkit, templates-linking ]
   variables:
     GIT_DEPTH: 1
     _TARGET_DB_TYPE: sqlite

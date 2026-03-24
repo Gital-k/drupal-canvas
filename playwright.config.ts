@@ -63,15 +63,14 @@ const activeTemplatesLinkingProjects =
     ? [templatesLinkingProject]
     : [];
 
-// When running the templates-linking job, exclude it from the regular chromium
-// project so it doesn't run twice.
-const filteredBrowserProjects = activeBrowserProjects.map((project) => {
-  if (project.name !== 'chromium') return project;
-  return {
-    ...project,
-    testIgnore: /templates-linking\.spec\.ts/,
-  };
-});
+// templates-linking.spec.ts is handled exclusively by the dedicated
+// templates-linking project (Chromium only). Exclude it from all browser
+// projects so it never runs under firefox or webkit, and doesn't run twice
+// under chromium.
+const filteredBrowserProjects = activeBrowserProjects.map((project) => ({
+  ...project,
+  testIgnore: /templates-linking\.spec\.ts/,
+}));
 
 export default defineConfig({
   testDir: './tests/src/Playwright',
@@ -83,11 +82,8 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   /* Maximum failures */
   maxFailures: 999999,
-  /* On CI: limit workers to avoid resource contention on CPU-constrained pods.
-   * 23 workers caused cascading timeouts under load; 10 stays well within the
-   * 30-minute job limit on a healthy pod while degrading gracefully on a slow one.
-   * Locally: 50% of CPU cores to avoid thrashing the dev machine. */
-  workers: process.env.CI ? 10 : '50%',
+  /* Parallel test workers, leave undefined for automatic */
+  workers: '50%',
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [
     ['list'],

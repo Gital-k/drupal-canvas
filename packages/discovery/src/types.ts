@@ -24,6 +24,7 @@ export interface DiscoveredComponent {
   name: string;
   directory: string;
   relativeDirectory: string;
+  projectRelativeDirectory: string;
   metadataPath: string;
   jsEntryPath: string | null;
   cssEntryPath: string | null;
@@ -38,6 +39,7 @@ export interface DiscoveredPage {
 
 export interface DiscoveryResult {
   componentRoot: string;
+  projectRoot: string;
   components: DiscoveredComponent[];
   pages: DiscoveredPage[];
   warnings: DiscoveryWarning[];
@@ -54,4 +56,13 @@ export interface ComponentMetadata extends Pick<
   props: {
     properties: CodeComponentSerialized['props'];
   };
+}
+
+export interface CanvasConfig {
+  aliasBaseDir: string;
+  outputDir: string;
+  componentDir: string;
+  pagesDir: string;
+  deprecatedComponentDir: string;
+  globalCssPath: string;
 }

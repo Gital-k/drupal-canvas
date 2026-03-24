@@ -21,17 +21,26 @@ import { fileExists } from './utils';
 import type { DiscoveredComponent } from '@drupal-canvas/discovery';
 import type { DataDependencies } from '@drupal-canvas/ui/types/CodeComponent';
 import type { ApiService } from '../services/api.js';
+import type { Component } from '../types/Component.js';
 import type { Result } from '../types/Result.js';
 
-interface ComponentExistsResult {
-  machineName: string;
-  exists: boolean;
-}
+type ComponentOperation = 'create' | 'update' | 'delete';
+
+type ComponentUploadTask =
+  | {
+      machineName: string;
+      operation: 'create' | 'update';
+      componentPayload: Component;
+    }
+  | {
+      machineName: string;
+      operation: 'delete';
+    };
 
 interface ComponentUploadResult {
   machineName: string;
   success: boolean;
-  operation: 'create' | 'update';
+  operation: ComponentOperation;
   error?: Error;
 }
 
@@ -42,91 +51,83 @@ interface PreparedComponent {
 }
 
 /**
- * Check if components exist on the remote.
+ * Determine the operation for each component (create, update, or delete)
+ * and build upload tasks with payloads attached.
  */
-export async function checkComponentsExist(
-  machineNames: string[],
+export async function buildComponentUploadTasks(
+  preparedByName: Map<string, PreparedComponent>,
   apiService: { listComponents: () => Promise<Record<string, unknown>> },
   onProgress: () => void,
-): Promise<ComponentExistsResult[]> {
+): Promise<ComponentUploadTask[]> {
   const existingComponents = await apiService.listComponents();
-  const existingMachineNames = new Set(Object.keys(existingComponents));
+  const remoteNames = new Set(Object.keys(existingComponents));
 
-  return machineNames.map((machineName) => {
+  const tasks: ComponentUploadTask[] = [];
+  for (const [machineName, { componentPayload }] of preparedByName.entries()) {
     onProgress();
-    return {
-      machineName,
-      exists: existingMachineNames.has(machineName),
-    };
-  });
+    if (remoteNames.has(machineName)) {
+      tasks.push({ machineName, operation: 'update', componentPayload });
+    } else {
+      tasks.push({ machineName, operation: 'create', componentPayload });
+    }
+  }
+
+  for (const name of remoteNames) {
+    if (!preparedByName.has(name)) {
+      tasks.push({ machineName: name, operation: 'delete' });
+    }
+  }
+
+  return tasks;
 }
 
 /**
- * Upload (create or update) multiple components concurrently.
+ * Upload (create, update, or delete) multiple components concurrently.
  */
-export async function uploadComponents<T>(
-  uploadTasks: Array<{
-    machineName: string;
-    componentPayload: T;
-    shouldUpdate: boolean;
-  }>,
-  apiService: {
-    createComponent: (payload: T, raw?: boolean) => Promise<unknown>;
-    updateComponent: (name: string, payload: T) => Promise<unknown>;
-  },
-  onProgress?: () => void,
+export async function uploadComponents(
+  uploadTasks: ComponentUploadTask[],
+  apiService: Pick<
+    ApiService,
+    'createComponent' | 'updateComponent' | 'deleteComponent'
+  >,
+  onProgress: () => void,
 ): Promise<ComponentUploadResult[]> {
   const results = await processInPool(uploadTasks, async (task) => {
-    try {
-      if (task.shouldUpdate) {
-        await apiService.updateComponent(
-          task.machineName,
-          task.componentPayload,
-        );
-      } else {
-        await apiService.createComponent(task.componentPayload, true);
-      }
-      onProgress?.();
-      return {
-        machineName: task.machineName,
-        success: true,
-        operation: task.shouldUpdate
-          ? ('update' as const)
-          : ('create' as const),
-      };
-    } catch {
-      try {
-        if (task.shouldUpdate) {
-          await apiService.updateComponent(
+    const execute = (raw: boolean) => {
+      switch (task.operation) {
+        case 'create':
+          return apiService.createComponent(task.componentPayload, raw);
+        case 'update':
+          return apiService.updateComponent(
             task.machineName,
             task.componentPayload,
           );
-        } else {
-          await apiService.createComponent(task.componentPayload);
-        }
-        onProgress?.();
-        return {
-          machineName: task.machineName,
-          success: true,
-          operation: task.shouldUpdate
-            ? ('update' as const)
-            : ('create' as const),
-        };
+        case 'delete':
+          return apiService.deleteComponent(task.machineName);
+      }
+    };
+
+    let error: Error | undefined;
+    try {
+      await execute(true);
+    } catch {
+      try {
+        await execute(false);
       } catch (fallbackError) {
-        onProgress?.();
-        return {
-          machineName: task.machineName,
-          success: false,
-          operation: task.shouldUpdate
-            ? ('update' as const)
-            : ('create' as const),
-          error:
-            fallbackError instanceof Error
-              ? fallbackError
-              : new Error(String(fallbackError)),
-        };
+        error =
+          fallbackError instanceof Error
+            ? fallbackError
+            : new Error(String(fallbackError));
       }
     }
+
+    onProgress();
+    return {
+      machineName: task.machineName,
+      success: !error,
+      operation: task.operation,
+      error,
+    };
   });
 
   return results.map((result) => {
@@ -134,9 +135,9 @@ export async function uploadComponents<T>(
       return result.result;
     }
     return {
-      machineName: uploadTasks[result.index]?.machineName || 'unknown',
+      machineName: uploadTasks[result.index].machineName,
       success: false,
-      operation: uploadTasks[result.index]?.shouldUpdate ? 'update' : 'create',
+      operation: uploadTasks[result.index].operation,
       error: result.error || new Error('Unknown error during upload'),
     };
   });
@@ -237,12 +238,12 @@ export async function buildAndPushComponents(
   const failedBuilds = buildResults.filter((build) => !build.success);
 
   if (failedBuilds.length > 0) {
-    const failedComponents = failedBuilds
-      .map((result) => result.itemName || 'unknown')
-      .join(', ');
-    throw new Error(
-      `Component build failed for ${failedBuilds.length} ${pluralizeComponent(failedBuilds.length)}: ${failedComponents}`,
+    spinner.stop(
+      chalk.red(
+        `Build failed for ${failedBuilds.length} ${pluralizeComponent(failedBuilds.length)}.`,
+      ),
     );
+    return buildResults;
   }
 
   if (successfulBuilds.length === 0) {
@@ -255,42 +256,32 @@ export async function buildAndPushComponents(
     await prepareComponentsForUpload(successfulBuilds, componentsToUpload);
 
   if (preparationFailures.length > 0) {
-    const failedPreparations = preparationFailures
-      .map((result) => {
-        const name = result.itemName || 'unknown';
-        const message =
-          result.details?.[0]?.content || 'Unknown preparation error';
-        return `${name} (${message})`;
-      })
-      .join(', ');
-    throw new Error(
-      `Component preparation failed for ${preparationFailures.length} ${pluralizeComponent(preparationFailures.length)}: ${failedPreparations}`,
+    spinner.stop(
+      chalk.red(
+        `Preparation failed for ${preparationFailures.length} ${pluralizeComponent(preparationFailures.length)}.`,
+      ),
     );
+    return [...successfulBuilds, ...preparationFailures];
   }
 
   if (prepared.length === 0) {
-    throw new Error('No components were prepared for upload.');
+    spinner.stop(chalk.red('No components were prepared for upload.'));
+    return [...successfulBuilds, ...preparationFailures];
   }
 
-  const machineNames = prepared.map((c) => c.machineName);
+  const preparedByName = new Map(prepared.map((c) => [c.machineName, c]));
   const existenceProgress = createProgressCallback(
     spinner,
     'Checking component existence',
-    machineNames.length,
+    preparedByName.size,
   );
 
-  spinner.message('Checking component existence');
-  const existenceResults = await checkComponentsExist(
-    machineNames,
+  spinner.message('Checking component operations');
+  const uploadTasks = await buildComponentUploadTasks(
+    preparedByName,
     apiService,
     existenceProgress,
   );
-
-  const uploadTasks = prepared.map((component, index) => ({
-    machineName: component.machineName,
-    componentPayload: component.componentPayload,
-    shouldUpdate: existenceResults[index]?.exists || false,
-  }));
 
   const uploadProgress = createProgressCallback(
     spinner,
@@ -324,16 +315,22 @@ export async function buildAndPushComponents(
     );
   }
 
-  for (let i = 0; i < prepared.length; i++) {
-    const component = prepared[i];
+  const operationLabels: Record<ComponentOperation, string> = {
+    create: 'Created',
+    update: chalk.cyan('Updated'),
+    delete: chalk.dim('Deleted'),
+  };
+  for (let i = 0; i < uploadResults.length; i++) {
     const uploadResult = uploadResults[i];
 
     results.push({
-      itemName: component.componentName,
-      success: true,
+      itemName: prepared[i]?.componentName ?? uploadResult.machineName,
+      success: uploadResult.success,
       details: [
         {
-          content: uploadResult.operation === 'update' ? 'Updated' : 'Created',
+          content: uploadResult.success
+            ? operationLabels[uploadResult.operation]
+            : uploadResult.error?.message?.trim() || 'Unknown upload error',
         },
       ],
     });
@@ -349,24 +346,21 @@ export async function buildAndPushComponents(
 
 /**
  * Upload the global asset library (CSS/JS) to Drupal.
- *
- * Shared by both the push and upload commands.
  */
 export async function uploadGlobalAssetLibrary(
   apiService: ApiService,
-  componentDir: string,
+  outputDir: string,
 ): Promise<Result> {
   try {
-    const distDir = path.join(componentDir, 'dist');
-    const globalCompiledCssPath = path.join(distDir, 'index.css');
+    const globalCompiledCssPath = path.join(outputDir, 'index.css');
     const globalCompiledCssExists = await fileExists(globalCompiledCssPath);
     if (globalCompiledCssExists) {
       const globalCompiledCss = await fs.readFile(
-        path.join(distDir, 'index.css'),
+        path.join(outputDir, 'index.css'),
         'utf-8',
       );
       const classNameCandidateIndexFile = await fs.readFile(
-        path.join(distDir, 'index.js'),
+        path.join(outputDir, 'index.js'),
         'utf-8',
       );
       const originalCss = await getGlobalCss();
