@@ -253,7 +253,7 @@ final class StaticPropSource extends PropSourceBase {
   }
 
   /**
-   * Returns a copy of this prop source with empty field items removed.
+   * Determines if this prop source is empty.
    *
    * Uses the field type's own isEmpty() logic (via filterEmptyItems()) to
    * determine which items to drop, rather than a PHP-level falsy check. This
@@ -263,27 +263,14 @@ final class StaticPropSource extends PropSourceBase {
    * Intended for multiple-cardinality prop sources that arrive in a
    * "mid-input" state during preview/auto-save, where the user may have left
    * some entries blank while still filling in others.
-   */
-  public function withoutEmptyItems(): static {
-    $field_item_list = clone $this->fieldItemList;
-    $field_item_list->filterEmptyItems();
-    return new StaticPropSource(
-      $field_item_list,
-      $this->expression,
-      $this->cardinality,
-      $this->fieldStorageSettings,
-      $this->fieldInstanceSettings,
-    );
-  }
-
-  /**
-   * Determines if this prop source is empty.
    *
    * @return bool
    *   If the prop is empty.
    */
   public function isEmpty(): bool {
-    return $this->withoutEmptyItems()->fieldItemList->isEmpty();
+    $filtered = clone $this->fieldItemList;
+    $filtered->filterEmptyItems();
+    return $filtered->isEmpty();
   }
 
   /**
