@@ -2,7 +2,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 
-import { syncPropSourcesToResolvedValues } from '@/components/form/InputBehaviorsComponentPropsForm';
+import { syncPropSourcesToResolvedValues } from '@/components/form/formUtil';
 import { selectEditorFrameContext } from '@/features/ui/uiSlice';
 import { previewApi } from '@/services/preview';
 import { hasSlotDefinitions, isPropSourceComponent } from '@/types/Component';

@@ -1,0 +1,22 @@
+name: Canvas Test Templates in Cypress
+type: module
+description: 'Provides test setup for Canvas template testing, converted from template_basic_setup recipe'
+package: Testing
+version: VERSION
+core_version_requirement: ^10 || ^11
+
+dependencies:
+  - drupal:node
+  - drupal:field
+  - drupal:file
+  - drupal:image
+  - drupal:media
+  - drupal:taxonomy
+  - drupal:datetime
+  - drupal:link
+  - drupal:options
+  - drupal:filter
+  - canvas:canvas_test_linkable_props
+
+# Test module - not for production use
+hidden: true

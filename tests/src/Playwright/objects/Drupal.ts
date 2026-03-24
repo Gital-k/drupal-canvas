@@ -356,7 +356,7 @@ export class Drupal {
     // @todo select the item we just uploaded rather than the first.
     await this.page
       .locator(
-        '.media-library-widget-modal input[data-drupal-selector^="edit-media-library-select-form"]',
+        '.media-library-widget-modal input[data-drupal-selector^="edit-media-library-select-form"][type="checkbox"]',
       )
       .first()
       .setChecked(true, { force: true });
@@ -393,7 +393,7 @@ export class Drupal {
     // @todo select the item we just uploaded rather than the first.
     await this.page
       .locator(
-        '.media-library-widget-modal input[data-drupal-selector^="edit-media-library-select-form"]',
+        '.media-library-widget-modal input[data-drupal-selector^="edit-media-library-select-form"][type="checkbox"]',
       )
       .first()
       .setChecked(true, { force: true });

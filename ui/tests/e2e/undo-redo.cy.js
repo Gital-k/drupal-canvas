@@ -26,12 +26,10 @@ describe('Undo/Redo functionality', () => {
         expect(myHeroComponent.length).to.equal(3);
       },
     );
-    cy.intercept('POST', '**/canvas/api/v0/layout/node/1').as('getPreview');
     cy.insertComponent({ name: 'Two Column' });
 
     // Click on the menu item with data-canvas-name="Hero" inside menu.
     cy.insertComponent({ name: 'Hero' });
-    cy.wait('@getPreview');
 
     cy.getIframeBody().find(
       '[data-component-id="canvas_test_sdc:my-hero"]',
@@ -41,7 +39,6 @@ describe('Undo/Redo functionality', () => {
     );
     // Undo
     cy.realPress(['Meta', 'Z']);
-    cy.wait('@getPreview');
 
     // Assert that the component was deleted from the layout.
     cy.getIframeBody().find(
@@ -53,7 +50,6 @@ describe('Undo/Redo functionality', () => {
 
     // Redo.
     cy.realPress(['Meta', 'Shift', 'Z']);
-    cy.wait('@getPreview');
 
     // Assert that the component was again added to the layout.
     cy.getIframeBody().find(

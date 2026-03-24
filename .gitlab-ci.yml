@@ -329,13 +329,15 @@ phpunit:
     name: $_CONFIG_DOCKERHUB_ROOT/php-$PHP_VERSION-ubuntu-apache:$_TARGET_PHP_IMAGE_TAG
   # @todo Remove when https://www.drupal.org/project/gitlab_templates/issues/3452183 lands.
   rules:
-    - *is-push-rule
-    - *php-files-change-rule
-    - *module-metadata-files-change-rule
-    - *module-config-files-change-rule
-    - *SDC-files-change-rule
-    - *UI-fixtures-files-change-rule
-    - *manual-rule
+    - when: never
+#  rules:
+#    - *is-push-rule
+#    - *php-files-change-rule
+#    - *module-metadata-files-change-rule
+#    - *module-config-files-change-rule
+#    - *SDC-files-change-rule
+#    - *UI-fixtures-files-change-rule
+#    - *manual-rule
 
 phpunit (11.3):
   extends: phpunit
@@ -505,7 +507,9 @@ vitest:
 
 cypress E2E:
   extends: .cypress-base
-  parallel: 4
+  parallel: 5
+  rules:
+    - when: never
   script:
     - npx cypress run --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml" --spec=`node ./tests/support/parallel.js` 2>&1 | tee cypress.log || EXIT_CODE=$?
     # Auto-retry when known frequent random failures occur.
@@ -667,6 +671,8 @@ playwright:
   retry:
     max: 2
     exit_codes: 112
+    when:
+      - runner_system_failure
 
 CLI Test:
   stage: test

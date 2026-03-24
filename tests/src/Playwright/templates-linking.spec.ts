@@ -189,6 +189,7 @@ test.describe.serial('Linking Basic Page fields ', () => {
       const page = await browser.newPage();
       const drupal: Drupal = new Drupal({ page, drupalSite });
       await drupal.setupCanvasTestSite();
+      await drupal.drush('theme:enable canvas_stark');
       const moduleDir = await getModuleDir();
       await drupal.applyRecipe(
         `${moduleDir}/canvas/tests/fixtures/recipes/template_basic_setup`,

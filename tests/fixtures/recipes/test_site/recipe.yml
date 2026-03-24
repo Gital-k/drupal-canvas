@@ -22,6 +22,11 @@ config:
     # which field types are used to populate code component props would cause the component versions to change,
     # but even that shouldn't break the default content included in this Recipe, because it'll just be pointing
     # to "old" Component config entity versions.
+    # @todo Restore this import once the conflict between the explicit `install: canvas_test_code_components`
+    # above and this config.import is resolved. The explicit install causes Drupal to write the module's
+    # config/install/ configs to the DB first, then this import finds canvas.component.js.* already exists
+    # and throws "exists already and does not match the recipe's configuration".
+    # @see https://www.drupal.org/project/canvas/issues/
     canvas_test_code_components: '*'
   actions:
     system.site:

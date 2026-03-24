@@ -13,6 +13,8 @@ test.describe('Video Component', () => {
     async ({ browser, drupalSite }) => {
       const page = await browser.newPage();
       const drupal: Drupal = new Drupal({ page, drupalSite });
+      await drupal.drush('theme:enable claro');
+      await drupal.drush('config:set system.theme admin claro');
       await drupal.installModules(['canvas']);
       await page.close();
     },

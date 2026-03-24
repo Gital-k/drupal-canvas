@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import {
   DndContext,
@@ -61,6 +62,32 @@ const App: React.FC = () => {
     },
   });
   const sensors = useSensors(pointerSensor);
+
+  useEffect(() => {
+    // At the body level, add handling for inputs within tabledrag that
+    // immediately mark a layout request in progress. By default, the
+    // in progress status does not change until after the input debounce.
+
+    const handleInput = (e: Event) => {
+      if (
+        e.target &&
+        (e.target as HTMLElement).tagName === 'INPUT' &&
+        (e.target as HTMLElement).closest('[data-canvas-tabledrag="true"]')
+      ) {
+        document.body.setAttribute(
+          'data-canvas-layout-request-in-progress',
+          'true',
+        );
+      }
+    };
+
+    document.body.addEventListener('input', handleInput);
+
+    return () => {
+      document.body.removeEventListener('input', handleInput);
+    };
+  }, []);
+
   return (
     <div className="canvas-app">
       <div className={styles.canvasCalloutContainer}>
