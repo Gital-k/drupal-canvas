@@ -1,0 +1,50 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Drupal\canvas;
+
+use Drupal\Core\Entity\ContentEntityTypeInterface;
+use Drupal\Core\Entity\EntityTypeInterface;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
+
+/**
+ * Provides information about content entity types eligible for Canvas templates.
+ */
+final readonly class ContentTemplateRepository {
+
+  public function __construct(
+    private EntityTypeManagerInterface $entityTypeManager,
+  ) {}
+
+  /**
+   * Returns whether an entity type supports content templates.
+   *
+   * @param \Drupal\Core\Entity\EntityTypeInterface $entity_type
+   *   The entity type to check.
+   *
+   * @return bool
+   *   TRUE if the entity type supports content templates.
+   *
+   * @todo Handle content entity types powered by base fields only (no
+   *   configurable fields via Field UI). Follow-up issue needed.
+   */
+  public function isSupportedEntityType(EntityTypeInterface $entity_type): bool {
+    return $entity_type instanceof ContentEntityTypeInterface && (bool) $entity_type->get('field_ui_base_route');
+  }
+
+  /**
+   * Returns entity type IDs that support content templates.
+   *
+   * @return string[]
+   *   An array of entity type IDs.
+   */
+  public function getSupportedEntityTypeIds(): array {
+    $definitions = array_filter(
+      $this->entityTypeManager->getDefinitions(),
+      fn($entity_type): bool => $this->isSupportedEntityType($entity_type),
+    );
+    return \array_keys($definitions);
+  }
+
+}

@@ -8,6 +8,7 @@ use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\TestWith;
 use Drupal\canvas\PropSource\PropSource;
+use Drupal\Core\Entity\Entity\EntityViewMode;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Url;
 use Drupal\canvas\Entity\ContentTemplate;
@@ -1161,7 +1162,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
     ], $json);
 
     // 6. Register a custom view mode for entity_test to verify multi-entity-type support.
-    \Drupal\Core\Entity\Entity\EntityViewMode::create([
+    EntityViewMode::create([
       'id' => 'entity_test.test_view_mode',
       'label' => 'Test view mode',
       'targetEntityType' => 'entity_test',
@@ -1179,6 +1180,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
     );
 
     // entity_test now appears in the response with the new view mode.
+    self::assertIsArray($json);
     self::assertArrayHasKey('entity_test', $json);
     self::assertEquals([
       'entity_test' => [
@@ -1208,6 +1210,7 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
       expected_page_cache: 'UNCACHEABLE (request policy)',
       expected_dynamic_page_cache: 'UNCACHEABLE (no cacheability)',
     );
+    self::assertIsArray($json);
     self::assertEquals([
       'entity_test' => [
         'test_view_mode' => [

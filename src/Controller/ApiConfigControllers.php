@@ -26,7 +26,7 @@ use Drupal\Core\Url;
 use Drupal\canvas\AssetRenderer;
 use Drupal\canvas\ClientSideRepresentation;
 use Drupal\canvas\Entity\CanvasHttpApiEligibleConfigEntityInterface;
-use Drupal\canvas\EntityHandlers\ContentTemplateAwareViewBuilder;
+use Drupal\canvas\ContentTemplateRepository;
 use Drupal\canvas\EntityHandlers\VisibleWhenDisabledCanvasConfigEntityAccessControlHandler;
 use Drupal\canvas\Exception\ConstraintViolationException;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
@@ -59,6 +59,7 @@ final class ApiConfigControllers extends ApiControllerBase {
     private readonly AccessManagerInterface $accessManager,
     private readonly AccountProxyInterface $currentUser,
     private readonly ComponentSourceManager $componentSourceManager,
+    private readonly ContentTemplateRepository $contentTemplateRepository,
   ) {}
 
   /**
@@ -160,7 +161,7 @@ final class ApiConfigControllers extends ApiControllerBase {
     // @phpstan-ignore-next-line argument.type
     $flat_json = json_decode($response->getContent(), TRUE);
 
-    $supported_entity_type_ids = ContentTemplateAwareViewBuilder::getSupportedEntityTypeIds();
+    $supported_entity_type_ids = $this->contentTemplateRepository->getSupportedEntityTypeIds();
     $individual_bundle_entity_cache_tag_prefixes_to_ignore = [];
 
     // 1. Create the hierarchy:

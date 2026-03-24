@@ -6,7 +6,6 @@ namespace Drupal\canvas\EntityHandlers;
 
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Cache\CacheableMetadata;
-use Drupal\Core\Entity\ContentEntityTypeInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
@@ -44,20 +43,6 @@ final class ContentTemplateAwareViewBuilder extends EntityViewBuilder {
   private RouteMatchInterface $routeMatch;
 
   private AutoSaveManager $autoSaveManager;
-
-  /**
-   * Returns entity type IDs of content entity types with a field UI base route.
-   *
-   * @return string[]
-   *   An array of entity type IDs.
-   */
-  public static function getSupportedEntityTypeIds(): array {
-    $definitions = array_filter(
-      \Drupal::entityTypeManager()->getDefinitions(),
-      fn ($entity_type): bool => $entity_type instanceof ContentEntityTypeInterface && $entity_type->get('field_ui_base_route'),
-    );
-    return array_keys($definitions);
-  }
 
   /**
    * {@inheritdoc}

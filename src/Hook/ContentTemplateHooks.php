@@ -13,11 +13,11 @@ use Drupal\Core\Entity\EntityFieldManagerInterface;
 use Drupal\Core\Entity\EntityPublishedInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
-use Drupal\Core\Entity\ContentEntityTypeInterface;
 use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\canvas\Entity\Page;
+use Drupal\canvas\ContentTemplateRepository;
 use Drupal\canvas\EntityHandlers\ContentTemplateAwareViewBuilder;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\Core\Url;
@@ -32,6 +32,7 @@ final class ContentTemplateHooks {
     private readonly RouteMatchInterface $routeMatch,
     private readonly EntityTypeManagerInterface $entityTypeManager,
     private readonly EntityFieldManagerInterface $entityFieldManager,
+    private readonly ContentTemplateRepository $contentTemplateRepository,
   ) {
   }
 
@@ -87,9 +88,7 @@ final class ContentTemplateHooks {
       // type + view mode, the original template will NOT be used anymore:
       // - not the view mode-specific one, such as `node--teaser.html.twig`
       // - not the generic one, such as `node.html.twig`
-      // Only entity types with `field_ui_base_route` are eligible for Canvas
-      // content templates. This is the same criterion Field UI uses for its UIs.
-      if ($entity_type instanceof ContentEntityTypeInterface && $entity_type->get('field_ui_base_route')) {
+      if ($this->contentTemplateRepository->isSupportedEntityType($entity_type)) {
         // @see \Drupal\canvas\EntityHandlers\ContentTemplateAwareViewBuilder::createInstance()
         $entity_type->setHandlerClass(ContentTemplateAwareViewBuilder::DECORATED_HANDLER_KEY, $entity_type->getViewBuilderClass())
           ->setViewBuilderClass(ContentTemplateAwareViewBuilder::class);
@@ -120,7 +119,7 @@ final class ContentTemplateHooks {
     // Also apply to the main "Manage display" pages for any supported entity
     // type so tabs update correctly when templates are created/deleted.
     $is_entity_view_display_route = FALSE;
-    foreach (ContentTemplateAwareViewBuilder::getSupportedEntityTypeIds() as $entity_type_id) {
+    foreach ($this->contentTemplateRepository->getSupportedEntityTypeIds() as $entity_type_id) {
       if (\str_starts_with($route_name, "entity.entity_view_display.$entity_type_id.")) {
         $is_entity_view_display_route = TRUE;
         break;

@@ -13,7 +13,7 @@ use Drupal\Core\Entity\EntityTypeBundleInfoInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\TypedData\EntityDataDefinition;
 use Drupal\canvas\Entity\Component;
-use Drupal\canvas\EntityHandlers\ContentTemplateAwareViewBuilder;
+use Drupal\canvas\ContentTemplateRepository;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase;
 use Drupal\canvas\ShapeMatcher\PropSourceSuggester;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -37,6 +37,7 @@ final class ApiUiContentTemplateControllers extends ApiControllerBase {
     private readonly PropSourceSuggester $propSourceSuggester,
     private readonly EntityTypeBundleInfoInterface $bundleInfo,
     private readonly EntityDisplayRepositoryInterface $entityDisplayRepository,
+    private readonly ContentTemplateRepository $contentTemplateRepository,
   ) {}
 
   /**
@@ -137,7 +138,7 @@ final class ApiUiContentTemplateControllers extends ApiControllerBase {
   public function listViewModes(): JsonResponse {
     $data = [];
 
-    foreach (ContentTemplateAwareViewBuilder::getSupportedEntityTypeIds() as $entity_type_id) {
+    foreach ($this->contentTemplateRepository->getSupportedEntityTypeIds() as $entity_type_id) {
       $entity_view_modes = $this->entityDisplayRepository->getViewModeOptions($entity_type_id);
 
       foreach ($entity_view_modes as $view_mode => $view_mode_label) {

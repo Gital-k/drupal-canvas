@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Drupal\canvas\Hook;
 
 use Drupal\canvas\Entity\ContentTemplate;
-use Drupal\canvas\EntityHandlers\ContentTemplateAwareViewBuilder;
+use Drupal\canvas\ContentTemplateRepository;
 use Drupal\Core\Entity\Display\EntityDisplayInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Form\FormStateInterface;
@@ -28,6 +28,7 @@ final class FieldUiHooks {
     private readonly MessengerInterface $messenger,
     private readonly EntityTypeManagerInterface $entityTypeManager,
     TranslationInterface $string_translation,
+    private readonly ContentTemplateRepository $contentTemplateRepository,
   ) {
     $this->setStringTranslation($string_translation);
   }
@@ -59,8 +60,11 @@ final class FieldUiHooks {
     // Show the CTA on entity_view_display routes for any entity type that
     // supports Canvas content templates (i.e. has a field_ui_base_route).
     $route_name = $this->routeMatch->getRouteName();
+    if ($route_name === NULL) {
+      return;
+    }
     $is_supported_route = FALSE;
-    foreach (ContentTemplateAwareViewBuilder::getSupportedEntityTypeIds() as $entity_type_id) {
+    foreach ($this->contentTemplateRepository->getSupportedEntityTypeIds() as $entity_type_id) {
       if (\str_starts_with($route_name, "entity.entity_view_display.$entity_type_id.")) {
         $is_supported_route = TRUE;
         break;
