@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { ArrowRightIcon, Cross2Icon, TrashIcon } from '@radix-ui/react-icons';
 import { Box, Button, Flex, Popover, Text } from '@radix-ui/themes';
@@ -10,9 +10,6 @@ import { a2p } from '@/local_packages/utils';
 
 import {
   copyInputAttributes,
-  isRemoveButtonEnabled,
-  triggerDrupalRemoveButton,
-  updateInputValue,
 } from './multivalueFormUtils';
 
 import type { NumericInputAttributes } from '@/types/DrupalAttribute';
@@ -55,6 +52,9 @@ const DrupalInputMultivalueForm = ({
   const triggerRowRef = useRef<HTMLDivElement | null>(null);
   // Controlled popover state so we can close it programmatically on remove.
   const [popoverOpen, setPopoverOpen] = useState(false);
+  // Set immediately on click to give instant visual
+  // feedback (row disappears) before the AJAX round-trip completes.
+  const [isRemoving, setIsRemoving] = useState(false);
   const fieldLabel = attributes['data-field-label'] || '';
   // Ref for the popover trigger to restore focus after closing.
   const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -83,6 +83,16 @@ const DrupalInputMultivalueForm = ({
     setDisplayValue(newValue);
     setTempValue(newValue);
   }, [attributes.value, attributes.defaultValue]);
+
+  // Hide the parent <tr> immediately when isRemoving is
+  // set, so the row disappears on click without waiting for the AJAX response.
+  useEffect(() => {
+    if (!isRemoving) return;
+    const tableRow = triggerRowRef.current?.closest('tr');
+    if (tableRow) {
+      (tableRow as HTMLElement).style.display = 'none';
+    }
+  }, [isRemoving]);
 
   // Commit a value directly — used by the autocomplete selection handler so
   // the table row updates immediately.
@@ -114,13 +124,17 @@ const DrupalInputMultivalueForm = ({
       autocompleteCleanupRef.current = null;
     }
   }, [popoverOpen]);
+
   // Handle temporary input changes in popover (not committed until Enter).
-  const handleTempInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setTempValue(e.target.value);
-  };
+  const handleTempInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setTempValue(e.target.value);
+    },
+    [],
+  );
 
   // Commit the temporary value to the actual input and display.
-  const handleCommitValue = () => {
+  const handleCommitValue = useCallback(() => {
     // Validate the input using the popover input element's HTML5 validation.
     if (popoverInputRef.current) {
       // Check if the input is valid according to its constraints
@@ -133,53 +147,56 @@ const DrupalInputMultivalueForm = ({
     }
 
     commitValue(tempValue);
-  };
+  }, [commitValue, tempValue]);
 
   // Handle Enter key press in popover input.
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      // If a jQuery UI autocomplete suggestion was just selected synchronously
-      // (before this React event handler ran via event delegation), do NOT
-      // commit the stale tempValue. The data-canvas-autocomplete-selected
-      // handler already committed the correct suggestion value.
-      if (autocompleteJustSelectedRef.current) {
-        autocompleteJustSelectedRef.current = false;
-        return;
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Enter') {
+        // If a jQuery UI autocomplete suggestion was just selected synchronously
+        // (before this React event handler ran via event delegation), do NOT
+        // commit the stale tempValue. The data-canvas-autocomplete-selected
+        // handler already committed the correct suggestion value.
+        if (autocompleteJustSelectedRef.current) {
+          autocompleteJustSelectedRef.current = false;
+          return;
+        }
+
+        // If a jQuery UI autocomplete dropdown is currently open, do NOT
+        // intercept Enter — let jQuery UI process the selection so that
+        // the autocomplete select event fires. The data-canvas-autocomplete-selected
+        // listener will then commit the correct suggestion value and close the popover.
+        const inputElement =
+          popoverInputRef.current || (e.target as HTMLInputElement);
+        const $jq =
+          typeof window !== 'undefined' && (window as any).jQuery
+            ? (window as any).jQuery
+            : null;
+        const isAutocompleteOpen =
+          $jq &&
+          $jq(inputElement)
+            .data('ui-autocomplete')
+            ?.menu?.element?.is?.(':visible');
+
+        if (isAutocompleteOpen) {
+          return;
+        }
+
+        e.preventDefault();
+
+        // Validate the input before committing
+        if (inputElement && !inputElement.checkValidity()) {
+          // Show validation error and keep popover open
+          inputElement.reportValidity();
+          return;
+        }
+
+        handleCommitValue();
+        setPopoverOpen(false);
       }
-
-      // If a jQuery UI autocomplete dropdown is currently open, do NOT
-      // intercept Enter — let jQuery UI process the selection so that
-      // the auto complete select event fires. The data-canvas-autocomplete-selected
-      // listener will then commit the correct suggestion value and close the popover.
-      const inputElement =
-        popoverInputRef.current || (e.target as HTMLInputElement);
-      const $jq =
-        typeof window !== 'undefined' && (window as any).jQuery
-          ? (window as any).jQuery
-          : null;
-      const isAutocompleteOpen =
-        $jq &&
-        $jq(inputElement)
-          .data('ui-autocomplete')
-          ?.menu?.element?.is?.(':visible');
-
-      if (isAutocompleteOpen) {
-        return;
-      }
-
-      e.preventDefault();
-
-      // Validate the input before committing
-      if (inputElement && !inputElement.checkValidity()) {
-        // Show validation error and keep popover open
-        inputElement.reportValidity();
-        return;
-      }
-
-      handleCommitValue();
-      setPopoverOpen(false);
-    }
-  };
+    },
+    [handleCommitValue],
+  );
 
   // Handle popover open/close - reset tempValue when opening,
   // revert when closing without commit.
@@ -234,14 +251,87 @@ const DrupalInputMultivalueForm = ({
     setPopoverOpen(open);
   };
 
-  const handleRemove = () => {
-    // Close the popover first so the portal is cleaned up before AJAX replaces the DOM.
-    setPopoverOpen(false);
+  // Determine if the remove button should be enabled.
+  const removeButtonEnabled = useMemo(() => {
+    if (!popoverOpen) return false;
+    const tableRow = triggerRowRef.current?.closest('tr');
+    const removeActionCell = tableRow?.querySelector('.canvas-remove-action');
 
+    // Look for the Drupal remove button. Drupal adds these buttons to all rows
+    // in unlimited cardinality fields.
+    const removeButton = removeActionCell?.querySelector(
+      'input[type="submit"][name*="remove_button"]',
+    ) as HTMLInputElement | null;
+
+    // Check if button exists and is not disabled
+    if (!removeButton || removeButton.disabled) {
+      return false;
+    }
+
+    // Get the field wrapper that contains row count and required status
+    // These are set by canvas_stark_preprocess_field_multiple_value_form
+    const fieldWrapperRowCount = tableRow?.closest('[data-canvas-row-count]');
+    if (!fieldWrapperRowCount) {
+      return true;
+    }
+
+    const rowCount = parseInt(
+      fieldWrapperRowCount.getAttribute('data-canvas-row-count') || '0',
+      10,
+    );
+    // Check if the field is required by looking for .form-required class
+    // This class is added by Drupal to the label or field wrapper
+    if (tableRow) {
+      const table = tableRow.closest('table');
+      const fieldWrapper = table?.closest('.js-form-wrapper, .form-item');
+      const isRequired =
+        fieldWrapper?.querySelector('.form-required, .js-form-required') !==
+        null;
+
+      // Disable remove button if required field with only one item
+      if (isRequired && rowCount === 1) {
+        return false;
+      }
+    }
+
+    return true;
+  }, [popoverOpen]);
+
+  const handleRemove = () => {
     if (!triggerRowRef.current) return;
 
-    // Try to trigger the Drupal remove button.
-    if (triggerDrupalRemoveButton(triggerRowRef.current)) {
+    // Locate the Drupal remove button FIRST — before any state updates trigger
+    // a React re-render that could unmount/move DOM nodes.
+    const tableRow = triggerRowRef.current.closest('tr');
+    if (!tableRow) return;
+
+    // Find the original Drupal remove button directly (the hidden input/button
+    // that carries the AJAX behavior). The cell and button are hidden by
+    // CSS but remain in the DOM.
+    const removeActionCell = tableRow.querySelector('.canvas-remove-action');
+    const removeButton = removeActionCell?.querySelector(
+      'input[type="submit"][name*="remove_button"]',
+    ) as HTMLElement | null;
+
+    // Give immediate visual feedback by hiding this row right now. The AJAX
+    // response will then replace the entire wrapper.
+    setIsRemoving(true);
+
+    // Close the popover so the portal is cleaned up before AJAX replaces the
+    // DOM.
+    setPopoverOpen(false);
+
+    if (removeButton) {
+      // Dispatch mousedown first (some Drupal AJAX handlers listen for it),
+      // then click — mirroring what Drupal's AJAX system expects.
+      removeButton.dispatchEvent(
+        new MouseEvent('mousedown', {
+          bubbles: true,
+          cancelable: true,
+          view: window,
+        }),
+      );
+      removeButton.click();
       return;
     }
 
@@ -250,7 +340,14 @@ const DrupalInputMultivalueForm = ({
     const inputElement = inputWrapperRef.current.querySelector(
       'input',
     ) as HTMLInputElement | null;
-    updateInputValue(inputElement, '');
+    if (inputElement) {
+      const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        'value',
+      )?.set;
+      nativeInputValueSetter?.call(inputElement, '');
+      inputElement.dispatchEvent(new Event('input', { bubbles: true }));
+    }
   };
 
   return (
@@ -364,7 +461,7 @@ const DrupalInputMultivalueForm = ({
               color="red"
               size="1"
               onClick={handleRemove}
-              disabled={!isRemoveButtonEnabled(triggerRowRef.current)}
+              disabled={!removeButtonEnabled}
             >
               <TrashIcon />
               Remove
@@ -377,3 +474,4 @@ const DrupalInputMultivalueForm = ({
 };
 
 export default DrupalInputMultivalueForm;
+

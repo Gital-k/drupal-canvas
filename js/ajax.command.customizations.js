@@ -596,6 +596,56 @@
       { once: true }
     );
   }
+
+  // When the "+ Add new" button is clicked, immediately insert a skeleton
+  // placeholder row so the user sees instant feedback while the AJAX
+  // round-trip completes.
+  const originalBeforeSend = Drupal.Ajax.prototype.beforeSend;
+  Drupal.Ajax.prototype.beforeSend = function (xmlhttprequest, options) {
+    const el = this.element;
+    if (
+      el &&
+      el.name &&
+      el.name.endsWith('_add_more') &&
+      el.closest('[data-canvas-multiple-values]')
+    ) {
+      const outerWrapper = el.closest('[data-canvas-multiple-values]');
+      const tbody = outerWrapper && outerWrapper.querySelector('table.field-multiple-table tbody');
+      if (tbody) {
+        // Clone the last real row so the skeleton matches the exact column
+        // widths, classes, and padding already in the table.
+        const lastRow = tbody.querySelector('tr.draggable:last-child');
+        if (lastRow) {
+          const skeleton = lastRow.cloneNode(true);
+          skeleton.setAttribute('data-canvas-optimistic', 'add');
+          skeleton.querySelectorAll('input').forEach(function(input) {
+            input.value = '';
+            input.checked = false;
+          });
+
+          // Replace the content of the input cell (2nd td) with a shimmer.
+          // The input cell is the one that contains the custom element / text.
+          const inputCell = skeleton.querySelector('td:nth-child(2)');
+          if (inputCell) {
+            inputCell.innerHTML = '';
+            const shimmer = document.createElement('div');
+            shimmer.className = 'canvas-skeleton-shimmer';
+            inputCell.appendChild(shimmer);
+          }
+
+          // Empty the actions cell so no stale remove button is cloned.
+          const actionsCell = skeleton.querySelector('.canvas-remove-action');
+          if (actionsCell) {
+            actionsCell.innerHTML = '';
+          }
+
+          tbody.appendChild(skeleton);
+        }
+      }
+    }
+    return originalBeforeSend.apply(this, arguments);
+  };
+
   const originalInsert = Drupal.AjaxCommands.prototype.insert;
 
   Drupal.AjaxCommands.prototype.insert = function (...args) {
