@@ -15,16 +15,16 @@ import {
   useGetContentTemplatesQuery,
 } from '@/services/componentAndLayout';
 
-type TemplateListProps = {
-  entityTypeId: string;
-};
-
 import type {
   TemplateInBundle,
   TemplateViewMode,
 } from '@/services/componentAndLayout';
 
 import nodeStyles from '@/components/sidePanel/SidebarNode.module.css';
+
+type TemplateListProps = {
+  entityTypeId: string;
+};
 
 type BundleListItemProps = {
   bundle: TemplateInBundle;

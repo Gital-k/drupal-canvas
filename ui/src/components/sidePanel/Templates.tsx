@@ -26,9 +26,11 @@ const canvasSettings = getCanvasSettings();
 
 const Templates = () => {
   const supportedEntityTypes =
-    canvasSettings?.contentTemplateEntityTypes ?? ({} as NonNullable<typeof canvasSettings>['contentTemplateEntityTypes']);
+    canvasSettings?.contentTemplateEntityTypes ??
+    ({} as NonNullable<typeof canvasSettings>['contentTemplateEntityTypes']);
   const entityTypeIds = Object.keys(supportedEntityTypes);
-  const [openEntityTypes, setOpenEntityTypes] = useState<string[]>(entityTypeIds);
+  const [openEntityTypes, setOpenEntityTypes] =
+    useState<string[]>(entityTypeIds);
   const { data } = useGetContentTemplatesQuery();
 
   const visibleEntityTypeIds = entityTypeIds.filter((entityTypeId) => {
@@ -60,7 +62,10 @@ const Templates = () => {
           <AccordionDetails
             key={entityTypeId}
             value={entityTypeId}
-            title={data?.[entityTypeId]?.label ?? supportedEntityTypes[entityTypeId].label}
+            title={
+              data?.[entityTypeId]?.label ??
+              supportedEntityTypes[entityTypeId].label
+            }
             onTriggerClick={() => onClickHandler(entityTypeId)}
           >
             <ErrorBoundary title="An unexpected error has occurred while fetching templates.">
@@ -107,7 +112,8 @@ const AddTemplateDialog = ({
 }: TemplateDialogProps) => {
   const { navigateToTemplateEditor } = useEditorNavigation();
   const supportedEntityTypes =
-    canvasSettings?.contentTemplateEntityTypes ?? ({} as NonNullable<typeof canvasSettings>['contentTemplateEntityTypes']);
+    canvasSettings?.contentTemplateEntityTypes ??
+    ({} as NonNullable<typeof canvasSettings>['contentTemplateEntityTypes']);
   const entityTypeIds = Object.keys(supportedEntityTypes);
   const defaultEntityType =
     entityType ?? (entityTypeIds.length === 1 ? entityTypeIds[0] : null);
@@ -158,7 +164,13 @@ const AddTemplateDialog = ({
       setSelectedEntityType(defaultEntityType);
       reset();
     }
-  }, [isSuccess, reset, setIsOpen, redirectToSelectedAfterCreation, defaultEntityType]);
+  }, [
+    isSuccess,
+    reset,
+    setIsOpen,
+    redirectToSelectedAfterCreation,
+    defaultEntityType,
+  ]);
 
   useEffect(() => {
     setSelectedViewMode('');
@@ -257,7 +269,10 @@ const AddTemplateDialog = ({
               />
               <Select.Content>
                 {Object.entries(supportedEntityTypes).map(([id, meta]) => {
-                  const { label } = meta as { label: string; bundleLabel: string | null };
+                  const { label } = meta as {
+                    label: string;
+                    bundleLabel: string | null;
+                  };
                   return (
                     <Select.Item key={id} value={id}>
                       {label}
@@ -301,54 +316,54 @@ const AddTemplateDialog = ({
           </Flex>
         )}
         {selectedContentType && (
-        <Flex direction="column" gap="2">
-          <Box>
-            <DialogFieldLabel htmlFor="template-name">
-              Template
-            </DialogFieldLabel>
-          </Box>
-          <Select.Root
-            name="template name"
-            required
-            disabled={!selectedContentType}
-            value={selectedViewMode || ''}
-            onValueChange={(value) => setSelectedViewMode(value)}
-            size="1"
-          >
-            <Select.Trigger
-              id="template-name"
-              placeholder={
-                availableTemplates === 0
-                  ? 'No more available templates'
-                  : 'Available templates…'
-              }
-              style={{ width: '100%' }}
+          <Flex direction="column" gap="2">
+            <Box>
+              <DialogFieldLabel htmlFor="template-name">
+                Template
+              </DialogFieldLabel>
+            </Box>
+            <Select.Root
+              name="template name"
+              required
               disabled={!selectedContentType}
-            />
-            <Select.Content>
-              <Select.Group>
-                {!!selectedEntityType &&
-                  selectedContentType &&
-                  Object.entries(
-                    data?.[selectedEntityType]?.[selectedContentType] || {},
-                  ).map(([mode, modeData]) => {
-                    const typedModeData = modeData as unknown as ModeData;
-                    return (
-                      <Select.Item
-                        key={mode}
-                        value={mode}
-                        disabled={typedModeData.hasTemplate}
-                      >
-                        {typedModeData.label}{' '}
-                        {typedModeData.hasTemplate &&
-                          '(template already exists)'}
-                      </Select.Item>
-                    );
-                  })}
-              </Select.Group>
-            </Select.Content>
-          </Select.Root>
-        </Flex>
+              value={selectedViewMode || ''}
+              onValueChange={(value) => setSelectedViewMode(value)}
+              size="1"
+            >
+              <Select.Trigger
+                id="template-name"
+                placeholder={
+                  availableTemplates === 0
+                    ? 'No more available templates'
+                    : 'Available templates…'
+                }
+                style={{ width: '100%' }}
+                disabled={!selectedContentType}
+              />
+              <Select.Content>
+                <Select.Group>
+                  {!!selectedEntityType &&
+                    selectedContentType &&
+                    Object.entries(
+                      data?.[selectedEntityType]?.[selectedContentType] || {},
+                    ).map(([mode, modeData]) => {
+                      const typedModeData = modeData as unknown as ModeData;
+                      return (
+                        <Select.Item
+                          key={mode}
+                          value={mode}
+                          disabled={typedModeData.hasTemplate}
+                        >
+                          {typedModeData.label}{' '}
+                          {typedModeData.hasTemplate &&
+                            '(template already exists)'}
+                        </Select.Item>
+                      );
+                    })}
+                </Select.Group>
+              </Select.Content>
+            </Select.Root>
+          </Flex>
         )}
       </Flex>
     </Dialog>

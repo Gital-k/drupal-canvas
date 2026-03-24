@@ -9,7 +9,7 @@ use Drupal\Core\Validation\Attribute\Constraint;
 use Symfony\Component\Validator\Constraint as SymfonyConstraint;
 
 /**
- * Validates that a value is a content entity type that supports Canvas templates.
+ * Validates that a value is an entity type that supports Canvas templates.
  */
 #[Constraint(
   id: 'ContentTemplateEntityType',
@@ -18,6 +18,6 @@ use Symfony\Component\Validator\Constraint as SymfonyConstraint;
 )]
 final class ContentTemplateEntityTypeConstraint extends SymfonyConstraint {
 
-  public string $message = 'This is not a content entity type that supports Field UI.';
+  public string $message = 'This is not an entity type that supports Field UI.';
 
 }

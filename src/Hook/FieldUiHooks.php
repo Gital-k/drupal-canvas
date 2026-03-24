@@ -42,7 +42,8 @@ final class FieldUiHooks {
    * instead of the standard "Manage display" table.
    *
    * The CTA is only displayed when:
-   * - The current route is an entity view display edit form for a supported entity type
+   * - The current route is an entity view display edit form for a supported
+   *   entity type
    * - No content templates exist for the bundle
    * - The user has permission to create a content template
    *

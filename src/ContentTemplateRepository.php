@@ -9,7 +9,7 @@ use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 
 /**
- * Provides information about content entity types eligible for Canvas templates.
+ * Provides information about entity types eligible for Canvas templates.
  */
 final readonly class ContentTemplateRepository {
 

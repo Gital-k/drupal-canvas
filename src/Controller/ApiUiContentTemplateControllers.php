@@ -149,7 +149,7 @@ final class ApiUiContentTemplateControllers extends ApiControllerBase {
 
         $bundle_info = $this->bundleInfo->getBundleInfo($entity_type_id);
         $template_keys = $this->entityTypeManager->getStorage(ContentTemplate::ENTITY_TYPE_ID)->getQuery()
-          // TRICKY: not checking access is acceptable because the route requires
+          // TRICKY: not checking access is acceptable. The route requires
           // "create" access for ContentTemplates. This is only exposing labels
           // (the "view label" operation) and whether a ContentTemplate exists.
           ->accessCheck(FALSE)
