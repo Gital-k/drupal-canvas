@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Access;
 
-use Drupal\canvas\ContentTemplateRepository;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Access\AccessResultInterface;
@@ -22,39 +21,23 @@ final class ViewModeAccessCheck implements AccessInterface {
   public function __construct(
     private readonly AccessInterface $inner,
     private readonly EntityTypeManagerInterface $entityTypeManager,
-    private readonly ContentTemplateRepository $contentTemplateRepository,
   ) {}
 
   /**
    * {@inheritdoc}
    */
   public function access(Route $route, RouteMatchInterface $route_match, AccountInterface $account, string $view_mode_name = 'default', ?string $bundle = NULL): AccessResultInterface {
-    $current_route_name = $route_match->getRouteName();
-    // AccessInterface does not declare access(). Possibly will be fixed in
-    // https://www.drupal.org/node/2266817.
-    if ($current_route_name === NULL) {
-      // @phpstan-ignore-next-line method.notFound
-      return $this->inner->access($route, $route_match, $account, $view_mode_name, $bundle);
-    }
-    $view_mode_routes = \array_map(
-      static fn($id) => "entity.entity_view_display.$id.view_mode",
-      $this->contentTemplateRepository->getSupportedEntityTypeIds(),
-    );
-    if (!\in_array($current_route_name, $view_mode_routes, TRUE)) {
-      // @phpstan-ignore-next-line method.notFound
-      return $this->inner->access($route, $route_match, $account, $view_mode_name, $bundle);
-    }
-
     $template = $this->loadFromRoute($view_mode_name, $route_match, $bundle);
-    $access = AccessResult::neutral();
     if ($template) {
       // Add the ContentTemplate as a cacheable dependency so access rebuilds
       // when content templates are added or updated.
-      $access = $access->addCacheableDependency($template);
+      $access = AccessResult::neutral()->addCacheableDependency($template);
       if ($template->status()) {
         return $access->allowedIfHasPermission($account, ContentTemplate::ADMIN_PERMISSION);
       }
     }
+    // AccessInterface does not declare access(). Possibly will be fixed in
+    // https://www.drupal.org/node/2266817.
     // @phpstan-ignore-next-line method.notFound
     return $this->inner->access($route, $route_match, $account, $view_mode_name, $bundle);
   }
