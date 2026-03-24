@@ -1326,7 +1326,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
           $prop_evaluates_to_nothing = match ($source->getCardinality()) {
             // Nothing for single-cardinality prop: NULL evaluation result.
             1 => $evaluated === NULL,
-            // Nothing for multi-cardinality prop: empty array evaluation result.
+            // Nothing for multi-cardinality prop: empty array eval result.
             default => $evaluated === [],
           };
           if (!$is_required_prop && $prop_evaluates_to_nothing) {

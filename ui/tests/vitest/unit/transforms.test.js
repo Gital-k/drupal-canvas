@@ -81,9 +81,9 @@ describe('Transforms - link', () => {
 
   it('Should not alter an already-resolved entity:node URI without title', () => {
     fieldData.sourceTypeSettings.instance.title = 0;
-    expect(
-      transforms.link([{ uri: 'entity:node/42' }], {}, fieldData),
-    ).toEqual('entity:node/42');
+    expect(transforms.link([{ uri: 'entity:node/42' }], {}, fieldData)).toEqual(
+      'entity:node/42',
+    );
   });
 
   it('Should not alter an already-resolved entity:node URI with title', () => {
