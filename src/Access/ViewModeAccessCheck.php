@@ -66,13 +66,13 @@ final class ViewModeAccessCheck implements AccessInterface {
       return NULL;
     }
 
-    if ($bundle === NULL) {
+    if (empty($bundle)) {
       $entity_type = $this->entityTypeManager->getDefinition($entity_type_id);
       if ($bundle_entity_type = $entity_type->getBundleEntityType()) {
         $bundle = $route_match->getRawParameter($bundle_entity_type);
       }
     }
-    return $this->entityTypeManager->getStorage(ContentTemplate::ENTITY_TYPE_ID)->load("$entity_type_id.$bundle.$view_mode");
+    return ContentTemplate::load("$entity_type_id.$bundle.$view_mode");
   }
 
 }
