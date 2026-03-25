@@ -119,6 +119,7 @@ final class SingleDirectoryComponentTest extends GeneratedFieldExplicitInputUxCo
     $this->installEntitySchema('node');
     $this->installConfig('node');
     $this->createContentType(['type' => 'article']);
+    $this->expectedDefaultComponentInstallCount++;
     parent::testGetClientSideInfo($component_ids);
   }
 
@@ -232,6 +233,7 @@ final class SingleDirectoryComponentTest extends GeneratedFieldExplicitInputUxCo
       'sdc.canvas_test_sdc.image-optional-without-example',
       'sdc.canvas_test_sdc.image-required-with-example',
       'sdc.canvas_test_sdc.image-without-ref',
+      'sdc.canvas_test_sdc.mixed-images-with-example',
       'sdc.canvas_test_sdc.my-cta',
       'sdc.canvas_test_sdc.my-hero',
       'sdc.canvas_test_sdc.my-section',
@@ -309,6 +311,7 @@ final class SingleDirectoryComponentTest extends GeneratedFieldExplicitInputUxCo
   public function testRenderComponentLive(array $component_ids): void {
     $this->installEntitySchema('node');
     $this->installConfig('node');
+    $this->expectedDefaultComponentInstallCount++;
     $this->createContentType(['type' => 'article']);
     $this->assertNotEmpty($component_ids);
 
@@ -1049,6 +1052,16 @@ HTML
           ],
         ],
       ],
+      'sdc.canvas_test_sdc.mixed-images-with-example' => [
+        'html' => '<img class="primary" src="https://example.com/cat.jpg" alt="Primary default image" /><img class="secondary" src="https://example.com/cat.jpg" alt="Secondary default image" /><img class="required" src="https://example.com/cat.jpg" alt="Required default image" />',
+        'cacheability' => $default_cacheability,
+        'attachments' => [
+          'library' => [
+            'core/components.canvas_test_sdc--mixed-images-with-example',
+            'core/components.canvas_test_sdc--mixed-images-with-example',
+          ],
+        ],
+      ],
     ], $rendered);
   }
 
@@ -1264,7 +1277,7 @@ HTML
   protected function generateCrashTestDummyComponentTree(string $component_id, array $inputs, bool $assertCount = TRUE): ComponentTreeItemList {
     if (str_starts_with($component_id, 'sdc.canvas_broken_sdcs.')) {
       // This component needs an extra module.
-      $this->assertCount(0, $this->componentStorage->loadMultiple());
+      $this->assertCount($this->expectedDefaultComponentInstallCount, $this->componentStorage->loadMultiple());
       \Drupal::service(ModuleInstallerInterface::class)->install(['canvas_broken_sdcs']);
 
       // Now call the parent, but don't assert the count of components, as we've
@@ -1327,6 +1340,34 @@ HTML
       'expected_validation_errors' => [],
       'expected_exception' => NULL,
       'expected_output_selector' => 'h1:contains("test")',
+    ];
+
+    // Garbage (non-existent) prop should result in:
+    // - validation error (since 1.1.0)
+    // - hydration failing (`::getExplicitInput()` throwing an exception)
+    // TRICKY: This did not trigger a validation error before 1.1.0. Component
+    // instances created before 1.1.0 may still exist (they are not
+    // automatically updated), so expect the exception that occurs during
+    // hydration to appear similar to a rendering exception.
+    // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::getExplicitInput()
+    // @see https://www.drupal.org/project/canvas/issues/3524401
+    yield "SDC with extraneous prop, validation error (since 1.1.0), with hydration exception visible similar to rendering exception" => [
+      'component_id' => 'sdc.canvas_test_sdc.crash',
+      'inputs' => [
+        // Do not trigger a crash in the render logic.
+        'crash' => FALSE,
+        // But instead trigger a crash during hydration.
+        // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::getExplicitInput()
+        'hydration_should_fail_on_this_non_existent_value' => TRUE,
+      ],
+      'expected_validation_errors' => [
+        '2.inputs.3204a711-a1bd-401d-9ce0-895665487eaa.hydration_should_fail_on_this_non_existent_value' => 'Component `3204a711-a1bd-401d-9ce0-895665487eaa`: the `hydration_should_fail_on_this_non_existent_value` prop is not defined.',
+      ],
+      'expected_exception' => [
+        'class' => \OutOfRangeException::class,
+        'message' => '\'hydration_should_fail_on_this_non_existent_value\' is not a prop on this version of the Component \'Single-directory component: <em class="placeholder">Canvas test SDC that crashes when &#039;crash&#039; prop is TRUE</em>\'.',
+      ],
+      'expected_output_selector' => NULL,
     ];
 
     yield "SDC with valid props, with exception" => [
@@ -2153,6 +2194,43 @@ HTML
           ],
         ],
       ],
+      'sdc.canvas_test_sdc.mixed-images-with-example' => [
+        'prop_field_definitions' => [
+          'primary_image' => [
+            'required' => FALSE,
+            'field_type' => 'image',
+            'field_storage_settings' => [],
+            'field_instance_settings' => [],
+            'field_widget' => 'image_image',
+            // ⚠️ Empty default value.
+            // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::exampleValueRequiresEntity()
+            'default_value' => [],
+            'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
+          ],
+          'secondary_image' => [
+            'required' => FALSE,
+            'field_type' => 'image',
+            'field_storage_settings' => [],
+            'field_instance_settings' => [],
+            'field_widget' => 'image_image',
+            // ⚠️ Empty default value.
+            // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::exampleValueRequiresEntity()
+            'default_value' => [],
+            'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
+          ],
+          'required_image' => [
+            'required' => TRUE,
+            'field_type' => 'image',
+            'field_storage_settings' => [],
+            'field_instance_settings' => [],
+            'field_widget' => 'image_image',
+            // ⚠️ Empty default value.
+            // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::exampleValueRequiresEntity()
+            'default_value' => [],
+            'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
+          ],
+        ],
+      ],
       'sdc.canvas_test_sdc.my-cta' => [
         'prop_field_definitions' => [
           'text' => [
@@ -2693,9 +2771,6 @@ HTML
         ],
       ],
       'sdc.canvas_test_sdc.card-with-stream-wrapper-image' => [
-        'config' => [
-          0 => 'image.style.canvas_parametrized_width',
-        ],
         'content' => [],
         'module' => [
           'core',
@@ -2840,6 +2915,16 @@ HTML
         ],
       ],
       'sdc.canvas_test_sdc.image-without-ref' => [
+        'config' => [
+          'image.style.canvas_parametrized_width',
+        ],
+        'module' => [
+          'file',
+          'image',
+          'canvas_test_sdc',
+        ],
+      ],
+      'sdc.canvas_test_sdc.mixed-images-with-example' => [
         'config' => [
           'image.style.canvas_parametrized_width',
         ],
@@ -4484,6 +4569,117 @@ HTML
         ],
         'transforms' => [],
       ],
+      'sdc.canvas_test_sdc.mixed-images-with-example' => [
+        'expected_output_selectors' => [
+          'img.primary[src="https://example.com/cat.jpg"]',
+          'img.secondary[src="https://example.com/cat.jpg"]',
+          'img.required[src="https://example.com/cat.jpg"]',
+        ],
+        'source' => 'Module component',
+        'metadata' => ['slots' => []],
+        'propSources' => [
+          'primary_image' => [
+            'required' => FALSE,
+            'jsonSchema' => [
+              'type' => 'object',
+              'title' => 'image',
+              'required' => ['src'],
+              'properties' => [
+                'src' => [
+                  'title' => 'Image URL',
+                  'type' => 'string',
+                  'format' => 'uri-reference',
+                  'contentMediaType' => 'image/*',
+                  'x-allowed-schemes' => ['http', 'https'],
+                  'id' => 'json-schema-definitions://canvas.module/image-uri',
+                ],
+                'alt' => ['title' => 'Alternative text', 'type' => 'string'],
+                'width' => ['title' => 'Image width', 'type' => 'integer'],
+                'height' => ['title' => 'Image height', 'type' => 'integer'],
+              ],
+              'id' => 'json-schema-definitions://canvas.module/image',
+            ],
+            'sourceType' => 'static:field_item:image',
+            'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
+            'default_values' => [
+              'source' => [],
+              'resolved' => [
+                'src' => 'https://example.com/cat.jpg',
+                'alt' => 'Primary default image',
+                'width' => 600,
+                'height' => 400,
+              ],
+            ],
+          ],
+          'secondary_image' => [
+            'required' => FALSE,
+            'jsonSchema' => [
+              'type' => 'object',
+              'title' => 'image',
+              'required' => ['src'],
+              'properties' => [
+                'src' => [
+                  'title' => 'Image URL',
+                  'type' => 'string',
+                  'format' => 'uri-reference',
+                  'contentMediaType' => 'image/*',
+                  'x-allowed-schemes' => ['http', 'https'],
+                  'id' => 'json-schema-definitions://canvas.module/image-uri',
+                ],
+                'alt' => ['title' => 'Alternative text', 'type' => 'string'],
+                'width' => ['title' => 'Image width', 'type' => 'integer'],
+                'height' => ['title' => 'Image height', 'type' => 'integer'],
+              ],
+              'id' => 'json-schema-definitions://canvas.module/image',
+            ],
+            'sourceType' => 'static:field_item:image',
+            'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
+            'default_values' => [
+              'source' => [],
+              'resolved' => [
+                'src' => 'https://example.com/cat.jpg',
+                'alt' => 'Secondary default image',
+                'width' => 600,
+                'height' => 400,
+              ],
+            ],
+          ],
+          'required_image' => [
+            'required' => TRUE,
+            'jsonSchema' => [
+              'type' => 'object',
+              'title' => 'image',
+              'required' => ['src'],
+              'properties' => [
+                'src' => [
+                  'title' => 'Image URL',
+                  'type' => 'string',
+                  'format' => 'uri-reference',
+                  'contentMediaType' => 'image/*',
+                  'x-allowed-schemes' => ['http', 'https'],
+                  'id' => 'json-schema-definitions://canvas.module/image-uri',
+                ],
+                'alt' => ['title' => 'Alternative text', 'type' => 'string'],
+                'width' => ['title' => 'Image width', 'type' => 'integer'],
+                'height' => ['title' => 'Image height', 'type' => 'integer'],
+              ],
+              'id' => 'json-schema-definitions://canvas.module/image',
+            ],
+            'sourceType' => 'static:field_item:image',
+            'expression' => 'ℹ︎image␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
+            'default_values' => [
+              'source' => [],
+              'resolved' => [
+                'src' => 'https://example.com/cat.jpg',
+                'alt' => 'Required default image',
+                'width' => 600,
+                'height' => 400,
+              ],
+            ],
+          ],
+        ],
+        'transforms' => [],
+      ],
       'sdc.canvas_test_sdc.my-cta' => [
         'expected_output_selectors' => [
           'a:contains("Press")',
@@ -5732,6 +5928,44 @@ HTML
           'sourceType' => 'static:field_item:string',
           'value' => [['value' => 'Valid heading']],
           'expression' => 'ℹ︎string␟value',
+        ],
+      ],
+    ];
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function providerGetOptionsForExplicitInputEnumProp(): array {
+    return [
+      // The test SDC has a mismatch between enum values and meta:enum keys.
+      // The method returns ALL enum values with labels from meta:enum where
+      // available, or the value itself as the label where not.
+      'non-array enum prop' => [
+        'component_id' => 'sdc.canvas_test_sdc.component-mismatch-meta-enum',
+        'prop_name' => 'style',
+        'expected_options' => [
+          // From enum: ['small', 'big', 'huge', 'contains.dots']
+          // From meta:enum: {small: 'Small', tiny: 'Tiny', contains.dots: 'Contains dots'}
+          // Result: enum values with meta:enum labels where available.
+          'small' => 'Small',
+          'big' => 'big',
+          'huge' => 'huge',
+          'contains.dots' => 'Contains dots',
+        ],
+      ],
+      'array-type enum prop with items' => [
+        'component_id' => 'sdc.canvas_test_sdc.component-mismatch-meta-enum-array-items',
+        'prop_name' => 'colors',
+        'expected_options' => [
+          // From enum: ['red', 'blue', 'green_light', 'yellow']
+          // From meta:enum: {red: 'Red', blue: 'Blue', green.light: 'Light Green', yellow: 'Yellow'}
+          // Note: For array-type props, the meta:enum is returned directly from
+          // the items schema, so keys come from meta:enum.
+          'red' => 'Red',
+          'blue' => 'Blue',
+          'green.light' => 'Light Green',
+          'yellow' => 'Yellow',
         ],
       ],
     ];

@@ -68,7 +68,9 @@ export interface CodeComponentProp {
     | string[]
     | number[]
     | CodeComponentPropImageExample
-    | CodeComponentPropVideoExample;
+    | CodeComponentPropImageExample[]
+    | CodeComponentPropVideoExample
+    | CodeComponentPropVideoExample[];
   $ref?: string;
   format?: string;
   derivedType: (typeof derivedPropTypes)[number]['type'] | null;
@@ -78,11 +80,16 @@ export interface CodeComponentProp {
   valueMode?: ValueMode;
   limitedCount?: number;
   items?: {
-    type: 'string' | 'integer' | 'number' | 'boolean';
+    type: 'string' | 'integer' | 'number' | 'boolean' | 'object';
     format?: string;
     contentMediaType?: string;
     'x-formatting-context'?: string;
     $ref?: string;
+    enum?: (string | number)[];
+    'meta:enum'?: Record<
+      CodeComponentPropEnumItem['value'],
+      CodeComponentPropEnumItem['label']
+    >;
   };
 }
 
@@ -108,18 +115,26 @@ export interface CodeComponentPropSerialized {
     | string[]
     | number[]
     | CodeComponentPropImageExample
+    | CodeComponentPropImageExample[]
     | CodeComponentPropVideoExample
+    | CodeComponentPropVideoExample[]
   )[];
   $ref?: string;
   format?: string;
   contentMediaType?: string;
   'x-formatting-context'?: string;
+  maxItems?: number;
   items?: {
-    type: 'string' | 'integer' | 'number' | 'boolean';
+    type: 'string' | 'integer' | 'number' | 'boolean' | 'object';
     format?: string;
     contentMediaType?: string;
     'x-formatting-context'?: string;
     $ref?: string;
+    enum?: (string | number)[];
+    'meta:enum'?: Record<
+      CodeComponentPropEnumItem['value'],
+      CodeComponentPropEnumItem['label']
+    >;
   };
 }
 
@@ -134,7 +149,14 @@ export interface CodeComponentSlotSerialized {
   examples?: string[];
 }
 
-export type CodeComponentPropPreviewValue = string | number | boolean;
+export type CodeComponentPropPreviewValue =
+  | string
+  | number
+  | boolean
+  | string[]
+  | number[]
+  | CodeComponentPropImageExample[]
+  | CodeComponentPropVideoExample[];
 
 export interface AssetLibrary {
   id: string;
@@ -148,6 +170,45 @@ export interface AssetLibrary {
     compiled: string;
   };
 }
+
+export interface BrandKit {
+  id: string;
+  label: string;
+  fonts: BrandKitFont[] | null;
+}
+
+export type BrandKitFontVariantType = 'static' | 'variable';
+
+export interface BrandKitFontAxis {
+  tag: string;
+  name?: string;
+  min: number;
+  max: number;
+  default: number;
+}
+
+export interface BrandKitFontAxisSetting {
+  tag: string;
+  value: number;
+}
+
+export interface BrandKitFont {
+  id: string;
+  family: string;
+  uri: string;
+  format: 'woff2' | 'woff' | 'ttf' | 'otf';
+  variantType?: BrandKitFontVariantType;
+  weight: string;
+  style: string;
+  axes?: BrandKitFontAxis[] | null;
+  axisSettings?: BrandKitFontAxisSetting[] | null;
+  url?: string;
+}
+
+export type AssetLibraryFont = BrandKitFont;
+export type AssetLibraryFontAxis = BrandKitFontAxis;
+export type AssetLibraryFontAxisSetting = BrandKitFontAxisSetting;
+export type AssetLibraryFontVariantType = BrandKitFontVariantType;
 
 export interface CodeComponentPropVideoExample {
   src: string;

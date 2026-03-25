@@ -17,7 +17,11 @@
 }
 
 .listItem:hover {
-  background-color: var(--blue-2);
+  background-color: var(--blue-3);
+}
+
+.removeButtonContainer {
+  margin-top: var(--space-2);
 }
 
 .listItem:hover .arrowIcon {
@@ -70,4 +74,9 @@
 
 .popoverLabel {
   color: var(--gray-11);
+}
+
+.visuallyHiddenInput {
+  position: absolute;
+  left: -9999px;
 }

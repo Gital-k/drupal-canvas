@@ -25,7 +25,7 @@ use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\canvas\MissingComponentInputsException;
 use Drupal\canvas\Plugin\DataType\ConfigEntityVersionAdapter;
-use Drupal\canvas\PropSource\ContentAwareDependentInterface;
+use Drupal\canvas\PropExpressions\StructuredData\ContentAwareDependentInterface;
 use Symfony\Component\Validator\ConstraintViolation;
 use Symfony\Component\Validator\ConstraintViolationInterface;
 use Symfony\Component\Validator\ConstraintViolationList;
@@ -118,6 +118,9 @@ use Symfony\Component\Validator\ConstraintViolationList;
 class ComponentTreeItem extends FieldItemBase {
 
   public const string PLUGIN_ID = 'component_tree';
+
+  // @todo Decide what the best location is for this constant.
+  public const string VIOLATION_CODE_GARBAGE_INPUT = 'garbage';
 
   use ComponentTreeItemListInstantiatorTrait;
 

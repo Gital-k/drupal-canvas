@@ -114,13 +114,18 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
 
       // Most hidden fields are read only. Add an attribute that allows it to be
       // updated and tracked in Redux form state.
-      if (isset($form['selection'][0]['target_id'])) {
-        $form['selection'][0]['target_id']['#attributes']['data-track-hidden-value'] = 'true';
-      }
-
       $selections = $form['selection'] ?? [];
+      $is_multiple = $context['items']->getFieldDefinition()->getFieldStorageDefinition()->isMultiple();
       foreach (Element::children($selections) as $key) {
+        if (isset($form['selection'][$key]['target_id'])) {
+          $form['selection'][$key]['target_id']['#attributes']['data-track-hidden-value'] = 'true';
+        }
+        if (isset($form['selection'][$key]['weight'])) {
+          $form['selection'][$key]['weight']['#attributes']['data-track-hidden-value'] = 'true';
+          $form['selection'][$key]['weight']['#attributes']['data-canvas-media-weight'] = 'true';
+        }
         $form['selection'][$key]['remove_button']['#attributes']['data-canvas-media-remove-button'] = 'true';
+        $form['selection'][$key]['#attributes']['data-is-multiple'] = $is_multiple ? 'true' : 'false';
       }
 
     }
@@ -213,18 +218,48 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
    * Marks elements within multivalue forms to enable specialized rendering.
    * This allows the DrupalInputMultivalueForm component to handle inputs
    * specifically within multivalue widgets.
+   *
+   * For media library widgets in the component instance form, we also set
+   * #component_prop_name so that the DefaultImagePreview React component can
+   * identify which prop to manage. This enables the "Remove default"
+   * functionality for optional image props.
+   *
+   * @see themes/canvas_stark/templates/media_library/fieldset--media-library-widget.html.twig
+   * @see ui/src/components/form/components/DefaultImagePreview.tsx
+   * @see \Drupal\canvas\Form\ComponentInstanceForm
    */
   #[Hook('field_widget_complete_form_alter')]
   public function fieldWidgetCompleteFormAlter(array &$widget, FormStateInterface $form_state, array $context): void {
     // Provide additional context to be used by
     // canvas_theme_suggestions_alter().
-    $widget['#widget-type'] = $context['widget']->getPluginId();
+    $widget_type = $context['widget']->getPluginId();
+    // Set #widget-type so themeSuggestionsAlter() can add widget-specific
+    // theme suggestions (e.g. fieldset__widget_media_library_widget).
+    $widget['#widget-type'] = $widget_type;
     if (isset($widget['widget']) && \is_array($widget["widget"])) {
-      $widget["widget"]['#widget-type'] = $context['widget']->getPluginId();
+      $widget["widget"]['#widget-type'] = $widget_type;
       foreach (Element::children($widget['widget']) as $key) {
-        $widget['widget'][$key]['#widget-type'] = $context['widget']->getPluginId();
+        $widget['widget'][$key]['#widget-type'] = $widget_type;
         foreach (Element::children($widget['widget'][$key]) as $child_key) {
-          $widget['widget'][$key][$child_key]['#widget-type'] = $context['widget']->getPluginId();
+          $widget['widget'][$key][$child_key]['#widget-type'] = $widget_type;
+        }
+      }
+    }
+
+    // For media library widgets in ComponentInstanceForm, propagate
+    // #component_prop_name so DefaultImagePreview can identify the prop,
+    // show the default image preview, and enable "Remove default" for
+    // optional image props.
+    $form_object = $form_state->getFormObject();
+    $is_component_instance_form = $form_object !== NULL && $form_object->getFormId() === ComponentInstanceForm::FORM_ID;
+    if ($widget_type === 'media_library_widget' && $is_component_instance_form) {
+      $field_name = $context['items']->getFieldDefinition()->getName();
+      $widget['#component_prop_name'] = $field_name;
+
+      if (isset($widget['widget'])) {
+        $widget['widget']['#component_prop_name'] = $field_name;
+        foreach (Element::children($widget['widget']) as $key) {
+          $widget['widget'][$key]['#component_prop_name'] = $field_name;
         }
       }
     }
@@ -256,9 +291,14 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
     foreach (Element::children($element) as $key) {
       // Mark input elements.
       if (isset($element[$key]['#type']) &&
-          \in_array($element[$key]['#type'], ['textfield'], TRUE)) {
+          \in_array($element[$key]['#type'], ['textfield', 'number', 'url', 'entity_autocomplete'], TRUE)) {
         $element[$key]['#is_multivalue_form'] = TRUE;
         $element[$key]['#attributes']['data-field-label'] = $field_label;
+        // Hide the sub-field label for url and entity_autocomplete types so
+        // that labels like "URL" are not shown in the multivalue table rows.
+        if (\in_array($element[$key]['#type'], ['url', 'entity_autocomplete'], TRUE)) {
+          $element[$key]['#title_display'] = 'invisible';
+        }
       }
       // Recursively process child elements.
       if (\is_array($element[$key])) {
@@ -275,6 +315,7 @@ class ReduxIntegratedFieldWidgetsHooks implements TrustedCallbackInterface {
     $map = [
       'boolean_checkbox' => ['mainProperty' => ['list' => \FALSE]],
       'datetime_default' => ['mainProperty' => [], 'dateTime' => []],
+      'daterange_default' => ['dateRange' => []],
       'email_default' => ['mainProperty' => []],
       'file_generic' => ['mainProperty' => ['name' => 'fids']],
       'image_image' => ['mainProperty' => ['name' => 'fids']],

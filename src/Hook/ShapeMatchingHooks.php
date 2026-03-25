@@ -52,7 +52,7 @@ use Symfony\Component\Validator\Constraints\Ip;
  * Hook implementations that make shape matching work.
  *
  * @see https://www.drupal.org/project/issues/canvas?component=Shape+matching
- * @see docs/shape-matching-into-field-types.md, section 3.1.2.a
+ * @see docs/shape-matching-into-field-types.md, section 3.1.2.b
  */
 class ShapeMatchingHooks {
 
@@ -398,7 +398,6 @@ class ShapeMatchingHooks {
         'to' => new FieldTypePropExpression('daterange', 'end_value'),
       ]);
       $storable_prop_shape->fieldStorageSettings = ['datetime_type' => DateTimeItem::DATETIME_TYPE_DATE];
-      // @todo Make this actually work in component instance forms in https://www.drupal.org/project/canvas/issues/3523379
       $storable_prop_shape->fieldWidget = 'daterange_default';
     }
   }

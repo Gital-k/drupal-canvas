@@ -17,6 +17,7 @@ use Drupal\Core\Url;
 use Drupal\canvas\Audit\ComponentAudit;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Entity\AssetLibrary;
+use Drupal\canvas\Entity\BrandKit;
 use Drupal\canvas\Entity\Folder;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ComponentInterface;
@@ -177,6 +178,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
       'items' => [
         'sdc.canvas_broken_sdcs.invalid-filter',
         'sdc.canvas_broken_sdcs.malformed-image',
+        'sdc.canvas_test_sdc.mixed-images-with-example',
         'sdc.canvas_test_sdc.my-cta',
         'sdc.canvas_test_sdc.component-mismatch-meta-enum',
         'sdc.canvas_test_sdc.component-mismatch-meta-enum-array-items',
@@ -246,6 +248,8 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
       'administer themes',
       Page::EDIT_PERMISSION,
       Component::ADMIN_PERMISSION,
+      AssetLibrary::ADMIN_PERMISSION,
+      BrandKit::ADMIN_PERMISSION,
       JavaScriptComponent::ADMIN_PERMISSION,
       Pattern::ADMIN_PERMISSION,
       Folder::ADMIN_PERMISSION,
@@ -1473,7 +1477,9 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
       'label' => NULL,
       'css' => NULL,
       'js' => NULL,
-      'fonts' => NULL,
+      'imports' => NULL,
+      'assets' => NULL,
+      'shared' => NULL,
     ];
     $request_options[RequestOptions::JSON] = $asset_library_to_send;
     $body = $this->assertExpectedResponse('POST', $list_url, $request_options, 500, NULL, NULL, NULL, NULL);
@@ -1548,6 +1554,178 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
 
     // Cannot delete the global library.
     $this->assertExpectedResponse('DELETE', Url::fromUri('base:/canvas/api/v0/config/asset_library/global'), [], 403, NULL, NULL, NULL, NULL);
+  }
+
+  /**
+   * @see \Drupal\canvas\Controller\ApiConfigControllers::patch()
+   * @see \Drupal\canvas\Entity\AssetLibrary::updateFromClientSide()
+   */
+  public function testAssetLibraryPatchManifestKeys(): void {
+    $this->drupalLogin($this->httpApiUser);
+    $canonical_url = Url::fromUri("base:/canvas/api/v0/config/asset_library/global");
+
+    $library = AssetLibrary::load(AssetLibrary::GLOBAL_ID);
+    if ($library === NULL) {
+      $library = AssetLibrary::create([
+        'id' => AssetLibrary::GLOBAL_ID,
+        'label' => 'Global',
+        'css' => ['original' => '', 'compiled' => ''],
+        'js' => ['original' => '', 'compiled' => ''],
+      ]);
+      $library->save();
+    }
+
+    $shared_entry = [
+      'name' => './vendor/shared-chunk.js',
+      'uri' => AssetLibrary::ARTIFACTS_DIRECTORY . 'shared-chunk.js',
+    ];
+    $imports_entry = [
+      'name' => 'vendor-lib',
+      'uri' => AssetLibrary::ARTIFACTS_DIRECTORY . 'vendor/vendor-lib.js',
+    ];
+    $assets_entry = [
+      'name' => '@/local/component',
+      'uri' => AssetLibrary::ARTIFACTS_DIRECTORY . 'local/component.js',
+    ];
+
+    $library->setShared([$shared_entry]);
+    $library->save();
+
+    $request_options = [
+      RequestOptions::HEADERS => [
+        'Content-Type' => 'application/json',
+      ],
+    ];
+
+    $cases = [
+      [
+        'label' => 'omit key leaves shared unchanged',
+        'patch' => ['label' => 'Global'],
+        'expected_imports' => NULL,
+        'expected_assets' => NULL,
+        'expected_shared' => [$shared_entry],
+      ],
+      [
+        'label' => 'empty array clears shared',
+        'patch' => [
+          'imports' => [],
+          'assets' => [],
+          'shared' => [],
+        ],
+        'expected_imports' => NULL,
+        'expected_assets' => NULL,
+        'expected_shared' => NULL,
+      ],
+      [
+        'label' => 'change manifest',
+        'patch' => [
+          'imports' => [$imports_entry],
+          'assets' => [$assets_entry],
+          'shared' => [$shared_entry],
+        ],
+        'expected_imports' => [$imports_entry],
+        'expected_assets' => [$assets_entry],
+        'expected_shared' => [$shared_entry],
+      ],
+    ];
+
+    foreach ($cases as $case) {
+      $request_options[RequestOptions::JSON] = $case['patch'];
+      $this->assertExpectedResponse('PATCH', $canonical_url, $request_options, 200, NULL, NULL, NULL, NULL);
+
+      $body = $this->assertExpectedResponse('GET', $canonical_url, [], 200, ['user.permissions'], ['config:canvas.asset_library.global', 'http_response'], 'UNCACHEABLE (request policy)', 'MISS');
+      self::assertNotNull($body);
+      $this->assertArrayHasKey('shared', $body, $case['label']);
+      $this->assertSame($case['expected_shared'], $body['shared'], $case['label']);
+      if ($case['expected_imports'] !== NULL) {
+        $this->assertArrayHasKey('imports', $body, $case['label']);
+        $this->assertSame($case['expected_imports'], $body['imports'], $case['label']);
+      }
+      if ($case['expected_assets'] !== NULL) {
+        $this->assertArrayHasKey('assets', $body, $case['label']);
+        $this->assertSame($case['expected_assets'], $body['assets'], $case['label']);
+      }
+    }
+  }
+
+  /**
+   * @see \Drupal\canvas\Entity\BrandKit
+   */
+  public function testBrandKit(): void {
+    $list_url = Url::fromUri("base:/canvas/api/v0/config/brand_kit");
+    $canonical_url = Url::fromUri("base:/canvas/api/v0/config/brand_kit/global");
+    $auto_save_url = Url::fromUri("base:/canvas/api/v0/config/auto-save/brand_kit/global");
+
+    $request_options = [
+      RequestOptions::HEADERS => [
+        'Content-Type' => 'application/json',
+      ],
+    ];
+
+    // Insufficient permissions: 403.
+    $this->drupalLogin($this->limitedPermissionsUser);
+    $body = $this->assertExpectedResponse('GET', $list_url, [], 403, ['user.permissions'], ['4xx-response', 'http_response'], 'UNCACHEABLE (request policy)', NULL);
+    $this->assertSame([
+      'errors' => [
+        'Requires >=1 content entity type with a Canvas field that can be created or edited.',
+      ],
+    ], $body);
+
+    // Authenticated and authorized: list returns the default global brand kit.
+    $this->drupalLogin($this->httpApiUser);
+    $body = $this->assertExpectedResponse('GET', $list_url, [], 200, ['user.permissions'], ['config:brand_kit_list', 'http_response'], 'UNCACHEABLE (request policy)', 'MISS');
+    $this->assertIsArray($body);
+    $this->assertArrayHasKey(BrandKit::GLOBAL_ID, $body);
+    $brand_kit_from_list = $body[BrandKit::GLOBAL_ID];
+    $this->assertIsArray($brand_kit_from_list);
+    $this->assertArrayHasKey('id', $brand_kit_from_list);
+    $this->assertSame('global', $brand_kit_from_list['id']);
+    $this->assertArrayHasKey('label', $brand_kit_from_list);
+    $this->assertArrayHasKey('fonts', $brand_kit_from_list);
+
+    // Creating a brand kit via the API is not allowed: 403.
+    $request_options[RequestOptions::JSON] = [
+      'id' => 'global',
+      'label' => 'Test Brand Kit',
+      'fonts' => NULL,
+    ];
+    $body = $this->assertExpectedResponse('POST', $list_url, $request_options, 403, NULL, NULL, NULL, NULL);
+    $this->assertSame([
+      'errors' => [
+        'Brand kits cannot be created via the API.',
+      ],
+    ], $body);
+
+    // GET canonical: 200.
+    $body = $this->assertExpectedResponse('GET', $canonical_url, [], 200, ['user.permissions'], ['config:canvas.brand_kit.global', 'http_response'], 'UNCACHEABLE (request policy)', 'MISS');
+    $this->assertIsArray($body);
+    $this->assertArrayHasKey('id', $body);
+    $this->assertArrayHasKey('label', $body);
+    $this->assertSame($brand_kit_from_list['id'], $body['id']);
+    $this->assertSame($brand_kit_from_list['label'], $body['label']);
+
+    // PATCH to update label: 200.
+    $updated_label = 'Updated brand kit label';
+    $request_options[RequestOptions::JSON] = ['label' => $updated_label];
+    $body = $this->assertExpectedResponse('PATCH', $canonical_url, $request_options, 200, NULL, NULL, NULL, NULL);
+    $this->assertIsArray($body);
+    $this->assertArrayHasKey('id', $body);
+    $this->assertArrayHasKey('label', $body);
+    $this->assertSame('global', $body['id']);
+    $this->assertSame($updated_label, $body['label']);
+    $this->assertArrayHasKey('fonts', $body);
+
+    // GET canonical again: 200 with updated data (cache miss after PATCH).
+    $body = $this->assertExpectedResponse('GET', $canonical_url, [], 200, ['user.permissions'], ['config:canvas.brand_kit.global', 'http_response'], 'UNCACHEABLE (request policy)', 'MISS');
+    $this->assertIsArray($body);
+    $this->assertArrayHasKey('label', $body);
+    $this->assertSame($updated_label, $body['label']);
+
+    // Auto-save endpoint: 200.
+    $this->assertExpectedResponse('GET', $auto_save_url, $request_options, 200, ['user.permissions'], [AutoSaveManager::CACHE_TAG, 'http_response', 'config:canvas.brand_kit.global'], 'UNCACHEABLE (request policy)', 'MISS');
+
+    // Cannot delete the global brand kit: 403.
+    $this->assertExpectedResponse('DELETE', $canonical_url, [], 403, NULL, NULL, NULL, NULL);
   }
 
   private function assertAuthenticationAndAuthorization(string $entity_type_id, bool $delete_allowed = TRUE, array $initial_items = [], array $initial_cache_tags = ['http_response']): void {
