@@ -82,8 +82,10 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   /* Maximum failures */
   maxFailures: 999999,
-  /* Parallel test workers, leave undefined for automatic */
-  workers: '50%',
+  /* On CI: exactly one worker per spec file so workers are never reused across
+   * files and each worker always operates on its own clean database.
+   * Locally: 50% of CPU cores to avoid thrashing the dev machine. */
+  workers: process.env.CI ? 23 : '50%',
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [
     ['list'],
