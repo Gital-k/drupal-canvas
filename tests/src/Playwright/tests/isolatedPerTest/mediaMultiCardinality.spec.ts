@@ -45,11 +45,7 @@ test.describe('Media Multi-Cardinality', () => {
     );
     await drupal.logout();
   });
-  test('Can add multiple media items', async ({
-    page,
-    drupal,
-    canvas,
-  }) => {
+  test('Can add multiple media items', async ({ page, drupal, canvas }) => {
     await drupal.loginAsAdmin();
     await canvas.createCanvas();
     await canvas.openLibraryPanel();
