@@ -37,12 +37,9 @@ async function getPreviewImageOrder(
 
 test.describe('Media Multi-Cardinality', () => {
   test.beforeEach(async ({ drupal }) => {
+    await drupal.enableTestExtensions();
     await drupal.loginAsAdmin();
-    await drupal.applyRecipe('core/recipes/image_media_type');
     await drupal.installModules(['canvas_test_sdc']);
-    await drupal.applyRecipe(
-      'modules/contrib/canvas/tests/fixtures/recipes/test_site',
-    );
     await drupal.logout();
   });
   test('Can add multiple media items', async ({ page, drupal, canvas }) => {
