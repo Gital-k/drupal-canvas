@@ -16,10 +16,22 @@ describe('Contextual panel', () => {
     cy.loadURLandWaitForCanvasLoaded();
     // Wait for the preview iframe to load and render something that confirms it is ready.
     cy.get('iframe[data-canvas-preview]').should('exist');
-    // Right-click on the element that should trigger the context menu
-    cy.get('[aria-label="Draggable component Hero"]')
+    // Right-click on the element that should trigger the context menu.
+    // This differs from the layers panel tests because the structure in the left
+    // panel is different than in previews.
+    cy.getComponentInPreview('Hero')
+      // Targets the inner div.canvas--sortable-item which is the actual element that Radix's
+      // ContextMenu.Trigger (with asChild) attaches its onContextMenu handler to. The original
+      // code fired on the outer .componentOverlay div, but DOM events bubble up, so they never
+      // reached the child's handler.
+      .find('[data-canvas-overlay]')
+      // Ensures we get only the direct sortable item, not nested component overlays that
+      // also have [data-canvas-overlay] and might be present in slots.
       .first()
-      .rightclick({ force: true });
+      // Bypass actionability checks, since the inner element is intentionally
+      // hidden (see .componentOverlay > span in PreviewOverlay.module.css).
+      .trigger('contextmenu', { force: true });
+
     cy.findByLabelText('Context menu for Hero')
       .should('exist')
       .and('be.visible');
@@ -303,11 +315,21 @@ describe('Contextual panel', () => {
     cy.loadURLandWaitForCanvasLoaded();
     // Wait for the preview iframe to load
     cy.get('iframe[data-canvas-preview]').should('exist');
-
-    // Right-click on the element in the preview should trigger the context menu.
-    cy.get('[aria-label="Draggable component Test Code Component"]')
+    // Right-click on the element that should trigger the context menu.
+    // This differs from the layers panel tests because the structure in the left
+    // panel is different than in previews.
+    cy.getComponentInPreview('Test Code Component')
+      // Targets the inner div.canvas--sortable-item which is the actual element that Radix's
+      // ContextMenu.Trigger (with asChild) attaches its onContextMenu handler to. The original
+      // code fired on the outer .componentOverlay div, but DOM events bubble up, so they never
+      // reached the child's handler.
+      .find('[data-canvas-overlay]')
+      // Ensures we get only the direct sortable item, not nested component overlays that
+      // also have [data-canvas-overlay] and might be present in slots.
       .first()
-      .rightclick({ force: true });
+      // Bypass actionability checks, since the inner element is intentionally
+      // hidden (see .componentOverlay > span in PreviewOverlay.module.css).
+      .trigger('contextmenu', { force: true });
 
     // Verify the context menu opened with component name.
     cy.findByLabelText('Context menu for Test Code Component')
