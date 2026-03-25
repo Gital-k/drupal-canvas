@@ -228,6 +228,7 @@
 
 .canvas-skeleton-shimmer {
   height: 20px;
+  animation: canvas-shimmer 1.2s infinite linear;
   border-radius: 4px;
   background: linear-gradient(
     90deg,
@@ -235,6 +236,5 @@
     #e0e0e0 50%,
     #f0f0f0 75%
   );
-  animation: canvas-shimmer 1.2s infinite linear;
   background-size: 200% 100%;
 }
