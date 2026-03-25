@@ -18,7 +18,7 @@ const DrupalInput = ({
   element,
 }: {
   attributes?: Attributes | NumericInputAttributes;
-  element: any;
+  element?: any;
 }) => {
   switch (attributes?.type) {
     case 'checkbox': {
