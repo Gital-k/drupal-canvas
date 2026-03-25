@@ -43,7 +43,7 @@ test.describe('Media Multi-Cardinality', () => {
     await drupal.installModules(['canvas_test_sdc']);
     await drupal.logout();
   });
-  
+
   test('Can add multiple media items', async ({ page, drupal, canvas }) => {
     await drupal.loginAsAdmin();
     await canvas.createCanvas();
@@ -51,7 +51,6 @@ test.describe('Media Multi-Cardinality', () => {
     await canvas.addComponent({
       id: 'sdc.canvas_test_sdc.image-gallery',
     });
-
 
     await canvas.addMediaImage(
       '../../../../../fixtures/recipes/test_site/content/file/cats-1.jpg',
