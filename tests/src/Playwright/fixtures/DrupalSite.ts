@@ -47,7 +47,7 @@ const drupalSite = base.extend<DrupalSiteInstall>({
         },
       });
     },
-    { scope: 'worker' },
+    { scope: 'file' },
   ],
 });
 
@@ -96,8 +96,7 @@ export const beforeAllTests = base.extend<{ forEachWorker: void }>({
       // This code runs after all the tests in the worker process.
       drupalSite.teardown();
     },
-    { scope: 'worker', auto: true },
-  ], // automatically starts for every worker.
+    { scope: 'file', auto: true },
 });
 
 const beforeEachTest = base.extend<{ forEachTest: void }>({
