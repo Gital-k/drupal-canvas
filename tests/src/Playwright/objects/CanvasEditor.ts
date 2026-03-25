@@ -235,10 +235,11 @@ export class CanvasEditor {
     identifier: { id?: string; name?: string },
     options: {
       hasInputs?: boolean;
+      skipDimensionCheck?: boolean;
     } = {},
   ) {
     const { id, name } = identifier;
-    const { hasInputs = true } = options;
+    const { hasInputs = true, skipDimensionCheck = false } = options;
 
     let selector, previewSelector;
 
@@ -271,7 +272,9 @@ export class CanvasEditor {
     const initialCount = await existingInstances.count();
     await componentLocator.hover();
     await componentLocator.getByLabel('Open contextual menu').click();
-    await this.page.getByText('Insert').click();
+    await this.page
+      .getByRole('menuitem', { name: 'Insert', exact: true })
+      .click();
 
     expect(await this.page.locator(previewSelector).count()).toBe(
       initialCount + 1,
@@ -279,16 +282,18 @@ export class CanvasEditor {
 
     const updatedInstances = this.page.locator(previewSelector);
     const updatedCount = await updatedInstances.count();
-    for (let i = 0; i < updatedCount; i++) {
-      await this.page.waitForFunction(
-        ([selector, index]) => {
-          const element = document.querySelectorAll(selector)[index];
-          if (!element) return false;
-          const box = element.getBoundingClientRect();
-          return box.width > 0 && box.height > 0;
-        },
-        [previewSelector, i],
-      );
+    if (!skipDimensionCheck) {
+      for (let i = 0; i < updatedCount; i++) {
+        await this.page.waitForFunction(
+          ([selector, index]) => {
+            const element = document.querySelectorAll(selector)[index];
+            if (!element) return false;
+            const box = element.getBoundingClientRect();
+            return box.width > 0 && box.height > 0;
+          },
+          [previewSelector, i],
+        );
+      }
     }
 
     if (hasInputs) {
