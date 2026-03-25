@@ -1,7 +1,6 @@
 import { expect } from '@playwright/test';
 
-import { test } from './fixtures/DrupalSite';
-import { Drupal } from './objects/Drupal';
+import { isolatedPerTest as test } from '../../fixtures/test.js';
 
 import type { FrameLocator, Page } from '@playwright/test';
 
@@ -37,27 +36,24 @@ async function getPreviewImageOrder(
 }
 
 test.describe('Media Multi-Cardinality', () => {
-  test.beforeAll(
-    'Setup test site with media entities',
-    async ({ browser, drupalSite }) => {
-      const page = await browser.newPage();
-      const drupal: Drupal = new Drupal({ page, drupalSite });
-      await drupal.setupCanvasTestSite();
-      await page.close();
-    },
-  );
-
+  test.beforeEach(async ({ drupal }) => {
+    await drupal.loginAsAdmin();
+    await drupal.applyRecipe('core/recipes/image_media_type');
+    await drupal.installModules(['canvas_test_sdc']);
+    await drupal.applyRecipe(
+      'modules/contrib/canvas/tests/fixtures/recipes/test_site',
+    );
+    await drupal.logout();
+  });
   test('Can add multiple media items', async ({
     page,
     drupal,
-    canvasEditor,
+    canvas,
   }) => {
     await drupal.loginAsAdmin();
-    await drupal.createCanvasPage('Gallery Multi Test', '/gallery-multi');
-    await page.goto('/gallery-multi');
-    await canvasEditor.goToEditor();
-    await canvasEditor.openLibraryPanel();
-    await canvasEditor.addComponent({
+    await canvas.createCanvas();
+    await canvas.openLibraryPanel();
+    await canvas.addComponent({
       id: 'sdc.canvas_test_sdc.image-gallery',
     });
 
@@ -107,7 +103,7 @@ test.describe('Media Multi-Cardinality', () => {
 
     await page.waitForTimeout(1000);
 
-    const previewFrame = await canvasEditor.getActivePreviewFrame();
+    const previewFrame = await canvas.getActivePreviewFrame();
     const previewInitialOrder = await getPreviewImageOrder(previewFrame);
     expect(previewInitialOrder.length).toBe(2);
     expect(previewInitialOrder).toEqual(initialOrder);
@@ -116,14 +112,12 @@ test.describe('Media Multi-Cardinality', () => {
   test('Adding media after page reload preserves existing items', async ({
     page,
     drupal,
-    canvasEditor,
+    canvas,
   }) => {
     await drupal.loginAsAdmin();
-    await drupal.createCanvasPage('Gallery Reload Test', '/gallery-reload');
-    await page.goto('/gallery-reload');
-    await canvasEditor.goToEditor();
-    await canvasEditor.openLibraryPanel();
-    await canvasEditor.addComponent({
+    await canvas.createCanvas();
+    await canvas.openLibraryPanel();
+    await canvas.addComponent({
       id: 'sdc.canvas_test_sdc.image-gallery',
     });
 
@@ -169,7 +163,7 @@ test.describe('Media Multi-Cardinality', () => {
 
     // Reload the page
     await page.reload();
-    await canvasEditor.waitForEditorUi();
+    await canvas.waitForEditorUi();
 
     // Verify image is still there after reload
     await expect(
