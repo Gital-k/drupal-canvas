@@ -474,4 +474,3 @@ const DrupalInputMultivalueForm = ({
 };
 
 export default DrupalInputMultivalueForm;
-
