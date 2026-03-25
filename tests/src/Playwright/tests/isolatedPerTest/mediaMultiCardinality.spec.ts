@@ -39,6 +39,7 @@ test.describe('Media Multi-Cardinality', () => {
   test.beforeEach(async ({ drupal }) => {
     await drupal.enableTestExtensions();
     await drupal.loginAsAdmin();
+    await drupal.applyRecipe(`core/recipes/image_media_type`);
     await drupal.installModules(['canvas_test_sdc']);
     await drupal.logout();
   });
@@ -50,34 +51,15 @@ test.describe('Media Multi-Cardinality', () => {
       id: 'sdc.canvas_test_sdc.image-gallery',
     });
 
-    await page
-      .locator('[data-testid="canvas-contextual-panel"]')
-      .getByRole('button', { name: 'Add media' })
-      .first()
-      .click();
 
-    await page.waitForSelector('.media-library-widget-modal', {
-      state: 'visible',
-    });
-
-    // Add first image (cat)
-    const catCheckbox = page.locator(
-      `.js-media-library-item:has(img[alt="A cat on top of a cat tree trying to reach a Christmas tree"]) input[type="checkbox"]`,
+    await canvas.addMediaImage(
+      '../../../../../fixtures/recipes/test_site/content/file/cats-1.jpg',
+      'A cat on top of a cat tree trying to reach a Christmas tree',
     );
-    await catCheckbox.setChecked(true);
-
-    const pubCheckbox = page.locator(
-      `.js-media-library-item:has(img[alt="A pub called The Princes Head surrounded by trees and two red London phone boxes"]) input[type="checkbox"]`,
+    await canvas.addMediaImage(
+      '../../../../../fixtures/recipes/test_site/content/file/PrincesHead.jpg',
+      'A pub called The Princes Head surrounded by trees and two red London phone boxes',
     );
-    await pubCheckbox.setChecked(true);
-
-    await page
-      .getByRole('button', { name: 'Insert selected', exact: true })
-      .click();
-
-    await page.waitForSelector('.media-library-widget-modal', {
-      state: 'hidden',
-    });
 
     await expect(
       page.locator(
@@ -94,9 +76,8 @@ test.describe('Media Multi-Cardinality', () => {
       'A pub called The Princes Head surrounded by trees and two red London phone boxes',
     );
 
-    await page.waitForTimeout(1000);
-
     const previewFrame = await canvas.getActivePreviewFrame();
+    await expect(previewFrame.locator('main figure img')).toHaveCount(2);
     const previewInitialOrder = await getPreviewImageOrder(previewFrame);
     expect(previewInitialOrder.length).toBe(2);
     expect(previewInitialOrder).toEqual(initialOrder);
