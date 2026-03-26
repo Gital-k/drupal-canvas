@@ -59,10 +59,6 @@ drupal-html-fragment, element-prop {
   pointer-events: none;
   user-select: none;
   opacity: .6;
-  &[type="submit"] {
-    border: 2px rgba(0,0,0,0.4) solid;
-    border-radius: 3px;
-  }
 }
 
 [data-canvas-layout-request-in-progress] [data-canvas-tabledrag="true"],
