@@ -1014,29 +1014,31 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
     );
 
     self::assertEquals([
-      'article' => [
-        'teaser' => [
-          'label' => 'Teaser',
-          'hasTemplate' => FALSE,
-        ],
-        'full' => [
-          'label' => 'Full content',
-          'hasTemplate' => TRUE,
-        ],
-        'rss' => [
-          'label' => 'RSS',
-          'hasTemplate' => FALSE,
-        ],
-        'search_index' => [
-          'label' => 'Search index',
-          'hasTemplate' => FALSE,
-        ],
-        'search_result' => [
-          'label' => 'Search result highlighting input',
-          'hasTemplate' => FALSE,
+      'node' => [
+        'article' => [
+          'teaser' => [
+            'label' => 'Teaser',
+            'hasTemplate' => FALSE,
+          ],
+          'full' => [
+            'label' => 'Full content',
+            'hasTemplate' => TRUE,
+          ],
+          'rss' => [
+            'label' => 'RSS',
+            'hasTemplate' => FALSE,
+          ],
+          'search_index' => [
+            'label' => 'Search index',
+            'hasTemplate' => FALSE,
+          ],
+          'search_result' => [
+            'label' => 'Search result highlighting input',
+            'hasTemplate' => FALSE,
+          ],
         ],
       ],
-    ], $json['node']);
+    ], $json);
 
     // 4. Create ContentTemplate for Teaser View Mode.
     $template_data['content_entity_type_view_mode'] = 'teaser';
@@ -1057,29 +1059,31 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
     );
 
     self::assertEquals([
-      'article' => [
-        'teaser' => [
-          'label' => 'Teaser',
-          'hasTemplate' => TRUE,
-        ],
-        'full' => [
-          'label' => 'Full content',
-          'hasTemplate' => TRUE,
-        ],
-        'rss' => [
-          'label' => 'RSS',
-          'hasTemplate' => FALSE,
-        ],
-        'search_index' => [
-          'label' => 'Search index',
-          'hasTemplate' => FALSE,
-        ],
-        'search_result' => [
-          'label' => 'Search result highlighting input',
-          'hasTemplate' => FALSE,
+      'node' => [
+        'article' => [
+          'teaser' => [
+            'label' => 'Teaser',
+            'hasTemplate' => TRUE,
+          ],
+          'full' => [
+            'label' => 'Full content',
+            'hasTemplate' => TRUE,
+          ],
+          'rss' => [
+            'label' => 'RSS',
+            'hasTemplate' => FALSE,
+          ],
+          'search_index' => [
+            'label' => 'Search index',
+            'hasTemplate' => FALSE,
+          ],
+          'search_result' => [
+            'label' => 'Search result highlighting input',
+            'hasTemplate' => FALSE,
+          ],
         ],
       ],
-    ], $json['node']);
+    ], $json);
   }
 
 }
