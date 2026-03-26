@@ -46,7 +46,7 @@ class StaleComponentVersionTest extends CanvasKernelTestBase {
    * {@inheritdoc}
    */
   protected static $modules = [
-    ...CanvasKernelTestBase::CANVAS_KERNEL_TEST_MINIMAL_MODULES,
+    ...self::CANVAS_KERNEL_TEST_MINIMAL_MODULES,
     'canvas_test_sdc',
     'field',
   ];
@@ -72,7 +72,7 @@ class StaleComponentVersionTest extends CanvasKernelTestBase {
    *   svg_image on Drupal CMS).
    *
    * The component version hash encodes the set of allowed target_bundles for
-   * image entity-reference fields. Adding a second image-source media type
+   * image entity-reference fields. Adding a second image-based media type
    * changes target_bundles, producing a different hash. Because the target
    * site was installed from scratch with both types, its component config
    * entity only ever knew the two-bundle hash — the recipe's one-bundle hash
@@ -143,7 +143,7 @@ class StaleComponentVersionTest extends CanvasKernelTestBase {
     // ValidConfigEntityVersionConstraintValidator looks up the component and
     // checks whether $stale_version is in getVersions(). It is not — the
     // component was freshly created with $current_version only — so a violation
-    // is added.  RecipeConfigInstaller surfaces this as a fatal exception.
+    // is added.  RecipeConfigInstaller surfaces this as an exception.
     $violations = self::violationsToArray($pattern->getTypedData()->validate());
 
     $this->assertArrayHasKey(
