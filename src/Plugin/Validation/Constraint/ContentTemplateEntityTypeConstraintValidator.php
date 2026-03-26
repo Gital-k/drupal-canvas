@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Drupal\canvas\Plugin\Validation\Constraint;
 
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
+use Drupal\Core\Entity\ContentEntityTypeInterface;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\canvas\ContentTemplateRepository;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Validator\Constraint;
@@ -19,6 +21,7 @@ final class ContentTemplateEntityTypeConstraintValidator extends ConstraintValid
 
   public function __construct(
     private readonly ContentTemplateRepository $contentTemplateRepository,
+    private readonly EntityTypeManagerInterface $entityTypeManager,
   ) {}
 
   /**
@@ -27,6 +30,7 @@ final class ContentTemplateEntityTypeConstraintValidator extends ConstraintValid
   public static function create(ContainerInterface $container): static {
     return new static(
       $container->get(ContentTemplateRepository::class),
+      $container->get(EntityTypeManagerInterface::class),
     );
   }
 
@@ -46,7 +50,15 @@ final class ContentTemplateEntityTypeConstraintValidator extends ConstraintValid
       throw new UnexpectedValueException($value, 'string');
     }
 
-    if (!\in_array($value, $this->contentTemplateRepository->getSupportedEntityTypeIds(), TRUE)) {
+    // Non-existent and non-content entity types are already caught by the
+    // PluginExists constraint in the schema. Only add a violation here for
+    // content entity types that exist but lack field_ui_base_route.
+    $entity_type = $this->entityTypeManager->getDefinition($value, FALSE);
+    if (!$entity_type instanceof ContentEntityTypeInterface) {
+      return;
+    }
+
+    if (!$this->contentTemplateRepository->isSupportedEntityType($entity_type)) {
       $this->context->buildViolation($constraint->message)
         ->setInvalidValue($value)
         ->addViolation();
