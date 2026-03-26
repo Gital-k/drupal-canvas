@@ -2214,8 +2214,6 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
    * @see \Drupal\canvas\Entity\ContentTemplate
    */
   public function testContentTemplate(): void {
-    // @todo Expand this test coverage in https://www.drupal.org/i/3498525, once more content entity types can have ContentTemplates, for now restricted to only `node`
-
     // Test with multiple bundles of each content entity type.
     NodeType::create(['type' => 'bunny', 'name' => 'Bunnies'])->save();
     NodeType::create(['type' => 'llama', 'name' => 'Llamas'])->save();
@@ -2355,10 +2353,6 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
       'errors' => [
         [
           'detail' => 'The \'fake_entity_type\' plugin does not exist.',
-          'source' => ['pointer' => 'content_entity_type_id'],
-        ],
-        [
-          'detail' => 'This is not an entity type that supports Field UI.',
           'source' => ['pointer' => 'content_entity_type_id'],
         ],
         [

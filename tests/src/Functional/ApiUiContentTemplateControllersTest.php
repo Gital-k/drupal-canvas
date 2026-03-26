@@ -1037,6 +1037,18 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
           ],
         ],
       ],
+      'user' => [
+        'user' => [
+          'compact' => [
+            'label' => 'Compact',
+            'hasTemplate' => FALSE,
+          ],
+          'full' => [
+            'label' => 'User account',
+            'hasTemplate' => FALSE,
+          ]
+        ]
+      ]
     ], $json);
 
     // 4. Create ContentTemplate for Teaser View Mode.
@@ -1082,6 +1094,18 @@ final class ApiUiContentTemplateControllersTest extends HttpApiTestBase {
           ],
         ],
       ],
+      'user' => [
+        'user' => [
+          'compact' => [
+            'label' => 'Compact',
+            'hasTemplate' => FALSE,
+          ],
+          'full' => [
+            'label' => 'User account',
+            'hasTemplate' => FALSE,
+          ]
+        ]
+      ]
     ], $json);
   }
 
