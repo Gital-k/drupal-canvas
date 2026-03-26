@@ -125,7 +125,7 @@ class StaleComponentVersionTest extends CanvasKernelTestBase {
     // Simulate what RecipeConfigInstaller does when it imports a Pattern config
     // that was built on the "one media type" environment: component_version
     // references $stale_version, which the target site's component has never
-    // had. This reproduces andyg's crash at RecipeConfigInstaller.php line 70.
+    // had.
     $pattern = Pattern::create([
       'id' => 'stale_version_test',
       'label' => 'Stale version test',
@@ -159,8 +159,8 @@ class StaleComponentVersionTest extends CanvasKernelTestBase {
 
     // ── The fix: resolve component_version: null to the active version ────────
     // Recipe authors should not have to know or encode a version hash that is
-    // environment-specific. The fix (#3571366) lets them omit the version
-    // entirely (null); ComponentTreeConfigEntityBase::preCreate() resolves it
+    // environment-specific. The fix lets them omit the version entirely (null).
+    // ComponentTreeConfigEntityBase::preCreate() resolves it
     // to the current active version before the entity is constructed, so stored
     // config is always concrete and ValidConfigEntityVersionConstraint never fires.
     $pattern = Pattern::create([
