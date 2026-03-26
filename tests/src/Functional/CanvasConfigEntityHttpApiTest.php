@@ -2262,7 +2262,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
             'viewModes' => [],
             'editFieldsUrl' => NULL,
             'deleteUrl' => NULL,
-          ]
+          ],
         ],
       ],
     ];

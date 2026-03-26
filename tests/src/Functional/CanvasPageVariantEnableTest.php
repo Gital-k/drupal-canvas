@@ -56,6 +56,7 @@ class CanvasPageVariantEnableTest extends BrowserTestBase {
       'rendered',
       'user:1',
       'user_view',
+      'config:content_template_list',
     ];
     $this->assertCacheTags([
       ...$content_cache_tags,
