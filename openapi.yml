@@ -2565,38 +2565,39 @@ paths:
                             description: Boolean flag indicating if ContentTemplate for this Entity View Display exists
               examples:
                 node:
-                  article:
-                    rss:
-                      label: RSS
-                      hasTemplate: false
-                    search_index:
-                      label: Search index
-                      hasTemplate: false
-                    search_result:
-                      label: Search result highlighting input
-                      hasTemplate: false
-                    full:
-                      label: Full content
-                      hasTemplate: true
-                    teaser:
-                      label: Teaser
-                      hasTemplate: false
-                  page:
-                    rss:
-                      label: RSS
-                      hasTemplate: false
-                    search_index:
-                      label: Search index
-                      hasTemplate: false
-                    search_result:
-                      label: Search result highlighting input
-                      hasTemplate: false
-                    full:
-                      label: Full content
-                      hasTemplate: true
-                    teaser:
-                      label: Teaser
-                      hasTemplate: true
+                  value:
+                    article:
+                      rss:
+                        label: RSS
+                        hasTemplate: false
+                      search_index:
+                        label: Search index
+                        hasTemplate: false
+                      search_result:
+                        label: Search result highlighting input
+                        hasTemplate: false
+                      full:
+                        label: Full content
+                        hasTemplate: true
+                      teaser:
+                        label: Teaser
+                        hasTemplate: false
+                    page:
+                      rss:
+                        label: RSS
+                        hasTemplate: false
+                      search_index:
+                        label: Search index
+                        hasTemplate: false
+                      search_result:
+                        label: Search result highlighting input
+                        hasTemplate: false
+                      full:
+                        label: Full content
+                        hasTemplate: true
+                      teaser:
+                        label: Teaser
+                        hasTemplate: true
   /canvas/api/v0/usage/component:
     get:
       summary: Get all components to see if they are in use.
