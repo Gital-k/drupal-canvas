@@ -160,9 +160,9 @@ class StaleComponentVersionTest extends CanvasKernelTestBase {
     // ── The fix: resolve component_version: null to the active version ────────
     // Recipe authors should not have to know or encode a version hash that is
     // environment-specific. The fix (#3571366) lets them omit the version
-    // entirely (null); Pattern::preCreate() resolves it to the component's
-    // current active version before the entity is constructed, so stored config
-    // is always concrete and ValidConfigEntityVersionConstraint never fires.
+    // entirely (null); ComponentTreeConfigEntityBase::preCreate() resolves it
+    // to the current active version before the entity is constructed, so stored
+    // config is always concrete and ValidConfigEntityVersionConstraint never fires.
     $pattern = Pattern::create([
       'id' => 'null_version_test',
       'label' => 'Null version test',

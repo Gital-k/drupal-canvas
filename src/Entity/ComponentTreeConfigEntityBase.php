@@ -24,6 +24,26 @@ abstract class ComponentTreeConfigEntityBase extends ConfigEntityBase implements
    */
   protected ?array $component_tree;
 
+  /**
+   * {@inheritdoc}
+   */
+  public static function preCreate(EntityStorageInterface $storage, array &$values) {
+    // Resolve null component_version values to the component's current active
+    // version. This allows recipe authors to ship environment-agnostic config
+    // by omitting the version hash, which encodes environment-specific state
+    // such as the installed set of image media types.
+    // @see https://www.drupal.org/project/canvas/issues/3571366
+    foreach ($values['component_tree'] ?? [] as $delta => $item) {
+      if (($item['component_version'] ?? NULL) === NULL && isset($item['component_id'])) {
+        $component = Component::load($item['component_id']);
+        if ($component !== NULL) {
+          $values['component_tree'][$delta]['component_version'] = $component->getActiveVersion();
+        }
+      }
+    }
+    parent::preCreate($storage, $values);
+  }
+
   public function setComponentTree(array $values): static {
     $this->set('component_tree', $values);
     return $this;
