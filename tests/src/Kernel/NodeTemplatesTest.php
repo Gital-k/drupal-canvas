@@ -15,6 +15,8 @@ use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\EntityHandlers\ContentTemplateAwareViewBuilder;
 use Drupal\filter\Entity\FilterFormat;
+use Drupal\language\Config\LanguageConfigFactoryOverrideInterface;
+use Drupal\language\Entity\ConfigurableLanguage;
 use Drupal\node\NodeInterface;
 use Drupal\Tests\canvas\Traits\CanvasFieldCreationTrait;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
@@ -44,7 +46,9 @@ final class NodeTemplatesTest extends CanvasKernelTestBase {
   use UserCreationTrait;
 
   /**
-   * @see core.services.yml
+   * Tests Node Templates.
+   *
+   * @legacy-covers \Drupal\canvas\EntityHandlers\ContentTemplateAwareViewBuilder
    */
   private const REQUIRED_CACHE_CONTEXTS = [
     'languages:language_interface',
@@ -59,6 +63,10 @@ final class NodeTemplatesTest extends CanvasKernelTestBase {
     'node',
     'field',
     'canvas_test_rendering',
+    'language',
+    'locale',
+    'config_translation',
+    'canvas_dev_translation',
   ];
 
   /**
@@ -70,7 +78,8 @@ final class NodeTemplatesTest extends CanvasKernelTestBase {
     $this->installEntitySchema('media');
     $this->installEntitySchema('node');
     $this->installEntitySchema('path_alias');
-    $this->installConfig(['node', 'filter']);
+    $this->installEntitySchema('configurable_language');
+    $this->installConfig(['node', 'filter', 'language']);
     $this->installConfig(['canvas']);
     $this->createContentType(['type' => 'article']);
     $this->generateComponentConfig();
@@ -89,8 +98,21 @@ final class NodeTemplatesTest extends CanvasKernelTestBase {
       ],
     ])->save();
     $this->setUpCurrentUser(permissions: ['access content']);
+    ConfigurableLanguage::createFromLangcode('fr')->save();
   }
 
+  /**
+   * Tests opting a content type into Canvas rendering.
+   *
+   * @param bool $node_is_published
+   *   Whether the node should be published.
+   * @param string $view_mode
+   *   The view mode to render the node in.
+   * @param bool $expected_entity_data_is_accessible
+   *   Whether entity field data is expected to be accessible.
+   * @param list<string> $expected_node_component_tree_cache_tags
+   *   Expected cache tags from the component tree render.
+   */
   #[TestWith([
     TRUE,
     'full',
@@ -123,8 +145,8 @@ final class NodeTemplatesTest extends CanvasKernelTestBase {
     FALSE,
     [
       // Components in the component tree — minus the ones whose props failed to
-      // resolve because they were inaccessible: EntityFieldPropSources populated by
-      // the host entity.
+      // resolve because they were inaccessible: EntityFieldPropSources
+      // populated by the host entity.
       'config:canvas.component.sdc.canvas_test_sdc.my-hero',
       // @todo Stop expecting this cache tag in https://www.drupal.org/i/3559820
       'config:canvas.component.sdc.canvas_test_sdc.props-no-slots',
@@ -215,8 +237,8 @@ HTML;
     self::assertInstanceOf(ContentTemplateAwareViewBuilder::class, $viewBuilder);
     $build = $viewBuilder->view($node, $view_mode);
     $crawler = $this->crawlerForRenderArray($build);
-    // The content type has not been opted into Canvas, so it should not be using
-    // Canvas for rendering.
+    // The content type has not been opted into Canvas, so it should not be
+    // using Canvas for rendering.
     self::assertCount(0, $crawler->filter('h1.my-hero__heading:contains("Canvas is large and in charge!")'));
     self::assertCount(0, $crawler->filter('div.my-hero__container > p.my-hero__subheading:contains("2025-12-04")'));
     self::assertCount(0, $crawler->filter(\sprintf('div.my-hero__container > div.my-hero__actions > a[href="%s/node/1"]:contains("%s")', $GLOBALS['base_url'], $node->getTitle())));
@@ -275,8 +297,7 @@ HTML;
     $template->setStatus(TRUE)->save();
 
     // Reload the node now that the field definitions have changed.
-    self::assertNotNull($node->id());
-    $node = $this->container->get(EntityTypeManagerInterface::class)->getStorage('node')->loadUnchanged($node->id());
+    $node = $this->container->get(EntityTypeManagerInterface::class)->getStorage('node')->loadUnchanged((int) $node->id());
     \assert($node instanceof NodeInterface);
     // Set up a logger so we can tell if
     // canvas_test_rendering_entity_display_build_alter() gets invoked.
@@ -453,6 +474,152 @@ HTML;
     // If we delete the field item, all good!
     $node->get('field_component_tree')->removeItem(1);
     self::assertEntityIsValid($node);
+  }
+
+  /**
+   * Tests that translated content templates render correctly per language.
+   *
+   * Verifies that:
+   * 1. A French config language override of a content template's component_tree
+   *    is respected when the view builder renders in French.
+   * 2. The English default component_tree is rendered when the active language
+   *    is English.
+   * 3. Both rendered builds have the languages:language_interface cache context
+   *    so that Drupal's page cache correctly varies the response per language.
+   *
+   * Only static prop sources are used so that every observable difference
+   * between the two renders comes exclusively from the translated config,
+   * with no interference from entity-field resolution or access checks.
+   *
+   * These scenarios are split into two test methods rather than one method
+   * that switches language mid-test. Switching config override language inside
+   * a single kernel test requires invalidating the config factory cache, the
+   * entity storage cache, and the render cache before the second render.
+   * Splitting into two methods avoids that ceremony: each method sets the
+   * language before anything is loaded or cached, so no mid-test flushing
+   * is needed.
+   *
+   * @see self::testContentTemplateRendersEnglishByDefault()
+   * @see self::testContentTemplateRendersFrenchWhenOverrideLanguageIsFrench()
+   */
+  public function testContentTemplateRendersEnglishByDefault(): void {
+    $this->doSetUpTranslatedTemplate();
+
+    $node = $this->createNode(['type' => 'article', 'title' => 'Translation test node', 'status' => TRUE, 'uid' => 1]);
+    self::assertFalse($node->isNew());
+
+    $viewBuilder = $this->container->get(EntityTypeManagerInterface::class)->getViewBuilder('node');
+    self::assertInstanceOf(ContentTemplateAwareViewBuilder::class, $viewBuilder);
+
+    $build = $viewBuilder->view($node, 'full');
+    $crawler = $this->crawlerForRenderArray($build);
+
+    self::assertCount(
+      1,
+      $crawler->filter('h1:contains("Canvas is large and in charge!")'),
+      'English heading must be present when the active language is English.',
+    );
+    self::assertCount(
+      0,
+      $crawler->filter('h1:contains("Canvas est grand et aux commandes !")'),
+      'French heading must not appear when the active language is English.',
+    );
+    // This cache context is what allows Drupal's page cache to store separate
+    // responses per language. Its presence here is the contract this test
+    // enforces.
+    self::assertContains(
+      'languages:language_interface',
+      $build['#cache']['contexts'],
+      'Build must declare languages:language_interface so the page cache varies by language.',
+    );
+  }
+
+  /**
+   * French override: switch the config override language to French.
+   *
+   * This ensures the French component_tree is used when rendering.
+   */
+  public function testContentTemplateRendersFrenchWhenOverrideLanguageIsFrench(): void {
+    $this->doSetUpTranslatedTemplate();
+
+    // Switch to French before anything is loaded or rendered. Because nothing
+    // has been cached yet in this test method, no cache flushing is needed.
+    $languageManager = $this->container->get('language_manager');
+    $french = $languageManager->getLanguage('fr');
+    self::assertNotNull($french, 'French language must be installed.');
+    $languageManager->setConfigOverrideLanguage($french);
+
+    $node = $this->createNode(['type' => 'article', 'title' => 'Translation test node', 'status' => TRUE, 'uid' => 1]);
+    self::assertFalse($node->isNew());
+
+    $viewBuilder = $this->container->get(EntityTypeManagerInterface::class)->getViewBuilder('node');
+    self::assertInstanceOf(ContentTemplateAwareViewBuilder::class, $viewBuilder);
+
+    $build = $viewBuilder->view($node, 'full');
+    $crawler = $this->crawlerForRenderArray($build);
+
+    self::assertCount(
+      1,
+      $crawler->filter('h1:contains("Canvas est grand et aux commandes !")'),
+      'French heading must be present when the config override language is French.',
+    );
+    self::assertCount(
+      0,
+      $crawler->filter('h1:contains("Canvas is large and in charge!")'),
+      'English heading must not appear when the config override language is French.',
+    );
+    self::assertContains(
+      'languages:language_interface',
+      $build['#cache']['contexts'],
+      'French build must also declare languages:language_interface as a cache context.',
+    );
+  }
+
+  /**
+   * Set up the English default content template and its French config override.
+   *
+   * Extracted into a helper so both translation test methods share identical
+   * fixture setup without duplication.
+   */
+  private function doSetUpTranslatedTemplate(): void {
+    // props-no-slots is used instead of my-hero because it only requires a
+    // single `heading` prop. my-hero has several required props (cta1href,
+    // cta1, subheading) whose absence would cause the config schema checker to
+    // throw before the test reaches its assertions.
+    ContentTemplate::create([
+      'id' => 'node.article.full',
+      'content_entity_type_id' => 'node',
+      'content_entity_type_bundle' => 'article',
+      'content_entity_type_view_mode' => 'full',
+      'component_tree' => [
+        [
+          'uuid' => 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+          'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+          'component_version' => 'b1e991f726a2a266',
+          'inputs' => [
+            'heading' => 'Canvas is large and in charge!',
+          ],
+        ],
+      ],
+    ])->setStatus(TRUE)->save();
+
+    // Store a French config language override. This is the same mechanism that
+    // Drupal's config_translation UI uses when a site builder translates a
+    // content template: it writes a language-specific override file on top of
+    // the default config rather than duplicating the entire config entity.
+    $this->container->get(LanguageConfigFactoryOverrideInterface::class)
+      ->getOverride('fr', 'canvas.content_template.node.article.full')
+      ->set('component_tree', [
+        [
+          'uuid' => 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+          'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+          'component_version' => 'b1e991f726a2a266',
+          'inputs' => [
+            'heading' => 'Canvas est grand et aux commandes !',
+          ],
+        ],
+      ])
+      ->save();
   }
 
 }
