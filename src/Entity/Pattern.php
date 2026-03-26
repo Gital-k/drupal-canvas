@@ -77,6 +77,19 @@ final class Pattern extends ComponentTreeConfigEntityBase implements CanvasHttpA
     if (!\array_key_exists('id', $values)) {
       $values['id'] = self::generateId($values['label']);
     }
+    // Resolve null component_version values to the current active version.
+    // This allows recipe authors to ship environment-agnostic Pattern config
+    // by omitting the version hash, which encodes environment-specific state
+    // such as the installed set of image media types.
+    // @see https://www.drupal.org/project/canvas/issues/3571366
+    foreach ($values['component_tree'] ?? [] as $delta => $item) {
+      if (($item['component_version'] ?? NULL) === NULL && isset($item['component_id'])) {
+        $component = Component::load($item['component_id']);
+        if ($component !== NULL) {
+          $values['component_tree'][$delta]['component_version'] = $component->getActiveVersion();
+        }
+      }
+    }
     parent::preCreate($storage, $values);
   }
 

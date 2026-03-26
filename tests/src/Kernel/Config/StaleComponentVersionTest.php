@@ -28,9 +28,8 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
  * and RecipeConfigInstaller throws a validation error.
  *
  * This class contains two assertions inside the same test method:
- *   1. A stale version triggers a violation (green: proves the bug exists).
- *   2. A null version triggers no violation (red: failing spec that drives
- *      the fix — will become green once #3571366 is resolved).
+ *   1. A stale version triggers a violation (proves the bug exists).
+ *   2. A null version triggers no violation (proves the fix works).
  *
  * @see https://www.drupal.org/project/canvas/issues/3571366
  */
@@ -65,7 +64,7 @@ class StaleComponentVersionTest extends CanvasKernelTestBase {
   }
 
   /**
-   * Reproduces the crash and specifies the fix as a failing assertion.
+   * Reproduces the crash and verifies the fix.
    *
    * Simulates the cross-environment scenario from #3571366:
    * - "Recipe author" environment: only the 'image' media type.
@@ -79,12 +78,6 @@ class StaleComponentVersionTest extends CanvasKernelTestBase {
    * entity only ever knew the two-bundle hash — the recipe's one-bundle hash
    * was never valid there.
    *
-   * The method ends with an intentionally failing assertion (marked @todo):
-   * it describes the desired post-fix behaviour and will become green once
-   * #3571366 is resolved, with no code changes needed here.
-   *
-   * @todo Convert the end of this test into a recipe-based test once the fix
-   *   lands, to also cover the full RecipeConfigInstaller path.
    */
   public function testPatternComponentVersionBecomesStaleAcrossEnvironments(): void {
     // ── "Recipe author" environment ──────────────────────────────────────────
@@ -164,23 +157,12 @@ class StaleComponentVersionTest extends CanvasKernelTestBase {
       'The violation message identifies the stale version hash.',
     );
 
-    // ── The fix: allow component_version: null in recipe-provided config ──────
+    // ── The fix: resolve component_version: null to the active version ────────
     // Recipe authors should not have to know or encode a version hash that is
-    // environment-specific. The proposed resolution (#3571366) lets them omit
-    // the version entirely (null) and have Canvas resolve it at import time.
-    //
-    // ValidConfigEntityVersionConstraintValidator already returns early for
-    // NULL (see line 36-38 of the validator), so that half is done. What is
-    // still missing:
-    //   1. The config schema must allow component_version to be null so that
-    //      typed-data validation does not reject the value before the
-    //      constraint validator even runs.
-    //   2. A Recipe subsystem event (or equivalent hook in
-    //      RecipeConfigInstaller) must resolve null versions to the current
-    //      active version at import time, so the stored config is always
-    //      concrete.
-    //
-    // Once both are in place this assertion will be green with no code changes.
+    // environment-specific. The fix (#3571366) lets them omit the version
+    // entirely (null); Pattern::preCreate() resolves it to the component's
+    // current active version before the entity is constructed, so stored config
+    // is always concrete and ValidConfigEntityVersionConstraint never fires.
     $pattern = Pattern::create([
       'id' => 'null_version_test',
       'label' => 'Null version test',
@@ -194,10 +176,12 @@ class StaleComponentVersionTest extends CanvasKernelTestBase {
       ],
     ]);
 
-    // @todo Currently fails: the schema rejects null for component_version.
-    //   Remove this @todo once #3571366 is resolved.
     $violations = self::violationsToArray($pattern->getTypedData()->validate());
-    self::assertSame([], $violations);
+    self::assertArrayNotHasKey(
+      'component_tree.0.component_version',
+      $violations,
+      'A null component_version must not trigger a version violation.',
+    );
 
   }
 
