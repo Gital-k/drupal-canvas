@@ -74,8 +74,8 @@ final class MaybeUrl extends AccessResult implements AccessResultReasonInterface
    * Returns the URL string, or empty string if inaccessible.
    *
    * Without this, the token system (and any code casting data type values to
-   * string) fatals with "MaybeUrl could not be converted to string" when
-   * resolving chained entity reference URL tokens such as
+   * string) throws a fatal error "MaybeUrl could not be converted to string"
+   * when resolving chained entity reference URL tokens such as
    * [current-user:customer:uid:url].
    */
   public function __toString(): string {
