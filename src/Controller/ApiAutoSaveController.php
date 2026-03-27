@@ -549,10 +549,10 @@ final class ApiAutoSaveController extends ApiControllerBase {
         // where this entity should be considered new, which means it has never
         // published before in Drupal Canvas.
         // @see \Drupal\canvas\AutoSave\AutoSaveManager::contentEntityIsConsideredNew()
-        if ($revision_user = $entity_definition->getRevisionMetadataKey('revision_user')) {
+        $revision_user = $entity_definition->getRevisionMetadataKey('revision_user');
+        if (is_string($revision_user) && $revision_user !== '') {
           $entity->set($revision_user, $this->currentUser->id());
         }
-
         // Even though we will validate each entity individually before it is
         // saved to ensure the data is still valid after other entities have
         // been saved, we should still validate here before we save any entities
