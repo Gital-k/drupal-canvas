@@ -598,7 +598,7 @@ final class ContentTemplateValidationTest extends BetterConfigEntityValidationTe
     'file',
     [
       '' => "The 'content_entity_type_id' property cannot be changed.",
-      'content_entity_type_id' => 'This is not a content entity type that supports Field UI.',
+      'content_entity_type_id' => 'Content templates are not available for this entity type.',
       'content_entity_type_bundle' => "The 'alpha' bundle does not exist on the 'file' entity type.",
       'content_entity_type_view_mode' => "The 'core.entity_view_mode.file.full' config does not exist.",
     ],

@@ -18,6 +18,6 @@ use Symfony\Component\Validator\Constraint as SymfonyConstraint;
 )]
 final class ContentTemplateEntityTypeConstraint extends SymfonyConstraint {
 
-  public string $message = 'This is not a content entity type that supports Field UI.';
+  public string $message = 'Content templates are not available for this entity type.';
 
 }
