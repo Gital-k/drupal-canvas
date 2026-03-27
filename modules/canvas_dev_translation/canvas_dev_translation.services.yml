@@ -1,19 +1,11 @@
 services:
-  Drupal\canvas_dev_translation\Controller\ApiTranslationController:
-    class: Drupal\canvas_dev_translation\Controller\ApiTranslationController
-    arguments:
-      - '@entity_type.manager'
-      - '@language_manager'
-      - '@language.config_factory_override'
-      - '@Drupal\canvas\AutoSave\AutoSaveManager'
-      - '@keyvalue'
-      - '@cache_tags.invalidator'
+  _defaults:
+    autoconfigure: true
+    autowire: true
+
+  Drupal\canvas_dev_translation\Controller\ApiTranslationController: {}
 
   canvas_dev_translation.translation_not_found_subscriber:
     class: Drupal\canvas_dev_translation\EventSubscriber\TranslationNotFoundSubscriber
-    arguments:
-      - '@current_route_match'
-      - '@language_manager'
-      - '@current_user'
     tags:
       - { name: event_subscriber, priority: 100 }

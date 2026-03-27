@@ -1,24 +1,61 @@
-canvas_dev_translation.api.translations:
-  path: '/canvas/api/v0/{entity_type}/{id}/translations'
+canvas_dev_translation.api.translations.config:
+  path: '/canvas/api/v0/config/{canvas_config_entity_type_id}/{entity}/translations'
   defaults:
-    _controller: '\Drupal\canvas_dev_translation\Controller\ApiTranslationController::getTranslations'
+    _controller: 'Drupal\canvas_dev_translation\Controller\ApiTranslationController::getTranslations'
   requirements:
-    _permission: 'access content'
-    entity_type: 'canvas_page|canvas_content_template|canvas_page_region'
+    _canvas_authentication_required: TRUE
+    _canvas_http_eligible_config_entity: 'TRUE'
+    canvas_config_entity_type_id: '(content_template|page_region)'
   options:
-    _auth:
-      - cookie
-      - basic_auth
+    parameters:
+      entity:
+        type: entity:{canvas_config_entity_type_id}
+    _format: 'json'
+  methods: [GET]
 
-canvas_dev_translation.api.translations.create:
-  path: '/canvas/api/v0/auto-save/{entity_type}/{id}/translations/{target_langcode}'
+canvas_dev_translation.api.translations.content:
+  path: '/canvas/api/v0/content/{entity_type}/{entity}/translations'
   defaults:
-    _controller: '\Drupal\canvas_dev_translation\Controller\ApiTranslationController::createTranslation'
-  methods: [POST]
+    _controller: 'Drupal\canvas_dev_translation\Controller\ApiTranslationController::getTranslations'
   requirements:
-    _permission: 'access content'
-    entity_type: 'canvas_page|canvas_content_template|canvas_page_region'
+    _canvas_authentication_required: TRUE
+    _entity_access: 'entity.view'
+    entity_type: 'canvas_page'
   options:
-    _auth:
-      - cookie
-      - basic_auth
+    parameters:
+      entity:
+        type: entity:{entity_type}
+    _format: 'json'
+  methods: [GET]
+
+canvas_dev_translation.api.translations.create.config:
+  path: '/canvas/api/v0/config/{canvas_config_entity_type_id}/{entity}/translations/{target_langcode}'
+  defaults:
+    _controller: 'Drupal\canvas_dev_translation\Controller\ApiTranslationController::createTranslation'
+  requirements:
+    _canvas_authentication_required: TRUE
+    _entity_access: 'canvas_config_entity.update'
+    _canvas_http_eligible_config_entity: 'TRUE'
+    canvas_config_entity_type_id: '(content_template|page_region)'
+  options:
+    parameters:
+      entity:
+        type: entity:{canvas_config_entity_type_id}
+    _format: 'json'
+  methods: [POST]
+
+canvas_dev_translation.api.translations.create.content:
+  path: '/canvas/api/v0/content/{entity_type}/{entity}/translations/{target_langcode}'
+  defaults:
+    _controller: 'Drupal\canvas_dev_translation\Controller\ApiTranslationController::createTranslation'
+  requirements:
+    _canvas_authentication_required: TRUE
+    _entity_access: 'entity.update'
+    entity_type: 'canvas_page'
+  options:
+    parameters:
+      entity:
+        type: entity:{entity_type}
+    _format: 'json'
+  methods: [POST]
+  

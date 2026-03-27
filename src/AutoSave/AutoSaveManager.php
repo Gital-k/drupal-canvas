@@ -65,7 +65,10 @@ class AutoSaveManager implements EventSubscriberInterface {
   /**
    * The key used for the component tree in config override translations.
    *
-   * Only this key is supported for config entity translation in phase 1.
+   * Only this key is stored for config entity translations. This assumes that
+   * ContentTemplate and PageRegion — the only translatable Canvas config entity
+   * types in phase 1 — have no other translatable data beyond the component
+   * tree. Future translatable config entity types may need to extend this.
    */
   private const CONFIG_OVERRIDE_TRANSLATION_KEY = 'component_tree';
 
@@ -285,7 +288,11 @@ class AutoSaveManager implements EventSubscriberInterface {
     }
 
     $data_hash = self::generateHash([self::CONFIG_OVERRIDE_TRANSLATION_KEY => $componentTree]);
-
+    // Only the component_tree key is stored for config entity translations.
+    // This is intentional for phase 1: ContentTemplate and PageRegion config
+    // entities have no other translatable data. If future Canvas config entity
+    // types introduce additional translatable properties, this method must be
+    // updated to handle them.
     $auto_save_data = [
       'entity_type' => $entity->getEntityTypeId(),
       'entity_id' => $entity->id(),
@@ -439,15 +446,15 @@ class AutoSaveManager implements EventSubscriberInterface {
     return $this->componentInstanceFormViolationsStore->get($component_uuid) ?? new ConstraintViolationList();
   }
 
-  /**
-   * Normalizes an entity to a stable array for hashing and storage.
-   *
-   * @param \Drupal\Core\Entity\EntityInterface $entity
-   *   The entity to normalize.
-   *
-   * @return array
-   *   The normalized entity data.
-   */
+/**
+ * Normalizes an entity to a stable array for hashing and storage.
+ *
+ * @param \Drupal\Core\Entity\EntityInterface $entity
+ *   The entity to normalize.
+ *
+ * @return array<string, mixed>
+ *   The normalized entity data.
+ */
   private static function normalizeEntity(EntityInterface $entity): array {
     if (!$entity instanceof FieldableEntityInterface) {
       if ($entity instanceof ComponentTreeEntityInterface && $entity instanceof ConfigEntityInterface) {
@@ -484,7 +491,6 @@ class AutoSaveManager implements EventSubscriberInterface {
           }
           $value = $item->toArray();
           foreach (\array_filter($item->getProperties(), static fn (TypedDataInterface $property) => $property instanceof PrimitiveInterface) as $property) {
-            \assert($property instanceof PrimitiveInterface);
             $value[$property->getName()] = $property->getCastedValue();
           }
           return $value;
@@ -550,7 +556,7 @@ class AutoSaveManager implements EventSubscriberInterface {
    *   The hash string, or NULL if the entity does not exist in storage.
    */
   private function getUnchangedHash(EntityInterface $entity): ?string {
-    \assert(!is_null($entity->id()));
+    \assert(!\is_null($entity->id()));
     $original = $this->entityTypeManager->getStorage($entity->getEntityTypeId())->loadUnchanged($entity->id());
     if ($original === NULL) {
       return NULL;
@@ -631,9 +637,22 @@ class AutoSaveManager implements EventSubscriberInterface {
   }
 
   /**
+   * Deletes an auto-save entry by its key.
+   *
+   * @param string $key
+   *   The auto-save key.
+   */
+  public function deleteByKey(string $key): void {
+    $this->cacheTagsInvalidator->invalidateTags([self::CACHE_TAG]);
+    $this->autoSaveStore->delete($key);
+    $this->formViolationsStore->delete($key);
+    // Cannot delete component instance form violations without the entity.
+  }
+
+  /**
    * Generates a stable hash for an array of data.
    *
-   * @param array $data
+   * @param array<string, mixed> $data
    *   The data to hash.
    *
    * @return string
@@ -647,13 +666,13 @@ class AutoSaveManager implements EventSubscriberInterface {
   /**
    * Recursively sorts an array by key for stable hashing.
    *
-   * @param array $array
+   * @param array<string, mixed> $array
    *   The array to sort in place.
    */
   private static function recursiveKsort(array &$array): void {
     ksort($array);
     foreach ($array as &$value) {
-      if (is_array($value)) {
+      if (\is_array($value)) {
         self::recursiveKsort($value);
       }
     }
@@ -691,7 +710,7 @@ class AutoSaveManager implements EventSubscriberInterface {
     $auto_save_update_needed = FALSE;
     \assert($entity->getEntityType() instanceof ConfigEntityTypeInterface);
     $properties_to_assess = $entity->getEntityType()->getPropertiesToExport();
-    \assert(is_array($properties_to_assess));
+    \assert(\is_array($properties_to_assess));
     $auto_save_updatable_properties = \array_intersect_key(
       $entity->getEntityType()->getKeys(),
       \array_flip(['status', 'label'])
@@ -734,7 +753,6 @@ class AutoSaveManager implements EventSubscriberInterface {
     );
     foreach ($autoSaveEntities as $autoSaveEntity) {
       $staged_config_update = $autoSaveEntity['entity'];
-      \assert($staged_config_update instanceof StagedConfigUpdate);
       if ($staged_config_update->getTarget() === $event->getConfig()->getName()) {
         $this->delete($staged_config_update);
       }

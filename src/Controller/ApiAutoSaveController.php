@@ -7,7 +7,6 @@ namespace Drupal\canvas\Controller;
 use Drupal\Core\Cache\CacheableJsonResponse;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Config\ConfigFactoryInterface;
-use Drupal\Core\Config\ConfigFactoryOverrideInterface;
 use Drupal\Core\Config\Entity\ConfigEntityInterface;
 use Drupal\Core\Database\Connection;
 use Drupal\Core\Entity\ContentEntityInterface;
@@ -20,7 +19,6 @@ use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\Core\File\FileUrlGeneratorInterface;
 use Drupal\Core\Http\Exception\CacheableAccessDeniedHttpException;
-use Drupal\Core\KeyValueStore\KeyValueFactoryInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\StringTranslation\PluralTranslatableMarkup;
@@ -36,6 +34,7 @@ use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Validation\ConstraintPropertyPathTranslatorTrait;
 use Drupal\image\Entity\ImageStyle;
 use Drupal\language\Config\LanguageConfigFactoryOverride;
+use Drupal\language\Config\LanguageConfigFactoryOverrideInterface;
 use Drupal\user\UserInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -74,10 +73,8 @@ final class ApiAutoSaveController extends ApiControllerBase {
    *   The current user.
    * @param \Drupal\Core\Language\LanguageManagerInterface $languageManager
    *   The language manager.
-   * @param \Drupal\Core\Config\ConfigFactoryOverrideInterface $configLanguageOverride
+   * @param \Drupal\language\Config\LanguageConfigFactoryOverrideInterface $configLanguageOverride
    *   The language config factory override.
-   * @param \Drupal\Core\KeyValueStore\KeyValueFactoryInterface $keyValueFactory
-   *   The key-value factory service.
    */
   public function __construct(
     private readonly Connection $database,
@@ -90,17 +87,15 @@ final class ApiAutoSaveController extends ApiControllerBase {
     private readonly AccountInterface $currentUser,
     private readonly LanguageManagerInterface $languageManager,
     #[Autowire(service: 'language.config_factory_override')]
-    private readonly ConfigFactoryOverrideInterface $configLanguageOverride,
-    #[Autowire(service: 'keyvalue')]
-    private readonly KeyValueFactoryInterface $keyValueFactory,
+    private readonly LanguageConfigFactoryOverrideInterface $configLanguageOverride,
   ) {}
 
   /**
    * Validates that the client's expected auto-saves match the stored ones.
    *
-   * @param array $expected_auto_saves
+   * @param array<string, array<string, mixed>> $expected_auto_saves
    *   The auto-saves submitted by the client, keyed by auto-save key.
-   * @param array $all_auto_saves
+   * @param array<string, array<string, mixed>> $all_auto_saves
    *   All auto-saves currently in the store, keyed by auto-save key.
    *
    * @return \Symfony\Component\HttpFoundation\JsonResponse|null
@@ -327,7 +322,7 @@ final class ApiAutoSaveController extends ApiControllerBase {
 
     // Delete published config override auto-save entries.
     foreach ($config_override_keys as $key) {
-      $this->keyValueFactory->get(AutoSaveManager::AUTO_SAVE_STORE)->delete($key);
+      $this->autoSaveManager->deleteByKey($key);
       unset($publish_auto_saves[$key]);
     }
 
@@ -390,7 +385,7 @@ final class ApiAutoSaveController extends ApiControllerBase {
         // skipping fields that should not be overwritten.
         $skip_fields = ['langcode', 'default_langcode', 'id', 'uuid', 'revision_id'];
         foreach ($data as $field_name => $field_value) {
-          if (in_array($field_name, $skip_fields, TRUE)) {
+          if (\in_array($field_name, $skip_fields, TRUE)) {
             continue;
           }
           if ($translation->hasField($field_name)) {
@@ -411,13 +406,13 @@ final class ApiAutoSaveController extends ApiControllerBase {
         $original_entity_type = $original->getEntityType();
         \assert($original_entity_type instanceof ContentEntityTypeInterface);
 
-        // Revision ID
+        // Revision ID.
         $revision_id_key = $original_entity_type->getKey('revision');
         if ($revision_id_key) {
           $translation->set($revision_id_key, NULL);
         }
 
-        // Revision user
+        // Revision user.
         $revision_user = $original_entity_type->getRevisionMetadataKey('revision_user');
         if (\is_string($revision_user)) {
           $translation->set($revision_user, $this->currentUser->id());
@@ -426,7 +421,7 @@ final class ApiAutoSaveController extends ApiControllerBase {
         $original->save();
 
         // Delete the auto-save entry.
-        $this->keyValueFactory->get(AutoSaveManager::AUTO_SAVE_STORE)->delete($autoSaveKey);
+        $this->autoSaveManager->deleteByKey($autoSaveKey);
         $translation_keys[] = $autoSaveKey;
         unset($publish_auto_saves[$autoSaveKey]);
       }
@@ -555,9 +550,9 @@ final class ApiAutoSaveController extends ApiControllerBase {
         // published before in Drupal Canvas.
         // @see \Drupal\canvas\AutoSave\AutoSaveManager::contentEntityIsConsideredNew()
         if ($revision_user = $entity_definition->getRevisionMetadataKey('revision_user')) {
-          \assert(\is_string($revision_user));
           $entity->set($revision_user, $this->currentUser->id());
         }
+
         // Even though we will validate each entity individually before it is
         // saved to ensure the data is still valid after other entities have
         // been saved, we should still validate here before we save any entities
@@ -602,9 +597,8 @@ final class ApiAutoSaveController extends ApiControllerBase {
       }
     }
     catch (ConstraintViolationException $e) {
-      if (isset($transaction)) {
-        $transaction->rollBack();
-      }
+      $transaction->rollBack();
+
       $violationList = $e->getConstraintViolationList();
       \assert(count($violationList) > 0);
       $violationList = self::getViolationSetsFromPropertyPathsAndRoot($lastEntityEvaluated, $violationList);
@@ -613,9 +607,7 @@ final class ApiAutoSaveController extends ApiControllerBase {
       return $violationsResponse;
     }
     catch (\Exception $e) {
-      if (isset($transaction)) {
-        $transaction->rollBack();
-      }
+      $transaction->rollBack();
       Error::logException($this->logger, $e);
       return new JsonResponse(data: [
         'errors' => [

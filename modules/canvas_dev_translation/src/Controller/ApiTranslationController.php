@@ -5,139 +5,90 @@ declare(strict_types=1);
 namespace Drupal\canvas_dev_translation\Controller;
 
 use Drupal\canvas\AutoSave\AutoSaveManager;
+use Drupal\canvas\Controller\ApiControllerBase;
+use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\canvas\Entity\Page;
+use Drupal\canvas\Entity\PageRegion;
 use Drupal\Core\Cache\CacheTagsInvalidatorInterface;
-use Drupal\Core\Config\ConfigFactoryOverrideInterface;
-use Drupal\Core\Controller\ControllerBase;
+use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Entity\TranslatableInterface;
 use Drupal\Core\KeyValueStore\KeyValueFactoryInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
-use Drupal\language\Config\LanguageConfigFactoryOverride;
-use Symfony\Component\DependencyInjection\ContainerInterface;
+use Drupal\Core\Session\AccountProxyInterface;
+use Drupal\language\Config\LanguageConfigFactoryOverrideInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
-use Drupal\Core\Entity\FieldableEntityInterface;
 
 /**
  * Handles translation metadata and creation for Canvas entities.
+ *
+ * @phpstan-ignore-next-line
  */
-final class ApiTranslationController extends ControllerBase {
+final class ApiTranslationController extends ApiControllerBase {
 
   /**
-   * Maps route entity type slugs to Drupal internal entity type IDs.
+   * Maps Drupal entity type IDs to entity type info.
    */
   private const ENTITY_TYPE_MAP = [
-    'canvas_page'             => 'canvas_page',
-    'canvas_content_template' => 'content_template',
-    'canvas_page_region'      => 'page_region',
+    Page::ENTITY_TYPE_ID => [
+      'is_config' => FALSE,
+    ],
+    ContentTemplate::ENTITY_TYPE_ID => [
+      'is_config' => TRUE,
+    ],
+    PageRegion::ENTITY_TYPE_ID => [
+      'is_config' => TRUE,
+    ],
   ];
-
-  /**
-   * Entity type slugs that are config entities using config overrides.
-   */
-  private const CONFIG_ENTITY_TYPES = [
-    'canvas_content_template',
-    'canvas_page_region',
-  ];
-
-  /**
-   * The config language override service.
-   *
-   * @var \Drupal\Core\Config\ConfigFactoryOverrideInterface
-   */
-  protected ConfigFactoryOverrideInterface $configLanguageOverride;
 
   /**
    * Constructs an ApiTranslationController object.
-   *
-   * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entityTypeManager
-   *   The entity type manager.
-   * @param \Drupal\Core\Language\LanguageManagerInterface $languageManager
-   *   The language manager.
-   * @param \Drupal\Core\Config\ConfigFactoryOverrideInterface $configLanguageOverride
-   *   The language config factory override.
-   * @param \Drupal\Core\KeyValueStore\KeyValueFactoryInterface $keyValueFactory
-   *   The key-value factory.
-   * @param \Drupal\Core\Cache\CacheTagsInvalidatorInterface $cacheTagsInvalidator
-   *   The cache tags invalidator.
    */
   public function __construct(
-    EntityTypeManagerInterface $entityTypeManager,
-    LanguageManagerInterface $languageManager,
-    ConfigFactoryOverrideInterface $configLanguageOverride,
+    private readonly EntityTypeManagerInterface $entityTypeManager,
+    private readonly LanguageManagerInterface $languageManager,
+    private readonly LanguageConfigFactoryOverrideInterface $configLanguageOverride,
     private readonly KeyValueFactoryInterface $keyValueFactory,
     private readonly CacheTagsInvalidatorInterface $cacheTagsInvalidator,
-  ) {
-    $this->entityTypeManager = $entityTypeManager;
-    $this->languageManager = $languageManager;
-    $this->configLanguageOverride = $configLanguageOverride;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public static function create(ContainerInterface $container): static {
-    return new static(
-      $container->get('entity_type.manager'),
-      $container->get('language_manager'),
-      $container->get('language.config_factory_override'),
-      $container->get('keyvalue'),
-      $container->get('cache_tags.invalidator'),
-    );
-  }
+    private readonly AccountProxyInterface $currentUser,
+  ) {}
 
   /**
    * Returns translation metadata for all configured languages for an entity.
-   *
-   * @param string $entity_type
-   *   The route entity type slug (e.g. canvas_page).
-   * @param string $id
-   *   The entity ID.
-   * @param \Symfony\Component\HttpFoundation\Request $request
-   *   The current request.
-   *
-   * @return \Symfony\Component\HttpFoundation\JsonResponse
-   *   A JSON response containing translation metadata per language.
    */
-  public function getTranslations(string $entity_type, string $id, Request $request): JsonResponse {
-    if (!isset(self::ENTITY_TYPE_MAP[$entity_type])) {
-      throw new NotFoundHttpException("Unsupported entity type: $entity_type");
+  public function getTranslations(EntityInterface $entity, Request $request): JsonResponse {
+    $entity_type_id = $entity->getEntityTypeId();
+
+    if (!isset(self::ENTITY_TYPE_MAP[$entity_type_id])) {
+      throw new NotFoundHttpException("Unsupported entity type: $entity_type_id");
     }
 
-    $drupal_entity_type = self::ENTITY_TYPE_MAP[$entity_type];
+    $is_config = self::ENTITY_TYPE_MAP[$entity_type_id]['is_config'];
     $languages = $this->languageManager->getLanguages();
 
-    $data = in_array($entity_type, self::CONFIG_ENTITY_TYPES, TRUE)
-      ? $this->buildConfigEntityMetadata($drupal_entity_type, $entity_type, $id, $languages)
-      : $this->buildContentEntityMetadata($drupal_entity_type, $entity_type, $id, $languages);
+    $data = $is_config
+      ? $this->buildConfigEntityMetadata($entity_type_id, (string) $entity->id(), $languages)
+      : $this->buildContentEntityMetadata($entity_type_id, (string) $entity->id(), $languages);
 
     return new JsonResponse(['data' => $data]);
   }
 
   /**
    * Creates a translation auto-save entry copied from a source language.
-   *
-   * @param string $entity_type
-   *   The route entity type slug (e.g. canvas_page).
-   * @param string $id
-   *   The entity ID.
-   * @param string $target_langcode
-   *   The target language code to create.
-   * @param \Symfony\Component\HttpFoundation\Request $request
-   *   The current request. Must contain source_langcode in the JSON body.
-   *
-   * @return \Symfony\Component\HttpFoundation\JsonResponse
-   *   A JSON response with the result of the translation creation.
    */
-  public function createTranslation(string $entity_type, string $id, string $target_langcode, Request $request): JsonResponse {
-    if (!isset(self::ENTITY_TYPE_MAP[$entity_type])) {
-      throw new NotFoundHttpException("Unsupported entity type: $entity_type");
+  public function createTranslation(EntityInterface $entity, string $target_langcode, Request $request): JsonResponse {
+    $entity_type_id = $entity->getEntityTypeId();
+
+    if (!isset(self::ENTITY_TYPE_MAP[$entity_type_id])) {
+      throw new NotFoundHttpException("Unsupported entity type: $entity_type_id");
     }
 
-    $body = json_decode($request->getContent(), TRUE);
-    if (!\is_array($body) || empty($body['source_langcode'])) {
+    $body = self::decode($request);
+    if (empty($body['source_langcode'])) {
       return new JsonResponse(
         ['error' => 'Missing required body parameter: source_langcode'],
         Response::HTTP_BAD_REQUEST
@@ -168,34 +119,27 @@ final class ApiTranslationController extends ControllerBase {
       );
     }
 
-    $drupal_entity_type = self::ENTITY_TYPE_MAP[$entity_type];
+    $is_config = self::ENTITY_TYPE_MAP[$entity_type_id]['is_config'];
 
-    return in_array($entity_type, self::CONFIG_ENTITY_TYPES, TRUE)
-      ? $this->createConfigEntityTranslation($drupal_entity_type, $entity_type, $id, $source_langcode, $target_langcode)
-      : $this->createContentEntityTranslation($drupal_entity_type, $entity_type, $id, $source_langcode, $target_langcode);
+    return $is_config
+      ? $this->createConfigEntityTranslation($entity_type_id, (string) $entity->id(), $source_langcode, $target_langcode)
+      : $this->createContentEntityTranslation($entity_type_id, (string) $entity->id(), $source_langcode, $target_langcode);
   }
 
   /**
    * Builds translation metadata for a content entity across all languages.
    *
    * @param string $drupal_entity_type
-   *   The internal Drupal entity type ID.
-   * @param string $route_entity_type
-   *   The route entity type slug.
+   *   The Drupal entity type ID.
    * @param string $id
    *   The entity ID.
    * @param \Drupal\Core\Language\LanguageInterface[] $languages
-   *   All configured languages.
+   *   The list of available languages.
    *
-   * @return array
-   *   An array of language metadata entries.
+   * @return array<int, array<string, mixed>>
+   *   An array of translation metadata indexed numerically.
    */
-  private function buildContentEntityMetadata(
-    string $drupal_entity_type,
-    string $route_entity_type,
-    string $id,
-    array $languages,
-  ): array {
+  private function buildContentEntityMetadata(string $drupal_entity_type, string $id, array $languages): array {
     $storage = $this->entityTypeManager->getStorage($drupal_entity_type);
     $entity = $storage->load($id);
     if (!$entity) {
@@ -253,9 +197,6 @@ final class ApiTranslationController extends ControllerBase {
   /**
    * Resolves the translation status string for a content entity translation.
    *
-   * @param object $translation
-   *   The entity translation object.
-   *
    * @return string
    *   Either 'published' or 'draft'.
    */
@@ -268,28 +209,8 @@ final class ApiTranslationController extends ControllerBase {
 
   /**
    * Creates a content entity translation auto-save from a source language.
-   *
-   * @param string $drupal_entity_type
-   *   The internal Drupal entity type ID.
-   * @param string $route_entity_type
-   *   The route entity type slug.
-   * @param string $id
-   *   The entity ID.
-   * @param string $source_langcode
-   *   The source language code to copy from.
-   * @param string $target_langcode
-   *   The target language code to create.
-   *
-   * @return \Symfony\Component\HttpFoundation\JsonResponse
-   *   A JSON response with the result.
    */
-  private function createContentEntityTranslation(
-    string $drupal_entity_type,
-    string $route_entity_type,
-    string $id,
-    string $source_langcode,
-    string $target_langcode,
-  ): JsonResponse {
+  private function createContentEntityTranslation(string $drupal_entity_type, string $id, string $source_langcode, string $target_langcode): JsonResponse {
     $storage = $this->entityTypeManager->getStorage($drupal_entity_type);
     $entity = $storage->load($id);
     if (!$entity) {
@@ -339,7 +260,7 @@ final class ApiTranslationController extends ControllerBase {
       'label'       => $entity->label(),
       'data_hash'   => $data_hash,
       'client_id'   => NULL,
-      'owner'       => (int) $this->currentUser()->id(),
+      'owner'       => (int) $this->currentUser->id(),
       'updated'     => time(),
     ]);
 
@@ -358,23 +279,16 @@ final class ApiTranslationController extends ControllerBase {
    * Builds translation metadata for a config entity across all languages.
    *
    * @param string $drupal_entity_type
-   *   The internal Drupal entity type ID.
-   * @param string $route_entity_type
-   *   The route entity type slug.
+   *   The Drupal entity type ID.
    * @param string $id
    *   The entity ID.
    * @param \Drupal\Core\Language\LanguageInterface[] $languages
-   *   All configured languages.
+   *   The list of available languages.
    *
-   * @return array
-   *   An array of language metadata entries.
+   * @return array<int, array<string, mixed>>
+   *   An array of translation metadata indexed numerically.
    */
-  private function buildConfigEntityMetadata(
-    string $drupal_entity_type,
-    string $route_entity_type,
-    string $id,
-    array $languages,
-  ): array {
+  private function buildConfigEntityMetadata(string $drupal_entity_type, string $id, array $languages): array {
     $storage = $this->entityTypeManager->getStorage($drupal_entity_type);
     $entity = $storage->load($id);
     if (!$entity) {
@@ -384,7 +298,6 @@ final class ApiTranslationController extends ControllerBase {
     $config_name = $entity->getConfigDependencyName();
     $default_langcode = $this->languageManager->getDefaultLanguage()->getId();
     $autoSaveStore = $this->keyValueFactory->get(AutoSaveManager::AUTO_SAVE_STORE);
-    \assert($this->configLanguageOverride instanceof LanguageConfigFactoryOverride);
     $result = [];
 
     foreach ($languages as $langcode => $language) {
@@ -437,28 +350,8 @@ final class ApiTranslationController extends ControllerBase {
 
   /**
    * Creates a config entity translation auto-save from a source language.
-   *
-   * @param string $drupal_entity_type
-   *   The internal Drupal entity type ID.
-   * @param string $route_entity_type
-   *   The route entity type slug.
-   * @param string $id
-   *   The entity ID.
-   * @param string $source_langcode
-   *   The source language code to copy from.
-   * @param string $target_langcode
-   *   The target language code to create.
-   *
-   * @return \Symfony\Component\HttpFoundation\JsonResponse
-   *   A JSON response with the result.
    */
-  private function createConfigEntityTranslation(
-    string $drupal_entity_type,
-    string $route_entity_type,
-    string $id,
-    string $source_langcode,
-    string $target_langcode,
-  ): JsonResponse {
+  private function createConfigEntityTranslation(string $drupal_entity_type, string $id, string $source_langcode, string $target_langcode): JsonResponse {
     $storage = $this->entityTypeManager->getStorage($drupal_entity_type);
     $entity = $storage->load($id);
     if (!$entity) {
@@ -467,16 +360,12 @@ final class ApiTranslationController extends ControllerBase {
 
     $config_name = $entity->getConfigDependencyName();
     $default_langcode = $this->languageManager->getDefaultLanguage()->getId();
-    \assert($this->configLanguageOverride instanceof LanguageConfigFactoryOverride);
 
     if ($source_langcode === $default_langcode) {
       $source_component_tree = $entity->toArray()['component_tree'] ?? [];
     }
     else {
-      $source_override = $this->configLanguageOverride->getOverride(
-        $source_langcode,
-        $config_name
-      );
+      $source_override = $this->configLanguageOverride->getOverride($source_langcode, $config_name);
       $source_component_tree = $source_override->get('component_tree') ?? [];
       if (empty($source_component_tree)) {
         return new JsonResponse(
@@ -506,7 +395,7 @@ final class ApiTranslationController extends ControllerBase {
       'label'              => $entity->label(),
       'data_hash'          => hash('xxh64', json_encode(['component_tree' => $source_component_tree], JSON_THROW_ON_ERROR)),
       'client_id'          => NULL,
-      'owner'              => (int) $this->currentUser()->id(),
+      'owner'              => (int) $this->currentUser->id(),
       'updated'            => time(),
       'is_config_override' => TRUE,
     ]);
@@ -525,10 +414,7 @@ final class ApiTranslationController extends ControllerBase {
   /**
    * Formats a Unix timestamp into a structured array for API responses.
    *
-   * @param int|null $timestamp
-   *   The Unix timestamp to format.
-   *
-   * @return array|null
+   * @return array{timestamp:int, formatted:string}|null
    *   An array with 'timestamp' and 'formatted' keys, or NULL if empty.
    */
   private function formatTimestamp(?int $timestamp): ?array {
