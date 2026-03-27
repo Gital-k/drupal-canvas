@@ -446,15 +446,15 @@ class AutoSaveManager implements EventSubscriberInterface {
     return $this->componentInstanceFormViolationsStore->get($component_uuid) ?? new ConstraintViolationList();
   }
 
-/**
- * Normalizes an entity to a stable array for hashing and storage.
- *
- * @param \Drupal\Core\Entity\EntityInterface $entity
- *   The entity to normalize.
- *
- * @return array<string, mixed>
- *   The normalized entity data.
- */
+  /**
+   * Normalizes an entity to a stable array for hashing and storage.
+   *
+   * @param \Drupal\Core\Entity\EntityInterface $entity
+   *   The entity to normalize.
+   *
+   * @return array<string, mixed>
+   *   The normalized entity data.
+   */
   private static function normalizeEntity(EntityInterface $entity): array {
     if (!$entity instanceof FieldableEntityInterface) {
       if ($entity instanceof ComponentTreeEntityInterface && $entity instanceof ConfigEntityInterface) {
