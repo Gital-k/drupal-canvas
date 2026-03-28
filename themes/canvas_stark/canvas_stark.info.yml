@@ -8,7 +8,8 @@ hidden: true
 libraries-extend:
   ckeditor5/internal.drupal.ckeditor5:
     - canvas_stark/canvas.internal.drupal.ckeditor5
-
+  core/drupal.tabledrag:
+    - canvas_stark/canvas.tabledrag
 libraries-override:
   media_library/widget:
     js:
