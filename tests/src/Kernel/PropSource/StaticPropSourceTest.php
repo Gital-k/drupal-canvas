@@ -20,6 +20,8 @@ use Drupal\canvas\PropSource\PropSource;
 use Drupal\canvas\PropSource\StaticPropSource;
 use Drupal\datetime_range\Plugin\Field\FieldWidget\DateRangeDatelistWidget;
 use Drupal\datetime_range\Plugin\Field\FieldWidget\DateRangeDefaultWidget;
+use Drupal\language\Entity\ConfigurableLanguage;
+use Drupal\media\Entity\Media;
 use Drupal\media_library\Plugin\Field\FieldWidget\MediaLibraryWidget;
 use Drupal\user\Entity\User;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -120,6 +122,94 @@ class StaticPropSourceTest extends PropSourceTestBase {
     self::assertSame($expected_cacheability->getCacheMaxAge(), $evaluation_result->getCacheMaxAge());
     // - the field type's item's raw value is minimized if it is single-property
     $this->assertSame($value, $prop_source_example->getValue());
+  }
+
+  /**
+   * Tests that a static entity reference resolves to the correct translation.
+   *
+   * Verifies that when a StaticPropSource contains an entity reference to a
+   * translated Media image entity, evaluating the prop expression returns the
+   * alt text matching the active content language. The Evaluator calls
+   * getTranslationFromContext() on the referenced entity, which picks the
+   * translation based on the current content language.
+   *
+   * Also verifies language fallback: evaluating in a language for which the
+   * entity has no translation falls back to the default language.
+   *
+   * @see \Drupal\canvas\PropExpressions\StructuredData\Evaluator::doEvaluate()
+   */
+  public function testStaticEntityReferenceTranslation(): void {
+    $this->enableModules(['language', 'content_translation']);
+    $this->installConfig(['language']);
+    ConfigurableLanguage::createFromLangcode('es')->save();
+    ConfigurableLanguage::createFromLangcode('fr')->save();
+
+    // Not enabled by default: mirrors language recipe config.
+    \Drupal::service('content_translation.manager')
+      ->setEnabled('media', 'image', TRUE);
+
+    $media = Media::create([
+      'bundle' => 'image',
+      'name' => 'Test image',
+      'langcode' => 'en',
+      'field_media_image' => [
+        'target_id' => 1,
+        'alt' => 'Hello',
+      ],
+    ]);
+    $media->save();
+    $media->addTranslation('es', [
+      'name' => 'Imagen de prueba',
+      'field_media_image' => [
+        'target_id' => 1,
+        'alt' => 'Hola',
+      ],
+    ]);
+    $media->save();
+
+    $this->setUpCurrentUser(permissions: ['view media']);
+
+    // Expression: entity_reference → entity → media:image →
+    // field_media_image → alt.
+    $prop_source = StaticPropSource::parse([
+      'sourceType' => 'static:field_item:entity_reference',
+      'value' => ['target_id' => $media->id()],
+      'expression' => 'ℹ︎entity_reference␟entity␜␜entity:media:image␝field_media_image␞␟alt',
+      'sourceTypeSettings' => [
+        'storage' => ['target_type' => 'media'],
+        'instance' => [
+          'handler' => 'default:media',
+          'handler_settings' => [
+            'target_bundles' => ['image' => 'image'],
+          ],
+        ],
+      ],
+    ]);
+
+    $result_en = $prop_source->evaluate(User::create(), is_required: TRUE);
+    self::assertSame('Hello', $result_en->value);
+
+    // Switch content language: change default language and reset so that
+    // getCurrentLanguage(TYPE_CONTENT) returns 'es'.
+    $es = \Drupal::languageManager()->getLanguage('es');
+    \assert($es !== NULL);
+    \Drupal::service('language.default')->set($es);
+    \Drupal::languageManager()->reset();
+
+    $result_es = $prop_source->evaluate(User::create(), is_required: TRUE);
+    self::assertSame('Hola', $result_es->value);
+    // getTranslationFromContext() adds this cache context when the entity
+    // has multiple translations.
+    self::assertContains('languages:language_content', $result_es->getCacheContexts());
+
+    // Language fallback: no FR translation exists, should return EN default.
+    $fr = \Drupal::languageManager()->getLanguage('fr');
+    \assert($fr !== NULL);
+    \Drupal::service('language.default')->set($fr);
+    \Drupal::languageManager()->reset();
+
+    $result_fr = $prop_source->evaluate(User::create(), is_required: TRUE);
+    self::assertSame('Hello', $result_fr->value);
   }
 
   public static function providerTest(): \Generator {

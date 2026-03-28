@@ -19,6 +19,8 @@ use Drupal\canvas\PropSource\EntityFieldPropSource;
 use Drupal\canvas\PropSource\PropSource;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
+use Drupal\language\Entity\ConfigurableLanguage;
+use Drupal\media\Entity\Media;
 use Drupal\node\Entity\NodeType;
 use Drupal\user\Entity\Role;
 use Drupal\user\Entity\User;
@@ -939,6 +941,96 @@ class EntityFieldPropSourceTest extends PropSourceTestBase {
       'expression' => 'ℹ︎␜entity:user␝created␞␟value',
       'adapter' => 'unix_to_date_oops_I_have_been_renamed',
     ]);
+  }
+
+  /**
+   * Tests that an EntityFieldPropSource resolves translated entity references.
+   *
+   * Verifies that when a node's entity reference field points to a translated
+   * Media image entity, evaluating the prop expression via EntityFieldPropSource
+   * returns the alt text matching the active content language. The Evaluator
+   * calls getTranslationFromContext() on the referenced entity, which picks the
+   * translation based on the current content language.
+   *
+   * Also verifies language fallback: evaluating in a language for which the
+   * entity has no translation falls back to the default language.
+   *
+   * @see \Drupal\canvas\PropExpressions\StructuredData\Evaluator::doEvaluate()
+   */
+  public function testEntityFieldTranslatedReference(): void {
+    $this->enableModules(['language', 'content_translation']);
+    $this->installConfig(['language']);
+    ConfigurableLanguage::createFromLangcode('es')->save();
+    ConfigurableLanguage::createFromLangcode('fr')->save();
+
+    // Not enabled by default: mirrors language recipe config.
+    \Drupal::service('content_translation.manager')
+      ->setEnabled('media', 'image', TRUE);
+
+    $this->installEntitySchema('node');
+    NodeType::create(['type' => 'page', 'name' => 'page'])->save();
+    $this->createEntityReferenceField('node', 'page', 'field_hero_image', 'Hero Image', 'media',
+      selection_handler_settings: ['target_bundles' => ['image' => 'image']],
+    );
+
+    $media = Media::create([
+      'bundle' => 'image',
+      'name' => 'Test image',
+      'langcode' => 'en',
+      'field_media_image' => [
+        'target_id' => 1,
+        'alt' => 'Hello',
+      ],
+    ]);
+    $media->save();
+    $media->addTranslation('es', [
+      'name' => 'Imagen de prueba',
+      'field_media_image' => [
+        'target_id' => 1,
+        'alt' => 'Hola',
+      ],
+    ]);
+    $media->save();
+
+    $node = $this->createNode([
+      'type' => 'page',
+      'langcode' => 'en',
+      'field_hero_image' => ['target_id' => $media->id()],
+    ]);
+    $this->setUpCurrentUser(permissions: ['access content', 'view media']);
+
+    // Expression: node:page → field_hero_image → entity → media:image →
+    // field_media_image → alt.
+    $expression = 'ℹ︎␜entity:node:page␝field_hero_image␞␟entity␜␜entity:media:image␝field_media_image␞␟alt';
+    $prop_source = EntityFieldPropSource::parse([
+      'sourceType' => PropSource::EntityField->value,
+      'expression' => $expression,
+    ]);
+
+    $result_en = $prop_source->evaluate(clone $node, is_required: TRUE);
+    self::assertSame('Hello', $result_en->value);
+
+    // Switch content language: change default language and reset so that
+    // getCurrentLanguage(TYPE_CONTENT) returns 'es'.
+    $es = \Drupal::languageManager()->getLanguage('es');
+    \assert($es !== NULL);
+    \Drupal::service('language.default')->set($es);
+    \Drupal::languageManager()->reset();
+
+    $result_es = $prop_source->evaluate(clone $node, is_required: TRUE);
+    self::assertSame('Hola', $result_es->value);
+    // getTranslationFromContext() adds this cache context when the entity
+    // has multiple translations.
+    self::assertContains('languages:language_content', $result_es->getCacheContexts());
+
+    // Language fallback: no FR translation exists, should return EN default.
+    $fr = \Drupal::languageManager()->getLanguage('fr');
+    \assert($fr !== NULL);
+    \Drupal::service('language.default')->set($fr);
+    \Drupal::languageManager()->reset();
+
+    $result_fr = $prop_source->evaluate(clone $node, is_required: TRUE);
+    self::assertSame('Hello', $result_fr->value);
   }
 
   /**
