@@ -468,18 +468,38 @@ Cypress.Commands.add(
     iframeSelector = initializedReadyPreviewIframeSelector,
     customTimeout,
   ) => {
-    cy.document().then((doc) => {
-      cy.get(true, {
-        timeout: customTimeout || Cypress.config('defaultCommandTimeout'),
-      }).should(() => {
-        const frameContent = doc
-          .querySelector(iframeSelector)
-          ?.contentWindow?.document?.body.querySelector(selector);
-        expect(
-          !!frameContent,
-          `'${selector}' was found in iframe '${iframeSelector}'`,
-        ).to.equal(true);
-      });
+    const timeout = customTimeout || 10000; // Use 10 seconds for testing
+    const startTime = Date.now();
+    let retryCount = 0;
+
+    // Log before starting - this WILL show up
+    cy.log(`START waitForElementInIframe at ${new Date().toISOString()} - timeout: ${timeout}ms`);
+
+    cy.document({ timeout }).should((doc) => {
+      retryCount++;
+      const frameContent = doc
+        .querySelector(iframeSelector)
+        ?.contentWindow?.document?.body.querySelector(selector);
+      const found = !!frameContent;
+      const elapsed = Date.now() - startTime;
+
+      // On last retry, include iframe body in error message so it shows in logs
+      let debugInfo = '';
+      if (!found && elapsed > timeout - 200) {
+        const iframeBody = doc.querySelector(iframeSelector)?.contentWindow?.document?.body;
+        const bodyHTML = iframeBody?.innerHTML?.substring(0, 500) || 'NO IFRAME BODY';
+        debugInfo = ` | IFRAME BODY: ${bodyHTML}`;
+      }
+
+      // Put retry count, elapsed time, and iframe body in the error message
+      expect(
+        found,
+        `[RETRY COUNT: ${retryCount}, ELAPSED: ${elapsed}ms] '${selector}' was found in iframe '${iframeSelector}'${debugInfo}`,
+      ).to.equal(true);
+    }).then(() => {
+      // Log on success - this will show if it passes
+      const elapsed = Date.now() - startTime;
+      cy.log(`SUCCESS waitForElementInIframe at ${new Date().toISOString()} - took ${elapsed}ms, ${retryCount} retries`);
     });
   },
 );
@@ -503,7 +523,7 @@ Cypress.Commands.add(
     customTimeout,
   ) => {
     cy.document().then((doc) => {
-      cy.get(true, {
+      cy.wrap(null, {
         timeout: customTimeout || Cypress.config('defaultCommandTimeout'),
       }).should(() => {
         const frameContent = doc
@@ -527,7 +547,7 @@ Cypress.Commands.add(
     customTimeout,
   ) => {
     cy.document().then((doc) => {
-      cy.get(true, {
+      cy.wrap(null, {
         timeout: customTimeout || Cypress.config('defaultCommandTimeout'),
       }).should(() => {
         const frameContent = doc
@@ -557,7 +577,7 @@ Cypress.Commands.add(
     customTimeout,
   ) => {
     cy.document().then((doc) => {
-      cy.get(true, {
+      cy.wrap(null, {
         timeout: customTimeout || Cypress.config('defaultCommandTimeout'),
       }).should(() => {
         const frameContent = doc
@@ -585,7 +605,7 @@ Cypress.Commands.add(
     customTimeout,
   ) => {
     cy.document().then((doc) => {
-      cy.get(true, {
+      cy.wrap(null, {
         timeout: customTimeout || Cypress.config('defaultCommandTimeout'),
       }).should(() => {
         const frameContent = doc
@@ -852,7 +872,7 @@ Cypress.Commands.add(
     customTimeout,
   ) => {
     cy.document().then((doc) => {
-      cy.get(true, {
+      cy.wrap(null, {
         timeout: customTimeout || Cypress.config('defaultCommandTimeout'),
       }).should(() => {
         const frameContent = doc
