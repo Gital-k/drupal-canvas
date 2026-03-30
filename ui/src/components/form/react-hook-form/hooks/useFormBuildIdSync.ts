@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 
-import { dispatchFieldValue } from '@/components/form/wrapRHF-utils';
-// import { dispatchFieldValue } from '@/components/form/utils';
+import { dispatchFieldValue } from '@/components/form/react-hook-form/utils';
 import { AJAX_UPDATE_FORM_BUILD_ID_EVENT } from '@/types/Ajax';
 
 import type { UseFormReturn } from 'react-hook-form';

@@ -3,7 +3,7 @@ import { createContext, useContext } from 'react';
 /**
  * Context for field-level form operations.
  *
- * Provided by wrapRHF-fields (ComponentFormField/PageDataFormField) to allow
+ * Provided by react-hook-form/fields (ComponentFormField/PageDataFormField) to allow
  * child components to trigger form state updates without prop drilling
  * attributes.onChange.
  */

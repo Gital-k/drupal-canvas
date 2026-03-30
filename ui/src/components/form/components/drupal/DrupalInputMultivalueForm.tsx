@@ -5,7 +5,7 @@ import { Box, Button, Flex, Popover, Text } from '@radix-ui/themes';
 
 import DrupalInput from '@/components/form/components/drupal/DrupalInput';
 import TextField from '@/components/form/components/TextField';
-import WithRHF from '@/components/form/withRHF';
+import WithRHF from '@/components/form/react-hook-form/withRHF';
 import { a2p } from '@/local_packages/utils';
 
 import type { NumericInputAttributes } from '@/types/DrupalAttribute';

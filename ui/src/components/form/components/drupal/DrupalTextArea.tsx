@@ -4,7 +4,7 @@ import { Flex } from '@radix-ui/themes';
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import TextArea from '@/components/form/components/TextArea';
 import { useFieldContext } from '@/components/form/contexts/FieldContext';
-import { withRHF } from '@/components/form/withRHF';
+import { withRHF } from '@/components/form/react-hook-form/withRHF';
 import {
   selectFormValues,
   setFieldValue,

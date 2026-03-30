@@ -19,17 +19,17 @@ import {
   toPropName,
   validateProp,
 } from '@/components/form/formUtil';
-import { useComponentFormInputInfo } from '@/components/form/wrapRHF-hooks/useComponentFormInputInfo';
-import { useComponentInitialValue } from '@/components/form/wrapRHF-hooks/useComponentInitialValue';
-import { useDebouncedFormState } from '@/components/form/wrapRHF-hooks/useDebouncedFormState';
-import { useUndoRedoSync } from '@/components/form/wrapRHF-hooks/useUndoRedoSync';
+import { useComponentFormInputInfo } from '@/components/form/react-hook-form/hooks/useComponentFormInputInfo';
+import { useComponentInitialValue } from '@/components/form/react-hook-form/hooks/useComponentInitialValue';
+import { useDebouncedFormState } from '@/components/form/react-hook-form/hooks/useDebouncedFormState';
+import { useUndoRedoSync } from '@/components/form/react-hook-form/hooks/useUndoRedoSync';
 import {
   applyEnhancedProps,
   comparePropsWithAttributes,
   createEnhancedOnBlur,
   createEnhancedOnChange,
   getCurrentValueFromProps,
-} from '@/components/form/wrapRHF-utils';
+} from '@/components/form/react-hook-form/utils';
 import { FORM_TYPES } from '@/features/form/constants';
 import {
   clearFieldError,

@@ -2,7 +2,7 @@ import { createContext, useContext, useRef, useState } from 'react';
 
 import { RadioGroup, RadioItem } from '@/components/form/components/Radio';
 import { useFieldContext } from '@/components/form/contexts/FieldContext';
-import { withRHF } from '@/components/form/withRHF';
+import { withRHF } from '@/components/form/react-hook-form/withRHF';
 import { a2p } from '@/local_packages/utils.js';
 
 import type { Attributes } from '@/types/DrupalAttribute';

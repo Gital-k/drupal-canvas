@@ -1,5 +1,5 @@
 import Select from '@/components/form/components/Select';
-import { withRHF } from '@/components/form/withRHF';
+import { withRHF } from '@/components/form/react-hook-form/withRHF';
 
 import type { Attributes } from '@/types/DrupalAttribute';
 

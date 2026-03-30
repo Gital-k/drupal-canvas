@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 
-import { dispatchFieldValue } from '@/components/form/wrapRHF-utils';
+import { dispatchFieldValue } from '@/components/form/react-hook-form/utils';
 
 import type { ComponentType } from 'react';
 import type { useAppDispatch } from '@/app/hooks';

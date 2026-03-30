@@ -11,10 +11,10 @@ import {
   useSafeFormContext,
   useSafeRHFContext,
 } from '@/components/form/contexts/FormContext';
-import { useDebouncedFormState } from '@/components/form/wrapRHF-hooks/useDebouncedFormState';
-import { usePageDataFormInputInfo } from '@/components/form/wrapRHF-hooks/usePageDataFormInputInfo';
-import { usePageDataInitialValue } from '@/components/form/wrapRHF-hooks/usePageDataInitialValue';
-import { useUndoRedoSync } from '@/components/form/wrapRHF-hooks/useUndoRedoSync';
+import { useDebouncedFormState } from '@/components/form/react-hook-form/hooks/useDebouncedFormState';
+import { usePageDataFormInputInfo } from '@/components/form/react-hook-form/hooks/usePageDataFormInputInfo';
+import { usePageDataInitialValue } from '@/components/form/react-hook-form/hooks/usePageDataInitialValue';
+import { useUndoRedoSync } from '@/components/form/react-hook-form/hooks/useUndoRedoSync';
 import {
   applyEnhancedProps,
   comparePropsWithAttributes,
@@ -22,7 +22,7 @@ import {
   createEnhancedOnChange,
   extractPageDataValue,
   getCurrentValueFromProps,
-} from '@/components/form/wrapRHF-utils';
+} from '@/components/form/react-hook-form/utils';
 import {
   clearFieldError,
   selectFieldError,
