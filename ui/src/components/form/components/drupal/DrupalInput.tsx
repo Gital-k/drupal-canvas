@@ -15,7 +15,7 @@ import type {
 
 const DrupalInput = ({
   attributes = {},
-  element,
+  element = {},
 }: {
   attributes?: Attributes | NumericInputAttributes;
   element?: any;

@@ -123,15 +123,18 @@ const DrupalForm = ({
   const formContent = (
     <>
       {children}
-      {/* Render AJAX content using portals so it appears in the correct DOM
-      location and has access to the FormProvider context */}
-      {ajaxContents.map((ajaxContent) => {
+      {/* Create React portals for AJAX-added content. The added nodes are in the
+        expected place in the DOM, but they are not positioned within this React
+        component tree. With createPortal, they become logical descendants of
+        FormProvider and gain access to its context. */}
+      {ajaxContents.map((ajaxContent, index) => {
         return createPortal(
           ajaxContent.application,
           ajaxContent.container,
           ajaxContent.id,
         );
       })}
+      {ajaxContents.map((ajaxContent, index) => ajaxContent.container)}
     </>
   );
 
