@@ -7,6 +7,7 @@ namespace Drupal\canvas\Access;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Access\AccessResultInterface;
+use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Routing\Access\AccessInterface;
 use Drupal\Core\Routing\RouteMatchInterface;
@@ -28,16 +29,18 @@ class ViewModeAccessCheck implements AccessInterface {
    */
   public function access(Route $route, RouteMatchInterface $route_match, AccountInterface $account, string $view_mode_name = 'default', ?string $bundle = NULL): AccessResultInterface {
     $template = $this->loadFromRoute($view_mode_name, $route_match, $bundle);
-    if ($template && $template->status()) {
-      // Add the ContentTemplate as a cacheable dependency so access rebuilds
-      // when content templates are added or updated.
+    // Add the ContentTemplate as a cacheable dependency, so access rebuilds
+    // when content templates are enabled or disabled.
+    $cacheable_metadata = $template ? CacheableMetadata::createFromObject($template) : new CacheableMetadata();
+    if ($template?->status()) {
       return AccessResult::allowedIfHasPermission($account, ContentTemplate::ADMIN_PERMISSION)
-        ->addCacheableDependency($template);
+        ->addCacheableDependency($cacheable_metadata);
     }
     // AccessInterface does not declare access(). Possibly will be fixed in
     // https://www.drupal.org/node/2266817.
     // @phpstan-ignore-next-line method.notFound
-    return $this->inner->access($route, $route_match, $account, $view_mode_name, $bundle);
+    return $this->inner->access($route, $route_match, $account, $view_mode_name, $bundle)
+      ->addCacheableDependency($cacheable_metadata);
   }
 
   /**
