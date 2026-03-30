@@ -5,6 +5,11 @@ declare(strict_types=1);
 namespace Drupal\Tests\canvas\Functional;
 
 use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\Component\Uuid\UuidInterface;
+use Drupal\content_translation\ContentTranslationManagerInterface;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Routing\RouteBuilderInterface;
+use Drupal\language\Config\LanguageConfigFactoryOverride;
 use Drupal\language\Config\LanguageConfigOverride;
 use Drupal\language\Entity\ConfigurableLanguage;
 use PHPUnit\Framework\Attributes\Group;
@@ -54,7 +59,7 @@ final class ContentTemplateConfigTranslationFunctionalTest extends FunctionalTes
    *
    * @var \Drupal\language\Config\LanguageConfigFactoryOverride
    */
-  private $overrideFactory;
+  private LanguageConfigFactoryOverride $overrideFactory;
 
   /**
    * The config name for the ContentTemplate under test.
@@ -75,14 +80,15 @@ final class ContentTemplateConfigTranslationFunctionalTest extends FunctionalTes
     $this->config('language.negotiation')
       ->set('url.source', 'path_prefix')
       ->save();
-    \Drupal::service('router.builder')->rebuild();
+    $this->container->get(RouteBuilderInterface::class)->rebuild();
 
     // Create the article content type and enable content translation on it,
     // so that language-prefixed node URLs resolve to the node.
     $this->drupalCreateContentType(['type' => 'article', 'name' => 'Article']);
-    \Drupal::service('content_translation.manager')
+    $this->container->get(ContentTranslationManagerInterface::class)
       ->setEnabled('node', 'article', TRUE);
-    \Drupal::entityTypeManager()->clearCachedDefinitions();
+    $this->container->get(EntityTypeManagerInterface::class)
+      ->clearCachedDefinitions();
 
     // Create a published English article.
     $this->node = $this->drupalCreateNode([
@@ -92,9 +98,15 @@ final class ContentTemplateConfigTranslationFunctionalTest extends FunctionalTes
       'status'   => 1,
     ]);
 
-    $this->overrideFactory = $this->container->get('language.config_factory_override');
+    /** @var \Drupal\language\Config\LanguageConfigFactoryOverride $overrideFactory */
+    $overrideFactory = $this->container->get('language.config_factory_override');
+    $this->overrideFactory = $overrideFactory;
   }
-  
+
+  // ---------------------------------------------------------------------------
+  // Tests
+  // ---------------------------------------------------------------------------
+
   /**
    * Tests that a French config override is rendered at the /fr node URL.
    *
@@ -220,7 +232,7 @@ final class ContentTemplateConfigTranslationFunctionalTest extends FunctionalTes
    *   The saved ContentTemplate entity.
    */
   private function createAndSaveTemplate(array $componentTree): ContentTemplate {
-    $storage  = $this->container->get('entity_type.manager')
+    $storage  = $this->container->get(EntityTypeManagerInterface::class)
       ->getStorage('content_template');
     $template = $storage->load('node.article.full');
     if ($template === NULL) {
@@ -275,9 +287,11 @@ final class ContentTemplateConfigTranslationFunctionalTest extends FunctionalTes
    *   The component tree array ready for saving in a ContentTemplate.
    */
   private function buildTree(string $sentinel): array {
+    /** @var \Drupal\Component\Uuid\UuidInterface $uuidService */
+    $uuidService = $this->container->get(UuidInterface::class);
     return [
       [
-        'uuid'              => \Drupal::service('uuid')->generate(),
+        'uuid'              => $uuidService->generate(),
         'component_id'      => 'sdc.canvas_test_sdc.props-no-slots',
         'component_version' => 'b1e991f726a2a266',
         'inputs'            => [
