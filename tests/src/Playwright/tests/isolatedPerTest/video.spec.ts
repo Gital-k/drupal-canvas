@@ -19,10 +19,10 @@ test.describe('Video Component', () => {
   });
 
   test('Can use a generic file widget to populate a video prop', async ({
-                                                                          page,
-                                                                          drupal,
-                                                                          canvas,
-                                                                        }) => {
+    page,
+    drupal,
+    canvas,
+  }) => {
     await drupal.login({ username: 'editor', password: 'editor' });
     await canvas.openCanvas(await canvas.createCanvas());
     let previewFrame;
