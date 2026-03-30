@@ -86,8 +86,8 @@ final class ApiAutoSaveController extends ApiControllerBase {
     private readonly LoggerInterface $logger,
     private readonly AccountInterface $currentUser,
     private readonly LanguageManagerInterface $languageManager,
-    #[Autowire(service: 'language.config_factory_override')]
-    private readonly LanguageConfigFactoryOverrideInterface $configLanguageOverride,
+    #[Autowire(service: '?language.config_factory_override')]
+    private readonly ?LanguageConfigFactoryOverrideInterface $configLanguageOverride = NULL,
   ) {}
 
   /**
