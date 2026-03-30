@@ -5,7 +5,7 @@ import { DrupalRadioItem } from '@/components/form/components/drupal/DrupalRadio
 import Hidden from '@/components/form/components/Hidden';
 import TextField from '@/components/form/components/TextField';
 import TextFieldAutocomplete from '@/components/form/components/TextFieldAutocomplete';
-import { wrapRHF } from '@/components/form/wrapRHF';
+import { withRHF } from '@/components/form/withRHF';
 import { a2p } from '@/local_packages/utils.js';
 
 import type {
@@ -85,4 +85,4 @@ const DrupalInput = ({
   }
 };
 
-export default wrapRHF(DrupalInput);
+export default withRHF(DrupalInput);

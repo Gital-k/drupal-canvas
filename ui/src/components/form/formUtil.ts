@@ -86,7 +86,7 @@ export function jsonSchemaValidate(
  * Get an object of array schemas keyed by prop name.
  *
  * @param {InputUIData} inputAndUiData
- *   An object usually generated on render by components wrapped with WrapRHF.
+ *   An object usually generated on render by components wrapped with WithRHF.
  *   The specific properties required by this function:
  *   - components {ComponentsList|undefined}: the list of all available components,
  *     managed by `services/componentAndLayoutApi`
@@ -219,7 +219,7 @@ export function coerceValueForSchema(
  * @param {any} data
  *   The data to check against the schema.
  * @param inputAndUiData
- *   An object usually generated on render by WrapRHF wrapped components,
+ *   An object usually generated on render by WithRHF wrapped components,
  *   containing information about the form and props. This is needed for passing
  *   to getPropSchemas().
  *
@@ -258,7 +258,7 @@ export function toPropName(inputName: string, selectedComponent: string) {
  * @param {object} formState
  *   An object with any number of {formElementName: formElementValue}.
  * @param {InputUIData} inputAndUiData
- *   An object usually generated on render by components wrapped with WrapRHF.
+ *   An object usually generated on render by components wrapped with WithRHF.
  *   The specific properties required by this function:
  *   - components {ComponentsList|undefined}: the list of all available components,
  *     managed by `services/componentAndLayoutApi`
@@ -399,7 +399,7 @@ export const formStateToObject = (
  * @param {object} formState
  *   An object with any number of {formElementName: formElementValue}.
  * @param {InputUIData} inputAndUiData
- *   An object usually generated on render by components wrapped with WrapRHF.
+ *   An object usually generated on render by components wrapped with WithRHF.
  *   The specific properties required by this function:
  *   - components {ComponentsList|undefined}: the list of all available components,
  *     managed by `services/componentAndLayoutApi`

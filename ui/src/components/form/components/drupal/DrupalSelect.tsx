@@ -1,5 +1,5 @@
 import Select from '@/components/form/components/Select';
-import { wrapRHF } from '@/components/form/wrapRHF';
+import { withRHF } from '@/components/form/withRHF';
 
 import type { Attributes } from '@/types/DrupalAttribute';
 
@@ -20,4 +20,4 @@ const DrupalSelect: React.FC<DrupalSelectProps> = ({
   return <Select options={options} attributes={attributes} />;
 };
 
-export default wrapRHF(DrupalSelect);
+export default withRHF(DrupalSelect);

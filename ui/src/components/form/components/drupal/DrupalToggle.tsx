@@ -2,7 +2,7 @@ import { useState } from 'react';
 
 import Toggle from '@/components/form/components/Toggle';
 import { useFieldContext } from '@/components/form/contexts/FieldContext';
-import { wrapRHF } from '@/components/form/wrapRHF';
+import { withRHF } from '@/components/form/withRHF';
 import { a2p } from '@/local_packages/utils.js';
 
 import type { Attributes } from '@/types/DrupalAttribute';
@@ -47,4 +47,4 @@ const DrupalToggle = ({
   );
 };
 
-export default wrapRHF(DrupalToggle);
+export default withRHF(DrupalToggle);

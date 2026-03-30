@@ -25,12 +25,12 @@ const errorsText = (errors?: any) => ajv.errorsText(errors || null);
  * - Works with any input component that has an `attributes` prop with a `name` field
  *
  * Usage:
- *   export default wrapRHF(MyComponent);
+ *   export default withRHF(MyComponent);
  */
-export const wrapRHF = <P extends Record<string, any>>(
+export const withRHF = <P extends Record<string, any>>(
   WrappedComponent: React.ComponentType<P>,
 ): React.ComponentType<P> => {
-  const WrapRHF = (props: P) => {
+  const WithRHF = (props: P) => {
     // Get form contexts - they may be null for external forms
     const dispatch = useAppDispatch();
     const formContext = useSafeFormContext();
@@ -82,11 +82,11 @@ export const wrapRHF = <P extends Record<string, any>>(
     );
   };
 
-  WrapRHF.displayName = `wrapRHF(${WrappedComponent.displayName || WrappedComponent.name || 'Component'})`;
+  WithRHF.displayName = `withRHF(${WrappedComponent.displayName || WrappedComponent.name || 'Component'})`;
 
   // Wrap with React.memo to prevent re-renders when props haven't actually changed
   // Use deep comparison since props objects are often recreated with same values
-  return React.memo(WrapRHF, (prevProps, nextProps) => {
+  return React.memo(WithRHF, (prevProps, nextProps) => {
     // Quick reference check first
     if (prevProps === nextProps) {
       return true; // Skip re-render
@@ -146,4 +146,4 @@ export const wrapRHF = <P extends Record<string, any>>(
   }) as unknown as React.ComponentType<P>;
 };
 
-export default wrapRHF;
+export default withRHF;

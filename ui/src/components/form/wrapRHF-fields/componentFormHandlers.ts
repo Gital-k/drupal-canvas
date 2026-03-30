@@ -101,7 +101,7 @@ export const createComponentFormStateHandler = (
         // If we're doing a background update, debounce that so we don't make
         // multiple requests for a single update. If we're not doing a
         // background preview update, we should schedule this immediately -
-        // debouncing in wrapRHF will handle preventing this firing too
+        // debouncing in withRHF will handle preventing this firing too
         // many times in succession.
         deps.polledBackgroundUpdate.current = setTimeout(
           updateBackend,

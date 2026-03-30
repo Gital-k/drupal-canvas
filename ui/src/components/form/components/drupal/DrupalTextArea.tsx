@@ -4,7 +4,7 @@ import { Flex } from '@radix-ui/themes';
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import TextArea from '@/components/form/components/TextArea';
 import { useFieldContext } from '@/components/form/contexts/FieldContext';
-import { wrapRHF } from '@/components/form/wrapRHF';
+import { withRHF } from '@/components/form/withRHF';
 import {
   selectFormValues,
   setFieldValue,
@@ -156,14 +156,14 @@ const FormatSelect = ({
   );
 };
 
-// We need to create a wrapper for FormatSelect that can be processed by wrapRHF
-// wrapRHF expects a component that can accept any props, but we have specific prop requirements
+// We need to create a wrapper for FormatSelect that can be processed by withRHF
+// withRHF expects a component that can accept any props, but we have specific prop requirements
 const FormatSelectWrapper = (props: any) => {
   // Ensure we're using the right props
   return <FormatSelect {...(props as FormatSelectProps)} />;
 };
 
-// Now wrapRHF can process our component correctly
-const WrappedFormatSelect = wrapRHF(FormatSelectWrapper);
+// Now withRHF can process our component correctly
+const WrappedFormatSelect = withRHF(FormatSelectWrapper);
 
-export default wrapRHF(DrupalTextArea);
+export default withRHF(DrupalTextArea);

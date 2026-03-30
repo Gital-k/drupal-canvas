@@ -4,7 +4,7 @@ import { skipToken } from '@reduxjs/toolkit/query';
 
 import TextField from '@/components/form/components/TextField';
 import { useFieldContext } from '@/components/form/contexts/FieldContext';
-import { wrapRHF } from '@/components/form/wrapRHF';
+import { withRHF } from '@/components/form/withRHF';
 import { useEntityTitle } from '@/hooks/useEntityTitle';
 import { a2p } from '@/local_packages/utils.js';
 import { useGetPageLayoutQuery } from '@/services/componentAndLayout';
@@ -205,4 +205,4 @@ const DrupalPathWidget = ({
   return <TextField attributes={processedAttrs} />;
 };
 
-export default wrapRHF(DrupalPathWidget);
+export default withRHF(DrupalPathWidget);
