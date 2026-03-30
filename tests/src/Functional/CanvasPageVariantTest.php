@@ -29,6 +29,7 @@ use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Plugin\DisplayVariant\CanvasPageVariant;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
+use Drupal\language\Entity\ConfigurableLanguage;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\system\Functional\Cache\AssertPageCacheContextsAndTagsTrait;
@@ -55,6 +56,16 @@ class CanvasPageVariantTest extends FunctionalTestBase {
   private const string UUID_BRANDING = 'b8fd639d-f1df-413a-8926-8d2c7a3d6493';
   private const string UUID_MESSAGES = '4d866c38-7261-45c6-9b1e-0b94096d51e8';
   private const string UUID_IN_ROOT_ANOTHER = '5944ef12-4a3d-4f3a-8e67-086661be9ffc';
+
+  /**
+   * {@inheritdoc}
+   */
+  protected static $modules = [
+    'language',
+    'locale',
+    'config_translation',
+    'canvas_dev_translation',
+  ];
 
   /**
    * {@inheritdoc}
@@ -89,6 +100,9 @@ class CanvasPageVariantTest extends FunctionalTestBase {
     $this->assertSession('canvas_ui');
   }
 
+  /**
+   *
+   */
   public function test(): void {
     self::assertNotNull($this->mink);
     $this->mink->setDefaultSessionName('default');
@@ -618,6 +632,15 @@ class CanvasPageVariantTest extends FunctionalTestBase {
     $this->assertSession()->responseHeaderEquals('X-Drupal-Cache', 'MISS');
   }
 
+/**
+ * Returns the rendered component instances grouped by type.
+ *
+ * @return array{
+ *   blocks: list<string>,
+ *   js_components: list<string>
+ * }
+ *   Associative array with the rendered block IDs and JS component UIDs.
+ */
   private function getRenderedComponentInstances(): array {
     // TRICKY: ideally, we'd also discover SDCs here, but there's no reliable
     // mechanism to detect them (`data-component-id` is optional).
@@ -650,9 +673,18 @@ class CanvasPageVariantTest extends FunctionalTestBase {
     );
   }
 
-  /**
-   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::renderComponent()
-   */
+/**
+ * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::renderComponent()
+ *
+ * @param string $html
+ *   The rendered HTML containing the canvas component.
+ * @param string $uid
+ *   The unique ID of the canvas component to assert.
+ * @param array<string, mixed> $expected_opts
+ *   Expected options for the component as an associative array.
+ * @param array<string, string> $expected_slots
+ *   Expected slot names and their corresponding HTML/text content.
+ */
   private function assertRenderedJavaScriptComponent(string $html, string $uid, array $expected_opts, array $expected_slots): void {
     // TRICKY: use Crawler to also be able to assert HTML embedded in a JSON
     // response.
@@ -676,5 +708,235 @@ class CanvasPageVariantTest extends FunctionalTestBase {
       $slot_index++;
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // Translation tests
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Tests that a French PageRegion config override is rendered at /fr/.
+   *
+   * Installs Canvas and canvas_test_sdc, adds French with URL prefix
+   * negotiation, creates a PageRegion with an English sentinel, writes a French
+   * config language override with a French sentinel, then asserts:
+   * - / renders the English sentinel and not the French one.
+   * - /fr/ renders the French sentinel and not the English one.
+   */
+  public function testFrenchPageRegionOverrideIsRenderedAtFrenchUrl(): void {
+    $this->container->get(ModuleInstallerInterface::class)->install([
+      'canvas',
+      'canvas_test_sdc',
+    ]);
+    $this->rebuildContainer();
+    $this->generateComponentConfig();
+
+    ConfigurableLanguage::createFromLangcode('fr')->save();
+    $this->config('language.negotiation')
+      ->set('url.source', 'path_prefix')
+      ->save();
+    \Drupal::service('router.builder')->rebuild();
+
+    $enSentinel = 'EN page region sentinel';
+    $frSentinel = 'FR page region sentinel';
+    $uuid = '1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d';
+
+    PageRegion::create([
+      'theme' => $this->defaultTheme,
+      'region' => 'sidebar_first',
+      'component_tree' => [
+        [
+          'uuid' => $uuid,
+          'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+          'component_version' => 'b1e991f726a2a266',
+          'inputs' => ['heading' => $enSentinel],
+        ],
+      ],
+    ])->save();
+
+    $configName = 'canvas.page_region.' . $this->defaultTheme . '.sidebar_first';
+
+    /** @var \Drupal\language\Config\LanguageConfigOverride $override */
+    $override = $this->container->get('language.config_factory_override')
+      ->getOverride('fr', $configName)
+      ->setData([
+        'component_tree' => [
+          [
+            'uuid' => $uuid,
+            'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+            'component_version' => 'b1e991f726a2a266',
+            'inputs' => ['heading' => $frSentinel],
+          ],
+        ],
+      ]);
+    $override->save();
+
+    // English (default) URL → English sentinel only.
+    $this->drupalGet('');
+    $this->assertSession()->statusCodeEquals(200);
+    $this->assertSession()->pageTextContains($enSentinel);
+    $this->assertSession()->pageTextNotContains($frSentinel);
+
+    // French URL → French sentinel only.
+    $this->drupalGet('fr/');
+    $this->assertSession()->statusCodeEquals(200);
+    $this->assertSession()->pageTextContains($frSentinel);
+    $this->assertSession()->pageTextNotContains($enSentinel);
+  }
+
+  /**
+   * Tests that deleting a French PageRegion override falls back to the default.
+   *
+   * After the French config language override is deleted, /fr/ must render the
+   * same English component tree that / renders — no stale French output.
+   */
+  public function testDeletingFrenchPageRegionOverrideFallsBackToDefault(): void {
+    $this->container->get(ModuleInstallerInterface::class)->install([
+      'canvas',
+      'canvas_test_sdc',
+    ]);
+    $this->rebuildContainer();
+    $this->generateComponentConfig();
+
+    ConfigurableLanguage::createFromLangcode('fr')->save();
+    $this->config('language.negotiation')
+      ->set('url.source', 'path_prefix')
+      ->save();
+    \Drupal::service('router.builder')->rebuild();
+
+    $enSentinel = 'EN page region sentinel';
+    $frSentinel = 'FR page region sentinel';
+
+    // Generate a valid UUID for the component tree.
+    $uuid = \Drupal::service('uuid')->generate();
+
+    PageRegion::create([
+      'theme' => $this->defaultTheme,
+      'region' => 'sidebar_first',
+      'component_tree' => [
+      [
+        'uuid' => $uuid,
+        'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+        'component_version' => 'b1e991f726a2a266',
+        'inputs' => ['heading' => $enSentinel],
+      ],
+      ],
+    ])->save();
+
+    $configName = 'canvas.page_region.' . $this->defaultTheme . '.sidebar_first';
+    $overrideFactory = $this->container->get('language.config_factory_override');
+
+    /** @var \Drupal\language\Config\LanguageConfigOverride $override */
+    $override = $overrideFactory
+      ->getOverride('fr', $configName)
+      ->setData([
+        'component_tree' => [
+        [
+          'uuid' => $uuid,
+          'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+          'component_version' => 'b1e991f726a2a266',
+          'inputs' => ['heading' => $frSentinel],
+        ],
+        ],
+      ]);
+    $override->save();
+
+    // Confirm the French override is initially applied.
+    $this->drupalGet('fr/');
+    $this->assertSession()->pageTextContains($frSentinel);
+
+    // Delete the override.
+    $override->delete();
+
+    // French URL must now fall back to the default (EN) tree.
+    $this->drupalGet('fr/');
+    $this->assertSession()->statusCodeEquals(200);
+    $this->assertSession()->pageTextContains($enSentinel);
+    $this->assertSession()->pageTextNotContains($frSentinel);
+  }
+
+  /**
+   * Tests that updating a French PageRegion override is immediately reflected.
+   *
+   * After a second write to the French config language override, /fr/ must
+   * render the updated sentinel — no stale output from the first override.
+   */
+  public function testUpdatingFrenchPageRegionOverrideIsReflected(): void {
+    $this->container->get(ModuleInstallerInterface::class)->install([
+      'canvas',
+      'canvas_test_sdc',
+    ]);
+    $this->rebuildContainer();
+    $this->generateComponentConfig();
+
+    ConfigurableLanguage::createFromLangcode('fr')->save();
+    $this->config('language.negotiation')
+      ->set('url.source', 'path_prefix')
+      ->save();
+    \Drupal::service('router.builder')->rebuild();
+
+    $enSentinel = 'EN page region sentinel';
+    $frSentinel = 'FR page region sentinel';
+    $frUpdatedSentinel = 'FR updated page region sentinel';
+
+    // Generate a valid UUID.
+    $uuid = \Drupal::service('uuid')->generate();
+
+    PageRegion::create([
+      'theme' => $this->defaultTheme,
+      'region' => 'sidebar_first',
+      'component_tree' => [
+      [
+        'uuid' => $uuid,
+        'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+        'component_version' => 'b1e991f726a2a266',
+        'inputs' => ['heading' => $enSentinel],
+      ],
+      ],
+    ])->save();
+
+    $configName = 'canvas.page_region.' . $this->defaultTheme . '.sidebar_first';
+    $overrideFactory = $this->container->get('language.config_factory_override');
+
+    // Create French override.
+    $overrideFactory
+      ->getOverride('fr', $configName)
+      ->setData([
+        'component_tree' => [
+        [
+          'uuid' => $uuid,
+          'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+          'component_version' => 'b1e991f726a2a266',
+          'inputs' => ['heading' => $frSentinel],
+        ],
+        ],
+      ])
+      ->save();
+
+    $this->drupalGet('fr/');
+    $this->assertSession()->pageTextContains($frSentinel);
+
+    // Update French override in place.
+    $overrideFactory
+      ->getOverride('fr', $configName)
+      ->setData([
+        'component_tree' => [
+        [
+          'uuid' => $uuid,
+          'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+          'component_version' => 'b1e991f726a2a266',
+          'inputs' => ['heading' => $frUpdatedSentinel],
+        ],
+        ],
+      ])
+      ->save();
+
+    $this->drupalGet('fr/');
+    $this->assertSession()->statusCodeEquals(200);
+    $this->assertSession()->pageTextContains($frUpdatedSentinel);
+    $this->assertSession()->pageTextNotContains($frSentinel);
+    $this->assertSession()->pageTextNotContains($enSentinel);
+  }
+
+
 
 }
