@@ -232,6 +232,20 @@ export const InputBehaviorsCommon = ({
     attributes.value = inputValue;
 
     attributes.onChange = (e: React.ChangeEvent) => {
+      // Inputs marked with data-canvas-skip-validation are managed externally
+      // (e.g. the multivalue popover). Only update the local React state so
+      // the controlled input stays in sync — do NOT dispatch to the Redux
+      // store, validate, or commit form state. The popover's own commit flow
+      // will push the final validated value.
+      if (
+        typeof e?.target?.hasAttribute === 'function' &&
+        e.target.hasAttribute('data-canvas-skip-validation')
+      ) {
+        const newValue = parseNewValue(e);
+        setInputValue(newValue);
+        return;
+      }
+
       delete attributes['data-invalid-prop-value'];
 
       const formId = attributes['data-form-id'] as FormId;
@@ -285,6 +299,12 @@ export const InputBehaviorsCommon = ({
     };
 
     attributes.onBlur = (e: React.FocusEvent) => {
+      if (
+        typeof e?.target?.hasAttribute === 'function' &&
+        e.target.hasAttribute('data-canvas-skip-validation')
+      ) {
+        return;
+      }
       const validationResult = validateNewValue(e, inputValue);
       if (!validationResult.valid) {
         if (formId) {
