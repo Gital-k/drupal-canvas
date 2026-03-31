@@ -119,7 +119,7 @@ final class StorablePropShape {
     if (($this->fieldInstanceSettings ?? self::DEFAULT_INSTANCE_SETTINGS) !== ($target->fieldInstanceSettings ?? self::DEFAULT_INSTANCE_SETTINGS)) {
       // Entity reference fields are special: their instance settings
       // contain the allowed target bundles, which can be a superset.
-      // @todo Consider allowing contributed modules to provide similar logic for other field types in https://www.drupal.org/project/canvas/issues/3571366.
+      // @todo Consider allowing contributed modules to provide similar logic for other field types in FIND DIFFERENT ISSUE?
       if ($this->fieldTypeProp->getFieldType() === 'entity_reference') {
         \assert($target->fieldTypeProp->getFieldType() === 'entity_reference');
         // @see \Drupal\Core\Field\Plugin\Field\FieldType\EntityReferenceItem::getReferenceableBundles()

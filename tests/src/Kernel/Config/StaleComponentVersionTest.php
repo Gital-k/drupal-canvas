@@ -77,7 +77,6 @@ class StaleComponentVersionTest extends CanvasKernelTestBase {
    * site was installed from scratch with both types, its component config
    * entity only ever knew the two-bundle hash — the recipe's one-bundle hash
    * was never valid there.
-   *
    */
   public function testPatternComponentVersionBecomesStaleAcrossEnvironments(): void {
     // ── "Recipe author" environment ──────────────────────────────────────────

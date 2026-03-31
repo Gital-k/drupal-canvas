@@ -27,7 +27,7 @@ abstract class ComponentTreeConfigEntityBase extends ConfigEntityBase implements
   /**
    * {@inheritdoc}
    */
-  public static function preCreate(EntityStorageInterface $storage, array &$values) {
+  public static function preCreate(EntityStorageInterface $storage, array &$values): void {
     // Resolve null component_version values to the component's current active
     // version. This allows recipe authors to ship environment-agnostic config
     // by omitting the version hash, which encodes environment-specific state

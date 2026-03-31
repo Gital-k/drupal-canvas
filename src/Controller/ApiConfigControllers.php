@@ -366,7 +366,6 @@ final class ApiConfigControllers extends ApiControllerBase {
     // Auto-update Pattern's component instances before serving them, which will
     // make the preview accurate with what the editor would see when adding the
     // Pattern to the component tree being edited.
-    // @todo Refine in https://www.drupal.org/project/canvas/issues/3571366
     if ($entity instanceof Pattern) {
       $tree = $entity->getComponentTree();
       $this->componentSourceManager->updateComponentInstances($tree);
