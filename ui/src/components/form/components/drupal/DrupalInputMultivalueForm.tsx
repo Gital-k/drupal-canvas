@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
-import { ArrowRightIcon, Cross2Icon, TrashIcon } from '@radix-ui/react-icons';
-import { Box, Button, Flex, Popover, Text } from '@radix-ui/themes';
+import {
+  ArrowRightIcon,
+  Cross2Icon,
+  ExclamationTriangleIcon,
+  TrashIcon,
+} from '@radix-ui/react-icons';
+import { Box, Button, Callout, Flex, Popover, Text } from '@radix-ui/themes';
 
 import DrupalInput from '@/components/form/components/drupal/DrupalInput';
 import TextField from '@/components/form/components/TextField';
@@ -14,6 +19,12 @@ import styles from './DrupalInputMultivalueForm.module.css';
 
 // Create the wrapped TextField component with InputBehaviors HOC.
 const TextFieldWithBehaviors = InputBehaviors(TextField);
+
+// Type for validation results.
+type ValidationResult = {
+  valid: boolean;
+  errorMessage?: string;
+};
 
 /**
  * DrupalInputMultivalueForm component for inputs within multivalue widgets.
@@ -48,6 +59,8 @@ const DrupalInputMultivalueForm = ({
   const triggerRowRef = useRef<HTMLDivElement | null>(null);
   // Controlled popover state so we can close it programmatically on remove.
   const [popoverOpen, setPopoverOpen] = useState(false);
+  // Validation error message to display in the popover.
+  const [validationError, setValidationError] = useState<string | null>(null);
   const fieldLabel = attributes['data-field-label'] || '';
   // Ref for the popover trigger to restore focus after closing.
   const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -64,27 +77,64 @@ const DrupalInputMultivalueForm = ({
     setTempValue(newValue as string);
   }, [attributes.value, attributes.defaultValue]);
 
+  // Validation callback — uses native HTML5 validation but displays messages in the popover.
+  // The popover input is React-controlled (value={tempValue}), so its native value already
+  // reflects the current input; checkValidity() can be called directly.
+  const validateInputValue = useCallback(
+    (inputElement: HTMLInputElement | null): ValidationResult => {
+      if (!inputElement) {
+        return { valid: true };
+      }
+
+      if (!inputElement.checkValidity()) {
+        return {
+          valid: false,
+          errorMessage: inputElement.validationMessage,
+        };
+      }
+
+      return { valid: true };
+    },
+    [],
+  );
+
   // Commit a value directly — used by the autocomplete selection handler so
   // the table row updates immediately.
-  const commitValue = useCallback((newValue: string) => {
-    setDisplayValue(newValue);
-    setTempValue(newValue);
-
-    if (inputWrapperRef.current) {
-      const realInput = inputWrapperRef.current.querySelector(
-        'input',
-      ) as HTMLInputElement | null;
-      if (realInput && realInput.value !== newValue) {
-        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-          HTMLInputElement.prototype,
-          'value',
-        )?.set;
-        nativeInputValueSetter?.call(realInput, newValue);
-        realInput.dispatchEvent(new Event('input', { bubbles: true }));
-        realInput.dispatchEvent(new Event('change', { bubbles: true }));
+  // Returns true if the value was committed, false if validation failed.
+  const commitValue = useCallback(
+    (newValue: string, skipValidation = false): boolean => {
+      // Validate before committing unless explicitly skipped.
+      if (!skipValidation && popoverInputRef.current) {
+        const validationResult = validateInputValue(popoverInputRef.current);
+        if (!validationResult.valid) {
+          setValidationError(validationResult.errorMessage || 'Invalid value');
+          return false;
+        }
       }
-    }
-  }, []);
+
+      // Clear any validation errors on successful commit.
+      setValidationError(null);
+      setDisplayValue(newValue);
+      setTempValue(newValue);
+
+      if (inputWrapperRef.current) {
+        const realInput = inputWrapperRef.current.querySelector(
+          'input',
+        ) as HTMLInputElement | null;
+        if (realInput && realInput.value !== newValue) {
+          const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+            HTMLInputElement.prototype,
+            'value',
+          )?.set;
+          nativeInputValueSetter?.call(realInput, newValue);
+          realInput.dispatchEvent(new Event('input', { bubbles: true }));
+          realInput.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      }
+      return true;
+    },
+    [validateInputValue],
+  );
 
   // Listen for the custom autocomplete-selected event dispatched by
   // autocomplete.extend.js when the user picks a suggestion.
@@ -102,25 +152,21 @@ const DrupalInputMultivalueForm = ({
       autocompleteCleanupRef.current = null;
     }
   }, [popoverOpen]);
+
   // Handle temporary input changes in popover (not committed until Enter).
   const handleTempInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Clear validation error when user starts typing.
+    setValidationError(null);
     setTempValue(e.target.value);
   };
 
   // Commit the temporary value to the actual input and display.
+  // commitValue now handles validation internally and returns success status.
   const handleCommitValue = () => {
-    // Validate the input using the popover input element's HTML5 validation.
-    if (popoverInputRef.current) {
-      // Check if the input is valid according to its constraints
-      // (min, max, step, etc.).
-      if (!popoverInputRef.current.checkValidity()) {
-        // Show the browser's native validation message.
-        popoverInputRef.current.reportValidity();
-        return;
-      }
+    const success = commitValue(tempValue);
+    if (success) {
+      setPopoverOpen(false);
     }
-
-    commitValue(tempValue);
   };
 
   // Handle Enter key press in popover input.
@@ -157,15 +203,8 @@ const DrupalInputMultivalueForm = ({
 
       e.preventDefault();
 
-      // Validate the input before committing
-      if (inputElement && !inputElement.checkValidity()) {
-        // Show validation error and keep popover open
-        inputElement.reportValidity();
-        return;
-      }
-
+      // Use handleCommitValue which validates and closes the popover on success.
       handleCommitValue();
-      setPopoverOpen(false);
     }
   };
 
@@ -173,8 +212,9 @@ const DrupalInputMultivalueForm = ({
   // revert when closing without commit.
   const handlePopoverOpenChange = (open: boolean) => {
     if (open) {
-      // When opening, set tempValue to current displayValue.
+      // When opening, set tempValue to current displayValue and clear any previous errors.
       setTempValue(displayValue);
+      setValidationError(null);
       // Focus the input field in the popover. Find it inside the container
       // since TextFieldAutocomplete does not forward the ref from attributes.
       // Also re-attach Drupal behaviors so that entity_autocomplete (jQuery UI
@@ -190,8 +230,6 @@ const DrupalInputMultivalueForm = ({
             if (!popoverContainerRef.current?.contains(e.target as Node))
               return;
             autocompleteJustSelectedRef.current = true;
-            commitValue((e as CustomEvent<{ value: string }>).detail.value);
-            setPopoverOpen(false);
           };
           document.addEventListener(
             'data-canvas-autocomplete-selected',
@@ -331,6 +369,9 @@ const DrupalInputMultivalueForm = ({
             attributes: {
               ...a2p(attributes, {}, { skipAttributes: ['class'] }),
               tabIndex: -1,
+              // Skip validation in InputBehaviors for this hidden input.
+              // Validation is handled in the popover instead.
+              'data-canvas-skip-validation': 'true',
             },
           }}
         />
@@ -403,6 +444,8 @@ const DrupalInputMultivalueForm = ({
                   value: tempValue,
                   onChange: handleTempInputChange,
                   onKeyDown: handleKeyDown,
+                  // Skip validation in InputBehaviors - validation is handled manually in the popover.
+                  'data-canvas-skip-validation': 'true',
                 }}
               />
             ) : (
@@ -431,6 +474,16 @@ const DrupalInputMultivalueForm = ({
               />
             )}
           </Box>
+
+          {/* Validation Error Display */}
+          {validationError && (
+            <Callout.Root color="red" size="1" mt="2">
+              <Callout.Icon>
+                <ExclamationTriangleIcon />
+              </Callout.Icon>
+              <Callout.Text size="1">{validationError}</Callout.Text>
+            </Callout.Root>
+          )}
 
           {/* Remove Button */}
           <Flex justify="center" className={styles.removeButtonContainer}>

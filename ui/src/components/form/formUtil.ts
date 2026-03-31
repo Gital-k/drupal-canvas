@@ -280,17 +280,70 @@ export function propInputData(
   // Keep track of all props that have been checked, so we can identify
   // props that have multiple single-value fields associated with them.
   const propsInThisForm: string[] = [];
+  // Track "propName + delta + subfield" keys to distinguish between:
+  // - Truly multiple-inputs-per-single-value props (e.g. datetime with
+  //   separate date/time sub-fields under the same delta index [0]):
+  //   canvas_component_props[UUID][field_datetime][0][date] and
+  //   canvas_component_props[UUID][field_datetime][0][time] both yield
+  //   the same propDeltaKey "field_datetime[0]" → flagged as
+  //   multipleInputsSingleValue.
+  // - Multivalue array items (e.g. a link field with two values):
+  //   canvas_component_props[UUID][field_link][0][uri] yields
+  //   "field_link[0]" and canvas_component_props[UUID][field_link][1][uri]
+  //   yields "field_link[1]" — different keys → NOT multipleInputsSingleValue.
+  // - Drupal-internal structural sub-fields such as _weight, _original_delta,
+  //   and _actions (prefixed with "_") are present in every multivalue row
+  //   but are NOT semantic prop inputs. They must be excluded from this
+  //   detection entirely, otherwise a single-item multivalue field with both
+  //   a "uri" and a "_weight" sub-field at delta [0] would incorrectly trigger
+  //   the multipleInputsSingleValue flag and bypass JSON Schema validation.
+  const propDeltaKeysInThisForm: string[] = [];
   Object.keys(formState).forEach((itemKey) => {
     if (itemKey.includes(`canvas_component_props[${selectedComponent}][`)) {
       const propName = itemKey.split('][')[1];
+      // Extract the segment immediately after the prop name (the delta index
+      // for array fields, e.g. "0"), and the sub-field name that follows it
+      // (e.g. "uri", "date", "_weight").
+      const afterProp = itemKey
+        .replace(
+          `canvas_component_props[${selectedComponent}][${propName}]`,
+          '',
+        )
+        .match(/^\[([^\]]*)\](?:\[([^\]]*)\])?/);
+      const deltaSegment = afterProp ? afterProp[1] : '';
+      const subFieldSegment = afterProp ? (afterProp[2] ?? '') : '';
+
+      // Skip Drupal-internal structural sub-fields (_weight, _original_delta,
+      // _actions, etc.). These begin with "_" and are added by WidgetBase to
+      // every row of a multivalue field. They are not semantic prop inputs and
+      // must never contribute to multipleInputsSingleValue detection.
+      if (subFieldSegment.startsWith('_')) {
+        return;
+      }
+
+      // Build a key that combines the prop name with the delta index so
+      // that different numeric delta items of the same multivalue field
+      // are treated as distinct entries.
+      const propDeltaKey = `${propName}[${deltaSegment}]`;
+
       if (propsInThisForm.includes(propName)) {
-        // If we hit a prop that is already in `propsInThisForm`, add it
-        // to the array keeping track of props that have multiple single
-        // value form elements associated with it.
-        multipleInputsSingleValue.push(propName);
+        // The prop name has been seen before. Only flag it as
+        // multipleInputsSingleValue if this input shares the same
+        // propDeltaKey as a previously seen input — meaning two or more
+        // semantic form elements exist for the same prop at the same delta
+        // index (e.g. datetime's date + time sub-fields). If the
+        // propDeltaKey is new, this is simply another array item of a
+        // multivalue field and should NOT be flagged.
+        if (propDeltaKeysInThisForm.includes(propDeltaKey)) {
+          multipleInputsSingleValue.push(propName);
+        }
       } else {
         // Add this to the list of props we know the form can edit.
         propsInThisForm.push(propName);
+      }
+
+      if (!propDeltaKeysInThisForm.includes(propDeltaKey)) {
+        propDeltaKeysInThisForm.push(propDeltaKey);
       }
     }
   });
