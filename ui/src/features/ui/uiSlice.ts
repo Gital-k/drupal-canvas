@@ -55,6 +55,11 @@ export interface UndoRedoStackItem {
   debugInfoAction?: Action;
 }
 
+export interface TargetSlotInfo {
+  slotId: string;
+  parentComponentType?: string; // Component type ID for looking up allowedComponents
+}
+
 export interface uiSliceState {
   pending: boolean;
   zooming: boolean;
@@ -65,6 +70,7 @@ export interface uiSliceState {
   selection: Selection;
   collapsedLayers: string[];
   targetSlot: string | undefined; //uuid of slot being hovered when dragging
+  targetSlotInfo: TargetSlotInfo | undefined; // Extended slot info with parent component type
   viewportWidth: number;
   viewportMinHeight: number;
   editorViewPort: EditorViewPort;
@@ -98,6 +104,7 @@ export const initialState: uiSliceState = {
   hoveredComponent: undefined,
   updatingComponent: undefined,
   targetSlot: undefined,
+  targetSlotInfo: undefined,
   viewportWidth: 0,
   viewportMinHeight: 0,
   editorViewPort: {
@@ -263,6 +270,11 @@ export const uiSlice = createAppSlice({
     setTargetSlot: create.reducer((state, action: PayloadAction<string>) => {
       state.targetSlot = action.payload;
     }),
+    setTargetSlotInfo: create.reducer(
+      (state, action: PayloadAction<TargetSlotInfo | undefined>) => {
+        state.targetSlotInfo = action.payload;
+      },
+    ),
     unsetHoveredComponent: create.reducer((state) => {
       state.hoveredComponent = undefined;
     }),
@@ -271,6 +283,7 @@ export const uiSlice = createAppSlice({
     }),
     unsetTargetSlot: create.reducer((state) => {
       state.targetSlot = undefined;
+      state.targetSlotInfo = undefined;
     }),
     setEditorFrameViewPort: create.reducer(
       (state, action: PayloadAction<UpdateViewportPayload>) => {
@@ -402,6 +415,9 @@ export const uiSlice = createAppSlice({
     selectTargetSlot: (ui): string | undefined => {
       return ui.targetSlot;
     },
+    selectTargetSlotInfo: (ui): TargetSlotInfo | undefined => {
+      return ui.targetSlotInfo;
+    },
     selectEditorViewPort: (ui): EditorViewPort => {
       return ui.editorViewPort;
     },
@@ -468,6 +484,7 @@ export const {
   setHoveredComponent,
   setUpdatingComponent,
   setTargetSlot,
+  setTargetSlotInfo,
   unsetHoveredComponent,
   unsetUpdatingComponent,
   unsetTargetSlot,
@@ -502,6 +519,7 @@ export const {
   selectHoveredComponent,
   selectNoComponentIsHovered,
   selectTargetSlot,
+  selectTargetSlotInfo,
   selectEditorViewPort,
   selectEditorViewPortScale,
   selectViewportWidth,

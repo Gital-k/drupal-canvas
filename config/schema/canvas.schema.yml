@@ -392,6 +392,22 @@ canvas.slot_definition:
       sequence:
         type: text
         label: 'Example for slot'
+    # @see https://www.drupal.org/i/3514072
+    expected:
+      type: sequence
+      label: 'Expected components'
+      requiredKey: false
+      sequence:
+        type: string
+        label: 'A component ID or tag'
+    # Legacy Canvas property, supported alongside 'expected'.
+    allowedComponents:
+      type: sequence
+      label: 'Allowed components'
+      requiredKey: false
+      sequence:
+        type: string
+        label: 'A component ID'
 
 canvas.component_source_local_id.sdc:
   type: canvas.component_source_local_id.*

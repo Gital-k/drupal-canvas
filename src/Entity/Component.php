@@ -717,7 +717,7 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
    *
    * @param array $definition
    *
-   * @return array{title: string, description?: string, examples: string[]}
+   * @return array{title: string, description?: string, examples: string[], expected?: string[]}
    *   Clean definitions.
    */
   private static function cleanSlotDefinition(array $definition): array {
@@ -725,11 +725,15 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
     // that aren't specified in the SDC metadata schema and in our config
     // schema.
     // @todo Remove when core enforces this - https://www.drupal.org/i/3522623
-    /** @var array{title: string, description?: string, examples: string[]} */
+    /** @var array{title: string, description?: string, examples: string[], expected?: string[]} */
     return \array_intersect_key($definition, array_flip([
       'title',
       'description',
       'examples',
+      // @see https://www.drupal.org/i/3514072
+      'expected',
+      // Legacy Canvas property, supported alongside 'expected'.
+      'allowedComponents',
     ]));
   }
 

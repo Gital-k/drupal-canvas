@@ -26,3 +26,11 @@
   cursor: default !important;
 }
 
+.notAllowed, .notAllowed * {
+  cursor: not-allowed !important;
+}
+
+.notAllowedOverlay div {
+  background-color: var(--red-9, #e5484d);
+}
+

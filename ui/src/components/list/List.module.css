@@ -96,3 +96,41 @@
   z-index: 10;
   border-radius: 1px;
 }
+
+/* Hierarchical list item styles */
+.hierarchicalItem {
+  width: 100%;
+}
+
+.hierarchicalTrigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0 var(--space-1) 0 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--slate-11);
+  width: 16px;
+  min-width: 16px;
+  min-height: 16px;
+  border-radius: var(--radius-1);
+
+  &:hover {
+    background-color: var(--gray-4);
+    color: var(--blue-9);
+  }
+}
+
+.hierarchicalSpacer {
+  width: 16px;
+  min-width: 16px;
+  margin: 0 var(--space-1) 0 0;
+}
+
+.hierarchicalChildren {
+  padding-left: var(--space-4);
+  border-left: 1px solid var(--gray-5);
+  margin-left: var(--space-2);
+}

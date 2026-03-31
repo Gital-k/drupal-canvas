@@ -9,6 +9,7 @@ import { Text } from '@radix-ui/themes';
 import { useAppSelector } from '@/app/hooks';
 import { selectLayout } from '@/features/layout/layoutModelSlice';
 import { selectEditorFrameContext } from '@/features/ui/uiSlice';
+import { useDraggedItemInfo } from '@/hooks/useIsDropAllowed';
 import { useTemplateCaption } from '@/hooks/useTemplateCaption';
 
 import type React from 'react';
@@ -23,9 +24,9 @@ const EmptyRegionDropZone: React.FC<EmptyRegionDropZoneProps> = (props) => {
   const { region } = props;
   const layout = useAppSelector(selectLayout);
   const [activeName, setActiveName] = useState('');
-  const [activeOrigin, setActiveOrigin] = useState('');
   const isTemplateRoute =
     useAppSelector(selectEditorFrameContext) === 'template';
+  const { hasSlotRestrictions } = useDraggedItemInfo();
 
   const regionIndex = layout.findIndex((r) => r.id === region.id);
   const regionPath = [regionIndex, 0];
@@ -37,7 +38,7 @@ const EmptyRegionDropZone: React.FC<EmptyRegionDropZoneProps> = (props) => {
     active,
   } = useDroppable({
     id: region.id,
-    disabled: !accepts.includes(activeOrigin),
+    // See EmptySlotDropZone for rationale on omitting disabled.
     data: {
       region: region,
       parentRegion: region,
@@ -56,19 +57,16 @@ const EmptyRegionDropZone: React.FC<EmptyRegionDropZoneProps> = (props) => {
     }
   }, [active, isOver]);
 
-  useEffect(() => {
-    if (active) {
-      setActiveOrigin(active.data?.current?.origin);
-    } else {
-      setActiveOrigin('');
-    }
-  }, [active]);
-
   return (
-    <div className={styles.emptyPageContainer}>
+    <div
+      className={clsx(styles.emptyPageContainer, {
+        [styles.isDragging]: !!active,
+      })}
+    >
       <div
         className={clsx(styles.emptyPageDropZone, {
-          [styles.isOver]: isOver,
+          [styles.isOver]: isOver && !hasSlotRestrictions,
+          [styles.isDragging]: !!active,
         })}
         ref={setDropRef}
         data-testid={`canvas-empty-region-drop-zone-${kebabCase(region.name)}`}
