@@ -250,7 +250,6 @@ export const InputBehaviorsComponentPropsForm = (
   }
 
   const commitFormState = (newFormState: PropsValues) => {
-    console.log('Committing form state to store:', newFormState);
     const elementType = attributes.type || attributes['data-canvas-type'];
 
     // We don't debounce updates for code components where the prop is scalar -

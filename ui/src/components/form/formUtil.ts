@@ -1,6 +1,5 @@
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
-// @ts-ignore
 import addDraft2019 from 'ajv-formats-draft2019';
 import qs from 'qs';
 
@@ -274,8 +273,6 @@ export function propInputData(
   const { selectedComponent, components, selectedComponentType } =
     inputAndUiData;
 
-  // OpenAPI already ensures this exists, but the condition check is here
-  // to soothe Typescript.
   const component = components?.[selectedComponentType];
 
   // Keep track of fields that are part of a group of fields that result
@@ -291,6 +288,7 @@ export function propInputData(
       const propName = itemKey.split('][')[1];
       // @ts-ignore
       const cardinality =
+        isPropSourceComponent(component) &&
         component?.propSources?.[propName]?.sourceTypeSettings?.cardinality;
       if (
         propsInThisForm.includes(propName) &&

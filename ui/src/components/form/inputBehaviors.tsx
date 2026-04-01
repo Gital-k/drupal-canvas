@@ -306,9 +306,7 @@ export const InputBehaviorsCommon = ({
   if (!hasListener && !['hidden', 'submit'].includes(elementType as string)) {
     delete attributes.value;
   }
-  if (fieldError) {
-    console.log({ fieldError });
-  }
+
   return (
     <>
       <InputDescription

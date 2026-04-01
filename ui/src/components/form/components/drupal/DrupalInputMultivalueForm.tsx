@@ -138,20 +138,6 @@ const DrupalInputMultivalueForm = ({
           }
         }
       });
-
-      // if (popoverInputRef.current && attributes.onBlur) {
-      //   const syntheticFocusEvent = new FocusEvent('focus', {
-      //     bubbles: true,
-      //     cancelable: true,
-      //   });
-      //   Object.defineProperty(syntheticFocusEvent, 'target', {
-      //     value: popoverInputRef.current,
-      //   });
-      //   // @ts-ignore
-      //   attributes.onBlur(
-      //     syntheticFocusEvent as unknown as React.FocusEvent<HTMLInputElement>,
-      //   );
-      // }
     }
   };
   // Handle popover open/close - reset tempValue when opening,
