@@ -84,12 +84,31 @@ Example of a content entity conflict:
   }
 }
 ```
-
 By default `status` property of conflict should be false.
-We should implement post save hooks targeting entities we want to detect conflicts for.
-If the entity is represented by an entry in the autosave, we should mark the autosave entry with the conflict status and revision id or hash.
 
-⁉️🤔 How do we make sure we're not triggering a conflict for a valid "autosave publish" of an entity during this post save hook?
+This also need to detect conflicts without having user attempt publishing their changes.
+In order to achieve that, we should implement post save hooks targeting entities we want to detect conflicts for. If the entity in post save hook is represented by an entry in the autosave, we should mark the autosave entry with the conflict status and revision id or hash.
+To prevent issues when a valid entity without conflicts is being published via Canvas UI we could change the logic handling entity saving in `\Drupal\canvas\Controller\ApiAutoSaveController::post()` to include the following:
+```php
+foreach ($entities as $entity) {
+        $lastEntityEvaluated = $entity;
+        // Even though the entities are being validated before, there is a
+        // possibility where, when multiple entities are being saved together,
+        // the first entity collides with some of the following entities. So
+        // we need to validate right before saving the entity.
+        self::ensureEntityIsValid($entity);
+        // 💁‍♂️💁‍♂️💁‍♂️💁‍♂️ This would be a new method.
+        $this->autoSaveManager->setPublishing($entity, TRUE);
+        $entity->save();
+      }
+      foreach ($entities as $entity) {
+        $this->autoSaveManager->delete($entity);
+      }
+
+```
+Then in our hook we could check `$this->autoSaveManager->isPublishing($entity)`.
+We don't need to call `$this->autoSaveManager->setPublishing($entity, FALSE);` because either the publishing would succeed, in which case we will delete the autoSave entry completely, or it will fail in which case we will do a DB transaction rollback.
+Later on we could add `$this->autoSaveManager->publish($entity);` to handle this internally.
 
 ## Consequences
 
