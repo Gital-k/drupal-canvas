@@ -9,6 +9,7 @@ use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Extension\ModuleExtensionList;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Extension\ThemeHandlerInterface;
+use Drupal\Core\File\FileUrlGeneratorInterface;
 use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\Core\Plugin\Discovery\YamlDiscovery;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
@@ -34,6 +35,7 @@ final class LibraryHooks {
     private readonly ThemeHandlerInterface $themeHandler,
     private readonly ModuleExtensionList $moduleExtensionList,
     private readonly Version $version,
+    private readonly FileUrlGeneratorInterface $fileUrlGenerator,
   ) {
   }
 
@@ -177,7 +179,7 @@ final class LibraryHooks {
           if (!str_ends_with($filename, '.css')) {
             continue;
           }
-          $css_files[] = str_replace('/./', '/', $filename);
+          $css_files[] = $this->fileUrlGenerator->generateString(str_replace('/./', '/', $filename));
         }
       }
     }
