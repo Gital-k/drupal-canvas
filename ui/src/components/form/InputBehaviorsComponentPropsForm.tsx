@@ -212,8 +212,12 @@ export const InputBehaviorsComponentPropsForm = (
       !shouldSkipPropValidation(fieldName, target, inputAndUiData, newValue)
     ) {
       const schemas = getPropSchemas(inputAndUiData);
-      const schema = schemas?.[toPropName(fieldName, selectedComponent)];
+      let schema = schemas?.[toPropName(fieldName, selectedComponent)];
+      if (schema?.type === 'array') {
+        schema = schema.items as any;
+      }
       const valueToValidate = coerceValueForSchema(newValue, schema);
+
       const [valid, validate] = validateProp(
         toPropName(fieldName, selectedComponent),
         valueToValidate,
@@ -246,6 +250,7 @@ export const InputBehaviorsComponentPropsForm = (
   }
 
   const commitFormState = (newFormState: PropsValues) => {
+    console.log('Committing form state to store:', newFormState);
     const elementType = attributes.type || attributes['data-canvas-type'];
 
     // We don't debounce updates for code components where the prop is scalar -

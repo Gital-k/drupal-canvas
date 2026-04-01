@@ -1,5 +1,6 @@
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
+// @ts-ignore
 import addDraft2019 from 'ajv-formats-draft2019';
 import qs from 'qs';
 
@@ -272,6 +273,11 @@ export function propInputData(
 ) {
   const { selectedComponent, components, selectedComponentType } =
     inputAndUiData;
+
+  // OpenAPI already ensures this exists, but the condition check is here
+  // to soothe Typescript.
+  const component = components?.[selectedComponentType];
+
   // Keep track of fields that are part of a group of fields that result
   // in a single prop value being stored, such as individual date and time
   // fields being stored as a single datetime prop.
@@ -283,7 +289,13 @@ export function propInputData(
   Object.keys(formState).forEach((itemKey) => {
     if (itemKey.includes(`canvas_component_props[${selectedComponent}][`)) {
       const propName = itemKey.split('][')[1];
-      if (propsInThisForm.includes(propName)) {
+      // @ts-ignore
+      const cardinality =
+        component?.propSources?.[propName]?.sourceTypeSettings?.cardinality;
+      if (
+        propsInThisForm.includes(propName) &&
+        (!cardinality || cardinality === 1)
+      ) {
         // If we hit a prop that is already in `propsInThisForm`, add it
         // to the array keeping track of props that have multiple single
         // value form elements associated with it.
@@ -297,9 +309,7 @@ export function propInputData(
 
   const propsWithObjectValues: PropsValues = {};
   const propsWithSourceStorageSettings: PropsValues = {};
-  // OpenAPI already ensures this exists, but the condition check is here
-  // to soothe Typescript.
-  const component = components?.[selectedComponentType];
+
   if (isPropSourceComponent(component)) {
     Object.entries(component.propSources).forEach(
       // @ts-ignore

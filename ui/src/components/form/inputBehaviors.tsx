@@ -264,7 +264,7 @@ export const InputBehaviorsCommon = ({
       ) {
         const validationResult = validateNewValue(e, newValue);
         if (!shouldUpdateFormState(e, validationResult)) {
-          if (formId) {
+          if (formId && validationResult?.valid === false) {
             dispatchFieldError(dispatch, formId, fieldName, validationResult);
           }
           return;
@@ -306,7 +306,9 @@ export const InputBehaviorsCommon = ({
   if (!hasListener && !['hidden', 'submit'].includes(elementType as string)) {
     delete attributes.value;
   }
-
+  if (fieldError) {
+    console.log({ fieldError });
+  }
   return (
     <>
       <InputDescription
@@ -315,7 +317,10 @@ export const InputBehaviorsCommon = ({
       >
         <OriginalInput
           {...passProps}
-          attributes={attributes}
+          attributes={{
+            ...attributes,
+            'data-has-field-error': fieldError ? 'true' : 'false',
+          }}
           options={options}
         />
         {fieldError && (
