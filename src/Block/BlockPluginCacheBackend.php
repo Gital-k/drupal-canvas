@@ -35,21 +35,21 @@ final readonly class BlockPluginCacheBackend implements CacheBackendInterface {
   /**
    * {@inheritdoc}
    */
-  public function get($cid, $allow_invalid = FALSE) {
+  public function get($cid, $allow_invalid = FALSE): object|false {
     return $this->decorated->get($cid, $allow_invalid);
   }
 
   /**
    * {@inheritdoc}
    */
-  public function getMultiple(&$cids, $allow_invalid = FALSE) {
+  public function getMultiple(&$cids, $allow_invalid = FALSE): array {
     return $this->decorated->getMultiple($cids, $allow_invalid);
   }
 
   /**
    * {@inheritdoc}
    */
-  public function set($cid, $data, $expire = CacheBackendInterface::CACHE_PERMANENT, array $tags = []) {
+  public function set($cid, $data, $expire = CacheBackendInterface::CACHE_PERMANENT, array $tags = []): void {
     $this->decorated->set($cid, $data, $expire, $tags);
     if ($cid === 'block_plugins') {
       $this->componentSourceManager->generateComponents(BlockComponent::SOURCE_PLUGIN_ID);
@@ -59,63 +59,63 @@ final readonly class BlockPluginCacheBackend implements CacheBackendInterface {
   /**
    * {@inheritdoc}
    */
-  public function setMultiple(array $items) {
+  public function setMultiple(array $items): void {
     $this->decorated->setMultiple($items);
   }
 
   /**
    * {@inheritdoc}
    */
-  public function delete($cid) {
+  public function delete($cid): void {
     $this->decorated->delete($cid);
   }
 
   /**
    * {@inheritdoc}
    */
-  public function deleteMultiple(array $cids) {
+  public function deleteMultiple(array $cids): void {
     $this->decorated->deleteMultiple($cids);
   }
 
   /**
    * {@inheritdoc}
    */
-  public function deleteAll() {
+  public function deleteAll(): void {
     $this->decorated->deleteAll();
   }
 
   /**
    * {@inheritdoc}
    */
-  public function invalidate($cid) {
+  public function invalidate($cid): void {
     $this->decorated->invalidate($cid);
   }
 
   /**
    * {@inheritdoc}
    */
-  public function invalidateMultiple(array $cids) {
+  public function invalidateMultiple(array $cids): void {
     $this->decorated->invalidateMultiple($cids);
   }
 
   /**
    * {@inheritdoc}
    */
-  public function invalidateAll() {
+  public function invalidateAll(): void {
     $this->decorated->invalidateAll();
   }
 
   /**
    * {@inheritdoc}
    */
-  public function garbageCollection() {
+  public function garbageCollection(): void {
     $this->decorated->garbageCollection();
   }
 
   /**
    * {@inheritdoc}
    */
-  public function removeBin() {
+  public function removeBin(): void {
     $this->decorated->removeBin();
   }
 
