@@ -482,6 +482,7 @@ export const componentAndLayoutApi = createApi({
         { type: 'CodeComponentAutoSave', id },
         { type: 'CodeComponents', id: 'LIST' },
         { type: 'Components', id: 'LIST' },
+        { type: 'Folders', id: 'LIST' },
         { type: 'Layout' },
       ],
       async onQueryStarted(isExposing, { dispatch, queryFulfilled }) {

@@ -8,6 +8,7 @@ import {
   selectDialogStates,
   selectSelectedCodeComponent,
 } from '@/features/ui/codeComponentDialogSlice';
+import { setActivePanel } from '@/features/ui/primaryPanelSlice';
 import { selectPreviouslyEdited } from '@/features/ui/uiSlice';
 import { useUpdateCodeComponentMutation } from '@/services/componentAndLayout';
 
@@ -54,6 +55,7 @@ const AddToComponentsDialog = () => {
   useEffect(() => {
     if (isSuccess) {
       dispatch(closeAllDialogs());
+      dispatch(setActivePanel('library'));
       if (!previouslyEdited.path) {
         navigate('/editor');
       } else {
