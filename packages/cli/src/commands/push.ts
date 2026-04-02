@@ -297,7 +297,15 @@ export function pushCommand(program: Command): void {
         const discoveredPages = includesPages ? allDiscoveredPages : [];
         const hasIgnoredPages = !includesPages && allDiscoveredPages.length > 0;
 
-        if (components.length === 0 && discoveredPages.length === 0) {
+        const apiService = await createApiService();
+        // Always fetch existing components to detect deletions, even if no local components exist.
+        const existingComponents = await apiService.listComponents();
+        const remoteNames = new Set(Object.keys(existingComponents));
+        const localNames = new Set(components.map((c) => c.name));
+
+        // Check if there's anything to do: local components, pages, or remote deletions.
+        const hasRemoteDeletions = remoteNames.size > 0 && components.length === 0;
+        if (components.length === 0 && discoveredPages.length === 0 && !hasRemoteDeletions) {
           if (hasIgnoredPages) {
             p.log.info(
               'Ignoring local pages. Use --include-pages or set CANVAS_INCLUDE_PAGES=true to push them.',
@@ -308,8 +316,8 @@ export function pushCommand(program: Command): void {
           return;
         }
 
-        if (components.length === 0) {
-          p.log.info('No components found. Skipping component push.');
+        if (components.length === 0 && !hasRemoteDeletions) {
+          p.log.info('No local components found.');
         }
 
         if (hasIgnoredPages && components.length > 0) {
@@ -317,12 +325,6 @@ export function pushCommand(program: Command): void {
             'Ignoring local pages. Use --include-pages or set CANVAS_INCLUDE_PAGES=true to push them.',
           );
         }
-
-        const apiService = await createApiService();
-        const existingComponents =
-          components.length > 0 ? await apiService.listComponents() : {};
-        const remoteNames = new Set(Object.keys(existingComponents));
-        const localNames = new Set(components.map((c) => c.name));
 
         // Fetch remote pages early for the planned operations summary.
         const remotePages =
@@ -415,26 +417,29 @@ export function pushCommand(program: Command): void {
           }
         }
 
-        // Step 2: Build Tailwind CSS + Global CSS
-        const s2 = p.spinner();
-        s2.start('Building Tailwind CSS');
-        const tailwindResult = await buildTailwindForComponents(
-          components,
-          true,
-          outputDir,
-        );
-        s2.stop(
-          chalk.green(
-            `Processed Tailwind CSS classes from ${components.length} selected local ${pluralizeComponent(components.length)} and all online components`,
-          ),
-        );
-        reportResults([tailwindResult], 'Built assets', 'Asset');
-        if (!tailwindResult.success) {
-          p.note(
-            chalk.red('Tailwind build failed, global assets upload aborted.'),
+        // Step 2: Build Tailwind CSS + Global CSS (only if there are local components)
+        let tailwindResult: Result | null = null;
+        if (components.length > 0) {
+          const s2 = p.spinner();
+          s2.start('Building Tailwind CSS');
+          tailwindResult = await buildTailwindForComponents(
+            components,
+            true,
+            outputDir,
           );
-          p.note(chalk.red('Push aborted. Nothing was pushed.'));
-          process.exit(1);
+          s2.stop(
+            chalk.green(
+              `Processed Tailwind CSS classes from ${components.length} selected local ${pluralizeComponent(components.length)} and all online components`,
+            ),
+          );
+          reportResults([tailwindResult], 'Built assets', 'Asset');
+          if (!tailwindResult.success) {
+            p.note(
+              chalk.red('Tailwind build failed, global assets upload aborted.'),
+            );
+            p.note(chalk.red('Push aborted. Nothing was pushed.'));
+            process.exit(1);
+          }
         }
 
         // Step 3: Analyze and bundle imports (vendor + local) and generate canvas-manifest.json
@@ -507,25 +512,78 @@ export function pushCommand(program: Command): void {
             process.exit(1);
           }
           reportResults(componentResults, 'Pushed components', 'Component');
+        } else if (remoteNames.size > 0) {
+          // No local components, but remote components exist - handle deletions.
+          const deleteSpinner = p.spinner();
+          const deleteProgress = createProgressCallback(
+            deleteSpinner,
+            'Deleting remote components',
+            remoteNames.size,
+          );
+          deleteSpinner.start('Deleting remote components');
+
+          const deleteResults = await processInPool(
+            [...remoteNames],
+            async (machineName) => {
+              try {
+                await apiService.deleteComponent(machineName);
+                deleteProgress();
+                return {
+                  itemName: machineName,
+                  success: true,
+                  details: [{ content: chalk.dim('Deleted') }],
+                };
+              } catch (error) {
+                deleteProgress();
+                return {
+                  itemName: machineName,
+                  success: false,
+                  details: [
+                    {
+                      content:
+                        error instanceof Error
+                          ? error.message
+                          : 'Unknown error',
+                    },
+                  ],
+                };
+              }
+            },
+          );
+
+          componentResults = deleteResults.map((r) =>
+            r.success && r.result ? r.result : r.result!,
+          );
+
+          deleteSpinner.stop(
+            chalk.green(
+              `Deleted ${remoteNames.size} remote ${pluralizeComponent(remoteNames.size)}`,
+            ),
+          );
+          reportResults(componentResults, 'Deleted components', 'Component');
         }
 
-        // Upload Tailwind CSS.
-        const globalCssResult = await uploadGlobalAssetLibrary(
-          apiService,
-          config.outputDir,
-        );
-        reportResults([globalCssResult], 'Pushed assets', 'Asset');
-        if (!globalCssResult.success) {
-          p.note(chalk.red('Push aborted (incomplete). Try again.'));
-          process.exit(1);
+        // Upload Tailwind CSS (only if there are local components).
+        if (components.length > 0) {
+          const globalCssResult = await uploadGlobalAssetLibrary(
+            apiService,
+            config.outputDir,
+          );
+          reportResults([globalCssResult], 'Pushed assets', 'Asset');
+          if (!globalCssResult.success) {
+            p.note(chalk.red('Push aborted (incomplete). Try again.'));
+            process.exit(1);
+          }
         }
 
-        // Step 5: Upload vendor/local artifacts and sync manifest
-        await syncManifestArtifacts(outputDir, {
-          apiService,
-          createSpinner: () => p.spinner(),
-          logInfo: (msg) => p.log.info(msg),
-        });
+        // Step 5: Upload vendor/local artifacts and sync manifest (only if there are local components).
+        if (components.length > 0) {
+          await syncManifestArtifacts(outputDir, {
+            apiService,
+            createSpinner: () => p.spinner(),
+            logInfo: (msg) => p.log.info(msg),
+          });
+        }
 
         // Step 6: Push pages
         if (discoveredPages.length > 0) {
