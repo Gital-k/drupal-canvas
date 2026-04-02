@@ -94,7 +94,8 @@ class CanvasServiceProvider extends ServiceProviderBase {
       ->setArguments([
         new Reference('cache.discovery'),
         new Reference(ComponentSourceManager::class),
-      ]);
+      ])
+      ->setPublic(FALSE);
     $container->getDefinition('plugin.manager.block')
       ->replaceArgument(1, new Reference('canvas.cache.block_plugin_discovery'));
 
