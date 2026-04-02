@@ -88,23 +88,25 @@ export function CanvasNavigationMixin<TBase extends Constructor<CanvasBase>>(
       const libraryHeading = this.page.getByRole('heading', {
         name: 'Library',
       });
-      if (!(await libraryHeading.isVisible())) {
+      const isAlreadyOpen = await libraryHeading.isVisible();
+
+      if (!isAlreadyOpen) {
         await this.page
           .getByTestId('canvas-side-menu')
           .getByLabel('Library')
           .click();
+      }
 
-        await expect(
-          this.page.getByTestId('canvas-components-library-loading'),
-        ).toBeHidden();
-        try {
-          await expect(libraryHeading).toBeVisible();
-        } catch (error) {
-          throw new Error(
-            'openLibraryPanel: Library panel did not open.\n' +
-              (error instanceof Error ? error.message : String(error)),
-          );
-        }
+      await expect(
+        this.page.getByTestId('canvas-components-library-loading'),
+      ).toBeHidden();
+      try {
+        await expect(libraryHeading).toBeVisible();
+      } catch (error) {
+        throw new Error(
+          'openLibraryPanel: Library panel did not open - was it already open?\n' +
+            (error instanceof Error ? error.message : String(error)),
+        );
       }
 
       // Ensure we are on the Components tab.
