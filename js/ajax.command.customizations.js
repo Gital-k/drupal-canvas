@@ -4,7 +4,7 @@
  */
 
 /* global csstree */
-(function (Drupal, csstree, drupalSettings) {
+(function (Drupal, csstree, drupalSettings, $) {
   // Keeps track of shorthand properties and their corresponding longhand
   // properties.
   const shorthands = {
@@ -646,10 +646,94 @@
     return originalBeforeSend.apply(this, arguments);
   };
 
+  /**
+   * Replaces $wrapper with $newContent after React has hydrated it, preventing
+   * pre-hydration flicker. The element is inserted into the real DOM immediately
+   * (visibility:hidden) so Drupal AJAX behaviors have correct form ancestry,
+   * then revealed as soon as an outerHTML change is detected or the fallback
+   * timeout expires.
+   *
+   * @param {jQuery} $wrapper - The element to replace.
+   * @param {jQuery} $newContent - The already-parsed, themed replacement content.
+   * @param {object} settings - Drupal settings object.
+   * @param {object} effect - Effect object from ajax.getEffect().
+   * @param {number} [hydrationDelayMs=150] - Max ms to wait before revealing as fallback.
+   */
+  const replaceWithAfterHydration = ($wrapper, $newContent, settings, effect, hydrationDelayMs = 150) => {
+    // Visually hide the new content before inserting so the un-hydrated
+    // state is never seen. Using visibility:hidden (not display:none) so
+    // the element still occupies layout space, avoiding reflow on reveal.
+    $newContent.each((i, el) => {
+      if (el.nodeType === Node.ELEMENT_NODE) {
+        el.style.visibility = 'hidden';
+      }
+    });
+
+    // Insert into the real DOM now. This is critical — Drupal AJAX behaviors
+    // (initAjax) need the element to be in the document so they can traverse
+    // up to the parent <form> for correct serialization of hidden inputs like
+    // form_canvas_tree.
+    $wrapper.replaceWith($newContent);
+
+    // Attach behaviors now that the element is live in the DOM. React hydrates
+    // here; form context is correct for AJAX rebinding.
+    $newContent.each((index, el) => {
+      if (el.nodeType === Node.ELEMENT_NODE) {
+        Drupal.attachBehaviors(el, settings);
+      }
+    });
+
+    // Snapshot outerHTML immediately after attachBehaviors so we can detect
+    // when React has mutated the DOM.
+    const snapshots = [];
+    $newContent.each((i, el) => {
+      if (el.nodeType === Node.ELEMENT_NODE) {
+        snapshots.push({ el, before: el.outerHTML });
+      }
+    });
+
+    const reveal = () => {
+      $newContent.each((i, el) => {
+        if (el.nodeType === Node.ELEMENT_NODE) {
+          el.style.visibility = '';
+        }
+      });
+
+      // Handle show effects.
+      if (effect.showEffect !== 'show') {
+        $newContent.hide();
+      }
+      const $ajaxNewContent = $newContent.find('.ajax-new-content');
+      if ($ajaxNewContent.length) {
+        $ajaxNewContent.hide();
+        $newContent.show();
+        $ajaxNewContent[effect.showEffect](effect.showSpeed);
+      } else if (effect.showEffect !== 'show') {
+        $newContent[effect.showEffect](effect.showSpeed);
+      }
+    };
+
+    const intervalMs = 10;
+    let elapsed = 0;
+    const pollInterval = setInterval(() => {
+      elapsed += intervalMs;
+      const changed = snapshots.some(({ el, before }) => el.outerHTML !== before);
+      if (changed) {
+        clearInterval(pollInterval);
+        reveal();
+      } else if (elapsed >= hydrationDelayMs) {
+        clearInterval(pollInterval);
+        reveal();
+      }
+    }, intervalMs);
+  };
+
   const originalInsert = Drupal.AjaxCommands.prototype.insert;
 
   Drupal.AjaxCommands.prototype.insert = function (...args) {
-    const [,command,] = args;
+    const [ajax, command] = args;
+    const { callback, element } = ajax;
+
     // When a media library fieldset is replaced, skip the default AJAX replace
     // and instead send the new markup with a custom event. This is done to
     // ensure the replacement is placed in the correct location within the DOM
@@ -659,15 +743,51 @@
     if (command.method === 'replaceWith' && command?.selector && document.querySelector(`${command.selector}[data-canvas-media-library-fieldset] `)) {
       const mediaItems = document.querySelector(`${command.selector}[data-canvas-media-library-fieldset]`).closest('[data-canvas-ml-ajax-target]')
       const event = new CustomEvent('canvas:updateMediaWidget', {
-        detail: {
-          data: command.data,
-        },
+        detail: { data: command.data },
         bubbles: true,
       });
       mediaItems.dispatchEvent(event);
       return;
     }
+
+    // Replicate the resolved method exactly as the original does:
+    // response.method takes precedence over ajax.method.
+    const method = command.method || ajax.method;
+
+    // For addMoreAjax replaceWith on a multivalue element, place the new
+    // content into the real DOM immediately (so Drupal AJAX behaviors have
+    // correct form ancestry for serialization), but keep it visually hidden
+    // until React has had time to hydrate, avoiding pre-hydration flicker.
+    if (
+      method === 'replaceWith' &&
+      callback?.[1] === 'addMoreAjax' &&
+      !!element.closest('[data-canvas-multiple-values]')
+    ) {
+      // Mirror the original: resolve wrapper and settings.
+      const $wrapper = command.selector ? $(command.selector) : $(ajax.wrapper);
+      const settings = command.settings || ajax.settings || drupalSettings;
+      const effect = ajax.getEffect(command);
+
+      // Mirror the original: parse response.data and apply the ajaxWrapperNewContent theme.
+      const parseHTML = (htmlString) => {
+        const fragment = document.createDocumentFragment();
+        const template = fragment.appendChild(document.createElement('template'));
+        template.innerHTML = htmlString;
+        return template.content.childNodes;
+      };
+      let $newContent = $(parseHTML(command.data));
+      $newContent = Drupal.theme('ajaxWrapperNewContent', $newContent, ajax, command);
+
+      // Mirror the original: detach behaviors from the element being replaced.
+      Drupal.detachBehaviors($wrapper.get(0), settings);
+
+      replaceWithAfterHydration($wrapper, $newContent, settings, effect);
+
+      return;
+    }
+
+    // Default insert behavior for all other cases.
     originalInsert.apply(this, args);
   };
 
-})(Drupal, csstree, drupalSettings);
+})(Drupal, csstree, drupalSettings, jQuery);

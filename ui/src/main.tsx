@@ -178,7 +178,6 @@ if (container) {
     const container = document.createElement('drupal-html-fragment');
     context.after(container);
     const root = createRoot(container);
-
     // Wrap the newly rendered content in the Redux provider so it has access
     // to the existing store.
     root.render(
