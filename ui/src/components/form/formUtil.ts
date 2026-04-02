@@ -219,10 +219,15 @@ export function validateProp(
   schemaName: string,
   data: any,
   inputAndUiData: InputUIData,
+  schema?: any,
 ): JsonSchemaValidationResult {
   const schemas = getPropSchemas(inputAndUiData);
-  if (schemas[schemaName]) {
-    return jsonSchemaValidate(data, schemas[schemaName]);
+  if (schema || schemas[schemaName]) {
+    console.log(`check ${schemaName}`, {
+      data,
+      sc: schema || schemas[schemaName],
+    })
+    return jsonSchemaValidate(data, schema || schemas[schemaName]);
   }
   return [true, null];
 }

@@ -222,7 +222,9 @@ export const InputBehaviorsComponentPropsForm = (
         toPropName(fieldName, selectedComponent),
         valueToValidate,
         inputAndUiData,
+        schema,
       );
+
       return {
         valid,
         errors: validate?.errors || null,
