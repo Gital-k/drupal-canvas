@@ -9,7 +9,6 @@ use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Depends;
 use PHPUnit\Framework\Attributes\TestWith;
 use PHPUnit\Framework\Attributes\DataProvider;
-use Drupal\canvas\Block\BlockManagerDecorator;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\canvas\Entity\Page;
@@ -93,7 +92,7 @@ final class BlockComponentTest extends ComponentSourceTestBase {
     $this->assertCount($this->expectedDefaultComponentInstallCount, $this->componentStorage->loadMultiple());
 
     // Some Block Components may already be discovered at this point due to the
-    // BlockManagerDecorator reacting to earlier block definition cache clears.
+    // BlockPluginCacheBackend reacting to earlier block definition cache sets.
     self::assertSame([
       'block.canvas_test_block_input_unvalidatable' => [
         'Block plugin settings must opt into strict validation. Use the FullyValidatable constraint. See https://www.drupal.org/node/3404425',
@@ -112,7 +111,7 @@ final class BlockComponentTest extends ComponentSourceTestBase {
     ], $auto_created_components);
 
     // Trigger component generation, as if the test module was just installed.
-    // Due to BlockManagerDecorator, this should result in zero extra Block
+    // Due to BlockPluginCacheBackend, this should result in zero extra Block
     // Components being discovered.
     $this->generateComponentConfig();
     $this->assertCount($this->expectedDefaultComponentInstallCount, \array_filter(
@@ -617,10 +616,9 @@ HTML,
   }
 
   protected function triggerBrokenComponent(ComponentInterface $component): BrokenPluginManagerInterface {
-    $decorator = \Drupal::service(BlockManagerInterface::class);
-    \assert($decorator instanceof BlockManagerDecorator);
-    /** @var \Drupal\Tests\canvas\Kernel\BrokenPluginManagerInterface */
-    return (new \ReflectionProperty($decorator, 'decorated'))->getValue($decorator);
+    $blockManager = \Drupal::service(BlockManagerInterface::class);
+    \assert($blockManager instanceof BrokenPluginManagerInterface);
+    return $blockManager;
   }
 
   public function alter(ContainerBuilder $container): void {
