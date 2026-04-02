@@ -51,9 +51,12 @@ describe('Multivalue Form Design – Link Field', () => {
       .find('[class*="_listItem_"]')
       .eq(0)
       .click();
-    cy.get('[role="dialog"]').find('input').first().clear();
+    cy.get('[role="dialog"][data-state="open"]').find('input').first().clear();
     if (useAutocomplete) {
-      cy.get('[role="dialog"]').find('input').first().type(title);
+      cy.get('[role="dialog"][data-state="open"]')
+        .find('input')
+        .first()
+        .type(title);
       // Wait for the autocomplete suggestion matching the title to appear, then
       // click it so the resolved URL is committed and propagated to the right panel.
       cy.get('.ui-menu-item-wrapper')
@@ -62,9 +65,12 @@ describe('Multivalue Form Design – Link Field', () => {
         .click();
     } else {
       // For plain URLs that don't trigger autocomplete, press Enter to commit.
-      cy.get('[role="dialog"]').find('input').first().type(`${title}{enter}`);
+      cy.get('[role="dialog"][data-state="open"]')
+        .find('input')
+        .first()
+        .type(`${title}{enter}`);
     }
-    cy.get('[role="dialog"]').should('not.exist');
+    cy.get('[role="dialog"][data-state="open"]').should('not.exist');
   };
 
   /**
@@ -369,6 +375,7 @@ describe('Multivalue Form Design – Link Field', () => {
       'https://www.cypress.io',
     ]);
 
+    cy.get('@unlimited-link').scrollIntoView();
     // Open the URL popover for the second item and click Remove.
     cy.get('@unlimited-link')
       .find('tbody tr')
@@ -377,17 +384,15 @@ describe('Multivalue Form Design – Link Field', () => {
       .eq(0)
       .click();
 
-    cy.get('[role="dialog"]').should('be.visible');
-
-    cy.get('[role="dialog"]')
+    cy.get('[role="dialog"][data-state="open"]').should('be.visible');
+    cy.get('[role="dialog"][data-state="open"]')
       .findByRole('button', { name: /Remove/i })
       .should('be.visible');
 
-    cy.get('[role="dialog"]')
+    cy.get('[role="dialog"][data-state="open"]')
       .findByRole('button', { name: /Remove/i })
       .click();
-
-    cy.get('[role="dialog"]').should('not.exist');
+    cy.get('[role="dialog"][data-state="open"]').should('not.exist');
 
     cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
     cy.waitForAjax();
@@ -412,24 +417,31 @@ describe('Multivalue Form Design – Link Field', () => {
       .eq(0)
       .click();
 
-    cy.get('[role="dialog"]').should('be.visible');
+    cy.get('[role="dialog"][data-state="open"]').should('be.visible');
 
     // The popover header should contain the field label.
-    cy.get('[role="dialog"]').should('contain', 'Canvas Unlimited Link');
+    cy.get('[role="dialog"][data-state="open"]').should(
+      'contain',
+      'Canvas Unlimited Link',
+    );
 
     // The input should show the current URL value.
-    cy.get('[role="dialog"]')
+    cy.get('[role="dialog"][data-state="open"]')
       .find('input')
       .first()
       .should('be.visible')
       .should('have.value', 'https://drupal.org');
 
     // The Close button should exist.
-    cy.get('[role="dialog"]').find('[aria-label="Close"]').should('exist');
+    cy.get('[role="dialog"][data-state="open"]')
+      .find('[aria-label="Close"]')
+      .should('exist');
 
     // Close the popover.
-    cy.get('[role="dialog"]').find('[aria-label="Close"]').click();
-    cy.get('[role="dialog"]').should('not.exist');
+    cy.get('[role="dialog"][data-state="open"]')
+      .find('[aria-label="Close"]')
+      .click();
+    cy.get('[role="dialog"][data-state="open"]').should('not.exist');
   });
 
   it('popover discards uncommitted changes when closed without Enter', () => {
@@ -451,14 +463,16 @@ describe('Multivalue Form Design – Link Field', () => {
       .eq(0)
       .click();
 
-    cy.get('[role="dialog"]').find('input').first().clear();
-    cy.get('[role="dialog"]')
+    cy.get('[role="dialog"][data-state="open"]').find('input').first().clear();
+    cy.get('[role="dialog"][data-state="open"]')
       .find('input')
       .first()
       .type('https://this-should-not-be-saved.com');
 
-    cy.get('[role="dialog"]').find('[aria-label="Close"]').click();
-    cy.get('[role="dialog"]').should('not.exist');
+    cy.get('[role="dialog"][data-state="open"]')
+      .find('[aria-label="Close"]')
+      .click();
+    cy.get('[role="dialog"][data-state="open"]').should('not.exist');
 
     // The original URL should be restored.
     verifyUrlRowText('@unlimited-link', 0, originalUrl);
@@ -482,13 +496,13 @@ describe('Multivalue Form Design – Link Field', () => {
       .eq(0)
       .click();
 
-    cy.get('[role="dialog"]').find('input').first().clear();
-    cy.get('[role="dialog"]')
+    cy.get('[role="dialog"][data-state="open"]').find('input').first().clear();
+    cy.get('[role="dialog"][data-state="open"]')
       .find('input')
       .first()
       .type('https://modified-url.com{enter}');
 
-    cy.get('[role="dialog"]').should('not.exist');
+    cy.get('[role="dialog"][data-state="open"]').should('not.exist');
 
     cy.intercept({
       url: '**/canvas/api/v0/layout/node/2',
@@ -562,19 +576,24 @@ describe('Multivalue Form Design – Link Field', () => {
       .eq(0)
       .click();
 
-    cy.get('[role="dialog"]').should('be.visible');
+    cy.get('[role="dialog"][data-state="open"]').should('be.visible');
 
     // The popover header should contain the field label.
-    cy.get('[role="dialog"]').should('contain', 'Canvas Limited Link');
+    cy.get('[role="dialog"][data-state="open"]').should(
+      'contain',
+      'Canvas Limited Link',
+    );
 
     // The Remove button must be disabled for a limited cardinality field.
-    cy.get('[role="dialog"]')
+    cy.get('[role="dialog"][data-state="open"]')
       .findByRole('button', { name: /Remove/i })
       .should('be.disabled');
 
     // Close the popover.
-    cy.get('[role="dialog"]').find('[aria-label="Close"]').click();
-    cy.get('[role="dialog"]').should('not.exist');
+    cy.get('[role="dialog"][data-state="open"]')
+      .find('[aria-label="Close"]')
+      .click();
+    cy.get('[role="dialog"][data-state="open"]').should('not.exist');
 
     // Open the popover for the second row and verify Remove button is disabled there too.
     cy.get('@limited-link')
@@ -584,14 +603,16 @@ describe('Multivalue Form Design – Link Field', () => {
       .eq(0)
       .click();
 
-    cy.get('[role="dialog"]').should('be.visible');
+    cy.get('[role="dialog"][data-state="open"]').should('be.visible');
 
-    cy.get('[role="dialog"]')
+    cy.get('[role="dialog"][data-state="open"]')
       .findByRole('button', { name: /Remove/i })
       .should('be.disabled');
 
-    cy.get('[role="dialog"]').find('[aria-label="Close"]').click();
-    cy.get('[role="dialog"]').should('not.exist');
+    cy.get('[role="dialog"][data-state="open"]')
+      .find('[aria-label="Close"]')
+      .click();
+    cy.get('[role="dialog"][data-state="open"]').should('not.exist');
   });
 
   it('can use relative URLs in field_cvt_uri_relative (Canvas URI Relative)', () => {
