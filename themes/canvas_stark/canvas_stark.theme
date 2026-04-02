@@ -97,7 +97,8 @@ function canvas_stark_theme_suggestions_input_alter(array &$suggestions, array $
     $type = $variables['element']['#type'] ?? '';
     if ($type === 'submit') {
       $suggestions[] = 'input__submit__multivalue_form';
-    } else {
+    }
+    else {
       $suggestions[] = 'input__multivalue_form';
     }
   }
