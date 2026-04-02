@@ -597,55 +597,6 @@
     );
   }
 
-  // When the "+ Add new" button is clicked, immediately insert a skeleton
-  // placeholder row so the user sees instant feedback while the AJAX
-  // round-trip completes.
-  const originalBeforeSend = Drupal.Ajax.prototype.beforeSend;
-  Drupal.Ajax.prototype.beforeSend = function (xmlhttprequest, options) {
-    const el = this.element;
-    if (
-      el &&
-      el.name &&
-      el.name.endsWith('_add_more') &&
-      el.closest('[data-canvas-multiple-values]')
-    ) {
-      const outerWrapper = el.closest('[data-canvas-multiple-values]');
-      const tbody = outerWrapper && outerWrapper.querySelector('table.field-multiple-table tbody');
-      if (tbody) {
-        // Clone the last real row so the skeleton matches the exact column
-        // widths, classes, and padding already in the table.
-        const lastRow = tbody.querySelector('tr.draggable:last-child');
-        if (lastRow) {
-          const skeleton = lastRow.cloneNode(true);
-          skeleton.setAttribute('data-canvas-optimistic', 'add');
-          skeleton.querySelectorAll('input').forEach(function(input) {
-            input.value = '';
-            input.checked = false;
-          });
-
-          // Replace the content of the input cell (2nd td) with a shimmer.
-          // The input cell is the one that contains the custom element / text.
-          const inputCell = skeleton.querySelector('td:nth-child(2)');
-          if (inputCell) {
-            inputCell.innerHTML = '';
-            const shimmer = document.createElement('div');
-            shimmer.className = 'canvas-skeleton-shimmer';
-            inputCell.appendChild(shimmer);
-          }
-
-          // Empty the actions cell so no stale remove button is cloned.
-          const actionsCell = skeleton.querySelector('.canvas-remove-action');
-          if (actionsCell) {
-            actionsCell.innerHTML = '';
-          }
-
-          tbody.appendChild(skeleton);
-        }
-      }
-    }
-    return originalBeforeSend.apply(this, arguments);
-  };
-
   /**
    * Replaces $wrapper with $newContent after React has hydrated it, preventing
    * pre-hydration flicker. The element is inserted into the real DOM immediately
@@ -660,42 +611,43 @@
    * @param {number} [hydrationDelayMs=150] - Max ms to wait before revealing as fallback.
    */
   const replaceWithAfterHydration = ($wrapper, $newContent, settings, effect, hydrationDelayMs = 150) => {
-    // Visually hide the new content before inserting so the un-hydrated
-    // state is never seen. Using visibility:hidden (not display:none) so
-    // the element still occupies layout space, avoiding reflow on reveal.
+    // Hide the new content and insert it as a sibling AFTER $wrapper so the
+    // old content stays visible during hydration. Inserting as a sibling (not
+    // replacing yet) means attachBehaviors has correct form ancestry while
+    // avoiding any visible flash of un-hydrated markup.
     $newContent.each((i, el) => {
       if (el.nodeType === Node.ELEMENT_NODE) {
-        el.style.visibility = 'hidden';
+        el.style.display = 'none';
       }
     });
+    $wrapper.after($newContent);
 
-    // Insert into the real DOM now. This is critical — Drupal AJAX behaviors
-    // (initAjax) need the element to be in the document so they can traverse
-    // up to the parent <form> for correct serialization of hidden inputs like
-    // form_canvas_tree.
-    $wrapper.replaceWith($newContent);
-
-    // Attach behaviors now that the element is live in the DOM. React hydrates
-    // here; form context is correct for AJAX rebinding.
+    // Attach behaviors now that $newContent is live in the real DOM as a
+    // sibling of $wrapper. React hydrates here; form context is correct for
+    // AJAX rebinding because the parent <form> is an ancestor of both.
     $newContent.each((index, el) => {
       if (el.nodeType === Node.ELEMENT_NODE) {
         Drupal.attachBehaviors(el, settings);
       }
     });
 
-    // Snapshot outerHTML immediately after attachBehaviors so we can detect
-    // when React has mutated the DOM.
+    // Snapshot the elements so we can poll their outerHTML for hydration completion.
     const snapshots = [];
     $newContent.each((i, el) => {
       if (el.nodeType === Node.ELEMENT_NODE) {
-        snapshots.push({ el, before: el.outerHTML });
+        snapshots.push(el);
       }
     });
 
     const reveal = () => {
+      // Now that React has hydrated, detach behaviors from the outgoing
+      // element, remove it, and show the new content in its place.
+      Drupal.detachBehaviors($wrapper.get(0), settings);
+      $wrapper.remove();
+
       $newContent.each((i, el) => {
         if (el.nodeType === Node.ELEMENT_NODE) {
-          el.style.visibility = '';
+          el.style.display = '';
         }
       });
 
@@ -717,13 +669,17 @@
     let elapsed = 0;
     const pollInterval = setInterval(() => {
       elapsed += intervalMs;
-      const changed = snapshots.some(({ el, before }) => el.outerHTML !== before);
-      if (changed) {
+      // React hydration is complete when no drupal-canvas custom elements
+      // remain in the markup — they are replaced by fully rendered React output.
+      const hydrated = snapshots.every((el) => !el.outerHTML.includes('</drupal-canvas'));
+      if (hydrated) {
         clearInterval(pollInterval);
-        reveal();
+        // reveal();
+        setTimeout(reveal, 10);
       } else if (elapsed >= hydrationDelayMs) {
         clearInterval(pollInterval);
-        reveal();
+        // reveal();
+        setTimeout(reveal, 10);
       }
     }, intervalMs);
   };
@@ -779,8 +735,8 @@
       $newContent = Drupal.theme('ajaxWrapperNewContent', $newContent, ajax, command);
 
       // Mirror the original: detach behaviors from the element being replaced.
-      Drupal.detachBehaviors($wrapper.get(0), settings);
-
+      // Note: detachBehaviors is deferred to reveal() inside replaceWithAfterHydration
+      // so the old element stays live in the DOM during hydration.
       replaceWithAfterHydration($wrapper, $newContent, settings, effect);
 
       return;
