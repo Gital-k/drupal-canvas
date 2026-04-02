@@ -123,7 +123,6 @@ const DrupalInputMultivalueForm = ({
       if (isAutocompleteOpen) {
         return;
       }
-      ``;
 
       e.preventDefault();
 
@@ -153,9 +152,6 @@ const DrupalInputMultivalueForm = ({
       // autocomplete during the initial page load.
       setTimeout(() => {
         if (popoverContainerRef.current) {
-          // @todo Refactor this as a part of https://www.drupal.org/i/3581159.
-          // window.Drupal?.attachBehaviors(popoverContainerRef.current);
-
           const handleSelected = (e: Event) => {
             if (!popoverContainerRef.current?.contains(e.target as Node))
               return;
@@ -237,7 +233,6 @@ const DrupalInputMultivalueForm = ({
         </Flex>
 
         {/* Edit Popover */}
-        {/*<Popover.Portal forceMount={true} container={divRef.current || undefined}>*/}
         <Popover.Content
           forceMount={true}
           ref={popoverContainerRef}
@@ -277,7 +272,6 @@ const DrupalInputMultivalueForm = ({
           {/* Input Field - Visual duplicate for popover editing */}
           <Box ref={popoverTextFieldWrapperRef}>
             <DrupalInput
-              // onKeyDown={}
               attributes={{ ...attributes, onKeyDown: handleKeyDown }}
             />
           </Box>
@@ -296,7 +290,6 @@ const DrupalInputMultivalueForm = ({
             </Button>
           </Flex>
         </Popover.Content>
-        {/*</Popover.Portal>*/}
       </Popover.Root>
     </div>
   );

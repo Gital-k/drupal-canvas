@@ -45,7 +45,9 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
       .find('[class*="_listItem_"]')
       .click();
 
-    cy.get('[role="dialog"]').should('be.visible').as('datetimePopover');
+    cy.get('[role="dialog"][data-state="open"]')
+      .should('be.visible')
+      .as('datetimePopover');
   };
 
   const commitPopoverWithEnter = (inputSelector) => {
@@ -92,7 +94,7 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
     }
 
     // Wait for popover to close after Enter.
-    cy.get('[role="dialog"]').should('not.exist');
+    cy.get('[role="dialog"][data-state="open"]').should('not.exist');
   };
 
   const findEditableEmptyRowIndex = (fieldAlias) => {
@@ -576,17 +578,17 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
     // Open the popover for the first item and verify the Remove button.
     openEditableRowPopover('@unlimited-datetime', 0);
 
-    cy.get('[role="dialog"]').should('be.visible');
+    cy.get('[role="dialog"][data-state="open"]').should('be.visible');
 
-    cy.get('[role="dialog"]')
+    cy.get('[role="dialog"][data-state="open"]')
       .findByRole('button', { name: /Remove/i })
       .should('be.visible');
 
-    cy.get('[role="dialog"]')
+    cy.get('[role="dialog"][data-state="open"]')
       .findByRole('button', { name: /Remove/i })
       .click();
 
-    cy.get('[role="dialog"]').should('not.exist');
+    cy.get('[role="dialog"][data-state="open"]').should('not.exist');
 
     cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
     cy.waitForAjax();
@@ -606,24 +608,35 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
     // Click the first item to open popover.
     openEditableRowPopover('@unlimited-datetime', 0);
 
-    cy.get('[role="dialog"]').should('be.visible');
+    cy.get('[role="dialog"][data-state="open"]').should('be.visible');
 
     // Verify popover shows field label.
-    cy.get('[role="dialog"]').should('contain', 'Canvas Unlimited DateTime');
+    cy.get('[role="dialog"][data-state="open"]').should(
+      'contain',
+      'Canvas Unlimited DateTime',
+    );
 
     // Verify date input is visible.
-    cy.get('[role="dialog"]').find('input[type="date"]').should('be.visible');
+    cy.get('[role="dialog"][data-state="open"]')
+      .find('input[type="date"]')
+      .should('be.visible');
 
     // Verify time input is visible (for datetime fields).
-    cy.get('[role="dialog"]').find('input[type="time"]').should('be.visible');
+    cy.get('[role="dialog"][data-state="open"]')
+      .find('input[type="time"]')
+      .should('be.visible');
 
     // Verify close button exists.
-    cy.get('[role="dialog"]').find('[aria-label="Close"]').should('exist');
+    cy.get('[role="dialog"][data-state="open"]')
+      .find('[aria-label="Close"]')
+      .should('exist');
 
     // Close the popover.
-    cy.get('[role="dialog"]').find('[aria-label="Close"]');
-    cy.get('[aria-label="Close"]').click();
-    cy.get('[role="dialog"]').should('not.exist');
+    cy.get('[role="dialog"][data-state="open"]').find('[aria-label="Close"]');
+    cy.get('[role="dialog"][data-state="open"]')
+      .find('[aria-label="Close"]')
+      .click();
+    cy.get('[role="dialog"][data-state="open"]').should('not.exist');
   });
 
   it('popover discards uncommitted datetime changes when closed without Enter', () => {
@@ -650,16 +663,26 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
     // Open popover and change values without committing.
     openEditableRowPopover('@unlimited-datetime', 0);
 
-    cy.get('[role="dialog"]').find('input[type="date"]').clear();
-    cy.get('[role="dialog"]').find('input[type="date"]').type('2024-12-25');
-    cy.get('[role="dialog"]').find('input[type="time"]').clear();
-    cy.get('[role="dialog"]').find('input[type="time"]').type('23:59');
+    cy.get('[role="dialog"][data-state="open"]')
+      .find('input[type="date"]')
+      .clear();
+    cy.get('[role="dialog"][data-state="open"]')
+      .find('input[type="date"]')
+      .type('2024-12-25');
+    cy.get('[role="dialog"][data-state="open"]')
+      .find('input[type="time"]')
+      .clear();
+    cy.get('[role="dialog"][data-state="open"]')
+      .find('input[type="time"]')
+      .type('23:59');
 
     // Close without pressing Enter.
-    cy.get('[role="dialog"]').find('[aria-label="Close"]');
-    cy.get('[aria-label="Close"]').click();
+    cy.get('[role="dialog"][data-state="open"]').find('[aria-label="Close"]');
+    cy.get('[role="dialog"][data-state="open"]')
+      .find('[aria-label="Close"]')
+      .click();
 
-    cy.get('[role="dialog"]').should('not.exist');
+    cy.get('[role="dialog"][data-state="open"]').should('not.exist');
 
     // Verify original value is retained.
     verifyRowDateTime('@unlimited-datetime', 0, originalDisplay);
@@ -714,18 +737,24 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
     // Click the first item to open popover.
     openEditableRowPopover('@unlimited-date', 0);
 
-    cy.get('[role="dialog"]').should('be.visible');
+    cy.get('[role="dialog"][data-state="open"]').should('be.visible');
 
     // Verify date input is visible.
-    cy.get('[role="dialog"]').find('input[type="date"]').should('be.visible');
+    cy.get('[role="dialog"][data-state="open"]')
+      .find('input[type="date"]')
+      .should('be.visible');
 
     // Verify time input does NOT exist for date-only fields.
-    cy.get('[role="dialog"]').find('input[type="time"]').should('not.exist');
+    cy.get('[role="dialog"][data-state="open"]')
+      .find('input[type="time"]')
+      .should('not.exist');
 
     // Close the popover.
-    cy.get('[role="dialog"]').find('[aria-label="Close"]');
-    cy.get('[aria-label="Close"]').click();
-    cy.get('[role="dialog"]').should('not.exist');
+    cy.get('[role="dialog"][data-state="open"]').find('[aria-label="Close"]');
+    cy.get('[role="dialog"][data-state="open"]')
+      .find('[aria-label="Close"]')
+      .click();
+    cy.get('[role="dialog"][data-state="open"]').should('not.exist');
   });
 
   it('remove button is disabled for required field with only one item', () => {
@@ -757,24 +786,26 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
     // Open the popover for the only item.
     openEditableRowPopover('@required-datetime', 0);
 
-    cy.get('[role="dialog"]').should('be.visible');
+    cy.get('[role="dialog"][data-state="open"]').should('be.visible');
 
     // Verify button state reflects the current count.
     cy.get('@requiredCountBeforePopover').then((count) => {
       if (count === 1) {
-        cy.get('[role="dialog"]')
+        cy.get('[role="dialog"][data-state="open"]')
           .findByRole('button', { name: /Remove/i })
           .should('be.disabled');
       } else {
-        cy.get('[role="dialog"]')
+        cy.get('[role="dialog"][data-state="open"]')
           .findByRole('button', { name: /Remove/i })
           .should('be.visible');
       }
     });
 
     // Close the popover.
-    cy.get('[role="dialog"]').find('[aria-label="Close"]').click();
-    cy.get('[role="dialog"]').should('not.exist');
+    cy.get('[role="dialog"][data-state="open"]')
+      .find('[aria-label="Close"]')
+      .click();
+    cy.get('[role="dialog"][data-state="open"]').should('not.exist');
   });
 
   it('remove button is enabled for required field with multiple items', () => {
@@ -825,19 +856,19 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
     // Open the popover for the first item.
     openEditableRowPopover('@required-datetime', 0);
 
-    cy.get('[role="dialog"]').should('be.visible');
+    cy.get('[role="dialog"][data-state="open"]').should('be.visible');
 
     // Verify Remove button IS visible (enabled for required field with multiple items).
-    cy.get('[role="dialog"]')
+    cy.get('[role="dialog"][data-state="open"]')
       .findByRole('button', { name: /Remove/i })
       .should('be.visible');
 
     // Click remove button to verify it works.
-    cy.get('[role="dialog"]')
+    cy.get('[role="dialog"][data-state="open"]')
       .findByRole('button', { name: /Remove/i })
       .click();
 
-    cy.get('[role="dialog"]').should('not.exist');
+    cy.get('[role="dialog"][data-state="open"]').should('not.exist');
 
     cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
     cy.waitForAjax();
@@ -853,23 +884,25 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
     // Now open the popover again for the remaining item.
     openEditableRowPopover('@required-datetime', 0);
 
-    cy.get('[role="dialog"]').should('be.visible');
+    cy.get('[role="dialog"][data-state="open"]').should('be.visible');
 
     // Verify button state matches remaining item count.
     getCommittedItemCount('@required-datetime').then((remainingCount) => {
       if (remainingCount === 1) {
-        cy.get('[role="dialog"]')
+        cy.get('[role="dialog"][data-state="open"]')
           .findByRole('button', { name: /Remove/i })
           .should('be.disabled');
       } else {
-        cy.get('[role="dialog"]')
+        cy.get('[role="dialog"][data-state="open"]')
           .findByRole('button', { name: /Remove/i })
           .should('be.visible');
       }
     });
 
     // Close the popover.
-    cy.get('[role="dialog"]').find('[aria-label="Close"]').click();
-    cy.get('[role="dialog"]').should('not.exist');
+    cy.get('[role="dialog"][data-state="open"]')
+      .find('[aria-label="Close"]')
+      .click();
+    cy.get('[role="dialog"][data-state="open"]').should('not.exist');
   });
 });
