@@ -61,6 +61,59 @@ export const isRemoveButtonEnabled = (
 };
 
 /**
+ * Normalize the _weight selects/inputs of a multivalue table so that each
+ * element's submitted value matches the visual DOM row order.
+ *
+ * The problem: after a wrong-order AJAX rebuild, PHP renders rows in the order
+ * it sorted them (e.g. delta-1 first, delta-0 second). The <select> elements
+ * keep their original delta-based names (field[0][_weight], field[1][_weight])
+ * but now appear in the wrong DOM positions. Simply writing 0,1,2 by DOM
+ * position won't help because the names don't match their positions — PHP
+ * would still sort wrong.
+ *
+ * The correct fix: set each weight element's value equal to its DOM row index,
+ * AND swap the name attributes so name[N][_weight] corresponds to the Nth DOM
+ * row. PHP then receives delta-0=0, delta-1=1, etc. and sorts to the current
+ * visual order.
+ *
+ * Call this immediately before triggering any AJAX action (add or remove).
+ *
+ * @param triggerElement - Any element inside the multivalue field wrapper.
+ */
+export const normalizeRowWeights = (
+  triggerElement: HTMLElement | null,
+): void => {
+  if (!triggerElement) return;
+  const tbody = triggerElement
+    .closest('[data-canvas-multiple-values]')
+    ?.querySelector('table.field-multiple-table tbody');
+  if (!tbody) return;
+
+  // Only operate on real (non-optimistic) draggable rows.
+  const rows = [
+    ...tbody.querySelectorAll<HTMLTableRowElement>('tr.draggable'),
+  ].filter((row) => !row.hasAttribute('data-canvas-optimistic'));
+
+  // Weight fields render as <select> when delta <= weight_select_max (15),
+  // otherwise as <input type="number">. Collect them in DOM order.
+  const weightEls = rows.map((row) =>
+    row.querySelector<HTMLSelectElement | HTMLInputElement>(
+      '[name*="_weight"]',
+    ),
+  );
+
+  // Extract the delta from each element's name, e.g. "field[1][_weight]" → 1.
+  // Then assign names sequentially (0, 1, 2…) to match DOM row order, and
+  // set the corresponding value so PHP receives delta-N = weight N.
+  const deltaPattern = /\[(\d+)\]\[_weight\]/;
+  weightEls.forEach((el, i) => {
+    if (!el) return;
+    el.name = el.name.replace(deltaPattern, `[${i}][_weight]`);
+    el.value = String(i);
+  });
+};
+
+/**
  * Trigger the Drupal remove button for a multivalue field row.
  *
  * This function finds and clicks the hidden Drupal remove button that carries
@@ -80,6 +133,7 @@ export const triggerDrupalRemoveButton = (
   if (!tableRow) return false;
 
   tableRow.style.display = 'none';
+  normalizeRowWeights(triggerElement);
   // Find the original Drupal remove button directly (the hidden input/button
   // that carries the AJAX behavior). The cell and button are hidden by
   // CSS but remain in the DOM.

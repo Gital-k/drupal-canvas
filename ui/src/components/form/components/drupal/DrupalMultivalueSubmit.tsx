@@ -1,5 +1,7 @@
 import { a2p } from '@/local_packages/utils';
 
+import { normalizeRowWeights } from './multivalueFormUtils';
+
 import type { Attributes } from '@/types/DrupalAttribute';
 
 const DrupalMultivalueSubmit = ({ attributes }: { attributes: Attributes }) => {
@@ -15,6 +17,11 @@ const DrupalMultivalueSubmit = ({ attributes }: { attributes: Attributes }) => {
             const tbody =
               outerWrapper &&
               outerWrapper.querySelector('table.field-multiple-table tbody');
+
+            // Normalize weight selects to sequential DOM order before the AJAX
+            // POST is serialized, preventing stale/drifted weight values from
+            // causing PHP to render rows in the wrong order after the rebuild.
+            normalizeRowWeights(node);
             if (tbody) {
               // Clone the last real row so the skeleton matches the exact column
               // widths, classes, and padding already in the table.
@@ -31,6 +38,14 @@ const DrupalMultivalueSubmit = ({ attributes }: { attributes: Attributes }) => {
                   input.value = '';
                   input.checked = false;
                 });
+
+                // Remove the weight select from the skeleton entirely — it
+                // must not be submitted as part of the AJAX POST because its
+                // cloned name/value would duplicate a real row's weight entry
+                // and corrupt PHP's sort order.
+                skeleton
+                  .querySelectorAll('[name*="_weight"]')
+                  .forEach((el) => el.removeAttribute('name'));
 
                 // Replace the content of the input cell (2nd td) with a shimmer.
                 // The input cell is the one that contains the custom element / text.
