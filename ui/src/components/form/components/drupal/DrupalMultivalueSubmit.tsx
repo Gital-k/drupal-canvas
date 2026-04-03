@@ -3,14 +3,12 @@ import { a2p } from '@/local_packages/utils';
 import type { Attributes } from '@/types/DrupalAttribute';
 
 const DrupalMultivalueSubmit = ({ attributes }: { attributes: Attributes }) => {
-  console.log('avava ' + attributes.value, attributes);
   return (
     <input
       type={'submit'}
       {...a2p(attributes)}
       value={attributes.value || ''}
       ref={(node) => {
-        console.log('REF!', node);
         if (attributes?.['data-multivalue-add-new'] && node) {
           node.addEventListener('click', () => {
             const outerWrapper = node.closest('[data-canvas-multiple-values]');
