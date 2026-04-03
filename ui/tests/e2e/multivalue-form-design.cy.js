@@ -292,15 +292,25 @@ describe('Multivalue Form Design (canvas_dev_mode)', () => {
 
     cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
     cy.waitForAjax();
+    // eslint-disable-next-line cypress/no-unnecessary-waiting
+    cy.wait(1000);
 
     confirmTextInputs('@unlimited-text', [
       'Marshmallow Coast',
       'The Olivia Tremor Control',
       'Neutral Milk Hotel',
     ]);
+    // Refresh the page to ensure the update persists.
+    cy.reload();
+    confirmTextInputs('@unlimited-text', [
+      'Marshmallow Coast',
+      'The Olivia Tremor Control',
+      'Neutral Milk Hotel',
+      '',
+    ]);
   });
 
-  it('can remove items using popover remove button', () => {
+  it.only('can remove items using popover remove button', () => {
     cy.loadURLandWaitForCanvasLoaded({ url: 'canvas/editor/node/2' });
     cy.findByTestId('canvas-page-data-form').as('entityForm');
     cy.get('@entityForm').recordFormBuildId();

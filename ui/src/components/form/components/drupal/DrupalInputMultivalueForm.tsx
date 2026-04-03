@@ -4,17 +4,22 @@ import { ArrowRightIcon, Cross2Icon, TrashIcon } from '@radix-ui/react-icons';
 import * as Popover from '@radix-ui/react-popover';
 import { Box, Button, Flex, Text } from '@radix-ui/themes';
 
+
+
 import DrupalInput from '@/components/form/components/drupal/DrupalInput';
 
-import {
-  isRemoveButtonEnabled,
-  triggerDrupalRemoveButton,
-  updateInputValue,
-} from './multivalueFormUtils';
+
+
+import { isRemoveButtonEnabled, triggerDrupalRemoveButton, updateInputValue } from './multivalueFormUtils';
+
+
 
 import type { NumericInputAttributes } from '@/types/DrupalAttribute';
 
+
+
 import styles from './DrupalInputMultivalueForm.module.css';
+
 
 /**
  * DrupalInputMultivalueForm component for inputs within multivalue widgets.
@@ -56,10 +61,21 @@ const DrupalInputMultivalueForm = ({
   const popoverTextFieldWrapperRef = useRef<HTMLDivElement | null>(null);
   const popoverContainerRef = useRef<HTMLDivElement | null>(null);
   const divRef = useRef<HTMLDivElement | null>(null);
-  // Sync displayValue with attributes.value when it changes (e.g., after AJAX updates)
+
   useEffect(() => {
-    const newValue = attributes.value || attributes.defaultValue || '';
-    setDisplayValue(newValue as string);
+    const liveInput = inputWrapperRef.current?.querySelector(
+      'input',
+    ) as HTMLInputElement | null;
+    const liveValue = liveInput?.value ?? '';
+    const attrValue = (attributes.value ??
+      attributes.defaultValue ??
+      '') as string;
+
+    // Use the live input value when it is non-empty; fall back to the
+    // attribute value on the very first mount (before InputBehaviors has had
+    // a chance to populate the input).
+    const newValue = liveValue !== '' ? liveValue : attrValue;
+    setDisplayValue(newValue);
   }, [attributes.value, attributes.defaultValue]);
 
   // Commit a value directly — used by the autocomplete selection handler so
@@ -191,7 +207,8 @@ const DrupalInputMultivalueForm = ({
   const handleRemove = () => {
     const triggerElement = triggerRowRef.current;
     if (!triggerElement) return;
-
+    // @ts-ignore
+    window.Drupal.attachBehaviors(triggerRowRef);
     // Close the popover first so the portal is cleaned up before AJAX replaces the DOM.
     setPopoverOpen(false);
 
