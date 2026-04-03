@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { ArrowRightIcon, Cross2Icon, TrashIcon } from '@radix-ui/react-icons';
 import { Box, Button, Flex, Popover, Text } from '@radix-ui/themes';
@@ -10,6 +10,9 @@ import { a2p } from '@/local_packages/utils';
 
 import {
   copyInputAttributes,
+  isRemoveButtonEnabled,
+  triggerDrupalRemoveButton,
+  updateInputValue,
 } from './multivalueFormUtils';
 
 import type { NumericInputAttributes } from '@/types/DrupalAttribute';
@@ -91,7 +94,9 @@ const DrupalInputMultivalueForm = ({
       const realInput = inputWrapperRef.current.querySelector(
         'input',
       ) as HTMLInputElement | null;
-      updateInputValue(realInput, newValue);
+      if (realInput && realInput.value !== newValue) {
+        updateInputValue(realInput, newValue);
+      }
     }
   }, []);
 
@@ -216,86 +221,15 @@ const DrupalInputMultivalueForm = ({
     setPopoverOpen(open);
   };
 
-  // Determine if the remove button should be enabled.
-  const removeButtonEnabled = useMemo(() => {
-    if (!popoverOpen) return false;
-    const tableRow = triggerRowRef.current?.closest('tr');
-    const removeActionCell = tableRow?.querySelector('.canvas-remove-action');
-
-    // Look for the Drupal remove button. Drupal adds these buttons to all rows
-    // in unlimited cardinality fields.
-    const removeButton = removeActionCell?.querySelector(
-      'input[type="submit"][name*="remove_button"]',
-    ) as HTMLInputElement | null;
-
-    // Check if button exists and is not disabled
-    if (!removeButton || removeButton.disabled) {
-      return false;
-    }
-
-    // Get the field wrapper that contains row count and required status
-    // These are set by canvas_stark_preprocess_field_multiple_value_form
-    const fieldWrapperRowCount = tableRow?.closest('[data-canvas-row-count]');
-    if (!fieldWrapperRowCount) {
-      return true;
-    }
-
-    const rowCount = parseInt(
-      fieldWrapperRowCount.getAttribute('data-canvas-row-count') || '0',
-      10,
-    );
-    // Check if the field is required by looking for .form-required class
-    // This class is added by Drupal to the label or field wrapper
-    if (tableRow) {
-      const table = tableRow.closest('table');
-      const fieldWrapper = table?.closest('.js-form-wrapper, .form-item');
-      const isRequired =
-        fieldWrapper?.querySelector('.form-required, .js-form-required') !==
-        null;
-
-      // Disable remove button if required field with only one item
-      if (isRequired && rowCount === 1) {
-        return false;
-      }
-    }
-
-    return true;
-  }, [popoverOpen]);
-
   const handleRemove = () => {
-    if (!triggerRowRef.current) return;
+    const triggerElement = triggerRowRef.current;
+    if (!triggerElement) return;
 
-    // Locate the Drupal remove button FIRST — before any state updates trigger
-    // a React re-render that could unmount/move DOM nodes.
-    const tableRow = triggerRowRef.current.closest('tr');
-    if (!tableRow) return;
-
-    // Find the original Drupal remove button directly (the hidden input/button
-    // that carries the AJAX behavior). The cell and button are hidden by
-    // CSS but remain in the DOM.
-    const removeActionCell = tableRow.querySelector('.canvas-remove-action');
-    const removeButton = removeActionCell?.querySelector(
-      'input[type="submit"][name*="remove_button"]',
-    ) as HTMLElement | null;
-
-    // Give immediate visual feedback by hiding this row before the AJAX response.
-    tableRow.style.display = 'none';
-
-    // Close the popover so the portal is cleaned up before AJAX replaces the
-    // DOM.
+    // Close the popover first so the portal is cleaned up before AJAX replaces the DOM.
     setPopoverOpen(false);
 
-    if (removeButton) {
-      // Dispatch mousedown first (some Drupal AJAX handlers listen for it),
-      // then click — mirroring what Drupal's AJAX system expects.
-      removeButton.dispatchEvent(
-        new MouseEvent('mousedown', {
-          bubbles: true,
-          cancelable: true,
-          view: window,
-        }),
-      );
-      removeButton.click();
+    // Try to trigger the Drupal remove button.
+    if (triggerDrupalRemoveButton(triggerElement)) {
       return;
     }
 
@@ -304,14 +238,7 @@ const DrupalInputMultivalueForm = ({
     const inputElement = inputWrapperRef.current.querySelector(
       'input',
     ) as HTMLInputElement | null;
-    if (inputElement) {
-      const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-        HTMLInputElement.prototype,
-        'value',
-      )?.set;
-      nativeInputValueSetter?.call(inputElement, '');
-      inputElement.dispatchEvent(new Event('input', { bubbles: true }));
-    }
+    updateInputValue(inputElement, '');
   };
 
   return (
@@ -427,7 +354,7 @@ const DrupalInputMultivalueForm = ({
               color="red"
               size="1"
               onClick={handleRemove}
-              disabled={!removeButtonEnabled}
+              disabled={!isRemoveButtonEnabled(triggerRowRef.current)}
             >
               <TrashIcon />
               Remove

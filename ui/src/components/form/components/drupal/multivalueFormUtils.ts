@@ -19,14 +19,12 @@ export const isRemoveButtonEnabled = (
 
   // Check whether the table row has a Drupal remove button.
   const tableRow = triggerElement.closest('tr');
-  const removeActionCell = tableRow?.querySelector(
-    '[data-canvas-remove-button]',
-  );
+  const removeActionCell = tableRow?.querySelector('.canvas-remove-action');
 
   // Look for the Drupal remove button. Drupal adds these buttons to all rows
   // in unlimited cardinality fields.
   const removeButton = removeActionCell?.querySelector(
-    'input[type="submit"]',
+    'input[type="submit"][name*="remove_button"]',
   ) as HTMLInputElement | null;
 
   // Check if button exists and is not disabled
@@ -84,12 +82,10 @@ export const triggerDrupalRemoveButton = (
   // Find the original Drupal remove button directly (the hidden input/button
   // that carries the AJAX behavior). The cell and button are hidden by
   // CSS but remain in the DOM.
-  const removeActionCell = tableRow.querySelector(
-    '[data-canvas-remove-button]',
-  );
+  const removeActionCell = tableRow.querySelector('.canvas-remove-action');
   if (removeActionCell) {
     const removeButton = removeActionCell.querySelector(
-      'input[type="submit"]',
+      'input[type="submit"][name*="remove_button"]',
     ) as HTMLElement | null;
     if (removeButton) {
       // Dispatch mousedown first (some Drupal AJAX handlers listen for it),
