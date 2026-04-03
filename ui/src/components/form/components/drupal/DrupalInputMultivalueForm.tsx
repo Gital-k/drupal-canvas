@@ -52,9 +52,6 @@ const DrupalInputMultivalueForm = ({
   const triggerRowRef = useRef<HTMLDivElement | null>(null);
   // Controlled popover state so we can close it programmatically on remove.
   const [popoverOpen, setPopoverOpen] = useState(false);
-  // Set immediately on click to give instant visual
-  // feedback (row disappears) before the AJAX round-trip completes.
-  const [isRemoving, setIsRemoving] = useState(false);
   const fieldLabel = attributes['data-field-label'] || '';
   // Ref for the popover trigger to restore focus after closing.
   const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -83,16 +80,6 @@ const DrupalInputMultivalueForm = ({
     setDisplayValue(newValue);
     setTempValue(newValue);
   }, [attributes.value, attributes.defaultValue]);
-
-  // Hide the parent <tr> immediately when isRemoving is
-  // set, so the row disappears on click without waiting for the AJAX response.
-  useEffect(() => {
-    if (!isRemoving) return;
-    const tableRow = triggerRowRef.current?.closest('tr');
-    if (tableRow) {
-      (tableRow as HTMLElement).style.display = 'none';
-    }
-  }, [isRemoving]);
 
   // Commit a value directly — used by the autocomplete selection handler so
   // the table row updates immediately.
@@ -125,78 +112,56 @@ const DrupalInputMultivalueForm = ({
     }
   }, [popoverOpen]);
 
-  // Handle temporary input changes in popover (not committed until Enter).
-  const handleTempInputChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      setTempValue(e.target.value);
-    },
-    [],
-  );
+  // Handle Enter key press in popover input.
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      // If a jQuery UI autocomplete suggestion was just selected synchronously
+      // (before this React event handler ran via event delegation), do NOT
+      // commit the stale tempValue. The data-canvas-autocomplete-selected
+      // handler already committed the correct suggestion value.
+      if (autocompleteJustSelectedRef.current) {
+        autocompleteJustSelectedRef.current = false;
+        return;
+      }
 
-  // Commit the temporary value to the actual input and display.
-  const handleCommitValue = useCallback(() => {
-    // Validate the input using the popover input element's HTML5 validation.
-    if (popoverInputRef.current) {
-      // Check if the input is valid according to its constraints
-      // (min, max, step, etc.).
-      if (!popoverInputRef.current.checkValidity()) {
-        // Show the browser's native validation message.
+      // If a jQuery UI autocomplete dropdown is currently open, do NOT
+      // intercept Enter — let jQuery UI process the selection so that
+      // the autocomplete select event fires. The data-canvas-autocomplete-selected
+      // listener will then commit the correct suggestion value and close the popover.
+      const inputElement =
+        popoverInputRef.current || (e.target as HTMLInputElement);
+      const $jq =
+        typeof window !== 'undefined' && (window as any).jQuery
+          ? (window as any).jQuery
+          : null;
+      const isAutocompleteOpen =
+        $jq &&
+        $jq(inputElement)
+          .data('ui-autocomplete')
+          ?.menu?.element?.is?.(':visible');
+
+      if (isAutocompleteOpen) {
+        return;
+      }
+
+      e.preventDefault();
+
+      // Validate the input before committing.
+      if (inputElement && !inputElement.checkValidity()) {
+        inputElement.reportValidity();
+        return;
+      }
+
+      // Validate against HTML5 constraints on the popover input (min, max, step, etc.).
+      if (popoverInputRef.current && !popoverInputRef.current.checkValidity()) {
         popoverInputRef.current.reportValidity();
         return;
       }
+
+      commitValue(tempValue);
+      setPopoverOpen(false);
     }
-
-    commitValue(tempValue);
-  }, [commitValue, tempValue]);
-
-  // Handle Enter key press in popover input.
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === 'Enter') {
-        // If a jQuery UI autocomplete suggestion was just selected synchronously
-        // (before this React event handler ran via event delegation), do NOT
-        // commit the stale tempValue. The data-canvas-autocomplete-selected
-        // handler already committed the correct suggestion value.
-        if (autocompleteJustSelectedRef.current) {
-          autocompleteJustSelectedRef.current = false;
-          return;
-        }
-
-        // If a jQuery UI autocomplete dropdown is currently open, do NOT
-        // intercept Enter — let jQuery UI process the selection so that
-        // the autocomplete select event fires. The data-canvas-autocomplete-selected
-        // listener will then commit the correct suggestion value and close the popover.
-        const inputElement =
-          popoverInputRef.current || (e.target as HTMLInputElement);
-        const $jq =
-          typeof window !== 'undefined' && (window as any).jQuery
-            ? (window as any).jQuery
-            : null;
-        const isAutocompleteOpen =
-          $jq &&
-          $jq(inputElement)
-            .data('ui-autocomplete')
-            ?.menu?.element?.is?.(':visible');
-
-        if (isAutocompleteOpen) {
-          return;
-        }
-
-        e.preventDefault();
-
-        // Validate the input before committing
-        if (inputElement && !inputElement.checkValidity()) {
-          // Show validation error and keep popover open
-          inputElement.reportValidity();
-          return;
-        }
-
-        handleCommitValue();
-        setPopoverOpen(false);
-      }
-    },
-    [handleCommitValue],
-  );
+  };
 
   // Handle popover open/close - reset tempValue when opening,
   // revert when closing without commit.
@@ -313,9 +278,8 @@ const DrupalInputMultivalueForm = ({
       'input[type="submit"][name*="remove_button"]',
     ) as HTMLElement | null;
 
-    // Give immediate visual feedback by hiding this row right now. The AJAX
-    // response will then replace the entire wrapper.
-    setIsRemoving(true);
+    // Give immediate visual feedback by hiding this row before the AJAX response.
+    tableRow.style.display = 'none';
 
     // Close the popover so the portal is cleaned up before AJAX replaces the
     // DOM.
@@ -434,7 +398,8 @@ const DrupalInputMultivalueForm = ({
                 attributes={{
                   ...attributes,
                   value: tempValue,
-                  onChange: handleTempInputChange,
+                  onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
+                    setTempValue(e.target.value),
                   onKeyDown: handleKeyDown,
                 }}
               />
@@ -444,7 +409,8 @@ const DrupalInputMultivalueForm = ({
                 attributes={{
                   ...attributes,
                   value: tempValue,
-                  onChange: handleTempInputChange,
+                  onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
+                    setTempValue(e.target.value),
                   onKeyDown: handleKeyDown,
                   type: attributes.type || 'text',
                   placeholder: attributes.placeholder,
