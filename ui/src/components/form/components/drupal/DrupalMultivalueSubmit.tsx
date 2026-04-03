@@ -10,7 +10,7 @@ const DrupalMultivalueSubmit = ({ attributes }: { attributes: Attributes }) => {
       value={attributes.value || ''}
       ref={(node) => {
         if (attributes?.['data-multivalue-add-new'] && node) {
-          node.addEventListener('click', () => {
+          node.addEventListener('mousedown', () => {
             const outerWrapper = node.closest('[data-canvas-multiple-values]');
             const tbody =
               outerWrapper &&
@@ -19,7 +19,10 @@ const DrupalMultivalueSubmit = ({ attributes }: { attributes: Attributes }) => {
               // Clone the last real row so the skeleton matches the exact column
               // widths, classes, and padding already in the table.
               const lastRow = tbody.querySelector('tr.draggable:last-child');
-              if (lastRow) {
+              if (
+                lastRow &&
+                !lastRow.querySelector('[data-canvas-optimistic]')
+              ) {
                 const skeleton = lastRow.cloneNode(true) as Element;
                 skeleton.setAttribute('data-canvas-optimistic', 'add');
                 skeleton.querySelectorAll('input').forEach(function (

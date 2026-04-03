@@ -94,9 +94,7 @@ const DrupalInputMultivalueForm = ({
       const realInput = inputWrapperRef.current.querySelector(
         'input',
       ) as HTMLInputElement | null;
-      if (realInput && realInput.value !== newValue) {
-        updateInputValue(realInput, newValue);
-      }
+      updateInputValue(realInput, newValue);
     }
   }, []);
 
@@ -116,6 +114,26 @@ const DrupalInputMultivalueForm = ({
       autocompleteCleanupRef.current = null;
     }
   }, [popoverOpen]);
+  // Handle temporary input changes in popover (not committed until Enter).
+  const handleTempInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setTempValue(e.target.value);
+  };
+
+  // Commit the temporary value to the actual input and display.
+  const handleCommitValue = () => {
+    // Validate the input using the popover input element's HTML5 validation.
+    if (popoverInputRef.current) {
+      // Check if the input is valid according to its constraints
+      // (min, max, step, etc.).
+      if (!popoverInputRef.current.checkValidity()) {
+        // Show the browser's native validation message.
+        popoverInputRef.current.reportValidity();
+        return;
+      }
+    }
+
+    commitValue(tempValue);
+  };
 
   // Handle Enter key press in popover input.
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -131,7 +149,7 @@ const DrupalInputMultivalueForm = ({
 
       // If a jQuery UI autocomplete dropdown is currently open, do NOT
       // intercept Enter — let jQuery UI process the selection so that
-      // the autocomplete select event fires. The data-canvas-autocomplete-selected
+      // the auto complete select event fires. The data-canvas-autocomplete-selected
       // listener will then commit the correct suggestion value and close the popover.
       const inputElement =
         popoverInputRef.current || (e.target as HTMLInputElement);
@@ -151,19 +169,14 @@ const DrupalInputMultivalueForm = ({
 
       e.preventDefault();
 
-      // Validate the input before committing.
+      // Validate the input before committing
       if (inputElement && !inputElement.checkValidity()) {
+        // Show validation error and keep popover open
         inputElement.reportValidity();
         return;
       }
 
-      // Validate against HTML5 constraints on the popover input (min, max, step, etc.).
-      if (popoverInputRef.current && !popoverInputRef.current.checkValidity()) {
-        popoverInputRef.current.reportValidity();
-        return;
-      }
-
-      commitValue(tempValue);
+      handleCommitValue();
       setPopoverOpen(false);
     }
   };
@@ -222,14 +235,13 @@ const DrupalInputMultivalueForm = ({
   };
 
   const handleRemove = () => {
-    const triggerElement = triggerRowRef.current;
-    if (!triggerElement) return;
-
     // Close the popover first so the portal is cleaned up before AJAX replaces the DOM.
     setPopoverOpen(false);
 
+    if (!triggerRowRef.current) return;
+
     // Try to trigger the Drupal remove button.
-    if (triggerDrupalRemoveButton(triggerElement)) {
+    if (triggerDrupalRemoveButton(triggerRowRef.current)) {
       return;
     }
 
@@ -275,7 +287,11 @@ const DrupalInputMultivalueForm = ({
               type="button"
               aria-label={`Edit ${fieldLabel}: ${displayValue || 'Empty'}`}
             >
-              <Text size="2" className={styles.itemText}>
+              <Text
+                size="2"
+                className={styles.itemText}
+                data-canvas-multivalue-label
+              >
                 {displayValue || 'Empty'}
               </Text>
               <ArrowRightIcon className={styles.arrowIcon} />
@@ -325,8 +341,7 @@ const DrupalInputMultivalueForm = ({
                 attributes={{
                   ...attributes,
                   value: tempValue,
-                  onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
-                    setTempValue(e.target.value),
+                  onChange: handleTempInputChange,
                   onKeyDown: handleKeyDown,
                 }}
               />
@@ -336,8 +351,7 @@ const DrupalInputMultivalueForm = ({
                 attributes={{
                   ...attributes,
                   value: tempValue,
-                  onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
-                    setTempValue(e.target.value),
+                  onChange: handleTempInputChange,
                   onKeyDown: handleKeyDown,
                   type: attributes.type || 'text',
                   placeholder: attributes.placeholder,

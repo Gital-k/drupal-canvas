@@ -659,9 +659,9 @@
       if ($ajaxNewContent.length) {
         $ajaxNewContent.hide();
         $newContent.show();
-        $ajaxNewContent[effect.showEffect](effect.showSpeed);
+        $ajaxNewContent[effect.showEffect](0);
       } else if (effect.showEffect !== 'show') {
-        $newContent[effect.showEffect](effect.showSpeed);
+        $newContent.show();
       }
     };
 
@@ -674,12 +674,10 @@
       const hydrated = snapshots.every((el) => !el.outerHTML.includes('</drupal-canvas'));
       if (hydrated) {
         clearInterval(pollInterval);
-        // reveal();
         setTimeout(reveal, 10);
       } else if (elapsed >= hydrationDelayMs) {
         clearInterval(pollInterval);
-        // reveal();
-        setTimeout(reveal, 10);
+        reveal();
       }
     }, intervalMs);
   };
@@ -716,7 +714,7 @@
     // until React has had time to hydrate, avoiding pre-hydration flicker.
     if (
       method === 'replaceWith' &&
-      callback?.[1] === 'addMoreAjax' &&
+      ['addMoreAjax', 'deleteAjax'].includes(callback?.[1]) &&
       !!element.closest('[data-canvas-multiple-values]')
     ) {
       // Mirror the original: resolve wrapper and settings.
