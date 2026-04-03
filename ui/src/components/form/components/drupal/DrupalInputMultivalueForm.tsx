@@ -207,8 +207,6 @@ const DrupalInputMultivalueForm = ({
   const handleRemove = () => {
     const triggerElement = triggerRowRef.current;
     if (!triggerElement) return;
-    // @ts-ignore
-    window.Drupal.attachBehaviors(triggerRowRef);
     // Close the popover first so the portal is cleaned up before AJAX replaces the DOM.
     setPopoverOpen(false);
 
