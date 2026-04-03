@@ -25,7 +25,7 @@ test.describe('Block form', () => {
     );
     await expect(inputsForm).toContainText('Menu levels');
     await expect(inputsForm.locator('select')).toHaveCount(2);
-    await expect(inputsForm.locator('input[type="checkbox"]')).toBeVisible();
+    await expect(inputsForm.locator('input[type="checkbox"]')).toHaveCount(2);
   });
 
   test('Block settings form values are stored and the preview is updated', async ({
@@ -54,7 +54,7 @@ test.describe('Block form', () => {
     ).toBeVisible();
 
     const siteNameLocator =
-      'xpath=//a[ancestor::*[starts-with(@id, "block-") and string-length(@id) = 42]]';
+      'xpath=//a[not(img) and ancestor::*[starts-with(@id, "block-") and string-length(@id) = 42]]';
     const siteNameCheckbox = page.getByRole('checkbox', { name: 'Site name' });
     await expect(siteNameCheckbox).toBeChecked();
     await expect(
