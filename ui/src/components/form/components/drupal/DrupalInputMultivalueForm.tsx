@@ -4,22 +4,17 @@ import { ArrowRightIcon, Cross2Icon, TrashIcon } from '@radix-ui/react-icons';
 import * as Popover from '@radix-ui/react-popover';
 import { Box, Button, Flex, Text } from '@radix-ui/themes';
 
-
-
 import DrupalInput from '@/components/form/components/drupal/DrupalInput';
 
-
-
-import { isRemoveButtonEnabled, triggerDrupalRemoveButton, updateInputValue } from './multivalueFormUtils';
-
-
+import {
+  isRemoveButtonEnabled,
+  triggerDrupalRemoveButton,
+  updateInputValue,
+} from './multivalueFormUtils';
 
 import type { NumericInputAttributes } from '@/types/DrupalAttribute';
 
-
-
 import styles from './DrupalInputMultivalueForm.module.css';
-
 
 /**
  * DrupalInputMultivalueForm component for inputs within multivalue widgets.
@@ -159,13 +154,6 @@ const DrupalInputMultivalueForm = ({
   // revert when closing without commit.
   const handlePopoverOpenChange = (open: boolean) => {
     if (open) {
-      // When opening, set tempValue to current displayValue.
-      // Focus the input field in the popover. Find it inside the container
-      // since TextFieldAutocomplete does not forward the ref from attributes.
-      // Also re-attach Drupal behaviors so that entity_autocomplete (jQuery UI
-      // autocomplete) is initialized on the input that just appeared inside
-      // the Radix UI portal — it was never seen by Drupal.behaviors.
-      // autocomplete during the initial page load.
       setTimeout(() => {
         if (popoverContainerRef.current) {
           const handleSelected = (e: Event) => {
@@ -204,7 +192,8 @@ const DrupalInputMultivalueForm = ({
     setPopoverOpen(open);
   };
 
-  const handleRemove = () => {
+  const handleRemove = (e: any) => {
+    e.preventDefault();
     const triggerElement = triggerRowRef.current;
     if (!triggerElement) return;
     // Close the popover first so the portal is cleaned up before AJAX replaces the DOM.

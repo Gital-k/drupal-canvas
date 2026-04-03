@@ -310,7 +310,7 @@ describe('Multivalue Form Design (canvas_dev_mode)', () => {
     ]);
   });
 
-  it.only('can remove items using popover remove button', () => {
+  it('can remove items using popover remove button', () => {
     cy.loadURLandWaitForCanvasLoaded({ url: 'canvas/editor/node/2' });
     cy.findByTestId('canvas-page-data-form').as('entityForm');
     cy.get('@entityForm').recordFormBuildId();

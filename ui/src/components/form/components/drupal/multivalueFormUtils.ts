@@ -89,7 +89,7 @@ export const triggerDrupalRemoveButton = (
   );
   if (removeActionCell) {
     const removeButton = removeActionCell.querySelector(
-      'input[type="submit"]',
+      'input[type="submit"][data-once="drupal-ajax"]',
     ) as HTMLElement | null;
     if (removeButton) {
       // Dispatch mousedown first (some Drupal AJAX handlers listen for it),
