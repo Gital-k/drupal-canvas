@@ -9,7 +9,6 @@ import DrupalInput from '@/components/form/components/drupal/DrupalInput';
 import {
   isRemoveButtonEnabled,
   triggerDrupalRemoveButton,
-  updateInputValue,
 } from './multivalueFormUtils';
 
 import type { NumericInputAttributes } from '@/types/DrupalAttribute';
@@ -36,13 +35,10 @@ const DrupalInputMultivalueForm = ({
     'data-field-label'?: string;
   };
 }) => {
-  // Get the initial value from attributes
   const initialValue = attributes.value || attributes.defaultValue || '';
-  // Manage local state to sync display value with input changes
   const [displayValue, setDisplayValue] = useState<string>(
     initialValue as string,
   );
-  const inputWrapperRef = useRef<HTMLDivElement | null>(null);
   // Ref for the trigger area that lives inside the actual table row.
   const triggerRowRef = useRef<HTMLDivElement | null>(null);
   // Controlled popover state so we can close it programmatically on remove.
@@ -50,40 +46,23 @@ const DrupalInputMultivalueForm = ({
   const fieldLabel = attributes['data-field-label'] || '';
   // Ref for the popover trigger to restore focus after closing.
   const triggerRef = useRef<HTMLButtonElement | null>(null);
-  // Ref for the popover input to focus it when opening.
+  // Ref for the popover input — set when the popover opens.
   const popoverInputRef = useRef<HTMLInputElement | null>(null);
-  // Ref to the Box containing the TextField so we can find the input element
-  const popoverTextFieldWrapperRef = useRef<HTMLDivElement | null>(null);
   const popoverContainerRef = useRef<HTMLDivElement | null>(null);
-  const divRef = useRef<HTMLDivElement | null>(null);
 
+  // Sync displayValue when a genuine external value arrives (e.g. AJAX
+  // rebuild after "Add another item" or "Remove").
   useEffect(() => {
-    const liveInput = inputWrapperRef.current?.querySelector(
-      'input',
-    ) as HTMLInputElement | null;
-    const liveValue = liveInput?.value ?? '';
     const attrValue = (attributes.value ??
       attributes.defaultValue ??
       '') as string;
-
-    // Use the live input value when it is non-empty; fall back to the
-    // attribute value on the very first mount (before InputBehaviors has had
-    // a chance to populate the input).
-    const newValue = liveValue !== '' ? liveValue : attrValue;
-    setDisplayValue(newValue);
+    setDisplayValue(attrValue);
   }, [attributes.value, attributes.defaultValue]);
 
   // Commit a value directly — used by the autocomplete selection handler so
   // the table row updates immediately.
   const commitValue = useCallback((newValue: string) => {
     setDisplayValue(newValue);
-
-    if (inputWrapperRef.current) {
-      const realInput = inputWrapperRef.current.querySelector(
-        'input',
-      ) as HTMLInputElement | null;
-      updateInputValue(realInput, newValue);
-    }
   }, []);
 
   // Listen for the custom autocomplete-selected event dispatched by
@@ -91,8 +70,8 @@ const DrupalInputMultivalueForm = ({
   const autocompleteCleanupRef = useRef<(() => void) | null>(null);
   // Flag to indicate an autocomplete suggestion was just selected. Set by the
   // data-canvas-autocomplete-selected handler so that handleKeyDown (which may
-  // fire after jQuery UI has already closed the dropdown) does not overwrite
-  // the committed value with the stale tempValue.
+  // fire after jQuery UI has already closed the dropdown) does not close the
+  // popover before the committed value has been reflected.
   const autocompleteJustSelectedRef = useRef(false);
 
   // Clean up the autocomplete listener whenever the popover closes.
@@ -108,8 +87,8 @@ const DrupalInputMultivalueForm = ({
     if (e.key === 'Enter') {
       // If a jQuery UI autocomplete suggestion was just selected synchronously
       // (before this React event handler ran via event delegation), do NOT
-      // commit the stale tempValue. The data-canvas-autocomplete-selected
-      // handler already committed the correct suggestion value.
+      // close the popover — the data-canvas-autocomplete-selected handler
+      // already committed the correct value.
       if (autocompleteJustSelectedRef.current) {
         autocompleteJustSelectedRef.current = false;
         return;
@@ -117,7 +96,7 @@ const DrupalInputMultivalueForm = ({
 
       // If a jQuery UI autocomplete dropdown is currently open, do NOT
       // intercept Enter — let jQuery UI process the selection so that
-      // the auto complete select event fires. The data-canvas-autocomplete-selected
+      // the autocomplete select event fires. The data-canvas-autocomplete-selected
       // listener will then commit the correct suggestion value and close the popover.
       const inputElement =
         popoverInputRef.current || (e.target as HTMLInputElement);
@@ -150,8 +129,7 @@ const DrupalInputMultivalueForm = ({
       });
     }
   };
-  // Handle popover open/close - reset tempValue when opening,
-  // revert when closing without commit.
+
   const handlePopoverOpenChange = (open: boolean) => {
     if (open) {
       setTimeout(() => {
@@ -204,16 +182,12 @@ const DrupalInputMultivalueForm = ({
       return;
     }
 
+    // Fallback: no Drupal remove button (e.g. non-AJAX field), just clear.
     setDisplayValue('');
-    if (!inputWrapperRef.current) return;
-    const inputElement = inputWrapperRef.current.querySelector(
-      'input',
-    ) as HTMLInputElement | null;
-    updateInputValue(inputElement, '');
   };
 
   return (
-    <div ref={divRef} style={{ display: 'contents' }}>
+    <div style={{ display: 'contents' }}>
       <Popover.Root open={popoverOpen} onOpenChange={handlePopoverOpenChange}>
         <Flex
           ref={triggerRowRef}
@@ -229,7 +203,11 @@ const DrupalInputMultivalueForm = ({
               type="button"
               aria-label={`Edit ${fieldLabel}: ${displayValue || 'Empty'}`}
             >
-              <Text size="2" className={styles.itemText}>
+              <Text
+                size="2"
+                className={styles.itemText}
+                data-canvas-multivalue-label
+              >
                 {displayValue || 'Empty'}
               </Text>
               <ArrowRightIcon className={styles.arrowIcon} />
@@ -253,7 +231,7 @@ const DrupalInputMultivalueForm = ({
             // jQuery UI autocomplete suggestion. The dropdown is rendered in
             // a portal outside the popover, so Radix treats it as an outside
             // click and would close the popover before the selection is
-            // committed via the MutationObserver.
+            // committed.
             const target = e.target as Element | null;
             if (target?.closest('.ui-autocomplete, .ui-menu')) {
               e.preventDefault();
@@ -274,8 +252,8 @@ const DrupalInputMultivalueForm = ({
             </Popover.Close>
           </Flex>
 
-          {/* Input Field - Visual duplicate for popover editing */}
-          <Box ref={popoverTextFieldWrapperRef}>
+          {/* Input Field */}
+          <Box>
             <DrupalInput
               attributes={{ ...attributes, onKeyDown: handleKeyDown }}
             />
