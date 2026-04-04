@@ -25,7 +25,9 @@ test.describe('Block form', () => {
     );
     await expect(inputsForm).toContainText('Menu levels');
     await expect(inputsForm.locator('select')).toHaveCount(2);
-    await expect(inputsForm.locator('input[type="checkbox"]').first()).toBeVisible();
+    await expect(
+      inputsForm.locator('input[type="checkbox"]').first(),
+    ).toBeVisible();
   });
 
   test('Block settings form values are stored and the preview is updated', async ({
