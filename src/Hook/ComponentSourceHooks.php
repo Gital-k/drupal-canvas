@@ -48,25 +48,6 @@ readonly final class ComponentSourceHooks {
   ];
 
   /**
-   * Implements hook_rebuild().
-   */
-  #[Hook('rebuild')]
-  public function rebuild(): void {
-    $this->componentSourceManager->generateComponents();
-  }
-
-  /**
-   * Implements hook_modules_installed().
-   */
-  #[Hook('modules_installed')]
-  public function modulesInstalled(array $modules, bool $is_syncing): void {
-    if ($is_syncing) {
-      return;
-    }
-    $this->rebuild();
-  }
-
-  /**
    * Implements hook_config_schema_info_alter().
    */
   #[Hook('config_schema_info_alter')]

@@ -13,6 +13,7 @@ use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 use Drupal\Component\Assertion\Inspector;
 use Drupal\Core\Cache\CacheBackendInterface;
+use Drupal\Core\Cache\CacheTagsInvalidatorInterface;
 use Drupal\Core\Config\ConfigInstallerInterface;
 use Drupal\Core\DependencyInjection\ClassResolverInterface;
 use Drupal\Core\DrupalKernel;
@@ -30,7 +31,7 @@ use Drupal\Core\Update\UpdateKernel;
  *
  * @phpstan-import-type ComponentSourceSpecificId from \Drupal\canvas\ComponentSource\ComponentCandidatesDiscoveryInterface
  */
-final class ComponentSourceManager extends DefaultPluginManager {
+final class ComponentSourceManager extends DefaultPluginManager implements CacheTagsInvalidatorInterface {
 
   /**
    * TRUE if we're running in an update kernel.
@@ -63,6 +64,17 @@ final class ComponentSourceManager extends DefaultPluginManager {
     $this->alterInfo('canvas_component_source');
     $this->setCacheBackend($cache_backend, 'canvas_component_source');
     $this->isUpdateKernel = $kernel instanceof UpdateKernel;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function invalidateTags(array $tags): void {
+    // When a module or theme has been installed or uninstalled, we need to
+    // (re)generate components for all component sources.
+    if (in_array('config:core.extension', $tags, TRUE)) {
+      $this->generateComponents();
+    }
   }
 
   /**
