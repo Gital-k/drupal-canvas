@@ -111,10 +111,6 @@ function canvas_install(bool $is_syncing): void {
   // @see \Drupal\canvas\Theme\CanvasThemeNegotiator
   // @see \Drupal\Core\Theme\ThemeNegotiator::determineActiveTheme()
   \Drupal::service(ThemeInstallerInterface::class)->install(['canvas_stark']);
-
-  // @todo This is a bad practice, and shouldn't be needed, but without it some
-  //   tests are failing. Investigate in https://www.drupal.org/i/3580247
-  drupal_flush_all_caches();
 }
 
 /**

@@ -85,10 +85,10 @@ abstract class ComponentSourceTestBase extends CanvasKernelTestBase implements L
    * The default number of Component config entities, for Canvas' default deps.
    *
    * - 14 Component config entities for the `block` ComponentSource. Due to
-   *   BlockManagerDecorator.
+   *   BlockPluginCacheBackend.
    * - 0 others
    *
-   * @see \Drupal\canvas\Block\BlockManagerDecorator
+   * @see \Drupal\canvas\Block\BlockPluginCacheBackend
    */
   protected const int DEFAULT_COMPONENT_INSTALL_COUNT = 14;
 

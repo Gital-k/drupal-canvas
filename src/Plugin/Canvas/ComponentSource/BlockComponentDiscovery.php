@@ -19,7 +19,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\BlockComponent
- * @see \Drupal\canvas\Block\BlockManagerDecorator
+ * @see \Drupal\canvas\Block\BlockPluginCacheBackend
  * @internal
  */
 final class BlockComponentDiscovery implements ComponentCandidatesDiscoveryInterface {

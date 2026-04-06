@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Drupal\canvas;
 
 use Drupal\canvas\Access\ViewModeAccessCheck;
+use Drupal\canvas\Block\BlockPluginCacheBackend;
+use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\canvas\Config\ThemeSettingsDiscovery;
 use Drupal\canvas\CoreBugFix\ConfigEntityQueryFactory;
 use Drupal\canvas\CoreBugFix\TypedConfigManagerWithCachePollutionFix;
@@ -84,6 +86,18 @@ class CanvasServiceProvider extends ServiceProviderBase {
         ->setDecoratedService('access_check.field_ui.view_mode');
       $container->setDefinition('canvas.access_check.field_ui.view_mode', $definition);
     }
+
+    // Replace the cache backend for the block plugin manager with a decorator
+    // that triggers block component generation when block definitions are cached.
+    // @todo Remove after https://www.drupal.org/project/drupal/issues/3001284 lands.
+    $container->register('canvas.cache.block_plugin_discovery', BlockPluginCacheBackend::class)
+      ->setArguments([
+        new Reference('cache.discovery'),
+        new Reference(ComponentSourceManager::class),
+      ])
+      ->setPublic(FALSE);
+    $container->getDefinition('plugin.manager.block')
+      ->replaceArgument(1, new Reference('canvas.cache.block_plugin_discovery'));
 
     // Alter the config entity query factory to fix a bug with sorting by
     // multiple config entity properties.
