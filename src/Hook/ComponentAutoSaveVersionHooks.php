@@ -64,6 +64,10 @@ final class ComponentAutoSaveVersionHooks {
       try {
         $ephemeralSdc = JsComponentDiscovery::buildEphemeralSdcPluginInstance($autoSave->entity);
         $propFieldDefs = GeneratedFieldExplicitInputUxComponentSourceBase::getPropsForComponentPlugin($ephemeralSdc);
+        $slotDefs = \array_map(
+          Component::cleanSlotDefinition(...),
+          $ephemeralSdc->metadata->slots,
+        );
       }
       catch (\Exception) {
         continue;
@@ -78,8 +82,10 @@ final class ComponentAutoSaveVersionHooks {
       // createVersion makes 'auto_save' the active version, moves the
       // original active to its hash key, and sets loadedVersion.
       $entity->createVersion(JsComponent::AUTO_SAVE_VERSION);
-      // Populate the new active version's settings.
+      // Populate the new active version's settings and
+      // fallback_metadata.
       $entity->setSettings(['prop_field_definitions' => $propFieldDefs]);
+      $entity->set('fallback_metadata', ['slot_definitions' => $slotDefs]);
     }
   }
 
