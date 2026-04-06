@@ -368,6 +368,27 @@ class AutoSaveManager implements EventSubscriberInterface {
     }
   }
 
+  /**
+   * Gets the raw auto-save store entry for a given key.
+   *
+   * Used to snapshot entries before modification, enabling rollback.
+   */
+  public function getRawEntry(string $key): ?array {
+    $data = $this->autoSaveStore->get($key);
+    return \is_array($data) ? $data : NULL;
+  }
+
+  /**
+   * Restores a raw auto-save store entry, bypassing hash checks.
+   *
+   * Used to roll back auto-save modifications when publish fails.
+   */
+  public function setRawEntry(string $key, array $data): void {
+    $this->autoSaveStore->set($key, $data);
+    $this->cache->delete($key);
+    $this->cacheTagsInvalidator->invalidateTags([self::CACHE_TAG]);
+  }
+
   public function deleteAll(): void {
     $this->cacheTagsInvalidator->invalidateTags([self::CACHE_TAG]);
     $this->autoSaveStore->deleteAll();

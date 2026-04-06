@@ -94,6 +94,14 @@ final class ValidConfigEntityVersionConstraintValidator extends ConstraintValida
     }
 
     $available_versions = \array_unique($versioned_config_entity->getVersions());
+    // The 'auto_save' version is a virtual in-memory version for JsComponent-
+    // backed Components with pending auto-saves. It's never persisted but is
+    // valid during editing and publishing.
+    // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent::AUTO_SAVE_VERSION
+    // @see \Drupal\canvas\Hook\ComponentAutoSaveVersionHooks
+    if ($version === 'auto_save' && !\in_array('auto_save', $available_versions, TRUE)) {
+      $available_versions[] = 'auto_save';
+    }
     if (!\in_array($version, $available_versions, TRUE)) {
       $this->context->buildViolation($constraint->message)
         ->setParameter('@version', $version)

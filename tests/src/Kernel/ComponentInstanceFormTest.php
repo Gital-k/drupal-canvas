@@ -7,6 +7,7 @@ namespace Drupal\Tests\canvas\Kernel;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Group;
 use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Form\ComponentInstanceForm;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Entity\Page;
@@ -663,6 +664,94 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
     $form_state_ci->setFormObject(new StubForm(ComponentInstanceForm::FORM_ID, $form_ci));
     $rendered_form_ci = $prop_source->formTemporaryRemoveThisExclamationExclamationExclamation($widget_for_ci, 'some-prop-name', FALSE, User::create([]), $form_ci, $form_state_ci);
     $this->assertSame('some-prop-name', $rendered_form_ci['#component_prop_name']);
+  }
+
+  /**
+   * Tests that auto-saved JsComponent props appear in the form.
+   *
+   * When a code component gains a new prop via auto-save (not yet published),
+   * the ComponentInstanceForm should show that new prop in the form, matching
+   * the preview rendering behavior.
+   */
+  public function testAutoSavedPropsAppearInForm(): void {
+    $page = Page::create(['title' => $this->randomMachineName()]);
+    self::assertSame(SAVED_NEW, $page->save());
+
+    // Create a code component with one prop: "heading".
+    $code_component = JavaScriptComponent::create([
+      'machineName' => 'auto-save-form-test',
+      'name' => 'Auto Save Form Test',
+      'status' => TRUE,
+      'props' => [
+        'heading' => [
+          'type' => 'string',
+          'title' => 'Heading',
+          'examples' => ['Example heading'],
+        ],
+      ],
+      'slots' => [],
+      'js' => [
+        'original' => 'console.log("test")',
+        'compiled' => 'console.log("test")',
+      ],
+      'css' => [
+        'original' => '',
+        'compiled' => '',
+      ],
+      'dataDependencies' => [],
+    ]);
+    self::assertCount(0, $code_component->getTypedData()->validate());
+    $code_component->save();
+
+    $component = Component::load(JsComponent::componentIdFromJavascriptComponentId($code_component->id()));
+    self::assertInstanceOf(Component::class, $component);
+
+    // Confirm the published form shows the "heading" prop only.
+    $form_canvas_props = $this->getFormCanvasPropsForComponent($component->id());
+    self::assertArrayHasKey('heading', $form_canvas_props['source']);
+    $crawler = $this->getCrawlerForFormRequest(
+      '/canvas/api/v0/form/component-instance/canvas_page/' . $page->id(),
+      $component,
+      $form_canvas_props,
+    );
+    self::assertStringContainsString('Heading', $crawler->text());
+    self::assertStringNotContainsString('Subtitle', $crawler->text());
+
+    // Create an auto-save entry with an additional "subtitle" prop.
+    $autoSaveManager = $this->container->get(AutoSaveManager::class);
+    \assert($autoSaveManager instanceof AutoSaveManager);
+    $autoSaveJsComponent = JavaScriptComponent::create($code_component->toArray());
+    $autoSaveJsComponent->updateFromClientSide([
+      'props' => [
+        'heading' => [
+          'type' => 'string',
+          'title' => 'Heading',
+          'examples' => ['Example heading'],
+        ],
+        'subtitle' => [
+          'type' => 'string',
+          'title' => 'Subtitle',
+          'examples' => ['Example subtitle'],
+        ],
+      ],
+    ]);
+    $autoSaveManager->saveEntity($autoSaveJsComponent);
+    self::assertFalse($autoSaveManager->getAutoSaveEntity($code_component)->isEmpty(), 'Auto-save should exist.');
+
+    // Even without the client sending data for the new "subtitle" prop (it
+    // doesn't know about it yet), the form should show it with its default
+    // value populated from the auto-saved component's example value.
+    $crawler = $this->getCrawlerForFormRequest(
+      '/canvas/api/v0/form/component-instance/canvas_page/' . $page->id(),
+      $component,
+      $form_canvas_props,
+    );
+    self::assertStringContainsString('Heading', $crawler->text());
+    self::assertStringContainsString('Subtitle', $crawler->text());
+    // Verify the default value is populated in the subtitle field.
+    $subtitle_input = $crawler->filter('input[name*="subtitle"]');
+    self::assertGreaterThan(0, $subtitle_input->count(), 'Subtitle input field should exist.');
+    self::assertSame('Example subtitle', $subtitle_input->attr('value'));
   }
 
 }

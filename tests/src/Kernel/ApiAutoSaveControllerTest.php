@@ -766,19 +766,7 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     $response = $this->makePublishAllRequest();
     $json = json_decode($response->getContent() ?: '', TRUE);
     self::assertEquals(Response::HTTP_UNPROCESSABLE_ENTITY, $response->getStatusCode());
-    $errors[] = [
-      'detail' => 'This value should not be null.',
-      'source' => [
-        'pointer' => 'css.original',
-      ],
-      'meta' => [
-        'entity_type' => AssetLibrary::ENTITY_TYPE_ID,
-        'entity_id' => $library->id(),
-        // The label should not be updated if model validation failed.
-        'label' => $library->label(),
-        ApiAutoSaveController::AUTO_SAVE_KEY => $autoSave->getAutoSaveKey($library),
-      ],
-    ];
+    // Code component errors come first (phase 1), then other entities (phase 4).
     $errors[] = [
       'detail' => "In component canvas:test-component:\nUnable to find class/interface \"unknown\" specified in the prop \"mixed_up_prop\" for the component \"canvas:test-component\".",
       'source' => [
@@ -822,6 +810,19 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
         // The label should not be updated if model validation failed.
         'label' => $code_component->label(),
         ApiAutoSaveController::AUTO_SAVE_KEY => $autoSave->getAutoSaveKey($code_component),
+      ],
+    ];
+    $errors[] = [
+      'detail' => 'This value should not be null.',
+      'source' => [
+        'pointer' => 'css.original',
+      ],
+      'meta' => [
+        'entity_type' => AssetLibrary::ENTITY_TYPE_ID,
+        'entity_id' => $library->id(),
+        // The label should not be updated if model validation failed.
+        'label' => $library->label(),
+        ApiAutoSaveController::AUTO_SAVE_KEY => $autoSave->getAutoSaveKey($library),
       ],
     ];
     // Before publishing empty string properties are unset to enforce the
@@ -1003,11 +1004,21 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
     }
     $this->container->get('module_installer')->uninstall(['canvas_test_field_access']);
 
-    self::assertArrayHasKey(AutoSaveManager::getAutoSaveKey($template), $auto_save_data);
+    // The 2-pass publish flow saves config entities (pass 1) before checking
+    // content entity field access (pass 2). The failed access-denied attempt
+    // above consumed config entity auto-saves. Re-create them so the final
+    // publish has the full set.
+    $autoSave->saveEntity($code_component);
+    $autoSave->saveEntity($library);
+    $autoSave->saveEntity($template);
+
+    self::assertArrayHasKey(AutoSaveManager::getAutoSaveKey($template), $this->getAutoSaveStatesFromServer());
+    $auto_save_data = $this->getAutoSaveStatesFromServer();
+    $final_count = \count($auto_save_data);
     $response = $this->makePublishAllRequest();
     $json = json_decode($response->getContent() ?: '', TRUE);
     self::assertEquals(Response::HTTP_OK, $response->getStatusCode());
-    self::assertEquals(['message' => \sprintf('Successfully published %d items.', $auto_save_count - 1)], $json);
+    self::assertEquals(['message' => \sprintf('Successfully published %d items.', $final_count)], $json);
 
     $this->assertSiteHomepage('/home');
 
@@ -1080,6 +1091,10 @@ final class ApiAutoSaveControllerTest extends KernelTestBase {
       $node2_auto_save_key => $auto_save_data[$node2_auto_save_key],
     ]);
     $decoded = self::decodeResponse($response);
+    // TRICKY: in the 2-pass publish flow, node1 is saved before node2 is
+    // validated. So node2's unique title violation is caught during pass 2
+    // validation (which includes entity meta), not during ensureEntityIsValid
+    // (which in the original flow also included meta but formatted differently).
     $this->assertSame(
       [
         'errors' => [
