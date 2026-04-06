@@ -1,7 +1,7 @@
 import { IconButton, Tooltip } from '@radix-ui/themes';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
-import { AI_PANEL_STATE_KEY } from '@/components/aiExtension/AiPanelState';
+import { saveAiPanelState } from '@/components/aiExtension/AiPanelState';
 import {
   selectAiPanelOpen,
   setAiPanelClosed,
@@ -15,24 +15,10 @@ const AiToggleButton = () => {
   function handleToggle() {
     if (isAiPanelOpen) {
       dispatch(setAiPanelClosed());
-      try {
-        localStorage.setItem(
-          AI_PANEL_STATE_KEY,
-          JSON.stringify({ isOpen: false, shouldClearHistory: true }),
-        );
-      } catch (e) {
-        console.warn('Failed to save AI panel state to localStorage:', e);
-      }
+      saveAiPanelState(false, true);
     } else {
       dispatch(setAiPanelOpen());
-      try {
-        localStorage.setItem(
-          AI_PANEL_STATE_KEY,
-          JSON.stringify({ isOpen: true, shouldClearHistory: true }),
-        );
-      } catch (e) {
-        console.warn('Failed to save AI panel state to localStorage:', e);
-      }
+      saveAiPanelState(true, true);
     }
   }
 

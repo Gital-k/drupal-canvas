@@ -15,7 +15,10 @@ import AiWelcome from '@assets/icons/ai-welcome.svg?react';
 import { Box, Flex, Text } from '@radix-ui/themes';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
-import { AI_PANEL_STATE_KEY } from '@/components/aiExtension/AiPanelState';
+import {
+  AI_PANEL_STATE_KEY,
+  saveAiPanelState,
+} from '@/components/aiExtension/AiPanelState';
 import {
   selectCodeComponentProperty,
   setCodeComponentProperty,
@@ -908,13 +911,7 @@ const AiWizard = () => {
                   if (state.shouldClearHistory) {
                     chatElementRef.current.clearMessages();
                     historyStore.clearHistory();
-                    localStorage.setItem(
-                      AI_PANEL_STATE_KEY,
-                      JSON.stringify({
-                        isOpen: true,
-                        shouldClearHistory: false,
-                      }),
-                    );
+                    saveAiPanelState(true, false);
                   }
                 }
               } catch (e) {
