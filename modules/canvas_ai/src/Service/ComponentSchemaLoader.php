@@ -397,8 +397,8 @@ final class ComponentSchemaLoader implements ComponentSchemaLoaderInterface {
     }
 
     // Derive the SDC name from the directory name.
-    // File: .../components/heading/heading.component.yml
-    //   → sdc.<default_theme>.heading
+    // File: .../components/heading/heading.component.yml becomes
+    // sdc.<default_theme>.heading.
     $componentDir = basename(dirname($file));
     $sdcName = 'sdc.' . $defaultThemeName . '.' . $componentDir;
 
@@ -432,7 +432,7 @@ final class ComponentSchemaLoader implements ComponentSchemaLoaderInterface {
       $propType = $propDef['type'] ?? NULL;
       if ($propType === 'boolean' && !isset(self::NON_TOGGLE_BOOLEAN_PROPS[$propName])) {
         $boolProps[$propName] = [
-          'aliases' => $generatedAliases,
+          'aliases' => array_values($generatedAliases),
           'inverted' => isset(self::INVERTED_BOOLEAN_PROPS[$propName]),
         ];
       }

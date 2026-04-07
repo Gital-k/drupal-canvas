@@ -218,7 +218,7 @@ final class DirectEditController extends ControllerBase {
       ], 400);
     }
 
-    $changes = isset($match['changes']) ? $match['changes'] : [$match];
+    $changes = $match['changes'] ?? [$match];
     $propValues = [];
     foreach ($changes as $change) {
       $propValues[$change['prop']] = $change['value'];

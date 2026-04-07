@@ -14,6 +14,8 @@ use Drupal\Core\Access\CsrfTokenGenerator;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Config\ImmutableConfig;
 use Drupal\Tests\UnitTestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\Request;
 
@@ -23,6 +25,9 @@ use Symfony\Component\HttpFoundation\Request;
  * @group canvas_ai
  * @coversDefaultClass \Drupal\canvas_ai\Controller\DirectEditController
  */
+#[CoversClass(DirectEditController::class)]
+#[Group('canvas')]
+#[Group('canvas_direct_edit')]
 final class DirectEditControllerTest extends UnitTestCase {
 
   /**

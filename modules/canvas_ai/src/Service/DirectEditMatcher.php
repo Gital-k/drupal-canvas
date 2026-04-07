@@ -142,6 +142,7 @@ final class DirectEditMatcher {
 
     $fragments = $this->splitCompoundMessage($message);
     if (count($fragments) > 1) {
+      /** @var list<array{prop: string, value: mixed}> $changes */
       $changes = [];
       foreach ($fragments as $fragment) {
         $result = $this->matchSingle($fragment, $componentName, $currentPropValues);
@@ -180,6 +181,9 @@ final class DirectEditMatcher {
 
   /**
    * Attempts to match a single deterministic prop edit.
+   *
+   * @return array{prop: string, value: mixed}|null
+   *   Resolved prop and value, or NULL if no deterministic match.
    */
   private function matchSingle(string $message, string $componentName, ?array $currentPropValues = NULL): ?array {
     // Reject if the message contains add/create keywords or phrases.
@@ -274,7 +278,7 @@ final class DirectEditMatcher {
    */
   private function matchRelativeAdjustment(string $messageLower, string $componentName, array $currentPropValues): ?array {
     // Strip "make it/this/the" prefix.
-    $stripped = preg_replace('/^(?:make\s+(?:it|this|the)\s+)/i', '', $messageLower);
+    $stripped = preg_replace('/^(?:make\s+(?:it|this|the)\s+)/i', '', $messageLower) ?? '';
     $stripped = trim($stripped);
 
     // Check if the (possibly stripped) message is a known comparative.
@@ -418,7 +422,7 @@ final class DirectEditMatcher {
       '/^(?:(?:make|use)\s+(?:it|this|the)\s+)/i',
       '',
       $messageLower
-    );
+    ) ?? '';
     $bareValue = trim($bareValue);
 
     if ($bareValue === '' || $bareValue === $messageLower) {

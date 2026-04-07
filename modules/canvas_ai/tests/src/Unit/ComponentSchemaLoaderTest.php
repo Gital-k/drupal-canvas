@@ -11,6 +11,8 @@ use Drupal\Core\Config\ImmutableConfig;
 use Drupal\Core\Extension\ThemeExtensionList;
 use Drupal\Core\Extension\ThemeHandlerInterface;
 use Drupal\Tests\UnitTestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Yaml\Yaml;
 
@@ -23,6 +25,9 @@ use Symfony\Component\Yaml\Yaml;
  * @group canvas_ai
  * @coversDefaultClass \Drupal\canvas_ai\Service\ComponentSchemaLoader
  */
+#[CoversClass(ComponentSchemaLoader::class)]
+#[Group('canvas')]
+#[Group('canvas_direct_edit')]
 final class ComponentSchemaLoaderTest extends UnitTestCase {
 
   /**
@@ -130,7 +135,15 @@ final class ComponentSchemaLoaderTest extends UnitTestCase {
     $reflection = new \ReflectionClass($loader);
 
     // Initialize the internal arrays.
-    $arrayProps = ['propAliases', 'enumValues', 'reverseEnumIndex', 'booleanProps', 'enumOrdinals', 'integerEnums', 'reverseAliasIndex'];
+    $arrayProps = [
+      'propAliases',
+      'enumValues',
+      'reverseEnumIndex',
+      'booleanProps',
+      'enumOrdinals',
+      'integerEnums',
+      'reverseAliasIndex',
+    ];
     foreach ($arrayProps as $prop) {
       $rp = $reflection->getProperty($prop);
       $rp->setValue($loader, []);
@@ -587,7 +600,7 @@ final class ComponentSchemaLoaderTest extends UnitTestCase {
     $this->assertSame(['text_color'], $index['inverted']);
     // 'muted' is unique to background_color.
     $this->assertSame(['background_color'], $index['muted']);
-    // columns values are string-typed, so they are included despite looking
+    // Columns values are string-typed, so they are included despite looking
     // numeric (the type check replaces is_numeric() on values).
     $this->assertArrayHasKey('1', $index);
     $this->assertSame(['columns'], $index['1']);

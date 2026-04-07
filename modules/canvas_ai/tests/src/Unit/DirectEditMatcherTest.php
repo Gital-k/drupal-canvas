@@ -9,6 +9,8 @@ use Drupal\canvas_ai\Service\DirectEditMatcher;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Config\ImmutableConfig;
 use Drupal\Tests\UnitTestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
 
 /**
  * Tests the DirectEditMatcher service.
@@ -16,8 +18,14 @@ use Drupal\Tests\UnitTestCase;
  * @group canvas_ai
  * @coversDefaultClass \Drupal\canvas_ai\Service\DirectEditMatcher
  */
+#[CoversClass(DirectEditMatcher::class)]
+#[Group('canvas')]
+#[Group('canvas_direct_edit')]
 class DirectEditMatcherTest extends UnitTestCase {
 
+  /**
+   * The matcher under test.
+   */
   private DirectEditMatcher $matcher;
 
   /**
@@ -197,7 +205,17 @@ class DirectEditMatcherTest extends UnitTestCase {
     $enumOrdinals = [
       'sdc.byte_theme.heading' => [
         'text_size' => [
-          'values' => ['default', 'heading-responsive-8xl', 'heading-responsive-7xl', 'heading-responsive-6xl', 'heading-responsive-5xl', 'heading-responsive-4xl', 'heading-responsive-3xl', 'heading-responsive-2xl', 'heading-responsive-xl'],
+          'values' => [
+            'default',
+            'heading-responsive-8xl',
+            'heading-responsive-7xl',
+            'heading-responsive-6xl',
+            'heading-responsive-5xl',
+            'heading-responsive-4xl',
+            'heading-responsive-3xl',
+            'heading-responsive-2xl',
+            'heading-responsive-xl',
+          ],
           'direction' => 'descending',
         ],
         'text_color' => [
