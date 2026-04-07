@@ -21,6 +21,7 @@ const formatDateForDisplay = (value: string): string => {
   try {
     // Parse ISO date string (YYYY-MM-DD) and format using browser's locale.
     const date = new Date(value + 'T00:00:00');
+    // Use Intl.DateTimeFormat to match native input formatting.
     return new Intl.DateTimeFormat().format(date);
   } catch {
     return value;
@@ -43,6 +44,7 @@ const formatTimeForDisplay = (value: string): string => {
     const parts = value.split(':');
     const hasNonZeroSeconds =
       parts.length === 3 && parts[2] !== '00' && parts[2] !== '00.000';
+    // Use Intl.DateTimeFormat to match native input formatting.
     return new Intl.DateTimeFormat(undefined, {
       hour: 'numeric',
       minute: 'numeric',
@@ -81,8 +83,15 @@ const DrupalDatetimeMultivalueForm = ({
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [displayDate, setDisplayDate] = useState('');
   const [displayTime, setDisplayTime] = useState('');
+  // Tracks whether a time input exists — derived from the real DOM via the
+  // useEffect below rather than queried at render time, so it is stable across
+  // renders and correct before the popover container is first populated.
+  const [hasTime, setHasTime] = useState(false);
 
   // Read initial values from the inputs once the popover container is in the DOM.
+  // Depends only on popoverContainer: when children change (AJAX rebuild) Radix
+  // remounts the content node, which re-fires setPopoverContainer and re-runs
+  // this effect automatically.
   useEffect(() => {
     if (!popoverContainer) return;
 
@@ -95,7 +104,8 @@ const DrupalDatetimeMultivalueForm = ({
 
     setDisplayDate(dateInput?.value || dateInput?.defaultValue || '');
     setDisplayTime(timeInput?.value || timeInput?.defaultValue || '');
-  }, [popoverContainer, children]);
+    setHasTime(!!timeInput);
+  }, [popoverContainer]);
 
   // Returns the date input from the popover container, or null.
   const getDateInput = (): HTMLInputElement | null =>
@@ -114,18 +124,6 @@ const DrupalDatetimeMultivalueForm = ({
     return true;
   };
 
-  // Commit — read values from the real inputs and update display state.
-  const handleCommitValues = () => {
-    const dateInput = getDateInput();
-    const timeInput = getTimeInput();
-
-    if (!checkValid(dateInput)) return;
-    if (timeInput && !checkValid(timeInput)) return;
-
-    setDisplayDate(dateInput?.value ?? '');
-    setDisplayTime(timeInput?.value ?? '');
-  };
-
   // Handle Enter key press in popover inputs.
   const handleKeyDown = (e: React.KeyboardEvent<HTMLElement>) => {
     if (e.key !== 'Enter') return;
@@ -142,14 +140,17 @@ const DrupalDatetimeMultivalueForm = ({
     // If the time input is valid, also validate the date input.
     if (inputElement.type === 'time' && !checkValid(getDateInput())) return;
 
-    handleCommitValues();
+    const dateInput = getDateInput();
+    const timeInput = getTimeInput();
+    setDisplayDate(dateInput?.value ?? '');
+    setDisplayTime(timeInput?.value ?? '');
     setPopoverOpen(false);
   };
 
   const handlePopoverOpenChange = (open: boolean) => {
     if (!open) {
-      // On close without commit, reset the real inputs back to the last
-      // committed display values so the form doesn't submit stale data.
+      // Cancel any in-progress edit: reset the real inputs back to the last
+      // committed display values so the form doesn't submit uncommitted data.
       const dateInput = getDateInput();
       const timeInput = getTimeInput();
       if (dateInput) dateInput.value = displayDate;
@@ -174,8 +175,6 @@ const DrupalDatetimeMultivalueForm = ({
     setDisplayDate('');
     setDisplayTime('');
   };
-
-  const hasTime = !!getTimeInput();
 
   // Build the combined display value.
   const combinedDisplayValue = (() => {
