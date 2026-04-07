@@ -509,6 +509,64 @@ canvas.api.log_error:
   options:
     _format: 'json'
 
+canvas.api.notifications.get:
+  path: '/canvas/api/v0/notifications'
+  defaults:
+    _controller: 'Drupal\canvas\Controller\ApiNotificationController::list'
+  requirements:
+    _canvas_authentication_required: TRUE
+    _canvas_ui_access: 'TRUE'
+  methods: ['GET']
+  options:
+    _format: 'json'
+
+canvas.api.notifications.read:
+  path: '/canvas/api/v0/notifications/read'
+  defaults:
+    _controller: 'Drupal\canvas\Controller\ApiNotificationController::markRead'
+  requirements:
+    _canvas_authentication_required: TRUE
+    _canvas_ui_access: 'TRUE'
+  methods: ['POST']
+  options:
+    _format: 'json'
+
+canvas.api.push.complete:
+  path: '/canvas/api/v0/push/complete'
+  defaults:
+    _controller: 'Drupal\canvas\Controller\ApiPushController::complete'
+  requirements:
+    _canvas_authentication_required: TRUE
+    _permission: 'administer code components'
+  methods: [POST]
+  options:
+    _format: 'json'
+    canvas_external_api: true
+
+canvas.api.push.fail:
+  path: '/canvas/api/v0/push/fail'
+  defaults:
+    _controller: 'Drupal\canvas\Controller\ApiPushController::fail'
+  requirements:
+    _canvas_authentication_required: TRUE
+    _permission: 'administer code components'
+  methods: [POST]
+  options:
+    _format: 'json'
+    canvas_external_api: true
+
+canvas.api.push.start:
+  path: '/canvas/api/v0/push/start'
+  defaults:
+    _controller: 'Drupal\canvas\Controller\ApiPushController::start'
+  requirements:
+    _canvas_authentication_required: TRUE
+    _permission: 'administer code components'
+  methods: [POST]
+  options:
+    _format: 'json'
+    canvas_external_api: true
+
 canvas.api.staged-update.auto-save.post:
   path: '/canvas/api/v0/staged-update/auto-save'
   defaults:

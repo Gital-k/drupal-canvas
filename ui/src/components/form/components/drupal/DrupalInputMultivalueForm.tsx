@@ -8,6 +8,13 @@ import TextField from '@/components/form/components/TextField';
 import WithRHF from '@/components/form/react-hook-form/withRHF';
 import { a2p } from '@/local_packages/utils';
 
+import {
+  copyInputAttributes,
+  isRemoveButtonEnabled,
+  triggerDrupalRemoveButton,
+  updateInputValue,
+} from './multivalueFormUtils';
+
 import type { NumericInputAttributes } from '@/types/DrupalAttribute';
 
 import styles from './DrupalInputMultivalueForm.module.css';
@@ -57,11 +64,24 @@ const DrupalInputMultivalueForm = ({
   const popoverTextFieldWrapperRef = useRef<HTMLDivElement | null>(null);
   const popoverContainerRef = useRef<HTMLDivElement | null>(null);
 
-  // Sync displayValue with attributes.value when it changes (e.g., after AJAX updates)
+  // Sync displayValue when a genuine external value arrives (e.g. AJAX
+  // re-hyperscriptification after "Add another item" or "Remove").
   useEffect(() => {
-    const newValue = attributes.value || attributes.defaultValue || '';
-    setDisplayValue(newValue as string);
-    setTempValue(newValue as string);
+    const liveInput = inputWrapperRef.current?.querySelector(
+      'input',
+    ) as HTMLInputElement | null;
+    const liveValue = liveInput?.value ?? '';
+    const attrValue = (attributes.value ??
+      attributes.defaultValue ??
+      '') as string;
+
+    // Use the live input value when it is non-empty; fall back to the
+    // attribute value on the very first mount (before InputBehaviors has had
+    // a chance to populate the input).
+    const newValue = liveValue !== '' ? liveValue : attrValue;
+
+    setDisplayValue(newValue);
+    setTempValue(newValue);
   }, [attributes.value, attributes.defaultValue]);
 
   // Commit a value directly — used by the autocomplete selection handler so
@@ -74,15 +94,7 @@ const DrupalInputMultivalueForm = ({
       const realInput = inputWrapperRef.current.querySelector(
         'input',
       ) as HTMLInputElement | null;
-      if (realInput && realInput.value !== newValue) {
-        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-          HTMLInputElement.prototype,
-          'value',
-        )?.set;
-        nativeInputValueSetter?.call(realInput, newValue);
-        realInput.dispatchEvent(new Event('input', { bubbles: true }));
-        realInput.dispatchEvent(new Event('change', { bubbles: true }));
-      }
+      updateInputValue(realInput, newValue);
     }
   }, []);
 
@@ -222,83 +234,15 @@ const DrupalInputMultivalueForm = ({
     setPopoverOpen(open);
   };
 
-  // Determine if the remove button should be enabled.
-  const isRemoveButtonEnabled = () => {
-    // Check whether the table row has a Drupal remove button.
-    const tableRow = triggerRowRef.current?.closest('tr');
-    const removeActionCell = tableRow?.querySelector('.canvas-remove-action');
-
-    // Look for the Drupal remove button. Drupal adds these buttons to all rows
-    // in unlimited cardinality fields.
-    const removeButton = removeActionCell?.querySelector(
-      'input[type="submit"][name*="remove_button"]',
-    ) as HTMLInputElement | null;
-
-    // Check if button exists and is not disabled
-    if (!removeButton || removeButton.disabled) {
-      return false;
-    }
-
-    // Get the field wrapper that contains row count and required status
-    // These are set by canvas_stark_preprocess_field_multiple_value_form
-    const fieldWrapperRowCount = tableRow?.closest('[data-canvas-row-count]');
-    if (!fieldWrapperRowCount) {
-      return true;
-    }
-
-    const rowCount = parseInt(
-      fieldWrapperRowCount.getAttribute('data-canvas-row-count') || '0',
-      10,
-    );
-    // Check if the field is required by looking for .form-required class
-    // This class is added by Drupal to the label or field wrapper
-    if (tableRow) {
-      const table = tableRow.closest('table');
-      const fieldWrapper = table?.closest('.js-form-wrapper, .form-item');
-      const isRequired =
-        fieldWrapper?.querySelector('.form-required, .js-form-required') !==
-        null;
-
-      // Disable remove button if required field with only one item
-      if (isRequired && rowCount === 1) {
-        return false;
-      }
-    }
-
-    return true;
-  };
-
   const handleRemove = () => {
     // Close the popover first so the portal is cleaned up before AJAX replaces the DOM.
     setPopoverOpen(false);
 
     if (!triggerRowRef.current) return;
 
-    // Traverse up from the trigger element to find the containing table row,
-    // then locate the Drupal remove button in the .canvas-remove-action cell.
-    const tableRow = triggerRowRef.current.closest('tr');
-    if (!tableRow) return;
-
-    // Find the original Drupal remove button directly (the hidden input/button
-    // that carries the AJAX behavior). The cell and button are hidden by
-    // CSS but remain in the DOM.
-    const removeActionCell = tableRow.querySelector('.canvas-remove-action');
-    if (removeActionCell) {
-      const removeButton = removeActionCell.querySelector(
-        'input[type="submit"][name*="remove_button"]',
-      ) as HTMLElement | null;
-      if (removeButton) {
-        // Dispatch mousedown first (some Drupal AJAX handlers listen for it),
-        // then click — mirroring what Drupal's AJAX system expects.
-        const mousedownEvent = new MouseEvent('mousedown', {
-          bubbles: true,
-          cancelable: true,
-          view: window,
-        });
-        removeButton.dispatchEvent(mousedownEvent);
-        removeButton.click();
-        return;
-      }
+    // Try to trigger the Drupal remove button.
+    if (triggerDrupalRemoveButton(triggerRowRef.current)) {
+      return;
     }
 
     setDisplayValue('');
@@ -306,15 +250,7 @@ const DrupalInputMultivalueForm = ({
     const inputElement = inputWrapperRef.current.querySelector(
       'input',
     ) as HTMLInputElement | null;
-    if (inputElement) {
-      const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-        HTMLInputElement.prototype,
-        'value',
-      )?.set;
-      nativeInputValueSetter?.call(inputElement, '');
-      const event = new Event('input', { bubbles: true });
-      inputElement.dispatchEvent(event);
-    }
+    updateInputValue(inputElement, '');
   };
 
   return (
@@ -415,18 +351,7 @@ const DrupalInputMultivalueForm = ({
                   onKeyDown: handleKeyDown,
                   type: attributes.type || 'text',
                   placeholder: attributes.placeholder,
-                  ...Object.fromEntries(
-                    ['min', 'max', 'step']
-                      .filter(
-                        (key) =>
-                          attributes[key as keyof typeof attributes] !==
-                          undefined,
-                      )
-                      .map((key) => [
-                        key,
-                        attributes[key as keyof typeof attributes],
-                      ]),
-                  ),
+                  ...copyInputAttributes(attributes),
                 }}
               />
             )}
@@ -439,7 +364,7 @@ const DrupalInputMultivalueForm = ({
               color="red"
               size="1"
               onClick={handleRemove}
-              disabled={!isRemoveButtonEnabled()}
+              disabled={!isRemoveButtonEnabled(triggerRowRef.current)}
             >
               <TrashIcon />
               Remove

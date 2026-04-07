@@ -3,12 +3,14 @@ import axios from 'axios';
 import { getConfig } from '../config.js';
 
 import type { AxiosError, AxiosInstance } from 'axios';
+import type { CanvasComponentTree } from 'drupal-canvas/json-render-utils';
 import type {
   AssetLibrary,
   Component,
   UploadedArtifact,
   UploadedArtifactResult,
 } from '../types/Component';
+import type { Page, PageListItem } from '../types/Page';
 
 export interface ApiOptions {
   siteUrl: string;
@@ -16,6 +18,7 @@ export interface ApiOptions {
   clientSecret: string;
   scope: string;
   userAgent?: string;
+  accessToken?: string;
 }
 
 export class ApiService {
@@ -71,13 +74,20 @@ export class ApiService {
       ],
     });
 
+    // When a pre-issued access token is provided, use it directly without OAuth
+    if (options.accessToken) {
+      this.accessToken = options.accessToken;
+      this.client.defaults.headers.common['Authorization'] =
+        `Bearer ${options.accessToken}`;
+    }
+
     // Add response interceptor for automatic token refresh
     this.client.interceptors.response.use(
       (response) => response,
       async (error) => {
         const originalRequest = error.config;
 
-        // Check if this is a 401 error and we haven't already retried this request
+        // Check if this is a 401 error and we haven't already retried this request.
         if (
           error.response?.status === 401 &&
           !originalRequest._retry &&
@@ -129,6 +139,12 @@ export class ApiService {
    * Handles concurrent refresh attempts by reusing the same promise.
    */
   private async refreshAccessToken(): Promise<string> {
+    if (!this.clientId || !this.clientSecret) {
+      throw new Error(
+        'No client credentials configured; cannot refresh access token.',
+      );
+    }
+
     // If a refresh is already in progress, wait for it
     if (this.refreshPromise) {
       return this.refreshPromise;
@@ -194,6 +210,27 @@ export class ApiService {
     } catch (error) {
       this.handleApiError(error);
       throw new Error('Failed to list components');
+    }
+  }
+
+  /**
+   * Fetch active version hashes for all Component config entities.
+   */
+  async listComponentVersions(): Promise<Map<string, string>> {
+    try {
+      const response = await this.client.get('/canvas/api/v0/config/component');
+      const versions = new Map<string, string>();
+      for (const [id, comp] of Object.entries(
+        response.data as Record<string, { version?: string }>,
+      )) {
+        if (comp.version) {
+          versions.set(id, comp.version);
+        }
+      }
+      return versions;
+    } catch (error) {
+      this.handleApiError(error);
+      throw new Error('Failed to list component versions');
     }
   }
 
@@ -280,6 +317,95 @@ export class ApiService {
     } catch (error) {
       this.handleApiError(error);
       throw new Error('Failed to get global asset library');
+    }
+  }
+
+  /**
+   * List all pages, paginating through all results.
+   */
+  async listPages(): Promise<Record<string, PageListItem>> {
+    try {
+      const pages: Record<string, PageListItem> = {};
+      let nextUrl: string | null = '/canvas/api/v0/content/canvas_page';
+
+      while (nextUrl !== null) {
+        const response = await this.client.get(nextUrl);
+        const body = response.data as {
+          data: PageListItem[];
+          links?: Record<string, { href: string }>;
+        };
+
+        for (const page of body.data) {
+          pages[page.id] = page;
+        }
+
+        nextUrl = body.links?.next?.href ?? null;
+      }
+
+      return pages;
+    } catch (error) {
+      this.handleApiError(error);
+      throw new Error('Failed to list pages');
+    }
+  }
+
+  /**
+   * Get a single page with its component tree.
+   */
+  async getPage(id: string | number): Promise<Page> {
+    try {
+      const response = await this.client.get(
+        `/canvas/api/v0/content/canvas_page/${id}`,
+      );
+      return response.data;
+    } catch (error) {
+      this.handleApiError(error);
+      throw new Error(`Failed to get page '${id}'`);
+    }
+  }
+
+  /**
+   * Create a new page.
+   */
+  async createPage(page: {
+    title: string;
+    status: boolean;
+    path: string | null;
+    components: CanvasComponentTree;
+  }): Promise<Page> {
+    try {
+      const response = await this.client.post(
+        '/canvas/api/v0/content/canvas_page',
+        page,
+      );
+      return response.data;
+    } catch (error) {
+      this.handleApiError(error);
+      throw new Error(`Failed to create page '${page.title}'`);
+    }
+  }
+
+  /**
+   * Update an existing page.
+   */
+  async updatePage(
+    id: string | number,
+    page: {
+      title: string;
+      status: boolean;
+      path: string | null;
+      components: CanvasComponentTree;
+    },
+  ): Promise<Page> {
+    try {
+      const response = await this.client.patch(
+        `/canvas/api/v0/content/canvas_page/${id}`,
+        page,
+      );
+      return response.data;
+    } catch (error) {
+      this.handleApiError(error);
+      throw new Error(`Failed to update page '${page.title}'`);
     }
   }
 
@@ -374,6 +500,42 @@ export class ApiService {
   }
 
   /**
+   * Signals that a CLI push has started (best-effort).
+   */
+  async signalPushStart(): Promise<void> {
+    try {
+      await this.client.post('/canvas/api/v0/push/start');
+    } catch {
+      // Best-effort: signal errors are safe to ignore since they don't affect the push data.
+    }
+  }
+
+  /**
+   * Signals that a CLI push completed successfully (best-effort).
+   */
+  async signalPushComplete(): Promise<void> {
+    try {
+      await this.client.post('/canvas/api/v0/push/complete');
+    } catch {
+      // Best-effort: signal errors are safe to ignore since they don't affect the push data.
+    }
+  }
+
+  /**
+   * Signals that a CLI push failed (best-effort).
+   */
+  async signalPushFail(message?: string): Promise<void> {
+    try {
+      await this.client.post(
+        '/canvas/api/v0/push/fail',
+        message ? { message } : undefined,
+      );
+    } catch {
+      // Best-effort: signal errors are safe to ignore since they don't affect the push data.
+    }
+  }
+
+  /**
    * Parse Canvas API error responses into user-friendly messages.
    * Handles both structured validation errors and simple string errors.
    */
@@ -452,8 +614,9 @@ export class ApiService {
 
     // 401 Authentication errors
     if (status === 401) {
-      let message =
-        'Authentication failed. Please check your client ID and secret.';
+      let message = !this.clientId
+        ? 'Authentication failed. Please check your access token (CANVAS_ACCESS_TOKEN).'
+        : 'Authentication failed. Please check your client ID and secret.';
 
       // Include error_description if available
       if (
@@ -589,6 +752,19 @@ export function createApiService(): Promise<ApiService> {
     throw new Error(
       'Site URL is required. Set it in the CANVAS_SITE_URL environment variable or pass it with --site-url.',
     );
+  }
+
+  const accessToken = process.env.CANVAS_ACCESS_TOKEN;
+
+  if (accessToken) {
+    return ApiService.create({
+      siteUrl: config.siteUrl,
+      clientId: '',
+      clientSecret: '',
+      scope: '',
+      userAgent: config.userAgent,
+      accessToken,
+    });
   }
 
   if (!config.clientId) {

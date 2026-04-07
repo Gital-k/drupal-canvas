@@ -34,7 +34,10 @@ import FormPropTypeDate from '@/features/code-editor/component-data/forms/FormPr
 import FormPropTypeEnum from '@/features/code-editor/component-data/forms/FormPropTypeEnum';
 import FormPropTypeFormattedText from '@/features/code-editor/component-data/forms/FormPropTypeFormattedText';
 import FormPropTypeImage from '@/features/code-editor/component-data/forms/FormPropTypeImage';
-import FormPropTypeLink from '@/features/code-editor/component-data/forms/FormPropTypeLink';
+import FormPropTypeLink, {
+  DEFAULT_LINK_EXAMPLES,
+  linkFormatMap,
+} from '@/features/code-editor/component-data/forms/FormPropTypeLink';
 import FormPropTypeTextField from '@/features/code-editor/component-data/forms/FormPropTypeTextField';
 import FormPropTypeVideo from '@/features/code-editor/component-data/forms/FormPropTypeVideo';
 import SortableList from '@/features/code-editor/component-data/SortableList';
@@ -123,17 +126,28 @@ export default function Props() {
     currentExample: unknown,
     newCount: number,
     defaultValue: string | number = '',
+    derivedType?: string | null,
   ) => {
+    // For complex object types (video, image), we need to preserve
+    // existing objects or use an empty array.
+    let newExample;
+    if (derivedType === 'video' || derivedType === 'image') {
+      const exampleArray = Array.isArray(currentExample) ? currentExample : [];
+      newExample = exampleArray.slice(0, newCount);
+    } else {
+      newExample = createArrayWithCount(
+        currentExample,
+        newCount,
+        defaultValue,
+      ) as string[] | number[];
+    }
+
     dispatch(
       updateProp({
         id: propId,
         updates: {
           limitedCount: newCount,
-          example: createArrayWithCount(
-            currentExample,
-            newCount,
-            defaultValue,
-          ) as string[] | number[],
+          example: newExample,
         },
       }),
     );
@@ -447,7 +461,27 @@ export default function Props() {
                     } else {
                       // Convert back to single value.
                       updates.items = undefined;
-                      updates.example = '';
+                      // If prop is required, restore the default example value.
+                      const isRequired = required.includes(propName);
+                      let defaultExample = '';
+                      if (isRequired) {
+                        if (prop.derivedType === 'link') {
+                          const linkType =
+                            prop.format && prop.format in linkFormatMap
+                              ? linkFormatMap[
+                                  prop.format as keyof typeof linkFormatMap
+                                ]
+                              : 'relative';
+                          defaultExample = DEFAULT_LINK_EXAMPLES[linkType];
+                        } else if (prop.derivedType === 'date') {
+                          defaultExample =
+                            DEFAULT_EXAMPLES[prop.format ?? 'date'] ?? '';
+                        } else {
+                          defaultExample =
+                            DEFAULT_EXAMPLES[prop.derivedType ?? ''] ?? '';
+                        }
+                      }
+                      updates.example = defaultExample;
                       updates.valueMode = undefined;
                       updates.limitedCount = undefined;
                     }
@@ -479,13 +513,24 @@ export default function Props() {
                         // The server requires maxItems >= 2 for array types, so enforce a minimum of 2.
                         const count = Math.max(2, prop.limitedCount ?? 2);
                         updates.limitedCount = count;
-                        // Use empty string as default to match single-value component behavior
-                        // (no default value unless explicitly set or required)
-                        updates.example = createArrayWithCount(
-                          prop.example,
-                          count,
-                          '',
-                        ) as string[] | number[];
+
+                        // For complex object types (video, image), we need to preserve
+                        // existing objects or use an empty array.
+                        if (
+                          prop.derivedType === 'video' ||
+                          prop.derivedType === 'image'
+                        ) {
+                          const exampleArray = Array.isArray(prop.example)
+                            ? prop.example
+                            : [];
+                          updates.example = exampleArray.slice(0, count);
+                        } else {
+                          updates.example = createArrayWithCount(
+                            prop.example,
+                            count,
+                            '',
+                          ) as string[] | number[];
+                        }
                       }
 
                       dispatch(updateProp({ id: prop.id, updates }));
@@ -548,6 +593,7 @@ export default function Props() {
                             prop.example,
                             newCount,
                             '',
+                            prop.derivedType,
                           );
                         }}
                         disabled={componentStatus}

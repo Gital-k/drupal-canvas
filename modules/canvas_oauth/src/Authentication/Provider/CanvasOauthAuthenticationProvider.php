@@ -7,6 +7,7 @@ namespace Drupal\canvas_oauth\Authentication\Provider;
 use Drupal\Core\Authentication\AuthenticationProviderInterface;
 use Drupal\Core\Routing\RouteMatch;
 use Drupal\canvas\Entity\AssetLibrary;
+use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\simple_oauth\Authentication\Provider\SimpleOauthAuthenticationProvider;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -53,8 +54,14 @@ class CanvasOauthAuthenticationProvider implements AuthenticationProviderInterfa
     ];
     $route_match = RouteMatch::createFromRequest($request);
 
-    // Special case: artifact upload route.
-    if ($route_match->getRouteName() === 'canvas.api.artifacts.upload') {
+    // Special case: artifact upload and push lifecycle routes.
+    $named_routes = [
+      'canvas.api.artifacts.upload',
+      'canvas.api.push.complete',
+      'canvas.api.push.fail',
+      'canvas.api.push.start',
+    ];
+    if (\in_array($route_match->getRouteName(), $named_routes, TRUE)) {
       return $this->simpleOauthAuthenticationProvider->applies($request);
     }
 
@@ -64,6 +71,7 @@ class CanvasOauthAuthenticationProvider implements AuthenticationProviderInterfa
     // Narrow down the config entity types that are protected by this
     // authentication provider.
     $protected_config_entity_types = [
+      Component::ENTITY_TYPE_ID,
       JavaScriptComponent::ENTITY_TYPE_ID,
       AssetLibrary::ENTITY_TYPE_ID,
     ];

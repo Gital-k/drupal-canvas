@@ -152,17 +152,18 @@ configs.forEach((config) => {
       cy.findByTestId('canvas-page-data-form').as('entityForm');
 
       cy.findByRole('heading', { name: config.fieldLabel })
-        .parents('.js-form-wrapper')
+        .closest('.js-form-wrapper')
         .as(config.fieldAlias);
 
       // Verify the multi-value container exists with proper structure.
       cy.get(`@${config.fieldAlias}`)
         .find('.multivalue-container')
         .should('exist');
+      cy.get(`@${config.fieldAlias}`).find('table').first().scrollIntoView();
       cy.get(`@${config.fieldAlias}`)
-        .find('.multivalue-container')
-        .scrollIntoView();
-      cy.get(`@${config.fieldAlias}`).find('table').should('be.visible');
+        .find('table')
+        .first()
+        .should('be.visible');
       cy.get(`@${config.fieldAlias}`).find('tbody tr').should('have.length', 2);
 
       // Verify initial values using the UI.
@@ -186,7 +187,7 @@ configs.forEach((config) => {
       cy.get('@entityForm').recordFormBuildId();
 
       cy.findByRole('heading', { name: config.fieldLabel })
-        .parents('.js-form-wrapper')
+        .closest('.js-form-wrapper')
         .as(config.fieldAlias);
 
       cy.intercept('POST', '**/canvas/api/v0/form/content-entity/**');
@@ -216,7 +217,7 @@ configs.forEach((config) => {
       cy.get('@entityForm').recordFormBuildId();
 
       cy.findByRole('heading', { name: config.fieldLabel })
-        .parents('.js-form-wrapper')
+        .closest('.js-form-wrapper')
         .as(config.fieldAlias);
 
       const entityFormSelector = '[data-testid="canvas-page-data-form"]';
@@ -255,7 +256,7 @@ configs.forEach((config) => {
       cy.get('@entityForm').recordFormBuildId();
 
       cy.findByRole('heading', { name: config.fieldLabel })
-        .parents('.js-form-wrapper')
+        .closest('.js-form-wrapper')
         .as(config.fieldAlias);
 
       const entityFormSelector = '[data-testid="canvas-page-data-form"]';
@@ -304,7 +305,12 @@ configs.forEach((config) => {
       cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
       cy.waitForAjax();
 
+      // eslint-disable-next-line cypress/no-unnecessary-waiting
+      cy.wait(1000);
       confirmInputs(`@${config.fieldAlias}`, config.reorderedValues);
+      // Refresh the page to ensure the update persists.
+      cy.reload();
+      confirmInputs(`@${config.fieldAlias}`, [...config.reorderedValues, '']);
     });
 
     it('can remove items using popover remove button', () => {
@@ -313,7 +319,7 @@ configs.forEach((config) => {
       cy.get('@entityForm').recordFormBuildId();
 
       cy.findByRole('heading', { name: config.fieldLabel })
-        .parents('.js-form-wrapper')
+        .closest('.js-form-wrapper')
         .as(config.fieldAlias);
 
       typeInRow(`@${config.fieldAlias}`, 1, config.testValues[0]);
@@ -366,7 +372,7 @@ configs.forEach((config) => {
       cy.findByTestId('canvas-page-data-form').as('entityForm');
 
       cy.findByRole('heading', { name: config.fieldLabel })
-        .parents('.js-form-wrapper')
+        .closest('.js-form-wrapper')
         .as(config.fieldAlias);
 
       // Click the first item to open popover.
@@ -395,7 +401,7 @@ configs.forEach((config) => {
       cy.findByTestId('canvas-page-data-form').as('entityForm');
 
       cy.findByRole('heading', { name: config.fieldLabel })
-        .parents('.js-form-wrapper')
+        .closest('.js-form-wrapper')
         .as(config.fieldAlias);
 
       cy.get(`@${config.fieldAlias}`)
@@ -418,7 +424,7 @@ configs.forEach((config) => {
       cy.get('@entityForm').recordFormBuildId();
 
       cy.findByRole('heading', { name: config.fieldLabel })
-        .parents('.js-form-wrapper')
+        .closest('.js-form-wrapper')
         .as(config.fieldAlias);
 
       typeInRow(`@${config.fieldAlias}`, 0, config.testValues[2]);
@@ -451,7 +457,7 @@ configs.forEach((config) => {
         cy.get('@entityForm').recordFormBuildId();
 
         cy.findByRole('heading', { name: config.fieldLabel })
-          .parents('.js-form-wrapper')
+          .closest('.js-form-wrapper')
           .as(config.fieldAlias);
 
         // Verify the field label has the required class
@@ -547,7 +553,7 @@ configs.forEach((config) => {
         cy.get('@entityForm').recordFormBuildId();
 
         cy.findByRole('heading', { name: config.fieldLabel })
-          .parents('.js-form-wrapper')
+          .closest('.js-form-wrapper')
           .as(config.fieldAlias);
 
         const entityFormSelector = '[data-testid="canvas-page-data-form"]';

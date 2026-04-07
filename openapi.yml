@@ -1346,7 +1346,7 @@ paths:
         - in: query
           name: search
           required: false
-          description: Search term to filter content by title
+          description: Search term to filter content by title. When present, pagination parameters are ignored.
           schema:
             type: string
           examples:
@@ -1354,6 +1354,25 @@ paths:
               value: 'My page'
             Search for marketing update content:
               value: 'Marketing update'
+        - in: query
+          name: page[offset]
+          required: false
+          description: Zero-based index of the first item to return. Ignored when `search` is present.
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          example: 50
+        - in: query
+          name: page[limit]
+          required: false
+          description: Maximum number of items to return. Capped at 50. Ignored when `search` is present.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 50
+          example: 25
       responses:
         200:
           description: Page list generated successfully.
@@ -1361,82 +1380,129 @@ paths:
             application/json:
               schema:
                 type: object
-                minProperties: 0
-                # @todo Validate the property keys match the '^[0-9]$' pattern
-                #   in https://drupal.org/i/3506543.
-                additionalProperties:
-                  type: object
-                  required:
-                    - id
-                    - uuid
-                    - title
-                    - status
-                    - path
-                    - autoSaveLabel
-                    - autoSavePath
-                    - internalPath
-                    - links
-                  properties:
-                    id:
-                      type: integer
-                      description: The page ID.
-                    uuid:
-                      type: string
-                      format: uuid
-                      description: The page UUID.
-                    title:
-                      type: string
-                      description: The page title.
-                    status:
-                      type: boolean
-                      description: The page status.
-                    autoSaveLabel:
-                      type: [string, "null"]
-                      description: The auto-save title.
-                    autoSavePath:
-                      type: [string, "null"]
-                      format: uri-reference
-                      description: The auto-save path.
-                    internalPath:
-                      type: string
-                      format: uri-reference
-                      description: The internal (unprocessed) path
-                    path:
-                      type: string
-                      format: uri-reference
-                      title: The processed path
-                    links:
+                required:
+                  - data
+                properties:
+                  data:
+                    type: array
+                    description: The list of page entities.
+                    items:
                       type: object
-                      description: The operation links.
-                      additionalProperties:
-                        type: string
-                      examples:
-                        edit-form: /canvas/editor/canvas_page/3
+                      required:
+                        - id
+                        - uuid
+                        - title
+                        - status
+                        - path
+                        - autoSaveLabel
+                        - autoSavePath
+                        - internalPath
+                        - isNew
+                        - hasUnsavedStatusChange
+                        - links
+                      additionalProperties: false
+                      properties:
+                        id:
+                          type: integer
+                          description: The page ID.
+                        uuid:
+                          type: string
+                          format: uuid
+                          description: The page UUID.
+                        title:
+                          type: string
+                          description: The page title.
+                        status:
+                          type: boolean
+                          description: The page status.
+                        autoSaveLabel:
+                          type: [string, "null"]
+                          description: The auto-save title.
+                        autoSavePath:
+                          type: [string, "null"]
+                          format: uri-reference
+                          description: The auto-save path.
+                        internalPath:
+                          type: string
+                          format: uri-reference
+                          description: The internal (unprocessed) path
+                        path:
+                          type: string
+                          format: uri-reference
+                          title: The processed path
+                        isNew:
+                          type: boolean
+                          description: Whether the entity has no published revision.
+                        hasUnsavedStatusChange:
+                          type: boolean
+                          description: Whether the auto-save has an unsaved publish/unpublish status change.
+                        links:
+                          type: object
+                          description: The operation links for this entity.
+                          additionalProperties:
+                            type: string
+                          example:
+                            edit-form: /canvas/editor/canvas_page/3
+                  meta:
+                    type: object
+                    description: Present for non-search requests only.
+                    required:
+                      - count
+                    properties:
+                      count:
+                        type: integer
+                        description: Total number of pages (ignoring pagination).
+                  links:
+                    type: object
+                    description: >
+                      JSON:API-style pagination links. Present for non-search
+                      requests only. `self` is always included; `first`/`prev`
+                      appear when not on the first page; `next`/`last` appear
+                      when not on the last page.
+                    properties:
+                      self:
+                        $ref: '#/components/schemas/PaginationLink'
+                      first:
+                        $ref: '#/components/schemas/PaginationLink'
+                      prev:
+                        $ref: '#/components/schemas/PaginationLink'
+                      next:
+                        $ref: '#/components/schemas/PaginationLink'
+                      last:
+                        $ref: '#/components/schemas/PaginationLink'
               examples:
                 pageList:
                   value:
-                    '1':
-                      id: 1
-                      uuid: 2eaa55ce-382d-437d-8d74-a385fecd0c33
-                      title: Home
-                      status: true
-                      path: /home
-                      autoSaveLabel: Homer
-                      autoSavePath: /updated-path
-                      internalPath: /page/1
-                      links:
-                        edit-form: /canvas/editor/canvas_page/1
-                    '2':
-                      id: 2
-                      uuid: ede9e76b-42c9-4c8d-ab99-134f2c4fc9a3
-                      title: About
-                      status: false
-                      path: /about
-                      autoSaveLabel: About who?
-                      autoSavePath: /page/1
-                      internalPath: /page/2
-                      links:
-                        edit-form: /canvas/editor/canvas_page/2
+                    data:
+                      - id: 1
+                        uuid: 2eaa55ce-382d-437d-8d74-a385fecd0c33
+                        title: Home
+                        status: true
+                        path: /home
+                        autoSaveLabel: Homer
+                        autoSavePath: /updated-path
+                        internalPath: /page/1
+                        links:
+                          edit-form: /canvas/editor/canvas_page/1
+                      - id: 2
+                        uuid: ede9e76b-42c9-4c8d-ab99-134f2c4fc9a3
+                        title: About
+                        status: false
+                        path: /about
+                        autoSaveLabel: About who?
+                        autoSavePath: /page/1
+                        internalPath: /page/2
+                        links:
+                          edit-form: /canvas/editor/canvas_page/2
+                    meta:
+                      count: 42
+                    links:
+                      self:
+                        href: /canvas/api/v0/content/canvas_page?page[offset]=0&page[limit]=50
+                      next:
+                        href: /canvas/api/v0/content/canvas_page?page[offset]=50&page[limit]=50
+                      last:
+                        href: /canvas/api/v0/content/canvas_page?page[offset]=0&page[limit]=50
     post:
       summary: Creates content for a specific entity type
       parameters:
@@ -2077,6 +2143,93 @@ paths:
                   error:
                     type: string
                     description: Error description
+  /canvas/api/v0/notifications:
+    description: Fetch recent notifications for the authenticated user.
+    get:
+      summary: Fetch recent notifications for the authenticated user.
+      responses:
+        '200':
+          description: List of recent notifications.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                properties:
+                  data:
+                    type: object
+                    required:
+                      - notifications
+                    properties:
+                      notifications:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Notification'
+        '403':
+          $ref: '#/components/responses/AuthenticationErrorResponse'
+  /canvas/api/v0/notifications/read:
+    description: Mark notifications as read for the authenticated user.
+    post:
+      summary: Mark notifications as read for the authenticated user.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - ids
+              properties:
+                ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+      responses:
+        '204':
+          description: Notifications marked as read.
+        '400':
+          $ref: '#/components/responses/ClientErrorResponse'
+        '403':
+          $ref: '#/components/responses/AuthenticationErrorResponse'
+  /canvas/api/v0/push/complete:
+    description: Signal that a CLI push completed successfully.
+    post:
+      summary: Signal that a CLI push completed successfully.
+      responses:
+        '204':
+          description: Push completion recorded.
+        '403':
+          $ref: '#/components/responses/AuthenticationErrorResponse'
+  /canvas/api/v0/push/fail:
+    description: Signal that a CLI push failed.
+    post:
+      summary: Signal that a CLI push failed.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  description: Optional error message describing why the push failed.
+      responses:
+        '204':
+          description: Push failure recorded.
+        '403':
+          $ref: '#/components/responses/AuthenticationErrorResponse'
+  /canvas/api/v0/push/start:
+    description: Signal that a CLI push has started.
+    post:
+      summary: Signal that a CLI push has started.
+      responses:
+        '204':
+          description: Push start recorded.
+        '403':
+          $ref: '#/components/responses/AuthenticationErrorResponse'
   /canvas/api/v0/staged-update/auto-save:
     description: Auto-save endpoints for staged config updates.
     post:
@@ -2424,6 +2577,16 @@ paths:
 components:
   # @see https://spec.openapis.org/oas/v3.1.0.html#schema-object
   schemas:
+    PaginationLink:
+      type: object
+      description: A JSON:API-style link object.
+      required:
+        - href
+      properties:
+        href:
+          type: string
+          format: url-reference
+          description: The URL for this link.
     # Update ensure required and optional properties are present in
     #    https://drupal.org/i/3507427.
     ClientSideTransforms:
@@ -3278,6 +3441,60 @@ components:
         - type
         - weight
         - items
+    Notification:
+      type: object
+      required:
+        - id
+        - type
+        - title
+        - message
+        - timestamp
+        - hasRead
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          description: The severity or status of the notification.
+          enum:
+            - processing
+            - success
+            - info
+            - warning
+            - error
+        key:
+          type: string
+          nullable: true
+          description: Deduplication key. When a new processing, error, or warning notification is created with the same key, it replaces the previous one.
+        title:
+          type: string
+          description: Short headline displayed to the user.
+        message:
+          type: string
+          description: Detailed body text of the notification.
+        timestamp:
+          type: integer
+          description: Unix timestamp in milliseconds.
+        hasRead:
+          type: boolean
+          description: Whether the current user has marked this notification as read.
+        actions:
+          type: array
+          nullable: true
+          description: Optional action links displayed alongside the notification.
+          items:
+            type: object
+            required:
+              - label
+              - href
+            properties:
+              label:
+                type: string
+                description: Button label for the action.
+              href:
+                type: string
+                description: URL the action links to.
     StagedConfigUpdate:
       title: Staged Config Update
       type: object

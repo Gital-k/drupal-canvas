@@ -18,6 +18,7 @@ export interface CanvasComponentTreeNode {
   component_id: string;
   component_version: string | null;
   inputs: Record<string, unknown>;
+  inputs_resolved?: Record<string, unknown> | null;
   label: string | null;
 }
 
@@ -26,6 +27,19 @@ export interface CanvasComponentTreeNode {
  * @see canvas.component_tree in config/schema/canvas.schema.yml
  */
 export type CanvasComponentTree = CanvasComponentTreeNode[];
+
+/**
+ * Authored page spec element. The local file representation of a component
+ * instance, as opposed to CanvasComponentTreeNode which is the API representation.
+ */
+export interface AuthoredSpecElement {
+  type: string;
+  props?: unknown;
+  slots?: AuthoredSpecSlots;
+}
+
+export type AuthoredSpecElementMap = Record<string, AuthoredSpecElement>;
+export type AuthoredSpecSlots = Record<string, string[]>;
 
 /**
  * Converts an array of Drupal Canvas components to json-render spec format.
