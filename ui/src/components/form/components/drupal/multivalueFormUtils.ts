@@ -131,6 +131,7 @@ export const triggerDrupalRemoveButton = (
   // then locate the Drupal remove button in the .canvas-remove-action cell.
   const tableRow = triggerElement.closest('tr');
   if (!tableRow) return false;
+  document.body.setAttribute('data-canvas-ajax-behaviors', 'true');
 
   // Effectively hide the row, but maintain a pixel of height so the popover
   // can still anchor to its position.

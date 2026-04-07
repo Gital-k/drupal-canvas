@@ -13,6 +13,7 @@ const DrupalMultivalueSubmit = ({ attributes }: { attributes: Attributes }) => {
       ref={(node) => {
         if (attributes?.['data-multivalue-add-new'] && node) {
           node.addEventListener('mousedown', () => {
+            document.body.setAttribute('data-canvas-ajax-behaviors', 'true');
             const outerWrapper = node.closest('[data-canvas-multiple-values]');
             const tbody =
               outerWrapper &&

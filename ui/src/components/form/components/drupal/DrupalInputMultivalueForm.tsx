@@ -369,6 +369,7 @@ const DrupalInputMultivalueForm = ({
               size="1"
               onClick={handleRemove}
               disabled={!isRemoveButtonEnabled(triggerRowRef.current)}
+              data-multivalue-remove-item={true}
             >
               <TrashIcon />
               Remove
