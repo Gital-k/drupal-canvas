@@ -118,7 +118,7 @@ export function getPropSchemas(inputAndUiData: InputUIData) {
  * @param target
  *   The HTMLFormElement being validated.
  * @param {InputUIData} inputAndUiData
- *   An object usually generated on render by components wrapped with WrapRHF.
+ *   An object usually generated on render by components wrapped with withRHF.
  *   The specific properties required by this function:
  *   - selectedComponent {string}: the id of the selected component within the model.
  * @param newValue {string | number | boolean | null}

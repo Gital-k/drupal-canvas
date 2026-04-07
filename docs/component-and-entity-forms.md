@@ -32,7 +32,7 @@ Canvas has two special forms rendered in React that are based on Drupal render a
 │    └─ <DrupalFormElement>                                                   │
 │         └─ <DrupalInput> / <DrupalSelect> / <DrupalTextArea> / ...          │
 │              │                                                              │
-│              └─ wrapRHF(WrappedComponent)                                   │
+│              └─ withRHF(WrappedComponent)                                   │
 │                   │                                                         │
 │                   ├─ formId === "component_instance_form"                   │
 │                   │    └─ <ComponentFormField>                              │
@@ -183,15 +183,15 @@ Components in `ui/src/components/form/components/drupal/` bridge Drupal's form s
 These components share a common pattern:
 1. Receive props/attributes from the Drupal render array
 2. Map them to the corresponding base UI component (from `ui/src/components/form/components/`)
-3. **Are wrapped with `wrapRHF()`** to integrate with form state management
+3. **Are wrapped with `withRHF()`** to integrate with form state management
 
 The base UI components (e.g., `Checkbox`, `TextField`, `Select`) contain ref-based logic allowing them to respond to DOM and jQuery events, enabling integration with Drupal's vanilla JS behaviors.
 
 ---
 
-## `wrapRHF` — The React Hook Form Integration HOC
+## `withRHF` — The React Hook Form Integration HOC
 
-`wrapRHF` (`ui/src/components/form/wrapRHF.tsx`) is the heart of form state management. It wraps every interactive form input and:
+`withRHF` (`ui/src/components/form/withRHF.tsx`) is the heart of form state management. It wraps every interactive form input and:
 
 1. **Extracts the field name** from `props.attributes.name` (or `data-canvas-name` for radios)
 
@@ -211,7 +211,7 @@ The base UI components (e.g., `Checkbox`, `TextField`, `Select`) contain ref-bas
 
 ## `ComponentFormField` — Component Instance Form Fields
 
-`ComponentFormField` (`ui/src/components/form/wrapRHF-fields/ComponentFormField.tsx`) handles each field in the component instance form. This is the most complex piece.
+`ComponentFormField` (`ui/src/components/form/withRHF-fields/ComponentFormField.tsx`) handles each field in the component instance form. This is the most complex piece.
 
 ### Initialization
 
@@ -276,7 +276,7 @@ enhancedOnChange()
 
 ## `PageDataFormField` — Page Data Form Fields
 
-`PageDataFormField` (`ui/src/components/form/wrapRHF-fields/PageDataFormField.tsx`) handles entity form fields with a simpler flow than `ComponentFormField`.
+`PageDataFormField` (`ui/src/components/form/withRHF-fields/PageDataFormField.tsx`) handles entity form fields with a simpler flow than `ComponentFormField`.
 
 ### Key Differences from ComponentFormField
 

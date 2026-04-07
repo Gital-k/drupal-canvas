@@ -123,7 +123,7 @@ final class ComponentInstanceForm extends FormBase {
     // Prevent form submission while specifying values for component instance's
     // inputs, because changes are saved via Redux instead of a traditional
     // submit.
-    // @see ui/src/components/form/wrapRHF-fields/ComponentFormField.tsx
+    // @see ui/src/components/form/withRHF-fields/ComponentFormField.tsx
     // @see https://developer.mozilla.org/en-US/docs/Web/HTML/Element/form#method
     $form['#method'] = 'dialog';
 
