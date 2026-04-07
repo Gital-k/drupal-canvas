@@ -42,14 +42,17 @@ const DrupalInputMultivalueForm = ({
     'data-field-label'?: string;
   };
 }) => {
-  // Get the initial value from attributes
-  const initialValue = attributes.value || attributes.defaultValue || '';
+  // Get the initial value from attributes.
+  // Use ?? (nullish coalescing) instead of || to correctly handle the numeric
+  // value 0. Hyperscriptify's factory.js JSON-parses attribute values, so a
+  // Drupal attribute like value="222" becomes the JS number 222 — convert it
+  // to a string so downstream || 'Empty' display logic works correctly.
+  const rawInitialValue = attributes.value ?? attributes.defaultValue ?? '';
+  const initialValue = String(rawInitialValue);
   // Manage local state to sync display value with input changes
-  const [displayValue, setDisplayValue] = useState<string>(
-    initialValue as string,
-  );
+  const [displayValue, setDisplayValue] = useState<string>(initialValue);
   // Temporary value for the popover input (only committed on Enter).
-  const [tempValue, setTempValue] = useState<string>(initialValue as string);
+  const [tempValue, setTempValue] = useState<string>(initialValue);
   const inputWrapperRef = useRef<HTMLDivElement | null>(null);
   // Ref for the trigger area that lives inside the actual table row.
   const triggerRowRef = useRef<HTMLDivElement | null>(null);
@@ -66,22 +69,22 @@ const DrupalInputMultivalueForm = ({
 
   // Sync displayValue when a genuine external value arrives (e.g. AJAX
   // re-hyperscriptification after "Add another item" or "Remove").
+  //
+  // Important: only update the *display* state here. The hidden input's value
+  // is managed entirely by InputBehaviors / Redux (via HyperscriptifyUpdateStore
+  // → setPageData → InputBehaviorsEntityForm). Calling updateInputValue() from
+  // this effect would fire a synthetic change event → commitFormState → an
+  // extra PATCH request, which can race with the Drupal AJAX that just fired
+  // and produce incorrect intermediate states (e.g. the removed row reappearing
+  // with a stale value).
   useEffect(() => {
-    const liveInput = inputWrapperRef.current?.querySelector(
-      'input',
-    ) as HTMLInputElement | null;
-    const liveValue = liveInput?.value ?? '';
-    const attrValue = (attributes.value ??
-      attributes.defaultValue ??
-      '') as string;
+    // Convert to string: hyperscriptify JSON-parses attribute values, so
+    // numeric field values arrive as JS numbers (e.g. 222 instead of "222").
+    const rawAttrValue = attributes.value ?? attributes.defaultValue ?? '';
+    const attrValue = String(rawAttrValue);
 
-    // Use the live input value when it is non-empty; fall back to the
-    // attribute value on the very first mount (before InputBehaviors has had
-    // a chance to populate the input).
-    const newValue = liveValue !== '' ? liveValue : attrValue;
-
-    setDisplayValue(newValue);
-    setTempValue(newValue);
+    setDisplayValue(attrValue);
+    setTempValue(attrValue);
   }, [attributes.value, attributes.defaultValue]);
 
   // Commit a value directly — used by the autocomplete selection handler so
