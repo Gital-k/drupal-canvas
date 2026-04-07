@@ -279,7 +279,7 @@ describe('Multivalue Form Design – Link Field', () => {
     cy.get('@unlimited-link').find('tbody tr').eq(0).scrollIntoView();
 
     const dndDefaults = {
-      position: 'center',
+      position: 'topLeft',
       scrollBehavior: false,
     };
 
@@ -297,7 +297,7 @@ describe('Multivalue Form Design – Link Field', () => {
     cy.get(
       '[data-drupal-selector="edit-field-cvt-unlimited-link"] tr.draggable:nth-child(3) [title="Change order"]',
     ).realDnd(
-      '[data-drupal-selector="edit-field-cvt-unlimited-link"] tr.draggable:nth-child(2) [title="Change order"]',
+      '[data-drupal-selector="edit-field-cvt-unlimited-link"] tr.draggable:nth-child(2)',
       dndDefaults,
     );
 
