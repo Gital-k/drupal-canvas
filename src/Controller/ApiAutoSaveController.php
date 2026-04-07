@@ -542,7 +542,24 @@ final class ApiAutoSaveController extends ApiControllerBase {
       }
       $componentId = $item->getComponentId();
       if (isset($publishedVersionMap[$componentId])) {
-        $item->set('component_version', $publishedVersionMap[$componentId]);
+        $targetVersion = $publishedVersionMap[$componentId];
+        $item->set('component_version', $targetVersion);
+        // Strip input values for props that don't exist in the
+        // target version. When reverting from 'auto_save' to the
+        // published version, the auto-save may have added props
+        // that the published version doesn't have.
+        $component = $item->getComponent();
+        if ($component !== NULL) {
+          $targetSettings = $component->getSettings($targetVersion);
+          $validProps = $targetSettings['prop_field_definitions'] ?? [];
+          $inputs = $item->getInputs();
+          if (\is_array($inputs) && \is_array($validProps)) {
+            $filtered = \array_intersect_key($inputs, $validProps);
+            if (\count($filtered) !== \count($inputs)) {
+              $item->setInput($filtered);
+            }
+          }
+        }
         $treeModified = TRUE;
       }
     }
@@ -585,6 +602,33 @@ final class ApiAutoSaveController extends ApiControllerBase {
       return new JsonResponse(data: ['error' => 'No auto-save data found for this entity.'], status: Response::HTTP_NOT_FOUND);
     }
     $this->autoSaveManager->delete($entity);
+
+    // When a JsComponent auto-save is discarded, other auto-saves
+    // may still reference its Component with
+    // component_version: 'auto_save'. Revert those to the real
+    // published version.
+    if ($entity instanceof JavaScriptComponent) {
+      $componentId = JsComponentDiscovery::getComponentConfigEntityId($entity->id());
+      // Reset static cache so hook_entity_load sees no auto-save
+      // and doesn't inject 'auto_save' as active version.
+      $componentStorage = $this->entityTypeManager->getStorage(Component::ENTITY_TYPE_ID);
+      $componentStorage->resetCache([$componentId]);
+      $component = $componentStorage->load($componentId);
+      if ($component instanceof Component) {
+        \assert($component->getActiveVersion() !== JsComponent::AUTO_SAVE_VERSION);
+        $publishedVersionMap = [$componentId => $component->getActiveVersion()];
+        $allAutoSaves = $this->autoSaveManager->getAllAutoSaveList(TRUE);
+        foreach ($allAutoSaves as ['entity' => $autoSaveEntity]) {
+          if (!$autoSaveEntity instanceof ContentEntityInterface && !$autoSaveEntity instanceof ComponentTreeEntityInterface) {
+            continue;
+          }
+          if ($this->replaceAutoSaveVersionsInTree($autoSaveEntity, $publishedVersionMap)) {
+            $this->autoSaveManager->saveEntity($autoSaveEntity);
+          }
+        }
+      }
+    }
+
     return new JsonResponse(data: ['message' => 'Auto-save data deleted successfully.'], status: Response::HTTP_NO_CONTENT);
   }
 

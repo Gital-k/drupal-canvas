@@ -347,9 +347,10 @@ class AutoSaveManager implements EventSubscriberInterface {
     if (!$auto_save_entity->isEmpty() && $auto_save_entity->entity instanceof CanvasHttpApiEligibleConfigEntityInterface) {
       BrandKit::clearAutoSaveFileUsage($auto_save_entity->entity, (string) $entity->id());
     }
-    $this->cacheTagsInvalidator->invalidateTags([self::CACHE_TAG]);
     $key = $this->getAutoSaveKey($entity);
     $this->autoSaveStore->delete($key);
+    $this->cache->delete($key);
+    $this->cacheTagsInvalidator->invalidateTags([self::CACHE_TAG]);
     $this->formViolationsStore->delete($key);
     if ($entity instanceof ContentEntityInterface) {
       $canvas_fields = \array_keys(
