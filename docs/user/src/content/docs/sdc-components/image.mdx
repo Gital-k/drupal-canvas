@@ -103,10 +103,49 @@ Use the `sizes` attribute to optimize image loading for different viewport sizes
 }) only %}
 ```
 
+## Using Drupal image styles
+
+Canvas provides the `apply_image_style` filter to apply Drupal image styles
+to images before passing them to the `canvas:image` component. This allows
+you to use server-side image processing (cropping, resizing, effects) while
+still benefiting from Canvas's responsive image handling.
+
+### Basic usage
+
+```twig
+{% set styled = image|apply_image_style('thumbnail') %}
+{% include 'canvas:image' with styled only %}
+```
+
+### Combining with responsive images
+
+When you pass a styled image to `canvas:image`, Canvas will generate responsive
+variants that also have the style's effects applied:
+
+```twig
+{% set styled = image|apply_image_style('16_9_crop') %}
+{% include 'canvas:image' with styled|merge({
+  sizes: '(max-width: 768px) 100vw, 50vw',
+}) only %}
+```
+
+This is powerful because it lets you combine server-side effects (like cropping
+with focal point) with Canvas's automatic responsive image generation.
+
+### Portability note
+
+Image styles are site configuration meaning that they are not shipped with the component.
+If you want your components to be transferable between sites, prefer client-side
+image transforms (such as CSS `object-fit` and `aspect-ratio`) over
+`apply_image_style`. Reserve this filter for cases where server-side processing
+is necessary, such as focal-point cropping that cannot be
+achieved in the browser.
+
 ## Best practices
 
 - Always provide meaningful `alt` text for accessibility
 - Use `eager` loading only for above-the-fold images
 - Specify appropriate `sizes` for responsive images
 - Include `width` and `height` to prevent layout shifts
+- Use `apply_image_style` when you need server-side effects like cropping with focal point
 
