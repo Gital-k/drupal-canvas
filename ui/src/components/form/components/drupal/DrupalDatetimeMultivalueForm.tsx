@@ -245,7 +245,7 @@ const DrupalDatetimeMultivalueForm = ({
           {/* Date and time inputs rendered by Drupal */}
           {children}
 
-          {/* Remove Button */}
+          {/* Remove Button - disabled when removing is not allowed */}
           <Flex justify="center" className={styles.removeButtonContainer}>
             <Button
               variant="ghost"
