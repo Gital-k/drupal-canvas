@@ -43,3 +43,11 @@ canvas_ai.get_progress:
     _controller: '\Drupal\canvas_ai\Controller\CanvasBuilder::getAiProgress'
   requirements:
     _permission: 'use Drupal Canvas AI'
+
+canvas_ai.direct_edit:
+  path: '/admin/api/canvas/direct-edit'
+  defaults:
+    _controller: '\Drupal\canvas_ai\Controller\DirectEditController::edit'
+  requirements:
+    _permission: 'use Drupal Canvas AI'
+  methods: [POST]
