@@ -720,7 +720,7 @@ final class Component extends VersionedConfigEntityBase implements ComponentInte
    * @return array{title: string, description?: string, examples: string[]}
    *   Clean definitions.
    */
-  public static function cleanSlotDefinition(array $definition): array {
+  private static function cleanSlotDefinition(array $definition): array {
     // Some SDC have additional keys in their slot definitions. Remove those
     // that aren't specified in the SDC metadata schema and in our config
     // schema.

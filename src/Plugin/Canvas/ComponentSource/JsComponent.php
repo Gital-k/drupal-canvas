@@ -58,7 +58,6 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
   protected ?JavaScriptComponent $jsComponent = NULL;
   protected GlobalImports $globalImports;
   private ?array $autoSavePropFieldDefinitions = NULL;
-  private ?array $autoSaveSlotDefinitions = NULL;
   private ?array $publishedPropFieldDefinitions = NULL;
   private bool $autoSaveApplied = FALSE;
 
@@ -445,15 +444,10 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
     $this->jsComponent = $autoSave->entity;
     $this->resetCachedPropState();
 
-    // Recompute prop and slot definitions from the auto-saved
-    // component.
+    // Recompute prop_field_definitions from the auto-saved component.
     try {
       $ephemeralSdc = JsComponentDiscovery::buildEphemeralSdcPluginInstance($autoSave->entity);
       $this->autoSavePropFieldDefinitions = self::getPropsForComponentPlugin($ephemeralSdc);
-      $this->autoSaveSlotDefinitions = \array_map(
-        Component::cleanSlotDefinition(...),
-        $ephemeralSdc->metadata->slots,
-      );
     }
     catch (\Exception) {
       // Invalid auto-save schema: fall back to published version.
@@ -496,9 +490,6 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
     // Otherwise inject it as the active version.
     $component->createVersion(self::AUTO_SAVE_VERSION);
     $component->setSettings(['prop_field_definitions' => $this->autoSavePropFieldDefinitions]);
-    if ($this->autoSaveSlotDefinitions !== NULL) {
-      $component->set('fallback_metadata', ['slot_definitions' => $this->autoSaveSlotDefinitions]);
-    }
   }
 
   /**

@@ -64,10 +64,7 @@ final class ComponentAutoSaveVersionHooks {
       try {
         $ephemeralSdc = JsComponentDiscovery::buildEphemeralSdcPluginInstance($autoSave->entity);
         $propFieldDefs = GeneratedFieldExplicitInputUxComponentSourceBase::getPropsForComponentPlugin($ephemeralSdc);
-        $slotDefs = \array_map(
-          Component::cleanSlotDefinition(...),
-          $ephemeralSdc->metadata->slots,
-        );
+        $slotDefs = $ephemeralSdc->metadata->slots;
       }
       catch (\Exception) {
         continue;
