@@ -182,7 +182,7 @@ export const createEnhancedOnChange = ({
 
       if (shouldSkipAutoSave) {
         // Show blocking error but don't auto-save to backend
-        if (formId && validationResult?.valid !== true) {
+        if (formId && !validationResult?.valid) {
           dispatchFieldError(
             dispatch,
             formId as FormId,

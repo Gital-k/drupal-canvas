@@ -39,7 +39,7 @@ import {
 import { parseValue } from '@/utils/function-utils';
 
 import { createComponentFormStateHandler } from './componentFormHandlers';
-import { FieldErrorDisplay } from './shared-utilities';
+import { FieldErrorDisplay } from './FieldErrorDisplay';
 
 import type { ComponentType } from 'react';
 import type * as ReactType from 'react';

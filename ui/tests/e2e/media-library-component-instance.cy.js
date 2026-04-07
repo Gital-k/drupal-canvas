@@ -49,9 +49,6 @@ const testMediaLibraryInComponentInstanceForm = (
   cy.get('.js-media-library-item-preview img').should('exist');
 
   cy.get('[data-testid*="canvas-component-form-"]').as('inputForm');
-  // cy.intercept('PATCH', '**/canvas/api/v0/form/component-instance/**').as(
-  //   'patch',
-  // );
 
   iterations.forEach((step, index) => {
     // The image location in the preview is different depending on the entity
@@ -85,7 +82,6 @@ const testMediaLibraryInComponentInstanceForm = (
     cy.findByLabelText(step.selectNewText).check();
     cy.get('button:contains("Insert selected")').click();
 
-    // cy.wait('@patch');
     cy.get('div[role="dialog"]').should('not.exist');
     cy.get(
       `[class*="contextualPanel"] input[aria-label="${step.removeAriaLabel}"]`,

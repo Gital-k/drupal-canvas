@@ -28,11 +28,11 @@ import {
   selectFieldError,
 } from '@/features/form/formStateSlice';
 
+import { FieldErrorDisplay } from './FieldErrorDisplay';
 import {
   createPageDataFormStateHandler,
   useRespondToPageDataStoreUpdates,
 } from './pageDataFormHandlers';
-import { FieldErrorDisplay } from './shared-utilities';
 
 import type { ComponentType } from 'react';
 import type * as ReactType from 'react';

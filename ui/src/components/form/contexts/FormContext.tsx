@@ -16,21 +16,13 @@ interface FormContextValue {
 
 const FormContext = createContext<FormContextValue | null>(null);
 
-export const useFormContext = () => {
-  const context = useContext(FormContext);
-  if (!context) {
-    throw new Error('useFormContext must be used within a FormProvider');
-  }
-  return context;
-};
-
 // Safe version that returns null instead of throwing
 export const useSafeFormContext = () => {
   const context = useContext(FormContext);
   if (!context) {
     console.warn('useFormContext must be used within a FormProvider');
   }
-  return useContext(FormContext);
+  return context;
 };
 
 // Safe version of react-hook-form's useFormContext that returns null instead of throwing
