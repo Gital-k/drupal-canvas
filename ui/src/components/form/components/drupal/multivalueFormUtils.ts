@@ -132,7 +132,9 @@ export const triggerDrupalRemoveButton = (
   const tableRow = triggerElement.closest('tr');
   if (!tableRow) return false;
 
-  tableRow.style.display = 'none';
+  // Effectively hide the row, but maintain a pixel of height so the popover
+  // can still anchor to its position.
+  tableRow.style.height = '1px';
   normalizeRowWeights(triggerElement);
   // Find the original Drupal remove button directly (the hidden input/button
   // that carries the AJAX behavior). The cell and button are hidden by
