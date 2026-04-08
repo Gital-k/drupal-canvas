@@ -304,7 +304,7 @@ const DrupalInputMultivalueForm = ({
           ref={popoverContainerRef}
           side="left"
           align="start"
-          sideOffset={6}
+          sideOffset={36}
           className={styles.popoverContent}
           style={{ maxWidth: '235px' }}
           onInteractOutside={(e) => {
