@@ -365,6 +365,14 @@ configs.forEach((config) => {
       cy.waitForAjax();
 
       cy.get(`@${config.fieldAlias}`).find('tbody tr').should('have.length', 2);
+
+      // Verify remaining rows still display their numeric values correctly
+      // after AJAX re-hyperscriptification (regression: numeric values could
+      // be overwritten with 'Empty' if the effect wrote to the hidden input).
+      confirmInputs(`@${config.fieldAlias}`, [
+        config.defaultValue,
+        config.testValues[1],
+      ]);
     });
 
     it(`popover opens and closes correctly for ${fieldTypeLower}`, () => {
