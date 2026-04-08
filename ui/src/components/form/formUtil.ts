@@ -225,8 +225,8 @@ export function validateProp(
   schema?: any,
 ): JsonSchemaValidationResult {
   const schemas = getPropSchemas(inputAndUiData);
-  if (schema || schemas[schemaName]) {
-    return jsonSchemaValidate(data, schema || schemas[schemaName]);
+  if (schemas[schemaName]) {
+    return jsonSchemaValidate(data, schemas[schemaName]);
   }
   return [true, null];
 }

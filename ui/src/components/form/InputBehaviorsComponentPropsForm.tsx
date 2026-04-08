@@ -212,12 +212,12 @@ export const InputBehaviorsComponentPropsForm = (
       !shouldSkipPropValidation(fieldName, target, inputAndUiData, newValue)
     ) {
       const schemas = getPropSchemas(inputAndUiData);
-      let schema = schemas?.[toPropName(fieldName, selectedComponent)];
-      if (schema?.type === 'array') {
-        schema = schema.items as any;
-      }
-      const valueToValidate = coerceValueForSchema(newValue, schema);
+      const schema = schemas?.[toPropName(fieldName, selectedComponent)];
 
+      let valueToValidate = coerceValueForSchema(newValue, schema);
+      if (schema?.type === 'array' && !Array.isArray(valueToValidate)) {
+        valueToValidate = [valueToValidate];
+      }
       const [valid, validate] = validateProp(
         toPropName(fieldName, selectedComponent),
         valueToValidate,
