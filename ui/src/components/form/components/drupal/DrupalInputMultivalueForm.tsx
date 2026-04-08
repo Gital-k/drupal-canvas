@@ -43,10 +43,6 @@ const DrupalInputMultivalueForm = ({
   };
 }) => {
   // Get the initial value from attributes.
-  // Use ?? (nullish coalescing) instead of || to correctly handle the numeric
-  // value 0. Hyperscriptify's factory.js JSON-parses attribute values, so a
-  // Drupal attribute like value="222" becomes the JS number 222 — convert it
-  // to a string so downstream || 'Empty' display logic works correctly.
   const rawInitialValue = attributes.value ?? attributes.defaultValue ?? '';
   const initialValue = String(rawInitialValue);
   // Manage local state to sync display value with input changes
@@ -69,14 +65,8 @@ const DrupalInputMultivalueForm = ({
 
   // Sync displayValue when a genuine external value arrives (e.g. AJAX
   // re-hyperscriptification after "Add another item" or "Remove").
-  //
-  // Important: only update the *display* state here. The hidden input's value
-  // is managed entirely by InputBehaviors / Redux (via HyperscriptifyUpdateStore
-  // → setPageData → InputBehaviorsEntityForm). Calling updateInputValue() from
-  // this effect would fire a synthetic change event → commitFormState → an
-  // extra PATCH request, which can race with the Drupal AJAX that just fired
-  // and produce incorrect intermediate states (e.g. the removed row reappearing
-  // with a stale value).
+  // Only update display state — avoid writing to the hidden input to prevent
+  // a race condition with the Drupal AJAX save.
   useEffect(() => {
     // Convert to string: hyperscriptify JSON-parses attribute values, so
     // numeric field values arrive as JS numbers (e.g. 222 instead of "222").
