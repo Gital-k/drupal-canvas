@@ -128,7 +128,6 @@
 :global([data-canvas-ajax-behaviors="true"] [data-multivalue-remove-item]),
 :global([data-canvas-layout-request-in-progress] [data-multivalue-add-new]),
 :global([data-canvas-layout-request-in-progress] [data-multivalue-remove-item]) {
-  transition: opacity 0.15s ease;
   pointer-events: none;
   opacity: .3;
 }
