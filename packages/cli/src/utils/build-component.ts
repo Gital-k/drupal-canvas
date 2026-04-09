@@ -14,6 +14,8 @@ export async function buildComponent(
   component: DiscoveredComponent,
   useLocalGlobalCss: boolean = true,
   outputDir: string = 'dist',
+  assetDir?: string,
+  assetBasePath?: string,
 ): Promise<Result> {
   const { name, kind, jsEntryPath, cssEntryPath } = component;
 
@@ -71,7 +73,7 @@ export async function buildComponent(
   if (jsEntryPath) {
     try {
       const jsSource = await fs.readFile(jsEntryPath, 'utf-8');
-      const jsCompiled = compileJS(jsSource);
+      const jsCompiled = compileJS(jsSource, assetDir, assetBasePath);
       await fs.writeFile(
         path.join(distDir, `${outputBaseName}.js`),
         jsCompiled,

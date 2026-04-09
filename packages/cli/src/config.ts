@@ -88,6 +88,7 @@ export interface Config {
   deprecatedComponentDir: string;
   globalCssPath: string;
   fonts?: FontsConfig;
+  assetDir: string;
 }
 
 /** Filename for Brand Kit (font) configuration in the project root. */
@@ -196,6 +197,7 @@ let config: Config = {
   deprecatedComponentDir: deprecatedComponentDir,
   globalCssPath: globalCssPath,
   fonts: loadFontsFromBrandKitFile(process.cwd()),
+  assetDir: canvasConfig?.assetDir || 'public',
 };
 
 export function getConfig(): Config {

@@ -59,6 +59,7 @@ properties:
 | `aliasBaseDir`  | `"src"`                         | Base directory for module resolution when using path aliases in your components. Tied to your project's import structure. |
 | `outputDir`     | `"dist"`                        | Build output directory (similar to Vite's `build.outDir`). Defines where compiled assets are generated.                   |
 | `globalCssPath` | `"./src/components/global.css"` | Path to the global CSS file.                                                                                              |
+| `assetDir`      | `"public"`                      | Directory for static assets (images, fonts, etc.). Similar to Astro's `public/` directory. Assets are copied to build output and uploaded to Drupal. |
 
 If `canvas.config.json` is not present, the CLI will use the default values
 shown above.
@@ -218,6 +219,52 @@ Configuration sources are applied in order of precedence from highest to lowest:
 Example: If you have `CANVAS_SITE_URL=https://dev.example.com` in your `.env`
 file but run `npx canvas download --site-url https://prod.example.com`, the CLI
 will use `https://prod.example.com`.
+
+## Static Assets
+
+The Canvas CLI supports a static asset directory (similar to Astro's `public/` directory) for images, fonts, and other static files that your components need to reference.
+
+### Configuration
+
+Configure the asset directory in `canvas.config.json`:
+
+```json
+{
+  "assetDir": "public"
+}
+```
+
+The default is `"public"` if not specified.
+
+### Usage
+
+1. Place your static assets in the configured directory (e.g., `public/`):
+   ```
+   public/
+     images/
+       logo.png
+       hero.jpg
+     fonts/
+       custom-font.woff2
+   ```
+
+2. Reference assets in your components using the asset directory path:
+   ```jsx
+   export default function MyComponent() {
+     return (
+       <div>
+         <img src="/public/images/logo.png" alt="Logo" />
+       </div>
+     );
+   }
+   ```
+
+3. During build, the CLI will:
+   - Copy all assets from the asset directory to the build output
+   - Replace asset paths in your JavaScript code with the actual Drupal paths
+   - Upload assets to Drupal during push
+
+The path replacement happens automatically, so `/public/images/logo.png` becomes the actual Drupal file URL (e.g., `/sites/default/files/canvas-artifacts/images/logo.png`).
 
 ## Supported Imports in Canvas Code Components
 

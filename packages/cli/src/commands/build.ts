@@ -8,8 +8,10 @@ import { analyzeAndBundleImports } from '../utils/analyze-and-bundle-imports';
 import { buildComponent } from '../utils/build-component';
 import { buildTailwindForComponents } from '../utils/build-tailwind';
 import { pluralize, updateConfigFromOptions } from '../utils/command-helpers';
+import { copyAssets } from '../utils/copy-assets';
 import { generateManifest } from '../utils/generate-manifest';
 import { reportResults } from '../utils/report-results';
+import { createApiService } from '../services/api';
 
 import type { Command } from 'commander';
 
@@ -51,7 +53,7 @@ export function buildCommand(program: Command): void {
 
         // Update config with CLI options
         updateConfigFromOptions(options);
-        const { aliasBaseDir, outputDir, componentDir } = getConfig();
+        const { aliasBaseDir, outputDir, componentDir, assetDir } = getConfig();
 
         const skipTailwind = !options.tailwind;
         // Clean output directory to remove stale builds.
@@ -60,6 +62,18 @@ export function buildCommand(program: Command): void {
         if (!skipTailwind) {
           await ensureConfig(['siteUrl', 'clientId', 'clientSecret']);
         }
+        
+        // Fetch asset path information from API
+        let assetBasePath: string | undefined;
+        try {
+          const apiService = await createApiService();
+          const assetPathInfo = await apiService.getAssetPath();
+          assetBasePath = assetPathInfo.basePath;
+        } catch (error) {
+          // If we can't get asset path, continue without it
+          p.log.warn('Could not fetch asset path from API, asset path replacement will be skipped');
+        }
+        
         // Step 1: Discover all components
         const s1 = p.spinner();
         s1.start('Discovering components');
@@ -151,7 +165,7 @@ export function buildCommand(program: Command): void {
         const s3 = p.spinner();
         s3.start(`Building ${componentLabelPluralized}`);
         const results = await Promise.all(
-          components.map((c) => buildComponent(c, true, outputDir)),
+          components.map((c) => buildComponent(c, true, outputDir, assetDir, assetBasePath)),
         );
 
         s3.stop(
@@ -182,6 +196,21 @@ export function buildCommand(program: Command): void {
         reportResults(resultsWithWarnings, 'Built components', 'Component');
         if (resultsWithWarnings.some((result) => !result.success)) {
           process.exit(1);
+        }
+
+        // Step 3.5: Copy assets
+        const s3_5 = p.spinner();
+        s3_5.start('Copying assets');
+        const assetResult = await copyAssets(assetDir, outputDir);
+        if (assetResult.success) {
+          s3_5.stop(chalk.green(`Copied assets from ${assetDir}/`));
+        } else {
+          s3_5.stop(chalk.yellow('⚠ Asset copying completed with warnings'));
+          if (assetResult.details) {
+            for (const detail of assetResult.details) {
+              p.log.warn(`${detail.heading}: ${detail.content}`);
+            }
+          }
         }
 
         // Step 4: Build Tailwind CSS
