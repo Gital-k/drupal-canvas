@@ -324,12 +324,43 @@ final class Evaluator {
           $evaluated_references = [];
           $referenced_entities = $referencer_result->value;
           \assert(\is_array($referenced_entities));
+          
+          // Get the target expression to check if it targets specific bundles.
+          $targets_multiple_bundles = $expr->targetsMultipleBundles();
+          
           foreach ($referenced_entities as $delta => $referenced_entity) {
             \assert($referenced_entity instanceof FieldableEntityInterface);
-            $referenced_expression = $expr->getTargetExpression(
-              $expr->targetsMultipleBundles() ? $referenced_entity : NULL
-            );
-            $evaluated_references[$delta] = self::evaluate($referenced_entity, $referenced_expression, $is_required);
+            
+            // If the expression targets multiple bundles, get the bundle-specific
+            // target expression and check if this entity's bundle matches.
+            if ($targets_multiple_bundles) {
+              $referenced_expression = $expr->getTargetExpression($referenced_entity);
+              // Check if the expression's host entity definition matches this entity's bundle.
+              $target_host_def = $referenced_expression->getHostEntityDataDefinition();
+              $target_bundles = $target_host_def->getBundles();
+              $entity_bundle = $referenced_entity->bundle();
+              
+              // Skip entities that don't match the targeted bundle.
+              if ($target_bundles !== NULL && !in_array($entity_bundle, $target_bundles, TRUE)) {
+                continue;
+              }
+            }
+            else {
+              $referenced_expression = $expr->getTargetExpression(NULL);
+            }
+            
+            $result = self::evaluate($referenced_entity, $referenced_expression, $is_required);
+            
+            // If the result value is an array (from nested multi-cardinality traversal),
+            // flatten it into the parent results array.
+            if (is_array($result->value)) {
+              foreach ($result->value as $nested_value) {
+                $evaluated_references[] = $nested_value;
+              }
+            }
+            else {
+              $evaluated_references[] = $result;
+            }
           }
           return new EvaluationResult($evaluated_references, $referencer_result);
         })(),

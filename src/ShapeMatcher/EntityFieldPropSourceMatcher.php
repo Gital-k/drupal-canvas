@@ -19,6 +19,7 @@ use Drupal\Component\Assertion\Inspector;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Cache\CacheBackendInterface;
 use Drupal\Core\Entity\EntityFieldManagerInterface;
+use Drupal\Core\Entity\EntityTypeBundleInfoInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\Plugin\DataType\ConfigEntityAdapter;
 use Drupal\Core\Entity\Plugin\DataType\EntityAdapter;
@@ -165,6 +166,7 @@ final class EntityFieldPropSourceMatcher {
     private readonly CacheBackendInterface $cache,
     #[Autowire(service: 'file.mime_type.guesser.extension')]
     private readonly ExtensionMimeTypeGuesser|LazyExtensionMimeTypeGuesser $extensionMimeTypeGuesser,
+    private readonly \Drupal\Core\Entity\EntityTypeBundleInfoInterface $entityTypeBundleInfo,
   ) {}
 
   /**
@@ -553,7 +555,21 @@ final class EntityFieldPropSourceMatcher {
         //    would be visible, or they'd need to be able to pick specific
         //    values.
         if (!($field_cardinality > 1 && $cardinality_in_json_schema > $field_cardinality)) {
-          continue;
+          // Exception: allow entity reference fields to be traversed regardless
+          // of cardinality mismatch when we have recursion depth remaining.
+          // This enables matching fields on referenced entities (e.g., paragraph
+          // fields) even when the ER field itself has unlimited cardinality.
+          // The ER field is not being matched — it's being traversed.
+          $is_entity_reference_field = FALSE;
+          foreach ($this->recurseDataDefinitionInterface($field_definition) as $property_definition) {
+            if ($property_definition instanceof DataReferenceDefinitionInterface && is_a($property_definition->getClass(), EntityReference::class, TRUE)) {
+              $is_entity_reference_field = TRUE;
+              break;
+            }
+          }
+          if (!($is_entity_reference_field && $levels_to_recurse > 0)) {
+            continue;
+          }
         }
       }
       $properties = $this->recurseDataDefinitionInterface($field_definition);
@@ -626,7 +642,18 @@ final class EntityFieldPropSourceMatcher {
             // $target, and hence repeat the same process as above — but exclude
             // base fields that are re-matched.
             // @see \Drupal\Core\Entity\TypedData\EntityDataDefinition::getPropertyDefinitions()
-            $target_bundles = $field_definition->getItemDefinition()->getSettings()['handler_settings']['target_bundles'] ?? [];
+            $handler_settings = $field_definition->getItemDefinition()->getSettings()['handler_settings'] ?? [];
+            $target_bundles = $handler_settings['target_bundles'] ?? [];
+            $negate = $handler_settings['negate'] ?? FALSE;
+            
+            // If negate is TRUE, the target_bundles list is a deny list.
+            // Invert it to get the actual allowed bundles.
+            if ($negate && count($target_bundles) > 0) {
+              $target_entity_type_id = $target->getEntityTypeId();
+              $all_bundles = array_keys($this->entityTypeBundleInfo->getBundleInfo($target_entity_type_id));
+              $target_bundles = array_diff($all_bundles, $target_bundles);
+            }
+            
             if (count($target_bundles) > 0) {
               $base_field_names = \array_keys($target->getPropertyDefinitions());
               foreach ($target_bundles as $target_bundle) {
@@ -834,9 +861,9 @@ final class EntityFieldPropSourceMatcher {
       JsonSchemaType::String => match ($schema['format'] ?? NULL) {
         JsonSchemaStringFormat::Uri->value, JsonSchemaStringFormat::UriReference->value => 2,
         JsonSchemaStringFormat::Iri->value, JsonSchemaStringFormat::IriReference->value => 2,
-        default => 1,
+        default => 2,
       },
-      default => 1,
+      default => 2,
     };
     $entity_data_definition = EntityDataDefinition::createFromDataType("entity:$host_entity_type:$host_entity_bundle");
     $matches = $this->matchEntityProps($entity_data_definition, $levels_to_recurse, $primitive_type, $is_required_in_json_schema, $schema);
