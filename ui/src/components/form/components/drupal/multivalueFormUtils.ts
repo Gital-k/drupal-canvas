@@ -92,6 +92,17 @@ export const triggerDrupalRemoveButton = (
       'input[type="submit"][data-once="drupal-ajax"]',
     ) as HTMLElement | null;
     if (removeButton) {
+      // eslint-disable-next-line no-console
+      console.log('[canvas:remove] found remove button', {
+        id: removeButton.id,
+        name: (removeButton as HTMLInputElement).name,
+        disabled: (removeButton as HTMLInputElement).disabled,
+        dataOnce: removeButton.getAttribute('data-once'),
+        drupalAjaxEntry: (window as any).drupalSettings?.ajax?.[
+          removeButton.id
+        ],
+        jQueryEvents: (window as any).jQuery?.(removeButton).data?.('events'),
+      });
       // Dispatch mousedown first (some Drupal AJAX handlers listen for it),
       // then click — mirroring what Drupal's AJAX system expects.
       const mousedownEvent = new MouseEvent('mousedown', {
