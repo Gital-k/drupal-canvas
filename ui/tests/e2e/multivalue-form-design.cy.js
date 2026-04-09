@@ -410,6 +410,192 @@ describe('Multivalue Form Design (canvas_dev_mode)', () => {
     cy.get('[role="dialog"][data-state="open"]').should('not.exist');
   });
 
+  /**
+   * Helper to type in a number field row's popover.
+   */
+  const typeInNumberRow = (fieldAlias, rowIndex, value) => {
+    cy.get(fieldAlias)
+      .find('tbody tr')
+      .eq(rowIndex)
+      .find('[class*="_listItem_"]')
+      .click();
+    cy.get('[role="dialog"][data-state="open"]')
+      .find('input[type="number"]')
+      .clear();
+    cy.get('[role="dialog"][data-state="open"]')
+      .find('input[type="number"]')
+      .type(value);
+    cy.get('[role="dialog"][data-state="open"]')
+      .find('input[type="number"]')
+      .type('{enter}');
+    cy.get('[role="dialog"][data-state="open"]').should('not.exist');
+  };
+
+  /**
+   * Helper to remove a row via the popover Remove button.
+   */
+  const removeRow = (fieldAlias, rowIndex) => {
+    cy.get(fieldAlias)
+      .find('tbody tr')
+      .eq(rowIndex)
+      .find('[class*="_listItem_"]')
+      .click();
+    cy.get('[role="dialog"][data-state="open"]').should('be.visible');
+    cy.get('[role="dialog"][data-state="open"]')
+      .findByRole('button', { name: /Remove/i })
+      .click();
+    cy.get('[role="dialog"][data-state="open"]').should('not.exist');
+    cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
+    cy.waitForAjax();
+  };
+
+  it('can remove items one at a time after a page refresh', () => {
+    cy.loadURLandWaitForCanvasLoaded({ url: 'canvas/editor/node/2' });
+    cy.findByTestId('canvas-page-data-form').as('entityForm');
+    cy.get('@entityForm').recordFormBuildId();
+
+    const entityFormSelector = '[data-testid="canvas-page-data-form"]';
+
+    cy.findByRole('heading', { name: 'Canvas Unlimited Number' })
+      .parents('.js-form-wrapper')
+      .as('unlimited-number');
+
+    const waitForPreview = () => {
+      cy.intercept({
+        url: '**/canvas/api/v0/layout/node/2',
+        times: 1,
+        method: 'POST',
+      }).as('updatePreview');
+      cy.get(document.activeElement).blur();
+      cy.wait('@updatePreview');
+    };
+
+    // Add two more items so we have 3 total (default value 3 + two new ones).
+    typeInNumberRow('@unlimited-number', 1, '4');
+    waitForPreview();
+
+    cy.get('@unlimited-number')
+      .findByRole('button', { name: '+ Add new' })
+      .click();
+    cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
+    cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
+
+    typeInNumberRow('@unlimited-number', 2, '5');
+
+    // Wait for auto-save to persist before reloading.
+    cy.intercept({
+      url: '**/canvas/api/v0/layout/node/2',
+      method: 'POST',
+    }).as('finalPreview');
+    cy.get(document.activeElement).blur();
+    cy.wait('@finalPreview');
+    cy.waitForAjax();
+
+    cy.get('@unlimited-number').find('tbody tr').should('have.length', 3);
+
+    // Reload the page — this is the scenario the fix addresses.
+    cy.reload();
+    cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
+
+    cy.findByRole('heading', { name: 'Canvas Unlimited Number' })
+      .parents('.js-form-wrapper')
+      .as('unlimited-number');
+
+    // After reload, auto-save should restore 3 items + 1 empty trailing row.
+    cy.get('@unlimited-number').find('tbody tr').should('have.length', 4);
+
+    // Remove the third item (value '5').
+    removeRow('@unlimited-number', 2);
+    cy.get('@unlimited-number').find('tbody tr').should('have.length', 3);
+
+    // Remove the second item (value '4').
+    removeRow('@unlimited-number', 1);
+    cy.get('@unlimited-number').find('tbody tr').should('have.length', 2);
+
+    // Remove the first item (value '3').
+    removeRow('@unlimited-number', 0);
+    cy.get('@unlimited-number').find('tbody tr').should('have.length', 1);
+  });
+
+  it('can add a new item after a page refresh', () => {
+    cy.loadURLandWaitForCanvasLoaded({ url: 'canvas/editor/node/2' });
+    cy.findByTestId('canvas-page-data-form').as('entityForm');
+    cy.get('@entityForm').recordFormBuildId();
+
+    const entityFormSelector = '[data-testid="canvas-page-data-form"]';
+
+    cy.findByRole('heading', { name: 'Canvas Unlimited Number' })
+      .parents('.js-form-wrapper')
+      .as('unlimited-number');
+
+    const waitForPreview = () => {
+      cy.intercept({
+        url: '**/canvas/api/v0/layout/node/2',
+        times: 1,
+        method: 'POST',
+      }).as('updatePreview');
+      cy.get(document.activeElement).blur();
+      cy.wait('@updatePreview');
+    };
+
+    // Add two more items so we have 3 total.
+    typeInNumberRow('@unlimited-number', 1, '4');
+    waitForPreview();
+
+    cy.get('@unlimited-number')
+      .findByRole('button', { name: '+ Add new' })
+      .click();
+    cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
+    cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
+
+    typeInNumberRow('@unlimited-number', 2, '5');
+
+    // Wait for auto-save to persist before reloading.
+    cy.intercept({
+      url: '**/canvas/api/v0/layout/node/2',
+      method: 'POST',
+    }).as('finalPreview');
+    cy.get(document.activeElement).blur();
+    cy.wait('@finalPreview');
+    cy.waitForAjax();
+
+    cy.get('@unlimited-number').find('tbody tr').should('have.length', 3);
+
+    // Reload the page.
+    cy.reload();
+    cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
+
+    cy.findByRole('heading', { name: 'Canvas Unlimited Number' })
+      .parents('.js-form-wrapper')
+      .as('unlimited-number');
+
+    // After reload, auto-save should restore 3 items + 1 empty trailing row.
+    cy.get('@unlimited-number').find('tbody tr').should('have.length', 4);
+
+    // Add a new item — this is the scenario the fix addresses.
+    cy.get('@unlimited-number')
+      .findByRole('button', { name: '+ Add new' })
+      .click();
+    cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
+    cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
+
+    // Should now have 4 items + 1 empty trailing row.
+    cy.get('@unlimited-number').find('tbody tr').should('have.length', 5);
+
+    typeInNumberRow('@unlimited-number', 3, '6');
+    waitForPreview();
+    cy.waitForAjax();
+
+    // Verify all four values are present.
+    cy.get('@unlimited-number')
+      .find('[class*="_itemText_"]')
+      .should('have.length', 5);
+    verifyRowText('@unlimited-number', 0, '3');
+    verifyRowText('@unlimited-number', 1, '4');
+    verifyRowText('@unlimited-number', 2, '5');
+    verifyRowText('@unlimited-number', 3, '6');
+  });
+
   it('popover discards uncommitted changes when closed without Enter', () => {
     cy.loadURLandWaitForCanvasLoaded({ url: 'canvas/editor/node/2' });
     cy.findByTestId('canvas-page-data-form').as('entityForm');

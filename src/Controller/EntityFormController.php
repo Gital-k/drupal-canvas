@@ -91,7 +91,7 @@ final class EntityFormController extends ControllerBase {
 
     $form_state = $this->buildFormState($form, $form_entity, $entity_form_mode);
 
-    // On a cold-cache add-more POST, items_count gets initialised from
+    // On a cold-cache add-more POST, items_count gets initialized from
     // count($items) on the DB entity — too low when auto-save has more items.
     // We cannot swap the entity (that corrupts rendered field default values).
     // Instead, count the submitted deltas directly from the POST data.
