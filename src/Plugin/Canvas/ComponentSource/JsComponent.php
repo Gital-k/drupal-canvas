@@ -421,7 +421,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
    * prop_field_definitions from the auto-saved JavaScriptComponent.
    * Called lazily on first form-related method invocation; no-ops thereafter.
    */
-  private function ensureAutoSaveAppliedForFormBuilding(): void {
+  private function ensureAutoSaveVersionExists(): void {
     if ($this->autoSaveApplied) {
       return;
     }
@@ -496,7 +496,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
    * {@inheritdoc}
    */
   public function clientModelToInput(string $component_instance_uuid, Component $component, array $client_model, ?FieldableEntityInterface $host_entity, ?ConstraintViolationListInterface $violations = NULL): array {
-    $this->ensureAutoSaveAppliedForFormBuilding();
+    $this->ensureAutoSaveVersionExists();
     return parent::clientModelToInput($component_instance_uuid, $component, $client_model, $host_entity, $violations);
   }
 
@@ -512,7 +512,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
     ?EntityInterface $entity = NULL,
     array $settings = [],
   ): array {
-    $this->ensureAutoSaveAppliedForFormBuilding();
+    $this->ensureAutoSaveVersionExists();
     if ($this->autoSavePropFieldDefinitions !== NULL) {
       $settings['prop_field_definitions'] = $this->autoSavePropFieldDefinitions;
       // For new props that exist in auto-save but not in the published version
@@ -534,7 +534,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
    * {@inheritdoc}
    */
   public function getExplicitInput(string $uuid, ComponentTreeItem $item, ?FieldableEntityInterface $host_entity = NULL): array {
-    $this->ensureAutoSaveAppliedForFormBuilding();
+    $this->ensureAutoSaveVersionExists();
     return parent::getExplicitInput($uuid, $item, $host_entity);
   }
 
@@ -542,7 +542,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
    * {@inheritdoc}
    */
   public function inputToClientModel(array $explicit_input): array {
-    $this->ensureAutoSaveAppliedForFormBuilding();
+    $this->ensureAutoSaveVersionExists();
     return parent::inputToClientModel($explicit_input);
   }
 
@@ -550,7 +550,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
    * {@inheritdoc}
    */
   public function optimizeExplicitInput(array $values): array {
-    $this->ensureAutoSaveAppliedForFormBuilding();
+    $this->ensureAutoSaveVersionExists();
     return parent::optimizeExplicitInput($values);
   }
 
@@ -558,7 +558,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
    * {@inheritdoc}
    */
   public function validateComponentInput(array $inputValues, string $component_instance_uuid, ?FieldableEntityInterface $entity): ConstraintViolationListInterface {
-    $this->ensureAutoSaveAppliedForFormBuilding();
+    $this->ensureAutoSaveVersionExists();
     return parent::validateComponentInput($inputValues, $component_instance_uuid, $entity);
   }
 
@@ -566,7 +566,7 @@ final class JsComponent extends GeneratedFieldExplicitInputUxComponentSourceBase
    * {@inheritdoc}
    */
   public function getClientSideInfo(Component $component): array {
-    $this->ensureAutoSaveAppliedForFormBuilding();
+    $this->ensureAutoSaveVersionExists();
     // When auto_save is the active version (set by hook_entity_load),
     // parent::getClientSideInfo naturally reads auto_save settings and
     // normalizeForClientSide() naturally returns version: 'auto_save'.
