@@ -26,24 +26,13 @@ services:
       - { name: module_install.uninstall_validator }
   canvas_template_renderer:
     class: Drupal\canvas\Render\MainContent\CanvasTemplateRenderer
-    arguments:
-      $cssCollectionRenderer: '@asset.css.collection_renderer'
-      $jsCollectionRenderer: '@asset.js.collection_renderer'
     tags:
       - { name: render.main_content_renderer, format: canvas_template }
   Drupal\canvas\Render\MainContent\CanvasPreviewRenderer: { }
   Drupal\canvas\ComponentSource\ComponentSourceManager:
     parent: default_plugin_manager
-    arguments:
-      $reasonRepository: '@Drupal\canvas\ComponentIncompatibilityReasonRepository'
-      $classResolver: '@Drupal\Core\DependencyInjection\ClassResolverInterface'
-      $configInstaller: '@Drupal\Core\Config\ConfigInstallerInterface'
-      $kernel: '@kernel'
     public: true
   Drupal\canvas\Extension\CanvasExtensionPluginManager:
-    arguments:
-      - '@cache.discovery'
-      - '@module_handler'
     public: true
 
   # Shape matching.
@@ -83,25 +72,18 @@ services:
   # Cache contexts.
   cache_context.route.name.is_canvas_editor_ui:
     class: Drupal\canvas\Cache\CanvasEditorUiCacheContext
-    arguments: ['@current_route_match']
     tags:
       - { name: cache.context }
 
   # Event subscribers.
   canvas.openapi.http_request_validator.subscriber:
     class: Drupal\canvas\EventSubscriber\ApiRequestValidator
-    arguments:
-      $logger: '@logger.channel.canvas'
-      $appRoot: '%app.root%'
     calls:
       - [setValidatorBuilder, []]
     tags:
       - { name: event_subscriber }
   canvas.openapi.http_response_validator.subscriber:
     class: Drupal\canvas\EventSubscriber\ApiResponseValidator
-    arguments:
-      $logger: '@logger.channel.canvas'
-      $appRoot: '%app.root%'
     calls:
       - [setValidatorBuilder, []]
     tags:

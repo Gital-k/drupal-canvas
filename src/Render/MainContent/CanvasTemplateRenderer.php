@@ -8,6 +8,7 @@ use Drupal\Component\Utility\NestedArray;
 use Drupal\Component\Utility\UrlHelper;
 use Drupal\Core\Asset\AssetCollectionRendererInterface;
 use Drupal\Core\Asset\AssetResolverInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Core\Render\ElementInfoManagerInterface;
@@ -43,7 +44,9 @@ final class CanvasTemplateRenderer implements MainContentRendererInterface {
     protected ElementInfoManagerInterface $element_info_manager,
     protected RendererInterface $renderer,
     protected AssetResolverInterface $assetResolver,
+    #[Autowire(service: 'asset.css.collection_renderer')]
     protected AssetCollectionRendererInterface $cssCollectionRenderer,
+    #[Autowire(service: 'asset.js.collection_renderer')]
     protected AssetCollectionRendererInterface $jsCollectionRenderer,
     protected RequestStack $requestStack,
     protected ModuleHandlerInterface $moduleHandler,

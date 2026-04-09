@@ -8,6 +8,7 @@ use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
 use Drupal\canvas\Validation\ConstraintPropertyPathTranslatorTrait;
 use Drupal\Component\Uuid\UuidInterface;
 use Drupal\Core\Validation\BasicRecursiveValidatorFactory;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * Service for validating AI-generated component structures.
@@ -27,6 +28,7 @@ class AiResponseValidator {
    */
   public function __construct(
     protected readonly BasicRecursiveValidatorFactory $validatorFactory,
+    #[Autowire(service: 'uuid')]
     protected readonly UuidInterface $uuidService,
   ) {
   }
