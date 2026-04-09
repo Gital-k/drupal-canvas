@@ -36,12 +36,32 @@ final class EntityFormController extends ControllerBase {
     // is for 'operation' not form mode.
     $form = $this->entityTypeManager()->getFormObject($entity_type, 'default');
     $form_entity = $entity;
-    // The form structure is fetched from Canvas via a GET request. Any
-    // subsequent updates to the form via AJAX use Drupal's standard POST
-    // request. We only want to fetch the entity from auto-save if we're
-    // requesting the original form. If the form is being updated by AJAX, the
-    // entity field values in form-state should be used instead.
-    if ($this->requestStack->getCurrentRequest()?->getMethod() === 'GET') {
+    $request = $this->requestStack->getCurrentRequest();
+    $is_get = $request?->getMethod() === 'GET';
+
+    // On a cold-cache POST triggered by a remove button, FormBuilder rebuilds
+    // the form from scratch using the route entity (DB values only). For fields
+    // with unsaved auto-save additions this produces wrong items_count — the
+    // remove button for the extra delta doesn't exist in the rebuilt form.
+    // We detect this specific case by checking both the triggering element name
+    // and whether the form cache is cold, then load the auto-save entity so
+    // items_count is initialised correctly.
+    // We intentionally do NOT do this for add-more or other triggers since those
+    // are also cold-cache on first use and must not get a different entity.
+    $is_cold_remove_post = FALSE;
+    if (!$is_get && $request?->getMethod() === 'POST') {
+      $triggering = $request->request->get('_triggering_element_name', '');
+      if (str_contains($triggering, '_remove_button')) {
+        $form_build_id = $request->request->get('form_build_id');
+        if ($form_build_id) {
+          /** @var \Drupal\Core\KeyValueStore\KeyValueExpirableFactoryInterface $kv */
+          $kv = \Drupal::service('keyvalue.expirable');
+          $is_cold_remove_post = ($kv->get('form')->get($form_build_id) === NULL);
+        }
+      }
+    }
+
+    if ($is_get || $is_cold_remove_post) {
       $autoSave = $this->autoSaveManager->getAutoSaveEntity($entity);
       if (!$autoSave->isEmpty()) {
         \assert($autoSave->entity instanceof FieldableEntityInterface);
@@ -62,9 +82,30 @@ final class EntityFormController extends ControllerBase {
         }
       }
     }
+
     $form_state = $this->buildFormState($form, $form_entity, $entity_form_mode);
 
-    return $this->formBuilder()->buildForm($form, $form_state);
+    $built_form = $this->formBuilder()->buildForm($form, $form_state);
+
+    // DEBUG: log entity source and items_count for comparison.
+    $widget_state = \Drupal\Core\Field\WidgetBase::getWidgetState(
+      [],
+      'field_cvt_unlimited_number',
+      $form_state,
+    );
+    \Drupal::logger('canvas_mv_debug')->debug(
+      '[canvas:controller] form() done. method=@method form_build_id=@id is_cached=@cached entity_source=@source field_cvt_unlimited_number items_count=@count array_parents_set=@ap',
+      [
+        '@method' => $request?->getMethod(),
+        '@id' => $built_form['#build_id'] ?? '?',
+        '@cached' => $form_state->isCached() ? 'YES' : 'NO',
+        '@source' => ($form_entity !== $entity) ? 'auto-save' : 'db-entity',
+        '@count' => $widget_state['items_count'] ?? 'N/A',
+        '@ap' => !empty($widget_state['array_parents']) ? 'YES' : 'NO',
+      ]
+    );
+
+    return $built_form;
   }
 
 }
