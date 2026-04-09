@@ -145,8 +145,7 @@ class ModuleHooks {
   }
 
   /**
-   * Implements hook_toolbar_alter().
-   */
+   * Implements hook_toolbar_alter().   */
   #[Hook('toolbar')]
   public function toolbar(): array {
     $items = [];

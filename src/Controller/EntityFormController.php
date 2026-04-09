@@ -9,6 +9,8 @@ use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Entity\RevisionableInterface;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\Core\Extension\ThemeHandlerInterface;
+use Drupal\Core\Field\FieldStorageDefinitionInterface;
+use Drupal\Core\Field\WidgetBase;
 use Symfony\Component\HttpFoundation\RequestStack;
 
 final class EntityFormController extends ControllerBase {
@@ -43,21 +45,25 @@ final class EntityFormController extends ControllerBase {
     // the form from scratch using the route entity (DB values only). For fields
     // with unsaved auto-save additions this produces wrong items_count — the
     // remove button for the extra delta doesn't exist in the rebuilt form.
-    // We detect this specific case by checking both the triggering element name
-    // and whether the form cache is cold, then load the auto-save entity so
-    // items_count is initialised correctly.
-    // We intentionally do NOT do this for add-more or other triggers since those
-    // are also cold-cache on first use and must not get a different entity.
+    // We detect this by checking the triggering element name and whether the
+    // form cache is cold, then load the auto-save entity so items_count is
+    // initialized correctly.
     $is_cold_remove_post = FALSE;
+    $is_cold_add_more_post = FALSE;
     if (!$is_get && $request?->getMethod() === 'POST') {
       $triggering = $request->request->get('_triggering_element_name', '');
-      if (str_contains($triggering, '_remove_button')) {
-        $form_build_id = $request->request->get('form_build_id');
-        if ($form_build_id) {
-          /** @var \Drupal\Core\KeyValueStore\KeyValueExpirableFactoryInterface $kv */
-          $kv = \Drupal::service('keyvalue.expirable');
-          $is_cold_remove_post = ($kv->get('form')->get($form_build_id) === NULL);
-        }
+      $form_build_id = $request->request->get('form_build_id');
+      $is_cold_cache = FALSE;
+      if ($form_build_id) {
+        /** @var \Drupal\Core\KeyValueStore\KeyValueExpirableFactoryInterface $kv */
+        $kv = \Drupal::service('keyvalue.expirable');
+        $is_cold_cache = ($kv->get('form')->get($form_build_id) === NULL);
+      }
+      if ($is_cold_cache && str_contains($triggering, '_remove_button')) {
+        $is_cold_remove_post = TRUE;
+      }
+      if ($is_cold_cache && str_contains($triggering, '_add_more')) {
+        $is_cold_add_more_post = TRUE;
       }
     }
 
@@ -85,25 +91,37 @@ final class EntityFormController extends ControllerBase {
 
     $form_state = $this->buildFormState($form, $form_entity, $entity_form_mode);
 
-    $built_form = $this->formBuilder()->buildForm($form, $form_state);
+    // On a cold-cache add-more POST, items_count gets initialised from
+    // count($items) on the DB entity — too low when auto-save has more items.
+    // We cannot swap the entity (that corrupts rendered field default values).
+    // Instead, count the submitted deltas directly from the POST data.
+    // items_count = submitted deltas - 1 because the form always renders one
+    // extra trailing empty row (delta = items_count), and addMoreSubmit will
+    // increment items_count by 1 after we set it.
+    if ($is_cold_add_more_post) {
+      $input = $request->request->all();
+      foreach ($entity->getFields() as $field_name => $field_items) {
+        $field_storage = $field_items->getFieldDefinition()->getFieldStorageDefinition();
+        if ($field_storage->getCardinality() !== FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED) {
+          continue;
+        }
+        if (!isset($input[$field_name]) || !is_array($input[$field_name])) {
+          continue;
+        }
+        $submitted_count = count(array_filter(
+          array_keys($input[$field_name]),
+          'is_numeric',
+        ));
+        // Subtract 1 for the trailing empty row that is always included.
+        $items_count = max(0, $submitted_count - 1);
+        WidgetBase::setWidgetState([], $field_name, $form_state, [
+          'items_count' => $items_count,
+          'array_parents' => [],
+        ]);
+      }
+    }
 
-    // DEBUG: log entity source and items_count for comparison.
-    $widget_state = \Drupal\Core\Field\WidgetBase::getWidgetState(
-      [],
-      'field_cvt_unlimited_number',
-      $form_state,
-    );
-    \Drupal::logger('canvas_mv_debug')->debug(
-      '[canvas:controller] form() done. method=@method form_build_id=@id is_cached=@cached entity_source=@source field_cvt_unlimited_number items_count=@count array_parents_set=@ap',
-      [
-        '@method' => $request?->getMethod(),
-        '@id' => $built_form['#build_id'] ?? '?',
-        '@cached' => $form_state->isCached() ? 'YES' : 'NO',
-        '@source' => ($form_entity !== $entity) ? 'auto-save' : 'db-entity',
-        '@count' => $widget_state['items_count'] ?? 'N/A',
-        '@ap' => !empty($widget_state['array_parents']) ? 'YES' : 'NO',
-      ]
-    );
+    $built_form = $this->formBuilder()->buildForm($form, $form_state);
 
     return $built_form;
   }
