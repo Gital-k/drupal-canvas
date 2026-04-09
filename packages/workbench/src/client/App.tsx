@@ -27,6 +27,7 @@ import {
 } from '@wb/lib/preview-client';
 import { isPreviewFrameEvent } from '@wb/lib/preview-contract';
 import { toViteFsUrl } from '@wb/lib/preview-runtime';
+import { WORKBENCH_PREVIEW_HTML_PATH } from '@wb/lib/workbench-preview-constants';
 
 import type { Spec } from '@json-render/core';
 import type {
@@ -284,8 +285,8 @@ export function App() {
         | undefined,
     ) => {
       if (payload?.reloadFrameOnly) {
-        setIsFrameReady(false);
-        setIframeKey((value) => value + 1);
+        // Source-only change: the preview iframe is a separate Vite entry; Vite HMR
+        // updates modules in place. No parent-driven remount or extra preview:render.
         return;
       }
 
@@ -380,6 +381,9 @@ export function App() {
     selectedMockIndex,
   ]);
 
+  const locationRef = useRef(location);
+  locationRef.current = location;
+
   useEffect(() => {
     const handleFrameMessage = (event: MessageEvent<unknown>) => {
       if (event.origin !== window.location.origin) {
@@ -387,6 +391,16 @@ export function App() {
       }
 
       if (!isPreviewFrameEvent(event.data)) {
+        return;
+      }
+
+      if (event.data.type === 'preview:shell-sync') {
+        const syncPath = event.data.payload.path;
+        const current =
+          locationRef.current.pathname + locationRef.current.search;
+        if (syncPath !== current) {
+          navigate(syncPath);
+        }
         return;
       }
 
@@ -404,7 +418,7 @@ export function App() {
     return () => {
       window.removeEventListener('message', handleFrameMessage);
     };
-  }, [isPageRoute]);
+  }, [navigate]);
 
   useEffect(() => {
     if (!previewManifest) {
@@ -454,6 +468,8 @@ export function App() {
     if (!frameWindow) {
       return;
     }
+
+    const shellPath = location.pathname + location.search;
 
     if (
       !isPageRoute &&
@@ -520,6 +536,7 @@ export function App() {
           spec: specToRender,
           registrySources,
           cssUrls,
+          shellPath,
         },
       };
       frameWindow.postMessage(message, window.location.origin);
@@ -543,6 +560,7 @@ export function App() {
               renderId: selectedPage.slug,
               renderType: 'page',
               spec: pageSpec,
+              shellPath,
               registrySources: discoveryResult.components
                 .filter(
                   (
@@ -593,6 +611,8 @@ export function App() {
     discoveryResult,
     isFrameReady,
     isPageRoute,
+    location.pathname,
+    location.search,
     previewManifest,
     selectedComponent,
     selectedComponentMock,
@@ -735,9 +755,9 @@ export function App() {
                 key={iframeKey}
                 ref={iframeRef}
                 title="Canvas component preview"
-                src="/__canvas/preview-frame"
+                src={WORKBENCH_PREVIEW_HTML_PATH}
                 className="h-full w-full"
-                sandbox="allow-scripts allow-same-origin"
+                sandbox="allow-scripts allow-same-origin allow-popups"
               />
             </div>
           )}
