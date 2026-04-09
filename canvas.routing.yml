@@ -10,6 +10,17 @@ canvas.api.artifacts.upload:
     _format: 'json'
     canvas_external_api: true
 
+canvas.api.artifacts.asset_path:
+  path: '/canvas/api/v0/artifacts/asset-path'
+  defaults:
+    _controller: 'Drupal\canvas\Controller\ApiArtifactController::getAssetPath'
+  requirements:
+    _canvas_authentication_required: TRUE
+  methods: [GET]
+  options:
+    _format: 'json'
+    canvas_external_api: true
+
 canvas.api.auto-save.delete:
   path: '/canvas/api/v0/auto-saves/{entity_type}/{entity}'
   defaults:

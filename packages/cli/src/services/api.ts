@@ -604,6 +604,22 @@ export class ApiService {
   }
 
   /**
+   * Get the base path for assets in Drupal.
+   * Used by the CLI to replace asset paths during JavaScript compilation.
+   */
+  async getAssetPath(): Promise<{ basePath: string; directory: string }> {
+    try {
+      const response = await this.client.get(
+        '/canvas/api/v0/artifacts/asset-path',
+      );
+      return response.data;
+    } catch (error) {
+      this.handleApiError(error);
+      throw new Error('Failed to get asset path');
+    }
+  }
+
+  /**
    * Parse Canvas API error responses into user-friendly messages.
    * Handles both structured validation errors and simple string errors.
    */

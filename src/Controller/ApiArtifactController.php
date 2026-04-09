@@ -146,4 +146,21 @@ final class ApiArtifactController extends ApiControllerBase {
     ]);
   }
 
+  /**
+   * Returns the base path for assets in Drupal.
+   *
+   * This endpoint provides the CLI with the path where assets will be
+   * accessible in Drupal, allowing the CLI to replace asset paths during
+   * JavaScript compilation.
+   */
+  public function getAssetPath(): JsonResponse {
+    $destination = BrandKit::ARTIFACTS_DIRECTORY;
+    $url = $this->fileUrlGenerator->generateString($destination);
+    
+    return new JsonResponse(data: [
+      'basePath' => $url,
+      'directory' => $destination,
+    ]);
+  }
+
 }

@@ -31,6 +31,7 @@ import {
 } from '../utils/prepare-push';
 import { reportResults } from '../utils/report-results';
 import { createProgressCallback, processInPool } from '../utils/request-pool';
+import { uploadAssets } from '../utils/upload-assets';
 
 import type { Command } from 'commander';
 import type { ApiService } from '../services/api.js';
@@ -550,6 +551,29 @@ export function pushCommand(program: Command): void {
           throw new Error('Push aborted (incomplete). Try again.');
         }
         includeGlobalCss = true;
+
+        // Step 4a: Upload assets from asset directory
+        const assetSpinner = p.spinner();
+        assetSpinner.start('Uploading assets');
+        try {
+          const assetCount = await uploadAssets(
+            config.assetDir,
+            config.outputDir,
+            apiService,
+            (current, total) => {
+              assetSpinner.message(`Uploading assets (${current}/${total})`);
+            },
+          );
+          if (assetCount > 0) {
+            assetSpinner.stop(chalk.green(`Uploaded ${assetCount} ${pluralize(assetCount, 'asset')}`));
+          } else {
+            assetSpinner.stop(chalk.dim('No assets to upload'));
+          }
+        } catch (error) {
+          assetSpinner.stop(chalk.yellow('⚠ Asset upload completed with warnings'));
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          p.log.warn(`Asset upload error: ${errorMessage}`);
+        }
 
         // Step 4b: Push fonts from canvas.brand-kit.json (when configured)
         if (config.fonts) {
