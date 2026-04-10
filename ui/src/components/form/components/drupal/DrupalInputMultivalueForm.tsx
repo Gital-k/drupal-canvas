@@ -160,6 +160,20 @@ const DrupalInputMultivalueForm = ({
         }
       }, 0);
     } else {
+      // If the input currently has a validation error, reset its DOM value
+      // back to the last committed displayValue before focus moves away.
+      // This prevents the blur handler in TextFieldAutocomplete from firing
+      // onChange with the invalid typed value, which would bypass the
+      // e.target.form guard in inputBehaviors and commit invalid data to the
+      // preview (the popover portal renders outside the Drupal form element).
+      if (popoverInputRef.current) {
+        const hasError = !!popoverInputRef.current.closest(
+          '[data-has-field-error="true"]',
+        );
+        if (hasError) {
+          popoverInputRef.current.value = displayValue;
+        }
+      }
       // Restore focus to the trigger button after closing.
       setTimeout(() => {
         if (triggerRef.current) {
