@@ -12,17 +12,19 @@ use PHPStan\Rules\RuleErrorBuilder;
 use Symfony\Component\Yaml\Yaml;
 
 /**
- * Disallows passing explicit DIC `arguments` in `.services.yml` files.
+ * Disallows explicit DIC `arguments` on autowired class-based services.
  *
- * When `_defaults.autowire: true` is set, services should rely on autowiring
- * for their constructor dependencies. Explicit `arguments` keys are only
- * allowed in specific cases:
- * - The service has `decorates` (decorators typically need `@.inner`).
- * - The service has `parent` (parent-based services may need overriding args).
- * - The service has `factory` (factory-based services may need factory args).
+ * Canvas prefers constructor autowiring for ordinary services. If a
+ * constructor parameter needs special wiring, add a `#[Autowire]` attribute to
+ * that parameter instead of wiring the service in `.services.yml`.
  *
- * This rule fires once per analyzed class that appears as an autowired service
- * with explicit `arguments` in a `.services.yml` file within the project.
+ * Decorators are exempt because they commonly need `@.inner`, and factory
+ * definitions are exempt because their arguments do not map cleanly to
+ * constructor autowiring.
+ *
+ * This rule fires once per analyzed class that appears as an autowired
+ * class-based service with explicit `arguments` in a `.services.yml` file
+ * within the project.
  *
  * @implements Rule<InClassNode>
  */
@@ -71,7 +73,7 @@ final class NoExplicitServiceArgumentsRule implements Rule {
     return [
       RuleErrorBuilder::message(
         \sprintf(
-          'Service "%s" in %s has explicit "arguments" but autowiring is enabled. Remove the "arguments" key and let autowiring resolve dependencies. If a parameter cannot be autowired, use a #[AutowireService] or #[Autowire] attribute on the constructor parameter.',
+          'Service "%s" in %s has explicit "arguments" but autowiring is enabled. Remove the "arguments" key and let autowiring resolve dependencies. If a parameter needs special wiring, use a #[Autowire] attribute on that constructor parameter instead.',
           $violation['service_id'],
           $violation['file'],
         )
@@ -139,12 +141,7 @@ final class NoExplicitServiceArgumentsRule implements Rule {
 
     $services = $parsed['services'];
     $defaults = $services['_defaults'] ?? [];
-
-    // Only check files that have autowire enabled in _defaults.
-    $autowireEnabled = !empty($defaults['autowire']);
-    if (!$autowireEnabled) {
-      return;
-    }
+    $defaultAutowireEnabled = !empty($defaults['autowire']);
 
     $relativePath = \str_starts_with($filePath, $this->servicesYmlRootDir)
       ? \ltrim(\substr($filePath, \strlen($this->servicesYmlRootDir)), '/')
@@ -159,8 +156,8 @@ final class NoExplicitServiceArgumentsRule implements Rule {
         continue;
       }
 
-      // Skip if the service explicitly sets autowire: false.
-      if (isset($definition['autowire']) && $definition['autowire'] === FALSE) {
+      $autowireEnabled = $definition['autowire'] ?? $defaultAutowireEnabled;
+      if (!$autowireEnabled) {
         continue;
       }
 
@@ -176,9 +173,15 @@ final class NoExplicitServiceArgumentsRule implements Rule {
         continue;
       }
 
-      // Determine the class: it's either the explicit `class` key or the
-      // service ID itself (when using FQCN-based service IDs).
-      $class = $definition['class'] ?? $serviceId;
+      if (isset($definition['class']) && \is_string($definition['class'])) {
+        $class = $definition['class'];
+      }
+      elseif (self::looksLikeClassName($serviceId)) {
+        $class = $serviceId;
+      }
+      else {
+        continue;
+      }
 
       // Normalize: strip leading backslash.
       $class = \ltrim($class, '\\');
@@ -188,6 +191,10 @@ final class NoExplicitServiceArgumentsRule implements Rule {
         'service_id' => $serviceId,
       ];
     }
+  }
+
+  private static function looksLikeClassName(string $serviceId): bool {
+    return str_contains($serviceId, '\\');
   }
 
 }

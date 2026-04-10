@@ -34,7 +34,7 @@ use Symfony\Component\HttpFoundation\Request;
 class CanvasOauthAuthenticationProvider implements AuthenticationProviderInterface {
 
   public function __construct(
-    #[Autowire(service: '@simple_oauth.authentication.simple_oauth')]
+    #[Autowire(service: 'simple_oauth.authentication.simple_oauth')]
     private readonly SimpleOauthAuthenticationProvider $simpleOauthAuthenticationProvider,
   ) {}
 
