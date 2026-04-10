@@ -12,7 +12,7 @@ export function CanvasTemplatesMixin<TBase extends Constructor<CanvasBase>>(
      * Templates *
      *************/
     async addTemplate(
-      contentType: string,
+      bundle: string,
       template: string,
       entityType = 'Content',
     ) {
@@ -28,9 +28,9 @@ export function CanvasTemplatesMixin<TBase extends Constructor<CanvasBase>>(
       }
       await this.page.locator('#content-type').click();
       await expect(
-        this.page.getByRole('option', { name: contentType }),
+        this.page.getByRole('option', { name: bundle }),
       ).toBeVisible();
-      await this.page.getByRole('option', { name: contentType }).click();
+      await this.page.getByRole('option', { name: bundle }).click();
       await this.page.locator('#template-name').click();
       await expect(
         this.page.getByRole('option', { name: template }),
