@@ -16,6 +16,7 @@ export interface PreviewBuildCliArgs {
   inputPath: string;
   pretty: boolean;
   outDir: string;
+  splitFiles: boolean;
 }
 
 export interface PreviewBuildPayload {
@@ -27,8 +28,8 @@ export interface PreviewBuildPayload {
   outDir: string | null;
   files: {
     indexHtml: string;
-    javascript: string;
-    css: string;
+    javascript: string | null;
+    css: string | null;
   } | null;
   warnings: PreviewDataIssue[];
   errors: PreviewDataIssue[];
@@ -39,6 +40,7 @@ interface BuildPreviewArtifactOptions {
   inputPath: string;
   projectRoot: string;
   outDir: string;
+  splitFiles: boolean;
 }
 
 interface BuildPreviewArtifactDependencies {
@@ -92,6 +94,7 @@ export function parsePreviewBuildArgs(
 ): { ok: true; value: PreviewBuildCliArgs } | { ok: false; error: string } {
   const forwardedArgs: string[] = [];
   let outDir: string | null = null;
+  let splitFiles = false;
 
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
@@ -104,6 +107,11 @@ export function parsePreviewBuildArgs(
 
       outDir = next;
       index += 1;
+      continue;
+    }
+
+    if (argument === '--split-files') {
+      splitFiles = true;
       continue;
     }
 
@@ -128,6 +136,7 @@ export function parsePreviewBuildArgs(
       inputPath: parsed.value.inputPath,
       pretty: parsed.value.pretty,
       outDir,
+      splitFiles,
     },
   };
 }
@@ -211,15 +220,10 @@ export async function buildPreviewArtifact(
     });
   }
 
-  const bootstrapScript = extractInlineScript(
-    previewDataPayload.iframeHtml,
-    'data-canvas-preview-bootstrap',
-  );
   const runtimeScript = extractInlineScript(
     previewDataPayload.iframeHtml,
     'data-canvas-preview-runtime',
   );
-
   if (!runtimeScript) {
     return toPayload(request, {
       ok: false,
@@ -237,16 +241,53 @@ export async function buildPreviewArtifact(
     });
   }
 
-  const javascript = [bootstrapScript, runtimeScript]
-    .filter((script): script is string => Boolean(script))
-    .join('\n');
-  const css = previewDataPayload.css;
-  const indexHtml = buildPreviewArtifactIndexHtml();
-
   await fs.rm(outputDirectory, { recursive: true, force: true });
   await fs.mkdir(outputDirectory, { recursive: true });
-
   const indexHtmlPath = path.join(outputDirectory, 'index.html');
+
+  if (!options.splitFiles) {
+    await fs.writeFile(indexHtmlPath, previewDataPayload.iframeHtml, 'utf-8');
+
+    return toPayload(request, {
+      ok: true,
+      target: previewDataPayload.target,
+      spec: previewDataPayload.spec,
+      outDir: outputDirectory,
+      files: {
+        indexHtml: indexHtmlPath,
+        javascript: null,
+        css: null,
+      },
+      warnings: previewDataPayload.warnings,
+      errors: [],
+    });
+  }
+
+  const bootstrapScript = extractInlineScript(
+    previewDataPayload.iframeHtml,
+    'data-canvas-preview-bootstrap',
+  );
+
+  if (!bootstrapScript) {
+    return toPayload(request, {
+      ok: false,
+      target: previewDataPayload.target,
+      spec: previewDataPayload.spec,
+      outDir: outputDirectory,
+      warnings: previewDataPayload.warnings,
+      errors: [
+        ...previewDataPayload.errors,
+        toIssue(
+          'artifact_build_failed',
+          'Missing bootstrap script in preview iframe HTML.',
+        ),
+      ],
+    });
+  }
+
+  const javascript = [bootstrapScript, runtimeScript].join('\n');
+  const css = previewDataPayload.css;
+  const indexHtml = buildPreviewArtifactIndexHtml();
   const jsPath = path.join(outputDirectory, 'preview.js');
   const cssPath = path.join(outputDirectory, 'preview.css');
 
@@ -295,6 +336,7 @@ export async function runPreviewBuildCli(argv: string[]): Promise<number> {
     inputPath: parsed.value.inputPath,
     projectRoot: process.cwd(),
     outDir: parsed.value.outDir,
+    splitFiles: parsed.value.splitFiles,
   });
 
   const serialized = parsed.value.pretty
