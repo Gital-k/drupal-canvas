@@ -25,6 +25,27 @@ Then run it from your project root:
 npx canvas-workbench
 ```
 
+## Preview data command
+
+Workbench includes a one-shot command for external preview consumers:
+
+```bash
+npx canvas-workbench preview-data --component-path components/card/component.yml
+```
+
+```bash
+npx canvas-workbench preview-data --page-path pages/home.json
+```
+
+The command prints one JSON payload to stdout with:
+
+- `spec` for the selected component or page.
+- `css` as raw CSS text.
+- `iframeHtml` as a self-contained interactive HTML document with CSS inlined.
+- `renderMode` (`interactive`) and structured warnings/errors.
+
+Use `--pretty` to print formatted JSON.
+
 The `canvas-workbench` binary starts the packaged Workbench Vite runtime in your
 current working directory.
 
