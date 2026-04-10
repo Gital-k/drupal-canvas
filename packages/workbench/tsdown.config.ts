@@ -47,7 +47,7 @@ export default defineConfig({
     ],
   },
   dts: false,
-  entry: ['vite.published.config.ts'],
+  entry: ['vite.published.config.ts', 'src/server/preview-data.ts'],
   format: ['es'],
   hooks: {
     async 'build:done'(ctx) {
