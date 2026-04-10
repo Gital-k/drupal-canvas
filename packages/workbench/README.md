@@ -48,7 +48,8 @@ Use `--pretty` to print formatted JSON.
 
 ## Preview build command
 
-Workbench can also export a standalone preview artifact directory:
+Workbench can also export a standalone preview artifact directory. By default,
+it writes one fully self-contained `index.html`:
 
 ```bash
 npx canvas-workbench preview-build --component-path components/card/component.yml --out-dir .canvas-preview/card
@@ -58,9 +59,19 @@ npx canvas-workbench preview-build --component-path components/card/component.ym
 npx canvas-workbench preview-build --page-path pages/home.json --out-dir .canvas-preview/home
 ```
 
-The command writes:
+Default output writes:
 
-- `index.html`
+- `index.html` (self-contained, with CSS and runtime JS inlined)
+
+Use `--split-files` when you want separate files:
+
+```bash
+npx canvas-workbench preview-build --component-path components/card/component.yml --out-dir .canvas-preview/card --split-files
+```
+
+Split output writes:
+
+- `index.html` (shell)
 - `preview.js`
 - `preview.css`
 
@@ -68,9 +79,9 @@ It also prints one JSON payload to stdout with `request`, `target`, `spec`,
 `renderMode` (`interactive`), `outDir`, output file paths, plus warnings and
 errors.
 
-`preview.js` and `preview.css` are generated from the same interactive runtime
-used by `preview-data`, and local asset imports (for example fonts and images)
-are bundled inline into those files.
+Both output modes are generated from the same interactive runtime used by
+`preview-data`. Local asset imports (for example fonts and images) are bundled
+inline into the output.
 
 The `canvas-workbench` binary starts the packaged Workbench Vite runtime in your
 current working directory.

@@ -43,7 +43,9 @@ function makePreviewDataPayload(
     },
     css: '.card{color:red;}',
     iframeHtml: [
-      '<!doctype html><html><body>',
+      '<!doctype html><html><head>',
+      '<style data-canvas-preview-css>.card{color:red;}</style>',
+      '</head><body>',
       '<script data-canvas-preview-bootstrap>window.bootstrap=true;</script>',
       '<script data-canvas-preview-runtime>window.runtime=true;</script>',
       '</body></html>',
@@ -81,6 +83,25 @@ describe('preview-build', () => {
         inputPath: 'components/card/component.yml',
         outDir: '.canvas-preview',
         pretty: true,
+        splitFiles: false,
+      },
+    });
+
+    const splitModeArgs = parsePreviewBuildArgs([
+      '--component-path',
+      'components/card/component.yml',
+      '--out-dir',
+      '.canvas-preview',
+      '--split-files',
+    ]);
+    expect(splitModeArgs).toEqual({
+      ok: true,
+      value: {
+        mode: 'component',
+        inputPath: 'components/card/component.yml',
+        outDir: '.canvas-preview',
+        pretty: false,
+        splitFiles: true,
       },
     });
 
@@ -100,7 +121,7 @@ describe('preview-build', () => {
     expect(extractInlineScript(html, 'data-canvas-preview-runtime')).toBeNull();
   });
 
-  it('writes index.html, preview.js, and preview.css', async () => {
+  it('writes a self-contained index.html by default', async () => {
     const projectRoot = await makeTemporaryDirectory();
     const outDir = '.canvas-preview';
 
@@ -110,6 +131,7 @@ describe('preview-build', () => {
         inputPath: 'components/card/component.yml',
         projectRoot,
         outDir,
+        splitFiles: false,
       },
       {
         buildPreviewDataPayload: async () => makePreviewDataPayload(),
@@ -125,6 +147,53 @@ describe('preview-build', () => {
     expect(outputPaths.indexHtml).toBe(
       path.join(outputDirectory, 'index.html'),
     );
+    expect(outputPaths.javascript).toBeNull();
+    expect(outputPaths.css).toBeNull();
+
+    const [indexHtml, jsFileCheck, cssFileCheck] = await Promise.all([
+      fs.readFile(outputPaths.indexHtml, 'utf-8'),
+      fs.access(path.join(outputDirectory, 'preview.js')).then(
+        () => 'exists',
+        () => 'missing',
+      ),
+      fs.access(path.join(outputDirectory, 'preview.css')).then(
+        () => 'exists',
+        () => 'missing',
+      ),
+    ]);
+
+    expect(indexHtml).toContain('<style data-canvas-preview-css>');
+    expect(indexHtml).toContain('window.bootstrap=true;');
+    expect(indexHtml).toContain('window.runtime=true;');
+    expect(jsFileCheck).toBe('missing');
+    expect(cssFileCheck).toBe('missing');
+  });
+
+  it('writes split files when --split-files is enabled', async () => {
+    const projectRoot = await makeTemporaryDirectory();
+    const outDir = '.canvas-preview';
+
+    const payload = await buildPreviewArtifact(
+      {
+        mode: 'component',
+        inputPath: 'components/card/component.yml',
+        projectRoot,
+        outDir,
+        splitFiles: true,
+      },
+      {
+        buildPreviewDataPayload: async () => makePreviewDataPayload(),
+      },
+    );
+
+    expect(payload.ok).toBe(true);
+    expect(payload.files).not.toBeNull();
+
+    const outputDirectory = path.resolve(projectRoot, outDir);
+    const outputPaths = payload.files!;
+    expect(outputPaths.indexHtml).toBe(
+      path.join(outputDirectory, 'index.html'),
+    );
     expect(outputPaths.javascript).toBe(
       path.join(outputDirectory, 'preview.js'),
     );
@@ -132,8 +201,8 @@ describe('preview-build', () => {
 
     const [indexHtml, javascript, css] = await Promise.all([
       fs.readFile(outputPaths.indexHtml, 'utf-8'),
-      fs.readFile(outputPaths.javascript, 'utf-8'),
-      fs.readFile(outputPaths.css, 'utf-8'),
+      fs.readFile(outputPaths.javascript!, 'utf-8'),
+      fs.readFile(outputPaths.css!, 'utf-8'),
     ]);
 
     expect(indexHtml).toContain(
@@ -156,6 +225,7 @@ describe('preview-build', () => {
         inputPath: 'components/card/component.yml',
         projectRoot,
         outDir: '.canvas-preview',
+        splitFiles: false,
       },
       {
         buildPreviewDataPayload: async () =>
@@ -183,6 +253,7 @@ describe('preview-build', () => {
         inputPath: 'components/card/component.yml',
         projectRoot,
         outDir: '.canvas-preview',
+        splitFiles: false,
       },
       {
         buildPreviewDataPayload: async () =>
@@ -207,6 +278,7 @@ describe('preview-build', () => {
         inputPath: 'components/card/component.yml',
         projectRoot,
         outDir: '.canvas-preview',
+        splitFiles: false,
       },
       {
         buildPreviewDataPayload: async () =>
