@@ -63,6 +63,10 @@ const DrupalInputMultivalueForm = ({
   const popoverTextFieldWrapperRef = useRef<HTMLDivElement | null>(null);
   const popoverContainerRef = useRef<HTMLDivElement | null>(null);
 
+  // Track the previous row count so we can distinguish a Drupal AJAX
+  // add/remove (row count changes) from a reorder (row count stays the same).
+  const prevRowCountRef = useRef<number | null>(null);
+
   // Sync displayValue when a genuine external value arrives (e.g. AJAX
   // re-hyperscriptification after "Add another item" or "Remove").
   // Only update display state — avoid writing to the hidden input to prevent
@@ -73,8 +77,50 @@ const DrupalInputMultivalueForm = ({
     const rawAttrValue = attributes.value ?? attributes.defaultValue ?? '';
     const attrValue = String(rawAttrValue);
 
-    setDisplayValue(attrValue);
-    setTempValue(attrValue);
+    // Detect whether the row count changed — this indicates a Drupal AJAX
+    // add or remove operation, where the attribute values correctly reflect
+    // the new/shifted rows and should be trusted.
+    const fieldWrapper =
+      inputWrapperRef.current?.closest('[data-canvas-row-count]') ??
+      triggerRowRef.current?.closest('[data-canvas-row-count]');
+    const currentRowCount = fieldWrapper
+      ? parseInt(
+          fieldWrapper.getAttribute('data-canvas-row-count') || '0',
+          10,
+        )
+      : null;
+    const prevRowCount = prevRowCountRef.current;
+    prevRowCountRef.current = currentRowCount;
+
+    const rowCountChanged =
+      prevRowCount !== null &&
+      currentRowCount !== null &&
+      prevRowCount !== currentRowCount;
+
+    if (rowCountChanged) {
+      // Row count changed — a row was added or removed via Drupal AJAX.
+      // Trust the attribute values from the rebuilt form; the live input
+      // may still hold a stale value from the previous render.
+      setDisplayValue(attrValue);
+      setTempValue(attrValue);
+    } else {
+      // Row count unchanged — this could be a reorder or a value edit.
+      // Prefer the live input value (set by InputBehaviors or commitValue)
+      // over the attribute value.  During a tabledrag reorder the debounced
+      // PATCH may send partially-stale weights, causing the server to
+      // return an incorrect order; the live input still holds the pre-PATCH
+      // value which keeps the display stable until the page reloads with
+      // the correct persisted order.  This prevents the reorder-reset bug
+      // (#3582219).
+      const liveInput = inputWrapperRef.current?.querySelector(
+        'input',
+      ) as HTMLInputElement | null;
+      const liveValue = liveInput?.value ?? '';
+
+      const newValue = liveValue !== '' ? liveValue : attrValue;
+      setDisplayValue(newValue);
+      setTempValue(newValue);
+    }
   }, [attributes.value, attributes.defaultValue]);
 
   // Commit a value directly — used by the autocomplete selection handler so
