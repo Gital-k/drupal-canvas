@@ -140,8 +140,6 @@ describe('Multivalue Form Design – Link Field', () => {
       'https://github.com',
     );
 
-    // --- Relative field: invalid character '>' should show validation error ---
-
     // Find the Relative field wrapper.
     cy.get('@componentForm')
       .findByRole('heading', { name: 'Relative' })
@@ -205,7 +203,7 @@ describe('Multivalue Form Design – Link Field', () => {
       'first-path',
     );
 
-    // --- Absolute field: single character should show uri validation error ---
+    typeUrlInRow('@relative-field', 0, 'a block', true);
 
     // Find the Absolute field wrapper.
     cy.get('@componentForm')
