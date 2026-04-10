@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   buildPreviewDataPayload,
   buildPreviewRuntimeEntrySource,
+  bundleInteractivePreview,
   parsePreviewDataArgs,
 } from './preview-data';
 
@@ -19,9 +20,12 @@ async function makeTemporaryDirectory(): Promise<string> {
   return directory;
 }
 
-async function writeFile(filePath: string, content: string): Promise<void> {
+async function writeFile(
+  filePath: string,
+  content: string | Buffer,
+): Promise<void> {
   await fs.mkdir(path.dirname(filePath), { recursive: true });
-  await fs.writeFile(filePath, content, 'utf-8');
+  await fs.writeFile(filePath, content);
 }
 
 afterEach(async () => {
@@ -114,7 +118,7 @@ describe('preview-data', () => {
       '<script type="text/javascript" data-canvas-preview-bootstrap>',
     );
     expect(payload.iframeHtml).toContain(
-      "window.drupalSettings.canvasData.v0.baseUrl = canvasPreviewBaseUrl;",
+      'window.drupalSettings.canvasData.v0.baseUrl = canvasPreviewBaseUrl;',
     );
     expect(capturedRoot).toBe('canvas-workbench-preview-root');
     expect(capturedCssEntryPaths).toEqual(
@@ -277,6 +281,71 @@ describe('preview-data', () => {
     expect(source).toContain(
       'window.drupalSettings.canvasData.v0.baseUrl = window.location.origin;',
     );
+  });
+
+  it('inlines local font and image assets in the interactive bundle outputs', async () => {
+    const root = await makeTemporaryDirectory();
+
+    await writeFile(
+      path.join(root, 'src/global.css'),
+      [
+        '@font-face {',
+        "  font-family: 'DemoFont';",
+        "  src: url('./fonts/demo.woff2') format('woff2');",
+        '}',
+        ":root { --demo-font: 'DemoFont'; }",
+      ].join('\n'),
+    );
+    await writeFile(
+      path.join(root, 'src/fonts/demo.woff2'),
+      'not-a-real-font-but-valid-as-an-asset\n',
+    );
+    await writeFile(
+      path.join(root, 'src/components/asset-card/logo.png'),
+      Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7ZsS8AAAAASUVORK5CYII=',
+        'base64',
+      ),
+    );
+    await writeFile(
+      path.join(root, 'src/components/asset-card/index.tsx'),
+      [
+        "import logoUrl from './logo.png';",
+        '',
+        'export default function AssetCard() {',
+        '  return (',
+        "    <div style={{ fontFamily: 'DemoFont' }}>",
+        '      <img alt="logo" src={logoUrl} />',
+        '      <p>Asset card</p>',
+        '    </div>',
+        '  );',
+        '}',
+      ].join('\n'),
+    );
+
+    const bundled = await bundleInteractivePreview({
+      projectRoot: root,
+      aliasBaseDir: 'src',
+      spec: {
+        root: 'canvas-workbench-preview-root',
+        elements: {
+          'canvas-workbench-preview-root': {
+            type: 'asset-card',
+            props: {},
+          },
+        },
+      },
+      componentSources: [
+        {
+          name: 'asset-card',
+          jsEntryPath: path.join(root, 'src/components/asset-card/index.tsx'),
+        },
+      ],
+      cssEntryPaths: [path.join(root, 'src/global.css')],
+    });
+
+    expect(bundled.css).toContain('data:font/woff2;base64');
+    expect(bundled.js).toContain('data:image/png;base64');
   });
 
   it('parses preview-data cli args with strict selector rules', () => {

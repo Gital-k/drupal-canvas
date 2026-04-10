@@ -47,6 +47,12 @@ if (incomingArgs[0] === 'preview-data') {
     'dist/server/src/server/preview-data.mjs',
   );
   runChild([previewDataBinPath, ...incomingArgs.slice(1)]);
+} else if (incomingArgs[0] === 'preview-build') {
+  const previewBuildBinPath = path.join(
+    packageRoot,
+    'dist/server/src/server/preview-build.mjs',
+  );
+  runChild([previewBuildBinPath, ...incomingArgs.slice(1)]);
 } else {
   const hasExplicitCommand =
     incomingArgs[0] !== undefined && !incomingArgs[0].startsWith('-');
