@@ -84,10 +84,7 @@ const DrupalInputMultivalueForm = ({
       inputWrapperRef.current?.closest('[data-canvas-row-count]') ??
       triggerRowRef.current?.closest('[data-canvas-row-count]');
     const currentRowCount = fieldWrapper
-      ? parseInt(
-          fieldWrapper.getAttribute('data-canvas-row-count') || '0',
-          10,
-        )
+      ? parseInt(fieldWrapper.getAttribute('data-canvas-row-count') || '0', 10)
       : null;
     const prevRowCount = prevRowCountRef.current;
     prevRowCountRef.current = currentRowCount;
