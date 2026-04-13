@@ -16,6 +16,10 @@ export interface TransformConfig {
   [key: keyof PropsValues]: Partial<Transform>;
 }
 
+// Mirror Drupal core's parsing of entity autocomplete values like
+// "Label (123)" so the client-side transform extracts the trailing ID.
+// @see https://api.drupal.org/api/drupal/core%21lib%21Drupal%21Core%21Entity%21Element%21EntityAutocomplete.php/function/EntityAutocomplete%3A%3AextractEntityIdFromAutocompleteInput/11.x
+// @see https://api.drupal.org/api/drupal/core%21lib%21Drupal%21Core%21Entity%21Element%21EntityAutocomplete.php/11.x
 export const ENTITY_AUTOCOMPLETE_MATCH = /.+\s\(([^)]+)\)\s*$/;
 
 const parseSingleEntityAutocompleteSelection = (
@@ -247,16 +251,10 @@ const entityAutocompleteTargetId: Transformer<
     return null;
   }
   if (Array.isArray(value)) {
-    return value.map(
-      (selection) =>
-        parseSingleEntityAutocompleteSelection(selection) ?? selection,
-    );
+    const ids = value.map(parseSingleEntityAutocompleteSelection);
+    return ids.some((id) => id === null) ? null : (ids as string[]);
   }
-  const parsed = parseEntityAutocompleteValue(value);
-  if (parsed === null) {
-    return value;
-  }
-  return parsed;
+  return parseEntityAutocompleteValue(value);
 };
 
 const cast: Transformer<

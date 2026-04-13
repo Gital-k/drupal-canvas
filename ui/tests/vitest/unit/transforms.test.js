@@ -473,7 +473,7 @@ describe('Transforms - entityAutocompleteTargetId', () => {
     ).to.equal('3');
   });
 
-  it('Should map array values when upstream provides arrays', () => {
+  it('Should map array values when given array input', () => {
     expect(
       transforms.entityAutocompleteTargetId([
         'A node title (3)',
@@ -482,9 +482,9 @@ describe('Transforms - entityAutocompleteTargetId', () => {
     ).to.deep.equal(['3', '42']);
   });
 
-  it('Should return original value when no autocomplete ID is present', () => {
+  it('Should return null when no autocomplete ID is present', () => {
     expect(transforms.entityAutocompleteTargetId('A node title')).to.equal(
-      'A node title',
+      null,
     );
   });
 

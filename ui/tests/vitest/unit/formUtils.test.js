@@ -399,6 +399,22 @@ Value`,
 
     expect(propsValues.entityReferenceAutocomplete).to.deep.equal(['3', '42']);
   });
+
+  it('Should omit invalid entity autocomplete values', () => {
+    const invalidAutocompleteFormState = {
+      ...formState,
+      'canvas_component_props[all-props][entityReferenceAutocomplete][0][target_id]':
+        'A node title',
+    };
+
+    const { propsValues } = getPropsValues(
+      invalidAutocompleteFormState,
+      inputAndUiData,
+      transformConfig,
+    );
+
+    expect(propsValues).to.not.have.property('entityReferenceAutocomplete');
+  });
 });
 
 describe('coerceValueForSchema', () => {
