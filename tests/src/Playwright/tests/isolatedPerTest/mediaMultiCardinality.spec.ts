@@ -36,10 +36,20 @@ async function getPreviewImageOrder(
 }
 
 test.describe('Media Multi-Cardinality', () => {
-  test.beforeEach(async ({ drupal }) => {
+  test.beforeEach(async ({ drupal, page }) => {
     await drupal.enableTestExtensions();
     await drupal.loginAsAdmin();
     await drupal.applyRecipe(`core/recipes/image_media_type`);
+    await page.goto('/admin/appearance');
+    await page.getByTitle('Install Claro theme').click();
+    await expect(
+      page.getByRole('contentinfo', { name: 'Status message' }),
+    ).toContainText('The Claro theme has been installed.');
+    await page.goto('/admin/appearance');
+    await page
+      .getByLabel('Administration theme', { exact: true })
+      .selectOption('claro');
+    await page.getByRole('button', { name: 'Save configuration' }).click();
     await drupal.installModules(['canvas_test_sdc']);
     await drupal.logout();
   });
