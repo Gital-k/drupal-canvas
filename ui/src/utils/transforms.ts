@@ -243,7 +243,7 @@ const link: Transformer<
 };
 
 const entityAutocompleteTargetId: Transformer<
-  void,
+  BaseTransformOptions,
   null | string | string[],
   null | string | string[]
 > = (value) => {
