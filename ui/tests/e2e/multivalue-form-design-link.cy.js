@@ -277,7 +277,7 @@ describe('Multivalue Form Design – Link Field', () => {
 
     // Ensure the drop target is in the viewport.
     cy.get('@unlimited-link').find('tbody tr').eq(0).scrollIntoView();
-
+    cy.reasonableWait();
     const dndDefaults = {
       position: 'topLeft',
       scrollBehavior: false,
