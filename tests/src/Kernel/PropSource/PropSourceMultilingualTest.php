@@ -30,7 +30,6 @@ class PropSourceMultilingualTest extends PropSourceTestBase {
   protected static $modules = [
     'field',
     'node',
-    'datetime_range',
     'media_test_source',
     'language',
     'content_translation',
