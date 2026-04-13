@@ -11,6 +11,7 @@ use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\Core\Extension\ThemeHandlerInterface;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Field\WidgetBase;
+use Drupal\Core\KeyValueStore\KeyValueExpirableFactoryInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
 
 final class EntityFormController extends ControllerBase {
@@ -21,8 +22,10 @@ final class EntityFormController extends ControllerBase {
     private readonly AutoSaveManager $autoSaveManager,
     private readonly RequestStack $requestStack,
     protected ThemeHandlerInterface $themeHandler,
+    private readonly KeyValueExpirableFactoryInterface $keyValueExpirable,
   ) {
   }
+
 
   public function form(string $entity_type, FieldableEntityInterface $entity, string $entity_form_mode): array {
     // @phpstan-ignore-next-line property.notFound
@@ -55,14 +58,12 @@ final class EntityFormController extends ControllerBase {
       $form_build_id = $request->request->get('form_build_id');
       $is_cold_cache = FALSE;
       if ($form_build_id) {
-        /** @var \Drupal\Core\KeyValueStore\KeyValueExpirableFactoryInterface $kv */
-        $kv = \Drupal::service('keyvalue.expirable');
-        $is_cold_cache = ($kv->get('form')->get($form_build_id) === NULL);
+        $is_cold_cache = is_string($form_build_id) && ($this->keyValueExpirable->get('form')->get($form_build_id) === NULL);
       }
-      if ($is_cold_cache && str_contains($triggering, '_remove_button')) {
+      if ($is_cold_cache && is_string($triggering) &&  str_contains($triggering, '_remove_button')) {
         $is_cold_remove_post = TRUE;
       }
-      if ($is_cold_cache && str_contains($triggering, '_add_more')) {
+      if ($is_cold_cache && is_string($triggering) && str_contains($triggering, '_add_more')) {
         $is_cold_add_more_post = TRUE;
       }
     }
@@ -98,18 +99,18 @@ final class EntityFormController extends ControllerBase {
     // items_count = submitted deltas - 1 because the form always renders one
     // extra trailing empty row (delta = items_count), and addMoreSubmit will
     // increment items_count by 1 after we set it.
-    if ($is_cold_add_more_post) {
+    if ($is_cold_add_more_post && $request !== NULL) {
       $input = $request->request->all();
       foreach ($entity->getFields() as $field_name => $field_items) {
         $field_storage = $field_items->getFieldDefinition()->getFieldStorageDefinition();
         if ($field_storage->getCardinality() !== FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED) {
           continue;
         }
-        if (!isset($input[$field_name]) || !is_array($input[$field_name])) {
+        if (!isset($input[$field_name]) || !\is_array($input[$field_name])) {
           continue;
         }
         $submitted_count = count(array_filter(
-          array_keys($input[$field_name]),
+          \array_keys($input[$field_name]),
           'is_numeric',
         ));
         // Subtract 1 for the trailing empty row that is always included.
