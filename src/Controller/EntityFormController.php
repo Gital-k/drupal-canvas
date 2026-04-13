@@ -26,7 +26,6 @@ final class EntityFormController extends ControllerBase {
   ) {
   }
 
-
   public function form(string $entity_type, FieldableEntityInterface $entity, string $entity_form_mode): array {
     // @phpstan-ignore-next-line property.notFound
     if (!$this->themeHandler->themeExists('canvas_stark') || !$this->themeHandler->listInfo()['canvas_stark']->status) {
@@ -58,12 +57,12 @@ final class EntityFormController extends ControllerBase {
       $form_build_id = $request->request->get('form_build_id');
       $is_cold_cache = FALSE;
       if ($form_build_id) {
-        $is_cold_cache = is_string($form_build_id) && ($this->keyValueExpirable->get('form')->get($form_build_id) === NULL);
+        $is_cold_cache = \is_string($form_build_id) && ($this->keyValueExpirable->get('form')->get($form_build_id) === NULL);
       }
-      if ($is_cold_cache && is_string($triggering) &&  str_contains($triggering, '_remove_button')) {
+      if ($is_cold_cache && \is_string($triggering) &&  str_contains($triggering, '_remove_button')) {
         $is_cold_remove_post = TRUE;
       }
-      if ($is_cold_cache && is_string($triggering) && str_contains($triggering, '_add_more')) {
+      if ($is_cold_cache && \is_string($triggering) && str_contains($triggering, '_add_more')) {
         $is_cold_add_more_post = TRUE;
       }
     }
