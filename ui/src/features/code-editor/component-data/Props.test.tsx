@@ -1,6 +1,7 @@
 // @todo: Port tests from code-editor-component-data-props.cy.jsx to this file since we want to move away from
 //    Cypress unit tests toward vitest. https://www.drupal.org/i/3523490.
 import { describe, expect, it } from 'vitest';
+import { arrayMove } from '@dnd-kit/sortable';
 import {
   act,
   cleanup,
@@ -18,6 +19,7 @@ import {
   initialState,
   selectCodeComponentProperty,
 } from '@/features/code-editor/codeEditorSlice';
+import { createDisplayArray } from '@/features/code-editor/utils/arrayPropUtils';
 import {
   getPropMachineName,
   serializeProps,
@@ -1178,6 +1180,109 @@ describe('props in code editor', () => {
     });
   });
 
+  describe('prop type switching', () => {
+    it.each([
+      {
+        targetTypeName: 'Date and time',
+        expectedDerivedType: 'date' as const,
+        expectedFormat: 'date',
+      },
+      {
+        targetTypeName: 'Link',
+        expectedDerivedType: 'link' as const,
+        expectedFormat: 'uri-reference',
+      },
+      {
+        targetTypeName: 'Text',
+        expectedDerivedType: 'text' as const,
+        expectedFormat: undefined,
+      },
+      {
+        targetTypeName: 'Integer',
+        expectedDerivedType: 'integer' as const,
+        expectedFormat: undefined,
+      },
+      {
+        targetTypeName: 'Number',
+        expectedDerivedType: 'number' as const,
+        expectedFormat: undefined,
+      },
+      {
+        targetTypeName: 'Boolean',
+        expectedDerivedType: 'boolean' as const,
+        expectedFormat: undefined,
+      },
+      {
+        targetTypeName: 'Image',
+        expectedDerivedType: 'image' as const,
+        expectedFormat: undefined,
+      },
+      {
+        targetTypeName: 'Video',
+        expectedDerivedType: 'video' as const,
+        expectedFormat: undefined,
+      },
+      {
+        targetTypeName: 'List: text',
+        expectedDerivedType: 'listText' as const,
+        expectedFormat: undefined,
+      },
+      {
+        targetTypeName: 'List: integer',
+        expectedDerivedType: 'listInteger' as const,
+        expectedFormat: undefined,
+      },
+    ])(
+      'clears contentMediaType and x-formatting-context when switching from formattedText to $targetTypeName',
+      async ({ targetTypeName, expectedDerivedType, expectedFormat }) => {
+        // First, add a prop as 'Formatted text' — this sets contentMediaType and x-formatting-context.
+        await addProp('Formatted text', 'MyProp');
+
+        await waitFor(() => {
+          const prop = selectCodeComponentProperty('props')(
+            store.getState(),
+          )[0];
+          expect(prop.derivedType).toBe('formattedText');
+          expect(prop.contentMediaType).toBe('text/html');
+          expect(prop['x-formatting-context']).toBe('block');
+        });
+
+        // Switch the type to the target type.
+        const typeSelect = screen.getByRole('combobox', { name: 'Type' });
+        await userEvent.click(typeSelect);
+        const targetOption = await screen.findByRole('option', {
+          name: targetTypeName,
+        });
+        await userEvent.click(targetOption);
+
+        await waitFor(() => {
+          const prop = selectCodeComponentProperty('props')(
+            store.getState(),
+          )[0];
+          expect(prop.derivedType).toBe(expectedDerivedType);
+          // contentMediaType and x-formatting-context must be cleared so that the
+          // prop is not re-derived as 'formattedText' after a page reload.
+          expect(prop.contentMediaType).toBeUndefined();
+          expect(prop['x-formatting-context']).toBeUndefined();
+          if (expectedFormat) {
+            expect(prop.format).toBe(expectedFormat);
+          }
+        });
+
+        // Verify serialization does NOT include contentMediaType or x-formatting-context.
+        const serialized = serializeProps(
+          selectCodeComponentProperty('props')(store.getState()),
+        );
+        const serializedProp = Object.values(serialized)[0];
+        expect(serializedProp.contentMediaType).toBeUndefined();
+        expect(serializedProp['x-formatting-context']).toBeUndefined();
+        if (expectedFormat) {
+          expect(serializedProp.format).toBe(expectedFormat);
+        }
+      },
+    );
+  });
+
   describe('image data', () => {
     const aspectRatios = [
       ['1:1 (Square)', { width: 600, height: 600 }],
@@ -2157,6 +2262,132 @@ describe('props in code editor', () => {
         );
         expect(inputs.length).toBe(3);
       });
+    });
+
+    it('pads array to match limitedCount when loaded with fewer items', async () => {
+      const testCases = [
+        {
+          propType: 'Text',
+          itemType: 'string' as const,
+          derivedType: 'text' as const,
+          values: ['Tag1', 'Tag2', 'Tag3'] as string[],
+        },
+        {
+          propType: 'Integer',
+          itemType: 'integer' as const,
+          derivedType: 'integer' as const,
+          values: [100, 200, 300] as number[],
+        },
+        {
+          propType: 'Number',
+          itemType: 'number' as const,
+          derivedType: 'number' as const,
+          values: [1.5, 2.5, 3.5] as number[],
+        },
+        {
+          propType: 'Link',
+          itemType: 'string' as const,
+          derivedType: 'link' as const,
+          values: ['/link1', '/link2', '/link3'] as string[],
+          format: 'uri-reference' as const,
+        },
+        {
+          propType: 'Date',
+          itemType: 'string' as const,
+          derivedType: 'date' as const,
+          values: ['2024-01-01', '2024-02-01', '2024-03-01'] as string[],
+          format: 'date' as const,
+        },
+      ];
+
+      for (const testCase of testCases) {
+        const { propType, itemType, derivedType, values, format } = testCase;
+
+        cleanup();
+
+        // Simulate loading a prop from backend with only 3 items but limitedCount=5.
+        const propId = `limited-prop-${derivedType}`;
+        const storeWithLimitedProp = makeStore({
+          codeEditor: {
+            ...initialState,
+            codeComponent: {
+              ...initialState.codeComponent,
+              status: true,
+              props: [
+                {
+                  id: propId,
+                  name: `Test${propType}`,
+                  type: 'array',
+                  items: { type: itemType, ...(format && { format }) },
+                  example: values,
+                  derivedType: derivedType,
+                  allowMultiple: true,
+                  valueMode: 'limited' as const,
+                  limitedCount: 5,
+                  ...(format && { format }),
+                },
+              ],
+            },
+            initialPropIds: [propId],
+          },
+        });
+
+        render(<Wrapper store={storeWithLimitedProp} />);
+
+        // Verify all 5 input fields render.
+        await waitFor(() => {
+          for (let i = 0; i < 5; i++) {
+            expect(
+              screen.getByTestId(`array-prop-value-${propId}-${i}`),
+            ).toBeInTheDocument();
+          }
+        });
+
+        const inputs: HTMLInputElement[] = [];
+        for (let i = 0; i < 5; i++) {
+          inputs.push(
+            screen.getByTestId(
+              `array-prop-value-${propId}-${i}`,
+            ) as HTMLInputElement,
+          );
+        }
+
+        // First 3 should have values.
+        expect(inputs[0].value).toBe(String(values[0]));
+        expect(inputs[1].value).toBe(String(values[1]));
+        expect(inputs[2].value).toBe(String(values[2]));
+
+        // Last 2 should be empty.
+        expect(inputs[3].value).toBe('');
+        expect(inputs[4].value).toBe('');
+
+        const prop = selectCodeComponentProperty('props')(
+          storeWithLimitedProp.getState(),
+        )[0];
+        const currentExample = prop.example as Array<string | number>;
+
+        // Use the same utility function that is used for creating the display array.
+        const displayArray = createDisplayArray(currentExample, 'limited', 5);
+
+        //Simulate reordering using arrayMove.
+        const reordered = arrayMove([...displayArray], 3, 0);
+
+        // Verify reordering worked.
+        expect(reordered[0]).toBe('');
+        expect(reordered[1]).toBe(values[0]);
+        expect(reordered[2]).toBe(values[1]);
+        expect(reordered[3]).toBe(values[2]);
+        expect(reordered[4]).toBe('');
+
+        // Verify no undefined values.
+        reordered.forEach((val) => {
+          expect(val).not.toBeUndefined();
+          expect(val).not.toBeNull();
+        });
+
+        // Verify no null in JSON.
+        expect(JSON.stringify(reordered)).not.toContain('null');
+      }
     });
 
     it('updates example array when changing limited count', async () => {

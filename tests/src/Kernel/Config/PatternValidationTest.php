@@ -12,7 +12,6 @@ use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Drupal\canvas\Entity\Component;
-use Drupal\canvas\Entity\ComponentTreeEntityInterface;
 use Drupal\canvas\Entity\Pattern;
 use Drupal\canvas\PropSource\PropSource;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
@@ -243,8 +242,7 @@ class PatternValidationTest extends BetterConfigEntityValidationTestBase {
   #[DataProvider('providerInvalidComponentTree')]
   public function testInvalidComponentTree(array $component_tree, array $expected_messages): void {
     \assert($this->entity instanceof Pattern);
-    self::populateActiveComponentVersionPlaceholders($component_tree);
-    \assert($this->entity instanceof ComponentTreeEntityInterface);
+    $component_tree = self::populateActiveComponentVersionPlaceholders($component_tree);
     $this->entity->setComponentTree($component_tree);
     $this->assertValidationErrors($expected_messages);
   }
@@ -321,7 +319,7 @@ class PatternValidationTest extends BetterConfigEntityValidationTestBase {
       'expected_messages' => [
         'component_tree' => 'The \'Drupal\Core\Block\TitleBlockPluginInterface\' component interface must be absent.',
         'component_tree.2.uuid' => 'This is not a valid UUID.',
-        'component_tree.2.inputs.block-invalid.' => [
+        'component_tree.2.inputs' => [
           "'label' is a required key.",
           "'label_display' is a required key.",
         ],

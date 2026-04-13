@@ -27,6 +27,11 @@ import {
 } from '@wb/lib/preview-client';
 import { isPreviewFrameEvent } from '@wb/lib/preview-contract';
 import { toViteFsUrl } from '@wb/lib/preview-runtime';
+import { WORKBENCH_PREVIEW_HTML_PATH } from '@wb/lib/workbench-preview-constants';
+import {
+  computeWorkbenchStructuralFingerprint,
+  shouldSkipWorkbenchIframeRemount,
+} from '@wb/lib/workbench-preview-iframe-remount';
 
 import type { Spec } from '@json-render/core';
 import type {
@@ -40,7 +45,9 @@ import type {
   PreviewManifestComponentMock,
   PreviewRenderRequest,
   PreviewWarning,
+  WorkbenchDiscoveryRefresh,
 } from '@wb/lib/preview-contract';
+import type { WorkbenchHotPayload } from '@wb/lib/workbench-preview-iframe-remount';
 
 const SIDEBAR_COOKIE_NAME = 'sidebar_state';
 const DEFAULT_COMPONENT_VARIANT_ID = '__default__';
@@ -114,6 +121,7 @@ export function App() {
   const [isFrameReady, setIsFrameReady] = useState(false);
   const [iframeKey, setIframeKey] = useState(0);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const lastStructuralFingerprintRef = useRef<string | null>(null);
   const warningToastIdsRef = useRef<Set<string>>(new Set());
   const [sidebarDefaultOpen] = useState(getSidebarDefaultOpen);
 
@@ -253,6 +261,8 @@ export function App() {
 
         setDiscoveryResult(discovery);
         setPreviewManifest(manifest);
+        lastStructuralFingerprintRef.current =
+          computeWorkbenchStructuralFingerprint(discovery, manifest);
       })
       .catch((fetchError: unknown) => {
         if (!isMounted) {
@@ -276,23 +286,43 @@ export function App() {
       return;
     }
 
-    const onWorkbenchUpdate = (
-      payload:
-        | {
-            reloadFrameOnly?: boolean;
-          }
-        | undefined,
-    ) => {
+    const onWorkbenchUpdate = (payload: WorkbenchHotPayload | undefined) => {
       if (payload?.reloadFrameOnly) {
-        setIsFrameReady(false);
-        setIframeKey((value) => value + 1);
+        // Source-only change: the preview iframe is a separate Vite entry; Vite HMR
+        // updates modules in place. No parent-driven remount or extra preview:render.
         return;
       }
 
       void loadWorkbenchData()
         .then(({ discovery, manifest }) => {
+          const previousFingerprint = lastStructuralFingerprintRef.current;
+          const nextFingerprint = computeWorkbenchStructuralFingerprint(
+            discovery,
+            manifest,
+          );
+
           setDiscoveryResult(discovery);
           setPreviewManifest(manifest);
+          lastStructuralFingerprintRef.current = nextFingerprint;
+
+          if (
+            shouldSkipWorkbenchIframeRemount({
+              payload,
+              previousFingerprint,
+              nextFingerprint,
+            })
+          ) {
+            const iframeWindow = iframeRef.current?.contentWindow;
+            if (iframeWindow) {
+              const message: WorkbenchDiscoveryRefresh = {
+                source: 'canvas-workbench-parent',
+                type: 'workbench:discovery-refresh',
+              };
+              iframeWindow.postMessage(message, window.location.origin);
+            }
+            return;
+          }
+
           setIsFrameReady(false);
           setIframeKey((value) => value + 1);
         })
@@ -380,6 +410,9 @@ export function App() {
     selectedMockIndex,
   ]);
 
+  const locationRef = useRef(location);
+  locationRef.current = location;
+
   useEffect(() => {
     const handleFrameMessage = (event: MessageEvent<unknown>) => {
       if (event.origin !== window.location.origin) {
@@ -387,6 +420,16 @@ export function App() {
       }
 
       if (!isPreviewFrameEvent(event.data)) {
+        return;
+      }
+
+      if (event.data.type === 'preview:shell-sync') {
+        const syncPath = event.data.payload.path;
+        const current =
+          locationRef.current.pathname + locationRef.current.search;
+        if (syncPath !== current) {
+          navigate(syncPath);
+        }
         return;
       }
 
@@ -404,7 +447,7 @@ export function App() {
     return () => {
       window.removeEventListener('message', handleFrameMessage);
     };
-  }, [isPageRoute]);
+  }, [navigate]);
 
   useEffect(() => {
     if (!previewManifest) {
@@ -454,6 +497,8 @@ export function App() {
     if (!frameWindow) {
       return;
     }
+
+    const shellPath = location.pathname + location.search;
 
     if (
       !isPageRoute &&
@@ -520,6 +565,7 @@ export function App() {
           spec: specToRender,
           registrySources,
           cssUrls,
+          shellPath,
         },
       };
       frameWindow.postMessage(message, window.location.origin);
@@ -543,6 +589,7 @@ export function App() {
               renderId: selectedPage.slug,
               renderType: 'page',
               spec: pageSpec,
+              shellPath,
               registrySources: discoveryResult.components
                 .filter(
                   (
@@ -593,6 +640,8 @@ export function App() {
     discoveryResult,
     isFrameReady,
     isPageRoute,
+    location.pathname,
+    location.search,
     previewManifest,
     selectedComponent,
     selectedComponentMock,
@@ -735,9 +784,9 @@ export function App() {
                 key={iframeKey}
                 ref={iframeRef}
                 title="Canvas component preview"
-                src="/__canvas/preview-frame"
+                src={WORKBENCH_PREVIEW_HTML_PATH}
                 className="h-full w-full"
-                sandbox="allow-scripts allow-same-origin"
+                sandbox="allow-scripts allow-same-origin allow-popups"
               />
             </div>
           )}

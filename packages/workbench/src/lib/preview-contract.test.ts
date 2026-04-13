@@ -4,6 +4,7 @@ import {
   buildPreviewManifest,
   isPreviewFrameEvent,
   isPreviewRenderRequest,
+  isWorkbenchDiscoveryRefreshMessage,
   toPreviewManifestComponent,
 } from './preview-contract';
 
@@ -131,9 +132,30 @@ describe('preview-contract', () => {
             },
           ],
           cssUrls: ['/@id/virtual:canvas-host-global.css', '/@fs/tmp/file.css'],
+          shellPath: '/component/hero',
         },
       }),
     ).toBe(true);
+
+    expect(
+      isPreviewRenderRequest({
+        source: 'canvas-workbench-parent',
+        type: 'preview:render',
+        payload: {
+          renderId: 'id-1',
+          renderType: 'component',
+          spec: validSpec,
+          registrySources: [
+            {
+              name: 'hero',
+              jsEntryUrl: '/@fs/tmp/file.tsx',
+            },
+          ],
+          cssUrls: [],
+          shellPath: '',
+        },
+      }),
+    ).toBe(false);
 
     expect(
       isPreviewRenderRequest({
@@ -257,5 +279,46 @@ describe('preview-contract', () => {
         },
       }),
     ).toBe(false);
+
+    expect(
+      isPreviewFrameEvent({
+        source: 'canvas-workbench-frame',
+        type: 'preview:shell-sync',
+        payload: {
+          path: '/page/about',
+        },
+      }),
+    ).toBe(true);
+
+    expect(
+      isPreviewFrameEvent({
+        source: 'canvas-workbench-frame',
+        type: 'preview:shell-sync',
+        payload: {
+          path: 1,
+        },
+      }),
+    ).toBe(false);
+  });
+
+  describe('isWorkbenchDiscoveryRefreshMessage', () => {
+    it('accepts the workbench discovery refresh shape', () => {
+      expect(
+        isWorkbenchDiscoveryRefreshMessage({
+          source: 'canvas-workbench-parent',
+          type: 'workbench:discovery-refresh',
+        }),
+      ).toBe(true);
+    });
+
+    it('rejects other messages', () => {
+      expect(isWorkbenchDiscoveryRefreshMessage(null)).toBe(false);
+      expect(
+        isWorkbenchDiscoveryRefreshMessage({
+          source: 'canvas-workbench-parent',
+          type: 'preview:render',
+        }),
+      ).toBe(false);
+    });
   });
 });
