@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
 import { Theme } from '@radix-ui/themes';
+import { act, render, screen } from '@testing-library/react';
+
+import DrupalInputMultivalueForm from '@/components/form/components/drupal/DrupalInputMultivalueForm';
 
 // Mock InputBehaviors as an identity HOC so `TextFieldWithBehaviors` is just
 // `TextField`. This lets us control the hidden input's behaviour directly via
@@ -43,8 +45,6 @@ vi.mock('@/local_packages/utils', () => ({
   a2p: (attrs: Record<string, any>) => attrs,
   cleanClass: (input: string) => input,
 }));
-
-import DrupalInputMultivalueForm from '@/components/form/components/drupal/DrupalInputMultivalueForm';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -234,4 +234,3 @@ describe('DrupalInputMultivalueForm – multi-row reorder regression', () => {
     expect(reorderedButtons[2]).toHaveAccessibleName('Edit Number: 323');
   });
 });
-
