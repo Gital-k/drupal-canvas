@@ -1,7 +1,9 @@
 import { cloneElement, createElement, isValidElement } from 'react';
-import { fromJSONSchema } from 'zod';
+import { fromJSONSchema, z } from 'zod';
 import { defineCatalog, resolveElementProps } from '@json-render/core';
 import { schema } from '@json-render/react/schema';
+
+import canvasSchema from '../../../schema.json';
 
 import type { ComponentType, ReactNode } from 'react';
 import type { ComponentMetadata } from '@drupal-canvas/discovery';
@@ -388,11 +390,92 @@ export function renderCanvasTree(
   return renderSpec(spec, registry);
 }
 
+/**
+ * Canvas JSON Schema `$ref` prefix used in component metadata.
+ */
+const CANVAS_REF_PREFIX = 'json-schema-definitions://canvas.module/';
+
+/**
+ * Rewrites Canvas-specific `$ref` URIs to local JSON Pointer refs (`#/$defs/...`)
+ * that Zod's `fromJSONSchema` can resolve natively.
+ */
+function rewriteCanvasRefs(node: unknown): unknown {
+  if (!node || typeof node !== 'object' || Array.isArray(node)) {
+    return node;
+  }
+  const record = node as Record<string, unknown>;
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(record)) {
+    if (
+      key === '$ref' &&
+      typeof value === 'string' &&
+      value.startsWith(CANVAS_REF_PREFIX)
+    ) {
+      result.$ref = `#/$defs/${value.slice(CANVAS_REF_PREFIX.length)}`;
+    } else {
+      result[key] = rewriteCanvasRefs(value);
+    }
+  }
+  return result;
+}
+
+/**
+ * Pre-rewritten Canvas $defs with local refs.
+ */
+const canvasDefs = rewriteCanvasRefs(canvasSchema.$defs) as Record<
+  string,
+  unknown
+>;
+
+/**
+ * Recursively walks a JSON schema object, stripping `uri-reference` and
+ * `iri-reference` format keywords and collecting the property paths where
+ * they appeared. Follows `$defs` and nested `properties`/`items`.
+ */
+function stripUriRefFormats(
+  node: unknown,
+  currentPath: string[],
+  paths: string[][],
+  visited = new WeakSet<object>(),
+): void {
+  if (!node || typeof node !== 'object') return;
+  const obj = node as Record<string, unknown>;
+  if (visited.has(obj)) return;
+  visited.add(obj);
+
+  if (obj.format === 'uri-reference' || obj.format === 'iri-reference') {
+    delete obj.format;
+    if (currentPath.length > 0) {
+      paths.push([...currentPath]);
+    }
+  }
+
+  if (obj.properties && typeof obj.properties === 'object') {
+    for (const [key, prop] of Object.entries(
+      obj.properties as Record<string, unknown>,
+    )) {
+      stripUriRefFormats(prop, [...currentPath, key], paths, visited);
+    }
+  }
+
+  if (obj.items) {
+    stripUriRefFormats(obj.items, currentPath, paths, visited);
+  }
+
+  if (obj.$defs && typeof obj.$defs === 'object') {
+    for (const def of Object.values(obj.$defs as Record<string, unknown>)) {
+      stripUriRefFormats(def, currentPath, paths, visited);
+    }
+  }
+}
+
 function metadataToCatalogEntry(metadata: ComponentMetadata) {
   const jsonSchema: Record<string, unknown> = {
     type: 'object',
     ...metadata.props,
   };
+  // Include Canvas $defs so Zod can resolve rewritten local $ref pointers.
+  jsonSchema.$defs = canvasDefs;
 
   if (metadata.required.length > 0) {
     jsonSchema.required = metadata.required;
@@ -410,8 +493,48 @@ function metadataToCatalogEntry(metadata: ComponentMetadata) {
     }
     jsonSchema.properties = properties;
   }
+
+  const rewritten = rewriteCanvasRefs(jsonSchema) as Record<string, unknown>;
+
+  // Recursively strip uri-reference/iri-reference formats from the schema
+  // (including $defs) so fromJSONSchema doesn't apply z.url() which rejects
+  // relative URLs. Collect the property paths so we can re-add validation
+  // with a lenient URL check that accepts relative URLs.
+  const uriRefPaths: string[][] = [];
+  stripUriRefFormats(rewritten, [], uriRefPaths);
+
+  let zodSchema = fromJSONSchema(rewritten);
+
+  // Re-add validation for uri-reference/iri-reference props: resolve against
+  // a dummy base so relative URLs like "/path" or "image.png" pass.
+  if (uriRefPaths.length > 0) {
+    zodSchema = zodSchema.superRefine((val, ctx) => {
+      for (const path of uriRefPaths) {
+        let current: unknown = val;
+        for (const segment of path) {
+          if (current && typeof current === 'object') {
+            current = (current as Record<string, unknown>)[segment];
+          } else {
+            current = undefined;
+            break;
+          }
+        }
+        if (typeof current !== 'string') continue;
+        try {
+          new URL(current, 'http://localhost');
+        } catch {
+          ctx.addIssue({
+            code: 'custom',
+            message: `Invalid URI reference: ${current}`,
+            path,
+          });
+        }
+      }
+    });
+  }
+
   return {
-    props: fromJSONSchema(jsonSchema),
+    props: zodSchema,
     slots: slotNames,
   };
 }
@@ -488,5 +611,53 @@ export function defineComponentCatalog(metadata: ComponentMetadata[]) {
     ]),
   );
 
-  return defineCatalog(schema, { components, actions: {} });
+  // Add the synthetic canvas:component-tree wrapper used by canvasTreeToSpec
+  // for multi-root trees so that catalog validation accepts it.
+  components['canvas:component-tree'] = {
+    props: z.object({}),
+    slots: ['children'],
+  };
+
+  const catalog = defineCatalog(schema, { components, actions: {} });
+
+  // Override catalog.validate — the default implementation falls back to
+  // z.record(z.string(), z.unknown()) for props when there are 2+ components,
+  // which skips per-component prop validation entirely. We build a
+  // discriminated union on `type` so each element's props are validated
+  // against the correct component schema.
+  const elementVariants = Object.entries(components).map(([name, entry]) =>
+    z.object({
+      type: z.literal(name),
+      props: entry.props,
+      children: z.array(z.string()),
+      slots: z.record(z.string(), z.array(z.string())),
+      visible: z.any().optional(),
+    }),
+  );
+
+  const elementSchema =
+    elementVariants.length >= 2
+      ? z.discriminatedUnion(
+          'type',
+          elementVariants as [
+            (typeof elementVariants)[number],
+            ...typeof elementVariants,
+          ],
+        )
+      : elementVariants[0];
+
+  const specSchema = z.object({
+    root: z.string(),
+    elements: z.record(z.string(), elementSchema),
+  });
+
+  return Object.assign(catalog, {
+    validate(spec: unknown) {
+      const result = specSchema.safeParse(spec);
+      if (result.success) {
+        return { success: true as const, data: result.data };
+      }
+      return { success: false as const, error: result.error };
+    },
+  });
 }
