@@ -312,7 +312,7 @@ configs.forEach((config) => {
       // right-side panel must show the value that belongs to that position after
       // the reorder — not a value carried over from a different row. Before the
       // fix, Drupal AJAX re-hyperscriptification caused some rows to display
-      // a neighbour's value.
+      // a neighbor's value.
       confirmInputs(`@${config.fieldAlias}`, config.reorderedValues);
       // Refresh the page to ensure the update persists.
       cy.reload();

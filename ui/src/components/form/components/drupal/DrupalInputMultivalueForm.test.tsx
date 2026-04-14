@@ -5,7 +5,7 @@ import { act, render, screen } from '@testing-library/react';
 import DrupalInputMultivalueForm from '@/components/form/components/drupal/DrupalInputMultivalueForm';
 
 // Mock InputBehaviors as an identity HOC so `TextFieldWithBehaviors` is just
-// `TextField`. This lets us control the hidden input's behaviour directly via
+// `TextField`. This lets us control the hidden input's behavior directly via
 // the TextField mock below without pulling in Redux / RTK-query dependencies.
 vi.mock('@/components/form/inputBehaviors', () => ({
   default: (Component: any) => Component,
@@ -15,12 +15,18 @@ vi.mock('@/components/form/inputBehaviors', () => ({
 // value). This is the crucial piece: in the real app, InputBehaviors manages
 // its own inputValue state and never re-syncs it from an incoming
 // attributes.value prop change. Using `defaultValue` here reproduces that
-// behaviour so the hidden input retains its original value across re-renders,
+// behavior so the hidden input retains its original value across re-renders,
 // exactly as it does in the browser when a tabledrag reorder triggers a Drupal
 // AJAX response.
 vi.mock('@/components/form/components/TextField', () => ({
   default: ({ attributes = {}, className }: any) => {
-    const { value, onChange, onKeyDown, onBlur, ...rest } = attributes;
+    const {
+      value,
+      onChange: _onChange, // eslint-disable-line @typescript-eslint/no-unused-vars
+      onKeyDown: _onKeyDown, // eslint-disable-line @typescript-eslint/no-unused-vars
+      onBlur: _onBlur, // eslint-disable-line @typescript-eslint/no-unused-vars
+      ...rest
+    } = attributes;
     return (
       <div>
         <input defaultValue={value} className={className} {...rest} />
