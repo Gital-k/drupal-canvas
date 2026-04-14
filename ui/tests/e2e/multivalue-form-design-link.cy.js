@@ -292,7 +292,7 @@ describe('Multivalue Form Design – Link Field', () => {
     cy.get('@unlimited-link')
       .find('.canvas-drag-handle a.tabledrag-handle .drag-handle-icon')
       .should('have.length', 3);
-    cy.get('@unlimited-link').scrollIntoView({ offset: { top: -400 } });
+    cy.get('@unlimited-link').scrollIntoView();
 
     cy.get(
       '[data-drupal-selector="edit-field-cvt-unlimited-link"] tr.draggable:nth-child(3) [title="Change order"]',
