@@ -5,7 +5,7 @@ import { Box, Button, Flex, Popover, Text } from '@radix-ui/themes';
 
 import DrupalInput from '@/components/form/components/drupal/DrupalInput';
 import TextField from '@/components/form/components/TextField';
-import InputBehaviors from '@/components/form/inputBehaviors';
+import WithRHF from '@/components/form/react-hook-form/withRHF';
 import { a2p } from '@/local_packages/utils';
 
 import {
@@ -19,8 +19,8 @@ import type { NumericInputAttributes } from '@/types/DrupalAttribute';
 
 import styles from './DrupalInputMultivalueForm.module.css';
 
-// Create the wrapped TextField component with InputBehaviors HOC.
-const TextFieldWithBehaviors = InputBehaviors(TextField);
+// Create the wrapped TextField component with WithRHF HOC.
+const TextFieldWithBehaviors = WithRHF(TextField);
 
 /**
  * DrupalInputMultivalueForm component for inputs within multivalue widgets.

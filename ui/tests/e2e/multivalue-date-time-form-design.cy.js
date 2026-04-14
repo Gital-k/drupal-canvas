@@ -467,6 +467,7 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
 
     // Ensure the drop target is in the viewport.
     cy.get('@unlimited-datetime').find('tbody tr').eq(0).scrollIntoView();
+    cy.reasonableWait();
 
     const dndDefaults = {
       position: 'topLeft',
@@ -517,6 +518,8 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
 
     cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
     cy.waitForAjax();
+    // eslint-disable-next-line cypress/no-unnecessary-waiting
+    cy.wait(1000);
 
     // Verify date2 appears before date1 after drag and drop.
     cy.get('@unlimited-datetime')

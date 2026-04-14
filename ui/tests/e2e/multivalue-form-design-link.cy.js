@@ -277,9 +277,9 @@ describe('Multivalue Form Design – Link Field', () => {
 
     // Ensure the drop target is in the viewport.
     cy.get('@unlimited-link').find('tbody tr').eq(0).scrollIntoView();
-
+    cy.reasonableWait();
     const dndDefaults = {
-      position: 'center',
+      position: 'topLeft',
       scrollBehavior: false,
     };
 
@@ -292,12 +292,12 @@ describe('Multivalue Form Design – Link Field', () => {
     cy.get('@unlimited-link')
       .find('.canvas-drag-handle a.tabledrag-handle .drag-handle-icon')
       .should('have.length', 3);
-    cy.get('@unlimited-link').scrollIntoView({ offset: { top: -400 } });
+    cy.get('@unlimited-link').scrollIntoView();
 
     cy.get(
       '[data-drupal-selector="edit-field-cvt-unlimited-link"] tr.draggable:nth-child(3) [title="Change order"]',
     ).realDnd(
-      '[data-drupal-selector="edit-field-cvt-unlimited-link"] tr.draggable:nth-child(2) [title="Change order"]',
+      '[data-drupal-selector="edit-field-cvt-unlimited-link"] tr.draggable:nth-child(2)',
       dndDefaults,
     );
 

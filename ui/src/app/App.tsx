@@ -63,6 +63,7 @@ const App: React.FC = () => {
     },
   });
   const sensors = useSensors(pointerSensor);
+
   return (
     <div className="canvas-app">
       <div className={styles.canvasCalloutContainer}>

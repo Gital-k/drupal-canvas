@@ -315,7 +315,6 @@ describe('Contextual panel', () => {
     cy.loadURLandWaitForCanvasLoaded();
     // Wait for the preview iframe to load
     cy.get('iframe[data-canvas-preview]').should('exist');
-
     // Right-click on the element that should trigger the context menu.
     // This differs from the layers panel tests because the structure in the left
     // panel is different than in previews.

@@ -21,6 +21,84 @@ import type { EditorFrameContext } from '@/features/ui/uiSlice';
 import type { ConflictError } from '@/services/pendingChangesApi';
 import type { AutoSavesHash } from '@/types/AutoSaves';
 
+/**
+ * Request Queue Manager
+ *
+ * Prevents parallel requests to the endpoint.
+ * Only the most recent request is executed after the current one completes.
+ * In addition to eliminating unnecessary requests and undo history bloating,
+ * this prevents entity lock contention on the backend.
+ *
+ * Usage:
+ *   const queuedRequest = createRequestQueue();
+ *   const result = await queuedRequest(() => postPreview(data));
+ */
+export function createRequestQueue<T>() {
+  let activePromise: Promise<T> | null = null;
+  let queuedRequest: (() => Promise<T>) | null = null;
+
+  return async function queuedExecute(requestFn: () => Promise<T>): Promise<T> {
+    // If there's an active request, queue this one (replacing any previously queued request)
+    if (activePromise) {
+      // Store this request to execute after the active one completes
+      queuedRequest = requestFn;
+
+      // Wait for the active request to complete, then execute the queued one
+      await activePromise;
+
+      // After waiting, check if we're the queued request that should execute
+      // (another request might have queued after us)
+      if (queuedRequest === requestFn) {
+        queuedRequest = null;
+        return queuedExecute(requestFn); // Execute now that nothing is active
+      } else {
+        return Promise.resolve(null as T);
+      }
+    }
+
+    // Set activePromise synchronously BEFORE calling requestFn()
+    // This prevents race conditions when multiple requests arrive
+    // in the same tick.
+    let resolver: (value: T) => void;
+    let rejecter: (error: any) => void;
+
+    activePromise = new Promise<T>((resolve, reject) => {
+      resolver = resolve;
+      rejecter = reject;
+    });
+
+    // Now execute the actual request
+    try {
+      const result = await requestFn();
+      resolver!(result);
+      return result;
+    } catch (error) {
+      rejecter!(error);
+      throw error;
+    } finally {
+      activePromise = null;
+
+      // If there's a queued request, execute it immediately (non-recursive)
+      if (queuedRequest) {
+        const nextRequest = queuedRequest;
+        queuedRequest = null;
+
+        // Re-invoke queuedExecute properly to maintain the queue state
+        // This ensures proper promise chain management without unbounded recursion
+        queuedExecute(nextRequest).catch((error) => {
+          console.error('Queued request failed:', error);
+        });
+      }
+    }
+  };
+}
+
+// Global queue for postPreview requests
+const queuedPostPreview = createRequestQueue<{
+  html: string;
+  autoSaves: AutoSavesHash;
+}>();
+
 export type UpdateComponentResultType = {
   html: string;
   layout: any;
@@ -35,6 +113,19 @@ export type UpdateComponentQueryArg = {
   componentType: string;
   model: Omit<ComponentModel, 'name'> | Omit<EvaluatedComponentModel, 'name'>;
 };
+
+// Track the last HTML to prevent unnecessary dispatches
+let lastHtmlHash: string | null = null;
+
+function simpleHash(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return hash.toString(36);
+}
 
 export const previewApi = createApi({
   reducerPath: 'previewApi',
@@ -55,18 +146,53 @@ export const previewApi = createApi({
         method: 'POST',
         body,
       }),
-      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
-        const { data, meta } = await queryFulfilled;
-        const { html, autoSaves } = data;
-        dispatch(
-          pendingChangesApi.util.invalidateTags([
-            { type: 'PendingChanges', id: 'LIST' },
-          ]),
-        );
-        // Update our preview slice.
-        dispatch(setHtml(html));
-        handleAutoSavesHashUpdate(dispatch, autoSaves, meta);
-        dispatch(setPostPreviewCompleted(true));
+      async onQueryStarted(arg, { dispatch, queryFulfilled, getState }) {
+        pushCanvasLayoutRequest();
+
+        try {
+          const { data, meta } = await queryFulfilled;
+          const { html, autoSaves } = data;
+
+          // Calculate hash of HTML to prevent infinite loops
+          const currentHtmlHash = simpleHash(html);
+          const htmlChanged = currentHtmlHash !== lastHtmlHash;
+          dispatch(
+            pendingChangesApi.util.invalidateTags([
+              { type: 'PendingChanges', id: 'LIST' },
+            ]),
+          );
+
+          // Only dispatch setHtml if the HTML actually changed
+          if (htmlChanged) {
+            lastHtmlHash = currentHtmlHash;
+            dispatch(setHtml(html));
+          }
+
+          handleAutoSavesHashUpdate(dispatch, autoSaves, meta);
+
+          dispatch(setPostPreviewCompleted(true));
+        } catch (error: any) {
+          // Log all errors
+          const status = error?.error?.status || 'unknown';
+          console.error(`Preview request FAILED (${status}):`, error);
+
+          if (error?.error?.status === 500) {
+            const errorMessage =
+              error?.error?.data?.message ||
+              error?.error?.data ||
+              'Unknown error';
+            console.error(`500 Server Error - Message:`, errorMessage);
+            console.error(`500 Server Error - Full error details:`, {
+              status: error.error.status,
+              data: error.error.data,
+              error: error.error,
+            });
+          }
+
+          // Don't re-throw errors - swallow them to prevent error boundary
+        } finally {
+          popCanvasLayoutRequest();
+        }
       },
     }),
     updateComponent: builder.mutation<
@@ -111,6 +237,45 @@ export const previewApi = createApi({
 
 export const { usePostPreviewMutation, useUpdateComponentMutation } =
   previewApi;
+
+/**
+ * Queued version of usePostPreviewMutation that prevents parallel requests.
+ * Use this instead of usePostPreviewMutation to avoid 429 errors from backend lock contention.
+ *
+ * Usage:
+ *   const [postPreview, { isLoading }] = useQueuedPostPreviewMutation({ fixedCacheKey: 'myKey' });
+ *   const result = await postPreview({ layout, model, entity_form_fields, entityId, entityType });
+ */
+export function useQueuedPostPreviewMutation(
+  options?: Parameters<typeof usePostPreviewMutation>[0],
+): [
+  (arg: {
+    layout: any;
+    model: any;
+    entity_form_fields: any;
+    entityId: string;
+    entityType: string;
+  }) => Promise<{ html: string; autoSaves: AutoSavesHash }>,
+  ReturnType<typeof usePostPreviewMutation>[1],
+] {
+  const [postPreview, mutationState] = usePostPreviewMutation(options);
+
+  const queuedPostPreviewWrapper = (arg: {
+    layout: any;
+    model: any;
+    entity_form_fields: any;
+    entityId: string;
+    entityType: string;
+  }): Promise<{ html: string; autoSaves: AutoSavesHash }> => {
+    // Queue the entire mutation call to prevent RTK Query from dispatching
+    // the HTTP request until the queue allows it
+    return queuedPostPreview(() => {
+      return postPreview(arg).unwrap();
+    });
+  };
+
+  return [queuedPostPreviewWrapper, mutationState];
+}
 
 // A selector that returns the current updateComponent mutation loading state
 // given a component ID.

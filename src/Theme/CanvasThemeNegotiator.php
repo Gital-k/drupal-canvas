@@ -23,7 +23,7 @@ use Symfony\Component\HttpFoundation\RequestStack;
  * default templates only.
  *
  * @see ui/src/components/form/twig-to-jsx-component-map.js
- * @see ui/src/components/form/inputBehaviors.tsx
+ * @see ui/src/components/form/withRHF.tsx
  */
 final class CanvasThemeNegotiator implements ThemeNegotiatorInterface {
 

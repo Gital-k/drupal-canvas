@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router';
 import { skipToken } from '@reduxjs/toolkit/query';
 
 import TextField from '@/components/form/components/TextField';
-import InputBehaviors from '@/components/form/inputBehaviors';
+import { useFieldContext } from '@/components/form/contexts/FieldContext';
+import { withRHF } from '@/components/form/react-hook-form/withRHF';
 import { useEntityTitle } from '@/hooks/useEntityTitle';
 import { a2p } from '@/local_packages/utils.js';
 import { useGetPageLayoutQuery } from '@/services/componentAndLayout';
@@ -55,9 +56,7 @@ const getPathAlias = (titleValue: string) => {
 const DrupalPathWidget = ({
   attributes = {},
 }: {
-  attributes?: Attributes & {
-    onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  };
+  attributes?: Attributes;
   children?: React.ReactNode;
 }) => {
   const initialValue = attributes?.value || '';
@@ -66,6 +65,9 @@ const DrupalPathWidget = ({
   const [initialTitle, setInitialTitle] = useState<string | null>(null);
   const [userHasEditedPath, setUserHasEditedPath] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const isGeneratingRef = useRef(false);
+
+  const fieldContext = useFieldContext();
 
   const { entityId, entityType } = useParams();
   const titleInput = useEntityTitle();
@@ -76,7 +78,9 @@ const DrupalPathWidget = ({
 
   // Initialize state on first render by checking if initial path matches generated path
   useEffect(() => {
-    if (isInitialized || !titleInput) return;
+    if (isInitialized || !titleInput) {
+      return;
+    }
 
     setInitialTitle(titleInput);
 
@@ -102,11 +106,10 @@ const DrupalPathWidget = ({
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       setPathValue(e.target.value);
-      if (attributes.onChange) {
-        attributes.onChange(e);
-      }
+      // Pass through the event to trigger form state update
+      fieldContext?.triggerChange(e);
     },
-    [attributes],
+    [fieldContext],
   );
 
   const handleManualChange = useCallback(
@@ -120,7 +123,14 @@ const DrupalPathWidget = ({
 
   // Auto-generate path from title
   useEffect(() => {
-    if (!titleInput || !isInitialized) return;
+    // Prevent re-entry while we're already generating
+    if (isGeneratingRef.current) {
+      return;
+    }
+
+    if (!titleInput || !isInitialized) {
+      return;
+    }
 
     const generatedPath = getPathAlias(titleInput);
 
@@ -145,16 +155,23 @@ const DrupalPathWidget = ({
 
     let shouldGenerate = false;
 
-    if (pathMatchesGenerated && pathValue) {
-      // Path matches what we generated, so keep auto-generating
-      shouldGenerate = true;
-    } else if (!pathValue && titleHasChanged) {
-      // No path exists and title has changed from initial
-      shouldGenerate = true;
+    // Only generate if the new path would be different from current
+    if (generatedPath !== pathValue) {
+      if (pathMatchesGenerated && pathValue) {
+        // Path matches what we last generated, so keep auto-generating
+        shouldGenerate = true;
+      } else if (!pathValue && titleHasChanged) {
+        // No path exists and title has changed from initial
+        shouldGenerate = true;
+      }
     }
 
     if (shouldGenerate) {
+      // Set flag to prevent re-entry
+      isGeneratingRef.current = true;
+
       setLastGeneratedPath(generatedPath);
+
       const syntheticEvent = {
         target: {
           value: generatedPath,
@@ -162,6 +179,11 @@ const DrupalPathWidget = ({
         },
       } as React.ChangeEvent<HTMLInputElement>;
       handleChange(syntheticEvent);
+
+      // Reset flag after a microtask to allow state updates to complete
+      Promise.resolve().then(() => {
+        isGeneratingRef.current = false;
+      });
     }
   }, [
     titleInput,
@@ -183,4 +205,4 @@ const DrupalPathWidget = ({
   return <TextField attributes={processedAttrs} />;
 };
 
-export default InputBehaviors(DrupalPathWidget);
+export default withRHF(DrupalPathWidget);
