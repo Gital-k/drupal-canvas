@@ -88,6 +88,22 @@ describe('Multivalue Form Design – Link Field', () => {
   };
 
   /**
+   * Helper to trigger Enter key in the open popover dialog.
+   */
+  const keyOutOfPopover = () => {
+    cy.get('[role="dialog"][data-state="open"]')
+      .find('input')
+      .first()
+      .trigger('keydown', {
+        key: 'Enter',
+        code: 'Enter',
+        keyCode: 13,
+        which: 13,
+        bubbles: true,
+      });
+  };
+
+  /**
    * Helper function to confirm the URL values displayed in all rows.
    * Uses per-row retryable assertions to avoid stale DOM issues.
    */
@@ -108,6 +124,39 @@ describe('Multivalue Form Design – Link Field', () => {
     });
   };
 
+  /**
+   * Helper function to verify preview iframe shows expected values for all four
+   * fields in the Four Multiple Links component.
+   *
+   * @param {string} relativeValue - Expected value for Relative field item 0
+   * @param {string} relativeTwoValue - Expected value for Relative Two field item 0
+   * @param {string} absoluteValue - Expected value for Absolute field item 0
+   * @param {string} absoluteTwoValue - Expected value for Absolute Two field item 0
+   */
+  const confirmFourLinksPreview = (
+    relativeValue,
+    relativeTwoValue,
+    absoluteValue,
+    absoluteTwoValue,
+  ) => {
+    cy.waitForElementContentInIframe(
+      '[data-field="relative"] p[data-item="0"]',
+      relativeValue,
+    );
+    cy.waitForElementContentInIframe(
+      '[data-field="relative-two"] p[data-item="0"]',
+      relativeTwoValue,
+    );
+    cy.waitForElementContentInIframe(
+      '[data-field="absolute"] p[data-item="0"]',
+      absoluteValue,
+    );
+    cy.waitForElementContentInIframe(
+      '[data-field="absolute-two"] p[data-item="0"]',
+      absoluteTwoValue,
+    );
+  };
+
   it('validates Four Multiple Links component fields on the layout', () => {
     cy.loadURLandWaitForCanvasLoaded({ url: 'canvas/editor/node/2' });
 
@@ -123,20 +172,10 @@ describe('Multivalue Form Design – Link Field', () => {
     cy.get('form[data-form-id="component_instance_form"]').as('componentForm');
 
     // Confirm preview iframe shows default values for all four fields.
-    cy.waitForElementContentInIframe(
-      '[data-field="relative"] p[data-item="0"]',
+    confirmFourLinksPreview(
       'first-path',
-    );
-    cy.waitForElementContentInIframe(
-      '[data-field="relative-two"] p[data-item="0"]',
       'another-first-path',
-    );
-    cy.waitForElementContentInIframe(
-      '[data-field="absolute"] p[data-item="0"]',
       'https://drupal.org',
-    );
-    cy.waitForElementContentInIframe(
-      '[data-field="absolute-two"] p[data-item="0"]',
       'https://github.com',
     );
 
@@ -163,16 +202,7 @@ describe('Multivalue Form Design – Link Field', () => {
       .type('{selectall}invalid>value');
     // eslint-disable-next-line cypress/no-unnecessary-waiting
     cy.wait(100);
-    cy.get('[role="dialog"][data-state="open"]')
-      .find('input')
-      .first()
-      .trigger('keydown', {
-        key: 'Enter',
-        code: 'Enter',
-        keyCode: 13,
-        which: 13,
-        bubbles: true,
-      });
+    keyOutOfPopover();
 
     // The popover should report a validation error.
     cy.get('[role="dialog"][data-state="open"]')
@@ -195,15 +225,76 @@ describe('Multivalue Form Design – Link Field', () => {
     cy.get('[role="dialog"][data-state="open"]').should('not.exist');
 
     // Wait 1000ms to ensure any in-flight requests have settled, then confirm
-    // the preview has restored to the original value.
+    // the preview retains the original value.
     // eslint-disable-next-line cypress/no-unnecessary-waiting
     cy.wait(1000);
-    cy.waitForElementContentInIframe(
-      '[data-field="relative"] p[data-item="0"]',
+    confirmFourLinksPreview(
       'first-path',
+      'another-first-path',
+      'https://drupal.org',
+      'https://github.com',
     );
 
     typeUrlInRow('@relative-field', 0, 'a block', true);
+
+    // Confirm preview updated with the new valid value.
+    confirmFourLinksPreview(
+      '/the-one-with-a-block',
+      'another-first-path',
+      'https://drupal.org',
+      'https://github.com',
+    );
+
+    // Test validation on the second row of the Relative field.
+    cy.get('@relative-field')
+      .find('tbody tr')
+      .eq(1)
+      .find('[class*="_listItem_"]')
+      .eq(0)
+      .click();
+
+    // Type an invalid URI-reference value.
+    // Use select-all + type rather than .clear() to avoid triggering a
+    // debounced commit of the intermediate empty value.
+    cy.get('[role="dialog"][data-state="open"]')
+      .find('input')
+      .first()
+      .type('{selectall}apple test');
+    // eslint-disable-next-line cypress/no-unnecessary-waiting
+    cy.wait(100);
+    keyOutOfPopover();
+
+    // The popover should report a validation error.
+    cy.get('[role="dialog"][data-state="open"]')
+      .find('[data-prop-message="true"]')
+      .should('contain.text', '❌ data/0 must match format "uri-reference"');
+
+    // The list item text should be unchanged (error should not propagate).
+    cy.get('@relative-field')
+      .find('tbody tr')
+      .eq(1)
+      .find('[class*="_listItem_"]')
+      .eq(0)
+      .find('[class*="_itemText_"]')
+      .should('have.text', 'Empty');
+
+    // Close the popover (discards the invalid value).
+    cy.get('[role="dialog"][data-state="open"]')
+      .find('[aria-label="Close"]')
+      .click({ force: true });
+    cy.get('[role="dialog"][data-state="open"]').should('not.exist');
+
+    // Wait 1000ms to ensure any in-flight requests have settled.
+    // eslint-disable-next-line cypress/no-unnecessary-waiting
+    cy.wait(1000);
+
+    // Confirm preview still shows the previously valid values.
+    confirmFourLinksPreview(
+      '/the-one-with-a-block',
+      'another-first-path',
+      'https://drupal.org',
+      'https://github.com',
+    );
 
     // Find the Absolute field wrapper.
     cy.get('@componentForm')
@@ -228,16 +319,7 @@ describe('Multivalue Form Design – Link Field', () => {
       .type('{selectall}x');
     // eslint-disable-next-line cypress/no-unnecessary-waiting
     cy.wait(100);
-    cy.get('[role="dialog"][data-state="open"]')
-      .find('input')
-      .first()
-      .trigger('keydown', {
-        key: 'Enter',
-        code: 'Enter',
-        keyCode: 13,
-        which: 13,
-        bubbles: true,
-      });
+    keyOutOfPopover();
 
     // The popover should report a uri validation error.
     cy.get('[role="dialog"][data-state="open"]')
@@ -263,9 +345,11 @@ describe('Multivalue Form Design – Link Field', () => {
     // the preview has restored to the original value.
     // eslint-disable-next-line cypress/no-unnecessary-waiting
     cy.wait(1000);
-    cy.waitForElementContentInIframe(
-      '[data-field="absolute"] p[data-item="0"]',
+    confirmFourLinksPreview(
+      '/the-one-with-a-block',
+      'another-first-path',
       'https://drupal.org',
+      'https://github.com',
     );
 
     // --- Edit valid values and confirm the preview updates ---
@@ -285,20 +369,13 @@ describe('Multivalue Form Design – Link Field', () => {
       .type('{selectall}https://www.example.com');
     // eslint-disable-next-line cypress/no-unnecessary-waiting
     cy.wait(100);
-    cy.get('[role="dialog"][data-state="open"]')
-      .find('input')
-      .first()
-      .trigger('keydown', {
-        key: 'Enter',
-        code: 'Enter',
-        keyCode: 13,
-        which: 13,
-        bubbles: true,
-      });
+    keyOutOfPopover();
     cy.get('[role="dialog"][data-state="open"]').should('not.exist');
-    cy.waitForElementContentInIframe(
-      '[data-field="absolute"] p[data-item="0"]',
+    confirmFourLinksPreview(
+      '/the-one-with-a-block',
+      'another-first-path',
       'https://www.example.com',
+      'https://github.com',
     );
 
     // Edit the Absolute Two field row 0: change to a new valid absolute URL.
@@ -318,19 +395,12 @@ describe('Multivalue Form Design – Link Field', () => {
       .type('{selectall}https://www.cypress.io');
     // eslint-disable-next-line cypress/no-unnecessary-waiting
     cy.wait(100);
-    cy.get('[role="dialog"][data-state="open"]')
-      .find('input')
-      .first()
-      .trigger('keydown', {
-        key: 'Enter',
-        code: 'Enter',
-        keyCode: 13,
-        which: 13,
-        bubbles: true,
-      });
+    keyOutOfPopover();
     cy.get('[role="dialog"][data-state="open"]').should('not.exist');
-    cy.waitForElementContentInIframe(
-      '[data-field="absolute-two"] p[data-item="0"]',
+    confirmFourLinksPreview(
+      '/the-one-with-a-block',
+      'another-first-path',
+      'https://www.example.com',
       'https://www.cypress.io',
     );
   });

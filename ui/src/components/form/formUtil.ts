@@ -212,9 +212,6 @@ export function coerceValueForSchema(
  * @param inputAndUiData
  *   An object usually generated on render in inputBehaviors.tsx with information
  *   about the form and props. This is needed for passing to getPropSchemas().
- * @param {object|null} schema
- *   Optionally, the JSON Schema to validate against. If not provided, the
- *   the function will pull from inputAndUiData.
  *
  * @return {JsonSchemaValidationResult}
  */
@@ -222,7 +219,6 @@ export function validateProp(
   schemaName: string,
   data: any,
   inputAndUiData: InputUIData,
-  schema?: any,
 ): JsonSchemaValidationResult {
   const schemas = getPropSchemas(inputAndUiData);
   if (schemas[schemaName]) {

@@ -50,15 +50,6 @@ const DrupalInputMultivalueForm = ({
   const popoverInputRef = useRef<HTMLInputElement | null>(null);
   const popoverContainerRef = useRef<HTMLDivElement | null>(null);
 
-  // Sync displayValue when a genuine external value arrives (e.g. AJAX
-  // rebuild after "Add another item" or "Remove").
-  useEffect(() => {
-    const attrValue = (attributes.value ??
-      attributes.defaultValue ??
-      '') as string;
-    setDisplayValue(attrValue);
-  }, [attributes.value, attributes.defaultValue]);
-
   // Commit a value directly — used by the autocomplete selection handler so
   // the table row updates immediately.
   const commitValue = useCallback((newValue: string) => {
@@ -160,18 +151,19 @@ const DrupalInputMultivalueForm = ({
         }
       }, 0);
     } else {
-      // If the input currently has a validation error, reset its DOM value
-      // back to the last committed displayValue before focus moves away.
-      // This prevents the blur handler in TextFieldAutocomplete from firing
-      // onChange with the invalid typed value, which would bypass the
-      // e.target.form guard in inputBehaviors and commit invalid data to the
-      // preview (the popover portal renders outside the Drupal form element).
+      // If we explicitly close the popover, the changes made thus far should
+      // be undone, and the field reverted to its value prior to opening.
       if (popoverInputRef.current) {
-        const hasError = !!popoverInputRef.current.closest(
-          '[data-has-field-error="true"]',
-        );
-        if (hasError) {
-          popoverInputRef.current.value = displayValue;
+        // Set the value in a way that triggers React's onChange
+        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+          window.HTMLInputElement.prototype,
+          'value',
+        )?.set;
+        if (nativeInputValueSetter) {
+          nativeInputValueSetter.call(popoverInputRef.current, displayValue);
+          // Dispatch input event to trigger React's onChange
+          const inputEvent = new Event('input', { bubbles: true });
+          popoverInputRef.current.dispatchEvent(inputEvent);
         }
       }
       // Restore focus to the trigger button after closing.

@@ -222,7 +222,6 @@ export const InputBehaviorsComponentPropsForm = (
         toPropName(fieldName, selectedComponent),
         valueToValidate,
         inputAndUiData,
-        schema,
       );
 
       return {
