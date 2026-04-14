@@ -101,14 +101,8 @@ const DrupalInputMultivalueForm = ({
       setDisplayValue(attrValue);
       setTempValue(attrValue);
     } else {
-      // Row count unchanged — this could be a reorder or a value edit.
-      // Prefer the live input value (set by InputBehaviors or commitValue)
-      // over the attribute value.  During a tabledrag reorder the debounced
-      // PATCH may send partially-stale weights, causing the server to
-      // return an incorrect order; the live input still holds the pre-PATCH
-      // value which keeps the display stable until the page reloads with
-      // the correct persisted order.  This prevents the reorder-reset bug
-      // (#3582219).
+      // Row count unchanged — prefer the live input value (set by
+      // InputBehaviors or commitValue) over the attribute value.
       const liveInput = inputWrapperRef.current?.querySelector(
         'input',
       ) as HTMLInputElement | null;
