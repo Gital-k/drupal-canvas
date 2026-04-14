@@ -300,7 +300,7 @@ configs.forEach((config) => {
       cy.get(`@${config.fieldAlias}`)
         .find('.canvas-drag-handle a.tabledrag-handle')
         .should('have.length', 3);
-
+      cy.get(`@${config.fieldAlias}`).scrollIntoView();
       cy.get(
         `[data-drupal-selector="${config.drupalSelector}"] tr.draggable:nth-child(3) [title="Change order"]`,
       ).realDnd(
@@ -482,6 +482,8 @@ configs.forEach((config) => {
           'form-required',
         );
 
+        cy.get(`@${config.fieldAlias}`).scrollIntoView();
+
         // Initially we have 2 items (one with value, one empty)
         cy.get(`@${config.fieldAlias}`)
           .find('tbody tr')
@@ -496,44 +498,50 @@ configs.forEach((config) => {
           config.testValues[0],
         ]);
 
-        // Open popover for first item (we have 2 items now, remove should be enabled)
-        cy.get(`@${config.fieldAlias}`)
-          .find('tbody tr')
-          .eq(0)
-          .find('[class*="_listItem_"]')
-          .click();
-
-        cy.get('[role="dialog"][data-state="open"]').should('be.visible');
-
-        // Remove button should be enabled when there are multiple items
-        cy.get('[role="dialog"][data-state="open"]')
-          .findByRole('button', { name: /Remove/i })
-          .should('be.visible')
-          .should('not.be.disabled');
-
         // Close popover
-        cy.get('[role="dialog"][data-state="open"]')
-          .find('[aria-label="Close"]')
-          .click();
-        cy.get('[role="dialog"][data-state="open"]').should('not.exist');
+        const removeItem = () => {
+          cy.get(`@${config.fieldAlias}`)
+            .find('tbody tr')
+            .eq(0)
+            .find('[class*="_listItem_"]')
+            .click();
 
-        // Now remove the second item to leave only one
-        cy.get(`@${config.fieldAlias}`)
-          .find('tbody tr')
-          .eq(1)
-          .find('[class*="_listItem_"]')
-          .click();
+          cy.get('[role="dialog"][data-state="open"]').should('be.visible');
 
-        cy.get('[role="dialog"][data-state="open"]').should('be.visible');
+          // Remove button should be enabled when there are multiple items
+          cy.get('[role="dialog"][data-state="open"]')
+            .findByRole('button', { name: /Remove/i })
+            .should('be.visible')
+            .should('not.be.disabled');
+          cy.get('[role="dialog"][data-state="open"]')
+            .find('[aria-label="Close"]')
+            .click();
+          cy.get('[role="dialog"][data-state="open"]').should('not.exist');
 
-        cy.get('[role="dialog"][data-state="open"]')
-          .findByRole('button', { name: /Remove/i })
-          .should('be.visible')
-          .click();
+          // Now remove the second item to leave only one
+          cy.get(`@${config.fieldAlias}`)
+            .find('tbody tr')
+            .eq(1)
+            .find('[class*="_listItem_"]')
+            .click();
 
-        cy.get('[role="dialog"][data-state="open"]').should('not.exist');
-        cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
-        cy.waitForAjax();
+          cy.get('[role="dialog"][data-state="open"]').should('be.visible');
+
+          cy.get('[role="dialog"][data-state="open"]')
+            .findByRole('button', { name: /Remove/i })
+            .should('be.visible')
+            .click();
+
+          cy.get('[role="dialog"][data-state="open"]').should('not.exist');
+          cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
+          cy.waitForAjax();
+        };
+        // Remove the field we added, and the empty field that is typically added
+        // on rebuild.
+        cy.log('remove added item');
+        removeItem();
+        cy.log('remove empty item');
+        removeItem();
 
         // Now we should have only one item
         cy.get(`@${config.fieldAlias}`)
