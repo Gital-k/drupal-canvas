@@ -45,6 +45,9 @@ const Pages = () => {
     error: pageItemsError,
     hasMore,
     handleLoadMore,
+    paginationError,
+    handleRetryPagination,
+    isLoadingMore,
   } = usePaginatedContentList('canvas_page', searchTerm);
 
   const [
@@ -219,6 +222,9 @@ const Pages = () => {
       onSearch={setSearchTerm}
       hasMore={hasMore}
       onLoadMore={handleLoadMore}
+      paginationError={paginationError}
+      onRetryPagination={handleRetryPagination}
+      isLoadingMore={isLoadingMore}
     />
   );
 };

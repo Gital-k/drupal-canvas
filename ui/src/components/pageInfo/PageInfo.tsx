@@ -115,6 +115,9 @@ const PageInfo = () => {
     isSuccess: isGetPageItemsSuccess,
     hasMore,
     handleLoadMore,
+    paginationError,
+    handleRetryPagination,
+    isLoadingMore,
   } = usePaginatedContentList('canvas_page', searchTerm);
 
   const [
@@ -366,6 +369,9 @@ const PageInfo = () => {
                   onDelete={handleDeletePage}
                   hasMore={hasMore}
                   onLoadMore={handleLoadMore}
+                  paginationError={paginationError}
+                  onRetryPagination={handleRetryPagination}
+                  isLoadingMore={isLoadingMore}
                 />
               )}
               {pageItemsError && (
