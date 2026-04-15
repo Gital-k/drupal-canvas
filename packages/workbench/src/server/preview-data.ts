@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { canvasTreeToSpec } from 'drupal-canvas/json-render-utils';
-import { build as viteBuild } from 'vite';
+import { loadEnv, build as viteBuild } from 'vite';
 import {
   discoverCanvasProject,
   resolveCanvasConfig,
@@ -68,6 +68,11 @@ export interface InteractiveBundleResult {
   css: string;
 }
 
+export interface PreviewRuntimeSettings {
+  baseUrl: string | null;
+  jsonapiPrefix: string | null;
+}
+
 interface BundleComponentSource {
   name: string;
   jsEntryPath: string;
@@ -98,6 +103,23 @@ interface BuildPreviewDataOptions {
   mode: PreviewDataMode;
   inputPath: string;
   projectRoot: string;
+}
+
+function normalizePreviewRuntimeSetting(value?: string): string | null {
+  const trimmedValue = value?.trim();
+
+  return trimmedValue ? trimmedValue : null;
+}
+
+export function resolvePreviewRuntimeSettings(
+  projectRoot: string,
+): PreviewRuntimeSettings {
+  const env = loadEnv('', projectRoot, 'CANVAS_');
+
+  return {
+    baseUrl: normalizePreviewRuntimeSetting(env.CANVAS_SITE_URL),
+    jsonapiPrefix: normalizePreviewRuntimeSetting(env.CANVAS_JSONAPI_PREFIX),
+  };
 }
 
 export function buildPreviewRuntimeEntrySource(options: {
@@ -226,20 +248,44 @@ function toPayload(
   };
 }
 
-function buildIframeHtml(js: string, css: string): string {
-  const escapedScript = js.replaceAll('</script>', '<\\/script>');
-  const escapedStyle = css.replaceAll('</style>', '<\\/style>');
-  const bootstrapScript = [
+function buildPreviewBootstrapScript(
+  runtimeSettings: PreviewRuntimeSettings,
+): string {
+  const bootstrapStatements = [
     'window.drupalSettings = window.drupalSettings ?? {};',
     'window.drupalSettings.canvasData = window.drupalSettings.canvasData ?? {};',
     'window.drupalSettings.canvasData.v0 = window.drupalSettings.canvasData.v0 ?? {};',
-    "const canvasPreviewBaseUrl = window.location.origin !== 'null' ? window.location.origin : 'http://localhost';",
+    runtimeSettings.baseUrl
+      ? `const canvasPreviewBaseUrl = ${JSON.stringify(runtimeSettings.baseUrl)};`
+      : "const canvasPreviewBaseUrl = ['http:', 'https:'].includes(window.location.protocol) ? window.location.origin : 'http://localhost';",
     'if (typeof window.drupalSettings.canvasData.v0.baseUrl !== "string" || window.drupalSettings.canvasData.v0.baseUrl.length === 0) {',
     '  window.drupalSettings.canvasData.v0.baseUrl = canvasPreviewBaseUrl;',
     '}',
-  ]
-    .join('')
-    .replaceAll('</script>', '<\\/script>');
+  ];
+
+  if (runtimeSettings.jsonapiPrefix) {
+    bootstrapStatements.push(
+      'window.drupalSettings.canvasData.v0.jsonapiSettings = window.drupalSettings.canvasData.v0.jsonapiSettings ?? {};',
+      'if (typeof window.drupalSettings.canvasData.v0.jsonapiSettings.apiPrefix !== "string" || window.drupalSettings.canvasData.v0.jsonapiSettings.apiPrefix.length === 0) {',
+      `  window.drupalSettings.canvasData.v0.jsonapiSettings.apiPrefix = ${JSON.stringify(runtimeSettings.jsonapiPrefix)};`,
+      '}',
+    );
+  }
+
+  return bootstrapStatements.join('').replaceAll('</script>', '<\\/script>');
+}
+
+export function buildIframeHtml(
+  js: string,
+  css: string,
+  runtimeSettings: PreviewRuntimeSettings = {
+    baseUrl: null,
+    jsonapiPrefix: null,
+  },
+): string {
+  const escapedScript = js.replaceAll('</script>', '<\\/script>');
+  const escapedStyle = css.replaceAll('</style>', '<\\/style>');
+  const bootstrapScript = buildPreviewBootstrapScript(runtimeSettings);
 
   return [
     '<!doctype html>',
@@ -752,6 +798,7 @@ export async function buildPreviewDataPayload(
   const uniqueCssPaths = [
     ...new Set(allCssEntryPaths.map((entry) => path.resolve(entry))),
   ];
+  const runtimeSettings = resolvePreviewRuntimeSettings(options.projectRoot);
 
   try {
     const bundleResult = await bundle({
@@ -762,7 +809,11 @@ export async function buildPreviewDataPayload(
       cssEntryPaths: uniqueCssPaths,
     });
 
-    const iframeHtml = buildIframeHtml(bundleResult.js, bundleResult.css);
+    const iframeHtml = buildIframeHtml(
+      bundleResult.js,
+      bundleResult.css,
+      runtimeSettings,
+    );
 
     return toPayload(request, {
       ok: true,

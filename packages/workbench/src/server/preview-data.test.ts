@@ -79,6 +79,13 @@ describe('preview-data', () => {
       path.join(root, 'src/components/global.css'),
       'body { margin: 0; }',
     );
+    await writeFile(
+      path.join(root, '.env'),
+      [
+        'CANVAS_SITE_URL=https://canvas.example.test',
+        'CANVAS_JSONAPI_PREFIX=api',
+      ].join('\n'),
+    );
 
     let capturedRoot: string | null = null;
     let capturedCssEntryPaths: string[] = [];
@@ -118,7 +125,13 @@ describe('preview-data', () => {
       '<script type="text/javascript" data-canvas-preview-bootstrap>',
     );
     expect(payload.iframeHtml).toContain(
+      'const canvasPreviewBaseUrl = "https://canvas.example.test";',
+    );
+    expect(payload.iframeHtml).toContain(
       'window.drupalSettings.canvasData.v0.baseUrl = canvasPreviewBaseUrl;',
+    );
+    expect(payload.iframeHtml).toContain(
+      'window.drupalSettings.canvasData.v0.jsonapiSettings.apiPrefix = "api";',
     );
     expect(capturedRoot).toBe('canvas-workbench-preview-root');
     expect(capturedCssEntryPaths).toEqual(

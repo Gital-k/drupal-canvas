@@ -187,6 +187,13 @@ describe('preview-build', () => {
         2,
       ),
     );
+    await writeFile(
+      path.join(projectRoot, '.env'),
+      [
+        'CANVAS_SITE_URL=https://canvas.example.test',
+        'CANVAS_JSONAPI_PREFIX=api',
+      ].join('\n'),
+    );
     await writeFile(path.join(projectRoot, 'src/global.css'), 'body { }');
 
     const payload = await buildPreviewArtifact(
@@ -265,6 +272,12 @@ describe('preview-build', () => {
 
     expect(defaultHtml).toContain('window.default=true;');
     expect(firstMockHtml).toContain('data-canvas-preview-runtime');
+    expect(firstMockHtml).toContain(
+      'const canvasPreviewBaseUrl = "https://canvas.example.test";',
+    );
+    expect(firstMockHtml).toContain(
+      'window.drupalSettings.canvasData.v0.jsonapiSettings.apiPrefix = "api";',
+    );
     expect(manifest.targetType).toBe('component');
     expect(manifest.target.hasMocks).toBe(true);
     expect(manifest.target.mockCount).toBe(2);
