@@ -42,11 +42,10 @@ function runChild(args) {
 }
 
 if (incomingArgs[0] === 'preview-data') {
-  const previewDataBinPath = path.join(
-    packageRoot,
-    'dist/server/src/server/preview-data.mjs',
+  console.error(
+    'The `preview-data` command has been removed. Use `preview-build` instead.',
   );
-  runChild([previewDataBinPath, ...incomingArgs.slice(1)]);
+  process.exit(1);
 } else if (incomingArgs[0] === 'preview-build') {
   const previewBuildBinPath = path.join(
     packageRoot,

@@ -4,17 +4,16 @@ import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
-  buildPreviewDataPayload,
+  buildPreviewPayload,
   buildPreviewRuntimeEntrySource,
   bundleInteractivePreview,
-  parsePreviewDataArgs,
-} from './preview-data';
+} from './preview-payload';
 
 const temporaryDirectories: string[] = [];
 
 async function makeTemporaryDirectory(): Promise<string> {
   const directory = await fs.mkdtemp(
-    path.join(os.tmpdir(), 'canvas-workbench-preview-data-'),
+    path.join(os.tmpdir(), 'canvas-workbench-preview-payload-'),
   );
   temporaryDirectories.push(directory);
   return directory;
@@ -37,7 +36,7 @@ afterEach(async () => {
   temporaryDirectories.length = 0;
 });
 
-describe('preview-data', () => {
+describe('preview-payload', () => {
   it('builds interactive component preview payload with inlined css html', async () => {
     const root = await makeTemporaryDirectory();
 
@@ -90,7 +89,7 @@ describe('preview-data', () => {
     let capturedRoot: string | null = null;
     let capturedCssEntryPaths: string[] = [];
 
-    const payload = await buildPreviewDataPayload(
+    const payload = await buildPreviewPayload(
       {
         mode: 'component',
         inputPath: 'components/card/component.yml',
@@ -213,7 +212,7 @@ describe('preview-data', () => {
 
     let capturedRegistryNames: string[] = [];
 
-    const payload = await buildPreviewDataPayload(
+    const payload = await buildPreviewPayload(
       {
         mode: 'page',
         inputPath: 'pages/home.json',
@@ -253,7 +252,7 @@ describe('preview-data', () => {
       'export default function Card() { return null; }',
     );
 
-    const payload = await buildPreviewDataPayload(
+    const payload = await buildPreviewPayload(
       {
         mode: 'component',
         inputPath: 'components/card/component.yml',
@@ -375,29 +374,5 @@ describe('preview-data', () => {
 
     expect(bundled.css).toContain('data:font/woff2;base64');
     expect(bundled.js).toContain('data:image/png;base64');
-  });
-
-  it('parses preview-data cli args with strict selector rules', () => {
-    const componentArgs = parsePreviewDataArgs([
-      '--component-path',
-      'components/card/component.yml',
-      '--pretty',
-    ]);
-    expect(componentArgs).toEqual({
-      ok: true,
-      value: {
-        mode: 'component',
-        inputPath: 'components/card/component.yml',
-        pretty: true,
-      },
-    });
-
-    const invalidArgs = parsePreviewDataArgs([
-      '--component-path',
-      'components/card/component.yml',
-      '--page-path',
-      'pages/home.json',
-    ]);
-    expect(invalidArgs.ok).toBe(false);
   });
 });

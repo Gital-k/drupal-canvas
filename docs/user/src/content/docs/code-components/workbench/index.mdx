@@ -28,27 +28,36 @@ Then run it from your project root:
 npx canvas-workbench
 ```
 
-## Preview data command
+## Preview build command
 
-Workbench also provides a one-shot preview-data command for external preview
-consumers:
+Workbench can export standalone preview artifacts into a required output
+directory:
 
 ```bash
-npx canvas-workbench preview-data --component-path components/card/component.yml
+npx canvas-workbench preview-build --component-path components/card/component.yml --out-dir .canvas-preview/card
 ```
 
 ```bash
-npx canvas-workbench preview-data --page-path pages/home.json
+npx canvas-workbench preview-build --page-path pages/home.json --out-dir .canvas-preview/home
 ```
 
-It prints one JSON payload to stdout, including:
+For component targets, output writes:
 
-- `spec` for the selected target.
-- `css` as raw CSS text.
-- `iframeHtml` as a self-contained interactive HTML document with CSS inlined.
-- `renderMode` (`interactive`) plus warnings and errors.
+- `component-default.html`
+- `component-mock-01.html`, `component-mock-02.html`, and so on for each mock
+- `manifest.json`
 
-Use `--pretty` for formatted JSON output.
+For page targets, output writes:
+
+- `page-default.html`
+- `manifest.json`
+
+The command prints one JSON payload to stdout, including `request`, `target`,
+`renderMode` (`interactive`), `outDir`, `manifestPath`, summary counts,
+warnings, and errors.
+
+Each exported HTML file is self-contained. Local asset imports, such as fonts
+and images, are bundled inline into the output.
 
 ## Configuration
 
