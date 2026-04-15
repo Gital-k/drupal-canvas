@@ -28,37 +28,6 @@ Then run it from your project root:
 npx canvas-workbench
 ```
 
-## Preview build command
-
-Workbench can export standalone preview artifacts into a required output
-directory:
-
-```bash
-npx canvas-workbench preview-build --component-path components/card/component.yml --out-dir .canvas-preview/card
-```
-
-```bash
-npx canvas-workbench preview-build --page-path pages/home.json --out-dir .canvas-preview/home
-```
-
-For component targets, output writes:
-
-- `component-default.html`
-- `component-mock-01.html`, `component-mock-02.html`, and so on for each mock
-- `manifest.json`
-
-For page targets, output writes:
-
-- `page-default.html`
-- `manifest.json`
-
-The command prints one JSON payload to stdout, including `request`, `target`,
-`renderMode` (`interactive`), `outDir`, `manifestPath`, summary counts,
-warnings, and errors.
-
-Each exported HTML file is self-contained. Local asset imports, such as fonts
-and images, are bundled inline into the output.
-
 ## Configuration
 
 Workbench can run without a `canvas.config.json` file, but it is useful to add
@@ -118,6 +87,9 @@ This makes it easy to keep a quick default preview and add richer,
 scenario-specific previews side by side.
 
 ## Next steps
+
+To export standalone preview artifacts, see
+[Code components - Workbench preview build](./preview-build/).
 
 To add tabbed mock previews, see
 [Code components - Workbench mocks](./mocks/).

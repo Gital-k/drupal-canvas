@@ -41,12 +41,7 @@ function runChild(args) {
   });
 }
 
-if (incomingArgs[0] === 'preview-data') {
-  console.error(
-    'The `preview-data` command has been removed. Use `preview-build` instead.',
-  );
-  process.exit(1);
-} else if (incomingArgs[0] === 'preview-build') {
+if (incomingArgs[0] === 'preview-build') {
   const previewBuildBinPath = path.join(
     packageRoot,
     'dist/server/src/server/preview-build.mjs',
