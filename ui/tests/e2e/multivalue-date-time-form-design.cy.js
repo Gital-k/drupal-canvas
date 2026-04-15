@@ -40,6 +40,7 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
   };
 
   const openEditableRowPopover = (fieldAlias, rowIndex) => {
+    cy.get(fieldAlias).scrollIntoView();
     getEditableRows(fieldAlias)
       .eq(rowIndex)
       .find('[class*="_listItem_"]')
@@ -867,6 +868,11 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
       .findByRole('button', { name: /Remove/i })
       .should('exist')
       .should('not.be.disabled');
+
+    // @todo Arbitrary wait should not be needed after
+    //   https://drupal.org/i/3579026.
+    // eslint-disable-next-line cypress/no-unnecessary-waiting
+    cy.wait(500);
 
     // Click remove button to verify it works.
     cy.get('[role="dialog"][data-state="open"]')

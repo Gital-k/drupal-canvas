@@ -50,15 +50,6 @@ const DrupalInputMultivalueForm = ({
   const popoverInputRef = useRef<HTMLInputElement | null>(null);
   const popoverContainerRef = useRef<HTMLDivElement | null>(null);
 
-  // Sync displayValue when a genuine external value arrives (e.g. AJAX
-  // rebuild after "Add another item" or "Remove").
-  useEffect(() => {
-    const attrValue = (attributes.value ??
-      attributes.defaultValue ??
-      '') as string;
-    setDisplayValue(attrValue);
-  }, [attributes.value, attributes.defaultValue]);
-
   // Commit a value directly — used by the autocomplete selection handler so
   // the table row updates immediately.
   const commitValue = useCallback((newValue: string) => {
@@ -160,6 +151,21 @@ const DrupalInputMultivalueForm = ({
         }
       }, 0);
     } else {
+      // If we explicitly close the popover, the changes made thus far should
+      // be undone, and the field reverted to its value prior to opening.
+      if (popoverInputRef.current) {
+        // Set the value in a way that triggers React's onChange
+        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+          window.HTMLInputElement.prototype,
+          'value',
+        )?.set;
+        if (nativeInputValueSetter) {
+          nativeInputValueSetter.call(popoverInputRef.current, displayValue);
+          // Dispatch input event to trigger React's onChange
+          const inputEvent = new Event('input', { bubbles: true });
+          popoverInputRef.current.dispatchEvent(inputEvent);
+        }
+      }
       // Restore focus to the trigger button after closing.
       setTimeout(() => {
         if (triggerRef.current) {
@@ -181,9 +187,6 @@ const DrupalInputMultivalueForm = ({
     if (triggerDrupalRemoveButton(triggerElement)) {
       return;
     }
-
-    // Fallback: no Drupal remove button (e.g. non-AJAX field), just clear.
-    setDisplayValue('');
   };
 
   return (

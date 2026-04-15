@@ -222,12 +222,14 @@ final class SingleDirectoryComponentTest extends GeneratedFieldExplicitInputUxCo
       'sdc.canvas_test_sdc.image-required-with-example',
       'sdc.canvas_test_sdc.image-without-ref',
       'sdc.canvas_test_sdc.mixed-images-with-example',
+      'sdc.canvas_test_sdc.multivalue-props',
       'sdc.canvas_test_sdc.my-cta',
       'sdc.canvas_test_sdc.my-hero',
       'sdc.canvas_test_sdc.my-section',
       'sdc.canvas_test_sdc.one_column',
       'sdc.canvas_test_sdc.props-no-slots',
       'sdc.canvas_test_sdc.props-slots',
+      'sdc.canvas_test_sdc.select-fields',
       'sdc.canvas_test_sdc.shoe_badge',
       'sdc.canvas_test_sdc.shoe_tab',
       'sdc.canvas_test_sdc.shoe_tab_group',
@@ -601,6 +603,25 @@ HTML,
           'library' => [
             'core/components.canvas_test_sdc--image-required-with-example',
             'core/components.canvas_test_sdc--image-required-with-example',
+          ],
+        ],
+      ],
+      'sdc.canvas_test_sdc.select-fields' => [
+        'html' => <<<HTML
+<div class="select-fields">
+      <p class="select-fields__size">Size: medium</p>
+        <ul class="select-fields__colors">
+              <li class="select-fields__color">red</li>
+              <li class="select-fields__color">blue</li>
+          </ul>
+  </div>
+
+HTML,
+        'cacheability' => $default_cacheability,
+        'attachments' => [
+          'library' => [
+            'core/components.canvas_test_sdc--select-fields',
+            'core/components.canvas_test_sdc--select-fields',
           ],
         ],
       ],
@@ -1047,6 +1068,85 @@ HTML
           'library' => [
             'core/components.canvas_test_sdc--mixed-images-with-example',
             'core/components.canvas_test_sdc--mixed-images-with-example',
+          ],
+        ],
+      ],
+      'sdc.canvas_test_sdc.multivalue-props' => [
+        'html' => '<div data-testid="multivalue-props-component">
+      <div data-testid="text-component">
+      <ul id="text-list">
+                  <li>Hello World</li>
+                  <li>Sample Text</li>
+              </ul>
+    </div>
+        <div data-testid="text-limited-component">
+      <ul id="text-limited-list">
+                  <li>Hello World</li>
+                  <li>Sample Text</li>
+              </ul>
+    </div>
+        <div data-testid="text-required-component">
+      <ul id="text-required-list">
+                  <li>Required Text 1</li>
+                  <li>Required Text 2</li>
+              </ul>
+    </div>
+        <div data-testid="link-component">
+      <ul id="link-list">
+                  <li><a href="https://drupal.org">https://drupal.org</a></li>
+                  <li><a href="https://example.com">https://example.com</a></li>
+              </ul>
+    </div>
+        <div data-testid="link-limited-component">
+      <ul id="link-limited-list">
+                  <li><a href="https://drupal.org">https://drupal.org</a></li>
+                  <li><a href="https://example.com">https://example.com</a></li>
+              </ul>
+    </div>
+        <div data-testid="relative_link-component">
+      <ul id="relative-link-list">
+                  <li><a href="/about">/about</a></li>
+                  <li><a href="/contact">/contact</a></li>
+              </ul>
+    </div>
+        <div data-testid="relative_link-limited-component">
+      <ul id="relative-link-limited-list">
+                  <li><a href="/about">/about</a></li>
+                  <li><a href="/contact">/contact</a></li>
+              </ul>
+    </div>
+        <div data-testid="number-component">
+      <ul id="number-list">
+                  <li>42</li>
+                  <li>100</li>
+              </ul>
+    </div>
+        <div data-testid="number-limited-component">
+      <ul id="number-limited-list">
+                  <li>42</li>
+                  <li>100</li>
+              </ul>
+    </div>
+        <div data-testid="integer-component">
+      <ul id="integer-list">
+                  <li>7</li>
+                  <li>14</li>
+              </ul>
+    </div>
+        <div data-testid="integer-limited-component">
+      <ul id="integer-limited-list">
+                  <li>7</li>
+                  <li>14</li>
+              </ul>
+    </div>
+
+</div>
+',
+        'cacheability' => $default_cacheability,
+        'attachments' => [
+          'library' => [
+            'core/components.canvas_test_sdc--multivalue-props',
+            'core/components.canvas_test_sdc--multivalue-props',
           ],
         ],
       ],
@@ -2217,6 +2317,265 @@ HTML
           ],
         ],
       ],
+      'sdc.canvas_test_sdc.multivalue-props' => [
+        'prop_field_definitions' => [
+          'text' => [
+            'required' => FALSE,
+            'field_type' => 'string',
+            'cardinality' => -1,
+            'field_storage_settings' => [],
+            'field_instance_settings' => [],
+            'field_widget' => 'string_textfield',
+            'default_value' => [
+              0 => [
+                'value' => 'Hello World',
+              ],
+              1 => [
+                'value' => 'Sample Text',
+              ],
+            ],
+            'expression' => 'ℹ︎string␟value',
+          ],
+          'text_limited' => [
+            'required' => FALSE,
+            'field_type' => 'string',
+            'cardinality' => 3,
+            'field_storage_settings' => [],
+            'field_instance_settings' => [],
+            'field_widget' => 'string_textfield',
+            'default_value' => [
+              0 => [
+                'value' => 'Hello World',
+              ],
+              1 => [
+                'value' => 'Sample Text',
+              ],
+            ],
+            'expression' => 'ℹ︎string␟value',
+          ],
+          'text_required' => [
+            'required' => TRUE,
+            'field_type' => 'string',
+            'cardinality' => -1,
+            'field_storage_settings' => [],
+            'field_instance_settings' => [],
+            'field_widget' => 'string_textfield',
+            'default_value' => [
+              0 => [
+                'value' => 'Required Text 1',
+              ],
+              1 => [
+                'value' => 'Required Text 2',
+              ],
+            ],
+            'expression' => 'ℹ︎string␟value',
+          ],
+          'link' => [
+            'required' => FALSE,
+            'field_type' => 'link',
+            'cardinality' => -1,
+            'field_storage_settings' => [],
+            'field_instance_settings' => [
+              'title' => 0,
+              'link_type' => 16,
+            ],
+            'field_widget' => 'link_default',
+            'default_value' => [
+              0 => [
+                'uri' => 'https://drupal.org',
+                'options' => [],
+              ],
+              1 => [
+                'uri' => 'https://example.com',
+                'options' => [],
+              ],
+            ],
+            'expression' => 'ℹ︎link␟url',
+          ],
+          'link_limited' => [
+            'required' => FALSE,
+            'field_type' => 'link',
+            'cardinality' => 3,
+            'field_storage_settings' => [],
+            'field_instance_settings' => [
+              'title' => 0,
+              'link_type' => 16,
+            ],
+            'field_widget' => 'link_default',
+            'default_value' => [
+              0 => [
+                'uri' => 'https://drupal.org',
+                'options' => [],
+              ],
+              1 => [
+                'uri' => 'https://example.com',
+                'options' => [],
+              ],
+            ],
+            'expression' => 'ℹ︎link␟url',
+          ],
+          'relative_link' => [
+            'required' => FALSE,
+            'field_type' => 'link',
+            'cardinality' => -1,
+            'field_storage_settings' => [],
+            'field_instance_settings' => [
+              'title' => 0,
+              'link_type' => 17,
+            ],
+            'field_widget' => 'link_default',
+            'default_value' => [
+              0 => [
+                'uri' => '/about',
+                'options' => [],
+              ],
+              1 => [
+                'uri' => '/contact',
+                'options' => [],
+              ],
+            ],
+            'expression' => 'ℹ︎link␟url',
+          ],
+          'relative_link_limited' => [
+            'required' => FALSE,
+            'field_type' => 'link',
+            'cardinality' => 3,
+            'field_storage_settings' => [],
+            'field_instance_settings' => [
+              'title' => 0,
+              'link_type' => 17,
+            ],
+            'field_widget' => 'link_default',
+            'default_value' => [
+              0 => [
+                'uri' => '/about',
+                'options' => [],
+              ],
+              1 => [
+                'uri' => '/contact',
+                'options' => [],
+              ],
+            ],
+            'expression' => 'ℹ︎link␟url',
+          ],
+          'number' => [
+            'required' => FALSE,
+            'field_type' => 'float',
+            'cardinality' => -1,
+            'field_storage_settings' => [],
+            'field_instance_settings' => [],
+            'field_widget' => 'number',
+            'default_value' => [
+              0 => [
+                'value' => 42.0,
+              ],
+              1 => [
+                'value' => 100.0,
+              ],
+            ],
+            'expression' => 'ℹ︎float␟value',
+          ],
+          'number_limited' => [
+            'required' => FALSE,
+            'field_type' => 'float',
+            'cardinality' => 3,
+            'field_storage_settings' => [],
+            'field_instance_settings' => [],
+            'field_widget' => 'number',
+            'default_value' => [
+              0 => [
+                'value' => 42.0,
+              ],
+              1 => [
+                'value' => 100.0,
+              ],
+            ],
+            'expression' => 'ℹ︎float␟value',
+          ],
+          'integer' => [
+            'required' => FALSE,
+            'field_type' => 'integer',
+            'cardinality' => -1,
+            'field_storage_settings' => [],
+            'field_instance_settings' => [],
+            'field_widget' => 'number',
+            'default_value' => [
+              0 => [
+                'value' => 7,
+              ],
+              1 => [
+                'value' => 14,
+              ],
+            ],
+            'expression' => 'ℹ︎integer␟value',
+          ],
+          'integer_limited' => [
+            'required' => FALSE,
+            'field_type' => 'integer',
+            'cardinality' => 3,
+            'field_storage_settings' => [],
+            'field_instance_settings' => [],
+            'field_widget' => 'number',
+            'default_value' => [
+              0 => [
+                'value' => 7,
+              ],
+              1 => [
+                'value' => 14,
+              ],
+            ],
+            'expression' => 'ℹ︎integer␟value',
+          ],
+          'datetime' => [
+            'required' => FALSE,
+            'field_type' => 'datetime',
+            'cardinality' => -1,
+            'field_storage_settings' => [
+              'datetime_type' => 'datetime',
+            ],
+            'field_instance_settings' => [],
+            'field_widget' => 'datetime_default',
+            'default_value' => NULL,
+            'expression' => 'ℹ︎datetime␟value',
+          ],
+          'datetime_limited' => [
+            'required' => FALSE,
+            'field_type' => 'datetime',
+            'cardinality' => 3,
+            'field_storage_settings' => [
+              'datetime_type' => 'datetime',
+            ],
+            'field_instance_settings' => [],
+            'field_widget' => 'datetime_default',
+            'default_value' => NULL,
+            'expression' => 'ℹ︎datetime␟value',
+          ],
+          'date' => [
+            'required' => FALSE,
+            'field_type' => 'datetime',
+            'cardinality' => -1,
+            'field_storage_settings' => [
+              'datetime_type' => 'date',
+            ],
+            'field_instance_settings' => [],
+            'field_widget' => 'datetime_default',
+            'default_value' => NULL,
+            'expression' => 'ℹ︎datetime␟value',
+          ],
+          'date_limited' => [
+            'required' => FALSE,
+            'field_type' => 'datetime',
+            'cardinality' => 3,
+            'field_storage_settings' => [
+              'datetime_type' => 'date',
+            ],
+            'field_instance_settings' => [],
+            'field_widget' => 'datetime_default',
+            'default_value' => NULL,
+            'expression' => 'ℹ︎datetime␟value',
+          ],
+        ],
+      ],
       'sdc.canvas_test_sdc.my-cta' => [
         'prop_field_definitions' => [
           'text' => [
@@ -2394,6 +2753,44 @@ HTML
             'field_widget' => 'string_textfield',
             'default_value' => [0 => ['value' => 'There goes my hero']],
             'expression' => 'ℹ︎string␟value',
+          ],
+        ],
+      ],
+      'sdc.canvas_test_sdc.select-fields' => [
+        'prop_field_definitions' => [
+          'size' => [
+            'required' => FALSE,
+            'field_type' => 'list_string',
+            'field_storage_settings' => [
+              'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
+            ],
+            'field_instance_settings' => [],
+            'field_widget' => 'options_select',
+            'default_value' => [
+              [
+                'value' => 'medium',
+              ],
+            ],
+            'expression' => 'ℹ︎list_string␟value',
+          ],
+          'colors' => [
+            'required' => FALSE,
+            'field_type' => 'list_string',
+            'cardinality' => -1,
+            'field_storage_settings' => [
+              'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
+            ],
+            'field_instance_settings' => [],
+            'field_widget' => 'options_select',
+            'default_value' => [
+              [
+                'value' => 'red',
+              ],
+              [
+                'value' => 'blue',
+              ],
+            ],
+            'expression' => 'ℹ︎list_string␟value',
           ],
         ],
       ],
@@ -2920,6 +3317,14 @@ HTML
           'canvas_test_sdc',
         ],
       ],
+      'sdc.canvas_test_sdc.multivalue-props' => [
+        'module' => [
+          'core',
+          'datetime',
+          'link',
+          'canvas_test_sdc',
+        ],
+      ],
       'sdc.canvas_test_sdc.my-cta' => [
         'module' => [
           'core',
@@ -2957,6 +3362,13 @@ HTML
       'sdc.canvas_test_sdc.props-slots' => [
         'module' => [
           'core',
+          'canvas_test_sdc',
+        ],
+      ],
+      'sdc.canvas_test_sdc.select-fields' => [
+        'module' => [
+          'core',
+          'options',
           'canvas_test_sdc',
         ],
       ],
@@ -3840,12 +4252,6 @@ HTML
                   'green_light',
                   'yellow',
                 ],
-                'meta:enum' => [
-                  'red' => 'Red',
-                  'blue' => 'Blue',
-                  'green.light' => 'Light Green',
-                  'yellow' => 'Yellow',
-                ],
               ],
             ],
             'sourceType' => 'static:field_item:list_string',
@@ -4666,6 +5072,431 @@ HTML
         ],
         'transforms' => [],
       ],
+      'sdc.canvas_test_sdc.multivalue-props' => [
+        'expected_output_selectors' => [
+          'div[data-testid="multivalue-props-component"]',
+        ],
+        'source' => 'Module component',
+        'metadata' => ['slots' => []],
+        'propSources' => [
+          'text' => [
+            'required' => FALSE,
+            'jsonSchema' => [
+              'type' => 'array',
+              'items' => [
+                'type' => 'string',
+              ],
+            ],
+            'sourceType' => 'static:field_item:string',
+            'expression' => 'ℹ︎string␟value',
+            'sourceTypeSettings' => [
+              'cardinality' => FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
+            ],
+            'default_values' => [
+              'source' => [
+                0 => [
+                  'value' => 'Hello World',
+                ],
+                1 => [
+                  'value' => 'Sample Text',
+                ],
+              ],
+              'resolved' => [
+                0 => 'Hello World',
+                1 => 'Sample Text',
+              ],
+            ],
+          ],
+          'text_limited' => [
+            'required' => FALSE,
+            'jsonSchema' => [
+              'type' => 'array',
+              'items' => [
+                'type' => 'string',
+              ],
+              'maxItems' => 3,
+            ],
+            'sourceType' => 'static:field_item:string',
+            'expression' => 'ℹ︎string␟value',
+            'sourceTypeSettings' => [
+              'cardinality' => 3,
+            ],
+            'default_values' => [
+              'source' => [
+                0 => [
+                  'value' => 'Hello World',
+                ],
+                1 => [
+                  'value' => 'Sample Text',
+                ],
+              ],
+              'resolved' => [
+                0 => 'Hello World',
+                1 => 'Sample Text',
+              ],
+            ],
+          ],
+          'text_required' => [
+            'required' => TRUE,
+            'jsonSchema' => [
+              'type' => 'array',
+              'items' => [
+                'type' => 'string',
+              ],
+            ],
+            'sourceType' => 'static:field_item:string',
+            'expression' => 'ℹ︎string␟value',
+            'sourceTypeSettings' => [
+              'cardinality' => FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
+            ],
+            'default_values' => [
+              'source' => [
+                0 => [
+                  'value' => 'Required Text 1',
+                ],
+                1 => [
+                  'value' => 'Required Text 2',
+                ],
+              ],
+              'resolved' => [
+                0 => 'Required Text 1',
+                1 => 'Required Text 2',
+              ],
+            ],
+          ],
+          'link' => [
+            'required' => FALSE,
+            'jsonSchema' => [
+              'type' => 'array',
+              'items' => [
+                'type' => 'string',
+                'format' => 'uri',
+              ],
+            ],
+            'sourceType' => 'static:field_item:link',
+            'expression' => 'ℹ︎link␟url',
+            'sourceTypeSettings' => [
+              'instance' => [
+                'title' => 0,
+                'link_type' => 16,
+              ],
+              'cardinality' => FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
+            ],
+            'default_values' => [
+              'source' => [
+                0 => [
+                  'uri' => 'https://drupal.org',
+                  'options' => [],
+                ],
+                1 => [
+                  'uri' => 'https://example.com',
+                  'options' => [],
+                ],
+              ],
+              'resolved' => [
+                0 => 'https://drupal.org',
+                1 => 'https://example.com',
+              ],
+            ],
+          ],
+          'link_limited' => [
+            'required' => FALSE,
+            'jsonSchema' => [
+              'type' => 'array',
+              'items' => [
+                'type' => 'string',
+                'format' => 'uri',
+              ],
+              'maxItems' => 3,
+            ],
+            'sourceType' => 'static:field_item:link',
+            'expression' => 'ℹ︎link␟url',
+            'sourceTypeSettings' => [
+              'instance' => [
+                'title' => 0,
+                'link_type' => 16,
+              ],
+              'cardinality' => 3,
+            ],
+            'default_values' => [
+              'source' => [
+                0 => [
+                  'uri' => 'https://drupal.org',
+                  'options' => [],
+                ],
+                1 => [
+                  'uri' => 'https://example.com',
+                  'options' => [],
+                ],
+              ],
+              'resolved' => [
+                0 => 'https://drupal.org',
+                1 => 'https://example.com',
+              ],
+            ],
+          ],
+          'relative_link' => [
+            'required' => FALSE,
+            'jsonSchema' => [
+              'type' => 'array',
+              'items' => [
+                'type' => 'string',
+                'format' => 'uri-reference',
+              ],
+            ],
+            'sourceType' => 'static:field_item:link',
+            'expression' => 'ℹ︎link␟url',
+            'sourceTypeSettings' => [
+              'instance' => [
+                'title' => 0,
+                'link_type' => 17,
+              ],
+              'cardinality' => FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
+            ],
+            'default_values' => [
+              'source' => [
+                0 => [
+                  'uri' => '/about',
+                  'options' => [],
+                ],
+                1 => [
+                  'uri' => '/contact',
+                  'options' => [],
+                ],
+              ],
+              'resolved' => [
+                0 => '/about',
+                1 => '/contact',
+              ],
+            ],
+          ],
+          'relative_link_limited' => [
+            'required' => FALSE,
+            'jsonSchema' => [
+              'type' => 'array',
+              'items' => [
+                'type' => 'string',
+                'format' => 'uri-reference',
+              ],
+              'maxItems' => 3,
+            ],
+            'sourceType' => 'static:field_item:link',
+            'expression' => 'ℹ︎link␟url',
+            'sourceTypeSettings' => [
+              'instance' => [
+                'title' => 0,
+                'link_type' => 17,
+              ],
+              'cardinality' => 3,
+            ],
+            'default_values' => [
+              'source' => [
+                0 => [
+                  'uri' => '/about',
+                  'options' => [],
+                ],
+                1 => [
+                  'uri' => '/contact',
+                  'options' => [],
+                ],
+              ],
+              'resolved' => [
+                0 => '/about',
+                1 => '/contact',
+              ],
+            ],
+          ],
+          'number' => [
+            'required' => FALSE,
+            'jsonSchema' => [
+              'type' => 'array',
+              'items' => [
+                'type' => 'number',
+              ],
+            ],
+            'sourceType' => 'static:field_item:float',
+            'expression' => 'ℹ︎float␟value',
+            'sourceTypeSettings' => [
+              'cardinality' => FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
+            ],
+            'default_values' => [
+              'source' => [
+                0 => [
+                  'value' => 42.0,
+                ],
+                1 => [
+                  'value' => 100.0,
+                ],
+              ],
+              'resolved' => [
+                0 => 42.0,
+                1 => 100.0,
+              ],
+            ],
+          ],
+          'number_limited' => [
+            'required' => FALSE,
+            'jsonSchema' => [
+              'type' => 'array',
+              'items' => [
+                'type' => 'number',
+              ],
+              'maxItems' => 3,
+            ],
+            'sourceType' => 'static:field_item:float',
+            'expression' => 'ℹ︎float␟value',
+            'sourceTypeSettings' => [
+              'cardinality' => 3,
+            ],
+            'default_values' => [
+              'source' => [
+                0 => [
+                  'value' => 42.0,
+                ],
+                1 => [
+                  'value' => 100.0,
+                ],
+              ],
+              'resolved' => [
+                0 => 42.0,
+                1 => 100.0,
+              ],
+            ],
+          ],
+          'integer' => [
+            'required' => FALSE,
+            'jsonSchema' => [
+              'type' => 'array',
+              'items' => [
+                'type' => 'integer',
+              ],
+            ],
+            'sourceType' => 'static:field_item:integer',
+            'expression' => 'ℹ︎integer␟value',
+            'sourceTypeSettings' => [
+              'cardinality' => FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
+            ],
+            'default_values' => [
+              'source' => [
+                0 => [
+                  'value' => 7,
+                ],
+                1 => [
+                  'value' => 14,
+                ],
+              ],
+              'resolved' => [
+                0 => 7,
+                1 => 14,
+              ],
+            ],
+          ],
+          'integer_limited' => [
+            'required' => FALSE,
+            'jsonSchema' => [
+              'type' => 'array',
+              'items' => [
+                'type' => 'integer',
+              ],
+              'maxItems' => 3,
+            ],
+            'sourceType' => 'static:field_item:integer',
+            'expression' => 'ℹ︎integer␟value',
+            'sourceTypeSettings' => [
+              'cardinality' => 3,
+            ],
+            'default_values' => [
+              'source' => [
+                0 => [
+                  'value' => 7,
+                ],
+                1 => [
+                  'value' => 14,
+                ],
+              ],
+              'resolved' => [
+                0 => 7,
+                1 => 14,
+              ],
+            ],
+          ],
+          'datetime' => [
+            'required' => FALSE,
+            'jsonSchema' => [
+              'type' => 'array',
+              'items' => [
+                'type' => 'string',
+                'format' => 'date-time',
+              ],
+            ],
+            'sourceType' => 'static:field_item:datetime',
+            'expression' => 'ℹ︎datetime␟value',
+            'sourceTypeSettings' => [
+              'storage' => [
+                'datetime_type' => 'datetime',
+              ],
+              'cardinality' => FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
+            ],
+          ],
+          'datetime_limited' => [
+            'required' => FALSE,
+            'jsonSchema' => [
+              'type' => 'array',
+              'items' => [
+                'type' => 'string',
+                'format' => 'date-time',
+              ],
+              'maxItems' => 3,
+            ],
+            'sourceType' => 'static:field_item:datetime',
+            'expression' => 'ℹ︎datetime␟value',
+            'sourceTypeSettings' => [
+              'storage' => [
+                'datetime_type' => 'datetime',
+              ],
+              'cardinality' => 3,
+            ],
+          ],
+          'date' => [
+            'required' => FALSE,
+            'jsonSchema' => [
+              'type' => 'array',
+              'items' => [
+                'type' => 'string',
+                'format' => 'date',
+              ],
+            ],
+            'sourceType' => 'static:field_item:datetime',
+            'expression' => 'ℹ︎datetime␟value',
+            'sourceTypeSettings' => [
+              'storage' => [
+                'datetime_type' => 'date',
+              ],
+              'cardinality' => FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
+            ],
+          ],
+          'date_limited' => [
+            'required' => FALSE,
+            'jsonSchema' => [
+              'type' => 'array',
+              'items' => [
+                'type' => 'string',
+                'format' => 'date',
+              ],
+              'maxItems' => 3,
+            ],
+            'sourceType' => 'static:field_item:datetime',
+            'expression' => 'ℹ︎datetime␟value',
+            'sourceTypeSettings' => [
+              'storage' => [
+                'datetime_type' => 'date',
+              ],
+              'cardinality' => 3,
+            ],
+          ],
+        ],
+        'transforms' => [],
+      ],
       'sdc.canvas_test_sdc.my-cta' => [
         'expected_output_selectors' => [
           'a:contains("Press")',
@@ -4983,6 +5814,72 @@ HTML
                 0 => ['value' => 'There goes my hero'],
               ],
               'resolved' => 'There goes my hero',
+            ],
+          ],
+        ],
+        'transforms' => [],
+      ],
+      'sdc.canvas_test_sdc.select-fields' => [
+        'expected_output_selectors' => [
+          ':contains("medium")',
+          ':contains("red")',
+          ':contains("blue")',
+        ],
+        'source' => 'Module component',
+        'metadata' => ['slots' => []],
+        'propSources' => [
+          'size' => [
+            'required' => FALSE,
+            'jsonSchema' => [
+              'type' => 'string',
+              'enum' => [
+                'small',
+                'medium',
+                'large',
+              ],
+            ],
+            'sourceType' => 'static:field_item:list_string',
+            'expression' => 'ℹ︎list_string␟value',
+            'sourceTypeSettings' => [
+              'storage' => [
+                'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
+              ],
+            ],
+            'default_values' => [
+              'source' => [
+                0 => ['value' => 'medium'],
+              ],
+              'resolved' => 'medium',
+            ],
+          ],
+          'colors' => [
+            'required' => FALSE,
+            'jsonSchema' => [
+              'type' => 'array',
+              'items' => [
+                'type' => 'string',
+                'enum' => [
+                  'red',
+                  'green',
+                  'blue',
+                  'yellow',
+                ],
+              ],
+            ],
+            'sourceType' => 'static:field_item:list_string',
+            'expression' => 'ℹ︎list_string␟value',
+            'sourceTypeSettings' => [
+              'storage' => [
+                'allowed_values_function' => 'canvas_load_allowed_values_for_component_prop',
+              ],
+              'cardinality' => -1,
+            ],
+            'default_values' => [
+              'source' => [
+                0 => ['value' => 'red'],
+                1 => ['value' => 'blue'],
+              ],
+              'resolved' => ['red', 'blue'],
             ],
           ],
         ],
