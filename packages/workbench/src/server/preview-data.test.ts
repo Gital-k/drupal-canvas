@@ -270,6 +270,10 @@ describe('preview-data', () => {
           name: 'card',
           jsEntryPath: '/tmp/card.tsx',
         },
+        {
+          name: 'js.hero',
+          jsEntryPath: '/tmp/hero.tsx',
+        },
       ],
       cssEntryPaths: ['/tmp/global.css'],
     });
@@ -280,6 +284,18 @@ describe('preview-data', () => {
     );
     expect(source).toContain(
       'window.drupalSettings.canvasData.v0.baseUrl = window.location.origin;',
+    );
+    expect(source).toContain(
+      '"card": typeof Component0 === \'function\' ? Component0 : () => null',
+    );
+    expect(source).toContain(
+      '"js.card": typeof Component0 === \'function\' ? Component0 : () => null',
+    );
+    expect(source).toContain(
+      '"js.hero": typeof Component1 === \'function\' ? Component1 : () => null',
+    );
+    expect(source).toContain(
+      '"hero": typeof Component1 === \'function\' ? Component1 : () => null',
     );
   });
 

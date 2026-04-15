@@ -114,11 +114,20 @@ export function buildPreviewRuntimeEntrySource(options: {
   const cssImports = options.cssEntryPaths
     .map((cssPath) => `import ${JSON.stringify(toImportPath(cssPath))};`)
     .join('\n');
-  const registryEntries = options.componentSources
-    .map(
-      (source, index) =>
-        `${JSON.stringify(source.name)}: typeof Component${index} === 'function' ? Component${index} : () => null`,
-    )
+  const registryEntryByName = new Map<string, string>();
+  options.componentSources.forEach((source, index) => {
+    const componentReference = `typeof Component${index} === 'function' ? Component${index} : () => null`;
+
+    toRuntimeRegistryNames(source.name).forEach((name) => {
+      if (!registryEntryByName.has(name)) {
+        registryEntryByName.set(name, componentReference);
+      }
+    });
+  });
+  const registryEntries = [...registryEntryByName.entries()]
+    .map(([name, componentReference]) => {
+      return `${JSON.stringify(name)}: ${componentReference}`;
+    })
     .join(',\n');
 
   return [
@@ -149,6 +158,27 @@ export function buildPreviewRuntimeEntrySource(options: {
 
 function normalizePath(value: string): string {
   return value.replaceAll('\\', '/');
+}
+
+function toRuntimeRegistryNames(componentName: string): string[] {
+  const trimmedName = componentName.trim();
+  if (trimmedName.length === 0) {
+    return [];
+  }
+
+  const names = new Set<string>([trimmedName]);
+  const canonicalName = trimmedName.startsWith('js.')
+    ? trimmedName.slice(3)
+    : trimmedName;
+
+  if (canonicalName.length > 0) {
+    names.add(canonicalName);
+    names.add(canonicalName.toLowerCase());
+    names.add(`js.${canonicalName}`);
+    names.add(`js.${canonicalName.toLowerCase()}`);
+  }
+
+  return [...names];
 }
 
 function toProjectRelativePath(
