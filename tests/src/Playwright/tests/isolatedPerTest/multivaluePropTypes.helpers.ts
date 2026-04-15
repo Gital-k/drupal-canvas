@@ -112,13 +112,15 @@ export async function typeInPopoverWithoutCommit(
 }
 
 /**
- * Closes the currently open popover by clicking the × (Close) button.
+ * Closes the currently open popover by pressing Escape.
+ * Using Escape key instead of clicking the Close button avoids issues with
+ * UI elements (like resize handles) intercepting pointer events.
  * Verifies the dialog closes successfully.
  * @param page - The Playwright Page object
  */
 export async function closePopoverViaCloseButton(page: Page): Promise<void> {
   const dialog = page.locator('[role="dialog"][data-state="open"]');
-  await dialog.locator('[aria-label="Close"]').click();
+  await page.keyboard.press('Escape');
   await expect(dialog).not.toBeVisible();
 }
 

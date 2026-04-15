@@ -107,8 +107,7 @@ function registerNumericTypeTests(config: NumericTypeTestConfig): void {
       const dialog = page.locator('[role="dialog"][data-state="open"]');
       await expect(dialog.locator('input[type="number"]')).toHaveValue(val1);
       await expect(dialog.locator('[aria-label="Close"]')).toBeVisible();
-      await dialog.locator('[aria-label="Close"]').click();
-      await expect(dialog).not.toBeVisible();
+      await closePopoverViaCloseButton(page);
     });
 
     test(`popover header shows the correct field label for unlimited ${typeName}`, async ({
@@ -120,7 +119,7 @@ function registerNumericTypeTests(config: NumericTypeTestConfig): void {
       await expect(dialog.locator('[class*="_popoverLabel_"]')).toHaveText(
         unlimitedLabel,
       );
-      await dialog.locator('[aria-label="Close"]').click();
+      await closePopoverViaCloseButton(page);
     });
 
     test('can reorder items using drag and drop', async ({ page, canvas }) => {
@@ -240,7 +239,7 @@ function registerNumericTypeTests(config: NumericTypeTestConfig): void {
       await expect(removeButton).toBeVisible();
       await expect(removeButton).toBeDisabled();
       await expect(removeButton).toHaveAttribute('data-disabled', 'true');
-      await dialog.locator('[aria-label="Close"]').click();
+      await closePopoverViaCloseButton(page);
     });
 
     test('can reorder items using drag and drop', async ({ page, canvas }) => {
@@ -313,7 +312,7 @@ test.describe('Multivalue Prop Types', () => {
       }) => {
         const field = getField(page, PROP_NAMES.TEXT);
         await clickAddNew(field);
-        await expect(field.locator('tbody tr')).toHaveCount(4);
+        await expect(field.locator('tbody tr')).toHaveCount(3);
         await openPopoverForRow(page, field, 2);
         await typeInPopover(page, '.form-text', 'Marshmallow Coast');
         await verifyRowText(field, 2, 'Marshmallow Coast');
@@ -367,8 +366,7 @@ test.describe('Multivalue Prop Types', () => {
           'Hello World',
         );
         await expect(dialog.locator('[aria-label="Close"]')).toBeVisible();
-        await dialog.locator('[aria-label="Close"]').click();
-        await expect(dialog).not.toBeVisible();
+        await closePopoverViaCloseButton(page);
       });
 
       test('popover header shows the correct field label for unlimited text', async ({
@@ -380,7 +378,7 @@ test.describe('Multivalue Prop Types', () => {
         await expect(dialog.locator('[class*="_popoverLabel_"]')).toHaveText(
           'Text (Unlimited)',
         );
-        await dialog.locator('[aria-label="Close"]').click();
+        await closePopoverViaCloseButton(page);
       });
 
       test('can reorder items using drag and drop', async ({
@@ -424,7 +422,7 @@ test.describe('Multivalue Prop Types', () => {
       }) => {
         const field = getField(page, PROP_NAMES.TEXT);
         await clickAddNew(field);
-        await expect(field.locator('tbody tr')).toHaveCount(4);
+        await expect(field.locator('tbody tr')).toHaveCount(3);
         await openPopoverForRow(page, field, 2);
         await typeInPopover(page, '.form-text', 'Persisted Value');
         await verifyRowText(field, 2, 'Persisted Value');
@@ -524,7 +522,7 @@ test.describe('Multivalue Prop Types', () => {
         await expect(removeButton).toBeVisible();
         await expect(removeButton).toBeDisabled();
         await expect(removeButton).toHaveAttribute('data-disabled', 'true');
-        await dialog.locator('[aria-label="Close"]').click();
+        await closePopoverViaCloseButton(page);
       });
 
       test('popover header shows the correct field label for limited text', async ({
@@ -536,7 +534,7 @@ test.describe('Multivalue Prop Types', () => {
         await expect(dialog.locator('[class*="_popoverLabel_"]')).toHaveText(
           'Text (Limited)',
         );
-        await dialog.locator('[aria-label="Close"]').click();
+        await closePopoverViaCloseButton(page);
       });
 
       test('can reorder items using drag and drop', async ({
@@ -612,7 +610,7 @@ test.describe('Multivalue Prop Types', () => {
         await expect(removeButton).toBeVisible();
         await expect(removeButton).toBeDisabled();
         await expect(removeButton).toHaveAttribute('data-disabled', 'true');
-        await dialog.locator('[aria-label="Close"]').click();
+        await closePopoverViaCloseButton(page);
 
         // Add a second item.
         await clickAddNew(field);
@@ -627,7 +625,7 @@ test.describe('Multivalue Prop Types', () => {
         const removeButton2 = dialog2.getByRole('button', { name: /Remove/i });
         await expect(removeButton2).toBeVisible();
         await expect(removeButton2).toBeEnabled();
-        await dialog2.locator('[aria-label="Close"]').click();
+        await page.keyboard.press('Escape'); await expect(dialog2).not.toBeVisible();
       });
     });
   });
@@ -651,7 +649,7 @@ test.describe('Multivalue Prop Types', () => {
       }) => {
         const field = getField(page, PROP_NAMES.LINK);
         await clickAddNew(field);
-        await expect(field.locator('tbody tr')).toHaveCount(4);
+        await expect(field.locator('tbody tr')).toHaveCount(3);
         await openPopoverForRow(page, field, 2);
         await typeInPopover(
           page,
@@ -713,8 +711,7 @@ test.describe('Multivalue Prop Types', () => {
           'https://drupal.org',
         );
         await expect(dialog.locator('[aria-label="Close"]')).toBeVisible();
-        await dialog.locator('[aria-label="Close"]').click();
-        await expect(dialog).not.toBeVisible();
+        await closePopoverViaCloseButton(page);
       });
 
       test('popover header shows the correct field label for unlimited link', async ({
@@ -726,7 +723,7 @@ test.describe('Multivalue Prop Types', () => {
         await expect(dialog.locator('[class*="_popoverLabel_"]')).toHaveText(
           'Link (Unlimited)',
         );
-        await dialog.locator('[aria-label="Close"]').click();
+        await closePopoverViaCloseButton(page);
       });
 
       test('can reorder items using drag and drop', async ({
@@ -790,7 +787,7 @@ test.describe('Multivalue Prop Types', () => {
       }) => {
         const field = getField(page, PROP_NAMES.LINK);
         await clickAddNew(field);
-        await expect(field.locator('tbody tr')).toHaveCount(4);
+        await expect(field.locator('tbody tr')).toHaveCount(3);
         await openPopoverForRow(page, field, 2);
         await typeInPopover(page, 'input[type="url"]', 'https://persisted.com');
         await verifyRowText(field, 2, 'https://persisted.com');
@@ -896,7 +893,7 @@ test.describe('Multivalue Prop Types', () => {
         await expect(removeButton).toBeVisible();
         await expect(removeButton).toBeDisabled();
         await expect(removeButton).toHaveAttribute('data-disabled', 'true');
-        await dialog.locator('[aria-label="Close"]').click();
+        await closePopoverViaCloseButton(page);
       });
 
       test('popover header shows the correct field label for limited link', async ({
@@ -908,7 +905,7 @@ test.describe('Multivalue Prop Types', () => {
         await expect(dialog.locator('[class*="_popoverLabel_"]')).toHaveText(
           'Link (Limited)',
         );
-        await dialog.locator('[aria-label="Close"]').click();
+        await closePopoverViaCloseButton(page);
       });
 
       test('can reorder items using drag and drop', async ({
@@ -985,7 +982,7 @@ test.describe('Multivalue Prop Types', () => {
     test('number type accepts decimal values', async ({ page, canvas }) => {
       const field = getField(page, PROP_NAMES.NUMBER);
       await clickAddNew(field);
-      await expect(field.locator('tbody tr')).toHaveCount(4);
+      await expect(field.locator('tbody tr')).toHaveCount(3);
       await openPopoverForRow(page, field, 2);
       const decimalValue = '123.45';
       await typeInPopover(page, 'input[type="number"]', decimalValue);
@@ -1005,7 +1002,7 @@ test.describe('Multivalue Prop Types', () => {
     test('integer type rejects decimal values', async ({ page }) => {
       const field = getField(page, PROP_NAMES.INTEGER);
       await clickAddNew(field);
-      await expect(field.locator('tbody tr')).toHaveCount(4);
+      await expect(field.locator('tbody tr')).toHaveCount(3);
       await openPopoverForRow(page, field, 2);
       const decimalValue = '123.45';
       const input = page
@@ -1138,8 +1135,7 @@ test.describe('Multivalue Prop Types', () => {
         await expect(dialog.locator('input[type="date"]')).toHaveValue('');
         await expect(dialog.locator('input[type="time"]')).toBeVisible();
         await expect(dialog.locator('[aria-label="Close"]')).toBeVisible();
-        await dialog.locator('[aria-label="Close"]').click();
-        await expect(dialog).not.toBeVisible();
+        await closePopoverViaCloseButton(page);
       });
 
       test('popover header shows the correct field label for unlimited datetime', async ({
@@ -1151,7 +1147,7 @@ test.describe('Multivalue Prop Types', () => {
         await expect(dialog.locator('[class*="_popoverLabel_"]')).toHaveText(
           'DateTime (Unlimited)',
         );
-        await dialog.locator('[aria-label="Close"]').click();
+        await closePopoverViaCloseButton(page);
       });
       // @todo: Remove Skip from test once https://www.drupal.org/i/3582883 lands in as
       // this fixes the issue.
@@ -1354,7 +1350,7 @@ test.describe('Multivalue Prop Types', () => {
         await expect(removeButton).toBeVisible();
         await expect(removeButton).toBeDisabled();
         await expect(removeButton).toHaveAttribute('data-disabled', 'true');
-        await dialog.locator('[aria-label="Close"]').click();
+        await closePopoverViaCloseButton(page);
       });
 
       test('popover header shows the correct field label for limited datetime', async ({
@@ -1366,7 +1362,7 @@ test.describe('Multivalue Prop Types', () => {
         await expect(dialog.locator('[class*="_popoverLabel_"]')).toHaveText(
           'DateTime (Limited)',
         );
-        await dialog.locator('[aria-label="Close"]').click();
+        await closePopoverViaCloseButton(page);
       });
 
       // @todo: Remove Skip from test once https://www.drupal.org/i/3582883 lands in as
@@ -1501,8 +1497,7 @@ test.describe('Multivalue Prop Types', () => {
         const dialog = page.locator('[role="dialog"][data-state="open"]');
         await expect(dialog.locator('input[type="date"]')).toHaveValue('');
         await expect(dialog.locator('[aria-label="Close"]')).toBeVisible();
-        await dialog.locator('[aria-label="Close"]').click();
-        await expect(dialog).not.toBeVisible();
+        await closePopoverViaCloseButton(page);
       });
 
       test('popover header shows the correct field label for unlimited date', async ({
@@ -1514,7 +1509,7 @@ test.describe('Multivalue Prop Types', () => {
         await expect(dialog.locator('[class*="_popoverLabel_"]')).toHaveText(
           'Date (Unlimited)',
         );
-        await dialog.locator('[aria-label="Close"]').click();
+        await closePopoverViaCloseButton(page);
       });
 
       test('popover discards uncommitted date changes when closed via × button', async ({
@@ -1671,7 +1666,7 @@ test.describe('Multivalue Prop Types', () => {
         await expect(removeButton).toBeVisible();
         await expect(removeButton).toBeDisabled();
         await expect(removeButton).toHaveAttribute('data-disabled', 'true');
-        await dialog.locator('[aria-label="Close"]').click();
+        await closePopoverViaCloseButton(page);
       });
 
       test('popover header shows the correct field label for limited date', async ({
@@ -1683,7 +1678,7 @@ test.describe('Multivalue Prop Types', () => {
         await expect(dialog.locator('[class*="_popoverLabel_"]')).toHaveText(
           'Date (Limited)',
         );
-        await dialog.locator('[aria-label="Close"]').click();
+        await closePopoverViaCloseButton(page);
       });
 
       // @todo: Remove Skip from test once https://www.drupal.org/i/3582883 lands in as
@@ -1836,8 +1831,7 @@ test.describe('Relative Link Component', () => {
       const dialog = page.locator('[role="dialog"][data-state="open"]');
       await expect(dialog.locator('input[type="text"]')).toHaveValue('/about');
       await expect(dialog.locator('[aria-label="Close"]')).toBeVisible();
-      await dialog.locator('[aria-label="Close"]').click();
-      await expect(dialog).not.toBeVisible();
+      await closePopoverViaCloseButton(page);
     });
 
     test('popover header shows the correct field label for unlimited relative_link', async ({
@@ -1849,7 +1843,7 @@ test.describe('Relative Link Component', () => {
       await expect(dialog.locator('[class*="_popoverLabel_"]')).toHaveText(
         'Relative Link (Unlimited)',
       );
-      await dialog.locator('[aria-label="Close"]').click();
+      await closePopoverViaCloseButton(page);
     });
 
     test('can reorder items using drag and drop', async ({ page, canvas }) => {
@@ -1983,7 +1977,7 @@ test.describe('Relative Link Component', () => {
       await expect(removeButton).toBeVisible();
       await expect(removeButton).toBeDisabled();
       await expect(removeButton).toHaveAttribute('data-disabled', 'true');
-      await dialog.locator('[aria-label="Close"]').click();
+      await closePopoverViaCloseButton(page);
     });
 
     test('popover header shows the correct field label for limited relative_link', async ({
@@ -1995,7 +1989,7 @@ test.describe('Relative Link Component', () => {
       await expect(dialog.locator('[class*="_popoverLabel_"]')).toHaveText(
         'Relative Link (Limited)',
       );
-      await dialog.locator('[aria-label="Close"]').click();
+      await closePopoverViaCloseButton(page);
     });
 
     test('can reorder items using drag and drop', async ({ page, canvas }) => {

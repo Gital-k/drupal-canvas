@@ -109,8 +109,14 @@ const DrupalDatetimeMultivalueForm = ({
   const getTimeInput = (): HTMLInputElement | null =>
     popoverContainer?.querySelector('input[type="time"]') ?? null;
 
-  // Handle Enter key press in popover inputs.
+  // Handle Enter and Escape key presses in popover inputs.
   const handleKeyDown = (e: React.KeyboardEvent<HTMLElement>) => {
+    // Handle Escape key to close popover without committing changes
+    if (e.key === 'Escape') {
+      setPopoverOpen(false);
+      return;
+    }
+
     if (e.key !== 'Enter') return;
 
     e.preventDefault();

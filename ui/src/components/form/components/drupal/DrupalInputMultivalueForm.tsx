@@ -73,8 +73,14 @@ const DrupalInputMultivalueForm = ({
     }
   }, [popoverOpen]);
 
-  // Handle Enter key press in popover input.
+  // Handle Enter and Escape key presses in popover input.
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Handle Escape key to close popover without committing changes
+    if (e.key === 'Escape') {
+      setPopoverOpen(false);
+      return;
+    }
+
     if (e.key === 'Enter') {
       // If a jQuery UI autocomplete suggestion was just selected synchronously
       // (before this React event handler ran via event delegation), do NOT
