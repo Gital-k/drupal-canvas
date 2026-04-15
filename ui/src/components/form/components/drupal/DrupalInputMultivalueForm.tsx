@@ -187,9 +187,6 @@ const DrupalInputMultivalueForm = ({
     if (triggerDrupalRemoveButton(triggerElement)) {
       return;
     }
-
-    // Fallback: no Drupal remove button (e.g. non-AJAX field), just clear.
-    setDisplayValue('');
   };
 
   return (

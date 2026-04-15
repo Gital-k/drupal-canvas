@@ -61,10 +61,6 @@ const formatTimeForDisplay = (value: string): string => {
  *
  * This component wraps the entire datetime widget (date + time inputs) and displays them
  * as a single combined value in the list view, with separate date and time inputs in the popover.
- *
- * The children (real Drupal date/time inputs) are rendered inside Popover.Content with
- * forceMount={true} so they remain in the DOM for form submission at all times, hidden
- * via CSS when the popover is closed.
  */
 const DrupalDatetimeMultivalueForm = ({
   children,
@@ -74,12 +70,6 @@ const DrupalDatetimeMultivalueForm = ({
   fieldLabel?: string;
 }) => {
   const triggerRowRef = useRef<HTMLDivElement | null>(null);
-  // Callback ref: state is set when Radix mounts the portal content, which
-  // may be deferred past the first render commit. Using state (rather than a
-  // ref) means the useEffect below re-runs reliably as soon as the node is
-  // available, without polling or an arbitrary timeout.
-  const [popoverContainer, setPopoverContainer] =
-    useState<HTMLDivElement | null>(null);
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [displayDate, setDisplayDate] = useState('');
   const [displayTime, setDisplayTime] = useState('');
@@ -88,10 +78,14 @@ const DrupalDatetimeMultivalueForm = ({
   // renders and correct before the popover container is first populated.
   const [hasTime, setHasTime] = useState(false);
 
+  // This state is set when Radix mounts the popover content, which
+  // may be deferred past the first render commit. Using state (rather than a
+  // ref) means the useEffect below re-runs reliably as soon as the node is
+  // available.
+  const [popoverContainer, setPopoverContainer] =
+    useState<HTMLDivElement | null>(null);
+
   // Read initial values from the inputs once the popover container is in the DOM.
-  // Depends only on popoverContainer: when children change (AJAX rebuild) Radix
-  // remounts the content node, which re-fires setPopoverContainer and re-runs
-  // this effect automatically.
   useEffect(() => {
     if (!popoverContainer) return;
 
@@ -115,30 +109,15 @@ const DrupalDatetimeMultivalueForm = ({
   const getTimeInput = (): HTMLInputElement | null =>
     popoverContainer?.querySelector('input[type="time"]') ?? null;
 
-  // Validate an input element; shows native validation UI and returns false if invalid.
-  const checkValid = (input: HTMLInputElement | null): boolean => {
-    if (input && !input.checkValidity()) {
-      input.reportValidity();
-      return false;
-    }
-    return true;
-  };
-
   // Handle Enter key press in popover inputs.
   const handleKeyDown = (e: React.KeyboardEvent<HTMLElement>) => {
     if (e.key !== 'Enter') return;
 
     e.preventDefault();
 
-    const inputElement = e.target as HTMLInputElement;
-
-    if (!checkValid(inputElement)) return;
-
-    // If the date input is valid, also validate the time input (if present).
-    if (inputElement.type === 'date' && !checkValid(getTimeInput())) return;
-
-    // If the time input is valid, also validate the date input.
-    if (inputElement.type === 'time' && !checkValid(getDateInput())) return;
+    if (popoverContainer?.querySelector('[data-has-field-error="true"]')) {
+      return;
+    }
 
     const dateInput = getDateInput();
     const timeInput = getTimeInput();
