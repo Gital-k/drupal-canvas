@@ -10,9 +10,11 @@ import { extractComponentPreviewMetadataFromComponentYaml } from '@drupal-canvas
 import { isSupportedPreviewModulePath } from '../lib/preview-runtime';
 import { toPreviewManifestComponentMocks } from '../lib/spec-discovery';
 import {
+  buildIframeHtml,
   buildPreviewDataPayload,
   bundleInteractivePreview,
   parsePreviewDataArgs,
+  resolvePreviewRuntimeSettings,
 } from './preview-data';
 
 import type { DiscoveryResult } from '@drupal-canvas/discovery';
@@ -217,44 +219,6 @@ export function extractInlineScript(
   }
 
   return match[1] ?? null;
-}
-
-function buildIframeHtml(js: string, css: string): string {
-  const escapedScript = js.replaceAll('</script>', '<\\/script>');
-  const escapedStyle = css.replaceAll('</style>', '<\\/style>');
-  const bootstrapScript = [
-    'window.drupalSettings = window.drupalSettings ?? {};',
-    'window.drupalSettings.canvasData = window.drupalSettings.canvasData ?? {};',
-    'window.drupalSettings.canvasData.v0 = window.drupalSettings.canvasData.v0 ?? {};',
-    "const canvasPreviewBaseUrl = window.location.origin !== 'null' ? window.location.origin : 'http://localhost';",
-    'if (typeof window.drupalSettings.canvasData.v0.baseUrl !== "string" || window.drupalSettings.canvasData.v0.baseUrl.length === 0) {',
-    '  window.drupalSettings.canvasData.v0.baseUrl = canvasPreviewBaseUrl;',
-    '}',
-  ]
-    .join('')
-    .replaceAll('</script>', '<\\/script>');
-
-  return [
-    '<!doctype html>',
-    '<html lang="en">',
-    '<head>',
-    '<meta charset="utf-8"/>',
-    '<meta name="viewport" content="width=device-width, initial-scale=1"/>',
-    '<style data-canvas-preview-css>',
-    escapedStyle,
-    '</style>',
-    '</head>',
-    '<body>',
-    '<div id="root"></div>',
-    '<script type="text/javascript" data-canvas-preview-bootstrap>',
-    bootstrapScript,
-    '</script>',
-    '<script type="text/javascript" data-canvas-preview-runtime>',
-    escapedScript,
-    '</script>',
-    '</body>',
-    '</html>',
-  ].join('');
 }
 
 function isSamePath(left: string, right: string): boolean {
@@ -505,6 +469,7 @@ export async function buildPreviewArtifact(
     dependencies.bundleInteractivePreview ?? bundleInteractivePreview;
   const outputDirectory = path.resolve(options.projectRoot, options.outDir);
   const combinedWarnings: PreviewDataIssue[] = [];
+  const runtimeSettings = resolvePreviewRuntimeSettings(options.projectRoot);
   let stagingDirectory: string | null = null;
 
   const previewDataPayload = await buildPayload({
@@ -685,7 +650,11 @@ export async function buildPreviewArtifact(
             componentSources: registrySources,
             cssEntryPaths: uniqueCssEntryPaths,
           });
-          const mockHtml = buildIframeHtml(bundleResult.js, bundleResult.css);
+          const mockHtml = buildIframeHtml(
+            bundleResult.js,
+            bundleResult.css,
+            runtimeSettings,
+          );
           const fileName = `component-mock-${String(mockIndex + 1).padStart(2, '0')}.html`;
 
           stagedHtmlFiles.push({
