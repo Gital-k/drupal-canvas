@@ -11,11 +11,10 @@ import { isSupportedPreviewModulePath } from '../lib/preview-runtime';
 import { toPreviewManifestComponentMocks } from '../lib/spec-discovery';
 import {
   buildIframeHtml,
-  buildPreviewDataPayload,
+  buildPreviewPayload,
   bundleInteractivePreview,
-  parsePreviewDataArgs,
   resolvePreviewRuntimeSettings,
-} from './preview-data';
+} from './preview-payload';
 
 import type { DiscoveryResult } from '@drupal-canvas/discovery';
 import type {
@@ -24,10 +23,11 @@ import type {
   PreviewWarning,
 } from '../lib/preview-contract';
 import type {
-  PreviewDataIssue,
-  PreviewDataRequest,
-  PreviewDataTarget,
-} from './preview-data';
+  PreviewIssue,
+  PreviewMode,
+  PreviewRequest,
+  PreviewTarget,
+} from './preview-payload';
 
 export interface PreviewBuildCliArgs {
   mode: 'component' | 'page';
@@ -43,14 +43,14 @@ export interface PreviewBuildSummary {
 
 export interface PreviewBuildPayload {
   ok: boolean;
-  request: PreviewDataRequest;
-  target: PreviewDataTarget | null;
+  request: PreviewRequest;
+  target: PreviewTarget | null;
   renderMode: 'interactive';
   outDir: string | null;
   manifestPath: string | null;
   summary: PreviewBuildSummary | null;
-  warnings: PreviewDataIssue[];
-  errors: PreviewDataIssue[];
+  warnings: PreviewIssue[];
+  errors: PreviewIssue[];
 }
 
 interface BuildPreviewArtifactOptions {
@@ -61,7 +61,7 @@ interface BuildPreviewArtifactOptions {
 }
 
 interface BuildPreviewArtifactDependencies {
-  buildPreviewDataPayload?: typeof buildPreviewDataPayload;
+  buildPreviewPayload?: typeof buildPreviewPayload;
   discover?: typeof discoverCanvasProject;
   resolveConfig?: typeof resolveCanvasConfig;
   extractMetadata?: typeof extractComponentPreviewMetadataFromComponentYaml;
@@ -118,7 +118,7 @@ function toIssue(
   code: string,
   message: string,
   issuePath?: string,
-): PreviewDataIssue {
+): PreviewIssue {
   return {
     code,
     message,
@@ -127,15 +127,15 @@ function toIssue(
 }
 
 function toPayload(
-  request: PreviewDataRequest,
+  request: PreviewRequest,
   options: {
     ok: boolean;
-    target?: PreviewDataTarget | null;
+    target?: PreviewTarget | null;
     outDir?: string | null;
     manifestPath?: string | null;
     summary?: PreviewBuildSummary | null;
-    warnings?: PreviewDataIssue[];
-    errors?: PreviewDataIssue[];
+    warnings?: PreviewIssue[];
+    errors?: PreviewIssue[];
   },
 ): PreviewBuildPayload {
   return {
@@ -158,6 +158,83 @@ function parsePreviewBuildArgsError(message: string): {
   return {
     ok: false,
     error: message,
+  };
+}
+
+interface ParsedPreviewTargetArgs {
+  mode: PreviewMode;
+  inputPath: string;
+  pretty: boolean;
+}
+
+function parsePreviewTargetArgs(
+  argv: string[],
+): { ok: true; value: ParsedPreviewTargetArgs } | { ok: false; error: string } {
+  let componentPath: string | null = null;
+  let pagePath: string | null = null;
+  let pretty = false;
+
+  for (let index = 0; index < argv.length; index += 1) {
+    const argument = argv[index];
+
+    if (argument === '--component-path') {
+      const next = argv[index + 1];
+      if (!next || next.startsWith('--')) {
+        return parsePreviewBuildArgsError(
+          'Missing value for --component-path.',
+        );
+      }
+
+      componentPath = next;
+      index += 1;
+      continue;
+    }
+
+    if (argument === '--page-path') {
+      const next = argv[index + 1];
+      if (!next || next.startsWith('--')) {
+        return parsePreviewBuildArgsError('Missing value for --page-path.');
+      }
+
+      pagePath = next;
+      index += 1;
+      continue;
+    }
+
+    if (argument === '--pretty') {
+      pretty = true;
+      continue;
+    }
+
+    return parsePreviewBuildArgsError(`Unknown argument: ${argument}`);
+  }
+
+  const selectedCount =
+    Number(componentPath !== null) + Number(pagePath !== null);
+  if (selectedCount !== 1) {
+    return parsePreviewBuildArgsError(
+      'Provide exactly one selector: --component-path <path> or --page-path <path>.',
+    );
+  }
+
+  if (componentPath) {
+    return {
+      ok: true,
+      value: {
+        mode: 'component',
+        inputPath: componentPath,
+        pretty,
+      },
+    };
+  }
+
+  return {
+    ok: true,
+    value: {
+      mode: 'page',
+      inputPath: pagePath!,
+      pretty,
+    },
   };
 }
 
@@ -190,7 +267,7 @@ export function parsePreviewBuildArgs(
     );
   }
 
-  const parsed = parsePreviewDataArgs(forwardedArgs);
+  const parsed = parsePreviewTargetArgs(forwardedArgs);
   if (!parsed.ok) {
     return parsePreviewBuildArgsError(parsed.error);
   }
@@ -225,8 +302,8 @@ function isSamePath(left: string, right: string): boolean {
   return path.resolve(left) === path.resolve(right);
 }
 
-function dedupeIssues(issues: PreviewDataIssue[]): PreviewDataIssue[] {
-  const deduped = new Map<string, PreviewDataIssue>();
+function dedupeIssues(issues: PreviewIssue[]): PreviewIssue[] {
+  const deduped = new Map<string, PreviewIssue>();
 
   issues.forEach((issue) => {
     const key = `${issue.code}|${issue.message}|${issue.path ?? ''}`;
@@ -238,7 +315,7 @@ function dedupeIssues(issues: PreviewDataIssue[]): PreviewDataIssue[] {
   return [...deduped.values()];
 }
 
-function toPreviewIssue(warning: PreviewWarning): PreviewDataIssue {
+function toPreviewIssue(warning: PreviewWarning): PreviewIssue {
   return {
     code: warning.code,
     message: warning.message,
@@ -364,10 +441,10 @@ async function loadComponentMocks(options: {
   componentExampleProps: Record<string, unknown>;
 }): Promise<{
   mocks: PreviewManifestComponentMock[];
-  warnings: PreviewDataIssue[];
+  warnings: PreviewIssue[];
 }> {
   const expectedMockPaths = toExpectedMockPaths(options.component);
-  const warnings: PreviewDataIssue[] = [];
+  const warnings: PreviewIssue[] = [];
   const mocks: PreviewManifestComponentMock[] = [];
 
   for (const mockPath of expectedMockPaths) {
@@ -413,7 +490,7 @@ async function loadComponentMocks(options: {
 
 function createManifest(options: {
   mode: 'component' | 'page';
-  target: PreviewDataTarget;
+  target: PreviewTarget;
   defaultEntry: ManifestEntry;
   mockEntries: ManifestEntry[];
   mockCount: number;
@@ -453,13 +530,12 @@ export async function buildPreviewArtifact(
   options: BuildPreviewArtifactOptions,
   dependencies: BuildPreviewArtifactDependencies = {},
 ): Promise<PreviewBuildPayload> {
-  const request: PreviewDataRequest = {
+  const request: PreviewRequest = {
     mode: options.mode,
     inputPath: options.inputPath,
     projectRoot: options.projectRoot,
   };
-  const buildPayload =
-    dependencies.buildPreviewDataPayload ?? buildPreviewDataPayload;
+  const buildPayload = dependencies.buildPreviewPayload ?? buildPreviewPayload;
   const discover = dependencies.discover ?? discoverCanvasProject;
   const resolveConfig = dependencies.resolveConfig ?? resolveCanvasConfig;
   const extractMetadata =
@@ -468,36 +544,36 @@ export async function buildPreviewArtifact(
   const bundle =
     dependencies.bundleInteractivePreview ?? bundleInteractivePreview;
   const outputDirectory = path.resolve(options.projectRoot, options.outDir);
-  const combinedWarnings: PreviewDataIssue[] = [];
+  const combinedWarnings: PreviewIssue[] = [];
   const runtimeSettings = resolvePreviewRuntimeSettings(options.projectRoot);
   let stagingDirectory: string | null = null;
 
-  const previewDataPayload = await buildPayload({
+  const previewPayload = await buildPayload({
     mode: options.mode,
     inputPath: options.inputPath,
     projectRoot: options.projectRoot,
   });
 
-  if (!previewDataPayload.ok) {
+  if (!previewPayload.ok) {
     return toPayload(request, {
       ok: false,
-      target: previewDataPayload.target,
+      target: previewPayload.target,
       outDir: outputDirectory,
-      warnings: previewDataPayload.warnings,
-      errors: previewDataPayload.errors,
+      warnings: previewPayload.warnings,
+      errors: previewPayload.errors,
     });
   }
 
-  combinedWarnings.push(...previewDataPayload.warnings);
+  combinedWarnings.push(...previewPayload.warnings);
 
-  if (!previewDataPayload.iframeHtml) {
+  if (!previewPayload.iframeHtml) {
     return toPayload(request, {
       ok: false,
-      target: previewDataPayload.target,
+      target: previewPayload.target,
       outDir: outputDirectory,
       warnings: dedupeIssues(combinedWarnings),
       errors: [
-        ...previewDataPayload.errors,
+        ...previewPayload.errors,
         toIssue(
           'artifact_build_failed',
           'Preview data payload did not include iframeHtml.',
@@ -507,17 +583,17 @@ export async function buildPreviewArtifact(
   }
 
   const runtimeScript = extractInlineScript(
-    previewDataPayload.iframeHtml,
+    previewPayload.iframeHtml,
     'data-canvas-preview-runtime',
   );
   if (!runtimeScript) {
     return toPayload(request, {
       ok: false,
-      target: previewDataPayload.target,
+      target: previewPayload.target,
       outDir: outputDirectory,
       warnings: dedupeIssues(combinedWarnings),
       errors: [
-        ...previewDataPayload.errors,
+        ...previewPayload.errors,
         toIssue(
           'artifact_build_failed',
           'Missing runtime script in preview iframe HTML.',
@@ -526,7 +602,7 @@ export async function buildPreviewArtifact(
     });
   }
 
-  if (!previewDataPayload.target) {
+  if (!previewPayload.target) {
     return toPayload(request, {
       ok: false,
       outDir: outputDirectory,
@@ -551,7 +627,7 @@ export async function buildPreviewArtifact(
     if (options.mode === 'component') {
       stagedHtmlFiles.push({
         fileName: 'component-default.html',
-        content: previewDataPayload.iframeHtml,
+        content: previewPayload.iframeHtml,
       });
       defaultManifestEntry = createComponentManifestEntry(
         outputDirectory,
@@ -671,7 +747,7 @@ export async function buildPreviewArtifact(
     } else {
       stagedHtmlFiles.push({
         fileName: 'page-default.html',
-        content: previewDataPayload.iframeHtml,
+        content: previewPayload.iframeHtml,
       });
       defaultManifestEntry = createPageManifestEntry(
         outputDirectory,
@@ -695,7 +771,7 @@ export async function buildPreviewArtifact(
 
     const manifest = createManifest({
       mode: options.mode,
-      target: previewDataPayload.target,
+      target: previewPayload.target,
       defaultEntry: defaultManifestEntry,
       mockEntries: mockManifestEntries,
       mockCount,
@@ -712,7 +788,7 @@ export async function buildPreviewArtifact(
 
     return toPayload(request, {
       ok: true,
-      target: previewDataPayload.target,
+      target: previewPayload.target,
       outDir: outputDirectory,
       manifestPath,
       summary: {
@@ -729,7 +805,7 @@ export async function buildPreviewArtifact(
 
     return toPayload(request, {
       ok: false,
-      target: previewDataPayload.target,
+      target: previewPayload.target,
       outDir: outputDirectory,
       warnings: dedupeIssues(combinedWarnings),
       errors: [

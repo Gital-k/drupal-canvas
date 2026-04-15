@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { buildPreviewArtifact, parsePreviewBuildArgs } from './preview-build';
 
 import type { CanvasConfig, DiscoveryResult } from '@drupal-canvas/discovery';
-import type { PreviewDataPayload } from './preview-data';
+import type { PreviewPayload } from './preview-payload';
 
 const temporaryDirectories: string[] = [];
 
@@ -23,10 +23,10 @@ async function writeFile(filePath: string, content: string): Promise<void> {
   await fs.writeFile(filePath, content, 'utf-8');
 }
 
-function makePreviewDataPayload(
+function makePreviewPayload(
   projectRoot: string,
-  overrides: Partial<PreviewDataPayload> = {},
-): PreviewDataPayload {
+  overrides: Partial<PreviewPayload> = {},
+): PreviewPayload {
   return {
     ok: true,
     request: {
@@ -204,8 +204,8 @@ describe('preview-build', () => {
         outDir: outputDir,
       },
       {
-        buildPreviewDataPayload: async (options) =>
-          makePreviewDataPayload(options.projectRoot),
+        buildPreviewPayload: async (options) =>
+          makePreviewPayload(options.projectRoot),
         discover: async () => makeDiscoveryResult(projectRoot),
         resolveConfig: () => makeCanvasConfig(),
         extractMetadata: async () => ({
@@ -311,8 +311,8 @@ describe('preview-build', () => {
         outDir: outputDir,
       },
       {
-        buildPreviewDataPayload: async (options) =>
-          makePreviewDataPayload(options.projectRoot, {
+        buildPreviewPayload: async (options) =>
+          makePreviewPayload(options.projectRoot, {
             request: {
               mode: 'page',
               inputPath: 'pages/home.json',
@@ -389,8 +389,8 @@ describe('preview-build', () => {
         outDir: outputDir,
       },
       {
-        buildPreviewDataPayload: async (options) =>
-          makePreviewDataPayload(options.projectRoot),
+        buildPreviewPayload: async (options) =>
+          makePreviewPayload(options.projectRoot),
         discover: async () => makeDiscoveryResult(projectRoot),
         resolveConfig: () => makeCanvasConfig(),
         extractMetadata: async () => ({

@@ -2,7 +2,7 @@ import { promises as fs } from 'node:fs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { canvasTreeToSpec } from 'drupal-canvas/json-render-utils';
 import { loadEnv, build as viteBuild } from 'vite';
 import {
@@ -25,42 +25,36 @@ import type {
 import type { Spec } from '@json-render/core';
 import type { OutputAsset, OutputChunk, RollupOutput } from 'rollup';
 
-export type PreviewDataMode = 'component' | 'page';
+export type PreviewMode = 'component' | 'page';
 
-export interface PreviewDataIssue {
+export interface PreviewIssue {
   code: string;
   message: string;
   path?: string;
 }
 
-export interface PreviewDataRequest {
-  mode: PreviewDataMode;
+export interface PreviewRequest {
+  mode: PreviewMode;
   inputPath: string;
   projectRoot: string;
 }
 
-export interface PreviewDataTarget {
+export interface PreviewTarget {
   id: string;
   name: string;
   projectRelativePath: string;
 }
 
-export interface PreviewDataPayload {
+export interface PreviewPayload {
   ok: boolean;
-  request: PreviewDataRequest;
-  target: PreviewDataTarget | null;
+  request: PreviewRequest;
+  target: PreviewTarget | null;
   spec: Spec | null;
   css: string;
   iframeHtml: string | null;
   renderMode: 'interactive';
-  warnings: PreviewDataIssue[];
-  errors: PreviewDataIssue[];
-}
-
-export interface PreviewDataCliArgs {
-  mode: PreviewDataMode;
-  inputPath: string;
-  pretty: boolean;
+  warnings: PreviewIssue[];
+  errors: PreviewIssue[];
 }
 
 export interface InteractiveBundleResult {
@@ -79,28 +73,28 @@ interface BundleComponentSource {
 }
 
 interface PreparedComponentPreview {
-  target: PreviewDataTarget;
+  target: PreviewTarget;
   spec: Spec;
   bundleSources: BundleComponentSource[];
   cssEntryPaths: string[];
 }
 
 interface PreparedPagePreview {
-  target: PreviewDataTarget;
+  target: PreviewTarget;
   spec: Spec;
   bundleSources: BundleComponentSource[];
   cssEntryPaths: string[];
 }
 
-interface BuildPreviewDataDependencies {
+interface BuildPreviewPayloadDependencies {
   discover?: typeof discoverCanvasProject;
   resolveConfig?: typeof resolveCanvasConfig;
   extractMetadata?: typeof extractComponentPreviewMetadataFromComponentYaml;
   bundleInteractivePreview?: typeof bundleInteractivePreview;
 }
 
-interface BuildPreviewDataOptions {
-  mode: PreviewDataMode;
+interface BuildPreviewPayloadOptions {
+  mode: PreviewMode;
   inputPath: string;
   projectRoot: string;
 }
@@ -214,7 +208,7 @@ function toIssue(
   code: string,
   message: string,
   issuePath?: string,
-): PreviewDataIssue {
+): PreviewIssue {
   return {
     code,
     message,
@@ -223,18 +217,18 @@ function toIssue(
 }
 
 function toPayload(
-  request: PreviewDataRequest,
+  request: PreviewRequest,
   options: {
     ok: boolean;
-    target?: PreviewDataTarget | null;
+    target?: PreviewTarget | null;
     spec?: Spec | null;
     css?: string;
     iframeHtml?: string | null;
     renderMode?: 'interactive';
-    warnings?: PreviewDataIssue[];
-    errors?: PreviewDataIssue[];
+    warnings?: PreviewIssue[];
+    errors?: PreviewIssue[];
   },
-): PreviewDataPayload {
+): PreviewPayload {
   return {
     ok: options.ok,
     request,
@@ -507,7 +501,7 @@ function isSamePath(left: string, right: string): boolean {
 async function maybeResolveGlobalCssPath(
   projectRoot: string,
   globalCssPath: string,
-): Promise<{ cssPath: string | null; warning: PreviewDataIssue | null }> {
+): Promise<{ cssPath: string | null; warning: PreviewIssue | null }> {
   const absoluteGlobalCssPath = path.resolve(projectRoot, globalCssPath);
 
   try {
@@ -534,8 +528,8 @@ async function prepareComponentPreview(options: {
   discoveryResult: DiscoveryResult;
   extractMetadata: typeof extractComponentPreviewMetadataFromComponentYaml;
 }): Promise<
-  | { prepared: PreparedComponentPreview; warnings: PreviewDataIssue[] }
-  | { errors: PreviewDataIssue[]; warnings: PreviewDataIssue[] }
+  | { prepared: PreparedComponentPreview; warnings: PreviewIssue[] }
+  | { errors: PreviewIssue[]; warnings: PreviewIssue[] }
 > {
   const requestedPath = path.resolve(options.projectRoot, options.inputPath);
   const component = options.discoveryResult.components.find((candidate) =>
@@ -637,8 +631,8 @@ async function preparePagePreview(options: {
   inputPath: string;
   discoveryResult: DiscoveryResult;
 }): Promise<
-  | { prepared: PreparedPagePreview; warnings: PreviewDataIssue[] }
-  | { errors: PreviewDataIssue[]; warnings: PreviewDataIssue[] }
+  | { prepared: PreparedPagePreview; warnings: PreviewIssue[] }
+  | { errors: PreviewIssue[]; warnings: PreviewIssue[] }
 > {
   const requestedPath = path.resolve(options.projectRoot, options.inputPath);
   const page = options.discoveryResult.pages.find((candidate) =>
@@ -716,11 +710,11 @@ async function preparePagePreview(options: {
   };
 }
 
-export async function buildPreviewDataPayload(
-  options: BuildPreviewDataOptions,
-  dependencies: BuildPreviewDataDependencies = {},
-): Promise<PreviewDataPayload> {
-  const request: PreviewDataRequest = {
+export async function buildPreviewPayload(
+  options: BuildPreviewPayloadOptions,
+  dependencies: BuildPreviewPayloadDependencies = {},
+): Promise<PreviewPayload> {
+  const request: PreviewRequest = {
     mode: options.mode,
     inputPath: options.inputPath,
     projectRoot: options.projectRoot,
@@ -757,7 +751,7 @@ export async function buildPreviewDataPayload(
     });
   }
 
-  const warnings: PreviewDataIssue[] = discoveryResult.warnings.map((warning) =>
+  const warnings: PreviewIssue[] = discoveryResult.warnings.map((warning) =>
     toIssue(warning.code, warning.message, warning.path),
   );
 
@@ -840,152 +834,4 @@ export async function buildPreviewDataPayload(
       ],
     });
   }
-}
-
-function parsePreviewDataArgsError(message: string): {
-  ok: false;
-  error: string;
-} {
-  return {
-    ok: false,
-    error: message,
-  };
-}
-
-export function parsePreviewDataArgs(
-  argv: string[],
-): { ok: true; value: PreviewDataCliArgs } | { ok: false; error: string } {
-  let componentPath: string | null = null;
-  let pagePath: string | null = null;
-  let pretty = false;
-
-  for (let index = 0; index < argv.length; index += 1) {
-    const argument = argv[index];
-
-    if (argument === '--component-path') {
-      const next = argv[index + 1];
-      if (!next || next.startsWith('--')) {
-        return parsePreviewDataArgsError('Missing value for --component-path.');
-      }
-
-      componentPath = next;
-      index += 1;
-      continue;
-    }
-
-    if (argument === '--page-path') {
-      const next = argv[index + 1];
-      if (!next || next.startsWith('--')) {
-        return parsePreviewDataArgsError('Missing value for --page-path.');
-      }
-
-      pagePath = next;
-      index += 1;
-      continue;
-    }
-
-    if (argument === '--pretty') {
-      pretty = true;
-      continue;
-    }
-
-    return parsePreviewDataArgsError(`Unknown argument: ${argument}`);
-  }
-
-  const selectedCount =
-    Number(componentPath !== null) + Number(pagePath !== null);
-  if (selectedCount !== 1) {
-    return parsePreviewDataArgsError(
-      'Provide exactly one selector: --component-path <path> or --page-path <path>.',
-    );
-  }
-
-  if (componentPath) {
-    return {
-      ok: true,
-      value: {
-        mode: 'component',
-        inputPath: componentPath,
-        pretty,
-      },
-    };
-  }
-
-  return {
-    ok: true,
-    value: {
-      mode: 'page',
-      inputPath: pagePath!,
-      pretty,
-    },
-  };
-}
-
-export async function runPreviewDataCli(argv: string[]): Promise<number> {
-  const parsed = parsePreviewDataArgs(argv);
-
-  if (!parsed.ok) {
-    const payload = toPayload(
-      {
-        mode: 'component',
-        inputPath: '',
-        projectRoot: process.cwd(),
-      },
-      {
-        ok: false,
-        errors: [toIssue('invalid_arguments', parsed.error)],
-      },
-    );
-    process.stdout.write(`${JSON.stringify(payload)}\n`);
-    return 1;
-  }
-
-  const payload = await buildPreviewDataPayload({
-    mode: parsed.value.mode,
-    inputPath: parsed.value.inputPath,
-    projectRoot: process.cwd(),
-  });
-
-  const serialized = parsed.value.pretty
-    ? JSON.stringify(payload, null, 2)
-    : JSON.stringify(payload);
-  process.stdout.write(`${serialized}\n`);
-
-  return payload.ok ? 0 : 1;
-}
-
-function isDirectExecution(): boolean {
-  const executedPath = process.argv[1];
-  if (!executedPath) {
-    return false;
-  }
-
-  return import.meta.url === pathToFileURL(executedPath).href;
-}
-
-if (isDirectExecution()) {
-  runPreviewDataCli(process.argv.slice(2))
-    .then((exitCode) => {
-      process.exit(exitCode);
-    })
-    .catch((error: unknown) => {
-      const payload = toPayload(
-        {
-          mode: 'component',
-          inputPath: '',
-          projectRoot: process.cwd(),
-        },
-        {
-          ok: false,
-          errors: [
-            toIssue(
-              'runtime_failure',
-              error instanceof Error ? error.message : String(error),
-            ),
-          ],
-        },
-      );
-      process.stdout.write(`${JSON.stringify(payload)}\n`);
-      process.exit(1);
-    });
 }
