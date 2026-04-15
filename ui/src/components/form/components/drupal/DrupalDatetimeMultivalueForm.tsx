@@ -4,6 +4,9 @@ import { ArrowRightIcon, Cross2Icon, TrashIcon } from '@radix-ui/react-icons';
 import * as Popover from '@radix-ui/react-popover';
 import { Button, Flex, Text } from '@radix-ui/themes';
 
+import { useAppDispatch } from '@/app/hooks';
+import { removeFieldValue } from '@/features/form/formStateSlice';
+
 import {
   isRemoveButtonEnabled,
   triggerDrupalRemoveButton,
@@ -65,10 +68,13 @@ const formatTimeForDisplay = (value: string): string => {
 const DrupalDatetimeMultivalueForm = ({
   children,
   fieldLabel = '',
+  formId,
 }: {
   children?: React.ReactNode;
   fieldLabel?: string;
+  formId?: string;
 }) => {
+  const dispatch = useAppDispatch();
   const triggerRowRef = useRef<HTMLDivElement | null>(null);
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [displayDate, setDisplayDate] = useState('');
@@ -145,8 +151,38 @@ const DrupalDatetimeMultivalueForm = ({
 
     if (!triggerRowRef.current) return;
 
+    const dateInput = getDateInput();
+    const { name } = dateInput || {};
+
     // Try to trigger the Drupal remove button.
-    if (triggerDrupalRemoveButton(triggerRowRef.current)) {
+    const removeButtonName: string | null = triggerDrupalRemoveButton(
+      triggerRowRef.current,
+    );
+
+    if (removeButtonName && name && formId) {
+      const fieldNames: string[] = [name];
+
+      // Add the time field name if it exists (replace [date] with [time])
+      if (name.includes('[date]')) {
+        const timeName = name.replace('[date]', '[time]');
+        fieldNames.push(timeName);
+      }
+
+      // Add the weight field (replace [value][date] with [_weight])
+      if (name.includes('[value][date]')) {
+        const weightName = name.replace('[value][date]', '[_weight]');
+        fieldNames.push(weightName);
+      }
+
+      // Add the remove button name
+      fieldNames.push(removeButtonName);
+
+      dispatch(
+        removeFieldValue({
+          formId: formId as any,
+          fieldName: fieldNames,
+        }),
+      );
       return;
     }
 
