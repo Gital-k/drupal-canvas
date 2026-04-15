@@ -48,8 +48,8 @@ Use `--pretty` to print formatted JSON.
 
 ## Preview build command
 
-Workbench can also export a standalone preview artifact directory. By default,
-it writes one fully self-contained `index.html`:
+Workbench can export target-based standalone preview artifacts into a required
+output directory:
 
 ```bash
 npx canvas-workbench preview-build --component-path components/card/component.yml --out-dir .canvas-preview/card
@@ -59,29 +59,31 @@ npx canvas-workbench preview-build --component-path components/card/component.ym
 npx canvas-workbench preview-build --page-path pages/home.json --out-dir .canvas-preview/home
 ```
 
-Default output writes:
+For component targets, output writes:
 
-- `index.html` (self-contained, with CSS and runtime JS inlined)
+- `component-default.html`
+- `component-mock-01.html`, `component-mock-02.html`, and so on for each mock
+- `manifest.json`
 
-Use `--split-files` when you want separate files:
+For page targets, output writes:
 
-```bash
-npx canvas-workbench preview-build --component-path components/card/component.yml --out-dir .canvas-preview/card --split-files
-```
+- `page-default.html`
+- `manifest.json`
 
-Split output writes:
+`manifest.json` is target-specific:
 
-- `index.html` (shell)
-- `preview.js`
-- `preview.css`
+- Component manifests include `entries.default` and `entries.mocks`.
+- Page manifests include only `entries.default`. Each entry includes `path` and
+  `label` (`Default` for the default variant, and the mock name for mock
+  variants).
 
-It also prints one JSON payload to stdout with `request`, `target`, `spec`,
-`renderMode` (`interactive`), `outDir`, output file paths, plus warnings and
-errors.
+The command also prints one JSON payload to stdout with `request`, `target`,
+`renderMode` (`interactive`), `outDir`, `manifestPath`, summary counts, plus
+warnings and errors.
 
-Both output modes are generated from the same interactive runtime used by
-`preview-data`. Local asset imports (for example fonts and images) are bundled
-inline into the output.
+Output is generated from the same interactive runtime used by `preview-data`.
+Local asset imports (for example fonts and images) are bundled inline into the
+output.
 
 The `canvas-workbench` binary starts the packaged Workbench Vite runtime in your
 current working directory.
