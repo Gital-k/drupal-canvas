@@ -48,7 +48,9 @@ const testMediaLibraryInEntityForm = (cy, loadOptions = {}, title) => {
         .should('exist')
         .click();
       // Wait for the preview to finish loading.
-      cy.wait('@updatePreview');
+      cy.wait('@updatePreview')
+        .its('response.statusCode')
+        .should('eq', 200);
       cy.findByLabelText('Loading Preview').should('not.exist');
       cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
       cy.log(`Iteration ${ix + 1}: ${step.removeText} complete`);
@@ -70,7 +72,9 @@ const testMediaLibraryInEntityForm = (cy, loadOptions = {}, title) => {
       .click();
     cy.findByRole('dialog').should('not.exist');
     // Wait for the preview to finish loading.
-    cy.wait('@updatePreview', { timeout: 10000 });
+    cy.wait('@updatePreview', { timeout: 10000 })
+      .its('response.statusCode')
+      .should('eq', 200);
     cy.findByLabelText('Loading Preview').should('not.exist');
     cy.get('@entityForm').findByAltText(step.expectedAlt).should('exist');
     cy.get('@entityForm')
