@@ -67,7 +67,9 @@ export async function openPopoverForRow(
     .nth(rowIndex)
     .locator('[class*="_listItem_"]')
     .click();
-  await expect(page.locator('[role="dialog"]')).toBeVisible();
+  await expect(
+    page.locator('[role="dialog"][data-state="open"]'),
+  ).toBeVisible();
 }
 
 /**
@@ -82,11 +84,13 @@ export async function typeInPopover(
   inputSelector: string,
   value: string,
 ): Promise<void> {
-  const dialog = page.locator('[role="dialog"]');
+  const dialog = page.locator('[role="dialog"][data-state="open"]');
   const input = dialog.locator(inputSelector);
   await input.fill(value);
   await input.press('Enter');
-  await expect(page.locator('[role="dialog"]')).not.toBeVisible();
+  await expect(
+    page.locator('[role="dialog"][data-state="open"]'),
+  ).not.toBeVisible();
 }
 
 /**
@@ -102,7 +106,7 @@ export async function typeInPopoverWithoutCommit(
   inputSelector: string,
   value: string,
 ): Promise<void> {
-  const dialog = page.locator('[role="dialog"]');
+  const dialog = page.locator('[role="dialog"][data-state="open"]');
   const input = dialog.locator(inputSelector);
   await input.fill(value);
 }
@@ -113,7 +117,7 @@ export async function typeInPopoverWithoutCommit(
  * @param page - The Playwright Page object
  */
 export async function closePopoverViaCloseButton(page: Page): Promise<void> {
-  const dialog = page.locator('[role="dialog"]');
+  const dialog = page.locator('[role="dialog"][data-state="open"]');
   await dialog.locator('[aria-label="Close"]').click();
   await expect(dialog).not.toBeVisible();
 }
@@ -127,7 +131,7 @@ export async function typeRelativeLinkViaAutocomplete(
   page: Page,
   nodeTitle: string,
 ): Promise<void> {
-  const dialog = page.locator('[role="dialog"]');
+  const dialog = page.locator('[role="dialog"][data-state="open"]');
   const input = dialog.locator('input[type="text"]').first();
   await input.fill('');
   await input.pressSequentially(nodeTitle);
@@ -139,7 +143,9 @@ export async function typeRelativeLinkViaAutocomplete(
   await suggestion.click();
   await input.press('Enter');
 
-  await expect(page.locator('[role="dialog"]')).not.toBeVisible();
+  await expect(
+    page.locator('[role="dialog"][data-state="open"]'),
+  ).not.toBeVisible();
 }
 
 /**
@@ -199,13 +205,15 @@ export async function typeDatetimeInPopover(
   dateValue: string,
   timeValue: string,
 ): Promise<void> {
-  const dialog = page.locator('[role="dialog"]');
+  const dialog = page.locator('[role="dialog"][data-state="open"]');
   const dateInput = dialog.locator('input[type="date"]');
   const timeInput = dialog.locator('input[type="time"]');
   await dateInput.fill(dateValue);
   await timeInput.fill(timeValue);
   await timeInput.press('Enter');
-  await expect(page.locator('[role="dialog"]')).not.toBeVisible();
+  await expect(
+    page.locator('[role="dialog"][data-state="open"]'),
+  ).not.toBeVisible();
 }
 
 /**

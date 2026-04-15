@@ -84,10 +84,12 @@ function registerNumericTypeTests(config: NumericTypeTestConfig): void {
       await expect(field.locator('tbody tr')).toHaveCount(3);
       await openPopoverForRow(page, field, 0);
       await page
-        .locator('[role="dialog"]')
+        .locator('[role="dialog"][data-state="open"]')
         .getByRole('button', { name: /Remove/i })
         .click();
-      await expect(page.locator('[role="dialog"]')).not.toBeVisible();
+      await expect(
+        page.locator('[role="dialog"][data-state="open"]'),
+      ).not.toBeVisible();
       await expect(field.locator('tbody tr')).toHaveCount(2);
       expect(await getAllRowTexts(field)).toEqual([val2, '']);
 
@@ -102,7 +104,7 @@ function registerNumericTypeTests(config: NumericTypeTestConfig): void {
     test('popover opens and closes correctly', async ({ page }) => {
       const field = getField(page, propName);
       await openPopoverForRow(page, field, 0);
-      const dialog = page.locator('[role="dialog"]');
+      const dialog = page.locator('[role="dialog"][data-state="open"]');
       await expect(dialog.locator('input[type="number"]')).toHaveValue(val1);
       await expect(dialog.locator('[aria-label="Close"]')).toBeVisible();
       await dialog.locator('[aria-label="Close"]').click();
@@ -114,7 +116,7 @@ function registerNumericTypeTests(config: NumericTypeTestConfig): void {
     }) => {
       const field = getField(page, propName);
       await openPopoverForRow(page, field, 0);
-      const dialog = page.locator('[role="dialog"]');
+      const dialog = page.locator('[role="dialog"][data-state="open"]');
       await expect(dialog.locator('[class*="_popoverLabel_"]')).toHaveText(
         unlimitedLabel,
       );
@@ -177,7 +179,7 @@ function registerNumericTypeTests(config: NumericTypeTestConfig): void {
     }) => {
       const field = getField(page, propName);
       await openPopoverForRow(page, field, 0);
-      const dialog = page.locator('[role="dialog"]');
+      const dialog = page.locator('[role="dialog"][data-state="open"]');
       const input = dialog.locator('input[type="number"]');
       await expect(input).toHaveValue(val1);
 
@@ -195,7 +197,7 @@ function registerNumericTypeTests(config: NumericTypeTestConfig): void {
 
       // Reopen the same row and verify the original value is still there.
       await openPopoverForRow(page, field, 0);
-      const dialog2 = page.locator('[role="dialog"]');
+      const dialog2 = page.locator('[role="dialog"][data-state="open"]');
       const input2 = dialog2.locator('input[type="number"]');
       await expect(input2).toHaveValue(val1);
       await closePopoverViaCloseButton(page);
@@ -233,7 +235,7 @@ function registerNumericTypeTests(config: NumericTypeTestConfig): void {
     }) => {
       const field = getField(page, propNameLimited);
       await openPopoverForRow(page, field, 0);
-      const dialog = page.locator('[role="dialog"]');
+      const dialog = page.locator('[role="dialog"][data-state="open"]');
       const removeButton = dialog.getByRole('button', { name: /Remove/i });
       await expect(removeButton).toBeVisible();
       await expect(removeButton).toBeDisabled();
@@ -338,10 +340,12 @@ test.describe('Multivalue Prop Types', () => {
         await expect(field.locator('tbody tr')).toHaveCount(3);
         await openPopoverForRow(page, field, 0);
         await page
-          .locator('[role="dialog"]')
+          .locator('[role="dialog"][data-state="open"]')
           .getByRole('button', { name: /Remove/i })
           .click();
-        await expect(page.locator('[role="dialog"]')).not.toBeVisible();
+        await expect(
+          page.locator('[role="dialog"][data-state="open"]'),
+        ).not.toBeVisible();
         await expect(field.locator('tbody tr')).toHaveCount(2);
         expect(await getAllRowTexts(field)).toEqual(['Sample Text', '']);
 
@@ -358,7 +362,7 @@ test.describe('Multivalue Prop Types', () => {
       test('popover opens and closes correctly', async ({ page }) => {
         const field = getField(page, PROP_NAMES.TEXT);
         await openPopoverForRow(page, field, 0);
-        const dialog = page.locator('[role="dialog"]');
+        const dialog = page.locator('[role="dialog"][data-state="open"]');
         await expect(dialog.locator('input[type="text"]')).toHaveValue(
           'Hello World',
         );
@@ -372,7 +376,7 @@ test.describe('Multivalue Prop Types', () => {
       }) => {
         const field = getField(page, PROP_NAMES.TEXT);
         await openPopoverForRow(page, field, 0);
-        const dialog = page.locator('[role="dialog"]');
+        const dialog = page.locator('[role="dialog"][data-state="open"]');
         await expect(dialog.locator('[class*="_popoverLabel_"]')).toHaveText(
           'Text (Unlimited)',
         );
@@ -457,7 +461,7 @@ test.describe('Multivalue Prop Types', () => {
       }) => {
         const field = getField(page, PROP_NAMES.TEXT);
         await openPopoverForRow(page, field, 0);
-        const dialog = page.locator('[role="dialog"]');
+        const dialog = page.locator('[role="dialog"][data-state="open"]');
         const input = dialog.locator('input[type="text"]');
         await expect(input).toHaveValue('Hello World');
 
@@ -475,7 +479,7 @@ test.describe('Multivalue Prop Types', () => {
 
         // Reopen the same row and verify the original value is still there.
         await openPopoverForRow(page, field, 0);
-        const dialog2 = page.locator('[role="dialog"]');
+        const dialog2 = page.locator('[role="dialog"][data-state="open"]');
         const input2 = dialog2.locator('input[type="text"]');
         await expect(input2).toHaveValue('Hello World');
         await closePopoverViaCloseButton(page);
@@ -515,7 +519,7 @@ test.describe('Multivalue Prop Types', () => {
       }) => {
         const field = getField(page, PROP_NAMES.TEXT_LIMITED);
         await openPopoverForRow(page, field, 0);
-        const dialog = page.locator('[role="dialog"]');
+        const dialog = page.locator('[role="dialog"][data-state="open"]');
         const removeButton = dialog.getByRole('button', { name: /Remove/i });
         await expect(removeButton).toBeVisible();
         await expect(removeButton).toBeDisabled();
@@ -528,7 +532,7 @@ test.describe('Multivalue Prop Types', () => {
       }) => {
         const field = getField(page, PROP_NAMES.TEXT_LIMITED);
         await openPopoverForRow(page, field, 0);
-        const dialog = page.locator('[role="dialog"]');
+        const dialog = page.locator('[role="dialog"][data-state="open"]');
         await expect(dialog.locator('[class*="_popoverLabel_"]')).toHaveText(
           'Text (Limited)',
         );
@@ -580,26 +584,30 @@ test.describe('Multivalue Prop Types', () => {
         // Remove the first item.
         await openPopoverForRow(page, field, 0);
         await page
-          .locator('[role="dialog"]')
+          .locator('[role="dialog"][data-state="open"]')
           .getByRole('button', { name: /Remove/i })
           .click();
-        await expect(page.locator('[role="dialog"]')).not.toBeVisible();
+        await expect(
+          page.locator('[role="dialog"][data-state="open"]'),
+        ).not.toBeVisible();
 
         // Now there should be 2 rows (1 value + 1 empty).
         await expect(field.locator('tbody tr')).toHaveCount(2);
         // Remove the second item.
         await openPopoverForRow(page, field, 1);
         await page
-          .locator('[role="dialog"]')
+          .locator('[role="dialog"][data-state="open"]')
           .getByRole('button', { name: /Remove/i })
           .click();
-        await expect(page.locator('[role="dialog"]')).not.toBeVisible();
+        await expect(
+          page.locator('[role="dialog"][data-state="open"]'),
+        ).not.toBeVisible();
         // Now there should be 1 empty row.
         await expect(field.locator('tbody tr')).toHaveCount(1);
 
         // Open the popover for the remaining single value row — remove should be disabled.
         await openPopoverForRow(page, field, 0);
-        const dialog = page.locator('[role="dialog"]');
+        const dialog = page.locator('[role="dialog"][data-state="open"]');
         const removeButton = dialog.getByRole('button', { name: /Remove/i });
         await expect(removeButton).toBeVisible();
         await expect(removeButton).toBeDisabled();
@@ -615,7 +623,7 @@ test.describe('Multivalue Prop Types', () => {
 
         // Open the popover for the first row — remove should now be enabled.
         await openPopoverForRow(page, field, 0);
-        const dialog2 = page.locator('[role="dialog"]');
+        const dialog2 = page.locator('[role="dialog"][data-state="open"]');
         const removeButton2 = dialog2.getByRole('button', { name: /Remove/i });
         await expect(removeButton2).toBeVisible();
         await expect(removeButton2).toBeEnabled();
@@ -675,10 +683,12 @@ test.describe('Multivalue Prop Types', () => {
         await expect(field.locator('tbody tr')).toHaveCount(3);
         await openPopoverForRow(page, field, 0);
         await page
-          .locator('[role="dialog"]')
+          .locator('[role="dialog"][data-state="open"]')
           .getByRole('button', { name: /Remove/i })
           .click();
-        await expect(page.locator('[role="dialog"]')).not.toBeVisible();
+        await expect(
+          page.locator('[role="dialog"][data-state="open"]'),
+        ).not.toBeVisible();
         await expect(field.locator('tbody tr')).toHaveCount(2);
         expect(await getAllRowTexts(field)).toEqual([
           'https://example.com',
@@ -698,7 +708,7 @@ test.describe('Multivalue Prop Types', () => {
       test('popover opens and closes correctly', async ({ page }) => {
         const field = getField(page, PROP_NAMES.LINK);
         await openPopoverForRow(page, field, 0);
-        const dialog = page.locator('[role="dialog"]');
+        const dialog = page.locator('[role="dialog"][data-state="open"]');
         await expect(dialog.locator('input[type="url"]')).toHaveValue(
           'https://drupal.org',
         );
@@ -712,7 +722,7 @@ test.describe('Multivalue Prop Types', () => {
       }) => {
         const field = getField(page, PROP_NAMES.LINK);
         await openPopoverForRow(page, field, 0);
-        const dialog = page.locator('[role="dialog"]');
+        const dialog = page.locator('[role="dialog"][data-state="open"]');
         await expect(dialog.locator('[class*="_popoverLabel_"]')).toHaveText(
           'Link (Unlimited)',
         );
@@ -823,7 +833,7 @@ test.describe('Multivalue Prop Types', () => {
       }) => {
         const field = getField(page, PROP_NAMES.LINK);
         await openPopoverForRow(page, field, 0);
-        const dialog = page.locator('[role="dialog"]');
+        const dialog = page.locator('[role="dialog"][data-state="open"]');
         const input = dialog.locator('input[type="url"]');
         await expect(input).toHaveValue('https://drupal.org');
 
@@ -841,7 +851,7 @@ test.describe('Multivalue Prop Types', () => {
 
         // Reopen the same row and verify the original value is still there.
         await openPopoverForRow(page, field, 0);
-        const dialog2 = page.locator('[role="dialog"]');
+        const dialog2 = page.locator('[role="dialog"][data-state="open"]');
         const input2 = dialog2.locator('input[type="url"]');
         await expect(input2).toHaveValue('https://drupal.org');
         await closePopoverViaCloseButton(page);
@@ -881,7 +891,7 @@ test.describe('Multivalue Prop Types', () => {
       }) => {
         const field = getField(page, PROP_NAMES.LINK_LIMITED);
         await openPopoverForRow(page, field, 0);
-        const dialog = page.locator('[role="dialog"]');
+        const dialog = page.locator('[role="dialog"][data-state="open"]');
         const removeButton = dialog.getByRole('button', { name: /Remove/i });
         await expect(removeButton).toBeVisible();
         await expect(removeButton).toBeDisabled();
@@ -894,7 +904,7 @@ test.describe('Multivalue Prop Types', () => {
       }) => {
         const field = getField(page, PROP_NAMES.LINK_LIMITED);
         await openPopoverForRow(page, field, 0);
-        const dialog = page.locator('[role="dialog"]');
+        const dialog = page.locator('[role="dialog"][data-state="open"]');
         await expect(dialog.locator('[class*="_popoverLabel_"]')).toHaveText(
           'Link (Limited)',
         );
@@ -999,13 +1009,15 @@ test.describe('Multivalue Prop Types', () => {
       await openPopoverForRow(page, field, 2);
       const decimalValue = '123.45';
       const input = page
-        .locator('[role="dialog"]')
+        .locator('[role="dialog"][data-state="open"]')
         .locator('input[type="number"]');
       await input.fill(decimalValue);
       // Attempt to submit the decimal value by pressing Enter.
       await input.press('Enter');
       // The popover should remain open because the integer input rejects decimal values.
-      await expect(page.locator('[role="dialog"]')).toBeVisible();
+      await expect(
+        page.locator('[role="dialog"][data-state="open"]'),
+      ).toBeVisible();
       // Verify that a validation error message appears with suggestions for nearest valid values.
       const validationMessage = await input.evaluate(
         (el: HTMLInputElement) => el.validationMessage,
@@ -1013,7 +1025,7 @@ test.describe('Multivalue Prop Types', () => {
       expect(validationMessage).toMatch(/Please enter a valid value/);
       // Close the popover without saving
       await page
-        .locator('[role="dialog"]')
+        .locator('[role="dialog"][data-state="open"]')
         .locator('[aria-label="Close"]')
         .click();
       // Verify that the new row is still empty since the decimal was rejected.
@@ -1101,10 +1113,12 @@ test.describe('Multivalue Prop Types', () => {
         );
         await openPopoverForRow(page, field, 0);
         await page
-          .locator('[role="dialog"]')
+          .locator('[role="dialog"][data-state="open"]')
           .getByRole('button', { name: /Remove/i })
           .click();
-        await expect(page.locator('[role="dialog"]')).not.toBeVisible();
+        await expect(
+          page.locator('[role="dialog"][data-state="open"]'),
+        ).not.toBeVisible();
         await expect(field.locator('tbody tr')).toHaveCount(1);
         expect(await getAllRowTexts(field)).toEqual([
           formatDatetimeForDisplay('2025-12-25', '09:00'),
@@ -1120,7 +1134,7 @@ test.describe('Multivalue Prop Types', () => {
       test('popover opens and closes correctly', async ({ page }) => {
         const field = getField(page, PROP_NAMES.DATETIME);
         await openPopoverForRow(page, field, 0);
-        const dialog = page.locator('[role="dialog"]');
+        const dialog = page.locator('[role="dialog"][data-state="open"]');
         await expect(dialog.locator('input[type="date"]')).toHaveValue('');
         await expect(dialog.locator('input[type="time"]')).toBeVisible();
         await expect(dialog.locator('[aria-label="Close"]')).toBeVisible();
@@ -1133,7 +1147,7 @@ test.describe('Multivalue Prop Types', () => {
       }) => {
         const field = getField(page, PROP_NAMES.DATETIME);
         await openPopoverForRow(page, field, 0);
-        const dialog = page.locator('[role="dialog"]');
+        const dialog = page.locator('[role="dialog"][data-state="open"]');
         await expect(dialog.locator('[class*="_popoverLabel_"]')).toHaveText(
           'DateTime (Unlimited)',
         );
@@ -1260,7 +1274,7 @@ test.describe('Multivalue Prop Types', () => {
           formatDatetimeForDisplay('2025-12-24', '08:00'),
         );
         await openPopoverForRow(page, field, 0);
-        const dialog = page.locator('[role="dialog"]');
+        const dialog = page.locator('[role="dialog"][data-state="open"]');
         const dateInput = dialog.locator('input[type="date"]');
         const timeInput = dialog.locator('input[type="time"]');
         await expect(dateInput).toHaveValue('2025-12-24');
@@ -1277,7 +1291,7 @@ test.describe('Multivalue Prop Types', () => {
 
         // Reopen the same row and verify the original values are still there.
         await openPopoverForRow(page, field, 0);
-        const dialog2 = page.locator('[role="dialog"]');
+        const dialog2 = page.locator('[role="dialog"][data-state="open"]');
         const dateInput2 = dialog2.locator('input[type="date"]');
         const timeInput2 = dialog2.locator('input[type="time"]');
         await expect(dateInput2).toHaveValue('2025-12-24');
@@ -1335,7 +1349,7 @@ test.describe('Multivalue Prop Types', () => {
       }) => {
         const field = getField(page, PROP_NAMES.DATETIME_LIMITED);
         await openPopoverForRow(page, field, 0);
-        const dialog = page.locator('[role="dialog"]');
+        const dialog = page.locator('[role="dialog"][data-state="open"]');
         const removeButton = dialog.getByRole('button', { name: /Remove/i });
         await expect(removeButton).toBeVisible();
         await expect(removeButton).toBeDisabled();
@@ -1348,7 +1362,7 @@ test.describe('Multivalue Prop Types', () => {
       }) => {
         const field = getField(page, PROP_NAMES.DATETIME_LIMITED);
         await openPopoverForRow(page, field, 0);
-        const dialog = page.locator('[role="dialog"]');
+        const dialog = page.locator('[role="dialog"][data-state="open"]');
         await expect(dialog.locator('[class*="_popoverLabel_"]')).toHaveText(
           'DateTime (Limited)',
         );
@@ -1463,10 +1477,12 @@ test.describe('Multivalue Prop Types', () => {
         await verifyRowText(field, 1, formatDateForDisplay('2026-04-28'));
         await openPopoverForRow(page, field, 0);
         await page
-          .locator('[role="dialog"]')
+          .locator('[role="dialog"][data-state="open"]')
           .getByRole('button', { name: /Remove/i })
           .click();
-        await expect(page.locator('[role="dialog"]')).not.toBeVisible();
+        await expect(
+          page.locator('[role="dialog"][data-state="open"]'),
+        ).not.toBeVisible();
         await expect(field.locator('tbody tr')).toHaveCount(1);
         expect(await getAllRowTexts(field)).toEqual([
           formatDateForDisplay('2026-04-28'),
@@ -1482,7 +1498,7 @@ test.describe('Multivalue Prop Types', () => {
       test('popover opens and closes correctly', async ({ page }) => {
         const field = getField(page, PROP_NAMES.DATE);
         await openPopoverForRow(page, field, 0);
-        const dialog = page.locator('[role="dialog"]');
+        const dialog = page.locator('[role="dialog"][data-state="open"]');
         await expect(dialog.locator('input[type="date"]')).toHaveValue('');
         await expect(dialog.locator('[aria-label="Close"]')).toBeVisible();
         await dialog.locator('[aria-label="Close"]').click();
@@ -1494,7 +1510,7 @@ test.describe('Multivalue Prop Types', () => {
       }) => {
         const field = getField(page, PROP_NAMES.DATE);
         await openPopoverForRow(page, field, 0);
-        const dialog = page.locator('[role="dialog"]');
+        const dialog = page.locator('[role="dialog"][data-state="open"]');
         await expect(dialog.locator('[class*="_popoverLabel_"]')).toHaveText(
           'Date (Unlimited)',
         );
@@ -1511,7 +1527,7 @@ test.describe('Multivalue Prop Types', () => {
         await typeInPopover(page, 'input[type="date"]', '2026-04-27');
         await verifyRowText(field, 0, formatDateForDisplay('2026-04-27'));
         await openPopoverForRow(page, field, 0);
-        const dialog = page.locator('[role="dialog"]');
+        const dialog = page.locator('[role="dialog"][data-state="open"]');
         const input = dialog.locator('input[type="date"]');
         await expect(input).toHaveValue('2026-04-27');
 
@@ -1529,7 +1545,7 @@ test.describe('Multivalue Prop Types', () => {
 
         // Reopen the same row and verify the original value is still there.
         await openPopoverForRow(page, field, 0);
-        const dialog2 = page.locator('[role="dialog"]');
+        const dialog2 = page.locator('[role="dialog"][data-state="open"]');
         const input2 = dialog2.locator('input[type="date"]');
         await expect(input2).toHaveValue('2026-04-27');
         await closePopoverViaCloseButton(page);
@@ -1650,7 +1666,7 @@ test.describe('Multivalue Prop Types', () => {
       }) => {
         const field = getField(page, PROP_NAMES.DATE_LIMITED);
         await openPopoverForRow(page, field, 0);
-        const dialog = page.locator('[role="dialog"]');
+        const dialog = page.locator('[role="dialog"][data-state="open"]');
         const removeButton = dialog.getByRole('button', { name: /Remove/i });
         await expect(removeButton).toBeVisible();
         await expect(removeButton).toBeDisabled();
@@ -1663,7 +1679,7 @@ test.describe('Multivalue Prop Types', () => {
       }) => {
         const field = getField(page, PROP_NAMES.DATE_LIMITED);
         await openPopoverForRow(page, field, 0);
-        const dialog = page.locator('[role="dialog"]');
+        const dialog = page.locator('[role="dialog"][data-state="open"]');
         await expect(dialog.locator('[class*="_popoverLabel_"]')).toHaveText(
           'Date (Limited)',
         );
@@ -1793,10 +1809,12 @@ test.describe('Relative Link Component', () => {
       await expect(field.locator('tbody tr')).toHaveCount(3);
       await openPopoverForRow(page, field, 0);
       await page
-        .locator('[role="dialog"]')
+        .locator('[role="dialog"][data-state="open"]')
         .getByRole('button', { name: /Remove/i })
         .click();
-      await expect(page.locator('[role="dialog"]')).not.toBeVisible();
+      await expect(
+        page.locator('[role="dialog"][data-state="open"]'),
+      ).not.toBeVisible();
       await expect(field.locator('tbody tr')).toHaveCount(2);
       expect(await getAllRowTexts(field)).toEqual(['/contact', '']);
 
@@ -1815,7 +1833,7 @@ test.describe('Relative Link Component', () => {
     test('popover opens and closes correctly', async ({ page }) => {
       const field = getField(page, PROP_NAMES.RELATIVE_LINK);
       await openPopoverForRow(page, field, 0);
-      const dialog = page.locator('[role="dialog"]');
+      const dialog = page.locator('[role="dialog"][data-state="open"]');
       await expect(dialog.locator('input[type="text"]')).toHaveValue('/about');
       await expect(dialog.locator('[aria-label="Close"]')).toBeVisible();
       await dialog.locator('[aria-label="Close"]').click();
@@ -1827,7 +1845,7 @@ test.describe('Relative Link Component', () => {
     }) => {
       const field = getField(page, PROP_NAMES.RELATIVE_LINK);
       await openPopoverForRow(page, field, 0);
-      const dialog = page.locator('[role="dialog"]');
+      const dialog = page.locator('[role="dialog"][data-state="open"]');
       await expect(dialog.locator('[class*="_popoverLabel_"]')).toHaveText(
         'Relative Link (Unlimited)',
       );
@@ -1900,7 +1918,7 @@ test.describe('Relative Link Component', () => {
     }) => {
       const field = getField(page, PROP_NAMES.RELATIVE_LINK);
       await openPopoverForRow(page, field, 0);
-      const dialog = page.locator('[role="dialog"]');
+      const dialog = page.locator('[role="dialog"][data-state="open"]');
       const input = dialog.locator('input[type="text"]');
       await expect(input).toHaveValue('/about');
 
@@ -1918,7 +1936,7 @@ test.describe('Relative Link Component', () => {
 
       // Reopen the same row and verify the original value is still there.
       await openPopoverForRow(page, field, 0);
-      const dialog2 = page.locator('[role="dialog"]');
+      const dialog2 = page.locator('[role="dialog"][data-state="open"]');
       const input2 = dialog2.locator('input[type="text"]');
       await expect(input2).toHaveValue('/about');
       await closePopoverViaCloseButton(page);
@@ -1960,7 +1978,7 @@ test.describe('Relative Link Component', () => {
     }) => {
       const field = getField(page, PROP_NAMES.RELATIVE_LINK_LIMITED);
       await openPopoverForRow(page, field, 0);
-      const dialog = page.locator('[role="dialog"]');
+      const dialog = page.locator('[role="dialog"][data-state="open"]');
       const removeButton = dialog.getByRole('button', { name: /Remove/i });
       await expect(removeButton).toBeVisible();
       await expect(removeButton).toBeDisabled();
@@ -1973,7 +1991,7 @@ test.describe('Relative Link Component', () => {
     }) => {
       const field = getField(page, PROP_NAMES.RELATIVE_LINK_LIMITED);
       await openPopoverForRow(page, field, 0);
-      const dialog = page.locator('[role="dialog"]');
+      const dialog = page.locator('[role="dialog"][data-state="open"]');
       await expect(dialog.locator('[class*="_popoverLabel_"]')).toHaveText(
         'Relative Link (Limited)',
       );
