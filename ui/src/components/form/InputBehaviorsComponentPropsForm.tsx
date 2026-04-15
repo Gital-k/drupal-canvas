@@ -211,7 +211,12 @@ export const InputBehaviorsComponentPropsForm = (
       inputAndUiData,
       transforms,
     );
-    return propName in values ? values[propName] : rawValue;
+    const returnValue = propName in values ? values[propName] : rawValue;
+    // This is a value parser for a single input. If the transformed value is an
+    // array, yet isn't a multivalue select, the transform has structured it
+    // with the assumption of it representing the entire prop value, as opposed
+    // to the input which determines only a single item within.
+    return Array.isArray(returnValue) ? returnValue[0] : returnValue;
   };
 
   const validateNewValue = (e: React.ChangeEvent, newValue: any) => {
