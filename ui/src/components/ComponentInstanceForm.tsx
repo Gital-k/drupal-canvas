@@ -54,7 +54,6 @@ import type { TransformConfig } from '@/utils/transforms';
 
 const TransformsContext = createContext<TransformConfig | undefined>(undefined);
 
-
 export const useComponentTransforms = () => {
   return useContext(TransformsContext);
 };
@@ -315,9 +314,9 @@ const ComponentInstanceForm: React.FC<ComponentInstanceFormProps> = () => {
   const [renderComponentId, setRenderComponentId] = useState<string | null>(
     null,
   );
-   const previousModelRef = useRef<EvaluatedComponentModel | null>(null);
-   const previousSelectedComponentRef = useRef<string | null>(null);
-   const previousLatestUndoRedoActionIdRef = useRef<string | null>(null);
+  const previousModelRef = useRef<EvaluatedComponentModel | null>(null);
+  const previousSelectedComponentRef = useRef<string | null>(null);
+  const previousLatestUndoRedoActionIdRef = useRef<string | null>(null);
 
   const buildPreparedModel = (
     model: ComponentModel,
