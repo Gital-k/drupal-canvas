@@ -271,6 +271,89 @@ describe('preview-payload', () => {
     expect(payload.errors[0]?.code).toBe('interactive_bundle_failed');
   });
 
+  it('explains the configured componentDir when the target path is outside it', async () => {
+    const root = await makeTemporaryDirectory();
+
+    await writeFile(
+      path.join(root, 'canvas.config.json'),
+      JSON.stringify(
+        {
+          componentDir: './components',
+          pagesDir: './pages',
+        },
+        null,
+        2,
+      ),
+    );
+    await writeFile(
+      path.join(root, 'examples/components/card/component.yml'),
+      'name: Card\n',
+    );
+
+    const payload = await buildPreviewPayload({
+      mode: 'component',
+      inputPath: 'examples/components/card/component.yml',
+      projectRoot: root,
+    });
+
+    expect(payload.ok).toBe(false);
+    expect(payload.errors).toEqual([
+      expect.objectContaining({
+        code: 'component_not_found',
+        message: expect.stringContaining(
+          'configured componentDir ("./components")',
+        ),
+      }),
+    ]);
+    expect(payload.errors[0]?.message).toContain(
+      'preview discovery, mocks, and @/ module resolution are scoped to the configured roots.',
+    );
+  });
+
+  it('explains the configured pagesDir when the target path is outside it', async () => {
+    const root = await makeTemporaryDirectory();
+
+    await writeFile(
+      path.join(root, 'canvas.config.json'),
+      JSON.stringify(
+        {
+          componentDir: './components',
+          pagesDir: './pages',
+        },
+        null,
+        2,
+      ),
+    );
+    await writeFile(
+      path.join(root, 'examples/pages/home.json'),
+      JSON.stringify(
+        {
+          title: 'Home',
+          elements: {},
+        },
+        null,
+        2,
+      ),
+    );
+
+    const payload = await buildPreviewPayload({
+      mode: 'page',
+      inputPath: 'examples/pages/home.json',
+      projectRoot: root,
+    });
+
+    expect(payload.ok).toBe(false);
+    expect(payload.errors).toEqual([
+      expect.objectContaining({
+        code: 'page_not_found',
+        message: expect.stringContaining('configured pagesDir ("./pages")'),
+      }),
+    ]);
+    expect(payload.errors[0]?.message).toContain(
+      'components discovered under componentDir ("./components")',
+    );
+  });
+
   it('builds runtime source that bootstraps React and drupalSettings defaults', () => {
     const source = buildPreviewRuntimeEntrySource({
       spec: {
