@@ -367,23 +367,23 @@ async function maybeResolveGlobalCssPath(
   }
 }
 
+function toPortableManifestPath(relativePath: string): string {
+  return relativePath.split(/[/\\]+/).join('/');
+}
+
 function createComponentManifestEntry(
-  outputDirectory: string,
   fileName: string,
   label: string,
 ): ManifestEntry {
   return {
-    path: path.join(outputDirectory, fileName),
+    path: toPortableManifestPath(fileName),
     label,
   };
 }
 
-function createPageManifestEntry(
-  outputDirectory: string,
-  fileName: string,
-): ManifestEntry {
+function createPageManifestEntry(fileName: string): ManifestEntry {
   return {
-    path: path.join(outputDirectory, fileName),
+    path: toPortableManifestPath(fileName),
     label: 'Default',
   };
 }
@@ -630,7 +630,6 @@ export async function buildPreviewArtifact(
         content: previewPayload.iframeHtml,
       });
       defaultManifestEntry = createComponentManifestEntry(
-        outputDirectory,
         'component-default.html',
         'Default',
       );
@@ -738,7 +737,7 @@ export async function buildPreviewArtifact(
             content: mockHtml,
           });
           mockManifestEntries.push(
-            createComponentManifestEntry(outputDirectory, fileName, mock.label),
+            createComponentManifestEntry(fileName, mock.label),
           );
         }
       }
@@ -749,10 +748,7 @@ export async function buildPreviewArtifact(
         fileName: 'page-default.html',
         content: previewPayload.iframeHtml,
       });
-      defaultManifestEntry = createPageManifestEntry(
-        outputDirectory,
-        'page-default.html',
-      );
+      defaultManifestEntry = createPageManifestEntry('page-default.html');
     }
 
     await Promise.all(
