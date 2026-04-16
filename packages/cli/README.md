@@ -16,9 +16,15 @@ npm install @drupal-canvas/cli
 
 1. Install the Drupal Canvas OAuth module (`canvas_oauth`), which is shipped as
    a submodule of Drupal Canvas.
-2. Follow the
-   [configuration steps of the module](https://git.drupalcode.org/project/canvas/-/tree/1.x/modules/canvas_oauth#22-configuration)
-   to set up a client with an ID and secret.
+2. Choose an authentication flow:
+   - **Interactive login (recommended for individual developers):** Follow the
+     [authorization code setup](https://git.drupalcode.org/project/canvas/-/tree/1.x/modules/canvas_oauth#23-interactive-login-with-canvas-login)
+     and run `npx canvas login`. Tokens are stored in
+     `~/.config/drupal-canvas/oauth.json` and used automatically — no
+     environment variables needed.
+   - **Client credentials (for CI/CD or service accounts):** Follow the
+     [client credentials setup](https://git.drupalcode.org/project/canvas/-/tree/1.x/modules/canvas_oauth#22-configuration)
+     and configure `CANVAS_CLIENT_ID` and `CANVAS_CLIENT_SECRET`.
 
 ### Configuration
 
@@ -172,18 +178,21 @@ You can copy the
 [`.env.example` file](https://git.drupalcode.org/project/canvas/-/blob/1.x/cli/.env.example)
 to get started.
 
-| CLI argument      | Environment variable   | Description                                                                                                                                                                                           |
-| ----------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--site-url`      | `CANVAS_SITE_URL`      | Base URL of your Drupal site. Can point to different environments (local dev, staging, production).                                                                                                   |
-| `--client-id`     | `CANVAS_CLIENT_ID`     | OAuth client ID. Different environments may have different OAuth clients with different permissions.                                                                                                  |
-| `--client-secret` | `CANVAS_CLIENT_SECRET` | OAuth client secret. This is a secret credential that must never be committed to version control.                                                                                                     |
-| `--scope`         | `CANVAS_SCOPE`         | (Optional) Space-separated list of OAuth scopes to request. Tied to your specific Drupal site's OAuth configuration. Defaults to standard scopes.                                                     |
-| _(none)_          | `CANVAS_ACCESS_TOKEN`  | (Optional) Pre-issued Bearer token. When set, skips the OAuth client credentials flow entirely. `CANVAS_CLIENT_ID`, `CANVAS_CLIENT_SECRET`, and `CANVAS_SCOPE` are ignored. Must not be empty if set. |
-| `--include-pages` | `CANVAS_INCLUDE_PAGES` | (Optional) Include pages in `pull` and `push`. Defaults to `false`. Accepts `true`/`false`, `1`/`0`, or `yes`/`no`.                                                                                   |
+| CLI argument          | Environment variable       | Description                                                                                                                                                                                           |
+| --------------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--site-url`          | `CANVAS_SITE_URL`          | Base URL of your Drupal site. Can point to different environments (local dev, staging, production).                                                                                                   |
+| `--client-id`         | `CANVAS_CLIENT_ID`         | OAuth client ID. Different environments may have different OAuth clients with different permissions.                                                                                                  |
+| `--client-secret`     | `CANVAS_CLIENT_SECRET`     | OAuth client secret. This is a secret credential that must never be committed to version control.                                                                                                     |
+| `--scope`             | `CANVAS_SCOPE`             | (Optional) Space-separated list of OAuth scopes to request. Tied to your specific Drupal site's OAuth configuration. Defaults to standard scopes.                                                     |
+| _(none)_              | `CANVAS_ACCESS_TOKEN`      | (Optional) Pre-issued Bearer token. When set, skips the OAuth client credentials flow entirely. `CANVAS_CLIENT_ID`, `CANVAS_CLIENT_SECRET`, and `CANVAS_SCOPE` are ignored. Must not be empty if set. |
+| _(none)_              | _(none)_                   | User tokens from `canvas auth login` are stored in `~/.config/drupal-canvas/oauth.json` (keyed by site URL) and used automatically. No environment variable is needed.                                |
+| `--include-pages`     | `CANVAS_INCLUDE_PAGES`     | (Optional) Include pages in `pull` and `push`. Defaults to `false`. Accepts `true`/`false`, `1`/`0`, or `yes`/`no`.                                                                                   |
+| `--include-brand-kit` | `CANVAS_INCLUDE_BRAND_KIT` | (Optional) Include brand kit (fonts) in `pull` and `push`. Defaults to `false`. Accepts `true`/`false`, `1`/`0`, or `yes`/`no`.                                                                       |
 
 **Note:** When `CANVAS_SCOPE` is unset, the CLI uses the `canvas_oauth`
-defaults, including `canvas:brand_kit`. With `--include-pages` or
-`CANVAS_INCLUDE_PAGES`, it also adds the `canvas:page:*` scopes.
+defaults. With `--include-brand-kit` or `CANVAS_INCLUDE_BRAND_KIT`, it adds the
+`canvas:brand_kit` scope. With `--include-pages` or `CANVAS_INCLUDE_PAGES`, it
+also adds the `canvas:page:*` scopes.
 
 #### Configuration Precedence
 
@@ -430,7 +439,8 @@ font files into a `fonts/` directory, and adds local `src` entries to
 weight + style). Variants already present in your config (e.g., from a previous
 push) are skipped, so push-then-pull is idempotent. New variants added via the
 Canvas UI for a family you already have in config are downloaded and appended to
-`families`. Requires the `canvas:brand_kit` OAuth scope.
+`families`. Requires `--include-brand-kit` or `CANVAS_INCLUDE_BRAND_KIT` which
+will add the `canvas:brand_kit` OAuth scope.
 
 ---
 
@@ -748,13 +758,109 @@ Tailwind CSS, and uploads the selected content to your Drupal site including:
 2. **Global CSS** - Tailwind CSS assets uploaded as asset_library
 3. **Fonts** - If `canvas.brand-kit.json` is present, fonts are resolved (via
    unifont or local `src`), uploaded, and synced to the global Brand Kit.
-   Requires `canvas:brand_kit` OAuth scope. See
+   Requires `--include-brand-kit` or `CANVAS_INCLUDE_BRAND_KIT` which will add
+   the `canvas:brand_kit` OAuth scope. See
    [Font push (Brand Kit)](#font-push-brand-kit).
 4. **Vendor artifacts** - Bundled third-party dependencies
 5. **Local artifacts** - Bundled local imports (e.g., `@/utils`)
 6. **Shared chunks** - Common code shared between vendor bundles
 7. **Pages** - Canvas pages built from components, when enabled with
    `--include-pages` or `CANVAS_INCLUDE_PAGES=true`.
+
+---
+
+### `reconcile-media`
+
+Upload external media referenced in local page specs to Drupal and store
+provenance metadata so that pages can be pushed.
+
+When page specs contain image props with external URLs (e.g.
+`https://example.com/photo.jpg`), they cannot be pushed directly because Drupal
+expects a media entity reference. This command downloads each external image,
+uploads it to Drupal as a media entity, and updates the local page spec with the
+resolved image data and provenance (`target_id`).
+
+**Usage:**
+
+```bash
+npx canvas reconcile-media [options]
+```
+
+**Options:**
+
+- `-y, --yes`: Skip confirmation prompts (non-interactive mode)
+
+**Examples:**
+
+Reconcile all external media in local pages:
+
+```bash
+npx canvas reconcile-media
+```
+
+Non-interactive mode for CI/CD:
+
+```bash
+npx canvas reconcile-media --yes
+```
+
+---
+
+### `login`
+
+Log in to a Canvas site via browser using the OAuth 2.0 authorization code flow
+with PKCE. Stores the resulting access and refresh tokens in
+`~/.config/drupal-canvas/oauth.json` (keyed by site URL). After logging in,
+`canvas push` and `canvas pull` use the stored token automatically.
+
+**Usage:**
+
+```bash
+npx canvas login [options]
+```
+
+**Options:**
+
+- `--site-url <url>`: Canvas site URL (prompted if not provided)
+- `--client-id <id>`: OAuth client ID for the consumer configured in Drupal
+  admin
+- `--port <number>`: Local callback port (default: `4444`). The consumer's
+  redirect URI must match: `http://localhost:<port>/callback`.
+
+**Example:**
+
+```bash
+npx canvas login --site-url https://example.com --client-id my-cli-client
+```
+
+The CLI opens your browser to the Drupal login page, waits for authorization,
+then saves your tokens locally. Requires the consumer to be configured for the
+Authorization Code grant with `http://localhost:4444/callback` (or the port you
+specify) as a redirect URI — see the
+[canvas_oauth setup guide](https://git.drupalcode.org/project/canvas/-/tree/1.x/modules/canvas_oauth#23-interactive-login-with-canvas-login).
+
+---
+
+### `logout`
+
+Remove stored credentials for a Canvas site from
+`~/.config/drupal-canvas/oauth.json`.
+
+**Usage:**
+
+```bash
+npx canvas logout [options]
+```
+
+**Options:**
+
+- `--site-url <url>`: Canvas site URL to log out of (prompted if not provided)
+
+**Example:**
+
+```bash
+npx canvas logout --site-url https://example.com
+```
 
 ---
 
