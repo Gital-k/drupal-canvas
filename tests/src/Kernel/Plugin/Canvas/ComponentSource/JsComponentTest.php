@@ -1798,11 +1798,6 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
                   'medium',
                   'large',
                 ],
-                'meta:enum' => [
-                  'small' => 'Small',
-                  'medium' => 'Medium',
-                  'large' => 'Large',
-                ],
               ],
             ],
             'sourceType' => 'static:field_item:list_string',
@@ -2331,8 +2326,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       ],
       'dataDependencies' => [],
     ]);
-    $violations = $js_component->getTypedData()->validate();
-    self::assertCount(0, $violations);
+    self::assertEntityIsValid($js_component);
 
     // Save and enable to create a component.
     $js_component->enable()->save();

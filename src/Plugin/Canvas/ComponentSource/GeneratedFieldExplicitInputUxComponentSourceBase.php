@@ -1026,7 +1026,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       // @see \Drupal\canvas\Form\ComponentInstanceForm
       $field_data[$prop_name] = [
         'required' => \in_array($prop_name, $this->getMetadata()->schema['required'] ?? [], TRUE),
-        'jsonSchema' => array_diff_key($prop_shape->resolvedSchema, array_flip(['meta:enum', 'x-translation-context'])),
+        'jsonSchema' => self::stripNonStandardJsonSchemaKeys($prop_shape->resolvedSchema),
       ] + \array_diff_key($default_static_prop_source->toArray(), \array_flip(['value']));
       if ($default_resolved->value !== NULL) {
         $field_data[$prop_name]['default_values']['source'] = $default_source_value;
@@ -1328,6 +1328,18 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
         if ($is_static_prop_source && !\array_key_exists('value', $prop_source)) {
           $prop_source['value'] = $prop_value;
         }
+        // Required integer/float static props must never be stored with a NULL
+        // value: the numeric input in the UI defaults 0 when the value is
+        // empty and the prop is required. Mirror that behavior here so that
+        // rendering always receives a valid numeric value instead of NULL,
+        // which would cause an InvalidComponentException.
+        // @see https://www.drupal.org/project/canvas/issues/3583639
+        if ($is_required_prop && ($prop_source['value'] ?? NULL) === NULL && $is_static_prop_source) {
+          $field_type = $this->configuration['prop_field_definitions'][$prop]['field_type'] ?? NULL;
+          if (\in_array($field_type, ['integer', 'float'], TRUE)) {
+            $prop_source['value'] = 0;
+          }
+        }
         $source = PropSource::parse($prop_source);
         if ($source instanceof EntityFieldPropSource) {
           if ($host_entity === NULL) {
@@ -1348,8 +1360,8 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
           $prop_evaluates_to_nothing = match ($source->getCardinality()) {
             // Nothing for single-cardinality prop: NULL evaluation result.
             1 => $evaluated === NULL,
-            // Nothing for multi-cardinality prop: empty array eval result.
-            default => $evaluated === [],
+            // Nothing for multi-cardinality prop: empty result.
+            default => $source->isEmpty(),
           };
           if (!$is_required_prop && $prop_evaluates_to_nothing) {
             continue;
@@ -1391,6 +1403,34 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
         continue;
       }
       $props[$prop] = $this->collapse($source, $prop);
+    }
+
+    // Uphold the guarantee that every required prop appears in the result
+    // when the UI removes the prop key from 'source' entirely (e.g. via a
+    // "Remove" action), so the foreach loop above never processes it.
+    // Without this, ::buildComponentInstanceForm() would fail with an
+    // assertion error and return a 500 instead of gracefully rendering the
+    // form so that validation can surface a proper user-facing error message.
+    // For integer/float field types the stored value is 0 (not NULL) to
+    // mirror what the numeric UI input produces and avoid an
+    // InvalidComponentException during preview rendering.
+    // Note: the case where the client sends value=null for a required
+    // integer/float prop is handled earlier in this method, before parsing.
+    // @see ::buildComponentInstanceForm()
+    // @see https://www.drupal.org/project/canvas/issues/3583639
+    foreach ($required_props as $required_prop) {
+      if (
+        !\array_key_exists($required_prop, $props)
+        && \array_key_exists($required_prop, $this->configuration['prop_field_definitions'] ?? [])
+        && \in_array(
+          $this->configuration['prop_field_definitions'][$required_prop]['field_type'] ?? NULL,
+          ['integer', 'float'],
+          TRUE
+        )
+      ) {
+        // Default to 0 so rendering receives a valid numeric value.
+        $props[$required_prop] = $this->collapse($this->uncollapse(0, $required_prop), $required_prop);
+      }
     }
 
     return $props;
@@ -1489,6 +1529,29 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       }
     }
     return $source->toArray();
+  }
+
+  /**
+   * Strips non-standard JSON Schema keys recursively from a schema array.
+   *
+   * Keys like `meta:enum` and `x-translation-context` are valid in SDC
+   * component definitions but are not part of the JSON Schema spec. They must
+   * be removed before sending the schema to the client, where a strict-mode
+   * JSON Schema validator (Ajv) would reject them as unknown keywords.
+   *
+   * @param array<string, mixed> $schema
+   *
+   * @return array<string, mixed>
+   */
+  protected static function stripNonStandardJsonSchemaKeys(array $schema): array {
+    $keys_to_remove = ['meta:enum', 'x-translation-context'];
+    $schema = array_diff_key($schema, array_flip($keys_to_remove));
+    foreach ($schema as $key => $value) {
+      if (\is_array($value)) {
+        $schema[$key] = self::stripNonStandardJsonSchemaKeys($value);
+      }
+    }
+    return $schema;
   }
 
   /**
