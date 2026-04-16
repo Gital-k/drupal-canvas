@@ -80,12 +80,6 @@ const ComponentInstanceFormRenderer: React.FC<
   const [currentComponentId, setCurrentComponentId] = useState<string | null>(
     null,
   );
-  // Counter that increments each time new form HTML arrives.  Used in the
-  // wrapper div's key so React destroys the old fiber tree and creates a
-  // new one.  This is necessary because tabledrag physically reorders DOM
-  // nodes, and React's index-based reconciliation would update props on the
-  // wrong DOM nodes if we reuse the old fiber tree.
-  const formVersionRef = useRef(0);
   const formRef = useRef(null);
   const selectedComponentId = selectedComponent || 'noop';
   const skip = useAppSelector((state) =>
@@ -157,7 +151,6 @@ const ComponentInstanceFormRenderer: React.FC<
     );
     setCurrentComponentId(componentId);
 
-    formVersionRef.current += 1;
     setJsxFormContent(
       // Wrapping the constructed `ReactElement` for the form so we can add a
       // key which tells React when to re-render this subtree. The component ID
@@ -166,13 +159,8 @@ const ComponentInstanceFormRenderer: React.FC<
       // prop values are being updated by the user in the contextual panel,
       // causing the form to lose focus.
       // A `<div>` is used instead of `React.Fragment` so a test ID can be added.
-      // formVersion ensures that when new form HTML arrives (e.g. after a
-      // multivalue field reorder), React destroys the old fiber tree and
-      // creates a new one instead of reconciling by index.  This is critical
-      // because tabledrag physically reorders DOM <tr> nodes; without a key
-      // change React would update props on the wrong (moved) DOM nodes.
       <div
-        key={`${componentId}-${latestUndoRedoActionId}-${formVersionRef.current}`}
+        key={`${componentId}-${latestUndoRedoActionId}`}
         data-testid={`canvas-component-form-${componentId}`}
       >
         {hyperscriptify(
@@ -411,35 +399,16 @@ const ComponentInstanceForm: React.FC<ComponentInstanceFormProps> = () => {
       return JSON.stringify(prevSource) !== JSON.stringify(currentSource);
     })();
 
-    // Detect multivalue field reorders by checking if resolved keys changed.
-    // This is cheaper than full JSON comparison and only triggers on structural
-    // changes (like reorders), not on every value update.
-    const resolvedKeysChanged = (() => {
-      const prevResolved = prevModel?.resolved;
-      const currentResolved = builtPreparedModel.resolved;
-
-      if (!prevResolved && !currentResolved) return false;
-      if (!prevResolved || !currentResolved) return true;
-
-      // Check if the keys are the same (cheaper than full comparison)
-      const prevKeys = Object.keys(prevResolved).sort().join(',');
-      const currentKeys = Object.keys(currentResolved).sort().join(',');
-
-      return prevKeys !== currentKeys;
-    })();
-
     // Only build and update formQueryString if:
     // - First render (!prevModel)
     // - Component changed (user selected different component)
     // - Undo/redo occurred (latestUndoRedoActionId changed)
     // - Source changed
-    // - Resolved keys changed (indicates multivalue field reorder or structural change)
     const shouldUpdate =
       !prevModel ||
       prevSelectedComponent !== selectedComponent ||
       prevLatestUndoRedoActionId !== latestUndoRedoActionId ||
-      sourceChanged ||
-      resolvedKeysChanged;
+      sourceChanged;
 
     if (shouldUpdate) {
       // Build the query string only when needed
