@@ -52,10 +52,6 @@ vi.mock('@/local_packages/utils', () => ({
   cleanClass: (input: string) => input,
 }));
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 const renderInWrapper = (
   rowCount: number,
   value: string,
@@ -70,10 +66,6 @@ const renderInWrapper = (
       </div>
     </Theme>,
   );
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 describe('DrupalInputMultivalueForm – reorder scenario', () => {
   /**
@@ -182,16 +174,6 @@ describe('DrupalInputMultivalueForm – reorder scenario', () => {
 
 describe('DrupalInputMultivalueForm – multi-row reorder regression', () => {
   /**
-   * Regression test: https://www.drupal.org/i/3582219
-   *
-   * Renders three rows with values [321, 322, 323] inside a shared
-   * `data-canvas-row-count` wrapper, then simulates the Drupal AJAX response
-   * after a tabledrag reorder by re-rendering with rotated attribute values:
-   *
-   *   row 1: live=321, new attr="323"
-   *   row 2: live=322, new attr="321"
-   *   row 3: live=323, new attr="322"
-   *
    * Because the row count is unchanged (3→3), each row must trust its live
    * hidden input and keep displaying its original value — not the shifted
    * attribute from the AJAX response. Before the fix, rows would flip to the
