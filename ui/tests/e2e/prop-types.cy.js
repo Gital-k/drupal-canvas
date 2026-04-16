@@ -275,7 +275,7 @@ describe('Prop types editing', () => {
     cy.get(timeSelector).should('have.value', '07:21:35');
     cy.waitForElementContentInIframe(
       '#test-string-format-date-time',
-      '2017-06-28T07:21:35.000Z',
+      '2017-06-28T07:21:35',
     );
   });
 
