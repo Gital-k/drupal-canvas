@@ -87,8 +87,10 @@ For page targets, output writes:
 
 - Component manifests include `entries.default` and `entries.mocks`.
 - Page manifests include only `entries.default`.
-- Each entry includes `path` and `label`. The default entry uses `Default`, and
-  mock entries use each mock name.
+- Each entry includes `path` and `label`.
+- Entry `path` values are relative to the export directory, so the bundle stays
+  portable when you move or copy it.
+- The default entry uses `Default`, and mock entries use each mock name.
 
 The command also prints one JSON payload to stdout with `request`, `target`,
 `renderMode` (`interactive`), `outDir`, `manifestPath`, summary counts, plus

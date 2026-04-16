@@ -283,20 +283,36 @@ describe('preview-build', () => {
     expect(manifest.target.mockCount).toBe(2);
     expect(manifest.entries).toEqual({
       default: {
-        path: path.join(outputDirectory, 'component-default.html'),
+        path: 'component-default.html',
         label: 'Default',
       },
       mocks: [
         {
-          path: path.join(outputDirectory, 'component-mock-01.html'),
+          path: 'component-mock-01.html',
           label: 'Mock One',
         },
         {
-          path: path.join(outputDirectory, 'component-mock-02.html'),
+          path: 'component-mock-02.html',
           label: 'Mock Two',
         },
       ],
     });
+
+    const relocatedDirectory = path.join(projectRoot, '.canvas-preview/moved');
+    await fs.rename(outputDirectory, relocatedDirectory);
+
+    expect(
+      await fs.readFile(
+        path.resolve(relocatedDirectory, manifest.entries.default.path),
+        'utf-8',
+      ),
+    ).toContain('window.default=true;');
+    expect(
+      await fs.readFile(
+        path.resolve(relocatedDirectory, manifest.entries.mocks[0].path),
+        'utf-8',
+      ),
+    ).toContain('data-canvas-preview-runtime');
   });
 
   it('exports page html and simplified manifest without mocks', async () => {
@@ -357,7 +373,7 @@ describe('preview-build', () => {
     expect(manifest.target.mockCount).toBe(0);
     expect(manifest.entries).toEqual({
       default: {
-        path: path.join(outputDirectory, 'page-default.html'),
+        path: 'page-default.html',
         label: 'Default',
       },
     });
