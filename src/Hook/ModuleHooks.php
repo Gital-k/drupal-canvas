@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace Drupal\canvas\Hook;
 
 use Drupal\canvas\Access\CanvasUiAccessCheck;
+use Drupal\canvas\Plugin\Validation\Constraint\CanvasLinkAccessConstraint;
+use Drupal\canvas\Plugin\Validation\Constraint\CanvasLinkExternalProtocolsConstraint;
+use Drupal\canvas\Plugin\Validation\Constraint\CanvasLinkNotExistingInternalConstraint;
+use Drupal\canvas\Plugin\Validation\Constraint\CanvasLinkTypeConstraint;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Entity\EntityForm;
 use Drupal\Core\EventSubscriber\AjaxResponseSubscriber;
@@ -90,6 +94,23 @@ class ModuleHooks {
         'provider' => 'core',
         'id' => 'Unique',
       ];
+    }
+    // Route core's link constraint validators through Canvas shims so they
+    // skip empty LinkItems instead of forwarding a NULL `uri` into
+    // Url::fromUri(). Only apply when the link module is installed (the
+    // corresponding definition is present).
+    // @see \Drupal\canvas\Plugin\Validation\Constraint\CanvasSkipEmptyLinkItemTrait
+    // @todo Remove once the upstream core fix lands.
+    $canvas_link_shims = [
+      'LinkType' => CanvasLinkTypeConstraint::class,
+      'LinkAccess' => CanvasLinkAccessConstraint::class,
+      'LinkExternalProtocols' => CanvasLinkExternalProtocolsConstraint::class,
+      'LinkNotExistingInternal' => CanvasLinkNotExistingInternalConstraint::class,
+    ];
+    foreach ($canvas_link_shims as $id => $class) {
+      if (isset($definitions[$id])) {
+        $definitions[$id]['class'] = $class;
+      }
     }
   }
 
