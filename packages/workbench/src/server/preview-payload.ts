@@ -67,6 +67,21 @@ export interface PreviewRuntimeSettings {
   jsonapiPrefix: string | null;
 }
 
+export function formatComponentPathConstraintMessage(options: {
+  inputPath: string;
+  componentDir: string;
+}): string {
+  return `No component found for path "${options.inputPath}". Workbench resolves --component-path only inside the configured componentDir ("${options.componentDir}"). Paths outside that directory are not supported, because preview discovery, mocks, and @/ module resolution are scoped to the configured roots. Move the component under "${options.componentDir}" or update canvas.config.json.`;
+}
+
+export function formatPagePathConstraintMessage(options: {
+  inputPath: string;
+  pagesDir: string;
+  componentDir: string;
+}): string {
+  return `No page found for path "${options.inputPath}". Workbench resolves --page-path only inside the configured pagesDir ("${options.pagesDir}"). Page previews also use components discovered under componentDir ("${options.componentDir}"), so paths outside those roots are not supported. Move the page under "${options.pagesDir}" or update canvas.config.json.`;
+}
+
 interface BundleComponentSource {
   name: string;
   jsEntryPath: string;
@@ -525,6 +540,7 @@ async function maybeResolveGlobalCssPath(
 async function prepareComponentPreview(options: {
   projectRoot: string;
   inputPath: string;
+  componentDir: string;
   discoveryResult: DiscoveryResult;
   extractMetadata: typeof extractComponentPreviewMetadataFromComponentYaml;
 }): Promise<
@@ -542,7 +558,10 @@ async function prepareComponentPreview(options: {
       errors: [
         toIssue(
           'component_not_found',
-          `No component found for path "${options.inputPath}".`,
+          formatComponentPathConstraintMessage({
+            inputPath: options.inputPath,
+            componentDir: options.componentDir,
+          }),
           requestedPath,
         ),
       ],
@@ -629,6 +648,8 @@ function toPreviewablePageRegistrySources(
 async function preparePagePreview(options: {
   projectRoot: string;
   inputPath: string;
+  componentDir: string;
+  pagesDir: string;
   discoveryResult: DiscoveryResult;
 }): Promise<
   | { prepared: PreparedPagePreview; warnings: PreviewIssue[] }
@@ -645,7 +666,11 @@ async function preparePagePreview(options: {
       errors: [
         toIssue(
           'page_not_found',
-          `No page found for path "${options.inputPath}".`,
+          formatPagePathConstraintMessage({
+            inputPath: options.inputPath,
+            pagesDir: options.pagesDir,
+            componentDir: options.componentDir,
+          }),
           requestedPath,
         ),
       ],
@@ -768,12 +793,15 @@ export async function buildPreviewPayload(
       ? await prepareComponentPreview({
           projectRoot: options.projectRoot,
           inputPath: options.inputPath,
+          componentDir: config.componentDir,
           discoveryResult,
           extractMetadata,
         })
       : await preparePagePreview({
           projectRoot: options.projectRoot,
           inputPath: options.inputPath,
+          componentDir: config.componentDir,
+          pagesDir: config.pagesDir,
           discoveryResult,
         });
 

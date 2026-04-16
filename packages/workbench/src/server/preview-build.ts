@@ -13,6 +13,7 @@ import {
   buildIframeHtml,
   buildPreviewPayload,
   bundleInteractivePreview,
+  formatComponentPathConstraintMessage,
   resolvePreviewRuntimeSettings,
 } from './preview-payload';
 
@@ -655,7 +656,10 @@ export async function buildPreviewArtifact(
       );
       if (!selectedComponent) {
         throw new Error(
-          `No component found for path "${options.inputPath}" while exporting mocks.`,
+          formatComponentPathConstraintMessage({
+            inputPath: options.inputPath,
+            componentDir: config.componentDir,
+          }),
         );
       }
 

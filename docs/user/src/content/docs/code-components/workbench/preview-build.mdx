@@ -29,6 +29,17 @@ Page exports write:
 - `page-default.html`
 - `manifest.json`
 
+## Path constraints
+
+`--component-path` must point to a component metadata file discovered inside the
+configured `componentDir`. `--page-path` must point to a page JSON file inside
+the configured `pagesDir`.
+
+Paths elsewhere in the project are not supported, even when the files exist,
+because preview discovery, mocks, and `@/` module resolution are scoped to
+those configured roots. If your files live under a different tree, update
+`canvas.config.json` first.
+
 ## Manifest format
 
 `manifest.json` is target-specific:

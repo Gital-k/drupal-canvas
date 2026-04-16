@@ -430,4 +430,44 @@ describe('preview-build', () => {
       await fs.readFile(path.join(outputDirectory, 'keep.txt'), 'utf-8'),
     ).toBe('keep');
   });
+
+  it('surfaces the configured componentDir when mock export cannot resolve the target', async () => {
+    const projectRoot = await makeTemporaryDirectory();
+
+    const payload = await buildPreviewArtifact(
+      {
+        mode: 'component',
+        inputPath: 'examples/components/card/component.yml',
+        projectRoot,
+        outDir: '.canvas-preview/component',
+      },
+      {
+        buildPreviewPayload: async (options) =>
+          makePreviewPayload(options.projectRoot, {
+            request: {
+              mode: 'component',
+              inputPath: 'examples/components/card/component.yml',
+              projectRoot: options.projectRoot,
+            },
+            target: {
+              id: 'card-id',
+              name: 'Card',
+              projectRelativePath: 'examples/components/card/component.yml',
+            },
+          }),
+        discover: async () => makeDiscoveryResult(projectRoot),
+        resolveConfig: () => makeCanvasConfig(),
+      },
+    );
+
+    expect(payload.ok).toBe(false);
+    expect(payload.errors).toEqual([
+      expect.objectContaining({
+        code: 'artifact_build_failed',
+        message: expect.stringContaining(
+          'configured componentDir ("./components")',
+        ),
+      }),
+    ]);
+  });
 });

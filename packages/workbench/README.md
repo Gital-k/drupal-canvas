@@ -72,6 +72,13 @@ npx canvas-workbench preview-build --component-path components/card/component.ym
 npx canvas-workbench preview-build --page-path pages/home.json --out-dir .canvas-preview/home
 ```
 
+`--component-path` must point to a component metadata file discovered inside the
+configured `componentDir`. `--page-path` must point to a page JSON file inside
+the configured `pagesDir`. Paths elsewhere in the project are not supported,
+because preview discovery, mocks, and `@/` module resolution are scoped to those
+configured roots. If your files live under a different tree, update
+`canvas.config.json` first.
+
 For component targets, output writes:
 
 - `component-default.html`
