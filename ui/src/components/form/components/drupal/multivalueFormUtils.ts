@@ -2,6 +2,8 @@
  * Utility functions for multivalue form components.
  */
 
+const ENTITY_AUTOCOMPLETE_MATCH = /.+\s\(([^)]+)\)/;
+
 /**
  * Determine if the remove button should be enabled for a multivalue field item.
  *
@@ -106,4 +108,75 @@ export const triggerDrupalRemoveButton = (
   }
 
   return false;
+};
+
+/**
+ * Programmatically set an input value and trigger its change pipeline.
+ *
+ * If the input defines an element-level value setter (for example TextField's
+ * setter override), assigning `input.value` will invoke that implementation.
+ * Otherwise we fall back to the native setter and dispatch bubbling events.
+ */
+export const dispatchSyntheticChange = (
+  input: HTMLInputElement,
+  value: string,
+): void => {
+  const instanceValueSetter = Object.getOwnPropertyDescriptor(
+    input,
+    'value',
+  )?.set;
+  if (instanceValueSetter) {
+    input.value = value;
+    return;
+  }
+
+  const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+    window.HTMLInputElement.prototype,
+    'value',
+  )?.set;
+  if (nativeInputValueSetter) {
+    nativeInputValueSetter.call(input, value);
+  }
+
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+};
+
+/**
+ * Converts Drupal autocomplete labels like "Title (123)" to entity URIs.
+ */
+export const toAutocompleteEntityUri = (value: string): string => {
+  const match = value.match(ENTITY_AUTOCOMPLETE_MATCH);
+  return match ? `entity:node/${match[1]}` : value;
+};
+
+/**
+ * Returns true when jQuery UI autocomplete menu is currently visible.
+ */
+export const isAutocompleteMenuOpen = (input: HTMLInputElement): boolean => {
+  const $jq =
+    typeof window !== 'undefined' && (window as any).jQuery
+      ? (window as any).jQuery
+      : null;
+  return !!(
+    $jq && $jq(input).data('ui-autocomplete')?.menu?.element?.is?.(':visible')
+  );
+};
+
+/**
+ * Sets a value using the native input setter and emits a bubbling input event.
+ */
+export const revertInputValue = (
+  input: HTMLInputElement,
+  value: string,
+): void => {
+  const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+    window.HTMLInputElement.prototype,
+    'value',
+  )?.set;
+  if (!nativeInputValueSetter) {
+    return;
+  }
+  nativeInputValueSetter.call(input, value);
+  input.dispatchEvent(new Event('input', { bubbles: true }));
 };

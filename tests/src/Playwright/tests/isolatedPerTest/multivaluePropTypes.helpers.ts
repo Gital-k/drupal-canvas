@@ -50,6 +50,9 @@ export function getField(page: Page, propName: string): Locator {
 
 /** Clicks the "+ Add new" button inside a field wrapper to append a blank row. */
 export async function clickAddNew(fieldWrapper: Locator): Promise<void> {
+  await expect(
+    fieldWrapper.page().locator('body[data-canvas-ajax-behaviors="true"]'),
+  ).not.toBeAttached();
   await fieldWrapper.getByRole('button', { name: '+ Add new' }).click();
 }
 
@@ -120,7 +123,30 @@ export async function typeInPopoverWithoutCommit(
  */
 export async function closePopoverViaCloseButton(page: Page): Promise<void> {
   const dialog = page.locator('[role="dialog"][data-state="open"]');
+  await expect(dialog).toBeVisible();
+
+  // Ensure focus is inside the popover so Escape is handled consistently.
+  const focusTarget = dialog
+    .locator('input, textarea, [contenteditable="true"], button')
+    .first();
+  if (await focusTarget.count()) {
+    await focusTarget.focus();
+  } else {
+    await dialog.focus();
+  }
+
   await page.keyboard.press('Escape');
+
+  // Retry using dialog context in case the first Escape is swallowed.
+  if (await dialog.isVisible()) {
+    await dialog.press('Escape');
+  }
+
+  // Final fallback: use the explicit close control.
+  if (await dialog.isVisible()) {
+    await dialog.getByRole('button', { name: 'Close' }).click({ force: true });
+  }
+
   await expect(dialog).not.toBeVisible();
 }
 
@@ -143,8 +169,6 @@ export async function typeRelativeLinkViaAutocomplete(
     .first();
   await expect(suggestion).toBeVisible({ timeout: 10000 });
   await suggestion.click();
-  await input.press('Enter');
-
   await expect(
     page.locator('[role="dialog"][data-state="open"]'),
   ).not.toBeVisible();

@@ -178,6 +178,15 @@ export const InputBehaviorsComponentPropsForm = (
   const parseNewValue = (e: React.ChangeEvent) => {
     const schemas = getPropSchemas(inputAndUiData);
     const target = e.target as HTMLInputElement | HTMLSelectElement;
+    const eventFieldName = target.name;
+    const fieldName = eventFieldName;
+    const isNestedArraySubfield =
+      typeof fieldName === 'string' &&
+      schemas?.[propName]?.type === 'array' &&
+      fieldName.startsWith(
+        `canvas_component_props[${selectedComponent}][${propName}][`,
+      ) &&
+      fieldName !== `canvas_component_props[${selectedComponent}][${propName}]`;
 
     // A <select multiple> element's .value is only the last-clicked option.
     // For array props rendered as multi-selects, collect every selected option.
@@ -190,7 +199,6 @@ export const InputBehaviorsComponentPropsForm = (
       e.target as HTMLInputElement,
       schemas?.[propName],
     );
-    const fieldName = (e.target as HTMLInputElement | HTMLSelectElement).name;
     if (
       // If there are no transforms, we cannot use them, just return the raw
       // value. Note that the 'undefined' check here is technically not required
@@ -202,7 +210,11 @@ export const InputBehaviorsComponentPropsForm = (
       // overhead of transforms.
       !(propName in transforms) ||
       // Or if the prop relies on multiple input fields.
-      multipleInputsSingleValue.includes(propName)
+      multipleInputsSingleValue.includes(propName) ||
+      // Nested updates for array props (for example multivalue `_weight` and
+      // `value` subfields) should bypass per-field transforms. Transforms for
+      // the parent prop need full form context and can collapse partial updates.
+      isNestedArraySubfield
     ) {
       return rawValue;
     }

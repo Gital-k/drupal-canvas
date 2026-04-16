@@ -20,6 +20,7 @@ import {
   setFieldError,
   setFieldValue,
 } from '@/features/form/formStateSlice';
+import { selectUpdatePreview } from '@/features/layout/layoutModelSlice';
 import { AJAX_UPDATE_FORM_BUILD_ID_EVENT } from '@/types/Ajax';
 import { isAjaxing } from '@/utils/isAjaxing';
 
@@ -161,6 +162,7 @@ export const InputBehaviorsCommon = ({
   const formValues = useAppSelector((state) =>
     selectFormValues(state, attributes['data-form-id'] as FormId),
   );
+  const updatePreview = useAppSelector(selectUpdatePreview);
 
   const formId = attributes['data-form-id'] as FormId;
   const fieldName = (attributes.name ||
@@ -233,7 +235,6 @@ export const InputBehaviorsCommon = ({
 
     attributes.onChange = (e: React.ChangeEvent) => {
       delete attributes['data-invalid-prop-value'];
-
       const formId = attributes['data-form-id'] as FormId;
       if (formId) {
         dispatch(
@@ -272,7 +273,7 @@ export const InputBehaviorsCommon = ({
       }
 
       // If no AJAX operations are in progress, update the form state and store.
-      if (!isAjaxing()) {
+      if (!isAjaxing() && updatePreview) {
         commitFormState({ ...formValues, [fieldName]: newValue });
         return;
       }

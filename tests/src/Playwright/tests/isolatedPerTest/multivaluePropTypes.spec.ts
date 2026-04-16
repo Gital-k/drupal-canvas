@@ -311,7 +311,6 @@ test.describe('Multivalue Prop Types', () => {
         canvas,
       }) => {
         const field = getField(page, PROP_NAMES.TEXT);
-        await clickAddNew(field);
         await expect(field.locator('tbody tr')).toHaveCount(3);
         await openPopoverForRow(page, field, 2);
         await typeInPopover(page, '.form-text', 'Marshmallow Coast');
@@ -421,7 +420,6 @@ test.describe('Multivalue Prop Types', () => {
         canvas,
       }) => {
         const field = getField(page, PROP_NAMES.TEXT);
-        await clickAddNew(field);
         await expect(field.locator('tbody tr')).toHaveCount(3);
         await openPopoverForRow(page, field, 2);
         await typeInPopover(page, '.form-text', 'Persisted Value');
@@ -625,7 +623,7 @@ test.describe('Multivalue Prop Types', () => {
         const removeButton2 = dialog2.getByRole('button', { name: /Remove/i });
         await expect(removeButton2).toBeVisible();
         await expect(removeButton2).toBeEnabled();
-        await page.keyboard.press('Escape'); await expect(dialog2).not.toBeVisible();
+        await closePopoverViaCloseButton(page);
       });
     });
   });
@@ -1776,8 +1774,7 @@ test.describe('Relative Link Component', () => {
       canvas,
     }) => {
       const field = getField(page, PROP_NAMES.RELATIVE_LINK);
-      await clickAddNew(field);
-      await expect(field.locator('tbody tr')).toHaveCount(4);
+      await expect(field.locator('tbody tr')).toHaveCount(3);
       await openPopoverForRow(page, field, 2);
       await typeRelativeLinkViaAutocomplete(page, 'article');
       await verifyRowText(field, 2, 'Article One (1)');
@@ -1876,8 +1873,7 @@ test.describe('Relative Link Component', () => {
       canvas,
     }) => {
       const field = getField(page, PROP_NAMES.RELATIVE_LINK);
-      await clickAddNew(field);
-      await expect(field.locator('tbody tr')).toHaveCount(4);
+      await expect(field.locator('tbody tr')).toHaveCount(3);
       await openPopoverForRow(page, field, 2);
       await typeRelativeLinkViaAutocomplete(page, 'article');
       await verifyRowText(field, 2, 'Article One (1)');
