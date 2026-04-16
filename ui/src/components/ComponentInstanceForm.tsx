@@ -54,6 +54,7 @@ import type { TransformConfig } from '@/utils/transforms';
 
 const TransformsContext = createContext<TransformConfig | undefined>(undefined);
 
+
 export const useComponentTransforms = () => {
   return useContext(TransformsContext);
 };
@@ -314,9 +315,9 @@ const ComponentInstanceForm: React.FC<ComponentInstanceFormProps> = () => {
   const [renderComponentId, setRenderComponentId] = useState<string | null>(
     null,
   );
-  const previousModelRef = useRef<EvaluatedComponentModel | null>(null);
-  const previousSelectedComponentRef = useRef<string | null>(null);
-  const previousLatestUndoRedoActionIdRef = useRef<string | null>(null);
+   const previousModelRef = useRef<EvaluatedComponentModel | null>(null);
+   const previousSelectedComponentRef = useRef<string | null>(null);
+   const previousLatestUndoRedoActionIdRef = useRef<string | null>(null);
 
   const buildPreparedModel = (
     model: ComponentModel,
@@ -410,12 +411,22 @@ const ComponentInstanceForm: React.FC<ComponentInstanceFormProps> = () => {
       // Both have source, compare them
       return JSON.stringify(prevSource) !== JSON.stringify(currentSource);
     })();
-    const resolvedChanged = (() => {
+
+    // Detect multivalue field reorders by checking if resolved keys changed.
+    // This is cheaper than full JSON comparison and only triggers on structural
+    // changes (like reorders), not on every value update.
+    const resolvedKeysChanged = (() => {
       const prevResolved = prevModel?.resolved;
       const currentResolved = builtPreparedModel.resolved;
+
       if (!prevResolved && !currentResolved) return false;
       if (!prevResolved || !currentResolved) return true;
-      return JSON.stringify(prevResolved) !== JSON.stringify(currentResolved);
+
+      // Check if the keys are the same (cheaper than full comparison)
+      const prevKeys = Object.keys(prevResolved).sort().join(',');
+      const currentKeys = Object.keys(currentResolved).sort().join(',');
+
+      return prevKeys !== currentKeys;
     })();
 
     // Only build and update formQueryString if:
@@ -423,13 +434,13 @@ const ComponentInstanceForm: React.FC<ComponentInstanceFormProps> = () => {
     // - Component changed (user selected different component)
     // - Undo/redo occurred (latestUndoRedoActionId changed)
     // - Source changed
-    // - Resolved values changed (e.g. multivalue field reorder)
+    // - Resolved keys changed (indicates multivalue field reorder or structural change)
     const shouldUpdate =
       !prevModel ||
       prevSelectedComponent !== selectedComponent ||
       prevLatestUndoRedoActionId !== latestUndoRedoActionId ||
       sourceChanged ||
-      resolvedChanged;
+      resolvedKeysChanged;
 
     if (shouldUpdate) {
       // Build the query string only when needed
