@@ -1,24 +1,13 @@
 import { expect } from '@playwright/test';
 
+
+
 import { isolatedPerTest as test } from '../../fixtures/test.js';
-import {
-  clickAddNew,
-  closePopoverViaCloseButton,
-  COMPONENT_ID,
-  dragRow,
-  formatDateForDisplay,
-  formatDatetimeForDisplay,
-  getAllRowTexts,
-  getField,
-  getForm,
-  openPopoverForRow,
-  PROP_NAMES,
-  typeDatetimeInPopover,
-  typeInPopover,
-  typeInPopoverWithoutCommit,
-  typeRelativeLinkViaAutocomplete,
-  verifyRowText,
-} from './multivaluePropTypes.helpers.js';
+import { clickAddNew, closePopoverViaCloseButton, COMPONENT_ID, dragRow, formatDateForDisplay, formatDatetimeForDisplay, getAllRowTexts, getField, getForm, openPopoverForRow, PROP_NAMES, typeDatetimeInPopover, typeInPopover, typeInPopoverWithoutCommit, typeRelativeLinkViaAutocomplete, verifyRowText } from './multivaluePropTypes.helpers.js';
+
+
+
+
 
 interface NumericTypeTestConfig {
   propName: string;
@@ -149,7 +138,7 @@ function registerNumericTypeTests(config: NumericTypeTestConfig): void {
       page,
       canvas,
     }) => {
-      const field = getField(page, propName);
+      let field = getField(page, propName);
       await clickAddNew(field);
       await expect(field.locator('tbody tr')).toHaveCount(4);
       await openPopoverForRow(page, field, 2);
@@ -170,6 +159,7 @@ function registerNumericTypeTests(config: NumericTypeTestConfig): void {
       await expect(listItems2.nth(0)).toContainText(val1);
       await expect(listItems2.nth(1)).toContainText(val2);
       await expect(listItems2.nth(2)).toContainText(persistVal);
+      field = getField(page, propName);
       expect(await getAllRowTexts(field)).toEqual([val1, val2, persistVal, '']);
     });
 
