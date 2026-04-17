@@ -21,8 +21,7 @@ const TOOLTIP = {
   enabled: 'View page in a new tab',
   loading: 'Loading page data...',
   error: 'Unable to load page data',
-  unpublishedCanvas:
-    'Publish the page to view it outside the editor.',
+  unpublishedCanvas: 'Publish the page to view it outside the editor.',
 } as const;
 
 type ViewPageRouteParams = {
