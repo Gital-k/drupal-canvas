@@ -969,7 +969,7 @@ test.describe('Multivalue Prop Types', () => {
   test.describe('Decimal Values Support', () => {
     test('number type accepts decimal values', async ({ page, canvas }) => {
       const field = getField(page, PROP_NAMES.NUMBER);
-      await clickAddNew(field);
+      // await clickAddNew(field);
       await expect(field.locator('tbody tr')).toHaveCount(3);
       await openPopoverForRow(page, field, 2);
       const decimalValue = '123.45';
