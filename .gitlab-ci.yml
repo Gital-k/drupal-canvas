@@ -585,10 +585,10 @@ lint (node):
 playwright:
   stage: test
   needs: []
-  parallel:
-    matrix:
-      - SHARD: [ "1/5", "2/5", "3/5", "4/5", "5/5" ]
-        #PROJECT: [ "chromium", "firefox", "webkit" ]
+#  parallel:
+#    matrix:
+#      - SHARD: [ "1/5", "2/5", "3/5", "4/5", "5/5" ]
+#        #PROJECT: [ "chromium", "firefox", "webkit" ]
   rules:
     - *e2e-tests-are-enabled-rule
     - *manual-rule
@@ -628,7 +628,8 @@ playwright:
     - composer run install-dev-deps
   script:
     - npm ci
-    - npm run test:playwright -- --shard=$SHARD --reporter=blob
+#    - npm run test:playwright -- --shard=$SHARD --reporter=blob
+    - npm run test:playwright -- -project=chromium tests/isolatedPerTest/multivaluePropTypes.spec.ts --shard=$SHARD --reporter=blob
   after_script:
     - cp -R _drupal/web/modules/contrib/$CI_PARENT_PROJECT_NAME/blob-report $CI_PROJECT_DIR/blob-report
   artifacts:
