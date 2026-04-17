@@ -1,56 +1,9 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { Theme } from '@radix-ui/themes';
-import { act, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 
 import DrupalInputMultivalueForm from '@/components/form/components/drupal/DrupalInputMultivalueForm';
 
-// Mock InputBehaviors as an identity HOC so `TextFieldWithBehaviors` is just
-// `TextField`. This lets us control the hidden input's behavior directly via
-// the TextField mock below without pulling in Redux / RTK-query dependencies.
-vi.mock('@/components/form/inputBehaviors', () => ({
-  default: (Component: any) => Component,
-}));
-
-// Mock TextField to render an *uncontrolled* input (defaultValue instead of
-// value). This is the crucial piece: in the real app, InputBehaviors manages
-// its own inputValue state and never re-syncs it from an incoming
-// attributes.value prop change. Using `defaultValue` here reproduces that
-// behavior so the hidden input retains its original value across re-renders,
-// exactly as it does in the browser when a tabledrag reorder triggers a Drupal
-// AJAX response.
-vi.mock('@/components/form/components/TextField', () => ({
-  default: ({ attributes = {}, className }: any) => {
-    const {
-      value,
-      onChange: _onChange, // eslint-disable-line @typescript-eslint/no-unused-vars
-      onKeyDown: _onKeyDown, // eslint-disable-line @typescript-eslint/no-unused-vars
-      onBlur: _onBlur, // eslint-disable-line @typescript-eslint/no-unused-vars
-      ...rest
-    } = attributes;
-    return (
-      <div>
-        <input defaultValue={value} className={className} {...rest} />
-      </div>
-    );
-  },
-}));
-
-// Mock DrupalInput (used for autocomplete variants) to keep the test isolated.
-vi.mock('@/components/form/components/drupal/DrupalInput', () => ({
-  default: ({ attributes = {} }: any) => (
-    <input data-testid="drupal-input" {...attributes} />
-  ),
-}));
-
-// Mock a2p as an identity function. The real implementation calls propsify
-// which converts `value` → `defaultValue` only when a DOM element context is
-// provided; without that context the hidden input would be controlled and its
-// value would be overwritten by React on re-render, defeating the purpose of
-// this test.
-vi.mock('@/local_packages/utils', () => ({
-  a2p: (attrs: Record<string, any>) => attrs,
-  cleanClass: (input: string) => input,
-}));
 
 const renderInWrapper = (
   rowCount: number,
@@ -84,26 +37,23 @@ describe('DrupalInputMultivalueForm – reorder scenario', () => {
     const { rerender } = renderInWrapper(3, '321');
 
     // Initial render: trigger button shows "321".
-    expect(
-      screen.getByRole('button', { name: 'Edit Number: 321' }),
-    ).toBeInTheDocument();
+    const initialButton = screen.getByRole('button', { name: 'Edit Number: 321' });
+    expect(initialButton).toBeInTheDocument();
 
     // Drupal AJAX reorder response: attributes.value shifts to "323",
     // but the row count stays at 3 (no rows added or removed).
-    // The live hidden input still holds "321" (simulated by the uncontrolled
-    // TextField mock), so the display must NOT change to "323".
-    await act(async () => {
-      rerender(
-        <Theme>
-          <div data-canvas-row-count="3">
-            <DrupalInputMultivalueForm
-              attributes={{ value: '323', 'data-field-label': 'Number' }}
-            />
-          </div>
-        </Theme>,
-      );
-    });
+    // InputBehaviors should retain the original value since row count is unchanged.
+    rerender(
+      <Theme>
+        <div data-canvas-row-count="3">
+          <DrupalInputMultivalueForm
+            attributes={{ value: '323', 'data-field-label': 'Number' }}
+          />
+        </div>
+      </Theme>,
+    );
 
+    // The button should still show "321" since the row count didn't change.
     expect(
       screen.getByRole('button', { name: 'Edit Number: 321' }),
     ).toBeInTheDocument();
@@ -126,17 +76,15 @@ describe('DrupalInputMultivalueForm – reorder scenario', () => {
 
     // Drupal AJAX response after adding a new row: row count grows from 3→4
     // and this row now holds "400" from the rebuilt form.
-    await act(async () => {
-      rerender(
-        <Theme>
-          <div data-canvas-row-count="4">
-            <DrupalInputMultivalueForm
-              attributes={{ value: '400', 'data-field-label': 'Number' }}
-            />
-          </div>
-        </Theme>,
-      );
-    });
+    rerender(
+      <Theme>
+        <div data-canvas-row-count="4">
+          <DrupalInputMultivalueForm
+            attributes={{ value: '400', 'data-field-label': 'Number' }}
+          />
+        </div>
+      </Theme>,
+    );
 
     // Row count changed → trust the new attribute value.
     expect(
@@ -206,11 +154,9 @@ describe('DrupalInputMultivalueForm – multi-row reorder regression', () => {
     expect(initialButtons[2]).toHaveAccessibleName('Edit Number: 323');
 
     // Simulate the Drupal AJAX reorder response: attribute values rotate
-    // across all three rows while the live hidden inputs (backed by the
-    // uncontrolled TextField mock) retain their original values.
-    await act(async () => {
-      rerender(<RowSet values={['323', '321', '322']} />);
-    });
+    // across all three rows. InputBehaviors should retain the original values
+    // since the row count is unchanged.
+    rerender(<RowSet values={['323', '321', '322']} />);
 
     // Each row must still show its live value, not the shifted attribute.
     // Before the fix: row 1 (live=321, attr=323) would incorrectly show "323".
