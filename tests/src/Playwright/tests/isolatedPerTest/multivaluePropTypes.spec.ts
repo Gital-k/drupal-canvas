@@ -1,13 +1,24 @@
 import { expect } from '@playwright/test';
 
-
-
 import { isolatedPerTest as test } from '../../fixtures/test.js';
-import { clickAddNew, closePopoverViaCloseButton, COMPONENT_ID, dragRow, formatDateForDisplay, formatDatetimeForDisplay, getAllRowTexts, getField, getForm, openPopoverForRow, PROP_NAMES, typeDatetimeInPopover, typeInPopover, typeInPopoverWithoutCommit, typeRelativeLinkViaAutocomplete, verifyRowText } from './multivaluePropTypes.helpers.js';
-
-
-
-
+import {
+  clickAddNew,
+  closePopoverViaCloseButton,
+  COMPONENT_ID,
+  dragRow,
+  formatDateForDisplay,
+  formatDatetimeForDisplay,
+  getAllRowTexts,
+  getField,
+  getForm,
+  openPopoverForRow,
+  PROP_NAMES,
+  typeDatetimeInPopover,
+  typeInPopover,
+  typeInPopoverWithoutCommit,
+  typeRelativeLinkViaAutocomplete,
+  verifyRowText,
+} from './multivaluePropTypes.helpers.js';
 
 interface NumericTypeTestConfig {
   propName: string;

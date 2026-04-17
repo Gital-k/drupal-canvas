@@ -70,9 +70,15 @@ const DrupalDatetimeMultivalueForm = ({
   fieldLabel?: string;
 }) => {
   const triggerRowRef = useRef<HTMLDivElement | null>(null);
+  const triggerButtonRef = useRef<HTMLButtonElement | null>(null);
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [displayDate, setDisplayDate] = useState('');
   const [displayTime, setDisplayTime] = useState('');
+  const valueAtOpenRef = useRef<{ date: string; time: string }>({
+    date: '',
+    time: '',
+  });
+  const shouldRevertOnCloseRef = useRef(true);
   // Tracks whether a time input exists — derived from the real DOM via the
   // useEffect below rather than queried at render time, so it is stable across
   // renders and correct before the popover container is first populated.
@@ -113,7 +119,8 @@ const DrupalDatetimeMultivalueForm = ({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLElement>) => {
     // Handle Escape key to close popover without committing changes
     if (e.key === 'Escape') {
-      setPopoverOpen(false);
+      shouldRevertOnCloseRef.current = true;
+      handlePopoverOpenChange(false);
       return;
     }
 
@@ -129,23 +136,37 @@ const DrupalDatetimeMultivalueForm = ({
     const timeInput = getTimeInput();
     setDisplayDate(dateInput?.value ?? '');
     setDisplayTime(timeInput?.value ?? '');
-    setPopoverOpen(false);
+    shouldRevertOnCloseRef.current = false;
+    handlePopoverOpenChange(false);
   };
 
   const handlePopoverOpenChange = (open: boolean) => {
-    if (!open) {
-      // Cancel any in-progress edit: reset the real inputs back to the last
-      // committed display values so the form doesn't submit uncommitted data.
+    if (open) {
+      shouldRevertOnCloseRef.current = true;
       const dateInput = getDateInput();
       const timeInput = getTimeInput();
-      if (dateInput) dateInput.value = displayDate;
-      if (timeInput) timeInput.value = displayTime;
+      valueAtOpenRef.current = {
+        date: dateInput?.value ?? displayDate,
+        time: timeInput?.value ?? displayTime,
+      };
+    } else if (shouldRevertOnCloseRef.current) {
+      // Cancel any in-progress edit: reset inputs back to the values at open.
+      const dateInput = getDateInput();
+      const timeInput = getTimeInput();
+      if (dateInput) dateInput.value = valueAtOpenRef.current.date;
+      if (timeInput) timeInput.value = valueAtOpenRef.current.time;
     }
     setPopoverOpen(open);
+    if (!open) {
+      setTimeout(() => {
+        triggerButtonRef.current?.focus();
+      }, 30);
+    }
   };
 
   const handleRemove = (e: React.MouseEvent) => {
     e.preventDefault();
+    shouldRevertOnCloseRef.current = false;
     // Close the popover first so the portal is cleaned up before AJAX replaces the DOM.
     setPopoverOpen(false);
 
@@ -184,6 +205,7 @@ const DrupalDatetimeMultivalueForm = ({
           {/* List Item View - Trigger */}
           <Popover.Trigger asChild>
             <button
+              ref={triggerButtonRef}
               className={styles.listItem}
               type="button"
               aria-label={`Edit ${fieldLabel}: ${combinedDisplayValue}`}
