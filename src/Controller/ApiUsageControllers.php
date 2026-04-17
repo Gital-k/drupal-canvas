@@ -45,6 +45,8 @@ final class ApiUsageControllers extends ApiControllerBase {
    * @todo Add the ability to request the details for a specific version of a `Component`, rather than only the active version of the `Component`.
    * @todo Do not list every revision it is used in, but only the entities it is used in, along with the oldest and newest revision it occurs in, but not a unique array item per revision
    * @todo Add "editUrl" for every listed entity.
+   *
+   * @see \Drupal\canvas\Entity\Component
    */
   public function componentDetails(Component $component): JsonResponse {
     if ($this->componentAudit->hasUsages($component)) {

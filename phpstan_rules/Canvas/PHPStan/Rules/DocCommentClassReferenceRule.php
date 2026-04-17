@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Drupal\Tests\canvas\PHPStan\Rules;
+namespace Canvas\PHPStan\Rules;
 
 use PhpParser\Node;
 use PHPStan\Analyser\Scope;
@@ -35,9 +35,10 @@ final class DocCommentClassReferenceRule implements Rule {
 
   public function processNode(Node $node, Scope $scope): array {
     $classNode = $node->getOriginalNode();
-    $errors = $this->inspect($classNode);
+    $currentClass = $node->getClassReflection()->getName();
+    $errors = $this->inspect($classNode, $currentClass);
     foreach ($classNode->stmts as $stmt) {
-      $errors = array_merge($errors, $this->inspect($stmt));
+      $errors = array_merge($errors, $this->inspect($stmt, $currentClass));
     }
     return $errors;
   }
@@ -45,7 +46,7 @@ final class DocCommentClassReferenceRule implements Rule {
   /**
    * @return list<\PHPStan\Rules\IdentifierRuleError>
    */
-  private function inspect(Node $node): array {
+  private function inspect(Node $node, string $currentClass): array {
     $docComment = $node->getDocComment();
     if ($docComment === NULL) {
       return [];
@@ -76,9 +77,21 @@ final class DocCommentClassReferenceRule implements Rule {
         continue;
       }
 
-      $matched = FALSE;
+      $selfReference = FALSE;
       foreach ($candidates as $fqcn) {
-        if (isset($seenFqcns[$fqcn])) {
+        if ($fqcn === $currentClass) {
+          $selfReference = TRUE;
+          break;
+        }
+      }
+      if ($selfReference) {
+        continue;
+      }
+
+      $shortNameSuffix = '\\' . $shortName;
+      $matched = FALSE;
+      foreach ($seenFqcns as $fqcn => $unused) {
+        if ($fqcn === $shortName || str_ends_with($fqcn, $shortNameSuffix)) {
           $matched = TRUE;
           break;
         }

@@ -18,6 +18,8 @@ use Drupal\Core\Extension\ThemeHandlerInterface;
  *
  * @phpstan-type JsonSchema array<string, mixed>
  * @internal
+ *
+ * @see \Drupal\Core\Plugin\Component
  */
 final class PropShape {
 

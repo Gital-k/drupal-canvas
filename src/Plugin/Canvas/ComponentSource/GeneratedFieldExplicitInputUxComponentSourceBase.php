@@ -1487,6 +1487,9 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
    *   are allowed to be the latter.
    *
    * @see ::uncollapse()
+   * @see \Drupal\canvas\PropSource\StaticPropSource
+   * @see \Drupal\canvas\PropSource\DynamicPropSource
+   * @see \Drupal\canvas\PropSource\HostEntityUrlPropSource
    */
   private function collapse(PropSourceBase $source, string $prop_name): mixed {
     // @todo Simplify this to just `if ($source instanceof StaticPropSource && $source->hasSameShapeAs($this->getDefaultStaticPropSource($prop_name))) { return $source->getValue(); }` in https://www.drupal.org/project/canvas/issues/3532414
