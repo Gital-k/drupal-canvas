@@ -226,6 +226,16 @@ export const InputBehaviorsComponentPropsForm = (
     return propName in values ? values[propName] : rawValue;
   };
 
+  const isDateOnly = (val: string): boolean => /^\d{4}-\d{2}-\d{2}$/.test(val);
+  const isTimeOnly = (val: string): boolean =>
+    /^\d{2}:\d{2}(:\d{2})?$/.test(val);
+
+  const toDateTime = (val: string): string => {
+    if (isDateOnly(val)) return `${val}T00:00:00Z`;
+    if (isTimeOnly(val)) return `1970-01-01T${val}Z`;
+    return val;
+  };
+
   const validateNewValue = (e: React.ChangeEvent, newValue: any) => {
     const target = e.target as HTMLInputElement;
     if (
@@ -235,6 +245,14 @@ export const InputBehaviorsComponentPropsForm = (
       const schema = schemas?.[toPropName(fieldName, selectedComponent)];
 
       let valueToValidate = coerceValueForSchema(newValue, schema);
+
+      if (
+        schema?.format === 'date-time' ||
+        schema?.items?.format === 'date-time'
+      ) {
+        valueToValidate = toDateTime(valueToValidate);
+      }
+
       if (schema?.type === 'array' && !Array.isArray(valueToValidate)) {
         valueToValidate = [valueToValidate];
       }
