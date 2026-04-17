@@ -4,21 +4,23 @@ declare(strict_types=1);
 
 namespace Canvas\PHPStan\Rules;
 
+use PhpParser\Comment;
 use PhpParser\Node;
 use PHPStan\Analyser\Scope;
-use PHPStan\Node\InClassNode;
+use PHPStan\Node\FileNode;
 use PHPStan\Rules\Rule;
 use PHPStan\Rules\RuleErrorBuilder;
 
 /**
- * Requires an @see tag for class names referenced in backticks in docblocks.
+ * Requires an @see tag for class names referenced in backticks in comments.
  *
- * A docblock mentioning `Component` must include
+ * A comment mentioning `Component` must include
  * "@see \Drupal\canvas\Entity\Component" so readers and tooling can follow
- * the reference to the canonical class. Only short names that match a class
- * under the Drupal\canvas namespace (or a sub-namespace) are flagged.
+ * the reference to the canonical class. Applies to every comment (docblock,
+ * block, or line), on every node. Only short names that match a class under
+ * the Drupal\canvas namespace (or a sub-namespace) are flagged.
  *
- * @implements Rule<InClassNode>
+ * @implements Rule<FileNode>
  */
 final class DocCommentClassReferenceRule implements Rule {
 
@@ -30,30 +32,65 @@ final class DocCommentClassReferenceRule implements Rule {
   private ?array $classIndex = NULL;
 
   public function getNodeType(): string {
-    return InClassNode::class;
+    return FileNode::class;
   }
 
   public function processNode(Node $node, Scope $scope): array {
-    $classNode = $node->getOriginalNode();
-    $currentClass = $node->getClassReflection()->getName();
-    $errors = $this->inspect($classNode, $currentClass);
-    foreach ($classNode->stmts as $stmt) {
-      $errors = array_merge($errors, $this->inspect($stmt, $currentClass));
-    }
+    $errors = [];
+    $this->walk($node->getNodes(), NULL, $errors);
     return $errors;
+  }
+
+  /**
+   * @param Node[] $nodes
+   * @param list<\PHPStan\Rules\IdentifierRuleError> $errors
+   */
+  private function walk(array $nodes, ?string $currentClass, array &$errors): void {
+    foreach ($nodes as $node) {
+      $comments = $node->getComments();
+      if ($comments !== []) {
+        $text = '';
+        $line = $comments[0]->getStartLine();
+        foreach ($comments as $comment) {
+          $text .= $comment->getText() . "\n";
+        }
+        foreach ($this->inspect($text, $line, $currentClass) as $error) {
+          $errors[] = $error;
+        }
+      }
+
+      $nextClass = $currentClass;
+      if ($node instanceof Node\Stmt\ClassLike && isset($node->namespacedName)) {
+        $nextClass = $node->namespacedName->toString();
+      }
+
+      foreach ($node->getSubNodeNames() as $subNodeName) {
+        $subNode = $node->$subNodeName;
+        if ($subNode === NULL) {
+          continue;
+        }
+        if (is_array($subNode)) {
+          $childNodes = [];
+          foreach ($subNode as $item) {
+            if ($item instanceof Node) {
+              $childNodes[] = $item;
+            }
+          }
+          if ($childNodes !== []) {
+            $this->walk($childNodes, $nextClass, $errors);
+          }
+        }
+        elseif ($subNode instanceof Node) {
+          $this->walk([$subNode], $nextClass, $errors);
+        }
+      }
+    }
   }
 
   /**
    * @return list<\PHPStan\Rules\IdentifierRuleError>
    */
-  private function inspect(Node $node, string $currentClass): array {
-    $docComment = $node->getDocComment();
-    if ($docComment === NULL) {
-      return [];
-    }
-
-    $text = $docComment->getText();
-
+  private function inspect(string $text, int $line, ?string $currentClass): array {
     if (preg_match_all('/`([A-Z][A-Za-z0-9_]*)`/', $text, $backtickMatches) === 0) {
       return [];
     }
@@ -102,12 +139,12 @@ final class DocCommentClassReferenceRule implements Rule {
 
       $expected = $candidates[0];
       $errors[] = RuleErrorBuilder::message(sprintf(
-        'Doc comment references class `%s` in backticks but is missing "@see \\%s".',
+        'Comment references class `%s` in backticks but is missing "@see \\%s".',
         $shortName,
         $expected,
       ))
         ->identifier('canvas.docComment.missingSee')
-        ->line($docComment->getStartLine())
+        ->line($line)
         ->build();
     }
 

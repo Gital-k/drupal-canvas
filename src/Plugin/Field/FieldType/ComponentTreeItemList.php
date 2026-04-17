@@ -270,6 +270,8 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
           // `::renderComponent()`.
           // This also associates any cache contexts and max-age; both may be
           // used for dynamic config overrides.
+          // @see \Drupal\canvas\Entity\Component
+          // @see \Drupal\canvas\Attribute\ComponentSource
           // @todo Ensure this does not appear anymore for components omitted due to field/entity access in https://www.drupal.org/i/3559820
           CacheableMetadata::createFromRenderArray($element)
             ->addCacheableDependency($component)

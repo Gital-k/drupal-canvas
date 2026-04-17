@@ -77,6 +77,8 @@ final class ComponentTreeEditAccessCheck implements AccessInterface {
       // dangling component tree with either:
       // - never a parent (`PageRegion`, `Pattern`)
       // - sometimes a parent, but of a different entity (`ContentTemplate`)
+      // @see \Drupal\canvas\Entity\PageRegion
+      // @see \Drupal\canvas\Entity\Pattern
       // @see \Drupal\canvas\Entity\ContentTemplate::getComponentTree()
       // @phpstan-ignore-next-line method.notFound
       assert($tree->getParent() === NULL || $tree->getParent()->getEntity() !== $entity);
