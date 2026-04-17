@@ -261,6 +261,7 @@ final class SingleDirectoryComponentTest extends GeneratedFieldExplicitInputUxCo
     // sufficient, everything beyond that is covered by PropShapeRepositoryTest.
     // @see \Drupal\Tests\canvas\Kernel\PropShapeRepositoryTest::testPropShapesYieldWorkingStaticPropSources()
     // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase
+    // @see \Drupal\canvas\PropSource\StaticPropSource
     $components = $this->componentStorage->loadMultiple($component_ids);
     foreach ($components as $component_id => $component) {
       // Use reflection to test the private ::getDefaultStaticPropSource() method.

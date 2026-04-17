@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Canvas\PHPStan\Rules;
 
-use PhpParser\Comment;
 use PhpParser\Node;
+use PhpParser\Node\Stmt\ClassLike;
 use PHPStan\Analyser\Scope;
 use PHPStan\Node\FileNode;
 use PHPStan\Rules\Rule;
@@ -42,7 +42,7 @@ final class DocCommentClassReferenceRule implements Rule {
   }
 
   /**
-   * @param Node[] $nodes
+   * @param \PhpParser\Node[] $nodes
    * @param list<\PHPStan\Rules\IdentifierRuleError> $errors
    */
   private function walk(array $nodes, ?string $currentClass, array &$errors): void {
@@ -60,7 +60,7 @@ final class DocCommentClassReferenceRule implements Rule {
       }
 
       $nextClass = $currentClass;
-      if ($node instanceof Node\Stmt\ClassLike && isset($node->namespacedName)) {
+      if ($node instanceof ClassLike && isset($node->namespacedName)) {
         $nextClass = $node->namespacedName->toString();
       }
 
@@ -69,7 +69,7 @@ final class DocCommentClassReferenceRule implements Rule {
         if ($subNode === NULL) {
           continue;
         }
-        if (is_array($subNode)) {
+        if (\is_array($subNode)) {
           $childNodes = [];
           foreach ($subNode as $item) {
             if ($item instanceof Node) {
@@ -138,7 +138,7 @@ final class DocCommentClassReferenceRule implements Rule {
       }
 
       $expected = $candidates[0];
-      $errors[] = RuleErrorBuilder::message(sprintf(
+      $errors[] = RuleErrorBuilder::message(\sprintf(
         'Comment references class `%s` in backticks but is missing "@see \\%s".',
         $shortName,
         $expected,
