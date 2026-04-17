@@ -1,3 +1,6 @@
+rules:
+  - Drupal\Tests\canvas\PHPStan\Rules\DocCommentClassReferenceRule
+
 parameters:
   level: 8
   strictRules:
