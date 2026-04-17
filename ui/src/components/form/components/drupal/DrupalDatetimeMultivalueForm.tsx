@@ -1,10 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { ArrowRightIcon, Cross2Icon, TrashIcon } from '@radix-ui/react-icons';
 import * as Popover from '@radix-ui/react-popover';
 import { Button, Flex, Text } from '@radix-ui/themes';
 
+import { useAppDispatch } from '@/app/hooks';
+import { setUpdatePreview } from '@/features/layout/layoutModelSlice';
+
 import {
+  dispatchSyntheticChange,
   isRemoveButtonEnabled,
   triggerDrupalRemoveButton,
 } from './multivalueFormUtils';
@@ -69,8 +73,10 @@ const DrupalDatetimeMultivalueForm = ({
   children?: React.ReactNode;
   fieldLabel?: string;
 }) => {
+  const dispatch = useAppDispatch();
   const triggerRowRef = useRef<HTMLDivElement | null>(null);
   const triggerButtonRef = useRef<HTMLButtonElement | null>(null);
+  const isPreviewPausedRef = useRef(false);
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [displayDate, setDisplayDate] = useState('');
   const [displayTime, setDisplayTime] = useState('');
@@ -90,6 +96,26 @@ const DrupalDatetimeMultivalueForm = ({
   // available.
   const [popoverContainer, setPopoverContainer] =
     useState<HTMLDivElement | null>(null);
+
+  const pausePreviewUpdates = useCallback(() => {
+    if (!isPreviewPausedRef.current) {
+      dispatch(setUpdatePreview(false));
+      isPreviewPausedRef.current = true;
+    }
+  }, [dispatch]);
+
+  const resumePreviewUpdates = useCallback(() => {
+    if (isPreviewPausedRef.current) {
+      dispatch(setUpdatePreview(true));
+      isPreviewPausedRef.current = false;
+    }
+  }, [dispatch]);
+
+  useEffect(() => {
+    return () => {
+      resumePreviewUpdates();
+    };
+  }, [resumePreviewUpdates]);
 
   // Read initial values from the inputs once the popover container is in the DOM.
   useEffect(() => {
@@ -142,6 +168,7 @@ const DrupalDatetimeMultivalueForm = ({
 
   const handlePopoverOpenChange = (open: boolean) => {
     if (open) {
+      pausePreviewUpdates();
       shouldRevertOnCloseRef.current = true;
       const dateInput = getDateInput();
       const timeInput = getTimeInput();
@@ -149,15 +176,25 @@ const DrupalDatetimeMultivalueForm = ({
         date: dateInput?.value ?? displayDate,
         time: timeInput?.value ?? displayTime,
       };
+      setTimeout(() => {
+        const firstInput = dateInput || timeInput;
+        firstInput?.focus();
+      }, 0);
     } else if (shouldRevertOnCloseRef.current) {
       // Cancel any in-progress edit: reset inputs back to the values at open.
       const dateInput = getDateInput();
       const timeInput = getTimeInput();
-      if (dateInput) dateInput.value = valueAtOpenRef.current.date;
-      if (timeInput) timeInput.value = valueAtOpenRef.current.time;
+      // if (dateInput) dateInput.value = valueAtOpenRef.current.date;
+      // if (timeInput) timeInput.value = valueAtOpenRef.current.time;
+      if (dateInput)
+        dispatchSyntheticChange(dateInput, valueAtOpenRef.current.date);
+      if (timeInput)
+        dispatchSyntheticChange(timeInput, valueAtOpenRef.current.time);
     }
     setPopoverOpen(open);
     if (!open) {
+      resumePreviewUpdates();
+      shouldRevertOnCloseRef.current = true;
       setTimeout(() => {
         triggerButtonRef.current?.focus();
       }, 30);
@@ -168,7 +205,7 @@ const DrupalDatetimeMultivalueForm = ({
     e.preventDefault();
     shouldRevertOnCloseRef.current = false;
     // Close the popover first so the portal is cleaned up before AJAX replaces the DOM.
-    setPopoverOpen(false);
+    handlePopoverOpenChange(false);
 
     if (!triggerRowRef.current) return;
 

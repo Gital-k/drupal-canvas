@@ -1018,7 +1018,7 @@ test.describe('Multivalue Prop Types', () => {
       const validationMessage = await input.evaluate(
         (el: HTMLInputElement) => el.validationMessage,
       );
-      expect(validationMessage).toMatch(/Please enter a valid value/);
+      expect(validationMessage).toMatch(/data\/0 must be integer/);
       // Close the popover without saving
       await page
         .locator('[role="dialog"][data-state="open"]')
@@ -1094,14 +1094,14 @@ test.describe('Multivalue Prop Types', () => {
         await expect(field.locator('tbody tr')).toHaveCount(2);
         // Adding new values to see if the page instances are updated correctly.
         await openPopoverForRow(page, field, 0);
-        await typeDatetimeInPopover(page, '2025-12-24', '08:00');
+        await typeDatetimeInPopover(page, '2025-12-24', '08:00:00');
         await verifyRowText(
           field,
           0,
           formatDatetimeForDisplay('2025-12-24', '08:00'),
         );
         await openPopoverForRow(page, field, 1);
-        await typeDatetimeInPopover(page, '2025-12-25', '09:00');
+        await typeDatetimeInPopover(page, '2025-12-25', '09:00:00');
         await verifyRowText(
           field,
           1,
@@ -1122,6 +1122,7 @@ test.describe('Multivalue Prop Types', () => {
 
         // Assert that page is also updated.
         const previewFrame = await canvas.getActivePreviewFrame();
+        await previewFrame.locator('#datetime-list').scrollIntoViewIfNeeded();
         const listItems = previewFrame.locator('#datetime-list li');
         await expect(listItems).toHaveCount(1);
         await expect(listItems.nth(0)).toContainText('2025-12-25');
@@ -1262,7 +1263,7 @@ test.describe('Multivalue Prop Types', () => {
         await clickAddNew(field);
         await expect(field.locator('tbody tr')).toHaveCount(3);
         await openPopoverForRow(page, field, 0);
-        await typeDatetimeInPopover(page, '2025-12-24', '08:00');
+        await typeDatetimeInPopover(page, '2025-12-24', '08:00:00');
         await verifyRowText(
           field,
           0,
@@ -1273,7 +1274,7 @@ test.describe('Multivalue Prop Types', () => {
         const dateInput = dialog.locator('input[type="date"]');
         const timeInput = dialog.locator('input[type="time"]');
         await expect(dateInput).toHaveValue('2025-12-24');
-        await expect(timeInput).toHaveValue('08:00');
+        await expect(timeInput).toHaveValue('08:00:00');
 
         // Make uncommitted changes by filling the inputs without pressing Enter.
         await dateInput.fill('2026-01-15');
@@ -1290,7 +1291,7 @@ test.describe('Multivalue Prop Types', () => {
         const dateInput2 = dialog2.locator('input[type="date"]');
         const timeInput2 = dialog2.locator('input[type="time"]');
         await expect(dateInput2).toHaveValue('2025-12-24');
-        await expect(timeInput2).toHaveValue('08:00');
+        await expect(timeInput2).toHaveValue('08:00:00');
         await closePopoverViaCloseButton(page);
       });
     });

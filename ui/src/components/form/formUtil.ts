@@ -594,3 +594,14 @@ export class ComponentPreviewUpdateEvent extends Event {
     return this.previewBackgroundUpdate;
   }
 }
+
+export const isDateOnly = (val: string): boolean =>
+  /^\d{4}-\d{2}-\d{2}$/.test(val);
+export const isTimeOnly = (val: string): boolean =>
+  /^\d{2}:\d{2}(:\d{2})?$/.test(val);
+
+export const toDateTime = (val: string): string => {
+  if (isDateOnly(val)) return `${val}T00:00:00Z`;
+  if (isTimeOnly(val)) return `1970-01-01T${val}Z`;
+  return val;
+};

@@ -286,6 +286,10 @@ const dateTime: Transformer<
     if ('time' in record) {
       timeString = record.time;
     }
+    if (!dateString && !timeString) {
+      return null;
+    }
+
     // @todo Update this in https://www.drupal.org/project/canvas/issues/3501281, which will allow removing the FE-special casing in \Drupal\canvas\PropExpressions\StructuredData\Evaluator::evaluate()
     return new Date(`${dateString} ${timeString}+0000`).toISOString();
   });
