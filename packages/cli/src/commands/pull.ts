@@ -15,12 +15,13 @@ import {
   updateBrandKitConfig,
   variantKey,
 } from '../lib/fonts/font-pull.js';
-import { createApiService } from '../services/api';
+import { createApiService, ensureAuthConfig } from '../services/api';
 import {
   parseBooleanOption,
   pluralizeComponent,
   updateConfigFromOptions,
 } from '../utils/command-helpers';
+import { ensureTailwindImportAtTop } from '../utils/ensure-global-css-tailwind-import';
 import { pageToAuthoredSpec } from '../utils/pages';
 import { reportResults } from '../utils/report-results';
 
@@ -403,7 +404,8 @@ export function createAssetsPullTask(
           });
         } else {
           await fs.mkdir(path.dirname(globalCssPath), { recursive: true });
-          await fs.writeFile(globalCssPath, globalCss, 'utf-8');
+          const outputCss = ensureTailwindImportAtTop(globalCss);
+          await fs.writeFile(globalCssPath, outputCss, 'utf-8');
           results.push({ itemName: 'global.css', success: true });
         }
       } catch (error) {
@@ -546,13 +548,8 @@ export function pullCommand(program: Command): void {
       try {
         updateConfigFromOptions(options);
 
-        await ensureConfig([
-          'siteUrl',
-          'clientId',
-          'clientSecret',
-          'scope',
-          'componentDir',
-        ]);
+        await ensureAuthConfig();
+        await ensureConfig(['componentDir']);
 
         const config = getConfig();
         const apiService = await createApiService();

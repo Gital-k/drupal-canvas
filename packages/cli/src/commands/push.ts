@@ -10,7 +10,7 @@ import {
   buildFontPushPlannedResults,
   pushFonts,
 } from '../lib/fonts/font-push.js';
-import { createApiService } from '../services/api.js';
+import { createApiService, ensureAuthConfig } from '../services/api.js';
 import { analyzeAndBundleImports } from '../utils/analyze-and-bundle-imports';
 import { buildTailwindForComponents } from '../utils/build-tailwind';
 import {
@@ -289,13 +289,9 @@ export function pushCommand(program: Command): void {
         p.intro(chalk.bold('Drupal Canvas CLI: push'));
         // Update config with CLI options.
         updateConfigFromOptions(options);
-        await ensureConfig([
-          'siteUrl',
-          'clientId',
-          'clientSecret',
-          'scope',
-          'componentDir',
-        ]);
+
+        await ensureAuthConfig();
+        await ensureConfig(['componentDir']);
         const config = getConfig();
         const { componentDir, aliasBaseDir, outputDir } = config;
         const includesPages = config.includePages;
@@ -651,11 +647,22 @@ export function pushCommand(program: Command): void {
           const pageSpinner = p.spinner();
           pageSpinner.start('Preparing pages');
 
-          const { valid: validPages, failed: failedPreps } = await preparePages(
+          const {
+            valid: validPages,
+            failed: failedPreps,
+            pendingMediaReconciliations,
+          } = await preparePages(
             discoveredPages,
             componentVersions,
             discoveryResult,
           );
+
+          if (pendingMediaReconciliations.length > 0) {
+            throw new Error(
+              'Some pages contain media that references external URLs instead of Drupal media entities.\n' +
+                'Run `npx canvas reconcile-media` to download the external media, upload them to Drupal, and replace them in page files before pushing.',
+            );
+          }
 
           if (validPages.length === 0) {
             pageSpinner.stop(chalk.yellow('No valid pages to push'));
