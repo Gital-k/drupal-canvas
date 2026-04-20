@@ -1000,7 +1000,6 @@ test.describe('Multivalue Prop Types', () => {
 
     test('integer type rejects decimal values', async ({ page }) => {
       const field = getField(page, PROP_NAMES.INTEGER);
-      await clickAddNew(field);
       await expect(field.locator('tbody tr')).toHaveCount(3);
       await openPopoverForRow(page, field, 2);
       const decimalValue = '123.45';
@@ -1014,16 +1013,14 @@ test.describe('Multivalue Prop Types', () => {
       await expect(
         page.locator('[role="dialog"][data-state="open"]'),
       ).toBeVisible();
-      // Verify that a validation error message appears with suggestions for nearest valid values.
-      const validationMessage = await input.evaluate(
-        (el: HTMLInputElement) => el.validationMessage,
-      );
+      const validationMessage = await page
+        .locator(
+          '[role="dialog"][data-state="open"] [data-prop-message="true"]',
+        )
+        .textContent();
       expect(validationMessage).toMatch(/data\/0 must be integer/);
       // Close the popover without saving
-      await page
-        .locator('[role="dialog"][data-state="open"]')
-        .locator('[aria-label="Close"]')
-        .click();
+      await closePopoverViaCloseButton(page);
       // Verify that the new row is still empty since the decimal was rejected.
       const newRowText = await getAllRowTexts(field);
       expect(newRowText[2]).toBe('');
@@ -1125,7 +1122,9 @@ test.describe('Multivalue Prop Types', () => {
         await previewFrame.locator('#datetime-list').scrollIntoViewIfNeeded();
         const listItems = previewFrame.locator('#datetime-list li');
         await expect(listItems).toHaveCount(1);
-        await expect(listItems.nth(0)).toContainText('2025-12-25');
+        await expect(listItems.nth(0)).toContainText(
+          '2025-12-24T08:00:00.000Z',
+        );
       });
 
       test('popover opens and closes correctly', async ({ page }) => {
@@ -1486,6 +1485,8 @@ test.describe('Multivalue Prop Types', () => {
 
         // Assert that page is also updated.
         const previewFrame = await canvas.getActivePreviewFrame();
+        await previewFrame.locator('#date-list').scrollIntoViewIfNeeded();
+
         const listItems = previewFrame.locator('#date-list li');
         await expect(listItems).toHaveCount(1);
         await expect(listItems.nth(0)).toContainText('2026-04-28');
@@ -1649,6 +1650,9 @@ test.describe('Multivalue Prop Types', () => {
         await verifyRowText(field, 0, formatDateForDisplay('2026-04-27'));
 
         const previewFrame = await canvas.getActivePreviewFrame();
+        await previewFrame
+          .locator('#date-limited-list')
+          .scrollIntoViewIfNeeded();
         const listItems = previewFrame.locator('#date-limited-list li');
         await expect(listItems.nth(0)).toContainText('2026-04-27');
         expect(await getAllRowTexts(field)).toContain(

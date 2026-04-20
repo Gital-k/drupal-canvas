@@ -4,16 +4,19 @@ import { ArrowRightIcon, Cross2Icon, TrashIcon } from '@radix-ui/react-icons';
 import * as Popover from '@radix-ui/react-popover';
 import { Button, Flex, Text } from '@radix-ui/themes';
 
+
+
 import { useAppDispatch } from '@/app/hooks';
 import { setUpdatePreview } from '@/features/layout/layoutModelSlice';
 
-import {
-  dispatchSyntheticChange,
-  isRemoveButtonEnabled,
-  triggerDrupalRemoveButton,
-} from './multivalueFormUtils';
+
+
+import { dispatchSyntheticChange, isRemoveButtonEnabled, triggerDrupalRemoveButton } from './multivalueFormUtils';
+
+
 
 import styles from './DrupalInputMultivalueForm.module.css';
+
 
 /**
  * Format a date string for display using Intl.DateTimeFormat.
@@ -163,7 +166,15 @@ const DrupalDatetimeMultivalueForm = ({
     setDisplayDate(dateInput?.value ?? '');
     setDisplayTime(timeInput?.value ?? '');
     shouldRevertOnCloseRef.current = false;
-    handlePopoverOpenChange(false);
+
+    resumePreviewUpdates();
+
+    // Dispatch synthetic change events so the preview handler sees the new values.
+    setTimeout(() => {
+      if (dateInput) dispatchSyntheticChange(dateInput, dateInput.value);
+      if (timeInput) dispatchSyntheticChange(timeInput, timeInput.value);
+      handlePopoverOpenChange(false);
+    });
   };
 
   const handlePopoverOpenChange = (open: boolean) => {
