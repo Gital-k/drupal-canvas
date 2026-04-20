@@ -32,6 +32,8 @@ final class CanvasCommands extends DrushCommands {
 
   #[CLI\Command(name: 'canvas:component:list', aliases: ['canvas-component-list'])]
   #[CLI\Help(description: 'List all Canvas components.')]
+  #[CLI\Usage(name: 'canvas:component:list', description: 'List all Canvas components in a table.')]
+  #[CLI\Usage(name: 'canvas:component:list --format=json', description: 'List all Canvas components as JSON.')]
   #[CLI\FieldLabels(labels: [
     'id' => 'ID',
     'label' => 'Label',
@@ -63,6 +65,7 @@ final class CanvasCommands extends DrushCommands {
 
   #[CLI\Command(name: 'canvas:component:status', aliases: ['canvas-component-status'])]
   #[CLI\Help(description: 'List Canvas components that have incompatibility reasons.')]
+  #[CLI\Usage(name: 'canvas:component:status', description: 'Show components with incompatibility reasons.')]
   #[CLI\FieldLabels(labels: [
     'id' => 'Component',
     'reasons' => 'Reasons',
@@ -89,10 +92,12 @@ final class CanvasCommands extends DrushCommands {
 
   #[CLI\Command(name: 'canvas:component:generate', aliases: ['canvas-component-generate'])]
   #[CLI\Help(description: 'Generate Canvas component config entities from discovered sources.')]
+  #[CLI\Usage(name: 'canvas:component:generate', description: 'Generate component entities for all sources.')]
+  #[CLI\Usage(name: 'canvas:component:generate --source=sdc', description: 'Generate only SDC-sourced component entities.')]
   #[CLI\Option(name: 'source', description: 'Limit generation to a specific ComponentSource plugin ID.')]
   public function componentGenerate(array $options = ['source' => NULL]): void {
     $this->componentSourceManager->generateComponents($options['source'] ?? NULL);
-    $this->logger()->success(dt('Canvas components generated successfully.'));
+    $this->logger()?->success(dt('Canvas components generated successfully.'));
   }
 
 }
