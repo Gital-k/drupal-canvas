@@ -40,14 +40,9 @@ test.describe('Templates - General', () => {
     await canvas.openCanvasRoot();
     await canvas.openTemplatesPanel();
 
-    await expect(
-      page.locator('[data-canvas-folder-name="Article"]'),
-    ).toBeVisible();
     await expect(page.locator('.primaryPanelContent')).toMatchAriaSnapshot(`
       - button "Add new template":
         - img
-      - button "Content types" [expanded]
-      - region "Content types"
     `);
 
     await canvas.addTemplate('Page', 'Full content');

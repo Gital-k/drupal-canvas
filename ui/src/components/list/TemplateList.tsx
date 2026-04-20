@@ -115,6 +115,18 @@ const BundleListItem = ({ bundle }: BundleListItemProps) => {
     );
   }
 
+  const listItems = (
+    <Flex pl="0" direction="column">
+      {Object.entries(bundle.viewModes).map(([key, viewMode]) => (
+        <TemplateListItem key={`${viewMode.id}-${key}`} viewMode={viewMode} />
+      ))}
+    </Flex>
+  );
+
+  if (!bundle.label) {
+    return listItems;
+  }
+
   return (
     <SidebarFolder
       id={bundle.label}
@@ -124,11 +136,7 @@ const BundleListItem = ({ bundle }: BundleListItemProps) => {
       onOpenChange={setIsOpen}
       className={nodeStyles.contextualAccordionVariant}
     >
-      <Flex pl="0" direction="column">
-        {Object.entries(bundle.viewModes).map(([key, viewMode]) => (
-          <TemplateListItem key={`${viewMode.id}-${key}`} viewMode={viewMode} />
-        ))}
-      </Flex>
+      {listItems}
     </SidebarFolder>
   );
 };
