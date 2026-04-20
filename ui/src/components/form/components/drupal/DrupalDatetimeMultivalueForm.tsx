@@ -4,19 +4,16 @@ import { ArrowRightIcon, Cross2Icon, TrashIcon } from '@radix-ui/react-icons';
 import * as Popover from '@radix-ui/react-popover';
 import { Button, Flex, Text } from '@radix-ui/themes';
 
-
-
 import { useAppDispatch } from '@/app/hooks';
 import { setUpdatePreview } from '@/features/layout/layoutModelSlice';
 
-
-
-import { dispatchSyntheticChange, isRemoveButtonEnabled, triggerDrupalRemoveButton } from './multivalueFormUtils';
-
-
+import {
+  dispatchSyntheticChange,
+  isRemoveButtonEnabled,
+  triggerDrupalRemoveButton,
+} from './multivalueFormUtils';
 
 import styles from './DrupalInputMultivalueForm.module.css';
-
 
 /**
  * Format a date string for display using Intl.DateTimeFormat.
