@@ -161,7 +161,7 @@
     {
       "name": "Image with no example value",
       "type": "object",
-      "$ref": "json-schema-definitions://canvas.module/image",
+      "$ref": "module://canvas/schema.json#$defs/image",
       "example": "",
       "id": "af004b63-5f58-4923-be8e-3249dde1b32e",
       "derivedType": "image"
@@ -169,7 +169,7 @@
     {
       "name": "Image with example value",
       "type": "object",
-      "$ref": "json-schema-definitions://canvas.module/image",
+      "$ref": "module://canvas/schema.json#$defs/image",
       "example": {
         "src": "https://placehold.co/1200x900@2x.png",
         "width": 1200,
@@ -232,7 +232,7 @@
     {
       "name": "Video with no example value",
       "type": "object",
-      "$ref": "json-schema-definitions://canvas.module/video",
+      "$ref": "module://canvas/schema.json#$defs/video",
       "example": "",
       "id": "12af6543-df85-4e6f-9054-8b6617b02c25",
       "derivedType": "video"
@@ -240,7 +240,7 @@
     {
       "name": "Video with example value",
       "type": "object",
-      "$ref": "json-schema-definitions://canvas.module/video",
+      "$ref": "module://canvas/schema.json#$defs/video",
       "example": {
         "src": "/modules/contrib/canvas/ui/assets/videos/mountain_wide.mp4",
         "poster": "https://placehold.co/1920x1080.png?text=Horizontal"
@@ -404,7 +404,7 @@
     "imageWithNoExampleValue": {
       "title": "Image with no example value",
       "type": "object",
-      "$ref": "json-schema-definitions://canvas.module/image"
+      "$ref": "module://canvas/schema.json#$defs/image"
     },
     "imageWithExampleValue": {
       "title": "Image with example value",
@@ -415,7 +415,7 @@
         "height": 900,
         "alt": "Example image placeholder"
       }],
-      "$ref": "json-schema-definitions://canvas.module/image"
+      "$ref": "module://canvas/schema.json#$defs/image"
     },
     "relativePathLinkWithNoExampleValue": {
       "title": "Relative path link with no example value",
@@ -442,18 +442,18 @@
     "deprecatedTextAreaWithNoExampleValue": {
       "title": "Deprecated text area with no example value",
       "type": "string",
-      "$ref": "json-schema-definitions://canvas.module/textarea"
+      "$ref": "module://canvas/schema.json#$defs/textarea"
     },
     "deprecatedTextAreaWithExampleValue": {
       "title": "Deprecated text area with example value",
       "type": "string",
       "examples": ["Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged."],
-      "$ref": "json-schema-definitions://canvas.module/textarea"
+      "$ref": "module://canvas/schema.json#$defs/textarea"
     },
     "videoWithNoExampleValue": {
       "title": "Video with no example value",
       "type": "object",
-      "$ref": "json-schema-definitions://canvas.module/video"
+      "$ref": "module://canvas/schema.json#$defs/video"
     },
     "videoWithExampleValue": {
       "title": "Video with example value",
@@ -462,7 +462,7 @@
         "src": "/ui/assets/videos/mountain_wide.mp4",
         "poster": "https://placehold.co/1920x1080.png?text=Horizontal"
       }],
-      "$ref": "json-schema-definitions://canvas.module/video"
+      "$ref": "module://canvas/schema.json#$defs/video"
     },
     "dateWithNoExampleValue": {
       "title": "Date with no example value",

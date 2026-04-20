@@ -12,7 +12,7 @@ props:
       -
         src: /ui/assets/videos/mountain_wide.mp4
         poster: 'https://placehold.co/1920x1080.png?text=Widescreen'
-    $ref: 'json-schema-definitions://canvas.module/video'
+    $ref: 'module://canvas/schema.json#$defs/video'
   theText:
     title: theText
     type: string

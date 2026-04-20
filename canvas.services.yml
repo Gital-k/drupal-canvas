@@ -16,6 +16,7 @@ services:
   Drupal\canvas\ComponentIncompatibilityReasonRepository: {}
   Drupal\canvas\JsonSchemaDefinitionsStreamwrapper:
     public: true
+    deprecation_version: canvas:1.3.1
     tags:
       - { name: stream_wrapper, scheme: json-schema-definitions }
   Drupal\canvas\Plugin\AdapterManager:

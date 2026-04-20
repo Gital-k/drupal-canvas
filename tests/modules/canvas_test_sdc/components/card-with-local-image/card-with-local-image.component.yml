@@ -29,9 +29,9 @@ props:
     src:
       title: Local image path
       type: string
-      # Note: the canvas_test_sdc:card SDC uses `json-schema-definitions://canvas.module/image`, and that shape
+      # Note: the canvas_test_sdc:card SDC uses `module://canvas/schema.json#$defs/image`, and that shape
       # uses the below for its `src` prop. Hence this SDC's implementation can reuse canvas_test_sdc:card.
-      $ref: json-schema-definitions://canvas.module/image-uri
+      $ref: module://canvas/schema.json#$defs/image-uri
       description: Local path starting with "/"
       examples:
         - '/core/misc/druplicon.png'

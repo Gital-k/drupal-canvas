@@ -7,6 +7,6 @@ props:
     - image
   properties:
     image:
-      $ref: json-schema-definitions://canvas.module/image
+      $ref: module://canvas/schema.json#$defs/image
       type: object
       title: 'Image'

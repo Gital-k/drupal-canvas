@@ -1168,7 +1168,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
    *
    * Typical examples:
    * - an SDC prop accepting an image, i.e.
-   *   `json-schema-definitions://canvas.module/image`. But other
+   *   `module://canvas/schema.json#$defs/image`. But other
    * - an SDC prop accepting a URL for a link, i.e.
    *   `type: string, format: uri-reference`
    *

@@ -15,7 +15,7 @@ props:
         width: 1200
         height: 900
         alt: 'Example image placeholder'
-    $ref: 'json-schema-definitions://canvas.module/image'
+    $ref: 'module://canvas/schema.json#$defs/image'
   text:
     title: text
     type: string

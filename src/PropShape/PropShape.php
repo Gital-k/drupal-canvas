@@ -178,7 +178,7 @@ final class PropShape {
     }
 
     // Support `$ref`s defined by Drupal extensions in a `/schema.json` file.
-    // So: `json-schema-definitions://<extension>.<extension type>/<definition>`
+    // So: `<extension type>://<extension>/schema.json#$defs/<definition>`
     // @see \Drupal\canvas\JsonSchemaDefinitionsStreamwrapper
     // @todo Validate the `/schema.json` files.
     $known_normalized = [];
@@ -201,7 +201,7 @@ final class PropShape {
       $extension_type = \array_key_exists($extension_name, $installed_modules) ? 'module' : 'theme';
       $known_normalized += array_combine(
         \array_map(
-          fn(string $def_name) => "json-schema-definitions://$extension_name.$extension_type/$def_name",
+          fn(string $def_name) => "$extension_type://$extension_name/schema.json#\$defs/$def_name",
           \array_keys($json['$defs']),
         ),
         \array_map(

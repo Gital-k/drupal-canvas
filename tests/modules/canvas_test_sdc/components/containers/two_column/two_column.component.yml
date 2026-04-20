@@ -8,7 +8,7 @@ props:
     - width
   properties:
     width:
-      $ref: json-schema-definitions://canvas.module/column-width
+      $ref: module://canvas/schema.json#$defs/column-width
       type: integer
       title: Column Width
       description: The width of the first column.

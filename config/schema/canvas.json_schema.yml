@@ -25,7 +25,7 @@
 #    Note: the official JSON Schema spec only defines formats for `type: string`, but formats for other types are
 #    possible in principle.
 # 2. Defining _arbitrary_ `type: object` shapes is not yet supported. Currently only two `type: object`s are supported:
-#    images, by specifying `$ref: json-schema-definitions://canvas.module/image`, and videos. Consequently, `$ref` is
+#    images, by specifying `$ref: module://canvas/schema.json#$defs/image`, and videos. Consequently, `$ref` is
 #    required for only this JSON schema type.
 
 canvas.json_schema.prop.*:
@@ -234,8 +234,8 @@ canvas.json_schema.prop_shape.object:
         # @see \Drupal\canvas\JsonSchemaInterpreter\JsonSchemaType::computeStorablePropShape()
         Choice:
           choices:
-            - 'json-schema-definitions://canvas.module/image'
-            - 'json-schema-definitions://canvas.module/video'
+            - 'module://canvas/schema.json#$defs/image'
+            - 'module://canvas/schema.json#$defs/video'
 
 canvas.json_schema.object:
   class: '\Drupal\canvas\Config\Schema\JsonSchemaObject'

@@ -219,7 +219,7 @@ enum JsonSchemaStringFormat: string {
           // Browser-accessible image URLs. Can be both:
           // - relative URLs (`format: uri-reference|iri-reference`)
           // - absolute URLs (`format: uri|iri`) with HTTP(S)
-          // @see json-schema-definitions://canvas.module/image-uri
+          // @see module://canvas/schema.json#$defs/image-uri
           !empty(array_intersect($shape->schema['x-allowed-schemes'] ?? [], ['http', 'https'])) => new StorablePropShape(
             shape: $shape,
             fieldTypeProp: new FieldTypePropExpression('image', 'src_with_alternate_widths'),
@@ -227,7 +227,7 @@ enum JsonSchemaStringFormat: string {
           ),
 
           // Stream wrapper image URIs. Can only be `format: uri|iri`.
-          // @see json-schema-definitions://canvas.module/stream-wrapper-image-uri
+          // @see module://canvas/schema.json#$defs/stream-wrapper-image-uri
           \in_array('public', $shape->schema['x-allowed-schemes'] ?? [], TRUE)
           && ($this == static::Uri || $this == static::Iri) => new StorablePropShape(
             shape: $shape,
@@ -243,7 +243,7 @@ enum JsonSchemaStringFormat: string {
           default => NULL,
         },
         // Stream wrapper file URIs (non-image). Can only be `format: uri|iri`.
-        // @see json-schema-definitions://canvas.module/stream-wrapper-uri
+        // @see module://canvas/schema.json#$defs/stream-wrapper-uri
         !\array_key_exists('contentMediaType', $shape->schema)
         && \in_array('public', $shape->schema['x-allowed-schemes'] ?? [], TRUE)
         && ($this == static::Uri || $this == static::Iri) => new StorablePropShape(

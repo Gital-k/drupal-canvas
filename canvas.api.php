@@ -56,7 +56,7 @@ function hook_canvas_storable_prop_shape_alter(CandidateStorablePropShape $stora
     $storable_prop_shape->fieldWidget = 'fancy_duration_widget';
   }
 
-  // The `type: object, $ref: json-schema-definitions://canvas.module/image`
+  // The `type: object, $ref: module://canvas/schema.json#$defs/image`
   // shape allows picking any media of a media type powered by the "image" media
   // source by default.
   // Some sites may want to exclude certain media types, and/or add other media
@@ -68,7 +68,7 @@ function hook_canvas_storable_prop_shape_alter(CandidateStorablePropShape $stora
     // "image" object shape?
     $storable_prop_shape->shape->schema['type'] === 'object'
     && isset($storable_prop_shape->shape->schema['$ref'])
-    && $storable_prop_shape->shape->schema['$ref'] === 'json-schema-definitions://canvas.module/image'
+    && $storable_prop_shape->shape->schema['$ref'] === 'module://canvas/schema.json#$defs/image'
     // Currently using media types?
     // @see \Drupal\canvas\Hook\ShapeMatchingHooks::mediaLibraryStorablePropShapeAlter()
     && $storable_prop_shape->fieldTypeProp instanceof ReferenceFieldTypePropExpression

@@ -148,8 +148,8 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
 
     $unique_prop_shapes = array_values($ephemeral_prop_shape_repository->getUniquePropShapes());
     $this->assertEquals([
-      new PropShape(['type' => 'array', 'items' => ['type' => 'object', '$ref' => 'json-schema-definitions://canvas.module/image']]),
-      new PropShape(['type' => 'array', 'items' => ['type' => 'object', '$ref' => 'json-schema-definitions://canvas.module/image'], 'maxItems' => 2]),
+      new PropShape(['type' => 'array', 'items' => ['type' => 'object', '$ref' => 'module://canvas/schema.json#$defs/image']]),
+      new PropShape(['type' => 'array', 'items' => ['type' => 'object', '$ref' => 'module://canvas/schema.json#$defs/image'], 'maxItems' => 2]),
       new PropShape(['type' => 'array', 'items' => ['type' => 'integer']]),
       new PropShape(['type' => 'array', 'items' => ['type' => 'integer', 'maximum' => 100, 'minimum' => -100], 'maxItems' => 100]),
       new PropShape(['type' => 'array', 'items' => ['type' => 'integer', 'maximum' => 100, 'minimum' => -100], 'maxItems' => 100, 'minItems' => 2]),
@@ -174,7 +174,7 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
       new PropShape(['type' => 'array', 'items' => ['type' => 'string'], 'maxItems' => 3]),
       new PropShape(['type' => 'boolean']),
       new PropShape(['type' => 'integer']),
-      new PropShape(['type' => 'integer', '$ref' => 'json-schema-definitions://canvas.module/column-width']),
+      new PropShape(['type' => 'integer', '$ref' => 'module://canvas/schema.json#$defs/column-width']),
       new PropShape(['type' => 'integer', 'enum' => [1, 2]]),
       new PropShape(['type' => 'integer', 'enum' => [1, 2, 3, 4, 5, 6]]),
       new PropShape(['type' => 'integer', 'maximum' => 100, 'minimum' => -100]),
@@ -184,16 +184,16 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
       new PropShape(['type' => 'integer', 'multipleOf' => 12]),
       new PropShape(['type' => 'number']),
       new PropShape(['type' => 'object']),
-      new PropShape(['type' => 'object', '$ref' => 'json-schema-definitions://canvas.module/date-range']),
-      new PropShape(['type' => 'object', '$ref' => 'json-schema-definitions://canvas.module/image']),
-      new PropShape(['type' => 'object', '$ref' => 'json-schema-definitions://canvas.module/shoe-icon']),
-      new PropShape(['type' => 'object', '$ref' => 'json-schema-definitions://canvas.module/video']),
+      new PropShape(['type' => 'object', '$ref' => 'module://canvas/schema.json#$defs/date-range']),
+      new PropShape(['type' => 'object', '$ref' => 'module://canvas/schema.json#$defs/image']),
+      new PropShape(['type' => 'object', '$ref' => 'module://canvas/schema.json#$defs/shoe-icon']),
+      new PropShape(['type' => 'object', '$ref' => 'module://canvas/schema.json#$defs/video']),
       new PropShape(['type' => 'string']),
-      new PropShape(['type' => 'string', '$ref' => 'json-schema-definitions://canvas.module/heading-element']),
-      new PropShape(['type' => 'string', '$ref' => 'json-schema-definitions://canvas.module/image-uri']),
-      new PropShape(['type' => 'string', '$ref' => 'json-schema-definitions://canvas.module/stream-wrapper-image-uri']),
-      new PropShape(['type' => 'string', '$ref' => 'json-schema-definitions://canvas.module/stream-wrapper-uri']),
-      new PropShape(['type' => 'string', '$ref' => 'json-schema-definitions://test_theme_base.theme/organization-logo-url']),
+      new PropShape(['type' => 'string', '$ref' => 'module://canvas/schema.json#$defs/heading-element']),
+      new PropShape(['type' => 'string', '$ref' => 'module://canvas/schema.json#$defs/image-uri']),
+      new PropShape(['type' => 'string', '$ref' => 'module://canvas/schema.json#$defs/stream-wrapper-image-uri']),
+      new PropShape(['type' => 'string', '$ref' => 'module://canvas/schema.json#$defs/stream-wrapper-uri']),
+      new PropShape(['type' => 'string', '$ref' => 'theme://test_theme_base/schema.json#$defs/organization-logo-url']),
       new PropShape(['type' => 'string', 'contentMediaType' => 'text/html']),
       new PropShape(['type' => 'string', 'contentMediaType' => 'text/html', 'x-formatting-context' => 'block']),
       new PropShape(['type' => 'string', 'contentMediaType' => 'text/html', 'x-formatting-context' => 'inline']),
@@ -259,7 +259,7 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
         fieldTypeProp: new FieldTypePropExpression('integer', 'value'),
         fieldWidget: 'number',
       ),
-      'type=integer&$ref=json-schema-definitions://canvas.module/column-width' => new StorablePropShape(
+      'type=integer&$ref=module://canvas/schema.json#$defs/column-width' => new StorablePropShape(
         shape: new PropShape(['type' => 'integer', 'enum' => [25, 33, 50, 66, 75]]),
         fieldTypeProp: new FieldTypePropExpression('list_integer', 'value'),
         fieldWidget: 'options_select',
@@ -301,12 +301,12 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
         fieldTypeProp: new FieldTypePropExpression('string', 'value'),
         fieldWidget: 'string_textfield',
       ),
-      'type=string&$ref=json-schema-definitions://canvas.module/image-uri' => new StorablePropShape(
+      'type=string&$ref=module://canvas/schema.json#$defs/image-uri' => new StorablePropShape(
         shape: new PropShape(['type' => 'string', 'contentMediaType' => 'image/*', 'format' => 'uri-reference', 'x-allowed-schemes' => ['http', 'https']]),
         fieldTypeProp: new FieldTypePropExpression('image', 'src_with_alternate_widths'),
         fieldWidget: 'image_image',
       ),
-      'type=string&$ref=json-schema-definitions://canvas.module/stream-wrapper-image-uri' => new StorablePropShape(
+      'type=string&$ref=module://canvas/schema.json#$defs/stream-wrapper-image-uri' => new StorablePropShape(
         shape: new PropShape(['type' => 'string', 'contentMediaType' => 'image/*', 'format' => 'uri', 'x-allowed-schemes' => ['public']]),
         fieldTypeProp: new ReferenceFieldTypePropExpression(
           referencer: new FieldTypePropExpression('image', 'entity'),
@@ -314,7 +314,7 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
         ),
         fieldWidget: 'image_image',
       ),
-      'type=string&$ref=json-schema-definitions://canvas.module/stream-wrapper-uri' => new StorablePropShape(
+      'type=string&$ref=module://canvas/schema.json#$defs/stream-wrapper-uri' => new StorablePropShape(
         shape: new PropShape(['type' => 'string', 'format' => 'uri', 'x-allowed-schemes' => ['public']]),
         fieldTypeProp: new ReferenceFieldTypePropExpression(
           referencer: new FieldTypePropExpression('file', 'entity'),
@@ -322,7 +322,7 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
         ),
         fieldWidget: 'file_generic',
       ),
-      'type=string&$ref=json-schema-definitions://test_theme_base.theme/organization-logo-url' => new StorablePropShape(
+      'type=string&$ref=theme://test_theme_base/schema.json#$defs/organization-logo-url' => new StorablePropShape(
         shape: new PropShape([
           'type' => 'string',
           'contentMediaType' => 'image/*',
@@ -343,8 +343,8 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
         ],
         fieldWidget: 'options_select',
       ),
-      'type=object&$ref=json-schema-definitions://canvas.module/image' => new StorablePropShape(
-        shape: new PropShape(['type' => 'object', '$ref' => 'json-schema-definitions://canvas.module/image']),
+      'type=object&$ref=module://canvas/schema.json#$defs/image' => new StorablePropShape(
+        shape: new PropShape(['type' => 'object', '$ref' => 'module://canvas/schema.json#$defs/image']),
         fieldTypeProp: new FieldTypeObjectPropsExpression('image', [
           'src' => new FieldTypePropExpression('image', 'src_with_alternate_widths'),
           'alt' => new FieldTypePropExpression('image', 'alt'),
@@ -353,8 +353,8 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
         ]),
         fieldWidget: 'image_image',
       ),
-      'type=object&$ref=json-schema-definitions://canvas.module/video' => new StorablePropShape(
-        new PropShape(['type' => 'object', '$ref' => 'json-schema-definitions://canvas.module/video']),
+      'type=object&$ref=module://canvas/schema.json#$defs/video' => new StorablePropShape(
+        new PropShape(['type' => 'object', '$ref' => 'module://canvas/schema.json#$defs/video']),
         fieldTypeProp: new FieldTypeObjectPropsExpression('file', [
           'src' => new ReferenceFieldTypePropExpression(
             new FieldTypePropExpression('file', 'entity'),
@@ -364,7 +364,7 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
         fieldInstanceSettings: ['file_extensions' => 'mp4'],
         fieldWidget: 'file_generic',
       ),
-      'type=string&$ref=json-schema-definitions://canvas.module/heading-element' => new StorablePropShape(
+      'type=string&$ref=module://canvas/schema.json#$defs/heading-element' => new StorablePropShape(
         shape: new PropShape(['type' => 'string', 'enum' => ['div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']]),
         fieldTypeProp: new FieldTypePropExpression('list_string', 'value'),
         fieldWidget: 'options_select',
@@ -652,8 +652,8 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
         cardinality: 2,
         fieldWidget: 'number',
       ),
-      'type=array&items[$ref]=json-schema-definitions://canvas.module/image&items[type]=object&maxItems=2' => new StorablePropShape(
-        shape: new PropShape(['type' => 'array', 'items' => ['type' => 'object', '$ref' => 'json-schema-definitions://canvas.module/image'], 'maxItems' => 2]),
+      'type=array&items[$ref]=module://canvas/schema.json#$defs/image&items[type]=object&maxItems=2' => new StorablePropShape(
+        shape: new PropShape(['type' => 'array', 'items' => ['type' => 'object', '$ref' => 'module://canvas/schema.json#$defs/image'], 'maxItems' => 2]),
         fieldTypeProp: new FieldTypeObjectPropsExpression('image', [
           'src' => new FieldTypePropExpression('image', 'src_with_alternate_widths'),
           'alt' => new FieldTypePropExpression('image', 'alt'),
@@ -663,8 +663,8 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
         cardinality: 2,
         fieldWidget: 'image_image',
       ),
-      'type=array&items[$ref]=json-schema-definitions://canvas.module/image&items[type]=object' => new StorablePropShape(
-        shape: new PropShape(['type' => 'array', 'items' => ['type' => 'object', '$ref' => 'json-schema-definitions://canvas.module/image']]),
+      'type=array&items[$ref]=module://canvas/schema.json#$defs/image&items[type]=object' => new StorablePropShape(
+        shape: new PropShape(['type' => 'array', 'items' => ['type' => 'object', '$ref' => 'module://canvas/schema.json#$defs/image']]),
         fieldTypeProp: new FieldTypeObjectPropsExpression('image', [
           'src' => new FieldTypePropExpression('image', 'src_with_alternate_widths'),
           'alt' => new FieldTypePropExpression('image', 'alt'),
@@ -873,8 +873,8 @@ class PropShapeRepositoryTest extends CanvasKernelTestBase {
       'type=array&items[type]=integer&maxItems=20&minItems=1' => new PropShape(['type' => 'array', 'items' => ['type' => 'integer'], 'maxItems' => 20, 'minItems' => 1]),
       'type=array&items[type]=integer&minItems=1' => new PropShape(['type' => 'array', 'items' => ['type' => 'integer'], 'minItems' => 1]),
       'type=array&items[type]=integer&minItems=2' => new PropShape(['type' => 'array', 'items' => ['type' => 'integer'], 'minItems' => 2]),
-      'type=object&$ref=json-schema-definitions://canvas.module/date-range' => new PropShape(['type' => 'object', '$ref' => 'json-schema-definitions://canvas.module/date-range']),
-      'type=object&$ref=json-schema-definitions://canvas.module/shoe-icon' => new PropShape(['type' => 'object', '$ref' => 'json-schema-definitions://canvas.module/shoe-icon']),
+      'type=object&$ref=module://canvas/schema.json#$defs/date-range' => new PropShape(['type' => 'object', '$ref' => 'module://canvas/schema.json#$defs/date-range']),
+      'type=object&$ref=module://canvas/schema.json#$defs/shoe-icon' => new PropShape(['type' => 'object', '$ref' => 'module://canvas/schema.json#$defs/shoe-icon']),
       'type=integer&multipleOf=12' => new PropShape(['type' => 'integer', 'multipleOf' => 12]),
       'type=string&format=duration' => new PropShape(['type' => 'string', 'format' => JsonSchemaStringFormat::Duration->value]),
       'type=string&format=hostname' => new PropShape(['type' => 'string', 'format' => JsonSchemaStringFormat::Hostname->value]),

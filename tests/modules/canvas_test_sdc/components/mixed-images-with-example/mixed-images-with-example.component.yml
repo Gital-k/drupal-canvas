@@ -7,7 +7,7 @@ props:
     - required_image
   properties:
     primary_image:
-      $ref: json-schema-definitions://canvas.module/image
+      $ref: module://canvas/schema.json#$defs/image
       type: object
       title: 'Primary Image'
       examples:
@@ -16,7 +16,7 @@ props:
           width: 600
           height: 400
     secondary_image:
-      $ref: json-schema-definitions://canvas.module/image
+      $ref: module://canvas/schema.json#$defs/image
       type: object
       title: 'Secondary Image'
       examples:
@@ -25,7 +25,7 @@ props:
           width: 600
           height: 400
     required_image:
-      $ref: json-schema-definitions://canvas.module/image
+      $ref: module://canvas/schema.json#$defs/image
       type: object
       title: 'Required Image'
       examples:
@@ -33,4 +33,3 @@ props:
           alt: 'Required default image'
           width: 600
           height: 400
-

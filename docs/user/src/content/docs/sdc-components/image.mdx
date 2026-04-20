@@ -67,7 +67,7 @@ props:
   type: object
   properties:
     image:
-      $ref: json-schema-definitions://canvas.module/image
+      $ref: module://canvas/schema.json#$defs/image
       type: object
       title: Card image
       examples:
@@ -109,4 +109,3 @@ Use the `sizes` attribute to optimize image loading for different viewport sizes
 - Use `eager` loading only for above-the-fold images
 - Specify appropriate `sizes` for responsive images
 - Include `width` and `height` to prevent layout shifts
-

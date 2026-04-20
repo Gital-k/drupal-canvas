@@ -130,7 +130,7 @@ props:
       # @todo this prop should only show in the form when href has a value
     icon:
       title: Icon
-      $ref: json-schema-definitions://canvas.module/shoe-icon
+      $ref: module://canvas/schema.json#$defs/shoe-icon
       type: object
     icon_position:
       type: string

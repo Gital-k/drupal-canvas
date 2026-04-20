@@ -542,7 +542,7 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
         'title' => 'Images',
         'items' => [
           'type' => 'object',
-          '$ref' => 'json-schema-definitions://canvas.module/image',
+          '$ref' => 'module://canvas/schema.json#$defs/image',
         ],
         'examples' => [
           [
@@ -570,7 +570,7 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
         'title' => 'Images',
         'items' => [
           'type' => 'object',
-          '$ref' => 'json-schema-definitions://canvas.module/image',
+          '$ref' => 'module://canvas/schema.json#$defs/image',
         ],
         'examples' => [
           [
@@ -613,7 +613,7 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
     $this->entity->set('props', [
       'some_object' => [
         'type' => 'object',
-        '$ref' => 'json-schema-definitions://canvas.module/image',
+        '$ref' => 'module://canvas/schema.json#$defs/image',
         'title' => $this->randomString(),
         'enum' => [NULL],
         'meta:enum' => [NULL => 'Test'],
@@ -957,7 +957,7 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
             'image' => [
               'title' => 'Image title',
               'type' => 'object',
-              '$ref' => "json-schema-definitions://canvas.module/image",
+              '$ref' => 'module://canvas/schema.json#$defs/image',
               'examples' => [
                 [
                   'src' => 'https://example.com/image.png',
@@ -992,7 +992,7 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
             'image' => [
               'title' => 'Image title',
               'type' => 'object',
-              '$ref' => "json-schema-definitions://canvas.module/image",
+              '$ref' => 'module://canvas/schema.json#$defs/image',
             ],
           ],
           'slots' => [],
@@ -1018,7 +1018,7 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
             'image' => [
               'title' => 'Image title',
               'type' => 'object',
-              '$ref' => "json-schema-definitions://canvas.module/image",
+              '$ref' => 'module://canvas/schema.json#$defs/image',
             ],
           ],
           'slots' => [],
@@ -1081,7 +1081,7 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
             'image' => [
               'title' => 'Image title',
               'type' => 'object',
-              '$ref' => "json-schema-definitions://canvas.module/heading",
+              '$ref' => 'module://canvas/schema.json#$defs/heading',
               'examples' => [
                 [
                   'src' => 'https://example.com/image.png',

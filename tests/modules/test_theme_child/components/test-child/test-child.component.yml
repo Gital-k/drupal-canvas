@@ -12,7 +12,7 @@ props:
         - This is the test child component
     logo:
       type: string
-      $ref: json-schema-definitions://test_theme_base.theme/organization-logo-url
+      $ref: theme://test_theme_base/schema.json#$defs/organization-logo-url
       # Needed for \Drupal\canvas\ComponentMetadataRequirementsChecker.
       # @todo Figure out what to do with this in https://www.drupal.org/project/canvas/issues/3560286
       title: Logo

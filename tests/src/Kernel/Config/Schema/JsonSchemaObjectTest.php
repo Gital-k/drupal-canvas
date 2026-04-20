@@ -27,7 +27,7 @@ final class JsonSchemaObjectTest extends CanvasKernelTestBase {
     $typed_config = $this->container->get(TypedConfigManagerInterface::class);
     $config = $typed_config->createFromNameAndData('canvas.json_schema.prop_shape.object', [
       'type' => 'object',
-      '$ref' => 'json-schema-definitions://canvas.module/heading',
+      '$ref' => 'module://canvas/schema.json#$defs/heading',
     ]);
     self::assertViolations([
       // We only allow image at this point, but we can still derive schema.
@@ -39,7 +39,7 @@ final class JsonSchemaObjectTest extends CanvasKernelTestBase {
     $typed_config = $this->container->get(TypedConfigManagerInterface::class);
     $config = $typed_config->createFromNameAndData('canvas.json_schema.prop.*', [
       'type' => 'object',
-      '$ref' => 'json-schema-definitions://canvas_config_schema_test.module/pony-ballast',
+      '$ref' => 'module://canvas_config_schema_test/schema.json#$defs/pony-ballast',
       'title' => $this->randomString(),
       'examples' => [
         [
@@ -56,7 +56,7 @@ final class JsonSchemaObjectTest extends CanvasKernelTestBase {
     $typed_config = $this->container->get(TypedConfigManagerInterface::class);
     $config = $typed_config->createFromNameAndData('canvas.json_schema.prop.*', [
       'type' => 'object',
-      '$ref' => 'json-schema-definitions://canvas_config_schema_test.module/chip-nozzle',
+      '$ref' => 'module://canvas_config_schema_test/schema.json#$defs/chip-nozzle',
       'title' => $this->randomString(),
       'examples' => [
         [
@@ -73,7 +73,7 @@ final class JsonSchemaObjectTest extends CanvasKernelTestBase {
     $typed_config = $this->container->get(TypedConfigManagerInterface::class);
     $config = $typed_config->createFromNameAndData('canvas.json_schema.prop.*', [
       'type' => 'object',
-      '$ref' => 'json-schema-definitions://canvas_config_schema_test.module/escape-goat',
+      '$ref' => 'module://canvas_config_schema_test/schema.json#$defs/escape-goat',
       'title' => $this->randomString(),
       'examples' => [
         [

@@ -33,11 +33,11 @@ class AdaptedPropSourceMatcherTest extends PropSourceMatcherTestBase {
    */
   protected array $expectedMatches = [
     'type=integer' => DayCountAdapter::PLUGIN_ID,
-    'type=object&$ref=json-schema-definitions://canvas.module/image' => [
+    'type=object&$ref=module://canvas/schema.json#$defs/image' => [
       ImageAndStyleAdapter::PLUGIN_ID,
       ImageAdapter::PLUGIN_ID,
     ],
-    'type=string&$ref=json-schema-definitions://canvas.module/image-uri' => ImageUriAdapter::PLUGIN_ID,
+    'type=string&$ref=module://canvas/schema.json#$defs/image-uri' => ImageUriAdapter::PLUGIN_ID,
     'type=string&format=date' => UnixTimestampToDateAdapter::PLUGIN_ID,
   ];
 
