@@ -20,3 +20,20 @@
 .time {
   color: var(--blue-9);
 }
+
+.conflictIcon {
+  color: #C0392B;
+  width: 14px;
+  height: 14px;
+}
+
+.resolveConflictMenuItem {
+  color: var(--gray-12);
+  font-weight: var(--font-weight-regular);
+}
+
+.menuIcon {
+  color: var(--gray-10);
+  width: 14px;
+  height: 14px;
+}

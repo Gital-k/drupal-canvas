@@ -17,8 +17,10 @@ import PermissionCheck from '@/components/PermissionCheck';
 import ReviewErrors from '@/components/review/ReviewErrors';
 import { getReviewGroupKey } from '@/components/review/utils';
 import { Divider } from '@/features/code-editor/component-data/FormElement';
+import { getCanvasSettings } from '@/utils/drupal-globals';
 
 import ChangeList from './changes/ChangeList';
+import ConflictBanner from './ConflictBanner';
 
 import type { ErrorResponse } from '@/services/pendingChangesApi';
 import type {
@@ -153,6 +155,17 @@ const PublishReview: React.FC<PublishReviewProps> = ({
     onOpenChangeCallback(open);
   };
 
+  // Check if dev mode is enabled
+  const isDevMode = getCanvasSettings()?.devMode;
+
+  // STATIC UI: Mock conflict count for visual demonstration
+  // Only shown when canvas_dev_mode is enabled
+  // TODO: Backend developer will replace with real conflict detection
+  const MOCK_CONFLICT_COUNT = 4;
+  const handleResolveConflicts = () => {
+    console.log('Resolve conflicts clicked - Static UI placeholder');
+  };
+
   return (
     <Popover.Root open={isOpen} onOpenChange={onOpenChangeHandler}>
       <Popover.Trigger>
@@ -221,6 +234,16 @@ const PublishReview: React.FC<PublishReviewProps> = ({
                     : 'All changes published!'}
                 </Text>
               </Box>
+              {/* STATIC UI: Only show conflict banner when dev mode is enabled */}
+              {isDevMode && (
+                <Box px="4" pt="4">
+                  <ConflictBanner
+                    conflictCount={MOCK_CONFLICT_COUNT}
+                    onResolveClick={handleResolveConflicts}
+                    disabled={isBusy}
+                  />
+                </Box>
+              )}
               <Box px="4" pt="4">
                 {changes?.length > 0 && (
                   <>

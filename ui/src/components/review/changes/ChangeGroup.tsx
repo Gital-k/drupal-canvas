@@ -3,7 +3,7 @@ import { kebabCase } from 'lodash';
 import { Box, Checkbox, Flex, Text } from '@radix-ui/themes';
 
 import { getGroupLabel } from '../utils';
-import ChangeRow from './ChangeRow';
+import ChangeRowWithStaticConflict from './ChangeRowWithStaticConflict';
 
 import type { UnpublishedChange } from '@/types/Review';
 
@@ -21,6 +21,7 @@ interface ChangeGroupProps {
     string,
     { status: boolean; isNew?: boolean; hasUnsavedStatusChange?: boolean }
   >;
+  isDevMode?: boolean;
 }
 
 const ChangeGroup = ({
@@ -32,6 +33,7 @@ const ChangeGroup = ({
   onDiscardClick,
   onViewClick,
   pageStatusMap,
+  isDevMode = false,
 }: ChangeGroupProps) => {
   const isGroupSelected = useMemo(() => {
     const groupSelectionCount = changes.filter((change) =>
@@ -84,7 +86,7 @@ const ChangeGroup = ({
       </Text>
       <ul className={styles.changeList}>
         {changes.map((change: UnpublishedChange, index: number) => (
-          <ChangeRow
+          <ChangeRowWithStaticConflict
             key={`${kebabCase(change.label + change.updated)}`}
             change={change}
             isBusy={isBusy}
@@ -93,6 +95,8 @@ const ChangeGroup = ({
             onDiscardClick={onDiscardClick}
             onViewClick={onViewClick}
             pageStatusMap={pageStatusMap}
+            index={index}
+            isDevMode={isDevMode}
           />
         ))}
       </ul>

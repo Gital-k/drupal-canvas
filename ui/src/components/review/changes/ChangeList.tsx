@@ -1,5 +1,6 @@
 import { Box } from '@radix-ui/themes';
 
+import { getCanvasSettings } from '@/utils/drupal-globals';
 import ChangeGroup from './ChangeGroup';
 
 import type {
@@ -29,6 +30,9 @@ const ChangeList = ({
   onViewClick,
   pageStatusMap,
 }: ChangeListProps) => {
+  // Check if dev mode is enabled for static conflict UI
+  const isDevMode = getCanvasSettings()?.devMode;
+
   return (
     groups && (
       <Box data-testid="pending-changes-list">
@@ -44,6 +48,7 @@ const ChangeList = ({
               onDiscardClick={onDiscardClick}
               onViewClick={onViewClick}
               pageStatusMap={pageStatusMap}
+              isDevMode={isDevMode}
             />
           );
         })}
