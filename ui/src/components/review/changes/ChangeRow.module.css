@@ -22,9 +22,9 @@
 }
 
 .conflictIcon {
-  color: #C0392B;
   width: 14px;
   height: 14px;
+  color: #C0392B;
 }
 
 .resolveConflictMenuItem {
@@ -33,7 +33,7 @@
 }
 
 .menuIcon {
-  color: var(--gray-10);
   width: 14px;
   height: 14px;
+  color: var(--gray-10);
 }

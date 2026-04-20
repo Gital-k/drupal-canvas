@@ -1,6 +1,7 @@
 import { Box } from '@radix-ui/themes';
 
 import { getCanvasSettings } from '@/utils/drupal-globals';
+
 import ChangeGroup from './ChangeGroup';
 
 import type {

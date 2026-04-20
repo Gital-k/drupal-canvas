@@ -1,7 +1,8 @@
-import type { Meta, StoryObj } from '@storybook/react';
 import { fn } from '@storybook/test';
 
 import ConflictBanner from './ConflictBanner';
+
+import type { Meta, StoryObj } from '@storybook/react';
 
 const meta = {
   title: 'Components/Review/ConflictBanner',
@@ -74,7 +75,8 @@ export const SingleConflict: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Shows the banner with a single conflict. Note the singular "conflict" text.',
+        story:
+          'Shows the banner with a single conflict. Note the singular "conflict" text.',
       },
     },
   },
@@ -91,7 +93,8 @@ export const FourConflicts: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Default static UI state showing 4 conflicts. This matches the mock data used in the implementation.',
+        story:
+          'Default static UI state showing 4 conflicts. This matches the mock data used in the implementation.',
       },
     },
   },
@@ -125,7 +128,8 @@ export const ManyConflicts: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Shows the banner with many conflicts to test text wrapping and layout.',
+        story:
+          'Shows the banner with many conflicts to test text wrapping and layout.',
       },
     },
   },
@@ -142,7 +146,8 @@ export const Disabled: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Shows the disabled state when the system is busy (publishing, fetching, etc.).',
+        story:
+          'Shows the disabled state when the system is busy (publishing, fetching, etc.).',
       },
     },
   },
@@ -159,7 +164,8 @@ export const NoConflicts: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'When there are no conflicts, the banner does not render. This story will appear empty.',
+        story:
+          'When there are no conflicts, the banner does not render. This story will appear empty.',
       },
     },
   },
@@ -176,7 +182,8 @@ export const Interactive: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Interactive example - click the button to see the console log. Check your browser console.',
+        story:
+          'Interactive example - click the button to see the console log. Check your browser console.',
       },
     },
   },

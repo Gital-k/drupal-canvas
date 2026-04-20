@@ -17,7 +17,6 @@ import {
 } from '@radix-ui/themes';
 
 import { getAvatarInitialColor, getChangeLabel, getTimeAgo } from '../utils';
-import ChangeIcon from './ChangeIcon';
 
 import type { UnpublishedChange } from '@/types/Review';
 
@@ -54,11 +53,11 @@ const ChangeRowWithStaticConflict = ({
   const initial = change.owner.name.trim().charAt(0).toUpperCase();
   const avatarColor = getAvatarInitialColor(change.owner.id);
   const date = new Date(change.updated * 1000);
-  
+
   // STATIC UI: First 2 items (index 0 and 1) show as conflicted ONLY when dev mode is enabled
   // TODO: Backend developer will replace with real conflict detection
   const hasStaticConflict = isDevMode && index < 2;
-  
+
   const color = hasStaticConflict ? 'red' : undefined;
   const weight = 'regular'; // Always regular weight to match Figma
 
