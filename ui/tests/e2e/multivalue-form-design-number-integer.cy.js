@@ -307,6 +307,12 @@ configs.forEach((config) => {
 
       // eslint-disable-next-line cypress/no-unnecessary-waiting
       cy.wait(1000);
+
+      // Regression check (https://www.drupal.org/i/3582219): each row in the
+      // right-side panel must show the value that belongs to that position after
+      // the reorder — not a value carried over from a different row. Before the
+      // fix, Drupal AJAX re-hyperscriptification caused some rows to display
+      // a neighbor's value.
       confirmInputs(`@${config.fieldAlias}`, config.reorderedValues);
       // Refresh the page to ensure the update persists.
       cy.reload();
@@ -365,6 +371,13 @@ configs.forEach((config) => {
       cy.waitForAjax();
 
       cy.get(`@${config.fieldAlias}`).find('tbody tr').should('have.length', 2);
+
+      // Verify remaining rows still display their numeric values correctly
+      // after AJAX re-hyperscriptification.
+      confirmInputs(`@${config.fieldAlias}`, [
+        config.defaultValue,
+        config.testValues[1],
+      ]);
     });
 
     it(`popover opens and closes correctly for ${fieldTypeLower}`, () => {

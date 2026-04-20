@@ -42,14 +42,13 @@ const DrupalInputMultivalueForm = ({
     'data-field-label'?: string;
   };
 }) => {
-  // Get the initial value from attributes
-  const initialValue = attributes.value || attributes.defaultValue || '';
+  // Get the initial value from attributes.
+  const rawInitialValue = attributes.value ?? attributes.defaultValue ?? '';
+  const initialValue = String(rawInitialValue);
   // Manage local state to sync display value with input changes
-  const [displayValue, setDisplayValue] = useState<string>(
-    initialValue as string,
-  );
+  const [displayValue, setDisplayValue] = useState<string>(initialValue);
   // Temporary value for the popover input (only committed on Enter).
-  const [tempValue, setTempValue] = useState<string>(initialValue as string);
+  const [tempValue, setTempValue] = useState<string>(initialValue);
   const inputWrapperRef = useRef<HTMLDivElement | null>(null);
   // Ref for the trigger area that lives inside the actual table row.
   const triggerRowRef = useRef<HTMLDivElement | null>(null);
@@ -64,24 +63,55 @@ const DrupalInputMultivalueForm = ({
   const popoverTextFieldWrapperRef = useRef<HTMLDivElement | null>(null);
   const popoverContainerRef = useRef<HTMLDivElement | null>(null);
 
+  // Track the previous row count so we can distinguish a Drupal AJAX
+  // add/remove (row count changes) from a reorder (row count stays the same).
+  const prevRowCountRef = useRef<number | null>(null);
+
   // Sync displayValue when a genuine external value arrives (e.g. AJAX
   // re-hyperscriptification after "Add another item" or "Remove").
+  // Only update display state — avoid writing to the hidden input to prevent
+  // a race condition with the Drupal AJAX save.
   useEffect(() => {
-    const liveInput = inputWrapperRef.current?.querySelector(
-      'input',
-    ) as HTMLInputElement | null;
-    const liveValue = liveInput?.value ?? '';
-    const attrValue = (attributes.value ??
-      attributes.defaultValue ??
-      '') as string;
+    // Convert to string: hyperscriptify JSON-parses attribute values, so
+    // numeric field values arrive as JS numbers (e.g. 222 instead of "222").
+    const rawAttrValue = attributes.value ?? attributes.defaultValue ?? '';
+    const attrValue = String(rawAttrValue);
 
-    // Use the live input value when it is non-empty; fall back to the
-    // attribute value on the very first mount (before InputBehaviors has had
-    // a chance to populate the input).
-    const newValue = liveValue !== '' ? liveValue : attrValue;
+    // Detect whether the row count changed — this indicates a Drupal AJAX
+    // add or remove operation, where the attribute values correctly reflect
+    // the new/shifted rows and should be trusted.
+    const fieldWrapper =
+      inputWrapperRef.current?.closest('[data-canvas-row-count]') ??
+      triggerRowRef.current?.closest('[data-canvas-row-count]');
+    const currentRowCount = fieldWrapper
+      ? parseInt(fieldWrapper.getAttribute('data-canvas-row-count') || '0', 10)
+      : null;
+    const prevRowCount = prevRowCountRef.current;
+    prevRowCountRef.current = currentRowCount;
 
-    setDisplayValue(newValue);
-    setTempValue(newValue);
+    const rowCountChanged =
+      prevRowCount !== null &&
+      currentRowCount !== null &&
+      prevRowCount !== currentRowCount;
+
+    if (rowCountChanged) {
+      // Row count changed — a row was added or removed via Drupal AJAX.
+      // Trust the attribute values from the rebuilt form; the live input
+      // may still hold a stale value from the previous render.
+      setDisplayValue(attrValue);
+      setTempValue(attrValue);
+    } else {
+      // Row count unchanged — prefer the live input value (set by
+      // InputBehaviors or commitValue) over the attribute value.
+      const liveInput = inputWrapperRef.current?.querySelector(
+        'input',
+      ) as HTMLInputElement | null;
+      const liveValue = liveInput?.value ?? '';
+
+      const newValue = liveValue !== '' ? liveValue : attrValue;
+      setDisplayValue(newValue);
+      setTempValue(newValue);
+    }
   }, [attributes.value, attributes.defaultValue]);
 
   // Commit a value directly — used by the autocomplete selection handler so
