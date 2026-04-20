@@ -42,7 +42,7 @@ export default defineConfig({
       mode: 'only-on-failure',
       fullPage: true,
     },
-    video: 'retain-on-failure',
+    video: process.env.CANVAS_E2E_VIDEO ? 'retain-on-failure' : 'off',
   },
 
   /* Configure projects for major browsers */
