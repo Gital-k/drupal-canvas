@@ -1,13 +1,24 @@
 import { expect } from '@playwright/test';
 
-
-
 import { isolatedPerTest as test } from '../../fixtures/test.js';
-import { clickAddNew, closePopoverViaCloseButton, COMPONENT_ID, dragRow, formatDateForDisplay, formatDatetimeForDisplay, getAllRowTexts, getField, getForm, openPopoverForRow, PROP_NAMES, typeDatetimeInPopover, typeInPopover, typeInPopoverWithoutCommit, typeRelativeLinkViaAutocomplete, verifyRowText } from './multivaluePropTypes.helpers.js';
-
-
-
-
+import {
+  clickAddNew,
+  closePopoverViaCloseButton,
+  COMPONENT_ID,
+  dragRow,
+  formatDateForDisplay,
+  formatDatetimeForDisplay,
+  getAllRowTexts,
+  getField,
+  getForm,
+  openPopoverForRow,
+  PROP_NAMES,
+  typeDatetimeInPopover,
+  typeInPopover,
+  typeInPopoverWithoutCommit,
+  typeRelativeLinkViaAutocomplete,
+  verifyRowText,
+} from './multivaluePropTypes.helpers.js';
 
 interface NumericTypeTestConfig {
   propName: string;
@@ -1810,9 +1821,7 @@ test.describe('Relative Link Component', () => {
       const field = getField(page, PROP_NAMES.RELATIVE_LINK);
       await expect(field.locator('tbody tr')).toHaveCount(3);
       const previewFrame = await canvas.getActivePreviewFrame();
-      const initialItems = previewFrame.locator(
-        '#relative-link-list li',
-      );
+      const initialItems = previewFrame.locator('#relative-link-list li');
       await expect(initialItems.nth(0)).toContainText('/about');
       await expect(initialItems.nth(1)).toContainText('/contact');
       await openPopoverForRow(page, field, 0);
