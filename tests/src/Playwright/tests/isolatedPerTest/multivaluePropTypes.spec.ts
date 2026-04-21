@@ -805,6 +805,7 @@ test.describe('Multivalue Prop Types', () => {
           'https://drupal.org',
           'https://example.com',
           'https://persisted.com',
+          '',
         ]);
 
         await page.reload();

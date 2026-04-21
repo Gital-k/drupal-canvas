@@ -176,8 +176,6 @@ const DrupalDatetimeMultivalueForm = ({
       // Cancel any in-progress edit: reset inputs back to the values at open.
       const dateInput = getDateInput();
       const timeInput = getTimeInput();
-      // if (dateInput) dateInput.value = valueAtOpenRef.current.date;
-      // if (timeInput) timeInput.value = valueAtOpenRef.current.time;
       if (dateInput)
         dispatchSyntheticChange(dateInput, valueAtOpenRef.current.date);
       if (timeInput)
@@ -246,8 +244,7 @@ const DrupalDatetimeMultivalueForm = ({
           </Popover.Trigger>
         </Flex>
 
-        {/* Edit Popover — forceMount keeps the real inputs in the DOM for
-            form submission even when the popover is closed. */}
+        {/* Edit Popover */}
         <Popover.Content
           forceMount={true}
           ref={setPopoverContainer}
