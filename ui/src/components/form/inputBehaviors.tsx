@@ -1,33 +1,46 @@
 import { useEffect, useState } from 'react';
 
+
+
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import { getDefaultValue } from '@/components/form/formUtil';
 
+
+
 import type * as React from 'react';
+
+
+
+
+
 
 import './InputBehaviors.css';
 
+
+
 import Ajv from 'ajv';
+
+
 
 import InputDescription from '@/components/form/components/drupal/InputDescription';
 import { InputBehaviorsComponentPropsForm } from '@/components/form/InputBehaviorsComponentPropsForm';
 import { InputBehaviorsEntityForm } from '@/components/form/InputBehaviorsEntityForm';
 import { FORM_TYPES } from '@/features/form/constants';
-import {
-  clearFieldError,
-  selectFieldError,
-  selectFormValues,
-  setFieldError,
-  setFieldValue,
-} from '@/features/form/formStateSlice';
+import { clearFieldError, selectFieldError, selectFormValues, setFieldError, setFieldValue } from '@/features/form/formStateSlice';
 import { AJAX_UPDATE_FORM_BUILD_ID_EVENT } from '@/types/Ajax';
 import { isAjaxing } from '@/utils/isAjaxing';
+
+
 
 import type { PropsValues } from '@drupal-canvas/types';
 import type { ErrorObject } from 'ajv/dist/types';
 import type { FormId } from '@/features/form/formStateSlice';
 import type { AjaxUpdateFormBuildIdEvent } from '@/types/Ajax';
 import type { Attributes } from '@/types/DrupalAttribute';
+
+
+
+
 
 const ajv = new Ajv();
 
@@ -271,7 +284,7 @@ export const InputBehaviorsCommon = ({
       }
 
       // If no AJAX operations are in progress, update the form state and store.
-      if (!isAjaxing() && !e.target.hasAttribute('data-canvas-stage-changes')) {
+      if (!isAjaxing() && (!e.target?.hasAttribute || !e.target.hasAttribute('data-canvas-stage-changes'))) {
         commitFormState({ ...formValues, [fieldName]: newValue });
         return;
       }
