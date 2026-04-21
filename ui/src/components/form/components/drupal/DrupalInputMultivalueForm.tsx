@@ -1,31 +1,32 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { ArrowRightIcon, Cross2Icon, TrashIcon } from '@radix-ui/react-icons';
 import * as Popover from '@radix-ui/react-popover';
 import { Box, Button, Flex, Text } from '@radix-ui/themes';
 
-import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import DrupalInput from '@/components/form/components/drupal/DrupalInput';
-import {
-  selectUpdatePreview,
-  setUpdatePreview,
-} from '@/features/layout/layoutModelSlice';
+import { resolveEntityUri } from '@/utils/transforms';
 
 import {
+  dispatchSyntheticChange,
   isAutocompleteMenuOpen,
   isRemoveButtonEnabled,
   revertInputValue,
   triggerDrupalRemoveButton,
 } from './multivalueFormUtils';
-import { useMultivalueAutocompleteBridge } from './useMultivalueAutocompleteBridge';
 
 import type { NumericInputAttributes } from '@/types/DrupalAttribute';
-import type { AutocompleteBridgeRefs } from './useMultivalueAutocompleteBridge';
 
 import styles from './DrupalInputMultivalueForm.module.css';
 
+type AutocompleteBridgeRefs = {
+  popoverInput: HTMLInputElement | null;
+  popoverContainer: HTMLDivElement | null;
+  shouldRevertOnClose: boolean;
+  autocompleteCleanup: (() => void) | null;
+  autocompleteJustSelected: boolean;
+};
 type MultivalueRefs = AutocompleteBridgeRefs & {
-  isPreviewPaused: boolean;
   triggerRow: HTMLDivElement | null;
   triggerButton: HTMLButtonElement | null;
   valueAtOpen: string;
@@ -50,22 +51,21 @@ const DrupalInputMultivalueForm = ({
     'data-field-label'?: string;
   };
 }) => {
-  const dispatch = useAppDispatch();
-  const updatePreview = useAppSelector(selectUpdatePreview);
+  const isAutocomplete =
+    attributes?.class instanceof Array &&
+    attributes?.class?.includes('form-autocomplete');
   const initialValue = attributes.value || attributes.defaultValue || '';
   const refs = useRef<MultivalueRefs>({
-    isPreviewPaused: false,
     triggerRow: null,
     triggerButton: null,
     popoverInput: null,
     popoverContainer: null,
     valueAtOpen: initialValue as string,
     shouldRevertOnClose: true,
-    pendingSyntheticCommit: null,
-    closeAfterSyntheticCommit: false,
     autocompleteCleanup: null,
     autocompleteJustSelected: false,
   });
+
   const [displayValue, setDisplayValue] = useState<string>(
     initialValue as string,
   );
@@ -86,29 +86,65 @@ const DrupalInputMultivalueForm = ({
     }
   };
 
-  const pausePreviewUpdates = useCallback(() => {
-    if (!refs.current.isPreviewPaused) {
-      dispatch(setUpdatePreview(false));
-      refs.current.isPreviewPaused = true;
+  const pausePreviewUpdates = () => {
+    if (refs.current.popoverInput) {
+      refs.current.popoverInput.setAttribute(
+        'data-canvas-stage-changes',
+        'true',
+      );
     }
-  }, [dispatch]);
+  };
 
-  const resumePreviewUpdates = useCallback(() => {
-    if (refs.current.isPreviewPaused) {
-      dispatch(setUpdatePreview(true));
-      refs.current.isPreviewPaused = false;
+  const resumePreviewUpdates = () => {
+    if (refs.current.popoverInput) {
+      refs.current.popoverInput.removeAttribute('data-canvas-stage-changes');
     }
-  }, [dispatch]);
+  };
 
-  const { attachSelectionListener } = useMultivalueAutocompleteBridge({
-    attributes,
-    refs,
-    updatePreview,
-    setDisplayValue,
-    setPopoverOpenAndRefocus,
-    resumePreviewUpdates,
-  });
+  useEffect(() => {
+    setTimeout(() => {
+      if (
+        isAutocomplete &&
+        refs.current.popoverInput &&
+        popoverOpen &&
+        !refs.current.popoverInput.hasAttribute(
+          'data-canvas-popover-autocomplete',
+        )
+      ) {
+        refs.current.popoverInput.setAttribute(
+          'data-canvas-popover-autocomplete',
+          'true',
+        );
+        console.log('we done spotted autocomplete');
+        refs.current.popoverInput.addEventListener(
+          'data-canvas-autocomplete-selected',
+          (e) => {
+            // @ts-ignore
+            refs.current.popoverInput.removeAttribute(
+              'data-canvas-stage-changes',
+            );
+            setTimeout(() => {
+              // @ts-ignore
+              const forDisplay = e.detail.value;
+              setDisplayValue(forDisplay);
+              setTimeout(() => {
+                // @ts-ignore
+                refs.current.popoverInput.value = resolveEntityUri(forDisplay);
 
+                dispatchSyntheticChange(
+                  // @ts-ignore
+                  refs.current.popoverInput,
+                  resolveEntityUri(forDisplay),
+                  true,
+                );
+                setPopoverOpen(false);
+              });
+            });
+          },
+        );
+      }
+    });
+  }, [isAutocomplete, refs.current.popoverInput, popoverOpen]);
   // Listen for the custom autocomplete-selected event dispatched by
   // autocomplete.extend.js when the user picks a suggestion.
 
@@ -145,6 +181,7 @@ const DrupalInputMultivalueForm = ({
       // listener will then commit the correct suggestion value and close the popover.
       const inputElement =
         refs.current.popoverInput || (e.target as HTMLInputElement);
+
       if (isAutocompleteMenuOpen(inputElement)) {
         return;
       }
@@ -157,12 +194,16 @@ const DrupalInputMultivalueForm = ({
             '[data-has-field-error="true"]',
           );
           if (!hasError) {
+            resumePreviewUpdates();
             const committedValue = refs.current.popoverInput.value;
+            setPopoverOpen(false);
+            dispatchSyntheticChange(
+              refs.current.popoverInput,
+              refs.current.popoverInput.value,
+              isAutocomplete,
+            );
             setDisplayValue(committedValue);
             refs.current.shouldRevertOnClose = false;
-            refs.current.pendingSyntheticCommit = committedValue;
-            refs.current.closeAfterSyntheticCommit = true;
-            resumePreviewUpdates();
           }
         }
       });
@@ -174,16 +215,16 @@ const DrupalInputMultivalueForm = ({
       pausePreviewUpdates();
       refs.current.shouldRevertOnClose = true;
       setTimeout(() => {
-        if (refs.current.popoverContainer) {
-          attachSelectionListener();
-        }
         const input = refs.current.popoverContainer?.querySelector(
           'input',
         ) as HTMLInputElement | null;
         if (input) {
           refs.current.popoverInput = input;
+          refs.current.popoverInput.setAttribute(
+            'data-canvas-stage-changes',
+            'true',
+          );
           refs.current.valueAtOpen = input.value;
-          input.setAttribute('data-canvas-popover-autocomplete', 'true');
           input.select();
         }
       }, 0);

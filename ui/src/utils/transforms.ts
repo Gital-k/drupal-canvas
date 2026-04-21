@@ -152,7 +152,7 @@ export interface LinkPropShape extends StaticPropSource {
   };
 }
 
-const resolveEntityUri = (uri: string): string => {
+export const resolveEntityUri = (uri: string): string => {
   const match = uri.match(ENTITY_AUTOCOMPLETE_MATCH);
   // LinkWidget with autocomplete support only supports matching on node
   // entities.

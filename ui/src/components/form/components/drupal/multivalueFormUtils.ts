@@ -120,26 +120,40 @@ export const triggerDrupalRemoveButton = (
 export const dispatchSyntheticChange = (
   input: HTMLInputElement,
   value: string,
+  blur: boolean = true,
 ): void => {
-  const instanceValueSetter = Object.getOwnPropertyDescriptor(
+  console.log('dispatch synthetic', {
     input,
-    'value',
-  )?.set;
-  if (instanceValueSetter) {
-    input.value = value;
-    return;
-  }
+    value,
+  });
 
   const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
     window.HTMLInputElement.prototype,
     'value',
   )?.set;
-  if (nativeInputValueSetter) {
-    nativeInputValueSetter.call(input, value);
-  }
 
-  input.dispatchEvent(new Event('input', { bubbles: true }));
-  input.dispatchEvent(new Event('change', { bubbles: true }));
+  nativeInputValueSetter?.call(input, value);
+
+  const propsKey = Object.keys(input).find((k) => k.startsWith('__reactProps'));
+  const reactProps = propsKey ? (input as any)[propsKey] : null;
+
+  if (reactProps?.onChange) {
+    const event = new Event('change');
+    Object.defineProperty(event, 'target', { writable: false, value: input });
+    reactProps.onChange(event);
+  } else {
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  if (blur) {
+    if (reactProps?.onBlur) {
+      const event = new Event('blur');
+      Object.defineProperty(event, 'target', { writable: false, value: input });
+      reactProps.onBlur(event);
+    } else {
+      input.dispatchEvent(new Event('blur', { bubbles: true }));
+    }
+  }
 };
 
 /**

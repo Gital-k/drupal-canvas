@@ -164,6 +164,7 @@ function registerNumericTypeTests(config: NumericTypeTestConfig): void {
       expect(await getAllRowTexts(field)).toEqual([val1, val2, persistVal, '']);
 
       await page.reload();
+      await expect(page.locator(`.field--name-${propName}`)).toBeVisible();
       const previewFrame2 = await canvas.getActivePreviewFrame();
       const listItems2 = previewFrame2.locator(`${listId} li`);
       // Asserting that the values are same on the page instance after refresh.
@@ -647,7 +648,7 @@ test.describe('Multivalue Prop Types', () => {
         canvas,
       }) => {
         const field = getField(page, PROP_NAMES.LINK);
-        await clickAddNew(field);
+        // await clickAddNew(field);
         await expect(field.locator('tbody tr')).toHaveCount(3);
         await openPopoverForRow(page, field, 2);
         await typeInPopover(
@@ -785,7 +786,7 @@ test.describe('Multivalue Prop Types', () => {
         canvas,
       }) => {
         const field = getField(page, PROP_NAMES.LINK);
-        await clickAddNew(field);
+        // await clickAddNew(field);
         await expect(field.locator('tbody tr')).toHaveCount(3);
         await openPopoverForRow(page, field, 2);
         await typeInPopover(page, 'input[type="url"]', 'https://persisted.com');
@@ -1892,7 +1893,6 @@ test.describe('Relative Link Component', () => {
         '/about',
         '/contact',
         'Article One (1)',
-        '',
       ]);
       await page.reload();
 

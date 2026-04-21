@@ -37,6 +37,7 @@ const TextField = ({
             Object.defineProperty(element, 'value', {
               get: descriptor.get,
               set: function (newValue) {
+                console.log('SET TEXT');
                 if (attributes?.type === 'number' && newValue === 'NaN') {
                   return;
                 }

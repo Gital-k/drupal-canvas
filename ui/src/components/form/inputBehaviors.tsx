@@ -20,7 +20,6 @@ import {
   setFieldError,
   setFieldValue,
 } from '@/features/form/formStateSlice';
-import { selectUpdatePreview } from '@/features/layout/layoutModelSlice';
 import { AJAX_UPDATE_FORM_BUILD_ID_EVENT } from '@/types/Ajax';
 import { isAjaxing } from '@/utils/isAjaxing';
 
@@ -162,7 +161,6 @@ export const InputBehaviorsCommon = ({
   const formValues = useAppSelector((state) =>
     selectFormValues(state, attributes['data-form-id'] as FormId),
   );
-  const updatePreview = useAppSelector(selectUpdatePreview);
 
   const formId = attributes['data-form-id'] as FormId;
   const fieldName = (attributes.name ||
@@ -273,10 +271,17 @@ export const InputBehaviorsCommon = ({
       }
 
       // If no AJAX operations are in progress, update the form state and store.
-      if (!isAjaxing() && updatePreview) {
+      if (!isAjaxing() && !e.target.hasAttribute('data-canvas-stage-changes')) {
+        console.log('we shall commit');
         commitFormState({ ...formValues, [fieldName]: newValue });
         return;
+      } else {
+        console.log('we shall skip', {
+          ajaxing: isAjaxing(),
+          hasTheAttribute: e.target.hasAttribute('data-canvas-stage-changes'),
+        });
       }
+
       // This is only reached if AJAX operations are in progress. Add an event
       // listener to update the form state once ajax is complete.
       const stopListener = () => {
