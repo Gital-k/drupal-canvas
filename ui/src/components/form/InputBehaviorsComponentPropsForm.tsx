@@ -182,12 +182,11 @@ export const InputBehaviorsComponentPropsForm = (
     const eventFieldName = target.name;
     const fieldName = eventFieldName;
     const isNestedArraySubfield =
-      typeof fieldName === 'string' &&
+      fieldName &&
       schemas?.[propName]?.type === 'array' &&
       fieldName.startsWith(
         `canvas_component_props[${selectedComponent}][${propName}][`,
-      ) &&
-      fieldName !== `canvas_component_props[${selectedComponent}][${propName}]`;
+      );
 
     // A <select multiple> element's .value is only the last-clicked option.
     // For array props rendered as multi-selects, collect every selected option.
@@ -213,8 +212,8 @@ export const InputBehaviorsComponentPropsForm = (
       // Or if the prop relies on multiple input fields.
       multipleInputsSingleValue.includes(propName) ||
       // Nested updates for array props (for example multivalue `_weight` and
-      // `value` subfields) should bypass per-field transforms. Transforms for
-      // the parent prop need full form context and can collapse partial updates.
+      // `value` subfields) should bypass per-field transforms. Transforms will
+      // be applied at the entire-prop level.
       isNestedArraySubfield
     ) {
       return rawValue;
@@ -237,10 +236,7 @@ export const InputBehaviorsComponentPropsForm = (
 
       let valueToValidate = coerceValueForSchema(newValue, schema);
 
-      if (
-        schema?.format === 'date-time' ||
-        schema?.items?.format === 'date-time'
-      ) {
+      if ([schema?.format, schema?.items?.format].includes('date-time')) {
         valueToValidate = toDateTime(valueToValidate);
       }
 
@@ -252,7 +248,6 @@ export const InputBehaviorsComponentPropsForm = (
         valueToValidate,
         inputAndUiData,
       );
-
       return {
         valid,
         errors: validate?.errors || null,

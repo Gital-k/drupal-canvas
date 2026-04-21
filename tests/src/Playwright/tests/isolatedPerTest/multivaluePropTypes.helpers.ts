@@ -121,7 +121,7 @@ export async function typeInPopoverWithoutCommit(
  * Verifies the dialog closes successfully.
  * @param page - The Playwright Page object
  */
-export async function closePopoverViaCloseButton(page: Page): Promise<void> {
+export async function closePopoverWithEscape(page: Page): Promise<void> {
   const dialog = page.locator('[role="dialog"][data-state="open"]');
   await expect(dialog).toBeVisible();
 
