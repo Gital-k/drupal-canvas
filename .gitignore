@@ -65,3 +65,5 @@ lerna-debug.log*
 
 # GitLab CI
 .cache
+!/ui/dist
+!/packages/astro-hydration/dist
