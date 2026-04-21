@@ -287,7 +287,11 @@ const DrupalInputMultivalueForm = ({
               type="button"
               aria-label={`Edit ${fieldLabel}: ${displayValue || 'Empty'}`}
             >
-              <Text size="2" className={styles.itemText}>
+              <Text
+                size="2"
+                className={styles.itemText}
+                data-canvas-multivalue-label
+              >
                 {displayValue || 'Empty'}
               </Text>
               <ArrowRightIcon className={styles.arrowIcon} />
@@ -300,7 +304,7 @@ const DrupalInputMultivalueForm = ({
           ref={popoverContainerRef}
           side="left"
           align="start"
-          sideOffset={6}
+          sideOffset={36}
           className={styles.popoverContent}
           style={{ maxWidth: '235px' }}
           onInteractOutside={(e) => {
@@ -365,6 +369,7 @@ const DrupalInputMultivalueForm = ({
               size="1"
               onClick={handleRemove}
               disabled={!isRemoveButtonEnabled(triggerRowRef.current)}
+              data-multivalue-remove-item={true}
             >
               <TrashIcon />
               Remove
