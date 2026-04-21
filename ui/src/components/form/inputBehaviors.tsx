@@ -272,14 +272,8 @@ export const InputBehaviorsCommon = ({
 
       // If no AJAX operations are in progress, update the form state and store.
       if (!isAjaxing() && !e.target.hasAttribute('data-canvas-stage-changes')) {
-        console.log('we shall commit');
         commitFormState({ ...formValues, [fieldName]: newValue });
         return;
-      } else {
-        console.log('we shall skip', {
-          ajaxing: isAjaxing(),
-          hasTheAttribute: e.target.hasAttribute('data-canvas-stage-changes'),
-        });
       }
 
       // This is only reached if AJAX operations are in progress. Add an event

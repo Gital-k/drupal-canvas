@@ -114,7 +114,6 @@ const TextFieldAutocomplete = ({
           }, autocompleteDelay * 3);
         }}
         onBlur={(e) => {
-          console.log('BLUR IT');
           if (inputRef.current) {
             inputRef.current.removeAttribute('data-canvas-no-update');
           }

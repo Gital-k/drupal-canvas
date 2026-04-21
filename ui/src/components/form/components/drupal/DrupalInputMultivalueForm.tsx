@@ -19,17 +19,13 @@ import type { NumericInputAttributes } from '@/types/DrupalAttribute';
 
 import styles from './DrupalInputMultivalueForm.module.css';
 
-type AutocompleteBridgeRefs = {
+type MultivalueRefs = {
   popoverInput: HTMLInputElement | null;
   popoverContainer: HTMLDivElement | null;
-  shouldRevertOnClose: boolean;
-  autocompleteCleanup: (() => void) | null;
-  autocompleteJustSelected: boolean;
-};
-type MultivalueRefs = AutocompleteBridgeRefs & {
   triggerRow: HTMLDivElement | null;
   triggerButton: HTMLButtonElement | null;
   valueAtOpen: string;
+  shouldRevertOnClose: boolean;
 };
 /**
  * DrupalInputMultivalueForm component for inputs within multivalue widgets.
@@ -62,8 +58,6 @@ const DrupalInputMultivalueForm = ({
     popoverContainer: null,
     valueAtOpen: initialValue as string,
     shouldRevertOnClose: true,
-    autocompleteCleanup: null,
-    autocompleteJustSelected: false,
   });
 
   const [displayValue, setDisplayValue] = useState<string>(
@@ -73,16 +67,10 @@ const DrupalInputMultivalueForm = ({
   const [popoverOpen, setPopoverOpen] = useState(false);
   const fieldLabel = attributes['data-field-label'] || '';
 
-  const focusTriggerAfterClose = () => {
-    setTimeout(() => {
-      refs.current.triggerButton?.focus();
-    }, 30);
-  };
-
   const setPopoverOpenAndRefocus = (open: boolean) => {
     setPopoverOpen(open);
     if (!open) {
-      focusTriggerAfterClose();
+      setTimeout(() => refs.current.triggerButton?.focus(), 30);
     }
   };
 
@@ -115,28 +103,24 @@ const DrupalInputMultivalueForm = ({
           'data-canvas-popover-autocomplete',
           'true',
         );
-        console.log('we done spotted autocomplete');
         refs.current.popoverInput.addEventListener(
           'data-canvas-autocomplete-selected',
-          (e) => {
-            // @ts-ignore
-            refs.current.popoverInput.removeAttribute(
+          (e: Event) => {
+            const customEvent = e as CustomEvent<{ value: string }>;
+            refs.current.popoverInput?.removeAttribute(
               'data-canvas-stage-changes',
             );
             setTimeout(() => {
-              // @ts-ignore
-              const forDisplay = e.detail.value;
+              const forDisplay = customEvent.detail.value;
               setDisplayValue(forDisplay);
               setTimeout(() => {
-                // @ts-ignore
-                refs.current.popoverInput.value = resolveEntityUri(forDisplay);
-
-                dispatchSyntheticChange(
-                  // @ts-ignore
-                  refs.current.popoverInput,
-                  resolveEntityUri(forDisplay),
-                  true,
-                );
+                if (refs.current.popoverInput) {
+                  dispatchSyntheticChange(
+                    refs.current.popoverInput,
+                    resolveEntityUri(forDisplay),
+                    true,
+                  );
+                }
                 setPopoverOpen(false);
               });
             });
@@ -148,14 +132,6 @@ const DrupalInputMultivalueForm = ({
   // Listen for the custom autocomplete-selected event dispatched by
   // autocomplete.extend.js when the user picks a suggestion.
 
-  // Clean up the autocomplete listener whenever the popover closes.
-  useEffect(() => {
-    if (!popoverOpen) {
-      refs.current.autocompleteCleanup?.();
-      refs.current.autocompleteCleanup = null;
-    }
-  }, [popoverOpen]);
-
   // Handle Enter and Escape key presses in popover input.
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     // Handle Escape key to close popover without committing changes
@@ -166,15 +142,6 @@ const DrupalInputMultivalueForm = ({
     }
 
     if (e.key === 'Enter') {
-      // If a jQuery UI autocomplete suggestion was just selected synchronously
-      // (before this React event handler ran via event delegation), do NOT
-      // close the popover — the data-canvas-autocomplete-selected handler
-      // already committed the correct value.
-      if (refs.current.autocompleteJustSelected) {
-        refs.current.autocompleteJustSelected = false;
-        return;
-      }
-
       // If a jQuery UI autocomplete dropdown is currently open, do NOT
       // intercept Enter — let jQuery UI process the selection so that
       // the autocomplete select event fires. The data-canvas-autocomplete-selected

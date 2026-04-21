@@ -111,22 +111,18 @@ export const triggerDrupalRemoveButton = (
 };
 
 /**
- * Programmatically set an input value and trigger its change pipeline.
+ * Programmatically set an input value and trigger React's onChange pipeline.
  *
- * If the input defines an element-level value setter (for example TextField's
- * setter override), assigning `input.value` will invoke that implementation.
- * Otherwise we fall back to the native setter and dispatch bubbling events.
+ * Uses the native HTMLInputElement prototype setter to set the value, then
+ * calls onChange (and optionally onBlur) directly via the React fiber props
+ * attached to the DOM node. This bypasses React's internal value tracker which
+ * would otherwise suppress the change event.
  */
 export const dispatchSyntheticChange = (
   input: HTMLInputElement,
   value: string,
   blur: boolean = true,
 ): void => {
-  console.log('dispatch synthetic', {
-    input,
-    value,
-  });
-
   const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
     window.HTMLInputElement.prototype,
     'value',
