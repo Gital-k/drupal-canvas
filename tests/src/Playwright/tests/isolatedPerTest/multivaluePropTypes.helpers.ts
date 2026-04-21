@@ -65,11 +65,12 @@ export async function openPopoverForRow(
   fieldWrapper: Locator,
   rowIndex: number,
 ): Promise<void> {
-  await fieldWrapper
+  const item = await fieldWrapper
     .locator('tbody tr')
     .nth(rowIndex)
-    .locator('[class*="_listItem_"]')
-    .click();
+    .locator('[class*="_listItem_"]');
+  await item.focus();
+  await item.click();
   await expect(
     page.locator('[role="dialog"][data-state="open"]'),
   ).toBeVisible();

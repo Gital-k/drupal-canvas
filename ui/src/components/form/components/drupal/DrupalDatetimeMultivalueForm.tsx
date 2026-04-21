@@ -4,6 +4,9 @@ import { ArrowRightIcon, Cross2Icon, TrashIcon } from '@radix-ui/react-icons';
 import * as Popover from '@radix-ui/react-popover';
 import { Button, Flex, Text } from '@radix-ui/themes';
 
+import { useAppDispatch } from '@/app/hooks';
+import { removeFieldValue } from '@/features/form/formStateSlice';
+
 import {
   dispatchSyntheticChange,
   isRemoveButtonEnabled,
@@ -70,6 +73,7 @@ const DrupalDatetimeMultivalueForm = ({
   children?: React.ReactNode;
   fieldLabel?: string;
 }) => {
+  const dispatch = useAppDispatch();
   const triggerRowRef = useRef<HTMLDivElement | null>(null);
   const triggerButtonRef = useRef<HTMLButtonElement | null>(null);
   const [popoverOpen, setPopoverOpen] = useState(false);
@@ -99,6 +103,13 @@ const DrupalDatetimeMultivalueForm = ({
   // Returns the time input from the popover container, or null.
   const getTimeInput = (): HTMLInputElement | null =>
     popoverContainer?.querySelector('input[type="time"]') ?? null;
+
+  const setPopoverOpenAndRefocus = (open: boolean) => {
+    setPopoverOpen(open);
+    if (!open) {
+      setTimeout(() => triggerButtonRef.current?.focus(), 30);
+    }
+  };
 
   const pausePreviewUpdates = () => {
     getDateInput()?.setAttribute('data-canvas-stage-changes', 'true');
@@ -181,13 +192,10 @@ const DrupalDatetimeMultivalueForm = ({
       if (timeInput)
         dispatchSyntheticChange(timeInput, valueAtOpenRef.current.time);
     }
-    setPopoverOpen(open);
+    setPopoverOpenAndRefocus(open);
     if (!open) {
       resumePreviewUpdates();
       shouldRevertOnCloseRef.current = true;
-      setTimeout(() => {
-        triggerButtonRef.current?.focus();
-      }, 30);
     }
   };
 
@@ -195,12 +203,43 @@ const DrupalDatetimeMultivalueForm = ({
     e.preventDefault();
     const triggerElement = triggerRowRef.current;
     if (!triggerElement) return;
-    // Close popover directly (bypass the full openChange handler to avoid side effects).
-    setPopoverOpen(false);
+    setPopoverOpenAndRefocus(false);
     resumePreviewUpdates();
     setTimeout(() => {
-      triggerButtonRef.current?.focus();
-      triggerDrupalRemoveButton(triggerElement);
+      const dateInput = getDateInput();
+      const { name } = dateInput || {};
+
+      const removeButtonName: string | null = triggerDrupalRemoveButton(
+        triggerRowRef.current,
+      );
+      const formId = dateInput?.getAttribute('data-form-id');
+      console.log('form id', formId);
+      if (removeButtonName && name && formId) {
+        const fieldNames: string[] = [name];
+
+        // Add the time field name if it exists (replace [date] with [time])
+        if (name.includes('[date]')) {
+          const timeName = name.replace('[date]', '[time]');
+          fieldNames.push(timeName);
+        }
+
+        // Add the weight field (replace [value][date] with [_weight])
+        if (name.includes('[value][date]')) {
+          const weightName = name.replace('[value][date]', '[_weight]');
+          fieldNames.push(weightName);
+        }
+
+        // Add the remove button name
+        fieldNames.push(removeButtonName);
+
+        dispatch(
+          removeFieldValue({
+            formId: formId as any,
+            fieldName: fieldNames,
+          }),
+        );
+        return;
+      }
     });
   };
 

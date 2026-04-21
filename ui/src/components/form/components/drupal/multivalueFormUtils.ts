@@ -69,17 +69,17 @@ export const isRemoveButtonEnabled = (
  * the AJAX behavior. The button is hidden by CSS but remains in the DOM.
  *
  * @param triggerElement - The DOM element that triggers the action (should be inside a table row)
- * @returns boolean - true if the remove button was found and triggered, false otherwise
+ * @returns string | null - The name attribute of the remove button if found and triggered, null otherwise
  */
 export const triggerDrupalRemoveButton = (
   triggerElement: HTMLElement | null,
-): boolean => {
-  if (!triggerElement) return false;
+): string | null => {
+  if (!triggerElement) return null;
 
   // Traverse up from the trigger element to find the containing table row,
   // then locate the Drupal remove button in the .canvas-remove-action cell.
   const tableRow = triggerElement.closest('tr');
-  if (!tableRow) return false;
+  if (!tableRow) return null;
 
   // Find the original Drupal remove button directly (the hidden input/button
   // that carries the AJAX behavior). The cell and button are hidden by
@@ -90,8 +90,9 @@ export const triggerDrupalRemoveButton = (
   if (removeActionCell) {
     const removeButton = removeActionCell.querySelector(
       'input[type="submit"][data-once="drupal-ajax"]',
-    ) as HTMLElement | null;
+    ) as HTMLInputElement | null;
     if (removeButton) {
+      const buttonName = removeButton.getAttribute('name');
       // Dispatch mousedown first (some Drupal AJAX handlers listen for it),
       // then click — mirroring what Drupal's AJAX system expects.
       const mousedownEvent = new MouseEvent('mousedown', {
@@ -101,11 +102,11 @@ export const triggerDrupalRemoveButton = (
       });
       removeButton.dispatchEvent(mousedownEvent);
       removeButton.click();
-      return true;
+      return buttonName;
     }
   }
 
-  return false;
+  return null;
 };
 
 /**

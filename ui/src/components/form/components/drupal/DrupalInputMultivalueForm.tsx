@@ -4,7 +4,9 @@ import { ArrowRightIcon, Cross2Icon, TrashIcon } from '@radix-ui/react-icons';
 import * as Popover from '@radix-ui/react-popover';
 import { Box, Button, Flex, Text } from '@radix-ui/themes';
 
+import { useAppDispatch } from '@/app/hooks';
 import DrupalInput from '@/components/form/components/drupal/DrupalInput';
+import { removeFieldValue } from '@/features/form/formStateSlice';
 import { resolveEntityUri } from '@/utils/transforms';
 
 import {
@@ -46,6 +48,7 @@ const DrupalInputMultivalueForm = ({
     'data-field-label'?: string;
   };
 }) => {
+  const dispatch = useAppDispatch();
   const isAutocomplete =
     attributes?.class instanceof Array &&
     attributes?.class?.includes('form-autocomplete');
@@ -209,14 +212,35 @@ const DrupalInputMultivalueForm = ({
     setPopoverOpenAndRefocus(true);
   };
 
-  const handleRemove = (e: any) => {
+  const handleRemove = (e: React.MouseEvent) => {
     e.preventDefault();
     const triggerElement = refs.current.triggerRow;
     if (!triggerElement) return;
     setPopoverOpenAndRefocus(false);
     resumePreviewUpdates();
     setTimeout(() => {
-      triggerDrupalRemoveButton(triggerElement);
+      const removeButtonName: string | null =
+        triggerDrupalRemoveButton(triggerElement);
+
+      // If we successfully triggered the remove button and have the necessary data, dispatch removeFieldValue
+      if (removeButtonName && attributes['data-form-id'] && attributes.name) {
+        const fieldNames: string[] = [attributes.name];
+
+        // Add the _weight field (replace [value] with [_weight])
+        if (attributes.name.includes('[value]')) {
+          fieldNames.push(attributes.name.replace('[value]', '[_weight]'));
+        }
+
+        // Add the remove button name
+        fieldNames.push(removeButtonName);
+
+        dispatch(
+          removeFieldValue({
+            formId: attributes['data-form-id'] as any,
+            fieldName: fieldNames,
+          }),
+        );
+      }
     });
   };
 
