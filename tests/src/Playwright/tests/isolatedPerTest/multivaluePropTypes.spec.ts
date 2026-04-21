@@ -1,24 +1,13 @@
 import { expect } from '@playwright/test';
 
+
+
 import { isolatedPerTest as test } from '../../fixtures/test.js';
-import {
-  clickAddNew,
-  closePopoverViaCloseButton,
-  COMPONENT_ID,
-  dragRow,
-  formatDateForDisplay,
-  formatDatetimeForDisplay,
-  getAllRowTexts,
-  getField,
-  getForm,
-  openPopoverForRow,
-  PROP_NAMES,
-  typeDatetimeInPopover,
-  typeInPopover,
-  typeInPopoverWithoutCommit,
-  typeRelativeLinkViaAutocomplete,
-  verifyRowText,
-} from './multivaluePropTypes.helpers.js';
+import { clickAddNew, closePopoverViaCloseButton, COMPONENT_ID, dragRow, formatDateForDisplay, formatDatetimeForDisplay, getAllRowTexts, getField, getForm, openPopoverForRow, PROP_NAMES, typeDatetimeInPopover, typeInPopover, typeInPopoverWithoutCommit, typeRelativeLinkViaAutocomplete, verifyRowText } from './multivaluePropTypes.helpers.js';
+
+
+
+
 
 interface NumericTypeTestConfig {
   propName: string;
@@ -1820,6 +1809,12 @@ test.describe('Relative Link Component', () => {
     }) => {
       const field = getField(page, PROP_NAMES.RELATIVE_LINK);
       await expect(field.locator('tbody tr')).toHaveCount(3);
+      const previewFrame = await canvas.getActivePreviewFrame();
+      const initialItems = previewFrame.locator(
+        '#relative-link-list li',
+      );
+      await expect(initialItems.nth(0)).toContainText('/about');
+      await expect(initialItems.nth(1)).toContainText('/contact');
       await openPopoverForRow(page, field, 0);
       await page
         .locator('[role="dialog"][data-state="open"]')
@@ -1832,7 +1827,6 @@ test.describe('Relative Link Component', () => {
       expect(await getAllRowTexts(field)).toEqual(['/contact', '']);
 
       // Assert that page is also updated.
-      const previewFrame = await canvas.getActivePreviewFrame();
       const relativeLinkListItems = previewFrame.locator(
         '#relative-link-list li',
       );
@@ -1907,6 +1901,7 @@ test.describe('Relative Link Component', () => {
         '/about',
         '/contact',
         'Article One (1)',
+        '',
       ]);
       await page.reload();
 
