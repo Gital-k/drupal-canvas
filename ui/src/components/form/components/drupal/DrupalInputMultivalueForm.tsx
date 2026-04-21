@@ -74,18 +74,14 @@ const DrupalInputMultivalueForm = ({
   };
 
   const pausePreviewUpdates = () => {
-    if (refs.current.popoverInput) {
-      refs.current.popoverInput.setAttribute(
-        'data-canvas-stage-changes',
-        'true',
-      );
-    }
+    refs.current?.popoverInput?.setAttribute(
+      'data-canvas-stage-changes',
+      'true',
+    );
   };
 
   const resumePreviewUpdates = () => {
-    if (refs.current.popoverInput) {
-      refs.current.popoverInput.removeAttribute('data-canvas-stage-changes');
-    }
+    refs.current?.popoverInput?.removeAttribute('data-canvas-stage-changes');
   };
 
   useEffect(() => {
@@ -164,7 +160,7 @@ const DrupalInputMultivalueForm = ({
             setPopoverOpen(false);
             dispatchSyntheticChange(
               refs.current.popoverInput,
-              refs.current.popoverInput.value,
+              committedValue,
               isAutocomplete,
             );
             setDisplayValue(committedValue);
@@ -217,7 +213,6 @@ const DrupalInputMultivalueForm = ({
     e.preventDefault();
     const triggerElement = refs.current.triggerRow;
     if (!triggerElement) return;
-    // Close the popover first so the portal is cleaned up before AJAX replaces the DOM.
     setPopoverOpenAndRefocus(false);
     resumePreviewUpdates();
     setTimeout(() => {
@@ -226,101 +221,90 @@ const DrupalInputMultivalueForm = ({
   };
 
   return (
-    <div style={{ display: 'contents' }}>
-      <Popover.Root open={popoverOpen} onOpenChange={handlePopoverOpenChange}>
-        <Flex
-          ref={(node) => {
-            refs.current.triggerRow = node;
-          }}
-          align="center"
-          gap="2"
-          className={styles.itemRow}
-        >
-          {/* List Item View - Trigger */}
-          <Popover.Trigger asChild>
-            <button
-              ref={(node) => {
-                refs.current.triggerButton = node;
-              }}
-              className={styles.listItem}
-              type="button"
-              aria-label={`Edit ${fieldLabel}: ${displayValue || 'Empty'}`}
-            >
-              <Text
-                size="2"
-                className={styles.itemText}
-                data-canvas-multivalue-label
-              >
-                {displayValue || 'Empty'}
-              </Text>
-              <ArrowRightIcon className={styles.arrowIcon} />
-            </button>
-          </Popover.Trigger>
-        </Flex>
-
-        {/* Edit Popover */}
-        <Popover.Content
-          forceMount={true}
-          ref={(node) => {
-            refs.current.popoverContainer = node;
-          }}
-          side="left"
-          align="start"
-          sideOffset={6}
-          className={clsx(styles.popoverContent, [
-            !popoverOpen && styles.visuallyHiddenInput,
-          ])}
-          style={{ maxWidth: '235px' }}
-          onInteractOutside={(e) => {
-            // Prevent the popover from closing when the user clicks on a
-            // jQuery UI autocomplete suggestion. The dropdown is rendered in
-            // a portal outside the popover, so Radix treats it as an outside
-            // click and would close the popover before the selection is
-            // committed.
-            const target = e.target as Element | null;
-            if (target?.closest('.ui-autocomplete, .ui-menu')) {
-              e.preventDefault();
-              return;
-            }
-          }}
-        >
-          {/* Popover Header */}
-          <Flex
-            justify="between"
-            align="center"
-            className={styles.popoverHeader}
+    <Popover.Root open={popoverOpen} onOpenChange={handlePopoverOpenChange}>
+      <Flex
+        ref={(node) => {
+          refs.current.triggerRow = node;
+        }}
+        align="center"
+        gap="2"
+        className={styles.itemRow}
+      >
+        {/* List Item View - Trigger */}
+        <Popover.Trigger asChild>
+          <button
+            ref={(node) => {
+              refs.current.triggerButton = node;
+            }}
+            className={styles.listItem}
+            type="button"
+            aria-label={`Edit ${fieldLabel}: ${displayValue || 'Empty'}`}
           >
-            <Text size="1" weight="medium" className={styles.popoverLabel}>
-              {fieldLabel}
-            </Text>
-            <Popover.Close aria-label="Close">
-              <Cross2Icon />
-            </Popover.Close>
-          </Flex>
-
-          {/* Input Field */}
-          <Box>
-            <DrupalInput
-              attributes={{ ...attributes, onKeyDown: handleKeyDown }}
-            />
-          </Box>
-
-          {/* Remove Button */}
-          <Flex justify="center" className={styles.removeButtonContainer}>
-            <Button
-              variant="ghost"
-              color="red"
-              size="1"
-              onClick={handleRemove}
-              disabled={!isRemoveButtonEnabled(refs.current.triggerRow)}
+            <Text
+              size="2"
+              className={styles.itemText}
+              data-canvas-multivalue-label
             >
-              <TrashIcon />
-              Remove
-            </Button>
-          </Flex>
-        </Popover.Content>
-      </Popover.Root>
-    </div>
+              {displayValue || 'Empty'}
+            </Text>
+            <ArrowRightIcon className={styles.arrowIcon} />
+          </button>
+        </Popover.Trigger>
+      </Flex>
+
+      <Popover.Content
+        forceMount={true}
+        ref={(node) => {
+          refs.current.popoverContainer = node;
+        }}
+        side="left"
+        align="start"
+        sideOffset={6}
+        className={clsx(styles.popoverContent, [
+          !popoverOpen && styles.visuallyHiddenInput,
+        ])}
+        style={{ maxWidth: '235px' }}
+        onInteractOutside={(e) => {
+          // Prevent the popover from closing when the user clicks on a
+          // jQuery UI autocomplete suggestion. The dropdown is rendered in
+          // a portal outside the popover, so Radix treats it as an outside
+          // click and would close the popover before the selection is
+          // committed.
+          const target = e.target as Element | null;
+          if (target?.closest('.ui-autocomplete, .ui-menu')) {
+            e.preventDefault();
+            return;
+          }
+        }}
+      >
+        {/* Popover Header */}
+        <Flex justify="between" align="center" className={styles.popoverHeader}>
+          <Text size="1" weight="medium" className={styles.popoverLabel}>
+            {fieldLabel}
+          </Text>
+          <Popover.Close aria-label="Close">
+            <Cross2Icon />
+          </Popover.Close>
+        </Flex>
+        <Box>
+          <DrupalInput
+            attributes={{ ...attributes, onKeyDown: handleKeyDown }}
+          />
+        </Box>
+        <Flex justify="center" className={styles.removeButtonContainer}>
+          <Button
+            variant="ghost"
+            color="red"
+            size="1"
+            onClick={handleRemove}
+            disabled={!isRemoveButtonEnabled(refs.current.triggerRow)}
+          >
+            <TrashIcon />
+            Remove
+          </Button>
+        </Flex>
+      </Popover.Content>
+    </Popover.Root>
   );
 };
 

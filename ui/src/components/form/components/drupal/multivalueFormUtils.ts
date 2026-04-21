@@ -2,8 +2,6 @@
  * Utility functions for multivalue form components.
  */
 
-const ENTITY_AUTOCOMPLETE_MATCH = /.+\s\(([^)]+)\)/;
-
 /**
  * Determine if the remove button should be enabled for a multivalue field item.
  *
@@ -153,14 +151,6 @@ export const dispatchSyntheticChange = (
 };
 
 /**
- * Converts Drupal autocomplete labels like "Title (123)" to entity URIs.
- */
-export const toAutocompleteEntityUri = (value: string): string => {
-  const match = value.match(ENTITY_AUTOCOMPLETE_MATCH);
-  return match ? `entity:node/${match[1]}` : value;
-};
-
-/**
  * Returns true when jQuery UI autocomplete menu is currently visible.
  */
 export const isAutocompleteMenuOpen = (input: HTMLInputElement): boolean => {
@@ -171,22 +161,4 @@ export const isAutocompleteMenuOpen = (input: HTMLInputElement): boolean => {
   return !!(
     $jq && $jq(input).data('ui-autocomplete')?.menu?.element?.is?.(':visible')
   );
-};
-
-/**
- * Sets a value using the native input setter and emits a bubbling input event.
- */
-export const revertInputValue = (
-  input: HTMLInputElement,
-  value: string,
-): void => {
-  const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-    window.HTMLInputElement.prototype,
-    'value',
-  )?.set;
-  if (!nativeInputValueSetter) {
-    return;
-  }
-  nativeInputValueSetter.call(input, value);
-  input.dispatchEvent(new Event('input', { bubbles: true }));
 };

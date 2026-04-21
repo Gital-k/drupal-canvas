@@ -1,11 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { ArrowRightIcon, Cross2Icon, TrashIcon } from '@radix-ui/react-icons';
 import * as Popover from '@radix-ui/react-popover';
 import { Button, Flex, Text } from '@radix-ui/themes';
-
-import { useAppDispatch } from '@/app/hooks';
-import { setUpdatePreview } from '@/features/layout/layoutModelSlice';
 
 import {
   dispatchSyntheticChange,
@@ -73,10 +70,8 @@ const DrupalDatetimeMultivalueForm = ({
   children?: React.ReactNode;
   fieldLabel?: string;
 }) => {
-  const dispatch = useAppDispatch();
   const triggerRowRef = useRef<HTMLDivElement | null>(null);
   const triggerButtonRef = useRef<HTMLButtonElement | null>(null);
-  const isPreviewPausedRef = useRef(false);
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [displayDate, setDisplayDate] = useState('');
   const [displayTime, setDisplayTime] = useState('');
@@ -85,8 +80,8 @@ const DrupalDatetimeMultivalueForm = ({
     time: '',
   });
   const shouldRevertOnCloseRef = useRef(true);
-  // Tracks whether a time input exists — derived from the real DOM via the
-  // useEffect below rather than queried at render time, so it is stable across
+  // Tracks whether a time input exists — derived from the real DOM via
+  // useEffect  rather than queried at render time, so it is stable across
   // renders and correct before the popover container is first populated.
   const [hasTime, setHasTime] = useState(false);
 
@@ -97,25 +92,23 @@ const DrupalDatetimeMultivalueForm = ({
   const [popoverContainer, setPopoverContainer] =
     useState<HTMLDivElement | null>(null);
 
-  const pausePreviewUpdates = useCallback(() => {
-    if (!isPreviewPausedRef.current) {
-      dispatch(setUpdatePreview(false));
-      isPreviewPausedRef.current = true;
-    }
-  }, [dispatch]);
+  // Returns the date input from the popover container, or null.
+  const getDateInput = (): HTMLInputElement | null =>
+    popoverContainer?.querySelector('input[type="date"]') ?? null;
 
-  const resumePreviewUpdates = useCallback(() => {
-    if (isPreviewPausedRef.current) {
-      dispatch(setUpdatePreview(true));
-      isPreviewPausedRef.current = false;
-    }
-  }, [dispatch]);
+  // Returns the time input from the popover container, or null.
+  const getTimeInput = (): HTMLInputElement | null =>
+    popoverContainer?.querySelector('input[type="time"]') ?? null;
 
-  useEffect(() => {
-    return () => {
-      resumePreviewUpdates();
-    };
-  }, [resumePreviewUpdates]);
+  const pausePreviewUpdates = () => {
+    getDateInput()?.setAttribute('data-canvas-stage-changes', 'true');
+    getTimeInput()?.setAttribute('data-canvas-stage-changes', 'true');
+  };
+
+  const resumePreviewUpdates = () => {
+    getDateInput()?.removeAttribute('data-canvas-stage-changes');
+    getTimeInput()?.removeAttribute('data-canvas-stage-changes');
+  };
 
   // Read initial values from the inputs once the popover container is in the DOM.
   useEffect(() => {
@@ -132,15 +125,6 @@ const DrupalDatetimeMultivalueForm = ({
     setDisplayTime(timeInput?.value || timeInput?.defaultValue || '');
     setHasTime(!!timeInput);
   }, [popoverContainer]);
-
-  // Returns the date input from the popover container, or null.
-  const getDateInput = (): HTMLInputElement | null =>
-    popoverContainer?.querySelector('input[type="date"]') ?? null;
-
-  // Returns the time input from the popover container, or null.
-  const getTimeInput = (): HTMLInputElement | null =>
-    popoverContainer?.querySelector('input[type="time"]') ?? null;
-
   // Handle Enter and Escape key presses in popover inputs.
   const handleKeyDown = (e: React.KeyboardEvent<HTMLElement>) => {
     // Handle Escape key to close popover without committing changes

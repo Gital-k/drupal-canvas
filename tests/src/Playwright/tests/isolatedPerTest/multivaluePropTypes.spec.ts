@@ -789,7 +789,6 @@ test.describe('Multivalue Prop Types', () => {
         canvas,
       }) => {
         const field = getField(page, PROP_NAMES.LINK);
-        // await clickAddNew(field);
         await expect(field.locator('tbody tr')).toHaveCount(3);
         await openPopoverForRow(page, field, 2);
         await typeInPopover(page, 'input[type="url"]', 'https://persisted.com');
@@ -806,7 +805,6 @@ test.describe('Multivalue Prop Types', () => {
           'https://drupal.org',
           'https://example.com',
           'https://persisted.com',
-          '',
         ]);
 
         await page.reload();
