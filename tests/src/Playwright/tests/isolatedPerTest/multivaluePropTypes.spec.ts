@@ -462,6 +462,7 @@ test.describe('Multivalue Prop Types', () => {
         const dialog = page.locator('[role="dialog"][data-state="open"]');
         const input = dialog.locator('input[type="text"]');
         await expect(input).toHaveValue('Hello World');
+        const inputId = await input.getAttribute('id');
 
         // Make an uncommitted change by filling the input without pressing Enter.
         const uncommittedText = 'Uncommitted changes';
@@ -474,6 +475,8 @@ test.describe('Multivalue Prop Types', () => {
 
         // Close the popover via the × button.
         await closePopoverViaCloseButton(page);
+        const inputById = page.locator(`#${inputId}`);
+        await expect(inputById).toHaveValue('Hello World');
 
         // Reopen the same row and verify the original value is still there.
         await openPopoverForRow(page, field, 0);
@@ -842,9 +845,12 @@ test.describe('Multivalue Prop Types', () => {
           uncommittedUrl,
         );
         await expect(input).toHaveValue(uncommittedUrl);
+        const inputId = await input.getAttribute('id');
 
         // Close the popover via the × button.
         await closePopoverViaCloseButton(page);
+        const inputById = page.locator(`#${inputId}`);
+        await expect(inputById).toHaveValue('https://drupal.org');
 
         // Reopen the same row and verify the original value is still there.
         await openPopoverForRow(page, field, 0);
@@ -1092,11 +1098,11 @@ test.describe('Multivalue Prop Types', () => {
         await expect(field.locator('tbody tr')).toHaveCount(2);
         // Adding new values to see if the page instances are updated correctly.
         await openPopoverForRow(page, field, 0);
-        await typeDatetimeInPopover(page, '2025-12-24', '08:00:00');
+        await typeDatetimeInPopover(page, '2025-11-24', '08:00:00');
         await verifyRowText(
           field,
           0,
-          formatDatetimeForDisplay('2025-12-24', '08:00'),
+          formatDatetimeForDisplay('2025-11-24', '08:00'),
         );
         await openPopoverForRow(page, field, 1);
         await typeDatetimeInPopover(page, '2025-12-25', '09:00:00');
@@ -1105,6 +1111,14 @@ test.describe('Multivalue Prop Types', () => {
           1,
           formatDatetimeForDisplay('2025-12-25', '09:00'),
         );
+
+        const previewFrame = await canvas.getActivePreviewFrame();
+        await previewFrame.locator('#datetime-list').scrollIntoViewIfNeeded();
+        const items = previewFrame.locator('#datetime-list li');
+        await expect(items).toHaveCount(2);
+        await expect(items.nth(0)).toContainText('2025-11-24T08:00:00.000Z');
+        await expect(items.nth(1)).toContainText('2025-12-25T09:00:00.000Z');
+
         await openPopoverForRow(page, field, 0);
         await page
           .locator('[role="dialog"][data-state="open"]')
@@ -1119,12 +1133,12 @@ test.describe('Multivalue Prop Types', () => {
         ]);
 
         // Assert that page is also updated.
-        const previewFrame = await canvas.getActivePreviewFrame();
-        await previewFrame.locator('#datetime-list').scrollIntoViewIfNeeded();
+        // const previewFrame = await canvas.getActivePreviewFrame();
+        // await previewFrame.locator('#datetime-list').scrollIntoViewIfNeeded();
         const listItems = previewFrame.locator('#datetime-list li');
         await expect(listItems).toHaveCount(1);
         await expect(listItems.nth(0)).toContainText(
-          '2025-12-24T08:00:00.000Z',
+          '2025-12-25T09:00:00.000Z',
         );
       });
 

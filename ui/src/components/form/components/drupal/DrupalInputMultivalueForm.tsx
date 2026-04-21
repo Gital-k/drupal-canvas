@@ -11,7 +11,6 @@ import {
   dispatchSyntheticChange,
   isAutocompleteMenuOpen,
   isRemoveButtonEnabled,
-  revertInputValue,
   triggerDrupalRemoveButton,
 } from './multivalueFormUtils';
 
@@ -136,7 +135,6 @@ const DrupalInputMultivalueForm = ({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     // Handle Escape key to close popover without committing changes
     if (e.key === 'Escape') {
-      resumePreviewUpdates();
       handlePopoverOpenChange(false);
       return;
     }
@@ -199,7 +197,11 @@ const DrupalInputMultivalueForm = ({
       // If we explicitly close the popover, the changes made thus far should
       // be undone, and the field reverted to its value prior to opening.
       if (refs.current.shouldRevertOnClose && refs.current.popoverInput) {
-        revertInputValue(refs.current.popoverInput, refs.current.valueAtOpen);
+        dispatchSyntheticChange(
+          refs.current.popoverInput,
+          refs.current.valueAtOpen,
+          isAutocomplete,
+        );
       }
 
       setPopoverOpenAndRefocus(false);
