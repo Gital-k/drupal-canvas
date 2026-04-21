@@ -628,7 +628,7 @@ playwright:
     - composer run install-dev-deps
   script:
     - npm ci
-    - npm run test:playwright -- --project=chromium tests/isolatedPerTest/multivaluePropTypes.spec.ts --shard=$SHARD --reporter=blob
+    - npm run test:playwright -- --shard=$SHARD --reporter=blob
   after_script:
     - cp -R _drupal/web/modules/contrib/$CI_PARENT_PROJECT_NAME/blob-report $CI_PROJECT_DIR/blob-report
   artifacts:
