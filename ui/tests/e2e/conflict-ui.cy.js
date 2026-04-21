@@ -3,25 +3,19 @@
  *
  * These tests verify the static/visual implementation of the conflict detection UI.
  * The UI is gated behind canvas_dev_mode and shows mock data for demonstration.
- *
- * Prerequisites for existing site:
- * - canvas_dev_mode module must be ALREADY enabled
- * - Site running at https://canvas-dev.ddev.site
- * - Editor user must exist with username 'editor', password 'editor'
- * - Editor user must have administrator role
  */
 
 describe('Conflict UI - Static Implementation', () => {
   // Skip installation - using existing site
-  // before(() => {
-  //   cy.drupalCanvasInstall();
-  // });
+  before(() => {
+    cy.drupalCanvasInstall();
+  });
 
   beforeEach(() => {
     cy.drupalSession();
     cy.drupalLogin(
-      Cypress.env('CANVAS_USER') || 'editor',
-      Cypress.env('CANVAS_USER') || 'editor',
+      Cypress.env('CANVAS_USER') || 'canvasUser',
+      Cypress.env('CANVAS_USER') || 'canvasUser',
     );
 
     // Combined setup logic
@@ -72,9 +66,9 @@ describe('Conflict UI - Static Implementation', () => {
   });
 
   // Skip uninstall - using existing site
-  // after(() => {
-  //   cy.drupalUninstall();
-  // });
+  after(() => {
+    cy.drupalUninstall();
+  });
 
   describe('Conflict Banner', () => {
     it('should display conflict banner with correct count', () => {
