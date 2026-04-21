@@ -14,6 +14,41 @@ import type { CodeComponentProp, ValueMode } from '@/types/CodeComponent';
  */
 
 /**
+ * Helper function to dispatch prop updates, reducing code repetition across
+ * form components.
+ *
+ * Prefer this over calling `dispatch(updateProp(...))` directly to keep
+ * callers concise and consistently typed.
+ *
+ * @param dispatch - The Redux dispatch function from useAppDispatch hook.
+ * @param id - The prop ID to update.
+ * @param updates - The updates to merge into the prop (typed as Partial<CodeComponentProp>).
+ */
+export function dispatchUpdateProp(
+  dispatch: AppDispatch,
+  id: string,
+  updates: Partial<CodeComponentProp>,
+): void {
+  dispatch(updateProp({ id, updates }));
+}
+
+/**
+ * Returns true if the given value contains at least one non-empty array item.
+ *
+ * Pass `allowMultiple ? example : []` from components that conditionally
+ * operate in multi-value mode so the caller doesn't have to repeat the
+ * guard each time.
+ *
+ * @param example - The value to inspect (may or may not be an array).
+ */
+export function hasNonEmptyArrayValue(example: unknown): boolean {
+  const arr = Array.isArray(example) ? example : [];
+  return (arr as unknown[]).some(
+    (v) => v !== '' && v !== undefined && v !== null,
+  );
+}
+
+/**
  * Creates a display array for rendering multivalue props.
  *
  * @param example - The example value(s) from the prop.
@@ -52,6 +87,7 @@ export function createDisplayArray<T extends string | number>(
  * @param dispatch - Redux dispatch function
  * @param id - The prop ID
  * @param additionalUpdates - Optional additional updates to include in the dispatch
+ * @param onReorder - Optional callback invoked with (oldIndex, newIndex) after reorder
  * @returns A function that handles the drag end event
  */
 export function createArrayDragEndHandler<T extends string | number>(
@@ -59,6 +95,7 @@ export function createArrayDragEndHandler<T extends string | number>(
   dispatch: AppDispatch,
   id: CodeComponentProp['id'],
   additionalUpdates?: Partial<CodeComponentProp>,
+  onReorder?: (oldIndex: number, newIndex: number) => void,
 ) {
   return (event: DragEndEvent) => {
     const { active, over } = event;
@@ -75,6 +112,7 @@ export function createArrayDragEndHandler<T extends string | number>(
           updates: { example: newExample, ...additionalUpdates },
         }),
       );
+      onReorder?.(oldIndex, newIndex);
     }
   };
 }
