@@ -1445,6 +1445,8 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     // For integer/float field types the stored value is 0 (not NULL) to
     // mirror what the numeric UI input produces and avoid an
     // InvalidComponentException during preview rendering.
+    // For uri-reference field types the stored value is '' (not NULL)
+    // to provide a valid default value for required URL fields.
     // Note: the case where the client sends value=null for a required
     // integer/float prop is handled earlier in this method, before parsing.
     // @see ::buildComponentInstanceForm()
@@ -1453,14 +1455,16 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       if (
         !\array_key_exists($required_prop, $props)
         && \array_key_exists($required_prop, $this->configuration['prop_field_definitions'] ?? [])
-        && \in_array(
-          $this->configuration['prop_field_definitions'][$required_prop]['field_type'] ?? NULL,
-          ['integer', 'float'],
-          TRUE
-        )
       ) {
-        // Default to 0 so rendering receives a valid numeric value.
-        $props[$required_prop] = $this->collapse($this->uncollapse(0, $required_prop), $required_prop);
+        $field_type = $this->configuration['prop_field_definitions'][$required_prop]['field_type'] ?? NULL;
+        if (\in_array($field_type, ['integer', 'float'], TRUE)) {
+          // Default to 0 so rendering receives a valid numeric value.
+          $props[$required_prop] = $this->collapse($this->uncollapse(0, $required_prop), $required_prop);
+        }
+        elseif ($field_type === 'link') {
+          // Default to empty string so rendering receives a valid URL value.
+          $props[$required_prop] = $this->collapse($this->uncollapse('', $required_prop), $required_prop);
+        }
       }
     }
 
