@@ -427,6 +427,7 @@ export class ApiService {
    * Create a new page.
    */
   async createPage(page: {
+    uuid: string | null;
     title: string;
     description: string;
     status: boolean;
