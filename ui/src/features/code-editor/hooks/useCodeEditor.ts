@@ -23,7 +23,6 @@ import useAutoSave from '@/features/code-editor/hooks/useAutoSave';
 import useGetCodeEditorData from '@/features/code-editor/hooks/useGetCodeEditorData';
 import useSourceCode from '@/features/code-editor/hooks/useSourceCode';
 import { deserializeCodeComponent } from '@/features/code-editor/utils/utils';
-import { selectWasmStatus } from '@/features/ui/uiSlice';
 
 import type {
   AssetLibrary,
@@ -44,9 +43,6 @@ const useCodeEditor: () => {
     selectCodeComponentProperty('machineName'),
   );
 
-  const { isCssWasmAvailable, isJsWasmAvailable } =
-    useAppSelector(selectWasmStatus);
-
   // Get the code component and global asset library data.
   const {
     dataCodeComponent,
@@ -59,12 +55,16 @@ const useCodeEditor: () => {
     skip: requestedComponentId === loadedComponentId,
   });
 
-  const isAppLoaded = !isLoading && isJsWasmAvailable && isCssWasmAvailable;
-
-  // Initialize the code editor with the data.
+  // Initialize the code editor as soon as the data is loaded. We deliberately
+  // do NOT wait for the WASM compilers (SWC and Lightning CSS) here so that the
+  // source code shows up in the editors immediately. The WASM-ready guard lives
+  // in `useSourceCode` (no compilation runs before WASM is ready) and in
+  // `useAutoSave` (no auto-save fires before WASM is ready), which together
+  // prevent persisting empty `compiledJs` / `compiledCss` if the user navigates
+  // away before the compilers finish initializing.
   useEffect(() => {
     if (
-      !isAppLoaded ||
+      isLoading ||
       (!isLoading && !isSuccess) ||
       !dataCodeComponent ||
       !dataGlobalAssetLibrary ||
@@ -102,7 +102,6 @@ const useCodeEditor: () => {
     dataCodeComponent,
     dataGlobalAssetLibrary,
     dataBrandKit,
-    isAppLoaded,
     isLoading,
     isSuccess,
     dispatch,
@@ -121,7 +120,7 @@ const useCodeEditor: () => {
     };
   }, [dispatch]);
 
-  return { isLoading: !isAppLoaded };
+  return { isLoading };
 };
 
 export default useCodeEditor;

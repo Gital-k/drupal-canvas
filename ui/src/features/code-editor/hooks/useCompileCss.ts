@@ -11,17 +11,11 @@ import {
   compilePartialCss,
   compileCss as compileTailwindCss,
   extractClassNameCandidates,
-  lightningCssInit,
   transformCss,
 } from 'tailwindcss-in-browser';
-import lightningCssWasm from 'tailwindcss-in-browser/lightningcss_node.wasm?url';
 
 import { useAppDispatch } from '@/app/hooks';
 import { setWasmStatus } from '@/features/ui/uiSlice';
-import { getBaseUrl, getCanvasSettings } from '@/utils/drupal-globals';
-
-const CANVAS_MODULE_UI_PATH =
-  `${getBaseUrl()}${getCanvasSettings().canvasModulePath}/ui` as const;
 
 const useCompileCss = (): {
   extractClassNameCandidates: (markup: string) => string[];
@@ -39,26 +33,14 @@ const useCompileCss = (): {
   useEffect(() => {
     const initializeLightningCss = async () => {
       try {
-        // When served in production, the WASM asset URLs need to be relative
-        // to the Drupal web root, so we pass that in to the lightningCssInit()
-        // function.
-        if (import.meta.env.MODE === 'production') {
-          await lightningCssInit(
-            new URL(
-              `${CANVAS_MODULE_UI_PATH}/dist/assets/lightningcss_node.wasm`,
-              import.meta.url,
-            ),
-          );
-        } else {
-          await lightningCssInit(new URL(lightningCssWasm, import.meta.url));
-        }
+        await transformCss('/* canvas-css-wasm-init */', { minify: false });
         dispatch(setWasmStatus({ isCssWasmAvailable: true }));
       } catch (error) {
         console.error('Failed to initialize LightningCss:', error);
       }
     };
     initializeLightningCss();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [dispatch]);
 
   /**
    * Builds CSS with Tailwind CSS using class name candidates.
@@ -110,7 +92,7 @@ const useCompileCss = (): {
           },
         );
         // The CSS syntax needs to be transformed.
-        const transformedCss = transformCss(compiledCss);
+        const transformedCss = await transformCss(compiledCss);
         return { css: transformedCss };
       } catch (error) {
         console.error('Failed to compile Tailwind CSS:', error);
@@ -139,7 +121,7 @@ const useCompileCss = (): {
           configurationCss,
         );
         // The CSS syntax needs to be transformed.
-        const transformedComponentCss = transformCss(compiledComponentCss);
+        const transformedComponentCss = await transformCss(compiledComponentCss);
         return { css: transformedComponentCss };
       } catch (error) {
         console.error('Failed to compile component CSS:', error);

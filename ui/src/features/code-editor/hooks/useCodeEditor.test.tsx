@@ -17,6 +17,7 @@ import {
   updateSlot,
 } from '@/features/code-editor/codeEditorSlice';
 import useCodeEditor from '@/features/code-editor/hooks/useCodeEditor';
+import { setWasmStatus } from '@/features/ui/uiSlice';
 import {
   useGetAssetLibraryQuery,
   useGetAutoSaveQuery as useGetAutoSaveQueryAssetLibrary,
@@ -113,6 +114,12 @@ describe('useCodeEditor hook', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     store = makeStore({});
+    // The compile/auto-save flow is gated on the WASM compilers being ready
+    // (see `useSourceCode`). The compilers themselves are mocked, but the
+    // readiness flags live in `uiSlice` and default to false.
+    store.dispatch(
+      setWasmStatus({ isCssWasmAvailable: true, isJsWasmAvailable: true }),
+    );
 
     (useGetCodeComponentsQuery as ReturnType<typeof vi.fn>).mockReturnValue({
       currentData: [],
@@ -222,13 +229,17 @@ describe('useCodeEditor hook', () => {
       codeComponent: {
         sourceCodeCss: '/* source CSS */',
         sourceCodeJs: '// source JS',
-        compiledCss: '', // Needs to be re-compiled.
-        compiledJs: '', // Needs to be re-compiled.
+        // The previously compiled code is preserved as a last-known-good
+        // fallback so an auto-save triggered before the WASM compilers finish
+        // initializing pairs the user's source with valid compiled output
+        // instead of empty strings.
+        compiledCss: '/* compiled CSS */',
+        compiledJs: '// compiled JS',
       },
       globalAssetLibrary: {
         css: {
           original: '/* source CSS global */',
-          compiled: '', // Needs to be re-compiled.
+          compiled: '/* compiled CSS global */',
         },
       },
       status: {
@@ -379,13 +390,16 @@ describe('useCodeEditor hook', () => {
         ),
       });
     });
-    // No compiled JS to start with.
-    expect(store.getState().codeEditor.codeComponent.compiledJs).toBe('');
+    // The previously compiled JS is preserved as a last-known-good fallback
+    // until the next compilation produces fresh output.
+    expect(store.getState().codeEditor.codeComponent.compiledJs).toBe(
+      '// compiled JS',
+    );
     // Run timer to trigger compilation.
     await act(async () => {
       vi.advanceTimersByTime(1500);
     });
-    // We now have compiled JS.
+    // We still have compiled JS — now from a fresh compilation.
     expect(store.getState().codeEditor.codeComponent.compiledJs).toBe(
       '// compiled JS',
     );
@@ -530,8 +544,10 @@ describe('useCodeEditor hook', () => {
       });
     });
 
-    // No compiled JS to start with
-    expect(store.getState().codeEditor.codeComponent.compiledJs).toBe('');
+    // The previously compiled JS is preserved as a last-known-good fallback.
+    expect(store.getState().codeEditor.codeComponent.compiledJs).toBe(
+      '// compiled JS',
+    );
     expect(updateAutoSaveMutation).not.toHaveBeenCalled();
 
     // Create initial props
@@ -596,8 +612,10 @@ describe('useCodeEditor hook', () => {
       });
     });
 
-    // No compiled JS to start with
-    expect(store.getState().codeEditor.codeComponent.compiledJs).toBe('');
+    // The previously compiled JS is preserved as a last-known-good fallback.
+    expect(store.getState().codeEditor.codeComponent.compiledJs).toBe(
+      '// compiled JS',
+    );
     expect(updateAutoSaveMutation).not.toHaveBeenCalled();
 
     // Add a slot.

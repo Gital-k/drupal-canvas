@@ -50,7 +50,14 @@ const useSourceCode = (requestedComponentId: string): void => {
   const hasCompiledOnceRef = useRef(false);
   const needsAutoSaveOnFirstCompilationRef = useRef(false);
 
-  const { needsAutoSaveOnFirstCompilation } = useAppSelector(selectStatus);
+  const { needsAutoSaveOnFirstCompilation, needsAutoSave } =
+    useAppSelector(selectStatus);
+  // Tracked in a ref so we can read the latest value inside `compile()` without
+  // re-triggering the compile effect every time `needsAutoSave` flips.
+  const needsAutoSaveRef = useRef(false);
+  useEffect(() => {
+    needsAutoSaveRef.current = needsAutoSave;
+  }, [needsAutoSave]);
 
   const { isCssWasmAvailable, isJsWasmAvailable } =
     useAppSelector(selectWasmStatus);
@@ -104,6 +111,11 @@ const useSourceCode = (requestedComponentId: string): void => {
   const lastGlobalSourceCodeJSRef = useRef<string>('');
   const lastPropsRef = useRef<CodeComponentProp[]>([]);
   const lastSlotsRef = useRef<CodeComponentSlot[]>([]);
+  // Tracks the last `componentId` we seeded the refs above for. The first
+  // detection after a new component is loaded must NOT flip
+  // `hasUnsavedChanges` to true — it just reflects the loaded data, not a user
+  // edit. We seed the refs and skip the dispatch in that case.
+  const seededForComponentIdRef = useRef<string>('');
 
   // Set hasUnsavedChanges flag whenever source code changes
   useEffect(() => {
@@ -128,7 +140,8 @@ const useSourceCode = (requestedComponentId: string): void => {
       componentId &&
       sourceCodeChanged
     ) {
-      dispatch(setStatus({ hasUnsavedChanges: true }));
+      const isInitialSeedForComponent =
+        seededForComponentIdRef.current !== componentId;
       // Update the reference values
       lastSourceCodeJSRef.current = sourceCodeJS;
       lastSourceCodeCSSRef.current = sourceCodeCSS;
@@ -136,6 +149,10 @@ const useSourceCode = (requestedComponentId: string): void => {
       lastGlobalSourceCodeJSRef.current = globalSourceCodeJS;
       lastPropsRef.current = props;
       lastSlotsRef.current = slots;
+      seededForComponentIdRef.current = componentId;
+      if (!isInitialSeedForComponent) {
+        dispatch(setStatus({ hasUnsavedChanges: true }));
+      }
     }
   }, [
     sourceCodeJS,
@@ -198,10 +215,16 @@ const useSourceCode = (requestedComponentId: string): void => {
       // (These updates are automatically batched since React 18+.)
 
       // Set the code editor needing to auto-save if it's already set to
-      // auto-save or if it's not the first compilation.
+      // auto-save or if it's not the first compilation. Also preserve a
+      // pre-existing `needsAutoSave` state — that happens when the user makes
+      // edits before the WASM compilers finish initializing, in which case
+      // the first compile must trigger a save with the freshly-compiled output
+      // (otherwise the prior save with the previously-known-good compiled
+      // values would be the only thing persisted).
       const needsAutoSave =
         needsAutoSaveOnFirstCompilationRef.current ||
-        hasCompiledOnceRef.current;
+        hasCompiledOnceRef.current ||
+        needsAutoSaveRef.current;
       setHasCompiledOnce(true);
 
       dispatch(
