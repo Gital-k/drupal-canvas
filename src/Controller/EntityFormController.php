@@ -43,13 +43,11 @@ final class EntityFormController extends ControllerBase {
     $request = $this->requestStack->getCurrentRequest();
     $is_get = $request?->getMethod() === 'GET';
 
-    // On a cold-cache POST triggered by a remove button, FormBuilder rebuilds
-    // the form from scratch using the route entity (DB values only). For fields
-    // with unsaved auto-save additions this produces wrong items_count — the
-    // remove button for the extra delta doesn't exist in the rebuilt form.
-    // We detect this by checking the triggering element name and whether the
-    // form cache is cold, then load the auto-save entity so items_count is
-    // initialized correctly.
+    // On a cold-cache POST triggered by the add or remove button, FormBuilder
+    // rebuilds the form from scratch using the route entity - db values unaware
+    // of how they might deviate from the autosaved entity. This can potentially
+    // produce the wrong items_count. Here we identify these scenarios so we can
+    // engage special handling later in this process.
     $is_cold_remove_post = FALSE;
     $is_cold_add_more_post = FALSE;
     if (!$is_get && $request?->getMethod() === 'POST') {
@@ -91,13 +89,11 @@ final class EntityFormController extends ControllerBase {
 
     $form_state = $this->buildFormState($form, $form_entity, $entity_form_mode);
 
-    // On a cold-cache add-more POST, items_count gets initialized from
-    // count($items) on the DB entity — too low when auto-save has more items.
-    // We cannot swap the entity (that corrupts rendered field default values).
-    // Instead, count the submitted deltas directly from the POST data.
-    // items_count = submitted deltas - 1 because the form always renders one
-    // extra trailing empty row (delta = items_count), and addMoreSubmit will
-    // increment items_count by 1 after we set it.
+    // On an add-more POST request, where there's not yet a form cache,
+    // items_count is based on the entity saved in the DB, not the autosaved
+    // version available to us as $entity. This can result in items_count not
+    // reflecting the number of items in the autosaved entity. To address this,
+    // we count the submitted deltas directly from the POST data.
     if ($is_cold_add_more_post && $request !== NULL) {
       $input = $request->request->all();
       foreach ($entity->getFields() as $field_name => $field_items) {

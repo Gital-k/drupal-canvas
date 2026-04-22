@@ -205,7 +205,7 @@ export const InputBehaviorsComponentPropsForm = (
       // because at this point the form has loaded and the value will be
       // defined, it is required to satisfy type-checks.
       transforms === undefined ||
-      Object.efntries(transforms).length === 0 ||
+      Object.entries(transforms).length === 0 ||
       // Or if there are no transforms for this prop, don't bother with the
       // overhead of transforms.
       !(propName in transforms) ||
