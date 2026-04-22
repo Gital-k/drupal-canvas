@@ -121,7 +121,8 @@ const useCompileCss = (): {
           configurationCss,
         );
         // The CSS syntax needs to be transformed.
-        const transformedComponentCss = await transformCss(compiledComponentCss);
+        const transformedComponentCss =
+          await transformCss(compiledComponentCss);
         return { css: transformedComponentCss };
       } catch (error) {
         console.error('Failed to compile component CSS:', error);
