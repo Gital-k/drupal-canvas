@@ -218,3 +218,10 @@ services:
     public: false
     decorates: plugin.manager.block
     arguments: ['@.inner']
+  Drupal\canvas\Plugin\ComponentPluginManager:
+    decorates: plugin.manager.sdc
+    decoration_inner_name: canvas.component_plugin_manager.inner
+    decoration_priority: 0
+    parent: plugin.manager.sdc
+    arguments:
+      $decorated: '@canvas.component_plugin_manager.inner'
