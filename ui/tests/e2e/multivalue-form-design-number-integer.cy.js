@@ -483,7 +483,6 @@ configs.forEach((config) => {
         );
 
         cy.get(`@${config.fieldAlias}`).scrollIntoView();
-
         // Initially we have 2 items (one with value, one empty)
         cy.get(`@${config.fieldAlias}`)
           .find('tbody tr')

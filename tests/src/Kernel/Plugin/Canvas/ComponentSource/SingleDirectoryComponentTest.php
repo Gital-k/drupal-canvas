@@ -229,6 +229,7 @@ final class SingleDirectoryComponentTest extends GeneratedFieldExplicitInputUxCo
       'sdc.canvas_test_sdc.one_column',
       'sdc.canvas_test_sdc.props-no-slots',
       'sdc.canvas_test_sdc.props-slots',
+      'sdc.canvas_test_sdc.required-integer',
       'sdc.canvas_test_sdc.select-fields',
       'sdc.canvas_test_sdc.shoe_badge',
       'sdc.canvas_test_sdc.shoe_tab',
@@ -659,6 +660,17 @@ HTML,
           ],
         ],
       ],
+      'sdc.canvas_test_sdc.required-integer' => [
+        'html' => '<span>42</span>
+',
+        'cacheability' => $default_cacheability,
+        'attachments' => [
+          'library' => [
+            'core/components.canvas_test_sdc--required-integer',
+            'core/components.canvas_test_sdc--required-integer',
+          ],
+        ],
+      ],
       'sdc.canvas_test_sdc.crash' => [
         'html' => '<h1>test</h1>
 
@@ -1073,72 +1085,87 @@ HTML
       ],
       'sdc.canvas_test_sdc.multivalue-props' => [
         'html' => '<div data-testid="multivalue-props-component">
+  <h2>Text</h2>
       <div data-testid="text-component">
       <ul id="text-list">
                   <li>Hello World</li>
                   <li>Sample Text</li>
               </ul>
     </div>
-        <div data-testid="text-limited-component">
+    <h2>Text Limited</h2>
+      <div data-testid="text-limited-component">
       <ul id="text-limited-list">
                   <li>Hello World</li>
                   <li>Sample Text</li>
               </ul>
     </div>
-        <div data-testid="text-required-component">
+    <h2>Text Required</h2>
+      <div data-testid="text-required-component">
       <ul id="text-required-list">
                   <li>Required Text 1</li>
                   <li>Required Text 2</li>
               </ul>
     </div>
-        <div data-testid="link-component">
+    <h2>Link</h2>
+      <div data-testid="link-component">
       <ul id="link-list">
                   <li><a href="https://drupal.org">https://drupal.org</a></li>
                   <li><a href="https://example.com">https://example.com</a></li>
               </ul>
     </div>
-        <div data-testid="link-limited-component">
+    <h2>Link Limited</h2>
+      <div data-testid="link-limited-component">
       <ul id="link-limited-list">
                   <li><a href="https://drupal.org">https://drupal.org</a></li>
                   <li><a href="https://example.com">https://example.com</a></li>
               </ul>
     </div>
-        <div data-testid="relative_link-component">
+    <h2>Relative Link</h2>
+      <div data-testid="relative_link-component">
       <ul id="relative-link-list">
                   <li><a href="/about">/about</a></li>
                   <li><a href="/contact">/contact</a></li>
               </ul>
     </div>
-        <div data-testid="relative_link-limited-component">
+    <h2>Relative Link Limited</h2>
+      <div data-testid="relative_link-limited-component">
       <ul id="relative-link-limited-list">
                   <li><a href="/about">/about</a></li>
                   <li><a href="/contact">/contact</a></li>
               </ul>
     </div>
-        <div data-testid="number-component">
+    <h2>Number</h2>
+      <div data-testid="number-component">
       <ul id="number-list">
                   <li>42</li>
                   <li>100</li>
               </ul>
     </div>
-        <div data-testid="number-limited-component">
+    <h2>Number Limited</h2>
+      <div data-testid="number-limited-component">
       <ul id="number-limited-list">
                   <li>42</li>
                   <li>100</li>
               </ul>
     </div>
-        <div data-testid="integer-component">
+    <h2>Integer</h2>
+      <div data-testid="integer-component">
       <ul id="integer-list">
                   <li>7</li>
                   <li>14</li>
               </ul>
     </div>
-        <div data-testid="integer-limited-component">
+    <h2>Integer Limited</h2>
+      <div data-testid="integer-limited-component">
       <ul id="integer-limited-list">
                   <li>7</li>
                   <li>14</li>
               </ul>
     </div>
+    <h2>Datetime</h2>
+    <h2>Datetime Limited</h2>
+    <h2>Date</h2>
+    <h2>Date Limited</h2>
 
 </div>
 ',
@@ -2756,6 +2783,23 @@ HTML
           ],
         ],
       ],
+      'sdc.canvas_test_sdc.required-integer' => [
+        'prop_field_definitions' => [
+          'count' => [
+            'required' => TRUE,
+            'field_type' => 'integer',
+            'field_storage_settings' => [],
+            'field_instance_settings' => [],
+            'field_widget' => 'number',
+            'default_value' => [
+              0 => [
+                'value' => 42,
+              ],
+            ],
+            'expression' => 'ℹ︎integer␟value',
+          ],
+        ],
+      ],
       'sdc.canvas_test_sdc.select-fields' => [
         'prop_field_definitions' => [
           'size' => [
@@ -3360,6 +3404,12 @@ HTML
         ],
       ],
       'sdc.canvas_test_sdc.props-slots' => [
+        'module' => [
+          'core',
+          'canvas_test_sdc',
+        ],
+      ],
+      'sdc.canvas_test_sdc.required-integer' => [
         'module' => [
           'core',
           'canvas_test_sdc',
@@ -5819,6 +5869,32 @@ HTML
         ],
         'transforms' => [],
       ],
+      'sdc.canvas_test_sdc.required-integer' => [
+        'expected_output_selectors' => [
+          'span:contains("42")',
+        ],
+        'source' => 'Module component',
+        'metadata' => ['slots' => []],
+        'propSources' => [
+          'count' => [
+            'required' => TRUE,
+            'jsonSchema' => [
+              'type' => 'integer',
+            ],
+            'sourceType' => 'static:field_item:integer',
+            'expression' => 'ℹ︎integer␟value',
+            'default_values' => [
+              'source' => [
+                0 => [
+                  'value' => 42,
+                ],
+              ],
+              'resolved' => 42,
+            ],
+          ],
+        ],
+        'transforms' => [],
+      ],
       'sdc.canvas_test_sdc.select-fields' => [
         'expected_output_selectors' => [
           ':contains("medium")',
@@ -6927,6 +7003,69 @@ HTML
     );
     $this->assertArrayHasKey('data', $input, 'A required multi-cardinality prop cleared by the user should still be stored (as []) for graceful degradation.');
     $this->assertSame([], $input['data']);
+  }
+
+  /**
+   * Tests clientModelToInput() defaults to zero for required integer props.
+   *
+   * When a single-cardinality required integer (or float) prop has its value
+   * cleared by the user (value=NULL sent from the Canvas UI), or when the prop
+   * key is omitted from 'source' entirely, ::clientModelToInput() must default
+   * the value to 0. This mirrors what the numeric UI input does on the
+   * client side, ensures the component always receives a valid numeric value,
+   * and prevents an InvalidComponentException during preview rendering.
+   * The prop must still appear in the returned array so that
+   * ::buildComponentInstanceForm() can render the form without triggering the
+   * assertion that guarantees every required prop has an entry in $inputValues.
+   *
+   * @see https://www.drupal.org/project/canvas/issues/3583639
+   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::clientModelToInput()
+   */
+  public function testClientModelToInputDefaultsToZeroForRequiredIntegerProp(): void {
+    $this->generateComponentConfig();
+
+    $component = Component::load('sdc.canvas_test_sdc.required-integer');
+    $this->assertInstanceOf(Component::class, $component);
+
+    // Case 1: client sends value=null (user cleared the integer input).
+    // The pre-parse fix sets the value to 0 so the prop flows through
+    // normally and is stored with value 0 instead of being skipped.
+    $clientModel = [
+      'source' => [
+        'count' => [
+          'sourceType' => 'static:field_item:integer',
+          'expression' => 'ℹ︎integer␟value',
+          'value' => NULL,
+        ],
+      ],
+      'resolved' => [
+        'count' => NULL,
+      ],
+    ];
+
+    $input = $component->getComponentSource()->clientModelToInput(
+      'a-uuid-for-testing',
+      $component,
+      $clientModel,
+      NULL,
+    );
+    $this->assertArrayHasKey('count', $input, 'Case 1: A required single-cardinality integer prop with value=null must appear in the result with value 0.');
+    $this->assertSame(0, $input['count']);
+
+    // Case 2: client omits the prop key from 'source' entirely.
+    $clientModelMissingProp = [
+      'source' => [],
+      'resolved' => [],
+    ];
+
+    $inputMissingProp = $component->getComponentSource()->clientModelToInput(
+      'a-uuid-for-testing',
+      $component,
+      $clientModelMissingProp,
+      NULL,
+    );
+    $this->assertArrayHasKey('count', $inputMissingProp, 'Case 2: A required prop absent from source entirely must appear in the result with value 0 so ::buildComponentInstanceForm() can render without a 500.');
+    $this->assertSame(0, $inputMissingProp['count']);
   }
 
   public function alter(ContainerBuilder $container): void {

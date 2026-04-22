@@ -2,7 +2,10 @@ import fs from 'fs/promises';
 import { loadComponentsMetadata } from '@drupal-canvas/discovery';
 
 import { authoredSpecToComponentTree } from './pages';
-import { serializeElementMapForServer } from './prop-transforms';
+import {
+  collectUnreconciledMediaProps,
+  serializeElementMapForServer,
+} from './prop-transforms';
 import { processInPool } from './request-pool';
 
 import type { DiscoveredPage, DiscoveryResult } from '@drupal-canvas/discovery';
@@ -10,6 +13,16 @@ import type { AuthoredSpecElementMap } from 'drupal-canvas/json-render-utils';
 import type { ApiService } from '../services/api';
 import type { Page, PageListItem } from '../types/Page';
 import type { Result } from '../types/Result';
+
+export interface PendingMediaReconciliation {
+  index: number;
+  title: string;
+  filePath: string;
+  elementId: string;
+  propName: string;
+  src: string;
+  mediaType: string;
+}
 
 export interface PagePushResult {
   title: string;
@@ -19,8 +32,13 @@ export interface PagePushResult {
 export interface PreparedPage {
   uuid: string | null;
   title: string;
+  description: string;
+  path: string;
   components: Page['components'];
   filePath: string;
+  pendingMediaReconciliations: Array<
+    Omit<PendingMediaReconciliation, 'index' | 'title' | 'filePath'>
+  >;
 }
 
 /**
@@ -34,6 +52,7 @@ export async function preparePages(
 ): Promise<{
   valid: Array<{ index: number; result: PreparedPage }>;
   failed: Array<{ index: number; error: Error }>;
+  pendingMediaReconciliations: PendingMediaReconciliation[];
 }> {
   const componentMetadata = await loadComponentsMetadata(discoveryResult);
 
@@ -41,8 +60,14 @@ export async function preparePages(
     const fileContent = await fs.readFile(localPage.path, 'utf-8');
     const spec = JSON.parse(fileContent) as {
       title: string;
+      description?: string;
+      path?: string;
       elements: AuthoredSpecElementMap;
     };
+    const pendingMediaReconciliations = collectUnreconciledMediaProps(
+      spec.elements ?? {},
+      componentMetadata,
+    );
     const elements = serializeElementMapForServer(
       spec.elements ?? {},
       componentMetadata,
@@ -51,8 +76,11 @@ export async function preparePages(
     return {
       uuid: localPage.uuid,
       title: spec.title,
+      description: spec.description ?? '',
+      path: spec.path ?? '',
       components,
       filePath: localPage.path,
+      pendingMediaReconciliations,
     };
   });
 
@@ -63,6 +91,16 @@ export async function preparePages(
     failed: results
       .filter((r) => !r.success)
       .map((r) => ({ index: r.index, error: r.error! })),
+    pendingMediaReconciliations: results
+      .filter((r) => r.success && r.result)
+      .flatMap((r) =>
+        r.result!.pendingMediaReconciliations.map((entry) => ({
+          index: r.index,
+          title: r.result!.title,
+          filePath: r.result!.filePath,
+          ...entry,
+        })),
+      ),
   };
 }
 
@@ -89,16 +127,18 @@ export async function pushPages(
     if (remotePage) {
       await apiService.updatePage(remotePage.id, {
         title: page.title,
+        description: page.description,
         status: remotePage.status,
-        path: remotePage.path,
+        path: page.path,
         components: page.components,
       });
       return { title: page.title, operation: 'Updated' as const };
     } else {
       const created = await apiService.createPage({
         title: page.title,
+        description: page.description,
         status: false,
-        path: '',
+        path: page.path,
         components: page.components,
       });
       // Write the server-assigned UUID back into the local file.

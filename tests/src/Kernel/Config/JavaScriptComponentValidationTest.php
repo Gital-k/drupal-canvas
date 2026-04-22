@@ -188,7 +188,7 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
   }
 
   #[DataProvider('providerInvalidEnumsAndExamples')]
-  public function testInvalidEnumsAndExamples(string $json_schema_type, array $enum_and_examples_both, ?array $meta_enum, array $indexed_validation_errors, array $expected_validation_errors = []): void {
+  public function testInvalidEnumsAndExamples(string $json_schema_type, array $enum_and_examples_both, ?array $meta_enum, array $indexed_validation_errors, array $expected_validation_errors): void {
     $this->entity->set('props', [
       'tested_enum_prop' => array_merge([
         'type' => $json_schema_type,
@@ -377,6 +377,22 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
         'title' => 'Links',
         'items' => ['type' => 'string', 'format' => 'uri-reference'],
         'examples' => [['/foo', '/bar']],
+      ],
+      [],
+    ];
+    yield 'Valid: string array with enum' => [
+      [
+        'type' => 'array',
+        'title' => 'Red or blue',
+        'items' => [
+          'type' => 'string',
+          'enum' => ['red', 'blue'],
+          'meta:enum' => [
+            'red' => 'Red',
+            'blue' => 'Blue',
+          ],
+        ],
+        'examples' => [['red', 'red', 'blue']],
       ],
       [],
     ];

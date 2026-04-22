@@ -8,6 +8,7 @@ import { useAppDispatch } from '@/app/hooks';
 import { removeFieldValue } from '@/features/form/formStateSlice';
 
 import {
+  dispatchSyntheticChange,
   isRemoveButtonEnabled,
   triggerDrupalRemoveButton,
 } from './multivalueFormUtils';
@@ -68,19 +69,23 @@ const formatTimeForDisplay = (value: string): string => {
 const DrupalDatetimeMultivalueForm = ({
   children,
   fieldLabel = '',
-  formId,
 }: {
   children?: React.ReactNode;
   fieldLabel?: string;
-  formId?: string;
 }) => {
   const dispatch = useAppDispatch();
   const triggerRowRef = useRef<HTMLDivElement | null>(null);
+  const triggerButtonRef = useRef<HTMLButtonElement | null>(null);
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [displayDate, setDisplayDate] = useState('');
   const [displayTime, setDisplayTime] = useState('');
-  // Tracks whether a time input exists — derived from the real DOM via the
-  // useEffect below rather than queried at render time, so it is stable across
+  const valueAtOpenRef = useRef<{ date: string; time: string }>({
+    date: '',
+    time: '',
+  });
+  const shouldRevertOnCloseRef = useRef(true);
+  // Tracks whether a time input exists — derived from the real DOM via
+  // useEffect  rather than queried at render time, so it is stable across
   // renders and correct before the popover container is first populated.
   const [hasTime, setHasTime] = useState(false);
 
@@ -90,6 +95,31 @@ const DrupalDatetimeMultivalueForm = ({
   // available.
   const [popoverContainer, setPopoverContainer] =
     useState<HTMLDivElement | null>(null);
+
+  // Returns the date input from the popover container, or null.
+  const getDateInput = (): HTMLInputElement | null =>
+    popoverContainer?.querySelector('input[type="date"]') ?? null;
+
+  // Returns the time input from the popover container, or null.
+  const getTimeInput = (): HTMLInputElement | null =>
+    popoverContainer?.querySelector('input[type="time"]') ?? null;
+
+  const setPopoverOpenAndRefocus = (open: boolean) => {
+    setPopoverOpen(open);
+    if (!open) {
+      setTimeout(() => triggerButtonRef.current?.focus(), 30);
+    }
+  };
+
+  const pausePreviewUpdates = () => {
+    getDateInput()?.setAttribute('data-canvas-stage-changes', 'true');
+    getTimeInput()?.setAttribute('data-canvas-stage-changes', 'true');
+  };
+
+  const resumePreviewUpdates = () => {
+    getDateInput()?.removeAttribute('data-canvas-stage-changes');
+    getTimeInput()?.removeAttribute('data-canvas-stage-changes');
+  };
 
   // Read initial values from the inputs once the popover container is in the DOM.
   useEffect(() => {
@@ -106,17 +136,15 @@ const DrupalDatetimeMultivalueForm = ({
     setDisplayTime(timeInput?.value || timeInput?.defaultValue || '');
     setHasTime(!!timeInput);
   }, [popoverContainer]);
-
-  // Returns the date input from the popover container, or null.
-  const getDateInput = (): HTMLInputElement | null =>
-    popoverContainer?.querySelector('input[type="date"]') ?? null;
-
-  // Returns the time input from the popover container, or null.
-  const getTimeInput = (): HTMLInputElement | null =>
-    popoverContainer?.querySelector('input[type="time"]') ?? null;
-
-  // Handle Enter key press in popover inputs.
+  // Handle Enter and Escape key presses in popover inputs.
   const handleKeyDown = (e: React.KeyboardEvent<HTMLElement>) => {
+    // Handle Escape key to close popover without committing changes
+    if (e.key === 'Escape') {
+      shouldRevertOnCloseRef.current = true;
+      handlePopoverOpenChange(false);
+      return;
+    }
+
     if (e.key !== 'Enter') return;
 
     e.preventDefault();
@@ -129,66 +157,90 @@ const DrupalDatetimeMultivalueForm = ({
     const timeInput = getTimeInput();
     setDisplayDate(dateInput?.value ?? '');
     setDisplayTime(timeInput?.value ?? '');
-    setPopoverOpen(false);
+    shouldRevertOnCloseRef.current = false;
+
+    resumePreviewUpdates();
+
+    // Dispatch synthetic change events so the preview handler sees the new values.
+    setTimeout(() => {
+      if (dateInput) dispatchSyntheticChange(dateInput, dateInput.value);
+      if (timeInput) dispatchSyntheticChange(timeInput, timeInput.value);
+      handlePopoverOpenChange(false);
+    });
   };
 
   const handlePopoverOpenChange = (open: boolean) => {
-    if (!open) {
-      // Cancel any in-progress edit: reset the real inputs back to the last
-      // committed display values so the form doesn't submit uncommitted data.
+    if (open) {
+      pausePreviewUpdates();
+      shouldRevertOnCloseRef.current = true;
       const dateInput = getDateInput();
       const timeInput = getTimeInput();
-      if (dateInput) dateInput.value = displayDate;
-      if (timeInput) timeInput.value = displayTime;
+      valueAtOpenRef.current = {
+        date: dateInput?.value ?? displayDate,
+        time: timeInput?.value ?? displayTime,
+      };
+      setTimeout(() => {
+        const firstInput = dateInput || timeInput;
+        firstInput?.focus();
+      }, 0);
+    } else if (shouldRevertOnCloseRef.current) {
+      // Cancel any in-progress edit: reset inputs back to the values at open.
+      const dateInput = getDateInput();
+      const timeInput = getTimeInput();
+      if (dateInput)
+        dispatchSyntheticChange(dateInput, valueAtOpenRef.current.date);
+      if (timeInput)
+        dispatchSyntheticChange(timeInput, valueAtOpenRef.current.time);
     }
-    setPopoverOpen(open);
+    setPopoverOpenAndRefocus(open);
+    if (!open) {
+      resumePreviewUpdates();
+      shouldRevertOnCloseRef.current = true;
+    }
   };
 
   const handleRemove = (e: React.MouseEvent) => {
     e.preventDefault();
-    // Close the popover first so the portal is cleaned up before AJAX replaces the DOM.
-    setPopoverOpen(false);
+    const triggerElement = triggerRowRef.current;
+    if (!triggerElement) return;
+    setPopoverOpenAndRefocus(false);
+    resumePreviewUpdates();
+    setTimeout(() => {
+      const dateInput = getDateInput();
+      const { name } = dateInput || {};
 
-    if (!triggerRowRef.current) return;
-
-    const dateInput = getDateInput();
-    const { name } = dateInput || {};
-
-    // Try to trigger the Drupal remove button.
-    const removeButtonName: string | null = triggerDrupalRemoveButton(
-      triggerRowRef.current,
-    );
-
-    if (removeButtonName && name && formId) {
-      const fieldNames: string[] = [name];
-
-      // Add the time field name if it exists (replace [date] with [time])
-      if (name.includes('[date]')) {
-        const timeName = name.replace('[date]', '[time]');
-        fieldNames.push(timeName);
-      }
-
-      // Add the weight field (replace [value][date] with [_weight])
-      if (name.includes('[value][date]')) {
-        const weightName = name.replace('[value][date]', '[_weight]');
-        fieldNames.push(weightName);
-      }
-
-      // Add the remove button name
-      fieldNames.push(removeButtonName);
-
-      dispatch(
-        removeFieldValue({
-          formId: formId as any,
-          fieldName: fieldNames,
-        }),
+      const removeButtonName: string | null = triggerDrupalRemoveButton(
+        triggerRowRef.current,
       );
-      return;
-    }
+      const formId = dateInput?.getAttribute('data-form-id');
+      console.log('form id', formId);
+      if (removeButtonName && name && formId) {
+        const fieldNames: string[] = [name];
 
-    // Fallback: no Drupal remove button, clear display.
-    setDisplayDate('');
-    setDisplayTime('');
+        // Add the time field name if it exists (replace [date] with [time])
+        if (name.includes('[date]')) {
+          const timeName = name.replace('[date]', '[time]');
+          fieldNames.push(timeName);
+        }
+
+        // Add the weight field (replace [value][date] with [_weight])
+        if (name.includes('[value][date]')) {
+          const weightName = name.replace('[value][date]', '[_weight]');
+          fieldNames.push(weightName);
+        }
+
+        // Add the remove button name
+        fieldNames.push(removeButtonName);
+
+        dispatch(
+          removeFieldValue({
+            formId: formId as any,
+            fieldName: fieldNames,
+          }),
+        );
+        return;
+      }
+    });
   };
 
   // Build the combined display value.
@@ -214,6 +266,7 @@ const DrupalDatetimeMultivalueForm = ({
           {/* List Item View - Trigger */}
           <Popover.Trigger asChild>
             <button
+              ref={triggerButtonRef}
               className={styles.listItem}
               type="button"
               aria-label={`Edit ${fieldLabel}: ${combinedDisplayValue}`}
@@ -230,8 +283,7 @@ const DrupalDatetimeMultivalueForm = ({
           </Popover.Trigger>
         </Flex>
 
-        {/* Edit Popover — forceMount keeps the real inputs in the DOM for
-            form submission even when the popover is closed. */}
+        {/* Edit Popover */}
         <Popover.Content
           forceMount={true}
           ref={setPopoverContainer}

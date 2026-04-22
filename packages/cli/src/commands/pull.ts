@@ -15,12 +15,13 @@ import {
   updateBrandKitConfig,
   variantKey,
 } from '../lib/fonts/font-pull.js';
-import { createApiService } from '../services/api';
+import { createApiService, ensureAuthConfig } from '../services/api';
 import {
   parseBooleanOption,
   pluralizeComponent,
   updateConfigFromOptions,
 } from '../utils/command-helpers';
+import { ensureTailwindImportAtTop } from '../utils/ensure-global-css-tailwind-import';
 import { pageToAuthoredSpec } from '../utils/pages';
 import { reportResults } from '../utils/report-results';
 
@@ -41,6 +42,7 @@ interface PullOptions {
   siteUrl?: string;
   scope?: string;
   includePages?: boolean;
+  includeBrandKit?: boolean;
   dir?: string;
   yes?: boolean;
   skipOverwrite?: boolean;
@@ -402,7 +404,8 @@ export function createAssetsPullTask(
           });
         } else {
           await fs.mkdir(path.dirname(globalCssPath), { recursive: true });
-          await fs.writeFile(globalCssPath, globalCss, 'utf-8');
+          const outputCss = ensureTailwindImportAtTop(globalCss);
+          await fs.writeFile(globalCssPath, outputCss, 'utf-8');
           results.push({ itemName: 'global.css', success: true });
         }
       } catch (error) {
@@ -512,7 +515,7 @@ export function pullCommand(program: Command): void {
   program
     .command('pull')
     .description(
-      'pull components, global CSS, fonts, and optional pages from Drupal',
+      'pull components, global CSS, and optional fonts and pages from Drupal',
     )
     .option('--client-id <id>', 'Client ID')
     .option('--client-secret <secret>', 'Client Secret')
@@ -527,6 +530,15 @@ export function pullCommand(program: Command): void {
         .argParser(parseBooleanOption)
         .default(undefined),
     )
+    .addOption(
+      new Option(
+        '--include-brand-kit [enabled]',
+        'Include brand kit (fonts) in the pull operation',
+      )
+        .preset('true')
+        .argParser(parseBooleanOption)
+        .default(undefined),
+    )
     .option('-d, --dir <directory>', 'Component directory')
     .option('-y, --yes', 'Skip all confirmation prompts')
     .option('--skip-overwrite', 'Skip pulling items that already exist locally')
@@ -536,22 +548,19 @@ export function pullCommand(program: Command): void {
       try {
         updateConfigFromOptions(options);
 
-        await ensureConfig([
-          'siteUrl',
-          'clientId',
-          'clientSecret',
-          'scope',
-          'componentDir',
-        ]);
+        await ensureAuthConfig();
+        await ensureConfig(['componentDir']);
 
         const config = getConfig();
         const apiService = await createApiService();
         const includesPages = config.includePages;
+        const includesBrandKit = config.includeBrandKit;
 
         const s = p.spinner();
-        const contentLabel = includesPages
-          ? 'components, global CSS, fonts, and pages'
-          : 'components, global CSS, and fonts';
+        const contentParts: string[] = ['components', 'global CSS'];
+        if (includesBrandKit) contentParts.push('fonts');
+        if (includesPages) contentParts.push('pages');
+        const contentLabel = contentParts.join(', ');
 
         // Build pull tasks.
         const projectRoot = process.cwd();
@@ -566,8 +575,11 @@ export function pullCommand(program: Command): void {
             resolveHostGlobalCssPath(projectRoot),
             options.skipOverwrite ?? false,
           ),
-          createFontsPullTask(apiService, projectRoot),
         ];
+
+        if (includesBrandKit) {
+          tasks.push(createFontsPullTask(apiService, projectRoot));
+        }
 
         if (includesPages) {
           tasks.push(
