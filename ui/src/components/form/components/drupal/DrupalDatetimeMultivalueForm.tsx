@@ -13,7 +13,9 @@ import useInputUIData from '@/hooks/useInputUIData';
 import { useUpdateComponentMutation } from '@/services/preview';
 
 import {
+  buildModelWithItemRemoved,
   dispatchSyntheticChange,
+  extractPositionFromFieldName,
   isRemoveButtonEnabled,
   triggerDrupalRemoveButton,
 } from './multivalueFormUtils';
@@ -244,40 +246,22 @@ const DrupalDatetimeMultivalueForm = ({
         // Add the remove button name
         fieldNames.push(removeButtonName);
         // If this is a component, update the model to reflect the removal
-        // immediately.
+        // immediately, then fire the actual Drupal AJAX click.
         if (formId === 'component_instance_form') {
           const propName = toPropName(name, inputUIData.selectedComponent);
-          let position: number | null = null;
-          if (propName && name) {
-            const propNamePattern = `\\[${propName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\]`;
-            const match = name.match(
-              new RegExp(propNamePattern + '\\[(\\d+)\\]'),
-            );
-            if (match && match[1]) {
-              position = parseInt(match[1], 10);
-            }
-          }
+          const position = extractPositionFromFieldName(name, propName);
           const model = inputUIData.model?.[inputUIData.selectedComponent];
           if (!model || !isEvaluatedComponentModel(model)) {
             return;
           }
-          const oldValue = model?.resolved?.[propName] || [];
-          // @ts-ignore
-          const thisValue = [...oldValue];
-          thisValue.splice(position || 0, 1);
           patchComponent({
             type: editorFrameContext,
             componentInstanceUuid: inputUIData.selectedComponent,
             componentType: `${inputUIData.selectedComponentType}@${inputUIData.version}`,
-            model: {
-              ...model,
-              source: model.source,
-              resolved: {
-                ...model.resolved,
-                [propName]: thisValue,
-              },
-            },
+            model: buildModelWithItemRemoved(model, propName, position ?? 0),
           });
+          // Second call: now that the model is patched, invoke the real
+          // Drupal AJAX click (no formId passed so the click is not suppressed).
           triggerDrupalRemoveButton(triggerRowRef.current);
         }
 
