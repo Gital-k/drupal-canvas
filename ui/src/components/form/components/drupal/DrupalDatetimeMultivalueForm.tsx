@@ -4,8 +4,13 @@ import { ArrowRightIcon, Cross2Icon, TrashIcon } from '@radix-ui/react-icons';
 import * as Popover from '@radix-ui/react-popover';
 import { Button, Flex, Text } from '@radix-ui/themes';
 
-import { useAppDispatch } from '@/app/hooks';
+import { useAppDispatch, useAppSelector } from '@/app/hooks';
+import { toPropName } from '@/components/form/formUtil';
 import { removeFieldValue } from '@/features/form/formStateSlice';
+import { isEvaluatedComponentModel } from '@/features/layout/layoutModelSlice';
+import { selectEditorFrameContext } from '@/features/ui/uiSlice';
+import useInputUIData from '@/hooks/useInputUIData';
+import { useUpdateComponentMutation } from '@/services/preview';
 
 import {
   dispatchSyntheticChange,
@@ -74,11 +79,18 @@ const DrupalDatetimeMultivalueForm = ({
   fieldLabel?: string;
 }) => {
   const dispatch = useAppDispatch();
+  const inputUIData = useInputUIData();
+  const [patchComponent] = useUpdateComponentMutation({
+    fixedCacheKey: inputUIData?.selectedComponent || '-',
+  });
+  const editorFrameContext = useAppSelector(selectEditorFrameContext);
+
   const triggerRowRef = useRef<HTMLDivElement | null>(null);
   const triggerButtonRef = useRef<HTMLButtonElement | null>(null);
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [displayDate, setDisplayDate] = useState('');
   const [displayTime, setDisplayTime] = useState('');
+  const [itemExists, setItemExists] = useState(true);
   const valueAtOpenRef = useRef<{ date: string; time: string }>({
     date: '',
     time: '',
@@ -208,12 +220,12 @@ const DrupalDatetimeMultivalueForm = ({
     setTimeout(() => {
       const dateInput = getDateInput();
       const { name } = dateInput || {};
+      const formId = dateInput?.getAttribute('data-form-id');
 
       const removeButtonName: string | null = triggerDrupalRemoveButton(
         triggerRowRef.current,
+        formId as string,
       );
-      const formId = dateInput?.getAttribute('data-form-id');
-      console.log('form id', formId);
       if (removeButtonName && name && formId) {
         const fieldNames: string[] = [name];
 
@@ -231,6 +243,43 @@ const DrupalDatetimeMultivalueForm = ({
 
         // Add the remove button name
         fieldNames.push(removeButtonName);
+        // If this is a component, update the model to reflect the removal
+        // immediately.
+        if (formId === 'component_instance_form') {
+          const propName = toPropName(name, inputUIData.selectedComponent);
+          let position: number | null = null;
+          if (propName && name) {
+            const propNamePattern = `\\[${propName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\]`;
+            const match = name.match(
+              new RegExp(propNamePattern + '\\[(\\d+)\\]'),
+            );
+            if (match && match[1]) {
+              position = parseInt(match[1], 10);
+            }
+          }
+          const model = inputUIData.model?.[inputUIData.selectedComponent];
+          if (!model || !isEvaluatedComponentModel(model)) {
+            return;
+          }
+          const oldValue = model?.resolved?.[propName] || [];
+          // @ts-ignore
+          const thisValue = [...oldValue];
+          thisValue.splice(position || 0, 1);
+          patchComponent({
+            type: editorFrameContext,
+            componentInstanceUuid: inputUIData.selectedComponent,
+            componentType: `${inputUIData.selectedComponentType}@${inputUIData.version}`,
+            model: {
+              ...model,
+              source: model.source,
+              resolved: {
+                ...model.resolved,
+                [propName]: thisValue,
+              },
+            },
+          });
+          triggerDrupalRemoveButton(triggerRowRef.current);
+        }
 
         dispatch(
           removeFieldValue({
@@ -238,7 +287,11 @@ const DrupalDatetimeMultivalueForm = ({
             fieldName: fieldNames,
           }),
         );
-        return;
+        const row = triggerRowRef.current?.closest('tr');
+        if (row) {
+          row.hidden = true;
+        }
+        setItemExists(false);
       }
     });
   };
@@ -253,6 +306,10 @@ const DrupalDatetimeMultivalueForm = ({
     }
     return 'Empty';
   })();
+
+  if (!itemExists) {
+    return null;
+  }
 
   return (
     <div style={{ display: 'contents' }}>

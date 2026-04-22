@@ -370,6 +370,28 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     };
 
     $values = $item->getInputs() ?? [];
+
+    // Populate missing multivalue properties as empty arrays
+    if (isset($this->configuration['prop_field_definitions'])) {
+      foreach ($this->configuration['prop_field_definitions'] as $prop_name => $definition) {
+        // Skip if already present in inputs
+        if (array_key_exists($prop_name, $values)) {
+          continue;
+        }
+        // Check if this is a multivalue field (cardinality -1 = unlimited, >1 = limited multivalue)
+        $cardinality = $definition['cardinality'] ?? 1;
+        if ($cardinality === -1 || $cardinality > 1) {
+          // Represent the absence of values as an empty array for multivalue fields
+          $values[$prop_name] = $this->getDefaultStaticPropSource($prop_name, FALSE)->toArray();
+          $values[$prop_name]['value'] = [];
+          \Drupal::logger('canvas')->debug('getExplicitInput line 395 - Added empty array for missing multivalue prop @prop with cardinality @cardinality', [
+            '@prop' => $prop_name,
+            '@cardinality' => $cardinality,
+          ]);
+        }
+      }
+    }
+
     $resolved_values = [];
     foreach ($values as $prop => $input) {
       $values[$prop] = $this->uncollapse($input, $prop)->toArray();

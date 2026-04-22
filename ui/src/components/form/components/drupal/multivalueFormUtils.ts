@@ -73,6 +73,7 @@ export const isRemoveButtonEnabled = (
  */
 export const triggerDrupalRemoveButton = (
   triggerElement: HTMLElement | null,
+  formId: string | null = '',
 ): string | null => {
   if (!triggerElement) return null;
 
@@ -92,16 +93,19 @@ export const triggerDrupalRemoveButton = (
       'input[type="submit"][data-once="drupal-ajax"]',
     ) as HTMLInputElement | null;
     if (removeButton) {
+      if (formId !== 'component_instance_form') {
+        // Dispatch mousedown first (some Drupal AJAX handlers listen for it),
+        // then click — mirroring what Drupal's AJAX system expects.
+        const mousedownEvent = new MouseEvent('mousedown', {
+          bubbles: true,
+          cancelable: true,
+          view: window,
+        });
+        removeButton.dispatchEvent(mousedownEvent);
+        removeButton.click();
+      }
       const buttonName = removeButton.getAttribute('name');
-      // Dispatch mousedown first (some Drupal AJAX handlers listen for it),
-      // then click — mirroring what Drupal's AJAX system expects.
-      const mousedownEvent = new MouseEvent('mousedown', {
-        bubbles: true,
-        cancelable: true,
-        view: window,
-      });
-      removeButton.dispatchEvent(mousedownEvent);
-      removeButton.click();
+
       return buttonName;
     }
   }
