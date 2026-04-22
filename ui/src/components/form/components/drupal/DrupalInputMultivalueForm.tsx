@@ -272,7 +272,7 @@ const DrupalInputMultivalueForm = ({
           });
           // Second call: now that the model is patched, invoke the real
           // Drupal AJAX click (no formId passed so the click is not suppressed).
-          triggerDrupalRemoveButton(triggerElement);
+          setTimeout(() => triggerDrupalRemoveButton(triggerElement));
         }
 
         dispatch(

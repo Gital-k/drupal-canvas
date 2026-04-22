@@ -262,7 +262,7 @@ const DrupalDatetimeMultivalueForm = ({
           });
           // Second call: now that the model is patched, invoke the real
           // Drupal AJAX click (no formId passed so the click is not suppressed).
-          triggerDrupalRemoveButton(triggerRowRef.current);
+          setTimeout(() => triggerDrupalRemoveButton(triggerRowRef.current));
         }
 
         dispatch(
