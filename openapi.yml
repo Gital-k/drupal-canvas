@@ -653,6 +653,8 @@ paths:
                               status: true
                               id: node.article.full
                               suggestedPreviewEntityId: 1
+                              links:
+                                edit-form: /canvas/template/node/article/full/1
                           editFieldsUrl: null
                           deleteUrl: null
                         page:
@@ -667,6 +669,8 @@ paths:
                               status: false
                               id: node.page.full
                               suggestedPreviewEntityId: 4
+                              links:
+                                edit-form: /canvas/template/node/page/full/4
                           editFieldsUrl: null
                           deleteUrl: null
                 single content entity type, no preview available:
@@ -686,6 +690,7 @@ paths:
                               id: 'node.article.full'
                               suggestedPreviewEntityId: null
                               viewModeLabel: 'Full content'
+                              links: []
                               label: 'article content items — Full content view'
                           editFieldsUrl: null
                           deleteUrl: null
@@ -3971,6 +3976,7 @@ components:
         - suggestedPreviewEntityId
         - label
         - viewModeLabel
+        - links
       properties:
         entityType:
           type: string
@@ -3996,6 +4002,12 @@ components:
         viewModeLabel:
           type: string
           description: Entity View Mode label.
+        links:
+          type: object
+          description: Available operations for this content template.
+          additionalProperties:
+            type: string
+            format: uri-reference
   # @see https://spec.openapis.org/oas/v3.1.0.html#response-object
   responses:
     ContentEntityResponse:

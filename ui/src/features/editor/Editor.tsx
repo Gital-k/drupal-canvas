@@ -27,6 +27,7 @@ import {
 import useEditorNavigation from '@/hooks/useEditorNavigation';
 import useReturnableLocation from '@/hooks/useReturnableLocation';
 import { useUndoRedo } from '@/hooks/useUndoRedo';
+import { useGetContentTemplatesQuery } from '@/services/componentAndLayout';
 import { getLayoutItem, setLayoutItem } from '@/utils/layoutStorage';
 
 import styles from '@/features/editor/Editor.module.css';
@@ -87,6 +88,7 @@ const Editor: React.FC<EditorProps> = ({ context, disable = false }) => {
   const [sidebarSizes, setSidebarSizes] = useState(loadSidebarSizes);
   const { entityId, entityType, bundle, viewMode } = useParams();
   const { navigateToTemplateEditor } = useEditorNavigation();
+  const { data: templatesData } = useGetContentTemplatesQuery();
 
   const isTemplateContext = editorFrameContext === EditorFrameContext.TEMPLATE;
   const isPanelHidden =
@@ -148,17 +150,12 @@ const Editor: React.FC<EditorProps> = ({ context, disable = false }) => {
             title="An error has occurred while fetching the template."
             variant="alert"
             onReset={() => {
-              if (entityType && bundle && viewMode) {
-                navigateToTemplateEditor(
-                  {
-                    entityType,
-                    bundle,
-                    viewMode,
-                  },
-                  {
-                    replace: true,
-                  },
-                );
+              if (entityType && bundle && viewMode && templatesData) {
+                const viewModeData =
+                  templatesData?.[entityType]?.bundles?.[bundle]?.viewModes?.[
+                    viewMode
+                  ];
+                navigateToTemplateEditor(viewModeData, { replace: true });
               } else {
                 navigate('/', { replace: true });
               }

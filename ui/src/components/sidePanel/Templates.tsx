@@ -100,8 +100,10 @@ const AddTemplateDialog = ({
   );
   const [selectedViewMode, setSelectedViewMode] = useState<string | null>();
 
-  const [createTemplate, { reset, isSuccess, isError, error }] =
-    useCreateContentTemplateMutation();
+  const [
+    createTemplate,
+    { reset, isSuccess, isError, error, data: createdTemplate },
+  ] = useCreateContentTemplateMutation();
   const {
     data,
     error: getViewModeError,
@@ -116,12 +118,14 @@ const AddTemplateDialog = ({
       entityType: selectedEntityType,
       bundle: selectedContentType,
       viewMode: selectedViewMode,
+      links: createdTemplate?.links,
     });
   }, [
     navigateToTemplateEditor,
     selectedContentType,
     selectedEntityType,
     selectedViewMode,
+    createdTemplate?.links,
   ]);
 
   useEffect(() => {

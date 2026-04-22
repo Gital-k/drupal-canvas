@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Entity;
 
+use Drupal\canvas\CanvasUriDefinitions;
 use Drupal\canvas\ClientSideRepresentation;
 use Drupal\canvas\EntityHandlers\VisibleWhenDisabledCanvasConfigEntityAccessControlHandler;
+use Drupal\canvas\Resource\CanvasResourceLinkCollection;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
 use Drupal\Core\Config\Entity\ConfigEntityInterface;
@@ -71,6 +73,7 @@ use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemList;
 final class ContentTemplate extends ComponentTreeConfigEntityBase implements CanvasHttpApiEligibleConfigEntityInterface, EntityViewDisplayInterface, AutoSavePublishAwareInterface {
 
   use ConfigUpdaterAwareEntityTrait;
+  use EntityOperationLinksTrait;
 
   public const string ENTITY_TYPE_ID = 'content_template';
 
@@ -433,6 +436,27 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
     return $this;
   }
 
+  /**
+   * Gets the available operations for this content template.
+   *
+   * @return \Drupal\canvas\Resource\CanvasResourceLinkCollection
+   *   A collection of links for this content template.
+   */
+  private function getEntityOperations(): CanvasResourceLinkCollection {
+    return $this->buildEntityOperationLinks([
+      CanvasUriDefinitions::LINK_REL_EDIT => [
+        'route' => [
+          'name' => 'canvas.boot.content_template',
+          'params' => [
+            'entity_type' => $this->content_entity_type_id,
+            'bundle' => $this->content_entity_type_bundle,
+            'view_mode_name' => $this->content_entity_type_view_mode,
+          ],
+        ],
+      ],
+    ]);
+  }
+
   public function normalizeForClientSide(): ClientSideRepresentation {
     $entity_type_manager = $this->entityTypeManager();
     \assert(\is_string($this->content_entity_type_id));
@@ -455,6 +479,9 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
       }
     }
 
+    // Expose available entity operations.
+    $linkCollection = $this->getEntityOperations();
+
     return ClientSideRepresentation::create(
       values: [
         'entityType' => $this->content_entity_type_id,
@@ -465,10 +492,13 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
         'status' => $this->status,
         'id' => $this->id(),
         'suggestedPreviewEntityId' => $preview_entity ? (int) $preview_entity->id() : NULL,
+        // @see https://jsonapi.org/format/#document-links
+        'links' => $linkCollection->asArray(),
       ],
       preview: NULL,
     )
       ->addCacheableDependency($preview_entity_cacheability)
+      ->addCacheableDependency($linkCollection)
       // Cacheability metadata for the suggested preview entity.
       ->addCacheTags($content_entity_type->getListCacheContexts())
       // @phpstan-ignore-next-line argument.type

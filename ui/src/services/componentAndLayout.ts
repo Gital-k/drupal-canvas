@@ -43,6 +43,9 @@ export type TemplateViewMode = {
   status: boolean;
   id: string;
   suggestedPreviewEntityId?: number;
+  links: {
+    'edit-form'?: string;
+  };
 };
 
 export type TemplateInBundle = {
