@@ -172,18 +172,19 @@ interface ComponentSourceInterface extends PluginInspectionInterface, Derivative
   public function getExplicitInput(string $uuid, ComponentTreeItem $item, ?FieldableEntityInterface $host_entity = NULL): array;
 
    /**
-    * Gets the user-facing label for an explicit input prop.
+    * Gets the user-facing label for an explicit input.
     *
-    * @param string $prop_name
-    *   The prop name.
+    * @param string $key
+    *   The key identifying which explicit input.
     *
     * @return string|\Drupal\Core\StringTranslation\TranslatableMarkup
-    *   The prop label (from component schema or humanized prop name).
+    *   The label for the explicit input.
     *
     * @see ::getExplicitInput()
     * @see ::getOptionsForExplicitInputEnumProp()
+    * @see \Drupal\canvas\Plugin\DataType\ComponentInputs::getTranslatableInputKeys()
     */
-   public function getLabelForExplicitInput(string $prop_name): string|TranslatableMarkup;
+   public function getLabelForExplicitInputKey(string $key): string|TranslatableMarkup;
 
    /**
     * Retrieves the resolved explicit input for this component instance.

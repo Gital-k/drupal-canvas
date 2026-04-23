@@ -323,7 +323,7 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
   /**
    * {@inheritdoc}
    */
-  public function getLabelForExplicitInput(string $prop_name): string|TranslatableMarkup {
+  public function getLabelForExplicitInputKey(string $prop_name): string|TranslatableMarkup {
     $plugin_id = $this->getSourceSpecificComponentId();
     $mapping = $this->typedConfigManager->getDefinition('block.settings.' . $plugin_id)['mapping'] ?? [];
     return $mapping[$prop_name]['label'] ?? Unicode::ucfirst($prop_name);

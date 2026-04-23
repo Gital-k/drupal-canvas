@@ -985,7 +985,7 @@ abstract class ComponentSourceTestBase extends CanvasKernelTestBase implements L
     $this->generateComponentConfig();
     $component = Component::load($component_id);
     self::assertInstanceOf(ComponentInterface::class, $component);
-    $actual_label = (string) $component->getComponentSource()->getLabelForExplicitInput($key);
+    $actual_label = (string) $component->getComponentSource()->getLabelForExplicitInputKey($key);
     self::assertSame($expected_label, $actual_label);
   }
 

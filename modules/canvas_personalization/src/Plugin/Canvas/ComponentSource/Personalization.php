@@ -300,8 +300,8 @@ final class Personalization extends ComponentSourceBase implements
   /**
    * {@inheritdoc}
    */
-  public function getLabelForExplicitInput(string $prop_name): string|TranslatableMarkup {
-    return Unicode::ucfirst($prop_name);
+  public function getLabelForExplicitInputKey(string $key): string|TranslatableMarkup {
+    return Unicode::ucfirst($key);
   }
 
   /**

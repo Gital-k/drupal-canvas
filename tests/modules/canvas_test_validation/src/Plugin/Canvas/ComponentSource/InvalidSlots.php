@@ -86,8 +86,8 @@ final class InvalidSlots extends ComponentSourceBase implements ComponentSourceW
   /**
    * {@inheritdoc}
    */
-  public function getLabelForExplicitInput(string $prop_name): string {
-    return Unicode::ucfirst($prop_name);
+  public function getLabelForExplicitInputKey(string $key): string {
+    return Unicode::ucfirst($key);
   }
 
   /**
