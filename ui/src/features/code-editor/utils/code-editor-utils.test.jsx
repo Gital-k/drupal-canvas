@@ -492,11 +492,11 @@ describe('Prop/slot schema keys and round-trip (machine name)', () => {
     expect(serialized).toHaveProperty('button_label');
     expect(serialized.button_label).toMatchObject({ title: 'Button label' });
 
-    const [deser] = deserializeProps(serialized);
-    expect(deser.name).toBe('Button label');
-    expect(deser.machineName).toBe('button_label');
-    expect(deser.type).toBe('string');
-    expect(deser.derivedType).toBe('text');
+    const [deserializedProp] = deserializeProps(serialized);
+    expect(deserializedProp.name).toBe('Button label');
+    expect(deserializedProp.machineName).toBe('button_label');
+    expect(deserializedProp.type).toBe('string');
+    expect(deserializedProp.derivedType).toBe('text');
   });
 
   it('getDuplicatePropSchemaKeys returns colliding keys only', () => {
