@@ -56,6 +56,7 @@ export function CanvasCodeComponentsMixin<
       propType: string,
       example: { label: string; value: string; type: string }[] = [],
       required: boolean = false,
+      machineName?: string,
     ) {
       await this.page
         .locator(
@@ -122,6 +123,12 @@ export function CanvasCodeComponentsMixin<
           default:
             throw new Error(`Unknown form element type ${type}`);
         }
+      }
+
+      if (machineName !== undefined) {
+        await propForm
+          .locator('[id^="prop-machine-name-"]')
+          .fill(machineName);
       }
 
       await this.page.waitForResponse(

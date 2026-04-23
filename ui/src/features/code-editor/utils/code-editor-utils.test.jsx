@@ -13,6 +13,8 @@ import {
   deserializeProps,
   deserializeSlots,
   formatToValidImportName,
+  getDuplicatePropSchemaKeys,
+  getDuplicateSlotSchemaKeys,
   getPropSchemaKey,
   getPropValuesForPreview,
   getSlotSchemaKey,
@@ -495,6 +497,87 @@ describe('Prop/slot schema keys and round-trip (machine name)', () => {
     expect(deser.machineName).toBe('button_label');
     expect(deser.type).toBe('string');
     expect(deser.derivedType).toBe('text');
+  });
+
+  it('getDuplicatePropSchemaKeys returns colliding keys only', () => {
+    expect(
+      getDuplicatePropSchemaKeys([
+        { id: '1', name: 'Alpha', type: 'string', derivedType: 'text' },
+        { id: '2', name: 'Bravo', type: 'string', derivedType: 'text' },
+      ]),
+    ).toEqual([]);
+    expect(
+      getDuplicatePropSchemaKeys([
+        { id: '1', name: 'X', type: 'string', derivedType: 'text' },
+        { id: '2', name: 'X', type: 'string', derivedType: 'text' },
+      ]),
+    ).toEqual(['x']);
+    expect(
+      getDuplicatePropSchemaKeys([
+        {
+          id: '1',
+          name: 'A',
+          machineName: 'same',
+          type: 'string',
+          derivedType: 'text',
+        },
+        {
+          id: '2',
+          name: 'B',
+          machineName: 'same',
+          type: 'string',
+          derivedType: 'text',
+        },
+      ]),
+    ).toEqual(['same']);
+  });
+
+  it('serializeProps keeps the first prop when two share a schema key', () => {
+    const first = {
+      id: 'a',
+      name: 'Background',
+      machineName: 'bg',
+      type: 'string',
+      example: 'base',
+      derivedType: 'text',
+    };
+    const second = {
+      id: 'b',
+      name: 'Other',
+      machineName: 'bg',
+      type: 'string',
+      example: 'Example text',
+      derivedType: 'text',
+    };
+    const out = serializeProps([first, second]);
+    expect(out.bg.title).toBe('Background');
+    expect(out.bg.examples).toEqual(['base']);
+  });
+
+  it('serializeSlots keeps the first slot when two share a schema key', () => {
+    const out = serializeSlots([
+      { id: '1', name: 'Main', machineName: 'content', example: '<p>first</p>' },
+      { id: '2', name: 'Other', machineName: 'content', example: '<p>second</p>' },
+    ]);
+    expect(out.content).toEqual({
+      title: 'Main',
+      examples: ['<p>first</p>'],
+    });
+  });
+
+  it('getDuplicateSlotSchemaKeys returns colliding keys only', () => {
+    expect(
+      getDuplicateSlotSchemaKeys([
+        { id: '1', name: 'Main', example: '' },
+        { id: '2', name: 'Body', example: '' },
+      ]),
+    ).toEqual([]);
+    expect(
+      getDuplicateSlotSchemaKeys([
+        { id: '1', name: 'Content', example: '<p></p>' },
+        { id: '2', name: 'Content', example: '<p></p>' },
+      ]),
+    ).toEqual(['content']);
   });
 
   it('serializeSlots then deserializeSlots preserves a key that differs from camelCase(title)', () => {

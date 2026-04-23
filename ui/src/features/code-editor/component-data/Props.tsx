@@ -43,7 +43,10 @@ import FormPropTypeLink, {
 import FormPropTypeTextField from '@/features/code-editor/component-data/forms/FormPropTypeTextField';
 import FormPropTypeVideo from '@/features/code-editor/component-data/forms/FormPropTypeVideo';
 import SortableList from '@/features/code-editor/component-data/SortableList';
-import { getPropSchemaKey } from '@/features/code-editor/utils/utils';
+import {
+  getDuplicatePropSchemaKeys,
+  getPropSchemaKey,
+} from '@/features/code-editor/utils/utils';
 import {
   VALUE_MODE_LIMITED,
   VALUE_MODE_UNLIMITED,
@@ -102,6 +105,11 @@ export default function Props() {
     if (!componentStatus) return new Set<string>();
     return new Set(initialPropIds);
   }, [componentStatus, initialPropIds]);
+
+  const duplicatePropSchemaKeys = useMemo(
+    () => getDuplicatePropSchemaKeys(props),
+    [props],
+  );
 
   /**
    * Helper function to create a new array with the specified count,
@@ -856,6 +864,21 @@ export default function Props() {
               Changing the name and type of an existing prop is not allowed when
               a component is added to <b>Components</b> in the Library. Remove
               prop and create a new one instead.
+            </Callout.Text>
+          </Callout.Root>
+        </Box>
+      )}
+      {duplicatePropSchemaKeys.length > 0 && (
+        <Box flexGrow="1" pt="4" maxWidth="500px" mx="auto">
+          <Callout.Root size="1" variant="surface" color="red">
+            <Callout.Icon>
+              <InfoCircledIcon />
+            </Callout.Icon>
+            <Callout.Text>
+              Two or more props use the same configuration key (
+              {duplicatePropSchemaKeys.join(', ')}). The first prop with each
+              key is what gets saved; give each prop a unique machine name (or
+              title) before the component can compile or auto-save.
             </Callout.Text>
           </Callout.Root>
         </Box>

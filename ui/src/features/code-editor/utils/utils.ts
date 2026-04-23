@@ -44,6 +44,46 @@ export function getSlotSchemaKey(slot: CodeComponentSlot): string {
 }
 
 /**
+ * Schema keys that would collide when serializing props (two+ props with the same key).
+ * Only includes props with a non-empty title, matching `serializeProps` filtering.
+ */
+export function getDuplicatePropSchemaKeys(
+  props: CodeComponentProp[],
+): string[] {
+  const counts = new Map<string, number>();
+  for (const prop of props) {
+    if (!prop.name?.trim()) {
+      continue;
+    }
+    const key = getPropSchemaKey(prop);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .filter(([, n]) => n > 1)
+    .map(([k]) => k);
+}
+
+/**
+ * Schema keys that would collide when serializing slots (two+ slots with the same key).
+ * Only includes slots with a non-empty title, matching `serializeSlots` filtering.
+ */
+export function getDuplicateSlotSchemaKeys(
+  slots: CodeComponentSlot[],
+): string[] {
+  const counts = new Map<string, number>();
+  for (const slot of slots) {
+    if (!slot.name?.trim()) {
+      continue;
+    }
+    const key = getSlotSchemaKey(slot);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .filter(([, n]) => n > 1)
+    .map(([k]) => k);
+}
+
+/**
  * Parses a prop value for the code editor preview.
  *
  * @see ui/src/features/code-editor/Preview.tsx
@@ -85,7 +125,11 @@ export function getPropValuesForPreview(
   props
     .filter((prop) => prop.name)
     .forEach((prop) => {
-      propValues[getPropSchemaKey(prop)] = parsePropValueForPreview(prop);
+      const key = getPropSchemaKey(prop);
+      if (key in propValues) {
+        return;
+      }
+      propValues[key] = parsePropValueForPreview(prop);
     });
   return propValues;
 }
@@ -99,9 +143,20 @@ export function getPropValuesForPreview(
  * @returns The slot names.
  */
 export function getSlotNamesForPreview(slots: CodeComponentSlot[]): string[] {
-  return slots
-    .filter((slot) => slot.name && slot.example)
-    .map((slot) => getSlotSchemaKey(slot));
+  const seen = new Set<string>();
+  const keys: string[] = [];
+  for (const slot of slots) {
+    if (!slot.name || !slot.example) {
+      continue;
+    }
+    const key = getSlotSchemaKey(slot);
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    keys.push(key);
+  }
+  return keys;
 }
 
 /**
@@ -113,14 +168,22 @@ export function getSlotNamesForPreview(slots: CodeComponentSlot[]): string[] {
  * @returns The JS for the slots.
  */
 export function getJsForSlotsPreview(slots: CodeComponentSlot[]) {
-  return slots
-    .filter((slot) => slot.name && slot.example)
-    .map((slot) => {
-      // Wrap the slot's example value in a function so that it can be
-      // rendered by Preact.
-      return `export function ${getSlotSchemaKey(slot)}() { return (${slot.example as string});}`;
-    })
-    .join('\n');
+  const seen = new Set<string>();
+  const lines: string[] = [];
+  for (const slot of slots) {
+    if (!slot.name || !slot.example) {
+      continue;
+    }
+    const key = getSlotSchemaKey(slot);
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    lines.push(
+      `export function ${key}() { return (${slot.example as string});}`,
+    );
+  }
+  return lines.join('\n');
 }
 
 function serializeExample(
@@ -279,7 +342,13 @@ export function serializeProps(props: CodeComponentProp[]) {
           if (xFormattingContext)
             processed['x-formatting-context'] = xFormattingContext;
         }
-        return { ...acc, [getPropSchemaKey(prop)]: processed };
+        const schemaKey = getPropSchemaKey(prop);
+        // First prop with a given schema key wins; later rows with the same key
+        // are ignored in the saved shape (the UI may still list the duplicate).
+        if (schemaKey in acc) {
+          return acc;
+        }
+        return { ...acc, [schemaKey]: processed };
       },
       {} as Record<string, CodeComponentPropSerialized>,
     );
@@ -475,10 +544,14 @@ export function serializeSlots(slots: CodeComponentSlot[]) {
     .filter((slot) => slot.name)
     .reduce(
       (acc, slot) => {
+        const schemaKey = getSlotSchemaKey(slot);
+        if (schemaKey in acc) {
+          return acc;
+        }
         const { name, example } = slot;
         return {
           ...acc,
-          [getSlotSchemaKey(slot)]: {
+          [schemaKey]: {
             title: name,
             ...(example && { examples: [example] }),
           },

@@ -1510,6 +1510,35 @@ describe('props in code editor', () => {
     );
   });
 
+  describe('prop machine name', () => {
+    it('shows machine name after Add and updates store', async () => {
+      await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+      const machineNameInput = screen.getByRole('textbox', {
+        name: 'Machine name',
+      });
+      expect(machineNameInput).toBeInTheDocument();
+      await userEvent.type(machineNameInput, 'my_custom_key');
+      expect(
+        selectCodeComponentProperty('props')(store.getState())[0].machineName,
+      ).toBe('my_custom_key');
+    });
+
+    it('shows duplicate message when two props resolve to the same schema key', async () => {
+      await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+      await userEvent.type(
+        screen.getByRole('textbox', { name: 'Title' }),
+        'Shared title',
+      );
+      await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+      const titleInputs = screen.getAllByRole('textbox', { name: 'Title' });
+      await userEvent.type(titleInputs[1], 'Shared title');
+      const dupMessages = screen.getAllByText(
+        'Another prop uses this machine name.',
+      );
+      expect(dupMessages).toHaveLength(2);
+    });
+  });
+
   describe('image data', () => {
     const aspectRatios = [
       ['1:1 (Square)', { width: 600, height: 600 }],
@@ -1600,6 +1629,16 @@ describe('props in code editor', () => {
         name: 'Example value',
       });
       expect(exampleField).not.toBeDisabled();
+    });
+
+    it('disables machine name field for existing props on exposed component', async () => {
+      const exposedStore = createExposedComponentStore();
+      render(<Wrapper store={exposedStore} />);
+
+      const machineNameField = screen.getByRole('textbox', {
+        name: 'Machine name',
+      });
+      expect(machineNameField).toBeDisabled();
     });
 
     it('allows editing name and type for newly added props on an exposed component', async () => {
