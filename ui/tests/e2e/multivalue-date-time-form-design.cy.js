@@ -700,15 +700,7 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
     cy.get('[role="dialog"][data-state="open"]').should('not.exist');
   });
 
-  // Skipping due to intermittent failures.
-  // Much of what is tested here is also covered by tests/src/Playwright/tests/isolatedPerTest/multivaluePropTypes.spec.ts
-  // The part that isn't covered there is this widget in an entity form, which
-  // is not currently something available to end users, as the canvas page data
-  // entity type is not currently fieldable.
-  // @todo un-skip in https://drupal.org/i/3562896 which includes preview API
-  // queueing that solved similar problems with AJAX operation in entity forms.
-  // eslint-disable-next-line mocha/no-pending-tests
-  it.skip('can remove datetime items using popover remove button', () => {
+  it('can remove datetime items using popover remove button', () => {
     cy.loadURLandWaitForCanvasLoaded({ url: 'canvas/editor/node/2' });
     cy.findByTestId('canvas-page-data-form').as('entityForm');
     cy.get('@entityForm').recordFormBuildId();
@@ -723,10 +715,11 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
     // the preview update.
     cy.intercept({
       url: '**/canvas/api/v0/layout/node/2',
-      times: 1,
+      times: 2,
       method: 'POST',
     }).as('updatePreview');
     setDateTimeInFirstEmptyRow('@unlimited-datetime', '2024-01-01', '10:00');
+    cy.wait('@updatePreview');
     cy.wait('@updatePreview');
     cy.waitForAjax();
 
@@ -738,10 +731,11 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
 
     cy.intercept({
       url: '**/canvas/api/v0/layout/node/2',
-      times: 1,
+      times: 2,
       method: 'POST',
     }).as('updatePreview');
     setDateTimeInFirstEmptyRow('@unlimited-datetime', '2024-02-01', '11:00');
+    cy.wait('@updatePreview');
     cy.wait('@updatePreview');
     cy.waitForAjax();
 
@@ -770,9 +764,7 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
     assertCommittedItemCount('@unlimited-datetime', 1);
   });
 
-  // See the explanation for the skip one test above.
-  // eslint-disable-next-line mocha/no-pending-tests
-  it.skip('remove button is disabled for required field with only one item', () => {
+  it('remove button is disabled for required field with only one item', () => {
     cy.loadURLandWaitForCanvasLoaded({ url: 'canvas/editor/node/2' });
     cy.findByTestId('canvas-page-data-form').as('entityForm');
     cy.get('@entityForm').recordFormBuildId();
@@ -785,10 +777,11 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
     // Register intercept BEFORE the action that triggers the preview update.
     cy.intercept({
       url: '**/canvas/api/v0/layout/node/2',
-      times: 1,
+      times: 2,
       method: 'POST',
     }).as('updatePreview');
     setDateTimeInFirstEmptyRow('@required-datetime', '2024-01-01', '10:00');
+    cy.wait('@updatePreview');
     cy.wait('@updatePreview');
     cy.waitForAjax();
 
@@ -823,9 +816,7 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
     cy.get('[role="dialog"][data-state="open"]').should('not.exist');
   });
 
-  // See the explanation for the skip two tests above.
-  // eslint-disable-next-line mocha/no-pending-tests
-  it.skip('remove button is enabled for required field with multiple items', () => {
+  it('remove button is enabled for required field with multiple items', () => {
     cy.loadURLandWaitForCanvasLoaded({ url: 'canvas/editor/node/2' });
     cy.findByTestId('canvas-page-data-form').as('entityForm');
     cy.get('@entityForm').recordFormBuildId();
@@ -840,10 +831,11 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
     // triggers the preview update.
     cy.intercept({
       url: '**/canvas/api/v0/layout/node/2',
-      times: 1,
+      times: 2,
       method: 'POST',
     }).as('updatePreview');
     setDateTimeInFirstEmptyRow('@required-datetime', '2024-01-01', '10:00');
+    cy.wait('@updatePreview');
     cy.wait('@updatePreview');
     cy.waitForAjax();
 
@@ -857,10 +849,11 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
     // Set second datetime value.
     cy.intercept({
       url: '**/canvas/api/v0/layout/node/2',
-      times: 1,
+      times: 2,
       method: 'POST',
     }).as('updatePreview');
     setDateTimeInFirstEmptyRow('@required-datetime', '2024-02-01', '11:00');
+    cy.wait('@updatePreview');
     cy.wait('@updatePreview');
     cy.waitForAjax();
 
