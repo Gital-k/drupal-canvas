@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\EventSubscriber;
 
+use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\Core\Render\PageDisplayVariantSelectionEvent;
 use Drupal\Core\Render\RenderEvents;
 use Drupal\canvas\Entity\PageRegion;
@@ -33,7 +34,7 @@ final class PageVariantSelectorSubscriber implements EventSubscriberInterface {
     }
     $event->setPluginId(CanvasPageVariant::PLUGIN_ID);
     $event->setPluginConfiguration([
-      CanvasPageVariant::PREVIEW_KEY => $event->getRouteMatch()->getRouteObject()?->getOption('_canvas_use_template_draft'),
+      CanvasPageVariant::PREVIEW_KEY => AutoSaveManager::routeIsCanvasPreview($event->getRouteMatch()->getRouteObject()),
     ]);
   }
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Cache;
 
+use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\Core\Cache\Context\RouteNameCacheContext;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 
@@ -32,7 +33,7 @@ final class CanvasEditorUiCacheContext extends RouteNameCacheContext {
    */
   public function getContext(): string {
     $route = $this->routeMatch->getRouteObject();
-    if ($route?->getOption('_canvas_use_template_draft') === TRUE) {
+    if (AutoSaveManager::routeIsCanvasPreview($route)) {
       return 'is_canvas_editor_ui.1';
     }
     return 'is_canvas_editor_ui.0';
