@@ -968,6 +968,34 @@ abstract class ComponentSourceTestBase extends CanvasKernelTestBase implements L
    */
   abstract public static function providerSymmetricallyTranslatableComponentInstanceScenarios(string $host_entity_type_id): \Generator;
 
+  /**
+   * Tests getLabelForExplicitInput() returns correct labels.
+   *
+   * @param string $component_id
+   *   The component config entity ID.
+   * @param string $key
+   *   The explicit input key to test.
+   * @param string $expected_label
+   *   The expected label for the prop.
+   *
+   * @legacy-covers ::getLabelForExplicitInput
+   */
+  #[DataProvider('providerGetLabelForExplicitInput')]
+  public function testGetLabelForExplicitInput(string $component_id, string $key, string $expected_label): void {
+    $this->generateComponentConfig();
+    $component = Component::load($component_id);
+    self::assertInstanceOf(ComponentInterface::class, $component);
+    $actual_label = (string) $component->getComponentSource()->getLabelForExplicitInput($key);
+    self::assertSame($expected_label, $actual_label);
+  }
+
+  /**
+   * Data provider for ::testGetLabelForExplicitInput().
+   *
+   * @return \Generator<string, array{component_id: string, prop_name: string, expected_label: string}>
+   */
+  abstract public static function providerGetLabelForExplicitInput(): \Generator;
+
   abstract protected function triggerBrokenComponent(ComponentInterface $component): ?BrokenPluginManagerInterface;
 
   abstract protected function getExpectedVerboseErrorMessage(): string;
