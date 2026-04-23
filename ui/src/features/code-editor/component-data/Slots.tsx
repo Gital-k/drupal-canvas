@@ -3,7 +3,7 @@ import {
   InfoCircledIcon,
   QuestionMarkCircledIcon,
 } from '@radix-ui/react-icons';
-import { Box, Callout, Flex, TextField } from '@radix-ui/themes';
+import { Box, Callout, Flex, Grid, TextField, Tooltip } from '@radix-ui/themes';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import {
@@ -20,6 +20,9 @@ import {
 } from '@/features/code-editor/component-data/FormElement';
 import FormPropTypeSlot from '@/features/code-editor/component-data/forms/FormPropTypeSlot';
 import SortableList from '@/features/code-editor/component-data/SortableList';
+
+import './Slots.css';
+import { getSlotSchemaKey } from '@/features/code-editor/utils/utils';
 
 import type { CodeComponentSlot } from '@/types/CodeComponent';
 
@@ -47,32 +50,71 @@ export default function Slots() {
     dispatch(reorderSlots({ oldIndex, newIndex }));
   };
 
-  const renderSlotContent = (slot: CodeComponentSlot) => (
-    <Flex direction="column" flexGrow="1">
-      <Box mb="4" width="100%" flexShrink="0" flexGrow="1">
-        <FormElement>
-          <Label htmlFor={`slot-name-${slot.id}`}>Slot name</Label>
-          <TextField.Root
-            autoComplete="off"
-            id={`slot-name-${slot.id}`}
-            placeholder="Enter a name"
-            value={slot.name}
-            size="1"
-            onChange={(e) =>
-              dispatch(
-                updateSlot({
-                  id: slot.id,
-                  updates: { name: e.target.value },
-                }),
-              )
-            }
-            disabled={disabledSlotIds.has(slot.id)}
-          />
-        </FormElement>
-      </Box>
-      <FormPropTypeSlot id={slot.id} example={slot.example} />
-    </Flex>
-  );
+  const renderSlotContent = (slot: CodeComponentSlot) => {
+    const defaultKeyHint = slot.name
+      ? getSlotSchemaKey({ ...slot, machineName: '' })
+      : '';
+    return (
+      <Flex direction="column" flexGrow="1" gap="4">
+        <Grid columns={{ initial: '1', sm: '2' }} gap="4" width="100%">
+          <Box minWidth="0" width="100%">
+            <FormElement>
+              <Flex align="center" className="slots-form-label-row">
+                <Label htmlFor={`slot-name-${slot.id}`}>Title</Label>
+              </Flex>
+              <TextField.Root
+                autoComplete="off"
+                id={`slot-name-${slot.id}`}
+                placeholder="Enter a label"
+                value={slot.name}
+                size="1"
+                className="slots-field-full-width"
+                onChange={(e) =>
+                  dispatch(
+                    updateSlot({
+                      id: slot.id,
+                      updates: { name: e.target.value },
+                    }),
+                  )
+                }
+                disabled={disabledSlotIds.has(slot.id)}
+              />
+            </FormElement>
+          </Box>
+          <Box minWidth="0" width="100%">
+            <FormElement>
+              <Flex align="center" gap="1" className="slots-form-label-row">
+                <Label htmlFor={`slot-machine-name-${slot.id}`}>
+                  Machine name
+                </Label>
+                <Tooltip content="The key used for this slot in config. If empty, it is derived from the title.">
+                  <QuestionMarkCircledIcon aria-label="About slot machine name" />
+                </Tooltip>
+              </Flex>
+              <TextField.Root
+                autoComplete="off"
+                id={`slot-machine-name-${slot.id}`}
+                placeholder={slot.name ? `Default: ${defaultKeyHint}` : 'Set title first'}
+                value={slot.machineName ?? ''}
+                size="1"
+                className="slots-field-full-width"
+                onChange={(e) =>
+                  dispatch(
+                    updateSlot({
+                      id: slot.id,
+                      updates: { machineName: e.target.value },
+                    }),
+                  )
+                }
+                disabled={disabledSlotIds.has(slot.id)}
+              />
+            </FormElement>
+          </Box>
+        </Grid>
+        <FormPropTypeSlot id={slot.id} example={slot.example} />
+      </Flex>
+    );
+  };
 
   return (
     <>

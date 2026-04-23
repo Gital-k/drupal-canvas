@@ -42,7 +42,7 @@ describe('Slots', () => {
   describe('slots form', () => {
     it('renders empty', () => {
       expect(
-        screen.queryByRole('textbox', { name: 'Slot name' }),
+        screen.queryByRole('textbox', { name: 'Title' }),
       ).not.toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Add' })).toBeInTheDocument();
     });
@@ -50,7 +50,7 @@ describe('Slots', () => {
     it('add new slot form', async () => {
       await userEvent.click(screen.getByRole('button', { name: 'Add' }));
       expect(
-        screen.getByRole('textbox', { name: 'Slot name' }),
+        screen.getByRole('textbox', { name: 'Title' }),
       ).toBeInTheDocument();
       expect(
         screen.getByRole('textbox', { name: /Example/ }),
@@ -67,7 +67,7 @@ describe('Slots', () => {
         screen.getByRole('button', { name: /Remove slot/ }),
       );
       expect(
-        screen.queryByRole('textbox', { name: 'Slot name' }),
+        screen.queryByRole('textbox', { name: 'Title' }),
       ).not.toBeInTheDocument();
       expect(
         screen.queryByRole('textbox', { name: /Example/ }),
@@ -80,10 +80,10 @@ describe('Slots', () => {
     it('saves slot data', async () => {
       await userEvent.click(screen.getByRole('button', { name: 'Add' }));
       expect(
-        screen.getByRole('textbox', { name: 'Slot name' }),
+        screen.getByRole('textbox', { name: 'Title' }),
       ).toBeInTheDocument();
       await userEvent.type(
-        screen.getByRole('textbox', { name: 'Slot name' }),
+        screen.getByRole('textbox', { name: 'Title' }),
         'Alpha',
       );
       await userEvent.type(
@@ -93,6 +93,7 @@ describe('Slots', () => {
       const values = selectCodeComponentProperty('slots')(store.getState());
       expect(values[0]).toMatchObject({
         name: 'Alpha',
+        machineName: '',
         example: 'Alpha example',
       });
     });
@@ -107,11 +108,11 @@ describe('Slots', () => {
       const slot2 = screen.getByTestId('slot-1');
 
       await userEvent.type(
-        within(slot1).getByRole('textbox', { name: 'Slot name' }),
+        within(slot1).getByRole('textbox', { name: 'Title' }),
         'Alpha',
       );
       await userEvent.type(
-        within(slot2).getByRole('textbox', { name: 'Slot name' }),
+        within(slot2).getByRole('textbox', { name: 'Title' }),
         'Beta',
       );
 
@@ -168,7 +169,7 @@ describe('Slots', () => {
       const exposedStore = createExposedComponentStore();
       render(<Wrapper store={exposedStore} />);
 
-      const nameField = screen.getByRole('textbox', { name: 'Slot name' });
+      const nameField = screen.getByRole('textbox', { name: 'Title' });
       expect(nameField).toBeDisabled();
       expect(nameField).toHaveValue('ExistingSlot');
       const exampleField = screen.getByRole('textbox', { name: /Example/ });
@@ -184,13 +185,13 @@ describe('Slots', () => {
 
       await waitFor(() => {
         expect(
-          screen.getAllByRole('textbox', { name: 'Slot name' }),
+          screen.getAllByRole('textbox', { name: 'Title' }),
         ).toHaveLength(2);
       });
 
       // The second slot name field (newly added) should not be disabled
       const slotNameFields = screen.getAllByRole('textbox', {
-        name: 'Slot name',
+        name: 'Title',
       });
       expect(slotNameFields).toHaveLength(2);
       expect(slotNameFields[0]).toBeDisabled(); // Existing slot
@@ -211,7 +212,7 @@ describe('Slots', () => {
         selectCodeComponentProperty('slots')(exposedStore.getState()),
       ).toHaveLength(0);
       expect(
-        screen.queryByRole('textbox', { name: 'Slot name' }),
+        screen.queryByRole('textbox', { name: 'Title' }),
       ).not.toBeInTheDocument();
     });
   });

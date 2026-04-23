@@ -59,7 +59,13 @@ export interface CodeComponentPropEnumItem {
 
 export interface CodeComponentProp {
   id: string;
+  /** Human-readable label, serialized as YAML `title`. */
   name: string;
+  /**
+   * Schema / config key (YAML prop key, `required` entry, source prop name).
+   * If empty, derived as camelCase of `name`.
+   */
+  machineName?: string;
   type: 'string' | 'integer' | 'number' | 'boolean' | 'object' | 'array';
   enum?: CodeComponentPropEnumItem[];
   example?:
@@ -140,7 +146,12 @@ export interface CodeComponentPropSerialized {
 
 export interface CodeComponentSlot {
   id: string;
+  /** Display title, serialized as YAML `title`. */
   name: string;
+  /**
+   * Schema key for the slot. If empty, derived as camelCase of `name`.
+   */
+  machineName?: string;
   example?: string;
 }
 

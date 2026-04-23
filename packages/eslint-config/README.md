@@ -37,7 +37,7 @@ Canvas Code Components:
 | ---------------------- | ------------------------------------------------------------------------------------------------------- |
 | `component-dir-name`   | Validates that `machineName` matches the directory name (index-style) or filename prefix (named-style). |
 | `component-exports`    | Validates that component has a default export.                                                          |
-| `component-prop-names` | Validates that component prop IDs match the camelCase version of their titles.                          |
+| `component-prop-names` | Ensures each `component.yml` prop under `props.properties` has a `title` (independent machine names are allowed). |
 
 ### Deprecated rules
 
