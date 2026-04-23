@@ -33,10 +33,10 @@ export default defineConfig([
 The following custom rules are part of the `required` config and validate Drupal
 Canvas Code Components:
 
-| Rule                   | Description                                                                                             |
-| ---------------------- | ------------------------------------------------------------------------------------------------------- |
-| `component-dir-name`   | Validates that `machineName` matches the directory name (index-style) or filename prefix (named-style). |
-| `component-exports`    | Validates that component has a default export.                                                          |
+| Rule                   | Description                                                                                                       |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `component-dir-name`   | Validates that `machineName` matches the directory name (index-style) or filename prefix (named-style).           |
+| `component-exports`    | Validates that component has a default export.                                                                    |
 | `component-prop-names` | Ensures each `component.yml` prop under `props.properties` has a `title` (independent machine names are allowed). |
 
 ### Deprecated rules

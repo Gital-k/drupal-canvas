@@ -207,9 +207,9 @@ describe('Slots', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Add' }));
 
       await waitFor(() => {
-        expect(
-          screen.getAllByRole('textbox', { name: 'Title' }),
-        ).toHaveLength(2);
+        expect(screen.getAllByRole('textbox', { name: 'Title' })).toHaveLength(
+          2,
+        );
       });
 
       // The second slot name field (newly added) should not be disabled

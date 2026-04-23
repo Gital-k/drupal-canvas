@@ -3,7 +3,11 @@ import { expect } from '@playwright/test';
 import { isolatedPerTest as test } from '../../fixtures/test.js';
 
 test.describe('Code editor', () => {
-  test('persists prop machine name after reload', async ({ page, canvas, drupal }) => {
+  test('persists prop machine name after reload', async ({
+    page,
+    canvas,
+    drupal,
+  }) => {
     await drupal.login({ username: 'editor', password: 'editor' });
     await canvas.openCanvas(await canvas.createCanvas());
 
@@ -13,7 +17,13 @@ export default C;
 `;
 
     await canvas.createCodeComponent('E2eMachineName', code);
-    await canvas.addCodeComponentProp('Body text', 'Text', [], false, machineName);
+    await canvas.addCodeComponentProp(
+      'Body text',
+      'Text',
+      [],
+      false,
+      machineName,
+    );
 
     await page.reload();
     await expect(
@@ -31,8 +41,8 @@ export default C;
       )
       .last();
 
-    await expect(
-      propForm.locator('[id^="prop-machine-name-"]'),
-    ).toHaveValue(machineName);
+    await expect(propForm.locator('[id^="prop-machine-name-"]')).toHaveValue(
+      machineName,
+    );
   });
 });
