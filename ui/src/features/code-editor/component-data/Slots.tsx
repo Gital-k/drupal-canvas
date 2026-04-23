@@ -22,7 +22,10 @@ import FormPropTypeSlot from '@/features/code-editor/component-data/forms/FormPr
 import SortableList from '@/features/code-editor/component-data/SortableList';
 
 import './Slots.css';
-import { getSlotSchemaKey } from '@/features/code-editor/utils/utils';
+import {
+  getDuplicateSlotSchemaKeys,
+  getSlotSchemaKey,
+} from '@/features/code-editor/utils/utils';
 
 import type { CodeComponentSlot } from '@/types/CodeComponent';
 
@@ -37,6 +40,11 @@ export default function Slots() {
     if (!componentStatus) return new Set<string>();
     return new Set(initialSlotIds);
   }, [componentStatus, initialSlotIds]);
+
+  const duplicateSlotSchemaKeys = useMemo(
+    () => getDuplicateSlotSchemaKeys(slots),
+    [slots],
+  );
 
   const handleAddSlot = () => {
     dispatch(addSlot());
@@ -140,6 +148,21 @@ export default function Slots() {
               Changing the name of an existing slot is not allowed when a
               component is added to <b>Components</b> in the Library. Remove
               slot and create a new one instead.
+            </Callout.Text>
+          </Callout.Root>
+        </Box>
+      )}
+      {duplicateSlotSchemaKeys.length > 0 && (
+        <Box flexGrow="1" pt="4" maxWidth="500px" mx="auto">
+          <Callout.Root size="1" variant="surface" color="red">
+            <Callout.Icon>
+              <InfoCircledIcon />
+            </Callout.Icon>
+            <Callout.Text>
+              Two or more slots use the same configuration key (
+              {duplicateSlotSchemaKeys.join(', ')}). The first slot with each
+              key is what gets saved; give each slot a unique machine name (or
+              title) before the component can compile or auto-save.
             </Callout.Text>
           </Callout.Root>
         </Box>

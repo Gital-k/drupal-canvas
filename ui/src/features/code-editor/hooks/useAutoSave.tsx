@@ -14,6 +14,8 @@ import {
   setStatus,
 } from '@/features/code-editor/codeEditorSlice';
 import {
+  getDuplicatePropSchemaKeys,
+  getDuplicateSlotSchemaKeys,
   serializeProps,
   serializeSlots,
 } from '@/features/code-editor/utils/utils';
@@ -129,6 +131,12 @@ const useAutoSave = (requestedComponentId: string): void => {
       clearTimeout(lastInvocationCodeComponentTimeoutRef.current);
     }
     lastInvocationCodeComponentTimeoutRef.current = setTimeout(() => {
+      if (
+        getDuplicatePropSchemaKeys(props).length > 0 ||
+        getDuplicateSlotSchemaKeys(slots).length > 0
+      ) {
+        return;
+      }
       updateCodeComponent({
         id: componentId,
         data: {

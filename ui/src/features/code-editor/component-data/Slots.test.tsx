@@ -98,6 +98,18 @@ describe('Slots', () => {
       });
     });
 
+    it('shows machine name after Add and updates store', async () => {
+      await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+      const machineNameInput = screen.getByRole('textbox', {
+        name: 'Machine name',
+      });
+      expect(machineNameInput).toBeInTheDocument();
+      await userEvent.type(machineNameInput, 'main_body');
+      expect(
+        selectCodeComponentProperty('slots')(store.getState())[0].machineName,
+      ).toBe('main_body');
+    });
+
     it('reorders slots', async () => {
       await userEvent.click(screen.getByRole('button', { name: 'Add' }));
       await userEvent.click(screen.getByRole('button', { name: 'Add' }));
@@ -156,6 +168,7 @@ describe('Slots', () => {
               {
                 id: existingSlotId,
                 name: 'ExistingSlot',
+                machineName: '',
                 example: '<p>Example content</p>',
               },
             ],
@@ -174,6 +187,16 @@ describe('Slots', () => {
       expect(nameField).toHaveValue('ExistingSlot');
       const exampleField = screen.getByRole('textbox', { name: /Example/ });
       expect(exampleField).not.toBeDisabled();
+    });
+
+    it('disables machine name field for existing slots on exposed component', async () => {
+      const exposedStore = createExposedComponentStore();
+      render(<Wrapper store={exposedStore} />);
+
+      const machineNameField = screen.getByRole('textbox', {
+        name: 'Machine name',
+      });
+      expect(machineNameField).toBeDisabled();
     });
 
     it('allows editing name for newly added slot on exposed component', async () => {
