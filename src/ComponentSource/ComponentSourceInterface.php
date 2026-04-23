@@ -169,7 +169,7 @@ interface ComponentSourceInterface extends PluginInspectionInterface, Derivative
    *
    * @todo Add ::getImplicitInput() in https://www.drupal.org/project/canvas/issues/3485502 — SDCs don't have implicit inputs, but Block plugins do: contexts
    */
-   public function getExplicitInput(string $uuid, ComponentTreeItem $item, ?FieldableEntityInterface $host_entity = NULL): array;
+  public function getExplicitInput(string $uuid, ComponentTreeItem $item, ?FieldableEntityInterface $host_entity = NULL): array;
 
    /**
     * Gets the user-facing label for an explicit input prop.

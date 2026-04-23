@@ -6892,7 +6892,7 @@ HTML
   /**
    * {@inheritdoc}
    */
-   public static function providerGetOptionsForExplicitInputEnumProp(): array {
+  public static function providerGetOptionsForExplicitInputEnumProp(): array {
     return [
       // The test SDC has a mismatch between enum values and meta:enum keys.
       // The method returns ALL enum values with labels from meta:enum where
@@ -6944,7 +6944,7 @@ HTML
   }
 
   /**
-    * Tests that validateComponentInput() keeps non-empty items for multi-cardinality props.
+   * Tests that validateComponentInput() keeps non-empty items for multi-cardinality props.
    *
    * When a multiple-cardinality static prop source contains a mix of valid and
    * empty items (as happens during "mid-input" preview/auto-save), the empty
