@@ -2669,7 +2669,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
   /**
    * {@inheritdoc}
    */
-   public static function providerGetOptionsForExplicitInputEnumProp(): array {
+  public static function providerGetOptionsForExplicitInputEnumProp(): array {
     return [
       'non-array enum prop' => [
         'component_id' => 'js.canvas_test_code_components_with_enums',
