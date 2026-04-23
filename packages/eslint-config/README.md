@@ -49,7 +49,7 @@ config:
 | Rule                     | Description                                                                               |
 | ------------------------ | ----------------------------------------------------------------------------------------- |
 | `component-files`        | Validates that component directory contains only allowed files.                           |
-| `component-imports`      | Validates that component imports only from supported import sources and patterns.         |
+| `component-imports`      | Validates that component imports only from supported import sources and patterns.          |
 | `component-no-hierarchy` | Validates that all component directories are at the same level with no nesting hierarchy. |
 
 ## Development

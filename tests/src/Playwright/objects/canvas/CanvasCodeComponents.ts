@@ -126,9 +126,7 @@ export function CanvasCodeComponentsMixin<
       }
 
       if (machineName !== undefined) {
-        await propForm
-          .locator('[id^="prop-machine-name-"]')
-          .fill(machineName);
+        await propForm.locator('[id^="prop-machine-name-"]').fill(machineName);
       }
 
       await this.page.waitForResponse(

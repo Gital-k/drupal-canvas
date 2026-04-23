@@ -20,7 +20,10 @@ import {
   selectCodeComponentProperty,
 } from '@/features/code-editor/codeEditorSlice';
 import { createDisplayArray } from '@/features/code-editor/utils/arrayPropUtils';
-import { getPropSchemaKey, serializeProps } from '@/features/code-editor/utils/utils';
+import {
+  getPropSchemaKey,
+  serializeProps,
+} from '@/features/code-editor/utils/utils';
 import { type CodeComponentPropImageExample } from '@/types/CodeComponent';
 
 import Props, { REQUIRED_EXAMPLE_ERROR_MESSAGE } from './Props';
@@ -1649,9 +1652,9 @@ describe('props in code editor', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Add' }));
 
       await waitFor(() => {
-        expect(
-          screen.getAllByRole('textbox', { name: 'Title' }),
-        ).toHaveLength(2);
+        expect(screen.getAllByRole('textbox', { name: 'Title' })).toHaveLength(
+          2,
+        );
       });
 
       // The second prop name field (newly added) should not be disabled

@@ -179,10 +179,7 @@ export default function Props() {
     const duplicateSchemaKey =
       prop.name &&
       props.some(
-        (p) =>
-          p.id !== prop.id &&
-          p.name &&
-          getPropSchemaKey(p) === propName,
+        (p) => p.id !== prop.id && p.name && getPropSchemaKey(p) === propName,
       );
     return (
       <Flex direction="column" flexGrow="1" gap="4">

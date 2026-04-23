@@ -17,7 +17,7 @@ const baseProp = {
 };
 
 function storeWithCodeComponent(
-  override: typeof initialState['codeComponent'],
+  override: (typeof initialState)['codeComponent'],
 ): AppStore {
   return makeStore({
     codeEditor: {
@@ -65,10 +65,12 @@ describe('codeEditorSlice', () => {
       );
 
       const state = store.getState();
-      expect(selectCodeComponentProperty('required')(state)).toEqual(['newKey']);
-      expect(
-        selectCodeComponentProperty('props')(state)[0].machineName,
-      ).toBe('newKey');
+      expect(selectCodeComponentProperty('required')(state)).toEqual([
+        'newKey',
+      ]);
+      expect(selectCodeComponentProperty('props')(state)[0].machineName).toBe(
+        'newKey',
+      );
     });
 
     it('migrates required when key was camelCase(name) and machineName is set for the first time', () => {
@@ -140,7 +142,9 @@ describe('codeEditorSlice', () => {
       store.dispatch(removeProp({ propId }));
 
       const state = store.getState();
-      expect(selectCodeComponentProperty('required')(state)).toEqual(['otherKey']);
+      expect(selectCodeComponentProperty('required')(state)).toEqual([
+        'otherKey',
+      ]);
       expect(selectCodeComponentProperty('props')(state)).toHaveLength(0);
     });
   });

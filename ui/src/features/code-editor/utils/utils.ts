@@ -58,9 +58,7 @@ export function getDuplicatePropSchemaKeys(
     const key = getPropSchemaKey(prop);
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
-  return [...counts.entries()]
-    .filter(([, n]) => n > 1)
-    .map(([k]) => k);
+  return [...counts.entries()].filter(([, n]) => n > 1).map(([k]) => k);
 }
 
 /**
@@ -78,9 +76,7 @@ export function getDuplicateSlotSchemaKeys(
     const key = getSlotSchemaKey(slot);
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
-  return [...counts.entries()]
-    .filter(([, n]) => n > 1)
-    .map(([k]) => k);
+  return [...counts.entries()].filter(([, n]) => n > 1).map(([k]) => k);
 }
 
 /**

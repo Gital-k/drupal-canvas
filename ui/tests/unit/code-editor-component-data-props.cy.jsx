@@ -215,7 +215,9 @@ describe('Component data / props in code editor', () => {
     // Check that the prop is now required.
     cy.log('Checking updated prop');
     cy.wrap(store).then((store) => {
-      const firstProp = selectCodeComponentProperty('props')(store.getState())[0];
+      const firstProp = selectCodeComponentProperty('props')(
+        store.getState(),
+      )[0];
       const required = selectCodeComponentProperty('required')(
         store.getState(),
       );

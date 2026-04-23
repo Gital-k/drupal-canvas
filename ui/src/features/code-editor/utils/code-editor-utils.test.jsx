@@ -556,8 +556,18 @@ describe('Prop/slot schema keys and round-trip (machine name)', () => {
 
   it('serializeSlots keeps the first slot when two share a schema key', () => {
     const out = serializeSlots([
-      { id: '1', name: 'Main', machineName: 'content', example: '<p>first</p>' },
-      { id: '2', name: 'Other', machineName: 'content', example: '<p>second</p>' },
+      {
+        id: '1',
+        name: 'Main',
+        machineName: 'content',
+        example: '<p>first</p>',
+      },
+      {
+        id: '2',
+        name: 'Other',
+        machineName: 'content',
+        example: '<p>second</p>',
+      },
     ]);
     expect(out.content).toEqual({
       title: 'Main',

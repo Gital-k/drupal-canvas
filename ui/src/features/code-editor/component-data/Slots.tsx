@@ -22,6 +22,7 @@ import FormPropTypeSlot from '@/features/code-editor/component-data/forms/FormPr
 import SortableList from '@/features/code-editor/component-data/SortableList';
 
 import './Slots.css';
+
 import {
   getDuplicateSlotSchemaKeys,
   getSlotSchemaKey,
@@ -102,7 +103,9 @@ export default function Slots() {
               <TextField.Root
                 autoComplete="off"
                 id={`slot-machine-name-${slot.id}`}
-                placeholder={slot.name ? `Default: ${defaultKeyHint}` : 'Set title first'}
+                placeholder={
+                  slot.name ? `Default: ${defaultKeyHint}` : 'Set title first'
+                }
                 value={slot.machineName ?? ''}
                 size="1"
                 className="slots-field-full-width"
