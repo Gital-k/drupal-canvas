@@ -6892,7 +6892,7 @@ HTML
   /**
    * {@inheritdoc}
    */
-  public static function providerGetOptionsForExplicitInputEnumProp(): array {
+   public static function providerGetOptionsForExplicitInputEnumProp(): array {
     return [
       // The test SDC has a mismatch between enum values and meta:enum keys.
       // The method returns ALL enum values with labels from meta:enum where
@@ -6927,8 +6927,24 @@ HTML
     ];
   }
 
+  public static function providerGetLabelForExplicitInput(): \Generator {
+    // Test case: SDC prop with title in schema
+    yield 'sdc_prop_with_title' => [
+      'component_id' => 'sdc.canvas_test_sdc.my-cta',
+      'prop_name' => 'text',
+      'expected_label' => 'Title',
+    ];
+
+    // Test case: SDC prop without title (fallback to ucfirst)
+    yield 'sdc_prop_without_title_fallback' => [
+      'component_id' => 'sdc.canvas_test_sdc.my-cta',
+      'prop_name' => 'attributes',
+      'expected_label' => 'Attributes',
+    ];
+  }
+
   /**
-   * Tests that validateComponentInput() keeps non-empty items for multi-cardinality props.
+    * Tests that validateComponentInput() keeps non-empty items for multi-cardinality props.
    *
    * When a multiple-cardinality static prop source contains a mix of valid and
    * empty items (as happens during "mid-input" preview/auto-save), the empty

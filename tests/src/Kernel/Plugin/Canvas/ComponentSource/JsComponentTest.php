@@ -2669,7 +2669,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
   /**
    * {@inheritdoc}
    */
-  public static function providerGetOptionsForExplicitInputEnumProp(): array {
+   public static function providerGetOptionsForExplicitInputEnumProp(): array {
     return [
       'non-array enum prop' => [
         'component_id' => 'js.canvas_test_code_components_with_enums',
@@ -2689,6 +2689,22 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
           'large' => 'Large',
         ],
       ],
+    ];
+  }
+
+  public static function providerGetLabelForExplicitInput(): \Generator {
+    // Test case: prop with title in schema
+    yield 'prop_with_title_in_schema' => [
+      'component_id' => 'js.canvas_test_code_components_with_enums',
+      'prop_name' => 'favorite_color',
+      'expected_label' => 'Favorite color',
+    ];
+
+    // Test case: prop with title matching lowercase prop name
+    yield 'prop_with_title_matching_prop_name' => [
+      'component_id' => 'js.canvas_test_code_components_with_props',
+      'prop_name' => 'name',
+      'expected_label' => 'name',
     ];
   }
 

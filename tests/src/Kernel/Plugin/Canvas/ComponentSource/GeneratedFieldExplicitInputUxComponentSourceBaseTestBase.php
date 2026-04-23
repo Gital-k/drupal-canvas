@@ -332,6 +332,39 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBaseTestBase extends 
     self::assertSame($expected_options, $options_as_strings);
   }
 
+  /**
+   * Data provider for ::testGetLabelForExplicitInput().
+   *
+   * @return \Generator<string, array{component_id: string, prop_name: string, expected_label: string}>
+   */
+  abstract public static function providerGetLabelForExplicitInput(): \Generator;
+
+  /**
+   * Tests getLabelForExplicitInput() returns correct labels.
+   *
+   * @param string $component_id
+   *   The component config entity ID.
+   * @param string $prop_name
+   *   The prop name to test.
+   * @param string $expected_label
+   *   The expected label for the prop.
+   *
+   * @legacy-covers ::getLabelForExplicitInput
+   */
+  #[DataProvider('providerGetLabelForExplicitInput')]
+  public function testGetLabelForExplicitInput(string $component_id, string $prop_name, string $expected_label): void {
+    $this->generateComponentConfig();
+    $component = Component::load($component_id);
+    self::assertInstanceOf(ComponentInterface::class, $component);
+
+    $source = $component->getComponentSource();
+    self::assertInstanceOf(GeneratedFieldExplicitInputUxComponentSourceBase::class, $source);
+
+    $actual_label = (string) $source->getLabelForExplicitInput($prop_name);
+
+    self::assertSame($expected_label, $actual_label);
+  }
+
   #[DataProvider('providerResolvedComponentInputs')]
   public function testResolvedComponentInputs(string $component_id, array $inputs, ?array $expectedResolvedInputs): void {
     $user = $this->setUpCurrentUser([], [

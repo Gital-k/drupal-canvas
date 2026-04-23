@@ -834,7 +834,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       }
 
       $field_widget_plugin_id = $static_prop_source_field_definition['field_widget'];
-      $label = $component_schema['properties'][$sdc_prop_name]['title'] ?? Unicode::ucfirst($sdc_prop_name);
+      $label = $this->getLabelForExplicitInput($sdc_prop_name);
       $description = $component_schema['properties'][$sdc_prop_name]['description'] ?? NULL;
       $widget = $source->getWidget($component->id(), $component->getLoadedVersion(), $sdc_prop_name, $label, $field_widget_plugin_id, $description);
       $is_required = $static_prop_source_field_definition['required'];
