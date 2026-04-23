@@ -343,16 +343,23 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     return $hydrated_inputs[self::EXPLICIT_INPUT_NAME];
   }
 
-  /**
-   * {@inheritdoc}
-   */
-  public function getExplicitInput(string $uuid, ComponentTreeItem $item, ?FieldableEntityInterface $host_entity = NULL): array {
-    if (!$this->requiresExplicitInput()) {
-      return [
-        'resolved' => [],
-        'source' => [],
-      ];
-    }
+   /**
+    * {@inheritdoc}
+    */
+   public function getLabelForExplicitInput(string $prop_name): string|TranslatableMarkup {
+     return $this->getMetadata()->schema['properties'][$prop_name]['title'] ?? Unicode::ucfirst($prop_name);
+   }
+
+   /**
+    * {@inheritdoc}
+    */
+   public function getExplicitInput(string $uuid, ComponentTreeItem $item, ?FieldableEntityInterface $host_entity = NULL): array {
+     if (!$this->requiresExplicitInput()) {
+       return [
+         'resolved' => [],
+         'source' => [],
+       ];
+     }
 
     // Prop sources can only evaluate structured data from fieldable entities,
     // but the component tree may be contained by a config entity.

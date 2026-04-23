@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupal\canvas\Plugin\Canvas\ComponentSource;
 
 use Drupal\Component\Utility\Html;
+use Drupal\Component\Utility\Unicode;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Form\FormStateInterface;
@@ -90,6 +91,13 @@ final class Fallback extends ComponentSourceBase implements ComponentSourceWithS
    */
   public function getDefaultExplicitInput(bool $only_required = FALSE): array {
     return [];
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getLabelForExplicitInput(string $prop_name): string {
+    return Unicode::ucfirst($prop_name);
   }
 
   public function getExplicitInput(string $uuid, ComponentTreeItem $item, ?FieldableEntityInterface $host_entity = NULL): array {

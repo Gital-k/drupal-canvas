@@ -12,6 +12,7 @@ use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\Validation\BasicRecursiveValidatorFactory;
+use Drupal\Component\Utility\Unicode;
 use Drupal\canvas\Attribute\ComponentSource;
 use Drupal\canvas\ComponentSource\ComponentSourceBase;
 use Drupal\canvas\ComponentSource\ComponentSourceWithSlotsInterface;
@@ -294,6 +295,13 @@ final class Personalization extends ComponentSourceBase implements
         'segments' => [Segment::DEFAULT_ID],
       ],
     };
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getLabelForExplicitInput(string $prop_name): string|TranslatableMarkup {
+    return Unicode::ucfirst($prop_name);
   }
 
   /**
