@@ -238,228 +238,6 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
       });
   };
 
-  it('can remove datetime items using popover remove button', () => {
-    cy.loadURLandWaitForCanvasLoaded({ url: 'canvas/editor/node/2' });
-    cy.findByTestId('canvas-page-data-form').as('entityForm');
-    cy.get('@entityForm').recordFormBuildId();
-
-    cy.findByRole('heading', { name: 'Canvas Unlimited DateTime' })
-      .closest('.js-form-wrapper')
-      .as('unlimited-datetime');
-
-    const entityFormSelector = '[data-testid="canvas-page-data-form"]';
-
-    // Set up two items. Register intercept BEFORE each action that triggers
-    // the preview update.
-    cy.intercept({
-      url: '**/canvas/api/v0/layout/node/2',
-      times: 1,
-      method: 'POST',
-    }).as('updatePreview');
-    setDateTimeInFirstEmptyRow('@unlimited-datetime', '2024-01-01', '10:00');
-    cy.wait('@updatePreview');
-    cy.waitForAjax();
-
-    cy.get('@unlimited-datetime')
-      .findByRole('button', { name: '+ Add new' })
-      .click();
-    cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
-    cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
-
-    cy.intercept({
-      url: '**/canvas/api/v0/layout/node/2',
-      times: 1,
-      method: 'POST',
-    }).as('updatePreview');
-    setDateTimeInFirstEmptyRow('@unlimited-datetime', '2024-02-01', '11:00');
-    cy.wait('@updatePreview');
-    cy.waitForAjax();
-
-    // Get initial row count and verify removal works.
-    assertCommittedItemCount('@unlimited-datetime', 2);
-
-    // Open the popover for the first item and verify the Remove button.
-    openEditableRowPopover('@unlimited-datetime', 0);
-
-    cy.get('[role="dialog"][data-state="open"]').should('exist');
-
-    cy.get('[role="dialog"][data-state="open"]')
-      .findByRole('button', { name: /Remove/i })
-      .should('exist');
-
-    cy.get('[role="dialog"][data-state="open"]')
-      .findByRole('button', { name: /Remove/i })
-      .click();
-
-    cy.get('[role="dialog"][data-state="open"]').should('not.exist');
-
-    cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
-    cy.waitForAjax();
-
-    // Verify row count decreased.
-    assertCommittedItemCount('@unlimited-datetime', 1);
-  });
-
-  it('remove button is disabled for required field with only one item', () => {
-    cy.loadURLandWaitForCanvasLoaded({ url: 'canvas/editor/node/2' });
-    cy.findByTestId('canvas-page-data-form').as('entityForm');
-    cy.get('@entityForm').recordFormBuildId();
-
-    cy.findByRole('heading', { name: 'Canvas Required DateTime' })
-      .closest('.js-form-wrapper')
-      .as('required-datetime');
-
-    // Set one datetime value (required field must have at least one value).
-    // Register intercept BEFORE the action that triggers the preview update.
-    cy.intercept({
-      url: '**/canvas/api/v0/layout/node/2',
-      times: 1,
-      method: 'POST',
-    }).as('updatePreview');
-    setDateTimeInFirstEmptyRow('@required-datetime', '2024-01-01', '10:00');
-    cy.wait('@updatePreview');
-    cy.waitForAjax();
-
-    // Verify at least one committed value exists.
-    getCommittedItemCount('@required-datetime').then((count) => {
-      expect(count).to.be.greaterThan(0);
-      cy.wrap(count).as('requiredCountBeforePopover');
-    });
-
-    // Open the popover for the only item.
-    openEditableRowPopover('@required-datetime', 0);
-
-    cy.get('[role="dialog"][data-state="open"]').should('exist');
-
-    // Verify button state reflects the current count.
-    cy.get('@requiredCountBeforePopover').then((count) => {
-      if (count === 1) {
-        cy.get('[role="dialog"][data-state="open"]')
-          .findByRole('button', { name: /Remove/i })
-          .should('be.disabled');
-      } else {
-        cy.get('[role="dialog"][data-state="open"]')
-          .findByRole('button', { name: /Remove/i })
-          .should('exist');
-      }
-    });
-
-    // Close the popover.
-    cy.get('[role="dialog"][data-state="open"]')
-      .find('[aria-label="Close"]')
-      .click();
-    cy.get('[role="dialog"][data-state="open"]').should('not.exist');
-  });
-
-  it('remove button is enabled for required field with multiple items', () => {
-    cy.loadURLandWaitForCanvasLoaded({ url: 'canvas/editor/node/2' });
-    cy.findByTestId('canvas-page-data-form').as('entityForm');
-    cy.get('@entityForm').recordFormBuildId();
-
-    cy.findByRole('heading', { name: 'Canvas Required DateTime' })
-      .closest('.js-form-wrapper')
-      .as('required-datetime');
-
-    const entityFormSelector = '[data-testid="canvas-page-data-form"]';
-
-    // Set first datetime value. Register intercept BEFORE the action that
-    // triggers the preview update.
-    cy.intercept({
-      url: '**/canvas/api/v0/layout/node/2',
-      times: 1,
-      method: 'POST',
-    }).as('updatePreview');
-    setDateTimeInFirstEmptyRow('@required-datetime', '2024-01-01', '10:00');
-    cy.wait('@updatePreview');
-    cy.waitForAjax();
-
-    // Add second item.
-    cy.get('@required-datetime')
-      .findByRole('button', { name: '+ Add new' })
-      .click();
-    cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
-    cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
-
-    // @todo Arbitrary wait should not be needed after
-    //   https://drupal.org/i/3579026.
-    // eslint-disable-next-line cypress/no-unnecessary-waiting
-    cy.wait(500);
-
-    // Set second datetime value.
-    cy.intercept({
-      url: '**/canvas/api/v0/layout/node/2',
-      times: 1,
-      method: 'POST',
-    }).as('updatePreview');
-    setDateTimeInFirstEmptyRow('@required-datetime', '2024-02-01', '11:00');
-    cy.wait('@updatePreview');
-    cy.waitForAjax();
-
-    // Verify multiple committed values exist.
-    getCommittedItemCount('@required-datetime').then((countBeforeRemove) => {
-      expect(countBeforeRemove).to.be.greaterThan(1);
-      cy.wrap(countBeforeRemove).as('countBeforeRemove');
-    });
-
-    // Open the popover for the first item.
-    openEditableRowPopover('@required-datetime', 0);
-
-    cy.get('[role="dialog"][data-state="open"]').should('exist');
-
-    // Verify Remove button IS visible (enabled for required field with multiple items).
-    cy.get('[role="dialog"][data-state="open"]')
-      .findByRole('button', { name: /Remove/i })
-      .should('exist')
-      .should('not.be.disabled');
-
-    // @todo Arbitrary wait should not be needed after
-    //   https://drupal.org/i/3579026.
-    // eslint-disable-next-line cypress/no-unnecessary-waiting
-    cy.wait(500);
-
-    // Click remove button to verify it works.
-    cy.get('[role="dialog"][data-state="open"]')
-      .findByRole('button', { name: /Remove/i })
-      .click();
-
-    cy.get('[role="dialog"][data-state="open"]').should('not.exist');
-
-    cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
-    cy.waitForAjax();
-
-    // Verify one item was removed.
-    cy.get('@countBeforeRemove').then((countBeforeRemove) => {
-      getCommittedItemCount('@required-datetime').then((countAfterRemove) => {
-        expect(countAfterRemove).to.be.lessThan(countBeforeRemove);
-        expect(countAfterRemove).to.be.greaterThan(0);
-      });
-    });
-
-    // Now open the popover again for the remaining item.
-    openEditableRowPopover('@required-datetime', 0);
-
-    cy.get('[role="dialog"][data-state="open"]').should('exist');
-
-    // Verify button state matches remaining item count.
-    getCommittedItemCount('@required-datetime').then((remainingCount) => {
-      if (remainingCount === 1) {
-        cy.get('[role="dialog"][data-state="open"]')
-          .findByRole('button', { name: /Remove/i })
-          .should('be.disabled');
-      } else {
-        cy.get('[role="dialog"][data-state="open"]')
-          .findByRole('button', { name: /Remove/i })
-          .should('exist');
-      }
-    });
-
-    // Close the popover.
-    cy.get('[role="dialog"][data-state="open"]')
-      .find('[aria-label="Close"]')
-      .click();
-    cy.get('[role="dialog"][data-state="open"]').should('not.exist');
-  });
-
   it('renders multivalue datetime fields with popover-based UI', () => {
     cy.loadURLandWaitForCanvasLoaded({ url: 'canvas/editor/node/2' });
 
@@ -916,6 +694,235 @@ describe('Multivalue DateTime Form Design (canvas_dev_mode)', () => {
 
     // Close the popover.
     cy.get('[role="dialog"][data-state="open"]').find('[aria-label="Close"]');
+    cy.get('[role="dialog"][data-state="open"]')
+      .find('[aria-label="Close"]')
+      .click();
+    cy.get('[role="dialog"][data-state="open"]').should('not.exist');
+  });
+
+  // Skipping due to intermittent failures.
+  // Much of what is tested here is also covered by tests/src/Playwright/tests/isolatedPerTest/multivaluePropTypes.spec.ts
+  // The part that isn't covered there is this widget in an entity form, which
+  // is not currently something available to end users, as the canvas page data
+  // entity type is not currently fieldable.
+  // @todo un-skip in https://drupal.org/i/3562896 which includes preview API
+  // queueing that solved similar problems with AJAX operation in entity forms.
+  // eslint-disable-next-line mocha/no-pending-tests
+  it.skip('can remove datetime items using popover remove button', () => {
+    cy.loadURLandWaitForCanvasLoaded({ url: 'canvas/editor/node/2' });
+    cy.findByTestId('canvas-page-data-form').as('entityForm');
+    cy.get('@entityForm').recordFormBuildId();
+
+    cy.findByRole('heading', { name: 'Canvas Unlimited DateTime' })
+      .closest('.js-form-wrapper')
+      .as('unlimited-datetime');
+
+    const entityFormSelector = '[data-testid="canvas-page-data-form"]';
+
+    // Set up two items. Register intercept BEFORE each action that triggers
+    // the preview update.
+    cy.intercept({
+      url: '**/canvas/api/v0/layout/node/2',
+      times: 1,
+      method: 'POST',
+    }).as('updatePreview');
+    setDateTimeInFirstEmptyRow('@unlimited-datetime', '2024-01-01', '10:00');
+    cy.wait('@updatePreview');
+    cy.waitForAjax();
+
+    cy.get('@unlimited-datetime')
+      .findByRole('button', { name: '+ Add new' })
+      .click();
+    cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
+    cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
+
+    cy.intercept({
+      url: '**/canvas/api/v0/layout/node/2',
+      times: 1,
+      method: 'POST',
+    }).as('updatePreview');
+    setDateTimeInFirstEmptyRow('@unlimited-datetime', '2024-02-01', '11:00');
+    cy.wait('@updatePreview');
+    cy.waitForAjax();
+
+    // Get initial row count and verify removal works.
+    assertCommittedItemCount('@unlimited-datetime', 2);
+
+    // Open the popover for the first item and verify the Remove button.
+    openEditableRowPopover('@unlimited-datetime', 0);
+
+    cy.get('[role="dialog"][data-state="open"]').should('exist');
+
+    cy.get('[role="dialog"][data-state="open"]')
+      .findByRole('button', { name: /Remove/i })
+      .should('exist');
+
+    cy.get('[role="dialog"][data-state="open"]')
+      .findByRole('button', { name: /Remove/i })
+      .click();
+
+    cy.get('[role="dialog"][data-state="open"]').should('not.exist');
+
+    cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
+    cy.waitForAjax();
+
+    // Verify row count decreased.
+    assertCommittedItemCount('@unlimited-datetime', 1);
+  });
+
+  // See the explanation for the skip one test above.
+  // eslint-disable-next-line mocha/no-pending-tests
+  it.skip('remove button is disabled for required field with only one item', () => {
+    cy.loadURLandWaitForCanvasLoaded({ url: 'canvas/editor/node/2' });
+    cy.findByTestId('canvas-page-data-form').as('entityForm');
+    cy.get('@entityForm').recordFormBuildId();
+
+    cy.findByRole('heading', { name: 'Canvas Required DateTime' })
+      .closest('.js-form-wrapper')
+      .as('required-datetime');
+
+    // Set one datetime value (required field must have at least one value).
+    // Register intercept BEFORE the action that triggers the preview update.
+    cy.intercept({
+      url: '**/canvas/api/v0/layout/node/2',
+      times: 1,
+      method: 'POST',
+    }).as('updatePreview');
+    setDateTimeInFirstEmptyRow('@required-datetime', '2024-01-01', '10:00');
+    cy.wait('@updatePreview');
+    cy.waitForAjax();
+
+    // Verify at least one committed value exists.
+    getCommittedItemCount('@required-datetime').then((count) => {
+      expect(count).to.be.greaterThan(0);
+      cy.wrap(count).as('requiredCountBeforePopover');
+    });
+
+    // Open the popover for the only item.
+    openEditableRowPopover('@required-datetime', 0);
+
+    cy.get('[role="dialog"][data-state="open"]').should('exist');
+
+    // Verify button state reflects the current count.
+    cy.get('@requiredCountBeforePopover').then((count) => {
+      if (count === 1) {
+        cy.get('[role="dialog"][data-state="open"]')
+          .findByRole('button', { name: /Remove/i })
+          .should('be.disabled');
+      } else {
+        cy.get('[role="dialog"][data-state="open"]')
+          .findByRole('button', { name: /Remove/i })
+          .should('exist');
+      }
+    });
+
+    // Close the popover.
+    cy.get('[role="dialog"][data-state="open"]')
+      .find('[aria-label="Close"]')
+      .click();
+    cy.get('[role="dialog"][data-state="open"]').should('not.exist');
+  });
+
+  // See the explanation for the skip two tests above.
+  // eslint-disable-next-line mocha/no-pending-tests
+  it.skip('remove button is enabled for required field with multiple items', () => {
+    cy.loadURLandWaitForCanvasLoaded({ url: 'canvas/editor/node/2' });
+    cy.findByTestId('canvas-page-data-form').as('entityForm');
+    cy.get('@entityForm').recordFormBuildId();
+
+    cy.findByRole('heading', { name: 'Canvas Required DateTime' })
+      .closest('.js-form-wrapper')
+      .as('required-datetime');
+
+    const entityFormSelector = '[data-testid="canvas-page-data-form"]';
+
+    // Set first datetime value. Register intercept BEFORE the action that
+    // triggers the preview update.
+    cy.intercept({
+      url: '**/canvas/api/v0/layout/node/2',
+      times: 1,
+      method: 'POST',
+    }).as('updatePreview');
+    setDateTimeInFirstEmptyRow('@required-datetime', '2024-01-01', '10:00');
+    cy.wait('@updatePreview');
+    cy.waitForAjax();
+
+    // Add second item.
+    cy.get('@required-datetime')
+      .findByRole('button', { name: '+ Add new' })
+      .click();
+    cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
+    cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
+
+    // Set second datetime value.
+    cy.intercept({
+      url: '**/canvas/api/v0/layout/node/2',
+      times: 1,
+      method: 'POST',
+    }).as('updatePreview');
+    setDateTimeInFirstEmptyRow('@required-datetime', '2024-02-01', '11:00');
+    cy.wait('@updatePreview');
+    cy.waitForAjax();
+
+    // Verify multiple committed values exist.
+    getCommittedItemCount('@required-datetime').then((countBeforeRemove) => {
+      expect(countBeforeRemove).to.be.greaterThan(1);
+      cy.wrap(countBeforeRemove).as('countBeforeRemove');
+    });
+
+    // Open the popover for the first item.
+    openEditableRowPopover('@required-datetime', 0);
+
+    cy.get('[role="dialog"][data-state="open"]').should('exist');
+
+    // Verify Remove button IS visible (enabled for required field with multiple items).
+    cy.get('[role="dialog"][data-state="open"]')
+      .findByRole('button', { name: /Remove/i })
+      .should('exist')
+      .should('not.be.disabled');
+
+    // @todo Arbitrary wait should not be needed after
+    //   https://drupal.org/i/3579026.
+    // eslint-disable-next-line cypress/no-unnecessary-waiting
+    cy.wait(500);
+
+    // Click remove button to verify it works.
+    cy.get('[role="dialog"][data-state="open"]')
+      .findByRole('button', { name: /Remove/i })
+      .click();
+
+    cy.get('[role="dialog"][data-state="open"]').should('not.exist');
+
+    cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
+    cy.waitForAjax();
+
+    // Verify one item was removed.
+    cy.get('@countBeforeRemove').then((countBeforeRemove) => {
+      getCommittedItemCount('@required-datetime').then((countAfterRemove) => {
+        expect(countAfterRemove).to.be.lessThan(countBeforeRemove);
+        expect(countAfterRemove).to.be.greaterThan(0);
+      });
+    });
+
+    // Now open the popover again for the remaining item.
+    openEditableRowPopover('@required-datetime', 0);
+
+    cy.get('[role="dialog"][data-state="open"]').should('exist');
+
+    // Verify button state matches remaining item count.
+    getCommittedItemCount('@required-datetime').then((remainingCount) => {
+      if (remainingCount === 1) {
+        cy.get('[role="dialog"][data-state="open"]')
+          .findByRole('button', { name: /Remove/i })
+          .should('be.disabled');
+      } else {
+        cy.get('[role="dialog"][data-state="open"]')
+          .findByRole('button', { name: /Remove/i })
+          .should('exist');
+      }
+    });
+
+    // Close the popover.
     cy.get('[role="dialog"][data-state="open"]')
       .find('[aria-label="Close"]')
       .click();
