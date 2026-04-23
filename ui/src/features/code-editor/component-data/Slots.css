@@ -1,0 +1,10 @@
+/* Match label row height (see Props.css .props-form-label-row) */
+.slots-form-label-row {
+  min-height: 1.25rem;
+  flex-shrink: 0;
+}
+
+/* Text fields in the slots grid: use full width of the cell */
+.slots-field-full-width {
+  width: 100%;
+}

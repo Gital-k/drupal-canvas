@@ -22,6 +22,28 @@ export function getPropMachineName(name: string) {
 }
 
 /**
+ * Schema / storage key for a prop: explicit machineName, else camelCase(title).
+ */
+export function getPropSchemaKey(prop: CodeComponentProp): string {
+  const explicit = prop.machineName?.trim();
+  if (explicit) {
+    return explicit;
+  }
+  return camelCase(prop.name);
+}
+
+/**
+ * Schema / storage key for a slot: explicit machineName, else camelCase(title).
+ */
+export function getSlotSchemaKey(slot: CodeComponentSlot): string {
+  const explicit = slot.machineName?.trim();
+  if (explicit) {
+    return explicit;
+  }
+  return camelCase(slot.name);
+}
+
+/**
  * Parses a prop value for the code editor preview.
  *
  * @see ui/src/features/code-editor/Preview.tsx
@@ -63,8 +85,7 @@ export function getPropValuesForPreview(
   props
     .filter((prop) => prop.name)
     .forEach((prop) => {
-      propValues[getPropMachineName(prop.name)] =
-        parsePropValueForPreview(prop);
+      propValues[getPropSchemaKey(prop)] = parsePropValueForPreview(prop);
     });
   return propValues;
 }
@@ -80,7 +101,7 @@ export function getPropValuesForPreview(
 export function getSlotNamesForPreview(slots: CodeComponentSlot[]): string[] {
   return slots
     .filter((slot) => slot.name && slot.example)
-    .map((slot) => getPropMachineName(slot.name));
+    .map((slot) => getSlotSchemaKey(slot));
 }
 
 /**
@@ -97,7 +118,7 @@ export function getJsForSlotsPreview(slots: CodeComponentSlot[]) {
     .map((slot) => {
       // Wrap the slot's example value in a function so that it can be
       // rendered by Preact.
-      return `export function ${getPropMachineName(slot.name)}() { return (${slot.example as string});}`;
+      return `export function ${getSlotSchemaKey(slot)}() { return (${slot.example as string});}`;
     })
     .join('\n');
 }
@@ -258,7 +279,7 @@ export function serializeProps(props: CodeComponentProp[]) {
           if (xFormattingContext)
             processed['x-formatting-context'] = xFormattingContext;
         }
-        return { ...acc, [getPropMachineName(name)]: processed };
+        return { ...acc, [getPropSchemaKey(prop)]: processed };
       },
       {} as Record<string, CodeComponentPropSerialized>,
     );
@@ -279,7 +300,10 @@ export function deserializeProps(
   if (!props) {
     return [];
   }
-  return Object.entries(props).map(([, prop]) => {
+  return Object.entries(props).map(([schemaKey, prop]) => {
+    // Tests (and any mistaken array input) use Object.entries on arrays, whose
+    // keys are "0", "1", …; those are not real schema keys.
+    const storageKey = /^\d+$/.test(schemaKey) ? undefined : schemaKey;
     const {
       title,
       type,
@@ -354,6 +378,7 @@ export function deserializeProps(
     const deserializedProp = {
       id: uuidv4(),
       name: title,
+      ...(storageKey !== undefined && { machineName: storageKey }),
       type: actualType,
       example:
         isVideo && Array.isArray(example)
@@ -453,7 +478,7 @@ export function serializeSlots(slots: CodeComponentSlot[]) {
         const { name, example } = slot;
         return {
           ...acc,
-          [getPropMachineName(name)]: {
+          [getSlotSchemaKey(slot)]: {
             title: name,
             ...(example && { examples: [example] }),
           },
@@ -475,11 +500,15 @@ export function deserializeSlots(
   if (!slots) {
     return [];
   }
-  return Object.entries(slots).map(([, slot]) => ({
-    id: uuidv4(),
-    name: slot.title,
-    example: slot.examples?.length ? slot.examples[0] : '',
-  }));
+  return Object.entries(slots).map(([schemaKey, slot]) => {
+    const storageKey = /^\d+$/.test(schemaKey) ? undefined : schemaKey;
+    return {
+      id: uuidv4(),
+      name: slot.title,
+      ...(storageKey !== undefined && { machineName: storageKey }),
+      example: slot.examples?.length ? slot.examples[0] : '',
+    };
+  });
 }
 
 /**

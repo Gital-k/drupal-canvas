@@ -2,7 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 
 import {
-  getPropMachineName,
+  getPropSchemaKey,
   serializeProps,
   serializeSlots,
 } from '@/features/code-editor/utils/utils';
@@ -188,6 +188,7 @@ export const codeEditorSlice = createSlice({
       state.codeComponent.props.push({
         id: uuidv4(),
         name: '',
+        machineName: '',
         type: 'string',
         example: '',
         format: undefined,
@@ -206,10 +207,18 @@ export const codeEditorSlice = createSlice({
       const propIndex = state.codeComponent.props.findIndex((p) => p.id === id);
       if (propIndex !== -1) {
         const currentProp = state.codeComponent.props[propIndex];
-        state.codeComponent.props[propIndex] = {
+        const oldKey = getPropSchemaKey(currentProp);
+        const merged = {
           ...currentProp,
           ...updates,
         } as CodeComponentProp;
+        const newKey = getPropSchemaKey(merged);
+        state.codeComponent.props[propIndex] = merged;
+        if (oldKey !== newKey) {
+          state.codeComponent.required = state.codeComponent.required.map(
+            (key) => (key === oldKey ? newKey : key),
+          );
+        }
         // Set auto-save to true when updating a prop.
         state.status.needsAutoSave = true;
       }
@@ -230,7 +239,7 @@ export const codeEditorSlice = createSlice({
       );
       if (propToRemove) {
         state.codeComponent.required = state.codeComponent.required.filter(
-          (name) => name !== getPropMachineName(propToRemove.name),
+          (name) => name !== getPropSchemaKey(propToRemove),
         );
         // Set auto-save to true when removing a prop.
         state.status.needsAutoSave = true;
@@ -262,7 +271,7 @@ export const codeEditorSlice = createSlice({
       const prop = state.codeComponent.props.find((p) => p.id === propId);
       if (!prop) return;
 
-      const propName = getPropMachineName(prop.name);
+      const propName = getPropSchemaKey(prop);
       if (state.codeComponent.required.includes(propName)) {
         state.codeComponent.required = state.codeComponent.required.filter(
           (name) => name !== propName,
@@ -278,6 +287,7 @@ export const codeEditorSlice = createSlice({
       state.codeComponent.slots.push({
         id: uuidv4(),
         name: '',
+        machineName: '',
         example: '',
       });
     },

@@ -13,7 +13,9 @@ import {
   deserializeProps,
   deserializeSlots,
   formatToValidImportName,
+  getPropSchemaKey,
   getPropValuesForPreview,
+  getSlotSchemaKey,
   serializeProps,
   serializeSlots,
 } from '@/features/code-editor/utils/utils';
@@ -414,6 +416,105 @@ describe('Code editor utilities', () => {
         id: undefined,
       });
     });
+  });
+});
+
+describe('Prop/slot schema keys and round-trip (machine name)', () => {
+  it('getPropSchemaKey returns trimmed machineName when set', () => {
+    expect(
+      getPropSchemaKey({
+        id: '1',
+        name: 'ignored when machine name set',
+        type: 'string',
+        derivedType: 'text',
+        machineName: '  my_custom_key  ',
+        example: '',
+      }),
+    ).toBe('my_custom_key');
+  });
+
+  it('getPropSchemaKey falls back to camelCase title when machineName is empty or whitespace', () => {
+    expect(
+      getPropSchemaKey({
+        id: '1',
+        name: 'Button label',
+        type: 'string',
+        derivedType: 'text',
+        machineName: '',
+        example: '',
+      }),
+    ).toBe('buttonLabel');
+    expect(
+      getPropSchemaKey({
+        id: '1',
+        name: 'Button label',
+        type: 'string',
+        derivedType: 'text',
+        machineName: '   ',
+        example: '',
+      }),
+    ).toBe('buttonLabel');
+  });
+
+  it('getSlotSchemaKey returns trimmed machineName when set', () => {
+    expect(
+      getSlotSchemaKey({
+        id: '1',
+        name: 'Any title',
+        machineName: '  slotKey  ',
+      }),
+    ).toBe('slotKey');
+  });
+
+  it('getSlotSchemaKey falls back to camelCase title when machineName is empty', () => {
+    expect(
+      getSlotSchemaKey({
+        id: '1',
+        name: 'Main region',
+        machineName: '',
+        example: '',
+      }),
+    ).toBe('mainRegion');
+  });
+
+  it('serializeProps then deserializeProps preserves a key that differs from camelCase(title)', () => {
+    const prop = {
+      id: 'round-trip-id',
+      name: 'Button label',
+      machineName: 'button_label',
+      type: 'string',
+      example: 'Go',
+      derivedType: 'text',
+    };
+    const serialized = serializeProps([prop]);
+    expect(serialized).toHaveProperty('button_label');
+    expect(serialized.button_label).toMatchObject({ title: 'Button label' });
+
+    const [deser] = deserializeProps(serialized);
+    expect(deser.name).toBe('Button label');
+    expect(deser.machineName).toBe('button_label');
+    expect(deser.type).toBe('string');
+    expect(deser.derivedType).toBe('text');
+  });
+
+  it('serializeSlots then deserializeSlots preserves a key that differs from camelCase(title)', () => {
+    const slot = {
+      id: 's1',
+      name: 'Body copy',
+      machineName: 'body_copy',
+      example: '<p>x</p>',
+    };
+    const serialized = serializeSlots([slot]);
+    expect(serialized).toHaveProperty('body_copy');
+    expect(serialized.body_copy).toEqual({
+      title: 'Body copy',
+      examples: ['<p>x</p>'],
+    });
+
+    const [deser] = deserializeSlots(serialized);
+    expect(deser.name).toBe('Body copy');
+    expect(deser.machineName).toBe('body_copy');
+    expect(deser.example).toBe('<p>x</p>');
   });
 });
 

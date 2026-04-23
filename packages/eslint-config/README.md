@@ -39,7 +39,7 @@ Canvas Code Components:
 | `component-exports`                            | Validates that component has a default export.                                                          |
 | `component-prop-example-value-image-url`       | Validates that `canvas.module/image` prop examples use fully qualified image URLs.                      |
 | `component-prop-example-value-no-empty-string` | Validates that string prop examples do not contain empty string values.                                 |
-| `component-prop-names`                         | Validates that component prop IDs match the camelCase version of their titles.                          |
+| `component-prop-names`                         | Ensures each `component.yml` prop under `props.properties` has a `title` (independent machine names are allowed). |
 
 ### Deprecated rules
 

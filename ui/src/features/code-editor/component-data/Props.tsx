@@ -7,8 +7,10 @@ import {
   Box,
   Callout,
   Flex,
+  Grid,
   Select,
   Switch,
+  Text,
   TextField,
   Tooltip,
 } from '@radix-ui/themes';
@@ -41,7 +43,7 @@ import FormPropTypeLink, {
 import FormPropTypeTextField from '@/features/code-editor/component-data/forms/FormPropTypeTextField';
 import FormPropTypeVideo from '@/features/code-editor/component-data/forms/FormPropTypeVideo';
 import SortableList from '@/features/code-editor/component-data/SortableList';
-import { getPropMachineName } from '@/features/code-editor/utils/utils';
+import { getPropSchemaKey } from '@/features/code-editor/utils/utils';
 import {
   VALUE_MODE_LIMITED,
   VALUE_MODE_UNLIMITED,
@@ -165,19 +167,34 @@ export default function Props() {
   };
 
   const renderPropContent = (prop: CodeComponentProp) => {
-    const propName = getPropMachineName(prop.name);
+    const propName = getPropSchemaKey(prop);
+    const duplicateSchemaKey =
+      prop.name &&
+      props.some(
+        (p) =>
+          p.id !== prop.id &&
+          p.name &&
+          getPropSchemaKey(p) === propName,
+      );
     return (
-      <Flex direction="column" flexGrow="1">
-        <Flex mb="4" gap="4" align="end" width="100%" wrap="wrap">
-          <Box flexShrink="0" flexGrow="1">
+      <Flex direction="column" flexGrow="1" gap="4">
+        {/*
+          2×2 grid (sm+): col1 = Title + Type, col2 = Machine name + Required
+          so labels and controls line up in columns. Single column on narrow viewports.
+        */}
+        <Grid columns={{ initial: '1', sm: '2' }} gap="4" width="100%">
+          <Box minWidth="0" width="100%">
             <FormElement>
-              <Label htmlFor={`prop-name-${prop.id}`}>Prop name</Label>
+              <Flex align="center" className="props-form-label-row">
+                <Label htmlFor={`prop-name-${prop.id}`}>Title</Label>
+              </Flex>
               <TextField.Root
                 autoComplete="off"
                 id={`prop-name-${prop.id}`}
-                placeholder="Enter a name"
+                placeholder="Enter a label"
                 value={prop.name}
                 size="1"
+                className="props-field-full-width"
                 onChange={(e) =>
                   dispatch(
                     updateProp({
@@ -190,7 +207,46 @@ export default function Props() {
               />
             </FormElement>
           </Box>
-          <Box flexShrink="0" minWidth="120px">
+          <Box minWidth="0" width="100%">
+            <FormElement>
+              <Flex align="center" gap="1" className="props-form-label-row">
+                <Label htmlFor={`prop-machine-name-${prop.id}`}>
+                  Machine name
+                </Label>
+                <Tooltip content="The key in component config, required fields, and your source (props passed to the component). If empty, it is derived from the title.">
+                  <QuestionMarkCircledIcon aria-label="About machine name" />
+                </Tooltip>
+              </Flex>
+              <TextField.Root
+                autoComplete="off"
+                id={`prop-machine-name-${prop.id}`}
+                placeholder={
+                  prop.name
+                    ? `Default: ${getPropSchemaKey({ ...prop, machineName: '' })}`
+                    : 'Set title first'
+                }
+                value={prop.machineName ?? ''}
+                size="1"
+                className="props-field-full-width"
+                onChange={(e) =>
+                  dispatch(
+                    updateProp({
+                      id: prop.id,
+                      updates: { machineName: e.target.value },
+                    }),
+                  )
+                }
+                disabled={disabledPropIds.has(prop.id)}
+                color={duplicateSchemaKey ? 'red' : undefined}
+              />
+              {duplicateSchemaKey && (
+                <Text size="1" color="red" mt="1">
+                  Another prop uses this machine name.
+                </Text>
+              )}
+            </FormElement>
+          </Box>
+          <Box minWidth="0" width="100%">
             <FormElement>
               <Label htmlFor={`prop-type-${prop.id}`}>Type</Label>
               <Select.Root
@@ -245,7 +301,10 @@ export default function Props() {
                 // Disable changing type if component is exposed and prop existed when loaded.
                 disabled={disabledPropIds.has(prop.id)}
               >
-                <Select.Trigger id={`prop-type-${prop.id}`} />
+                <Select.Trigger
+                  id={`prop-type-${prop.id}`}
+                  className="props-type-trigger"
+                />
                 <Select.Content>
                   {derivedPropTypes.map((type) => (
                     <Select.Item key={type.type} value={type.type}>
@@ -257,23 +316,25 @@ export default function Props() {
             </FormElement>
           </Box>
 
-          <Flex direction="column" gap="2">
-            <Label htmlFor={`prop-required-${prop.id}`}>Required</Label>
-            <Switch
-              id={`prop-required-${prop.id}`}
-              checked={required.includes(propName)}
-              size="1"
-              mb="1"
-              onCheckedChange={() =>
-                dispatch(
-                  toggleRequired({
-                    propId: prop.id,
-                  }),
-                )
-              }
-            />
-          </Flex>
-        </Flex>
+          <Box minWidth="0" width="100%">
+            <FormElement>
+              <Label htmlFor={`prop-required-${prop.id}`}>Required</Label>
+              <Switch
+                id={`prop-required-${prop.id}`}
+                checked={required.includes(propName)}
+                size="1"
+                disabled={disabledPropIds.has(prop.id)}
+                onCheckedChange={() =>
+                  dispatch(
+                    toggleRequired({
+                      propId: prop.id,
+                    }),
+                  )
+                }
+              />
+            </FormElement>
+          </Box>
+        </Grid>
 
         {(() => {
           switch (prop.derivedType) {
