@@ -346,6 +346,7 @@ const DrupalDatetimeMultivalueForm = ({
           {/* Remove Button - disabled when removing is not allowed */}
           <Flex justify="center" className={styles.removeButtonContainer}>
             <Button
+              data-multivalue-remove-item="true"
               variant="ghost"
               color="red"
               size="1"
