@@ -36,6 +36,7 @@ use Drupal\Core\Render\Element;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\Theme\Component\ComponentMetadata;
 use Drupal\Core\Theme\Component\ComponentValidator;
+use Drupal\Core\Url;
 use Drupal\canvas\ComponentSource\ComponentSourceBase;
 use Drupal\canvas\ComponentSource\ComponentSourceWithSlotsInterface;
 use Drupal\canvas\Entity\Component;
@@ -1367,9 +1368,15 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
         // @see https://www.drupal.org/project/canvas/issues/3583639
         if ($is_required_prop && ($prop_source['value'] ?? NULL) === NULL && $is_static_prop_source) {
           $field_type = $this->configuration['prop_field_definitions'][$prop]['field_type'] ?? NULL;
+          $link_type = (int) ($this->configuration['prop_field_definitions'][$prop]['field_instance_settings']['link_type'] ?? 0);
           if (\in_array($field_type, ['integer', 'float'], TRUE)) {
             $prop_source['value'] = 0;
           }
+          else if ($field_type === 'link' && $link_type === 16) {
+            $fallback_url = Url::fromRoute('<front>')->setAbsolute()->toString();
+            $prop_source['value'] = [['uri' => $fallback_url]];
+          }
+          // We also need to find a fallback mechanism for handling empty value for date and datetime.
         }
         $source = PropSource::parse($prop_source);
         if ($source instanceof EntityFieldPropSource) {
@@ -1457,14 +1464,21 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
         && \array_key_exists($required_prop, $this->configuration['prop_field_definitions'] ?? [])
       ) {
         $field_type = $this->configuration['prop_field_definitions'][$required_prop]['field_type'] ?? NULL;
+        $link_type = (int) ($this->configuration['prop_field_definitions'][$required_prop]['field_instance_settings']['link_type'] ?? 0);
+
         if (\in_array($field_type, ['integer', 'float'], TRUE)) {
           // Default to 0 so rendering receives a valid numeric value.
           $props[$required_prop] = $this->collapse($this->uncollapse(0, $required_prop), $required_prop);
         }
-        elseif ($field_type === 'link') {
+        elseif ($field_type === 'link' && $link_type === 17) {
           // Default to empty string so rendering receives a valid URL value.
           $props[$required_prop] = $this->collapse($this->uncollapse('', $required_prop), $required_prop);
         }
+        elseif ($field_type === 'link' && $link_type === 16) {
+          $fallback_url = Url::fromRoute('<front>')->setAbsolute()->toString();
+          $props[$required_prop] = $this->collapse($this->uncollapse([['uri' => $fallback_url]], $required_prop), $required_prop);
+        }
+        // We also need to find a fallback mechanism for handling empty value for date and datetime.
       }
     }
 
