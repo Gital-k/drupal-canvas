@@ -346,8 +346,8 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
    /**
     * {@inheritdoc}
     */
-   public function getLabelForExplicitInput(string $prop_name): string|TranslatableMarkup {
-     return $this->getMetadata()->schema['properties'][$prop_name]['title'] ?? Unicode::ucfirst($prop_name);
+   public function getLabelForExplicitInput(string $key): string|TranslatableMarkup {
+     return $this->getMetadata()->schema['properties'][$key]['title'] ?? Unicode::ucfirst($key);
    }
 
    /**
