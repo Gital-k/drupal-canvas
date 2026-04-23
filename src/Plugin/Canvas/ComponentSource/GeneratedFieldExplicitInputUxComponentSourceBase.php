@@ -253,8 +253,10 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
 
   /**
    * {@inheritdoc}
+   *
+   * @return array{'required': string[], 'shapes': array<string, array>}
    */
-  protected function getExplicitInputDefinitions(): array {
+  public function getExplicitInputDefinitions(): array {
     // Use the referenced Component version to determine required props.
     $required = \array_keys(\array_filter($this->configuration['prop_field_definitions'], static fn (array $definition) => $definition['required'] ?? FALSE));
     $prop_shapes = self::getComponentInputsForMetadata($this->getSourceSpecificComponentId(), $this->getMetadata());
@@ -370,6 +372,24 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
     };
 
     $values = $item->getInputs() ?? [];
+
+    // Populate missing multivalue properties as empty arrays
+    if (isset($this->configuration['prop_field_definitions'])) {
+      foreach ($this->configuration['prop_field_definitions'] as $prop_name => $definition) {
+        // Skip if already present in inputs
+        if (\array_key_exists($prop_name, $values)) {
+          continue;
+        }
+        // Check if this is a multivalue field.
+        $cardinality = $definition['cardinality'] ?? 1;
+        if ($cardinality === -1 || $cardinality > 1) {
+          // Represent the absence of values as an empty array.
+          $values[$prop_name] = $this->getDefaultStaticPropSource($prop_name, FALSE)->toArray();
+          $values[$prop_name]['value'] = [];
+        }
+      }
+    }
+
     $resolved_values = [];
     foreach ($values as $prop => $input) {
       $values[$prop] = $this->uncollapse($input, $prop)->toArray();
