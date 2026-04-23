@@ -92,7 +92,6 @@ const DrupalDatetimeMultivalueForm = ({
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [displayDate, setDisplayDate] = useState('');
   const [displayTime, setDisplayTime] = useState('');
-  const [itemExists, setItemExists] = useState(true);
   const valueAtOpenRef = useRef<{ date: string; time: string }>({
     date: '',
     time: '',
@@ -271,11 +270,6 @@ const DrupalDatetimeMultivalueForm = ({
             fieldName: fieldNames,
           }),
         );
-        const row = triggerRowRef.current?.closest('tr');
-        if (row) {
-          row.hidden = true;
-        }
-        setItemExists(false);
       }
     });
   };
@@ -290,10 +284,6 @@ const DrupalDatetimeMultivalueForm = ({
     }
     return 'Empty';
   })();
-
-  if (!itemExists) {
-    return null;
-  }
 
   return (
     <div style={{ display: 'contents' }}>

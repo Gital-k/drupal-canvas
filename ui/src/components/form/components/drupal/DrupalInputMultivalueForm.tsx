@@ -79,7 +79,6 @@ const DrupalInputMultivalueForm = ({
   );
   // Controlled popover state so we can close it programmatically on remove.
   const [popoverOpen, setPopoverOpen] = useState(false);
-  const [itemExists, setItemExists] = useState(true);
   const fieldLabel = attributes['data-field-label'] || '';
 
   const setPopoverOpenAndRefocus = (open: boolean) => {
@@ -281,18 +280,9 @@ const DrupalInputMultivalueForm = ({
             fieldName: fieldNames,
           }),
         );
-        const row = triggerElement.closest('tr');
-        if (row) {
-          row.hidden = true;
-        }
-        setItemExists(false);
       }
     });
   };
-
-  if (!itemExists) {
-    return null;
-  }
 
   return (
     <Popover.Root open={popoverOpen} onOpenChange={handlePopoverOpenChange}>

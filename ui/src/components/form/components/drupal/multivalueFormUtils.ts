@@ -87,6 +87,7 @@ export const triggerDrupalRemoveButton = (
   const tableRow = triggerElement.closest('tr');
   if (!tableRow) return null;
 
+  tableRow.hidden = true;
   // Find the original Drupal remove button directly (the hidden input/button
   // that carries the AJAX behavior). The cell and button are hidden by
   // CSS but remain in the DOM.
