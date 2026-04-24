@@ -1162,10 +1162,7 @@ final class EntityFieldPropSourceMatcher {
   }
 
   /**
-   * Returns the component plugin manager service.
-   *
-   * @return \Drupal\canvas\Plugin\ComponentPluginManager
-   *   The manager decorated by Canvas.
+   * @phpstan-return \Drupal\canvas\Plugin\ComponentPluginManager
    */
   private static function componentPluginManager(): ComponentPluginManager {
     return \Drupal::service(ComponentPluginManager::class);
