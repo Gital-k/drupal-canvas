@@ -4,22 +4,28 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Unit\Twig;
 
+use PHPUnit\Framework\Attributes\CoversMethod;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Drupal\Component\Render\MarkupInterface;
+use Drupal\Component\Serialization\Json;
 use Drupal\Core\File\FileUrlGeneratorInterface;
 use Drupal\Core\Image\ImageFactory;
+use Drupal\Core\Render\Markup;
 use Drupal\Core\Render\RendererInterface;
 use Drupal\Core\StreamWrapper\StreamWrapperManagerInterface;
+use Drupal\Core\Template\Attribute;
 use Drupal\canvas\Routing\ParametrizedImageStyleConverter;
 use Drupal\canvas\Twig\CanvasTwigExtension;
 use Drupal\Tests\UnitTestCase;
 
 // cspell:ignore fitok itok Bwidth
 /**
- * Tests Twig filter functionality.
- *
- * @legacy-covers \Drupal\canvas\Twig\CanvasTwigExtension::toSrcSet
+ * Tests Twig filter/function functionality.
  */
+#[CoversMethod(CanvasTwigExtension::class, 'toSrcSet')]
+#[CoversMethod(CanvasTwigExtension::class, 'jsxAttributes')]
+#[CoversMethod(CanvasTwigExtension::class, 'slot')]
 #[Group('canvas')]
 class CanvasTwigExtensionFiltersTest extends UnitTestCase {
 
@@ -155,6 +161,180 @@ class CanvasTwigExtensionFiltersTest extends UnitTestCase {
       max(ParametrizedImageStyleConverter::ALLOWED_WIDTHS),
       \AssertionError::class,
     ];
+  }
+
+  /**
+   * Tests jsxAttributes() filter.
+   *
+   * @legacy-covers \Drupal\canvas\Twig\CanvasTwigExtension::jsxAttributes
+   */
+  #[DataProvider('providerJsxAttributes')]
+  public function testJsxAttributes(mixed $input, mixed $expected): void {
+    $actual = $this->canvasTwigExtension->jsxAttributes($input);
+    $this->assertSame($expected, $actual);
+  }
+
+  /**
+   * Data provider for testJsxAttributes().
+   */
+  public static function providerJsxAttributes(): \Generator {
+    // Scalars pass through unchanged.
+    yield 'string' => ['hello', 'hello'];
+    yield 'empty string' => ['', ''];
+    yield 'integer' => [42, 42];
+    yield 'float' => [3.14, 3.14];
+    yield 'boolean true' => [TRUE, TRUE];
+    yield 'boolean false' => [FALSE, FALSE];
+    yield 'null' => [NULL, NULL];
+
+    // Arrays get JSON-encoded.
+    yield 'empty array' => [[], '[]'];
+    yield 'indexed array' => [['a', 'b'], '["a","b"]'];
+    yield 'associative array' => [
+      ['class' => 'foo', 'id' => 'bar'],
+      '{"class":"foo","id":"bar"}',
+    ];
+    yield 'nested array' => [
+      ['data' => ['x' => 1]],
+      '{"data":{"x":1}}',
+    ];
+
+    // Attribute objects: toArray() is called, then JSON-encoded.
+    $attr = new Attribute(['class' => ['foo', 'bar'], 'id' => 'my-id']);
+    yield 'Attribute object' => [$attr, Json::encode($attr->toArray())];
+
+    // Generic object without toArray() → JSON-encoded.
+    $obj = new \stdClass();
+    $obj->foo = 'bar';
+    yield 'plain stdClass' => [$obj, '{"foo":"bar"}'];
+
+    // Object with a toArray() method (but not Attribute subclass).
+    $custom = new class {
+
+      public function toArray(): array {
+        return ['key' => 'value'];
+      }
+
+    };
+    yield 'object with toArray()' => [$custom, '{"key":"value"}'];
+  }
+
+  /**
+   * Tests slot() with content that does NOT require the renderer.
+   *
+   * @legacy-covers \Drupal\canvas\Twig\CanvasTwigExtension::slot
+   */
+  #[DataProvider('providerSlotNoRenderer')]
+  public function testSlotNoRenderer(string $slot_name, mixed $content, ?string $expected_markup): void {
+    $result = $this->canvasTwigExtension->slot($slot_name, $content);
+
+    if ($expected_markup === NULL) {
+      $this->assertNull($result);
+    }
+    else {
+      $this->assertInstanceOf(MarkupInterface::class, $result);
+      $this->assertSame($expected_markup, (string) $result);
+    }
+  }
+
+  /**
+   * Data provider for testSlotNoRenderer() – cases that skip the renderer.
+   */
+  public static function providerSlotNoRenderer(): \Generator {
+    // Empty / null content returns NULL.
+    yield 'null content' => ['my-slot', NULL, NULL];
+    yield 'empty string content' => ['my-slot', '', NULL];
+    yield 'empty array content' => ['my-slot', [], NULL];
+
+    // String content wraps in element-prop.
+    yield 'string content' => [
+      'my-slot',
+      'Hello world',
+      '<element-prop slot="my-slot">Hello world</element-prop>',
+    ];
+
+    // Scalar (non-string) cast to string.
+    yield 'integer content' => [
+      'count',
+      42,
+      '<element-prop slot="count">42</element-prop>',
+    ];
+    yield 'float content' => [
+      'ratio',
+      1.5,
+      '<element-prop slot="ratio">1.5</element-prop>',
+    ];
+
+    // MarkupInterface content is cast directly without escaping.
+    yield 'markup content' => [
+      'body',
+      Markup::create('<strong>Bold</strong>'),
+      '<element-prop slot="body"><strong>Bold</strong></element-prop>',
+    ];
+
+    // Slot name with HTML-special characters is escaped.
+    yield 'slot name with quotes' => [
+      'foo"bar',
+      'content',
+      '<element-prop slot="foo&quot;bar">content</element-prop>',
+    ];
+  }
+
+  /**
+   * Tests slot() when the renderer is invoked for render-array content.
+   *
+   * @legacy-covers \Drupal\canvas\Twig\CanvasTwigExtension::slot
+   */
+  public function testSlotWithRenderArray(): void {
+    $render_array = ['#markup' => '<em>Rendered</em>'];
+    $rendered_output = '<em>Rendered</em>';
+
+    $renderer = $this->createMock(RendererInterface::class);
+    $renderer->expects($this->once())
+      ->method('render')
+      ->with($render_array)
+      ->willReturn($rendered_output);
+
+    $extension = new CanvasTwigExtension(
+      $this->createMock(StreamWrapperManagerInterface::class),
+      $this->createMock(ImageFactory::class),
+      $this->createMock(FileUrlGeneratorInterface::class),
+      $renderer,
+    );
+
+    $result = $extension->slot('body', $render_array);
+
+    $this->assertInstanceOf(MarkupInterface::class, $result);
+    $this->assertSame(
+      '<element-prop slot="body"><em>Rendered</em></element-prop>',
+      (string) $result,
+    );
+  }
+
+  /**
+   * Tests slot() returns NULL when the renderer returns an empty string.
+   *
+   * @legacy-covers \Drupal\canvas\Twig\CanvasTwigExtension::slot
+   */
+  public function testSlotWithRenderArrayThatRendersEmpty(): void {
+    $render_array = ['#markup' => ''];
+
+    $renderer = $this->createMock(RendererInterface::class);
+    $renderer->expects($this->once())
+      ->method('render')
+      ->with($render_array)
+      ->willReturn('');
+
+    $extension = new CanvasTwigExtension(
+      $this->createMock(StreamWrapperManagerInterface::class),
+      $this->createMock(ImageFactory::class),
+      $this->createMock(FileUrlGeneratorInterface::class),
+      $renderer,
+    );
+
+    $result = $extension->slot('body', $render_array);
+
+    $this->assertNull($result);
   }
 
 }
