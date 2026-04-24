@@ -181,7 +181,7 @@ class ComponentPluginManager extends CoreComponentPluginManager implements Categ
    * @phpstan-ignore-next-line missingType.parameter
    */
   public function processDefinition(&$definition, $plugin_id): void {
-    parent::processDefinition($definition, $plugin_id);
+    $this->decorated->processDefinition($definition, $plugin_id);
     if (isset($definition['props']['properties']) && \is_array($definition['props']['properties']) && !empty($definition['props']['properties'])) {
       $definition['props'] = $this->resolveJsonSchemaReferences($definition['props'], 0);
     }

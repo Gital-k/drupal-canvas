@@ -14,7 +14,7 @@ final class BrokenComponentManager extends ComponentPluginManager implements Bro
   use BrokenPluginManagerTrait;
 
   public function findDefinitions(): array {
-    return $this->removeBrokenPlugins(parent::findDefinitions());
+    return $this->removeBrokenPlugins($this->decorated->findDefinitions());
   }
 
 }

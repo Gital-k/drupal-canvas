@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource;
 
 use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\canvas\Plugin\ComponentPluginManager;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Depends;
@@ -7677,7 +7678,7 @@ HTML
     // Swap in the broken version of this class.
     // @see ::triggerBrokenComponent()
     // @see ::testIsBroken()
-    $container->getDefinition('plugin.manager.sdc')->setClass(BrokenComponentManager::class);
+    $container->getDefinition(ComponentPluginManager::class)->setClass(BrokenComponentManager::class);
   }
 
   protected function getExpectedVerboseErrorMessage(): string {

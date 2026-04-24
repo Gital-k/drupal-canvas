@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\PropShape;
 
-use Drupal\canvas\Plugin\ComponentPluginManager;
 use Drupal\Component\Assertion\Inspector;
 use Drupal\Core\Extension\ModuleHandlerInterface;
+use Drupal\Core\Theme\ComponentPluginManager;
 use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaType;
 use Drupal\Core\Extension\ThemeHandlerInterface;
 
