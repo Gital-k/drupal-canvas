@@ -201,6 +201,7 @@ final class EntityFieldPropSourceMatcher {
    */
   private static function resolveSchemaReferences(array $schema): array {
     /** @var \Drupal\canvas\Plugin\ComponentPluginManager $componentManager */
+    // @phptan-ignore-next-line phpat.shapeMatcher
     $componentManager = self::componentPluginManager();
     return $componentManager->resolveJsonSchemaReferences($schema);
   }
