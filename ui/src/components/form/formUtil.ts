@@ -3,21 +3,26 @@ import addFormats from 'ajv-formats';
 import addDraft2019 from 'ajv-formats-draft2019';
 import qs from 'qs';
 
+
+
 import { isPropSourceComponent } from '@/types/Component';
 import { getDrupal } from '@/utils/drupal-globals';
 import transforms from '@/utils/transforms';
+
+
 
 import type * as React from 'react';
 import type { PropsValues } from '@drupal-canvas/types';
 import type { SchemaObject, ValidateFunction } from 'ajv';
 import type { ParsedQs } from 'qs';
-import type {
-  ComponentModel,
-  EvaluatedComponentModel,
-} from '@/features/layout/layoutModelSlice';
+import type { ComponentModel, EvaluatedComponentModel } from '@/features/layout/layoutModelSlice';
 import type { FieldDataItem, PropSourceComponent } from '@/types/Component';
 import type { InputUIData } from '@/types/Form';
 import type { TransformConfig, Transforms } from '@/utils/transforms';
+
+
+
+
 
 const ajv = new Ajv();
 addFormats(ajv);
@@ -566,11 +571,26 @@ export function getPropsValues(
       !propFieldData?.required &&
       propFieldData?.jsonSchema?.format;
 
-    if (emptyOptionalWithFormatRequirements) {
+    // Skip storing empty values for datetime and link format types on the
+    // frontend to prevent sending them to the backend. By removing them from
+    // propsValues, the existing resolved value from selectedModel.resolved
+    // will persist (via the spread in formStateToStore), satisfying backend
+    // assertions for required props while allowing the UI to clear the field.
+    const isEmptyDatetimeOrLink =
+      value === '' &&
+      propFieldData?.jsonSchema?.format &&
+      ['uri', 'uri-reference', 'date', 'date-time'].includes(propFieldData.jsonSchema.format);
+
+    if (emptyOptionalWithFormatRequirements || isEmptyDatetimeOrLink) {
       delete propsValues[fieldName as keyof PropsValues];
-      const resolved = { ...selectedModel.resolved };
-      delete resolved[fieldName as keyof ComponentModel['resolved']];
-      selectedModel.resolved = resolved;
+      // For required datetime/link props, keep the existing resolved value
+      // so it persists via the spread in formStateToStore and satisfies the
+      // backend assertion that required props must be present in inputValues.
+      if (!propFieldData?.required) {
+        const resolved = { ...selectedModel.resolved };
+        delete resolved[fieldName as keyof ComponentModel['resolved']];
+        selectedModel.resolved = resolved;
+      }
     }
 
     if (

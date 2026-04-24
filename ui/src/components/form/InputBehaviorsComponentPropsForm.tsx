@@ -1,24 +1,12 @@
 import { useEffect, useRef } from 'react';
 import { debounce } from 'lodash';
 
+
+
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import { useComponentTransforms } from '@/components/ComponentInstanceForm';
-import {
-  coerceValueForSchema,
-  ComponentPreviewUpdateEvent,
-  getPropSchemas,
-  getPropsValues,
-  propInputData,
-  shouldSkipPropValidation,
-  toDateTime,
-  toPropName,
-  validateProp,
-} from '@/components/form/formUtil';
-import {
-  DEBOUNCE_TIMEOUT,
-  InputBehaviorsCommon,
-  POLLED_BACKGROUND_TIMEOUT,
-} from '@/components/form/inputBehaviors';
+import { coerceValueForSchema, ComponentPreviewUpdateEvent, getPropSchemas, getPropsValues, propInputData, shouldSkipPropValidation, toDateTime, toPropName, validateProp } from '@/components/form/formUtil';
+import { DEBOUNCE_TIMEOUT, InputBehaviorsCommon, POLLED_BACKGROUND_TIMEOUT } from '@/components/form/inputBehaviors';
 import { FORM_TYPES } from '@/features/form/constants';
 import { selectFormValues } from '@/features/form/formStateSlice';
 import { isEvaluatedComponentModel } from '@/features/layout/layoutModelSlice';
@@ -28,14 +16,16 @@ import { usePatchComponent } from '@/services/preview';
 import { isPropSourceComponent } from '@/types/Component';
 import { parseValue } from '@/utils/function-utils';
 
+
+
 import type { PropsValues } from '@drupal-canvas/types';
-import type {
-  ComponentModels,
-  ResolvedValues,
-  Sources,
-} from '@/features/layout/layoutModelSlice';
+import type { ComponentModels, ResolvedValues, Sources } from '@/features/layout/layoutModelSlice';
 import type { CanvasComponent, PropSourceComponent } from '@/types/Component';
 import type { InputUIData } from '@/types/Form';
+
+
+
+
 
 export const InputBehaviorsComponentPropsForm = (
   OriginalInput: React.FC,
@@ -318,9 +308,23 @@ export const syncPropSourcesToResolvedValues = (
 
   // Likewise, if a resolved value is now empty, we need to remove it from
   // the source data so it is not evaluated server side.
-  const emptyProps = Object.keys(fieldData).filter(
-    (key) => !Object.keys(resolvedValues).includes(key) && key in sources,
-  );
+  // Also remove sources for datetime and link format types when the value is empty
+  // to prevent sending empty values to the backend.
+  // However, for required props, we must keep the source entry so the backend
+  // assertion (which checks that required props exist in inputValues) is satisfied.
+  const emptyProps = Object.keys(fieldData).filter((key) => {
+    const isValueEmpty = !Object.keys(resolvedValues).includes(key) && key in sources;
+    const isDatetimeOrLinkFormat =
+      !Object.keys(resolvedValues).includes(key) &&
+      key in sources &&
+      [
+        'uri',
+        'uri-reference',
+        'date',
+        'date-time',
+      ].includes(fieldData[key]?.jsonSchema?.format);
+    return isValueEmpty || isDatetimeOrLinkFormat;
+  });
 
   return missingProps.reduce(
     (carry: Sources, propName: string) => ({

@@ -1371,18 +1371,6 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
           if (\in_array($field_type, ['integer', 'float'], TRUE)) {
             $prop_source['value'] = 0;
           }
-          elseif ($field_type === 'link' && $link_type === 16) {
-            // Dynamically fall back to the component's own example value.
-            // This only refills the value for the preview on page refresh,
-            // but at least prevents the UI from breaking.
-            $prop_source['value'] = $this->getMetadata()->schema['properties'][$prop]['examples'][0] ?? '';
-          }
-          // We also need to find a fallback mechanism for handling empty value
-          // for date and datetime.
-          elseif (\in_array($field_type, ['date', 'datetime'], TRUE)) {
-            // Dynamically fall back to the component's own example value.
-            $prop_source['value'] = $this->getMetadata()->schema['properties'][$prop]['examples'][0] ?? '';
-          }
         }
         $source = PropSource::parse($prop_source);
         if ($source instanceof EntityFieldPropSource) {
@@ -1475,22 +1463,6 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
         if (\in_array($field_type, ['integer', 'float'], TRUE)) {
           // Default to 0 so rendering receives a valid numeric value.
           $props[$required_prop] = $this->collapse($this->uncollapse(0, $required_prop), $required_prop);
-        }
-        elseif ($field_type === 'link' && $link_type === 17) {
-          // Default to empty string so rendering receives a valid URL value.
-          $props[$required_prop] = $this->collapse($this->uncollapse('', $required_prop), $required_prop);
-        }
-        elseif ($field_type === 'link' && $link_type === 16) {
-          // Dynamically fall back to the component's own example value.
-          $example_link = $this->getMetadata()->schema['properties'][$required_prop]['examples'][0] ?? '';
-          $props[$required_prop] = $this->collapse($this->uncollapse($example_link, $required_prop), $required_prop);
-        }
-        // We also need to find a fallback mechanism for handling empty value
-        // for date and datetime.
-        elseif (\in_array($field_type, ['date', 'datetime'], TRUE)) {
-          // Dynamically fall back to the component's own example value.
-          $example_date = $this->getMetadata()->schema['properties'][$required_prop]['examples'][0] ?? '';
-          $props[$required_prop] = $this->collapse($this->uncollapse($example_date, $required_prop), $required_prop);
         }
       }
     }
