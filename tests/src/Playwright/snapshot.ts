@@ -1,6 +1,6 @@
 import { Drupal } from '@drupal/playwright';
 
-import { mkdtemp, mkdir, readFile, rm, cp, copyFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, cp, copyFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import os from 'node:os';
@@ -69,6 +69,21 @@ function getSqliteSettings(settingsContents: string) {
   };
 }
 
+// Deterministic path keyed by CI job + shard so retries (new workers) reuse the same snapshot.
+function getSnapshotRoot(): string {
+  const shard = (process.env.SHARD || '0-0').replace('/', '-');
+  const jobId = process.env.CI_JOB_ID || 'local';
+  return path.join(os.tmpdir(), `canvas-snapshot-${jobId}-${shard}`);
+}
+
+interface SnapshotMeta {
+  dbPrefix: string;
+  userAgent: string;
+  sitePath: string;
+  url: string;
+  sqlitePath: string;
+}
+
 export async function createSnapshotState({
   baseURL,
   browser,
@@ -76,8 +91,50 @@ export async function createSnapshotState({
   baseURL?: string;
   browser: Browser;
 }): Promise<SnapshotState> {
-  const drupalSite = await Drupal.install();
+  const snapshotRoot = getSnapshotRoot();
+  const snapshotSitePath = path.join(snapshotRoot, 'site');
+  const snapshotDbPath = path.join(snapshotRoot, '.ht.sqlite');
+  const cacheMetaPath = path.join(snapshotRoot, 'meta.json');
   const rootDir = getDrupalRoot();
+
+  // Reuse snapshot from a previous attempt (Playwright retry spawns a new worker,
+  // which would otherwise re-run the full Drupal install + setupSite).
+  if (
+    existsSync(cacheMetaPath) &&
+    existsSync(snapshotSitePath) &&
+    existsSync(snapshotDbPath)
+  ) {
+    console.log('snapshotState: reusing cached snapshot from ' + snapshotRoot);
+    const meta: SnapshotMeta = JSON.parse(await readFile(cacheMetaPath, 'utf8'));
+    const { sqlitePath } = meta;
+    const sitePathFull = path.join(rootDir, meta.sitePath);
+    const drupalSite: DrupalSite = {
+      dbPrefix: meta.dbPrefix,
+      userAgent: meta.userAgent,
+      sitePath: meta.sitePath,
+      url: meta.url,
+      teardown: async () => '',
+    };
+    return {
+      drupalSite,
+      async restore() {
+        await mkdir(path.dirname(sqlitePath), { recursive: true });
+        await mkdir(path.dirname(sitePathFull), { recursive: true });
+        await rm(sitePathFull, { force: true, recursive: true });
+        await cp(snapshotSitePath, sitePathFull, {
+          preserveTimestamps: false,
+          recursive: true,
+        });
+        await copyFile(snapshotDbPath, sqlitePath);
+      },
+      async cleanup() {
+        // No-op: keep snapshot alive for further retries.
+        // CI containers are ephemeral; disk is reclaimed at job end.
+      },
+    };
+  }
+
+  const drupalSite = await Drupal.install();
   const sitePath = path.join(rootDir, drupalSite.sitePath);
   const settingsPath = path.join(sitePath, 'settings.php');
   const context =
@@ -92,7 +149,7 @@ export async function createSnapshotState({
   const filesDir = path.join(sitePath, 'files');
   await mkdir(filesDir, { recursive: true });
   execSync(`chmod -R 777 "${sitePath}"`);
-  console.log('createSnapshotState: files configured in '+sitePath);
+  console.log('createSnapshotState: files configured in ' + sitePath);
 
   await drupal.setTestCookie();
   const startTime = performance.now();
@@ -111,20 +168,26 @@ export async function createSnapshotState({
   }
 
   const sqlitePath = path.join(rootDir, databasePath);
-  const snapshotRoot = await mkdtemp(
-    path.join(os.tmpdir(), 'canvas-playwright-snapshot-'),
-  );
-  console.log('createSnapshotState: snapshotRoot', snapshotRoot);
-  const snapshotSitePath = path.join(snapshotRoot, 'site');
-  const snapshotDbPath = path.join(snapshotRoot, '.ht.sqlite');
 
+  await mkdir(snapshotRoot, { recursive: true });
   await cp(sitePath, snapshotSitePath, {
     preserveTimestamps: false,
     recursive: true,
   });
   await copyFile(sqlitePath, snapshotDbPath);
 
+  const meta: SnapshotMeta = {
+    dbPrefix: drupalSite.dbPrefix,
+    userAgent: drupalSite.userAgent,
+    sitePath: drupalSite.sitePath,
+    url: drupalSite.url,
+    sqlitePath,
+  };
+  await writeFile(cacheMetaPath, JSON.stringify(meta), 'utf8');
+
+  console.log('createSnapshotState: snapshotRoot', snapshotRoot);
   console.log('createSnapshotState: Database copied');
+
   return {
     drupalSite,
     async restore() {
@@ -138,7 +201,8 @@ export async function createSnapshotState({
       await copyFile(snapshotDbPath, sqlitePath);
     },
     async cleanup() {
-      await rm(snapshotRoot, { force: true, recursive: true });
+      // No-op: keep snapshot alive for further retries.
+      // CI containers are ephemeral; disk is reclaimed at job end.
     },
   };
 }
