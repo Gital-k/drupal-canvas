@@ -83,10 +83,13 @@ export const snapshotPerTest = base.extend<
 >({
   snapshotState: [
     async ({ browser }, use, testInfo) => {
+      console.log('snapshotState: creating snapshot for '+testInfo.project?.use?.baseURL || 'there is no baseURL');
+      const startTime = performance.now();
       const snapshotState = await createSnapshotState({
         baseURL: testInfo.project?.use?.baseURL,
         browser,
       });
+      console.log('snapshotState: Snapshot created in ' + (performance.now() - startTime));
 
       await use(snapshotState);
       await snapshotState.drupalSite.teardown();
@@ -102,7 +105,10 @@ export const snapshotPerTest = base.extend<
   ],
   drupal: [
     async ({ page, snapshotState }, use) => {
+      console.log('drupal: Starting to restore the snapshot')
+      const startTime = performance.now();
       await snapshotState.restore();
+      console.log('drupal: Snapshot restored in ' + (performance.now() - startTime));
       const drupal = new Drupal({ page, drupalSite: snapshotState.drupalSite });
       await drupal.setTestCookie();
       await use(drupal);

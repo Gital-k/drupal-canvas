@@ -84,6 +84,7 @@ export async function createSnapshotState({
     baseURL && baseURL.length
       ? await browser.newContext({ baseURL })
       : await browser.newContext();
+  console.log('createSnapshotState: new context created. BaseURL: ' + baseURL || 'No base URL');
   const page = await context.newPage();
   const drupal = new Drupal({ page, drupalSite });
 
@@ -91,9 +92,12 @@ export async function createSnapshotState({
   const filesDir = path.join(sitePath, 'files');
   await mkdir(filesDir, { recursive: true });
   execSync(`chmod -R 777 "${sitePath}"`);
+  console.log('createSnapshotState: files configured in '+sitePath);
 
   await drupal.setTestCookie();
+  const startTime = performance.now();
   await setupSite({ drupal });
+  console.log('createSnapshotState: Site configured in ' + (performance.now() - startTime));
   await page.close();
   await context.close();
 
@@ -110,6 +114,7 @@ export async function createSnapshotState({
   const snapshotRoot = await mkdtemp(
     path.join(os.tmpdir(), 'canvas-playwright-snapshot-'),
   );
+  console.log('createSnapshotState: snapshotRoot', snapshotRoot);
   const snapshotSitePath = path.join(snapshotRoot, 'site');
   const snapshotDbPath = path.join(snapshotRoot, '.ht.sqlite');
 
@@ -119,6 +124,7 @@ export async function createSnapshotState({
   });
   await copyFile(sqlitePath, snapshotDbPath);
 
+  console.log('createSnapshotState: Database copied');
   return {
     drupalSite,
     async restore() {
