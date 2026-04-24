@@ -114,7 +114,7 @@ export async function createSnapshotState({
   const snapshotDbPath = path.join(snapshotRoot, '.ht.sqlite');
 
   await cp(sitePath, snapshotSitePath, {
-    preserveTimestamps: true,
+    preserveTimestamps: false,
     recursive: true,
   });
   await copyFile(sqlitePath, snapshotDbPath);
@@ -126,7 +126,7 @@ export async function createSnapshotState({
       await mkdir(path.dirname(sitePath), { recursive: true });
       await rm(sitePath, { force: true, recursive: true });
       await cp(snapshotSitePath, sitePath, {
-        preserveTimestamps: true,
+        preserveTimestamps: false,
         recursive: true,
       });
       await copyFile(snapshotDbPath, sqlitePath);
