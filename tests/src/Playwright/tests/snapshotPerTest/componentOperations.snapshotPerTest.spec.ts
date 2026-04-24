@@ -278,7 +278,21 @@ test.describe('Perform CRUD operations on components', () => {
 
   test('The iframe loads the SDC CSS', async ({ drupal, page, canvas }) => {
     await drupal.loginAsAdmin();
-    await drupal.setPreprocessing({ css: false });
+    // setPreprocessing({ css: false }) clicks submit then immediately checks the DOM.
+    // With Canvas installed, cache clearing on submit is heavy and the browser
+    // navigates away before the check runs — element not found. Use explicit
+    // waitForURL to let the redirect complete before asserting.
+    const cssSel =
+      'form[data-drupal-selector="system-performance-settings"] [data-drupal-selector="edit-preprocess-css"]';
+    await page.goto('/admin/config/development/performance');
+    await page.locator(cssSel).setChecked(false);
+    await Promise.all([
+      page.waitForURL('**/admin/config/development/performance'),
+      page.locator(
+        'form[data-drupal-selector="system-performance-settings"] [data-drupal-selector="edit-submit"]',
+      ).click(),
+    ]);
+    await expect(page.locator(cssSel)).not.toBeChecked();
     await drupal.logout();
     await drupal.login({ username: 'editor', password: 'editor' });
     await canvas.openCanvas(await canvas.createCanvas());

@@ -125,6 +125,7 @@ export async function createSnapshotState({
           preserveTimestamps: false,
           recursive: true,
         });
+        execSync(`chmod -R 777 "${sitePathFull}"`);
         await copyFile(snapshotDbPath, sqlitePath);
       },
       async cleanup() {
@@ -198,6 +199,7 @@ export async function createSnapshotState({
         preserveTimestamps: false,
         recursive: true,
       });
+      execSync(`chmod -R 777 "${sitePath}"`);
       await copyFile(snapshotDbPath, sqlitePath);
     },
     async cleanup() {
