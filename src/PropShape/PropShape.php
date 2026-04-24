@@ -233,6 +233,12 @@ final class PropShape {
     return \Drupal::service(ThemeHandlerInterface::class);
   }
 
+  /**
+   * Returns the component plugin manager service.
+   *
+   * @return \Drupal\canvas\Plugin\ComponentPluginManager
+   *   The manager decorated by Canvas.
+   */
   private static function componentPluginManager(): ComponentPluginManager {
     return \Drupal::service(ComponentPluginManager::class);
   }

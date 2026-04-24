@@ -1161,6 +1161,12 @@ final class EntityFieldPropSourceMatcher {
     return FieldItemAnalyzer::getReferenceDependency($data_definition) !== NULL;
   }
 
+  /**
+   * Returns the component plugin manager service.
+   *
+   * @return \Drupal\canvas\Plugin\ComponentPluginManager
+   *   The manager decorated by Canvas.
+   */
   private static function componentPluginManager(): ComponentPluginManager {
     return \Drupal::service(ComponentPluginManager::class);
   }
