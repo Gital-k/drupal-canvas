@@ -586,7 +586,14 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
         $checkboxes = ClientFormSubmissionHelper::spotCheckboxesParents($form['settings']);
         $input = $form_state->getUserInput();
         foreach ($checkboxes as $parents) {
-          $value = NestedArray::getValue($input, $parents);
+          $key_exists = FALSE;
+          $value = NestedArray::getValue($input, $parents, $key_exists);
+          if (!$key_exists && \count($parents) > 2) {
+            // Some blocks put checkboxes inside a fieldset, so the value
+            // lives at a flat key like 'use_site_logo' rather than the
+            // nested path 'block_branding.use_site_logo'. Try the flat key.
+            $value = NestedArray::getValue($input, [$parents[0], \end($parents)], $key_exists);
+          }
           // Unchecked checkboxes are expected to be set with value NULL. For
           // a normal form submission, this is done for us by the Form
           // Builder. But for a programmatic form submission, this needs to be

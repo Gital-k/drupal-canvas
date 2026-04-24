@@ -645,6 +645,42 @@ HTML,
     ], $violationMap);
   }
 
+  /**
+   * Tests that block checkbox defaults are preserved when first added.
+   *
+   * @param string $component_id
+   * @param array<string, bool> $expected_checkbox_values
+   */
+  #[DataProvider('providerBlockCheckboxDefaults')]
+  public function testBlockCheckboxDefaultsOnAdd(string $component_id, array $expected_checkbox_values): void {
+    $this->generateComponentConfig();
+    $component = Component::load($component_id);
+    \assert($component instanceof ComponentInterface);
+    $source = $component->getComponentSource();
+    \assert($source instanceof BlockComponent);
+    // @phpstan-ignore-next-line
+    $input = $source->clientModelToInput('d7e04ff0-1a2b-3c4d-5e6f-7a8b9c0d1e2f', $component, [
+      'resolved' => [],
+    ], NULL);
+    foreach ($expected_checkbox_values as $key => $expected) {
+      self::assertSame($expected, $input[$key], \sprintf('Default for %s should be %s', $key, $expected ? 'TRUE' : 'FALSE'));
+    }
+  }
+
+  /**
+   * @return \Generator<string, array{string, array<string, bool>}>
+   */
+  public static function providerBlockCheckboxDefaults(): \Generator {
+    yield 'System branding block — nested checkboxes default to TRUE' => [
+      'block.system_branding_block',
+      [
+        'use_site_logo' => TRUE,
+        'use_site_name' => TRUE,
+        'use_site_slogan' => TRUE,
+      ],
+    ];
+  }
+
   protected function triggerBrokenComponent(ComponentInterface $component): BrokenPluginManagerInterface {
     $decorator = \Drupal::service(BlockManagerInterface::class);
     \assert($decorator instanceof BlockManagerDecorator);

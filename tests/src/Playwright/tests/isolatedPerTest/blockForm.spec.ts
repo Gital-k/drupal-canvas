@@ -25,7 +25,9 @@ test.describe('Block form', () => {
     );
     await expect(inputsForm).toContainText('Menu levels');
     await expect(inputsForm.locator('select')).toHaveCount(2);
-    await expect(inputsForm.locator('input[type="checkbox"]')).toBeVisible();
+    await expect(
+      inputsForm.locator('input[type="checkbox"]').first(),
+    ).toBeVisible();
   });
 
   test('Block settings form values are stored and the preview is updated', async ({
@@ -36,19 +38,33 @@ test.describe('Block form', () => {
     await drupal.login({ username: 'editor', password: 'editor' });
     await canvas.createCanvas();
     await canvas.openLibraryPanel();
-    // Don't wait for the preview as there won't be anything to see initially.
     await canvas.addComponent(
       { name: 'Site branding' },
-      { waitForVisible: false },
+      { waitForVisible: true },
     );
 
     await canvas.openLayersPanel();
     await canvas.openComponent('Site branding');
 
-    // Add and remove the site logo.
+    // All branding options should be enabled by default.
     const imgLocator =
       'xpath=//img[ancestor::*[starts-with(@id, "block-") and string-length(@id) = 42]]';
     const siteLogoCheckbox = page.getByRole('checkbox', { name: 'Site logo' });
+    await expect(siteLogoCheckbox).toBeChecked();
+    await expect(
+      (await canvas.getActivePreviewFrame()).locator(imgLocator),
+    ).toBeVisible();
+
+    const siteNameLocator =
+      'xpath=//a[not(img) and ancestor::*[starts-with(@id, "block-") and string-length(@id) = 42]]';
+    const siteNameCheckbox = page.getByRole('checkbox', { name: 'Site name' });
+    await expect(siteNameCheckbox).toBeChecked();
+    await expect(
+      (await canvas.getActivePreviewFrame()).locator(siteNameLocator),
+    ).toHaveText('Drupal');
+
+    // Remove and re-add the site logo.
+    await siteLogoCheckbox.click();
     await expect(siteLogoCheckbox).not.toBeChecked();
     await expect(
       (await canvas.getActivePreviewFrame()).locator(imgLocator),
@@ -58,34 +74,22 @@ test.describe('Block form', () => {
     await expect(
       (await canvas.getActivePreviewFrame()).locator(imgLocator),
     ).toBeVisible();
-    await siteLogoCheckbox.click();
-    await expect(siteLogoCheckbox).not.toBeChecked();
-    await expect(
-      (await canvas.getActivePreviewFrame()).locator(imgLocator),
-    ).not.toBeVisible();
 
-    // Add the site name.
-    const siteNameLocator =
-      'xpath=//a[ancestor::*[starts-with(@id, "block-") and string-length(@id) = 42]]';
-    const siteNameCheckbox = page.getByRole('checkbox', { name: 'Site name' });
+    // Remove the site name.
+    await siteNameCheckbox.click();
     await expect(siteNameCheckbox).not.toBeChecked();
     await expect(
       (await canvas.getActivePreviewFrame()).locator(siteNameLocator),
     ).not.toBeVisible();
-    await siteNameCheckbox.click();
-    await expect(siteNameCheckbox).toBeChecked();
-    await expect(
-      (await canvas.getActivePreviewFrame()).locator(siteNameLocator),
-    ).toHaveText('Drupal');
 
-    // Verify the component is saved and renders with the new options.
+    // Verify the component is saved and renders with the updated options.
     await canvas.publishAllChanges();
     await page.reload();
     await expect(
       (await canvas.getActivePreviewFrame()).locator(imgLocator),
-    ).not.toBeVisible();
+    ).toBeVisible();
     await expect(
       (await canvas.getActivePreviewFrame()).locator(siteNameLocator),
-    ).toHaveText('Drupal');
+    ).not.toBeVisible();
   });
 });
