@@ -3,26 +3,21 @@ import addFormats from 'ajv-formats';
 import addDraft2019 from 'ajv-formats-draft2019';
 import qs from 'qs';
 
-
-
 import { isPropSourceComponent } from '@/types/Component';
 import { getDrupal } from '@/utils/drupal-globals';
 import transforms from '@/utils/transforms';
-
-
 
 import type * as React from 'react';
 import type { PropsValues } from '@drupal-canvas/types';
 import type { SchemaObject, ValidateFunction } from 'ajv';
 import type { ParsedQs } from 'qs';
-import type { ComponentModel, EvaluatedComponentModel } from '@/features/layout/layoutModelSlice';
+import type {
+  ComponentModel,
+  EvaluatedComponentModel,
+} from '@/features/layout/layoutModelSlice';
 import type { FieldDataItem, PropSourceComponent } from '@/types/Component';
 import type { InputUIData } from '@/types/Form';
 import type { TransformConfig, Transforms } from '@/utils/transforms';
-
-
-
-
 
 const ajv = new Ajv();
 addFormats(ajv);
@@ -579,7 +574,9 @@ export function getPropsValues(
     const isEmptyDatetimeOrLink =
       value === '' &&
       propFieldData?.jsonSchema?.format &&
-      ['uri', 'uri-reference', 'date', 'date-time'].includes(propFieldData.jsonSchema.format);
+      ['uri', 'uri-reference', 'date', 'date-time'].includes(
+        propFieldData.jsonSchema.format,
+      );
 
     if (emptyOptionalWithFormatRequirements || isEmptyDatetimeOrLink) {
       delete propsValues[fieldName as keyof PropsValues];
