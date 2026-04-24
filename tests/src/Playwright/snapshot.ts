@@ -2,6 +2,7 @@ import { Drupal } from '@drupal/playwright';
 
 import { mkdtemp, mkdir, readFile, rm, cp, copyFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
+import { execSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -85,6 +86,11 @@ export async function createSnapshotState({
       : await browser.newContext();
   const page = await context.newPage();
   const drupal = new Drupal({ page, drupalSite });
+
+  // Ensure public:// files dir exists and is writable before site setup.
+  const filesDir = path.join(sitePath, 'files');
+  await mkdir(filesDir, { recursive: true });
+  execSync(`chmod -R 777 "${sitePath}"`);
 
   await drupal.setTestCookie();
   await setupSite({ drupal });
