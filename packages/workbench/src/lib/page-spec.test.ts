@@ -63,6 +63,22 @@ describe('page-spec', () => {
     });
   });
 
+  it('normalizes page elements with no props to empty props', () => {
+    const normalized = normalizePageSpec({
+      title: 'Home',
+      elements: {
+        spacer: {
+          type: 'js.spacer',
+        },
+      },
+    });
+
+    expect(normalized.spec.elements.spacer).toEqual({
+      type: 'js.spacer',
+      props: {},
+    });
+  });
+
   it('parses valid page specs and accepts js-prefixed component names', () => {
     const result = parsePageSpec(
       {
@@ -90,6 +106,30 @@ describe('page-spec', () => {
     const result = parsePageSpec(
       {
         $schema: 'https://example.com/page-spec.schema.json',
+        title: 'Home',
+        elements: {
+          hero: {
+            type: 'js.hero',
+            props: {
+              title: 'Hello world',
+            },
+          },
+        },
+      },
+      '/tmp/pages/home.json',
+      {
+        componentNames: ['hero'],
+      },
+    );
+
+    expect(result.issues).toEqual([]);
+    expect(result.page?.spec.root).toBe('canvas:component-tree');
+  });
+
+  it('accepts an optional top-level uuid key', () => {
+    const result = parsePageSpec(
+      {
+        uuid: '123e4567-e89b-12d3-a456-426614174000',
         title: 'Home',
         elements: {
           hero: {

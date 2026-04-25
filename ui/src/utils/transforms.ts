@@ -28,6 +28,77 @@ type BaseTransformOptions = {
   multiple?: boolean;
 };
 
+/**
+ * Maps empty strings to null and removes leading and trailing null entries.
+ *
+ * Empty strings become null to preserve positional placeholders so the backend
+ * can render filled rows at the correct positions. Leading and trailing nulls
+ * are removed because rows empty at the start or end have no positional
+ * significance.
+ */
+const trimNulls = <T>(values: Array<T | null | string>): Array<T | null> => {
+  const normalized = values.map((v) =>
+    v === '' ? null : v,
+  ) as Array<T | null>;
+
+  let start = 0;
+  while (start < normalized.length && normalized[start] === null) {
+    start++;
+  }
+
+  let end = normalized.length;
+  while (end > start && normalized[end - 1] === null) {
+    end--;
+  }
+
+  return normalized.slice(start, end);
+};
+
+const normalizeMultipleRecords = (
+  value: PropsValuesOrArrayOfPropsValues,
+): Array<PropsValues | null> => {
+  if (value === null || value === undefined) {
+    return [];
+  }
+
+  if (typeof value !== 'object') {
+    return [value];
+  }
+
+  const values = Object.values(value);
+  // Support both `weight` (media library) and `_weight` (other widgets).
+  const hasWeightedRecords = values.some(
+    (item) =>
+      typeof item === 'object' &&
+      item !== null &&
+      ('_weight' in item || 'weight' in item),
+  );
+
+  if (hasWeightedRecords) {
+    values.sort((a, b) => {
+      const weightA =
+        typeof a === 'object' && a !== null
+          ? Number(a._weight ?? a.weight)
+          : Number.NaN;
+      const weightB =
+        typeof b === 'object' && b !== null
+          ? Number(b._weight ?? b.weight)
+          : Number.NaN;
+
+      // Keep helper values such as `add_more` after weighted records.
+      const normalizedWeightA = Number.isNaN(weightA)
+        ? Number.MAX_SAFE_INTEGER
+        : weightA;
+      const normalizedWeightB = Number.isNaN(weightB)
+        ? Number.MAX_SAFE_INTEGER
+        : weightB;
+      return normalizedWeightA - normalizedWeightB;
+    });
+  }
+
+  return values;
+};
+
 type Transformer<
   TransformerOptions extends BaseTransformOptions,
   TransformerReturn extends unknown = any,
@@ -50,38 +121,13 @@ const mainProperty: Transformer<{
     return multiple ? [null] : null;
   }
 
-  let records: Array<PropsValues>;
+  let records: Array<PropsValues | null>;
   if (multiple) {
-    // Support both 'weight' (media library) and '_weight' (other widgets)
-    const values = Object.values(value);
-    const hasWeights =
-      values.length > 0 &&
-      values.every(
-        (item) =>
-          typeof item === 'object' &&
-          item !== null &&
-          ('_weight' in item || 'weight' in item),
-      );
-
-    if (hasWeights) {
-      // Sort by weight before extracting values
-      values.sort((a, b) => {
-        const weightA =
-          typeof a === 'object' && a !== null
-            ? Number(a._weight ?? a.weight) || 0
-            : 0;
-        const weightB =
-          typeof b === 'object' && b !== null
-            ? Number(b._weight ?? b.weight) || 0
-            : 0;
-        return weightA - weightB;
-      });
-    }
-    records = values;
+    records = normalizeMultipleRecords(value);
   } else {
     records = Array.isArray(value) ? value : [value];
   }
-  const returnValue = records.map((record: PropsValues) =>
+  const returnValue = records.map((record: PropsValues | null) =>
     record !== null && typeof record === 'object' && name in record
       ? record[name]
       : null,
@@ -112,13 +158,22 @@ export interface LinkPropShape extends StaticPropSource {
   };
 }
 
-const resolveEntityUri = (uri: string): string => {
+export const resolveEntityUri = (uri: string): string => {
   const match = uri.match(ENTITY_AUTOCOMPLETE_MATCH);
   // LinkWidget with autocomplete support only supports matching on node
   // entities.
   // @todo Add support for other entity types once core does -
   // https://www.drupal.org/i/2423093
   return match !== null ? `entity:node/${match[1]}` : uri;
+};
+
+const hasStringUri = (
+  value: unknown,
+): value is PropsValues & { uri: string } => {
+  if (typeof value !== 'object' || value === null || !('uri' in value)) {
+    return false;
+  }
+  return typeof value.uri === 'string';
 };
 
 const link: Transformer<
@@ -129,8 +184,10 @@ const link: Transformer<
 > = (value, options, propSource) => {
   if (value == null) return options.multiple ? [] : null;
 
-  const records: Array<PropsValues> = Array.isArray(value) ? value : [value];
-  const returnValue = records.map((record: PropsValues) => {
+  const records: Array<unknown> = options.multiple
+    ? normalizeMultipleRecords(value)
+    : [value].flat();
+  const returnValue = records.map((record: unknown) => {
     // `1` corresponds to `DRUPAL_OPTIONAL` and `2` to DRUPAL_REQUIRED on the
     // server side.
     // @see DRUPAL_DISABLED
@@ -138,18 +195,23 @@ const link: Transformer<
     // @see DRUPAL_REQUIRED
     if (![1, 2].includes(propSource?.sourceTypeSettings?.instance?.title)) {
       const uri = mainProperty(
-        [record],
+        [record as PropsValues],
         { name: 'uri', multiple: false },
         propSource,
       );
       return uri != null ? resolveEntityUri(uri) : uri;
     }
-    if (record === null) return record;
-    return record.uri != null
+    if (record === null || typeof record !== 'object') {
+      return null;
+    }
+    return hasStringUri(record)
       ? { ...record, uri: resolveEntityUri(record.uri) }
-      : record;
+      : (record as PropsValues);
   });
-  return options.multiple ? returnValue : (returnValue[0] ?? null);
+  if (options.multiple) {
+    return trimNulls(returnValue);
+  }
+  return returnValue[0] ?? null;
 };
 
 const cast: Transformer<
@@ -211,9 +273,11 @@ const dateTime: Transformer<
   }
   const type = propSource.sourceTypeSettings.storage.datetime_type;
   // @see \Drupal\Component\Datetime\DateTimePlus::setDefaultDateTime
-  const records: Array<PropsValues> = Array.isArray(value) ? value : [value];
+  const records: Array<PropsValues | null> = [
+    value,
+  ].flat() as Array<PropsValues | null>;
 
-  const returnValue = records.map((record: PropsValues) => {
+  const returnValue = records.map((record: PropsValues | null) => {
     if (record === null) {
       return null;
     }
@@ -225,14 +289,24 @@ const dateTime: Transformer<
     if (type === 'date') {
       return dateString;
     }
-    if ('time' in record) {
+    if ('time' in record && record.time) {
       timeString = record.time;
     }
+    if (!dateString && !timeString) {
+      return null;
+    }
+
+    try {
+      return new Date(`${dateString} ${timeString}+0000`).toISOString();
+    } catch (e) {
+      return null;
+    }
+
     // @todo Update this in https://www.drupal.org/project/canvas/issues/3501281, which will allow removing the FE-special casing in \Drupal\canvas\PropExpressions\StructuredData\Evaluator::evaluate()
     return new Date(`${dateString} ${timeString}+0000`).toISOString();
   });
   if (options.multiple) {
-    return returnValue;
+    return trimNulls(returnValue);
   }
   const singleValue = returnValue.shift();
   if (singleValue === undefined) {

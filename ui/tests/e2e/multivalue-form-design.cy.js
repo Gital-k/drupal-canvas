@@ -39,12 +39,35 @@ describe('Multivalue Form Design (canvas_dev_mode)', () => {
       .find('[class*="_listItem_"]')
       .click();
     // Type in the input field that appears in the popover.
-    cy.get('[role="dialog"]').find('input[type="text"]').clear();
-    cy.get('[role="dialog"]').find('input[type="text"]').type(text);
+    cy.get('[role="dialog"][data-state="open"]').should('be.visible');
+    cy.get('[role="dialog"][data-state="open"]')
+      .find('input[type="text"]')
+      .clear({ force: true });
+    cy.get('[role="dialog"][data-state="open"]')
+      .find('input[type="text"]')
+      .type(text);
     // Press Enter to commit the value (required for the value to update).
-    cy.get('[role="dialog"]').find('input[type="text"]').type('{enter}');
+    cy.get('[role="dialog"][data-state="open"]')
+      .find('input[type="text"]')
+      .type('{enter}');
     // Wait for popover to close after Enter.
-    cy.get('[role="dialog"]').should('not.exist');
+    cy.get('[role="dialog"][data-state="open"]').should('not.exist');
+  };
+
+  /**
+   * Types into a row and waits for the resulting preview update.
+   *
+   * The intercept MUST be registered before the {enter} keypress inside typeInRow,
+   * otherwise the preview POST can fire before the alias exists and cy.wait hangs.
+   */
+  const typeInRowAwaitPreview = (fieldAlias, rowIndex, text) => {
+    cy.intercept({
+      url: '**/canvas/api/v0/layout/node/*',
+      times: 1,
+      method: 'POST',
+    }).as('updatePreview');
+    typeInRow(fieldAlias, rowIndex, text);
+    cy.wait('@updatePreview');
   };
 
   /**
@@ -59,38 +82,27 @@ describe('Multivalue Form Design (canvas_dev_mode)', () => {
   };
 
   /**
-   * Helper function to confirm the contents of all rows by checking
-   * the list item text content (visible in the collapsed state).
+   * Helper function to confirm the contents of all rows.
+   *
+   * Uses retryable `should` assertions on each row's text so it waits for the
+   * DOM to settle after an async update (e.g. preview POST, drag reorder).
    */
   const confirmTextInputs = (fieldAlias, inputContent) => {
-    // First, wait for the list items to be present (using CSS module class prefix).
     cy.get(fieldAlias)
       .find('[class*="_listItem_"]')
       .should('have.length', inputContent.length);
-
     cy.get(fieldAlias)
       .find('tbody tr')
-      .should('have.length', inputContent.length)
-      .then(($rows) => {
-        const items = [];
-        $rows.each((ix, row) => {
-          // Find the listItem element (CSS module class) which contains the itemText.
-          const listItem = Cypress.$(row).find('[class*="_listItem_"]');
-          if (listItem.length > 0) {
-            // Get the text from the itemText element (CSS module class).
-            const textElement = listItem.find('[class*="_itemText_"]');
-            if (textElement.length > 0) {
-              const text = textElement.text().trim();
-              items.push(text === 'Empty' ? '' : text);
-            } else {
-              items.push('');
-            }
-          } else {
-            items.push('');
-          }
-        });
-        expect(items).to.deep.equal(inputContent);
-      });
+      .should('have.length', inputContent.length);
+
+    inputContent.forEach((expected, ix) => {
+      const expectedText = expected === '' ? 'Empty' : expected;
+      cy.get(fieldAlias)
+        .find('tbody tr')
+        .eq(ix)
+        .find('[class*="_itemText_"]')
+        .should('have.text', expectedText);
+    });
   };
 
   it('renders multivalue fields with new popover-based UI', () => {
@@ -140,17 +152,8 @@ describe('Multivalue Form Design (canvas_dev_mode)', () => {
     // Log all ajax form requests to help with debugging.
     cy.intercept('POST', '**/canvas/api/v0/form/content-entity/**');
 
-    cy.intercept({
-      url: '**/canvas/api/v0/layout/node/2',
-      times: 1,
-      method: 'POST',
-    }).as('updatePreview');
-
     // Populate the empty second item using the new popover interface.
-    typeInRow('@unlimited-text', 1, 'Neutral Milk Hotel');
-
-    // Wait for the preview to finish loading.
-    cy.wait('@updatePreview');
+    typeInRowAwaitPreview('@unlimited-text', 1, 'Neutral Milk Hotel');
     cy.findByLabelText('Loading Preview').should('not.exist');
 
     // Verify the value was set.
@@ -173,20 +176,7 @@ describe('Multivalue Form Design (canvas_dev_mode)', () => {
     const entityFormSelector = '[data-testid="canvas-page-data-form"]';
 
     // Populate the empty second item first.
-    typeInRow('@unlimited-text', 1, 'Neutral Milk Hotel');
-
-    const waitForPreview = () => {
-      cy.intercept({
-        url: '**/canvas/api/v0/layout/node/2',
-        times: 1,
-        method: 'POST',
-      }).as('updatePreview');
-      // Trigger a blur.
-      cy.get(document.activeElement).blur();
-      cy.wait('@updatePreview');
-    };
-
-    waitForPreview();
+    typeInRowAwaitPreview('@unlimited-text', 1, 'Neutral Milk Hotel');
 
     // Verify the new button text.
     cy.get('@unlimited-text')
@@ -203,8 +193,7 @@ describe('Multivalue Form Design (canvas_dev_mode)', () => {
     cy.get('@unlimited-text').find('tbody tr').should('have.length', 3);
 
     // Populate the new item
-    typeInRow('@unlimited-text', 2, 'The Olivia Tremor Control');
-    waitForPreview();
+    typeInRowAwaitPreview('@unlimited-text', 2, 'The Olivia Tremor Control');
     cy.waitForAjax();
 
     confirmTextInputs('@unlimited-text', [
@@ -226,19 +215,7 @@ describe('Multivalue Form Design (canvas_dev_mode)', () => {
     const entityFormSelector = '[data-testid="canvas-page-data-form"]';
 
     // Set up three items
-    typeInRow('@unlimited-text', 1, 'Neutral Milk Hotel');
-
-    const waitForPreview = () => {
-      cy.intercept({
-        url: '**/canvas/api/v0/layout/node/2',
-        times: 1,
-        method: 'POST',
-      }).as('updatePreview');
-      cy.get(document.activeElement).blur();
-      cy.wait('@updatePreview');
-    };
-
-    waitForPreview();
+    typeInRowAwaitPreview('@unlimited-text', 1, 'Neutral Milk Hotel');
 
     cy.get('@unlimited-text')
       .findByRole('button', { name: '+ Add new' })
@@ -246,8 +223,7 @@ describe('Multivalue Form Design (canvas_dev_mode)', () => {
     cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
     cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
 
-    typeInRow('@unlimited-text', 2, 'The Olivia Tremor Control');
-    waitForPreview();
+    typeInRowAwaitPreview('@unlimited-text', 2, 'The Olivia Tremor Control');
     cy.waitForAjax();
 
     confirmTextInputs('@unlimited-text', [
@@ -276,6 +252,11 @@ describe('Multivalue Form Design (canvas_dev_mode)', () => {
       .find('.canvas-drag-handle a.tabledrag-handle .drag-handle-icon')
       .should('have.length', 3);
 
+    // Register intercept before the drag so we capture every preview POST
+    // the reorder triggers (multiple can fire; the one that carries the
+    // reordered `_weight` values is what we wait for below).
+    cy.intercept('POST', '**/canvas/api/v0/layout/node/2').as('previewUpdate');
+
     cy.get(
       '[data-drupal-selector="edit-field-cvt-unlimited-text"] tr.draggable:nth-child(3) [title="Change order"]',
     ).realDnd(
@@ -283,6 +264,15 @@ describe('Multivalue Form Design (canvas_dev_mode)', () => {
       dndDefaults,
     );
 
+    cy.assertMultivalueReorder({
+      alias: 'previewUpdate',
+      fieldName: 'field_cvt_unlimited_text',
+      expectedOrder: [
+        'Marshmallow Coast',
+        'The Olivia Tremor Control',
+        'Neutral Milk Hotel',
+      ],
+    });
     cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
     cy.waitForAjax();
 
@@ -290,6 +280,14 @@ describe('Multivalue Form Design (canvas_dev_mode)', () => {
       'Marshmallow Coast',
       'The Olivia Tremor Control',
       'Neutral Milk Hotel',
+    ]);
+    // Refresh the page to ensure the update persists.
+    cy.reload();
+    confirmTextInputs('@unlimited-text', [
+      'Marshmallow Coast',
+      'The Olivia Tremor Control',
+      'Neutral Milk Hotel',
+      '',
     ]);
   });
 
@@ -304,19 +302,7 @@ describe('Multivalue Form Design (canvas_dev_mode)', () => {
 
     const entityFormSelector = '[data-testid="canvas-page-data-form"]';
 
-    typeInRow('@unlimited-text', 1, 'Neutral Milk Hotel');
-
-    const waitForPreview = () => {
-      cy.intercept({
-        url: '**/canvas/api/v0/layout/node/2',
-        times: 1,
-        method: 'POST',
-      }).as('updatePreview');
-      cy.get(document.activeElement).blur();
-      cy.wait('@updatePreview');
-    };
-
-    waitForPreview();
+    typeInRowAwaitPreview('@unlimited-text', 1, 'Neutral Milk Hotel');
 
     cy.get('@unlimited-text')
       .findByRole('button', { name: '+ Add new' })
@@ -324,8 +310,7 @@ describe('Multivalue Form Design (canvas_dev_mode)', () => {
     cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
     cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
 
-    typeInRow('@unlimited-text', 2, 'The Olivia Tremor Control');
-    waitForPreview();
+    typeInRowAwaitPreview('@unlimited-text', 2, 'The Olivia Tremor Control');
     cy.waitForAjax();
 
     confirmTextInputs('@unlimited-text', [
@@ -341,17 +326,17 @@ describe('Multivalue Form Design (canvas_dev_mode)', () => {
       .find('[class*="_listItem_"]')
       .click();
 
-    cy.get('[role="dialog"]').should('be.visible');
+    cy.get('[role="dialog"][data-state="open"]').should('be.visible');
 
-    cy.get('[role="dialog"]')
+    cy.get('[role="dialog"][data-state="open"]')
       .findByRole('button', { name: /Remove/i })
       .should('be.visible');
 
-    cy.get('[role="dialog"]')
+    cy.get('[role="dialog"][data-state="open"]')
       .findByRole('button', { name: /Remove/i })
       .click();
 
-    cy.get('[role="dialog"]').should('not.exist');
+    cy.get('[role="dialog"][data-state="open"]').should('not.exist');
 
     cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
     cy.waitForAjax();
@@ -374,20 +359,23 @@ describe('Multivalue Form Design (canvas_dev_mode)', () => {
       .find('[class*="_listItem_"]')
       .click();
 
-    cy.get('[role="dialog"]').should('be.visible');
+    cy.get('[role="dialog"][data-state="open"]').should('be.visible');
 
-    cy.get('[role="dialog"]').should('contain', 'Canvas Unlimited Text');
+    cy.get('[role="dialog"][data-state="open"]').should(
+      'contain',
+      'Canvas Unlimited Text',
+    );
 
-    cy.get('[role="dialog"]')
+    cy.get('[role="dialog"][data-state="open"]')
       .find('input[type="text"]')
       .should('be.visible')
       .should('have.value', 'Marshmallow Coast');
 
-    cy.get('[role="dialog"]').find('[aria-label="Close"]').should('exist');
-
-    cy.get('[role="dialog"]').find('[aria-label="Close"]');
-    cy.get('[aria-label="Close"]').click();
-    cy.get('[role="dialog"]').should('not.exist');
+    cy.get('[role="dialog"][data-state="open"]')
+      .find('[aria-label="Close"]')
+      .should('exist');
+    cy.get('[role="dialog"][data-state="open"] [aria-label="Close"]').click();
+    cy.get('[role="dialog"][data-state="open"]').should('not.exist');
   });
 
   it('popover discards uncommitted changes when closed without Enter', () => {
@@ -406,15 +394,17 @@ describe('Multivalue Form Design (canvas_dev_mode)', () => {
       .find('[class*="_listItem_"]')
       .click();
 
-    cy.get('[role="dialog"]').find('input[type="text"]').clear();
-    cy.get('[role="dialog"]')
+    cy.get('[role="dialog"][data-state="open"]')
+      .find('input[type="text"]')
+      .clear();
+    cy.get('[role="dialog"][data-state="open"]')
       .find('input[type="text"]')
       .type('This should not be saved');
 
-    cy.get('[role="dialog"]').find('[aria-label="Close"]');
-    cy.get('[aria-label="Close"]').click();
+    cy.get('[role="dialog"][data-state="open"]').find('[aria-label="Close"]');
+    cy.get('[role="dialog"][data-state="open"] [aria-label="Close"]').click();
 
-    cy.get('[role="dialog"]').should('not.exist');
+    cy.get('[role="dialog"][data-state="open"]').should('not.exist');
 
     verifyRowText('@unlimited-text', 0, originalText);
   });
@@ -434,22 +424,16 @@ describe('Multivalue Form Design (canvas_dev_mode)', () => {
       .find('[class*="_listItem_"]')
       .click();
 
-    cy.get('[role="dialog"]').find('input[type="text"]').clear();
-    cy.get('[role="dialog"]')
+    cy.get('[role="dialog"][data-state="open"]')
+      .find('input[type="text"]')
+      .clear();
+    cy.get('[role="dialog"][data-state="open"]')
       .find('input[type="text"]')
       .type('Modified Item 1{enter}');
 
-    cy.get('[role="dialog"]').should('not.exist');
+    cy.get('[role="dialog"][data-state="open"]').should('not.exist');
 
-    cy.intercept({
-      url: '**/canvas/api/v0/layout/node/2',
-      times: 1,
-      method: 'POST',
-    }).as('updatePreview');
-
-    typeInRow('@unlimited-text', 1, 'Modified Item 2');
-
-    cy.wait('@updatePreview');
+    typeInRowAwaitPreview('@unlimited-text', 1, 'Modified Item 2');
     cy.findByLabelText('Loading Preview').should('not.exist');
 
     // Verify both items maintain their values

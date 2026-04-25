@@ -52,6 +52,12 @@ export interface PreviewManifest {
   globalCssUrl: string | null;
 }
 
+/** Parent tells the preview iframe to refetch discovery/manifest without remounting (e.g. after page JSON save). */
+export interface WorkbenchDiscoveryRefresh {
+  source: 'canvas-workbench-parent';
+  type: 'workbench:discovery-refresh';
+}
+
 export interface PreviewRenderRequest {
   source: 'canvas-workbench-parent';
   type: 'preview:render';
@@ -64,6 +70,8 @@ export interface PreviewRenderRequest {
       jsEntryUrl: string;
     }>;
     cssUrls: string[];
+    /** Workbench shell path (pathname + search) so the preview iframe MemoryRouter stays aligned. */
+    shellPath?: string;
   };
 }
 
@@ -90,10 +98,20 @@ export interface PreviewFrameError {
   };
 }
 
+/** Iframe navigated internally; parent shell should match this path (SPA). */
+export interface PreviewShellSync {
+  source: 'canvas-workbench-frame';
+  type: 'preview:shell-sync';
+  payload: {
+    path: string;
+  };
+}
+
 export type PreviewFrameEvent =
   | PreviewFrameReady
   | PreviewFrameRendered
-  | PreviewFrameError;
+  | PreviewFrameError
+  | PreviewShellSync;
 
 export function toPreviewManifestComponent(component: {
   id: string;
@@ -187,6 +205,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
+export function isWorkbenchDiscoveryRefreshMessage(
+  value: unknown,
+): value is WorkbenchDiscoveryRefresh {
+  return (
+    isRecord(value) &&
+    value.source === 'canvas-workbench-parent' &&
+    value.type === 'workbench:discovery-refresh'
+  );
+}
+
 export function isPreviewRenderRequest(
   value: unknown,
 ): value is PreviewRenderRequest {
@@ -205,8 +233,14 @@ export function isPreviewRenderRequest(
     return false;
   }
 
-  const { renderId, renderType, spec, registrySources, cssUrls } =
+  const { renderId, renderType, spec, registrySources, cssUrls, shellPath } =
     value.payload;
+  if (
+    shellPath !== undefined &&
+    (typeof shellPath !== 'string' || shellPath.length === 0)
+  ) {
+    return false;
+  }
   return (
     typeof renderId === 'string' &&
     (renderType === 'component' || renderType === 'page') &&
@@ -251,6 +285,10 @@ export function isPreviewFrameEvent(
         value.payload.renderId === null) &&
       typeof value.payload.message === 'string'
     );
+  }
+
+  if (value.type === 'preview:shell-sync') {
+    return isRecord(value.payload) && typeof value.payload.path === 'string';
   }
 
   return false;

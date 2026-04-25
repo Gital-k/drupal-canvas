@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource;
 
-// cspell:ignore Bwidth Fitok Tilly anzut nhsy sxnz Umso Dzyawdvr Mafgg Royu Cmsy Pmsg Lgfkq ergmkgy Ptgi Ltxk
+// cspell:ignore Bwidth Fitok Synx Tilly anzut nhsy sxnz Umso Dzyawdvr Mafgg Royu Cmsy Pmsg Lgfkq ergmkgy Ptgi Ltxk
+
+use Drupal\Tests\canvas\Traits\CreateTestJsComponentTrait;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Depends;
 use PHPUnit\Framework\Attributes\TestWith;
@@ -63,6 +66,7 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSourceBaseTestBase {
 
   use CacheBustingTrait;
+  use CreateTestJsComponentTrait;
 
   protected readonly AssetResolverInterface $assetResolver;
   protected readonly CodeComponentDataProvider $codeComponentDataProvider;
@@ -261,6 +265,9 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
         ],
       ],
       'js.canvas_test_code_components_using_drupalsettings_get_site_data' => [
+        'prop_field_definitions' => [],
+      ],
+      'js.canvas_test_code_components_using_drupalsettings_get_theme_assets' => [
         'prop_field_definitions' => [],
       ],
       'js.canvas_test_code_components_using_get_page_data' => [
@@ -865,6 +872,29 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
           'import_maps' => $default_imports,
         ],
       ],
+      'js.canvas_test_code_components_using_drupalsettings_get_theme_assets' => [
+        'cacheability' => (clone $default_cacheability)
+          ->setCacheTags([
+            'config:canvas.js_component.canvas_test_code_components_using_drupalsettings_get_theme_assets',
+          ]),
+        'attachments' => [
+          'library' => [
+            'canvas/astro_island.canvas_test_code_components_using_drupalsettings_get_theme_assets',
+            ...$default_libraries,
+          ],
+          'html_head_link' => [
+            ...$default_html_head_links,
+            [
+              [
+                'rel' => 'modulepreload',
+                'fetchpriority' => 'high',
+                'href' => \sprintf('/%s/files/astro-island/YA8XnDFY2bejxOaOhkOI0tf8p26EOJcqAjvZvT1TSiA.js', $site_path),
+              ],
+            ],
+          ],
+          'import_maps' => $default_imports,
+        ],
+      ],
     ], $rendered_without_html);
   }
 
@@ -1151,6 +1181,11 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       'js.canvas_test_code_components_using_drupalsettings_get_site_data' => [
         'config' => [
           'canvas.js_component.canvas_test_code_components_using_drupalsettings_get_site_data',
+        ],
+      ],
+      'js.canvas_test_code_components_using_drupalsettings_get_theme_assets' => [
+        'config' => [
+          'canvas.js_component.canvas_test_code_components_using_drupalsettings_get_theme_assets',
         ],
       ],
       'js.canvas_test_code_components_using_get_page_data' => [
@@ -1702,6 +1737,16 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
         'propSources' => [],
         'transforms' => [],
       ],
+      'js.canvas_test_code_components_using_drupalsettings_get_theme_assets' => [
+        'expected_output_selectors' => [
+          'canvas-island[opts*="Using drupalSettings getThemeAssets"][props="{}"]',
+          'script[blocking="render"][src*="/packages/astro-hydration/dist/client.js"]',
+        ],
+        'source' => 'Code component',
+        'metadata' => ['slots' => []],
+        'propSources' => [],
+        'transforms' => [],
+      ],
       'js.canvas_test_code_components_using_get_page_data' => [
         'expected_output_selectors' => [
           'canvas-island[opts*="Using drupalSettings getPageData"][props="{}"]',
@@ -1797,11 +1842,6 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
                   'small',
                   'medium',
                   'large',
-                ],
-                'meta:enum' => [
-                  'small' => 'Small',
-                  'medium' => 'Medium',
-                  'large' => 'Large',
                 ],
               ],
             ],
@@ -2331,8 +2371,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       ],
       'dataDependencies' => [],
     ]);
-    $violations = $js_component->getTypedData()->validate();
-    self::assertCount(0, $violations);
+    self::assertEntityIsValid($js_component);
 
     // Save and enable to create a component.
     $js_component->enable()->save();
@@ -2659,6 +2698,31 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
     return \sprintf('The JavaScript Component with ID `%s` does not exist.', self::PSEUDO_RANDOM_CODE_COMPONENT_ID);
   }
 
+  #[DataProvider('providerGetTranslatableInputKeys')]
+  public function testGetTranslatableInputKeys(string $host_entity_type_id, array $host_entity_values, string $component_id, array $inputs, array $expected_translatable_inputs): void {
+    $this->createMyCtaComponentFromSdc();
+    parent::testGetTranslatableInputKeys($host_entity_type_id, $host_entity_values, $component_id, $inputs, $expected_translatable_inputs);
+  }
+
+  /**
+   * {@inheritdoc}
+   *
+   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentInstanceInputsConfigSchemaGenerator
+   */
+  public static function providerSymmetricallyTranslatableComponentInstanceScenarios(string $host_entity_type_id): \Generator {
+    foreach (SingleDirectoryComponentTest::providerSymmetricallyTranslatableComponentInstanceScenarios($host_entity_type_id) as $label => $test_case) {
+      // Reuse all the "my-cta" test cases from the SDC source's test coverage
+      // (because an equivalent code component can easily be made). Do not
+      // repeat other test cases; they're powered by the same logic anyway.
+      // @see \Drupal\Tests\canvas\Traits\CreateTestJsComponentTrait::createMyCtaComponentFromSdc()
+      if ($test_case[0] !== 'sdc.canvas_test_sdc.my-cta') {
+        continue;
+      }
+      $test_case[0] = 'js.my-cta';
+      yield $label => $test_case;
+    }
+  }
+
   public static function providerResolvedComponentInputs(): \Generator {
     yield 'JsComponent that does not exist' => [
       'js.missing_component',
@@ -2679,7 +2743,7 @@ final class JsComponentTest extends GeneratedFieldExplicitInputUxComponentSource
       ],
       [
         'image' => [
-          'src' => '::SITE_DIR_BASE_URL::/files/image-test.png?alternateWidths=::SITE_DIR_BASE_URL::/files/styles/canvas_parametrized_width--%7Bwidth%7D/public/image-test.png.avif%3Fitok%3DRreFpLsS',
+          'src' => '::SITE_DIR_BASE_URL::/files/image-test.png?alternateWidths=::SITE_DIR_BASE_URL::/files/styles/canvas_parametrized_width--%7Bwidth%7D/public/image-test.png.avif%3Fitok%3DujSynxBM',
           'alt' => '',
           'width' => 40,
           'height' => 20,

@@ -30,6 +30,7 @@ codespaces
 cqmr
 cset
 csstree
+cycache
 ddev
 debucketed
 dedreux
@@ -46,6 +47,7 @@ drupalsettings
 druplicon
 endapply
 entityviewdisplay
+esque
 extralight
 extensionless
 fieldtext
@@ -66,6 +68,7 @@ hyperscriptify
 hyperscriptifying
 ianvs
 importmap
+inlines
 interactable
 inwidget
 jangregor
@@ -74,6 +77,7 @@ JSONified
 jsxs
 langcode
 leftbar
+liftup
 lightningcss
 Linkit
 Mautic
@@ -92,8 +96,15 @@ OPENCOLLECTIVE
 outro
 personalizable
 phenaproxima
+fontshare
+myfont
+nourl
+opsz
 placehold
 Postel
+slugified
+slugifies
+Slugifies
 Prebundle
 prebundling
 previewable
@@ -104,6 +115,7 @@ Pryce's
 pubout
 Qqtnj
 rdndmb
+rearchitected
 recomputations
 redoable
 redocly
@@ -133,11 +145,14 @@ supersets
 superstrongpassword
 SVAY
 testid
+tmgmt
 toolset
 topbar
 trackpad
 tsconfigs
 tseslint
+unifont
+Unifont
 ultrawide
 uncollapse
 uncollapsed
@@ -191,3 +206,4 @@ trae
 videomedia
 Zencoder
 zencoder
+PKCE

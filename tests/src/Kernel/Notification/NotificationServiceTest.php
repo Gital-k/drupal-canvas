@@ -20,17 +20,6 @@ use PHPUnit\Framework\Attributes\TestWith;
 #[Group('canvas')]
 class NotificationServiceTest extends CanvasKernelTestBase {
 
-  /**
-   * {@inheritdoc}
-   */
-  protected function setUp(): void {
-    parent::setUp();
-    $this->installSchema('canvas', [
-      'canvas_notification',
-      'canvas_notification_read',
-    ]);
-  }
-
   private function handler(): CanvasNotificationHandler {
     return $this->container->get(CanvasNotificationHandler::class);
   }
@@ -184,8 +173,10 @@ class NotificationServiceTest extends CanvasKernelTestBase {
 
   public function testCreateSuccessWithKeyDeletesReplaceableTypes(): void {
     // Insert pre-existing notifications directly to avoid cascading deletes
-    // from create() on KEY_REPLACE_TYPES during setup.
+    // from create() on KEY_REPLACE_TYPES during setup. Ensure the table exists
+    // first since we bypass the handler for these inserts.
     $db = $this->container->get('database');
+    $db->schema()->createTable(CanvasNotificationHandler::NOTIFICATION_TABLE, CanvasNotificationHandler::schemaDefinition()[CanvasNotificationHandler::NOTIFICATION_TABLE]);
     $db->insert(CanvasNotificationHandler::NOTIFICATION_TABLE)->fields([
       'id' => 'pre-1',
       'type' => 'processing',
@@ -231,8 +222,10 @@ class NotificationServiceTest extends CanvasKernelTestBase {
 
   public function testCreateInfoWithKeyDeletesReplaceableTypes(): void {
     // Insert pre-existing notifications directly to avoid cascading deletes
-    // from create() on KEY_REPLACE_TYPES during setup.
+    // from create() on KEY_REPLACE_TYPES during setup. Ensure the table exists
+    // first since we bypass the handler for these inserts.
     $db = $this->container->get('database');
+    $db->schema()->createTable(CanvasNotificationHandler::NOTIFICATION_TABLE, CanvasNotificationHandler::schemaDefinition()[CanvasNotificationHandler::NOTIFICATION_TABLE]);
     $db->insert(CanvasNotificationHandler::NOTIFICATION_TABLE)->fields([
       'id' => 'pre-1',
       'type' => 'processing',
@@ -441,6 +434,49 @@ class NotificationServiceTest extends CanvasKernelTestBase {
       ->execute()
       ?->fetchField();
     self::assertSame(2, $count);
+  }
+
+  public function testMarkAllReadAcrossTypes(): void {
+    $handler = $this->handler();
+
+    $n1 = $handler->create(['type' => 'info', 'title' => 'Info', 'message' => 'M']);
+    $n2 = $handler->create(['type' => 'warning', 'title' => 'Warning', 'message' => 'M']);
+    $n3 = $handler->create(['type' => 'error', 'title' => 'Error', 'message' => 'M']);
+    $n4 = $handler->create(['type' => 'success', 'title' => 'Success', 'message' => 'M']);
+    $n5 = $handler->create(['type' => 'processing', 'title' => 'Processing', 'message' => 'M']);
+
+    $all_ids = [$n1['id'], $n2['id'], $n3['id'], $n4['id'], $n5['id']];
+    $handler->markRead(1, $all_ids);
+
+    $results = $handler->getRecent(1);
+    self::assertCount(5, $results);
+    foreach ($results as $n) {
+      self::assertTrue($n['hasRead'], \sprintf(
+        'Notification "%s" (type: %s) should be marked as read.',
+        $n['title'],
+        $n['type'],
+      ));
+    }
+  }
+
+  public function testMarkAllReadDoesNotAffectOtherUsers(): void {
+    $handler = $this->handler();
+
+    $n1 = $handler->create(['type' => 'info', 'title' => 'A', 'message' => 'M']);
+    $n2 = $handler->create(['type' => 'error', 'title' => 'B', 'message' => 'M']);
+
+    // Mark all as read for user 1.
+    $handler->markRead(1, [$n1['id'], $n2['id']]);
+
+    // User 1 sees all read.
+    foreach ($handler->getRecent(1) as $n) {
+      self::assertTrue($n['hasRead']);
+    }
+
+    // User 2 sees all unread.
+    foreach ($handler->getRecent(2) as $n) {
+      self::assertFalse($n['hasRead']);
+    }
   }
 
   public function testMarkReadIdempotent(): void {

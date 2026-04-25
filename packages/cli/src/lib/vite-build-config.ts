@@ -16,7 +16,14 @@ export const DRUPAL_CANVAS_EXTERNALS = [
   'tailwind-merge',
   'drupal-jsonapi-params',
   'swr',
+  '@tailwindcss/typography',
   'drupal-canvas',
+  'next-image-standalone',
+  '@drupal-api-client/json-api-client',
+  '@/lib/FormattedText',
+  '@/lib/utils',
+  '@/lib/jsonapi-utils',
+  '@/lib/drupal-utils',
 ];
 
 export interface CanvasViteBuildConfigOptions {
@@ -30,6 +37,7 @@ export function createCanvasViteBuildConfig(
   return {
     // Use project root (cwd) so Vite can resolve all paths correctly
     root: process.cwd(),
+    esbuild: { jsx: 'automatic' },
     plugins: [
       ...drupalCanvasCompat({
         // hostRoot is project root, aliasBaseDir is relative to it

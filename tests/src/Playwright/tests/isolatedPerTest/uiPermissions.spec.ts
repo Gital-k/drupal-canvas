@@ -7,11 +7,12 @@ import { isolatedPerTest as test } from '../../fixtures/test.js';
  * with different roles. It first ensures that a user with admin permissions can see all the buttons and options in the UI,
  * then it checks that a user with minimal permissions can still access the UI but with limited functionality.
  */
+test.use({ modules: ['canvas_test_sdc'], enableTestExtensions: true });
+
 test.describe('Canvas UI Permissions', () => {
-  test.beforeEach(async ({ drupal }) => {
-    await drupal.enableTestExtensions();
+  test.beforeEach(async ({ drupal, canvas }) => {
     await drupal.loginAsAdmin();
-    await drupal.installModules(['canvas_test_sdc']);
+    await canvas.enableGlobalRegions();
     await drupal.logout();
   });
 

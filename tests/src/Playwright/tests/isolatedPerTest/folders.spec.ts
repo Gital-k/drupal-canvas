@@ -3,6 +3,8 @@ import { expect } from '@playwright/test';
 
 import { isolatedPerTest as test } from '../../fixtures/test.js';
 
+test.use({ modules: ['canvas_test_sdc'], enableTestExtensions: true });
+
 /**
  * Tests folder management in Drupal Canvas.
  */
@@ -220,9 +222,6 @@ test.describe('Folder Management', () => {
   });
 
   test('Folder deletion', async ({ page, drupal, canvas }) => {
-    await drupal.loginAsAdmin();
-    await drupal.installModules(['canvas_test_sdc']);
-    await drupal.logout();
     await drupal.login({ username: 'editor', password: 'editor' });
     await canvas.createCanvas();
     await canvas.openLibraryPanel();
@@ -362,9 +361,30 @@ test.describe('Folder Management', () => {
     await canvas.createCodeComponent('Three', code);
 
     await canvas.moveComponentIntoFolder('One', '1337 Code');
-    await canvas.moveComponentOutOfFolder('One', '1337 Code');
+    await canvas.moveComponentOutOfFolder('One');
     await canvas.moveComponentIntoFolder('One', 'Suboptimal Code');
     await canvas.moveComponentIntoFolder('One', '1337 Code');
-    await canvas.moveComponentOutOfFolder('One', '1337 Code');
+    await canvas.moveComponentOutOfFolder('One');
+  });
+
+  test('moveComponentToLibraryLocation moves code component into folder', async ({
+    drupal,
+    canvas,
+  }) => {
+    await drupal.login({ username: 'editor', password: 'editor' });
+    await canvas.createCanvas();
+    await canvas.openCodePanel();
+    await canvas.addFolder('Library Location Target');
+
+    const code = await readFile(
+      'tests/fixtures/code_components/page-elements/PageTitle.jsx',
+      'utf-8',
+    );
+    await canvas.createCodeComponent('LocationTest', code);
+
+    await canvas.moveComponentToLibraryLocation(
+      'LocationTest',
+      'Library Location Target',
+    );
   });
 });

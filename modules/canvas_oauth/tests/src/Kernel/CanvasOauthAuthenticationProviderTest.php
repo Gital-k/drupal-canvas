@@ -9,6 +9,7 @@ use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Drupal\Core\Routing\RouteObjectInterface;
 use Drupal\canvas\Entity\AssetLibrary;
+use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\Folder;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Entity\Pattern;
@@ -88,6 +89,7 @@ class CanvasOauthAuthenticationProviderTest extends CanvasKernelTestBase {
       ['canvas.api.config.list', [], FALSE],
       ['canvas.api.config.patch', [], FALSE],
       ['canvas.api.config.post', [], FALSE],
+      ...$generate_per_config_entity_type_test_case(Component::ENTITY_TYPE_ID, TRUE),
       ...$generate_per_config_entity_type_test_case(JavaScriptComponent::ENTITY_TYPE_ID, TRUE),
       ...$generate_per_config_entity_type_test_case(Pattern::ENTITY_TYPE_ID, FALSE),
       ...$generate_per_config_entity_type_test_case(Folder::ENTITY_TYPE_ID, FALSE),
@@ -98,6 +100,7 @@ class CanvasOauthAuthenticationProviderTest extends CanvasKernelTestBase {
       ['canvas.api.content.create', [], TRUE],
       ['canvas.api.content.delete', [], TRUE],
       ['canvas.api.content.get', ['canvas_page' => "1"], TRUE],
+      ['canvas.api.content.get.by_uuid', ['canvas_page' => "550e8400-e29b-41d4-a716-446655440000"], TRUE],
       ['canvas.api.content.list', [], TRUE],
       ['canvas.api.content.patch', ['canvas_page' => "1"], TRUE],
       ['canvas.api.form.component_instance', [], FALSE],
@@ -109,6 +112,10 @@ class CanvasOauthAuthenticationProviderTest extends CanvasKernelTestBase {
       ['canvas.component.status', [], FALSE],
       ['canvas.boot.entity', [], FALSE],
       ['canvas.api.artifacts.upload', [], TRUE],
+      ['canvas.api.media.upload', [], TRUE],
+      ['canvas.api.push.complete', [], TRUE],
+      ['canvas.api.push.fail', [], TRUE],
+      ['canvas.api.push.start', [], TRUE],
     ];
   }
 

@@ -1293,6 +1293,18 @@ paths:
                 cannotUnpublishHomepage:
                   value:
                     error: "Cannot unpublish the homepage. Please set a different page as the homepage first."
+  '/canvas/api/v0/content/canvas_page/by-uuid/{entityUuid}':
+    description: Endpoint for retrieving a content entity by UUID.
+    get:
+      summary: Returns a single content entity by UUID with its component tree.
+      parameters:
+        - $ref: '#/components/parameters/entityUuid'
+      responses:
+        '200':
+          description: Content entity retrieved successfully.
+          $ref: '#/components/responses/ContentEntityResponse'
+        '404':
+          description: Content entity not found.
   '/canvas/api/v0/content/canvas_page/{entityId}':
     description: Endpoint for retrieving or deleting content entities.
     get:
@@ -1346,7 +1358,7 @@ paths:
         - in: query
           name: search
           required: false
-          description: Search term to filter content by title
+          description: Search term to filter content by title. When present, pagination parameters are ignored.
           schema:
             type: string
           examples:
@@ -1354,6 +1366,25 @@ paths:
               value: 'My page'
             Search for marketing update content:
               value: 'Marketing update'
+        - in: query
+          name: page[offset]
+          required: false
+          description: Zero-based index of the first item to return. Ignored when `search` is present.
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          example: 50
+        - in: query
+          name: page[limit]
+          required: false
+          description: Maximum number of items to return. Capped at 50. Ignored when `search` is present.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 50
+          example: 25
       responses:
         200:
           description: Page list generated successfully.
@@ -1361,82 +1392,129 @@ paths:
             application/json:
               schema:
                 type: object
-                minProperties: 0
-                # @todo Validate the property keys match the '^[0-9]$' pattern
-                #   in https://drupal.org/i/3506543.
-                additionalProperties:
-                  type: object
-                  required:
-                    - id
-                    - uuid
-                    - title
-                    - status
-                    - path
-                    - autoSaveLabel
-                    - autoSavePath
-                    - internalPath
-                    - links
-                  properties:
-                    id:
-                      type: integer
-                      description: The page ID.
-                    uuid:
-                      type: string
-                      format: uuid
-                      description: The page UUID.
-                    title:
-                      type: string
-                      description: The page title.
-                    status:
-                      type: boolean
-                      description: The page status.
-                    autoSaveLabel:
-                      type: [string, "null"]
-                      description: The auto-save title.
-                    autoSavePath:
-                      type: [string, "null"]
-                      format: uri-reference
-                      description: The auto-save path.
-                    internalPath:
-                      type: string
-                      format: uri-reference
-                      description: The internal (unprocessed) path
-                    path:
-                      type: string
-                      format: uri-reference
-                      title: The processed path
-                    links:
+                required:
+                  - data
+                properties:
+                  data:
+                    type: array
+                    description: The list of page entities.
+                    items:
                       type: object
-                      description: The operation links.
-                      additionalProperties:
-                        type: string
-                      examples:
-                        edit-form: /canvas/editor/canvas_page/3
+                      required:
+                        - id
+                        - uuid
+                        - title
+                        - status
+                        - path
+                        - autoSaveLabel
+                        - autoSavePath
+                        - internalPath
+                        - isNew
+                        - hasUnsavedStatusChange
+                        - links
+                      additionalProperties: false
+                      properties:
+                        id:
+                          type: integer
+                          description: The page ID.
+                        uuid:
+                          type: string
+                          format: uuid
+                          description: The page UUID.
+                        title:
+                          type: string
+                          description: The page title.
+                        status:
+                          type: boolean
+                          description: The page status.
+                        autoSaveLabel:
+                          type: [string, "null"]
+                          description: The auto-save title.
+                        autoSavePath:
+                          type: [string, "null"]
+                          format: uri-reference
+                          description: The auto-save path.
+                        internalPath:
+                          type: string
+                          format: uri-reference
+                          description: The internal (unprocessed) path
+                        path:
+                          type: string
+                          format: uri-reference
+                          title: The processed path
+                        isNew:
+                          type: boolean
+                          description: Whether the entity has no published revision.
+                        hasUnsavedStatusChange:
+                          type: boolean
+                          description: Whether the auto-save has an unsaved publish/unpublish status change.
+                        links:
+                          type: object
+                          description: The operation links for this entity.
+                          additionalProperties:
+                            type: string
+                          example:
+                            edit-form: /canvas/editor/canvas_page/3
+                  meta:
+                    type: object
+                    description: Present for non-search requests only.
+                    required:
+                      - count
+                    properties:
+                      count:
+                        type: integer
+                        description: Total number of pages (ignoring pagination).
+                  links:
+                    type: object
+                    description: >
+                      JSON:API-style pagination links. Present for non-search
+                      requests only. `self` is always included; `first`/`prev`
+                      appear when not on the first page; `next`/`last` appear
+                      when not on the last page.
+                    properties:
+                      self:
+                        $ref: '#/components/schemas/PaginationLink'
+                      first:
+                        $ref: '#/components/schemas/PaginationLink'
+                      prev:
+                        $ref: '#/components/schemas/PaginationLink'
+                      next:
+                        $ref: '#/components/schemas/PaginationLink'
+                      last:
+                        $ref: '#/components/schemas/PaginationLink'
               examples:
                 pageList:
                   value:
-                    '1':
-                      id: 1
-                      uuid: 2eaa55ce-382d-437d-8d74-a385fecd0c33
-                      title: Home
-                      status: true
-                      path: /home
-                      autoSaveLabel: Homer
-                      autoSavePath: /updated-path
-                      internalPath: /page/1
-                      links:
-                        edit-form: /canvas/editor/canvas_page/1
-                    '2':
-                      id: 2
-                      uuid: ede9e76b-42c9-4c8d-ab99-134f2c4fc9a3
-                      title: About
-                      status: false
-                      path: /about
-                      autoSaveLabel: About who?
-                      autoSavePath: /page/1
-                      internalPath: /page/2
-                      links:
-                        edit-form: /canvas/editor/canvas_page/2
+                    data:
+                      - id: 1
+                        uuid: 2eaa55ce-382d-437d-8d74-a385fecd0c33
+                        title: Home
+                        status: true
+                        path: /home
+                        autoSaveLabel: Homer
+                        autoSavePath: /updated-path
+                        internalPath: /page/1
+                        links:
+                          edit-form: /canvas/editor/canvas_page/1
+                      - id: 2
+                        uuid: ede9e76b-42c9-4c8d-ab99-134f2c4fc9a3
+                        title: About
+                        status: false
+                        path: /about
+                        autoSaveLabel: About who?
+                        autoSavePath: /page/1
+                        internalPath: /page/2
+                        links:
+                          edit-form: /canvas/editor/canvas_page/2
+                    meta:
+                      count: 42
+                    links:
+                      self:
+                        href: /canvas/api/v0/content/canvas_page?page[offset]=0&page[limit]=50
+                      next:
+                        href: /canvas/api/v0/content/canvas_page?page[offset]=50&page[limit]=50
+                      last:
+                        href: /canvas/api/v0/content/canvas_page?page[offset]=0&page[limit]=50
     post:
       summary: Creates content for a specific entity type
       parameters:
@@ -1466,6 +1544,7 @@ paths:
                   title: Home
                   status: true
                   path: /home
+                  description: The home page of the site.
                   components: [ ]
               "A page with components":
                 summary: A page with nested components
@@ -1473,6 +1552,7 @@ paths:
                   title: About
                   status: true
                   path: /about
+                  description: Learn more about us.
                   components:
                     - uuid: 09365c2d-1ee1-47fd-b5a3-7e4f34866186
                       component_id: sdc.my_theme.hero
@@ -2077,6 +2157,184 @@ paths:
                   error:
                     type: string
                     description: Error description
+  /canvas/api/v0/media/{media_type}/upload:
+    description: Upload a file and create a media entity
+    parameters:
+      - name: media_type
+        in: path
+        required: true
+        description: The media type (e.g. "image")
+        schema:
+          type: string
+    post:
+      summary: Upload a file and create a media entity
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: The file to upload
+                title:
+                  type: string
+                  description: Title for the media (used for image media types)
+                alt:
+                  type: string
+                  description: Alt text for the media (used for image media types)
+            examples:
+              image-upload:
+                summary: Upload an image with alt text
+                value:
+                  file: (binary content of sunset.jpg)
+                  title: Sunset
+                  alt: A vibrant sunset over the horizon
+      responses:
+        '201':
+          description: Media entity created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - id
+                  - uuid
+                  - inputs_resolved
+                properties:
+                  id:
+                    type: integer
+                    description: The media entity ID
+                  uuid:
+                    type: string
+                    format: uuid
+                    description: The media entity UUID
+                  inputs_resolved:
+                    type: object
+                    description: Resolved input values for use in Canvas components
+                    properties:
+                      src:
+                        type: string
+                        format: uri-reference
+                        description: Image URL with ?alternateWidths query parameter
+                      alt:
+                        type: string
+                        description: Alt text
+                      width:
+                        type: integer
+                        description: Image width in pixels
+                      height:
+                        type: integer
+                        description: Image height in pixels
+              examples:
+                image-upload:
+                  summary: Successful image upload
+                  value:
+                    id: 5
+                    uuid: 6cc261b1-b981-4714-965b-d5a5871b10dd
+                    inputs_resolved:
+                      src: '/sites/default/files/2026-03/sunset.jpg?alternateWidths=/sites/default/files/styles/canvas_parametrized_width--1200/public/2026-03/sunset.jpg.avif'
+                      alt: A vibrant sunset over the horizon
+                      width: 400
+                      height: 300
+        '400':
+          $ref: '#/components/responses/ClientErrorResponse'
+        '403':
+          $ref: '#/components/responses/AuthenticationErrorResponse'
+        '422':
+          $ref: '#/components/responses/ClientErrorResponse'
+  /canvas/api/v0/notifications:
+    description: Fetch recent notifications for the authenticated user.
+    get:
+      summary: Fetch recent notifications for the authenticated user.
+      responses:
+        '200':
+          description: List of recent notifications.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                properties:
+                  data:
+                    type: object
+                    required:
+                      - notifications
+                    properties:
+                      notifications:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Notification'
+        '403':
+          $ref: '#/components/responses/AuthenticationErrorResponse'
+  /canvas/api/v0/notifications/read:
+    description: Mark notifications as read for the authenticated user.
+    post:
+      summary: Mark notifications as read for the authenticated user.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - ids
+              properties:
+                ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+      responses:
+        '204':
+          description: Notifications marked as read.
+        '400':
+          $ref: '#/components/responses/ClientErrorResponse'
+        '403':
+          $ref: '#/components/responses/AuthenticationErrorResponse'
+  /canvas/api/v0/push/complete:
+    description: Signal that a CLI push completed successfully.
+    post:
+      summary: Signal that a CLI push completed successfully.
+      responses:
+        '204':
+          description: Push completion recorded.
+        '403':
+          $ref: '#/components/responses/AuthenticationErrorResponse'
+  /canvas/api/v0/push/fail:
+    description: Signal that a CLI push failed.
+    post:
+      summary: Signal that a CLI push failed.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  description: Optional error message describing why the push failed.
+      responses:
+        '204':
+          description: Push failure recorded.
+        '403':
+          $ref: '#/components/responses/AuthenticationErrorResponse'
+  /canvas/api/v0/push/start:
+    description: Signal that a CLI push has started.
+    post:
+      summary: Signal that a CLI push has started.
+      responses:
+        '204':
+          description: Push start recorded.
+        '403':
+          $ref: '#/components/responses/AuthenticationErrorResponse'
   /canvas/api/v0/staged-update/auto-save:
     description: Auto-save endpoints for staged config updates.
     post:
@@ -2424,6 +2682,16 @@ paths:
 components:
   # @see https://spec.openapis.org/oas/v3.1.0.html#schema-object
   schemas:
+    PaginationLink:
+      type: object
+      description: A JSON:API-style link object.
+      required:
+        - href
+      properties:
+        href:
+          type: string
+          format: url-reference
+          description: The URL for this link.
     # Update ensure required and optional properties are present in
     #    https://drupal.org/i/3507427.
     ClientSideTransforms:
@@ -2626,6 +2894,12 @@ components:
               type: array
               items:
                 type: string
+            entityFields:
+              type: object
+              additionalProperties:
+                type: array
+                items:
+                  type: string
     ExistingCodeComponent:
       type: object
       allOf:
@@ -3278,6 +3552,60 @@ components:
         - type
         - weight
         - items
+    Notification:
+      type: object
+      required:
+        - id
+        - type
+        - title
+        - message
+        - timestamp
+        - hasRead
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          description: The severity or status of the notification.
+          enum:
+            - processing
+            - success
+            - info
+            - warning
+            - error
+        key:
+          type: string
+          nullable: true
+          description: Deduplication key. When a new processing, error, or warning notification is created with the same key, it replaces the previous one.
+        title:
+          type: string
+          description: Short headline displayed to the user.
+        message:
+          type: string
+          description: Detailed body text of the notification.
+        timestamp:
+          type: integer
+          description: Unix timestamp in milliseconds.
+        hasRead:
+          type: boolean
+          description: Whether the current user has marked this notification as read.
+        actions:
+          type: array
+          nullable: true
+          description: Optional action links displayed alongside the notification.
+          items:
+            type: object
+            required:
+              - label
+              - href
+            properties:
+              label:
+                type: string
+                description: Button label for the action.
+              href:
+                type: string
+                description: URL the action links to.
     StagedConfigUpdate:
       title: Staged Config Update
       type: object
@@ -3453,6 +3781,9 @@ components:
           type: string
           format: uri-reference
           title: The processed path
+        description:
+          type: string
+          description: The meta description.
         components:
           type: array
           description: >
@@ -3507,6 +3838,7 @@ components:
           autoSavePath: /updated-path
           internalPath: /page/1
           components: [ ]
+          description: The home page of the site.
           links:
             edit-form: /canvas/editor/canvas_page/1
         -
@@ -3535,6 +3867,7 @@ components:
               inputs:
                 body: Hello world
               label: null
+          description: Learn more about us.
           links:
             edit-form: "/canvas/editor/canvas_page/1"
     DuplicateContentRequestBody:
@@ -3558,6 +3891,10 @@ components:
         - path
         - components
       properties:
+        uuid:
+          type: string
+          format: uuid
+          description: Optional UUID to assign to the new page. If omitted, one is generated automatically.
         title:
           type: string
           description: The page title.
@@ -3568,6 +3905,9 @@ components:
           type: string
           format: uri-reference
           title: The processed path
+        description:
+          type: string
+          description: The meta description.
         components:
           type: array
           description: >
@@ -3823,6 +4163,17 @@ components:
       examples:
         arbitraryEntityId:
           value: 42
+    entityUuid:
+      name: entityUuid
+      in: path
+      required: true
+      description: The entity UUID
+      schema:
+        type: string
+        format: uuid
+      examples:
+        arbitraryEntityUuid:
+          value: 550e8400-e29b-41d4-a716-446655440000
     configEntityId:
       name: configEntityId
       in: path

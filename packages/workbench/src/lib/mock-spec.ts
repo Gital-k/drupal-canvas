@@ -2,6 +2,7 @@ import {
   createSyntheticRootId,
   isNonEmptyString,
   isRecord,
+  normalizeElementMapProps,
   parseElementMap,
   parseSlotMap,
 } from './authored-spec-utils';
@@ -19,12 +20,12 @@ export interface MockSpecMetadataEntry {
 
 export interface MockSpecPropsEntry {
   name: string;
-  props: unknown;
+  props?: unknown;
 }
 
 export interface MockSpecPropsAndSlotsEntry {
   name: string;
-  props: unknown;
+  props?: unknown;
   slots: AuthoredSpecSlots;
   elements: AuthoredSpecElementMap;
 }
@@ -55,6 +56,7 @@ export interface MockSpecValidationOptions {
   componentName?: string;
   componentNames?: string[];
   componentExampleProps?: Record<string, unknown>;
+  componentRequiredPropNames?: string[];
 }
 
 export interface AuthoredMockSpecFile {
@@ -150,14 +152,28 @@ function parseMockSpecEntries(
 
 function mergeRootPropsWithExampleProps(
   props: unknown,
-  componentExampleProps?: Record<string, unknown>,
+  options: {
+    componentExampleProps?: Record<string, unknown>;
+    componentRequiredPropNames?: string[];
+  },
 ): unknown {
-  if (!componentExampleProps || !isRecord(props)) {
+  if (!options.componentExampleProps || !isRecord(props)) {
+    return props;
+  }
+
+  const requiredExampleProps = Object.fromEntries(
+    (options.componentRequiredPropNames ?? [])
+      .filter((propName) =>
+        Object.hasOwn(options.componentExampleProps as object, propName),
+      )
+      .map((propName) => [propName, options.componentExampleProps![propName]]),
+  );
+  if (Object.keys(requiredExampleProps).length === 0) {
     return props;
   }
 
   return {
-    ...componentExampleProps,
+    ...requiredExampleProps,
     ...props,
   };
 }
@@ -178,25 +194,28 @@ function mergeExamplePropsIntoInferredComponentElements(
   options: {
     componentName?: string;
     componentExampleProps?: Record<string, unknown>;
+    componentRequiredPropNames?: string[];
   },
 ): Spec['elements'] {
   return Object.fromEntries(
-    Object.entries(elements).map(([elementId, element]) => {
-      if (!isInferredComponentType(element.type, options.componentName)) {
-        return [elementId, element];
-      }
+    Object.entries(normalizeElementMapProps(elements)).map(
+      ([elementId, element]) => {
+        if (!isInferredComponentType(element.type, options.componentName)) {
+          return [elementId, element];
+        }
 
-      return [
-        elementId,
-        {
-          ...element,
-          props: mergeRootPropsWithExampleProps(
-            element.props ?? {},
-            options.componentExampleProps,
-          ),
-        },
-      ];
-    }),
+        return [
+          elementId,
+          {
+            ...element,
+            props: mergeRootPropsWithExampleProps(element.props ?? {}, {
+              componentExampleProps: options.componentExampleProps,
+              componentRequiredPropNames: options.componentRequiredPropNames,
+            }),
+          },
+        ];
+      },
+    ),
   ) as Spec['elements'];
 }
 
@@ -249,6 +268,7 @@ function normalizePropsEntry(
   entry: MockSpecPropsEntry,
   componentName: string,
   componentExampleProps?: Record<string, unknown>,
+  componentRequiredPropNames?: string[],
 ): NormalizedMockSpecEntry {
   const root = createSyntheticRootId([]);
 
@@ -259,10 +279,10 @@ function normalizePropsEntry(
       elements: {
         [root]: {
           type: componentName,
-          props: mergeRootPropsWithExampleProps(
-            entry.props,
+          props: mergeRootPropsWithExampleProps(entry.props ?? {}, {
             componentExampleProps,
-          ),
+            componentRequiredPropNames,
+          }),
         },
       } as Spec['elements'],
     },
@@ -273,6 +293,7 @@ function normalizePropsAndSlotsEntry(
   entry: MockSpecPropsAndSlotsEntry,
   componentName: string,
   componentExampleProps?: Record<string, unknown>,
+  componentRequiredPropNames?: string[],
 ): NormalizedMockSpecEntry {
   const root = createSyntheticRootId(Object.keys(entry.elements));
 
@@ -283,10 +304,10 @@ function normalizePropsAndSlotsEntry(
       elements: {
         [root]: {
           type: componentName,
-          props: mergeRootPropsWithExampleProps(
-            entry.props,
+          props: mergeRootPropsWithExampleProps(entry.props ?? {}, {
             componentExampleProps,
-          ),
+            componentRequiredPropNames,
+          }),
           slots: entry.slots,
         },
         ...entry.elements,
@@ -300,6 +321,7 @@ export function normalizeMockSpecEntry(
   options: {
     componentName?: string;
     componentExampleProps?: Record<string, unknown>;
+    componentRequiredPropNames?: string[];
   } = {},
 ): NormalizedMockSpecEntry {
   if ('root' in entry) {
@@ -326,6 +348,7 @@ export function normalizeMockSpecEntry(
       entry,
       options.componentName,
       options.componentExampleProps,
+      options.componentRequiredPropNames,
     );
   }
 
@@ -333,6 +356,7 @@ export function normalizeMockSpecEntry(
     entry,
     options.componentName,
     options.componentExampleProps,
+    options.componentRequiredPropNames,
   );
 }
 
@@ -385,8 +409,8 @@ function parseEntry(
   const hasElements = 'elements' in value;
   const hasRoot = 'root' in value;
 
-  const isPropsFormat = hasProps && !hasSlots && !hasElements && !hasRoot;
-  const isPropsAndSlotsFormat = hasProps && hasSlots && hasElements && !hasRoot;
+  const isPropsFormat = !hasSlots && !hasElements && !hasRoot;
+  const isPropsAndSlotsFormat = hasSlots && hasElements && !hasRoot;
   const isAdvancedFormat = hasRoot && hasElements && !hasProps && !hasSlots;
 
   if (!isPropsFormat && !isPropsAndSlotsFormat && !isAdvancedFormat) {
@@ -394,7 +418,7 @@ function parseEntry(
       toIssue(
         sourcePath,
         index,
-        'Expected one of these shapes: { name, props }, { name, props, slots, elements }, or { name, root, elements }.',
+        'Expected one of these shapes: { name, props? }, { name, props?, slots, elements }, or { name, root, elements }.',
       ),
     );
     return {
@@ -453,6 +477,7 @@ function parseEntry(
       {
         componentName: options.componentName,
         componentExampleProps: options.componentExampleProps,
+        componentRequiredPropNames: options.componentRequiredPropNames,
       },
     );
 
@@ -529,6 +554,7 @@ function parseEntry(
         {
           componentName: options.componentName,
           componentExampleProps: options.componentExampleProps,
+          componentRequiredPropNames: options.componentRequiredPropNames,
         },
       ),
       issues: [],
@@ -606,6 +632,7 @@ function parseEntry(
       {
         componentName: options.componentName,
         componentExampleProps: options.componentExampleProps,
+        componentRequiredPropNames: options.componentRequiredPropNames,
       },
     ),
     issues: [],

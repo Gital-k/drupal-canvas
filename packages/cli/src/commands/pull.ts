@@ -1,24 +1,39 @@
 import fs from 'fs/promises';
 import path from 'path';
 import chalk from 'chalk';
+import { Option } from 'commander';
 import yaml from 'js-yaml';
 import * as p from '@clack/prompts';
 import { discoverCanvasProject } from '@drupal-canvas/discovery';
 import { resolveHostGlobalCssPath } from '@drupal-canvas/vite-compat';
 
 import { ensureConfig, getConfig } from '../config';
-import { createApiService } from '../services/api';
 import {
+  buildExistingVariantKeys,
+  pullFonts,
+  readBrandKitConfig,
+  updateBrandKitConfig,
+  variantKey,
+} from '../lib/fonts/font-pull.js';
+import { createApiService, ensureAuthConfig } from '../services/api';
+import {
+  parseBooleanOption,
   pluralizeComponent,
   updateConfigFromOptions,
 } from '../utils/command-helpers';
+import { ensureTailwindImportAtTop } from '../utils/ensure-global-css-tailwind-import';
+import { pageToAuthoredSpec } from '../utils/pages';
 import { reportResults } from '../utils/report-results';
 
-import type { DiscoveredComponent } from '@drupal-canvas/discovery';
+import type {
+  DiscoveredComponent,
+  DiscoveredPage,
+} from '@drupal-canvas/discovery';
 import type { Command } from 'commander';
 import type { ApiService } from '../services/api';
 import type { Component } from '../types/Component';
 import type { Metadata } from '../types/Metadata';
+import type { PageListItem } from '../types/Page';
 import type { Result } from '../types/Result';
 
 interface PullOptions {
@@ -26,6 +41,8 @@ interface PullOptions {
   clientSecret?: string;
   siteUrl?: string;
   scope?: string;
+  includePages?: boolean;
+  includeBrandKit?: boolean;
   dir?: string;
   yes?: boolean;
   skipOverwrite?: boolean;
@@ -230,6 +247,130 @@ export function createComponentsPullTask(
   };
 }
 
+export function createPagesPullTask(
+  apiService: ApiService,
+  pagesDir: string,
+  skipOverwrite: boolean,
+): PullTask {
+  let pages: Record<string, PageListItem> = {};
+  const localPageMap = new Map<string, DiscoveredPage>();
+  const localPageSlugMap = new Map<string, DiscoveredPage>();
+
+  function getPageSlug(page: Pick<PageListItem, 'path' | 'uuid'>): string {
+    const slug = page.path.replace(/^\/+|\/+$/g, '').replace(/\//g, '-');
+
+    if (slug) {
+      return slug;
+    }
+
+    return page.path === '/' ? 'index' : page.uuid;
+  }
+
+  function getDiscoveredPage(page: PageListItem): DiscoveredPage | undefined {
+    const byUuid = localPageMap.get(page.uuid);
+    if (byUuid) {
+      return byUuid;
+    }
+
+    return localPageSlugMap.get(getPageSlug(page));
+  }
+
+  return {
+    async prepare(): Promise<PullTaskPrepareResult> {
+      const [fetchedPages, discoveryResult] = await Promise.all([
+        apiService.listPages(),
+        discoverCanvasProject({ pagesRoot: pagesDir }),
+      ]);
+
+      pages = fetchedPages;
+
+      for (const discovered of discoveryResult.pages) {
+        if (discovered.uuid) {
+          localPageMap.set(discovered.uuid, discovered);
+        }
+        localPageSlugMap.set(discovered.slug, discovered);
+      }
+
+      const total = Object.keys(pages).length;
+      if (total === 0) return { summaryLines: [], localOnlyCount: 0 };
+
+      const existingCount = Object.values(pages).filter((page) =>
+        Boolean(getDiscoveredPage(page)),
+      ).length;
+      const newCount = total - existingCount;
+
+      const lines = [formatSummaryLine('page', total, newCount, existingCount)];
+      return { summaryLines: lines, localOnlyCount: 0 };
+    },
+
+    async execute(): Promise<PullTaskResult> {
+      const results: Result[] = [];
+
+      for (const page of Object.values(pages)) {
+        try {
+          const discovered = getDiscoveredPage(page);
+
+          if (discovered && skipOverwrite) {
+            results.push({
+              itemName: page.title,
+              success: true,
+              details: [{ content: 'Skipped (already exists)' }],
+            });
+            continue;
+          }
+
+          const fullPage = await apiService.getPage(page.id);
+
+          const nonJsComponents = fullPage.components.filter(
+            (c) => !c.component_id.startsWith('js.'),
+          );
+          if (nonJsComponents.length > 0) {
+            const unsupported = [
+              ...new Set(nonJsComponents.map((c) => c.component_id)),
+            ].join(', ');
+            results.push({
+              itemName: page.title,
+              success: false,
+              details: [
+                {
+                  content: `Skipped: contains unsupported components (${unsupported}). Only code components are supported.`,
+                },
+              ],
+            });
+            continue;
+          }
+
+          const localData = pageToAuthoredSpec(fullPage);
+
+          const fileName = getPageSlug(page);
+          const filePath =
+            discovered?.path ?? path.join(pagesDir, `${fileName}.json`);
+          await fs.mkdir(path.dirname(filePath), { recursive: true });
+          await fs.writeFile(
+            filePath,
+            JSON.stringify(localData, null, 2) + '\n',
+            'utf-8',
+          );
+
+          results.push({ itemName: page.title, success: true });
+        } catch (error) {
+          results.push({
+            itemName: page.title,
+            success: false,
+            details: [
+              {
+                content: error instanceof Error ? error.message : String(error),
+              },
+            ],
+          });
+        }
+      }
+
+      return { results, title: 'Pulled pages', label: 'Page' };
+    },
+  };
+}
+
 export function createAssetsPullTask(
   apiService: ApiService,
   globalCssPath: string,
@@ -263,7 +404,8 @@ export function createAssetsPullTask(
           });
         } else {
           await fs.mkdir(path.dirname(globalCssPath), { recursive: true });
-          await fs.writeFile(globalCssPath, globalCss, 'utf-8');
+          const outputCss = ensureTailwindImportAtTop(globalCss);
+          await fs.writeFile(globalCssPath, outputCss, 'utf-8');
           results.push({ itemName: 'global.css', success: true });
         }
       } catch (error) {
@@ -280,14 +422,123 @@ export function createAssetsPullTask(
   };
 }
 
+export function createFontsPullTask(
+  apiService: ApiService,
+  projectRoot: string,
+): PullTask {
+  let totalFontVariants = 0;
+  let newCount = 0;
+  let existingCount = 0;
+
+  return {
+    async prepare(): Promise<PullTaskPrepareResult> {
+      const [brandKit, brandKitConfig] = await Promise.all([
+        apiService.getBrandKit(),
+        readBrandKitConfig(projectRoot),
+      ]);
+
+      const remoteFonts = brandKit.fonts ?? [];
+      totalFontVariants = remoteFonts.length;
+      if (totalFontVariants === 0) {
+        return { summaryLines: [], localOnlyCount: 0 };
+      }
+
+      const existingKeys = buildExistingVariantKeys(
+        brandKitConfig?.families ?? [],
+      );
+
+      existingCount = remoteFonts.filter((e) =>
+        existingKeys.has(
+          variantKey(e.family, e.weight ?? '400', e.style ?? 'normal'),
+        ),
+      ).length;
+      newCount = remoteFonts.filter(
+        (e) =>
+          e.url &&
+          !existingKeys.has(
+            variantKey(e.family, e.weight ?? '400', e.style ?? 'normal'),
+          ),
+      ).length;
+
+      return {
+        summaryLines: [
+          formatSummaryLine(
+            'font variant',
+            totalFontVariants,
+            newCount,
+            existingCount,
+          ),
+        ],
+        localOnlyCount: 0,
+      };
+    },
+
+    async execute(): Promise<PullTaskResult> {
+      const config = getConfig();
+      const result = await pullFonts(apiService, projectRoot, config.fonts);
+
+      const results: Result[] = [];
+
+      for (const entry of result.downloaded) {
+        results.push({
+          itemName: `${entry.name} ${entry.weights?.[0] ?? '400'} ${entry.styles?.[0] ?? 'normal'}`,
+          success: true,
+        });
+      }
+
+      if (result.skipped > 0) {
+        results.push({
+          itemName: 'font variants',
+          success: true,
+          details: [
+            {
+              content: `Skipped ${result.skipped} (already in config)`,
+            },
+          ],
+        });
+      }
+
+      if (result.count > 0) {
+        await updateBrandKitConfig(projectRoot, result.downloaded);
+      }
+
+      return {
+        results,
+        title: 'Pulled fonts',
+        label: 'Font variant',
+      };
+    },
+  };
+}
+
 export function pullCommand(program: Command): void {
   program
     .command('pull')
-    .description('pull components and global CSS from Drupal')
+    .description(
+      'pull components, global CSS, and optional fonts and pages from Drupal',
+    )
     .option('--client-id <id>', 'Client ID')
     .option('--client-secret <secret>', 'Client Secret')
     .option('--site-url <url>', 'Site URL')
     .option('--scope <scope>', 'Scope')
+    .addOption(
+      new Option(
+        '--include-pages [enabled]',
+        'Include pages in the pull operation',
+      )
+        .preset('true')
+        .argParser(parseBooleanOption)
+        .default(undefined),
+    )
+    .addOption(
+      new Option(
+        '--include-brand-kit [enabled]',
+        'Include brand kit (fonts) in the pull operation',
+      )
+        .preset('true')
+        .argParser(parseBooleanOption)
+        .default(undefined),
+    )
     .option('-d, --dir <directory>', 'Component directory')
     .option('-y, --yes', 'Skip all confirmation prompts')
     .option('--skip-overwrite', 'Skip pulling items that already exist locally')
@@ -297,20 +548,22 @@ export function pullCommand(program: Command): void {
       try {
         updateConfigFromOptions(options);
 
-        await ensureConfig([
-          'siteUrl',
-          'clientId',
-          'clientSecret',
-          'scope',
-          'componentDir',
-        ]);
+        await ensureAuthConfig();
+        await ensureConfig(['componentDir']);
 
         const config = getConfig();
         const apiService = await createApiService();
+        const includesPages = config.includePages;
+        const includesBrandKit = config.includeBrandKit;
 
         const s = p.spinner();
+        const contentParts: string[] = ['components', 'global CSS'];
+        if (includesBrandKit) contentParts.push('fonts');
+        if (includesPages) contentParts.push('pages');
+        const contentLabel = contentParts.join(', ');
 
         // Build pull tasks.
+        const projectRoot = process.cwd();
         const tasks: PullTask[] = [
           createComponentsPullTask(
             apiService,
@@ -319,13 +572,27 @@ export function pullCommand(program: Command): void {
           ),
           createAssetsPullTask(
             apiService,
-            resolveHostGlobalCssPath(process.cwd()),
+            resolveHostGlobalCssPath(projectRoot),
             options.skipOverwrite ?? false,
           ),
         ];
 
+        if (includesBrandKit) {
+          tasks.push(createFontsPullTask(apiService, projectRoot));
+        }
+
+        if (includesPages) {
+          tasks.push(
+            createPagesPullTask(
+              apiService,
+              config.pagesDir,
+              options.skipOverwrite ?? false,
+            ),
+          );
+        }
+
         // Fetch remote data and discover local state.
-        s.start('Fetching components and global CSS');
+        s.start(`Fetching ${contentLabel}`);
         const prepareResults = await Promise.all(tasks.map((t) => t.prepare()));
         const summaryLines = prepareResults.flatMap((r) => r.summaryLines);
         const localOnlyCount = prepareResults.reduce(
@@ -342,7 +609,7 @@ export function pullCommand(program: Command): void {
 
         if (!options.yes) {
           const confirmed = await p.confirm({
-            message: `Pull to ${config.componentDir}?`,
+            message: `Pull from ${config.siteUrl}?`,
             initialValue: true,
           });
           if (p.isCancel(confirmed) || !confirmed) {

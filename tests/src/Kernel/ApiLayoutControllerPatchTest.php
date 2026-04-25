@@ -293,7 +293,7 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
  * Tests .
  */
   #[DataProvider('providerValid')]
-  public function test(string $entity_type, bool $withAutoSave = FALSE, bool $withGlobal = FALSE): void {
+  public function test(string $entity_type, bool $withAutoSave, bool $withGlobal): void {
     $entity = $this->getTestEntity($entity_type);
     $url = $this->getLayoutUrl($entity)->toString();
     $this->setUpCurrentUser([], [
@@ -449,11 +449,9 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
     $images = (new Crawler($data['html']))->filter('img')->extract(['src']);
     self::assertEquals([
       // @see \Drupal\Tests\canvas\TestSite\CanvasTestSetup::UUID_STATIC_IMAGE
-      // @phpstan-ignore property.notFound
       Media::load(3)?->field_media_image->src_with_alternate_widths->getGeneratedUrl(),
       // @see \Drupal\Tests\canvas\TestSite\CanvasTestSetup::UUID_STATIC_IMAGE2
       // @see \Drupal\Tests\canvas\TestSite\CanvasTestSetup::UUID_MEDIA_IMAGE4
-      // @phpstan-ignore property.notFound
       Media::load(4)?->field_media_image->src_with_alternate_widths->getGeneratedUrl(),
     ], $images);
 
@@ -510,7 +508,7 @@ final class ApiLayoutControllerPatchTest extends ApiLayoutControllerTestBase {
 
   public static function providerValid(): iterable {
     foreach (['node', ContentTemplate::ENTITY_TYPE_ID] as $entity_type) {
-      yield "$entity_type: fresh state, no global" => [$entity_type];
+      yield "$entity_type: fresh state, no global" => [$entity_type, FALSE, FALSE];
       yield "$entity_type: fresh state, global" => [$entity_type, FALSE, TRUE];
       yield "$entity_type: existing auto-save, no global" => [$entity_type, TRUE, FALSE];
       yield "$entity_type: existing auto-save, global" => [$entity_type, TRUE, TRUE];

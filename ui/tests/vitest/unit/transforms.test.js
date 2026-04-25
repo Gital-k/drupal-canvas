@@ -114,6 +114,99 @@ describe('Transforms - link', () => {
       transforms.link([{ uri: null, title: 'Click me' }], {}, fieldData),
     ).toEqual({ uri: null, title: 'Click me' });
   });
+
+  it('Should normalize weighted object payloads and sort by weight for multiple values', () => {
+    fieldData.sourceTypeSettings.instance.title = 0;
+    expect(
+      transforms.link(
+        {
+          0: { uri: 'https://example.com/second', _weight: '1' },
+          1: { uri: 'https://example.com/first', _weight: '0' },
+          add_more: '',
+        },
+        { multiple: true },
+        fieldData,
+      ),
+    ).toEqual(['https://example.com/first', 'https://example.com/second']);
+  });
+
+  it('Should keep object values for titled links and sort by weight', () => {
+    fieldData.sourceTypeSettings.instance.title = 1;
+    expect(
+      transforms.link(
+        {
+          0: { uri: 'Content (42)', title: 'Second', _weight: '1' },
+          1: { uri: '/first', title: 'First', _weight: '0' },
+          add_more: '',
+        },
+        { multiple: true },
+        fieldData,
+      ),
+    ).toEqual([
+      { uri: '/first', title: 'First', _weight: '0' },
+      { uri: 'entity:node/42', title: 'Second', _weight: '1' },
+    ]);
+  });
+
+  it('Should trim trailing and leading nulls', () => {
+    fieldData.sourceTypeSettings.instance.title = 0;
+    expect(
+      transforms.link(
+        {
+          0: { uri: '', _weight: '0' },
+          1: { uri: 'https://example.com', _weight: '1' },
+          2: { uri: '', _weight: '2' },
+        },
+        { multiple: true },
+        fieldData,
+      ),
+    ).toEqual(['https://example.com']);
+  });
+
+  it('Should trim leading nulls', () => {
+    // Rows 0 and 1 are empty, row 2 has a value.
+    fieldData.sourceTypeSettings.instance.title = 0;
+    expect(
+      transforms.link(
+        {
+          0: { uri: '', _weight: '0' },
+          1: { uri: '', _weight: '1' },
+          2: { uri: 'https://example.com', _weight: '2' },
+        },
+        { multiple: true },
+        fieldData,
+      ),
+    ).toEqual(['https://example.com']);
+  });
+
+  it('Should return an empty array when all rows are empty', () => {
+    fieldData.sourceTypeSettings.instance.title = 0;
+    expect(
+      transforms.link(
+        {
+          0: { uri: '', _weight: '0' },
+          1: { uri: '', _weight: '1' },
+        },
+        { multiple: true },
+        fieldData,
+      ),
+    ).toEqual([]);
+  });
+
+  it('Should trim trailing empty rows when the first row is filled', () => {
+    fieldData.sourceTypeSettings.instance.title = 0;
+    expect(
+      transforms.link(
+        {
+          0: { uri: 'https://example.com/first', _weight: '0' },
+          1: { uri: '', _weight: '1' },
+          2: { uri: '', _weight: '2' },
+        },
+        { multiple: true },
+        fieldData,
+      ),
+    ).toEqual(['https://example.com/first']);
+  });
 });
 
 describe('Transforms - main property', () => {
@@ -351,8 +444,71 @@ describe('Transforms - firstRecord', () => {
 });
 
 describe('Transforms - dateTime', () => {
+  const datePropSource = {
+    sourceType: 'static:field_item:datetime',
+    sourceTypeSettings: {
+      storage: { datetime_type: 'date' },
+    },
+  };
+
   it('should return null when propSource is undefined', () => {
     expect(transforms.dateTime({ date: '' }, {}, undefined)).to.equal(null);
+  });
+
+  it('should trim trailing and leading', () => {
+    expect(
+      transforms.dateTime(
+        [
+          { date: '', time: '' },
+          { date: '2024-06-01', time: '' },
+          { date: '', time: '' },
+        ],
+        { type: 'date', multiple: true },
+        datePropSource,
+      ),
+    ).toEqual(['2024-06-01']);
+  });
+
+  it('should trim trailing and leading nulls but keep middle nulls', () => {
+    // Rows 0 and 1 are empty, row 2 has a value.
+    expect(
+      transforms.dateTime(
+        [
+          { date: '', time: '' },
+          { date: '', time: '' },
+          { date: '2024-06-01', time: '' },
+        ],
+        { type: 'date', multiple: true },
+        datePropSource,
+      ),
+    ).toEqual(['2024-06-01']);
+  });
+
+  it('should return an empty array when all rows are empty', () => {
+    expect(
+      transforms.dateTime(
+        [
+          { date: '', time: '' },
+          { date: '', time: '' },
+        ],
+        { type: 'date', multiple: true },
+        datePropSource,
+      ),
+    ).toEqual([]);
+  });
+
+  it('should trim trailing empty rows when the first row is filled', () => {
+    expect(
+      transforms.dateTime(
+        [
+          { date: '2024-01-01', time: '' },
+          { date: '', time: '' },
+          { date: '', time: '' },
+        ],
+        { type: 'date', multiple: true },
+        datePropSource,
+      ),
+    ).toEqual(['2024-01-01']);
   });
 });
 

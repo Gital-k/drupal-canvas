@@ -25,7 +25,6 @@ use SlevomatCodingStandard\Helpers\ReferencedNameHelper;
 
 class KernelTestBaseSniff implements Sniff {
 
-  public const CODE_REQUIRE_ASSERT_ENTITY_IS_VALID = 'RequireAssertEntityIsValid';
 
   // A valid reason to not extend CanvasKernelTestBase: because it extends
   // another class that does.
@@ -116,69 +115,6 @@ class KernelTestBaseSniff implements Sniff {
         }
       }
       return;
-    }
-
-    // Impose requirements on CanvasKernelTestBase subclasses, to automate code
-    // review.
-    $this->requireAssertEntityIsValid($phpcsFile, $stackPtr);
-  }
-
-  /**
-   * Detects manual `assertSame([], self::violationsToArray(…))` usage.
-   *
-   * Subclasses of CanvasKernelTestBase should use assertEntityIsValid() instead
-   * of manually asserting that violations are empty.
-   */
-  private function requireAssertEntityIsValid(File $phpcsFile, int $stackPtr): void {
-    // Skip CanvasKernelTestBase itself: that's where assertEntityIsValid() is
-    // defined.
-    if (str_ends_with($phpcsFile->getFilename(), 'CanvasKernelTestBase.php')) {
-      return;
-    }
-
-    $tokens = $phpcsFile->getTokens();
-    for ($i = $stackPtr; $i < $phpcsFile->numTokens; $i++) {
-      if ($tokens[$i]['code'] !== T_STRING || $tokens[$i]['content'] !== 'assertSame') {
-        continue;
-      }
-      // Find the opening parenthesis after assertSame.
-      $openParen = $phpcsFile->findNext(T_WHITESPACE, $i + 1, NULL, TRUE);
-      if ($openParen === FALSE || $tokens[$openParen]['code'] !== T_OPEN_PARENTHESIS) {
-        continue;
-      }
-      // Check if the first argument is `[]`.
-      $firstArg = $phpcsFile->findNext(T_WHITESPACE, $openParen + 1, NULL, TRUE);
-      if ($firstArg === FALSE || $tokens[$firstArg]['code'] !== T_OPEN_SHORT_ARRAY) {
-        continue;
-      }
-      $afterOpenBracket = $phpcsFile->findNext(T_WHITESPACE, $firstArg + 1, NULL, TRUE);
-      if ($afterOpenBracket === FALSE || $tokens[$afterOpenBracket]['code'] !== T_CLOSE_SHORT_ARRAY) {
-        continue;
-      }
-      // Check for a comma after `[]`.
-      $comma = $phpcsFile->findNext(T_WHITESPACE, $afterOpenBracket + 1, NULL, TRUE);
-      if ($comma === FALSE || $tokens[$comma]['code'] !== T_COMMA) {
-        continue;
-      }
-      // Now check if the second argument starts with `self::violationsToArray(`.
-      $secondArgStart = $phpcsFile->findNext(T_WHITESPACE, $comma + 1, NULL, TRUE);
-      if ($secondArgStart === FALSE || $tokens[$secondArgStart]['code'] !== T_SELF) {
-        continue;
-      }
-      $doubleColon = $phpcsFile->findNext(T_WHITESPACE, $secondArgStart + 1, NULL, TRUE);
-      if ($doubleColon === FALSE || $tokens[$doubleColon]['code'] !== T_DOUBLE_COLON) {
-        continue;
-      }
-      $methodName = $phpcsFile->findNext(T_WHITESPACE, $doubleColon + 1, NULL, TRUE);
-      if ($methodName === FALSE || $tokens[$methodName]['code'] !== T_STRING || $tokens[$methodName]['content'] !== 'violationsToArray') {
-        continue;
-      }
-
-      $phpcsFile->addError(
-        'Use self::assertEntityIsValid($entity) instead of assertSame([], self::violationsToArray(…)). The assertEntityIsValid() method is provided by CanvasKernelTestBase.',
-        $i,
-        self::CODE_REQUIRE_ASSERT_ENTITY_IS_VALID,
-      );
     }
   }
 

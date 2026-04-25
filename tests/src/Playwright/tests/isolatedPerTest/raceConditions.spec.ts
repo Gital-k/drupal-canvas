@@ -2,17 +2,12 @@ import { expect } from '@playwright/test';
 
 import { isolatedPerTest as test } from '../../fixtures/test.js';
 
-test.describe('Test race conditions are avoided', () => {
-  test.beforeEach(async ({ drupal }) => {
-    await drupal.enableTestExtensions();
-    await drupal.loginAsAdmin();
-    await drupal.installModules([
-      'canvas_test_sdc',
-      'canvas_test_autocomplete',
-    ]);
-    await drupal.logout();
-  });
+test.use({
+  modules: ['canvas_test_sdc', 'canvas_test_autocomplete'],
+  enableTestExtensions: true,
+});
 
+test.describe('Test race conditions are avoided', () => {
   test('Avoids race condition between AJAX and layout updates', async ({
     page,
     drupal,
@@ -30,7 +25,7 @@ test.describe('Test race conditions are avoided', () => {
 
     // Watch for AJAX requests.
     await page.route(
-      /\/canvas\/api\/v0\/form\/component-instance\/canvas_page\/\d\?.*drupal_ajax/,
+      /\/canvas\/api\/v0\/form\/component-instance\/canvas_page\/\d+\?.*drupal_ajax/,
       async (route) => {
         await expect(currentRequestCount.layout).toEqual(0);
         currentRequestCount.ajax++;
@@ -42,7 +37,7 @@ test.describe('Test race conditions are avoided', () => {
 
     // Watch for PATCH requests to update the form.
     await page.route(
-      /\/canvas\/api\/v0\/form\/component-instance\/canvas_page\/\d$/,
+      /\/canvas\/api\/v0\/form\/component-instance\/canvas_page\/\d+$/,
       async (route) => {
         // Artificial delay.
         await new Promise((resolve) => setTimeout(resolve, 3_000));
@@ -56,7 +51,7 @@ test.describe('Test race conditions are avoided', () => {
 
     // Watch for PATCH requests to the layout.
     await page.route(
-      /\/canvas\/api\/v0\/layout\/canvas_page\/\d$/,
+      /\/canvas\/api\/v0\/layout\/canvas_page\/\d+$/,
       async (route) => {
         // Artificial delay.
         await new Promise((resolve) => setTimeout(resolve, 3_000));

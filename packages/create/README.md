@@ -30,15 +30,52 @@ npx @drupal-canvas/create@latest my-app
 
 ### Options
 
-| Option          | Description                                                                                                                                                      |
-| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--template -t` | Template to use when scaffolding the app. One of the predefined templates (currently available: `canvas-cc-starter`) or URL to custom template's Git repository. |
-| `--ref <ref>`   | Custom Git ref to use when cloning the template repository. For example, a branch name or a tag.                                                                 |
+| Option          | Description                                                                                                                                                                                |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `--template -t` | Template to use when scaffolding the app. One of the predefined templates (currently available: `acquia-nebula`, `balintbrews-canvas-starter`) or URL to custom template's Git repository. |
+| `--ref <ref>`   | Custom Git ref to use when cloning the template repository. For example, a branch name or a tag.                                                                                           |
+| `--agents -a`   | Comma-separated list of additional agents to support, or `none` to skip compatibility symlink creation.                                                                                    |
 
 ### Example
 
 ```bash
-npx @drupal-canvas/create@latest my-app --template canvas-cc-starter
+npx @drupal-canvas/create@latest my-app --template acquia-nebula
+```
+
+Explicitly skip additional agent compatibility symlinks:
+
+```bash
+npx @drupal-canvas/create@latest my-app --template acquia-nebula --agents none
+```
+
+Provide additional agent compatibility symlinks without prompting:
+
+```bash
+npx @drupal-canvas/create@latest my-app --template acquia-nebula --agents claude-code,roo
+```
+
+If `--agents` is omitted, the CLI keeps the current interactive prompt on TTY
+runs. On non-interactive runs, it skips compatibility setup silently.
+
+### `agents` command
+
+Set up compatibility symlinks for additional agent skills directories in an
+existing project:
+
+```bash
+npx @drupal-canvas/create@latest agents
+```
+
+You can also provide the agents as an argument:
+
+```bash
+npx @drupal-canvas/create@latest agents claude-code,roo
+```
+
+Skip compatibility symlinks:
+
+```bash
+npx @drupal-canvas/create@latest agents none
 ```
 
 ## Development

@@ -1,15 +1,13 @@
 import { defineComponentCatalog } from 'drupal-canvas/json-render-utils';
 
 import type { Spec } from '@json-render/core';
+import type {
+  AuthoredSpecElement,
+  AuthoredSpecElementMap,
+  AuthoredSpecSlots,
+} from 'drupal-canvas/json-render-utils';
 
-export interface AuthoredSpecElement {
-  type: string;
-  props?: unknown;
-  slots?: AuthoredSpecSlots;
-}
-
-export type AuthoredSpecElementMap = Record<string, AuthoredSpecElement>;
-export type AuthoredSpecSlots = Record<string, string[]>;
+export type { AuthoredSpecElement, AuthoredSpecElementMap, AuthoredSpecSlots };
 
 export interface StructuralIssue {
   message: string;
@@ -117,7 +115,7 @@ export function parseElementMap(
       return;
     }
 
-    const allowedKeys = new Set(['type', 'props', 'slots']);
+    const allowedKeys = new Set(['type', 'props', 'slots', '_provenance']);
     const unexpectedKeys = Object.keys(elementValue).filter(
       (key) => !allowedKeys.has(key),
     );
@@ -152,7 +150,7 @@ export function parseElementMap(
 
     elements[elementId] = {
       type: elementValue.type,
-      ...('props' in elementValue ? { props: elementValue.props } : {}),
+      props: elementValue.props ?? {},
       ...(slots ? { slots } : {}),
     };
   });
@@ -161,6 +159,20 @@ export function parseElementMap(
     elements: issues.length > 0 ? null : elements,
     issues,
   };
+}
+
+export function normalizeElementMapProps(
+  elements: AuthoredSpecElementMap,
+): AuthoredSpecElementMap {
+  return Object.fromEntries(
+    Object.entries(elements).map(([elementId, element]) => [
+      elementId,
+      {
+        ...element,
+        props: element.props ?? {},
+      },
+    ]),
+  );
 }
 
 export function validateSlotReferences(

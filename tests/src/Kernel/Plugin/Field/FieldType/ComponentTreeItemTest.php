@@ -105,7 +105,6 @@ class ComponentTreeItemTest extends CanvasKernelTestBase {
         ],
       ]);
       $violations = $item_list->validate();
-      // @phpcs:ignore Canvas.Tests.KernelTestBase.RequireAssertEntityIsValid
       self::assertSame([], self::violationsToArray($violations));
       self::assertInstanceOf(ComponentTreeItem::class, $item_list->get(0));
       self::assertInstanceOf(ComponentTreeItem::class, $item_list->get(1));
@@ -524,6 +523,9 @@ class ComponentTreeItemTest extends CanvasKernelTestBase {
     $test_cases['invalid slot'][] = [
       'field_canvas_test.1.slot' => 'Invalid component subtree. This component subtree contains an invalid slot name for component <em class="placeholder">sdc.canvas_test_sdc.props-slots</em>: <em class="placeholder">banana</em>. Valid slot names are: <em class="placeholder">the_body, the_footer, the_colophon</em>.',
     ];
+    foreach ($test_cases as &$test_case) {
+      $test_case[2] ??= [];
+    }
     return $test_cases;
   }
 
@@ -531,11 +533,9 @@ class ComponentTreeItemTest extends CanvasKernelTestBase {
    * @param array $field_values
    * @param array $expected_violations
    * @param list<string> $permissions
-   * @param ?class-string<\Throwable> $expected_exception
-   * @param ?string $exception_message
    */
   #[DataProvider('providerInvalidField')]
-  public function testInvalidField(array $field_values, array $expected_violations, array $permissions = [], ?string $expected_exception = NULL, ?string $exception_message = NULL): void {
+  public function testInvalidField(array $field_values, array $expected_violations, array $permissions): void {
     $this->installEntitySchema('path_alias');
     $this->setUpCurrentUser(permissions: $permissions);
     $this->container->get('module_installer')->install(['canvas_test_config_node_article']);
@@ -544,11 +544,6 @@ class ComponentTreeItemTest extends CanvasKernelTestBase {
       'type' => 'article',
       'field_canvas_test' => $field_values,
     ]);
-    if ($expected_exception !== NULL) {
-      $this->expectException($expected_exception);
-      \assert(\is_string($exception_message));
-      $this->expectExceptionMessage($exception_message);
-    }
     $violations = $node->validate();
     $this->assertSame($expected_violations, self::violationsToArray($violations));
   }

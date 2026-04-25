@@ -59,10 +59,58 @@ If `canvas.config.json` is not present, Workbench uses those defaults.
 `outputDir` is part of the wider Canvas config surface, but Workbench does not
 use it.
 
+## Preview build command
+
+Workbench can export target-based standalone preview artifacts into the output
+directory you pass with `--out-dir`.
+
+```bash
+npx canvas-workbench preview-build --component-path components/card/component.yml --out-dir .canvas-preview/card
+```
+
+```bash
+npx canvas-workbench preview-build --page-path pages/home.json --out-dir .canvas-preview/home
+```
+
+`--component-path` must point to a component metadata file discovered inside the
+configured `componentDir`. `--page-path` must point to a page JSON file inside
+the configured `pagesDir`. Paths elsewhere in the project are not supported,
+because preview discovery, mocks, and `@/` module resolution are scoped to those
+configured roots. If your files live under a different tree, update
+`canvas.config.json` first.
+
+For component targets, output writes:
+
+- `component-default.html`
+- `component-mock-01.html`, `component-mock-02.html`, and so on for each mock
+- `manifest.json`
+
+For page targets, output writes:
+
+- `page-default.html`
+- `manifest.json`
+
+`manifest.json` is target-specific:
+
+- Component manifests include `entries.default` and `entries.mocks`.
+- Page manifests include only `entries.default`.
+- Each entry includes `path` and `label`.
+- Entry `path` values are relative to the export directory, so the bundle stays
+  portable when you move or copy it.
+- The default entry uses `Default`, and mock entries use each mock name.
+
+The command also prints one JSON payload to stdout with `request`, `target`,
+`renderMode` (`interactive`), `outDir`, `manifestPath`, summary counts, plus
+warnings and errors.
+
+Each exported HTML file is self-contained. Local asset imports, such as fonts
+and images, are bundled inline as data URLs. Binary assets, such as WOFF2 and
+PNG files, use base64 encoding in those URLs.
+
 ## User docs
 
 For end-user guidance, see:
-https://project.pages.drupalcode.org/canvas/code-components/workbench/
+[https://project.pages.drupalcode.org/canvas/code-components/workbench/](https://project.pages.drupalcode.org/canvas/code-components/workbench/)
 
 ## How the Workbench runtime works
 
@@ -81,24 +129,16 @@ https://project.pages.drupalcode.org/canvas/code-components/workbench/
   `@drupal-canvas/discovery` and `@drupal-canvas/vite-compat`.
 - The packaged client is served from packaged source files through the Workbench
   Vite runtime, not from a standalone production-built browser bundle.
-- The packaged runtime:
-  - Exposes discovery data at `/__canvas/discovery` as JSON for the UI.
-  - Exposes preview manifest data at `/__canvas/preview-manifest` as JSON for
-    preview runtime decisions.
-  - Uses routes:
-  - `/component/<component-id>` for component previews.
-  - `/page/<slug>` for discovered pages, where `slug` comes from
-    `pages/<slug>.json`.
-- Watches the host project for relevant file changes (`component.yml`,
-  `*.component.yml`, and JS(X)/TS(X)/CSS files), sends targeted HMR update
-  events, refreshes discovery when needed, and reloads only the preview iframe
-  for source-only changes.
+- The packaged runtime exposes `/__canvas/discovery` and
+  `/__canvas/preview-manifest`, serves the shell on `/component/...` and
+  `/page/...`, and watches the host project for file changes. Source-only edits
+  update the preview via Vite HMR without remounting the iframe.
 
 ## Strict preview MVP contract
 
 Workbench preview currently uses a strict compatibility contract.
 
-- Workbench renders previews in an iframe at `/__canvas/preview-frame`.
+- Workbench renders previews in an iframe at `/canvas/workbench-preview.html`.
 - A discovered component is previewable only when its JS entry exists and has a
   supported extension (`.js`, `.jsx`, `.ts`, or `.tsx`).
 - Workbench imports component modules through Vite `@fs` URLs, from the
@@ -112,7 +152,7 @@ Workbench preview currently uses a strict compatibility contract.
 Workbench does not ingest arbitrary host Vite config/plugins automatically.
 
 - Supported module resolution via `@drupal-canvas/vite-compat` — see
-  [`packages/vite-compat/README.md`](../vite-compat/README.md)
+  `[packages/vite-compat/README.md](../vite-compat/README.md)`
 - Tailwind entrypoint: Workbench loads the host's global CSS (default
   `src/components/global.css`, configurable via `globalCssPath` in
   `canvas.config.json`) through a virtual Vite CSS module that imports the host
