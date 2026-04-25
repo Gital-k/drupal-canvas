@@ -7219,7 +7219,7 @@ HTML
 
   protected function triggerBrokenComponent(ComponentInterface $component): BrokenPluginManagerInterface {
     /** @var \Drupal\Tests\canvas\Kernel\BrokenPluginManagerInterface */
-    return \Drupal::service('plugin.manager.sdc');
+    return \Drupal::service(ComponentPluginManager::class);
   }
 
   /**

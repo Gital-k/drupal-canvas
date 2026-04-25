@@ -137,6 +137,7 @@ class ComponentPluginManager extends CoreComponentPluginManager implements Categ
    * {@inheritdoc}
    */
   public function clearCachedDefinitions(): void {
+    parent::clearCachedDefinitions();
     $this->decorated->clearCachedDefinitions();
   }
 
