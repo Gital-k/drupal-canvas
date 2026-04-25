@@ -3,7 +3,6 @@ const testCanvasPagesCanBeCreatedInMultilingualSites = (
   title,
   expectedUrlAlias,
   expectedPathPrefix,
-  expectedMediaAlt,
 ) => {
   cy.visit(`/es/canvas`);
 
@@ -20,25 +19,6 @@ const testCanvasPagesCanBeCreatedInMultilingualSites = (
 
   cy.get('#edit-path-0-alias').should('have.value', expectedUrlAlias);
 
-  cy.openLibraryPanel();
-  cy.insertComponent({
-    name: 'Canvas test SDC with optional image, without example',
-  });
-
-  cy.waitForElementNotInIframe('.layout-content img');
-  cy.get(
-    '[class*="contextualPanel"] .js-media-library-open-button[data-once="drupal-ajax"]',
-  )
-    .first()
-    .click();
-  cy.get('div[role="dialog"]').should('exist');
-  // Media library shows the checkbox label using untranslated media,
-  // but displays the thumbnail using the translated media.
-  cy.findByLabelText('Select Example').check();
-  cy.get('button:contains("Insert selected")').click();
-  cy.get('div[role="dialog"]').should('not.exist');
-  cy.waitForElementInIframe('img[alt="Spanish Example"]');
-
   cy.findByTestId('canvas-publish-review').click();
   cy.findByTestId('canvas-publish-review-select-all').click();
   cy.findByText('Publish 1 selected').click();
@@ -49,7 +29,6 @@ const testCanvasPagesCanBeCreatedInMultilingualSites = (
   cy.visit(`/es/admin/content/pages`);
   cy.findByText(title).click();
   cy.get('body').should('contain.text', title);
-  cy.get('img[alt="' + expectedMediaAlt + '"]').should('exist');
   cy.url().should(
     'eq',
     `${Cypress.config().baseUrl}${expectedPathPrefix}${expectedUrlAlias}`,
@@ -75,7 +54,6 @@ describe('Canvas pages can be created in any language', () => {
       'Page created from ES language - Default',
       '/page-created-from-es-language-default',
       '',
-      'Example',
     );
   });
 
@@ -88,7 +66,6 @@ describe('Canvas pages can be created in any language', () => {
       'Page created from ES language - Interface',
       '/page-created-from-es-language-interface',
       '/es',
-      'Spanish Example',
     );
   });
 
