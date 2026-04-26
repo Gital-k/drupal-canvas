@@ -102,6 +102,20 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
   protected ?array $dataDependencies;
 
   /**
+   * Whether the current HTTP payload included a `folder` key (POST/PATCH).
+   *
+   * Not config-exported: used only to apply folder membership in ::postSave().
+   */
+  protected bool $folderMembershipChangeRequested = FALSE;
+
+  /**
+   * Parsed folder assignment from the client (POST/PATCH), not config-exported.
+   *
+   * @var array{mode: 'string', value: ?string}|array{mode: 'map', map: array<string, ?string>}|null
+   */
+  protected ?array $pendingFolderAssignment = NULL;
+
+  /**
    * Shared instance of the ComponentSource plugin manager, for previews.
    *
    * @see ::buildPreview()
@@ -163,22 +177,27 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
     \assert(\is_array($this->js));
     \assert(\is_array($this->css));
     $linkCollection = $this->getEntityOperations();
+    $values = [
+      'machineName' => $this->id(),
+      'name' => (string) $this->label(),
+      'status' => $this->status(),
+      'props' => $this->props,
+      'required' => $this->required,
+      'slots' => $this->slots,
+      'sourceCodeJs' => $this->js['original'] ?? '',
+      'sourceCodeCss' => $this->css['original'] ?? '',
+      'compiledJs' => $this->js['compiled'] ?? '',
+      'compiledCss' => $this->css['compiled'] ?? '',
+      'dataDependencies' => $this->dataDependencies,
+      // @see https://jsonapi.org/format/#document-links
+      'links' => $linkCollection->asArray(),
+    ];
+    $folder_value = $this->buildFolderValueForClientSide();
+    if ($folder_value !== NULL) {
+      $values['folder'] = $folder_value;
+    }
     return ClientSideRepresentation::create(
-      values: [
-        'machineName' => $this->id(),
-        'name' => (string) $this->label(),
-        'status' => $this->status(),
-        'props' => $this->props,
-        'required' => $this->required,
-        'slots' => $this->slots,
-        'sourceCodeJs' => $this->js['original'] ?? '',
-        'sourceCodeCss' => $this->css['original'] ?? '',
-        'compiledJs' => $this->js['compiled'] ?? '',
-        'compiledCss' => $this->css['compiled'] ?? '',
-        'dataDependencies' => $this->dataDependencies,
-        // @see https://jsonapi.org/format/#document-links
-        'links' => $linkCollection->asArray(),
-      ],
+      values: $values,
       preview: $this->buildPreview(),
     )->addCacheableDependency($this)
       ->addCacheableDependency($linkCollection);
@@ -308,6 +327,8 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
    * @see docs/adr/0005-Keep-the-front-end-simple.md
    */
   public function updateFromClientSide(array $data): void {
+    $this->capturePendingFolderAssignmentFromClientData($data);
+
     // Normalize props: move enum/meta:enum from array level to items level.
     if (!empty($data['props'])) {
       \assert(\is_array($data['props']));
@@ -483,6 +504,13 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
    */
   public function postSave(EntityStorageInterface $storage, $update = TRUE): void {
     parent::postSave($storage, $update);
+
+    if ($this->folderMembershipChangeRequested) {
+      $this->applyPendingFolderMembership();
+      $this->folderMembershipChangeRequested = FALSE;
+      $this->pendingFolderAssignment = NULL;
+    }
+
     // The files generated in CanvasAssetStorage::doSave() have a
     // content-dependent hash in their name. This has 2 consequences:
     // 1. Cached responses that referred to an older version, continue to work.
@@ -491,6 +519,201 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
     //    be recalculated.
     // @see \canvas_library_info_build()
     Cache::invalidateTags(['library_info']);
+  }
+
+  /**
+   * Builds the `folder` value for API clients (string when both match, else map).
+   *
+   * @return string|array{library?: string, code?: string}|null
+   *   NULL means omit the `folder` key.
+   */
+  private function buildFolderValueForClientSide(): string|array|null {
+    $machine_name = $this->id();
+    $code_label = $this->folderLabelForItem($machine_name, self::ENTITY_TYPE_ID);
+    $component_id = JsComponent::componentIdFromJavascriptComponentId($machine_name);
+    $library_label = NULL;
+    if (Component::load($component_id) !== NULL) {
+      $library_label = $this->folderLabelForItem($component_id, Component::ENTITY_TYPE_ID);
+    }
+    if ($code_label === NULL && $library_label === NULL) {
+      return NULL;
+    }
+    if ($library_label !== NULL && $library_label === $code_label) {
+      return $code_label;
+    }
+    $map = [];
+    if ($library_label !== NULL) {
+      $map['library'] = $library_label;
+    }
+    if ($code_label !== NULL) {
+      $map['code'] = $code_label;
+    }
+    return $map === [] ? NULL : $map;
+  }
+
+  private function folderLabelForItem(string $item_id, string $folder_item_type): ?string {
+    $folder = Folder::loadByItemAndConfigEntityTypeId($item_id, $folder_item_type);
+    return $folder === NULL ? NULL : (string) $folder->label();
+  }
+
+  /**
+   * Parses `folder` from decoded JSON and stores it for ::postSave().
+   */
+  private function capturePendingFolderAssignmentFromClientData(array $data): void {
+    $this->folderMembershipChangeRequested = \array_key_exists('folder', $data);
+    $this->pendingFolderAssignment = NULL;
+    if (!$this->folderMembershipChangeRequested) {
+      return;
+    }
+    $raw = $data['folder'];
+    // BC: clients may send `folder: {}` (or `[]`) when they do not intend to
+    // change folder placement; treat like a missing key.
+    if (\is_array($raw) && $raw === []) {
+      $this->folderMembershipChangeRequested = FALSE;
+      return;
+    }
+    if ($raw === NULL || (\is_string($raw) && trim($raw) === '')) {
+      $this->pendingFolderAssignment = [
+        'mode' => 'string',
+        'value' => NULL,
+      ];
+      return;
+    }
+    if (\is_string($raw)) {
+      $this->pendingFolderAssignment = [
+        'mode' => 'string',
+        'value' => trim($raw),
+      ];
+      return;
+    }
+    if (\is_array($raw)) {
+      $map = [];
+      foreach (['library', 'code'] as $key) {
+        if (!\array_key_exists($key, $raw)) {
+          continue;
+        }
+        $v = $raw[$key];
+        if ($v === NULL || (\is_string($v) && trim($v) === '')) {
+          $map[$key] = NULL;
+        }
+        elseif (\is_string($v)) {
+          $map[$key] = trim($v);
+        }
+        else {
+          throw new ConstraintViolationException(new EntityConstraintViolationList($this, [
+            new ConstraintViolation(
+              "The 'folder.$key' field must be a string or null.",
+              "The 'folder.$key' field must be a string or null.",
+              [],
+              '',
+              "folder.$key",
+              $v,
+            ),
+          ]));
+        }
+      }
+      if ($map === []) {
+        throw new ConstraintViolationException(new EntityConstraintViolationList($this, [
+          new ConstraintViolation(
+            "The 'folder' object must contain at least one of: library, code.",
+            "The 'folder' object must contain at least one of: library, code.",
+            [],
+            '',
+            'folder',
+            $raw,
+          ),
+        ]));
+      }
+      $component_id = JsComponent::componentIdFromJavascriptComponentId($this->id());
+      if (
+        \array_key_exists('library', $map)
+        && $map['library'] !== NULL
+        && Component::load($component_id) === NULL
+      ) {
+        throw new ConstraintViolationException(new EntityConstraintViolationList($this, [
+          new ConstraintViolation(
+            'Cannot assign a library folder: this code component is not exposed in the component catalog.',
+            'Cannot assign a library folder: this code component is not exposed in the component catalog.',
+            [],
+            '',
+            'folder.library',
+            $map['library'],
+          ),
+        ]));
+      }
+      $this->pendingFolderAssignment = [
+        'mode' => 'map',
+        'map' => $map,
+      ];
+      return;
+    }
+    throw new ConstraintViolationException(new EntityConstraintViolationList($this, [
+      new ConstraintViolation(
+        "The 'folder' field must be a string, null, or object.",
+        "The 'folder' field must be a string, null, or object.",
+        [],
+        '',
+        'folder',
+        $raw,
+      ),
+    ]));
+  }
+
+  /**
+   * Applies folder membership for `component` (library) and/or `js_component` (code) folders.
+   */
+  private function applyPendingFolderMembership(): void {
+    if ($this->pendingFolderAssignment === NULL) {
+      return;
+    }
+    $machine_name = $this->id();
+    $component_id = JsComponent::componentIdFromJavascriptComponentId($machine_name);
+    $exposed = Component::load($component_id) !== NULL;
+    $plan = $this->pendingFolderAssignment;
+    if (($plan['mode'] ?? '') === 'string') {
+      $value = $plan['value'];
+      $this->setItemFolderMembership($machine_name, self::ENTITY_TYPE_ID, $value);
+      if ($exposed) {
+        $this->setItemFolderMembership($component_id, Component::ENTITY_TYPE_ID, $value);
+      }
+      return;
+    }
+    if (($plan['mode'] ?? '') === 'map') {
+      foreach ($plan['map'] as $context => $folder_name) {
+        if ($context === 'code') {
+          $this->setItemFolderMembership($machine_name, self::ENTITY_TYPE_ID, $folder_name);
+        }
+        elseif ($context === 'library' && $exposed) {
+          $this->setItemFolderMembership($component_id, Component::ENTITY_TYPE_ID, $folder_name);
+        }
+      }
+    }
+  }
+
+  /**
+   * Places a folder item into a folder of the given config-entity type, or removes it.
+   */
+  private function setItemFolderMembership(string $item_id, string $folder_item_type, ?string $folder_name): void {
+    $current = Folder::loadByItemAndConfigEntityTypeId($item_id, $folder_item_type);
+    if ($current !== NULL) {
+      $current->removeItem($item_id)->save();
+    }
+    if ($folder_name !== NULL && $folder_name !== '') {
+      $target = Folder::loadByNameAndConfigEntityTypeId($folder_name, $folder_item_type);
+      if ($target === NULL) {
+        $target = Folder::create([
+          'name' => $folder_name,
+          'configEntityTypeId' => $folder_item_type,
+          'weight' => 0,
+          'items' => [],
+        ]);
+        $target->save();
+      }
+      $items = $target->get('items') ?? [];
+      if (!\in_array($item_id, $items, TRUE)) {
+        $target->addItems([$item_id])->save();
+      }
+    }
   }
 
   /**

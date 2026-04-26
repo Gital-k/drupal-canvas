@@ -226,3 +226,45 @@ function canvas_oauth_post_update_0004_media_view_scope(array &$sandbox): void {
     ])->save();
   }
 }
+
+/**
+ * Install scope for organizing code components into Canvas folders.
+ */
+function canvas_oauth_post_update_0005_canvas_folder_scope(array &$sandbox): void {
+  $dependencies = [
+    'enforced' => [
+      'module' => [
+        'canvas_oauth',
+      ],
+    ],
+  ];
+  $scope = Oauth2Scope::load('canvas_folder');
+  if (!$scope) {
+    Oauth2Scope::create([
+      'id' => 'canvas_folder',
+      'name' => 'canvas:folder',
+      'description' => 'Drupal Canvas: Organize code components into folders',
+      'status' => TRUE,
+      'grant_types' => [
+        'authorization_code' => [
+          'status' => TRUE,
+          'description' => 'Authorization code access for Canvas folders',
+        ],
+        'refresh_token' => [
+          'status' => TRUE,
+          'description' => 'Refresh token access for Canvas folders',
+        ],
+        'client_credentials' => [
+          'status' => TRUE,
+          'description' => 'Client credentials access for Canvas folders',
+        ],
+      ],
+      'umbrella' => FALSE,
+      'granularity_id' => 'permission',
+      'granularity_configuration' => [
+        'permission' => 'administer folders',
+      ],
+      'dependencies' => $dependencies,
+    ])->save();
+  }
+}

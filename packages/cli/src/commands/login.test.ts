@@ -252,7 +252,7 @@ describe('loginCommand', () => {
   it('falls back to getDefaultScope when scopesSupported is absent', async () => {
     setupHappyPath({ scopesSupported: undefined });
     vi.mocked(getDefaultScope).mockReturnValue(
-      'canvas:js_component canvas:asset_library',
+      'canvas:js_component canvas:folder canvas:asset_library',
     );
 
     const program = makeProgram();
@@ -268,7 +268,7 @@ describe('loginCommand', () => {
     const logInfoCall = vi.mocked(p.log.info).mock.calls[0][0] as string;
     const authUrl = new URL(logInfoCall.match(/https?:\/\/\S+/)?.[0] ?? '');
     expect(authUrl.searchParams.get('scope')).toBe(
-      'canvas:js_component canvas:asset_library',
+      'canvas:js_component canvas:folder canvas:asset_library',
     );
   });
 });

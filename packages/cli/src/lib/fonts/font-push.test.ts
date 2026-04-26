@@ -40,7 +40,8 @@ describe('pushFonts', () => {
       siteUrl: 'https://example.com',
       clientId: 'id',
       clientSecret: 'secret',
-      scope: 'canvas:js_component canvas:asset_library canvas:brand_kit',
+      scope:
+        'canvas:js_component canvas:folder canvas:asset_library canvas:brand_kit',
       userAgent: '',
       includePages: false,
       includeBrandKit: true,

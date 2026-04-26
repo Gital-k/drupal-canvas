@@ -140,7 +140,7 @@ export const DEFAULT_INCLUDE_PAGES = false;
 export const DEFAULT_INCLUDE_BRAND_KIT = false;
 
 const DEFAULT_SCOPE =
-  'canvas:js_component canvas:asset_library canvas:media:image:create canvas:media:view';
+  'canvas:js_component canvas:folder canvas:asset_library canvas:media:image:create canvas:media:view';
 const DEFAULT_SCOPE_WITH_PAGES = `${DEFAULT_SCOPE} canvas:page:create canvas:page:read canvas:page:edit`;
 const DEFAULT_SCOPE_WITH_BRAND_KIT = `${DEFAULT_SCOPE} canvas:brand_kit`;
 const DEFAULT_SCOPE_WITH_PAGES_AND_BRAND_KIT = `${DEFAULT_SCOPE_WITH_PAGES} canvas:brand_kit`;

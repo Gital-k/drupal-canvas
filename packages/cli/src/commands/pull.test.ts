@@ -158,6 +158,48 @@ describe('Pull Command', () => {
       const parsed = yaml.load(ymlContent) as Record<string, unknown>;
       expect(parsed).toHaveProperty('name', 'my-button');
       expect(parsed).toHaveProperty('machineName', 'my-button');
+      expect(parsed).not.toHaveProperty('folder');
+    });
+
+    it('should write folder to component.yml when the API includes it', async () => {
+      const remote = {
+        ...mockComponent('foldered'),
+        folder: 'Marketing',
+      } as Component;
+      const api = mockApiService({ a: remote });
+      const task = createComponentsPullTask(api, tmpDir, false);
+
+      await task.prepare();
+      await task.execute();
+
+      const ymlContent = await fs.readFile(
+        path.join(tmpDir, 'foldered', 'component.yml'),
+        'utf-8',
+      );
+      const parsed = yaml.load(ymlContent) as Record<string, unknown>;
+      expect(parsed.folder).toBe('Marketing');
+    });
+
+    it('should write folder object when the API returns per-context folders', async () => {
+      const remote = {
+        ...mockComponent('split'),
+        folder: { library: 'Banners', code: 'UI Components' },
+      } as Component;
+      const api = mockApiService({ a: remote });
+      const task = createComponentsPullTask(api, tmpDir, false);
+
+      await task.prepare();
+      await task.execute();
+
+      const ymlContent = await fs.readFile(
+        path.join(tmpDir, 'split', 'component.yml'),
+        'utf-8',
+      );
+      const parsed = yaml.load(ymlContent) as Record<string, unknown>;
+      expect(parsed.folder).toEqual({
+        library: 'Banners',
+        code: 'UI Components',
+      });
     });
 
     it('should update existing component files in-place', async () => {
