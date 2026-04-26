@@ -457,7 +457,9 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
     // - The Component became invalid though.
     self::assertGreaterThan(0, $component->getTypedData()->validate()->count());
 
-    $response = $this->getCrawlerForFormRequest('/canvas/api/v0/form/component-instance/canvas_page/' . $page->id(), $component, json_decode('undefined'));
+    $response = $this->getCrawlerForFormRequest('/canvas/api/v0/form/component-instance/canvas_page/' . $page->id(), $component, [
+      // 🐛 This is the bug in the UI today. This PHPUnit test has replicated once existing JS behavior, but it no longer occurs — see the GIF in https://www.drupal.org/project/canvas/issues/3558721#comment-16517317.
+    ]);
     self::assertSame("Component is missing. Fix the component or copy values to a new component. $fyi", $response->text());
   }
 
