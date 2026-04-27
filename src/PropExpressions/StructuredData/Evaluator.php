@@ -8,7 +8,6 @@ use Drupal\Core\Access\AccessResultInterface;
 use Drupal\Core\Access\AccessResultReasonInterface;
 use Drupal\Core\Cache\CacheableDependencyInterface;
 use Drupal\Core\Cache\CacheableMetadata;
-use Drupal\Core\Datetime\DrupalDateTime;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Entity\Plugin\DataType\EntityReference;
@@ -68,17 +67,7 @@ final class Evaluator {
       // includes a trailing offset, or using the Z flag.
       !\preg_match('/(Z|[+-](?:2[0-3]|[01][0-9])(?::?[0-5][0-9])?)$/', $result->value)) {
 
-      if (str_contains($result->value, 'T')) {
-        // It looks like an iso8601 datetime without timezone information.
-        // Assume it's in UTC and add the Z flag.
-        return new EvaluationResult($result->value . 'Z', $result);
-      }
-      else {
-        // Assume it is local time and an unknown format; parse it as best
-        // we can and reformat to iso8601.
-        $date = (new DrupalDateTime($result->value))->format(\DateTimeInterface::ISO8601);
-        return new EvaluationResult($date, $result);
-      }
+      return new EvaluationResult($result->value . 'Z', $result);
     }
     return new EvaluationResult(
       // Use the cacheability carried by:
