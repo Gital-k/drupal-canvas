@@ -318,11 +318,9 @@ export const syncPropSourcesToResolvedValues = (
 
   // Likewise, if a resolved value is now empty, we need to remove it from
   // the source data so it is not evaluated server side.
-  // However, for required props, we must keep the source entry so the backend
-  // assertion (which checks that required props exist in inputValues) is satisfied.
-  const emptyProps = Object.keys(fieldData).filter((key) => {
-    return !Object.keys(resolvedValues).includes(key) && key in sources;
-  });
+  const emptyProps = Object.keys(fieldData).filter(
+    (key) => !Object.keys(resolvedValues).includes(key) && key in sources,
+  );
 
   return missingProps.reduce(
     (carry: Sources, propName: string) => ({
