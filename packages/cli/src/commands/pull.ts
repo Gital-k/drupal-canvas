@@ -88,7 +88,7 @@ export function createComponentsPullTask(
   let localOnlyComponents: DiscoveredComponent[] = [];
 
   function buildMetadata(component: Component): Metadata {
-    return {
+    const metadata: Metadata = {
       name: component.name,
       machineName: component.machineName,
       status: component.status,
@@ -98,6 +98,21 @@ export function createComponentsPullTask(
       },
       slots: component.slots || {},
     };
+    const folder = (component as Component & { folder?: unknown }).folder;
+    if (folder === undefined || folder === null) {
+      return metadata;
+    }
+    if (typeof folder === 'string') {
+      const trimmed = folder.trim();
+      if (trimmed !== '') {
+        metadata.folder = trimmed;
+      }
+      return metadata;
+    }
+    if (typeof folder === 'object' && !Array.isArray(folder)) {
+      metadata.folder = folder as Metadata['folder'];
+    }
+    return metadata;
   }
 
   function writeComponentFiles(

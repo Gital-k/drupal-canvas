@@ -18,7 +18,7 @@ describe('api service', () => {
     siteUrl: 'https://canvas-mock',
     clientId: 'cli',
     clientSecret: 'secret',
-    scope: 'canvas:js_component canvas:asset_library',
+    scope: 'canvas:js_component canvas:folder canvas:asset_library',
   };
 
   beforeAll(() => {

@@ -189,10 +189,11 @@ to get started.
 | `--include-pages`     | `CANVAS_INCLUDE_PAGES`     | (Optional) Include pages in `pull` and `push`. Defaults to `false`. Accepts `true`/`false`, `1`/`0`, or `yes`/`no`.                                                                                   |
 | `--include-brand-kit` | `CANVAS_INCLUDE_BRAND_KIT` | (Optional) Include brand kit (fonts) in `pull` and `push`. Defaults to `false`. Accepts `true`/`false`, `1`/`0`, or `yes`/`no`.                                                                       |
 
-**Note:** When `CANVAS_SCOPE` is unset, the CLI uses the `canvas_oauth`
-defaults. With `--include-brand-kit` or `CANVAS_INCLUDE_BRAND_KIT`, it adds the
-`canvas:brand_kit` scope. With `--include-pages` or `CANVAS_INCLUDE_PAGES`, it
-also adds the `canvas:page:*` scopes.
+**Note:** When `CANVAS_SCOPE` is unset, the CLI uses the `canvas_oauth` defaults
+(including `canvas:folder`). With `--include-brand-kit` or
+`CANVAS_INCLUDE_BRAND_KIT`, it adds the `canvas:brand_kit` scope. With
+`--include-pages` or `CANVAS_INCLUDE_PAGES`, it also adds the `canvas:page:*`
+scopes.
 
 #### Configuration Precedence
 

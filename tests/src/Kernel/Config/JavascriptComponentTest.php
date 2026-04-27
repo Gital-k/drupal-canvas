@@ -9,6 +9,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use Drupal\canvas\Entity\EntityConstraintViolationList;
+use Drupal\canvas\Entity\Folder;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Exception\ConstraintViolationException;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
@@ -245,6 +246,38 @@ class JavascriptComponentTest extends CanvasKernelTestBase {
     self::assertCount(0, $violations);
     $this->assertSame(SAVED_NEW, $js_component->save());
     $this->assertSame($expected_component_props, $js_component->get('props'));
+  }
+
+  /**
+   * Empty JSON object for `folder` must not alter placement (BC).
+   *
+   * @legacy-covers \Drupal\canvas\Entity\JavaScriptComponent::capturePendingFolderAssignmentFromClientData
+   */
+  public function testEmptyFolderObjectIsIgnoredForBackwardCompatibility(): void {
+    $client_data = [
+      'machineName' => 'bc_empty_folder',
+      'name' => 'BC empty folder',
+      'status' => FALSE,
+      'required' => [],
+      'props' => [],
+      'slots' => [],
+      'sourceCodeJs' => '',
+      'sourceCodeCss' => '',
+      'compiledJs' => '',
+      'compiledCss' => '',
+      'importedJsComponents' => [],
+      'dataDependencies' => [],
+    ];
+    $js = JavaScriptComponent::createFromClientSide($client_data);
+    $this->assertSame(SAVED_NEW, $js->save());
+
+    $js->updateFromClientSide(['folder' => 'Some Folder']);
+    $this->assertSame(SAVED_UPDATED, $js->save());
+    $this->assertNotNull(Folder::loadByItemAndConfigEntityTypeId('bc_empty_folder', JavaScriptComponent::ENTITY_TYPE_ID));
+
+    $js->updateFromClientSide(['folder' => []]);
+    $this->assertSame(SAVED_UPDATED, $js->save());
+    $this->assertNotNull(Folder::loadByItemAndConfigEntityTypeId('bc_empty_folder', JavaScriptComponent::ENTITY_TYPE_ID));
   }
 
 }

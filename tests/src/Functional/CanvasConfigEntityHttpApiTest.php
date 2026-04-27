@@ -759,6 +759,28 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     self::assertIsArray($body);
     $body_without_preview = self::assertPreviewForJavaScriptComponentIsPresentThenOmit($body, 'disabled_js_component', []);
     $this->assertSame($expected_disabled_js_component_normalization, $body_without_preview);
+
+    // Code component folder name is exposed when the component is in a folder.
+    $marketing_folder = Folder::create([
+      'name' => 'Marketing',
+      'configEntityTypeId' => JavaScriptComponent::ENTITY_TYPE_ID,
+      'weight' => 0,
+      'items' => ['disabled_js_component'],
+    ]);
+    $marketing_folder->save();
+    $expected_with_folder = $expected_disabled_js_component_normalization;
+    $expected_with_folder['folder'] = [
+      'code' => 'Marketing',
+    ];
+    $body = $this->assertExpectedResponse('GET', $list_url, [], 200, ['languages:language_interface', 'theme', 'user.permissions'], [AutoSaveManager::CACHE_TAG, 'config:js_component_list', 'http_response'], 'UNCACHEABLE (request policy)', 'MISS');
+    self::assertIsArray($body);
+    $body_without_preview = self::assertPreviewForJavaScriptComponentIsPresentThenOmit($body, 'disabled_js_component', ['disabled_js_component']);
+    $this->assertSame([
+      'disabled_js_component' => $expected_with_folder,
+    ], $body_without_preview);
+    $marketing_folder->removeItem('disabled_js_component')->save();
+    $marketing_folder->delete();
+
     $jsComponent->delete();
 
     // Create a Code Component via the Canvas HTTP API, but forget crucial data: 500, courtesy of OpenAPI.
@@ -1089,6 +1111,42 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     self::assertIsArray($body);
     $body_without_preview = self::assertPreviewForJavaScriptComponentIsPresentThenOmit($body, 'test', []);
     $this->assertSame($expected_component, $body_without_preview);
+
+    // PATCH `folder` assigns the code component to a `js_component` folder.
+    $token = $this->drupalGet('session/token');
+    $request_options = [
+      RequestOptions::HEADERS => [
+        'Content-Type' => 'application/json',
+        'X-CSRF-Token' => $token,
+      ],
+      RequestOptions::JSON => [
+        'folder' => 'CLI Test Folder',
+      ],
+    ];
+    $body = $this->assertExpectedResponse('PATCH', Url::fromUri('base:/canvas/api/v0/config/js_component/test'), $request_options, 200, NULL, NULL, NULL, NULL);
+    self::assertIsArray($body);
+    $body_without_preview = self::assertPreviewForJavaScriptComponentIsPresentThenOmit($body, 'test', []);
+    $this->assertSame(NestedArray::mergeDeep($expected_component, [
+      'folder' => [
+        'code' => 'CLI Test Folder',
+      ],
+    ]), $body_without_preview);
+    $folder = Folder::loadByNameAndConfigEntityTypeId('CLI Test Folder', JavaScriptComponent::ENTITY_TYPE_ID);
+    self::assertNotNull($folder);
+    self::assertContains('test', $folder->get('items'));
+
+    // PATCH `folder` with null removes the component from folders.
+    $request_options[RequestOptions::JSON] = [
+      'folder' => NULL,
+    ];
+    $body = $this->assertExpectedResponse('PATCH', Url::fromUri('base:/canvas/api/v0/config/js_component/test'), $request_options, 200, NULL, NULL, NULL, NULL);
+    self::assertIsArray($body);
+    $body_without_preview = self::assertPreviewForJavaScriptComponentIsPresentThenOmit($body, 'test', []);
+    $this->assertSame($expected_component, $body_without_preview);
+    $folder = Folder::loadByNameAndConfigEntityTypeId('CLI Test Folder', JavaScriptComponent::ENTITY_TYPE_ID);
+    self::assertNotNull($folder);
+    self::assertNotContains('test', $folder->get('items'));
+    $folder->delete();
 
     // Editing the previous JavaScriptComponent to PATCH `meta:enum`,
     // which should be allowed.

@@ -2900,6 +2900,33 @@ components:
                 type: array
                 items:
                   type: string
+        folder:
+          description: >-
+            Folder placement for this code component. A string sets the same
+            folder name in both the component library (when exposed) and the
+            code panel (`js_component` folders). An object can set `library`
+            and/or `code` independently (component-folder vs code-folder). Use
+            null or an empty string at the top level to clear both; inside the
+            object, null clears only that context. Omitted when neither context
+            has a folder.
+          oneOf:
+            - type: 'null'
+            - type: string
+            - $ref: '#/components/schemas/CodeComponentFolderMap'
+    CodeComponentFolderMap:
+      type: object
+      description: Per-context folder names for library vs code panel.
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        library:
+          type: string
+          nullable: true
+          description: Folder in the component library (requires the component to be exposed).
+        code:
+          type: string
+          nullable: true
+          description: Folder in the code components panel.
     ExistingCodeComponent:
       type: object
       allOf:

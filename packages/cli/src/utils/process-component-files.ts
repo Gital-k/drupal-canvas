@@ -203,6 +203,41 @@ export async function readComponentMetadata(
       metadata.slots = {};
     }
 
+    if (Object.prototype.hasOwnProperty.call(metadata, 'folder')) {
+      const f = metadata.folder;
+      if (f === null) {
+        // Explicit null in YAML: keep for push (clear both contexts).
+      } else if (typeof f === 'string') {
+        if (f.trim() === '') {
+          delete metadata.folder;
+        } else {
+          metadata.folder = f.trim();
+        }
+      } else if (typeof f === 'object' && !Array.isArray(f)) {
+        const raw = f as Record<string, unknown>;
+        const cleaned: { library?: string | null; code?: string | null } = {};
+        for (const key of ['library', 'code'] as const) {
+          if (!Object.prototype.hasOwnProperty.call(raw, key)) {
+            continue;
+          }
+          const v = raw[key];
+          if (v === null) {
+            cleaned[key] = null;
+          } else if (typeof v === 'string') {
+            const t = v.trim();
+            cleaned[key] = t === '' ? null : t;
+          }
+        }
+        if (Object.keys(cleaned).length === 0) {
+          delete metadata.folder;
+        } else {
+          metadata.folder = cleaned;
+        }
+      } else {
+        delete metadata.folder;
+      }
+    }
+
     return metadata;
   } catch (error) {
     console.error(`Error reading component metadata from ${filePath}:`, error);
@@ -247,7 +282,7 @@ export function createComponentPayload(params: {
     slotsData = {};
   }
 
-  return {
+  const payload: Component = {
     machineName,
     name: metadata.name || componentName,
     status: metadata.status,
@@ -261,4 +296,19 @@ export function createComponentPayload(params: {
     importedJsComponents: importedJsComponents || [],
     dataDependencies: dataDependencies || {},
   };
+
+  if (Object.prototype.hasOwnProperty.call(metadata, 'folder')) {
+    const rawFolder = metadata.folder;
+    if (rawFolder === null) {
+      (payload as Component & { folder?: unknown }).folder = null;
+    } else if (typeof rawFolder === 'string') {
+      const trimmed = rawFolder.trim();
+      (payload as Component & { folder?: unknown }).folder =
+        trimmed === '' ? null : trimmed;
+    } else if (typeof rawFolder === 'object' && !Array.isArray(rawFolder)) {
+      (payload as Component & { folder?: unknown }).folder = rawFolder;
+    }
+  }
+
+  return payload;
 }
