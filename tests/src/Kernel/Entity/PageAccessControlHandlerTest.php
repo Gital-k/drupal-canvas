@@ -4,16 +4,21 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Entity;
 
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\canvas\Entity\Page;
-use Drupal\KernelTests\KernelTestBase;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Kernel\Traits\PageTrait;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
- * @group canvas
+ * Tests Page Access Control Handler.
  */
-final class PageAccessControlHandlerTest extends KernelTestBase {
+#[RunTestsInSeparateProcesses]
+#[Group('canvas')]
+final class PageAccessControlHandlerTest extends CanvasKernelTestBase {
 
   use PageTrait;
 
@@ -21,7 +26,6 @@ final class PageAccessControlHandlerTest extends KernelTestBase {
    * {@inheritdoc}
    */
   protected static $modules = [
-    'canvas',
     ...self::PAGE_TEST_MODULES,
   ];
 
@@ -32,12 +36,13 @@ final class PageAccessControlHandlerTest extends KernelTestBase {
    *   The permissions to grant to the account.
    * @param string $op
    *   The operation to check access for.
+   * @param bool $published
+   *   Whether the page should be published.
    * @param bool $expected_result
    *   The expected result.
-   *
-   * @dataProvider accessCheckProvider
    */
-  public function testAccess(array $permissions, string $op, bool $expected_result): void {
+  #[DataProvider('accessCheckProvider')]
+  public function testAccess(array $permissions, string $op, bool $published, bool $expected_result): void {
     $this->installPageEntitySchema();
 
     $access_handler = $this->container->get('entity_type.manager')->getAccessControlHandler(Page::ENTITY_TYPE_ID);
@@ -46,13 +51,13 @@ final class PageAccessControlHandlerTest extends KernelTestBase {
     $account = $this->createMock(AccountInterface::class);
     $account->expects($this->atLeastOnce())
       ->method('hasPermission')
-      ->willReturnCallback(fn ($permission) => in_array($permission, $permissions, TRUE));
+      ->willReturnCallback(fn ($permission) => \in_array($permission, $permissions, TRUE));
 
     if ($op === 'create') {
       $result = $access_handler->createAccess(NULL, $account);
     }
     else {
-      $page = Page::create([]);
+      $page = Page::create(['status' => $published]);
       $page->save();
       $result = $access_handler->access($page, $op, $account);
     }
@@ -64,32 +69,40 @@ final class PageAccessControlHandlerTest extends KernelTestBase {
 
   public static function accessCheckProvider(): array {
     return [
-      'create: with create permission' => [[Page::CREATE_PERMISSION], 'create', TRUE],
-      'create: with edit permission' => [[Page::EDIT_PERMISSION], 'create', FALSE],
-      'create: with delete permission' => [[Page::DELETE_PERMISSION], 'create', FALSE],
-      'create: without create permission' => [['access content'], 'create', FALSE],
+      'create: with create permission' => [[Page::CREATE_PERMISSION], 'create', TRUE, TRUE],
+      'create: with edit permission' => [[Page::EDIT_PERMISSION], 'create', TRUE, FALSE],
+      'create: with delete permission' => [[Page::DELETE_PERMISSION], 'create', TRUE, FALSE],
+      'create: without create permission' => [['access content'], 'create', TRUE, FALSE],
 
-      'view: with create permission' => [[Page::CREATE_PERMISSION], 'view', TRUE],
-      'view: with edit permission' => [[Page::EDIT_PERMISSION], 'view', TRUE],
-      'view: with delete permission' => [[Page::DELETE_PERMISSION], 'view', TRUE],
-      'view: with permission' => [['access content'], 'view', TRUE],
-      'view: without any permissions' => [[], 'view', FALSE],
+      // Published page view access.
+      'view published: with create permission' => [[Page::CREATE_PERMISSION], 'view', TRUE, TRUE],
+      'view published: with edit permission' => [[Page::EDIT_PERMISSION], 'view', TRUE, TRUE],
+      'view published: with delete permission' => [[Page::DELETE_PERMISSION], 'view', TRUE, TRUE],
+      'view published: with access content' => [['access content'], 'view', TRUE, TRUE],
+      'view published: without any permissions' => [[], 'view', TRUE, FALSE],
 
-      'update: with create permission' => [[Page::CREATE_PERMISSION], 'update', FALSE],
-      'update: with edit permission' => [[Page::EDIT_PERMISSION], 'update', TRUE],
-      'update: with delete permission' => [[Page::DELETE_PERMISSION], 'update', FALSE],
-      'update: without permission' => [['access content'], 'update', FALSE],
+      // Unpublished page view access.
+      'view unpublished: with create permission' => [[Page::CREATE_PERMISSION], 'view', FALSE, TRUE],
+      'view unpublished: with edit permission' => [[Page::EDIT_PERMISSION], 'view', FALSE, TRUE],
+      'view unpublished: with delete permission' => [[Page::DELETE_PERMISSION], 'view', FALSE, TRUE],
+      'view unpublished: with access content' => [['access content'], 'view', FALSE, FALSE],
+      'view unpublished: without any permissions' => [[], 'view', FALSE, FALSE],
 
-      'delete: with create permission' => [[Page::CREATE_PERMISSION], 'delete', FALSE],
-      'delete: with edit permission' => [[Page::EDIT_PERMISSION], 'delete', FALSE],
-      'delete: with delete permission' => [[Page::DELETE_PERMISSION], 'delete', TRUE],
-      'delete: without permission' => [['access content'], 'delete', FALSE],
+      'update: with create permission' => [[Page::CREATE_PERMISSION], 'update', TRUE, FALSE],
+      'update: with edit permission' => [[Page::EDIT_PERMISSION], 'update', TRUE, TRUE],
+      'update: with delete permission' => [[Page::DELETE_PERMISSION], 'update', TRUE, FALSE],
+      'update: without permission' => [['access content'], 'update', TRUE, FALSE],
 
-      'view all revisions: with edit permission' => [[Page::EDIT_PERMISSION], 'view all revisions', TRUE],
-      'view all revisions: without permission' => [['access content'], 'view all revisions', FALSE],
+      'delete: with create permission' => [[Page::CREATE_PERMISSION], 'delete', TRUE, FALSE],
+      'delete: with edit permission' => [[Page::EDIT_PERMISSION], 'delete', TRUE, FALSE],
+      'delete: with delete permission' => [[Page::DELETE_PERMISSION], 'delete', TRUE, TRUE],
+      'delete: without permission' => [['access content'], 'delete', TRUE, FALSE],
 
-      'view revision: with edit permission' => [[Page::EDIT_PERMISSION], 'view revision', TRUE],
-      'view revision: without permission' => [['access content'], 'view revision', FALSE],
+      'view all revisions: with edit permission' => [[Page::EDIT_PERMISSION], 'view all revisions', TRUE, TRUE],
+      'view all revisions: without permission' => [['access content'], 'view all revisions', TRUE, FALSE],
+
+      'view revision: with edit permission' => [[Page::EDIT_PERMISSION], 'view revision', TRUE, TRUE],
+      'view revision: without permission' => [['access content'], 'view revision', TRUE, FALSE],
     ];
   }
 
@@ -102,9 +115,8 @@ final class PageAccessControlHandlerTest extends KernelTestBase {
    *   The operation to check access for.
    * @param bool $expected_result
    *   The expected result.
-   *
-   * @dataProvider revertAccessProvider
    */
+  #[DataProvider('revertAccessProvider')]
   public function testRevertPermissionOnNonDefaultRevision(array $permissions, string $op, bool $expected_result): void {
     $this->installPageEntitySchema();
 
@@ -129,9 +141,9 @@ final class PageAccessControlHandlerTest extends KernelTestBase {
     $account = $this->createMock(AccountInterface::class);
     $account->expects($this->atLeastOnce())
       ->method('hasPermission')
-      ->willReturnCallback(fn ($permission) => in_array($permission, $permissions, TRUE));
+      ->willReturnCallback(fn ($permission) => \in_array($permission, $permissions, TRUE));
 
-    assert($non_default_revision instanceof EntityInterface);
+    \assert($non_default_revision instanceof EntityInterface);
     $result = $access_handler->access($non_default_revision, $op, $account);
     self::assertEquals($expected_result, $result);
   }

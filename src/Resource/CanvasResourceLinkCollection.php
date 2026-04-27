@@ -44,10 +44,10 @@ final class CanvasResourceLinkCollection implements \IteratorAggregate, Cacheabl
    *   An associated array of key names and CanvasResourceLink objects.
    */
   public function __construct(array $links) {
-    assert(Inspector::assertAll(function ($key) {
+    \assert(Inspector::assertAll(function ($key) {
       return static::validKey($key);
-    }, array_keys($links)));
-    assert(Inspector::assertAll(function ($link) {
+    }, \array_keys($links)));
+    \assert(Inspector::assertAll(function ($link) {
       return $link instanceof CanvasResourceLink;
     }, $links));
     ksort($links);
@@ -81,7 +81,7 @@ final class CanvasResourceLinkCollection implements \IteratorAggregate, Cacheabl
    *   merged with the current set of links.
    */
   public function withLink(string $key, CanvasResourceLink $new_link): CanvasResourceLinkCollection {
-    assert(static::validKey($key));
+    \assert(static::validKey($key));
     $merged = $this->links;
     if (isset($merged[$key])) {
       if (CanvasResourceLink::compare($merged[$key], $new_link) === 0) {
@@ -110,7 +110,7 @@ final class CanvasResourceLinkCollection implements \IteratorAggregate, Cacheabl
    *   TRUE if a link with the given key exist, FALSE otherwise.
    */
   public function hasLinkWithKey($key): bool {
-    return array_key_exists($key, $this->links);
+    return \array_key_exists($key, $this->links);
   }
 
   /**
@@ -128,7 +128,7 @@ final class CanvasResourceLinkCollection implements \IteratorAggregate, Cacheabl
    */
   public function filter(callable $f): CanvasResourceLinkCollection {
     $links = iterator_to_array($this);
-    $filtered = array_reduce(array_keys($links), function ($filtered, $key) use ($links, $f) {
+    $filtered = array_reduce(\array_keys($links), function ($filtered, $key) use ($links, $f) {
       if ($f($key, $links[$key])) {
         $filtered[$key] = $links[$key];
       }
@@ -169,7 +169,7 @@ final class CanvasResourceLinkCollection implements \IteratorAggregate, Cacheabl
    *   TRUE if the key is valid, FALSE otherwise.
    */
   protected static function validKey(string $key): bool {
-    return !is_numeric($key);
+    return !\is_numeric($key);
   }
 
   /**

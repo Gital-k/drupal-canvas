@@ -82,8 +82,8 @@ final class ParametrizedImageStyle extends ImageStyle {
           continue;
         }
         // Find all parametrized image style directories on disk.
-        $directories_to_delete = array_keys($file_system->scanDirectory(
-          $wrapper . '://styles', sprintf("/%s--%s/", $this->id(), '.*'),
+        $directories_to_delete = \array_keys($file_system->scanDirectory(
+          $wrapper . '://styles', \sprintf("/%s--%s/", $this->id(), '.*'),
           ['recurse' => FALSE, 'key' => 'filename'],
         ));
         foreach ($directories_to_delete as $directory) {

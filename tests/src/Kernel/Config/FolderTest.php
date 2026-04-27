@@ -7,38 +7,18 @@ namespace Drupal\Tests\canvas\Kernel\Config;
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\Folder;
-use Drupal\KernelTests\KernelTestBase;
-use Drupal\Tests\ConfigTestTrait;
-use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
-class FolderTest extends KernelTestBase {
-
-  use ConfigTestTrait;
-  use ContribStrictConfigSchemaTestTrait;
+#[Group('canvas')]
+#[RunTestsInSeparateProcesses]
+class FolderTest extends CanvasKernelTestBase {
 
   protected Folder $entity;
 
-  protected static $modules = [
-    'canvas',
-    'sdc',
-    // Canvas's dependencies (modules providing field types + widgets).
-    'datetime',
-    'file',
-    'image',
-    'options',
-    'path',
-    'link',
-    'system',
-    'user',
-    'text',
-    'filter',
-    'ckeditor5',
-    'editor',
-  ];
-
   protected function setUp(): void {
     parent::setUp();
-    $this->installConfig('canvas');
     $this->entity = Folder::create([
       'name' => 'Test folder, please ignore',
       'configEntityTypeId' => Component::ENTITY_TYPE_ID,
@@ -48,8 +28,10 @@ class FolderTest extends KernelTestBase {
 
   public function testFolderAutoCreationValidation(): void {
     $folders = Folder::loadMultiple();
-    // 1. At the start, only the ::setUp()-created Folder exists.
-    $this->assertEquals([$this->entity->id()], array_keys($folders));
+    // 1. At the start, the ::setUp()-created Folder must exist.
+    // Additional Folders may already exist due to auto-generated Block
+    // Components.
+    $this->assertArrayHasKey($this->entity->id(), $folders);
     $this->enableModules(['canvas_test_sdc']);
 
     // 2. Generate Component config entities, this will create additional Folder
@@ -70,6 +52,7 @@ class FolderTest extends KernelTestBase {
       'Container',
       'Container/Special',
       'Forms',
+      'Menus',
       'Other',
       'Status',
       'System',
@@ -111,6 +94,7 @@ class FolderTest extends KernelTestBase {
       'Container',
       'Container/Special',
       'Forms',
+      'Menus',
       'Other',
       'Status',
       'System',
@@ -124,7 +108,7 @@ class FolderTest extends KernelTestBase {
 
     // 1. Load Folder that contains 'sdc.canvas_test_sdc.card'.
     $original_folder = Folder::loadByItemAndConfigEntityTypeId('sdc.canvas_test_sdc.card', Component::ENTITY_TYPE_ID);
-    assert($original_folder instanceof Folder);
+    \assert($original_folder instanceof Folder);
 
     // 2. Remove 'sdc.canvas_test_sdc.card' from its default Folder.
     $original_folder->removeItem('sdc.canvas_test_sdc.card')->save();
@@ -140,7 +124,7 @@ class FolderTest extends KernelTestBase {
     // 5. Delete another Component from its default Folder, this should remove
     // the Component from Folder items list.
     $default_folder_id = Folder::loadByItemAndConfigEntityTypeId('sdc.canvas_test_sdc.attributes', Component::ENTITY_TYPE_ID);
-    assert($default_folder_id instanceof Folder);
+    \assert($default_folder_id instanceof Folder);
     Component::load('sdc.canvas_test_sdc.attributes')?->delete();
     $this->assertNotContains('sdc.canvas_test_sdc.attributes', Folder::load($default_folder_id->id())?->get('items'));
   }

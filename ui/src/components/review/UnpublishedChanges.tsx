@@ -11,14 +11,27 @@ import {
   setConflicts,
   setPreviousPendingChanges,
 } from '@/components/review/PublishReview.slice';
-import { setUpdatePreview } from '@/features/layout/layoutModelSlice';
+import {
+  resetCodeEditor,
+  setForceRefresh,
+} from '@/features/code-editor/codeEditorSlice';
+import { FORM_TYPES } from '@/features/form/constants';
+import { clearFieldValues } from '@/features/form/formStateSlice';
+import {
+  setInitialized,
+  setUpdatePreview,
+} from '@/features/layout/layoutModelSlice';
 import {
   selectPageData,
   setInitialPageData,
 } from '@/features/pageData/pageDataSlice';
-import { selectSelectedComponentUuid } from '@/features/ui/uiSlice';
+import {
+  clearSelection,
+  selectSelectedComponentUuid,
+} from '@/features/ui/uiSlice';
+import { brandKitApi } from '@/services/brandKit';
 import { componentAndLayoutApi } from '@/services/componentAndLayout';
-import { contentApi } from '@/services/content';
+import { contentApi, useGetContentListQuery } from '@/services/content';
 import {
   CONFLICT_CODE,
   pendingChangesApi,
@@ -63,10 +76,15 @@ const UnpublishedChanges = () => {
     pollingInterval: pollingInterval,
     skipPollingIfUnfocused: true,
   });
-  const { entityType, entityId } = useParams();
+  const { entityType, entityId, codeComponentId } = useParams();
   const dispatch = useAppDispatch();
   const { showBoundary } = useErrorBoundary();
   const entity_form_fields = useAppSelector(selectPageData);
+  // Fetch content list to get status information for all pages
+  const { data: contentListData } = useGetContentListQuery({
+    entityType: 'canvas_page',
+  });
+  const pageItems = contentListData?.items;
 
   // If either the selected component or the preview layout is being updated, disable the Publish button.
   const isUpdating = isUpdatingComponent || isUpdatingPreview;
@@ -124,15 +142,18 @@ const UnpublishedChanges = () => {
       const changedCodeComponentIds = Object.values(changesToPublish)
         .filter((change) => change.entity_type === 'js_component')
         .map((change) => change.entity_id);
+      const changedBrandKitIds = Object.values(changesToPublish)
+        .filter((change) => change.entity_type === 'brand_kit')
+        .map((change) => String(change.entity_id));
 
       await publishAllChanges(changesToPublish);
 
-      if (isCurrentChanged) {
+      if (isCurrentChanged && entityId && entityType) {
         // Update the isPublished and isNew status.
         dispatch(
           componentAndLayoutApi.util.updateQueryData(
             'getPageLayout',
-            undefined,
+            { entityId, entityType },
             (draft) => {
               draft.isPublished = true;
               draft.isNew = false;
@@ -187,20 +208,76 @@ const UnpublishedChanges = () => {
           ),
         );
       }
+
+      if (changedBrandKitIds.length) {
+        dispatch(
+          brandKitApi.util.invalidateTags([
+            ...changedBrandKitIds.flatMap((id) => [
+              { type: 'BrandKits' as const, id },
+              { type: 'BrandKitsAutoSave' as const, id },
+            ]),
+            { type: 'BrandKits' as const, id: 'LIST' },
+          ]),
+        );
+      }
     }
   };
 
   const onDiscardClick = async (selectedChange: UnpublishedChange) => {
     if (!selectedChange) return;
 
-    await discardChange(selectedChange);
-
-    // The discardPendingChange mutation will automatically reload the page
-    // when it is successful, so there is nothing more to do here until a better
-    // solution is implemented.
-
-    // After discarding, refresh the list to ensure UI is up to date
-    refetch();
+    try {
+      await discardChange(selectedChange).unwrap();
+      // After discarding, refresh the editor state from canonical server data.
+      dispatch(componentAndLayoutApi.util.invalidateTags([{ type: 'Layout' }]));
+      dispatch(
+        contentApi.util.invalidateTags([{ type: 'Content', id: 'LIST' }]),
+      );
+      if (selectedChange.entity_type === 'js_component') {
+        const discardedCodeComponentId = String(selectedChange.entity_id);
+        dispatch(
+          componentAndLayoutApi.util.invalidateTags([
+            { type: 'CodeComponents', id: discardedCodeComponentId },
+            { type: 'CodeComponentAutoSave', id: discardedCodeComponentId },
+          ]),
+        );
+        // If the code editor is open for this component, force it to refetch
+        // and re-initialize with the canonical (published) data.
+        if (codeComponentId && codeComponentId === discardedCodeComponentId) {
+          dispatch(setForceRefresh(true));
+          dispatch(resetCodeEditor());
+        }
+      }
+      if (selectedChange.entity_type === 'brand_kit') {
+        const discardedBrandKitId = String(selectedChange.entity_id);
+        dispatch(
+          brandKitApi.util.invalidateTags([
+            { type: 'BrandKits', id: discardedBrandKitId },
+            { type: 'BrandKitsAutoSave', id: discardedBrandKitId },
+            { type: 'BrandKits', id: 'LIST' },
+          ]),
+        );
+      }
+      // When the discarded change is for the current page, re-apply the
+      // refetched layout and model so the canvas, sidebar, and form fields
+      // show the published state instead of stale discarded values.
+      const isCurrentPage =
+        entityId &&
+        entityType &&
+        selectedChange.entity_type === entityType &&
+        String(selectedChange.entity_id) === entityId;
+      if (isCurrentPage) {
+        dispatch(setInitialized(false));
+        // Clear cached form values so the props and entity forms reflect the
+        // refetched layout and model.
+        dispatch(clearFieldValues(FORM_TYPES.COMPONENT_INSTANCE_FORM));
+        dispatch(clearFieldValues(FORM_TYPES.ENTITY_FORM));
+        dispatch(clearSelection());
+      }
+      refetch();
+    } catch {
+      // Error state is handled in pendingChangesApi.discardPendingChange.
+    }
   };
 
   if (!isFetching && conflicts && conflicts.length) {
@@ -241,6 +318,23 @@ const UnpublishedChanges = () => {
     }, 100);
   }
 
+  // Create a map of entity_id -> { status, isNew, hasUnsavedStatusChange } for quick lookup
+  const pageStatusMap = useMemo(() => {
+    if (!pageItems) return {};
+    const map: Record<
+      string,
+      { status: boolean; isNew?: boolean; hasUnsavedStatusChange?: boolean }
+    > = {};
+    pageItems.forEach((page) => {
+      map[String(page.id)] = {
+        status: page.status,
+        isNew: page.isNew,
+        hasUnsavedStatusChange: page.hasUnsavedStatusChange,
+      };
+    });
+    return map;
+  }, [pageItems]);
+
   return (
     <PublishReview
       isUpdating={isUpdating}
@@ -252,6 +346,7 @@ const UnpublishedChanges = () => {
       onDiscardClick={onDiscardClick}
       isPublishing={isPublishing}
       isDiscarding={isDiscarding}
+      pageStatusMap={pageStatusMap}
     />
   );
 };

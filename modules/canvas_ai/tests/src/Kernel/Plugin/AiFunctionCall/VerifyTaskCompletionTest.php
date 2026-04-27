@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas_ai\Kernel\Plugin\AiFunctionCall;
 
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
 use Drupal\canvas_ai\Plugin\AiFunctionCall\VerifyTaskCompletion;
-use Drupal\KernelTests\KernelTestBase;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 
 /**
- * @coversDefaultClass \Drupal\canvas_ai\Plugin\AiFunctionCall\VerifyTaskCompletion
- * @group canvas_ai
+ * Tests Drupal\canvas_ai\Plugin\AiFunctionCall\VerifyTaskCompletion.
  */
-final class VerifyTaskCompletionTest extends KernelTestBase {
+#[CoversClass(VerifyTaskCompletion::class)]
+#[Group('canvas_ai')]
+final class VerifyTaskCompletionTest extends CanvasKernelTestBase {
 
   /**
    * {@inheritdoc}
@@ -19,9 +22,6 @@ final class VerifyTaskCompletionTest extends KernelTestBase {
   protected static $modules = [
     'ai',
     'ai_agents',
-    'canvas',
-    'system',
-    'user',
     'canvas_ai',
   ];
 
@@ -37,11 +37,15 @@ final class VerifyTaskCompletionTest extends KernelTestBase {
 
     self::assertEquals(
       "Task completion verification checklist:\n\n" .
-      "✓ Confirm the following were completed:\n" .
-      "  - If canvas_page_builder_agent was used:\n" .
-      "    • Page components were added/modified\n" .
-      "    • Page title was generated using canvas_title_generation_agent (if title was empty or 'Untitled page')\n" .
-      "    • Page description was generated using canvas_metadata_generation_agent (if description was empty)",
+        "✓ Confirm the following were completed:\n" .
+        "  - If canvas_page_builder_agent was used:\n" .
+        "    • Page components were added/modified\n" .
+        "    • Page title was generated using canvas_title_generation_agent (if title was empty or 'Untitled page')\n" .
+        "    • Page description was generated using canvas_metadata_generation_agent (if description was empty)\n\n" .
+        "  - If canvas_template_builder_agent was used:\n" .
+        "    • Page was designed\n" .
+        "    • Page title was generated using canvas_title_generation_agent (if title was empty or 'Untitled page')\n" .
+        "    • Page description was generated using canvas_metadata_generation_agent (if description was empty)",
       $output
     );
   }

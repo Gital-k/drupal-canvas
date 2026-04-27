@@ -13,7 +13,7 @@ const testRunner = new RuleTester({
 vi.mock('node:fs', () => ({
   existsSync: vi.fn(() => true),
   readdirSync: vi.fn((dir) => {
-    const dirs = {
+    const dirs: Record<string, string[]> = {
       '/components/button': ['component.yml', 'index.jsx', 'index.css'],
       '/components/button2': ['component.yml', 'index.jsx'],
       '/components/button3': ['component.yml'],
@@ -115,31 +115,19 @@ describe('component-files rule', () => {
     invalid: [],
   });
 
-  testRunner.run(
-    'should not apply to directories that do not contain component.yml',
-    rule,
-    {
-      valid: [
-        {
-          name: 'Button 5',
-          code: `
+  testRunner.run('should not apply to non-component yml files', rule, {
+    valid: [
+      {
+        name: 'Button 5',
+        code: `
             name: Button 5
             machineName: button5
           `,
-          filename: '/components/button5/button.yml',
-        },
-        {
-          name: 'Button 6',
-          code: `
-            name: Button 6
-            machineName: button6
-          `,
-          filename: '/components/button6/button.component.yml',
-        },
-      ],
-      invalid: [],
-    },
-  );
+        filename: '/components/button5/button.yml',
+      },
+    ],
+    invalid: [],
+  });
 
   testRunner.run(
     'should fail when component directory contains disallowed files',

@@ -4,18 +4,21 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
+use PHPUnit\Framework\Attributes\Group;
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Access\AccessResultForbidden;
 use Drupal\Core\Session\AccountInterface;
-use Drupal\KernelTests\KernelTestBase;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\node\Traits\NodeCreationTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
- * @group canvas
+ * Tests Homepage Node Deletion.
  */
-class HomepageNodeDeletionTest extends KernelTestBase {
+#[RunTestsInSeparateProcesses]
+#[Group('canvas')]
+class HomepageNodeDeletionTest extends CanvasKernelTestBase {
 
   use NodeCreationTrait;
   use UserCreationTrait;
@@ -26,21 +29,7 @@ class HomepageNodeDeletionTest extends KernelTestBase {
    */
   protected static $modules = [
     'node',
-    'canvas',
-    'system',
-    'user',
-    'media',
     'field',
-    'link',
-    'text',
-    'filter',
-    'datetime',
-    'file',
-    'image',
-    'options',
-    'path',
-    'media',
-    'canvas_test_sdc',
     'canvas_test_config_node_article',
   ];
 
@@ -50,6 +39,7 @@ class HomepageNodeDeletionTest extends KernelTestBase {
   protected function setUp(): void {
     parent::setUp();
     $this->installEntitySchema('node');
+    $this->installEntitySchema('path_alias');
     $this->installEntitySchema('user');
     $this->generateComponentConfig();
     $this->installConfig('canvas_test_config_node_article');
@@ -63,14 +53,14 @@ class HomepageNodeDeletionTest extends KernelTestBase {
       ->save();
 
     $user = $this->createUser(['administer nodes', 'access content'], 'administer_node_user');
-    assert($user instanceof AccountInterface);
+    \assert($user instanceof AccountInterface);
     $access = $node->access('delete', $user, TRUE);
     $this->assertInstanceOf(AccessResultForbidden::class, $access);
     $this->assertSame('This entity cannot be deleted because its path is set as the homepage.', $access->getReason());
     $this->assertSame(['config:system.site', 'node:1'], $access->getCacheTags());
     // Provide bypass node access permission to the user.
     $user2 = $this->createUser(['bypass node access'], 'bypass_node_access_user');
-    assert($user2 instanceof AccountInterface);
+    \assert($user2 instanceof AccountInterface);
     $access = $node->access('delete', $user2, TRUE);
     $this->assertInstanceOf(AccessResult::class, $access);
     $this->assertTrue($access->isAllowed(), 'Bypass node access permission allows deletion of the node.');

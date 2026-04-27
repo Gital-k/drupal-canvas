@@ -17,12 +17,14 @@ export interface FieldDataItem {
   sourceTypeSettings?: {
     storage?: object;
     instance?: object;
+    cardinality?: number;
   };
   jsonSchema?: {
     type: 'number' | 'integer' | 'string' | 'boolean' | 'array' | 'object';
     properties?: object;
     enum?: any[];
     format?: string;
+    maxItems?: number;
   };
   default_values: DefaultValues;
   [x: string | number | symbol]: unknown;

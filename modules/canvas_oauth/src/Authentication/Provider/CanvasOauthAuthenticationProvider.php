@@ -7,6 +7,8 @@ namespace Drupal\canvas_oauth\Authentication\Provider;
 use Drupal\Core\Authentication\AuthenticationProviderInterface;
 use Drupal\Core\Routing\RouteMatch;
 use Drupal\canvas\Entity\AssetLibrary;
+use Drupal\canvas\Entity\BrandKit;
+use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\simple_oauth\Authentication\Provider\SimpleOauthAuthenticationProvider;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -20,12 +22,13 @@ use Symfony\Component\HttpFoundation\Request;
  *
  * @see \Drupal\simple_oauth\Authentication\Provider\SimpleOauthAuthenticationProvider
  *
- * This authentication provider is added to a subset of the Canvas API routes.
- * Currently, they are the routes to work with Canvas's config entities.
+ * This authentication provider is added to a subset of the Canvas API routes
+ * marked as external API endpoints.
  * @see \Drupal\canvas_oauth\Routing\CanvasOauthRouteSubscriber
  *
- * Because those endpoints can handle all types of config entities, applying the
- * authentication provider is narrowed down to specific entity types.
+ * It applies to artifact routes (upload and manifest sync) and to config entity
+ * routes for specific entity types (JavaScript components, asset libraries, and
+ * brand kits).
  * @see \Drupal\canvas_oauth\Authentication\Provider\CanvasOauthAuthenticationProvider::applies()
  */
 class CanvasOauthAuthenticationProvider implements AuthenticationProviderInterface {
@@ -39,19 +42,58 @@ class CanvasOauthAuthenticationProvider implements AuthenticationProviderInterfa
    * {@inheritdoc}
    */
   public function applies(Request $request) {
-    // Currently, this authentication provider is only applied to the routes
-    // that work with Canvas's config entities.
     // @see \Drupal\canvas_oauth\Routing\CanvasOauthRouteSubscriber
+    $applies_to_config = FALSE;
+    $applies_to_content = FALSE;
+    // @todo https://www.drupal.org/i/3498525 should verify this is fine
+    //   for all eligible content entity types.
+    $page_route_names = [
+      'canvas.api.content.get',
+      'canvas.api.content.get.by_uuid',
+      'canvas.api.content.patch',
+      'canvas.api.content.list',
+      'canvas.api.content.delete',
+      'canvas.api.content.create',
+    ];
     $route_match = RouteMatch::createFromRequest($request);
+
+    // Special case: artifact upload and push lifecycle routes.
+    $named_routes = [
+      'canvas.api.artifacts.upload',
+      'canvas.api.push.complete',
+      'canvas.api.push.fail',
+      'canvas.api.push.start',
+    ];
+    if (\in_array($route_match->getRouteName(), $named_routes, TRUE)) {
+      return $this->simpleOauthAuthenticationProvider->applies($request);
+    }
+
+    // Special case: media upload route. Media is not a Canvas provided entity.
+    if ($route_match->getRouteName() === 'canvas.api.media.upload') {
+      return $this->simpleOauthAuthenticationProvider->applies($request);
+    }
+
+    // Apply to config entity routes for protected entity types.
+    // @see \Drupal\canvas_oauth\Routing\CanvasOauthRouteSubscriber
     $entity_type_id = $route_match->getRawParameter('canvas_config_entity_type_id');
-    // Narrow down the entity types that are protected by this authentication
-    // provider.
-    $protected_entity_types = [
+    // Narrow down the config entity types that are protected by this
+    // authentication provider.
+    $protected_config_entity_types = [
+      Component::ENTITY_TYPE_ID,
       JavaScriptComponent::ENTITY_TYPE_ID,
       AssetLibrary::ENTITY_TYPE_ID,
+      BrandKit::ENTITY_TYPE_ID,
     ];
 
-    if ($entity_type_id === NULL || !in_array($entity_type_id, $protected_entity_types, TRUE)) {
+    if ($entity_type_id !== NULL && \in_array($entity_type_id, $protected_config_entity_types, TRUE)) {
+      $applies_to_config = TRUE;
+    }
+
+    if (\in_array($route_match->getRouteName(), $page_route_names, TRUE)) {
+      $applies_to_content = TRUE;
+    }
+
+    if (!$applies_to_content && !$applies_to_config) {
       return FALSE;
     }
 

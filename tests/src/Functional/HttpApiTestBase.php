@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Functional;
 
+use PHPUnit\Framework\Attributes\Group;
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
@@ -20,9 +21,8 @@ use Symfony\Component\HttpFoundation\Response;
  * Base class for functional tests of Canvas's internal HTTP API.
  *
  * Provides helper methods for making API requests and asserting response cacheability.
- *
- * @group canvas
  */
+#[Group('canvas')]
 abstract class HttpApiTestBase extends FunctionalTestBase {
 
   use ApiRequestTrait;
@@ -198,7 +198,7 @@ abstract class HttpApiTestBase extends FunctionalTestBase {
       // If the default list is not empty, check against that instead of an
       // empty array. We only expect this for the Folder config entity type.
       // @see \Drupal\Tests\canvas\Functional\CanvasConfigEntityHttpApiTest::$defaultFolders
-      assert(str_contains($list_url->getUri(), 'folder'));
+      \assert(str_contains($list_url->getUri(), 'folder'));
       $this->assertSameFoldersSansUuids($default_list, $body ?? []);
     }
     $individual_body = $this->assertExpectedResponse('GET', $resource_url, [], 404, NULL, NULL, 'UNCACHEABLE (request policy)', 'UNCACHEABLE (no cacheability)');
@@ -228,7 +228,7 @@ abstract class HttpApiTestBase extends FunctionalTestBase {
       ],
     ];
     $body = $this->assertExpectedResponse('GET', Url::fromUri("base:/canvas/api/v0/auto-saves/pending"), $request_options, 200, ['user.permissions'], [...$entity->getCacheTags(), 'config:user.settings', AutoSaveManager::CACHE_TAG, 'http_response', "user:{$user->id()}"], 'UNCACHEABLE (request policy)', 'MISS');
-    $id = array_keys($expected_list)[0];
+    $id = \array_keys($expected_list)[0];
     \assert(\is_array($body));
     self::assertArrayHasKey($id, $body);
     self::assertArrayHasKey('data_hash', $body[$id]);
@@ -246,7 +246,7 @@ abstract class HttpApiTestBase extends FunctionalTestBase {
   protected function assertSameFoldersSansUuids(array $expected, array $actual): void {
     $this->assertCount(count($expected), $actual);
 
-    $expected_values = array_map(function ($item) {
+    $expected_values = \array_map(function ($item) {
       unset($item['id']);
       $items = $item['items'];
       asort($items);
@@ -257,7 +257,7 @@ abstract class HttpApiTestBase extends FunctionalTestBase {
       return strcmp($a['name'], $b['name']);
     });
 
-    $actual_values = array_map(function ($item) {
+    $actual_values = \array_map(function ($item) {
       unset($item['id']);
       $items = $item['items'];
       asort($items);

@@ -4,21 +4,23 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Unit\Twig;
 
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Drupal\Core\File\FileUrlGeneratorInterface;
 use Drupal\Core\Image\ImageFactory;
+use Drupal\Core\Render\RendererInterface;
 use Drupal\Core\StreamWrapper\StreamWrapperManagerInterface;
 use Drupal\canvas\Routing\ParametrizedImageStyleConverter;
 use Drupal\canvas\Twig\CanvasTwigExtension;
 use Drupal\Tests\UnitTestCase;
 
 // cspell:ignore fitok itok Bwidth
-
 /**
  * Tests Twig filter functionality.
  *
- * @group canvas
- * @covers \Drupal\canvas\Twig\CanvasTwigExtension::toSrcSet
+ * @legacy-covers \Drupal\canvas\Twig\CanvasTwigExtension::toSrcSet
  */
+#[Group('canvas')]
 class CanvasTwigExtensionFiltersTest extends UnitTestCase {
 
   /**
@@ -32,19 +34,20 @@ class CanvasTwigExtensionFiltersTest extends UnitTestCase {
   protected function setUp(): void {
     parent::setUp();
 
-    // Mock the required dependencies
+    // Mock the required dependencies.
     $streamWrapperManager = $this->createMock(StreamWrapperManagerInterface::class);
     $imageFactory = $this->createMock(ImageFactory::class);
     $fileUrlInterfaceManager = $this->createMock(FileUrlGeneratorInterface::class);
+    $renderer = $this->createMock(RendererInterface::class);
 
     // Create the extension instance
-    $this->canvasTwigExtension = new CanvasTwigExtension($streamWrapperManager, $imageFactory, $fileUrlInterfaceManager);
+    $this->canvasTwigExtension = new CanvasTwigExtension($streamWrapperManager, $imageFactory, $fileUrlInterfaceManager, $renderer);
   }
 
   /**
-   * @covers CanvasTwigExtension::toSrcSet
-   * @dataProvider providerToSrcSet
-   */
+ * Tests to src set.
+ */
+  #[DataProvider('providerToSrcSet')]
   public function testToSrcSet(string $src, int $intrinsicImageWidth, ?string $expected): void {
     $actual = $this->canvasTwigExtension->toSrcSet($src, $intrinsicImageWidth);
     $this->assertSame($expected, $actual);
@@ -119,7 +122,7 @@ class CanvasTwigExtensionFiltersTest extends UnitTestCase {
   }
 
   private static function generateExpectedSrcSetForWidths(array $widths): string {
-    return implode(', ', array_map(function ($width) {
+    return implode(', ', \array_map(function ($width) {
       return "/sites/default/files/styles/canvas_parametrized_width--$width/public/2025-07/Screenshot 2025-07-08 at 8.56.02.png.webp?itok=Wp4lG4Wk {$width}w";
     }, $widths));
   }
@@ -133,10 +136,8 @@ class CanvasTwigExtensionFiltersTest extends UnitTestCase {
    *   The intrinsic width of the image in $src.
    * @param class-string<\Throwable> $expectedException
    *   The expected exception.
-   *
-   * @covers CanvasTwigExtension::toSrcSet
-   * @dataProvider invalidProviderToSrcSet
    */
+  #[DataProvider('invalidProviderToSrcSet')]
   public function testToSrcSetWithInvalidWidth(string $src, int $intrinsicImageWidth, string $expectedException): void {
     $this->expectException($expectedException);
     $this->canvasTwigExtension->toSrcSet($src, $intrinsicImageWidth);

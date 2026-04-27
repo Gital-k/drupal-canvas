@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Audit;
 
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Drupal\Core\Config\Entity\ConfigEntityInterface;
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\Entity\EntityViewMode;
@@ -15,17 +18,24 @@ use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Entity\Pattern;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
+use Drupal\node\Entity\NodeType;
 
 /**
- * @coversDefaultClass \Drupal\canvas\Audit\ComponentAudit
- * @group canvas
+ * Tests Drupal\canvas\Audit\ComponentAudit.
+ *
  * @todo Improve in
  *   https://www.drupal.org/project/canvas/issues/3522953
  */
+#[RunTestsInSeparateProcesses]
+#[CoversClass(ComponentAudit::class)]
+#[Group('canvas')]
 class ComponentAuditTest extends ComponentAuditTestBase {
 
   /**
-   * @covers ::getContentRevisionsUsingComponent
+   * Tests get content revisions using component.
+   *
+   * @legacy-covers ::getContentRevisionsUsingComponent
    */
   public function testGetContentRevisionsUsingComponent(): void {
     $audit = $this->container->get(ComponentAudit::class);
@@ -40,6 +50,7 @@ class ComponentAuditTest extends ComponentAuditTestBase {
       'title' => $this->randomMachineName(),
       'components' => $this->tree,
     ]);
+    self::assertEntityIsValid($page);
     $page->save();
     $revisionId1 = $page->getRevisionId();
     $page->setNewRevision();
@@ -93,17 +104,23 @@ class ComponentAuditTest extends ComponentAuditTestBase {
   }
 
   protected function createTestContentTemplate(array $tree): ContentTemplate {
-    $entity_type_id = Page::ENTITY_TYPE_ID;
+    $entity_type_id = 'node';
+    $bundle = 'foo';
     $view_mode = 'reverse';
+
     EntityViewMode::create([
       'id' => \implode('.', [$entity_type_id, $view_mode]),
       'label' => 'Reverse',
       'targetEntityType' => $entity_type_id,
     ])->save();
+    NodeType::create([
+      'type' => $bundle,
+      'name' => $this->randomString(),
+    ])->save();
     $content_template = ContentTemplate::create([
-      'id' => \implode('.', [$entity_type_id, $entity_type_id, $view_mode]),
+      'id' => \implode('.', [$entity_type_id, $bundle, $view_mode]),
       'content_entity_type_id' => $entity_type_id,
-      'content_entity_type_bundle' => $entity_type_id,
+      'content_entity_type_bundle' => $bundle,
       'content_entity_type_view_mode' => $view_mode,
       'component_tree' => $tree,
     ]);
@@ -112,9 +129,11 @@ class ComponentAuditTest extends ComponentAuditTestBase {
   }
 
   /**
-   * @covers ::getConfigEntityDependenciesUsingComponent
-   * @dataProvider configProvider
+   * Tests get config entity dependencies using component.
+   *
+   * @legacy-covers ::getConfigEntityDependenciesUsingComponent
    */
+  #[DataProvider('configProvider')]
   public function testGetConfigEntityDependenciesUsingComponent(string $config_entity_type_id): void {
     $audit = $this->container->get(ComponentAudit::class);
     $component = Component::load('sdc.canvas_test_sdc.my-cta');
@@ -146,7 +165,7 @@ class ComponentAuditTest extends ComponentAuditTestBase {
     self::assertEquals([$entity->id()], \array_values(\array_map(static fn(ConfigEntityInterface $entity): string|int|null => $entity->id(), $config)));
 
     // @todo Uncomment this in https://www.drupal.org/i/3530051.
-    assert($new_version != $old_version);
+    \assert($new_version != $old_version);
     /*
     // 2. Active (i.e. new) version: no uses yet.
     $config = $audit->getConfigEntityDependenciesUsingComponent($component, $config_entity_type_id, [$new_version]);

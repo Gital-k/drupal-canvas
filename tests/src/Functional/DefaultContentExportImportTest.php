@@ -24,16 +24,20 @@ use Drupal\FunctionalTests\Core\Recipe\RecipeTestTrait;
 use Drupal\media\Entity\Media;
 use Drupal\Tests\BrowserTestBase;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
+use Drupal\Tests\field\Traits\EntityReferenceFieldCreationTrait;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
 use Drupal\user\UserInterface;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 #[Group('canvas')]
 #[Group('default_content_api')]
 #[CoversClass(DefaultContentSubscriber::class)]
+#[RunTestsInSeparateProcesses]
 final class DefaultContentExportImportTest extends BrowserTestBase {
 
+  use EntityReferenceFieldCreationTrait;
   use MediaTypeCreationTrait;
   use RecipeTestTrait;
   use GenerateComponentConfigTrait;
@@ -46,6 +50,7 @@ final class DefaultContentExportImportTest extends BrowserTestBase {
     'media_library',
     'canvas_test_sdc',
     'canvas',
+    'node',
   ];
 
   /**
@@ -149,6 +154,7 @@ final class DefaultContentExportImportTest extends BrowserTestBase {
     $image_sdc_uuid = 'c990c4ee-341a-4f38-ab5d-e75b3de1fa1f';
     $local_file_sdc_uuid = '75144f9b-1bfc-4874-b848-b5889f066217';
     $js_component_uuid = '8b9c4e63-e3e2-4969-8f1f-7cb764e0e19f';
+    $block_component_uuid = 'ce05b065-00e7-43c4-8808-ac757de1c98a';
 
     $original_page = Page::create([
       'title' => 'Export this page',
@@ -205,6 +211,20 @@ final class DefaultContentExportImportTest extends BrowserTestBase {
             'loading' => 'lazy',
           ],
         ],
+        // A block component instance, with a few configuration options beyond
+        // the defaults.
+        [
+          'uuid' => $block_component_uuid,
+          'component_id' => 'block.system_menu_block.main',
+          'component_version' => Component::load('block.system_menu_block.main')?->getActiveVersion(),
+          'inputs' => [
+            'label' => '',
+            'label_display' => '0',
+            'level' => 1,
+            'depth' => 3,
+            'expand_all_items' => TRUE,
+          ],
+        ],
       ],
     ]);
     $violations = $original_page->validate();
@@ -234,7 +254,7 @@ final class DefaultContentExportImportTest extends BrowserTestBase {
       '--with-dependencies',
     ]);
     // The export should succeed.
-    self::assertSame(0, $process->wait());
+    self::assertSame(0, $process->wait(), $process->getOutput());
 
     // After exporting delete the page and all its dependencies.
     $unreferenced_file->delete();
@@ -332,8 +352,8 @@ final class DefaultContentExportImportTest extends BrowserTestBase {
     // when failing. So we can check (UUID, entity type) pairs on test output.
     $all_uuids_debug_string = var_export(array_combine($all_uuids, array_column($exported_entity_info, 'entity_type')), TRUE);
     sort($all_uuids);
-    $actual_export_uuids = array_keys($finder->data);
-    $actual_export_uuids_debug_string = var_export(array_combine(array_keys($finder->data), array_map(fn($data) => $data['_meta']['entity_type'], $finder->data)), TRUE);
+    $actual_export_uuids = \array_keys($finder->data);
+    $actual_export_uuids_debug_string = var_export(array_combine(\array_keys($finder->data), \array_map(fn($data) => $data['_meta']['entity_type'], $finder->data)), TRUE);
     sort($actual_export_uuids);
     self::assertEquals($all_uuids, $actual_export_uuids, $all_uuids_debug_string . ' vs ' . $actual_export_uuids_debug_string);
 
@@ -348,6 +368,28 @@ final class DefaultContentExportImportTest extends BrowserTestBase {
       $imported_entities[$entity->uuid()] = $entity;
     }
     return $imported_entities;
+  }
+
+  public function testCanvasSpecificEntityReferencePropertiesAreRemoved(): void {
+    $node_type = $this->drupalCreateContentType()->id();
+    \assert(\is_string($node_type));
+    $this->createEntityReferenceField('node', $node_type, 'field_related', 'Related content', 'node');
+    $node1 = $this->drupalCreateNode(['type' => $node_type]);
+    $node2 = $this->drupalCreateNode([
+      'type' => $node_type,
+      'field_related' => $node1->id(),
+    ]);
+
+    // This functionality is >= 11.3 only, but we want phpstan to pass with 11.2
+    // @phpstan-ignore-next-line class.notFound
+    $related = \Drupal::service(Exporter::class)->export($node2)->data['default']['field_related'];
+    $this->assertNotEmpty($related);
+    $this->assertArrayHasKey('entity', $related[0]);
+    // The `target_uuid` property should have been explicitly excluded from the
+    // exported field item.
+    $this->assertArrayNotHasKey('target_uuid', $related[0]);
+    // The `url` property is computed, and therefore should have been excluded.
+    $this->assertArrayNotHasKey('url', $related[0]);
   }
 
 }

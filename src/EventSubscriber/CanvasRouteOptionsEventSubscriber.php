@@ -35,7 +35,7 @@ final class CanvasRouteOptionsEventSubscriber implements EventSubscriberInterfac
     // @see \Drupal\Core\EventSubscriber\MainContentViewSubscriber::WRAPPER_FORMAT
     // @see \Drupal\canvas\Render\MainContent\CanvasTemplateRenderer
     $route_object = $this->routeMatch->getRouteObject();
-    if (!is_null($route_object) && $wrapper_format = $route_object->getOption('_wrapper_format')) {
+    if (!\is_null($route_object) && $wrapper_format = $route_object->getOption('_wrapper_format')) {
       $event->getRequest()->query->set(MainContentViewSubscriber::WRAPPER_FORMAT, $wrapper_format);
     }
   }
@@ -56,12 +56,20 @@ final class CanvasRouteOptionsEventSubscriber implements EventSubscriberInterfac
 
   public function preventRouteNormalization(RouteBuildEvent $event): void {
     foreach ($event->getRouteCollection()->getIterator() as $route_name => $route) {
-      assert($route instanceof Route);
+      \assert($route instanceof Route);
       // This ensures our react based routing works with redirect module
       // enabled.
       // @see \Drupal\canvas\PathProcessor\CanvasPathProcessor::processInbound.
       if (str_starts_with($route_name, 'canvas.')) {
         $route->setDefault('_disable_route_normalizer', TRUE);
+      }
+    }
+  }
+
+  public function enforceJsonFormatForApis(RouteBuildEvent $event): void {
+    foreach ($event->getRouteCollection() as $route_name => $route) {
+      if (str_starts_with($route_name, 'canvas.api.')) {
+        $route->setRequirement('_format', 'json');
       }
     }
   }
@@ -73,6 +81,7 @@ final class CanvasRouteOptionsEventSubscriber implements EventSubscriberInterfac
     $events[KernelEvents::REQUEST][] = ['transformWrapperFormatRouteOption'];
     $events[RoutingEvents::ALTER][] = ['addCsrfToken'];
     $events[RoutingEvents::ALTER][] = ['preventRouteNormalization'];
+    $events[RoutingEvents::ALTER][] = ['enforceJsonFormatForApis'];
     return $events;
   }
 

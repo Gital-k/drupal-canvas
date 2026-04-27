@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Drupal\canvas\Plugin\Adapter;
 
 use Drupal\Core\Plugin\PluginBase;
@@ -15,7 +17,7 @@ use JsonSchema\Validator;
 abstract class AdapterBase extends PluginBase implements AdapterInterface {
 
   public function addInput(string $input, mixed $value): AdapterBase {
-    if (array_key_exists($input, $this->getInputs())) {
+    if (\array_key_exists($input, $this->getInputs())) {
       $json_schema_type = $this->getInputs()[$input];
       // @see \Drupal\Core\Theme\Component\ComponentValidator
       if (!$this->validateConformanceToJsonSchemaType($json_schema_type, $value)) {
@@ -34,7 +36,7 @@ abstract class AdapterBase extends PluginBase implements AdapterInterface {
    * @return array<string, JsonSchema>
    */
   public function getInputs(): array {
-    return is_array($this->getPluginDefinition()) ? (array) $this->getPluginDefinition()['inputs'] : [];
+    return \is_array($this->getPluginDefinition()) ? (array) $this->getPluginDefinition()['inputs'] : [];
   }
 
   /**
@@ -61,9 +63,9 @@ abstract class AdapterBase extends PluginBase implements AdapterInterface {
       return TRUE;
     }
 
-    $message_parts = array_map(
+    $message_parts = \array_map(
       static function (array $error): string {
-        return sprintf("[%s] %s", $error['property'], $error['message']);
+        return \sprintf("[%s] %s", $error['property'], $error['message']);
       },
       $validator->getErrors()
     );
@@ -75,8 +77,8 @@ abstract class AdapterBase extends PluginBase implements AdapterInterface {
    * @return JsonSchema
    */
   public function getOutputSchema(): array {
-    assert(is_array($this->getPluginDefinition()));
-    assert(array_key_exists('output', $this->getPluginDefinition()));
+    \assert(\is_array($this->getPluginDefinition()));
+    \assert(\array_key_exists('output', $this->getPluginDefinition()));
     return PropShape::standardize($this->getPluginDefinition()['output'])->resolvedSchema;
   }
 
@@ -84,9 +86,9 @@ abstract class AdapterBase extends PluginBase implements AdapterInterface {
    * @todo Determine whether there is a better way.
    */
   public function inputIsRequired(string $input): bool {
-    assert(is_array($this->getPluginDefinition()));
-    assert(array_key_exists('requiredInputs', $this->getPluginDefinition()));
-    return in_array($input, $this->getPluginDefinition()['requiredInputs'], TRUE);
+    \assert(\is_array($this->getPluginDefinition()));
+    \assert(\array_key_exists('requiredInputs', $this->getPluginDefinition()));
+    return \in_array($input, $this->getPluginDefinition()['requiredInputs'], TRUE);
   }
 
 }

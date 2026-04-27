@@ -4,30 +4,33 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Unit;
 
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\Depends;
 use Drupal\Tests\UnitTestCase;
 use Symfony\Component\Yaml\Yaml;
 
 /**
- * @group canvas.
+ * Tests Dx Route Consistency.
  *
- * @covers canvas.routing.yml
- * @covers openapi.yml
+ * @see canvas.routing.yml
+ * @see openapi.yml
  */
+#[Group('canvas')]
 final class DxRouteConsistencyTest extends UnitTestCase {
 
   public function testRoutingYmlDx(): array {
     $routes = Yaml::parseFile(__DIR__ . '/../../../canvas.routing.yml');
-    assert(is_array($routes));
+    \assert(\is_array($routes));
 
     // All route definitions must be alphabetically ordered.
-    $actual_routes_order = array_keys($routes);
+    $actual_routes_order = \array_keys($routes);
     $expected_routers_order = $actual_routes_order;
     sort($expected_routers_order);
     $this->assertSame($expected_routers_order, $actual_routes_order);
 
     // All Canvas API routes must:
     // - have a `path` that starts with '/canvas/api/v0/'
-    // - specify `methods`
+    // - specify `methods`.
     $canvas_api_routes = array_filter($routes, fn ($k) => str_starts_with($k, 'canvas.api.'), ARRAY_FILTER_USE_KEY);
     foreach ($canvas_api_routes as $canvas_api_route_name => $canvas_api_route) {
       $this->assertStringStartsWith('/canvas/api/v0/', $canvas_api_route['path'], "`$canvas_api_route_name` route path starts with '/canvas/api/v0/'." . print_r($canvas_api_route, TRUE));
@@ -38,8 +41,9 @@ final class DxRouteConsistencyTest extends UnitTestCase {
   }
 
   /**
-   * @depends testRoutingYmlDx
-   */
+ * Tests authentication required permission.
+ */
+  #[Depends('testRoutingYmlDx')]
   public function testAuthenticationRequiredPermission(array $canvas_api_routes): void {
     foreach ($canvas_api_routes as $canvas_api_route_name => $canvas_api_route) {
       $this->assertArrayHasKey('_canvas_authentication_required', $canvas_api_route['requirements'], "`$canvas_api_route_name` needs to include the _canvas_authentication_required requirement. This is needed to provide useful errors for attempts to access the route unauthenticated.");
@@ -47,8 +51,9 @@ final class DxRouteConsistencyTest extends UnitTestCase {
   }
 
   /**
-   * @depends testRoutingYmlDx
-   */
+ * Tests open api completeness.
+ */
+  #[Depends('testRoutingYmlDx')]
   public function testOpenApiCompleteness(array $canvas_api_routes): void {
     // Map Canvas API route definitions keyed by route name to being keyed by path
     // and method, with the path resolved where possible.
@@ -67,12 +72,12 @@ final class DxRouteConsistencyTest extends UnitTestCase {
     $normalized_openapi_defined_operations = [];
     foreach ($normalized_openapi_paths as $path => $path_spec) {
       foreach (['DELETE', 'GET', 'PATCH', 'POST'] as $method) {
-        if (array_key_exists(strtolower($method), $path_spec)) {
+        if (\array_key_exists(strtolower($method), $path_spec)) {
           $normalized_openapi_defined_operations["$path $method"] = $path_spec[strtolower($method)];
         }
       }
     }
-    $this->assertSame(array_keys($normalized_route_defined_canvas_api_operations), array_keys($normalized_openapi_defined_operations), 'OpenAPI path and operation specs exist for every Canvas API route, and appear in alphabetical order.');
+    $this->assertSame(\array_keys($normalized_route_defined_canvas_api_operations), \array_keys($normalized_openapi_defined_operations), 'OpenAPI path and operation specs exist for every Canvas API route, and appear in alphabetical order.');
   }
 
   private static function resolveRouteDefinitionsToOperations(array $routes_by_name): array {
@@ -92,7 +97,7 @@ final class DxRouteConsistencyTest extends UnitTestCase {
       // need to be resolved, to account for e.g. different request/response
       // body schemas for each config entity type supported by a route.
       // @see https://symfony.com/doc/current/routing.html#route-parameters
-      $static_path_part_requirements = array_keys(array_filter(
+      $static_path_part_requirements = \array_keys(array_filter(
         $route['requirements'] ?? [],
           // Ignore special parameters.
           // @see https://symfony.com/doc/current/routing.html#special-parameters
@@ -109,7 +114,7 @@ final class DxRouteConsistencyTest extends UnitTestCase {
         continue;
       }
 
-      $operations_to_resolve = array_keys($operations_for_route);
+      $operations_to_resolve = \array_keys($operations_for_route);
       foreach ($static_path_part_requirements as $req_name) {
         $req_value = $route['requirements'][$req_name];
 
@@ -156,9 +161,9 @@ final class DxRouteConsistencyTest extends UnitTestCase {
   private static function ignoreDynamicPathPartNames(array $array_with_paths_as_keys): array {
     return array_combine(
       // @phpstan-ignore-next-line
-      array_map(
+      \array_map(
         fn (string $path) => preg_replace('/\{.*\}/', '{}', $path),
-        array_keys($array_with_paths_as_keys),
+        \array_keys($array_with_paths_as_keys),
       ),
       array_values($array_with_paths_as_keys)
     );

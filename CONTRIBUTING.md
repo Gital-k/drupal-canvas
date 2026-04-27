@@ -1,6 +1,6 @@
 # Contributing
 
-For joining the development process of Drupal Canvas (Canvas for short) or trying the development process, we strongly recommend the use of [DDEV](https://ddev.com/get-started/) (version 1.24.0 or later), and the use of the [drupal-canvas/ddev-drupal-canvas-dev addon](https://github.com/drupal-canvas/ddev-drupal-canvas-dev).
+For joining the development process of Drupal Canvas (Canvas for short) or trying the development process, we strongly recommend the use of [DDEV](https://ddev.com/get-started/) (version 1.24.0 or later), and the use of the [drupal-canvas/ddev-drupal-xb-dev addon](https://github.com/drupal-canvas/ddev-drupal-xb-dev).
 
 ## Useful links
 1. [Issue queue](https://www.drupal.org/project/issues/canvas?categories=All)
@@ -9,16 +9,16 @@ For joining the development process of Drupal Canvas (Canvas for short) or tryin
 ## DDEV for your local environment
 
 ```shell
-# Extracted from the ddev-drupal-canvas-dev plugin
+# Extracted from the ddev-drupal-xb-dev plugin
 mkdir ~/Sites/canvas-dev
 cd ~/Sites/canvas-dev
 ddev config --project-type=drupal --php-version=8.3 --docroot=web
 # Canvas requires Drupal >= 11.2
 ddev composer create drupal/recommended-project:11.x@dev --no-install
-ddev add-on get drupal-canvas/ddev-drupal-canvas-dev
+ddev add-on get drupal-canvas/ddev-drupal-xb-dev
 # This will clone the 'canvas' repo under web/modules/contrib
-ddev canvas-setup
-ddev canvas-dev-extras
+ddev xb-setup
+ddev xb-dev-extras
 ```
 Additionally, you should add  `$settings['extension_discovery_scan_tests'] = TRUE;` to the end of the `sites/default/settings.php` file (this allows hidden modules to be installed).
 
@@ -30,7 +30,7 @@ The most common commands in the development process are:
 1. `ddev xb-site-install`: This will reinstall the site and enable a couple of commands. Very useful when you update Canvas and what to have a fresh installation.
 2. `ddev xb-ui-build`: This will build the `canvas/ui` javascript application. Required whenever you update Canvas.
 3. Tests and linting: The commands `xb-eslint`, `xb-fix`, `xb-phpcs`, `xb-phpstan` and `xb-phpunit` must be used before any commit to ensure code looks good and pass tests.
-4. More commands with `ddev | grep xb-` and in the [ddev-drupal-xb-dev repo usage](https://github.com/drupal-xb/ddev-xb-canvas-dev#usage).
+4. More commands with `ddev | grep xb-` and in the [ddev-drupal-xb-dev repo usage](https://github.com/drupal-canvas/ddev-drupal-xb-dev#usage).
 
 Tip: Use `ddev help <command>` for additional information about the command and arguments available.
 
@@ -54,22 +54,17 @@ php core/scripts/drupal recipe modules/contrib/canvas/tests/fixtures/recipes/tes
 9. If you want to run *all* tests locally: `composer require drupal/simple_oauth:^6 jangregor/phpstan-prophecy league/openapi-psr7-validator devizzent/cebe-php-openapi --dev && composer update`
 
 ### During development
-The following commands assume the recommended development details outlined above, particularly the location of the `vendor` directory. If your `vendor` directory is not adjacent to your `index.php` — if you created your environment using [`drupal/recommended-project`](https://packagist.org/packages/drupal/recommended-project), for example — you will need to adjust the command path (i.e., `../vendor` instead of `vendor`).
 
-### Usage of the commands
-#### `phpcs`
-Manually, from the Drupal project root (i.e. where `index.php` lives):
+From the Canvas project root
 ```shell
-vendor/bin/phpcs -s modules/contrib/canvas/ --standard=modules/contrib/canvas/phpcs.xml --basepath=modules/contrib/canvas
-```
-#### `phpstan`
-Manually, from the Drupal project root (i.e. where `index.php` lives):
-```shell
-php vendor/bin/phpstan analyze modules/contrib/canvas --memory-limit=256M --configuration=modules/contrib/canvas/phpstan.neon
-```
-#### OpenAPI spec
-From the Canvas project root:
-```shell
+# Validate PHP (coding standards & static analysis).
+composer run phpcs
+composer run phpstan
+
+# Canvas' back-end test. The output provides guidance on how to run a subset. Running all tests is best left to CI.
+composer run phpunit
+
+# OpenAPI linting.
 npx @redocly/cli@latest lint openapi.yml
 ```
 
@@ -98,14 +93,7 @@ You can then click (focus) outside the iFrame and tap the `V` key once more to r
 
 # Releases
 
-For now, Drupal Canvas does _not_ include the built UI in its `git` repository, because it is currently optimized
-for development.
-
-Therefore, every release must build the UI, commit the built UI, and revert it. Similar to Drupal core's releases.
-
-This has been semi-automated: use `sh scripts/tag-release.sh` to be asked what tag to create, and it'll create that tag
-in a (temporary) working directory without touching the Drupal Canvas `git` repository the command runs from. Prior
-to pushing, you'll be given the opportunity to inspect the result.
+See `docs/release-process.md`.
 
 # Frequent contributors: expert tips
 

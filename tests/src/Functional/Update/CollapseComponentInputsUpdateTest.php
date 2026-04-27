@@ -4,20 +4,25 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Functional\Update;
 
+use PHPUnit\Framework\Attributes\Group;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Entity\Pattern;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\FieldConfigInterface;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
- * @covers canvas_post_update_0004_collapse_pattern_component_inputs()
- * @covers canvas_post_update_0004_collapse_page_region_component_inputs()
- * @covers canvas_post_update_0004_collapse_content_template_component_inputs()
- * @covers canvas_post_update_0004_collapse_field_config_component_inputs()
- * @group canvas
+ * Tests Collapse Component Inputs Update.
+ *
+ * @legacy-covers \canvas_post_update_0004_collapse_pattern_component_inputs
+ * @legacy-covers \canvas_post_update_0004_collapse_page_region_component_inputs
+ * @legacy-covers \canvas_post_update_0004_collapse_content_template_component_inputs
+ * @legacy-covers \canvas_post_update_0004_collapse_field_config_component_inputs
  */
+#[RunTestsInSeparateProcesses]
+#[Group('canvas')]
 final class CollapseComponentInputsUpdateTest extends CanvasUpdatePathTestBase {
 
   use ComponentTreeItemListInstantiatorTrait;

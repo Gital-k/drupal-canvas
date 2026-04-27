@@ -10,15 +10,16 @@ import {
   selectHomepageStagedConfigExists,
   setHomepagePath,
 } from '@/features/configuration/configurationSlice';
-import useDebounce from '@/hooks/useDebounce';
 import useEditorNavigation from '@/hooks/useEditorNavigation';
+import { usePaginatedContentList } from '@/hooks/usePaginatedContentList';
 import { useSmartRedirect } from '@/hooks/useSmartRedirect';
+import { componentAndLayoutApi } from '@/services/componentAndLayout';
 import {
   useCreateContentMutation,
   useDeleteContentMutation,
-  useGetContentListQuery,
   useGetStagedConfigQuery,
   useSetStagedConfigMutation,
+  useUpdateContentMutation,
 } from '@/services/content';
 import { getCanvasSettings } from '@/utils/drupal-globals';
 
@@ -29,24 +30,22 @@ export const HOMEPAGE_CONFIG_ID = 'canvas_set_homepage';
 
 const Pages = () => {
   const { showBoundary } = useErrorBoundary();
-  const { setEditorEntity } = useEditorNavigation();
+  const { navigateToEditor } = useEditorNavigation();
   const { redirectToNextBestPage } = useSmartRedirect();
   const dispatch = useAppDispatch();
   const { entityType, entityId } = useParams();
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
   const canCreatePages =
     !!canvasSettings.contentEntityCreateOperations?.canvas_page?.canvas_page;
 
   const {
-    data: pageItems,
+    items: pageItems,
     isLoading: isPageItemsLoading,
     error: pageItemsError,
-  } = useGetContentListQuery({
-    entityType: 'canvas_page',
-    search: debouncedSearchTerm,
-  });
+    hasMore,
+    handleLoadMore,
+  } = usePaginatedContentList('canvas_page', searchTerm);
 
   const [
     createContent,
@@ -69,6 +68,8 @@ const Pages = () => {
 
   const [deleteContent, { error: deleteContentError }] =
     useDeleteContentMutation();
+  const [updateContent, { error: updateContentError }] =
+    useUpdateContentMutation();
   const [setHomepage, { error: setHomepageError }] =
     useSetStagedConfigMutation();
 
@@ -104,7 +105,35 @@ const Pages = () => {
   }
 
   function handleOnSelect(item: ContentStub) {
-    setEditorEntity('canvas_page', String(item.id));
+    navigateToEditor('canvas_page', item.id);
+  }
+
+  async function handleUnpublishPage(item: ContentStub) {
+    const pageToUnpublishId = String(item.id);
+    await updateContent({
+      entityType: 'canvas_page',
+      entityId: pageToUnpublishId,
+      status: false,
+    });
+
+    // If the current page is being unpublished, invalidate the layout cache to refetch with updated hasUnsavedStatusChange
+    if (entityType === 'canvas_page' && entityId === pageToUnpublishId) {
+      dispatch(componentAndLayoutApi.util.invalidateTags([{ type: 'Layout' }]));
+    }
+  }
+
+  async function handlePublishPage(item: ContentStub) {
+    const pageToPublishId = String(item.id);
+    await updateContent({
+      entityType: 'canvas_page',
+      entityId: pageToPublishId,
+      status: true,
+    });
+
+    // If the current page is being published, invalidate the layout cache to refetch with updated hasUnsavedStatusChange
+    if (entityType === 'canvas_page' && entityId === pageToPublishId) {
+      dispatch(componentAndLayoutApi.util.invalidateTags([{ type: 'Layout' }]));
+    }
   }
 
   function handleSetHomepage(item: ContentStub) {
@@ -138,12 +167,12 @@ const Pages = () => {
 
   useEffect(() => {
     if (isCreateContentSuccess) {
-      setEditorEntity(
+      navigateToEditor(
         createContentData.entity_type,
         createContentData.entity_id,
       );
     }
-  }, [isCreateContentSuccess, createContentData, setEditorEntity]);
+  }, [isCreateContentSuccess, createContentData, navigateToEditor]);
 
   useEffect(() => {
     if (createContentError) {
@@ -163,6 +192,12 @@ const Pages = () => {
     }
   }, [setHomepageError, showBoundary]);
 
+  useEffect(() => {
+    if (updateContentError) {
+      showBoundary(updateContentError);
+    }
+  }, [updateContentError, showBoundary]);
+
   // Determine the currently selected page
   const selectedPageId = entityType === 'canvas_page' ? entityId : undefined;
 
@@ -179,7 +214,11 @@ const Pages = () => {
       onDuplicatePage={handleDuplication}
       onSelectPage={handleOnSelect}
       onSetHomepage={handleSetHomepage}
+      onUnpublishPage={handleUnpublishPage}
+      onPublishPage={handlePublishPage}
       onSearch={setSearchTerm}
+      hasMore={hasMore}
+      onLoadMore={handleLoadMore}
     />
   );
 };

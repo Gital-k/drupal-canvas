@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Storage\ComponentTreeLoader;
 use Drupal\field\Entity\FieldStorageConfig;
@@ -12,12 +14,16 @@ use Drupal\node\Entity\Node;
 use Drupal\node\Entity\NodeType;
 use Drupal\Tests\canvas\Kernel\Traits\VfsPublicStreamUrlTrait;
 use Drupal\Tests\canvas\TestSite\CanvasTestSetup;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
- * @coversDefaultClass \Drupal\canvas\Storage\ComponentTreeLoader
+ * Tests Drupal\canvas\Storage\ComponentTreeLoader.
  *
- * @group canvas
+ * @todo Refactor this to start using CanvasKernelTestBase and stop using CanvasTestSetup in https://www.drupal.org/project/canvas/issues/3531679
  */
+#[RunTestsInSeparateProcesses]
+#[CoversClass(ComponentTreeLoader::class)]
+#[Group('canvas')]
 class ComponentTreeLoaderTest extends KernelTestBase {
 
   use VfsPublicStreamUrlTrait;
@@ -28,6 +34,7 @@ class ComponentTreeLoaderTest extends KernelTestBase {
   protected function setUp(): void {
     parent::setUp();
     $this->container->get('module_installer')->install(['system']);
+    // @todo Refactor this away in https://www.drupal.org/project/canvas/issues/3531679
     (new CanvasTestSetup())->setup();
   }
 

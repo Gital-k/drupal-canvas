@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Drupal\canvas\EventSubscriber;
 
 use Drupal\canvas\Controller\ApiAutoSaveController;
@@ -68,7 +70,7 @@ final class ApiExceptionSubscriber implements EventSubscriberInterface {
       if ($status >= 400 && $status < 500) {
         $response = match (TRUE) {
           $exception instanceof ConstraintViolationException => [
-            'errors' => array_map(
+            'errors' => \array_map(
               fn($violation) => self::violationToJsonApiStyleErrorObject($violation),
               iterator_to_array($exception->getConstraintViolationList())
             ),
@@ -87,7 +89,7 @@ final class ApiExceptionSubscriber implements EventSubscriberInterface {
       // Server-side error responses.
       // @todo Make these also use JSON:API-style error responses?
       else {
-        assert($status >= 500);
+        \assert($status >= 500);
         $response = [
           'message' => ExceptionHelper::getVerboseMessage($exception),
         ];
@@ -110,14 +112,16 @@ final class ApiExceptionSubscriber implements EventSubscriberInterface {
         }
       }
 
+      // Preserve any headers, such as `WWW-Authenticate`.
+      $headers = $exception instanceof HttpExceptionInterface ? $exception->getHeaders() : [];
       if ($exception instanceof CacheableDependencyInterface) {
         $event->setResponse(
-          (new CacheableJsonResponse($response, $status))
+          (new CacheableJsonResponse($response, $status, $headers))
             ->addCacheableDependency($exception)
         );
       }
       else {
-        $event->setResponse(new JsonResponse($response, $status));
+        $event->setResponse(new JsonResponse($response, $status, $headers));
       }
     }
   }

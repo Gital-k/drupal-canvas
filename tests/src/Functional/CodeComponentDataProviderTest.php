@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Functional;
 
+use PHPUnit\Framework\Attributes\Group;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\Component\Serialization\Json;
 use Drupal\Component\Utility\UrlHelper;
@@ -13,11 +14,14 @@ use Drupal\canvas\Entity\Page;
 use Drupal\node\Entity\Node;
 use Drupal\Tests\canvas\TestSite\CanvasTestSetup;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\DomCrawler\Crawler;
 
 /**
- * @group canvas
+ * Tests Code Component Data Provider.
  */
+#[RunTestsInSeparateProcesses]
+#[Group('canvas')]
 class CodeComponentDataProviderTest extends FunctionalTestBase {
 
   use ContribStrictConfigSchemaTestTrait;
@@ -30,9 +34,10 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
   protected $defaultTheme = 'stark';
 
   /**
-   * @covers \Drupal\canvas\CodeComponentDataProvider::getCanvasDataBrandingV0
-   * @covers \Drupal\canvas\CodeComponentDataProvider::getRequiredCanvasDataLibraries
-   * @covers \Drupal\canvas\CodeComponentDataProvider::getPartialCanvasDataFromSettingsV0
+   * Tests v 0 using drupal settings get site data.
+   *
+   * @legacy-covers \Drupal\canvas\CodeComponentDataProvider::getCanvasDataBaseUrlV0
+   * @legacy-covers \Drupal\canvas\CodeComponentDataProvider::getCanvasDataBrandingV0
    */
   public function testV0UsingDrupalSettingsGetSiteData(): void {
     $page = Page::create([
@@ -66,8 +71,48 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
   }
 
   /**
-   * @covers \Drupal\canvas\CodeComponentDataProvider::getRequiredCanvasDataLibraries
-   * @covers \Drupal\canvas\CodeComponentDataProvider::getPartialCanvasDataFromSettingsV0
+   * Tests v 0 using drupal settings get theme assets.
+   *
+   * @legacy-covers \Drupal\canvas\CodeComponentDataProvider::getCanvasDataThemeAssetsV0
+   */
+  public function testV0UsingDrupalSettingsGetThemeAssets(): void {
+    $page = Page::create([
+      'title' => 'Test page',
+      'type' => 'page',
+      'components' => [
+        [
+          'uuid' => CanvasTestSetup::UUID_COMPONENT_SDC,
+          'component_id' => 'js.canvas_test_code_components_using_drupalsettings_get_theme_assets',
+        ],
+      ],
+    ]);
+    $page->save();
+
+    $regular_user = $this->drupalCreateUser(['access content']);
+    $this->assertInstanceOf(AccountInterface::class, $regular_user);
+    $this->drupalLogin($regular_user);
+
+    $this->drupalGet($page->toUrl());
+
+    $drupalSettings = $this->getDrupalSettings();
+    $this->assertArrayHasKey(CodeComponentDataProvider::CANVAS_DATA_KEY, $drupalSettings);
+    self::assertSame([
+      'themeAssets' => [
+        'logo' => [
+          'url' => '/core/themes/stark/logo.svg',
+        ],
+        'favicon' => [
+          'url' => '/core/misc/favicon.ico',
+          'mimeType' => 'image/vnd.microsoft.icon',
+        ],
+      ],
+    ], $drupalSettings[CodeComponentDataProvider::CANVAS_DATA_KEY][CodeComponentDataProvider::V0]);
+  }
+
+  /**
+   * Tests v 0 not using drupal settings.
+   *
+   * @legacy-covers \Drupal\canvas\CodeComponentDataProvider
    */
   public function testV0NotUsingDrupalSettings(): void {
     $page = Page::create([
@@ -93,7 +138,9 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
   }
 
   /**
-   * @covers \Drupal\canvas\CodeComponentDataProvider::getCanvasDataMainEntityV0
+   * Tests get canvas data main entity v 0 on canvas page route.
+   *
+   * @legacy-covers \Drupal\canvas\CodeComponentDataProvider::getCanvasDataMainEntityV0
    */
   public function testGetCanvasDataMainEntityV0OnCanvasPageRoute(): void {
     // Create a Canvas Page entity and visit its canonical route.
@@ -127,7 +174,9 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
   }
 
   /**
-   * @covers \Drupal\canvas\CodeComponentDataProvider::getCanvasDataMainEntityV0
+   * Tests get canvas data main entity v 0 on preview entity route.
+   *
+   * @legacy-covers \Drupal\canvas\CodeComponentDataProvider::getCanvasDataMainEntityV0
    */
   public function testGetCanvasDataMainEntityV0OnPreviewEntityRoute(): void {
     // Preview route should use 'preview_entity' when present.
@@ -187,7 +236,9 @@ class CodeComponentDataProviderTest extends FunctionalTestBase {
   }
 
   /**
-   * @covers \Drupal\canvas\CodeComponentDataProvider::getCanvasDataMainEntityV0
+   * Tests get canvas data main entity v 0 on invalid canvas route.
+   *
+   * @legacy-covers \Drupal\canvas\CodeComponentDataProvider::getCanvasDataMainEntityV0
    */
   public function testGetCanvasDataMainEntityV0OnInvalidCanvasRoute(): void {
     $this->container->get('module_installer')->install(['node']);

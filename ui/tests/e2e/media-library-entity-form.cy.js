@@ -21,12 +21,6 @@ const testMediaLibraryInEntityForm = (cy, loadOptions = {}, title) => {
   ];
 
   cy.drupalLogin('canvasUser', 'canvasUser');
-  // Node 1 includes prop sources that make use of adapters, we need to
-  // make sure there are no auto-save entries for that node before we attempt
-  // to publish. This test interacts with that node in the "Can open the media
-  // library widget in an article props form" case which causes an invalid entry
-  // in auto-save that prevents publishing.
-  cy.clearAutoSave('node', 1);
 
   cy.loadURLandWaitForCanvasLoaded(loadOptions);
 
@@ -46,7 +40,7 @@ const testMediaLibraryInEntityForm = (cy, loadOptions = {}, title) => {
   iterations.forEach((step, ix) => {
     cy.log(`Iteration ${ix + 1}: start`);
     cy.findByRole('dialog').should('not.exist');
-    cy.get('@entityForm').findByRole(step.expectedAlt).should('not.exist');
+    cy.get('@entityForm').findByAltText(step.expectedAlt).should('not.exist');
     if (ix > 0) {
       cy.intercept('POST', '**/canvas/api/v0/layout/**').as('updatePreview');
       cy.get('@entityForm')
@@ -82,7 +76,6 @@ const testMediaLibraryInEntityForm = (cy, loadOptions = {}, title) => {
     cy.get('@entityForm')
       .findByRole('button', { name: step.removeAriaLabel })
       .should('exist');
-    cy.selectorShouldHaveUpdatedFormBuildId(entityFormSelector);
     cy.log(`Iteration ${ix + 1}: Adding ${step.expectedAlt} complete`);
   });
 

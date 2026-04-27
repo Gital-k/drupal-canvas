@@ -29,7 +29,7 @@ describe('Multivalue widget drag and drop', () => {
     // when they shouldn't be is a useful canary for identifying AJAX problems.
     const confirmWeightSelectCount = (count, visible = false) => {
       cy.get('@unlimited-text')
-        .get('.delta-order select')
+        .find('.delta-order select')
         .should(($selects) => {
           expect($selects).to.have.length(count);
           $selects.each((index, weightSelect) => {
@@ -121,6 +121,9 @@ describe('Multivalue widget drag and drop', () => {
     cy.get(
       '[data-drupal-selector="edit-field-cvt-unlimited-text"] tr.draggable:nth-child(3) [title="Change order"]',
     ).realDnd('input[value="Neutral Milk Hotel"]', dndDefaults);
+    // Wait for table drag AJAX to complete before asserting the new order.
+    cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
+    cy.waitForAjax();
 
     confirmTextInputs([
       'Marshmallow Coast',
@@ -172,6 +175,8 @@ describe('Multivalue widget drag and drop', () => {
     cy.get(
       '[data-drupal-selector="edit-field-cvt-unlimited-text"] tr.draggable:nth-child(4) [title="Change order"]',
     ).realDnd('input[value="Neutral Milk Hotel"]', dndDefaults);
+    cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
+    cy.waitForAjax();
     cy.get('@unlimited-text')
       .findAllByRole('textbox')
       .eq(2)
@@ -186,14 +191,16 @@ describe('Multivalue widget drag and drop', () => {
     ]);
     confirmWeightSelectCount(5);
 
-    cy.findByText('Hide row weights').should('not.exist');
-    cy.findByText('Show row weights').click();
-    cy.findByText('Hide row weights').should('exist');
+    cy.get('@unlimited-text')
+      .findByText('Hide row weights')
+      .should('not.exist');
+    cy.get('@unlimited-text').findByText('Show row weights').click();
+    cy.get('@unlimited-text').findByText('Hide row weights').should('exist');
 
     confirmWeightSelectCount(5, true);
 
     cy.get('@unlimited-text')
-      .get('[title="Change order"]')
+      .find('[title="Change order"]')
       .should(($handles) => {
         expect($handles).to.have.length(5);
         $handles.each((index, handle) => {

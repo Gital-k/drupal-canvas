@@ -4,19 +4,23 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
+use PHPUnit\Framework\Attributes\Group;
 use Drupal\Core\Render\HtmlResponse;
 use Drupal\Core\Render\RenderContext;
 use Drupal\Core\Render\RendererInterface;
 use Drupal\canvas\Controller\CanvasController;
 use Drupal\canvas\Entity\Page;
-use Drupal\KernelTests\KernelTestBase;
 use Drupal\Tests\user\Traits\UserCreationTrait;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
- * @covers \Drupal\canvas\Hook\ReduxIntegratedFieldWidgetsHooks::transformsLibraryInfoAlter()
- * @group canvas
+ * Tests Library Info Alter.
+ *
+ * @legacy-covers \Drupal\canvas\Hook\ReduxIntegratedFieldWidgetsHooks::transformsLibraryInfoAlter
  */
-final class LibraryInfoAlterTest extends KernelTestBase {
+#[RunTestsInSeparateProcesses]
+#[Group('canvas')]
+final class LibraryInfoAlterTest extends CanvasKernelTestBase {
 
   use UserCreationTrait;
 
@@ -24,15 +28,7 @@ final class LibraryInfoAlterTest extends KernelTestBase {
    * {@inheritdoc}
    */
   protected static $modules = [
-    'canvas',
-    'system',
     'canvas_test_page',
-    'media',
-    'user',
-    'image',
-    'file',
-    'path_alias',
-    'path',
   ];
 
   /**
@@ -41,12 +37,10 @@ final class LibraryInfoAlterTest extends KernelTestBase {
   protected function setUp(): void {
     parent::setUp();
     $this->installEntitySchema('user');
-    $this->installEntitySchema('path_alias');
     $this->installEntitySchema('file');
     $this->installEntitySchema('media');
+    $this->installEntitySchema('path_alias');
     $this->installEntitySchema(Page::ENTITY_TYPE_ID);
-    $this->installConfig(['system']);
-
   }
 
   /**
@@ -70,6 +64,7 @@ final class LibraryInfoAlterTest extends KernelTestBase {
       'canvas/canvas.transform.mainProperty',
       'canvas/canvas.transform.firstRecord',
       'canvas/canvas.transform.dateTime',
+      'canvas/canvas.transform.dateRange',
       'canvas/canvas.transform.mediaSelection',
       'canvas/canvas.transform.cast',
       'canvas/canvas.transform.link',

@@ -6,6 +6,8 @@ namespace Drupal\canvas;
 
 use Drupal\canvas\Access\ViewModeAccessCheck;
 use Drupal\canvas\Config\ThemeSettingsDiscovery;
+use Drupal\canvas\CoreBugFix\ConfigEntityQueryFactory;
+use Drupal\canvas\CoreBugFix\TypedConfigManagerWithCachePollutionFix;
 use Drupal\canvas\Plugin\ComponentPluginManager;
 use Drupal\Core\DefaultContent\Exporter;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
@@ -26,8 +28,8 @@ class CanvasServiceProvider extends ServiceProviderBase {
    */
   public function register(ContainerBuilder $container): void {
     $modules = $container->getParameter('container.modules');
-    assert(is_array($modules));
-    if (array_key_exists('media_library', $modules)) {
+    \assert(\is_array($modules));
+    if (\array_key_exists('media_library', $modules)) {
       $container->register('canvas.media_library.opener', MediaLibraryCanvasPropOpener::class)
         ->addArgument(new Reference(CanvasUiAccessCheck::class))
         ->addTag('media_library.opener');
@@ -82,6 +84,18 @@ class CanvasServiceProvider extends ServiceProviderBase {
         ->setDecoratedService('access_check.field_ui.view_mode');
       $container->setDefinition('canvas.access_check.field_ui.view_mode', $definition);
     }
+
+    // Alter the config entity query factory to fix a bug with sorting by
+    // multiple config entity properties.
+    // @todo Remove this once Canvas relies on a Drupal core version that includes https://www.drupal.org/i/2862699.
+    $container->getDefinition('entity.query.config')
+      ->setClass(ConfigEntityQueryFactory::class);
+
+    // Alter the typed config manager to fix a cache pollution bug.
+    // @todo Remove this once Canvas relies on a Drupal core version that includes https://www.drupal.org/i/3400181.
+    $container->getDefinition('config.typed')
+      ->setClass(TypedConfigManagerWithCachePollutionFix::class);
+
     parent::alter($container);
   }
 

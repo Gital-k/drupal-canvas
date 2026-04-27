@@ -4,37 +4,23 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
+use PHPUnit\Framework\Attributes\Group;
 use Drupal\Component\Serialization\Yaml;
+use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Asset\LibraryDiscoveryParser;
 use Drupal\Core\Extension\ExtensionPathResolver;
 use Drupal\Core\Extension\ThemeInstallerInterface;
 use Drupal\Core\Theme\ThemeInitializationInterface;
-use Drupal\KernelTests\KernelTestBase;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
- * @covers \Drupal\canvas\Hook\LibraryHooks::libraryInfoBuild()
- * @group canvas
+ * Tests Media Libraries Build.
+ *
+ * @legacy-covers \Drupal\canvas\Hook\LibraryHooks::libraryInfoBuild
  */
-final class MediaLibrariesBuildTest extends KernelTestBase {
-
-  /**
-   * {@inheritdoc}
-   */
-  protected static $modules = [
-    'canvas',
-    'block',
-    // Canvas's dependencies (modules providing field types + widgets).
-    'datetime',
-    'file',
-    'image',
-    'media',
-    'options',
-    'path',
-    'link',
-    'text',
-    'system',
-    'user',
-  ];
+#[RunTestsInSeparateProcesses]
+#[Group('canvas')]
+final class MediaLibrariesBuildTest extends CanvasKernelTestBase {
 
   /**
    * {@inheritdoc}
@@ -115,7 +101,18 @@ final class MediaLibrariesBuildTest extends KernelTestBase {
     ];
     self::assertArrayHasKey('global-styling', $parsed);
     self::assertArrayHasKey('css', $parsed['global-styling']);
-    foreach ($parsed['global-styling']['css'] as $group_id => $group) {
+
+    // Drupal Core 11.3.4 moves `variables.css` to the `claro/variables` library
+    // which its `global-styling` library depends on. This is needed to support
+    // < 11.3.4 testing.
+    $grouped_items = $parsed['global-styling']['css'];
+    if (isset($parsed['variables'])) {
+      self::assertArrayHasKey('variables', $parsed);
+      self::assertArrayHasKey('css', $parsed['variables']);
+      $grouped_items = NestedArray::mergeDeep($grouped_items, $parsed['variables']['css']);
+    }
+
+    foreach ($grouped_items as $group_id => $group) {
       $expected = \array_map(static fn (string|int $path) => \sprintf('./%s/%s', $claro_path, $path), \array_keys($group));
       $group_items = \array_filter($discovered['canvas.scoped.admin.css']['css'], static fn(array $item) => $item['weight'] === $group_css_ids[$group_id]);
       $actual = \array_column($group_items, 'data');

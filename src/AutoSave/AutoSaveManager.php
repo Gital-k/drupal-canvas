@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Drupal\canvas\AutoSave;
 
 use Drupal\canvas\Entity\ComponentTreeEntityInterface;
@@ -28,6 +30,7 @@ use Drupal\Component\Datetime\TimeInterface;
 use Drupal\canvas\AutoSaveEntity;
 use Drupal\canvas\Controller\ApiContentControllers;
 use Drupal\canvas\Entity\ContentTemplate;
+use Drupal\canvas\Entity\BrandKit;
 use Drupal\canvas\Entity\StagedConfigUpdate;
 use Drupal\canvas\Entity\CanvasHttpApiEligibleConfigEntityInterface;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
@@ -195,7 +198,7 @@ class AutoSaveManager implements EventSubscriberInterface {
       if ($entity instanceof ComponentTreeEntityInterface && $entity instanceof ConfigEntityInterface) {
         $tree = $entity->getComponentTree();
         foreach ($tree as $component) {
-          assert($component instanceof ComponentTreeItem);
+          \assert($component instanceof ComponentTreeItem);
           $component->optimizeInputs();
         }
         $entity->setComponentTree($tree->getValue());
@@ -271,7 +274,7 @@ class AutoSaveManager implements EventSubscriberInterface {
     \assert($entity->id() !== NULL);
     $savedEntity = $this->entityTypeManager->getStorage($entity->getEntityTypeId())
       ->loadUnchanged($entity->id());
-    assert($savedEntity instanceof EntityInterface);
+    \assert($savedEntity instanceof EntityInterface);
 
     // If available we must use the revision ID and the changed time because
     // not all entity types will increment the revision ID on every change.
@@ -291,7 +294,7 @@ class AutoSaveManager implements EventSubscriberInterface {
    *
    */
   private function getUnchangedHash(EntityInterface $entity): ?string {
-    assert(!is_null($entity->id()));
+    \assert(!\is_null($entity->id()));
     $original = $this->entityTypeManager->getStorage($entity->getEntityTypeId())->loadUnchanged($entity->id());
     if ($original === NULL) {
       return NULL;
@@ -369,6 +372,10 @@ class AutoSaveManager implements EventSubscriberInterface {
    * @see ::onCanvasConfigEntitySave()
    */
   public function delete(EntityInterface $entity): void {
+    $auto_save_entity = $this->getAutoSaveEntity($entity);
+    if (!$auto_save_entity->isEmpty() && $auto_save_entity->entity instanceof CanvasHttpApiEligibleConfigEntityInterface) {
+      BrandKit::clearAutoSaveFileUsage($auto_save_entity->entity, (string) $entity->id());
+    }
     $this->cacheTagsInvalidator->invalidateTags([self::CACHE_TAG]);
     $key = $this->getAutoSaveKey($entity);
     $this->autoSaveStore->delete($key);
@@ -424,7 +431,7 @@ class AutoSaveManager implements EventSubscriberInterface {
   private static function recursiveKsort(array &$array): void {
     ksort($array);
     foreach ($array as &$value) {
-      if (is_array($value)) {
+      if (\is_array($value)) {
         self::recursiveKsort($value);
       }
     }
@@ -454,16 +461,19 @@ class AutoSaveManager implements EventSubscriberInterface {
       return;
     }
     $autoSaveEntity = $autoSaveData->entity;
-    assert($autoSaveEntity instanceof CanvasHttpApiEligibleConfigEntityInterface);
+    \assert($autoSaveEntity instanceof CanvasHttpApiEligibleConfigEntityInterface);
 
     // Update the `label` and `status` keys of the config entity, if they've
     // changed.
     // @todo Consider auto-updating the auto-save entries for other config entity properties, but that will need very careful evaluation.
     $auto_save_update_needed = FALSE;
-    assert($entity->getEntityType() instanceof ConfigEntityTypeInterface);
+    \assert($entity->getEntityType() instanceof ConfigEntityTypeInterface);
     $properties_to_assess = $entity->getEntityType()->getPropertiesToExport();
-    assert(is_array($properties_to_assess));
-    $auto_save_updatable_properties = \array_intersect_key($entity->getEntityType()->getKeys(), \array_flip(['status', 'label']));
+    \assert(\is_array($properties_to_assess));
+    $auto_save_updatable_properties = \array_intersect_key(
+      $entity->getEntityType()->getKeys(),
+      \array_flip(['status', 'label']),
+    );
 
     // Ensure that no properties other than `status` and `label` were modified;
     // otherwise the auto-save entry must be deleted.
@@ -497,7 +507,7 @@ class AutoSaveManager implements EventSubscriberInterface {
     $autoSaveEntities = array_filter($autoSaveEntities, fn($entityData) => $entityData['entity'] instanceof StagedConfigUpdate);
     foreach ($autoSaveEntities as $autoSaveEntity) {
       $staged_config_update = $autoSaveEntity['entity'];
-      assert($staged_config_update instanceof StagedConfigUpdate);
+      \assert($staged_config_update instanceof StagedConfigUpdate);
       if ($staged_config_update->getTarget() === $event->getConfig()->getName()) {
         $this->delete($staged_config_update);
       }

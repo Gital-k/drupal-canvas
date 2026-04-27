@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\canvas\Plugin\Validation\Constraint;
 
@@ -48,14 +48,14 @@ final class SdcPropKeysConstraintValidator extends ConstraintValidator implement
       throw new UnexpectedTypeException($constraint, __NAMESPACE__ . '\SdcPropKeysConstraint');
     }
 
-    if (!is_array($mapping)) {
+    if (!\is_array($mapping)) {
       throw new UnexpectedValueException($mapping, 'mapping');
     }
 
     // Resolve any dynamic tokens, like %parent, in the SDC plugin ID.
     // @phpstan-ignore argument.type
     $sdc_plugin_id = TypeResolver::resolveDynamicTypeName("[$constraint->sdcPluginId]", $this->context->getObject());
-    assert(!str_contains($sdc_plugin_id, '%'));
+    \assert(!str_contains($sdc_plugin_id, '%'));
     try {
       $sdc = $this->componentPluginManager->find($sdc_plugin_id);
     }
@@ -67,13 +67,13 @@ final class SdcPropKeysConstraintValidator extends ConstraintValidator implement
 
     // Fetch the props defined in the SDC's metadata.
     $prop_shapes = GeneratedFieldExplicitInputUxComponentSourceBase::getComponentInputsForMetadata($sdc->getPluginId(), $sdc->metadata);
-    $expected_keys = array_map(
+    $expected_keys = \array_map(
       fn (string $component_prop_expression) => ComponentPropExpression::fromString($component_prop_expression)->propName,
-      array_keys($prop_shapes)
+      \array_keys($prop_shapes)
     );
 
     foreach ($expected_keys as $expected_key) {
-      if (!array_key_exists($expected_key, $mapping)) {
+      if (!\array_key_exists($expected_key, $mapping)) {
         $this->context->buildViolation($constraint->message)
           // `title` is guaranteed to exist.
           // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponentDiscovery::checkRequirements()
@@ -84,7 +84,7 @@ final class SdcPropKeysConstraintValidator extends ConstraintValidator implement
       }
     }
 
-    $extraneous_keys = array_diff(array_keys($mapping), $expected_keys);
+    $extraneous_keys = array_diff(\array_keys($mapping), $expected_keys);
     foreach ($extraneous_keys as $extra_key) {
       $this->context->buildViolation($constraint->extraneousMessage)
         ->setParameter('%prop_machine_name', $extra_key)

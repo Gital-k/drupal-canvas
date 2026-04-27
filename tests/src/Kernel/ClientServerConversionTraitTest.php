@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
+use PHPUnit\Framework\Attributes\Group;
 use Drupal\canvas\Controller\ClientServerConversionTrait;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\JavaScriptComponent;
@@ -23,12 +24,17 @@ use Drupal\Tests\canvas\Kernel\Traits\VfsPublicStreamUrlTrait;
 use Drupal\Tests\canvas\TestSite\CanvasTestSetup;
 use Drupal\Tests\canvas\Traits\CanvasFieldCreationTrait;
 use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
-use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\canvas\Traits\CanvasFieldTrait;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
+use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 
 /**
- * @group canvas
+ * Tests Client Server Conversion Trait.
+ *
+ * @todo Refactor this to start using CanvasKernelTestBase and stop using CanvasTestSetup in https://www.drupal.org/project/canvas/issues/3531679
  */
+#[RunTestsInSeparateProcesses]
+#[Group('canvas')]
 class ClientServerConversionTraitTest extends KernelTestBase {
 
   private const TOP_LEVEL_SLOT_COMPONENT_UUID = '8caf6e23-8fb4-4524-bdb6-f57a2a6e7858';
@@ -52,10 +58,10 @@ class ClientServerConversionTraitTest extends KernelTestBase {
     $json = $this->traitGetValidClientJson(NULL, $dynamic_image);
     // @see \Drupal\canvas\ClientDataToEntityConverter::convert()
     $content_region = \array_values(\array_filter($json['layout'], static fn(array $region) => $region['id'] === 'content'))[0];
-    assert(count(array_intersect(['nodeType', 'id', 'name', 'components'], array_keys($content_region))) === 4);
-    assert($content_region['nodeType'] === 'region');
-    assert($content_region['id'] === 'content');
-    assert(is_array($content_region['components']));
+    \assert(count(array_intersect(['nodeType', 'id', 'name', 'components'], \array_keys($content_region))) === 4);
+    \assert($content_region['nodeType'] === 'region');
+    \assert($content_region['id'] === 'content');
+    \assert(\is_array($content_region['components']));
     $createComponentWithSlots = fn(string $uuid, array $body_component = []) => [
       'nodeType' => 'component',
       'uuid' => $uuid,
@@ -126,6 +132,7 @@ class ClientServerConversionTraitTest extends KernelTestBase {
   public function setUp(): void {
     parent::setUp();
     $this->container->get('module_installer')->install(['system']);
+    // @todo Refactor this away in https://www.drupal.org/project/canvas/issues/3531679
     (new CanvasTestSetup())->setup();
     $this->setUpImages();
   }
@@ -144,12 +151,12 @@ class ClientServerConversionTraitTest extends KernelTestBase {
       [
         'uuid' => self::TEST_IMAGE_UUID,
         'component_id' => 'sdc.canvas_test_sdc.image',
-        'component_version' => 'abadf2538ecfdecc',
+        'component_version' => 'fb40be57bd7e0973',
       ],
       [
         'uuid' => self::TEST_BLOCK,
         'component_id' => 'block.system_branding_block',
-        'component_version' => '247a23298360adb2',
+        'component_version' => Component::load('block.system_branding_block')?->getActiveVersion(),
       ],
       [
         'uuid' => self::TOP_LEVEL_SLOT_COMPONENT_UUID,
@@ -170,7 +177,7 @@ class ClientServerConversionTraitTest extends KernelTestBase {
       'title' => '5 amazing uses for old toothbrushes',
       'field_canvas_demo' => $converted_items,
     ]);
-    $node1->validate();
+    self::assertSame([], self::violationsToArray($node1->validate()));
     $node1->save();
     // Ensure the field has been updated.
     $this->assertNodeValues(
@@ -197,12 +204,12 @@ class ClientServerConversionTraitTest extends KernelTestBase {
       [
         'uuid' => self::TEST_IMAGE_UUID,
         'component_id' => 'sdc.canvas_test_sdc.image',
-        'component_version' => 'abadf2538ecfdecc',
+        'component_version' => 'fb40be57bd7e0973',
       ],
       [
         'uuid' => self::TEST_BLOCK,
         'component_id' => 'block.system_branding_block',
-        'component_version' => '247a23298360adb2',
+        'component_version' => Component::load('block.system_branding_block')?->getActiveVersion(),
       ],
     ], \array_map(static fn (array $item) => \array_filter(\array_diff_key($item, \array_flip(['inputs']))), $converted_items));
 
@@ -258,7 +265,7 @@ class ClientServerConversionTraitTest extends KernelTestBase {
       [
         'nodeType' => 'component',
         'uuid' => '587334b5-8a05-48f5-9f48-02b5a84e7267',
-        'type' => 'block.canvas_test_block_input_none@f91f8d4aff4aba7c',
+        'type' => 'block.canvas_test_block_input_none@' . Component::load('block.canvas_test_block_input_none')?->getActiveVersion(),
         'slots' => [],
       ],
     ];
@@ -336,13 +343,13 @@ class ClientServerConversionTraitTest extends KernelTestBase {
         [
           'nodeType' => 'component',
           'uuid' => self::TEST_IMAGE_UUID,
-          'type' => 'sdc.canvas_test_sdc.image@abadf2538ecfdecc',
+          'type' => 'sdc.canvas_test_sdc.image@fb40be57bd7e0973',
           'slots' => [],
         ],
         [
           'nodeType' => 'component',
           'uuid' => self::TEST_BLOCK,
-          'type' => 'block.system_branding_block@247a23298360adb2',
+          'type' => 'block.system_branding_block@' . Component::load('block.system_branding_block')?->getActiveVersion(),
           'slots' => [],
         ],
       ],
@@ -391,7 +398,7 @@ class ClientServerConversionTraitTest extends KernelTestBase {
             'image' => [
               'value' => $this->mediaEntity->id(),
               'sourceType' => 'static:field_item:entity_reference',
-              'expression' => 'ℹ︎entity_reference␟{src↝entity␜␜entity:media:image␝field_media_image␞␟src_with_alternate_widths,alt↝entity␜␜entity:media:image␝field_media_image␞␟alt,width↝entity␜␜entity:media:image␝field_media_image␞␟width,height↝entity␜␜entity:media:image␝field_media_image␞␟height}',
+              'expression' => 'ℹ︎entity_reference␟entity␜␜entity:media:image␝field_media_image␞␟{src↠src_with_alternate_widths,alt↠alt,width↠width,height↠height}',
               'sourceTypeSettings' => [
                 'storage' => ['target_type' => 'media'],
                 'instance' => [
@@ -412,7 +419,7 @@ class ClientServerConversionTraitTest extends KernelTestBase {
               'use_site_slogan' => FALSE,
             ],
             'label' => '',
-            'label_display' => FALSE,
+            'label_display' => '0',
           ],
         ],
       ],

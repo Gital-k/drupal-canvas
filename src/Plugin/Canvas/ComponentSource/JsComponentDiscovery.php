@@ -49,14 +49,14 @@ final class JsComponentDiscovery implements ComponentCandidatesDiscoveryInterfac
     // this prefix.
     $entity_type = $this->entityTypeManager->getDefinition(Component::ENTITY_TYPE_ID);
     \assert($entity_type instanceof ConfigEntityTypeInterface);
-    $config_prefix = sprintf('%s.%s.', $entity_type->getConfigPrefix(), JsComponent::SOURCE_PLUGIN_ID);
+    $config_prefix = \sprintf('%s.%s.', $entity_type->getConfigPrefix(), JsComponent::SOURCE_PLUGIN_ID);
     $already_exposed_js_components = $this->configFactory->listAll($config_prefix);
     return array_filter(
       $js_components,
       fn (JavaScriptComponent $js_component): bool =>
         // Any code component that has once been exposed, must continue to be
         // discovered, even if its `status` changes to FALSE.
-        in_array($config_prefix . $js_component->id(), $already_exposed_js_components, TRUE)
+        \in_array($config_prefix . $js_component->id(), $already_exposed_js_components, TRUE)
         // Before exposing a JavaScriptComponent as a Canvas Component for the
         // first time it must be flagged as being added to Canvas's component
         // library.
@@ -68,7 +68,7 @@ final class JsComponentDiscovery implements ComponentCandidatesDiscoveryInterfac
    * {@inheritdoc}
    */
   public function checkRequirements(string $source_specific_id): void {
-    \assert(array_key_exists($source_specific_id, $this->discover()), $source_specific_id);
+    \assert(\array_key_exists($source_specific_id, $this->discover()), $source_specific_id);
 
     $js_component = $this->discover()[$source_specific_id];
 
@@ -92,7 +92,7 @@ final class JsComponentDiscovery implements ComponentCandidatesDiscoveryInterfac
    * {@inheritdoc}
    */
   public function computeComponentSettings(string $source_specific_id): array {
-    \assert(array_key_exists($source_specific_id, $this->discover()), $source_specific_id);
+    \assert(\array_key_exists($source_specific_id, $this->discover()), $source_specific_id);
     $js_component = $this->discover()[$source_specific_id];
     $ephemeral_sdc_component = self::buildEphemeralSdcPluginInstance($js_component);
     // @see `type: canvas.component_source_settings.sdc`
@@ -120,7 +120,7 @@ final class JsComponentDiscovery implements ComponentCandidatesDiscoveryInterfac
    * {@inheritdoc}
    */
   public function computeCurrentComponentMetadata(string $source_specific_id): array {
-    \assert(array_key_exists($source_specific_id, $this->discover()), $source_specific_id);
+    \assert(\array_key_exists($source_specific_id, $this->discover()), $source_specific_id);
     $js_component = $this->discover()[$source_specific_id];
     return [
       'label' => (string) $js_component->label(),

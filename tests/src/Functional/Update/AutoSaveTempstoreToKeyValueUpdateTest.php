@@ -4,18 +4,21 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Functional\Update;
 
+use PHPUnit\Framework\Attributes\Group;
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\Entity\Page;
 use Drupal\Core\KeyValueStore\KeyValueFactoryInterface;
 use Symfony\Component\Validator\ConstraintViolation;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\Validator\ConstraintViolationList;
 
 /**
  * Tests migration of auto-save data from tempstore to key-value store.
  *
- * @covers canvas_post_update_0010_migrate_auto_save()
- * @group canvas
+ * @legacy-covers \canvas_post_update_0010_migrate_auto_save
  */
+#[RunTestsInSeparateProcesses]
+#[Group('canvas')]
 final class AutoSaveTempstoreToKeyValueUpdateTest extends CanvasUpdatePathTestBase {
 
   protected $defaultTheme = 'stark';

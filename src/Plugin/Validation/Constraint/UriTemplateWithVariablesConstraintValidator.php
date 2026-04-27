@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\canvas\Plugin\Validation\Constraint;
 
@@ -28,11 +28,11 @@ final class UriTemplateWithVariablesConstraintValidator extends ConstraintValida
     if ($value === NULL) {
       return;
     }
-    elseif (!is_string($value)) {
+    elseif (!\is_string($value)) {
       throw new UnexpectedValueException($value, 'string');
     }
 
-    $expected_placeholders = array_map(fn (string $name): string => "{$name}", $constraint->requiredVariables);
+    $expected_placeholders = \array_map(fn (string $name): string => "{$name}", $constraint->requiredVariables);
 
     foreach ($expected_placeholders as $required_placeholder) {
       if (!str_contains($value, $required_placeholder)) {

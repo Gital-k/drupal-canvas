@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Controller;
 
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Drupal\Core\Http\Exception\CacheableAccessDeniedHttpException;
 use Drupal\Core\Url;
 use Drupal\canvas\AutoSave\AutoSaveManager;
@@ -15,20 +17,21 @@ use Drupal\canvas\Entity\Pattern;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\canvas\Entity\Folder;
-use Drupal\KernelTests\KernelTestBase;
 use Drupal\node\Entity\NodeType;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Kernel\Traits\PageTrait;
 use Drupal\Tests\canvas\Kernel\Traits\RequestTrait;
 use Drupal\Tests\canvas\Kernel\Traits\CanvasUiAssertionsTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
  * Tests the Drupal Canvas UI mount for various entity types.
- *
- * @group canvas
  */
-final class CanvasControllerTest extends KernelTestBase {
+#[RunTestsInSeparateProcesses]
+#[Group('canvas')]
+final class CanvasControllerTest extends CanvasKernelTestBase {
 
   use PageTrait;
   use RequestTrait;
@@ -39,30 +42,15 @@ final class CanvasControllerTest extends KernelTestBase {
    * {@inheritdoc}
    */
   protected static $modules = [
-    'canvas',
     'canvas_test_page',
     'entity_test',
     'canvas_entity_test',
-    ...self::PAGE_TEST_MODULES,
-    'block',
     'node',
-    // Canvas's dependencies (modules providing field types + widgets).
-    'datetime',
-    'file',
-    'image',
-    'media',
-    'options',
-    'path',
-    'link',
-    'text',
-    'system',
-    'user',
+    ...self::PAGE_TEST_MODULES,
   ];
 
   protected function setUp(): void {
     parent::setUp();
-    // Needed for date formats.
-    $this->installConfig(['system']);
     $this->installConfig(['node']);
     $this->installEntitySchema('path_alias');
     $this->installEntitySchema('node_type');
@@ -95,10 +83,9 @@ final class CanvasControllerTest extends KernelTestBase {
    *   The values.
    * @param null|string $expected_exception_message
    *   Consider removing in https://www.drupal.org/i/3498525.
-   *
-   * @dataProvider entityData
    */
-  public function testController(string $entity_type, array $permissions, array $values, ?string $expected_exception_message = NULL): void {
+  #[DataProvider('entityData')]
+  public function testController(string $entity_type, array $permissions, array $values, ?string $expected_exception_message): void {
     $this->installEntitySchema($entity_type);
 
     $this->setUpCurrentUser([], $permissions);
@@ -148,6 +135,7 @@ final class CanvasControllerTest extends KernelTestBase {
           'description' => 'This is a test page.',
           'components' => [],
         ],
+        NULL,
       ],
       'entity_test' => [
         'entity_test',
@@ -167,9 +155,8 @@ final class CanvasControllerTest extends KernelTestBase {
    *   The permissions.
    * @param array $expectedPermissionFlags
    *   The expected flags.
-   *
-   * @dataProvider permissionsData
    */
+  #[DataProvider('permissionsData')]
   public function testControllerExposedPermissions(array $permissions, array $expectedPermissionFlags): void {
     $this->installEntitySchema(Page::ENTITY_TYPE_ID);
 
@@ -217,6 +204,7 @@ final class CanvasControllerTest extends KernelTestBase {
         [
           'globalRegions' => FALSE,
           'patterns' => FALSE,
+          'brandKit' => FALSE,
           'codeComponents' => FALSE,
           'contentTemplates' => FALSE,
           'publishChanges' => FALSE,
@@ -232,6 +220,7 @@ final class CanvasControllerTest extends KernelTestBase {
         [
           'globalRegions' => FALSE,
           'patterns' => FALSE,
+          'brandKit' => FALSE,
           'codeComponents' => TRUE,
           'contentTemplates' => FALSE,
           'publishChanges' => TRUE,
@@ -247,6 +236,7 @@ final class CanvasControllerTest extends KernelTestBase {
         [
           'globalRegions' => TRUE,
           'patterns' => TRUE,
+          'brandKit' => FALSE,
           'codeComponents' => FALSE,
           'contentTemplates' => FALSE,
           'publishChanges' => FALSE,
@@ -263,6 +253,7 @@ final class CanvasControllerTest extends KernelTestBase {
         [
           'globalRegions' => TRUE,
           'patterns' => TRUE,
+          'brandKit' => FALSE,
           'codeComponents' => TRUE,
           'contentTemplates' => FALSE,
           'publishChanges' => FALSE,
@@ -282,6 +273,7 @@ final class CanvasControllerTest extends KernelTestBase {
         [
           'globalRegions' => TRUE,
           'patterns' => TRUE,
+          'brandKit' => FALSE,
           'codeComponents' => TRUE,
           'contentTemplates' => TRUE,
           'publishChanges' => TRUE,
@@ -298,9 +290,8 @@ final class CanvasControllerTest extends KernelTestBase {
    *   The permissions.
    * @param array $expectedCreateOperations
    *   The expected create operations array.
-   *
-   * @dataProvider createOperationsData
    */
+  #[DataProvider('createOperationsData')]
   public function testControllerExposedContentEntityCreateOperations(array $permissions, array $expectedCreateOperations): void {
     $this->installEntitySchema(Page::ENTITY_TYPE_ID);
 
@@ -369,9 +360,8 @@ final class CanvasControllerTest extends KernelTestBase {
    *   The modules to enable.
    * @param array $expectedFeatureFlags
    *   The expected feature flags values.
-   *
-   * @dataProvider featureFlagsData
    */
+  #[DataProvider('featureFlagsData')]
   public function testControllerExposedFeatureFlags(array $modules, array $expectedFeatureFlags): void {
     $this->installEntitySchema(Page::ENTITY_TYPE_ID);
     $permissions = [

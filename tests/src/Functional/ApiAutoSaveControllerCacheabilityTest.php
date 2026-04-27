@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Functional;
 
+use PHPUnit\Framework\Attributes\CoversClass;
+use Drupal\canvas\Controller\ApiAutoSaveController;
+use PHPUnit\Framework\Attributes\Group;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Url;
 use Drupal\dynamic_page_cache\EventSubscriber\DynamicPageCacheSubscriber;
@@ -14,6 +17,7 @@ use Drupal\Tests\ApiRequestTrait;
 use Drupal\Tests\canvas\TestSite\CanvasTestSetup;
 use Drupal\Tests\canvas\Traits\CanvasFieldTrait;
 use GuzzleHttp\RequestOptions;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -23,9 +27,10 @@ use Symfony\Component\HttpFoundation\Response;
  * prevents caching as the request is seen as coming from the command line.
  *
  * @see \Drupal\Core\PageCache\RequestPolicy\CommandLineOrUnsafeMethod
- * @coversDefaultClass \Drupal\canvas\Controller\ApiAutoSaveController
- * @group canvas
  */
+#[RunTestsInSeparateProcesses]
+#[CoversClass(ApiAutoSaveController::class)]
+#[Group('canvas')]
 final class ApiAutoSaveControllerCacheabilityTest extends FunctionalTestBase {
 
   use ApiRequestTrait;
@@ -49,6 +54,7 @@ final class ApiAutoSaveControllerCacheabilityTest extends FunctionalTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
+    // @todo Refactor this away in https://www.drupal.org/project/canvas/issues/3531679
     (new CanvasTestSetup())->setup();
     $this->setUpImages();
   }
@@ -97,7 +103,7 @@ final class ApiAutoSaveControllerCacheabilityTest extends FunctionalTestBase {
         RequestOptions::HEADERS => ['X-CSRF-Token' => $token],
       ]
     );
-    self::assertEquals(Response::HTTP_OK, $response->getStatusCode());
+    self::assertEquals(Response::HTTP_OK, $response->getStatusCode(), (string) $response->getBody());
 
     // Now the cache should be invalidated and we should get a MISS.
     $this->drupalGet($url);

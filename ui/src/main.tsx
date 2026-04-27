@@ -20,6 +20,7 @@ import type { FC, ReactHTMLElement } from 'react';
 import type { EnhancedStore } from '@reduxjs/toolkit';
 import type { AppConfiguration } from '@/features/configuration/configurationSlice';
 
+import 'allotment/dist/style.css';
 import '@/styles/radix-themes';
 import '@/styles/index.css';
 
@@ -235,7 +236,7 @@ if (container) {
     const updates = updatedInputs
       .map((el) => {
         // For each element, parse out its attributes. These are JSON sent by
-        // the canvas_stark.theme with the semi_coupled theme engine.
+        // the canvas_stark.theme.
         return JSON.parse(el.getAttribute('attributes') || '{}');
       })
       // Build a key-value pair of input names and values.

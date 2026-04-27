@@ -104,7 +104,7 @@ final class EditComponentJs extends FunctionCallBase implements ExecutableFuncti
       $transformed_props = [];
       $required_props = [];
       $explicitly_marked_required_props = [];
-      if (is_array($props_array)) {
+      if (\is_array($props_array)) {
         foreach ($props_array as $prop) {
           if (!empty($prop['id']) && !empty($prop['name']) && !empty($prop['type']) && !empty($prop['example'])) {
             $transformed = [
@@ -172,14 +172,16 @@ final class EditComponentJs extends FunctionCallBase implements ExecutableFuncti
       $this->logger->error($e->getMessage());
       // \Drupal\canvas_ai\Controller\CanvasBuilder::render() also YAML parsable output.
       // @see \Drupal\canvas_ai\Controller\CanvasBuilder::render()
-      $this->setOutput(Yaml::dump(['error' => sprintf('Failed to process Javascript component data: %s', $e->getMessage())], 10, 2));
+      $this->setOutput(Yaml::dump(['error' => \sprintf('Failed to process Javascript component data: %s', $e->getMessage())], 10, 2));
       return;
     }
-    $this->setStructuredOutput([
+    $output = [
       'js_structure' => $js,
       'props_metadata' => Json::encode($transformed_props),
       'required_props' => $required_props,
-    ]);
+    ];
+    $this->setStructuredOutput($output);
+    $this->setOutput('Component with id "' . $machine_name . '" has been successfully updated.');
   }
 
 }

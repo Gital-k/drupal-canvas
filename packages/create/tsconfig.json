@@ -1,12 +1,4 @@
 {
-  "compilerOptions": {
-    "target": "esnext",
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
-    "strict": true,
-    "resolveJsonModule": true,
-    "esModuleInterop": true,
-    "skipLibCheck": false
-  },
-  "exclude": ["dist"]
+  "extends": "../../tsconfig.json",
+  "exclude": ["dist", "node_modules"]
 }

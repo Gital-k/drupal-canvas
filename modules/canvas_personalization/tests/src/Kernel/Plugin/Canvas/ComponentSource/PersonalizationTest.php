@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas_personalization\Kernel\Plugin\Canvas\ComponentSource;
 
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\Depends;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Drupal\canvas\ComponentSource\ComponentSourceWithSlotsInterface;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Render\BubbleableMetadata;
@@ -11,12 +15,7 @@ use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ComponentInterface;
 use Drupal\Tests\canvas\Kernel\BrokenPluginManagerInterface;
 use Drupal\Tests\canvas\Kernel\Plugin\Canvas\ComponentSource\ComponentSourceTestBase;
-use Drupal\Tests\canvas\Kernel\Traits\CiModulePathTrait;
-use Drupal\Tests\canvas\Traits\ConstraintViolationsTestTrait;
 use Drupal\Tests\canvas\Traits\SingleDirectoryComponentTreeTestTrait;
-use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
-use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
-use Drupal\Tests\canvas\Traits\CrawlerTrait;
 use Drupal\Tests\media\Traits\MediaTypeCreationTrait;
 use Drupal\Tests\node\Traits\ContentTypeCreationTrait;
 use Drupal\Tests\TestFileCreationTrait;
@@ -24,18 +23,15 @@ use Drupal\canvas_personalization\Entity\Segment;
 use Drupal\canvas_personalization\Plugin\Canvas\ComponentSource\Personalization;
 
 /**
- * @coversDefaultClass \Drupal\canvas_personalization\Plugin\Canvas\ComponentSource\Personalization
- * @group canvas_personalization
+ * Tests Drupal\canvas_personalization\Plugin\Canvas\ComponentSource\Personalization.
+ *
  * @phpstan-import-type ComponentConfigEntityId from \Drupal\canvas\Entity\Component
  */
+#[CoversClass(Personalization::class)]
+#[Group('canvas_personalization')]
 final class PersonalizationTest extends ComponentSourceTestBase {
 
-  use ConstraintViolationsTestTrait;
-  use ContribStrictConfigSchemaTestTrait;
   use SingleDirectoryComponentTreeTestTrait;
-  use GenerateComponentConfigTrait;
-  use CiModulePathTrait;
-  use CrawlerTrait;
   use MediaTypeCreationTrait;
   use TestFileCreationTrait;
   use ContentTypeCreationTrait;
@@ -45,14 +41,8 @@ final class PersonalizationTest extends ComponentSourceTestBase {
    */
   protected static $modules = [
     'canvas_personalization',
-    'canvas_test_sdc',
-    'image',
-    'media',
     'node',
-    'path',
-    'user',
     'field',
-    'text',
     // @todo Remove once ComponentSourceInterface is a public API, i.e. after https://www.drupal.org/i/3520484#stable is done.
     'canvas_dev_mode',
   ];
@@ -64,7 +54,7 @@ final class PersonalizationTest extends ComponentSourceTestBase {
    * @see modules/canvas_personalization/config/install/canvas.component.p13n.case.yml
    * @see modules/canvas_personalization/config/install/canvas.component.p13n.switch.yml
    */
-  protected int $expectedDefaultComponentInstallCount = 2;
+  protected int $expectedDefaultComponentInstallCount = parent::DEFAULT_COMPONENT_INSTALL_COUNT + 2;
 
   /**
    * Setup tests.
@@ -85,7 +75,7 @@ final class PersonalizationTest extends ComponentSourceTestBase {
   /**
    * Test our case and switch personalization Components are installed.
    *
-   * @covers ::checkRequirements()
+   * @legacy-covers ::checkRequirements
    */
   public function testDiscovery(): array {
     $provided_components = [
@@ -104,9 +94,8 @@ final class PersonalizationTest extends ComponentSourceTestBase {
 
   /**
    * Tests settings for the personalization components.
-   *
-   * @depends testDiscovery
    */
+  #[Depends('testDiscovery')]
   public function testSettings(array $component_ids): void {
     $settings = $this->getAllSettings($component_ids);
     self::assertSame(self::getExpectedSettings(), $settings);
@@ -117,9 +106,9 @@ final class PersonalizationTest extends ComponentSourceTestBase {
    *
    * @param array<ComponentConfigEntityId> $component_ids
    *
-   * @covers ::getReferencedPluginClass()
-   * @depends testDiscovery
+   * @legacy-covers ::getReferencedPluginClass
    */
+  #[Depends('testDiscovery')]
   public function testGetReferencedPluginClass(array $component_ids): void {
     self::assertSame(
       // No personalization components define a plugin class.
@@ -133,9 +122,9 @@ final class PersonalizationTest extends ComponentSourceTestBase {
    *
    * @param array<ComponentConfigEntityId> $component_ids
    *
-   * @covers ::renderComponent()
-   * @depends testDiscovery
+   * @legacy-covers ::renderComponent
    */
+  #[Depends('testDiscovery')]
   public function testRenderComponentLive(array $component_ids): void {
     $this->assertNotEmpty($component_ids);
 
@@ -186,9 +175,9 @@ HTML,
    *
    * @param array<ComponentConfigEntityId> $component_ids
    *
-   * @covers ::renderComponent()
-   * @depends testDiscovery
+   * @legacy-covers ::renderComponent
    */
+  #[Depends('testDiscovery')]
   public function testRenderComponentPreview(array $component_ids): void {
     $this->assertNotEmpty($component_ids);
 
@@ -233,7 +222,7 @@ HTML,
 
     $rendered = [];
     foreach ($this->componentStorage->loadMultiple($component_ids) as $component_id => $component) {
-      assert($component instanceof ComponentInterface);
+      \assert($component instanceof ComponentInterface);
       $source = $component->getComponentSource();
       \assert($source instanceof ComponentSourceWithSlotsInterface);
       $build = $source->renderComponent(
@@ -246,7 +235,7 @@ HTML,
       $html = (string) $this->renderer->renderInIsolation($build);
       // Strip trailing whitespace to make heredocs easier to write.
       $html = preg_replace('/ +$/m', '', $html);
-      assert(is_string($html));
+      \assert(\is_string($html));
       // Make it easier to write expectations containing root-relative URLs
       // pointing somewhere into the site-specific directory.
       $html = str_replace(base_path() . $this->siteDirectory, '::SITE_DIR_BASE_URL::', $html);
@@ -394,9 +383,11 @@ HTML,
   }
 
   /**
-   * @covers ::calculateDependencies()
-   * @depends testDiscovery
+   * Tests calculate dependencies.
+   *
+   * @legacy-covers ::calculateDependencies
    */
+  #[Depends('testDiscovery')]
   public function testCalculateDependencies(array $component_ids): void {
     self::assertSame([
       'p13n.case' => [
@@ -449,10 +440,12 @@ HTML,
   }
 
   /**
-   * @covers ::inputToClientModel()
-   * @covers ::clientModelToInput()
-   * @dataProvider explicitsInputsProvider
+   * Tests input to client model.
+   *
+   * @legacy-covers ::inputToClientModel
+   * @legacy-covers ::clientModelToInput
    */
+  #[DataProvider('explicitsInputsProvider')]
   public function testInputToClientModel(string $component_id, array $explicit_input): void {
     $this->generateComponentConfig();
 
@@ -548,6 +541,88 @@ HTML,
 
   protected function getExpectedVerboseErrorMessage(): string {
     return '';
+  }
+
+  public static function providerSymmetricallyTranslatableComponentInstanceScenarios(string $host_entity_type_id): \Generator {
+    yield 'p13n.case' => [
+      'p13n.case',
+      [
+        'variant_id' => Personalization::POC_ONLY_HARDCODED_VARIANTS_HALLOWEEN,
+        'segments' => [
+          'halloween',
+          Segment::DEFAULT_ID,
+        ],
+      ],
+      // Defaults to fallback, so nothing is translatable.
+      // @see \Drupal\canvas\ComponentSource\FallbackComponentInstanceInputsConfigSchemaGenerator
+      [],
+    ];
+    yield 'p13n.switch' => [
+      'p13n.switch',
+      [
+        'variants' => [Personalization::POC_ONLY_HARDCODED_VARIANTS_HALLOWEEN],
+      ],
+      // Defaults to fallback, so nothing is translatable.
+      // @see \Drupal\canvas\ComponentSource\FallbackComponentInstanceInputsConfigSchemaGenerator
+      [],
+    ];
+  }
+
+  public static function providerResolvedComponentInputs(): \Generator {
+    yield 'p13n case' => [
+      'p13n.case',
+      [
+        'variant_id' => 'my_variation',
+        'segments' => [
+          'andalusian_visitors',
+          'halloween',
+          Segment::DEFAULT_ID,
+        ],
+      ],
+      [
+        'variant_id' => 'my_variation',
+        'segments' => [
+          'andalusian_visitors',
+          'halloween',
+          Segment::DEFAULT_ID,
+        ],
+      ],
+    ];
+    yield 'p13n switch' => [
+      'p13n.switch',
+      [
+        'variants' => [
+          'my_variation' => [
+            'label' => 'My variation',
+            'segments' => [
+              'andalusian_visitors',
+            ],
+          ],
+          'default' => [
+            'label' => 'Default',
+            'segments' => [
+              Segment::DEFAULT_ID,
+            ],
+          ],
+        ],
+      ],
+      [
+        'variants' => [
+          'my_variation' => [
+            'label' => 'My variation',
+            'segments' => [
+              'andalusian_visitors',
+            ],
+          ],
+          'default' => [
+            'label' => 'Default',
+            'segments' => [
+              Segment::DEFAULT_ID,
+            ],
+          ],
+        ],
+      ],
+    ];
   }
 
 }

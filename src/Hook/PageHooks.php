@@ -100,7 +100,7 @@ final class PageHooks {
         // path.
         return AccessResult::neutral();
       }
-      if (in_array($homepage, $paths, TRUE)) {
+      if (\in_array($homepage, $paths, TRUE)) {
         return AccessResult::forbidden()
           ->addCacheableDependency($system_config)
           ->addCacheableDependency($entity)
@@ -124,7 +124,7 @@ final class PageHooks {
   public function ensurePathautoSkipped(Page $page): void {
     if ($this->moduleHandler->moduleExists('pathauto')) {
       $pathauto_item = $page->get('path')->first();
-      assert($pathauto_item instanceof PathautoItem);
+      \assert($pathauto_item instanceof PathautoItem);
       $pathauto_item->set('pathauto', PathautoState::SKIP);
     }
   }

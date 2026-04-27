@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas_personalization\Kernel;
 
+use PHPUnit\Framework\Attributes\Group;
 use Drupal\Core\Recipe\Recipe;
 use Drupal\Core\Recipe\RecipeRunner;
 use Drupal\Core\Render\HtmlResponse;
@@ -14,16 +15,21 @@ use Drupal\Tests\canvas\Kernel\Traits\RequestTrait;
 use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
 use Drupal\Tests\canvas\Traits\CrawlerTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
+ * @legacy-covers \Drupal\canvas\EventSubscriber\RecipeSubscriber
  * @see \Drupal\Tests\canvas\Kernel\ApiAutoSaveControllerTest
- * @group canvas
- * @group canvas_personalization
- * @covers \Drupal\canvas\EventSubscriber\RecipeSubscriber
+ *
+ * Note this cannot use CanvasKernelTestBase because that would pre-install the
+ * Canvas module: this test is installing Canvas via a recipe.
  */
+#[Group('canvas')]
+#[Group('canvas_personalization')]
+#[RunTestsInSeparateProcesses]
 final class PersonalizationTest extends KernelTestBase {
 
   use ContribStrictConfigSchemaTestTrait;
@@ -55,14 +61,14 @@ final class PersonalizationTest extends KernelTestBase {
     $response = $this->makeHtmlRequest('/');
     $this->assertHtmlResponseCacheability($response);
     $contents = $response->getContent();
-    assert(is_string($contents));
+    \assert(\is_string($contents));
     $crawler = new Crawler($contents);
     self::assertCount(1, $crawler->filter('h1.my-hero__heading:contains("Best bikes in the market")'));
 
     $response = $this->makeHtmlRequest('/?utm_campaign=HALLOWEEN');
     $this->assertHtmlResponseCacheability($response);
     $contents = $response->getContent();
-    assert(is_string($contents));
+    \assert(\is_string($contents));
     $crawler = new Crawler($contents);
     self::assertCount(1, $crawler->filter('h1.my-hero__heading:contains("Halloween season is here")'));
   }

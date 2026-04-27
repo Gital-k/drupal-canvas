@@ -4,19 +4,27 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Functional\Config;
 
+use Drupal\Tests\canvas\Traits\DataProviderWithComponentTreeTrait;
+use PHPUnit\Framework\Attributes\Group;
+use Drupal\canvas\PropSource\PropSource;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\Tests\canvas\Functional\FunctionalTestBase;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
- * @covers \Drupal\canvas\Entity\ContentTemplate::onDependencyRemoval
+ * Tests Content Template On Dependency Removal.
  *
- * @group canvas
+ * @legacy-covers \Drupal\canvas\Entity\ContentTemplate::onDependencyRemoval
  */
+#[RunTestsInSeparateProcesses]
+#[Group('canvas')]
 final class ContentTemplateOnDependencyRemovalTest extends FunctionalTestBase {
+
+  use DataProviderWithComponentTreeTrait;
 
   /**
    * {@inheritdoc}
@@ -109,13 +117,14 @@ final class ContentTemplateOnDependencyRemovalTest extends FunctionalTestBase {
       'content_entity_type_id' => 'node',
       'content_entity_type_bundle' => 'article',
       'content_entity_type_view_mode' => 'full',
-      'component_tree' => [
+      'component_tree' => self::populateActiveComponentVersionPlaceholders([
         [
           'uuid' => '02b766f7-0edc-4359-98bb-3f489e878330',
           'component_id' => 'sdc.canvas_test_sdc.props-no-slots',
+          'component_version' => '::ACTIVE_VERSION_IN_SUT::',
           'inputs' => [
             'heading' => [
-              'sourceType' => 'dynamic',
+              'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:node:article␝field_motto␞␟value',
             ],
           ],
@@ -123,19 +132,20 @@ final class ContentTemplateOnDependencyRemovalTest extends FunctionalTestBase {
         [
           'uuid' => '4ca2cb2e-f9ac-40e5-83be-0f2d08b455b3',
           'component_id' => 'sdc.canvas_test_sdc.my-cta',
+          'component_version' => '::ACTIVE_VERSION_IN_SUT::',
           'inputs' => [
             'text' => [
-              'sourceType' => 'dynamic',
+              'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:node:article␝field_slogan␞␟value',
             ],
             'href' => [
-              'sourceType' => 'dynamic',
+              'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:node:article␝field_more_info␞␟uri',
             ],
             'target' => '_blank',
           ],
         ],
-      ],
+      ]),
     ]);
     $template->setStatus(TRUE)->save();
     // All fields should be hard dependencies of the template.
@@ -165,7 +175,7 @@ final class ContentTemplateOnDependencyRemovalTest extends FunctionalTestBase {
     // Log in with permission to administer fields, and go delete one of the
     // fields in use by the template.
     $account = $this->drupalCreateUser(['administer node fields']);
-    assert($account instanceof AccountInterface);
+    \assert($account instanceof AccountInterface);
     $this->drupalLogin($account);
     $this->drupalGet('/admin/structure/types/manage/article/fields/node.article.field_slogan/delete');
     // The template should be among the things being updated, but nothing should
@@ -203,9 +213,9 @@ final class ContentTemplateOnDependencyRemovalTest extends FunctionalTestBase {
     // The template does not depend on the module that is about to be
     // uninstalled, but it does depend on the field instance that depends on it.
     $content_template = ContentTemplate::load('node.article.full');
-    assert($content_template instanceof ContentTemplate);
+    \assert($content_template instanceof ContentTemplate);
     $slogan_field = FieldConfig::load('node.article.field_slogan');
-    assert($slogan_field instanceof FieldConfig);
+    \assert($slogan_field instanceof FieldConfig);
     self::assertNotContains('entity_test', $content_template->getDependencies()['module']);
     self::assertContains($slogan_field->getConfigDependencyName(), $content_template->getDependencies()['config']);
     self::assertContains('entity_test', $slogan_field->getDependencies()['module']);
@@ -227,7 +237,7 @@ final class ContentTemplateOnDependencyRemovalTest extends FunctionalTestBase {
     // entity_test module (which provides the single_internal_property_test
     // field type) cannot be uninstalled.
     $account = $this->drupalCreateUser(['administer modules']);
-    assert($account instanceof AccountInterface);
+    \assert($account instanceof AccountInterface);
     $this->drupalLogin($account);
     $this->drupalGet('/admin/modules/uninstall');
     $assert_session->elementAttributeExists('named', ['field', 'Entity CRUD test module'], 'disabled');

@@ -8,7 +8,7 @@ use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 
 #[Adapter(
-  id: 'day_count',
+  id: self::PLUGIN_ID,
   label: new TranslatableMarkup('Count days'),
   inputs: [
     'oldest' => ['type' => 'string', 'format' => 'date'],
@@ -19,6 +19,7 @@ use Drupal\Core\StringTranslation\TranslatableMarkup;
 )]
 final class DayCountAdapter extends AdapterBase {
 
+  public const string PLUGIN_ID = 'day_count';
   protected string $oldest;
   protected ?string $newest = NULL;
 
@@ -30,7 +31,7 @@ final class DayCountAdapter extends AdapterBase {
       : new \DateTimeImmutable("now", $utc);
     // Note: $oldest and $newest are already guaranteed to be valid, so this
     // assertion exists only to satisfy PHPStan.
-    assert($oldest !== FALSE && $newest !== FALSE);
+    \assert($oldest !== FALSE && $newest !== FALSE);
     return new EvaluationResult($newest->diff($oldest)->days);
   }
 

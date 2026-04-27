@@ -4,25 +4,30 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Config;
 
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\TestWith;
+use Drupal\canvas\Entity\Component;
+use Drupal\canvas\PropSource\PropSource;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\EntityHandlers\ContentTemplateAwareViewBuilder;
-use Drupal\KernelTests\KernelTestBase;
 use Drupal\node\Entity\Node;
 use Drupal\node\Entity\NodeType;
-use Drupal\Tests\canvas\Traits\ContribStrictConfigSchemaTestTrait;
+use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\node\Traits\ContentTypeCreationTrait;
-use Symfony\Component\Validator\ConstraintViolationInterface;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
- * @coversDefaultClass \Drupal\canvas\Entity\ContentTemplate
- * @group canvas
+ * Tests Drupal\canvas\Entity\ContentTemplate.
  */
-final class ContentTemplateTest extends KernelTestBase {
+#[RunTestsInSeparateProcesses]
+#[CoversClass(ContentTemplate::class)]
+#[Group('canvas')]
+final class ContentTemplateTest extends CanvasKernelTestBase {
 
-  use ContribStrictConfigSchemaTestTrait;
   use ContentTypeCreationTrait;
   use GenerateComponentConfigTrait;
 
@@ -30,28 +35,8 @@ final class ContentTemplateTest extends KernelTestBase {
    * {@inheritdoc}
    */
   protected static $modules = [
-    // The two only modules Drupal truly requires.
-    'system',
-    'user',
-    // The module being tested.
-    'canvas',
-    // The content entity type being tested plus bundle fields.
     'node',
     'field',
-    'text',
-    // Test components.
-    'canvas_test_sdc',
-    'block',
-    // Field types used by test components.
-    'media',
-    'image',
-    'link',
-    'file',
-    'options',
-    'filter',
-    'ckeditor5',
-    'editor',
-    'datetime',
   ];
 
   /**
@@ -59,16 +44,18 @@ final class ContentTemplateTest extends KernelTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
+    $this->installEntitySchema('path_alias');
     $this->installConfig(['node', 'user']);
     NodeType::create(['type' => 'helpful', 'name' => 'Helpful'])->save();
   }
 
   /**
-   * @covers ::label
+   * Tests label.
    *
-   * @testWith ["node.helpful.full", "Helpful content items — Full content view"]
-   *           ["user.user.compact", "Users — Compact view"]
+   * @legacy-covers ::label
    */
+  #[TestWith(["node.helpful.full", "Helpful content items — Full content view"])]
+  #[TestWith(["user.user.compact", "Users — Compact view"])]
   public function testLabel(string $id, string $expected_label): void {
     [$entity_type_id, $bundle, $view_mode] = explode('.', $id, 3);
 
@@ -82,31 +69,32 @@ final class ContentTemplateTest extends KernelTestBase {
   }
 
   /**
-   * @covers \Drupal\canvas\Hook\ContentTemplateHooks::entityTypeAlter()
+   * Tests only content entities can use templates.
+   *
+   * @legacy-covers \Drupal\canvas\Hook\ContentTemplateHooks::entityTypeAlter
    */
   public function testOnlyContentEntitiesCanUseTemplates(): void {
     $manager = \Drupal::entityTypeManager();
     $definition = $manager->getDefinition('node');
-    assert($definition instanceof EntityTypeInterface);
+    \assert($definition instanceof EntityTypeInterface);
     $this->assertTrue($definition->hasHandlerClass(ContentTemplateAwareViewBuilder::DECORATED_HANDLER_KEY));
     $this->assertSame(ContentTemplateAwareViewBuilder::class, $definition->getViewBuilderClass());
 
     // Config entities have no view builder and Canvas doesn't touch them.
     $definition = $manager->getDefinition('user_role');
-    assert($definition instanceof EntityTypeInterface);
+    \assert($definition instanceof EntityTypeInterface);
     $this->assertFalse($definition->hasViewBuilderClass());
     $this->assertFalse($definition->hasHandlerClass(ContentTemplateAwareViewBuilder::DECORATED_HANDLER_KEY));
 
     // Canvas pages are left alone despite being content entities.
     $definition = $manager->getDefinition(Page::ENTITY_TYPE_ID);
-    assert($definition instanceof EntityTypeInterface);
+    \assert($definition instanceof EntityTypeInterface);
     $this->assertFalse($definition->hasHandlerClass(ContentTemplateAwareViewBuilder::DECORATED_HANDLER_KEY));
   }
 
   public function testTreeKeyOrdering(): void {
     $this->installConfig('node');
     $this->createContentType(['type' => 'alpha']);
-    $this->installConfig('canvas');
     $this->generateComponentConfig();
     $template = ContentTemplate::create([
       'content_entity_type_id' => 'node',
@@ -135,12 +123,12 @@ final class ContentTemplateTest extends KernelTestBase {
       [
         'uuid' => '5f1c5361-5658-467e-9c53-b0015d57945d',
         'component_id' => 'block.system_powered_by_block',
-        'component_version' => '3332388cade78d20',
+        'component_version' => Component::load('block.system_powered_by_block')?->getActiveVersion(),
         'parent_uuid' => '4f785025-9bd9-4752-9dd6-068b957b03ee',
         'slot' => 'the_footer',
         'inputs' => [
           'label' => '',
-          'label_display' => FALSE,
+          'label_display' => '0',
         ],
       ],
       [
@@ -159,7 +147,7 @@ final class ContentTemplateTest extends KernelTestBase {
         'component_version' => 'b1e991f726a2a266',
         'inputs' => [
           'heading' => [
-            'sourceType' => 'dynamic',
+            'sourceType' => PropSource::EntityField->value,
             'expression' => 'ℹ︎␜entity:node:alpha␝title␞␟value',
           ],
         ],
@@ -167,7 +155,7 @@ final class ContentTemplateTest extends KernelTestBase {
       [
         'uuid' => '93af433a-8ab0-4dd9-912a-73a99c882347',
         'component_id' => 'block.system_branding_block',
-        'component_version' => '247a23298360adb2',
+        'component_version' => Component::load('block.system_branding_block')?->getActiveVersion(),
         'parent_uuid' => '4f785025-9bd9-4752-9dd6-068b957b03ee',
         'slot' => 'the_body',
         'inputs' => [
@@ -175,7 +163,7 @@ final class ContentTemplateTest extends KernelTestBase {
           'use_site_name' => TRUE,
           'use_site_slogan' => TRUE,
           'label' => '',
-          'label_display' => FALSE,
+          'label_display' => '0',
         ],
       ],
     ]);
@@ -212,7 +200,7 @@ final class ContentTemplateTest extends KernelTestBase {
         '0:the_body:1' => [
           'uuid' => '93af433a-8ab0-4dd9-912a-73a99c882347',
           'component_id' => 'block.system_branding_block',
-          'component_version' => '247a23298360adb2',
+          'component_version' => Component::load('block.system_branding_block')?->getActiveVersion(),
           'parent_uuid' => '4f785025-9bd9-4752-9dd6-068b957b03ee',
           'slot' => 'the_body',
           'inputs' => [
@@ -220,18 +208,18 @@ final class ContentTemplateTest extends KernelTestBase {
             'use_site_name' => TRUE,
             'use_site_slogan' => TRUE,
             'label' => '',
-            'label_display' => FALSE,
+            'label_display' => '0',
           ],
         ],
         '0:the_footer:0' => [
           'uuid' => '5f1c5361-5658-467e-9c53-b0015d57945d',
           'component_id' => 'block.system_powered_by_block',
-          'component_version' => '3332388cade78d20',
+          'component_version' => Component::load('block.system_powered_by_block')?->getActiveVersion(),
           'parent_uuid' => '4f785025-9bd9-4752-9dd6-068b957b03ee',
           'slot' => 'the_footer',
           'inputs' => [
             'label' => '',
-            'label_display' => FALSE,
+            'label_display' => '0',
           ],
         ],
         '1' => [
@@ -240,7 +228,7 @@ final class ContentTemplateTest extends KernelTestBase {
           'component_version' => 'b1e991f726a2a266',
           'inputs' => [
             'heading' => [
-              'sourceType' => 'dynamic',
+              'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:node:alpha␝title␞␟value',
             ],
           ],
@@ -248,8 +236,7 @@ final class ContentTemplateTest extends KernelTestBase {
       ], $template->get('component_tree'),
     );
     // Sanity-check that the test template is valid.
-    $violations = $template->getTypedData()->validate();
-    self::assertCount(0, $violations, \implode(', ', \array_map(static fn (ConstraintViolationInterface $violation) => $violation->getMessage(), \iterator_to_array($violations))));
+    self::assertEntityIsValid($template);
   }
 
   public function testAbsentContentTemplateKeepsCacheMetadata(): void {
@@ -268,11 +255,17 @@ final class ContentTemplateTest extends KernelTestBase {
 
     // Assert the right cacheability.
     $this->assertContains('without-canvas', $build['#cache']['keys']);
+    // Note: AutoSaveManager::CACHE_TAG is NOT present because we're not on a
+    // preview route. It's only added on preview routes to avoid invalidating
+    // all rendered nodes on the live site when auto-saves change.
+    // @see \Drupal\canvas\EntityHandlers\ContentTemplateAwareViewBuilder::getBuildDefaults()
     $this->assertEqualsCanonicalizing([
       'node_view',
       'node:1',
       'config:content_template_list',
     ], $build['#cache']['tags']);
+    // Verify the specialized cache context is present.
+    $this->assertContains('route.name.is_canvas_editor_ui', $build['#cache']['contexts']);
   }
 
 }

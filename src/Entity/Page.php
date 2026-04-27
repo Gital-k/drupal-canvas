@@ -102,7 +102,7 @@ final class Page extends EditorialContentEntityBase implements EntityOwnerInterf
    */
   public function getComponentTree(): ComponentTreeItemList {
     $item = $this->get('components');
-    assert($item instanceof ComponentTreeItemList);
+    \assert($item instanceof ComponentTreeItemList);
     return $item;
   }
 
@@ -209,7 +209,7 @@ final class Page extends EditorialContentEntityBase implements EntityOwnerInterf
     foreach ($media_types as $media_type) {
       /** @var array{allowed_field_types: list<string>} $media_source_plugin_definition */
       $media_source_plugin_definition = $media_type->getSource()->getPluginDefinition();
-      if (in_array('image', $media_source_plugin_definition['allowed_field_types'], TRUE)) {
+      if (\in_array('image', $media_source_plugin_definition['allowed_field_types'], TRUE)) {
         $target_bundles[] = $media_type->id();
       }
     }

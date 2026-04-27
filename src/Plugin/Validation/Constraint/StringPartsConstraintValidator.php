@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\canvas\Plugin\Validation\Constraint;
 
@@ -21,15 +21,15 @@ class StringPartsConstraintValidator extends ConstraintValidator {
    * {@inheritdoc}
    */
   public function validate(mixed $value, Constraint $constraint): void {
-    if (!is_string($value)) {
+    if (!\is_string($value)) {
       throw new UnexpectedTypeException($value, 'string');
     }
     if (!$constraint instanceof StringPartsConstraint) {
       throw new UnexpectedTypeException($constraint, StringPartsConstraint::class);
     }
 
-    assert($this->context->getObject() instanceof TypedDataInterface);
-    $resolved_parts = array_map(
+    \assert($this->context->getObject() instanceof TypedDataInterface);
+    $resolved_parts = \array_map(
       fn (string $expression): mixed => TypeResolver::resolveExpression($expression, $this->context->getObject()),
       $constraint->parts
     );
@@ -49,8 +49,8 @@ class StringPartsConstraintValidator extends ConstraintValidator {
     $expected_string_parts = [];
     foreach ($constraint->parts as $index => $part) {
       $part_value = $resolved_parts[$index];
-      if (!is_string($part_value)) {
-        throw new \LogicException(sprintf('The "%s" property does not contain a string, but a %s: "%s".', $part, gettype($part_value), (string) $part_value));
+      if (!\is_string($part_value)) {
+        throw new \LogicException(\sprintf('The "%s" property does not contain a string, but a %s: "%s".', $part, gettype($part_value), (string) $part_value));
       }
       $expected_string_parts[] = $part_value;
     }
@@ -62,8 +62,8 @@ class StringPartsConstraintValidator extends ConstraintValidator {
     if ($expected_string !== $value) {
       $expected_format = implode(
         $constraint->separator,
-        array_map(function (string $v) {
-          return sprintf('<%s>', $v);
+        \array_map(function (string $v) {
+          return \sprintf('<%s>', $v);
         }, $constraint->parts)
       );
       $this->context->addViolation($constraint->message, [

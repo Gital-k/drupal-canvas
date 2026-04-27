@@ -12,7 +12,7 @@ use Drupal\Core\Config\Schema\SchemaIncompleteException;
 use Drupal\Core\Entity\EntityWithPluginCollectionInterface;
 use Drupal\KernelTests\Core\Config\ConfigEntityValidationTestBase;
 
-class BetterConfigEntityValidationTestBase extends ConfigEntityValidationTestBase {
+abstract class BetterConfigEntityValidationTestBase extends ConfigEntityValidationTestBase {
 
   use SchemaCheckTrait;
 
@@ -48,7 +48,7 @@ class BetterConfigEntityValidationTestBase extends ConfigEntityValidationTestBas
       function (string $schema_error_message, string $property_path) use ($expected_messages, $config_entity_prefix, &$nonsensical_subtrees): bool {
         $relative_property_path = substr($property_path, strlen($config_entity_prefix));
         // Ignore when there is a validation error for exactly this property.
-        if (array_key_exists($relative_property_path, $expected_messages)) {
+        if (\array_key_exists($relative_property_path, $expected_messages)) {
           return FALSE;
         }
         // Ignore when this is a validation error about typecasting, because the
@@ -62,19 +62,19 @@ class BetterConfigEntityValidationTestBase extends ConfigEntityValidationTestBas
         // For example, schema error for `props.some_boolean.enum` but a
         // validation error for `props.some_boolean` like:
         // @code
-        // 'enum' is an unknown key because props.some_boolean.type is boolean (see config schema type canvas.json_schema.prop.boolean).
+        // 'enum' is an unknown key because props.some_boolean.type is boolean (see config schema type canvas.json_schema.prop_shape.boolean).
         // @endcode
         $parts = explode('.', $relative_property_path);
         $popped = array_pop($parts);
         $parent_property_path = implode('.', $parts);
-        $validation_error_message = match (array_key_exists($parent_property_path, $expected_messages)) {
-          TRUE => is_array($expected_messages[$parent_property_path])
+        $validation_error_message = match (\array_key_exists($parent_property_path, $expected_messages)) {
+          TRUE => \is_array($expected_messages[$parent_property_path])
             ? reset($expected_messages[$parent_property_path])
             : $expected_messages[$parent_property_path],
           FALSE => '',
         };
-        assert(is_string($validation_error_message));
-        if (str_starts_with($validation_error_message, sprintf("'%s' is an unknown key because %s.type is", $popped, $parent_property_path))) {
+        \assert(\is_string($validation_error_message));
+        if (str_starts_with($validation_error_message, \sprintf("'%s' is an unknown key because %s.type is", $popped, $parent_property_path))) {
           NestedArray::setValue($nonsensical_subtrees, $parts, TRUE);
           return FALSE;
         }
@@ -112,18 +112,25 @@ class BetterConfigEntityValidationTestBase extends ConfigEntityValidationTestBas
    * the changes made here (other than three extra asserts to meet phpstan level
    * 6).
    *
+   * @param array<string, array<string, string|string[]>>|null $additional_expected_validation_errors_when_missing
+   *   Some required config entity properties have additional validation
+   *   constraints that cause additional messages to appear. Keys must be
+   *   config entity properties, values must be arrays as expected by
+   *   ::assertValidationErrors().
+   *
    * @todo Remove when https://drupal.org/i/3526908 is fixed
    */
+  // @phpstan-ignore-next-line method.childParameterType
   public function testRequiredPropertyValuesMissing(?array $additional_expected_validation_errors_when_missing = NULL): void {
     \assert($this->entity->getEntityType() instanceof ConfigEntityTypeInterface);
     \assert(\is_array($this->entity->getEntityType()->getPropertiesToExport()));
-    $config_entity_properties = array_keys($this->entity->getEntityType()->getPropertiesToExport());
+    $config_entity_properties = \array_keys($this->entity->getEntityType()->getPropertiesToExport());
 
     // Guide developers when $additional_expected_validation_errors_when_missing
     // does not contain sensible values.
-    $non_existing_properties = array_diff(array_keys($additional_expected_validation_errors_when_missing ?? []), $config_entity_properties);
+    $non_existing_properties = array_diff(\array_keys($additional_expected_validation_errors_when_missing ?? []), $config_entity_properties);
     if ($non_existing_properties) {
-      throw new \LogicException(sprintf('The test %s lists `%s` in $additional_expected_validation_errors_when_missing but it is not a property of the `%s` config entity type.',
+      throw new \LogicException(\sprintf('The test %s lists `%s` in $additional_expected_validation_errors_when_missing but it is not a property of the `%s` config entity type.',
         __METHOD__,
         implode(', ', $non_existing_properties),
         $this->entity->getEntityTypeId(),
@@ -141,7 +148,7 @@ class BetterConfigEntityValidationTestBase extends ConfigEntityValidationTestBas
     // @see \Drupal\Core\Config\Entity\ConfigEntityBase::set()
     // @see \Drupal\Core\Config\Entity\ConfigEntityBase::preSave()
     $plugin_collection_properties = $this->entity instanceof EntityWithPluginCollectionInterface
-      ? array_keys($this->entity->getPluginCollections())
+      ? \array_keys($this->entity->getPluginCollections())
       : [];
 
     // To test properties with missing required values, $this->entity must be
@@ -153,12 +160,12 @@ class BetterConfigEntityValidationTestBase extends ConfigEntityValidationTestBas
       // Do not try to set immutable properties to NULL: their immutability is
       // already tested.
       // @see ::testImmutableProperties()
-      if (in_array($property, $immutable_properties, TRUE)) {
+      if (\in_array($property, $immutable_properties, TRUE)) {
         continue;
       }
 
       // Do not try to set plugin collection properties to NULL.
-      if (in_array($property, $plugin_collection_properties, TRUE)) {
+      if (\in_array($property, $plugin_collection_properties, TRUE)) {
         continue;
       }
 
@@ -173,7 +180,7 @@ class BetterConfigEntityValidationTestBase extends ConfigEntityValidationTestBas
         continue;
       }
       // End overrides of core 👈️.
-      $expected_validation_errors = in_array($property, $properties_with_optional_values, TRUE)
+      $expected_validation_errors = \in_array($property, $properties_with_optional_values, TRUE)
         ? []
         : [$property => 'This value should not be null.'];
 

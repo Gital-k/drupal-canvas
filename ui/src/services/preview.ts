@@ -16,10 +16,13 @@ import type { RootState } from '@/app/store';
 import type {
   ComponentModel,
   EvaluatedComponentModel,
+  PropSource,
+  ResolvedValues,
 } from '@/features/layout/layoutModelSlice';
 import type { EditorFrameContext } from '@/features/ui/uiSlice';
 import type { ConflictError } from '@/services/pendingChangesApi';
 import type { AutoSavesHash } from '@/types/AutoSaves';
+import type { InputUIData } from '@/types/Form';
 
 export type UpdateComponentResultType = {
   html: string;
@@ -42,16 +45,23 @@ export const previewApi = createApi({
   endpoints: (builder) => ({
     postPreview: builder.mutation<
       { html: string; autoSaves: AutoSavesHash },
-      { layout: any; model: any; entity_form_fields: any }
+      {
+        entityType: string;
+        entityId: string;
+        layout: any;
+        model: any;
+        entity_form_fields: any;
+      }
     >({
-      query: (body) => ({
-        url: 'canvas/api/v0/layout/{entity_type}/{entity_id}',
+      query: ({ entityType, entityId, ...body }) => ({
+        url: `canvas/api/v0/layout/${entityType}/${entityId}`,
         method: 'POST',
         body,
       }),
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
         const { data, meta } = await queryFulfilled;
         const { html, autoSaves } = data;
+        pushCanvasLayoutRequest();
         dispatch(
           pendingChangesApi.util.invalidateTags([
             { type: 'PendingChanges', id: 'LIST' },
@@ -60,6 +70,7 @@ export const previewApi = createApi({
         // Update our preview slice.
         dispatch(setHtml(html));
         handleAutoSavesHashUpdate(dispatch, autoSaves, meta);
+        popCanvasLayoutRequest();
         dispatch(setPostPreviewCompleted(true));
       },
     }),
@@ -106,6 +117,89 @@ export const previewApi = createApi({
 export const { usePostPreviewMutation, useUpdateComponentMutation } =
   previewApi;
 
+/**
+ * A hook that wraps useUpdateComponentMutation with a simpler interface.
+ *
+ * Instead of manually constructing the full UpdateComponentQueryArg at every
+ * call site, consumers pass only the model payload. The hook derives
+ * `type`, `componentInstanceUuid`, and `componentType` from `inputUIData`.
+ *
+ * @param inputUIData - The return value of useInputUIData().
+ */
+export const usePatchComponent = () => {
+  const [updateComponent] = useUpdateComponentMutation();
+
+  return (
+    inputUIData: InputUIData,
+    model: UpdateComponentQueryArg['model'],
+  ) => {
+    const {
+      selectedComponent,
+      selectedComponentType,
+      version,
+      editorFrameContext,
+    } = inputUIData;
+    return updateComponent({
+      type: editorFrameContext,
+      componentInstanceUuid: selectedComponent,
+      componentType: `${selectedComponentType}@${version}`,
+      model,
+    });
+  };
+};
+
+/**
+ * A targeted variant of usePatchComponent for the common case of updating a
+ * single prop on the current component.
+ *
+ * The caller provides only the prop name and its new source/resolved values.
+ * The hook spreads the existing model's source and resolved, overriding just
+ * the named prop — avoiding the repetitive spread boilerplate at every call
+ * site.
+ *
+ * Only valid for EvaluatedComponentModel instances (components with source
+ * data). Returns null without patching if the current model is not evaluated.
+ */
+export const usePatchProp = () => {
+  const [updateComponent] = useUpdateComponentMutation();
+
+  return (
+    inputUIData: InputUIData,
+    propName: string,
+    sourceValue: PropSource | PropSource['value'],
+    resolvedValue: ResolvedValues[string],
+  ) => {
+    const {
+      selectedComponent,
+      selectedComponentType,
+      version,
+      editorFrameContext,
+      model,
+    } = inputUIData;
+
+    const selectedModel = model?.[selectedComponent];
+    if (!selectedModel || !('source' in selectedModel)) {
+      return null;
+    }
+
+    return updateComponent({
+      type: editorFrameContext,
+      componentInstanceUuid: selectedComponent,
+      componentType: `${selectedComponentType}@${version}`,
+      model: {
+        source: {
+          ...selectedModel.source,
+          [propName]: sourceValue,
+        },
+        resolved: {
+          ...selectedModel.resolved,
+          [propName]: resolvedValue,
+        },
+      },
+    });
+  };
+};
+
 // A selector that returns the current updateComponent mutation loading state
 // given a component ID.
 // For each API endpoint, RTK Query makes a .select method available allowing
@@ -125,12 +219,24 @@ const createUpdateComponentSelector = createSelector(
 // determine the current update mutation loading state given a component
 // instance ID. As createUpdateComponentSelector is memoized, we must also use
 // createSelector here so that the subsequent selector is memoised.
+// Returns false if componentInstanceId is undefined.
 // @see https://redux-toolkit.js.org/rtk-query/usage/usage-without-react-hooks
 // @see https://redux.js.org/tutorials/fundamentals/part-7-standard-patterns#memoizing-selectors-with-createselector
-export const selectUpdateComponentLoadingState = createSelector(
-  (state: RootState) => state,
-  (state: RootState, componentInstanceId: string) =>
-    createUpdateComponentSelector(componentInstanceId),
-  (state, selectUpdateComponentSelector) =>
-    selectUpdateComponentSelector(state).isLoading,
+export const selectUpdateComponentLoadingState: (
+  state: RootState,
+  componentInstanceId: string | undefined,
+) => boolean = createSelector(
+  [
+    (state: RootState) => state,
+    (_state: RootState, componentInstanceId: string | undefined) =>
+      componentInstanceId,
+  ],
+  (state, componentInstanceId): boolean => {
+    if (!componentInstanceId) {
+      return false;
+    }
+    const selectUpdateComponentSelector =
+      createUpdateComponentSelector(componentInstanceId);
+    return selectUpdateComponentSelector(state).isLoading;
+  },
 );

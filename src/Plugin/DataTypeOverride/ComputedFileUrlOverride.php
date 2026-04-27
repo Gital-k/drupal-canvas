@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Drupal\canvas\Plugin\DataTypeOverride;
 
 use Drupal\Core\TypedData\Plugin\DataType\Uri;
@@ -32,7 +34,7 @@ class ComputedFileUrlOverride extends Uri {
     if (!method_exists($parent, 'getEntity')) {
       return NULL;
     }
-    assert($parent->getEntity() instanceof FileInterface);
+    \assert($parent->getEntity() instanceof FileInterface);
 
     $uri = $parent->getEntity()->getFileUri();
     if (!$uri) {

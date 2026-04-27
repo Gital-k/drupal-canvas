@@ -4,22 +4,19 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel;
 
+use PHPUnit\Framework\Attributes\Group;
 use Drupal\canvas\ComponentIncompatibilityReasonRepository;
-use Drupal\KernelTests\KernelTestBase;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
  * Tests ComponentIncompatibilityReasonRepository.
  *
- * @covers \Drupal\canvas\ComponentIncompatibilityReasonRepository
- * @group JavaScriptComponents
- * @group canvas
+ * @legacy-covers \Drupal\canvas\ComponentIncompatibilityReasonRepository
  */
-final class ComponentIncompatibilityReasonRepositoryTest extends KernelTestBase {
-
-  /**
-   * {@inheritdoc}
-   */
-  protected static $modules = ['canvas'];
+#[RunTestsInSeparateProcesses]
+#[Group('JavaScriptComponents')]
+#[Group('canvas')]
+final class ComponentIncompatibilityReasonRepositoryTest extends CanvasKernelTestBase {
 
   /**
    * Covers ComponentIncompatibilityReasonRepository.
