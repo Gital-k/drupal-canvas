@@ -7673,6 +7673,64 @@ HTML
     $this->assertSame(0, $inputMissingProp['count']);
   }
 
+  /**
+   * Tests that datetime input is normalised to canonical UTC.
+   *
+   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::clientModelToInput()
+   */
+  public function testClientModelToInputNormalizesDatetime(): void {
+    $this->generateComponentConfig();
+    $component = Component::load('sdc.canvas_test_sdc.multivalue-props');
+    $this->assertInstanceOf(Component::class, $component);
+
+    $clientModel = [
+      'source' => [
+        'datetime' => [
+          'sourceType' => 'static:field_item:datetime',
+          'expression' => 'ℹ︎datetime␟value',
+          'value' => [
+            // 2025-01-31 20:30:33 Sydney (UTC+11 DST) → 2025-01-31T09:30:33 UTC
+            '2025-01-31 20:30:33',
+            // 2026-06-02 09:45:12 Sydney (UTC+10 standard) → 2026-06-01T23:45:12 UTC
+            '2026-06-02 09:45:12',
+          ],
+          'sourceTypeSettings' => [
+            'storage' => [
+              'datetime_type' => DateTimeItem::DATETIME_TYPE_DATETIME,
+            ],
+            'cardinality' => FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
+          ],
+        ],
+      ],
+      'resolved' => [
+        'datetime' => [
+          '2025-01-31 20:30:33',
+          '2026-06-02 09:45:12',
+        ],
+      ],
+    ];
+
+    $input = $component->getComponentSource()->clientModelToInput(
+      'a-uuid-for-testing',
+      $component,
+      $clientModel,
+      NULL,
+    );
+    $this->assertSame(['2025-01-31T09:30:33', '2026-06-01T23:45:12'], $input['datetime']);
+
+    // Re-submitting an already-canonical UTC value must be a no-op
+    // (idempotency), so editing one prop doesn't drift other stored values.
+    $clientModel['source']['datetime']['value'] = $input['datetime'];
+    $clientModel['resolved']['datetime'] = $input['datetime'];
+    $input2 = $component->getComponentSource()->clientModelToInput(
+      'a-uuid-for-testing',
+      $component,
+      $clientModel,
+      NULL,
+    );
+    $this->assertSame($input['datetime'], $input2['datetime']);
+  }
+
   public function alter(ContainerBuilder $container): void {
     // Swap in the broken version of this class.
     // @see ::triggerBrokenComponent()
