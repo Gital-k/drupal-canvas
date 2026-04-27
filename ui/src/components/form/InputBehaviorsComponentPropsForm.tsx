@@ -328,6 +328,7 @@ export const syncPropSourcesToResolvedValues = (
     const isDatetimeOrLinkFormat =
       !Object.keys(resolvedValues).includes(key) &&
       key in sources &&
+      fieldData[key]?.jsonSchema?.format &&
       ['uri', 'uri-reference', 'date', 'date-time'].includes(
         fieldData[key]?.jsonSchema?.format,
       );
