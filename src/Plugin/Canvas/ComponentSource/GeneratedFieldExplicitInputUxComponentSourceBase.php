@@ -1374,7 +1374,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
             $prop_source['value'] = 0;
           }
         }
-        // Normalise datetime input from the Canvas UI to the canonical UTC
+        // Normalize datetime input from the Canvas UI to the canonical UTC
         // storage format, mirroring what the date widgets do on entity forms.
         if (
           ($prop_source['sourceType'] ?? NULL) === 'static:field_item:datetime'
@@ -1636,7 +1636,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
    *   A static prop source value as submitted by the Canvas UI.
    *
    * @return array|string
-   *   The prop source with `value` normalised when applicable.
+   *   The prop source with `value` normalized when applicable.
    *
    * @see \Drupal\datetime\Plugin\Field\FieldWidget\DateTimeWidgetBase::massageFormValues()
    */
@@ -1662,7 +1662,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
       $date = new DrupalDateTime($value);
     }
     catch (\Exception) {
-      // Unparseable input: let validation catch it downstream.
+      // Unparsable input: let validation catch it downstream.
       return $value;
     }
     $date->setTimezone(new \DateTimeZone(DateTimeItemInterface::STORAGE_TIMEZONE));
