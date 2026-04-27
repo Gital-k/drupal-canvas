@@ -7674,7 +7674,7 @@ HTML
   }
 
   /**
-   * Tests that datetime input is normalised to canonical UTC.
+   * Tests that datetime input is normalized to canonical UTC.
    *
    * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::clientModelToInput()
    */
