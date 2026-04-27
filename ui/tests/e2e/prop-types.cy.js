@@ -700,7 +700,6 @@ describe('Prop types editing', () => {
     },
   );
 
-
   it(
     'String, format=iri-reference',
     { retries: { openMode: 0, runMode: 3 } },
@@ -890,6 +889,124 @@ describe('Prop types editing', () => {
         selector,
         '<p>A paragraph</p><ul><li>A list item</li></ul>',
       );
+    },
+  );
+
+  it(
+    'can empty a required uri field without 500 error',
+    { retries: { openMode: 0, runMode: 3 } },
+    () => {
+      const previewSelector = '#test-required-string-format-uri code';
+      const initialValue = 'https://uri.example.com';
+      cy.waitForElementContentInIframe(previewSelector, initialValue);
+
+      cy.findByLabelText('String, format=uri (required)')
+        .as('theInput')
+        .scrollIntoView()
+        .should('have.value', initialValue);
+
+      // Clear the field.
+      cy.get('@theInput').clear({ force: true });
+      // Autocomplete fields that did not select an autocomplete suggestion
+      // must be blurred before the store is updated.
+      cy.get('@theInput').blur();
+      cy.get('@theInput').should('have.value', '');
+
+      // Verify no 500 error occurred.
+      cy.get('body').should('not.contain', '500');
+    },
+  );
+
+  it(
+    'can empty a required iri-reference field without 500 error',
+    { retries: { openMode: 0, runMode: 3 } },
+    () => {
+      const previewSelector = '#test-required-string-format-iri-reference code';
+      const initialValue = '/example-iri';
+      cy.waitForElementContentInIframe(previewSelector, initialValue);
+
+      cy.findByLabelText('String, format=iri-reference (required)')
+        .as('theInput')
+        .scrollIntoView()
+        .should('have.value', initialValue);
+
+      // Clear the field.
+      cy.get('@theInput').clear({ force: true });
+      cy.get('@theInput').blur();
+      cy.get('@theInput').should('have.value', '');
+
+      // Verify no 500 error occurred.
+      cy.get('body').should('not.contain', '500');
+    },
+  );
+
+  it(
+    'can empty a required date field without 500 error',
+    { retries: { openMode: 0, runMode: 3 } },
+    () => {
+      const dateSelector = '[name$="[test_REQUIRED_string_format_date][0][value][date]"]';
+      const previewSelector = '#test-required-string-format-date code';
+
+      cy.findByText(
+        'This is the description of String, format=date (required)',
+      ).should('exist');
+
+      cy.get(dateSelector)
+        .scrollIntoView()
+        .should('have.value', '2018-11-13');
+
+      cy.waitForElementContentInIframe(previewSelector, '2018-11-13');
+
+      // Clear the field.
+      cy.get(dateSelector).focus();
+      cy.get(dateSelector).clear({ force: true });
+      cy.get(dateSelector).blur();
+
+      cy.get(dateSelector).should('have.value', '');
+
+      // Verify no 500 error occurred.
+      cy.get('body').should('not.contain', '500');
+    },
+  );
+
+  it(
+    'can empty a required datetime field without 500 error',
+    { retries: { openMode: 0, runMode: 3 } },
+    () => {
+      const dateSelector =
+        '[name$="[test_REQUIRED_string_format_date_time][0][value][date]"]';
+      const timeSelector =
+        '[name$="[test_REQUIRED_string_format_date_time][0][value][time]"]';
+      const previewSelector = '#test-required-string-format-date-time code';
+
+      cy.findByText(
+        'This is the description of String, format=date-time (required)',
+      ).should('exist');
+
+      cy.get(dateSelector)
+        .scrollIntoView()
+        .should('have.value', '2016-09-16');
+
+      cy.get(timeSelector).should('have.value', '20:20:39');
+
+      cy.waitForElementContentInIframe(
+        previewSelector,
+        '2016-09-16T20:20:39+00:00',
+      );
+
+      // Clear both date and time fields.
+      cy.get(dateSelector).focus();
+      cy.get(dateSelector).clear({ force: true });
+      cy.get(dateSelector).blur();
+
+      cy.get(timeSelector).focus();
+      cy.get(timeSelector).clear({ force: true });
+      cy.get(timeSelector).blur();
+
+      cy.get(dateSelector).should('have.value', '');
+      cy.get(timeSelector).should('have.value', '');
+      // Verify no 500 error occurred.
+      cy.get('body').should('not.contain', '500');
     },
   );
 
