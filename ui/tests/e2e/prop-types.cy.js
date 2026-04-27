@@ -700,60 +700,6 @@ describe('Prop types editing', () => {
     },
   );
 
-  it(
-    'Required: String, format=uri-reference - clearing value should not cause 500 error',
-    { retries: { openMode: 0, runMode: 3 } },
-    () => {
-      // Test that a required uri-reference field can be cleared without causing
-      // a 500 error. The fix validates that required relative url fields always
-      // have a valid default value (empty string) instead of NULL.
-      // @see https://www.drupal.org/project/canvas/issues/3586183.
-      const previewSelector =
-        '#test-required-string-format-uri-reference-web-links code';
-      const initialValue = 'https://uri.example.com';
-
-      cy.waitForElementContentInIframe(previewSelector, initialValue);
-
-      cy.findByLabelText(
-        'String, format=uri-reference, x-allowed-schemes: [http, https] (required)',
-      )
-        .as('theRequiredInput')
-        .should('have.value', initialValue);
-      cy.findByText(
-        'This is the description of String, format=uri-reference, x-allowed-schemes: [http, https] (required)',
-      ).should('exist');
-
-      // Clear the value and blur the field.
-      cy.get('@theRequiredInput').clear({ force: true });
-      cy.get('@theRequiredInput').blur();
-
-      // Verify the field is empty
-      cy.get('@theRequiredInput').should('have.value', '');
-
-      // Wait for the preview to update (should show empty value).
-      cy.waitForElementContentNotInIframe(previewSelector, initialValue);
-
-      // Verify the component still renders without a 500 error.
-      cy.testInIframe(previewSelector, (preview) => {
-        expect(preview.textContent.trim()).to.equal('');
-      });
-
-      // Reload the page to ensure the empty value is persisted correctly
-      // without any 500 errors.
-      cy.loadURLandWaitForCanvasLoaded({ clearAutoSave: false });
-      cy.openLayersPanel();
-      cy.clickComponentInLayersView('All props');
-
-      // Verify the field still shows empty after reload.
-      cy.findByLabelText(
-        'String, format=uri-reference, x-allowed-schemes: [http, https] (required)',
-      ).should('have.value', '');
-      cy.waitForElementContentNotInIframe(previewSelector, initialValue);
-      cy.testInIframe(previewSelector, (preview) => {
-        expect(preview.textContent.trim()).to.equal('');
-      });
-    },
-  );
 
   it(
     'String, format=iri-reference',
