@@ -921,7 +921,9 @@ describe('Prop types editing', () => {
 
       // Clear URI field.
       cy.findByLabelText('String, format=uri (required)').scrollIntoView();
-      cy.findByLabelText('String, format=uri (required)').clear({ force: true });
+      cy.findByLabelText('String, format=uri (required)').clear({
+        force: true,
+      });
       cy.findByLabelText('String, format=uri (required)').blur();
       cy.findByLabelText('String, format=uri (required)').should(
         'have.value',
@@ -929,8 +931,12 @@ describe('Prop types editing', () => {
       );
 
       // Clear IRI-reference field.
-      cy.findByLabelText('String, format=iri-reference (required)').scrollIntoView();
-      cy.findByLabelText('String, format=iri-reference (required)').clear({ force: true });
+      cy.findByLabelText(
+        'String, format=iri-reference (required)',
+      ).scrollIntoView();
+      cy.findByLabelText('String, format=iri-reference (required)').clear({
+        force: true,
+      });
       cy.findByLabelText('String, format=iri-reference (required)').blur();
       cy.findByLabelText('String, format=iri-reference (required)').should(
         'have.value',
