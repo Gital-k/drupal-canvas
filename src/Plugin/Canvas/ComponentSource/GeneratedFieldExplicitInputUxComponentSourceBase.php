@@ -1379,6 +1379,7 @@ abstract class GeneratedFieldExplicitInputUxComponentSourceBase extends Componen
         if (
           ($prop_source['sourceType'] ?? NULL) === 'static:field_item:datetime'
           && ($prop_source['sourceTypeSettings']['storage']['datetime_type'] ?? NULL) === DateTimeItem::DATETIME_TYPE_DATETIME
+          && \array_key_exists('value', $prop_source)
           && $prop_source['value'] !== NULL
         ) {
           $prop_source['value'] = self::normalizeDatetimeValue($prop_source['value']);
