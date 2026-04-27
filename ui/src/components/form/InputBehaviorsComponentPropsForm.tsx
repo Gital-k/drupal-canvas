@@ -318,21 +318,10 @@ export const syncPropSourcesToResolvedValues = (
 
   // Likewise, if a resolved value is now empty, we need to remove it from
   // the source data so it is not evaluated server side.
-  // Also remove sources for datetime and link format types when the value is empty
-  // to prevent sending empty values to the backend.
   // However, for required props, we must keep the source entry so the backend
   // assertion (which checks that required props exist in inputValues) is satisfied.
   const emptyProps = Object.keys(fieldData).filter((key) => {
-    const isValueEmpty =
-      !Object.keys(resolvedValues).includes(key) && key in sources;
-    const isDatetimeOrLinkFormat =
-      !Object.keys(resolvedValues).includes(key) &&
-      key in sources &&
-      fieldData[key]?.jsonSchema?.format &&
-      ['uri', 'uri-reference', 'date', 'date-time'].includes(
-        fieldData[key]?.jsonSchema?.format,
-      );
-    return isValueEmpty || isDatetimeOrLinkFormat;
+    return !Object.keys(resolvedValues).includes(key) && key in sources;
   });
 
   return missingProps.reduce(

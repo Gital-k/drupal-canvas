@@ -142,9 +142,21 @@ export const shouldSkipPropValidation = (
     return true;
   }
 
-  // An empty string on an optional field can skip validation. For example, an
-  // empty + optional URI field should not check for URI validity.
+  // An empty string on an optional field can skip validation, unless the
+  // field has a format constraint (e.g. uri, date-time). Format-constrained
+  // fields rely on validation to reject invalid/empty values so the resolved
+  // value is never stored incorrectly.
   if (newValue === '' && !target.required) {
+    const { selectedComponent } = inputAndUiData;
+    const schemas = getPropSchemas(inputAndUiData);
+    const schema = schemas?.[toPropName(name, selectedComponent)];
+    const format = schema?.format ?? schema?.items?.format;
+    if (
+      format &&
+      ['uri', 'uri-reference', 'date', 'date-time'].includes(format)
+    ) {
+      return false;
+    }
     return true;
   }
 
