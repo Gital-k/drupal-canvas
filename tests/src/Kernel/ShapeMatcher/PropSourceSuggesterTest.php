@@ -594,8 +594,50 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
           PropSource::Adapter->value => [],
           PropSource::HostEntityUrl->value => [],
         ],
+        '⿲sdc_test_all_props:all-props␟test_REQUIRED_string_format_date_time' => [
+          'required' => TRUE,
+          PropSource::EntityField->value => [
+            "field_event_duration → End date value" => [
+              'sourceType' => PropSource::EntityField->value,
+              'expression' => 'ℹ︎␜entity:node:foo␝field_event_duration␞␟end_value',
+            ],
+            "field_event_duration" => [
+              'sourceType' => PropSource::EntityField->value,
+              'expression' => 'ℹ︎␜entity:node:foo␝field_event_duration␞␟value',
+            ],
+          ],
+          PropSource::Adapter->value => [],
+          PropSource::HostEntityUrl->value => [],
+        ],
         '⿲sdc_test_all_props:all-props␟test_string_format_date' => [
           'required' => FALSE,
+          PropSource::EntityField->value => [
+            'Authored on' => [
+              'sourceType' => PropSource::EntityField->value,
+              'expression' => 'ℹ︎␜entity:node␝created␞␟value',
+              PropSource::Adapter->value => 'unix_to_date',
+            ],
+            "field_event_duration → End date value" => [
+              'sourceType' => PropSource::EntityField->value,
+              'expression' => 'ℹ︎␜entity:node:foo␝field_event_duration␞␟end_value',
+            ],
+            "field_event_duration" => [
+              'sourceType' => PropSource::EntityField->value,
+              'expression' => 'ℹ︎␜entity:node:foo␝field_event_duration␞␟value',
+            ],
+            'Changed' => [
+              'sourceType' => PropSource::EntityField->value,
+              'expression' => 'ℹ︎␜entity:node␝changed␞␟value',
+              PropSource::Adapter->value => 'unix_to_date',
+            ],
+          ],
+          PropSource::Adapter->value => [
+            'UNIX timestamp to date' => 'unix_to_date',
+          ],
+          PropSource::HostEntityUrl->value => [],
+        ],
+        '⿲sdc_test_all_props:all-props␟test_REQUIRED_string_format_date' => [
+          'required' => TRUE,
           PropSource::EntityField->value => [
             'Authored on' => [
               'sourceType' => PropSource::EntityField->value,
@@ -1088,6 +1130,34 @@ class PropSourceSuggesterTest extends CanvasKernelTestBase {
             'Revision user → URL' => [
               'sourceType' => PropSource::EntityField->value,
               'expression' => 'ℹ︎␜entity:node:foo␝revision_uid␞␟url',
+            ],
+          ],
+          PropSource::Adapter->value => [],
+          PropSource::HostEntityUrl->value => [
+            'Relative URL' => [
+              'sourceType' => PropSource::HostEntityUrl->value,
+              'absolute' => FALSE,
+            ],
+          ],
+        ],
+        '⿲sdc_test_all_props:all-props␟test_REQUIRED_string_format_iri_reference' => [
+          'required' => TRUE,
+          PropSource::EntityField->value => [
+            'Check it out! → Resolved URL' => [
+              'sourceType' => PropSource::EntityField->value,
+              'expression' => 'ℹ︎␜entity:node:foo␝field_check_it_out␞␟url',
+            ],
+            'Silly image 🤡 → URI → Root-relative file URL' => [
+              'sourceType' => PropSource::EntityField->value,
+              'expression' => 'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝uri␞␟url',
+            ],
+            'Silly image 🤡 → URI' => [
+              'sourceType' => PropSource::EntityField->value,
+              'expression' => 'ℹ︎␜entity:node:foo␝field_silly_image␞␟entity␜␜entity:file␝uri␞␟value',
+            ],
+            "Silly image 🤡" => [
+              'sourceType' => PropSource::EntityField->value,
+              'expression' => 'ℹ︎␜entity:node:foo␝field_silly_image␞␟src_with_alternate_widths',
             ],
           ],
           PropSource::Adapter->value => [],
