@@ -99,7 +99,9 @@ export async function createSnapshotState({
 
   // Reuse snapshot from a previous attempt (Playwright retry spawns a new worker,
   // which would otherwise re-run the full Drupal install + setupSite).
+  // Only cache in CI — local /tmp persists between runs causing stale-path reuse.
   if (
+    process.env.CI_JOB_ID &&
     existsSync(cacheMetaPath) &&
     existsSync(snapshotSitePath) &&
     existsSync(snapshotDbPath)

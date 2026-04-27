@@ -83,7 +83,7 @@ export const snapshotPerTest = base.extend<
 >({
   snapshotState: [
     async ({ browser }, use, testInfo) => {
-      console.log('snapshotState: creating snapshot for '+testInfo.project?.use?.baseURL || 'there is no baseURL');
+      console.log('snapshotState: worker init for '+(testInfo.project?.use?.baseURL || 'there is no baseURL'));
       const startTime = performance.now();
       const snapshotState = await createSnapshotState({
         baseURL: testInfo.project?.use?.baseURL,
