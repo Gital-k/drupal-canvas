@@ -105,6 +105,7 @@ describe('validatePages', () => {
       componentRoot: tmpDir,
       projectRoot: tmpDir,
       components: [],
+      contentTemplates: [],
       pages: [
         {
           name: 'home',
