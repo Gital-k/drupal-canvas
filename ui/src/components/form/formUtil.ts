@@ -579,18 +579,6 @@ export function getPropsValues(
       !propFieldData?.required &&
       propFieldData?.jsonSchema?.format;
 
-    // Skip storing empty values for datetime and link format types on the
-    // frontend to prevent sending them to the backend. By removing them from
-    // propsValues, the existing resolved value from selectedModel.resolved
-    // will persist (via the spread in formStateToStore), satisfying backend
-    // assertions for required props while allowing the UI to clear the field.
-    const isEmptyDatetimeOrLink =
-      value === '' &&
-      propFieldData?.jsonSchema?.format &&
-      ['uri', 'uri-reference', 'date', 'date-time'].includes(
-        propFieldData.jsonSchema.format,
-      );
-
     if (emptyOptionalWithFormatRequirements) {
       delete propsValues[fieldName as keyof PropsValues];
       const resolved = { ...selectedModel.resolved };
