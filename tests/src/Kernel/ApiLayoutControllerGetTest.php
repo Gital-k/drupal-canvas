@@ -22,6 +22,7 @@ use Drupal\canvas\Controller\ApiLayoutController;
 use Drupal\canvas\Entity\Page;
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Plugin\DisplayVariant\CanvasPageVariant;
+use Drupal\language\Entity\ConfigurableLanguage;
 use Drupal\link\LinkItemInterface;
 use Drupal\node\Entity\Node;
 use Drupal\node\Entity\NodeType;
@@ -928,6 +929,114 @@ class ApiLayoutControllerGetTest extends ApiLayoutControllerTestBase {
     $this->container->get(EntityTypeManagerInterface::class)->getAccessControlHandler('node')->resetCache();
     $response = $this->request(Request::create($url->toString()));
     $this->assertEquals(200, $response->getStatusCode(), 'Response status code is 200 OK');
+  }
+
+  /**
+   * Tests that Page translations are correctly returned based on language.
+   *
+   * Verifies that EntityConverter and language negotiation work correctly for
+   * the canvas_page entity type.
+   */
+  public function testPageTranslations(): void {
+    $this->container->get('module_installer')->install(['language', 'content_translation']);
+    $this->installEntitySchema(Page::ENTITY_TYPE_ID);
+    $this->installConfig(['language']);
+    $this->container->get('kernel')->rebuildContainer();
+
+    // Create French language.
+    ConfigurableLanguage::createFromLangcode('fr')->save();
+
+    $this->setUpCurrentUser([], [Page::EDIT_PERMISSION, Page::CREATE_PERMISSION]);
+
+    // Create an English page with components.
+    $page_en = Page::create([
+      'title' => 'English Page Title',
+      'langcode' => 'en',
+      'status' => TRUE,
+      'components' => [
+        [
+          'uuid' => 'test-translation-uuid',
+          'component_id' => 'sdc.canvas_test_sdc.heading',
+          'component_version' => '8c01a2bdb897a810',
+          'inputs' => [
+            'text' => 'English Heading',
+            'element' => 'h1',
+          ],
+        ],
+      ],
+    ]);
+    $page_en->save();
+
+    // Add French translation with different content.
+    $page_fr = $page_en->addTranslation('fr', [
+      'title' => 'French Page Title',
+      'components' => [
+        [
+          'uuid' => 'test-translation-uuid',
+          'component_id' => 'sdc.canvas_test_sdc.heading',
+          'component_version' => '8c01a2bdb897a810',
+          'inputs' => [
+            'text' => 'French Heading',
+            'element' => 'h1',
+          ],
+        ],
+      ],
+    ]);
+    $page_fr->save();
+
+    // Test GET for English version by directly calling controller with English entity.
+    $controller = $this->container->get(ApiLayoutController::class);
+    \assert($controller instanceof ApiLayoutController);
+
+    $envelope_en = $controller->get($page_en);
+    $data_en = $envelope_en->additionalData;
+    self::assertArrayHasKey('model', $data_en);
+    self::assertArrayHasKey('test-translation-uuid', $data_en['model']);
+    self::assertSame('English Heading', $data_en['model']['test-translation-uuid']['resolved']['text']);
+
+    // Test GET for French version by directly calling controller with French entity.
+    $page_fr_loaded_entity = Page::load($page_en->id());
+    \assert($page_fr_loaded_entity instanceof Page);
+    $page_fr_loaded = $page_fr_loaded_entity->getTranslation('fr');
+    $envelope_fr = $controller->get($page_fr_loaded);
+    $data_fr = $envelope_fr->additionalData;
+    self::assertArrayHasKey('model', $data_fr);
+    self::assertArrayHasKey('test-translation-uuid', $data_fr['model']);
+    self::assertSame('French Heading', $data_fr['model']['test-translation-uuid']['resolved']['text']);
+
+    // Test with auto-save for French translation.
+    $autoSave = $this->container->get(AutoSaveManager::class);
+    \assert($autoSave instanceof AutoSaveManager);
+
+    // Modify the French translation in auto-save.
+    $page_fr_modified_entity = Page::load($page_en->id());
+    \assert($page_fr_modified_entity instanceof Page);
+    $page_fr_modified = $page_fr_modified_entity->getTranslation('fr');
+    $page_fr_modified->set('title', 'Modified French Title');
+    $page_fr_modified->setComponentTree([
+      [
+        'uuid' => 'test-translation-uuid',
+        'component_id' => 'sdc.canvas_test_sdc.heading',
+        'component_version' => '8c01a2bdb897a810',
+        'inputs' => [
+          'text' => 'Modified French Heading',
+          'element' => 'h1',
+        ],
+      ],
+    ]);
+    $autoSave->saveEntity($page_fr_modified);
+
+    // Verify French auto-save is returned.
+    $envelope_fr_autosave = $controller->get($page_fr_loaded);
+    $data_fr_autosave = $envelope_fr_autosave->additionalData;
+    self::assertSame('Modified French Heading', $data_fr_autosave['model']['test-translation-uuid']['resolved']['text']);
+
+    // Verify English version is still unaffected.
+    $page_en_check = Page::load($page_en->id());
+    \assert($page_en_check instanceof Page);
+    $envelope_en_check = $controller->get($page_en_check);
+    $data_en_check = $envelope_en_check->additionalData;
+    self::assertSame('English Heading', $data_en_check['model']['test-translation-uuid']['resolved']['text']);
   }
 
 }
