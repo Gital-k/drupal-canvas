@@ -156,8 +156,9 @@ export const shouldSkipPropValidation = (
     const schemas = getPropSchemas(inputAndUiData);
     const schema = schemas?.[toPropName(name, selectedComponent)];
     const format = schema?.format ?? schema?.items?.format;
-    return !(format &&
-      ['uri', 'uri-reference', 'date', 'date-time'].includes(format));
+    return !(
+      format && ['uri', 'uri-reference', 'date', 'date-time'].includes(format)
+    );
   }
 
   const { selectedComponent } = inputAndUiData;
