@@ -1,7 +1,7 @@
 import { RuleTester } from 'eslint';
 import yamlParser from 'yaml-eslint-parser';
 
-import rule from '../src/rules/component-no-empty-example-values.js';
+import rule from '../src/rules/component-prop-example-value-no-empty-string.js';
 
 const testRunner = new RuleTester({
   languageOptions: {

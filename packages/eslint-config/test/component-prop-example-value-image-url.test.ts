@@ -1,7 +1,7 @@
 import { RuleTester } from 'eslint';
 import yamlParser from 'yaml-eslint-parser';
 
-import rule from '../src/rules/component-image-example-urls.js';
+import rule from '../src/rules/component-prop-example-value-image-url.js';
 
 const testRunner = new RuleTester({
   languageOptions: {

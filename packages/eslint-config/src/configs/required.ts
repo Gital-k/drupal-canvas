@@ -5,9 +5,9 @@ import tseslint from 'typescript-eslint';
 
 import componentDirNameRule from '../rules/component-dir-name.js';
 import componentExportsRule from '../rules/component-exports.js';
-import componentPropExampleValueImageUrlRule from '../rules/component-image-example-urls.js';
+import componentPropExampleValueImageUrlRule from '../rules/component-prop-example-value-image-url.js';
 import componentImportsRule from '../rules/component-imports.js';
-import componentPropExampleValueNoEmptyStringRule from '../rules/component-no-empty-example-values.js';
+import componentPropExampleValueNoEmptyStringRule from '../rules/component-prop-example-value-no-empty-string.js';
 import componentPropNamesRule from '../rules/component-prop-names.js';
 
 import type { Config } from '@eslint/config-helpers';
