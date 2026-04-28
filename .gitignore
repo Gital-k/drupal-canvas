@@ -9,9 +9,12 @@
 *.sln
 *.sw?
 
+# DDEV environment assets
 .env
 .env.development.local
-
+/web
+/recipes
+vendor
 node_modules
 
 # Playwright
@@ -65,3 +68,5 @@ lerna-debug.log*
 
 # GitLab CI
 .cache
+/.editorconfig
+/.gitattributes

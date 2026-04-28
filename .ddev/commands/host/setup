@@ -1,0 +1,71 @@
+#!/bin/bash
+
+## #ddev-generated
+## Description: Set up the Canvas development environment.
+## Usage: setup
+## Example: ddev setup\nddev setup --force
+## Flags: [{"Name":"force","Shorthand":"f","Usage":"Completely reset an existing environment if present and start over"}]
+## ExecRaw: true
+
+set -e
+
+# Flag handling
+FORCE=false
+while :; do
+  case ${1:-} in
+    -f | --force)
+      FORCE=true ;;
+    --)
+      shift
+      break ;;
+    -?*)
+      printf 'WARN: Unknown option (ignored): %s\n' "$1" >&2 ;;
+    *)
+      break ;;
+  esac
+  shift
+done
+
+# Exit early if already set up (unless --force)
+if [[ -f vendor/autoload.php ]] && [[ "$FORCE" != true ]]; then
+  echo "Development environment already set up."
+  echo "Run 'ddev setup --force' to reset and start over."
+  exit 0
+fi
+
+echo "Setting up Canvas development environment..."
+# Remove any temporary site information
+
+rm -rf web
+rm -rf node_modules
+rm -rf vendor
+
+# Allow all Composer plugins.
+ddev composer config \
+  --no-plugins \
+  allow-plugins.\* \
+  true
+
+# Run ddev-drupal-contrib scripts
+ddev poser
+ddev symlink-project
+
+# Regenerate ddev Drupal settings after directory structure is set up
+ddev config --update
+
+# Allow test modules and themes to be installed.
+# shellcheck disable=SC2016
+printf '\n# Allow test modules and themes to be installed.\n$settings["extension_discovery_scan_tests"] = TRUE;' \
+  >> web/sites/default/settings.ddev.php
+
+# Install Drupal and enable the Drupal Canvas module.
+ddev drupal-install
+
+ddev exec --dir /var/www/html/web/core npm install
+
+ddev exec composer run ui-build
+
+echo "Development environment ready!"
+
+# Display a one time login link for user ID 1.
+drush uli

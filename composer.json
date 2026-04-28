@@ -67,5 +67,7 @@
         "phpunit": "Runs Canvas' back-end test suite. Supports running subset, use `composer run phpunit -- --help`.",
         "lint": "Runs all Canvas back-end (PHP) linting. Sibling: `npm run lint`.",
         "fix": "Runs all Canvas back-end (PHP) auto-fixing. Sibling: `npm run fix`."
+        "ui-build": "ROOT=$(composer run composer-root) && drush --root=$ROOT pm:uninstall canvas_vite -y > /dev/null 2>&1 || true && npm ci && cd ui && npm run build",
+        "ui-dev": "ROOT=$(composer run composer-root) && drush --root=$ROOT pm:install canvas_vite -y > /dev/null 2>&1 || true && npm ci && cd ui && npm run drupaldev -- --host",
     }
 }
