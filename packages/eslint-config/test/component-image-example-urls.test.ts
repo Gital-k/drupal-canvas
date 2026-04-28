@@ -9,7 +9,7 @@ const testRunner = new RuleTester({
   },
 });
 
-testRunner.run('component-image-example-urls rule', rule, {
+testRunner.run('component-prop-example-value-image-url rule', rule, {
   valid: [
     {
       name: 'should pass when image example src is a fully-qualified URL',
