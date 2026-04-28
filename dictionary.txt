@@ -47,6 +47,7 @@ drupalsettings
 druplicon
 endapply
 entityviewdisplay
+esque
 extralight
 extensionless
 fieldtext
@@ -206,3 +207,5 @@ videomedia
 Zencoder
 zencoder
 PKCE
+Catbro
+Minibro
