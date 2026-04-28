@@ -63,6 +63,34 @@ final class ApiAutoSaveController extends ApiControllerBase {
     private readonly AccountInterface $currentUser,
   ) {}
 
+  /**
+   * Gets the langcode for any entity, whether content or config.
+   *
+   * Content entities expose langcode via their active language. Config entities
+   * also implement language() but may return 'und' when not translatable; this
+   * is still the correct canonical value to surface to the frontend.
+   *
+   * @param \Drupal\Core\Entity\EntityInterface $entity
+   *   The entity.
+   *
+   * @return string
+   *   The BCP 47 language tag, e.g. 'en', 'fr', or 'und'.
+   */
+  private static function getEntityLangcode(EntityInterface $entity): string {
+    return $entity->language()->getId();
+  }
+
+  /**
+   * Validates that the expected auto-saves match the recorded auto-saves.
+   *
+   * @param array $expected_auto_saves
+   *   Auto-saves submitted by the client for publishing.
+   * @param array $all_auto_saves
+   *   All auto-saves currently recorded by the auto-save manager.
+   *
+   * @return \Symfony\Component\HttpFoundation\JsonResponse|null
+   *   A JSON error response if validation fails, or NULL on success.
+   */
   private static function validateExpectedAutoSaves(array $expected_auto_saves, array $all_auto_saves): ?JsonResponse {
     $unexpected_keys = \array_diff_key($expected_auto_saves, $all_auto_saves);
     if ($unexpected_keys) {
@@ -94,6 +122,7 @@ final class ApiAutoSaveController extends ApiControllerBase {
             'entity_type',
             'entity_id',
             'label',
+            'langcode',
           ])) + [
             self::AUTO_SAVE_KEY => $key,
           ],
@@ -123,6 +152,7 @@ final class ApiAutoSaveController extends ApiControllerBase {
                     'entity_type',
                     'entity_id',
                     'label',
+                    'langcode',
                   ])) + [
                     self::AUTO_SAVE_KEY => $global_dependency_key,
                   ],
@@ -178,20 +208,23 @@ final class ApiAutoSaveController extends ApiControllerBase {
     // publishing process.
     $filtered = \array_map(fn(array $item) => \array_diff_key($item, \array_flip(['data', 'client_id', 'entity'])), $filtered);
 
-    $withUserDetails = \array_map(fn(array $item) => [
-      // @phpstan-ignore-next-line
-      'owner' => \array_key_exists($item['owner'], $users) ? [
-        'name' => $users[$item['owner']]->getDisplayName(),
-        'avatar' => $this->buildAvatarUrl($users[$item['owner']]),
-        'uri' => $users[$item['owner']]->toUrl()->toString(),
-        'id' => $item['owner'],
-      ] : [
-        'name' => new TranslatableMarkup('User @uid', ['@uid' => $item['owner']]),
-        'avatar' => NULL,
-        'uri' => NULL,
-        'id' => $item['owner'],
-      ],
-    ] + $item, $filtered);
+    $withUserDetails = \array_map(function (array $item) use ($users): array {
+      $owner_id = $item['owner'];
+      \assert(\is_int($owner_id) || \is_string($owner_id));
+      return [
+        'owner' => \array_key_exists($owner_id, $users) ? [
+          'name' => $users[$owner_id]->getDisplayName(),
+          'avatar' => $this->buildAvatarUrl($users[$owner_id]),
+          'uri' => $users[$owner_id]->toUrl()->toString(),
+          'id' => $owner_id,
+        ] : [
+          'name' => new TranslatableMarkup('User @uid', ['@uid' => $owner_id]),
+          'avatar' => NULL,
+          'uri' => NULL,
+          'id' => $owner_id,
+        ],
+      ] + $item;
+    }, $filtered);
     return (new CacheableJsonResponse($withUserDetails))->addCacheableDependency($cache->addCacheTags([AutoSaveManager::CACHE_TAG]));
   }
 
@@ -244,7 +277,7 @@ final class ApiAutoSaveController extends ApiControllerBase {
         $access_error_labels[] = $entity->label();
       }
     }
-    if (!empty($access_error_labels)) {
+    if ($access_error_labels !== []) {
       throw new CacheableAccessDeniedHttpException($access_error_cache, \sprintf('Unable to update entities: %s.', implode(', ', \array_map(fn(\Stringable|string|NULL $label) => $label ? "'$label'" : "''", $access_error_labels))));
     }
 
@@ -396,6 +429,7 @@ final class ApiAutoSaveController extends ApiControllerBase {
               'entity_type' => $lastEntityEvaluated->getEntityTypeId(),
               'entity_id' => $lastEntityEvaluated->id(),
               'label' => $lastEntityEvaluated->label(),
+              'langcode' => self::getEntityLangcode($lastEntityEvaluated),
               self::AUTO_SAVE_KEY => AutoSaveManager::getAutoSaveKey($lastEntityEvaluated),
             ],
           ],
@@ -406,6 +440,15 @@ final class ApiAutoSaveController extends ApiControllerBase {
     return new JsonResponse(data: ['message' => new PluralTranslatableMarkup(\count($publish_auto_saves), 'Successfully published 1 item.', 'Successfully published @count items.')], status: 200);
   }
 
+  /**
+   * Deletes auto-saved changes for an entity.
+   *
+   * @param \Drupal\Core\Entity\EntityInterface $entity
+   *   The entity whose auto-save data should be deleted.
+   *
+   * @return \Symfony\Component\HttpFoundation\JsonResponse
+   *   A JSON response indicating success or that no data was found.
+   */
   public function delete(EntityInterface $entity): JsonResponse {
     if ($this->autoSaveManager->getAutoSaveEntity($entity)->isEmpty()) {
       return new JsonResponse(data: ['error' => 'No auto-save data found for this entity.'], status: Response::HTTP_NOT_FOUND);
@@ -418,8 +461,10 @@ final class ApiAutoSaveController extends ApiControllerBase {
    * Gets URL to avatar.
    *
    * @param \Drupal\user\UserInterface $owner
+   *   The user whose avatar URL to build.
    *
    * @return string|null
+   *   The absolute URL to the styled avatar image, or NULL if unavailable.
    */
   private function buildAvatarUrl(UserInterface $owner): ?string {
     if (!$owner->hasField('user_picture') || $owner->get('user_picture')->isEmpty()) {
@@ -462,6 +507,21 @@ final class ApiAutoSaveController extends ApiControllerBase {
     }
   }
 
+  /**
+   * Remaps violation property paths for Canvas field inputs to 'model'.
+   *
+   * Config entities do not have fields, so violations are returned unchanged.
+   * For content entities, violations on ComponentTree field inputs are
+   * remapped so the frontend can correctly associate them with the model.
+   *
+   * @param \Drupal\Core\Entity\FieldableEntityInterface|\Drupal\Core\Config\Entity\ConfigEntityInterface $entity
+   *   The entity whose violations are being processed.
+   * @param \Symfony\Component\Validator\ConstraintViolationListInterface|\Drupal\Core\Entity\EntityConstraintViolationListInterface $violations
+   *   The violations to remap.
+   *
+   * @return \Symfony\Component\Validator\ConstraintViolationListInterface
+   *   The remapped violation list.
+   */
   public static function getViolationSetsFromPropertyPathsAndRoot(
     FieldableEntityInterface|ConfigEntityInterface $entity,
     ConstraintViolationListInterface|EntityConstraintViolationListInterface $violations,
@@ -487,7 +547,7 @@ final class ApiAutoSaveController extends ApiControllerBase {
         ...$carry,
         ...\array_combine(
           // Key the map by the field name for each delta.
-          // e.g. field_canvas_demo.0.inputs
+          // e.g. field_canvas_demo.0.inputs.
           \array_map(static fn (int|string $delta) => \sprintf('%s.%d.inputs', $field_name, (int) $delta), \array_keys($entity->get($field_name)->getValue())),
           // And map this to 'model'.
           \array_fill(0, $entity->get($field_name)->count(), 'model'),
