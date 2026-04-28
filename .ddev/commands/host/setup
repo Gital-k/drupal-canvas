@@ -34,11 +34,9 @@ if [[ -f vendor/autoload.php ]] && [[ "$FORCE" != true ]]; then
 fi
 
 echo "Setting up Canvas development environment..."
-# Remove any temporary site information
 
-rm -rf web
-rm -rf node_modules
-rm -rf vendor
+# Remove any environment-specific files
+ddev cleanup --force
 
 # Allow all Composer plugins.
 ddev composer config \
