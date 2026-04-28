@@ -58,6 +58,11 @@ ddev config --update
 printf '\n# Allow test modules and themes to be installed.\n$settings["extension_discovery_scan_tests"] = TRUE;' \
   >> web/sites/default/settings.ddev.php
 
+# Force sqlite
+# shellcheck disable=SC2016
+printf '\n# Force SQL Lite\n$databases["default"]["default"] = \n[\n    "driver" => "sqlite",\n    "database" => "sites/default/files/.ht.sqlite",\n];' \
+  >> web/sites/default/settings.ddev.php
+
 # Install Drupal and enable the Drupal Canvas module.
 ddev drupal-install
 
@@ -68,4 +73,4 @@ ddev exec composer run ui-build
 echo "Development environment ready!"
 
 # Display a one time login link for user ID 1.
-drush uli
+ddev drush uli

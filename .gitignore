@@ -17,6 +17,9 @@
 vendor
 node_modules
 
+#Cypress debug
+/ui/junit*
+
 # Playwright
 /test-results/
 /playwright-report/

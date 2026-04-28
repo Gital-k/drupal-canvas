@@ -3,9 +3,10 @@
 web_environment:
   - BASE_URL=http://web
   - CYPRESS_CACHE_FOLDER=/var/www/html/.cache/cypress
-  - DB_URL=sqlite://web/sites/default/files/db.sqlite
+  - DB_URL=sqlite://localhost/sites/default/files/.ht.sqlite
   - DISPLAY=host.docker.internal:0
-  - DRUPAL_TEST_DB_URL=sqlite://web/sites/default/files/db.sqlite
+  - DRUPAL_PROJECT_FOLDER=/var/www/html/web/modules/contrib/canvas
+  - DRUPAL_TEST_DB_URL=sqlite://localhost/sites/default/files/.ht.sqlite
   - VITE_SERVER_ORIGIN=https://${DDEV_HOSTNAME}:5174
 webimage_extra_packages:
   - libasound2
@@ -26,4 +27,6 @@ web_extra_exposed_ports:
 
 hooks:
   post-start:
-    - exec-host: ddev setup
+    - exec-host: |
+        rm -rf /var/www/html/.cache
+        ddev setup

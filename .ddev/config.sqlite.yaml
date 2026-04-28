@@ -1,0 +1,2 @@
+web_environment:
+  - SIMPLETEST_DB=sqlite://sites/default/files/.ht.sqlite
