@@ -1,0 +1,7 @@
+name: Canvas Paragraphs
+description: 'Paragraphs source'
+core_version_requirement: ^11.1
+type: module
+dependencies:
+  - canvas:canvas
+  - paragraphs:paragraphs
