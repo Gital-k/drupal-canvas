@@ -1,10 +1,9 @@
-import { Drupal } from '@drupal/playwright';
-
-import { mkdir, readFile, rm, cp, copyFile, writeFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { copyFile, cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { Drupal } from '@drupal/playwright';
 
 import { setupSite } from './setup.js';
 
@@ -107,7 +106,9 @@ export async function createSnapshotState({
     existsSync(snapshotDbPath)
   ) {
     console.log('snapshotState: reusing cached snapshot from ' + snapshotRoot);
-    const meta: SnapshotMeta = JSON.parse(await readFile(cacheMetaPath, 'utf8'));
+    const meta: SnapshotMeta = JSON.parse(
+      await readFile(cacheMetaPath, 'utf8'),
+    );
     const { sqlitePath } = meta;
     const sitePathFull = path.join(rootDir, meta.sitePath);
     const drupalSite: DrupalSite = {
@@ -144,7 +145,10 @@ export async function createSnapshotState({
     baseURL && baseURL.length
       ? await browser.newContext({ baseURL })
       : await browser.newContext();
-  console.log('createSnapshotState: new context created. BaseURL: ' + baseURL || 'No base URL');
+  console.log(
+    'createSnapshotState: new context created. BaseURL: ' + baseURL ||
+      'No base URL',
+  );
   const page = await context.newPage();
   const drupal = new Drupal({ page, drupalSite });
 
@@ -157,7 +161,10 @@ export async function createSnapshotState({
   await drupal.setTestCookie();
   const startTime = performance.now();
   await setupSite({ drupal });
-  console.log('createSnapshotState: Site configured in ' + (performance.now() - startTime));
+  console.log(
+    'createSnapshotState: Site configured in ' +
+      (performance.now() - startTime),
+  );
   await page.close();
   await context.close();
 

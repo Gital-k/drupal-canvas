@@ -7,8 +7,8 @@ import { test as base } from '@playwright/test';
 
 import { Ai } from '../objects/Ai.js';
 import { Canvas } from '../objects/Canvas.js';
-import { createSnapshotState } from '../snapshot.js';
 import { setupSite } from '../setup.js';
+import { createSnapshotState } from '../snapshot.js';
 
 import type { DrupalSite } from '@drupal/playwright';
 import type { Browser } from '@playwright/test';
@@ -87,13 +87,18 @@ export const snapshotPerTest = base.extend<
 >({
   snapshotState: [
     async ({ browser }, use, testInfo) => {
-      console.log('snapshotState: worker init for '+(testInfo.project?.use?.baseURL || 'there is no baseURL'));
+      console.log(
+        'snapshotState: worker init for ' +
+          (testInfo.project?.use?.baseURL || 'there is no baseURL'),
+      );
       const startTime = performance.now();
       const snapshotState = await createSnapshotState({
         baseURL: testInfo.project?.use?.baseURL,
         browser,
       });
-      console.log('snapshotState: Snapshot created in ' + (performance.now() - startTime));
+      console.log(
+        'snapshotState: Snapshot created in ' + (performance.now() - startTime),
+      );
 
       await use(snapshotState);
       await snapshotState.drupalSite.teardown();
@@ -109,10 +114,12 @@ export const snapshotPerTest = base.extend<
   ],
   drupal: [
     async ({ page, snapshotState }, use) => {
-      console.log('drupal: Starting to restore the snapshot')
+      console.log('drupal: Starting to restore the snapshot');
       const startTime = performance.now();
       await snapshotState.restore();
-      console.log('drupal: Snapshot restored in ' + (performance.now() - startTime));
+      console.log(
+        'drupal: Snapshot restored in ' + (performance.now() - startTime),
+      );
       const drupal = new Drupal({ page, drupalSite: snapshotState.drupalSite });
       await drupal.setTestCookie();
       await use(drupal);

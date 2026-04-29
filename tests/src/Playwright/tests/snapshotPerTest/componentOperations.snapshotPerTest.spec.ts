@@ -288,9 +288,11 @@ test.describe('Perform CRUD operations on components', () => {
     await page.locator(cssSel).setChecked(false);
     await Promise.all([
       page.waitForURL('**/admin/config/development/performance'),
-      page.locator(
-        'form[data-drupal-selector="system-performance-settings"] [data-drupal-selector="edit-submit"]',
-      ).click(),
+      page
+        .locator(
+          'form[data-drupal-selector="system-performance-settings"] [data-drupal-selector="edit-submit"]',
+        )
+        .click(),
     ]);
     await expect(page.locator(cssSel)).not.toBeChecked();
     await drupal.logout();
