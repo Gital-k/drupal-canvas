@@ -862,7 +862,7 @@ test.describe('Multivalue Prop Types', () => {
   });
 
   test.describe('Datetime (Unlimited)', () => {
-    test('ghost row appears when deleting from bottom to top', async ({
+    test('no ghost row appears when deleting from bottom to top', async ({
       page,
     }) => {
       // Find the DateTime (Unlimited) field - only appears with unlimited cardinality.
@@ -875,57 +875,48 @@ test.describe('Multivalue Prop Types', () => {
           }),
         });
 
-      // Verify initial state - get actual row count and add more rows if needed.
-      let rows = dateTimeUnlimitedField.locator('tr.draggable');
-      let initialRowCount = await rows.count();
+      // Rows locator is defined once — Playwright Locators are lazy and always
+      // reflect the current DOM, so there is no need to reassign it.
+      const rows = dateTimeUnlimitedField.locator('tr.draggable');
 
-      // Ensure we have at least 3 rows to delete 2 and see the ghost row
-      while (initialRowCount < 3) {
+      // Ensure we have at least 3 rows so we can delete 2 and verify no ghost
+      // rows remain.
+      while ((await rows.count()) < 3) {
         await dateTimeUnlimitedField
           .getByRole('button', { name: '+ Add new' })
           .click();
         await page.waitForLoadState('networkidle');
-        rows = dateTimeUnlimitedField.locator('tr.draggable');
-        initialRowCount = await rows.count();
       }
+
+      const initialRowCount = await rows.count();
 
       // Remove the last row (delete from bottom to top).
-      let lastRow = rows.last();
-      await lastRow.getByRole('button', { name: /^Edit DateTime/ }).click();
-      let popover = lastRow.getByRole('dialog');
-      let removeButton = popover.getByRole('button', { name: 'Remove' });
+      await rows.last().getByRole('button', { name: /^Edit DateTime/ }).click();
+      let popover = rows.last().getByRole('dialog');
+      const firstRemoveButton = popover.getByRole('button', { name: 'Remove' });
+      await expect(firstRemoveButton).toBeEnabled();
+      await firstRemoveButton.click();
+      await page.waitForLoadState('networkidle');
 
-      if (await removeButton.isEnabled()) {
-        await removeButton.click();
-        await page.waitForLoadState('networkidle');
-      } else {
-        await popover
-          .getByRole('button', { name: 'Close' })
-          .dispatchEvent('click');
-      }
+      // After the first deletion the count must drop by exactly 1.
+      // If a ghost row appeared instead, the count would remain at initialRowCount
+      // and this assertion would fail — catching the bug.
+      await expect(rows).toHaveCount(initialRowCount - 1);
 
-      // Remove another row (delete from bottom to top).
-      rows = dateTimeUnlimitedField.locator('tr.draggable');
-      lastRow = rows.last();
-      await lastRow.getByRole('button', { name: /^Edit DateTime/ }).click();
-      popover = lastRow.getByRole('dialog');
-      removeButton = popover.getByRole('button', { name: 'Remove' });
+      // Remove the new last row (continuing bottom-to-top).
+      await rows.last().getByRole('button', { name: /^Edit DateTime/ }).click();
+      popover = rows.last().getByRole('dialog');
+      const secondRemoveButton = popover.getByRole('button', {
+        name: 'Remove',
+      });
+      await expect(secondRemoveButton).toBeEnabled();
+      await secondRemoveButton.click();
+      await page.waitForLoadState('networkidle');
 
-      if (await removeButton.isEnabled()) {
-        await removeButton.click();
-        await page.waitForLoadState('networkidle');
-      } else {
-        await popover
-          .getByRole('button', { name: 'Close' })
-          .dispatchEvent('click');
-      }
-
-      // After deleting 2 rows from bottom to top, verify rows are removed.
-      rows = dateTimeUnlimitedField.locator('tr.draggable');
-      const finalRowCount = await rows.count();
-
-      // Final count should be less than initial (at least 2 were deleted)
-      await expect(finalRowCount).toBeLessThan(initialRowCount);
+      // After the second deletion the count must drop by exactly 2 from the
+      // original. A ghost row bug would leave the count at initialRowCount - 1
+      // or higher, failing this assertion.
+      await expect(rows).toHaveCount(initialRowCount - 2);
     });
   });
 });
