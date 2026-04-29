@@ -891,7 +891,10 @@ test.describe('Multivalue Prop Types', () => {
       const initialRowCount = await rows.count();
 
       // Remove the last row (delete from bottom to top).
-      await rows.last().getByRole('button', { name: /^Edit DateTime/ }).click();
+      await rows
+        .last()
+        .getByRole('button', { name: /^Edit DateTime/ })
+        .click();
       let popover = rows.last().getByRole('dialog');
       const firstRemoveButton = popover.getByRole('button', { name: 'Remove' });
       await expect(firstRemoveButton).toBeEnabled();
@@ -904,7 +907,10 @@ test.describe('Multivalue Prop Types', () => {
       await expect(rows).toHaveCount(initialRowCount - 1);
 
       // Remove the new last row (continuing bottom-to-top).
-      await rows.last().getByRole('button', { name: /^Edit DateTime/ }).click();
+      await rows
+        .last()
+        .getByRole('button', { name: /^Edit DateTime/ })
+        .click();
       popover = rows.last().getByRole('dialog');
       const secondRemoveButton = popover.getByRole('button', {
         name: 'Remove',
