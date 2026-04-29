@@ -6,7 +6,9 @@ web_environment:
   - DB_URL=sqlite://localhost/sites/default/files/.ht.sqlite
   - DISPLAY=host.docker.internal:0
   - DRUPAL_PROJECT_FOLDER=/var/www/html/web/modules/contrib/canvas
+  - DRUPAL_TEST_BASE_URL=https://${DDEV_HOSTNAME}
   - DRUPAL_TEST_DB_URL=sqlite://localhost/sites/default/files/.ht.sqlite
+  - DRUPAL_TEST_DRUPAL_ROOT=/var/www/html/web
   - VITE_SERVER_ORIGIN=https://${DDEV_HOSTNAME}:5174
 webimage_extra_packages:
   - libasound2

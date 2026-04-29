@@ -1,0 +1,25 @@
+name: ddev-playwright
+repository: Lullabot/ddev-playwright
+version: v0.5.3
+install_date: "2026-04-28T13:45:06-07:00"
+project_files:
+    - commands/host/install-playwright
+    - commands/web/playwright
+    - web-build/disabled.Dockerfile.playwright
+    - web-build/Dockerfile.task
+    - web-build/Dockerfile.uv
+    - web-build/install-task.sh
+    - web-build/install-kasmvnc.sh
+    - web-build/kasmvnc.yaml
+    - web-build/xstartup
+    - config.playwright.yml
+    - docker-compose.sqlite.yaml
+    - web-entrypoint.d/mkcert-nssdb.sh
+global_files: []
+removal_actions:
+    - if grep "#ddev-generated" web-build/Dockerfile.playwright 2>/dev/null; then rm web-build/Dockerfile.playwright; fi
+    - |
+      GITIGNORE="${DDEV_APPROOT}/.ddev/web-build/.gitignore"
+      if [ -f "$GITIGNORE" ]; then
+        sed -i '/# This file is optionally copied to enable playwright from$/d; /# disabled\.Dockerfile\.playwright\.$/d; /^Dockerfile\.playwright$/d; /# This directory is always copied from/d; /^playwright$/d' "$GITIGNORE"
+      fi

@@ -1,0 +1,6 @@
+#!/bin/sh
+#ddev-generated
+
+cd /var/www/html
+npm ci
+npx playwright "$@"

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 ## #ddev-generated
 ## Description: Set up the Canvas development environment.
@@ -51,14 +51,18 @@ ddev symlink-project
 # Regenerate ddev Drupal settings after directory structure is set up
 ddev config --update
 
+# Create simpletest directory for Playwright/PHPUnit test site installations
+mkdir -p web/sites/simpletest
+chmod 777 web/sites/simpletest
+
 # Allow test modules and themes to be installed.
 # shellcheck disable=SC2016
-printf '\n# Allow test modules and themes to be installed.\n$settings["extension_discovery_scan_tests"] = TRUE;' \
+printf '\n// Allow test modules and themes to be installed.\n$settings["extension_discovery_scan_tests"] = TRUE;' \
   >> web/sites/default/settings.ddev.php
 
 # Force sqlite
 # shellcheck disable=SC2016
-printf '\n# Force SQL Lite\n$databases["default"]["default"] = \n[\n    "driver" => "sqlite",\n    "database" => "sites/default/files/.ht.sqlite",\n];' \
+printf '\n// Force SQL Lite\n$databases["default"]["default"] = \n[\n    "driver" => "sqlite",\n    "database" => "sites/default/files/.ht.sqlite",\n];' \
   >> web/sites/default/settings.ddev.php
 
 # Install Drupal and enable the Drupal Canvas module.

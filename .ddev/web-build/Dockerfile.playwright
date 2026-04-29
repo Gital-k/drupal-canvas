@@ -1,0 +1,84 @@
+#ddev-generated
+# Debian images by default disable apt caching, so turn it on until we finish
+# the build.
+RUN mv /etc/apt/apt.conf.d/docker-clean /etc/apt/docker-clean-disabled
+
+RUN apt-get update
+
+# Install Playwright browsers and system dependencies.
+#
+# Manual changes to Dockerfile.playwright will be reverted every time ddev
+# start is run. In general, edit this file instead.
+#
+# Canvas uses playwright.config.ts at the project root with tests in
+# tests/src/Playwright/. What this does is:
+#
+# 1. Mounts a copy of package.json and package-lock.json from the project root.
+#    We need this to install the correct version of Playwright and its browsers.
+#    The config.playwright.yml pre-start hook copies these files to web-build/playwright/.
+# 2. $username doesn't work in --mount... lines as it's a shell variable set by
+#    ddev. Instead, we mount the .cache cache into /ms-playwright-cache, and
+#    symlink it in. We merge any existing ~/.cache content into the mount first
+#    (cp -an preserves existing cache entries) and then replace ~/.cache with a
+#    symlink. The merge step makes this order-independent with other Dockerfile
+#    instructions that may populate ~/.cache before this RUN executes.
+# 3. PLAYWRIGHT_SKIP_BROWSER_GC=1 prevents `playwright install` from removing
+#    browsers installed by a different playwright-core version (e.g.
+#    @playwright/cli from ddev-playwright-cli). Without this, playwright's
+#    built-in GC deletes any browsers not referenced by the current package.
+#    See https://github.com/microsoft/playwright/blob/7f55e117ce4d/packages/playwright-core/src/server/registry/index.ts#L1080-L1081
+# 4. Then we remove the symlink, and copy the cache directory into ~/.cache so
+#    it is persisted in the image.
+#
+# See https://github.com/ddev/ddev/issues/4727.
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+  --mount=type=cache,target=/var/lib/apt,sharing=locked \
+  --mount=type=cache,target=/ms-playwright-cache,sharing=locked \
+  --mount=type=bind,source=./playwright,target=/playwright-build \
+  chown -R $username:$username /ms-playwright-cache \
+  && cp -an /home/$username/.cache/* /ms-playwright-cache/ 2>/dev/null; \
+  rm -rf /home/$username/.cache \
+  && sudo -u $username ln -s /ms-playwright-cache /home/$username/.cache \
+  && cd /var/www/html \
+  && sudo -u $username cp /playwright-build/package.json . \
+  && sudo -u $username cp /playwright-build/package-lock.json . 2>/dev/null || true \
+  && sudo -u $username npm ci \
+  && sudo -u $username npx playwright install-deps \
+  && sudo -u $username PLAYWRIGHT_SKIP_BROWSER_GC=1 npx playwright install \
+  && rm /home/$username/.cache \
+  && sudo -u $username mkdir -p /home/$username/.cache \
+  && sudo -u $username cp -a /ms-playwright-cache/* /home/$username/.cache/
+
+# Install a window manager, plus libnss3-tools so the web-entrypoint.d
+# mkcert-nssdb.sh script can populate the user's NSS database with DDEV's
+# mkcert root CA — required for Chromium-based browsers to trust
+# *.ddev.site HTTPS certificates without `ignoreHTTPSErrors`.
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+  --mount=type=cache,target=/var/lib/apt,sharing=locked \
+  sudo apt-get install -y icewm \
+    libnss3-tools \
+    xauth
+
+# Install kasmvnc for remote access.
+COPY install-kasmvnc.sh /usr/local/bin
+RUN chmod +x /usr/local/bin/install-kasmvnc.sh
+
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+  --mount=type=cache,target=/var/lib/apt,sharing=locked \
+  install-kasmvnc.sh
+
+# We can't add the user to the ssl-cert group. Rather, we can add them, but it
+# won't actually apply to ddev ssh / docker exec.
+# Even though we disable requiring SSL because we route through the ddev
+# router, kasmvnc still requires reading the TLS cert.
+RUN sudo chgrp -R $gid /etc/ssl/private
+
+RUN sudo -u $username mkdir /home/$username/.vnc
+COPY kasmvnc.yaml xstartup /home/$username/.vnc
+RUN chown $username:$username /home/$username/.vnc/*
+RUN sudo -u $username touch /home/$username/.vnc/.de-was-selected
+
+RUN sudo -u $username /bin/bash -c 'echo -e "secret\nsecret\n" | kasmvncpasswd -wo -u $USER'
+
+# We're done with apt so disable caching again for the final image.
+RUN mv /etc/apt/docker-clean-disabled /etc/apt/apt.conf.d/docker-clean
