@@ -150,7 +150,7 @@ final class PageMetatagIntegrationTest extends CanvasKernelTestBase {
     self::assertSaveWithoutViolations($page);
     $themeHandler = $this->container->get('theme_handler');
     \assert($themeHandler instanceof ThemeHandlerInterface);
-    $sut = new EntityFormController($this->container->get(AutoSaveManager::class), $this->container->get(RequestStack::class), $themeHandler);
+    $sut = new EntityFormController($this->container->get(AutoSaveManager::class), $this->container->get(RequestStack::class), $themeHandler, $this->container->get('keyvalue.expirable'));
     $form = $sut->form(Page::ENTITY_TYPE_ID, $page, 'default');
     self::assertArrayHasKey('image', $form['seo_settings']);
     self::assertArrayHasKey('description', $form['seo_settings']);
