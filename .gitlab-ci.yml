@@ -115,7 +115,6 @@ variables:
   # (Useful when early in an MR and/or developing low-level functionality that is unlikely to affect E2E tests.)
   _CANVAS_E2E_TESTS: true
 
-# @todo Remove when https://www.drupal.org/project/gitlab_templates/issues/3452183 lands.
 .is-push-rule: &is-push-rule
   if: $CI_PIPELINE_SOURCE == "push" && $CI_PROJECT_ROOT_NAMESPACE == "project"
 
@@ -123,45 +122,52 @@ variables:
   - when: manual
     allow_failure: true
 
-# @todo Remove when https://www.drupal.org/project/gitlab_templates/issues/3452183 lands.
-.php-files-change-rule: &php-files-change-rule
+.backend-files-change-rule: &backend-files-change-rule
   - if: $_FOR_EVERY_MR_COMMIT == "true" || $_FOR_EVERY_MR_COMMIT == null
     changes:
-      - "**/*.{php,module,inc,install,theme,profile}"
-    when: on_success
-
-# @todo Remove when https://www.drupal.org/project/gitlab_templates/issues/3452183 lands.
-.css-files-change-rule: &css-files-change-rule
-  - if: $_FOR_EVERY_MR_COMMIT == "true" || $_FOR_EVERY_MR_COMMIT == null
-    changes:
-      - "**/*.css"
-      - package.json
-      - ui/package.json
-      - .prettierrc.json
-    when: on_success
-
-# @todo Remove when https://www.drupal.org/project/gitlab_templates/issues/3452183 lands.
-.module-metadata-files-change-rule: &module-metadata-files-change-rule
-  - if: $_FOR_EVERY_MR_COMMIT == "true" || $_FOR_EVERY_MR_COMMIT == null
-    changes:
-      - "**/*.yml"
-    when: on_success
-
-# @todo Remove when https://www.drupal.org/project/gitlab_templates/issues/3452183 lands.
-.module-config-files-change-rule: &module-config-files-change-rule
-  - if: $_FOR_EVERY_MR_COMMIT == "true" || $_FOR_EVERY_MR_COMMIT == null
-    changes:
-      # config schema and/or default config
-      - config
-    when: on_success
-
-# @todo Remove when https://www.drupal.org/project/gitlab_templates/issues/3452183 lands.
-.SDC-files-change-rule: &SDC-files-change-rule
-  - if: $_FOR_EVERY_MR_COMMIT == "true" || $_FOR_EVERY_MR_COMMIT == null
-    changes:
-      - components
+      # The files and directories most Drupal modules contain.
+      - canvas.*.yml
+      - canvas.module
+      - canvas.post_update.php
+      - composer.*
+      - config/**/*
+      - src/**/*
+      - templates/**/*
+      - themes/**/*
+      # JSON Schema definitions used by SDCs to define props.
       - schema.json
-      - "**/*.twig"
+      # SDCs provided by Canvas for other SDCs to reuse.
+      - components/**/*
+      # Submodules.
+      - modules/**/*
+      # Any test using Canvas' Internal HTTP API has its requests and responses validated against the OpenAPI spec.
+      - openapi.yml
+    when: on_success
+
+# This is a subset of .backend-files-change-rule.
+.data-integrity-files-change-rule: &data-integrity-files-change-rule
+  - if: $_FOR_EVERY_MR_COMMIT == "true" || $_FOR_EVERY_MR_COMMIT == null
+    changes:
+      # Configuration schema, which references many validation constraints.
+      - config/schema/**/*
+      # Validation logic for either content or config.
+      - "**/*Constraint.php"
+      - "**/*Validator.php"
+      # ⚠️Imperfect, because validation constraints can be added to entity type classes, altered in, etc. However, it
+      # is very unlikely that an MR would add or change validation constraints without also changing one of these files.
+
+.UI-files-change-rule: &UI-files-change-rule
+  - if: $_FOR_EVERY_MR_COMMIT == "true" || $_FOR_EVERY_MR_COMMIT == null
+    changes:
+      # Customizations to Drupal's JS.
+      - js/**/*
+      # The Canvas UI.
+      - package.json
+      - package-lock.json
+      - ui/**/*
+      # Dependencies of the Canvas UI.
+      - packages/astro-hydration
+      - packages/types
     when: on_success
 
 .ui-fixture-files-change-rule: &UI-fixtures-files-change-rule
@@ -170,8 +176,17 @@ variables:
       - ui/tests/fixtures/**/*
     when: on_success
 
-.e2e-tests-are-enabled-rule: &e2e-tests-are-enabled-rule
-  - if: $_CANVAS_E2E_TESTS == "true"
+.e2e-tests-must-not-be-disabled-rule: &e2e-tests-must-not-be-disabled-rule
+  - if: $_CANVAS_E2E_TESTS == "false"
+    when: never
+
+# The rules to be used by all E2E CI jobs, to ensure they are triggered consistently.
+.e2e-ci-job-rules: &e2e-ci-job-rules
+  - *e2e-tests-must-not-be-disabled-rule
+  - *is-push-rule
+  - *backend-files-change-rule
+  - *UI-files-change-rule
+  - *manual-rule
 
 default:
   cache:
@@ -183,6 +198,8 @@ default:
     paths:
       - .cache/composer
       - .cache/npm
+      - .cache/astro
+      - .cache/tsc
     policy: pull
     fallback_keys:
       - ${CI_PARENT_PROJECT_NAME}
@@ -202,9 +219,18 @@ cache dependencies:
       paths:
         - .cache/composer
         - .cache/npm
+        - .cache/astro
+        - .cache/tsc
       policy: pull-push
       fallback_keys:
         - ${CI_PARENT_PROJECT_NAME}
+    - key: ${CI_PARENT_PROJECT_NAME}
+      paths:
+        - .cache/composer
+        - .cache/npm
+        - .cache/astro
+        - .cache/tsc
+      policy: push
     - key:
         files:
           - package-lock.json
@@ -212,9 +238,12 @@ cache dependencies:
       paths:
         - .cache/ms-playwright
       policy: pull-push
+    - key: ${CI_PARENT_PROJECT_NAME}-playwright-latest
+      paths:
+        - .cache/ms-playwright
+      policy: push
   before_script:
-    - !reference [ .drupal ]
-    - composer run install-dev-deps
+    - !reference [ .drupal-with-dev-dependencies ]
   script:
     - npm ci
     - npx playwright install
@@ -260,8 +289,76 @@ stylelint:
   rules:
     - when: never
 
+phpstan-is-up-to-date:
+  stage: development
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - *manual-rule
+  script:
+    - |
+      # PHPStan packages in composer.json to check for updates.
+      PACKAGES="phpstan/phpstan jangregor/phpstan-prophecy mglaman/phpstan-drupal phpat/phpat phpstan/phpstan-strict-rules"
+      UPDATED=0
+      cp composer.json composer.json.orig
+
+      for PKG in $PACKAGES; do
+        # Get the current pinned version from composer.json.
+        CURRENT=$(jq -r --arg pkg "$PKG" '(.require[$pkg] // .["require-dev"][$pkg]) // empty' composer.json)
+        if [ -z "$CURRENT" ]; then
+          echo "⏭️  $PKG not found in composer.json, skipping."
+          continue
+        fi
+
+        # Query Packagist for the latest stable version.
+        LATEST=$(curl -s "https://repo.packagist.org/p2/$PKG.json" | jq -r --arg pkg "$PKG" '.packages[$pkg] | map(select(.version_normalized | test("^[0-9]") and (test("(alpha|beta|rc|dev)"; "i") | not))) | sort_by(.version_normalized | split(".") | map(tonumber)) | last | .version')
+
+        if [ -z "$LATEST" ] || [ "$LATEST" = "null" ]; then
+          echo "⚠️  Could not determine latest version for $PKG, skipping."
+          continue
+        fi
+
+        echo "📦 $PKG: pinned=$CURRENT, latest=$LATEST"
+
+        if [ "$CURRENT" != "$LATEST" ]; then
+          echo "  ⬆️  Update available: $CURRENT → $LATEST"
+          jq --indent 4 --arg pkg "$PKG" --arg ver "$LATEST" '
+            if .require[$pkg] then .require[$pkg] = $ver
+            elif .["require-dev"][$pkg] then .["require-dev"][$pkg] = $ver
+            else . end
+          ' composer.json > composer.json.tmp && mv composer.json.tmp composer.json
+          UPDATED=1
+        else
+          echo "  ✅ Up to date."
+        fi
+      done
+
+      if [ "$UPDATED" -eq 1 ]; then
+        echo ""
+        echo "🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥"
+        echo "PHPStan dependencies are outdated. Diff:"
+        echo ""
+        diff -u composer.json.orig composer.json || true
+        echo ""
+        echo "Updated composer.json is available in the artifacts."
+        exit 1
+      else
+        echo ""
+        echo "👍👍👍👍👍👍👍👍👍👍👍👍👍👍👍👍👍👍"
+        echo "All PHPStan dependencies are up to date."
+      fi
+  artifacts:
+    when: on_failure
+    expire_in: 6 mos
+    paths:
+      - composer.json
+  # Allow this to fail, to avoid disrupting Canvas's CI when upstream changes.
+  allow_failure: true
+
 phpcs-rules-match-drupal-11:
   stage: development
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - *manual-rule
   script:
     - |
       # Download the file from the Drupal repository
@@ -324,10 +421,9 @@ phpunit:
     # _PHPUNIT_TESTGROUPS: canvas_component_sources
 
   before_script:
-    - !reference [ .drupal ]
-    - !reference [.drupal-enable-test-modules]
+    - !reference [ .drupal-with-dev-dependencies ]
+    - !reference [ .drupal-enable-test-modules ]
     - !reference [ .canvas-ui ]
-    - composer run install-dev-deps
     # Forward-port upstream fix for https://www.drupal.org/project/drupal/issues/3582249
     # (PHPUnit SourceMapper races with concurrent test cleanup under sites/simpletest,
     # causing "RecursiveDirectoryIterator: Failed to open directory" random failures).
@@ -373,13 +469,9 @@ phpunit:
   # @see https://git.drupalcode.org/issue/gitlab_templates-3447792/-/compare/main...3447792-raise-sqlite-version?from_project_id=96292, when 984abb7b4781559a13078d58bb65f6959fe42179 was the last commit.
   image:
     name: $_CONFIG_DOCKERHUB_ROOT/php-$PHP_VERSION-ubuntu-apache:$_TARGET_PHP_IMAGE_TAG
-  # @todo Remove when https://www.drupal.org/project/gitlab_templates/issues/3452183 lands.
   rules:
     - *is-push-rule
-    - *php-files-change-rule
-    - *module-metadata-files-change-rule
-    - *module-config-files-change-rule
-    - *SDC-files-change-rule
+    - *backend-files-change-rule
     - *UI-fixtures-files-change-rule
     - *manual-rule
   artifacts:
@@ -439,9 +531,6 @@ vitest:
 
 .cypress-base:
   stage: test
-  rules:
-    - *e2e-tests-are-enabled-rule
-    - *manual-rule
   extends:
     - .test-variables
   before_script:
@@ -458,10 +547,9 @@ vitest:
     # Copied from `.nightwatch-base`, but converted to use GitLab CI references.
     # 👇
     #
-    - !reference [ .drupal ]
-    - !reference [.drupal-enable-test-modules]
+    - !reference [ .drupal-with-dev-dependencies ]
+    - !reference [ .drupal-enable-test-modules ]
     - !reference [ .canvas-ui ]
-    - composer run install-dev-deps
     #
     # 👆
     #
@@ -505,6 +593,7 @@ vitest:
 
 cypress E2E:
   extends: .cypress-base
+  rules: *e2e-ci-job-rules
   parallel: 4
   script:
     - npx cypress run --browser electron --reporter junit --reporter-options "mochaFile=junit-[hash].xml" --spec=`node ./tests/support/parallel.js` 2>&1 | tee cypress.log || EXIT_CODE=$?
@@ -542,8 +631,7 @@ lint (php):
     GIT_DEPTH: 1
     COMPOSER_ROOT_VERSION: 0.0.0
   before_script:
-    - !reference [ .drupal-files ]
-    - composer run install-dev-deps
+    - !reference [ .drupal-files-with-dev-dependencies ]
     - mkdir -p test-results
   script:
     # PHPStan doesn't allow multiple outputs, but it will cache the result so
@@ -584,9 +672,11 @@ lint (node):
 .playwright-comparison-base:
   stage: test
   needs: []
-  rules:
-    - *e2e-tests-are-enabled-rule
-    - *manual-rule
+  parallel:
+    matrix:
+      - SHARD: [ "1/6", "2/6", "3/6", "4/6", "5/6", "6/6" ]
+        #PROJECT: [ "chromium", "firefox", "webkit" ]
+  rules: *e2e-ci-job-rules
   interruptible: true
   image: ghcr.io/drupal-canvas/drupal-testing:2.0.0
   extends:
@@ -600,6 +690,8 @@ lint (node):
       paths:
         - .cache/composer
         - .cache/npm
+        - .cache/astro
+        - .cache/tsc
       policy: pull
       fallback_keys:
         - ${CI_PARENT_PROJECT_NAME}
@@ -610,6 +702,8 @@ lint (node):
       paths:
         - .cache/ms-playwright
       policy: pull
+      fallback_keys:
+        - ${CI_PARENT_PROJECT_NAME}-playwright-latest
   variables:
     GIT_DEPTH: 1
     _TARGET_DB_TYPE: sqlite
@@ -618,9 +712,11 @@ lint (node):
     DRUPAL_TEST_PLAYWRIGHT_SKIP_TEARDOWN: true
     COMPOSER_IGNORE_PLATFORM_REQS:
   before_script:
-    - !reference [ .drupal ]
+    - !reference [ .drupal-with-dev-dependencies ]
     - !reference [ .canvas-ui ]
-    - composer run install-dev-deps
+  script:
+    - npm ci
+    - npm run test:playwright -- --shard=$SHARD
   after_script:
     - cp -R _drupal/web/modules/contrib/$CI_PARENT_PROJECT_NAME/blob-report $CI_PROJECT_DIR/blob-report
   artifacts:
@@ -631,9 +727,11 @@ lint (node):
 
 .playwright-reports-base:
   stage: report
-  rules:
-    - *e2e-tests-are-enabled-rule
-    - *manual-rule
+  rules: *e2e-ci-job-rules
+  needs:
+    - playwright
+  when:
+    always
   image: ghcr.io/drupal-canvas/drupal-testing:2.0.0
   script:
     - mkdir -p test-results
@@ -701,19 +799,20 @@ CLI Test:
   image: ghcr.io/drupal-canvas/drupal-testing:2.0.0
   needs: []
   rules:
+    - *e2e-tests-must-not-be-disabled-rule
     - changes:
         - "packages/cli/**/*"
         - package.json
         - package-lock.json
         - openapi.yml
+        # Everything below is a subset of .backend-files-change-rule.
         - src/Entity/**/*
         - src/Controller/**/*
         # CLI Test checks these components so changes may affect test results.
         - tests/modules/canvas_test_code_components/**/*
     - if: '$CI_COMMIT_TAG =~ /^cli-\d+\.\d+\.\d+(-\w+\d*)?$/'
-    - *module-config-files-change-rule
+    - *data-integrity-files-change-rule
     - *manual-rule
-    - *e2e-tests-are-enabled-rule
   variables:
     GIT_DEPTH: 1
     _TARGET_DB_TYPE: sqlite
@@ -722,9 +821,8 @@ CLI Test:
     DRUPAL_TEST_WEBSERVER_USER: www-data
     DRUPAL_TEST_BASE_URL: http://localhost
   before_script:
-    - !reference [ .drupal ]
+    - !reference [ .drupal-with-dev-dependencies ]
     - !reference [ .canvas-ui ]
-    - composer run install-dev-deps
     - mkdir -p test-results
   # This job must pass, but must also not disrupt Canvas's CI if dependencies have a security vulnerability.
   allow_failure:
