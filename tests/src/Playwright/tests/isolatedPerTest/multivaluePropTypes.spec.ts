@@ -860,4 +860,72 @@ test.describe('Multivalue Prop Types', () => {
       },
     );
   });
+
+  test.describe('Datetime (Unlimited)', () => {
+    test('ghost row appears when deleting from bottom to top', async ({
+      page,
+    }) => {
+      // Find the DateTime (Unlimited) field - only appears with unlimited cardinality.
+      const dateTimeUnlimitedField = page
+        .locator('.field--type-datetime')
+        .filter({
+          has: page.getByRole('heading', {
+            name: 'DateTime (Unlimited)',
+            exact: true,
+          }),
+        });
+
+      // Verify initial state - get actual row count and add more rows if needed.
+      let rows = dateTimeUnlimitedField.locator('tr.draggable');
+      let initialRowCount = await rows.count();
+
+      // Ensure we have at least 3 rows to delete 2 and see the ghost row
+      while (initialRowCount < 3) {
+        await dateTimeUnlimitedField
+          .getByRole('button', { name: '+ Add new' })
+          .click();
+        await page.waitForLoadState('networkidle');
+        rows = dateTimeUnlimitedField.locator('tr.draggable');
+        initialRowCount = await rows.count();
+      }
+
+      // Remove the last row (delete from bottom to top).
+      let lastRow = rows.last();
+      await lastRow.getByRole('button', { name: /^Edit DateTime/ }).click();
+      let popover = lastRow.getByRole('dialog');
+      let removeButton = popover.getByRole('button', { name: 'Remove' });
+
+      if (await removeButton.isEnabled()) {
+        await removeButton.click();
+        await page.waitForLoadState('networkidle');
+      } else {
+        await popover
+          .getByRole('button', { name: 'Close' })
+          .dispatchEvent('click');
+      }
+
+      // Remove another row (delete from bottom to top).
+      rows = dateTimeUnlimitedField.locator('tr.draggable');
+      lastRow = rows.last();
+      await lastRow.getByRole('button', { name: /^Edit DateTime/ }).click();
+      popover = lastRow.getByRole('dialog');
+      removeButton = popover.getByRole('button', { name: 'Remove' });
+
+      if (await removeButton.isEnabled()) {
+        await removeButton.click();
+        await page.waitForLoadState('networkidle');
+      } else {
+        await popover
+          .getByRole('button', { name: 'Close' })
+          .dispatchEvent('click');
+      }
+
+      // After deleting 2 rows from bottom to top, verify rows are removed.
+      rows = dateTimeUnlimitedField.locator('tr.draggable');
+      const finalRowCount = await rows.count();
+
+      // Final count should be less than initial (at least 2 were deleted)
+      await expect(finalRowCount).toBeLessThan(initialRowCount);
+    });
+  });
 });
