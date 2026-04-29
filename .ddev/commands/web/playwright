@@ -3,4 +3,4 @@
 
 cd /var/www/html
 npm ci
-npx playwright "$@"
+DRUPAL_TEST_DRUPAL_ROOT=web npx playwright "$@"
