@@ -5669,6 +5669,72 @@ describe('props in code editor', () => {
         },
       );
     });
+
+    // Regression tests for https://www.drupal.org/project/canvas/issues/...
+    // When "Allow multiple values" is enabled on a prop that is already
+    // required, minItems: 1 must be set so the backend constraint is satisfied.
+    describe('minItems: 1 is set and cleared correctly for required array props', () => {
+      const minItemsCases = [
+        { propType: 'Date and time', propName: 'EventDate' },
+        { propType: 'Text', propName: 'Tags' },
+        { propType: 'Link', propName: 'URLs' },
+        { propType: 'Integer', propName: 'Counts' },
+      ];
+
+      describe.each(minItemsCases)(
+        '$propType prop',
+        ({ propType, propName }) => {
+          it('sets minItems: 1 when required is toggled ON after allowMultiple is enabled', async () => {
+            await addProp(propType, propName);
+            await enableMultipleValues();
+            await toggleRequired();
+
+            await waitFor(() => {
+              const prop = getFirstProp();
+              expect(prop.allowMultiple).toBe(true);
+              expect(prop.minItems).toBe(1);
+            });
+          });
+
+          it('sets minItems: 1 when allowMultiple is enabled on an already-required prop', async () => {
+            await addProp(propType, propName);
+            await toggleRequired();
+            // Bug fix: minItems: 1 must be set even when allowMultiple is
+            // toggled ON after required is already ON.
+            await enableMultipleValues();
+
+            await waitFor(() => {
+              const prop = getFirstProp();
+              expect(prop.allowMultiple).toBe(true);
+              expect(prop.minItems).toBe(1);
+            });
+          });
+
+          it('clears minItems when allowMultiple is disabled', async () => {
+            await addProp(propType, propName);
+            await enableMultipleValues();
+            await toggleRequired();
+
+            await waitFor(() => {
+              expect(getFirstProp().minItems).toBe(1);
+            });
+
+            const multiValueCheckbox = screen.getByRole('checkbox', {
+              name: 'Allow multiple values',
+            });
+            await act(async () => {
+              fireEvent.click(multiValueCheckbox);
+            });
+
+            await waitFor(() => {
+              const prop = getFirstProp();
+              expect(prop.allowMultiple).toBe(false);
+              expect(prop.minItems).toBeUndefined();
+            });
+          });
+        },
+      );
+    });
   });
 
   describe('new multivalue props on exposed component', () => {

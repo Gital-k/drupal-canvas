@@ -442,6 +442,13 @@ export default function Props() {
                             : [];
                         updates.valueMode = VALUE_MODE_UNLIMITED;
                         updates.limitedCount = 1;
+                        // If the prop is already required, set minItems: 1 so the
+                        // backend constraint is satisfied. `required` alone only
+                        // means the key must be present — it does NOT prevent an
+                        // empty array. Only `minItems: 1` enforces that.
+                        if (isRequired) {
+                          updates.minItems = 1;
+                        }
                       } else if (
                         ['string', 'integer', 'number'].includes(prop.type)
                       ) {
@@ -461,7 +468,12 @@ export default function Props() {
                             : [];
                         updates.valueMode = VALUE_MODE_UNLIMITED;
                         updates.limitedCount = 1;
+                        // If the prop is already required, set minItems: 1.
+                        if (isRequired) {
+                          updates.minItems = 1;
+                        }
                       } else if (prop.type === 'object') {
+                        const isRequired = required.includes(propName);
                         // Convert to array type - for object types (image/video).
                         updates.type = 'array';
                         updates.items = {
@@ -485,6 +497,10 @@ export default function Props() {
                         }
                         updates.valueMode = 'unlimited';
                         updates.limitedCount = 1;
+                        // If the prop is already required, set minItems: 1.
+                        if (isRequired) {
+                          updates.minItems = 1;
+                        }
                       }
                     } else {
                       // Convert back to single value.
@@ -544,6 +560,9 @@ export default function Props() {
                       updates.example = defaultExample;
                       updates.valueMode = undefined;
                       updates.limitedCount = undefined;
+                      // Clear minItems when converting back to a single-value
+                      // prop — it only applies to required array props.
+                      updates.minItems = undefined;
                     }
 
                     dispatch(updateProp({ id: prop.id, updates }));
