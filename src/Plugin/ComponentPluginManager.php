@@ -72,31 +72,22 @@ class ComponentPluginManager extends CoreComponentPluginManager implements Categ
    * {@inheritdoc}
    */
   public function getDefinitions() {
-    if ($this->decorated->getCachedDefinitions() === NULL) {
-      $definitions = parent::getDefinitions();
-      $this->decorated->setCachedDefinitions($definitions);
+    $definitions = $this->getCachedDefinitions();
+    if ($definitions) {
+      return $definitions;
     }
-    return $this->decorated->getDefinitions();
-  }
 
-  /**
-   * {@inheritdoc}
-   */
-  public function getDefinition($plugin_id, $exception_on_invalid = TRUE) {
-    if ($this->decorated->getCachedDefinitions() === NULL) {
-      $this->getDefinitions();
+    $definitions = $this->decorated->getCachedDefinitions();
+    if ($definitions) {
+      $this->setCachedDefinitions($definitions);
+      return $definitions;
     }
-    return $this->decorated->getDefinition($plugin_id, $exception_on_invalid);
-  }
 
-  /**
-   * {@inheritdoc}
-   */
-  public function hasDefinition($plugin_id) {
-    if ($this->decorated->getCachedDefinitions() === NULL) {
-      $this->getDefinitions();
-    }
-    return $this->decorated->hasDefinition($plugin_id);
+    $definitions = parent::getDefinitions();
+    $this->decorated->setCachedDefinitions($definitions);
+    $this->setCachedDefinitions($definitions);
+
+    return $definitions;
   }
 
   /**
@@ -111,26 +102,6 @@ class ComponentPluginManager extends CoreComponentPluginManager implements Categ
    */
   public function getInstance(array $options) {
     return $this->decorated->getInstance($options);
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function find(string $component_id): Component {
-    if ($this->decorated->getCachedDefinitions() === NULL) {
-      $this->getDefinitions();
-    }
-    return $this->decorated->find($component_id);
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getAllComponents(): array {
-    if ($this->decorated->getCachedDefinitions() === NULL) {
-      $this->getDefinitions();
-    }
-    return $this->decorated->getAllComponents();
   }
 
   /**
@@ -173,6 +144,7 @@ class ComponentPluginManager extends CoreComponentPluginManager implements Categ
    * {@inheritdoc}
    */
   public function setCacheBackend(CacheBackendInterface $cache_backend, $cache_key, array $cache_tags = []): void {
+    parent::setCacheBackend($cache_backend, $cache_key, $cache_tags);
     $this->decorated->setCacheBackend($cache_backend, $cache_key, $cache_tags);
   }
 
