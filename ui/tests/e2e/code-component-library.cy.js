@@ -1,6 +1,8 @@
 describe('Code component library', () => {
   const testCodeComponentSelector =
     '[data-testid="canvas-primary-panel"] [data-canvas-component-id="js.test-code-component"]';
+  const myFirstCodeComponentSelector =
+    '[data-testid="canvas-primary-panel"] [data-canvas-component-id="js.my-cta"]';
 
   const openTestCodeComponentMenu = () => {
     cy.get(testCodeComponentSelector).within(() => {
@@ -11,9 +13,30 @@ describe('Code component library', () => {
     });
   };
 
+  const openMyFirstCodeComponentMenu = () => {
+    cy.get(myFirstCodeComponentSelector).within(() => {
+      cy.findAllByLabelText('Open contextual menu')
+        .first()
+        .click({ force: true });
+    });
+  };
+
   const openTestCodeComponentMenuInCodeEditor = () => {
     cy.findByTestId('canvas-primary-panel').within(() => {
       cy.findByText('Test Code Component')
+        .parents('[role="listitem"]')
+        .first()
+        .within(() => {
+          cy.findAllByLabelText('Open contextual menu')
+            .first()
+            .click({ force: true });
+        });
+    });
+  };
+
+  const openMyFirstCodeComponentMenuInCodeEditor = () => {
+    cy.findByTestId('canvas-primary-panel').within(() => {
+      cy.findByText('My First Code Component')
         .parents('[role="listitem"]')
         .first()
         .within(() => {
@@ -81,5 +104,37 @@ describe('Code component library', () => {
     });
 
     assertInLayoutDialog();
+  });
+
+  it('removes a code component from components from the code editor', () => {
+    cy.loadURLandWaitForCanvasLoaded();
+    cy.openLibraryPanel();
+
+    cy.get(myFirstCodeComponentSelector).should('exist');
+    openMyFirstCodeComponentMenu();
+
+    cy.findByRole('menuitem', { name: 'Edit code' }).click({
+      force: true,
+    });
+
+    cy.url().should('include', '/code-editor/component/my-cta');
+    cy.findByTestId('canvas-code-editor-container').should('exist');
+
+    openMyFirstCodeComponentMenuInCodeEditor();
+
+    cy.findByRole('menuitem', { name: 'Remove from components' }).click({
+      force: true,
+    });
+
+    cy.findByRole('dialog').within(() => {
+      cy.contains('Remove from components').should('be.visible');
+      cy.findByRole('button', { name: 'Remove' }).click({ force: true });
+    });
+
+    cy.findByRole('dialog').should('not.exist');
+
+    cy.loadURLandWaitForCanvasLoaded();
+    cy.openLibraryPanel();
+    cy.get(myFirstCodeComponentSelector).should('not.exist');
   });
 });
