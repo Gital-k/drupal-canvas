@@ -70,7 +70,7 @@ ddev drupal-install
 
 ddev exec --dir /var/www/html/web/core npm install
 
-ddev exec composer run ui-build
+ddev composer run ui-build
 
 echo "Development environment ready!"
 

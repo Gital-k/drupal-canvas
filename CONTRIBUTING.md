@@ -14,7 +14,7 @@ cd canvas
 ddev start
 ```
 
-After `ddev start`, you will have a functional Drupal installation at https://canvas.ddev.site with Canvas already enabled.
+After `ddev start`, you will have a functional Drupal installation at https://canvas.ddev.site with Canvas already installed.
 
 ### First experience
 After this process, you will get the `drush uli` to login into the admin area. You will see an article created. If you edit the article, you will see a new link "Drupal Canvas: Test" to edit this entity with the new Canvas UI.
@@ -22,11 +22,13 @@ After this process, you will get the `drush uli` to login into the admin area. Y
 ### Usage
 The most common commands in the development process are:
 1. `ddev setup`: Set up the Canvas development environment (installs dependencies, builds UI, installs Drupal). Use `ddev setup --force` to completely reset an existing environment. (Note, this is executed automatically the first time you start ddev)
-2. `ddev cleanup`: Remove environment-specific folders and files ignored by .gitignore (web, vendor, node_modules, build artifacts, etc.). Use `ddev cleanup --force` to skip confirmation.
+2. `ddev cleanup`: Remove environment-specific folders and files ignored by `.gitignore` (web, vendor, node_modules, build artifacts, etc.). Use `ddev cleanup --force` to skip confirmation.
 3. `ddev drupal-install`: This will reinstall the site. Very useful when you update Canvas and want a fresh installation.
-4. Tests and linting: The commands `ddev eslint`, `ddev phpcs`, `ddev phpstan` and `ddev phpunit` must be used before any commit to ensure code looks good and pass tests.
-5. Cypress tests: `ddev cypress run`
-6. Playwright tests: `ddev playwright test`
+4. `ddev ui-build`: This will build a production ready canvas UI.
+5. `ddev ui-dev`: This will build a development environment for developing the canvas app itself.
+6. Tests and linting: The commands `ddev eslint`, `ddev phpcs`, `ddev phpstan` and `ddev phpunit` must be used before any commit to ensure code looks good and pass tests.
+7. Cypress tests: `ddev cypress run`
+8. Playwright tests: `ddev playwright test`
    - Watch tests run in the browser via VNC: https://canvas.ddev.site:8444
    - View test reports dashboard: https://canvas.ddev.site:9324
 
