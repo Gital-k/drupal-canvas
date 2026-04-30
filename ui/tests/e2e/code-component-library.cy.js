@@ -5,7 +5,9 @@ describe('Code component library', () => {
   const openTestCodeComponentMenu = () => {
     cy.get(testCodeComponentSelector).within(() => {
       // Force because the dots button has 0 height and width until hover.
-      cy.findAllByLabelText('Open contextual menu').first().click({ force: true });
+      cy.findAllByLabelText('Open contextual menu')
+        .first()
+        .click({ force: true });
     });
   };
 
