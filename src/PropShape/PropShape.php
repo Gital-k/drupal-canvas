@@ -104,7 +104,7 @@ final class PropShape {
    */
   private static function resolveSchemaReferences(array $schema): array {
     $componentManager = self::componentPluginManager();
-    assert($componentManager instanceof CanvasComponentPluginManager);
+    \assert($componentManager instanceof CanvasComponentPluginManager);
     return $componentManager->resolveJsonSchemaReferences($schema);
   }
 

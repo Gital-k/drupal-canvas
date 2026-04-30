@@ -10,6 +10,7 @@ use Drupal\canvas\JsonSchemaInterpreter\JsonSchemaStringFormat;
 use Drupal\canvas\MissingHostEntityException;
 use Drupal\canvas\Plugin\Adapter\AdapterInterface;
 use Drupal\canvas\Plugin\AdapterManager;
+use Drupal\canvas\Plugin\ComponentPluginManager as CanvasComponentPluginManager;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase;
 use Drupal\canvas\PropExpressions\PropExpressionInterface;
 use Drupal\canvas\TypedData\BetterEntityDataDefinition;
@@ -18,6 +19,7 @@ use Drupal\Core\Datetime\DrupalDateTime;
 use Drupal\Core\File\MimeType\ExtensionMimeTypeGuesser;
 use Drupal\Core\ProxyClass\File\MimeType\ExtensionMimeTypeGuesser as LazyExtensionMimeTypeGuesser;
 use Drupal\Core\Theme\Component\ComponentMetadata;
+use Drupal\Core\Theme\ComponentPluginManager;
 use Drupal\file\Plugin\Field\FieldType\FileItem;
 use Drupal\file\Plugin\Field\FieldType\FileUriItem;
 use Drupal\options\Plugin\Field\FieldType\ListFloatItem;
@@ -168,6 +170,8 @@ final class Layers {
         // With one exception: a Canvas-provided fix for broken core infra.
         // @see https://www.drupal.org/project/drupal/issues/2169813
         Selector::classname(BetterEntityDataDefinition::class),
+        Selector::classname(ComponentPluginManager::class),
+        Selector::classname(CanvasComponentPluginManager::class)
       )
       ->because("The entire ShapeMatcher infrastructure should depend only on core + Canvas' PropExpressions + PropShape + PropSource + JSON schema interpreter + adapters + select classes.");
   }
