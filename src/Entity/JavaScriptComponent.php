@@ -6,12 +6,15 @@ namespace Drupal\canvas\Entity;
 
 use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\CanvasUriDefinitions;
+use Drupal\canvas\ComponentDoesNotMeetRequirementsException;
+use Drupal\canvas\ComponentMetadataRequirementsChecker;
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
 use Drupal\canvas\PropExpressions\StructuredData\EvaluationResult;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
 use Drupal\canvas\Resource\CanvasResourceLink;
 use Drupal\canvas\Resource\CanvasResourceLinkCollection;
+use Drupal\Core\Theme\Component\ComponentMetadata;
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
@@ -427,6 +430,78 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
       $definition['props']['required'] = $this->required;
     }
     return $definition;
+  }
+
+  /**
+   * Checks this code component meets Canvas's metadata requirements.
+   *
+   * Combines the shape/schema requirements that apply to all component sources,
+   * via `ComponentMetadataRequirementsChecker::check()` and JS-specific
+   * contracts (e.g. relative URLs cannot be resolved).
+   *
+   * @throws \Drupal\canvas\ComponentDoesNotMeetRequirementsException
+   *   When this component does not meet requirements.
+   */
+  public function checkRequirements(): void {
+    $definition = $this->toSdcDefinition();
+    $metadata = new ComponentMetadata($definition, app_root: '', enforce_schemas: TRUE);
+    $messages = [];
+    try {
+      ComponentMetadataRequirementsChecker::check(
+        $definition['id'],
+        $metadata,
+        $definition['props']['required'] ?? [],
+        // Code component metadata is persisted as a Drupal config entity, so
+        // keys (e.g. `meta:enum`) cannot contain dots.
+        // @see \Drupal\Core\Config\ConfigBase::validateKeys()
+        forbidden_key_characters: ['.' => '_'],
+      );
+    }
+    catch (ComponentDoesNotMeetRequirementsException $e) {
+      $messages = $e->getMessages();
+    }
+
+    // Additional validation: any image src used in examples must be a fully
+    // qualified URL, as relative URLs cannot be resolved.
+    foreach ($metadata->schema['properties'] ?? [] as $prop_name => $prop) {
+      foreach (self::imageSrcsInExamples($prop) as $src) {
+        try {
+          JsComponent::validateExampleUrl($src);
+        }
+        catch (\InvalidArgumentException) {
+          $messages[] = \sprintf('Image prop "%s" example src "%s" must be a fully-qualified URL with both scheme and host. Use a placeholder URL such as https://placehold.co/600x400.', $prop_name, $src);
+        }
+      }
+    }
+
+    if (!empty($messages)) {
+      throw new ComponentDoesNotMeetRequirementsException($messages);
+    }
+  }
+
+  /**
+   * Yields image src values for each `examples` entry matching $schema.
+   *
+   * @param array<string, mixed> $schema
+   *   The (sub-)schema (still containing `$ref` references).
+   *
+   * @return \Generator<int, string>
+   */
+  private static function imageSrcsInExamples(array $schema): \Generator {
+    $is_image = ($schema['$ref'] ?? NULL) === 'json-schema-definitions://canvas.module/image';
+    foreach ($schema['examples'] ?? [] as $value) {
+      if (!\is_array($value)) {
+        continue;
+      }
+      if ($is_image) {
+        if (isset($value['src']) && \is_string($value['src'])) {
+          yield $value['src'];
+        }
+      }
+      elseif (isset($schema['items']) && \is_array($schema['items'])) {
+        yield from self::imageSrcsInExamples($schema['items'] + ['examples' => $value]);
+      }
+    }
   }
 
   /**
