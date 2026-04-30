@@ -37,6 +37,24 @@ import type {
 import type { CanvasComponent, PropSourceComponent } from '@/types/Component';
 import type { InputUIData } from '@/types/Form';
 
+/**
+ * One shared debounced sender per component instance UUID.
+ *
+ * All InputBehaviorsComponentPropsForm instances that belong to the same
+ * component instance form share this entry, so rapid changes across multiple
+ * inputs (e.g. reordering a multivalue field updates N _weight fields at once)
+ * are coalesced into a single backend request instead of firing N requests.
+ *
+ * Entries are cleaned up when the last input for a given component unmounts.
+ */
+const perComponentDebouncedSenders = new Map<
+  string,
+  {
+    fn: ReturnType<typeof debounce>;
+    refCount: number;
+  }
+>();
+
 export const InputBehaviorsComponentPropsForm = (
   OriginalInput: React.FC,
   props: React.ComponentProps<any>,
@@ -143,13 +161,46 @@ export const InputBehaviorsComponentPropsForm = (
   const debounceFormStateToStore = useRef(
     debounce(formStateToStore, DEBOUNCE_TIMEOUT),
   ).current;
+
+  // Shared debounced sender for this component instance.
+  //
+  // All inputs that belong to the same component instance form share one entry
+  // in perComponentDebouncedSenders, so rapid changes across multiple inputs
+  // (e.g. reordering a multivalue field updates N _weight fields at once) are
+  // coalesced into a single backend request instead of firing N requests.
+  //
+  // The ref-count lets us safely remove the entry only when the last input for
+  // this component unmounts, without cancelling a pending call that another
+  // still-mounted input might be waiting on.
+  useEffect(() => {
+    if (!perComponentDebouncedSenders.has(selectedComponent)) {
+      perComponentDebouncedSenders.set(selectedComponent, {
+        fn: debounce(formStateToStore, DEBOUNCE_TIMEOUT),
+        refCount: 0,
+      });
+    }
+    const entry = perComponentDebouncedSenders.get(selectedComponent)!;
+    entry.refCount += 1;
+
+    return () => {
+      entry.refCount -= 1;
+      if (entry.refCount === 0) {
+        entry.fn.cancel();
+        perComponentDebouncedSenders.delete(selectedComponent);
+      }
+    };
+    // formStateToStore is intentionally excluded: it closes over the latest
+    // values via refs/closures and must not cause the effect to re-run.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedComponent]);
+
+  // Keep the per-instance debounce in sync for the non-shared path (scalar
+  // props on code components that bypass the shared debounce).
   useEffect(() => {
     return () => {
-      // Cancel any pending debounced calls when the component unmounts.
       debounceFormStateToStore.cancel();
     };
   }, [debounceFormStateToStore]);
-
   const formState = useAppSelector((state) =>
     selectFormValues(state, FORM_TYPES.COMPONENT_INSTANCE_FORM),
   );
@@ -279,7 +330,17 @@ export const InputBehaviorsComponentPropsForm = (
       components?.[selectedComponentType]?.source !== 'Code component' ||
       !['checkbox', 'radio'].includes(elementType as string);
     if (shouldDebounce) {
-      debounceFormStateToStore(newFormState, inputAndUiData);
+      // Use the shared per-component debounced sender so that simultaneous
+      // changes from multiple inputs (e.g. N _weight fields updating at once
+      // during a multivalue reorder) are coalesced into a single request.
+      const sharedDebounce = perComponentDebouncedSenders.get(selectedComponent);
+      if (sharedDebounce) {
+        sharedDebounce.fn(newFormState, inputAndUiData);
+      } else {
+        // Fallback: the shared entry hasn't been registered yet (shouldn't
+        // normally happen, but be safe).
+        debounceFormStateToStore(newFormState, inputAndUiData);
+      }
     } else {
       formStateToStore(newFormState, inputAndUiData);
     }
