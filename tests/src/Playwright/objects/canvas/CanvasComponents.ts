@@ -505,7 +505,7 @@ export function CanvasComponentsMixin<
         field
           .locator('tr.draggable')
           .last()
-          .locator('[data-canvas-multivalue-label="true"]'),
+          .locator('[``data-canvas-multivalue-label``="true"]'),
       ).toHaveText('Empty');
 
       if (propValue) {
