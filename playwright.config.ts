@@ -7,6 +7,15 @@ import 'dotenv-defaults/config.js';
  */
 export default defineConfig({
   testDir: './tests/src/Playwright',
+  testMatch: [
+    // '**/isolatedPerTest/componentOperations.spec.ts',
+    // '**/isolatedPerTest/folders.spec.ts',
+    // '**/isolatedPerTest/multivaluePropTypes.spec.ts',
+    // '**/snapshotPerTest/componentOperations.snapshotPerTest.spec.ts',
+    '**/snapshotPerTest/**',
+    // '**/snapshotPerTest/folders.snapshotPerTest.spec.ts',
+    // '**/snapshotPerTest/multivaluePropTypes.snapshotPerTest.spec.ts',
+  ],
   /* Run tests in files in parallel */
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */

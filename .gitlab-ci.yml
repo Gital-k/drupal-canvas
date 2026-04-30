@@ -690,7 +690,7 @@ lint (node):
     - npm run build --workspace=drupal-canvas
     - npm run lint
 
-playwright:
+.playwright-comparison-base:
   stage: test
   needs: []
   parallel:
@@ -730,7 +730,7 @@ playwright:
     paths:
       - blob-report/
 
-playwright-reports:
+.playwright-reports-base:
   stage: report
   rules: *e2e-ci-job-rules
   needs:
@@ -766,6 +766,38 @@ playwright-reports:
       junit:
         - test-results/playwright.xml
       annotations: test-results/links.json
+
+#playwright (isolatedPerTest):
+#  extends:
+#    - .playwright-comparison-base
+#  parallel:
+#    matrix:
+#      - SHARD: [ "1/3", "2/3", "3/3" ]
+#  script:
+#    - npm ci
+#    - npx playwright test tests/src/Playwright/tests/isolatedPerTest --shard=$SHARD --reporter=blob,list
+
+#playwright-reports (isolatedPerTest):
+#  extends:
+#    - .playwright-reports-base
+#  needs:
+#    - playwright (isolatedPerTest)
+
+playwright (snapshotPerTest):
+  extends:
+    - .playwright-comparison-base
+  parallel:
+    matrix:
+      - SHARD: [ "1/5", "2/5", "3/5", "4/5", "5/5" ]
+  script:
+    - npm ci
+    - npx playwright test tests/src/Playwright/tests/snapshotPerTest --shard=$SHARD --reporter=blob,list
+
+playwright-reports (snapshotPerTest):
+  extends:
+    - .playwright-reports-base
+  needs:
+    - playwright (snapshotPerTest)
 
 CLI Test:
   stage: test
