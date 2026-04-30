@@ -66,13 +66,12 @@ export const InputBehaviorsEntityForm = (
           !['changed', 'formId', 'formType', 'externalUpdates'].includes(key)
         ) {
           const value = newFormState[key];
-          if (
-            Array.isArray(value) &&
-            // @todo replace this with a better solution in https://www.drupal.org/i/3587609.
-            document.querySelector(
-              `select[data-is-multiselect="true"][name="${key}"]`,
-            )
-          ) {
+          // Multi-select list fields are submitted with a `[]` suffix on their
+          // name (e.g. `field_name[]`) and their value is an array. Convert
+          // them to indexed keys so the backend receives the expected format:
+          // `field_name[0]`, `field_name[1]`, etc.
+          // @see \Drupal\canvas\ClientDataToEntityConverter::setEntityFields()
+          if (Array.isArray(value) && key.endsWith('[]')) {
             const baseKey = key.slice(0, -2);
             (value as any[]).forEach((item, index) => {
               acc[`${baseKey}[${index}]`] = item;

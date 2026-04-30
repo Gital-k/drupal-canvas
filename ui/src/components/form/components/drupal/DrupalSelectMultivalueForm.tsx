@@ -198,7 +198,7 @@ const DrupalSelectMultivalueForm = ({
       {/* Hidden native <select> wrapped with InputBehaviors. */}
       <div ref={hiddenSelectContainerRef}>
         <HiddenSelectWithBehaviors
-          attributes={{ ...attributes, 'data-is-multiselect': true }}
+          attributes={attributes}
           options={options}
         />
       </div>
