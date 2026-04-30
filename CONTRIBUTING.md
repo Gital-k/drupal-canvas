@@ -1,6 +1,6 @@
 # Contributing
 
-For joining the development process of Drupal Canvas (Canvas for short) or trying the development process, we strongly recommend the use of [DDEV](https://ddev.com/get-started/) (version 1.24.0 or later), and the use of the [drupal-canvas/ddev-drupal-xb-dev addon](https://github.com/drupal-canvas/ddev-drupal-xb-dev).
+For joining the development process of Drupal Canvas (Canvas for short) or trying the development process, we strongly recommend the use of [DDEV](https://ddev.com/get-started/) (version 1.24.0 or later).
 
 ## Useful links
 1. [Issue queue](https://www.drupal.org/project/issues/canvas?categories=All)
@@ -9,32 +9,29 @@ For joining the development process of Drupal Canvas (Canvas for short) or tryin
 ## DDEV for your local environment
 
 ```shell
-# Extracted from the ddev-drupal-xb-dev plugin
-mkdir ~/Sites/canvas-dev
-cd ~/Sites/canvas-dev
-ddev config --project-type=drupal --php-version=8.3 --docroot=web
-# Canvas requires Drupal >= 11.3
-ddev composer create drupal/recommended-project:11.x@dev --no-install
-ddev add-on get drupal-canvas/ddev-drupal-xb-dev
-# This will clone the 'canvas' repo under web/modules/contrib
-ddev xb-setup
-ddev xb-dev-extras
+git clone git@git.drupalcode.org:project/canvas.git
+cd canvas
+ddev start
 ```
-Additionally, you should add  `$settings['extension_discovery_scan_tests'] = TRUE;` to the end of the `sites/default/settings.php` file (this allows hidden modules to be installed).
+
+After `ddev start`, you will have a functional Drupal installation at https://canvas.ddev.site with Canvas already enabled.
 
 ### First experience
 After this process, you will get the `drush uli` to login into the admin area. You will see an article created. If you edit the article, you will see a new link "Drupal Canvas: Test" to edit this entity with the new Canvas UI.
 
 ### Usage
 The most common commands in the development process are:
-1. `ddev xb-site-install`: This will reinstall the site and enable a couple of commands. Very useful when you update Canvas and what to have a fresh installation.
-2. `ddev xb-ui-build`: This will build the `canvas/ui` javascript application. Required whenever you update Canvas.
-3. Tests and linting: The commands `xb-eslint`, `xb-fix`, `xb-phpcs`, `xb-phpstan` and `xb-phpunit` must be used before any commit to ensure code looks good and pass tests.
-4. More commands with `ddev | grep xb-` and in the [ddev-drupal-xb-dev repo usage](https://github.com/drupal-canvas/ddev-drupal-xb-dev#usage).
+1. `ddev setup`: Set up the Canvas development environment (installs dependencies, builds UI, installs Drupal). Use `ddev setup --force` to completely reset an existing environment. (Note, this is executed automatically the first time you start ddev)
+2. `ddev cleanup`: Remove environment-specific folders and files ignored by .gitignore (web, vendor, node_modules, build artifacts, etc.). Use `ddev cleanup --force` to skip confirmation.
+3. `ddev drupal-install`: This will reinstall the site. Very useful when you update Canvas and want a fresh installation.
+4. Tests and linting: The commands `ddev eslint`, `ddev phpcs`, `ddev phpstan` and `ddev phpunit` must be used before any commit to ensure code looks good and pass tests.
+5. Cypress tests: `ddev cypress run`
+6. Playwright tests: `ddev playwright test`
+   - Watch tests run in the browser via VNC: https://canvas.ddev.site:8444
+   - View test reports dashboard: https://canvas.ddev.site:9324
 
 Tip: Use `ddev help <command>` for additional information about the command and arguments available.
-
-## Setting up you local manually
+## Setting up your local environment manually
 1. Clone Drupal 11 (preferably a clone for Git archeology: `git clone git@git.drupal.org:project/drupal.git` — Drupal >=11.3 is required, so also do: `git checkout 11.3.x`).
 2. `cd drupal && git clone git@git.drupal.org:project/canvas.git modules/contrib/canvas`
 3. `composer require drush/drush`
@@ -86,9 +83,8 @@ If you press & hold the `V` key and then click on the iFrame (focusing into it),
 You can then click (focus) outside the iFrame and tap the `V` key once more to return the UI.
 
 ## 2. Always start from a fresh start
-1. Reinstall the site frequently (`ddev xb-site-install`).
+1. Reinstall the site frequently (`ddev drupal-install`).
 2. If you're working with sqlite, delete the database frequently (`rm web/sites/default/.ht.sqlite`).
-3. Build the UI frequently (`ddev xb-ui-build`).
 
 # Releases
 
