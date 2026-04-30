@@ -6,7 +6,7 @@ test.use({ modules: ['canvas_test_sdc'], enableTestExtensions: true });
 
 test.describe('Perform CRUD operations on components', () => {
   // eslint-disable-next-line playwright/no-focused-test
-  test.only('Can edit a select prop on a component', async ({
+  test('Can edit a select prop on a component', async ({
     page,
     drupal,
     canvas,
