@@ -9,14 +9,9 @@
  * - Custom drag handles and remove buttons via DrupalInputMultivalueForm component.
  */
 
-describe('Multivalue Form Design (canvas_dev_mode)', () => {
+describe('Multivalue Form Design', () => {
   before(() => {
-    cy.drupalCanvasInstall([
-      'canvas_test_article_fields',
-      // @todo remove once https://drupal.org/i/3577946 is fixed.
-      // Required for new multivalue form UI.
-      'canvas_dev_mode',
-    ]);
+    cy.drupalCanvasInstall(['canvas_test_article_fields']);
   });
 
   beforeEach(() => {
@@ -31,25 +26,31 @@ describe('Multivalue Form Design (canvas_dev_mode)', () => {
   /**
    * Helper function to open popover for a specific row and type text.
    */
-  const typeInRow = (fieldAlias, rowIndex, text) => {
-    // Click the list item to open the popover (using CSS module class prefix).
-    cy.get(fieldAlias)
-      .find('tbody tr')
-      .eq(rowIndex)
-      .find('[class*="_listItem_"]')
-      .click();
-    // Type in the input field that appears in the popover.
-    cy.get('[role="dialog"][data-state="open"]').should('be.visible');
-    cy.get('[role="dialog"][data-state="open"]')
-      .find('input[type="text"]')
-      .clear({ force: true });
+  /**
+   * Types a value into the text input of the currently open popover dialog.
+   *
+   * @param {string} text - The value to type.
+   * @param {boolean} [clear=false] - When true, clears the field before typing.
+   */
+  const typeInPopover = (text, clear = false) => {
+    if (clear) {
+      cy.get('[role="dialog"][data-state="open"]')
+        .find('input[type="text"]')
+        .clear({ force: true });
+    }
     cy.get('[role="dialog"][data-state="open"]')
       .find('input[type="text"]')
       .type(text);
-    // Press Enter to commit the value (required for the value to update).
-    cy.get('[role="dialog"][data-state="open"]')
-      .find('input[type="text"]')
-      .type('{enter}');
+  };
+
+  const typeInRow = (fieldAlias, rowIndex, text) => {
+    // Click the list item to open the popover (using CSS module class prefix).
+    cy.openMultivaluePopover(fieldAlias, rowIndex);
+    // Type in the input field that appears in the popover.
+    cy.get('[role="dialog"][data-state="open"]').should('be.visible');
+    typeInPopover(text, true);
+    // Press Enter to close the popover.
+    typeInPopover('{enter}');
     // Wait for popover to close after Enter.
     cy.get('[role="dialog"][data-state="open"]').should('not.exist');
   };
@@ -235,7 +236,10 @@ describe('Multivalue Form Design (canvas_dev_mode)', () => {
     cy.log('Move "item 3" to position 2 using custom drag handle');
 
     // Ensure the drop target is in the viewport.
-    cy.get('@unlimited-text').find('tbody tr').eq(0).scrollIntoView();
+    cy.get('@unlimited-text')
+      .find('tbody tr')
+      .eq(0)
+      .scrollIntoView({ offset: { top: -500 } });
 
     const dndDefaults = {
       position: 'topLeft',
@@ -260,7 +264,7 @@ describe('Multivalue Form Design (canvas_dev_mode)', () => {
     cy.get(
       '[data-drupal-selector="edit-field-cvt-unlimited-text"] tr.draggable:nth-child(3) [title="Change order"]',
     ).realDnd(
-      '[data-drupal-selector="edit-field-cvt-unlimited-text"] tr.draggable:nth-child(2)',
+      '[data-drupal-selector="edit-field-cvt-unlimited-text"] tr.draggable:nth-child(2) [title="Change order"]',
       dndDefaults,
     );
 
@@ -281,12 +285,49 @@ describe('Multivalue Form Design (canvas_dev_mode)', () => {
       'The Olivia Tremor Control',
       'Neutral Milk Hotel',
     ]);
-    // Refresh the page to ensure the update persists.
+    // Wait to ensure order is auto saved before reloading.
+    // eslint-disable-next-line cypress/no-unnecessary-waiting
+    cy.wait(10000);
+    cy.log('Refresh the page to ensure the update persists.');
     cy.reload();
     confirmTextInputs('@unlimited-text', [
       'Marshmallow Coast',
       'The Olivia Tremor Control',
       'Neutral Milk Hotel',
+      '',
+    ]);
+
+    cy.log('Drag and drop continues to work after page reload.');
+    cy.get('@unlimited-text').find('tbody tr').eq(0).scrollIntoView();
+
+    cy.intercept('POST', '**/canvas/api/v0/layout/node/2').as(
+      'previewUpdateAfterReload',
+    );
+
+    cy.get(
+      '[data-drupal-selector="edit-field-cvt-unlimited-text"] tr.draggable:nth-child(3) [title="Change order"]',
+    ).realDnd(
+      '[data-drupal-selector="edit-field-cvt-unlimited-text"] tr.draggable:nth-child(2) [title="Change order"]',
+      dndDefaults,
+    );
+
+    cy.assertMultivalueReorder({
+      alias: 'previewUpdateAfterReload',
+      fieldName: 'field_cvt_unlimited_text',
+      expectedOrder: [
+        'Marshmallow Coast',
+        'Neutral Milk Hotel',
+        'The Olivia Tremor Control',
+        '',
+      ],
+    });
+    cy.get('body[data-canvas-ajax-behaviors="true"]').should('not.exist');
+    cy.waitForAjax();
+
+    confirmTextInputs('@unlimited-text', [
+      'Marshmallow Coast',
+      'Neutral Milk Hotel',
+      'The Olivia Tremor Control',
       '',
     ]);
   });
@@ -320,11 +361,7 @@ describe('Multivalue Form Design (canvas_dev_mode)', () => {
     ]);
 
     // Open the popover for the second item and verify the Remove button.
-    cy.get('@unlimited-text')
-      .find('tbody tr')
-      .eq(1)
-      .find('[class*="_listItem_"]')
-      .click();
+    cy.openMultivaluePopover('@unlimited-text', 1);
 
     cy.get('[role="dialog"][data-state="open"]').should('be.visible');
 
@@ -353,11 +390,7 @@ describe('Multivalue Form Design (canvas_dev_mode)', () => {
       .as('unlimited-text');
 
     // Click the first item to open popover.
-    cy.get('@unlimited-text')
-      .find('tbody tr')
-      .eq(0)
-      .find('[class*="_listItem_"]')
-      .click();
+    cy.openMultivaluePopover('@unlimited-text', 0);
 
     cy.get('[role="dialog"][data-state="open"]').should('be.visible');
 
@@ -374,11 +407,10 @@ describe('Multivalue Form Design (canvas_dev_mode)', () => {
     cy.get('[role="dialog"][data-state="open"]')
       .find('[aria-label="Close"]')
       .should('exist');
-    cy.get('[role="dialog"][data-state="open"] [aria-label="Close"]').click();
-    cy.get('[role="dialog"][data-state="open"]').should('not.exist');
+    cy.closeMultivaluePopover();
   });
 
-  it('popover discards uncommitted changes when closed without Enter', () => {
+  it('popover propagates changes live as user types', () => {
     cy.loadURLandWaitForCanvasLoaded({ url: 'canvas/editor/node/2' });
     cy.findByTestId('canvas-page-data-form').as('entityForm');
 
@@ -386,27 +418,31 @@ describe('Multivalue Form Design (canvas_dev_mode)', () => {
       .parents('.js-form-wrapper')
       .as('unlimited-text');
 
-    const originalText = 'Marshmallow Coast';
+    // Open the first row's popover.
+    cy.openMultivaluePopover('@unlimited-text', 0);
 
-    cy.get('@unlimited-text')
-      .find('tbody tr')
-      .eq(0)
-      .find('[class*="_listItem_"]')
-      .click();
+    // Type a new value without pressing Enter — row label should update immediately.
+    typeInPopover('Live Update', true);
+    verifyRowText('@unlimited-text', 0, 'Live Update');
 
-    cy.get('[role="dialog"][data-state="open"]')
-      .find('input[type="text"]')
-      .clear();
-    cy.get('[role="dialog"][data-state="open"]')
-      .find('input[type="text"]')
-      .type('This should not be saved');
+    // Change the value again while the popover is still open.
+    typeInPopover('Second Edit', true);
+    verifyRowText('@unlimited-text', 0, 'Second Edit');
 
-    cy.get('[role="dialog"][data-state="open"]').find('[aria-label="Close"]');
-    cy.get('[role="dialog"][data-state="open"] [aria-label="Close"]').click();
-
+    // Close via Enter — value should not be reverted.
+    typeInPopover('{enter}');
     cy.get('[role="dialog"][data-state="open"]').should('not.exist');
+    verifyRowText('@unlimited-text', 0, 'Second Edit');
 
-    verifyRowText('@unlimited-text', 0, originalText);
+    // Reopen, make another change, then close via the × button — still no revert.
+    cy.openMultivaluePopover('@unlimited-text', 0);
+
+    typeInPopover('After Close', true);
+    verifyRowText('@unlimited-text', 0, 'After Close');
+
+    cy.closeMultivaluePopover();
+
+    verifyRowText('@unlimited-text', 0, 'After Close');
   });
 
   it('maintains form state across popover interactions', () => {
@@ -418,18 +454,9 @@ describe('Multivalue Form Design (canvas_dev_mode)', () => {
       .parents('.js-form-wrapper')
       .as('unlimited-text');
 
-    cy.get('@unlimited-text')
-      .find('tbody tr')
-      .eq(0)
-      .find('[class*="_listItem_"]')
-      .click();
+    cy.openMultivaluePopover('@unlimited-text', 0);
 
-    cy.get('[role="dialog"][data-state="open"]')
-      .find('input[type="text"]')
-      .clear();
-    cy.get('[role="dialog"][data-state="open"]')
-      .find('input[type="text"]')
-      .type('Modified Item 1{enter}');
+    typeInPopover('Modified Item 1{enter}', true);
 
     cy.get('[role="dialog"][data-state="open"]').should('not.exist');
 
